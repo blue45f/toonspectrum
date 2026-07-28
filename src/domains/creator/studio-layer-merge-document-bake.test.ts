@@ -120,7 +120,7 @@ describe("mixed document layer merge bake", () => {
     expect(planStudioDocumentMergeBake({
       ...input,
       elements: [elements[0]!, { ...elements[1]!, hidden: true }],
-    })).toMatchObject({ ok: false, code: "invalid-merge-plan" });
+    })).toMatchObject({ ok: false, code: "source-selection-mismatch" });
   });
 
   it("rechecks the same merge/source plan after async work", () => {

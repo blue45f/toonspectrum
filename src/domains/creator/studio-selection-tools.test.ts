@@ -31,6 +31,7 @@ import {
   circleSelectionPolygon,
   commitPolyLassoSession,
   commitSelectionDrag,
+  commitSelectionDragAtPoint,
   constrainSelectionDragCorners,
   ellipseSelectionPolygon,
   emptyPixelSelection,
@@ -788,6 +789,23 @@ describe("드래그 세션 — begin/update/commit", () => {
     line = updateSelectionDrag(line, { x: 0.9, y: 0.9 });
     expect(commitSelectionDrag(sel, line)).toBeNull();
   });
+
+  it.each(["rect", "ellipse"] as const)(
+    "%s: pointermove가 생략돼도 pointerup 최종 좌표로 선택을 확정",
+    (tool) => {
+      const drag = beginSelectionDrag(tool, "add", { x: 0.15, y: 0.2 });
+      const selection = commitSelectionDragAtPoint(
+        null,
+        drag,
+        { x: 0.85, y: 0.8 },
+        { aspect: 1 },
+      );
+
+      expect(selection).not.toBeNull();
+      expect(selection?.subpaths).toHaveLength(1);
+      expect(polygonAreaNorm(selection?.subpaths[0]?.points ?? [])).toBeGreaterThan(0.3);
+    },
+  );
 
   it("brush: 시작점 1개 + 정규화 반경으로 시작하고, 반경 비례 간격으로 궤적을 누적한다", () => {
     let drag = beginSelectionDrag("brush", "add", { x: 0.2, y: 0.2 }, 0.1);

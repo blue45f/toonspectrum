@@ -290,11 +290,14 @@ describe("StudioBrushStudio", () => {
   });
 
   it("renders deterministic rotated elliptical dabs from the shipped planner", () => {
-    // Solid ellipse path: force round tip so preview matches Canvas ellipse geometry.
-    const settings = {
-      ...studioBrushDynamicsPresetSettings("dry-media"),
+    // Solid ellipse path: force a round tip and neutral material grain so the preview exercises
+    // Canvas ellipse geometry rather than the alpha-map material sampling path.
+    const preset = studioBrushDynamicsPresetSettings("dry-media");
+    const settings = normalizeStudioBrushDynamicsSettings({
+      ...preset,
       tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
-    };
+      grain: { ...preset.grain, amount: 0 },
+    });
     const first = renderToStaticMarkup(
       <StudioBrushDynamicsPreview settings={settings} strokeWidth={9} color="#3a2218" />
     );
@@ -309,9 +312,10 @@ describe("StudioBrushStudio", () => {
 
   it("matches Canvas radius-then-roundness geometry for a deterministic thin tip", () => {
     const preset = studioBrushDynamicsPresetSettings("dry-media");
-    const settings = {
+    const settings = normalizeStudioBrushDynamicsSettings({
       ...preset,
       tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
+      grain: { ...preset.grain, amount: 0 },
       width: {
         ...preset.width,
         mappings: [{
@@ -331,7 +335,7 @@ describe("StudioBrushStudio", () => {
         mappings: [],
         jitter: null,
       },
-    };
+    });
     const html = renderToStaticMarkup(
       <StudioBrushDynamicsPreview settings={settings} strokeWidth={3} color="#3a2218" />
     );
@@ -387,7 +391,12 @@ describe("StudioBrushStudio", () => {
     const roundTip = {
       tip: { shape: "round" as const, softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
     };
-    const base = { ...studioBrushDynamicsPresetSettings("dry-media"), ...roundTip };
+    const preset = studioBrushDynamicsPresetSettings("dry-media");
+    const base = normalizeStudioBrushDynamicsSettings({
+      ...preset,
+      ...roundTip,
+      grain: { ...preset.grain, amount: 0 },
+    });
     const disabledHtml = renderToStaticMarkup(
       <StudioBrushDynamicsPreview settings={base} strokeWidth={9} color="#3a2218" />
     );

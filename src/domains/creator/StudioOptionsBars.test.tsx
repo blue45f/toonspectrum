@@ -180,6 +180,27 @@ describe("StudioOptionsBars", () => {
     expect(screen.queryByTestId("lazy-select-options")).toBeNull();
   });
 
+  it("remounts the draw surface when its tool context changes so local disclosures cannot linger", () => {
+    const view = render(
+      <StudioOptionsBars
+        {...createProps({
+          draw: { drawMode: "pen" },
+        })}
+      />
+    );
+    const penSurface = screen.getByTestId("lazy-draw-options");
+
+    view.rerender(
+      <StudioOptionsBars
+        {...createProps({
+          draw: { drawMode: "shape" },
+        })}
+      />
+    );
+
+    expect(screen.getByTestId("lazy-draw-options")).not.toBe(penSurface);
+  });
+
   it("passes the caller-owned draw model to the commercial options bar", () => {
     render(<StudioOptionsBars {...createProps()} />);
 

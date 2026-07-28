@@ -49,6 +49,9 @@ function ellipseDynamics(preset: StudioBrushDynamicsPresetId) {
   return normalizeStudioBrushDynamicsSettings({
     ...studioBrushDynamicsPresetSettings(preset),
     tip: { shape: "round", softness: 0.35 },
+    // Material presets may carry production grain. These geometry/opacity tests intentionally
+    // exercise the solid-ellipse route, so make that fixture contract explicit.
+    grain: { amount: 0 },
   });
 }
 
@@ -826,6 +829,36 @@ describe("도형 직렬화", () => {
       // 전용 opacity formatter는 6자리이므로 독립 반올림 오차만 허용한다.
       expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
     });
+  });
+
+  it("bounded-flow-v2 입자 브러시는 dab을 쌓은 뒤 획 투명도를 그룹에 한 번 적용한다", () => {
+    const dynamic = rectEl({
+      id: "dynamic-bounded-flow-v2",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [8, 12, 32, 18, 58, 10],
+      pressures: [0.3, 0.8, 0.5],
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        ...ellipseDynamics("dry-media"),
+        grain: { amount: 0 },
+      }),
+      stroke: "#4455aa",
+      strokeWidth: 22,
+      fill: undefined,
+      sampleSpacing: 0.5,
+      paintModel: "bounded-flow-v2",
+    });
+    const full = exportPageToSvg(page([{ ...dynamic, opacity: 1 }])).svg;
+    const half = exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg;
+    expect(exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg).toBe(half);
+    const dabOpacities = (svg: string) => Array.from(
+      svg.matchAll(/<ellipse [^>]*opacity="([0-9.]+)"/g),
+      (match) => Number(match[1])
+    );
+
+    expect((half.match(/<g opacity="0\.5">/g) ?? [])).toHaveLength(1);
+    expect(dabOpacities(half)).toEqual(dabOpacities(full));
+    expect(dabOpacities(half).length).toBeGreaterThan(2);
   });
 
   it.each([

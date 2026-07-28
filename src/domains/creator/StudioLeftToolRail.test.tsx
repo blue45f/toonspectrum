@@ -235,7 +235,7 @@ describe("StudioLeftToolRail", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "픽셀 펜 (P)" }));
     expect(props.setDrawMode).toHaveBeenCalledWith("pixel");
-    expect(props.setStrokeWidth).toHaveBeenCalledWith(1);
+    expect(props.setStrokeWidth).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
     expect(props.setDrawMode).toHaveBeenCalledWith("shape");
@@ -275,6 +275,90 @@ describe("StudioLeftToolRail", () => {
 
     fireEvent.click(fill);
     expect(props.stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
+  });
+
+  it("shows one primary pointer tool while selection and draw subtools are armed", () => {
+    const view = render(
+      <StudioLeftToolRail
+        {...createProps({
+          pixelTool: "rect",
+          selected: IMAGE,
+          tool: "select",
+        })}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "선택 (V)" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    expect(
+      screen.getByRole("button", { name: "사각 선택 (M)" }).getAttribute("aria-pressed")
+    ).toBe("true");
+
+    view.rerender(
+      <StudioLeftToolRail
+        {...createProps({
+          advancedFillActive: true,
+          selected: IMAGE,
+          tool: "select",
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "선택 (V)" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    expect(screen.getByRole("button", { name: "채우기 (G)" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+
+    view.rerender(
+      <StudioLeftToolRail
+        {...createProps({
+          eyedropperActive: true,
+          selected: IMAGE,
+          tool: "draw",
+          drawMode: "pen",
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "펜 (B)" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    expect(
+      screen.getByRole("button", { name: "스포이드 (I / Alt+클릭)" }).getAttribute("aria-pressed")
+    ).toBe("true");
+
+    view.rerender(
+      <StudioLeftToolRail
+        {...createProps({
+          selected: IMAGE,
+          smudgeActive: true,
+          tool: "select",
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "선택 (V)" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    expect(
+      screen.getByRole("button", { name: "혼합 (스머지) (N)" }).getAttribute("aria-pressed")
+    ).toBe("true");
+
+    view.rerender(
+      <StudioLeftToolRail
+        {...createProps({
+          commentPinArmed: true,
+          selected: IMAGE,
+          tool: "select",
+        })}
+      />
+    );
+    expect(screen.getByRole("button", { name: "선택 (V)" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    expect(
+      screen.getByRole("button", { name: "댓글 핀 배치 취소" }).getAttribute("aria-pressed")
+    ).toBe("true");
   });
 
   it("gives the eyedropper exclusive pointer ownership and still allows a direct exit", () => {

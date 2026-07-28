@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   exportPagePsd,
   planPsdEditableTextDescriptor,
+  preflightPsdExport,
+  PSD_EXPORT_MAX_DIMENSION_PX,
   type PsdExportEl,
   type PsdTextElLike,
 } from "./studio-psd-export";
@@ -128,6 +130,9 @@ describe("PSD editable text one-way export", () => {
 
     expect(result.layerCount).toBe(2);
     expect(result.skipped).toEqual([]);
+    expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ feature: "text", disposition: "preserved", count: 1 }),
+    ]));
     expect(parsed.children).toHaveLength(2);
     expect(caption).toBeDefined();
     expect(caption).toMatchObject({
@@ -199,6 +204,13 @@ describe("PSD editable text one-way export", () => {
       expect.stringMatching(/^Effect: 외곽선 효과/u),
     ]));
     expect(result.skipped).toHaveLength(elements.length);
+    expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        feature: "text",
+        disposition: "rasterized",
+        count: elements.length,
+      }),
+    ]));
   });
 
   it("keeps the bounded eligibility matrix explicit for inactive effects, size, color, and panel clipping", () => {
@@ -242,5 +254,66 @@ describe("PSD editable text one-way export", () => {
       text: null,
       fallbackReasons: ["패널 경계 클리핑"],
     });
+  });
+});
+
+describe("PSD export capability and loss preflight", () => {
+  it("fails PSB and unsafe PSD dimensions before raster capture", async () => {
+    expect(preflightPsdExport({
+      canvasW: 720,
+      canvasH: 1_080,
+      layerCount: 1,
+      container: "psb",
+    })).toMatchObject({
+      canExport: false,
+      blockingReasons: [expect.stringContaining("PSB")],
+      lossManifest: {
+        target: { container: "psb" },
+        decisions: expect.arrayContaining([
+          expect.objectContaining({ disposition: "blocked" }),
+        ]),
+      },
+    });
+    expect(preflightPsdExport({
+      canvasW: PSD_EXPORT_MAX_DIMENSION_PX + 1,
+      canvasH: 1,
+      layerCount: 1,
+    })).toMatchObject({
+      canExport: false,
+      blockingReasons: [expect.stringContaining("안전 한 변")],
+    });
+
+    const { stage } = fakeStage([]);
+    await expect(exportPagePsd(stage, [], 720, 1_080, 1, {
+      container: "psb",
+    })).rejects.toThrow("PSB 내보내기");
+  });
+
+  it("reports masks, smart filters, groups, and editable 3D scenes as rasterized/dropped", async () => {
+    const image: PsdExportEl = {
+      id: "scene",
+      type: "image",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      groupId: "group-a",
+      maskSrc: "data:image/png;base64,MASK",
+      filterMaskSrc: "data:image/png;base64,FILTER_MASK",
+      smartFilters: { entries: [{ id: "blur" }] },
+      bg3dScene: { version: 1 },
+    };
+    const { stage } = fakeStage([
+      { id: "scene", documentRect: { x: 0, y: 0, width: 100, height: 100 } },
+    ]);
+    const result = await exportPagePsd(stage, [image], 720, 1_080, 1, {
+      includeBackground: false,
+    });
+    expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ feature: "groups", disposition: "dropped", count: 1 }),
+      expect.objectContaining({ feature: "layer-mask", disposition: "rasterized", count: 1 }),
+      expect.objectContaining({ feature: "adjustment-layer", disposition: "rasterized", count: 1 }),
+      expect.objectContaining({ feature: "smart-object", disposition: "rasterized", count: 1 }),
+    ]));
   });
 });

@@ -41,6 +41,15 @@ export interface StudioInspectorNavigatorProps {
   selectedType: string | null;
   selectionLabel: string | null;
   drawing: boolean;
+  /**
+   * CSP의 도구 팔레트처럼 대상이 아직 없어도 전문 도구를 찾고 준비 조건을 확인할 수
+   * 있게 한다. 생략하면 기존 선택 타입 기반 동작을 유지한다.
+   */
+  imageToolsAvailable?: boolean;
+  /** Active professional-tool target state, resolved by the Inspector availability policy. */
+  imageToolsStatusLabel?: string;
+  imageToolsStatusDescription?: string;
+  imageToolsStatusTone?: "neutral" | "accent" | "good" | "warn";
   layerCount: number;
   mobileSheetHandle?: ReactNode;
   onRequestClose?: () => void;
@@ -136,6 +145,10 @@ export function StudioInspectorNavigator({
   selectedType,
   selectionLabel,
   drawing,
+  imageToolsAvailable,
+  imageToolsStatusLabel,
+  imageToolsStatusDescription,
+  imageToolsStatusTone = "neutral",
   layerCount,
   mobileSheetHandle,
   onRequestClose,
@@ -148,13 +161,21 @@ export function StudioInspectorNavigator({
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const hasSelection = selectedType !== null;
-  const actions = studioInspectorActions({ hasSelection, selectedType, drawing });
+  const resolvedImageToolsAvailable =
+    imageToolsAvailable ?? (selectedType === "image" || selectedType === "draw");
+  const actions = studioInspectorActions({
+    hasSelection,
+    selectedType,
+    drawing,
+    imageToolsAvailable: resolvedImageToolsAvailable,
+  });
   const results = filterStudioInspectorActions(actions, query);
   const normalizedLayerCount = safeLayerCount(layerCount);
   const imageInspectorTabs = IMAGE_TABS;
   const shouldShowImageInspectorTabs =
-    layout.primary === "properties" && (selectedType === "image" || selectedType === "draw");
+    layout.primary === "properties" && !drawing && resolvedImageToolsAvailable;
   const activeImageInspectorTab = layout.image;
+  const imageToolsStatusId = `${titleId}-image-tools-status`;
 
   function navigate(route: StudioInspectorRoute, restoreSearchFocus = false) {
     onChange(navigateStudioInspector(layout, route));
@@ -297,6 +318,9 @@ export function StudioInspectorNavigator({
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-describedby={
+                  active && imageToolsStatusLabel ? imageToolsStatusId : undefined
+                }
                 tabIndex={active ? 0 : -1}
                 onClick={() => navigate({ primary: "properties", image: tab.id })}
                 onKeyDown={moveTabFocus}
@@ -313,6 +337,20 @@ export function StudioInspectorNavigator({
               </button>
             );
           })}
+        </div>
+      ) : null}
+      {shouldShowImageInspectorTabs && imageToolsStatusLabel ? (
+        <div
+          id={imageToolsStatusId}
+          role="status"
+          className="mt-1.5 flex min-w-0 items-center gap-1.5 rounded-lg border border-line/70 bg-canvas/45 px-2 py-1.5 text-[0.62rem] leading-relaxed"
+        >
+          <StudioContextPill tone={imageToolsStatusTone}>
+            {imageToolsStatusLabel}
+          </StudioContextPill>
+          <span className="min-w-0 truncate text-fg-3">
+            {imageToolsStatusDescription}
+          </span>
         </div>
       ) : null}
 

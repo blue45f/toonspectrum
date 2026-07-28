@@ -65,6 +65,154 @@ describe("studio dialogue interchange", () => {
     ]);
   });
 
+  it("FDX 핵심 Paragraph를 장면=페이지, Action=컷, 화자·괄호·대사 cue로 결정 매핑한다", () => {
+    const source = `<?xml version="1.0" encoding="UTF-8"?>
+<FinalDraft DocumentType="Script" Template="No" Version="1">
+  <Content>
+    <Paragraph Type="Scene Heading"><Text>INT. 교실 - 낮</Text></Paragraph>
+    <Paragraph Type="Action"><Text>비가 창문을 두드린다.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>하나</Text></Paragraph>
+    <Paragraph Type="Parenthetical"><Text>(작게)</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text Style="Bold">안녕 &amp; </Text><Text>세계</Text></Paragraph>
+    <Paragraph Type="Action"><Text>문이 열린다.</Text></Paragraph>
+    <Paragraph Type="Character"><Text>둘</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text><![CDATA[늦어서 미안해.]]></Text></Paragraph>
+    <Paragraph Type="Transition"><Text>CUT TO:</Text></Paragraph>
+    <Paragraph Type="Scene Heading"><Text>EXT. 운동장 - 밤</Text></Paragraph>
+    <Paragraph Type="Character"><Text>하나</Text></Paragraph>
+    <Paragraph Type="Dialogue"><Text>기다렸어.</Text></Paragraph>
+  </Content>
+</FinalDraft>`;
+    const parsed = parseStudioDialogueInterchange("fdx", source);
+    expect(parsed.document.cues).toEqual([
+      {
+        page: 1,
+        panel: 1,
+        speaker: "하나",
+        text: "안녕 & 세계",
+        note: "(작게)",
+      },
+      {
+        page: 1,
+        panel: 2,
+        speaker: "둘",
+        text: "늦어서 미안해.",
+      },
+      {
+        page: 2,
+        panel: 1,
+        speaker: "하나",
+        text: "기다렸어.",
+      },
+    ]);
+    expect(parsed).toMatchObject({
+      lossy: true,
+      lossPreview: {
+        sourceFormat: "fdx",
+        sourceParagraphs: 12,
+        emittedCues: 3,
+        mappedElements: 7,
+        contextOnlyElements: 4,
+        droppedElements: 1,
+        truncated: false,
+      },
+    });
+    expect(parsed.lossPreview?.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceType: "Scene Heading",
+        disposition: "context-only",
+        page: 1,
+      }),
+      expect.objectContaining({
+        sourceType: "Parenthetical",
+        disposition: "mapped",
+        cueIndex: 0,
+      }),
+      expect.objectContaining({
+        sourceType: "Transition",
+        disposition: "dropped",
+      }),
+    ]));
+  });
+
+  it("FDX 안전 부분집합은 페이지·컷 marker와 XML 문자를 결정적으로 왕복한다", () => {
+    const file = serializeStudioDialogueInterchange("fdx", document);
+    expect(file).toMatchObject({
+      extension: ".fdx",
+      mimeType: "application/xml;charset=utf-8",
+      lossy: true,
+    });
+    expect(file.text).toContain('<Paragraph Type="Scene Heading"><Text>TOONSPECTRUM PAGE 1</Text>');
+    expect(file.text).toContain('<Paragraph Type="Action"><Text>TOONSPECTRUM PANEL 3</Text>');
+    expect(file.text).toContain("안녕,\n세계");
+    const escaped = serializeStudioDialogueInterchange("fdx", {
+      cues: [{ page: 1, panel: 1, speaker: "A&B", text: '<위험> "확인"' }],
+    });
+    expect(escaped.text).toContain("A&amp;B");
+    expect(escaped.text).toContain("&lt;위험&gt; &quot;확인&quot;");
+
+    const parsed = parseStudioDialogueInterchange("fdx", file.text);
+    expect(parsed.document.cues).toEqual([
+      { page: 1, panel: 1, speaker: "하나", text: "안녕,\n세계", note: "작게" },
+      { page: 2, panel: 3, speaker: "둘", text: "=위험한 수식" },
+    ]);
+    expect(file.warnings.join(" ")).toContain("cue ID");
+  });
+
+  it("FDX는 알 수 없는 확장 subtree 안의 지원 모양 Paragraph를 해석하지 않는다", () => {
+    const source = `<FinalDraft DocumentType="Script"><Content>
+      <Extension><Paragraph Type="Character"><Text>가짜</Text></Paragraph><Paragraph Type="Dialogue"><Text>무시</Text></Paragraph></Extension>
+      <Paragraph Type="Character"><Text>진짜</Text></Paragraph>
+      <Paragraph Type="Dialogue"><Text>대사</Text></Paragraph>
+    </Content></FinalDraft>`;
+    expect(parseStudioDialogueInterchange("fdx", source).document.cues).toEqual([
+      { page: 1, panel: 1, speaker: "진짜", text: "대사" },
+    ]);
+  });
+
+  it("FDX는 DTD/entity, 잘못된 구조와 XML DoS 예산 초과를 fail-closed한다", () => {
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      '<!DOCTYPE FinalDraft [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><FinalDraft><Content><Paragraph Type="Character"><Text>&xxe;</Text></Paragraph></Content></FinalDraft>'
+    )).toThrow(/DTD/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      '<FinalDraft><Content><Paragraph Type="Character"><Text>A</Paragraph></Text></Content></FinalDraft>'
+    )).toThrow(/닫는 순서/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      `<FinalDraft><Content><Extension>${"<x>".repeat(31)}${"</x>".repeat(31)}</Extension><Paragraph Type="Character"><Text>A</Text></Paragraph><Paragraph Type="Dialogue"><Text>B</Text></Paragraph></Content></FinalDraft>`
+    )).toThrow(/중첩 깊이/u);
+    const attributes = Array.from({ length: 32 }, (_, index) => ` a${index}="${index}"`).join("");
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      `<FinalDraft><Content><Paragraph Type="Character"${attributes}><Text>A</Text></Paragraph><Paragraph Type="Dialogue"><Text>B</Text></Paragraph></Content></FinalDraft>`
+    )).toThrow(/attribute 수/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      '<FinalDraft bad="raw<value"><Content><Paragraph Type="Character"><Text>A</Text></Paragraph><Paragraph Type="Dialogue"><Text>B</Text></Paragraph></Content></FinalDraft>'
+    )).toThrow(/raw '<'/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      "<FinalDraft><Content><Paragraph Type=\"Character\"><Text>A]]>B</Text></Paragraph><Paragraph Type=\"Dialogue\"><Text>C</Text></Paragraph></Content></FinalDraft>"
+    )).toThrow(/CDATA 종료/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      'prefix<FinalDraft><Content><Paragraph Type="Character"><Text>A</Text></Paragraph><Paragraph Type="Dialogue"><Text>B</Text></Paragraph></Content></FinalDraft>'
+    )).toThrow(/루트 앞/u);
+  });
+
+  it("FDX는 Parenthetical/Dialogue 순서와 화자·메모 길이를 엄격하게 검증한다", () => {
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      '<FinalDraft><Content><Paragraph Type="Parenthetical"><Text>(혼잣말)</Text></Paragraph><Paragraph Type="Dialogue"><Text>안녕</Text></Paragraph></Content></FinalDraft>'
+    )).toThrow(/Character/u);
+    expect(() => parseStudioDialogueInterchange(
+      "fdx",
+      `<FinalDraft><Content><Paragraph Type="Character"><Text>${"가".repeat(201)}</Text></Paragraph><Paragraph Type="Dialogue"><Text>안녕</Text></Paragraph></Content></FinalDraft>`
+    )).toThrow(/화자 길이/u);
+  });
+
   it.each(["srt", "vtt"] as const)("%s는 타임코드와 화자를 왕복한다", (format) => {
     const file = serializeStudioDialogueInterchange(format, document);
     const parsed = parseStudioDialogueInterchange(format, file.text);

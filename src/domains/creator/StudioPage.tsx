@@ -98,7 +98,6 @@ import {
 import { shouldClipToExistingAlpha } from "./studio-alpha-lock";
 import {
   clampGlobalFrameIndex,
-  duplicateAnimationTracks,
   globalFrameIndexAtElapsed,
   hasTrack,
   normalizeAnimationTimelineDoc,
@@ -469,7 +468,8 @@ import {
 import { pickColorFromImageData } from "./studio-eyedropper";
 import {
   collectOverlappingStudioFillReferenceLayers,
-  composeStudioFillReferenceImage,
+  composeStudioFillReferenceImageWithPageReferences,
+  type StudioFillPageReference,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
 import {
@@ -600,7 +600,6 @@ import {
   createLayerGroup,
   emptyGroupIds,
   groupItems,
-  insertLayerCopiesAdjacent,
   isEffectivelyHidden,
   isEffectivelyLocked,
   missingLayerGroupIds,
@@ -608,6 +607,7 @@ import {
   removeItemsFromGroups,
   removeLayerItems,
   reorderLayerItem,
+  reorderLayerSelection,
   setItemGroup,
   ungroupItems,
   type LayerGroup,
@@ -625,6 +625,10 @@ import {
   type StudioCanvasMutationIntent,
 } from "./studio-live-canvas-mutation-gate";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
+import {
+  StudioLiveDynamicBrushOverlayRenderer,
+  studioLiveDynamicBrushOverlaySupportsElement,
+} from "./studio-live-dynamic-brush-overlay";
 import {
   decideStudioLiveInkBackend,
 } from "./studio-live-ink-backend";
@@ -649,6 +653,10 @@ import {
 } from "./studio-live-mutation-lock-coordinator";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
+import {
+  StudioLiveWetInkOverlayRenderer,
+  studioLiveWetInkOverlaySupportsElement,
+} from "./studio-live-wet-ink-overlay";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -1003,6 +1011,7 @@ import {
   canvasPointToNormalized,
   commitPolyLassoSession,
   commitSelectionDrag,
+  commitSelectionDragAtPoint,
   emptyPixelSelection,
   extractSelectionToCanvas,
   isSelectionAdjustNoop,
@@ -5604,11 +5613,49 @@ function StudioCuttoonEditor() {
   const [studioFilterApplying, setStudioFilterApplying] = useState(false);
   const studioFilterPreparationRunIdRef = useRef(0);
   const studioFilterPreparationAbortRef = useRef<AbortController | null>(null);
+  const pixelMarqueeRasterPreparationRunIdRef = useRef(0);
+  const pixelMarqueeRasterPreparationAbortRef = useRef<AbortController | null>(null);
+  type PixelSelectionActivationKind =
+    | SelectionToolKind
+    | "circle"
+    | "wand"
+    | "color-range";
+  type PendingPixelSelectionRasterGesture = {
+    runId: number;
+    pointerId: number;
+    tool: SelectionToolKind | "wand";
+    forceCircle: boolean;
+    combine: SelectionCombineMode;
+    start: { x: number; y: number };
+    current: { x: number; y: number };
+    shift: boolean;
+    alt: boolean;
+    released: boolean;
+    cancelled: boolean;
+    captureTarget: Element | null;
+  };
+  const pendingPixelSelectionRasterGestureRef =
+    useRef<PendingPixelSelectionRasterGesture | null>(null);
   const studioFilterApplyBusyRef = useRef(false);
   useEffect(() => () => {
     studioFilterPreparationRunIdRef.current += 1;
     studioFilterPreparationAbortRef.current?.abort();
     studioFilterPreparationAbortRef.current = null;
+    pixelMarqueeRasterPreparationRunIdRef.current += 1;
+    pixelMarqueeRasterPreparationAbortRef.current?.abort();
+    pixelMarqueeRasterPreparationAbortRef.current = null;
+    setPixelBusy(false);
+    const pending = pendingPixelSelectionRasterGestureRef.current;
+    pendingPixelSelectionRasterGestureRef.current = null;
+    if (pending?.captureTarget) {
+      try {
+        if (pending.captureTarget.hasPointerCapture(pending.pointerId)) {
+          pending.captureTarget.releasePointerCapture(pending.pointerId);
+        }
+      } catch {
+        // The browser may already have released capture during route teardown.
+      }
+    }
   }, []);
   const [lastStudioFilterDraft, setLastStudioFilterDraft] = useState<StudioFilterDraft | null>(null);
   const [editing, setEditing] = useState<{ id: string } | null>(null);
@@ -7534,6 +7581,7 @@ function StudioCuttoonEditor() {
     || dodgeBurnDragRef.current
     || wetMixDragRef.current
     || pixelDragRef.current
+    || pendingPixelSelectionRasterGestureRef.current
     || cropDragRef.current
     || panelSplitDragRef.current
     || nodeEditDragRef.current
@@ -7558,6 +7606,7 @@ function StudioCuttoonEditor() {
     || dodgeBurnDragRef.current
     || wetMixDragRef.current
     || pixelDragRef.current
+    || pendingPixelSelectionRasterGestureRef.current
     || cropDragRef.current
     || panelSplitDragRef.current
     || nodeEditDragRef.current
@@ -9152,6 +9201,22 @@ function StudioCuttoonEditor() {
   const liveStampDraftDirectRef = useRef(false);
   const liveStampOverlayRendererRef = useRef<StudioLiveStampOverlayRenderer>(null as never);
   liveStampOverlayRendererRef.current ??= new StudioLiveStampOverlayRenderer();
+  /** bounded-flow-v2 dynamic brushes keep stable pixels on a suffix-only Canvas surface. */
+  const liveDynamicBrushDraftDirectRef = useRef(false);
+  const liveDynamicBrushOverlayRendererRef =
+    useRef<StudioLiveDynamicBrushOverlayRenderer>(null as never);
+  liveDynamicBrushOverlayRendererRef.current ??= new StudioLiveDynamicBrushOverlayRenderer();
+  /** causal watercolor/ink-wash uses an append-only sparse 4x physical field. */
+  const liveWetInkDraftDirectRef = useRef(false);
+  const liveWetInkOverlayRendererRef =
+    useRef<StudioLiveWetInkOverlayRenderer>(null as never);
+  liveWetInkOverlayRendererRef.current ??= new StudioLiveWetInkOverlayRenderer();
+  useEffect(() => {
+    // A physical field is page-local authority. Never replay an active/settled tile into a newly
+    // selected page even when both pages currently share the same viewport dimensions.
+    liveWetInkDraftDirectRef.current = false;
+    liveWetInkOverlayRendererRef.current.clear();
+  }, [currentPageId]);
   const liveDraftLayerRef = useRef<Konva.Layer>(null);
   const draftPreviewNormalLayerRef = useRef<Konva.Layer>(null);
   const draftPreviewDynamicLayerRef = useRef<Konva.Layer>(null);
@@ -9948,6 +10013,51 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next) return;
+    if (liveWetInkDraftDirectRef.current) {
+      const renderer = liveWetInkOverlayRendererRef.current;
+      if (!studioLiveWetInkOverlaySupportsElement(next) || !renderer.isActive) {
+        liveWetInkDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        renderer.resetActive();
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewNormalLayerRef.current?.drawScene();
+        return;
+      }
+      const outcome = renderer.appendFrom(next, {
+        pageEpoch: currentPageId,
+        hidden: next.hidden === true,
+      });
+      if (outcome.status === "fallback") {
+        liveWetInkDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewNormalLayerRef.current?.drawScene();
+        return;
+      }
+      liveDraftVisualRef.current = next;
+      return;
+    }
+    if (liveDynamicBrushDraftDirectRef.current) {
+      const renderer = liveDynamicBrushOverlayRendererRef.current;
+      if (!studioLiveDynamicBrushOverlaySupportsElement(next) || !renderer.isActive) {
+        liveDynamicBrushDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        renderer.resetActive();
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewDynamicLayerRef.current?.drawScene();
+        return;
+      }
+      const outcome = renderer.appendFrom(next);
+      if (outcome.status === "fallback") {
+        liveDynamicBrushDraftDirectRef.current = false;
+        liveDraftDirectRef.current = false;
+        draftPreviewStoreRef.current.setActive(next);
+        draftPreviewDynamicLayerRef.current?.drawScene();
+        return;
+      }
+      liveDraftVisualRef.current = next;
+      return;
+    }
     if (liveStampDraftDirectRef.current) {
       if (!isDirectLiveStampDraftEl(next) || !liveStampOverlayRendererRef.current.isActive) {
         return;
@@ -9984,7 +10094,11 @@ function StudioCuttoonEditor() {
     if (!next) return;
     const directInk = liveDraftDirectRef.current && isDirectLiveDraftEl(next);
     const directStamp = liveStampDraftDirectRef.current && isDirectLiveStampDraftEl(next);
-    if (!directInk && !directStamp) return;
+    const directDynamic = liveDynamicBrushDraftDirectRef.current
+      && studioLiveDynamicBrushOverlaySupportsElement(next);
+    const directWetInk = liveWetInkDraftDirectRef.current
+      && studioLiveWetInkOverlaySupportsElement(next);
+    if (!directInk && !directStamp && !directDynamic && !directWetInk) return;
     liveDraftPendingRef.current = next;
     if (liveDraftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
@@ -9994,9 +10108,16 @@ function StudioCuttoonEditor() {
   };
   // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
   const exitDirectLiveDraft = () => {
-    if (!liveDraftDirectRef.current && !liveStampDraftDirectRef.current) return;
+    if (
+      !liveDraftDirectRef.current
+      && !liveStampDraftDirectRef.current
+      && !liveDynamicBrushDraftDirectRef.current
+      && !liveWetInkDraftDirectRef.current
+    ) return;
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
+    liveDynamicBrushDraftDirectRef.current = false;
+    liveWetInkDraftDirectRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -10016,6 +10137,8 @@ function StudioCuttoonEditor() {
     liveInkOverlayClearGenRef.current += 1;
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
+    liveDynamicBrushOverlayRendererRef.current.resetActive();
+    liveWetInkOverlayRendererRef.current.resetActive();
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
       const pendingGpu = pendingGpuStrokesRef.current;
@@ -10026,6 +10149,32 @@ function StudioCuttoonEditor() {
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
+    if (next && liveWetInkDraftDirectRef.current) {
+      if (studioLiveWetInkOverlaySupportsElement(next)) {
+        liveDraftPendingRef.current = next;
+        if (liveDraftRafRef.current === null) {
+          liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+            liveDraftRafRef.current = null;
+            flushDirectLiveDraft();
+          });
+        }
+        return;
+      }
+      exitDirectLiveDraft();
+    }
+    if (next && liveDynamicBrushDraftDirectRef.current) {
+      if (studioLiveDynamicBrushOverlaySupportsElement(next)) {
+        liveDraftPendingRef.current = next;
+        if (liveDraftRafRef.current === null) {
+          liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+            liveDraftRafRef.current = null;
+            flushDirectLiveDraft();
+          });
+        }
+        return;
+      }
+      exitDirectLiveDraft();
+    }
     if (next && liveStampDraftDirectRef.current) {
       if (isDirectLiveStampDraftEl(next)) {
         liveDraftPendingRef.current = next;
@@ -10108,7 +10257,19 @@ function StudioCuttoonEditor() {
       draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
     }
     const wasStampDirect = liveStampDraftDirectRef.current;
-    const wasDirect = liveDraftDirectRef.current || wasStampDirect;
+    const wasDynamicBrushDirect = liveDynamicBrushDraftDirectRef.current;
+    const wasWetInkDirect = liveWetInkDraftDirectRef.current;
+    const finalDynamicBrushStroke = wasDynamicBrushDirect
+      ? liveDraftVisualRef.current
+      : null;
+    const finalWetInkStroke = wasWetInkDirect
+      ? liveDraftVisualRef.current
+      : null;
+    const wasDirect =
+      liveDraftDirectRef.current
+      || wasStampDirect
+      || wasDynamicBrushDirect
+      || wasWetInkDirect;
     const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
     endPredictedInkTail();
     pendingDraftRef.current = null;
@@ -10124,6 +10285,8 @@ function StudioCuttoonEditor() {
     }
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
+    liveDynamicBrushDraftDirectRef.current = false;
+    liveWetInkDraftDirectRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -10144,6 +10307,39 @@ function StudioCuttoonEditor() {
     // 스탬프는 pointerup에서 exact raw replay를 draft settled layer로 원자 교체한다. 저투명
     // dab을 두 표면에 동시에 남기면 농도가 두 배가 되므로 active overlay는 즉시 제거한다.
     if (wasStampDirect) liveStampOverlayRendererRef.current.resetActive();
+    if (wasDynamicBrushDirect) {
+      const renderer = liveDynamicBrushOverlayRendererRef.current;
+      if (preserveInk && finalDynamicBrushStroke) {
+        const seal = renderer.end(finalDynamicBrushStroke);
+        // The exact retained vector becomes visible synchronously before the transient coverage
+        // surface relinquishes authority. The existing draft FIFO then holds it until the main
+        // layer's committed-draw receipt releases that prefix.
+        draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
+        draftPreviewDynamicLayerRef.current?.drawScene();
+        if (seal.status === "settled") renderer.releaseSettledPrefix(1);
+        else renderer.resetActive();
+      } else {
+        renderer.resetActive();
+      }
+    }
+    if (wasWetInkDirect) {
+      const renderer = liveWetInkOverlayRendererRef.current;
+      if (preserveInk && finalWetInkStroke) {
+        const seal = renderer.end(finalWetInkStroke, {
+          pageEpoch: currentPageId,
+          hidden: finalWetInkStroke.hidden === true,
+        });
+        // Exact committed-runtime pixels are replaced synchronously, then the same DrawEl becomes
+        // the retained FIFO authority before the transient surface is released. Both mutations
+        // happen in one task, so there is no blank frame or doubled translucent wash.
+        draftPreviewStoreRef.current.settle(finalWetInkStroke);
+        draftPreviewNormalLayerRef.current?.drawScene();
+        if (seal.status === "settled") renderer.releaseSettledPrefix(1);
+        else renderer.resetActive();
+      } else {
+        renderer.resetActive();
+      }
+    }
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
       if (!preserveInk) {
@@ -10575,7 +10771,8 @@ function StudioCuttoonEditor() {
   )
     ? selectedId
     : null;
-  const activePixelSelectionElementId = () => selectedImageElementId;
+  const activePixelSelectionElementId = () =>
+    pixelSelectionAutoTargetRef.current ?? selectedImageElementId;
   const publishPixelSelectionHistory = (
     history: typeof pixelSelectionHistory,
     selection: PixelSelection | null
@@ -10662,6 +10859,27 @@ function StudioCuttoonEditor() {
     },
     []
   );
+  const releasePendingPixelSelectionRasterGesture = useCallback((
+    pending = pendingPixelSelectionRasterGestureRef.current,
+  ) => {
+    if (!pending?.captureTarget) return;
+    try {
+      if (pending.captureTarget.hasPointerCapture(pending.pointerId)) {
+        pending.captureTarget.releasePointerCapture(pending.pointerId);
+      }
+    } catch {
+      // Capture can already be gone after an outside pointerup or browser cancel.
+    }
+  }, []);
+  const clearPendingPixelSelectionRasterGesture = useCallback((options?: {
+    releaseCapture?: boolean;
+  }) => {
+    const pending = pendingPixelSelectionRasterGestureRef.current;
+    pendingPixelSelectionRasterGestureRef.current = null;
+    if (options?.releaseCapture !== false) {
+      releasePendingPixelSelectionRasterGesture(pending);
+    }
+  }, [releasePendingPixelSelectionRasterGesture]);
   const cancelPixelSelectionPointerSession = useCallback(() => {
     const session = pixelDragRef.current;
     pixelDragRef.current = null;
@@ -10710,18 +10928,32 @@ function StudioCuttoonEditor() {
     cancelLiquifyPointerSession();
     if (!keepAutoTargetGesture) {
       cancelPixelSelectionPointerSession();
+      clearPendingPixelSelectionRasterGesture();
       clearPolyLassoDraft();
     }
     pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
-    const history = createPixelSelectionHistory(
-      selectedImageElementId,
-      null,
-      pixelSelectionHistoryRef.current.limits
-    );
+    // A vector-only first gesture can finish while its editable raster copy is still being
+    // prepared. In that case the async continuation has already rebound the selection history to
+    // the new image and may even have committed the user's rectangle/lasso/brush path. Preserve
+    // that exact owner-scoped snapshot instead of resetting it during the selectedId transition.
+    const history = keepAutoTargetGesture
+      ? bindPixelSelectionHistory(
+          pixelSelectionHistoryRef.current,
+          selectedImageElementId,
+          pixelSelRef.current,
+        )
+      : createPixelSelectionHistory(
+          selectedImageElementId,
+          null,
+          pixelSelectionHistoryRef.current.limits
+        );
+    const nextSelection = keepAutoTargetGesture
+      ? history.present?.selection ?? pixelSelRef.current
+      : null;
     pixelSelectionHistoryRef.current = history;
-    pixelSelRef.current = null;
+    pixelSelRef.current = nextSelection;
     setPixelSelectionHistory(history);
-    setPixelSel(null);
+    setPixelSel(nextSelection);
     if (!keepAutoTargetGesture) {
       setPixelBusy(false);
       pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
@@ -10732,7 +10964,12 @@ function StudioCuttoonEditor() {
     colorRangeAbortRef.current = null;
     colorRangeActiveRunIdRef.current = null;
     setColorRangeSamples([]);
-  }, [cancelLiquifyPointerSession, cancelPixelSelectionPointerSession, selectedImageElementId]);
+  }, [
+    cancelLiquifyPointerSession,
+    cancelPixelSelectionPointerSession,
+    clearPendingPixelSelectionRasterGesture,
+    selectedImageElementId,
+  ]);
   useEffect(() => {
     saveStudioAdvancedFillSettings(studioAdvancedFillStorage(), advancedFillSettings);
   }, [advancedFillSettings]);
@@ -13019,11 +13256,19 @@ function StudioCuttoonEditor() {
       target.id,
       advancedFillSettings.referenceScope,
     ).length;
-    if (advancedFillSettings.referenceScope === "reference" && referenceLayerCount === 0) {
-      return "표시 중인 다른 래스터를 채우기 참조로 지정하세요.";
+    if (
+      advancedFillSettings.referenceScope === "reference"
+      && referenceLayerCount === 0
+      && !advancedFillHasVisibleVectorLineArt
+    ) {
+      return "표시 중인 다른 래스터를 채우기 참조로 지정하거나 벡터 선화를 추가하세요.";
     }
-    if (advancedFillSettings.referenceScope === "all-visible" && referenceLayerCount === 0) {
-      return "대상과 겹치는 다른 표시 래스터가 없어 현재 레이어 참조를 사용해야 해요.";
+    if (
+      advancedFillSettings.referenceScope === "all-visible"
+      && referenceLayerCount === 0
+      && !advancedFillHasVisibleVectorLineArt
+    ) {
+      return "대상과 겹치는 다른 표시 래스터나 벡터 선화가 없어 현재 레이어 참조를 사용해야 해요.";
     }
     return null;
   }
@@ -13072,6 +13317,15 @@ const selectedImageMutationLocked = selectedContentMutationLocked || selectedWor
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
 const pixelToolArmed =
     pixelTool !== null && !pixelBusy && selected?.type === "image" && !selectedImageMutationLocked;
+  // A vector-only page can be rasterizing immediately after the user chooses a pixel-selection
+  // tool. Keep that tool gesture-armed while the Worker prepares the hidden-originals copy: the
+  // first pointer contact is journaled below and replayed against the committed full-page image.
+  const pixelToolRasterPreparationArmed =
+    pixelTool !== null
+    && pixelBusy
+    && pixelMarqueeRasterPreparationAbortRef.current !== null
+    && selected?.type !== "image"
+    && !activeSurfaceReviewLocked;
   // arm-anytime(2026-07-24) — 대상 이미지 없이 무장된 픽셀 선택 도구. 첫 캔버스 제스처가
   // 포인터 아래 최상단의 편집 가능 이미지를 자동 획득한다(Photoshop/CSP 관례). 검토 잠금은
   // 표면 전체 잠금이라 여기서도 무장 불가. 비이미지 요소(잠김 포함)가 선택돼 있어도 무장된다.
@@ -13079,7 +13333,8 @@ const pixelToolArmed =
     pixelTool !== null && !pixelBusy && selected?.type !== "image" && !activeSurfaceReviewLocked;
   // 캔버스 자식(커서/요소 드래그·클릭 선택 잠금)에는 두 무장 상태를 합쳐 넘긴다 — 자동 획득
   // 대기 중에도 crosshair 커서와 "제스처는 도구가 가져간다" 규약이 유지된다.
-  const pixelToolGestureArmed = pixelToolArmed || pixelToolAutoTargetArmed;
+  const pixelToolGestureArmed =
+    pixelToolArmed || pixelToolAutoTargetArmed || pixelToolRasterPreparationArmed;
   // arm-anytime(2026-07-24) — 포인터 아래 최상단의 편집 가능 이미지를 결정한다(순수 리졸버 위임).
   // 이미지 후보만 위→아래 z순서로 모아 넘긴다(숨김/잠금 판정은 그룹 상속까지 포함). 검토잠금
   // 표면에서는 후보를 비워 항상 none — 작업에셋 파괴잠금은 획득 후 커밋 단계에서 재차 가드된다.
@@ -15073,6 +15328,7 @@ const puppetWarpArmed =
       // 아직 히스토리 밖인 대기 획 폐기(펜 리프트 직후의 undo) — 표면에서 즉시 지운다.
       liveInkOverlayClearGenRef.current += 1;
       liveInkOverlayRendererRef.current.clear();
+      liveWetInkOverlayRendererRef.current.clear();
       draftPreviewStoreRef.current.clearSettled();
       pendingGpuStrokesRef.current = [];
       pendingGpuDrawAuthoritiesRef.current = [];
@@ -15610,6 +15866,10 @@ const puppetWarpArmed =
   function disarmAllPixelTools() {
     cancelLiquifyPointerSession();
     cancelPixelSelectionPointerSession();
+    clearPendingPixelSelectionRasterGesture();
+    pixelMarqueeRasterPreparationRunIdRef.current += 1;
+    pixelMarqueeRasterPreparationAbortRef.current?.abort();
+    pixelMarqueeRasterPreparationAbortRef.current = null;
     if (pixelWandActiveRunIdRef.current !== null) {
       pixelWandRunIdRef.current += 1;
       pixelWandActiveRunIdRef.current = null;
@@ -16324,12 +16584,84 @@ const puppetWarpArmed =
   }
   function groupSelectedElements() {
     if (marqueeIds.length < 2) return;
+    const memberIds = [...marqueeIds];
     const groupId = uid();
     const g = createLayerGroup(groupId, `그룹 ${groups.length + 1}`);
-    const nextElements = groupItems(elements, marqueeIds, groupId) as El[];
+    const nextElements = groupItems(elements, memberIds, groupId) as El[];
     updateActivePage({ groups: [...groups, g], elements: nextElements });
     setSelectedId(null);
-    setMarqueeIds([]);
+    // PPT/Figma처럼 그룹 생성 직후 새 그룹을 그대로 선택한다. 이어서 이동·복제·잠금을
+    // 실행하려는 사용자가 캔버스에서 다시 그룹을 찾아 클릭할 필요가 없어야 한다.
+    setMarqueeIds(memberIds);
+    activeGroupIdRef.current = null;
+    setActiveGroupId(null);
+  }
+  function completeSelectedGroupId(): string | null {
+    if (marqueeIds.length < 2) return null;
+    const selectedIds = new Set(marqueeIds);
+    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
+    const groupIds = new Set(
+      selectedElements
+        .map((element) => element.groupId)
+        .filter((groupId): groupId is string => groupId !== undefined)
+    );
+    if (groupIds.size !== 1) return null;
+    const groupId = [...groupIds][0]!;
+    const memberIds = elements
+      .filter((element) => element.groupId === groupId)
+      .map((element) => element.id);
+    return (
+      memberIds.length === selectedElements.length &&
+      memberIds.every((id) => selectedIds.has(id))
+    )
+      ? groupId
+      : null;
+  }
+  function ungroupSelectedElements() {
+    const groupId = completeSelectedGroupId();
+    if (!groupId) return;
+    updateActivePage({
+      elements: ungroupItems(elements, groupId) as El[],
+      groups: groups.filter((group) => group.id !== groupId),
+    });
+    // 요소 선택은 유지한다. PPT/Figma처럼 그룹 해제 직후에도 이동·정렬·재그룹화가
+    // 이어져야 하며, 캔버스를 다시 드래그해 대상을 찾게 만들지 않는다.
+    setSelectedId(null);
+    setMarqueeIds((current) => current.filter((id) => elementById.has(id)));
+  }
+  function toggleSelectedElementsLocked() {
+    const selectedIds = new Set(marqueeIds);
+    if (selectedIds.size === 0) return;
+    const selectedElements = elements.filter((element) => selectedIds.has(element.id));
+    if (selectedElements.length === 0) return;
+    const nextLocked = !selectedElements.every((element) =>
+      isEffectivelyLocked(element, groups)
+    );
+    const groupId = completeSelectedGroupId();
+    if (groupId) {
+      updateActivePage({
+        groups: groups.map((group) =>
+          group.id === groupId ? { ...group, locked: nextLocked } : group
+        ),
+        // 잠금 해제는 그룹 잠금과 멤버 개별 잠금을 함께 정리해야 UI의 “잠금 해제”
+        // 약속대로 즉시 다시 편집할 수 있다. 잠글 때는 기존 멤버 메타를 보존한다.
+        elements: nextLocked
+          ? elements
+          : elements.map((element) =>
+              selectedIds.has(element.id) && element.locked
+                ? ({ ...element, locked: false } as El)
+                : element
+            ),
+      });
+      return;
+    }
+    patchLayerItems(marqueeIds, () => ({ locked: nextLocked }));
+  }
+  function reorderSelectedElements(direction: "front" | "back") {
+    if (marqueeIds.length === 0) return;
+    const next = reorderLayerSelection(elements, marqueeIds, direction) as El[];
+    if (next === elements) return;
+    commit(next);
   }
   // 그룹 해제: 멤버 groupId 제거 + 그룹 자체 삭제(요소는 보존).
   function deleteLayerGroup(groupId: string) {
@@ -17650,53 +17982,11 @@ const puppetWarpArmed =
     });
   }
   function duplicateSelected() {
-    if (marqueeIds.length > 0) {
-      const mv = new Set(marqueeIds);
-      const copies = new Map<string, El>();
-      const newIds: string[] = [];
-      for (const e of elements) {
-        if (!mv.has(e.id)) continue;
-        const id = uid();
-        newIds.push(id);
-        copies.set(
-          e.id,
-          detachStudioBg3dLtCopy(e.type === "draw"
-            ? { ...e, id, points: e.points.map((v) => v + 16), hidden: false, locked: false }
-            : ({ ...e, id, x: (e as { x: number }).x + 16, y: (e as { y: number }).y + 16, hidden: false, locked: false } as El))
-        );
-      }
-      if (copies.size > 0) {
-        const copyIds = new Map(
-          [...copies.entries()].map(([sourceId, copy]) => [sourceId, copy.id] as const)
-        );
-        const nextTimeline = duplicateAnimationTracks(animTimeline, copyIds, uid);
-        commit(
-          insertLayerCopiesAdjacent(elements, copies),
-          nextTimeline !== animTimeline ? { animTimeline: nextTimeline } : undefined
-        );
-        setMarqueeIds(newIds);
-        setSelectedId(null);
-        setTool("select");
-      }
-      return;
-    }
-    if (!selected) return;
-    const copy: El = detachStudioBg3dLtCopy(
-      selected.type === "draw"
-        ? { ...selected, id: uid(), points: selected.points.map((v) => v + 16), hidden: false, locked: false }
-        : ({ ...selected, id: uid(), x: selected.x + 16, y: selected.y + 16, hidden: false, locked: false } as El)
-    );
-    const nextTimeline = duplicateAnimationTracks(
-      animTimeline,
-      new Map([[selected.id, copy.id]]),
-      uid
-    );
-    commit(
-      insertLayerCopiesAdjacent(elements, new Map([[selected.id, copy]])),
-      nextTimeline !== animTimeline ? { animTimeline: nextTimeline } : undefined
-    );
-    setSelectedId(copy.id);
-    setTool("select");
+    // 복제도 복사/붙여넣기와 같은 검증·ID 재매핑 파이프라인을 사용한다. 그래야 그룹 메타,
+    // 애니메이션 트랙, 3D LT 번들이 빠지거나 복제본이 원본 그룹에 섞이는 일이 없다.
+    const captured = captureSelectedStudioClipboard();
+    if (!captured) return;
+    applyStudioClipboardPayload(captured.payload, "cascade", "복제");
   }
   function nudgeSelected(dx: number, dy: number) {
     if (marqueeIds.length > 0) {
@@ -18361,11 +18651,7 @@ const puppetWarpArmed =
       }
       if (matchStudioShortcut(sc["tool-lasso"], e)) {
         e.preventDefault();
-        if (selected?.type === "image" && !selectedImageMutationLocked) {
-          activatePrimaryCanvasTool("select");
-          clearPolyLassoDraft();
-          setPixelTool("lasso");
-        }
+        activatePixelSelectionToolFromInspector("lasso");
         return;
       }
       // 각 설정 가능 단축키는 레일 버튼과 동일한 상태 전이를 재사용한다.
@@ -19094,7 +19380,8 @@ const puppetWarpArmed =
 
   function applyStudioClipboardPayload(
     payload: StudioClipboardPayload,
-    placement: "cascade" | "in-place"
+    placement: "cascade" | "in-place",
+    announcement?: string,
   ): boolean {
     if (activeSurfaceReviewLocked) return false;
     const samePage = payload.source.pageId === activePage.id;
@@ -19154,7 +19441,7 @@ const puppetWarpArmed =
     setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
     setTool("select");
     announceDrawingShortcut(
-      placement === "in-place" ? "현재 위치에 붙여넣기" : "붙여넣기"
+      announcement ?? (placement === "in-place" ? "현재 위치에 붙여넣기" : "붙여넣기")
     );
     return true;
   }
@@ -21241,7 +21528,22 @@ const puppetWarpArmed =
   // studio-flood-fill의 BFS 스캔을 studio-magic-wand가 재사용하되 "칠하기" 대신 "선택"을 만든다.
   async function runMagicWandSelect(pos: { x: number; y: number }, frame: SelectionFrame) {
     if (pixelBusy || selected?.type !== "image") return;
-    const target = selected;
+    await runMagicWandSelectOnTarget(selected, pos, frame);
+  }
+
+  async function runMagicWandSelectOnTarget(
+    target: ImageEl & El,
+    pos: { x: number; y: number },
+    frame: SelectionFrame,
+  ) {
+    if (
+      activeSurfaceReviewLockedRef.current
+      || isEffectivelyLocked(target, groups)
+      || isEffectivelyHidden(target, groups)
+    ) {
+      setError("매직완드 대상 레이어의 표시·잠금 상태를 확인해 주세요.");
+      return;
+    }
     const mutationTicket = captureStudioMutationTicket();
     const p = { x: (pos.x - frame.x) / frame.width, y: (pos.y - frame.y) / frame.height };
     const runId = ++pixelWandRunIdRef.current;
@@ -21255,6 +21557,7 @@ const puppetWarpArmed =
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (runId !== pixelWandRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
+      if (activePixelSelectionElementId() !== target.id) return;
       commitPixelSelectionState(
         (previous) => applyMagicWandRegionToSelection(previous, region, pixelCombine),
         "magic-wand"
@@ -21667,19 +21970,76 @@ const puppetWarpArmed =
   liquifyPointerGlobalEndRef.current = (event, cancelled) =>
     finishLiquifyPointerSession(event, cancelled, stageRef.current);
 
+  function finishPendingPixelSelectionRasterGesture(
+    pointerEvent: PointerEvent,
+    cancelled: boolean,
+    stage = stageRef.current,
+  ): boolean {
+    const pending = pendingPixelSelectionRasterGestureRef.current;
+    const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+    if (!pending || pending.pointerId !== pointerId) return false;
+    if (!cancelled && stage) {
+      try {
+        stage.setPointersPositions(pointerEvent);
+        const position = stage.getRelativePointerPosition();
+        if (position) {
+          pending.current = { x: position.x, y: position.y };
+          pending.shift = pointerEvent.shiftKey;
+          pending.alt = pointerEvent.altKey;
+        }
+      } catch {
+        // The latest captured move remains an exact bounded fallback after Stage teardown.
+      }
+    }
+    pending.released = true;
+    pending.cancelled = cancelled;
+    releasePendingPixelSelectionRasterGesture(pending);
+    // Keep a successful release journaled until the async raster copy can replay it. Cancellation
+    // only discards the user's gesture; the requested tool/copy preparation may still finish.
+    if (cancelled) pendingPixelSelectionRasterGestureRef.current = null;
+    return true;
+  }
+
   function finishPixelSelectionPointerSession(
     pointerEvent: PointerEvent,
-    cancelled: boolean
+    cancelled: boolean,
+    stage = stageRef.current,
   ): boolean {
     const session = pixelDragRef.current;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     if (!session || session.pointerId !== pointerId) return false;
+    let releasePoint: SelPoint | null = null;
+    if (!cancelled && stage) {
+      try {
+        stage.setPointersPositions(pointerEvent);
+        const position = stage.getRelativePointerPosition();
+        if (position) {
+          releasePoint = canvasPointToNormalized(position.x, position.y, session.frame);
+        }
+      } catch {
+        // An outside release can race Stage teardown; commit the accumulated prefix in that case.
+      }
+    }
     pixelDragRef.current = null;
     releasePixelSelectionPointerCapture(session);
     clearPixelDragPreview();
     if (!cancelled) {
       commitPixelSelectionState(
-        (previous) => commitSelectionDrag(previous, session.drag) ?? previous,
+        (previous) => (
+          releasePoint
+            ? commitSelectionDragAtPoint(
+                previous,
+                session.drag,
+                releasePoint,
+                {
+                  shift: pointerEvent.shiftKey,
+                  alt: pointerEvent.altKey,
+                  aspect: session.frame.height / Math.max(1, session.frame.width),
+                  magneticField: session.magneticField,
+                },
+              )
+            : commitSelectionDrag(previous, session.drag)
+        ) ?? previous,
         session.drag.tool === "lasso"
           ? "free-lasso"
           : session.drag.tool === "brush"
@@ -21690,7 +22050,8 @@ const puppetWarpArmed =
     return true;
   }
   pixelSelectionPointerGlobalEndRef.current = (event, cancelled) =>
-    finishPixelSelectionPointerSession(event, cancelled);
+    finishPendingPixelSelectionRasterGesture(event, cancelled)
+    || finishPixelSelectionPointerSession(event, cancelled);
 
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
     if (smudgeBusy) return;
@@ -22404,6 +22765,16 @@ const puppetWarpArmed =
       setError(advancedFillDocumentUnsupportedReason);
       return;
     }
+    if (
+      hasPendingFillStrokes
+      && advancedFillSettings.referenceScope !== "current"
+      && !flushPendingStrokeCommitsRef.current()
+    ) {
+      const message = "마지막 선화를 문서에 확정하지 못했어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요.";
+      setAdvancedFillStatus(message);
+      setError(message);
+      return;
+    }
     const rasterLayers = elements.filter(
       (element): element is ImageEl & El => element.type === "image",
     );
@@ -22686,10 +23057,44 @@ const puppetWarpArmed =
         const layers = advancedFillRasterLayers.map((layer) =>
           layer.id === rasterTarget.id ? { ...layer, src: workingSrc } : layer
         );
-        const composed = await composeStudioFillReferenceImage(
+        const vectorInput = currentAdvancedFillVectorInput();
+        const vectorPlan = planStudioAdvancedFillVectorTarget(vectorInput);
+        const pageReferences: StudioFillPageReference[] = [];
+        if (vectorPlan.ok && vectorPlan.target.sourceElementCount > 0) {
+          const cachedReference = advancedFillVirtualReferenceRef.current;
+          let vectorReferenceSrc: string;
+          if (cachedReference?.fingerprint === vectorPlan.target.sourceFingerprint) {
+            vectorReferenceSrc = cachedReference.dataUrl;
+          } else {
+            setAdvancedFillStatus("래스터와 벡터 선화를 하나의 채우기 경계로 합성하고 있어요…");
+            const renderedReference = await renderStudioAdvancedFillVectorReference(vectorInput, {
+              signal: controller.signal,
+            });
+            if (renderedReference.fingerprint !== vectorPlan.target.sourceFingerprint) {
+              throw new Error("벡터 선화가 변환 중 바뀌었습니다. 캔버스를 다시 탭해 주세요.");
+            }
+            advancedFillVirtualReferenceRef.current = {
+              fingerprint: renderedReference.fingerprint,
+              dataUrl: renderedReference.dataUrl,
+            };
+            vectorReferenceSrc = renderedReference.dataUrl;
+          }
+          pageReferences.push({
+            id: `advanced-fill-page-reference-${vectorPlan.target.sourceFingerprint}`,
+            name: "표시 벡터 선화",
+            src: vectorReferenceSrc,
+            pageWidth: vectorInput.width,
+            pageHeight: vectorInput.height,
+            fillReference: true,
+          });
+        } else if (!vectorPlan.ok && vectorPlan.code !== "no-visible-vector-draw") {
+          throw new Error(vectorPlan.reason);
+        }
+        const composed = await composeStudioFillReferenceImageWithPageReferences(
           layers,
           rasterTarget.id,
           advancedFillSettings.referenceScope,
+          pageReferences,
           undefined,
           controller.signal,
         );
@@ -23143,6 +23548,8 @@ const puppetWarpArmed =
     }
     liveDraftDirectRef.current = false;
     liveStampDraftDirectRef.current = false;
+    liveDynamicBrushDraftDirectRef.current = false;
+    liveWetInkDraftDirectRef.current = false;
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -23152,6 +23559,8 @@ const puppetWarpArmed =
     gpuFinalReceiptRequestIdRef.current = null;
     liveInkOverlayRendererRef.current.resetActive();
     liveStampOverlayRendererRef.current.resetActive();
+    liveDynamicBrushOverlayRendererRef.current.resetActive();
+    liveWetInkOverlayRendererRef.current.resetActive();
     endPredictedInkTail();
     if (liveDrawPressureRafRef.current) {
       globalThis.cancelAnimationFrame(liveDrawPressureRafRef.current);
@@ -23393,6 +23802,48 @@ const puppetWarpArmed =
     return true;
   }
 
+  function journalPendingPixelSelectionRasterGesture(input: {
+    event: PointerEvent;
+    position: { x: number; y: number };
+    tool: SelectionToolKind | "wand";
+    forceCircle: boolean;
+    captureFallback: Element | null;
+  }): boolean {
+    if (
+      pendingPixelSelectionRasterGestureRef.current
+      || pixelMarqueeRasterPreparationAbortRef.current === null
+    ) return false;
+    const pointerId = Number.isFinite(input.event.pointerId) ? input.event.pointerId : 1;
+    const captureTarget = input.event.target instanceof Element
+      ? input.event.target
+      : input.captureFallback;
+    pendingPixelSelectionRasterGestureRef.current = {
+      runId: pixelMarqueeRasterPreparationRunIdRef.current,
+      pointerId,
+      tool: input.tool,
+      forceCircle: input.forceCircle,
+      combine: resolveSelectionCombineOverride(
+        pixelCombine,
+        { shift: input.event.shiftKey, alt: input.event.altKey },
+        isSelectionUsable(pixelSelRef.current),
+      ),
+      start: { x: input.position.x, y: input.position.y },
+      current: { x: input.position.x, y: input.position.y },
+      shift: input.event.shiftKey,
+      alt: input.event.altKey,
+      released: false,
+      cancelled: false,
+      captureTarget,
+    };
+    try {
+      captureTarget?.setPointerCapture(pointerId);
+    } catch {
+      // Global capture-phase pointerup remains the safety net without pointer capture.
+    }
+    announceDrawingShortcut("선택 대상을 준비하는 동안 첫 제스처를 안전하게 이어갈게요");
+    return true;
+  }
+
   /** One-shot CSP erase-to-intersection. Returns true when the pointer event is consumed. */
   function applyVectorEraseToIntersectionAt(x: number, y: number): boolean {
     const planned = planStudioVectorEraseToIntersectionApply({
@@ -23431,6 +23882,9 @@ const puppetWarpArmed =
     if (liquifyDragRef.current) return;
     // One contact also owns a pixel-selection drag; a palm/second finger cannot replace it.
     if (pixelDragRef.current) return;
+    // Raster preparation journals the first vector-only selection contact with the same ownership
+    // rule; a second touch/palm cannot replace its start point or release owner.
+    if (pendingPixelSelectionRasterGestureRef.current) return;
     // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
     if (bubbleShapeDragRef.current) return;
     if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
@@ -23934,6 +24388,20 @@ const puppetWarpArmed =
     ) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
+      if (pixelToolRasterPreparationArmed && pixelTool) {
+        // The artist began before the vector-only page copy finished rasterizing. Capture this
+        // pointer now instead of dropping the gesture or letting it move a vector element. The
+        // async preparation continuation replays the normalized drag once the full-page image is
+        // atomically committed; pointermove/up below only update this bounded intent record.
+        journalPendingPixelSelectionRasterGesture({
+          event: stagePointerEvent,
+          position: pos,
+          tool: pixelTool,
+          forceCircle: pixelForceCircle,
+          captureFallback: e.target.getStage()?.container() ?? null,
+        });
+        return;
+      }
       // 대상 이미지 해석 — 이미 편집 가능한 이미지가 선택돼 있으면 그대로, 아니면(arm-anytime)
       // 포인터 아래 최상단 이미지를 자동 획득해 선택하고 이번 제스처를 그 위에서 시작한다.
       // 자동 획득 id 를 ref 에 남겨 선택 변경 이펙트가 진행 중 제스처를 살려 두게 한다.
@@ -23974,6 +24442,35 @@ const puppetWarpArmed =
         const acquired =
           resolution.kind === "target" ? elementById.get(resolution.id) ?? null : null;
         if (!acquired || acquired.type !== "image") {
+          const editableRasterCount = elements.filter(
+            (element) =>
+              element.type === "image"
+              && !isEffectivelyHidden(element, groups)
+              && !isEffectivelyLocked(element, groups)
+              && !studioWorkAssetDestructiveEditReason(element)
+              && !element.isAnimatedGif
+              && (element.frames?.length ?? 0) <= 1,
+          ).length;
+          if (editableRasterCount === 0 && pixelTool) {
+            const activation: PixelSelectionActivationKind =
+              pixelTool === "ellipse" && pixelForceCircle
+                ? "circle"
+                : pixelTool;
+            // This call reaches its first dynamic-import await synchronously, so the preparation
+            // controller/run id already exist when the pointer journal is attached immediately
+            // below. Empty/locked/unsupported pages fail closed inside the same preparation seam.
+            void preparePixelMarqueeRasterTarget(activation);
+            if (pixelMarqueeRasterPreparationAbortRef.current) {
+              journalPendingPixelSelectionRasterGesture({
+                event: stagePointerEvent,
+                position: pos,
+                tool: pixelTool,
+                forceCircle: pixelForceCircle,
+                captureFallback: e.target.getStage()?.container() ?? null,
+              });
+              return;
+            }
+          }
           setError("픽셀을 고를 이미지가 이 위치에 없어요. 이미지 레이어 위에서 다시 시작하세요.");
           return;
         }
@@ -24293,9 +24790,10 @@ const puppetWarpArmed =
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
-        const overlayDirect = !pixelDirect
+        const overlayCandidate = !pixelDirect
           && isDirectLiveDraftEl(next)
           && (next.opacity ?? 1) === 1
+          && liveInkOverlayRendererRef.current.isNativeSurfaceReady
           && studioLiveInkFastOverlaySupportsStyle(liveInkStyleFor(next));
         const stampKind = resolveStudioStampBrushKind(next.brush);
         const stampDirect = Boolean(
@@ -24334,7 +24832,7 @@ const puppetWarpArmed =
           resolvedBackend: webGpuBackendRef.current,
           // Advanced GPU preparation is a deferred capability. Until its small helper chunk is
           // warm, the exact Canvas2D overlay owns the first stroke instead of racing module load.
-          direct: overlayDirect && gpuStartPlan !== null,
+          direct: overlayCandidate && gpuStartPlan !== null,
           postCorrectionActive: causalPostCorrectionEligible,
           mode: next.mode,
           fill: next.fill,
@@ -24351,18 +24849,69 @@ const puppetWarpArmed =
           gpuPin = false;
           gpuLiveOperationOrderKeyRef.current = null;
         }
-        const direct = pixelDirect || overlayDirect || gpuPin;
+        // Canvas overlay admission is authoritative only after begin succeeds at native DPR.
+        // A missing 2D context or an oversized 4K/high-DPR backing surface therefore keeps the
+        // exact retained draft visible instead of silently presenting a blurred reduced surface.
+        liveInkOverlayClearGenRef.current += 1;
+        let liveInkOverlayStarted = false;
+        if (
+          overlayCandidate
+          && !gpuPin
+          && next.mode !== "eraser"
+          && !next.fill
+          && (next.symmetry?.type ?? "none") === "none"
+        ) {
+          const liveInkStyle = liveInkStyleFor(next);
+          liveInkOverlayStarted = causalPostCorrectionEligible
+            ? liveInkOverlayRendererRef.current.beginDeferred(liveInkStyle)
+            : liveInkOverlayRendererRef.current.begin(
+                liveInkStyle,
+                next.points[0] ?? strokeOrigin.x,
+                next.points[1] ?? strokeOrigin.y,
+                studioLiveBrushPressure(next, next.pressures?.[0])
+              );
+        } else {
+          // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
+          liveInkOverlayRendererRef.current.resetActive();
+        }
+        const wetInkOverlayStarted = !pixelDirect
+          && !stampDirect
+          && !liveInkOverlayStarted
+          && !gpuPin
+          && studioLiveWetInkOverlaySupportsElement(next)
+          && liveWetInkOverlayRendererRef.current.isNativeSurfaceReady
+          && liveWetInkOverlayRendererRef.current.begin(next, {
+            pageEpoch: currentPageId,
+            hidden: next.hidden === true,
+          }).status === "started";
+        const dynamicBrushDirect = !pixelDirect
+          && !stampDirect
+          && !liveInkOverlayStarted
+          && !wetInkOverlayStarted
+          && !gpuPin
+          && studioLiveDynamicBrushOverlaySupportsElement(next)
+          && liveDynamicBrushOverlayRendererRef.current.begin(next).status === "started";
+        const direct =
+          pixelDirect
+          || liveInkOverlayStarted
+          || wetInkOverlayStarted
+          || gpuPin
+          || dynamicBrushDirect;
         liveDraftDirectRef.current = direct;
         liveStampDraftDirectRef.current = stampDirect;
+        liveDynamicBrushDraftDirectRef.current = dynamicBrushDirect;
+        liveWetInkDraftDirectRef.current = wetInkOverlayStarted;
         gpuLiveInkPinnedRef.current = gpuPin;
         if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
+        if (!dynamicBrushDirect) liveDynamicBrushOverlayRendererRef.current.resetActive();
+        if (!wetInkOverlayStarted) liveWetInkOverlayRendererRef.current.resetActive();
         liveDraftVisualRef.current = direct || stampDirect ? next : null;
         liveDraftPendingRef.current = direct || stampDirect ? next : null;
         const predictionTailEligible = canUseStudioPointerPredictionForSession(
           STUDIO_POINTER_PREDICTION_ENABLED,
           drawingPointerTransportRef.current?.getSession()
         )
-          && overlayDirect
+          && liveInkOverlayStarted
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
@@ -24376,26 +24925,6 @@ const puppetWarpArmed =
         webGpuCanvasHandleRef.current?.setPinnedVisible(
           gpuPin || pendingGpuStrokesRef.current.length > 0
         );
-        // 증분 오버레이: GPU 파인이 아닌 일반 펜/마커(대칭·채움 없음)는 표면에
-        // 새 조각만 누적한다. begin 실패(표면 미준비) 시 Konva 초안이 자연 폴백.
-        liveInkOverlayClearGenRef.current += 1;
-        if (overlayDirect && !gpuPin && next.mode !== "eraser" && !next.fill
-          && (next.symmetry?.type ?? "none") === "none") {
-          const liveInkStyle = liveInkStyleFor(next);
-          if (causalPostCorrectionEligible) {
-            liveInkOverlayRendererRef.current.beginDeferred(liveInkStyle);
-          } else {
-            liveInkOverlayRendererRef.current.begin(
-              liveInkStyle,
-              next.points[0] ?? strokeOrigin.x,
-              next.points[1] ?? strokeOrigin.y,
-              studioLiveBrushPressure(next, next.pressures?.[0])
-            );
-          }
-        } else {
-          // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
-          liveInkOverlayRendererRef.current.resetActive();
-        }
         if (gpuPin && gpuLiveAcceptedRequestIdRef.current) {
           beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current);
         } else {
@@ -24779,6 +25308,20 @@ const puppetWarpArmed =
     }
     // Window capture already consumed and previewed this active freehand delivery.
     if (nativeFreehandMoveOwnsStage) return;
+    const pendingRasterGesture = pendingPixelSelectionRasterGestureRef.current;
+    if (pendingRasterGesture) {
+      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+        ? stagePointerEvent.pointerId
+        : 1;
+      if (pendingRasterGesture.pointerId !== pointerId) return;
+      const position = e.target.getStage()?.getRelativePointerPosition();
+      if (position) {
+        pendingRasterGesture.current = { x: position.x, y: position.y };
+        pendingRasterGesture.shift = stagePointerEvent.shiftKey;
+        pendingRasterGesture.alt = stagePointerEvent.altKey;
+      }
+      return;
+    }
     if (advancedFillTapGestureRef.current) {
       const clientPoint = getClientPointFromKonvaEvent(e.evt);
       const pointerEvent = e.evt as PointerEvent;
@@ -25182,6 +25725,14 @@ const puppetWarpArmed =
     const mutateDirectly = (
       (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
       || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+      || (
+        liveDynamicBrushDraftDirectRef.current
+        && liveDynamicBrushOverlayRendererRef.current.isActive
+      )
+      || (
+        liveWetInkDraftDirectRef.current
+        && liveWetInkOverlayRendererRef.current.isActive
+      )
     )
       && !gpuLiveInkPinnedRef.current
       && (
@@ -25479,7 +26030,7 @@ const puppetWarpArmed =
     const lastY = current.points[current.points.length - 1] ?? targetY;
     const lastPressure = current.pressures?.at(-1)
       ?? studioInkFallbackPressure(current.pressureModel);
-    // Repeated browser samples that collapse to the same 1/16 coordinate and 10-bit pressure add
+    // Repeated browser samples that collapse to the same 1/32 coordinate and 10-bit pressure add
     // no information. A pressure-only change is retained so the incremental dab walker can update
     // interpolation state without repainting the stationary prefix.
     const shouldAppend = isStudioPixelPencilRenderMode(current.brush)
@@ -25534,6 +26085,14 @@ const puppetWarpArmed =
           (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
           || (liveDraftDirectRef.current && isStudioPixelPencilRenderMode(current.brush))
           || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+          || (
+            liveDynamicBrushDraftDirectRef.current
+            && liveDynamicBrushOverlayRendererRef.current.isActive
+          )
+          || (
+            liveWetInkDraftDirectRef.current
+            && liveWetInkOverlayRendererRef.current.isActive
+          )
           || (
             liveDraftDirectRef.current
             && gpuLiveInkPinnedRef.current
@@ -25670,6 +26229,14 @@ const puppetWarpArmed =
       || (
         liveStampDraftDirectRef.current
         && liveStampOverlayRendererRef.current.isActive
+      )
+      || (
+        liveDynamicBrushDraftDirectRef.current
+        && liveDynamicBrushOverlayRendererRef.current.isActive
+      )
+      || (
+        liveWetInkDraftDirectRef.current
+        && liveWetInkOverlayRendererRef.current.isActive
       )
     );
     const compactGpuSourceJournalActive = gpuLiveInkPinnedRef.current
@@ -26350,7 +26917,10 @@ const puppetWarpArmed =
             masterEditMode,
             directLiveDraft: liveDraftDirectRef.current,
             directInkSurfaceAvailable:
-              overlayRenderer.isActive || gpuLiveInkPinnedRef.current,
+              overlayRenderer.isActive
+              || gpuLiveInkPinnedRef.current
+              || liveDynamicBrushOverlayRendererRef.current.isActive
+              || liveWetInkOverlayRendererRef.current.isActive,
           },
         });
         // Worker-worthy post-correction can leave pointerup only when the exact live draft already
@@ -26361,6 +26931,12 @@ const puppetWarpArmed =
         }
         const finished = releasePlan.stroke;
         releaseAuthoritativeStroke = finished;
+        if (liveWetInkDraftDirectRef.current) {
+          // Pointer-up post-correction may replace geometry after the last live append. Seal the
+          // physical overlay from the exact DrawEl that will be committed, not the pre-correction
+          // pointer snapshot, so handoff digest/endpoint cannot pop.
+          liveDraftVisualRef.current = finished;
+        }
         if (releasePlan.quickShapeAnnouncementKind) {
           const kind = releasePlan.quickShapeAnnouncementKind;
           announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
@@ -26418,7 +26994,10 @@ const puppetWarpArmed =
           const committed = commit([...baseElements, finished]);
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
-              deferInkCleanup = overlayRenderer.isActive || gpuLiveInkPinnedRef.current;
+              deferInkCleanup = overlayRenderer.isActive
+                || gpuLiveInkPinnedRef.current
+                || liveDynamicBrushOverlayRendererRef.current.isActive
+                || liveWetInkOverlayRendererRef.current.isActive;
               if (gpuLiveInkPinnedRef.current) {
                 settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
               }
@@ -26448,7 +27027,12 @@ const puppetWarpArmed =
               deferInkCleanup = true;
               if (gpuLiveInkPinnedRef.current) {
                 settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
-              } else if (!overlayRenderer.isActive && finished.mode !== "eraser") {
+              } else if (
+                !overlayRenderer.isActive
+                && !liveDynamicBrushOverlayRendererRef.current.isActive
+                && !liveWetInkOverlayRendererRef.current.isActive
+                && finished.mode !== "eraser"
+              ) {
                 draftPreviewStoreRef.current.settle(finished);
               }
             } else {
@@ -27152,7 +27736,8 @@ const puppetWarpArmed =
     const layer = node.getLayer();
     if (!layer) return;
 
-    // 다중선택 그룹 이동: 끄는 노드(좌표형)의 이동량을 나머지 선택 노드에 실시간 적용(draw·잠금 제외).
+    // 다중선택 그룹 이동: 좌표형 멤버는 실시간으로 따라오고, points 기반 draw 멤버는
+    // 드래그 종료의 단일 문서 커밋에서 같은 델타를 적용한다. 잠긴 멤버는 항상 제외한다.
     const draggedId = studioElementIdOf(node);
     if (draggedId && marqueeIds.length > 1 && marqueeIds.includes(draggedId)) {
       const draggedEl = elementById.get(draggedId);
@@ -27314,9 +27899,20 @@ const puppetWarpArmed =
         if (dx !== 0 || dy !== 0) {
           const mv = new Set(marqueeIds);
           const next = elements.map((el) =>
-            !mv.has(el.id) || isEffectivelyLocked(el, groups) || el.type === "draw"
+            !mv.has(el.id) || isEffectivelyLocked(el, groups)
               ? el
-              : ({ ...el, x: (el as { x: number }).x + dx, y: (el as { y: number }).y + dy } as El)
+              : el.type === "draw"
+                ? ({
+                    ...el,
+                    points: el.points.map((value, index) =>
+                      value + (index % 2 === 0 ? dx : dy)
+                    ),
+                  } as El)
+                : ({
+                    ...el,
+                    x: (el as { x: number }).x + dx,
+                    y: (el as { y: number }).y + dy,
+                  } as El)
           );
           commit(next);
         }
@@ -27856,20 +28452,294 @@ function clearSelectionForEdit() {
     );
     announceDrawingShortcut("레이어 자르기");
   }
-  function togglePixelMarquee(kind: "rect" | "circle") {
-    // arm-anytime(2026-07-24) — 편집 가능한 이미지가 선택돼 있지 않아도 무장한다. 첫 캔버스
-    // 제스처가 포인터 아래 이미지를 자동 획득한다. 검토 잠금이나 잠긴 이미지 선택 시에만 막는다.
-    if (activeSurfaceReviewLocked || (selected?.type === "image" && selectedImageMutationLocked)) return;
-    const isActive = kind === "circle"
-      ? pixelTool === "ellipse" && pixelForceCircle
-      : pixelTool === "rect" && !pixelForceCircle;
+  function pixelSelectionToolForActivation(
+    kind: PixelSelectionActivationKind,
+  ): SelectionToolKind | "wand" | null {
+    if (kind === "color-range") return null;
+    return kind === "circle" ? "ellipse" : kind;
+  }
+
+  function isPixelSelectionActivationActive(kind: PixelSelectionActivationKind): boolean {
+    if (kind === "color-range") return colorRangePickActive;
+    const requestedTool = pixelSelectionToolForActivation(kind);
+    if (kind === "circle") return pixelTool === "ellipse" && pixelForceCircle;
+    if (kind === "ellipse") return pixelTool === "ellipse" && !pixelForceCircle;
+    return pixelTool === requestedTool && !pixelForceCircle;
+  }
+
+  function applyPixelSelectionActivation(kind: PixelSelectionActivationKind): void {
     setTool("select");
     setMenu(null);
     clearPolyLassoDraft();
-    disarmAllPixelTools();
-    if (isActive) return;
     setPixelForceCircle(kind === "circle");
-    setPixelTool(kind === "circle" ? "ellipse" : "rect");
+    if (kind === "color-range") {
+      setPixelTool(null);
+      setColorRangePickActive(true);
+      return;
+    }
+    setColorRangePickActive(false);
+    setPixelTool(pixelSelectionToolForActivation(kind));
+  }
+
+  async function preparePixelMarqueeRasterTarget(kind: PixelSelectionActivationKind) {
+    disarmAllPixelTools();
+    // Expose the requested tool immediately. While the Worker is busy, the Stage journals at most
+    // one owner pointer so a quick first drag cannot fall through to element selection or vanish.
+    applyPixelSelectionActivation(kind);
+    if (!prepareStudioDocumentReplacement("픽셀 선택용 래스터 복사본을 준비", { flushPending: true })) {
+      disarmAllPixelTools();
+      return;
+    }
+
+    const mutationTicket = captureStudioMutationTicket();
+    const historyIndex = pagesHiRef.current;
+    const pageId = currentPageIdRef.current;
+    const layerName = "픽셀 선택용 합성본";
+    const runId = ++pixelMarqueeRasterPreparationRunIdRef.current;
+    pixelMarqueeRasterPreparationAbortRef.current?.abort();
+    const controller = new AbortController();
+    pixelMarqueeRasterPreparationAbortRef.current = controller;
+    setPixelBusy(true);
+    setError(null);
+    announceDrawingShortcut("벡터 원본을 보존하며 픽셀 선택 대상을 준비하고 있어요");
+
+    try {
+      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      if (
+        runId !== pixelMarqueeRasterPreparationRunIdRef.current
+        || controller.signal.aborted
+      ) return;
+      const initialContext = currentStudioEditablePageRasterContext(
+        layerName,
+        rasterRuntime,
+        "pixel-selection",
+      );
+      if (initialContext.input.documentMutationBlockedReason) {
+        throw new Error(initialContext.input.documentMutationBlockedReason);
+      }
+      const sourceSummary = rasterRuntime.summarizeStudioRasterPreparationSources({
+        width: initialContext.input.width,
+        height: initialContext.input.height,
+        elements: initialContext.input.elements,
+        groups: initialContext.input.groups,
+        theme: initialContext.input.theme,
+        bg: initialContext.input.bg,
+        bgGrad: initialContext.input.bgGrad,
+      });
+      if (sourceSummary.visibleContentCount === 0) {
+        throw new Error(
+          "픽셀 선택 대상으로 만들 표시 요소가 없습니다. 먼저 펜, 도형 또는 텍스트를 추가하세요.",
+        );
+      }
+      const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
+      if (!planned.ok) throw new Error(planned.reason);
+      const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
+        planned.plan,
+        renderStudioVectorReference,
+        { signal: controller.signal },
+      );
+      if (
+        runId !== pixelMarqueeRasterPreparationRunIdRef.current
+        || controller.signal.aborted
+        || pagesHiRef.current !== historyIndex
+        || currentPageIdRef.current !== pageId
+        || !canApplyStudioMutation(mutationTicket)
+      ) return;
+      const latestContext = currentStudioEditablePageRasterContext(
+        layerName,
+        rasterRuntime,
+        "pixel-selection",
+      );
+      if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(
+        planned.plan,
+        latestContext.input,
+      )) {
+        throw new Error(
+          "픽셀 선택 대상을 준비하는 동안 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
+        );
+      }
+      const composite = {
+        ...rasterRuntime.materializeStudioEditableRasterCopy({
+          plan: planned.plan,
+          rendered,
+          newId: uid(),
+        }),
+        noClip: true,
+      } satisfies ImageEl & El;
+      const applied = rasterRuntime.applyStudioEditableRasterCopy({
+        plan: planned.plan,
+        current: latestContext.input,
+        composite,
+        destinationElements: latestContext.destinationElements,
+      });
+      if (!applied.ok) throw new Error(applied.reason);
+      if (
+        runId !== pixelMarqueeRasterPreparationRunIdRef.current
+        || controller.signal.aborted
+        || pagesHiRef.current !== historyIndex
+        || currentPageIdRef.current !== pageId
+        || !canApplyStudioMutation(mutationTicket)
+      ) return;
+      if (!commit(applied.elements, undefined, pageId)) return;
+      pixelSelectionAutoTargetRef.current = composite.id;
+      setMarqueeIds([]);
+      setSelectedId(composite.id);
+      applyPixelSelectionActivation(kind);
+      resetPixelSelectionHistoryState(composite.id, null);
+
+      const pending = pendingPixelSelectionRasterGestureRef.current;
+      if (
+        pending
+        && pending.runId === runId
+        && !pending.cancelled
+        && kind !== "color-range"
+      ) {
+        const frame: SelectionFrame = {
+          x: composite.x,
+          y: composite.y,
+          width: composite.width,
+          height: composite.height,
+          rotation: composite.rotation,
+        };
+        if (pending.tool === "wand") {
+          clearPendingPixelSelectionRasterGesture();
+          // Let the selectedId/page commit render before starting the image decode, while the
+          // explicit target keeps this click independent from a stale React selection closure.
+          globalThis.requestAnimationFrame(() => {
+            void runMagicWandSelectOnTarget(
+              composite,
+              pending.current,
+              frame,
+            );
+          });
+        } else if (pending.tool === "poly-lasso") {
+          const first = canvasPointToNormalized(
+            pending.start.x,
+            pending.start.y,
+            frame,
+          );
+          const next = beginPolyLassoSession(pending.combine, first);
+          polyLassoSessionRef.current = next;
+          setPolyLassoSession(next);
+          setPolyLassoHover(null);
+          clearPendingPixelSelectionRasterGesture();
+        } else {
+          const radiusNorm = pixelBrushRadius / Math.max(1, composite.width);
+          let drag = beginSelectionDrag(
+            pending.tool,
+            pending.combine,
+            canvasPointToNormalized(pending.start.x, pending.start.y, frame),
+            radiusNorm,
+            {
+              forceCircle:
+                pending.forceCircle
+                || (pending.tool === "ellipse" && pending.shift),
+            },
+          );
+          drag = updateSelectionDrag(
+            drag,
+            canvasPointToNormalized(pending.current.x, pending.current.y, frame),
+            {
+              shift: pending.shift,
+              alt: pending.alt,
+              aspect: frame.height / Math.max(1, frame.width),
+              magneticField: null,
+            },
+          );
+          if (pending.released) {
+            const selection = commitSelectionDrag(null, drag);
+            clearPendingPixelSelectionRasterGesture();
+            commitPixelSelectionState(
+              selection,
+              pending.tool === "lasso"
+                ? "free-lasso"
+                : pending.tool === "brush"
+                  ? "brush"
+                  : "marquee",
+            );
+          } else {
+            pendingPixelSelectionRasterGestureRef.current = null;
+            pixelDragRef.current = {
+              elId: composite.id,
+              frame,
+              drag,
+              pointerId: pending.pointerId,
+              magneticField: null,
+            };
+            pixelSelectionCaptureTargetRef.current = pending.captureTarget;
+            schedulePixelDragPreview(drag);
+          }
+        }
+      } else {
+        clearPendingPixelSelectionRasterGesture();
+      }
+      setError(null);
+      announceDrawingShortcut(
+        "원본은 숨겨 보존하고 편집용 래스터 복사본에서 픽셀 선택을 시작해요",
+      );
+    } catch (preparationError) {
+      if (
+        controller.signal.aborted
+        || runId !== pixelMarqueeRasterPreparationRunIdRef.current
+      ) return;
+      clearPendingPixelSelectionRasterGesture();
+      disarmAllPixelTools();
+      setError(
+        preparationError instanceof Error
+          ? preparationError.message
+          : "픽셀 선택용 래스터 복사본을 준비하지 못했습니다.",
+      );
+    } finally {
+      if (runId === pixelMarqueeRasterPreparationRunIdRef.current) {
+        const pending = pendingPixelSelectionRasterGestureRef.current;
+        if (pending?.runId === runId) {
+          // Epoch/page/collaboration rejection can return before the success replay block. Never
+          // leave its captured pointer journal owning the canvas after preparation has stopped.
+          clearPendingPixelSelectionRasterGesture();
+        }
+        pixelMarqueeRasterPreparationAbortRef.current = null;
+        setPixelBusy(false);
+      }
+    }
+  }
+  function togglePixelMarquee(kind: "rect" | "circle") {
+    activatePixelSelectionToolFromInspector(kind);
+  }
+
+  function activatePixelSelectionToolFromInspector(
+    kind: PixelSelectionActivationKind,
+  ): void {
+    if (pixelBusy && pixelMarqueeRasterPreparationAbortRef.current === null) {
+      announceDrawingShortcut("현재 픽셀 작업을 마친 뒤 선택 도구를 바꿀 수 있어요");
+      return;
+    }
+    if (activeSurfaceReviewLocked) {
+      setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
+      return;
+    }
+    const wasActive = isPixelSelectionActivationActive(kind);
+    disarmAllPixelTools();
+    setTool("select");
+    setMenu(null);
+    if (wasActive) return;
+    if (selected?.type === "image" && selectedImageMutationLocked) {
+      setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하거나 다른 이미지를 선택하세요.");
+      return;
+    }
+    const editableRasterCount = elements.filter(
+      (element) =>
+        element.type === "image"
+        && !isEffectivelyHidden(element, groups)
+        && !isEffectivelyLocked(element, groups)
+        && !studioWorkAssetDestructiveEditReason(element)
+        && !element.isAnimatedGif
+        && (element.frames?.length ?? 0) <= 1,
+    ).length;
+    if (editableRasterCount === 0) {
+      void preparePixelMarqueeRasterTarget(kind);
+      return;
+    }
+    applyPixelSelectionActivation(kind);
   }
   /**
    * 픽셀 도구 무장 전 대상 확보(2026-07-24) — 편집 가능한 이미지가 이미 선택돼 있으면 그대로 쓰고,
@@ -27917,44 +28787,52 @@ function clearSelectionForEdit() {
         ).length === 1)
     );
   function toggleSmudgeTool() {
-    if (smudgeBusy || !ensurePixelToolTarget("혼합(스머지)")) return;
-    const next = !smudgeActive;
-    disarmAllPixelTools();
-    if (next) {
-      setTool("select");
-      setSmudgeActive(true);
-      announceDrawingShortcut("혼합(스머지) · 이미지 위를 드래그하세요");
+    if (smudgeBusy) return;
+    if (smudgeActive) {
+      disarmAllPixelTools();
+      return;
     }
+    if (!ensurePixelToolTarget("혼합(스머지)")) return;
+    disarmAllPixelTools();
+    setTool("select");
+    setSmudgeActive(true);
+    announceDrawingShortcut("혼합(스머지) · 이미지 위를 드래그하세요");
   }
   function toggleLiquifyTool() {
-    if (liquifyBusy || !ensurePixelToolTarget("리퀴파이")) return;
-    const next = !liquifyActive;
-    disarmAllPixelTools();
-    if (next) {
-      setTool("select");
-      setLiquifyActive(true);
-      announceDrawingShortcut("리퀴파이 · 이미지 위를 밀어 보세요");
+    if (liquifyBusy) return;
+    if (liquifyActive) {
+      disarmAllPixelTools();
+      return;
     }
+    if (!ensurePixelToolTarget("리퀴파이")) return;
+    disarmAllPixelTools();
+    setTool("select");
+    setLiquifyActive(true);
+    announceDrawingShortcut("리퀴파이 · 이미지 위를 밀어 보세요");
   }
   function toggleDodgeBurnTool() {
-    if (dodgeBurnBusy || !ensurePixelToolTarget("닷지/번")) return;
-    const next = !dodgeBurnActive;
-    disarmAllPixelTools();
-    if (next) {
-      setTool("select");
-      setDodgeBurnActive(true);
-      announceDrawingShortcut("닷지/번 · 이미지 위를 드래그하세요");
+    if (dodgeBurnBusy) return;
+    if (dodgeBurnActive) {
+      disarmAllPixelTools();
+      return;
     }
+    if (!ensurePixelToolTarget("닷지/번")) return;
+    disarmAllPixelTools();
+    setTool("select");
+    setDodgeBurnActive(true);
+    announceDrawingShortcut("닷지/번 · 이미지 위를 드래그하세요");
   }
   function toggleWetMixTool() {
-    if (wetMixBusy || !ensurePixelToolTarget("혼색 브러시")) return;
-    const next = !wetMixActive;
-    disarmAllPixelTools();
-    if (next) {
-      setTool("select");
-      setWetMixActive(true);
-      announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
+    if (wetMixBusy) return;
+    if (wetMixActive) {
+      disarmAllPixelTools();
+      return;
     }
+    if (!ensurePixelToolTarget("혼색 브러시")) return;
+    disarmAllPixelTools();
+    setTool("select");
+    setWetMixActive(true);
+    announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
   }
   function openPixelSelectionTransform() {
     const target = ensurePixelToolTarget("내용 변형");
@@ -27985,9 +28863,10 @@ function clearSelectionForEdit() {
     setStudioFilterPreview(null);
   }
 
-  function currentStudioFilterPageRasterContext(
+  function currentStudioEditablePageRasterContext(
     name: string,
     rasterRuntime: typeof import("./studio-raster-edit-preparation"),
+    purpose: "page-filter" | "pixel-selection",
   ) {
     const currentHistory = pagesHistoryRef.current;
     const currentHistoryIndex = Math.max(
@@ -28011,8 +28890,16 @@ function clearSelectionForEdit() {
       reviewLocked: isPageReviewLocked(targetPage.review),
       timelinePlaying: timelinePlayingRef.current,
       viewTransformSuppressed: viewTransformSuppressedRef.current,
+      purpose,
       budgets: currentStudioVectorReferenceBudgets(),
     });
+  }
+
+  function currentStudioFilterPageRasterContext(
+    name: string,
+    rasterRuntime: typeof import("./studio-raster-edit-preparation"),
+  ) {
+    return currentStudioEditablePageRasterContext(name, rasterRuntime, "page-filter");
   }
 
   async function openStudioFilter(kind: StudioFilterKind, initialDraft?: StudioFilterDraft) {
@@ -28113,6 +29000,101 @@ function clearSelectionForEdit() {
         filterError instanceof Error
           ? filterError.message
           : "현재 페이지의 필터 미리보기를 준비하지 못했습니다."
+      );
+    } finally {
+      if (runId === studioFilterPreparationRunIdRef.current) {
+        studioFilterPreparationAbortRef.current = null;
+        setStudioFilterPreparationBusy(false);
+      }
+    }
+  }
+
+  async function createEditableRasterCopyForInspector() {
+    if (studioFilterPreparationBusy) {
+      announceDrawingShortcut("편집용 래스터 복사본을 준비하고 있어요");
+      return;
+    }
+    disarmAllPixelTools();
+    setTool("select");
+    if (!prepareStudioDocumentReplacement("편집용 래스터 복사본을 준비", { flushPending: true })) {
+      return;
+    }
+
+    const mutationTicket = captureStudioMutationTicket();
+    const historyIndex = pagesHiRef.current;
+    const pageId = currentPageIdRef.current;
+    const layerName = "편집용 래스터 복사본";
+    const runId = ++studioFilterPreparationRunIdRef.current;
+    studioFilterPreparationAbortRef.current?.abort();
+    const controller = new AbortController();
+    studioFilterPreparationAbortRef.current = controller;
+    setStudioFilterPreparationBusy(true);
+    setError(null);
+    announceDrawingShortcut("원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요");
+
+    try {
+      const rasterRuntime = await import("./studio-raster-edit-preparation");
+      if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
+      const initialContext = currentStudioEditablePageRasterContext(
+        layerName,
+        rasterRuntime,
+        "pixel-selection",
+      );
+      const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
+      if (!planned.ok) throw new Error(planned.reason);
+      const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
+        planned.plan,
+        renderStudioVectorReference,
+        { signal: controller.signal },
+      );
+      if (
+        runId !== studioFilterPreparationRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex ||
+        currentPageIdRef.current !== pageId ||
+        !canApplyStudioMutation(mutationTicket)
+      ) return;
+      const latestContext = currentStudioEditablePageRasterContext(
+        layerName,
+        rasterRuntime,
+        "pixel-selection",
+      );
+      const composite = {
+        ...rasterRuntime.materializeStudioEditableRasterCopy({
+          plan: planned.plan,
+          rendered,
+          newId: uid(),
+        }),
+        noClip: true,
+      } satisfies ImageEl & El;
+      const applied = rasterRuntime.applyStudioEditableRasterCopy({
+        plan: planned.plan,
+        current: latestContext.input,
+        composite,
+        destinationElements: latestContext.destinationElements,
+      });
+      if (!applied.ok) throw new Error(applied.reason);
+      if (
+        runId !== studioFilterPreparationRunIdRef.current ||
+        controller.signal.aborted ||
+        pagesHiRef.current !== historyIndex ||
+        currentPageIdRef.current !== pageId ||
+        !canApplyStudioMutation(mutationTicket)
+      ) return;
+      if (!commit(applied.elements, undefined, pageId)) return;
+      resetPixelSelectionHistoryState(composite.id, null);
+      setMarqueeIds([]);
+      setSelectedId(composite.id);
+      setPixelForceCircle(false);
+      setPixelTool(null);
+      setError(null);
+      announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
+    } catch (preparationError) {
+      if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
+      setError(
+        preparationError instanceof Error
+          ? preparationError.message
+          : "편집용 래스터 복사본을 준비하지 못했습니다.",
       );
     } finally {
       if (runId === studioFilterPreparationRunIdRef.current) {
@@ -29954,6 +30936,7 @@ function clearSelectionForEdit() {
     : null;
 
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
+    activatePixelSelectionToolFromInspector,
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
     addFilterMask,
@@ -29982,6 +30965,7 @@ function clearSelectionForEdit() {
     clearHealCloneSource,
     clearPolyLassoDraft,
     commit,
+    createEditableRasterCopyForInspector,
     deleteFilterMask,
     deleteLayerMask,
     detachBubbleAnchor,
@@ -30019,6 +31003,8 @@ function clearSelectionForEdit() {
       studioBrushCatalogHandlers.toggle("desktop-dock", trigger);
     },
     openFeatureTutorial,
+    openImagePastePicker,
+    openStudioFilter,
     patchEl,
     patchPageGrade,
     queueBrushDelete,
@@ -30050,6 +31036,10 @@ function clearSelectionForEdit() {
     setWebtoonTheme,
     splitFrameSelected,
     startEditText,
+    stopTimeline: () => {
+      setTimelinePlaying(false);
+      announceDrawingShortcut("타임라인을 멈췄어요");
+    },
     toggleAdvancedFill,
     toggleLiquifyTool,
     toggleSmudgeTool,
@@ -30582,8 +31572,22 @@ function clearSelectionForEdit() {
 
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
+    const selectionOptionsSuppressed =
+      advancedFillActive ||
+      commentPinArmed ||
+      cropRect !== null ||
+      dodgeBurnActive ||
+      eyedropperActive ||
+      liquifyActive ||
+      pixelTool !== null ||
+      smudgeActive ||
+      wetMixActive;
     return {
-      visible: tool === "select" && !canvasOnlyMode && count > 0,
+      visible:
+        tool === "select" &&
+        !canvasOnlyMode &&
+        !selectionOptionsSuppressed &&
+        count > 0,
       count,
       label: selected ? elementLabel(selected) : null,
       locked: Boolean(selected?.locked),
@@ -30601,7 +31605,24 @@ function clearSelectionForEdit() {
         !activeSurfaceReviewLocked &&
         !isEffectivelyLocked(selected, groups),
     };
-  }, [activeSurfaceReviewLocked, canvasOnlyMode, groups, marqueeIds.length, selected, selectedId, tool]);
+  }, [
+    activeSurfaceReviewLocked,
+    advancedFillActive,
+    canvasOnlyMode,
+    commentPinArmed,
+    cropRect,
+    dodgeBurnActive,
+    eyedropperActive,
+    groups,
+    liquifyActive,
+    marqueeIds.length,
+    pixelTool,
+    selected,
+    selectedId,
+    smudgeActive,
+    tool,
+    wetMixActive,
+  ]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
   // 에디터에서 읽어 값으로 전달한다(어차피 렌더 시점 값만 화면에 반영되므로 의미 동일).
@@ -30610,6 +31631,8 @@ function clearSelectionForEdit() {
   const liveInkOverlayRenderer = liveInkOverlayRendererRef.current;
   const liveInkPredictionRenderer = liveInkPredictionRendererRef.current;
   const liveStampOverlayRenderer = liveStampOverlayRendererRef.current;
+  const liveDynamicBrushOverlayRenderer = liveDynamicBrushOverlayRendererRef.current;
+  const liveWetInkOverlayRenderer = liveWetInkOverlayRendererRef.current;
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
   const bubbleShapeActiveHandleIndex =
     bubbleShapeDragRef.current?.session.pointIndex ?? bubbleShapeSelectedPointIndex;
@@ -30650,6 +31673,9 @@ function clearSelectionForEdit() {
     enterCanvasOnlyMode,
     executeGenerateTranslations,
     groupSelectedElements,
+    ungroupSelectedElements,
+    toggleSelectedElementsLocked,
+    reorderSelectedElements,
     mergeSelectedBubbles,
     handleTutorialTry,
     hideBrushCursor,
@@ -31711,6 +32737,8 @@ function clearSelectionForEdit() {
             </Suspense>
           ) : null}
           <StudioCanvasViewport
+          liveDynamicBrushOverlayRenderer={liveDynamicBrushOverlayRenderer}
+          liveWetInkOverlayRenderer={liveWetInkOverlayRenderer}
           liveInkPredictionRenderer={liveInkPredictionRenderer}
           liveStampOverlayRenderer={liveStampOverlayRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
@@ -32263,6 +33291,7 @@ function clearSelectionForEdit() {
           pixelCombine={pixelCombine}
           pixelMagneticLasso={pixelMagneticLasso}
           onTogglePixelMagneticLasso={() => setPixelMagneticLasso((v) => !v)}
+          pixelForceCircle={pixelForceCircle}
           pixelSel={pixelSel}
           pixelSelectionCanRedo={canRedoPixelSelectionHistory(
             pixelSelectionHistory,
@@ -32286,6 +33315,7 @@ function clearSelectionForEdit() {
           rightResize={rightResize}
           savedBrushes={savedBrushes}
           saving={saving}
+          studioFilterPreparationBusy={studioFilterPreparationBusy}
           scrollPos={scrollPos}
           selected={selected}
           selectedBg3dEditSource={selectedBg3dEditSource}
@@ -32477,6 +33507,7 @@ function clearSelectionForEdit() {
           symmetryRadialCount={symmetryRadialCount}
           symmetryType={symmetryType}
           tagsText={tagsText}
+          timelinePlaying={timelinePlaying}
           tiltEnabled={tiltEnabled}
           tipAngle={tipAngle}
           tipRoundness={tipRoundness}

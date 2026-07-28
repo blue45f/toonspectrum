@@ -18,7 +18,8 @@ import {
 } from "./studio-brush-stamp-engine";
 import {
   acquireStudioLowLatencyCanvas2dContext,
-  resolveStudioLiveSurfaceDevicePixelRatio,
+  decideStudioNativeLiveSurfaceResolution,
+  type StudioNativeLiveSurfaceResolutionDecision,
 } from "./studio-low-latency-canvas";
 
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
@@ -29,14 +30,16 @@ interface SettledLiveStampStroke {
   readonly pressures: readonly number[];
 }
 
-function liveStampDevicePixelRatio(surface: StudioLiveInkSurface): number {
-  return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-    ? resolveStudioLiveSurfaceDevicePixelRatio({
-        cssWidth: surface.width,
-        cssHeight: surface.height,
-        devicePixelRatio: globalThis.devicePixelRatio,
-      })
-    : 1;
+function liveStampSurfaceResolution(
+  surface: StudioLiveInkSurface
+): StudioNativeLiveSurfaceResolutionDecision {
+  return decideStudioNativeLiveSurfaceResolution({
+    cssWidth: surface.width,
+    cssHeight: surface.height,
+    devicePixelRatio: typeof globalThis.devicePixelRatio === "number"
+      ? globalThis.devicePixelRatio
+      : 1,
+  });
 }
 
 function normalizedPressure(value: unknown): number {
@@ -58,6 +61,7 @@ export class StudioLiveStampOverlayRenderer {
   private context: CanvasRenderingContext2D | null = null;
   private surface: StudioLiveInkSurface | null = null;
   private dpr = 1;
+  private resolutionDecision: StudioNativeLiveSurfaceResolutionDecision | null = null;
 
   private active = false;
   private style: StudioStampBrushStyle | null = null;
@@ -103,13 +107,24 @@ export class StudioLiveStampOverlayRenderer {
     return this.settled.length;
   }
 
+  /** False means the exact retained stamp renderer must own the visible draft. */
+  get isNativeSurfaceReady(): boolean {
+    return this.context !== null
+      && this.surface !== null
+      && this.resolutionDecision?.ok === true;
+  }
+
+  get surfaceResolutionDecision(): StudioNativeLiveSurfaceResolutionDecision | null {
+    return this.resolutionDecision;
+  }
+
   begin(
     inputStyle: StudioStampBrushStyle,
     xInput: number,
     yInput: number,
     pressureInput: number
   ): boolean {
-    if (!this.context || !this.surface) return false;
+    if (!this.context || !this.surface || !this.isNativeSurfaceReady) return false;
     const x = finiteCoordinate(xInput);
     const y = finiteCoordinate(yInput);
     if (x === null || y === null) return false;
@@ -265,7 +280,7 @@ export class StudioLiveStampOverlayRenderer {
   private prepared(): CanvasRenderingContext2D | null {
     const context = this.context;
     const surface = this.surface;
-    if (!context || !surface) return null;
+    if (!context || !surface || !this.isNativeSurfaceReady) return null;
     const k = this.dpr * surface.documentScale;
     context.save();
     if (surface.flipX) {
@@ -289,12 +304,22 @@ export class StudioLiveStampOverlayRenderer {
   private applySurface(): void {
     const canvas = this.canvas;
     const surface = this.surface;
-    if (!canvas || !surface) return;
-    this.dpr = liveStampDevicePixelRatio(surface);
-    const width = Math.max(1, Math.round(surface.width * this.dpr));
-    const height = Math.max(1, Math.round(surface.height * this.dpr));
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    if (!canvas || !surface) {
+      this.resolutionDecision = null;
+      return;
+    }
+    const decision = liveStampSurfaceResolution(surface);
+    this.resolutionDecision = decision;
+    if (!decision.ok) {
+      this.dpr = 1;
+      if (canvas.width !== 1) canvas.width = 1;
+      if (canvas.height !== 1) canvas.height = 1;
+      this.resetActiveState();
+      return;
+    }
+    this.dpr = decision.devicePixelRatio;
+    if (canvas.width !== decision.backingWidth) canvas.width = decision.backingWidth;
+    if (canvas.height !== decision.backingHeight) canvas.height = decision.backingHeight;
   }
 
   private clearRect(): void {

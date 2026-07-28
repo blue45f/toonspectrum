@@ -44,6 +44,7 @@ import {
   type StudioDialogueImportMatchMode,
   type StudioDialogueInterchangeDocument,
   type StudioDialogueInterchangeFormat,
+  type StudioDialogueInterchangeResult,
 } from "./studio-dialogue-interchange";
 import {
   buildDialogueReadAloudQueue,
@@ -155,11 +156,17 @@ const INTERCHANGE_FORMATS: readonly {
   { id: "tsv", label: "TSV 번역표" },
   { id: "json", label: "JSON 무손실" },
   { id: "fountain", label: "Fountain 대본" },
+  { id: "fdx", label: "Final Draft FDX" },
   { id: "srt", label: "SRT 자막" },
   { id: "vtt", label: "WebVTT 자막" },
   { id: "markdown", label: "Markdown" },
   { id: "txt", label: "TXT" },
 ] as const;
+
+interface PendingFdxInterchangeImport {
+  readonly fileName: string;
+  readonly parsed: StudioDialogueInterchangeResult;
+}
 
 function dialogueFormatFromFileName(fileName: string): StudioDialogueInterchangeFormat | null {
   const extension = fileName.toLocaleLowerCase("en-US").split(".").pop();
@@ -254,6 +261,8 @@ export function StudioDialogueBatchPanel({
     text: string;
   } | null>(null);
   const [interchangeBusy, setInterchangeBusy] = useState(false);
+  const [pendingFdxImport, setPendingFdxImport] =
+    useState<PendingFdxInterchangeImport | null>(null);
   /** Ephemeral action feedback for format / convert (not interchange). */
   const [formatStatus, setFormatStatus] = useState<{
     tone: "good" | "warn";
@@ -298,6 +307,8 @@ export function StudioDialogueBatchPanel({
   const skipBlurCommitIdRef = useRef<string | null>(null);
   const initialFocusDoneRef = useRef(false);
   const readAloudHeadingId = useId();
+  const interchangePanelId = useId();
+  const fdxPreviewHeadingId = useId();
 
   // 캔버스에서 대사를 선택한 뒤 열면 바로 편집하고, 그 외에는 기존 찾아바꾸기 진입점을 유지한다.
   useEffect(() => {
@@ -657,6 +668,29 @@ export function StudioDialogueBatchPanel({
     }
   };
 
+  const applyParsedInterchange = async (
+    parsed: StudioDialogueInterchangeResult
+  ): Promise<void> => {
+    if (!onImportInterchange) {
+      throw new Error("현재 문서에서는 대사 가져오기를 사용할 수 없습니다.");
+    }
+    const applied = await onImportInterchange(parsed.document, interchangeMatchMode);
+    setDrafts({});
+    const details = [
+      `${applied.changed}개 대사를 한 번에 반영했어요.`,
+      applied.locked > 0 ? `잠긴 대사 ${applied.locked}개 제외.` : "",
+      applied.missing > 0 ? `연결하지 못한 대사 ${applied.missing}개.` : "",
+      applied.droppedMetadata > 0
+        ? `화자·시간 메타데이터 ${applied.droppedMetadata}개는 캔버스에 쓰지 않았어요.`
+        : "",
+      ...parsed.warnings,
+    ].filter(Boolean);
+    setInterchangeStatus({
+      tone: applied.missing > 0 || applied.locked > 0 || parsed.lossy ? "warn" : "good",
+      text: details.join(" "),
+    });
+  };
+
   const importInterchange = async (file: File) => {
     const format = dialogueFormatFromFileName(file.name);
     if (!format) {
@@ -668,22 +702,22 @@ export function StudioDialogueBatchPanel({
       return;
     }
     setInterchangeBusy(true);
+    setPendingFdxImport(null);
     setInterchangeStatus(null);
     try {
       const parsed = parseStudioDialogueInterchange(format, await file.arrayBuffer());
-      const applied = await onImportInterchange(parsed.document, interchangeMatchMode);
-      setDrafts({});
-      const details = [
-        `${applied.changed}개 대사를 한 번에 반영했어요.`,
-        applied.locked > 0 ? `잠긴 대사 ${applied.locked}개 제외.` : "",
-        applied.missing > 0 ? `연결하지 못한 대사 ${applied.missing}개.` : "",
-        applied.droppedMetadata > 0 ? `화자·시간 메타데이터 ${applied.droppedMetadata}개는 캔버스에 쓰지 않았어요.` : "",
-        ...parsed.warnings,
-      ].filter(Boolean);
-      setInterchangeStatus({
-        tone: applied.missing > 0 || applied.locked > 0 || parsed.lossy ? "warn" : "good",
-        text: details.join(" "),
-      });
+      if (format === "fdx") {
+        if (!parsed.lossPreview) {
+          throw new Error("FDX 손실 미리보기를 만들지 못해 적용을 중단했습니다.");
+        }
+        setPendingFdxImport({ fileName: file.name, parsed });
+        setInterchangeStatus({
+          tone: "warn",
+          text: "FDX는 장면·액션 구조를 페이지와 컷으로 바꿉니다. 아래 손실 미리보기를 확인한 뒤 적용해 주세요.",
+        });
+      } else {
+        await applyParsedInterchange(parsed);
+      }
     } catch (error) {
       setInterchangeStatus({
         tone: "bad",
@@ -692,6 +726,32 @@ export function StudioDialogueBatchPanel({
     } finally {
       setInterchangeBusy(false);
     }
+  };
+
+  const confirmPendingFdxImport = async () => {
+    if (!pendingFdxImport || interchangeBusy) return;
+    setInterchangeBusy(true);
+    setInterchangeStatus(null);
+    try {
+      await applyParsedInterchange(pendingFdxImport.parsed);
+      setPendingFdxImport(null);
+    } catch (error) {
+      setInterchangeStatus({
+        tone: "bad",
+        text: error instanceof Error ? error.message : "FDX 대사를 반영하지 못했습니다.",
+      });
+    } finally {
+      setInterchangeBusy(false);
+    }
+  };
+
+  const cancelPendingFdxImport = () => {
+    if (interchangeBusy) return;
+    setPendingFdxImport(null);
+    setInterchangeStatus({
+      tone: "good",
+      text: "FDX 가져오기를 취소했어요. 문서는 변경되지 않았습니다.",
+    });
   };
 
   const canPause = playback.status === "playing" || playback.status === "paused";
@@ -738,11 +798,12 @@ export function StudioDialogueBatchPanel({
           type="button"
           onClick={() => setInterchangeOpen((open) => !open)}
           aria-expanded={interchangeOpen}
+          aria-controls={interchangePanelId}
           className="flex min-h-11 w-full items-center gap-2 rounded-lg px-1 text-left text-[0.7rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <FileText size={14} aria-hidden />
           번역·대본 파일
-          <span className="ml-auto text-[0.6rem] font-medium text-fg-4">8종</span>
+          <span className="ml-auto text-[0.6rem] font-medium text-fg-4">9종</span>
           <ChevronDown
             size={14}
             aria-hidden
@@ -750,7 +811,10 @@ export function StudioDialogueBatchPanel({
           />
         </button>
         {interchangeOpen && (
-          <div className="mt-1.5 space-y-2 rounded-xl border border-line bg-card/55 p-2">
+          <div
+            id={interchangePanelId}
+            className="mt-1.5 space-y-2 rounded-xl border border-line bg-card/55 p-2"
+          >
             <div className="grid grid-cols-2 gap-1.5">
               <label className="text-[0.6rem] font-medium text-fg-3">
                 내보내기 형식
@@ -796,7 +860,7 @@ export function StudioDialogueBatchPanel({
                 <Upload size={13} aria-hidden /> {interchangeBusy ? "읽는 중" : "가져오기"}
                 <input
                   type="file"
-                  accept=".csv,.tsv,.json,.fountain,.srt,.vtt,.md,.txt,text/plain,text/csv,text/vtt,application/json"
+                  accept=".csv,.tsv,.json,.fountain,.fdx,.srt,.vtt,.md,.txt,text/plain,text/csv,text/vtt,application/json,application/xml,text/xml"
                   className="sr-only"
                   disabled={interchangeBusy}
                   onChange={(event) => {
@@ -808,8 +872,129 @@ export function StudioDialogueBatchPanel({
               </label>
             </div>
             <p className="text-[0.6rem] leading-relaxed text-fg-4">
-              ID가 있는 JSON/CSV는 가장 정확합니다. SRT·VTT는 시간은 읽지만 캔버스 좌표가 없어 순서로 연결합니다.
+              ID가 있는 JSON/CSV는 가장 정확합니다. FDX는 적용 전 구조 손실을 확인하며,
+              SRT·VTT는 캔버스 좌표가 없어 순서로 연결합니다.
             </p>
+            {pendingFdxImport?.parsed.lossPreview ? (
+              <section
+                aria-labelledby={fdxPreviewHeadingId}
+                className="space-y-2 rounded-xl border border-warn/40 bg-warn/10 p-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3
+                      id={fdxPreviewHeadingId}
+                      className="text-[0.68rem] font-bold text-fg"
+                    >
+                      FDX 손실 미리보기
+                    </h3>
+                    <p
+                      className="mt-0.5 truncate text-[0.58rem] text-fg-3"
+                      title={pendingFdxImport.fileName}
+                    >
+                      {pendingFdxImport.fileName}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-warn/45 bg-panel/70 px-2 py-0.5 text-[0.56rem] font-semibold text-fg-2">
+                    적용 전 확인
+                  </span>
+                </div>
+
+                <dl className="grid grid-cols-2 gap-1 text-[0.59rem] sm:grid-cols-4">
+                  {[
+                    ["원본 문단", pendingFdxImport.parsed.lossPreview.sourceParagraphs],
+                    ["가져올 대사", pendingFdxImport.parsed.lossPreview.emittedCues],
+                    ["문맥만 사용", pendingFdxImport.parsed.lossPreview.contextOnlyElements],
+                    ["제외", pendingFdxImport.parsed.lossPreview.droppedElements],
+                  ].map(([label, value]) => (
+                    <div
+                      key={String(label)}
+                      className="rounded-lg border border-line/70 bg-panel/65 px-2 py-1.5"
+                    >
+                      <dt className="text-fg-4">{label}</dt>
+                      <dd className="mt-0.5 font-bold tabular-nums text-fg">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+
+                {pendingFdxImport.parsed.lossPreview.items.some(
+                  (item) => item.disposition !== "mapped"
+                ) ? (
+                  <div className="max-h-36 space-y-1 overflow-y-auto overscroll-contain rounded-lg border border-line/70 bg-panel/55 p-1.5">
+                    {pendingFdxImport.parsed.lossPreview.items
+                      .filter((item) => item.disposition !== "mapped")
+                      .slice(0, 12)
+                      .map((item) => (
+                        <div
+                          key={`${item.sourceIndex}:${item.sourceType}`}
+                          className="rounded-md px-1.5 py-1 text-[0.58rem] leading-relaxed text-fg-3"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={cx(
+                                "shrink-0 rounded-full border px-1.5 py-0.5 text-[0.52rem] font-semibold",
+                                item.disposition === "dropped"
+                                  ? "border-bad/35 bg-bad/10 text-bad"
+                                  : "border-warn/35 bg-warn/10 text-fg-2"
+                              )}
+                            >
+                              {item.disposition === "dropped" ? "제외" : "문맥"}
+                            </span>
+                            <strong className="min-w-0 truncate text-fg-2">
+                              {item.sourceType} · {item.preview}
+                            </strong>
+                          </div>
+                          <p className="mt-0.5 pl-1 text-fg-4">{item.detail}</p>
+                        </div>
+                      ))}
+                    {pendingFdxImport.parsed.lossPreview.items.filter(
+                      (item) => item.disposition !== "mapped"
+                    ).length > 12 ? (
+                      <p className="px-1.5 py-1 text-[0.56rem] text-fg-4">
+                        나머지{" "}
+                        {pendingFdxImport.parsed.lossPreview.items.filter(
+                          (item) => item.disposition !== "mapped"
+                        ).length - 12}
+                        개 항목은 요약 수치에 포함되어 있습니다.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-good/35 bg-good/10 px-2 py-1.5 text-[0.6rem] text-good">
+                    지원 범위 밖에서 제외되는 문단이 없습니다.
+                  </p>
+                )}
+
+                {pendingFdxImport.parsed.lossPreview.truncated ? (
+                  <p className="text-[0.58rem] leading-relaxed text-warn">
+                    매우 큰 파일이라 상세 목록은 안전 예산에서 줄였습니다. 위 합계에는 전체
+                    분석 결과가 반영되어 있습니다.
+                  </p>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={cancelPendingFdxImport}
+                    disabled={interchangeBusy}
+                    className="min-h-11 rounded-lg border border-line bg-panel px-2 text-[0.64rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void confirmPendingFdxImport()}
+                    disabled={interchangeBusy}
+                    className="min-h-11 rounded-lg bg-accent px-2 text-[0.64rem] font-semibold text-on-accent transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-50"
+                  >
+                    {interchangeBusy ? "적용 중" : "확인하고 적용"}
+                  </button>
+                </div>
+                <p className="text-[0.56rem] leading-relaxed text-fg-4">
+                  적용은 문서 기록 한 번으로 반영되며 실행 취소 한 번으로 되돌릴 수 있습니다.
+                </p>
+              </section>
+            ) : null}
             {interchangeStatus && (
               <p
                 role={interchangeStatus.tone === "bad" ? "alert" : "status"}

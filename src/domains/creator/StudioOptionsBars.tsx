@@ -127,6 +127,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
         // when the lazy chunk resolves, which can make a just-finished stroke appear to jump.
         <Suspense fallback={null}>
           <StudioDrawOptionsBar
+            key={draw.drawMode}
             docked
             brushCatalogOpen={draw.brushCatalogOpen}
             onToggleBrushCatalog={stableHandlers.toggleBrushCatalog}

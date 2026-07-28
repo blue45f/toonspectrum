@@ -35,12 +35,13 @@ import { uid } from "./studio-id";
 import { imageFilterCacheKey } from "./studio-konva-filter-fields";
 import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
+import { type StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
 import { StudioLiveInkOverlayRenderer, StudioLiveInkPredictionRenderer } from "./studio-live-ink-overlay";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "./studio-master-page";
 import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { vignetteCss, type PageGrade } from "./studio-page-grade";
-import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
+import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
 import { isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { type PanelSplitPreview } from "./studio-panel-split";
@@ -314,6 +315,9 @@ export interface StudioCanvasViewportHandlers {
   enterCanvasOnlyMode: () => void;
   executeGenerateTranslations: () => Promise<void>;
   groupSelectedElements: () => void;
+  ungroupSelectedElements: () => void;
+  toggleSelectedElementsLocked: () => void;
+  reorderSelectedElements: (direction: "front" | "back") => void;
   mergeSelectedBubbles: () => void;
   handleTutorialTry: (action: StudioTutorialTryAction) => void;
   hideBrushCursor: () => void;
@@ -376,6 +380,8 @@ export interface StudioCanvasViewportHandlers {
 }
 
 export interface StudioCanvasViewportProps {
+  liveDynamicBrushOverlayRenderer: StudioLiveDynamicBrushOverlayRenderer;
+  liveWetInkOverlayRenderer: import("./studio-live-wet-ink-overlay").StudioLiveWetInkOverlayRenderer;
   liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
   liveStampOverlayRenderer: StudioLiveStampOverlayRenderer;
   bubbleShapeActiveHandleIndex: number | null;
@@ -669,6 +675,8 @@ export interface StudioCanvasViewportProps {
 }
 
 export const StudioCanvasViewport = memo(function StudioCanvasViewport({
+  liveDynamicBrushOverlayRenderer,
+  liveWetInkOverlayRenderer,
   liveInkPredictionRenderer,
   liveStampOverlayRenderer,
   bubbleShapeActiveHandleIndex,
@@ -986,6 +994,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     fitCanvasToWidth,
     executeGenerateTranslations,
     groupSelectedElements,
+    ungroupSelectedElements,
+    toggleSelectedElementsLocked,
+    reorderSelectedElements,
     mergeSelectedBubbles,
     handleTutorialTry,
     hideBrushCursor,
@@ -1240,6 +1251,35 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     marqueeIds.length >= BUBBLE_MERGE_MIN_COUNT
       ? marqueeIds.map((id) => elementById.get(id)).filter((el): el is El => el !== undefined)
       : [];
+  const marqueeSelectedIdSet = new Set(marqueeSelectedEls.map((element) => element.id));
+  const selectedGroupIds = new Set(
+    marqueeSelectedEls
+      .map((element) => element.groupId)
+      .filter((groupId): groupId is string => groupId !== undefined)
+  );
+  const completeSelectionGroup =
+    selectedGroupIds.size === 1
+      ? groups.find((group) => {
+          if (!selectedGroupIds.has(group.id)) return false;
+          const memberIds = elements
+            .filter((element) => element.groupId === group.id)
+            .map((element) => element.id);
+          return (
+            memberIds.length > 0 &&
+            memberIds.length === marqueeSelectedEls.length &&
+            memberIds.every((id) => marqueeSelectedIdSet.has(id))
+          );
+        }) ?? null
+      : null;
+  const selectionLockedCount = marqueeSelectedEls.filter((element) =>
+    isEffectivelyLocked(element, groups)
+  ).length;
+  const selectionLockState =
+    selectionLockedCount === 0
+      ? "unlocked"
+      : selectionLockedCount === marqueeSelectedEls.length
+        ? "locked"
+        : "mixed";
   const marqueeBubbleCount = marqueeSelectedEls.filter((el) => el.type === "bubble").length;
   const showBubbleMerge = marqueeBubbleCount >= BUBBLE_MERGE_MIN_COUNT;
   const bubbleMergeReason = showBubbleMerge
@@ -1283,6 +1323,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             hasAutosave={hasAutosave}
             autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
             selectionCount={marqueeIds.length}
+            selectionGroupName={completeSelectionGroup?.name ?? null}
+            selectionLockState={selectionLockState}
             advancedFillBusy={advancedFillBusy}
             advancedFillPreviewMessage={advancedFillPreview?.message ?? null}
             advancedFillActive={advancedFillActive}
@@ -1290,6 +1332,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onRestoreAutosave={restoreAutosave}
             onClearAutosave={clearAutosave}
             onGroupSelection={groupSelectedElements}
+            onUngroupSelection={completeSelectionGroup ? ungroupSelectedElements : undefined}
+            onToggleSelectionLock={toggleSelectedElementsLocked}
+            onReorderSelection={reorderSelectedElements}
             onAlignSelection={alignSelected}
             showBubbleMerge={showBubbleMerge}
             bubbleMergeDisabledReason={bubbleMergeReason}
@@ -2784,6 +2829,30 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             {webGpuViewportSurface ? (
               <StudioLiveStampOverlayHost
                 renderer={liveStampOverlayRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+            {webGpuViewportSurface ? (
+              <StudioLiveDynamicBrushOverlayHost
+                renderer={liveDynamicBrushOverlayRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+            {webGpuViewportSurface ? (
+              <StudioLiveWetInkOverlayHost
+                renderer={liveWetInkOverlayRenderer}
                 left={webGpuViewportSurface.surface.left}
                 top={webGpuViewportSurface.surface.top}
                 width={webGpuViewportSurface.surface.width}

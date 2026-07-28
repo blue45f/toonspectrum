@@ -43,6 +43,11 @@ import {
   type Psd,
 } from "ag-psd";
 
+import type {
+  PsdInterchangeLossDecision,
+  PsdInterchangeLossManifest,
+  PsdInterchangeProfile,
+} from "./studio-psd-import";
 import type Konva from "konva";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +63,12 @@ interface PsdElMeta {
   blendMode?: string;
   clipBelow?: boolean;
   noClip?: boolean;
+  groupId?: string;
+  maskSrc?: string;
+  filterMaskSrc?: string;
+  smartFilters?: { entries?: readonly unknown[] };
+  bg3dScene?: unknown;
+  vrmScene?: unknown;
 }
 
 export interface PsdImageElLike extends PsdElMeta {
@@ -174,6 +185,11 @@ export interface PsdExportOptions {
   includeBackground?: boolean;
   /** 페이지 배경 — StudioPage 의 bg/bgGrad 를 그대로 전달(모듈 스스로는 페이지 상태를 모름). */
   background?: { color: string; gradient?: string[] | null };
+  /**
+   * 제품이 검증한 컨테이너는 PSD뿐이다. `"psb"`는 호출자가 지원 여부를 추측하지 않도록
+   * 런타임에서 명시적으로 fail-closed하는 사전검사 용도다.
+   */
+  container?: "psd" | "psb";
 }
 
 export interface PsdExportResult {
@@ -183,10 +199,144 @@ export interface PsdExportResult {
   skipped: string[];
   /** 실제로 PSD 레이어가 된 요소 수(배경 레이어 제외). */
   layerCount: number;
+  /** 기능별 보존/래스터화/제외를 기계적으로 읽을 수 있는 왕복 손실 명세. */
+  lossManifest?: PsdInterchangeLossManifest;
 }
 
 /** 콜러가 Blob 생성·다운로드에 쓸 MIME 타입. */
 export const PSD_EXPORT_MIME = "image/vnd.adobe.photoshop";
+export const PSD_EXPORT_MAX_FILE_BYTES = 128 * 1024 * 1024;
+export const PSD_EXPORT_MAX_DECODED_BYTES = 128 * 1024 * 1024;
+export const PSD_EXPORT_MAX_DIMENSION_PX = 30_000;
+export const PSD_EXPORT_MAX_CANVAS_PIXELS = 32 * 1024 * 1024;
+export const PSD_EXPORT_MAX_LAYERS = 4_096;
+
+const PSD_EXPORT_ALTERNATIVES = Object.freeze([
+  "대형 문서는 페이지를 나누거나 출력 배율을 낮춰 PSD로 저장",
+  "레이어 교환은 OpenRaster(.ora), 완성 픽셀은 PNG로 저장",
+] as const);
+
+export interface PsdExportPreflight {
+  readonly canExport: boolean;
+  readonly blockingReasons: readonly string[];
+  readonly lossManifest: PsdInterchangeLossManifest;
+}
+
+function exportProfile(
+  container: PsdInterchangeProfile["container"],
+  width: number,
+  height: number,
+  channels: number,
+  bitsPerChannel: number,
+  colorMode: string,
+): PsdInterchangeProfile {
+  return { container, width, height, channels, bitsPerChannel, colorMode };
+}
+
+function exportDecision(
+  feature: PsdInterchangeLossDecision["feature"],
+  disposition: PsdInterchangeLossDecision["disposition"],
+  count: number,
+  message: string,
+  alternative?: string,
+): PsdInterchangeLossDecision {
+  return alternative
+    ? { feature, disposition, count, message, alternative }
+    : { feature, disposition, count, message };
+}
+
+/** 캡처/압축을 시작하기 전에 컨테이너·크기·레이어·최소 RGBA 메모리 예산을 검증한다. */
+export function preflightPsdExport(input: {
+  readonly canvasW: number;
+  readonly canvasH: number;
+  readonly scale?: number;
+  readonly layerCount: number;
+  readonly container?: "psd" | "psb";
+}): PsdExportPreflight {
+  const scale = input.scale && input.scale > 0 ? input.scale : 1;
+  const width = Math.round(input.canvasW * scale);
+  const height = Math.round(input.canvasH * scale);
+  const container = input.container ?? "psd";
+  const blockingReasons: string[] = [];
+  const decisions: PsdInterchangeLossDecision[] = [
+    exportDecision("bit-depth", "preserved", 1, "Studio 8-bit/channel 픽셀을 PSD 8-bit/channel로 기록합니다."),
+    exportDecision("color-space", "preserved", 1, "Studio sRGB 픽셀을 PSD RGB 8-bit로 기록합니다."),
+  ];
+  if (container === "psb") {
+    blockingReasons.push("PSB 내보내기는 대형 문서 메모리·왕복 검증이 끝나지 않아 제공하지 않습니다.");
+    decisions.push(exportDecision(
+      "layers",
+      "blocked",
+      1,
+      "ag-psd의 PSB 코드가 존재하더라도 제품 지원으로 간주하지 않고 PSD만 출력합니다.",
+      PSD_EXPORT_ALTERNATIVES[0],
+    ));
+  }
+  if (
+    !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width < 1
+    || height < 1
+  ) {
+    blockingReasons.push("PSD 출력 캔버스 크기와 배율은 유한한 양의 정수 픽셀이어야 합니다.");
+  } else {
+    if (width > PSD_EXPORT_MAX_DIMENSION_PX || height > PSD_EXPORT_MAX_DIMENSION_PX) {
+      blockingReasons.push(
+        `PSD 출력 ${width.toLocaleString("ko-KR")}×${height.toLocaleString("ko-KR")}px가 안전 한 변 ${PSD_EXPORT_MAX_DIMENSION_PX.toLocaleString("ko-KR")}px를 넘습니다.`,
+      );
+      decisions.push(exportDecision(
+        "resolution",
+        "blocked",
+        1,
+        "PSD v1/브라우저 캔버스 안전 크기를 넘는 출력은 캡처 전에 차단합니다.",
+        PSD_EXPORT_ALTERNATIVES[0],
+      ));
+    }
+    if (width * height > PSD_EXPORT_MAX_CANVAS_PIXELS) {
+      blockingReasons.push(
+        `PSD 최소 합성 픽셀 ${Math.ceil(width * height / 1_000_000).toLocaleString("ko-KR")}MP가 브라우저 예산 ${Math.floor(PSD_EXPORT_MAX_CANVAS_PIXELS / 1_000_000)}MP를 넘습니다.`,
+      );
+      decisions.push(exportDecision(
+        "resolution",
+        "blocked",
+        1,
+        "최소 RGBA 합성 버퍼가 128MiB를 넘는 출력은 메모리 할당 전에 차단합니다.",
+        PSD_EXPORT_ALTERNATIVES[0],
+      ));
+    }
+  }
+  if (!Number.isSafeInteger(input.layerCount) || input.layerCount < 0) {
+    blockingReasons.push("PSD 레이어 수가 올바르지 않습니다.");
+  } else if (input.layerCount > PSD_EXPORT_MAX_LAYERS) {
+    blockingReasons.push(
+      `PSD 레이어 ${input.layerCount.toLocaleString("ko-KR")}개가 안전 예산 ${PSD_EXPORT_MAX_LAYERS.toLocaleString("ko-KR")}개를 넘습니다.`,
+    );
+  }
+  return {
+    canExport: blockingReasons.length === 0,
+    blockingReasons,
+    lossManifest: {
+      direction: "export",
+      source: exportProfile("studio", Math.max(1, width), Math.max(1, height), 4, 8, "sRGB"),
+      target: exportProfile(container, Math.max(1, width), Math.max(1, height), 4, 8, "RGB"),
+      decisions,
+      budgets: {
+        maxFileBytes: PSD_EXPORT_MAX_FILE_BYTES,
+        maxDecodedBytes: PSD_EXPORT_MAX_DECODED_BYTES,
+        maxDimensionPx: PSD_EXPORT_MAX_DIMENSION_PX,
+      },
+      alternatives: PSD_EXPORT_ALTERNATIVES,
+    },
+  };
+}
+
+function assertPsdOutputBudget(buffer: ArrayBuffer): void {
+  if (buffer.byteLength > PSD_EXPORT_MAX_FILE_BYTES) {
+    throw new Error(
+      `PSD 결과 ${Math.ceil(buffer.byteLength / 1024 / 1024)}MB가 출력 한도 ${PSD_EXPORT_MAX_FILE_BYTES / 1024 / 1024}MB를 넘습니다. ${PSD_EXPORT_ALTERNATIVES.join(" 또는 ")}해 주세요.`,
+    );
+  }
+}
 
 /** 단일 페이지 PSD 파일명 — 다른 내보내기 형식(svgExportFileName 등)과 같은 제목 규칙. */
 export function psdExportFileName(title: string): string {
@@ -197,6 +347,14 @@ export function psdExportFileName(title: string): string {
 export function psdExportResultMessage(result: PsdExportResult): string {
   const parts = [`PSD 저장 완료 — 레이어 ${result.layerCount}개`];
   if (result.skipped.length > 0) parts.push(`알림 ${result.skipped.length}건`);
+  const rasterized = result.lossManifest?.decisions
+    .filter((decision) => decision.disposition === "rasterized")
+    .reduce((total, decision) => total + decision.count, 0) ?? 0;
+  const dropped = result.lossManifest?.decisions
+    .filter((decision) => decision.disposition === "dropped")
+    .reduce((total, decision) => total + decision.count, 0) ?? 0;
+  if (rasterized > 0) parts.push(`래스터화 ${rasterized}건`);
+  if (dropped > 0) parts.push(`편집 구조 제외 ${dropped}건`);
   return parts.join(" · ");
 }
 
@@ -589,6 +747,161 @@ function makeBackgroundLayer(width: number, height: number, background: { color:
   return { name: "배경", left: 0, top: 0, canvas };
 }
 
+const PSD_BAKED_EFFECT_KEYS = Object.freeze([
+  "blur",
+  "brightness",
+  "chromatic",
+  "clarity",
+  "colorBalance",
+  "contrast",
+  "curve",
+  "detail",
+  "distort",
+  "duotoneHighlight",
+  "duotoneShadow",
+  "glow",
+  "gradientMap",
+  "grayscale",
+  "grain",
+  "halftone",
+  "hue",
+  "inkWash",
+  "invert",
+  "levelsBlack",
+  "light",
+  "lineart",
+  "noise",
+  "outline",
+  "photoFilter",
+  "pixelate",
+  "posterize",
+  "saturation",
+  "screentone",
+  "sepia",
+  "shadowBlur",
+  "shadowHighlight",
+  "sharpen",
+  "sketch",
+  "stylize",
+  "temperature",
+] as const);
+
+function hasBakedPsdEffect(element: PsdExportEl): boolean {
+  const record = element as unknown as Record<string, unknown>;
+  return PSD_BAKED_EFFECT_KEYS.some((key) => {
+    const value = record[key];
+    return value !== undefined && value !== null && value !== false && value !== 0 && value !== "";
+  });
+}
+
+function withPsdExportLossDecisions(
+  base: PsdInterchangeLossManifest,
+  sourceElements: readonly PsdExportEl[],
+  capturedElements: readonly PsdExportEl[],
+  editableTextCount: number,
+  rasterTextCount: number,
+): PsdInterchangeLossManifest {
+  const decisions = [...base.decisions];
+  const capturedLayerCount = capturedElements.length;
+  if (capturedLayerCount > 0) {
+    decisions.push(exportDecision(
+      "layers",
+      "preserved",
+      capturedLayerCount,
+      `요소 ${capturedLayerCount.toLocaleString("ko-KR")}개를 개별 PSD 레이어로 기록합니다.`,
+    ));
+  }
+  const missingLayerCount = Math.max(0, sourceElements.length - capturedLayerCount);
+  if (missingLayerCount > 0) {
+    decisions.push(exportDecision(
+      "layers",
+      "dropped",
+      missingLayerCount,
+      `캡처할 수 없는 요소 ${missingLayerCount.toLocaleString("ko-KR")}개는 PSD 레이어에서 제외합니다.`,
+    ));
+  }
+  if (editableTextCount > 0) {
+    decisions.push(exportDecision(
+      "text",
+      "preserved",
+      editableTextCount,
+      `가로 단색 텍스트 ${editableTextCount.toLocaleString("ko-KR")}개를 편집 가능한 PSD 문자 descriptor와 래스터 프리뷰로 기록합니다.`,
+    ));
+  }
+  if (rasterTextCount > 0) {
+    decisions.push(exportDecision(
+      "text",
+      "rasterized",
+      rasterTextCount,
+      `회전·세로쓰기·곡선·효과 텍스트 ${rasterTextCount.toLocaleString("ko-KR")}개는 화면 그대로 픽셀로 기록합니다.`,
+    ));
+  }
+  const groupCount = new Set(
+    capturedElements.map((element) => element.groupId).filter((id): id is string => !!id),
+  ).size;
+  if (groupCount > 0) {
+    decisions.push(exportDecision(
+      "groups",
+      "dropped",
+      groupCount,
+      `Studio 그룹 ${groupCount.toLocaleString("ko-KR")}개의 폴더 구조는 PSD에 만들지 않고 z-order만 유지합니다.`,
+    ));
+  }
+  const maskCount = capturedElements.filter((element) => !!element.maskSrc).length;
+  if (maskCount > 0) {
+    decisions.push(exportDecision(
+      "layer-mask",
+      "rasterized",
+      maskCount,
+      `Studio 레이어 마스크 ${maskCount.toLocaleString("ko-KR")}개는 PSD 마스크 채널이 아니라 각 레이어의 보이는 픽셀에 합성합니다.`,
+      "마스크 재편집이 필요하면 ToonSpectrum 프로젝트 아카이브를 함께 보관하세요.",
+    ));
+  }
+  const adjustmentCount = capturedElements.filter((element) =>
+    (element.smartFilters?.entries?.length ?? 0) > 0 || !!element.filterMaskSrc
+  ).length;
+  if (adjustmentCount > 0) {
+    decisions.push(exportDecision(
+      "adjustment-layer",
+      "rasterized",
+      adjustmentCount,
+      `스마트 필터·필터 마스크 ${adjustmentCount.toLocaleString("ko-KR")}개는 비파괴 파라미터 대신 레이어 픽셀에 굽습니다.`,
+    ));
+  }
+  const effectCount = capturedElements.filter(hasBakedPsdEffect).length;
+  if (effectCount > 0) {
+    decisions.push(exportDecision(
+      "layer-effects",
+      "rasterized",
+      effectCount,
+      `Studio 필터·레이어 효과 ${effectCount.toLocaleString("ko-KR")}개는 PSD 효과 descriptor 대신 화면 결과로 굽습니다.`,
+    ));
+  }
+  const sceneCount = capturedElements.filter((element) =>
+    !!element.bg3dScene || !!element.vrmScene
+  ).length;
+  if (sceneCount > 0) {
+    decisions.push(exportDecision(
+      "smart-object",
+      "rasterized",
+      sceneCount,
+      `3D/VRM 재편집 장면 ${sceneCount.toLocaleString("ko-KR")}개는 PSD 스마트 오브젝트가 아니라 캡처 레이어로 기록합니다.`,
+    ));
+  }
+  const vectorLikeCount = capturedElements.filter((element) =>
+    element.type !== "image" && element.type !== "text"
+  ).length;
+  if (vectorLikeCount > 0) {
+    decisions.push(exportDecision(
+      "layers",
+      "rasterized",
+      vectorLikeCount,
+      `말풍선·도형·드로잉 ${vectorLikeCount.toLocaleString("ko-KR")}개는 별도 레이어를 유지하되 벡터 편집 정보는 픽셀로 굽습니다.`,
+    ));
+  }
+  return { ...base, decisions };
+}
+
 // ---------------------------------------------------------------------------
 // 메인 — 페이지 → 레이어별 PSD
 // ---------------------------------------------------------------------------
@@ -618,6 +931,18 @@ export async function exportPagePsd(
   opts: PsdExportOptions = {}
 ): Promise<PsdExportResult> {
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
+  const preflight = preflightPsdExport({
+    canvasW,
+    canvasH,
+    scale,
+    layerCount: elements.length,
+    container: opts.container,
+  });
+  if (!preflight.canExport) {
+    throw new Error(
+      `${preflight.blockingReasons.join(" ")} ${preflight.lossManifest.alternatives.join(" 또는 ")}해 주세요.`,
+    );
+  }
   const safeEffScale = effScale > 0 ? effScale : 1;
   const psdWidth = Math.max(1, Math.round(canvasW * scale));
   const psdHeight = Math.max(1, Math.round(canvasH * scale));
@@ -626,11 +951,20 @@ export async function exportPagePsd(
   if (elements.length === 0) {
     skipped.push("페이지에 요소가 없어 빈 캔버스로 저장했어요.");
     const psd: Psd = { width: psdWidth, height: psdHeight };
-    const blob = new Blob([writePsd(psd)], { type: PSD_EXPORT_MIME });
-    return { blob, skipped, layerCount: 0 };
+    const buffer = writePsd(psd);
+    assertPsdOutputBudget(buffer);
+    return {
+      blob: new Blob([buffer], { type: PSD_EXPORT_MIME }),
+      skipped,
+      layerCount: 0,
+      lossManifest: withPsdExportLossDecisions(preflight.lossManifest, elements, [], 0, 0),
+    };
   }
 
   const layers: Layer[] = [];
+  const capturedElements: PsdExportEl[] = [];
+  let editableTextCount = 0;
+  let rasterTextCount = 0;
 
   for (let i = 0; i < elements.length; i++) {
     // 요소별 toCanvas() 래스터화 + writePsd() 압축은 전부 동기(CPU 바운드)라, 요소가 많은 페이지를
@@ -716,7 +1050,9 @@ export async function exportPagePsd(
       });
       if (editable.text) {
         layer.text = editable.text;
+        editableTextCount += 1;
       } else if (editable.fallbackReasons.length > 0) {
+        rasterTextCount += 1;
         skipped.push(
           `${label}: ${editable.fallbackReasons.join(", ")} 때문에 편집 가능한 PSD 텍스트로 보존할 수 없어 화면 그대로 래스터화했어요.`,
         );
@@ -724,6 +1060,7 @@ export async function exportPagePsd(
     }
 
     layers.push(layer);
+    capturedElements.push(el);
 
     if (el.clipBelow && layers.length < 2) {
       // 맨 뒤 요소가 clipBelow 인 경우 클리핑할 "아래 레이어"가 없다 — ag-psd 는 이를 그대로
@@ -759,6 +1096,18 @@ export async function exportPagePsd(
   } catch (err) {
     throw new Error(`PSD 파일을 만들지 못했어요: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
   }
+  assertPsdOutputBudget(buffer);
 
-  return { blob: new Blob([buffer], { type: PSD_EXPORT_MIME }), skipped, layerCount: layers.length };
+  return {
+    blob: new Blob([buffer], { type: PSD_EXPORT_MIME }),
+    skipped,
+    layerCount: layers.length,
+    lossManifest: withPsdExportLossDecisions(
+      preflight.lossManifest,
+      elements,
+      capturedElements,
+      editableTextCount,
+      rasterTextCount,
+    ),
+  };
 }

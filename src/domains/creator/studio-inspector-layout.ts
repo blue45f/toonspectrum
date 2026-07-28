@@ -50,6 +50,11 @@ export interface StudioInspectorActionContext {
   hasSelection: boolean;
   selectedType: string | null;
   drawing: boolean;
+  /**
+   * 전문 픽셀 도구는 선택 타입과 별개로 발견 가능해야 한다. false/생략은 레거시
+   * 호출부의 선택 기반 노출 규칙을 유지하고, Inspector는 명시적으로 true를 넘긴다.
+   */
+  imageToolsAvailable?: boolean;
 }
 
 export interface StudioInspectorAction {
@@ -241,8 +246,11 @@ export function studioInspectorActions(
     });
   }
 
-  if (context.selectedType === "image") contextual.push(...IMAGE_ACTIONS);
-  else if (context.selectedType === "draw") {
+  if (
+    context.imageToolsAvailable === true ||
+    context.selectedType === "image" ||
+    context.selectedType === "draw"
+  ) {
     contextual.push(...IMAGE_ACTIONS);
   }
   return [...contextual, ...ALWAYS_AVAILABLE_ACTIONS];

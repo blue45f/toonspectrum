@@ -15,7 +15,7 @@ import {
 
 import type { El, ImageEl } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
-import type { SvgExportTheme } from "./studio-svg-export";
+import type { SvgExportResult, SvgExportTheme } from "./studio-svg-export";
 import type {
   StudioVectorReferenceInput,
   StudioVectorReferenceBudgets,
@@ -51,6 +51,25 @@ export interface StudioEditableRasterCopyInput {
   readonly name?: string;
   /** BACK -> FRONT insertion index. Visible-page copies default to the top. */
   readonly insertionIndex?: number;
+  /**
+   * `hide-originals` keeps source objects intact but hides their authored page instances in the
+   * same commit that inserts the raster copy. Pixel editing then reveals the page background
+   * instead of an unchanged duplicate source directly underneath.
+   */
+  readonly sourceDisposition?: "preserve-visible" | "hide-originals";
+  /**
+   * Source ids that belong to the authored destination and may receive `sourceDisposition`.
+   *
+   * A page composite can also contain read-only master/linked underlays. Keeping this list
+   * separate prevents a locked master from being treated as an authored mutation target while
+   * still fingerprinting and rendering it in the exact BACK -> FRONT source order.
+   */
+  readonly sourceDispositionIds?: readonly string[];
+  /**
+   * Explicitly omitted ids (for example a transient preview target). An id cannot be both
+   * requested through `sourceIds` and excluded; that ambiguous request fails closed.
+   */
+  readonly excludedSourceIds?: readonly string[];
   readonly documentMutationBlockedReason?: string | null;
   readonly budgets?: StudioVectorReferenceBudgets;
 }
@@ -78,24 +97,80 @@ export interface StudioEditablePageRasterContextInput {
   readonly reviewLocked: boolean;
   readonly timelinePlaying: boolean;
   readonly viewTransformSuppressed: boolean;
+  readonly purpose?: "page-filter" | "pixel-selection";
   readonly budgets?: StudioVectorReferenceBudgets;
 }
 
 export interface StudioEditablePageRasterContext {
-  readonly input: StudioEditableRasterCopyInput;
+  /** Page contexts always normalize an owned mutable group snapshot for existing layer helpers. */
+  readonly input: StudioEditableRasterCopyInput & { readonly groups: LayerGroup[] };
   readonly destinationElements: readonly El[];
 }
 
 export interface StudioRasterPreparationSourceSummary {
+  /** Full-page image-local frame shared by rect/ellipse/lasso/brush/wand selection tools. */
+  readonly frame: StudioRasterPreparationFrame;
+  /** Clipped union of visible, non-transparent authored source geometry; null means no ink/object. */
+  readonly sourceBounds: StudioRasterPreparationBounds | null;
+  /** Stable BACK -> FRONT order used by both the SVG preflight and the raster result. */
+  readonly orderedVisibleSourceIds: readonly string[];
+  /** Exact renderer sources in the same BACK -> FRONT order. */
+  readonly exactRenderableSourceIds: readonly string[];
+  /** Visible ids whose effective element/group lock prevents hide-originals mutation. */
+  readonly lockedVisibleSourceIds: readonly string[];
   readonly visibleContentCount: number;
   readonly hiddenContentCount: number;
   readonly visibleRasterCount: number;
   readonly visibleUnlockedRasterCount: number;
   readonly visibleVectorDrawCount: number;
+  /** Draw, shape/frame, text/bubble and effect-line objects that contribute visible pixels. */
+  readonly visibleCompositeVectorCount: number;
+  /** Raster previews that retain a linked editable 3D/VRM scene. */
+  readonly visibleLinked3dPreviewCount: number;
   readonly exactRenderableVisibleCount: number;
   readonly unsupportedVisibleCount: number;
   readonly unsupportedReasons: readonly string[];
   readonly hasPageBackground: boolean;
+}
+
+export interface StudioRasterPreparationFrame {
+  readonly x: 0;
+  readonly y: 0;
+  readonly width: number;
+  readonly height: number;
+  readonly rotation: 0;
+}
+
+export interface StudioRasterPreparationBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export const STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS = [
+  "rect",
+  "ellipse",
+  "lasso",
+  "poly-lasso",
+  "brush",
+  "wand",
+  "color-range",
+] as const;
+
+export type StudioEditableRasterSelectionToolKind =
+  (typeof STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS)[number];
+
+/**
+ * Tool-neutral raster target contract. Every pixel-selection gesture consumes the same image-local
+ * frame and source revision; only its mask geometry differs.
+ */
+export interface StudioEditableRasterSelectionSurface {
+  readonly toolKind: StudioEditableRasterSelectionToolKind;
+  readonly frame: StudioRasterPreparationFrame;
+  readonly sourceBounds: StudioRasterPreparationBounds | null;
+  readonly sourceSummary: StudioRasterPreparationSourceSummary;
+  readonly sourceFingerprint: string;
 }
 
 export interface StudioRasterPreparationSourceSummaryInput {
@@ -123,6 +198,11 @@ export interface StudioEditableRasterCopyPlan {
   readonly bgGrad?: readonly string[] | null;
   readonly name: string;
   readonly insertionIndex: number;
+  readonly sourceDisposition: "preserve-visible" | "hide-originals";
+  readonly sourceDispositionIds: readonly string[];
+  readonly frame: StudioRasterPreparationFrame;
+  readonly sourceBounds: StudioRasterPreparationBounds | null;
+  readonly sourceSummary: StudioRasterPreparationSourceSummary;
   readonly sourceFingerprint: string;
   readonly sourceElementCount: number;
   readonly budgets?: StudioVectorReferenceBudgets;
@@ -133,6 +213,8 @@ export type StudioEditableRasterCopyFailureCode =
   | "invalid-dimensions"
   | "document-locked"
   | "no-visible-source"
+  | "source-selection-mismatch"
+  | "source-locked"
   | "source-budget-exceeded"
   | "svg-budget-exceeded"
   | "unsupported-fidelity";
@@ -270,12 +352,285 @@ function fingerprintEditableRasterCopySource(input: {
   }));
 }
 
-function selectCopySources(input: StudioEditableRasterCopyInput): readonly El[] {
+interface StudioRasterSourceSelection {
+  readonly sourceElements: readonly El[];
+  readonly mismatchIds: readonly string[];
+}
+
+const UNSUPPORTED_GROUP_TRANSFORM_KEYS = [
+  "x",
+  "y",
+  "rotation",
+  "scaleX",
+  "scaleY",
+  "skewX",
+  "skewY",
+  "transform",
+  "matrix",
+] as const;
+
+function hasUnsupportedGroupTransform(group: LayerGroup): boolean {
+  const record = group as LayerGroup & Record<string, unknown>;
+  return UNSUPPORTED_GROUP_TRANSFORM_KEYS.some((key) => {
+    const value = record[key];
+    if (value === undefined || value === null) return false;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return true;
+      if (key === "scaleX" || key === "scaleY") return value !== 1;
+      return value !== 0;
+    }
+    return true;
+  });
+}
+
+function studioRasterPreparationFrame(
+  width: number,
+  height: number,
+): StudioRasterPreparationFrame {
+  return { x: 0, y: 0, width, height, rotation: 0 };
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function fullyTransparentCssColor(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase().replace(/\s+/gu, "");
+  if (normalized === "transparent") return true;
+  if (/^#[0-9a-f]{8}$/u.test(normalized)) return normalized.slice(7) === "00";
+  if (/^#[0-9a-f]{4}$/u.test(normalized)) return normalized.slice(4) === "0";
+  const functional = normalized.match(/^rgba?\((.*)\)$/u);
+  if (!functional) return false;
+  const channels = functional[1]?.split(",") ?? [];
+  if (channels.length !== 4) return false;
+  const alpha = channels[3];
+  if (!alpha) return false;
+  return alpha.endsWith("%")
+    ? Number.parseFloat(alpha) <= 0
+    : Number.parseFloat(alpha) <= 0;
+}
+
+function elementContributesVisiblePixels(element: El): boolean {
+  if ((element.opacity ?? 1) <= 0) return false;
+  if (element.type === "draw") {
+    // An eraser contributes to the composite by removing pixels underneath it. It is not a
+    // selectable vector boundary, but must remain in the fidelity census so SVG preflight blocks
+    // rather than silently ignoring the deletion.
+    if (element.mode === "eraser") return element.points.length >= 2;
+    const fillVisible = element.fill !== undefined && !fullyTransparentCssColor(element.fill);
+    const strokeVisible = element.strokeWidth > 0 && !fullyTransparentCssColor(element.stroke);
+    return fillVisible || strokeVisible;
+  }
+  if (element.type === "text") {
+    return element.text.trim().length > 0
+      && (element.fontSize > 0)
+      && (!fullyTransparentCssColor(element.fill)
+        || ((element.strokeWidth ?? 0) > 0 && !fullyTransparentCssColor(element.stroke)));
+  }
+  if (element.type === "bubble") {
+    return !fullyTransparentCssColor(element.fill)
+      || !fullyTransparentCssColor(element.stroke)
+      || (element.text.trim().length > 0 && !fullyTransparentCssColor(element.textFill));
+  }
+  if (element.type === "sticker") {
+    return element.text.trim().length > 0 && element.fontSize > 0;
+  }
+  if (element.type === "image") return element.src.trim().length > 0;
+  if (element.type === "frame") {
+    return !fullyTransparentCssColor(element.bgColor ?? "#ffffff")
+      || ((element.strokeWidth ?? 3) > 0 && !fullyTransparentCssColor(element.stroke ?? "#16100c"))
+      || Boolean(element.bg);
+  }
+  return element.width > 0
+    && element.height > 0
+    && element.strokeWidth > 0
+    && !fullyTransparentCssColor(element.stroke);
+}
+
+function rotatedRectBounds(input: {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly rotation?: number;
+}): StudioRasterPreparationBounds {
+  const angle = ((input.rotation ?? 0) * Math.PI) / 180;
+  if (angle === 0) {
+    return { x: input.x, y: input.y, width: input.width, height: input.height };
+  }
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const corners = [
+    [0, 0],
+    [input.width, 0],
+    [input.width, input.height],
+    [0, input.height],
+  ] as const;
+  const xs = corners.map(([x, y]) => input.x + x * cos - y * sin);
+  const ys = corners.map(([x, y]) => input.y + x * sin + y * cos);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function drawElementBounds(
+  element: Extract<El, { type: "draw" }>,
+): StudioRasterPreparationBounds | null {
+  if (element.points.length < 2 || element.points.length % 2 !== 0) return null;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let index = 0; index < element.points.length; index += 2) {
+    xs.push(element.points[index]!);
+    ys.push(element.points[index + 1]!);
+  }
+  const padding = Math.max(0, element.strokeWidth) / 2;
+  const minX = Math.min(...xs) - padding;
+  const minY = Math.min(...ys) - padding;
+  const maxX = Math.max(...xs) + padding;
+  const maxY = Math.max(...ys) + padding;
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  };
+}
+
+function elementRasterPreparationBounds(element: El): StudioRasterPreparationBounds | null {
+  if (!elementContributesVisiblePixels(element)) return null;
+  if (element.type === "draw") return drawElementBounds(element);
+  if (element.type === "text") {
+    const lineCount = Math.max(1, element.text.split("\n").length);
+    return rotatedRectBounds({
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.fontSize * (element.lineHeight ?? 1) * lineCount,
+      rotation: element.rotation,
+    });
+  }
+  if (element.type === "sticker") {
+    return rotatedRectBounds({
+      x: element.x,
+      y: element.y,
+      width: element.fontSize,
+      height: element.fontSize,
+      rotation: element.rotation,
+    });
+  }
+  return rotatedRectBounds({
+    x: element.x,
+    y: element.y,
+    width: element.width,
+    height: element.height,
+    rotation: "rotation" in element ? element.rotation : 0,
+  });
+}
+
+function clipBoundsToFrame(
+  bounds: StudioRasterPreparationBounds,
+  frame: StudioRasterPreparationFrame,
+): StudioRasterPreparationBounds | null {
+  const x = Math.max(frame.x, bounds.x);
+  const y = Math.max(frame.y, bounds.y);
+  const right = Math.min(frame.width, bounds.x + bounds.width);
+  const bottom = Math.min(frame.height, bounds.y + bounds.height);
+  if (!(right > x && bottom > y)) return null;
+  return { x, y, width: right - x, height: bottom - y };
+}
+
+function unionSourceBounds(
+  elements: readonly El[],
+  frame: StudioRasterPreparationFrame,
+): StudioRasterPreparationBounds | null {
+  let union: StudioRasterPreparationBounds | null = null;
+  for (const element of elements) {
+    const rawBounds = elementRasterPreparationBounds(element);
+    if (!rawBounds) continue;
+    const bounds = clipBoundsToFrame(rawBounds, frame);
+    if (!bounds) continue;
+    if (!union) {
+      union = bounds;
+      continue;
+    }
+    const x = Math.min(union.x, bounds.x);
+    const y = Math.min(union.y, bounds.y);
+    const right = Math.max(union.x + union.width, bounds.x + bounds.width);
+    const bottom = Math.max(union.y + union.height, bounds.y + bounds.height);
+    union = { x, y, width: right - x, height: bottom - y };
+  }
+  return union;
+}
+
+function invalidElementGeometryReason(element: El): string | null {
+  if (!element.id.trim()) return "빈 요소 id";
+  if (!finiteNumber(element.opacity ?? 1) || (element.opacity ?? 1) < 0 || (element.opacity ?? 1) > 1) {
+    return "요소 불투명도";
+  }
+  if (element.type === "draw") {
+    if (
+      element.points.length < 2
+      || element.points.length % 2 !== 0
+      || element.points.some((point) => !finiteNumber(point))
+      || !finiteNumber(element.strokeWidth)
+      || element.strokeWidth < 0
+    ) {
+      return "선·도형 좌표";
+    }
+    return null;
+  }
+  if (
+    !finiteNumber(element.x)
+    || !finiteNumber(element.y)
+    || ("rotation" in element && !finiteNumber(element.rotation))
+  ) {
+    return "요소 변형";
+  }
+  if (element.type === "text") {
+    return finiteNumber(element.width)
+      && element.width > 0
+      && finiteNumber(element.fontSize)
+      && element.fontSize > 0
+      ? null
+      : "텍스트 경계";
+  }
+  if (element.type === "sticker") {
+    return finiteNumber(element.fontSize) && element.fontSize > 0 ? null : "스티커 경계";
+  }
+  return finiteNumber(element.width)
+    && finiteNumber(element.height)
+    && element.width > 0
+    && element.height > 0
+    ? null
+    : "요소 경계";
+}
+
+function selectCopySources(input: StudioEditableRasterCopyInput): StudioRasterSourceSelection {
   const groups = [...(input.groups ?? [])];
   const requested = input.sourceIds ? new Set(input.sourceIds) : null;
-  return input.elements.filter((element) =>
-    !isEffectivelyHidden(element, groups) && (!requested || requested.has(element.id))
+  const excluded = new Set(input.excludedSourceIds ?? []);
+  const visibleById = new Map(
+    input.elements
+      .filter((element) =>
+        !isEffectivelyHidden(element, groups) && elementContributesVisiblePixels(element)
+      )
+      .map((element) => [element.id, element] as const),
   );
+  const mismatchIds = requested
+    ? [...requested].filter((id) => !visibleById.has(id) || excluded.has(id))
+    : [];
+  return {
+    sourceElements: input.elements.filter((element) =>
+      !isEffectivelyHidden(element, groups)
+      && elementContributesVisiblePixels(element)
+      && !excluded.has(element.id)
+      && (!requested || requested.has(element.id))
+    ),
+    mismatchIds,
+  };
 }
 
 /** Builds the page snapshot and all fail-closed reasons inside the user-triggered lazy seam. */
@@ -283,6 +638,7 @@ export function createStudioEditablePageRasterContext(
   context: StudioEditablePageRasterContextInput,
 ): StudioEditablePageRasterContext {
   const { page } = context;
+  const purpose = context.purpose ?? "page-filter";
   const groups = [...(page.groups ?? [])];
   const sourceElements = [
     ...(page.hideMaster ? [] : context.masterElements),
@@ -298,7 +654,9 @@ export function createStudioEditablePageRasterContext(
   );
   const documentMutationBlockedReason = context.collaborationLockedReason
     ?? (context.sharedDocument
-      ? "공동 작업 문서의 페이지 합성 필터는 모든 참여자에게 동일한 픽셀 결과를 전달할 수 있도록 준비 중이에요. 지금은 선택 이미지 필터를 사용해 주세요."
+      ? purpose === "pixel-selection"
+        ? "공동 작업 문서에서는 편집용 래스터 복사본 동기화를 준비 중이에요. 개인 문서에서 픽셀 선택을 사용해 주세요."
+        : "공동 작업 문서의 페이지 합성 필터는 모든 참여자에게 동일한 픽셀 결과를 전달할 수 있도록 준비 중이에요. 지금은 선택 이미지 필터를 사용해 주세요."
       : hasLocallyHiddenSource
         ? "‘나만 숨기기’ 레이어를 먼저 다시 표시해 주세요. 개인 표시 상태는 공유·저장되는 필터 합성본에 포함하지 않습니다."
         : context.masterEditMode
@@ -312,17 +670,19 @@ export function createStudioEditablePageRasterContext(
                 : context.viewTransformSuppressed
                   ? "저장·내보내기·타임랩스 캡처가 끝난 뒤 현재 페이지에 필터를 적용해 주세요."
                   : null);
-  const budgets = {
-    ...context.budgets,
-    maxPixelCount: Math.min(
-      context.budgets?.maxPixelCount ?? PAGE_COMPOSITE_FILTER_MAX_PIXELS,
-      PAGE_COMPOSITE_FILTER_MAX_PIXELS,
-    ),
-    maxPngBytes: Math.min(
-      context.budgets?.maxPngBytes ?? PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
-      PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
-    ),
-  };
+  const budgets = purpose === "page-filter"
+    ? {
+        ...context.budgets,
+        maxPixelCount: Math.min(
+          context.budgets?.maxPixelCount ?? PAGE_COMPOSITE_FILTER_MAX_PIXELS,
+          PAGE_COMPOSITE_FILTER_MAX_PIXELS,
+        ),
+        maxPngBytes: Math.min(
+          context.budgets?.maxPngBytes ?? PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
+          PAGE_COMPOSITE_FILTER_MAX_PNG_BYTES,
+        ),
+      }
+    : context.budgets;
 
   return {
     input: {
@@ -337,6 +697,12 @@ export function createStudioEditablePageRasterContext(
       bgGrad: page.bgGrad,
       name: context.name,
       insertionIndex: page.elements.length,
+      sourceDisposition: purpose === "pixel-selection"
+        ? "hide-originals"
+        : "preserve-visible",
+      sourceDispositionIds: purpose === "pixel-selection"
+        ? page.elements.map((element) => element.id)
+        : [],
       documentMutationBlockedReason,
       budgets,
     },
@@ -348,18 +714,113 @@ export function createStudioEditablePageRasterContext(
  * One source census for menus/rails/inspectors. It is intended for command-open or panel-open
  * paths, not pointermove: SVG serialization is used to detect approximated fidelity honestly.
  */
-export function summarizeStudioRasterPreparationSources(
+interface StudioRasterPreparationAnalysis {
+  readonly summary: StudioRasterPreparationSourceSummary;
+  readonly exported: SvgExportResult | null;
+}
+
+function analyzeStudioRasterPreparationSources(
   input: StudioRasterPreparationSourceSummaryInput,
-): StudioRasterPreparationSourceSummary {
+): StudioRasterPreparationAnalysis {
   const groups = [...(input.groups ?? [])];
   const visible = input.elements.filter((element) => !isEffectivelyHidden(element, groups));
   const hiddenContentCount = input.elements.length - visible.length;
   const visibleRaster = visible.filter((element): element is ImageEl & El => element.type === "image");
-  const visibleVectorDrawCount = visible.filter(
+  const visibleContributing = visible.filter(elementContributesVisiblePixels);
+  const visibleVectorDrawCount = visibleContributing.filter(
     (element) => element.type === "draw" && element.mode !== "eraser",
   ).length;
+  const visibleCompositeVectorCount = visibleContributing.filter(
+    (element) => element.type !== "image" && !(element.type === "draw" && element.mode === "eraser"),
+  ).length;
+  const visibleLinked3dPreviewCount = visibleContributing.filter(
+    (element) => element.type === "image" && Boolean(element.bg3dScene || element.vrmScene),
+  ).length;
+  const frame = studioRasterPreparationFrame(input.width, input.height);
+  const sourceBounds = validDimensions(input.width, input.height)
+    ? unionSourceBounds(visibleContributing, frame)
+    : null;
+  const orderedVisibleSourceIds = visibleContributing.map((element) => element.id);
+  const lockedVisibleSourceIds = visibleContributing
+    .filter((element) => isEffectivelyLocked(element, groups))
+    .map((element) => element.id);
   if (!validDimensions(input.width, input.height)) {
     return {
+      summary: {
+        frame,
+        sourceBounds,
+        orderedVisibleSourceIds,
+        exactRenderableSourceIds: [],
+        lockedVisibleSourceIds,
+        visibleContentCount: visible.length,
+        hiddenContentCount,
+        visibleRasterCount: visibleRaster.length,
+        visibleUnlockedRasterCount: visibleRaster.filter(
+          (element) => !isEffectivelyLocked(element, groups),
+        ).length,
+        visibleVectorDrawCount,
+        visibleCompositeVectorCount,
+        visibleLinked3dPreviewCount,
+        exactRenderableVisibleCount: 0,
+        unsupportedVisibleCount: visibleContributing.length,
+        unsupportedReasons: ["페이지 크기가 안전한 래스터 처리 범위를 벗어났습니다."],
+        hasPageBackground: input.hasPageBackground ?? true,
+      },
+      exported: null,
+    };
+  }
+
+  const knownGroupIds = new Set(groups.map((group) => group.id));
+  const duplicateElementIds = new Set<string>();
+  const seenElementIds = new Set<string>();
+  for (const element of visible) {
+    if (seenElementIds.has(element.id)) duplicateElementIds.add(element.id);
+    seenElementIds.add(element.id);
+  }
+  const structurallyUnsupported = new Map<string, string>();
+  for (const element of visibleContributing) {
+    const invalidGeometry = invalidElementGeometryReason(element);
+    if (invalidGeometry) {
+      structurallyUnsupported.set(element.id, `${invalidGeometry}가 올바르지 않습니다.`);
+      continue;
+    }
+    if (duplicateElementIds.has(element.id)) {
+      structurallyUnsupported.set(element.id, "중복 요소 id는 안전하게 합성할 수 없습니다.");
+      continue;
+    }
+    if (element.groupId && !knownGroupIds.has(element.groupId)) {
+      structurallyUnsupported.set(element.id, "연결되지 않은 레이어 그룹은 안전하게 합성할 수 없습니다.");
+      continue;
+    }
+    const group = element.groupId
+      ? groups.find((candidate) => candidate.id === element.groupId)
+      : null;
+    if (group && hasUnsupportedGroupTransform(group)) {
+      structurallyUnsupported.set(element.id, "레이어 그룹 변형은 합성 렌더러에서 지원되지 않습니다.");
+    }
+  }
+  const exported = exportPageToSvg({
+    width: input.width,
+    height: input.height,
+    elements: visibleContributing,
+    groups,
+    theme: input.theme,
+    transparentBg: !(input.hasPageBackground ?? true),
+    bg: input.bg,
+    bgGrad: input.bgGrad,
+  });
+  const unsupportedIds = new Set([
+    ...exported.skipped.map((skip) => skip.id),
+    ...structurallyUnsupported.keys(),
+  ]);
+  const exactRenderableSourceIds = orderedVisibleSourceIds.filter((id) => !unsupportedIds.has(id));
+  return {
+    summary: {
+      frame,
+      sourceBounds,
+      orderedVisibleSourceIds,
+      exactRenderableSourceIds,
+      lockedVisibleSourceIds,
       visibleContentCount: visible.length,
       hiddenContentCount,
       visibleRasterCount: visibleRaster.length,
@@ -367,36 +828,28 @@ export function summarizeStudioRasterPreparationSources(
         (element) => !isEffectivelyLocked(element, groups),
       ).length,
       visibleVectorDrawCount,
-      exactRenderableVisibleCount: 0,
-      unsupportedVisibleCount: visible.length,
-      unsupportedReasons: ["페이지 크기가 안전한 래스터 처리 범위를 벗어났습니다."],
+      visibleCompositeVectorCount,
+      visibleLinked3dPreviewCount,
+      exactRenderableVisibleCount: exactRenderableSourceIds.length,
+      unsupportedVisibleCount: unsupportedIds.size,
+      unsupportedReasons: [...new Set([
+        ...exported.skipped.map((skip) => skip.label),
+        ...structurallyUnsupported.values(),
+      ])],
       hasPageBackground: input.hasPageBackground ?? true,
-    };
-  }
-  const exported = exportPageToSvg({
-    width: input.width,
-    height: input.height,
-    elements: visible,
-    groups,
-    theme: input.theme,
-    transparentBg: true,
-    bg: input.bg,
-    bgGrad: input.bgGrad,
-  });
-  const unsupportedIds = new Set(exported.skipped.map((skip) => skip.id));
-  return {
-    visibleContentCount: visible.length,
-    hiddenContentCount,
-    visibleRasterCount: visibleRaster.length,
-    visibleUnlockedRasterCount: visibleRaster.filter(
-      (element) => !isEffectivelyLocked(element, groups),
-    ).length,
-    visibleVectorDrawCount,
-    exactRenderableVisibleCount: Math.max(0, exported.elementCount - unsupportedIds.size),
-    unsupportedVisibleCount: unsupportedIds.size,
-    unsupportedReasons: [...new Set(exported.skipped.map((skip) => skip.label))],
-    hasPageBackground: input.hasPageBackground ?? true,
+    },
+    exported,
   };
+}
+
+/**
+ * One source census for menus, recovery panels and selection tools. Planning uses the same
+ * analyzer and reuses its SVG output so a large page is never serialized twice per command.
+ */
+export function summarizeStudioRasterPreparationSources(
+  input: StudioRasterPreparationSourceSummaryInput,
+): StudioRasterPreparationSourceSummary {
+  return analyzeStudioRasterPreparationSources(input).summary;
 }
 
 function fidelityReason(labels: readonly string[]): string {
@@ -445,13 +898,61 @@ export function planStudioEditableRasterCopy(
   }
 
   const includeBackground = input.includeBackground ?? true;
-  const sourceElements = selectCopySources(input);
-  if (sourceElements.length === 0 && !includeBackground) {
+  const sourceDisposition = input.sourceDisposition ?? "preserve-visible";
+  const selectedSources = selectCopySources(input);
+  const sourceElements = selectedSources.sourceElements;
+  if (selectedSources.mismatchIds.length > 0) {
+    return {
+      ok: false,
+      code: "source-selection-mismatch",
+      reason: `요청한 합성 원본 ${selectedSources.mismatchIds.slice(0, 3).join(" · ")}이(가) 숨김·제외·누락 또는 완전 투명 상태입니다. 표시 상태와 대상을 다시 확인해 주세요.`,
+    };
+  }
+  if (
+    sourceElements.length === 0
+    && (!includeBackground || sourceDisposition === "hide-originals")
+  ) {
     return {
       ok: false,
       code: "no-visible-source",
-      reason: "편집용 복사본으로 만들 표시 레이어가 없습니다.",
+      reason: sourceDisposition === "hide-originals"
+        ? "픽셀 선택용 복사본으로 만들 표시 요소가 없습니다. 완전 투명·숨김 레이어가 아닌 선이나 객체를 먼저 추가해 주세요."
+        : "편집용 복사본으로 만들 표시 레이어가 없습니다.",
     };
+  }
+  const requestedDispositionIds = input.sourceDispositionIds
+    ? new Set(input.sourceDispositionIds)
+    : sourceDisposition === "hide-originals"
+      ? new Set(sourceElements.map((element) => element.id))
+      : new Set<string>();
+  const sourceIds = new Set(sourceElements.map((element) => element.id));
+  const unknownDispositionIds = [...requestedDispositionIds].filter(
+    (id) => !input.elements.some((element) => element.id === id),
+  );
+  if (unknownDispositionIds.length > 0) {
+    return {
+      ok: false,
+      code: "source-selection-mismatch",
+      reason: `숨김 대상으로 지정한 원본 ${unknownDispositionIds.slice(0, 3).join(" · ")}을(를) 현재 문서에서 찾지 못했습니다.`,
+    };
+  }
+  const sourceDispositionIds = [...requestedDispositionIds].filter((id) => sourceIds.has(id));
+  if (sourceDisposition === "hide-originals") {
+    const groups = [...(input.groups ?? [])];
+    const lockedDispositionIds = sourceElements
+      .filter(
+        (element) =>
+          requestedDispositionIds.has(element.id)
+          && isEffectivelyLocked(element, groups),
+      )
+      .map((element) => element.id);
+    if (lockedDispositionIds.length > 0) {
+      return {
+        ok: false,
+        code: "source-locked",
+        reason: `잠긴 원본 ${lockedDispositionIds.slice(0, 3).join(" · ")}은(는) 숨길 수 없습니다. 요소 또는 그룹 잠금을 해제한 뒤 다시 시도해 주세요.`,
+      };
+    }
   }
   let serializedSource: string;
   let sourceFingerprint: string;
@@ -483,17 +984,33 @@ export function planStudioEditableRasterCopy(
       reason: "표시 레이어 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.",
     };
   }
-  const groups = [...(input.groups ?? [])];
-  const exported = exportPageToSvg({
+  const sourceAnalysis = analyzeStudioRasterPreparationSources({
     width: input.width,
     height: input.height,
     elements: sourceElements,
-    groups,
+    groups: input.groups,
     theme: input.theme,
-    transparentBg: !includeBackground,
     bg: input.bg,
     bgGrad: input.bgGrad,
+    hasPageBackground: includeBackground,
   });
+  const sourceSummary = sourceAnalysis.summary;
+  if (sourceSummary.unsupportedVisibleCount > 0) {
+    return {
+      ok: false,
+      code: "unsupported-fidelity",
+      reason: fidelityReason(sourceSummary.unsupportedReasons),
+    };
+  }
+  const groups = [...(input.groups ?? [])];
+  const exported = sourceAnalysis.exported;
+  if (!exported) {
+    return {
+      ok: false,
+      code: "invalid-dimensions",
+      reason: "페이지 크기가 올바르지 않습니다. 양수 정수 해상도로 조정해 주세요.",
+    };
+  }
   if (exported.skipped.length > 0) {
     return {
       ok: false,
@@ -527,10 +1044,28 @@ export function planStudioEditableRasterCopy(
       bgGrad: input.bgGrad,
       name: normalizeCopyName(input.name),
       insertionIndex: normalizeInsertionIndex(input.insertionIndex, input.elements.length),
+      sourceDisposition,
+      sourceDispositionIds,
+      frame: sourceSummary.frame,
+      sourceBounds: sourceSummary.sourceBounds,
+      sourceSummary,
       sourceFingerprint,
       sourceElementCount: exported.elementCount,
       budgets: input.budgets,
     },
+  };
+}
+
+export function describeStudioEditableRasterSelectionSurface(
+  plan: StudioEditableRasterCopyPlan,
+  toolKind: StudioEditableRasterSelectionToolKind,
+): StudioEditableRasterSelectionSurface {
+  return {
+    toolKind,
+    frame: plan.frame,
+    sourceBounds: plan.sourceBounds,
+    sourceSummary: plan.sourceSummary,
+    sourceFingerprint: plan.sourceFingerprint,
   };
 }
 
@@ -619,7 +1154,12 @@ export function isStudioEditableRasterCopyPlanCurrent(
   return next.ok
     && next.plan.pageId === plan.pageId
     && next.plan.sourceFingerprint === plan.sourceFingerprint
-    && next.plan.insertionIndex === plan.insertionIndex;
+    && next.plan.insertionIndex === plan.insertionIndex
+    && next.plan.sourceDisposition === plan.sourceDisposition
+    && next.plan.sourceDispositionIds.length === plan.sourceDispositionIds.length
+    && next.plan.sourceDispositionIds.every(
+      (id, index) => id === plan.sourceDispositionIds[index],
+    );
 }
 
 /**
@@ -687,7 +1227,14 @@ export function applyStudioEditableRasterCopy(input: {
     };
   }
 
-  const elements = [...destinationElements];
+  const sourceDispositionIds = new Set(plan.sourceDispositionIds);
+  const elements = plan.sourceDisposition === "hide-originals"
+    ? destinationElements.map((element) =>
+        sourceDispositionIds.has(element.id) && element.hidden !== true
+          ? { ...element, hidden: true }
+          : element
+      )
+    : [...destinationElements];
   elements.splice(plan.insertionIndex, 0, composite);
   return { ok: true, elements };
 }

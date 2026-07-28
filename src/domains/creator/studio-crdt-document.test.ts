@@ -101,6 +101,33 @@ function textElement(
   };
 }
 
+function bubbleElement(
+  id: string,
+  overrides: Record<string, StudioCrdtSceneElementInput["payload"]["props"][string]> = {}
+): StudioCrdtSceneElementInput {
+  return {
+    id,
+    pageId: "page-a",
+    layerId: "lettering",
+    payload: {
+      version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+      type: "bubble",
+      props: {
+        variant: "round",
+        text: "대사를 입력",
+        x: 120,
+        y: 160,
+        width: 280,
+        height: 180,
+        fill: "#ffffff",
+        textFill: "#111111",
+        rotation: 0,
+        ...overrides,
+      },
+    },
+  };
+}
+
 function page(id: string, overrides: Record<string, string | number | boolean | null | string[]> = {}): StudioCrdtPageInput {
   return {
     id,
@@ -147,6 +174,83 @@ describe("StudioCrdtDocument", () => {
     );
     warningSpy.mockRestore();
     document.destroy();
+  });
+
+  it("keeps shape and bubble create, duplicate, drag and undo-like reconciliation free of detached Yjs reads", () => {
+    const prematureAccessWarning =
+      "Invalid access: Add Yjs type to a document before reading data.";
+    const warningSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const document = new StudioCrdtDocument();
+    const observedSceneFrontiers: string[][] = [];
+    const unsubscribe = document.subscribeChanges((change) => {
+      observedSceneFrontiers.push(change.sceneElements.map(({ id }) => id));
+    });
+
+    try {
+      // Browser reproduction: an existing ink stroke, two Quick Shape draw elements, then a
+      // bubble inserted and duplicated from the top toolbar.
+      document.addStroke(stroke("ink", "page-a", [10, 10, 80, 45]));
+      document.addStroke({
+        ...stroke("quick-rect-1", "page-a", [100, 100, 260, 100, 260, 220, 100, 220]),
+        payload: payload([100, 100, 260, 100, 260, 220, 100, 220], { kind: "shape" }),
+      });
+      document.addStroke({
+        ...stroke("quick-rect-2", "page-a", [320, 140, 480, 140, 480, 280, 320, 280]),
+        payload: payload([320, 140, 480, 140, 480, 280, 320, 280], { kind: "shape" }),
+      });
+      document.addSceneElement(bubbleElement("bubble-source"));
+      document.addSceneElement(bubbleElement("bubble-copy", { x: 152, y: 192 }));
+
+      // Tail-anchor drag and repeated body drags publish successive partial property patches.
+      const straightTail = {
+        tail: "left",
+        tailDirection: "bottom",
+        tailXRatio: 0.5,
+        tailHeight: 72,
+        tailBase: 32,
+        tailBend: 0,
+      } as const;
+      const draggedTail = {
+        tail: "left",
+        tailDirection: "bottom",
+        tailXRatio: 0.64,
+        tailHeight: 98,
+        tailBase: 36,
+        tailBend: 18,
+      } as const;
+      document.patchSceneElement("bubble-copy", { set: draggedTail });
+      document.patchSceneElement("bubble-copy", { set: { x: 188, y: 210 } });
+      document.patchSceneElement("bubble-copy", { set: { x: 216, y: 232 } });
+      document.patchSceneElement("bubble-copy", { set: { x: 246, y: 218 } });
+
+      // History reconciliation applies earlier snapshots as ordinary field updates/tombstones.
+      document.patchSceneElement("bubble-copy", { set: { x: 216, y: 232 } });
+      document.patchSceneElement("bubble-copy", { set: { x: 188, y: 210 } });
+      document.patchSceneElement("bubble-copy", { set: straightTail });
+      expect(document.deleteSceneElement("bubble-copy")).toBe(true);
+      expect(document.restoreSceneElement("bubble-copy")).toBe(true);
+      document.moveElement("bubble-copy", "quick-rect-1");
+
+      const warningArguments = warningSpy.mock.calls.flat().map(String);
+      expect(warningArguments.some((argument) => argument.includes(prematureAccessWarning)))
+        .toBe(false);
+      expect(document.getSceneElement("bubble-copy")).toMatchObject({
+        deleted: false,
+        payload: {
+          type: "bubble",
+          props: {
+            x: 188,
+            y: 210,
+            ...straightTail,
+          },
+        },
+      });
+      expect(observedSceneFrontiers.length).toBeGreaterThan(0);
+    } finally {
+      unsubscribe();
+      document.destroy();
+      warningSpy.mockRestore();
+    }
   });
 
   it("uses full fallback pressure for sparse residual V2 payloads", () => {

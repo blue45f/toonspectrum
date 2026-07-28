@@ -1,9 +1,14 @@
 import {
+  ArrowDownToLine,
+  ArrowUpToLine,
   AlignCenter,
   AlignLeft,
   AlignRight,
   Combine,
+  FolderMinus,
   FolderPlus,
+  Lock,
+  LockOpen,
   Loader2,
   PaintBucket,
 } from "lucide-react";
@@ -18,10 +23,37 @@ const SELECTION_LAYOUT_HINTS = {
   group: {
     id: "selection-layout-group",
     title: "선택 요소 그룹화",
-    description: "선택한 요소 2개 이상을 새 레이어 그룹으로 묶고 현재 선택을 해제합니다.",
+    description: "선택한 요소 2개 이상을 한 조작 단위로 묶고, 만든 그룹을 계속 선택한 상태로 둡니다.",
     preview: "selection-layout",
     previewVariant: "group",
-    tip: "그룹은 레이어 패널에서 이름을 바꾸거나 다시 해제할 수 있어요.",
+    tip: "그룹은 함께 이동·변형되며 레이어 패널에서 한 번에 잠그거나 다시 해제할 수 있어요.",
+  },
+  ungroup: {
+    id: "selection-layout-ungroup",
+    title: "그룹 해제",
+    description: "선택한 그룹의 요소는 그대로 두고, 함께 묶인 관계만 해제합니다.",
+    tip: "요소의 위치와 앞뒤 순서는 바뀌지 않으며 한 번에 실행 취소할 수 있어요.",
+  },
+  lock: {
+    id: "selection-layout-lock",
+    title: "선택 잠금",
+    description: "선택 요소를 실수로 이동하거나 변형하지 않도록 한 번에 잠급니다.",
+    tip: "그룹 전체를 선택했다면 그룹 잠금으로 저장되어 새 멤버에도 일관되게 적용됩니다.",
+  },
+  unlock: {
+    id: "selection-layout-unlock",
+    title: "선택 잠금 해제",
+    description: "선택 요소 또는 그룹의 잠금을 한 번에 풀어 다시 편집할 수 있게 합니다.",
+  },
+  front: {
+    id: "selection-layout-front",
+    title: "맨 앞으로",
+    description: "선택한 요소와 완전한 그룹을 상대 순서 그대로 문서 맨 앞으로 옮깁니다.",
+  },
+  back: {
+    id: "selection-layout-back",
+    title: "맨 뒤로",
+    description: "선택한 요소와 완전한 그룹을 상대 순서 그대로 문서 맨 뒤로 옮깁니다.",
   },
   left: {
     id: "selection-layout-align-left",
@@ -100,6 +132,7 @@ export type StudioCanvasSelectionAlignment =
   | "distributeV";
 
 type SelectionLayoutHint = (typeof SELECTION_LAYOUT_HINTS)[keyof typeof SELECTION_LAYOUT_HINTS];
+export type StudioCanvasSelectionLockState = "locked" | "unlocked" | "mixed";
 
 const HORIZONTAL_ALIGNMENT_ACTIONS = [
   ["left", "선택 요소 왼쪽 정렬", SELECTION_LAYOUT_HINTS.left, AlignLeft],
@@ -152,10 +185,15 @@ export interface StudioCanvasStatusRailProps {
   advancedFillBusy: boolean;
   advancedFillPreviewMessage: string | null;
   advancedFillActive: boolean;
+  selectionGroupName?: string | null;
+  selectionLockState?: StudioCanvasSelectionLockState;
   onDownloadAutosaveBackup: () => void;
   onRestoreAutosave: () => void | Promise<void>;
   onClearAutosave: () => void;
   onGroupSelection: () => void;
+  onUngroupSelection?: () => void;
+  onToggleSelectionLock?: () => void;
+  onReorderSelection?: (direction: "front" | "back") => void;
   onAlignSelection: (alignment: StudioCanvasSelectionAlignment) => void;
   /** 다중 선택에 병합 가능한 말풍선(2개 이상)이 있어 "말풍선 병합" 액션을 노출할지. */
   showBubbleMerge?: boolean;
@@ -178,10 +216,15 @@ export function StudioCanvasStatusRail({
   advancedFillBusy,
   advancedFillPreviewMessage,
   advancedFillActive,
+  selectionGroupName = null,
+  selectionLockState = "unlocked",
   onDownloadAutosaveBackup,
   onRestoreAutosave,
   onClearAutosave,
   onGroupSelection,
+  onUngroupSelection,
+  onToggleSelectionLock,
+  onReorderSelection,
   onAlignSelection,
   showBubbleMerge = false,
   bubbleMergeDisabledReason = null,
@@ -244,11 +287,28 @@ export function StudioCanvasStatusRail({
       )}
 
       {selectionCount > 0 && (
-        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs">
-          <span className="font-semibold text-accent">{selectionCount}개 선택됨</span>
-          <span className="text-fg-3">· 방향키로 이동 · 모서리로 크기·회전</span>
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            {selectionCount >= 2 && (
+        <div className="mb-2 flex min-w-0 items-center gap-2 rounded-xl border border-accent/40 bg-accent-soft/30 px-2.5 py-1.5 text-xs shadow-sm">
+          <span className="flex shrink-0 items-center gap-1.5 font-semibold text-accent">
+            <span>{selectionCount}개 선택</span>
+            {selectionGroupName ? (
+              <span className="max-w-28 truncate rounded-full bg-accent/12 px-2 py-0.5 text-[0.64rem] text-accent">
+                {selectionGroupName}
+              </span>
+            ) : null}
+          </span>
+          <span className="hidden shrink-0 text-fg-3 xl:inline">방향키 이동 · 핸들 변형</span>
+          <div className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [scrollbar-width:thin]">
+            {selectionGroupName && onUngroupSelection ? (
+              <SelectionLayoutAction
+                hint={SELECTION_LAYOUT_HINTS.ungroup}
+                label="선택 그룹 해제"
+                onClick={onUngroupSelection}
+                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+              >
+                <FolderMinus size={13} aria-hidden />
+                <span>그룹 해제</span>
+              </SelectionLayoutAction>
+            ) : selectionCount >= 2 ? (
               <SelectionLayoutAction
                 hint={SELECTION_LAYOUT_HINTS.group}
                 label="선택 요소 그룹화"
@@ -258,7 +318,37 @@ export function StudioCanvasStatusRail({
                 <FolderPlus size={13} aria-hidden />
                 <span>그룹화</span>
               </SelectionLayoutAction>
-            )}
+            ) : null}
+            {onToggleSelectionLock ? (
+              <SelectionLayoutAction
+                hint={
+                  selectionLockState === "locked"
+                    ? SELECTION_LAYOUT_HINTS.unlock
+                    : SELECTION_LAYOUT_HINTS.lock
+                }
+                label={
+                  selectionLockState === "locked"
+                    ? "선택 잠금 해제"
+                    : selectionLockState === "mixed"
+                      ? "선택 잠금 통일"
+                      : "선택 잠금"
+                }
+                onClick={onToggleSelectionLock}
+                className="flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+              >
+                {selectionLockState === "locked" ? (
+                  <LockOpen size={13} aria-hidden />
+                ) : (
+                  <Lock size={13} aria-hidden />
+                )}
+                <span>{selectionLockState === "locked" ? "잠금 해제" : "잠금"}</span>
+                {selectionLockState === "mixed" ? (
+                  <span className="rounded bg-warning-soft px-1 text-[0.58rem] text-warning">
+                    혼합
+                  </span>
+                ) : null}
+              </SelectionLayoutAction>
+            ) : null}
             {showBubbleMerge && onMergeBubbles && (
               <button
                 type="button"
@@ -275,9 +365,33 @@ export function StudioCanvasStatusRail({
                 <span>말풍선 병합</span>
               </button>
             )}
-            <div className="mx-1 h-4 w-px bg-line/60" />
+            {onReorderSelection ? (
+              <div
+                className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+                role="group"
+                aria-label="앞뒤 순서"
+              >
+                <SelectionLayoutAction
+                  hint={SELECTION_LAYOUT_HINTS.front}
+                  label="선택 요소 맨 앞으로"
+                  onClick={() => onReorderSelection("front")}
+                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                >
+                  <ArrowUpToLine size={13} aria-hidden />
+                </SelectionLayoutAction>
+                <SelectionLayoutAction
+                  hint={SELECTION_LAYOUT_HINTS.back}
+                  label="선택 요소 맨 뒤로"
+                  onClick={() => onReorderSelection("back")}
+                  className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                >
+                  <ArrowDownToLine size={13} aria-hidden />
+                </SelectionLayoutAction>
+              </div>
+            ) : null}
+            <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
             <div
-              className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+              className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
               role="group"
               aria-label="가로 정렬"
             >
@@ -294,7 +408,7 @@ export function StudioCanvasStatusRail({
               ))}
             </div>
             <div
-              className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+              className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
               role="group"
               aria-label="세로 정렬"
             >
@@ -312,7 +426,7 @@ export function StudioCanvasStatusRail({
             </div>
             {selectionCount >= 3 && (
               <div
-                className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+                className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
                 role="group"
                 aria-label="균등 분배"
               >
@@ -329,25 +443,25 @@ export function StudioCanvasStatusRail({
                 ))}
               </div>
             )}
-            <div className="mx-1 h-4 w-px bg-line/60" />
+            <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
             <button
               type="button"
               onClick={onDuplicateSelection}
-              className="cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+              className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
               복제
             </button>
             <button
               type="button"
               onClick={onRemoveSelection}
-              className="cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised"
+              className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised"
             >
               삭제
             </button>
             <button
               type="button"
               onClick={onClearSelection}
-              className="cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
+              className="shrink-0 cursor-pointer rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised"
             >
               해제
             </button>

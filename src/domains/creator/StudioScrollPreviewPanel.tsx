@@ -18,12 +18,18 @@
  * 안전하다. StudioPageThumbnail 자신에는 h-full/w-full(고정 클래스, Tailwind 가 정상 생성)만
  * 넘겨 그 section 의 aspect-ratio 로 확정된 박스를 레터박스 없이 정확히 채우게 한다.
  */
-import { LocateFixed, Smartphone, X } from "lucide-react";
+import { Activity, LocateFixed, Pause, Play, Smartphone, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 
 import { CANVAS_W } from "./studio-assets";
 import { pageDisplayName } from "./studio-page-meta";
+import {
+  analyzeStudioScrollRhythm,
+  planStudioAutoScrollStep,
+  type StudioScrollRhythmAnalysis,
+  type StudioScrollRhythmInsightSeverity,
+} from "./studio-scroll-rhythm";
 import { StudioPageThumbnail } from "./StudioPageThumbnails";
 
 import type { ThumbPageLike } from "./studio-page-thumbs";
@@ -57,9 +63,114 @@ const FRAME_WIDTH_PRESETS = [
 
 type FrameWidthId = (typeof FRAME_WIDTH_PRESETS)[number]["id"];
 
+const AUTO_SCROLL_SPEED_PRESETS = [
+  { id: "slow", label: "천천히", pxPerSecond: 120 },
+  { id: "normal", label: "보통", pxPerSecond: 240 },
+  { id: "fast", label: "빠르게", pxPerSecond: 420 },
+] as const;
+
 // "웹툰 연합 스크롤" 다운로드(handleDownloadAll(24) 호출부)의 기본 페이지 간격과 의도적으로
 // 맞춘 값 — 화면에서 본 리듬과 다운로드한 결과물의 리듬이 최대한 비슷하게 느껴지도록 한다.
 const PAGE_GAP_PX = 24;
+
+function insightTone(severity: StudioScrollRhythmInsightSeverity): string {
+  if (severity === "critical") return "bg-danger";
+  if (severity === "warning") return "bg-amber-400";
+  return "bg-accent";
+}
+
+function RhythmSummaryCard({
+  analysis,
+}: {
+  analysis: StudioScrollRhythmAnalysis;
+}): ReactElement {
+  return (
+    <aside
+      aria-label="스크롤 리듬 분석"
+      className="w-full shrink-0 rounded-xl border border-line bg-panel/95 p-3 shadow-lg lg:sticky lg:top-0 lg:w-72"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[0.68rem] font-bold uppercase tracking-[0.14em] text-fg-4">
+            Scroll direction
+          </p>
+          <h3 className="mt-0.5 text-sm font-bold text-fg">연출 리듬 진단</h3>
+        </div>
+        <div
+          className="grid size-11 shrink-0 place-items-center rounded-xl border border-accent/30 bg-accent-soft text-center"
+          title={`리듬 점수 ${analysis.score}점`}
+        >
+          <span className="text-base font-black leading-none text-accent">{analysis.grade}</span>
+          <span className="text-[0.58rem] font-semibold leading-none text-fg-3">
+            {analysis.score}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        {[
+          { label: "분량", value: `${analysis.totalScreenCount}화면` },
+          { label: "과밀", value: `${analysis.densePageCount}p` },
+          { label: "호흡", value: `${analysis.breathingPageCount}p` },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg border border-line bg-card px-2 py-2 text-center">
+            <p className="text-[0.62rem] text-fg-4">{item.label}</p>
+            <p className="mt-0.5 text-[0.72rem] font-bold text-fg">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2.5 rounded-lg border border-line bg-card px-2.5 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[0.68rem] text-fg-4">마지막 비트</span>
+          <span className="text-[0.7rem] font-semibold text-fg-2">{analysis.ending.label}</span>
+        </div>
+        {analysis.ending.mode !== "none" && (
+          <p className="mt-1 text-[0.64rem] leading-4 text-fg-4">
+            뒤 여백 {analysis.ending.trailingWhitespaceScreens}화면
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-[0.68rem] font-bold text-fg-2">우선 확인</p>
+          <span className="text-[0.62rem] text-fg-4">{analysis.insights.length}건</span>
+        </div>
+        {analysis.insights.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line px-2.5 py-3 text-[0.68rem] leading-4 text-fg-3">
+            현재 분석 예산 안에서 큰 리듬 문제를 찾지 못했습니다.
+          </p>
+        ) : (
+          analysis.insights.slice(0, 5).map((insight, index) => (
+            <div
+              key={`${insight.code}-${insight.pageId ?? "document"}-${index}`}
+              className="rounded-lg border border-line bg-card px-2.5 py-2"
+            >
+              <div className="flex items-start gap-2">
+                <span
+                  aria-hidden
+                  className={cn("mt-1 size-1.5 shrink-0 rounded-full", insightTone(insight.severity))}
+                />
+                <div className="min-w-0">
+                  <p className="text-[0.68rem] font-semibold text-fg">
+                    {insight.title}
+                    {insight.pageId && (
+                      <span className="ml-1 font-normal text-fg-4">· {insight.pageId}</span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-[0.62rem] leading-4 text-fg-4">
+                    {insight.suggestion}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </aside>
+  );
+}
 
 export function StudioScrollPreviewPanel({
   open,
@@ -69,15 +180,20 @@ export function StudioScrollPreviewPanel({
   onSelectPage,
 }: StudioScrollPreviewPanelProps): ReactElement | null {
   const [frameWidthId, setFrameWidthId] = useState<FrameWidthId>("normal");
+  const [showRhythmAnalysis, setShowRhythmAnalysis] = useState(true);
+  const [autoScrollSpeed, setAutoScrollSpeed] = useState(240);
+  const [autoScrolling, setAutoScrolling] = useState(false);
   const pageRefs = useRef(new Map<string, HTMLDivElement>());
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
   // 마운트 시점의 currentPageId 스냅샷 — useRef(초기값)은 최초 렌더에서만 인자를 쓰므로 이후
   // currentPageId 가 바뀌어도 이 값은 그대로다("열릴 때 한 번만 그 위치로 스크롤"에 정확히 필요한
   // 의미론). "현재 페이지로" 버튼은 이 스냅샷이 아니라 최신 currentPageId prop 을 직접 읽는다.
   const initialPageId = useRef(currentPageId).current;
 
   useEffect(() => {
+    if (!open) return;
     pageRefs.current.get(initialPageId)?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, [initialPageId]);
+  }, [initialPageId, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,9 +204,43 @@ export function StudioScrollPreviewPanel({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open || !autoScrolling) return;
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return;
+    let animationFrame = 0;
+    let previousTimestamp: number | null = null;
+
+    const advance = (timestamp: number) => {
+      if (previousTimestamp !== null) {
+        const step = planStudioAutoScrollStep({
+          scrollTop: viewport.scrollTop,
+          scrollHeight: viewport.scrollHeight,
+          viewportHeight: viewport.clientHeight,
+          speedPxPerSecond: autoScrollSpeed,
+          elapsedMs: timestamp - previousTimestamp,
+        });
+        viewport.scrollTop = step.nextScrollTop;
+        if (step.reachedEnd) {
+          setAutoScrolling(false);
+          return;
+        }
+      }
+      previousTimestamp = timestamp;
+      animationFrame = window.requestAnimationFrame(advance);
+    };
+
+    animationFrame = window.requestAnimationFrame(advance);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [autoScrollSpeed, autoScrolling, open]);
+
   if (!open) return null;
 
   const framePx = FRAME_WIDTH_PRESETS.find((p) => p.id === frameWidthId)?.px ?? 400;
+  const rhythmAnalysis = analyzeStudioScrollRhythm(pages, {
+    viewportHeightPx: 1_280,
+    pageGapPx: PAGE_GAP_PX,
+  });
 
   const modal = (
     <div
@@ -137,6 +287,59 @@ export function StudioScrollPreviewPanel({
             </div>
             <button
               type="button"
+              onClick={() => setShowRhythmAnalysis((visible) => !visible)}
+              aria-pressed={showRhythmAnalysis}
+              className={cn(
+                "flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised",
+                showRhythmAnalysis && "border-accent/50 bg-accent-soft text-accent"
+              )}
+              title="정보 밀도·대사량·컷 간 호흡·엔딩 여백을 원고 안에서 계산합니다"
+            >
+              <Activity size={13} aria-hidden /> 리듬 분석
+            </button>
+            <div
+              role="group"
+              aria-label="독자 스크롤 속도 시뮬레이션"
+              className="flex min-h-8 items-center overflow-hidden rounded-lg border border-line bg-card"
+            >
+              <select
+                aria-label="자동 스크롤 속도"
+                value={autoScrollSpeed}
+                onChange={(event) => setAutoScrollSpeed(Number(event.target.value))}
+                className="min-h-8 border-0 bg-transparent px-2 text-[0.7rem] font-medium text-fg-2 outline-none"
+              >
+                {AUTO_SCROLL_SPEED_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.pxPerSecond}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                aria-label={autoScrolling ? "자동 스크롤 일시정지" : "자동 스크롤 재생"}
+                aria-pressed={autoScrolling}
+                onClick={() => {
+                  const viewport = scrollViewportRef.current;
+                  if (
+                    !autoScrolling &&
+                    viewport &&
+                    viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - 1
+                  ) {
+                    viewport.scrollTop = 0;
+                  }
+                  setAutoScrolling((playing) => !playing);
+                }}
+                className={cn(
+                  "grid size-8 place-items-center border-l border-line text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+                  autoScrolling && "bg-accent-soft text-accent"
+                )}
+                title={autoScrolling ? "독자 스크롤 일시정지" : "선택한 속도로 독자 스크롤 재생"}
+              >
+                {autoScrolling ? <Pause size={13} aria-hidden /> : <Play size={13} aria-hidden />}
+              </button>
+            </div>
+            <button
+              type="button"
               onClick={() => pageRefs.current.get(currentPageId)?.scrollIntoView({ block: "start", behavior: "smooth" })}
               className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
               title="현재 편집 중인 페이지로 이동"
@@ -155,54 +358,74 @@ export function StudioScrollPreviewPanel({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-raised/30 px-3 py-6">
-          <div className="mx-auto" style={{ width: framePx, maxWidth: "100%" }}>
-            {pages.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-line px-3 py-8 text-center text-xs text-fg-4">
-                표시할 페이지가 없어요.
-              </p>
-            ) : (
-              pages.map((page, index) => {
-                const canvasH = page.canvasH > 0 ? page.canvasH : 1080;
-                const displayName = pageDisplayName(page, index);
-                return (
-                  <div
-                    key={page.id}
-                    ref={(el) => {
-                      if (el) pageRefs.current.set(page.id, el);
-                      else pageRefs.current.delete(page.id);
-                    }}
-                    className="relative"
-                    style={{ marginBottom: index < pages.length - 1 ? PAGE_GAP_PX : 0 }}
-                  >
-                    <section
-                      aria-label={`${index + 1}/${pages.length}페이지`}
-                      className="w-full overflow-hidden rounded-lg shadow-sm"
-                      style={{ aspectRatio: `${CANVAS_W} / ${canvasH}` }}
-                    >
-                      <StudioPageThumbnail page={page} className="h-full w-full rounded-none border-0" />
-                    </section>
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute left-1.5 top-1.5 z-20 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white"
-                    >
-                      {displayName}
-                    </span>
-                    {onSelectPage && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onSelectPage(page.id);
-                          onClose();
-                        }}
-                        aria-label={`${displayName} 편집하기`}
-                        className="absolute inset-0 z-10 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      />
-                    )}
-                  </div>
-                );
-              })
+        <div
+          ref={scrollViewportRef}
+          className="min-h-0 flex-1 overflow-y-auto bg-raised/30 px-3 py-6"
+        >
+          <div
+            className={cn(
+              "mx-auto flex w-full items-start justify-center gap-4",
+              showRhythmAnalysis ? "max-w-5xl flex-col lg:flex-row" : "max-w-max"
             )}
+          >
+            {showRhythmAnalysis && <RhythmSummaryCard analysis={rhythmAnalysis} />}
+            <div className="mx-auto shrink-0" style={{ width: framePx, maxWidth: "100%" }}>
+              {pages.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-line px-3 py-8 text-center text-xs text-fg-4">
+                  표시할 페이지가 없어요.
+                </p>
+              ) : (
+                pages.map((page, index) => {
+                  const canvasH = page.canvasH > 0 ? page.canvasH : 1080;
+                  const displayName = pageDisplayName(page, index);
+                  const rhythmMetric = rhythmAnalysis.pages[index];
+                  return (
+                    <div
+                      key={page.id}
+                      ref={(el) => {
+                        if (el) pageRefs.current.set(page.id, el);
+                        else pageRefs.current.delete(page.id);
+                      }}
+                      className="relative"
+                      style={{ marginBottom: index < pages.length - 1 ? PAGE_GAP_PX : 0 }}
+                    >
+                      <section
+                        aria-label={`${index + 1}/${pages.length}페이지`}
+                        className="w-full overflow-hidden rounded-lg shadow-sm"
+                        style={{ aspectRatio: `${CANVAS_W} / ${canvasH}` }}
+                      >
+                        <StudioPageThumbnail page={page} className="h-full w-full rounded-none border-0" />
+                      </section>
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute left-1.5 top-1.5 z-20 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white"
+                      >
+                        {displayName}
+                      </span>
+                      {showRhythmAnalysis && rhythmMetric && (
+                        <span
+                          aria-label={`${displayName} 리듬 ${rhythmMetric.score}점, 화면당 밀도 ${rhythmMetric.densityPerScreen}`}
+                          className="pointer-events-none absolute right-1.5 top-1.5 z-20 rounded border border-white/20 bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-white backdrop-blur-sm"
+                        >
+                          {rhythmMetric.score} · 밀도 {rhythmMetric.densityPerScreen}
+                        </span>
+                      )}
+                      {onSelectPage && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectPage(page.id);
+                            onClose();
+                          }}
+                          aria-label={`${displayName} 편집하기`}
+                          className="absolute inset-0 z-10 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>

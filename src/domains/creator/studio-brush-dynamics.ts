@@ -492,12 +492,13 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         jitter: { mode: "multiply", amount: 0.1 },
       },
       // Mouse fallback pressure is 0.5. The soft alpha tip halves the centre sample again, so
-      // opacity/flow must be strong enough to survive a single tap; wider spacing prevents that
-      // stronger dab from turning a normal long stroke opaque.
+      // opacity/flow must be strong enough to survive a single tap. Keep the physical dab cadence
+      // independent of pointer speed: the arc-length planner should produce the same continuous
+      // material density for the same geometry, without opening gaps on a fast pointer sample run.
       opacity: { base: 0.65, mappings: [{ source: "pressure", from: 0.4, to: 1 }] },
       flow: { base: 0.48, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
-      spacingRatio: 0.18,
-      spacing: { mappings: [{ source: "speed", from: 0.8, to: 1.5 }] },
+      spacingRatio: 0.145,
+      spacing: { mappings: [] },
       scatterRatio: 0.32,
       scatter: { mappings: [{ source: "pressure", from: 1.4, to: 0.6 }] },
       angle: { base: 0, mappings: [] },
@@ -530,8 +531,19 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         jitter: { mode: "multiply", amount: 0.25 },
       },
       flow: { base: 0.55, mappings: [{ source: "pressure", from: 0.5, to: 1 }] },
+      // Stroke-fixed tooth follows the mark when it is transformed instead of appearing to slide
+      // through the pigment. The modest amount preserves the existing opaque dry-media baseline.
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.18,
+        scale: 5.5,
+        contrast: 0.55,
+        seed: 303,
+      },
       spacingRatio: 0.21,
-      spacing: { mappings: [{ source: "speed", from: 0.8, to: 1.6 }] },
+      // Keep a restrained velocity tooth, but cap it below one quarter of the nominal tip width.
+      // Roughness comes primarily from grain/scatter rather than discontinuous high-speed gaps.
+      spacing: { mappings: [{ source: "speed", from: 0.92, to: 1.1 }] },
       scatterRatio: 0.23,
       scatter: { mappings: [{ source: "speed", from: 0.6, to: 1.4 }] },
       angle: {
@@ -893,7 +905,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       },
       spacingRatio: 0.105,
       spacing: {
-        mappings: [{ source: "speed", from: 0.92, to: 1.12 }],
+        mappings: [],
         jitter: null,
       },
       scatterRatio: 0.035,

@@ -96,6 +96,8 @@ describe("Studio options-bars module boundary", () => {
     expect(page.source).toContain("useStudioStableHandlers<StudioOptionsBarsHandlers>({");
     expect(page.source).toContain("useMemo<StudioOptionsBarsDrawModel>(");
     expect(page.source).toContain("useMemo<StudioOptionsBarsSelectionModel>(() =>");
+    expect(page.source).toContain("const selectionOptionsSuppressed =");
+    expect(page.source).toContain("!selectionOptionsSuppressed");
     expect(page.source).toContain("<StudioOptionsBars");
   });
 
@@ -145,6 +147,7 @@ describe("Studio options-bars module boundary", () => {
       registry.dynamicImports.filter((specifier) => specifier === "./StudioSelectOptionsBar")
     ).toEqual(["./StudioSelectOptionsBar"]);
     expect(optionsBars.source.match(/<Suspense fallback=\{null\}>/gu)).toHaveLength(2);
+    expect(optionsBars.source).toContain("key={draw.drawMode}");
   });
 
   it("keeps persistence and stateful option actions in the parent controller", () => {

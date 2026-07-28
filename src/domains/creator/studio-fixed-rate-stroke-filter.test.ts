@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   FIXED_RATE_STROKE_FILTER_TICK_MS,
+  FIXED_RATE_STROKE_INTERPOLATION_MAX_MS,
+  FIXED_RATE_STROKE_POSITION_QUANTUM,
   FIXED_RATE_STROKE_PRESSURE_STEPS,
   FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON,
   FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON,
@@ -75,6 +77,87 @@ function fixturePoint(sample: FixedRateStrokeFilteredSample) {
   };
 }
 
+function polylineLength(samples: readonly { readonly x: number; readonly y: number }[]): number {
+  let length = 0;
+  for (let index = 1; index < samples.length; index += 1) {
+    length += Math.hypot(
+      samples[index]!.x - samples[index - 1]!.x,
+      samples[index]!.y - samples[index - 1]!.y
+    );
+  }
+  return length;
+}
+
+function maximumPointDistance(
+  left: readonly { readonly x: number; readonly y: number }[],
+  right: readonly { readonly x: number; readonly y: number }[]
+): number {
+  expect(left).toHaveLength(right.length);
+  let maximum = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    maximum = Math.max(
+      maximum,
+      Math.hypot(
+        left[index]!.x - right[index]!.x,
+        left[index]!.y - right[index]!.y
+      )
+    );
+  }
+  return maximum;
+}
+
+function totalAbsoluteTurn(
+  samples: readonly { readonly x: number; readonly y: number }[]
+): number {
+  let total = 0;
+  for (let index = 1; index + 1 < samples.length; index += 1) {
+    const ax = samples[index]!.x - samples[index - 1]!.x;
+    const ay = samples[index]!.y - samples[index - 1]!.y;
+    const bx = samples[index + 1]!.x - samples[index]!.x;
+    const by = samples[index + 1]!.y - samples[index]!.y;
+    const aLength = Math.hypot(ax, ay);
+    const bLength = Math.hypot(bx, by);
+    if (aLength <= Number.EPSILON || bLength <= Number.EPSILON) continue;
+    const cosine = Math.min(1, Math.max(-1, (ax * bx + ay * by) / (aLength * bLength)));
+    total += Math.acos(cosine);
+  }
+  return total;
+}
+
+function sampleTimes(
+  durationMs: number,
+  rateHz: number,
+  cadencePattern: readonly number[] = [1]
+): readonly number[] {
+  const interval = 1_000 / rateHz;
+  const times: number[] = [];
+  let timeStamp = 0;
+  let patternIndex = 0;
+  while (timeStamp < durationMs) {
+    timeStamp += interval * cadencePattern[patternIndex % cadencePattern.length]!;
+    patternIndex += 1;
+    times.push(Math.min(durationMs, timeStamp));
+  }
+  return times;
+}
+
+function runSampledPath(
+  path: (timeStamp: number) => FixedRateStrokeRawSample,
+  times: readonly number[],
+  strength = 5
+): readonly FixedRateStrokeFilteredSample[] {
+  const durationMs = times.at(-1) ?? 0;
+  const started = createFixedRateStrokeFilter(path(0), strength);
+  let state = started.state;
+  const emitted = [...started.emitted];
+  for (const timeStamp of times) {
+    const transition = append(state, [path(timeStamp)]);
+    state = transition.state;
+    emitted.push(...transition.emitted);
+  }
+  return emitted.filter((sample) => sample.timeStamp <= durationMs);
+}
+
 describe("fixed-rate stroke filter parameters", () => {
   it("maps strength 3.4 to the traced 40 response, 10 stages, and 0.6 alpha", () => {
     expect(resolveFixedRateStrokeFilterParameters(3.4)).toEqual({
@@ -138,7 +221,7 @@ describe("fixed-rate stroke filter parameters", () => {
 });
 
 describe("fixed-rate stroke input quantization", () => {
-  it("quantizes position and tilt to 1/16 and pressure to 1/1023", () => {
+  it("quantizes position to 1/32, tilt to 1/16, and pressure to 1/1023", () => {
     const sample = quantizeFixedRateStrokeSample({
       x: 1.03,
       y: -1.04,
@@ -148,8 +231,8 @@ describe("fixed-rate stroke input quantization", () => {
       timeStamp: 17.25,
     });
     expect(sample).toEqual({
-      x: 1,
-      y: -1.0625,
+      x: 1.03125,
+      y: -1.03125,
       pressure: Math.round(0.54321 * FIXED_RATE_STROKE_PRESSURE_STEPS)
         / FIXED_RATE_STROKE_PRESSURE_STEPS,
       tiltX: 12.3125,
@@ -158,7 +241,7 @@ describe("fixed-rate stroke input quantization", () => {
     });
   });
 
-  it("maps the 1/16 CSS pixel position grid into document space", () => {
+  it("maps the 1/32 CSS pixel position grid into document space", () => {
     expect(quantizeFixedRateStrokeSample({
       x: 1.03,
       y: 1.03,
@@ -203,12 +286,12 @@ describe("fixed-rate stroke input quantization", () => {
       x: 3.2,
       y: 3.2,
       positionScale: 0.001,
-    })).toMatchObject({ x: 6.25, y: 6.25 });
+    })).toMatchObject({ x: 3.125, y: 3.125 });
     expect(quantizeFixedRateStrokeSample({
-      x: 1 / 2_048,
-      y: 1 / 2_048,
+      x: 1 / 4_096,
+      y: 1 / 4_096,
       positionScale: 100,
-    })).toMatchObject({ x: 1 / 1_024, y: 1 / 1_024 });
+    })).toMatchObject({ x: 1 / 2_048, y: 1 / 2_048 });
   });
 
   it("clamps pressure and uses the previous finite channels for malformed samples", () => {
@@ -240,11 +323,11 @@ describe("fixed-rate stroke input quantization", () => {
 
   it("preserves the public half-step rounding and 10-bit pressure boundary", () => {
     const halfStep = quantizeFixedRateStrokeSample({
-      x: 1 / 32,
-      y: -1 / 32,
+      x: FIXED_RATE_STROKE_POSITION_QUANTUM / 2,
+      y: -FIXED_RATE_STROKE_POSITION_QUANTUM / 2,
       pressure: 0.5,
     });
-    expect(halfStep.x).toBe(1 / 16);
+    expect(halfStep.x).toBe(FIXED_RATE_STROKE_POSITION_QUANTUM);
     expect(halfStep.y).toBe(0);
     expect(Object.is(halfStep.y, -0)).toBe(false);
     expect(halfStep.pressure).toBe(512 / FIXED_RATE_STROKE_PRESSURE_STEPS);
@@ -256,10 +339,42 @@ describe("fixed-rate stroke input quantization", () => {
       pressure: Number.NaN,
     }, fallback).pressure).toBe(fallback.pressure);
   });
+
+  it("keeps a slow 240Hz micro-circle distinct and inside a sub-pixel arc-length budget", () => {
+    const radius = 2;
+    const source = Array.from({ length: 241 }, (_unused, index) => {
+      const angle = (index / 240) * Math.PI * 2;
+      return {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius,
+        timeStamp: (index * 1_000) / 240,
+      };
+    });
+    const quantized = source.map((sample) => quantizeFixedRateStrokeSample(sample));
+    const duplicateSteps = quantized.slice(1).filter((sample, index) => (
+      sample.x === quantized[index]!.x && sample.y === quantized[index]!.y
+    ));
+    const maximumPositionError = source.reduce((maximum, sample, index) => Math.max(
+      maximum,
+      Math.hypot(
+        sample.x - quantized[index]!.x,
+        sample.y - quantized[index]!.y
+      )
+    ), 0);
+    const arcLengthRatio = polylineLength(quantized) / polylineLength(source);
+
+    expect(duplicateSteps).toHaveLength(0);
+    expect(maximumPositionError)
+      .toBeLessThanOrEqual(Math.SQRT2 * FIXED_RATE_STROKE_POSITION_QUANTUM / 2);
+    // Quantizing an already sub-pixel 2px-radius curve may add a little grid travel, but it must
+    // not recreate the former 1/16-grid staircase (about 1.11x and 40 collapsed source steps).
+    expect(arcLengthRatio).toBeGreaterThanOrEqual(0.99);
+    expect(arcLengthRatio).toBeLessThanOrEqual(1.04);
+  });
 });
 
-describe("fixed logical clock and zero-order hold", () => {
-  it("evaluates a 5ms grid with the last raw sample eligible at each tick", () => {
+describe("fixed logical clock and piecewise-linear input", () => {
+  it("evaluates a 5ms grid from the raw segment that closes each tick", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
     const first = append(started.state, [
       { x: 4, y: 0, timeStamp: 4 },
@@ -271,8 +386,8 @@ describe("fixed logical clock and zero-order hold", () => {
       timeStamp: sample.timeStamp,
       sourceTimeStamp: sample.sourceTimeStamp,
     }))).toEqual([
-      { tick: 1, timeStamp: 5, sourceTimeStamp: 4 },
-      { tick: 2, timeStamp: 10, sourceTimeStamp: 7 },
+      { tick: 1, timeStamp: 5, sourceTimeStamp: 7 },
+      { tick: 2, timeStamp: 10, sourceTimeStamp: 12 },
     ]);
 
     const second = append(first.state, [{ x: 16, y: 0, timeStamp: 16 }]);
@@ -280,14 +395,27 @@ describe("fixed logical clock and zero-order hold", () => {
     expect(second.emitted[0]).toMatchObject({
       logicalTick: 3,
       timeStamp: 15,
-      sourceTimeStamp: 12,
+      sourceTimeStamp: 16,
     });
   });
 
-  it("anchors the fixed grid and skips settled duplicate geometry without drift", () => {
+  it("anchors the fixed grid and reconstructs a sparse finite segment without drift", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 10.25 }, 3.4);
     const result = append(started.state, [{ x: 20, y: 0, timeStamp: 36 }]);
-    expect(result.emitted).toEqual([]);
+    expect(result.emitted.map(({ logicalTick, timeStamp, sourceTimeStamp }) => ({
+      logicalTick,
+      timeStamp,
+      sourceTimeStamp,
+    }))).toEqual([
+      { logicalTick: 1, timeStamp: 15.25, sourceTimeStamp: 36 },
+      { logicalTick: 2, timeStamp: 20.25, sourceTimeStamp: 36 },
+      { logicalTick: 3, timeStamp: 25.25, sourceTimeStamp: 36 },
+      { logicalTick: 4, timeStamp: 30.25, sourceTimeStamp: 36 },
+      { logicalTick: 5, timeStamp: 35.25, sourceTimeStamp: 36 },
+    ]);
+    expect(result.emitted.every((sample, index, samples) => (
+      index === 0 || sample.x > samples[index - 1]!.x
+    ))).toBe(true);
     expect(result.state.nextLogicalTick).toBe(6);
 
     const evaluated = advance(result.state, 40.25);
@@ -315,21 +443,18 @@ describe("fixed logical clock and zero-order hold", () => {
     expect(advance(settled.state, 14).emitted).toEqual([]);
   });
 
-  it("publishes sparse held motion frame-by-frame without changing the final logical stream", () => {
+  it("publishes reconstructed sparse motion before its held frame suffix", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
     const sparseMove = append(started.state, [{ x: 50, y: 0, timeStamp: 50 }]);
-    expect(sparseMove.emitted).toEqual([]);
+    expect(sparseMove.emitted.map(({ logicalTick }) => logicalTick))
+      .toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(sparseMove.emitted.every(({ sourceTimeStamp }) => sourceTimeStamp === 50)).toBe(true);
 
     const frame66 = advance(sparseMove.state, 66);
     const frame83 = advance(frame66.state, 83);
     const oneShot = advance(sparseMove.state, 83);
 
     expect(frame66.emitted.map(({ logicalTick }) => logicalTick)).toEqual([11, 12, 13]);
-    expect(frame66.emitted.map(({ x }) => Number(x.toFixed(6)))).toEqual([
-      0.302331,
-      1.511654,
-      4.172166,
-    ]);
     expect([...frame66.emitted, ...frame83.emitted]).toEqual(oneShot.emitted);
     expect(frame83.state).toEqual(oneShot.state);
   });
@@ -362,6 +487,27 @@ describe("fixed logical clock and zero-order hold", () => {
     expect(resumed.endpoint.y).toBeCloseTo(20, 10);
   });
 
+  it("bounds reconstruction work for one sample after a suspended-tab clock gap", () => {
+    const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 10);
+    const resumed = append(started.state, [{
+      x: 100,
+      y: 20,
+      pressure: 0.8,
+      timeStamp: 10 * 60 * 1_000,
+    }]);
+
+    expect(resumed.emitted.length)
+      .toBeLessThanOrEqual(Math.ceil(
+        FIXED_RATE_STROKE_INTERPOLATION_MAX_MS / FIXED_RATE_STROKE_FILTER_TICK_MS
+      ) + 1);
+    expect(resumed.state.nextLogicalTick).toBe(120_001);
+    expect(resumed.emitted.at(-1)).toMatchObject({
+      logicalTick: 120_000,
+      timeStamp: 10 * 60 * 1_000,
+      sourceTimeStamp: 10 * 60 * 1_000,
+    });
+  });
+
   it("cascades x, y, pressure, and both tilt channels through every stage", () => {
     const started = createFixedRateStrokeFilter({
       x: 0,
@@ -390,18 +536,18 @@ describe("fixed logical clock and zero-order hold", () => {
 
     expect(evaluated.state.stages).toHaveLength(10);
     expect(evaluated.state.stages[0]).toMatchObject({
-      x: 6,
-      y: 12,
-      pressure: 0.6,
-      tiltX: 9.6,
-      tiltY: -4.8,
+      x: 8,
+      y: 16,
+      pressure: 0.8,
+      tiltX: 12.8,
+      tiltY: -6.4,
     });
-    expect(evaluated.state.stages[1]?.x).toBeCloseTo(3.6, 12);
-    expect(evaluated.endpoint.x).toBeCloseTo(10 * 0.6 ** 10, 12);
-    expect(evaluated.endpoint.y).toBeCloseTo(20 * 0.6 ** 10, 12);
-    expect(evaluated.endpoint.pressure).toBeCloseTo(0.6 ** 10, 12);
-    expect(evaluated.endpoint.tiltX).toBeCloseTo(16 * 0.6 ** 10, 12);
-    expect(evaluated.endpoint.tiltY).toBeCloseTo(-8 * 0.6 ** 10, 12);
+    expect(evaluated.state.stages[1]?.x).toBeCloseTo(6, 12);
+    expect(evaluated.endpoint.x).toBeCloseTo(0.2620200959999999, 12);
+    expect(evaluated.endpoint.y).toBeCloseTo(0.5240401919999998, 12);
+    expect(evaluated.endpoint.pressure).toBeCloseTo(0.026202009599999992, 12);
+    expect(evaluated.endpoint.tiltX).toBeCloseTo(0.4192321535999999, 12);
+    expect(evaluated.endpoint.tiltY).toBeCloseTo(-0.20961607679999994, 12);
   });
 });
 
@@ -463,11 +609,11 @@ describe("deterministic event batching", () => {
       duplicateSamples.slice(3),
     ]);
     expect(split.emitted).toEqual(together.emitted);
-    // Strict ZOH boundary: a raw sample at t=10 becomes eligible after, not at, the t=10 tick.
-    expect(split.emitted.find((sample) => sample.timeStamp === 10)?.sourceTimeStamp).toBe(4);
+    // The first t=10 sample closes that tick; the later equal-time sample cannot revise it.
+    expect(split.emitted.find((sample) => sample.timeStamp === 10)?.sourceTimeStamp).toBe(10);
   });
 
-  it("uses the previous hold on an exact tick and the last equal-time sample on the next tick", () => {
+  it("uses the closing sample on an exact tick and the last equal-time sample on the next tick", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
     const atFour = append(started.state, [{ x: 4, y: 0, timeStamp: 4 }]);
     const atBoundary = append(atFour.state, [
@@ -476,7 +622,7 @@ describe("deterministic event batching", () => {
     ]);
     const nextTick = advance(atBoundary.state, 15);
 
-    expect(atBoundary.emitted.find(({ timeStamp }) => timeStamp === 10)?.sourceTimeStamp).toBe(4);
+    expect(atBoundary.emitted.find(({ timeStamp }) => timeStamp === 10)?.sourceTimeStamp).toBe(10);
     expect(nextTick.emitted.find(({ timeStamp }) => timeStamp === 15)?.sourceTimeStamp).toBe(10);
     expect(nextTick.state.heldSample.x).toBe(10);
   });
@@ -519,6 +665,109 @@ describe("deterministic event batching", () => {
   });
 });
 
+describe("fixed-rate path fidelity and latency budgets", () => {
+  const irregularCadence = [0.45, 1.55, 0.7, 1.25, 1.05] as const;
+  const fixtures = [
+    {
+      name: "slow circle",
+      durationMs: 1_200,
+      path: (timeStamp: number): FixedRateStrokeRawSample => {
+        const angle = (timeStamp / 1_200) * Math.PI * 2;
+        return {
+          x: Math.cos(angle) * 30,
+          y: Math.sin(angle) * 30,
+          pressure: 0.4 + (timeStamp / 1_200) * 0.3,
+          timeStamp,
+        };
+      },
+      regularDistanceBudget: 0.03,
+    },
+    {
+      name: "fast S-curve",
+      durationMs: 180,
+      path: (timeStamp: number): FixedRateStrokeRawSample => {
+        const progress = timeStamp / 180;
+        return {
+          x: progress * 220,
+          y: Math.sin(progress * Math.PI * 2) * 42,
+          pressure: 0.55 + Math.sin(progress * Math.PI) * 0.2,
+          timeStamp,
+        };
+      },
+      regularDistanceBudget: 0.25,
+    },
+    {
+      name: "acute turn",
+      durationMs: 180,
+      path: (timeStamp: number): FixedRateStrokeRawSample => {
+        const progress = timeStamp / 180;
+        return progress <= 0.5
+          ? { x: progress * 160, y: 0, pressure: 0.5, timeStamp }
+          : {
+              x: 80 - (progress - 0.5) * 100,
+              y: (progress - 0.5) * 140,
+              pressure: 0.5,
+              timeStamp,
+            };
+      },
+      regularDistanceBudget: 0.15,
+    },
+  ] as const;
+
+  for (const fixture of fixtures) {
+    it(`preserves ${fixture.name} arc length and turn score at 120/240Hz and irregular cadence`, () => {
+      const at120Hz = runSampledPath(
+        fixture.path,
+        sampleTimes(fixture.durationMs, 120)
+      );
+      const at240Hz = runSampledPath(
+        fixture.path,
+        sampleTimes(fixture.durationMs, 240)
+      );
+      const irregular240Hz = runSampledPath(
+        fixture.path,
+        sampleTimes(fixture.durationMs, 240, irregularCadence)
+      );
+      const relativeDifference = (left: number, right: number) => (
+        Math.abs(left - right) / Math.max(left, right, Number.EPSILON)
+      );
+
+      expect(maximumPointDistance(at120Hz, at240Hz))
+        .toBeLessThanOrEqual(fixture.regularDistanceBudget);
+      expect(maximumPointDistance(at240Hz, irregular240Hz)).toBeLessThanOrEqual(0.08);
+      expect(relativeDifference(polylineLength(at120Hz), polylineLength(at240Hz)))
+        .toBeLessThanOrEqual(0.005);
+      expect(relativeDifference(polylineLength(at240Hz), polylineLength(irregular240Hz)))
+        .toBeLessThanOrEqual(0.002);
+      expect(relativeDifference(totalAbsoluteTurn(at120Hz), totalAbsoluteTurn(at240Hz)))
+        .toBeLessThanOrEqual(0.015);
+      expect(relativeDifference(totalAbsoluteTurn(at240Hz), totalAbsoluteTurn(irregular240Hz)))
+        .toBeLessThanOrEqual(0.015);
+    });
+  }
+
+  it("keeps the strongest steady-state trail below an 82ms phase-delay budget", () => {
+    const durationMs = 2_000;
+    const path = (timeStamp: number): FixedRateStrokeRawSample => ({
+      x: timeStamp,
+      y: 0,
+      pressure: 0.5,
+      timeStamp,
+    });
+    const trails = [
+      runSampledPath(path, sampleTimes(durationMs, 120), 10),
+      runSampledPath(path, sampleTimes(durationMs, 240), 10),
+      runSampledPath(path, sampleTimes(durationMs, 240, irregularCadence), 10),
+    ].map((samples) => {
+      const endpoint = samples.at(-1)!;
+      return durationMs - endpoint.x;
+    });
+
+    expect(Math.max(...trails)).toBeLessThanOrEqual(82);
+    expect(Math.max(...trails) - Math.min(...trails)).toBeLessThanOrEqual(0.05);
+  });
+});
+
 describe("representative stroke fixtures", () => {
   it("locks the causal sine response across position, pressure, and tilt", () => {
     const initial = {
@@ -547,35 +796,35 @@ describe("representative stroke fixtures", () => {
         { tick: 0, x: 0, y: 0, pressure: 0.399804, tiltX: 0, tiltY: -10 },
         {
           tick: 4,
-          x: 1.441514,
-          y: 0.820617,
-          pressure: 0.410989,
-          tiltX: 0.758714,
-          tiltY: -9.916345,
+          x: 1.801892,
+          y: 0.98414,
+          pressure: 0.413434,
+          tiltX: 0.93774,
+          tiltY: -9.866067,
         },
         {
           tick: 8,
-          x: 11.535184,
-          y: 5.159312,
-          pressure: 0.476425,
-          tiltX: 5.665724,
-          tiltY: -8.568895,
+          x: 13.365356,
+          y: 5.62917,
+          pressure: 0.485332,
+          tiltX: 6.45954,
+          tiltY: -8.195426,
         },
         {
           tick: 12,
-          x: 31.42924,
-          y: 7.702838,
-          pressure: 0.544587,
-          tiltX: 13.205966,
-          tiltY: -4.099059,
+          x: 34.229754,
+          y: 7.37685,
+          pressure: 0.546356,
+          tiltX: 13.966729,
+          tiltY: -3.339274,
         },
         {
           tick: 16,
-          x: 55.38034,
-          y: 1.911754,
-          pressure: 0.510308,
-          tiltX: 17.202255,
-          tiltY: 2.381086,
+          x: 58.449406,
+          y: 0.778795,
+          pressure: 0.497424,
+          tiltX: 17.220877,
+          tiltY: 3.145907,
         },
       ]);
     expect(fixturePoint(result.finished.endpoint)).toEqual({
@@ -619,7 +868,7 @@ describe("representative stroke fixtures", () => {
       .toEqual([
         {
           tick: 8,
-          x: 18.456294,
+          x: 21.38457,
           y: 0,
           pressure: 0.500489,
           tiltX: 0,
@@ -627,38 +876,38 @@ describe("representative stroke fixtures", () => {
         },
         {
           tick: 9,
-          x: 25.236442,
-          y: 0.048373,
+          x: 28.692516,
+          y: 0.060466,
           pressure: 0.500489,
           tiltX: 0,
           tiltY: 0,
         },
         {
           tick: 12,
-          x: 47.980362,
-          y: 2.306422,
+          x: 51.884579,
+          y: 2.883027,
           pressure: 0.500489,
           tiltX: 0,
           tiltY: 0,
         },
         {
           tick: 16,
-          x: 70.15225,
-          y: 18.456294,
+          x: 72.134479,
+          y: 21.38457,
           pressure: 0.500489,
           tiltX: 0,
           tiltY: 0,
         },
       ]);
     expect(fixturePoint(finished.endpoint)).toEqual({
-      tick: 32,
+      tick: 31,
       x: 80,
       y: 80,
       pressure: 0.500489,
       tiltX: 0,
       tiltY: 0,
     });
-    expect(finished.releaseDrainTicks).toBe(16);
+    expect(finished.releaseDrainTicks).toBe(15);
     expect(finished.state.lastStagePositionDelta).toBe(0);
   });
 

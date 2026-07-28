@@ -22,7 +22,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { Suspense, memo, useEffect, useState } from "react";
+import { Suspense, memo, useEffect, useMemo, useState } from "react";
 
 import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
@@ -76,6 +76,7 @@ import {
 } from "./studio-element-model";
 import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
+import { type StudioFilterKind } from "./studio-filter-menu";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
@@ -84,6 +85,7 @@ import {
   resolveStudioInspectorInteractionPolicy,
 } from "./studio-inspector-interaction-policy";
 import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
+import { resolveStudioInspectorRasterToolPolicy } from "./studio-inspector-raster-tool-policy";
 import {
   executeStudioInspectorArmedChange,
   executeStudioInspectorArmedToggle,
@@ -162,6 +164,11 @@ import {
 } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
+import { summarizeStudioRasterPreparationSources } from "./studio-raster-edit-preparation";
+import {
+  resolveStudioRasterToolAvailability,
+  type StudioRasterToolAvailabilityContext,
+} from "./studio-raster-tool-availability";
 import {
   DEFAULT_STUDIO_SKETCH_STYLE,
   studioSketchStyleOfElement,
@@ -202,7 +209,6 @@ import {
   StudioInspectorCurrentBrushSummary,
   StudioInspectorDisabledReasons,
   StudioInspectorDrawColorControls,
-  StudioInspectorEmptySelection,
   StudioInspectorMutationLockNotice,
   StudioInspectorPageGradeSurface,
   StudioInspectorPublishPanel,
@@ -214,6 +220,13 @@ import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
+import {
+  StudioInspectorFilterLauncher,
+  StudioInspectorPixelSelectionLauncher,
+  StudioRasterToolRecoveryPanel,
+  type StudioInspectorPixelSelectionToolId,
+  type StudioRasterRecoveryRequest,
+} from "./StudioRasterToolRecoveryPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 
 import type {
@@ -231,6 +244,9 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 export interface StudioInspectorAsideHandlers {
+  activatePixelSelectionToolFromInspector: (
+    kind: StudioInspectorPixelSelectionToolId,
+  ) => void;
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addBubbleShapePointFromInspector: () => void;
   addFilterMask: (fill: FilterMaskPaintMode) => void;
@@ -261,6 +277,7 @@ export interface StudioInspectorAsideHandlers {
   clearHealCloneSource: () => void;
   clearPolyLassoDraft: () => void;
   commit: (nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>, targetPageId?: string) => boolean;
+  createEditableRasterCopyForInspector: () => Promise<void>;
   deleteFilterMask: () => void;
   deleteLayerMask: () => void;
   detachBubbleAnchor: () => void;
@@ -289,6 +306,8 @@ export interface StudioInspectorAsideHandlers {
   onMinimapKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   openBrushCatalog: (trigger: HTMLButtonElement) => void;
   openFeatureTutorial: (tutorialId?: string | null) => void;
+  openImagePastePicker: () => void;
+  openStudioFilter: (kind: StudioFilterKind) => void;
   patchEl: (id: string, patch: Partial<El>) => void;
   patchPageGrade: (patch: Partial<PageGrade>) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
@@ -319,6 +338,7 @@ export interface StudioInspectorAsideHandlers {
   setTitle: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setWebtoonTheme: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<"classic" | "soft" | "vivid">>>[0]) => void;
   splitFrameSelected: (orientation: "horizontal" | "vertical") => void;
+  stopTimeline: () => void;
   startEditText: (id: string) => void;
   toggleAdvancedFill: () => void;
   toggleBubbleAnchorPick: () => void;
@@ -461,6 +481,7 @@ interface StudioInspectorAsideProps {
   pixelBrushRadius: number;
   pixelBusy: boolean;
   pixelCombine: SelectionCombineMode;
+  pixelForceCircle: boolean;
   pixelMagneticLasso: boolean;
   onTogglePixelMagneticLasso: () => void;
   pixelSel: PixelSelection | null;
@@ -481,6 +502,7 @@ interface StudioInspectorAsideProps {
   rightResize: import("@/components/use-resizable").Resizable;
   savedBrushes: StudioSavedBrush[];
   saving: boolean;
+  studioFilterPreparationBusy: boolean;
   scrollPos: { left: number; top: number; width: number; height: number; scrollWidth: number; scrollHeight: number; };
   selected: El | null;
   selectedBg3dEditSource: { readonly scene?: StudioBg3dSceneDocument; readonly legacyDataUrl?: string; } | null;
@@ -667,6 +689,7 @@ interface StudioInspectorAsideProps {
   symmetryRadialCount: number;
   symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
   tagsText: string;
+  timelinePlaying: boolean;
   tiltEnabled: boolean;
   tipAngle: number;
   tipRoundness: number;
@@ -810,6 +833,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   pixelBrushRadius,
   pixelBusy,
   pixelCombine,
+  pixelForceCircle,
   pixelMagneticLasso,
   onTogglePixelMagneticLasso,
   pixelSel,
@@ -831,6 +855,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   rightResize,
   savedBrushes,
   saving,
+  studioFilterPreparationBusy,
   scrollPos,
   selected,
   selectedBg3dEditSource,
@@ -921,7 +946,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setQuickMaskHardness,
   setQuickMaskOpacity,
   setColorRangeFuzziness,
-  setColorRangePickActive,
   setColorRangePreviewEnabled,
   setColorRangeSamples,
   setPixelTool,
@@ -1010,6 +1034,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   symmetryRadialCount,
   symmetryType,
   tagsText,
+  timelinePlaying,
   tiltEnabled,
   tipAngle,
   tipRoundness,
@@ -1027,6 +1052,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   stableHandlers,
 }: StudioInspectorAsideProps) {
   const {
+    activatePixelSelectionToolFromInspector,
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
     addFilterMask,
@@ -1054,6 +1080,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     clearHealCloneSource,
     clearPolyLassoDraft,
     commit,
+    createEditableRasterCopyForInspector,
     deleteFilterMask,
     deleteLayerMask,
     detachBubbleAnchor,
@@ -1082,6 +1109,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     onMinimapKeyDown,
     openBrushCatalog,
     openFeatureTutorial,
+    openImagePastePicker,
+    openStudioFilter,
     patchEl,
     patchPageGrade,
     queueBrushDelete,
@@ -1112,6 +1141,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     setTitle,
     setWebtoonTheme,
     splitFrameSelected,
+    stopTimeline,
     startEditText,
     toggleAdvancedFill,
     toggleBubbleAnchorPick,
@@ -1140,19 +1170,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const inspectorDrawing = inspectorContentMode === "drawing";
   const selectedSupportsImageInspectorTabs =
     !inspectorDrawing && (selected?.type === "image" || selected?.type === "draw");
-  const activeFillRouteImagePanel = inspectorLayout.primary === "properties" &&
-    inspectorLayout.image === "fill";
   const activeImageInspectorTab =
-    inspectorLayout.primary === "properties" &&
-      (
-        selectedSupportsImageInspectorTabs ||
-        (!inspectorDrawing && activeFillRouteImagePanel && advancedFillActive)
-      )
+    inspectorLayout.primary === "properties" && !inspectorDrawing
       ? inspectorLayout.image
       : null;
-  const advancedFillInspectorRouteWithoutImageSelection = activeFillRouteImagePanel &&
-    advancedFillActive &&
-    !inspectorDrawing &&
+  const imageInspectorRouteWithoutImageSelection =
+    activeImageInspectorTab !== null &&
     !selectedSupportsImageInspectorTabs;
   const inspectorTransientState: StudioInspectorTransientState = {
     advancedFillActive,
@@ -1198,24 +1221,217 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     (marqueeSelectionMutationLocked
       ? "선택한 도형 레이어의 잠금을 해제한 뒤 결합할 수 있어요."
       : pathBooleanUnavailableReason);
-  const imageInspectorUnsupportedDrawMessage = {
-    quick: "빠른 수정은 래스터 이미지 레이어가 선택되어야 동작해요.",
-    fill: "채우기·선화 탭은 이미지 레이어를 대상으로 동작해요. 선화 요소는 픽셀 이미지로 전환하거나 다른 도구로 처리할 수 있어요.",
-    retouch: "선택·리터치 도구는 이미지를 선택했을 때만 동작해요.",
-    mask: "레이어 마스크는 이미지 레이어에서만 사용할 수 있어요.",
-    transform: "변형은 이미지 레이어를 선택해 실행할 수 있어요.",
-  } as const;
-  const imageOnlyImageInspectorFallback = (
+  const normalizedPageBackground = bg.trim().toLowerCase();
+  const hasAuthoredPageBackground =
+    (bgGrad?.length ?? 0) > 0 ||
+    ![
+      "",
+      "#fff",
+      "#ffffff",
+      "rgb(255, 255, 255)",
+      "rgba(255, 255, 255, 1)",
+      "transparent",
+      "white",
+    ].includes(normalizedPageBackground);
+  const rasterPreparationSummary = useMemo(() => {
+    if (inspectorDrawing || inspectorLayout.primary !== "properties") return null;
+    return summarizeStudioRasterPreparationSources({
+      width: CANVAS_W,
+      height: canvasH,
+      elements,
+      groups,
+      theme: webtoonTheme,
+      bg,
+      bgGrad,
+      hasPageBackground: hasAuthoredPageBackground,
+    });
+  }, [
+    bg,
+    bgGrad,
+    canvasH,
+    elements,
+    groups,
+    hasAuthoredPageBackground,
+    inspectorDrawing,
+    inspectorLayout.primary,
+    webtoonTheme,
+  ]);
+  const rasterDocumentMutationBlockedReason =
+    inspectorInteractionPolicy.page.reason ||
+    (selected?.type !== "image"
+      ? inspectorInteractionPolicy.selection.reason
+      : undefined) ||
+    (selected?.type !== "image" && localHiddenElementIds.size > 0
+      ? "‘나만 숨기기’ 레이어를 다시 표시한 뒤 페이지 합성 복사본을 만들 수 있어요."
+      : null);
+  const selectedRasterAnimated =
+    selected?.type === "image" &&
+    (selected.isAnimatedGif || (selected.frames?.length ?? 0) > 1);
+  const rasterToolContext: StudioRasterToolAvailabilityContext = {
+    documentMutationBlockedReason: rasterDocumentMutationBlockedReason,
+    timelinePlaying,
+    selectedType: selected?.type ?? null,
+    selectedHidden: selected
+      ? localHiddenElementIds.has(selected.id) || isEffectivelyHidden(selected, groups)
+      : false,
+    selectedMutationBlockedReason:
+      selected?.type === "image"
+        ? selectedWorkAssetDestructiveEditReason ??
+          inspectorInteractionPolicy.selection.reason ??
+          null
+        : null,
+    selectedMutationRecovery: selectedWorkAssetDestructiveEditReason ? "copy" : "unlock",
+    selectedAnimated: selectedRasterAnimated,
+    visibleEditableRasterCount: rasterPreparationSummary?.visibleUnlockedRasterCount ?? 0,
+    visibleVectorDrawCount: rasterPreparationSummary?.visibleVectorDrawCount ?? 0,
+    exactRenderableVisibleCount: rasterPreparationSummary?.exactRenderableVisibleCount ?? 0,
+    unsupportedVisibleCount: rasterPreparationSummary?.unsupportedVisibleCount ?? 0,
+    hiddenContentCount:
+      (rasterPreparationSummary?.hiddenContentCount ?? 0) + localHiddenElementIds.size,
+    hasPageBackground: rasterPreparationSummary?.hasPageBackground ?? true,
+    hasPixelSelection: isSelectionUsable(pixelSel),
+    hasCloneSource: healCloneSourceAnchor !== null,
+    hasHistorySource: historyBrushSourceSrc !== null,
+    hasPuppetDisplacement: !isPuppetWarpNoop(puppetWarpPins),
+    hasCropChange: cropRect !== null && !isCropRectNoop(cropRect),
+  };
+  const lockedCompositeSourceReason =
+    (rasterPreparationSummary?.lockedVisibleSourceIds.length ?? 0) > 0
+      ? "페이지 합성본으로 바꿀 표시 레이어 중 잠긴 레이어가 있습니다. 해당 레이어의 잠금을 해제한 뒤 다시 시도하세요."
+      : null;
+  const activeInspectorPixelSelectionTool: StudioInspectorPixelSelectionToolId | null =
+    colorRangePickActive
+      ? "color-range"
+      : pixelTool === "ellipse"
+        ? pixelForceCircle
+          ? "circle"
+          : "ellipse"
+        : pixelTool;
+  const rasterAvailability = (
+    id: Parameters<typeof resolveStudioRasterToolAvailability>[0],
+    busy = false,
+  ) =>
+    resolveStudioRasterToolAvailability(id, {
+      ...rasterToolContext,
+      documentMutationBlockedReason:
+        rasterToolContext.documentMutationBlockedReason ??
+        (id === "filter" || id === "paint-bucket"
+          ? null
+          : lockedCompositeSourceReason),
+      busy,
+    });
+  const rasterAvailabilityForTab = (
     tab: StudioImageInspectorSection,
-  ): React.ReactNode | null => {
-    if (selected?.type !== "draw") return null;
-    const message = imageInspectorUnsupportedDrawMessage[tab];
-    if (!message) return null;
-    return (
-      <p className="rounded-md border border-line/50 bg-card/45 px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3">
-        {message}
-      </p>
-    );
+  ) => {
+    switch (tab) {
+      case "quick":
+        return [rasterAvailability("filter", studioFilterPreparationBusy)];
+      case "fill":
+        return [rasterAvailability("paint-bucket", advancedFillBusy)];
+      case "retouch":
+        return [
+          rasterAvailability("pixel-marquee", pixelBusy),
+          rasterAvailability("liquify", liquifyBusy),
+          rasterAvailability("heal", healCloneBusy),
+        ];
+      case "mask":
+        return [rasterAvailability("layer-mask", layerMaskBusy || filterMaskBusy)];
+      case "transform":
+        return [
+          rasterAvailability("crop", cropBusy),
+          rasterAvailability("pixel-transform", pixelBusy),
+          rasterAvailability("puppet-warp", puppetWarpBusy),
+      ];
+    }
+  };
+  const activeImageRasterAvailability = activeImageInspectorTab
+    ? rasterAvailabilityForTab(activeImageInspectorTab)[0]
+    : null;
+  const activeImageRasterPolicy = activeImageRasterAvailability
+    ? resolveStudioInspectorRasterToolPolicy(activeImageRasterAvailability)
+    : null;
+  const editableRasterCandidates = elements.filter(
+    (element): element is ImageEl =>
+      element.type === "image" &&
+      !localHiddenElementIds.has(element.id) &&
+      !isEffectivelyHidden(element, groups) &&
+      !isEffectivelyLocked(element, groups),
+  );
+  const handleRasterRecovery = (request: StudioRasterRecoveryRequest): void => {
+    switch (request.action.id) {
+      case "select-only-raster-layer": {
+        if (editableRasterCandidates.length === 1) {
+          selectLayersFromNavigator([editableRasterCandidates[0]!.id]);
+          announceDrawingShortcut(`${request.toolId} 대상 이미지 레이어를 선택했어요`);
+          return;
+        }
+        disarmAllPixelTools();
+        changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+        return;
+      }
+      case "select-raster-layer":
+      case "show-hidden-layers":
+      case "resolve-document-lock":
+        disarmAllPixelTools();
+        changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+        return;
+      case "show-selected-layer":
+        if (selected && localHiddenElementIds.has(selected.id)) {
+          toggleLocalHidden(selected.id);
+          announceDrawingShortcut("나만 숨긴 선택 레이어를 다시 표시했어요");
+          return;
+        }
+        if (selected && selected.hidden === true) {
+          patchEl(selected.id, { hidden: false } as Partial<El>);
+          announceDrawingShortcut("선택 레이어를 표시했어요");
+          return;
+        }
+        disarmAllPixelTools();
+        changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+        return;
+      case "unlock-selected-layer":
+        if (selected && selected.locked === true) {
+          patchEl(selected.id, { locked: false } as Partial<El>);
+          announceDrawingShortcut("선택 레이어 잠금을 해제했어요");
+          return;
+        }
+        disarmAllPixelTools();
+        changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+        return;
+      case "create-editable-raster-copy":
+      case "create-selected-static-copy":
+        void createEditableRasterCopyForInspector();
+        return;
+      case "add-or-import-content":
+        openImagePastePicker();
+        return;
+      case "stop-timeline":
+        stopTimeline();
+        return;
+      case "make-pixel-selection":
+        disarmAllPixelTools();
+        setTool("select");
+        setPixelForceCircle(false);
+        setPixelTool("rect");
+        changeInspectorLayout({ ...inspectorLayout, primary: "properties", image: "retouch" });
+        return;
+      case "pick-clone-source":
+        disarmAllPixelTools();
+        setTool("select");
+        setHealCloneTool("clone");
+        changeInspectorLayout({ ...inspectorLayout, primary: "properties", image: "retouch" });
+        return;
+      case "pick-history-source":
+        setHistoryPanelOpen(true);
+        return;
+      case "move-puppet-pin":
+      case "adjust-crop-area":
+        changeInspectorLayout({ ...inspectorLayout, primary: "properties", image: "transform" });
+        return;
+      case "retry-when-idle":
+        announceDrawingShortcut("현재 작업이 끝나면 같은 도구를 다시 눌러 주세요");
+        return;
+    }
   };
 
   useEffect(() => {
@@ -1311,6 +1527,18 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 : null
             }
             drawing={inspectorDrawing}
+            imageToolsAvailable={!inspectorDrawing}
+            imageToolsStatusLabel={activeImageRasterPolicy?.statusLabel}
+            imageToolsStatusDescription={activeImageRasterPolicy?.description}
+            imageToolsStatusTone={
+              activeImageRasterPolicy?.state === "ready"
+                ? "good"
+                : activeImageRasterPolicy?.selectable
+                  ? "accent"
+                  : activeImageRasterPolicy
+                    ? "warn"
+                    : undefined
+            }
             layerCount={elements.length}
             mobileSheetHandle={
               <StudioMobileSheetHandle
@@ -1445,6 +1673,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 hasActiveSession={inspectorTransientOwners.length > 0}
                 onExit={disarmAllPixelTools}
               />
+              {inspectorInteractionPolicy.selection.disabled && activeImageInspectorTab ? (
+                <div className="mb-3">
+                  <StudioRasterToolRecoveryPanel
+                    entries={rasterAvailabilityForTab(activeImageInspectorTab)}
+                    onRecover={handleRasterRecovery}
+                  />
+                </div>
+              ) : null}
               <fieldset
                 disabled={inspectorInteractionPolicy.selection.disabled}
                 title={inspectorInteractionPolicy.selection.reason}
@@ -2413,7 +2649,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         selectedIsReference={selected?.type === "image" ? selected.fillReference === true : false}
                         targetUnsupportedReason={
                           inspectorInteractionPolicy.selection.reason ??
-                          advancedFillUnsupportedReason
+                          advancedFillUnsupportedReason ??
+                          (!rasterAvailability("paint-bucket").entry.enabled
+                            ? rasterAvailability("paint-bucket").entry.reason
+                            : null)
                         }
                         statusMessage={advancedFillStatus}
                         diagnostics={advancedFillPreview?.diagnostics}
@@ -2435,6 +2674,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
                         }
                       />
+                      {rasterAvailability("paint-bucket").entry.mode !== "direct-raster" ? (
+                        <StudioRasterToolRecoveryPanel
+                          entries={[rasterAvailability("paint-bucket", advancedFillBusy)]}
+                          onRecover={handleRasterRecovery}
+                        />
+                      ) : null}
                       {selected.type === "image" ? (
                         <>
                           <StudioAutoColorHintsPanel
@@ -2509,7 +2754,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   {shouldMountImageInspectorTab("quick") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
                     <Suspense fallback={<StudioPanelLoading label="이미지 보정을 여는 중..." />}>
-                      {selected.type === "image" ? (
+                      <StudioInspectorFilterLauncher
+                        availability={rasterAvailability("filter", studioFilterPreparationBusy)}
+                        busy={studioFilterPreparationBusy}
+                        onRecover={handleRasterRecovery}
+                        onSelect={openStudioFilter}
+                      />
+                      {selected.type === "image" &&
+                      rasterAvailability("filter").entry.enabled ? (
                         <StudioImageAdjustmentsPanel
                           selected={selected}
                           filterClipboard={filterClipboard}
@@ -2519,17 +2771,25 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onToggleEffectFavorite={toggleEffectFavorite}
                           onRememberEffectRecent={rememberEffectRecent}
                         />
-                      ) : (
-                        imageOnlyImageInspectorFallback("quick")
-                      )}
+                      ) : null}
                     </Suspense>
                   </div>
                   ) : null}
                   {shouldMountImageInspectorTab("retouch") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "retouch"}>
                     <Suspense fallback={<StudioPanelLoading label="선택·리터치 도구를 여는 중..." />}>
-                      {selected.type === "image" ? (
+                      {selected.type === "image" &&
+                      rasterAvailability("pixel-marquee").entry.enabled ? (
                       <>
+                        <StudioInspectorPixelSelectionLauncher
+                          availability={rasterAvailability("pixel-marquee")}
+                          activeTool={activeInspectorPixelSelectionTool}
+                          busy={pixelBusy}
+                          heading="정원 마퀴"
+                          toolIds={["circle"]}
+                          onPickTool={activatePixelSelectionToolFromInspector}
+                          onRecover={handleRasterRecovery}
+                        />
                         {/* 픽셀 선택 도구 — 사각/타원/자유·다각형 올가미/브러시 + 결합/페더/확장·축소. */}
                         <StudioSelectionToolsPanel
                           selection={pixelSel}
@@ -2541,9 +2801,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onBrushRadiusChange={setPixelBrushRadius}
                           onPickTool={(t) => {
                             clearPolyLassoDraft();
-                            if (t) disarmAllPixelTools();
-                            setPixelForceCircle(false);
-                            setPixelTool(t);
+                            if (t) {
+                              activatePixelSelectionToolFromInspector(t);
+                              return;
+                            }
+                            disarmAllPixelTools();
                           }}
                           onCombineModeChange={setPixelCombine}
                           onFeatherChange={(px) => commitPixelSelectionState((selection) => selection ? setSelectionFeather(selection, px) : selection, "feather", "feather")}
@@ -2589,9 +2851,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           colorRangePickArmed={colorRangePickActive}
                           colorRangePreviewEnabled={colorRangePreviewEnabled}
                           onColorRangeTogglePick={() => {
-                            const next = !colorRangePickActive;
-                            if (next) disarmAllPixelTools();
-                            setColorRangePickActive(next);
+                            activatePixelSelectionToolFromInspector("color-range");
                           }}
                           onColorRangeFuzzinessChange={setColorRangeFuzziness}
                           onColorRangeFuzzinessCommit={(v) => {
@@ -2612,9 +2872,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           tolerance={wandTolerance}
                           busy={pixelBusy}
                           onToggleActive={() => {
-                            const next = pixelTool === "wand" ? null : "wand";
-                            if (next) disarmAllPixelTools();
-                            setPixelTool(next);
+                            activatePixelSelectionToolFromInspector("wand");
                           }}
                           onToleranceChange={setWandTolerance}
                         />
@@ -2736,7 +2994,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         />
                       </>
                       ) : (
-                        imageOnlyImageInspectorFallback("retouch")
+                        <>
+                          <StudioInspectorPixelSelectionLauncher
+                            availability={rasterAvailability("pixel-marquee")}
+                            activeTool={activeInspectorPixelSelectionTool}
+                            busy={pixelBusy}
+                            onPickTool={activatePixelSelectionToolFromInspector}
+                            onRecover={handleRasterRecovery}
+                          />
+                          <StudioRasterToolRecoveryPanel
+                            entries={[
+                              rasterAvailability("liquify", liquifyBusy),
+                              rasterAvailability("heal", healCloneBusy),
+                            ]}
+                            onRecover={handleRasterRecovery}
+                          />
+                        </>
                       )}
                     </Suspense>
                   </div>
@@ -2744,7 +3017,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   {shouldMountImageInspectorTab("mask") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "mask"}>
                     <Suspense fallback={<StudioPanelLoading label="레이어 마스크를 여는 중..." />}>
-                      {selected.type === "image" ? (
+                      {selected.type === "image" &&
+                      rasterAvailability("layer-mask").entry.enabled ? (
                         <>
                           <StudioLayerMaskPanel
                             hasMask={!!selected.maskSrc}
@@ -2801,7 +3075,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           />
                         </>
                       ) : (
-                        imageOnlyImageInspectorFallback("mask")
+                        <StudioRasterToolRecoveryPanel
+                          entries={[
+                            rasterAvailability("layer-mask", layerMaskBusy || filterMaskBusy),
+                          ]}
+                          onRecover={handleRasterRecovery}
+                        />
                       )}
                     </Suspense>
                   </div>
@@ -2809,7 +3088,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   {shouldMountImageInspectorTab("transform") ? (
                   <div className="space-y-3" hidden={activeImageInspectorTab !== "transform"}>
                     <Suspense fallback={<StudioPanelLoading label="이미지 변형 도구를 여는 중..." />}>
-                      {selected.type === "image" ? (
+                      {selected.type === "image" &&
+                      rasterAvailability("crop").entry.enabled ? (
                         <>
                           <StudioCropPanel
                             active={!!cropRect}
@@ -2860,7 +3140,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           />
                         </>
                       ) : (
-                        imageOnlyImageInspectorFallback("transform")
+                        <StudioRasterToolRecoveryPanel
+                          entries={[
+                            rasterAvailability("crop", cropBusy),
+                            rasterAvailability("pixel-transform", pixelBusy),
+                            rasterAvailability("puppet-warp", puppetWarpBusy),
+                          ]}
+                          onRecover={handleRasterRecovery}
+                        />
                       )}
                     </Suspense>
                   </div>
@@ -3403,21 +3690,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             </div>
           )}
 
-          <StudioInspectorEmptySelection
-            visible={
-              inspectorLayout.primary === "properties" &&
-              inspectorContentMode === "empty" &&
-              !activeFillRouteImagePanel
-            }
-          />
-
-          {advancedFillInspectorRouteWithoutImageSelection ? (
+          {imageInspectorRouteWithoutImageSelection ? (
             <div
               role="tabpanel"
-              aria-label="선채움 패널"
+              aria-label="전문 픽셀 도구"
               hidden={inspectorLayout.primary !== "properties"}
-              className="rounded-xl border border-line bg-panel/40 p-3"
+              className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
             >
+              {shouldMountImageInspectorTab("quick") ? (
+                <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
+                  <StudioInspectorFilterLauncher
+                    availability={rasterAvailability("filter", studioFilterPreparationBusy)}
+                    busy={studioFilterPreparationBusy}
+                    onRecover={handleRasterRecovery}
+                    onSelect={openStudioFilter}
+                  />
+                </div>
+              ) : null}
               {shouldMountImageInspectorTab("fill") ? (
                 <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
                   <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
@@ -3429,21 +3718,72 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       referenceLayerCount={advancedFillReferenceLayerCount}
                       visibleRasterCount={advancedFillVisibleRasterCount}
                       selectedIsReference={false}
+                      canToggleSelectedReference={false}
                       targetUnsupportedReason={
                         inspectorInteractionPolicy.page.reason ??
-                        advancedFillUnsupportedReason
+                        advancedFillUnsupportedReason ??
+                        (!rasterAvailability("paint-bucket", advancedFillBusy).entry.enabled
+                          ? rasterAvailability("paint-bucket", advancedFillBusy).entry.reason
+                          : null)
                       }
                       statusMessage={advancedFillStatus}
                       diagnostics={advancedFillPreview?.diagnostics}
                       onToggleActive={toggleAdvancedFill}
                       onFillColorChange={setColor}
                       onSettingsChange={updateAdvancedFillSettings}
-                      onToggleSelectedReference={() => {}}
+                      onToggleSelectedReference={() => undefined}
                       onResetSettings={() =>
                         updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
                       }
                     />
+                    {rasterAvailability("paint-bucket", advancedFillBusy).entry.mode !==
+                    "direct-raster" ? (
+                      <StudioRasterToolRecoveryPanel
+                        entries={[rasterAvailability("paint-bucket", advancedFillBusy)]}
+                        onRecover={handleRasterRecovery}
+                      />
+                    ) : null}
                   </Suspense>
+                </div>
+              ) : null}
+              {shouldMountImageInspectorTab("retouch") ? (
+                <div className="space-y-3" hidden={activeImageInspectorTab !== "retouch"}>
+                  <StudioInspectorPixelSelectionLauncher
+                    availability={rasterAvailability("pixel-marquee")}
+                    activeTool={activeInspectorPixelSelectionTool}
+                    busy={pixelBusy}
+                    onPickTool={activatePixelSelectionToolFromInspector}
+                    onRecover={handleRasterRecovery}
+                  />
+                  <StudioRasterToolRecoveryPanel
+                    entries={[
+                      rasterAvailability("liquify", liquifyBusy),
+                      rasterAvailability("heal", healCloneBusy),
+                    ]}
+                    onRecover={handleRasterRecovery}
+                  />
+                </div>
+              ) : null}
+              {shouldMountImageInspectorTab("mask") ? (
+                <div className="space-y-3" hidden={activeImageInspectorTab !== "mask"}>
+                  <StudioRasterToolRecoveryPanel
+                    entries={[
+                      rasterAvailability("layer-mask", layerMaskBusy || filterMaskBusy),
+                    ]}
+                    onRecover={handleRasterRecovery}
+                  />
+                </div>
+              ) : null}
+              {shouldMountImageInspectorTab("transform") ? (
+                <div className="space-y-3" hidden={activeImageInspectorTab !== "transform"}>
+                  <StudioRasterToolRecoveryPanel
+                    entries={[
+                      rasterAvailability("crop", cropBusy),
+                      rasterAvailability("pixel-transform", pixelBusy),
+                      rasterAvailability("puppet-warp", puppetWarpBusy),
+                    ]}
+                    onRecover={handleRasterRecovery}
+                  />
                 </div>
               ) : null}
             </div>

@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyStudioEditableRasterCopy,
   createStudioEditablePageRasterContext,
+  describeStudioEditableRasterSelectionSurface,
   isStudioEditableRasterCopyPlanCurrent,
   materializeStudioEditableRasterCopy,
   planStudioEditableRasterCopy,
   renderStudioEditableRasterCopy,
+  STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS,
   summarizeStudioRasterPreparationSources,
 } from "./studio-raster-edit-preparation";
 import { renderStudioVectorReference } from "./studio-vector-fill-reference";
@@ -43,6 +45,61 @@ function text(id = "text"): Extract<El, { type: "text" }> {
   };
 }
 
+function bubble(id = "bubble"): Extract<El, { type: "bubble" }> {
+  return {
+    id,
+    type: "bubble",
+    variant: "speech",
+    text: "짧은 대사",
+    x: 50,
+    y: 60,
+    width: 140,
+    height: 80,
+    fill: "#ffffff",
+    textFill: "#111111",
+    rotation: 0,
+  };
+}
+
+function frame(id = "frame"): Extract<El, { type: "frame" }> {
+  return {
+    id,
+    type: "frame",
+    x: 8,
+    y: 12,
+    width: 280,
+    height: 220,
+    bgColor: "#ffffff",
+    stroke: "#111111",
+    strokeWidth: 3,
+  };
+}
+
+function shape(id = "shape"): Extract<El, { type: "draw" }> {
+  return line(id, {
+    kind: "ellipse",
+    points: [80, 90, 180, 190],
+    fill: "#f2efe8",
+  });
+}
+
+function image(
+  id = "image",
+  patch: Partial<Extract<El, { type: "image" }>> = {},
+): Extract<El, { type: "image" }> {
+  return {
+    id,
+    type: "image",
+    src: PNG,
+    x: 0,
+    y: 0,
+    width: 120,
+    height: 100,
+    rotation: 0,
+    ...patch,
+  };
+}
+
 function pageRasterContext(options: {
   width?: number;
   height?: number;
@@ -52,6 +109,7 @@ function pageRasterContext(options: {
     maxPixelCount?: number;
     maxPngBytes?: number;
   };
+  purpose?: "page-filter" | "pixel-selection";
 } = {}) {
   const pageElements: El[] = [line()];
   return createStudioEditablePageRasterContext({
@@ -71,6 +129,7 @@ function pageRasterContext(options: {
     reviewLocked: false,
     timelinePlaying: false,
     viewTransformSuppressed: false,
+    purpose: options.purpose,
     budgets: options.budgets,
   });
 }
@@ -128,6 +187,27 @@ describe("editable raster copy planning", () => {
     });
   });
 
+  it("keeps the general render budget and hides originals for pixel-selection preparation", () => {
+    const context = pageRasterContext({
+      purpose: "pixel-selection",
+      budgets: {
+        maxPixelCount: 8 * 1024 * 1024,
+        maxPngBytes: 12 * 1024 * 1024,
+      },
+    });
+    const planned = planStudioEditableRasterCopy(context.input);
+
+    expect(context.input.budgets).toEqual({
+      maxPixelCount: 8 * 1024 * 1024,
+      maxPngBytes: 12 * 1024 * 1024,
+    });
+    expect(context.input.sourceDisposition).toBe("hide-originals");
+    expect(planned).toMatchObject({
+      ok: true,
+      plan: { sourceDisposition: "hide-originals" },
+    });
+  });
+
   it("rejects a page-composite pixel budget before the injected renderer can run", () => {
     const context = pageRasterContext({ width: 2_048, height: 2_049 });
     const renderer = vi.fn();
@@ -173,7 +253,7 @@ describe("editable raster copy planning", () => {
   });
 
   it("summarizes exact, hidden, locked, raster and vector sources for all UI surfaces", () => {
-    expect(summarizeStudioRasterPreparationSources({
+    const summary = summarizeStudioRasterPreparationSources({
       width: 320,
       height: 480,
       elements: [
@@ -192,16 +272,298 @@ describe("editable raster copy planning", () => {
           locked: true,
         },
       ],
-    })).toMatchObject({
+    });
+
+    expect(summary).toMatchObject({
+      frame: { x: 0, y: 0, width: 320, height: 480, rotation: 0 },
+      sourceBounds: { x: 0, y: 0, width: 100, height: 100 },
+      orderedVisibleSourceIds: ["visible", "eraser", "image"],
+      exactRenderableSourceIds: ["visible", "image"],
+      lockedVisibleSourceIds: ["image"],
       visibleContentCount: 3,
       hiddenContentCount: 1,
       visibleRasterCount: 1,
       visibleUnlockedRasterCount: 0,
       visibleVectorDrawCount: 1,
+      visibleCompositeVectorCount: 1,
+      visibleLinked3dPreviewCount: 0,
       exactRenderableVisibleCount: 2,
       unsupportedVisibleCount: 1,
       hasPageBackground: true,
     });
+  });
+
+  it("censuses freehand, smart shape, frame, text, bubble and linked 3D preview in one z-order", () => {
+    const linked3d = image("linked-3d", {
+      x: 200,
+      y: 260,
+      bg3dScene: {} as Extract<El, { type: "image" }>["bg3dScene"],
+    });
+    const elements: El[] = [
+      frame(),
+      line(),
+      shape(),
+      text(),
+      bubble(),
+      linked3d,
+    ];
+    const summary = summarizeStudioRasterPreparationSources({
+      width: 320,
+      height: 480,
+      elements,
+    });
+    const result = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements,
+      includeBackground: true,
+      sourceDisposition: "hide-originals",
+      sourceDispositionIds: elements.map((element) => element.id),
+    });
+
+    expect(summary).toMatchObject({
+      orderedVisibleSourceIds: ["frame", "line", "shape", "text", "bubble", "linked-3d"],
+      exactRenderableSourceIds: ["frame", "line", "shape", "text", "bubble", "linked-3d"],
+      visibleVectorDrawCount: 2,
+      visibleCompositeVectorCount: 5,
+      visibleLinked3dPreviewCount: 1,
+      exactRenderableVisibleCount: 6,
+      unsupportedVisibleCount: 0,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      plan: {
+        sourceIds: ["frame", "line", "shape", "text", "bubble", "linked-3d"],
+        sourceDispositionIds: ["frame", "line", "shape", "text", "bubble", "linked-3d"],
+        frame: { x: 0, y: 0, width: 320, height: 480, rotation: 0 },
+        sourceSummary: {
+          exactRenderableVisibleCount: 6,
+          unsupportedVisibleCount: 0,
+        },
+      },
+    });
+  });
+
+  it("keeps transparent geometry out of selectable bounds and never plans a blank transparent copy", () => {
+    const transparent = line("transparent", {
+      opacity: 0,
+      points: [-100, -100, 600, 600],
+    });
+    const edgeLine = line("edge", {
+      points: [-20, 20, 40, 20],
+      strokeWidth: 10,
+    });
+    const summary = summarizeStudioRasterPreparationSources({
+      width: 100,
+      height: 80,
+      elements: [transparent, edgeLine],
+      hasPageBackground: false,
+    });
+
+    expect(summary).toMatchObject({
+      orderedVisibleSourceIds: ["edge"],
+      visibleVectorDrawCount: 1,
+      sourceBounds: { x: 0, y: 15, width: 45, height: 10 },
+    });
+    expect(planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 100,
+      height: 80,
+      elements: [transparent],
+      includeBackground: false,
+    })).toMatchObject({
+      ok: false,
+      code: "no-visible-source",
+    });
+    expect(planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 100,
+      height: 80,
+      elements: [transparent],
+      includeBackground: true,
+      sourceDisposition: "hide-originals",
+    })).toMatchObject({
+      ok: false,
+      code: "no-visible-source",
+    });
+  });
+
+  it("includes locked sources in preserve-visible composites but blocks hide-originals mutations", () => {
+    const lockedGroup = { id: "locked-group", name: "잠금", locked: true };
+    const lockedLine = line("locked-line", { groupId: lockedGroup.id });
+    const preserve = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [lockedLine],
+      groups: [lockedGroup],
+      includeBackground: false,
+      sourceDisposition: "preserve-visible",
+    });
+    const hide = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [lockedLine],
+      groups: [lockedGroup],
+      includeBackground: false,
+      sourceDisposition: "hide-originals",
+      sourceDispositionIds: [lockedLine.id],
+    });
+
+    expect(preserve).toMatchObject({
+      ok: true,
+      plan: {
+        sourceIds: ["locked-line"],
+        sourceSummary: { lockedVisibleSourceIds: ["locked-line"] },
+      },
+    });
+    expect(hide).toMatchObject({
+      ok: false,
+      code: "source-locked",
+      reason: expect.stringMatching(/잠금/u),
+    });
+  });
+
+  it("renders locked master underlays but only hides authored disposition targets", () => {
+    const master = line("master", { locked: true });
+    const pageLine = line("page-line");
+    const result = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [master, pageLine],
+      includeBackground: true,
+      insertionIndex: 1,
+      sourceDisposition: "hide-originals",
+      sourceDispositionIds: [pageLine.id],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      plan: {
+        sourceIds: ["master", "page-line"],
+        sourceDispositionIds: ["page-line"],
+      },
+    });
+  });
+
+  it("fails closed for filtered composites, orphan/transformed groups and invalid geometry", () => {
+    const transformedGroup = {
+      id: "transformed",
+      name: "변형 그룹",
+      rotation: 15,
+    } as const;
+    const cases: Array<{ elements: El[]; groups?: typeof transformedGroup[] }> = [
+      { elements: [image("filter-only", { filterPageComposite: true, blur: 8 })] },
+      { elements: [line("orphan", { groupId: "missing-group" })] },
+      {
+        elements: [line("transformed-line", { groupId: transformedGroup.id })],
+        groups: [transformedGroup],
+      },
+      { elements: [line("invalid", { points: [10, Number.NaN, 20, 30] })] },
+    ];
+
+    for (const entry of cases) {
+      expect(planStudioEditableRasterCopy({
+        pageId: "page-1",
+        width: 320,
+        height: 480,
+        elements: entry.elements,
+        groups: entry.groups,
+        includeBackground: false,
+      })).toMatchObject({
+        ok: false,
+        code: "unsupported-fidelity",
+      });
+    }
+  });
+
+  it("honors explicit exclusions and rejects ambiguous requested targets", () => {
+    const elements: El[] = [line("back"), line("preview"), line("front")];
+    expect(planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements,
+      excludedSourceIds: ["preview"],
+      includeBackground: false,
+    })).toMatchObject({
+      ok: true,
+      plan: { sourceIds: ["back", "front"] },
+    });
+    expect(planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements,
+      sourceIds: ["preview"],
+      excludedSourceIds: ["preview"],
+      includeBackground: false,
+    })).toMatchObject({
+      ok: false,
+      code: "source-selection-mismatch",
+    });
+  });
+
+  it("preserves z-order and invalidates the plan when the source revision is reordered", () => {
+    const original = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line("back"), text("middle"), line("front")],
+      includeBackground: false,
+    } as const;
+    const planned = planStudioEditableRasterCopy(original);
+
+    expect(planned).toMatchObject({
+      ok: true,
+      plan: {
+        sourceIds: ["back", "middle", "front"],
+        sourceSummary: {
+          orderedVisibleSourceIds: ["back", "middle", "front"],
+        },
+      },
+    });
+    if (!planned.ok) return;
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, original)).toBe(true);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...original,
+      elements: [line("front"), text("middle"), line("back")],
+    })).toBe(false);
+  });
+
+  it("shares one deterministic image-local frame and revision across every pixel-selection tool", () => {
+    const result = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line("only-line")],
+      includeBackground: true,
+      sourceDisposition: "hide-originals",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const surfaces = STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS.map((toolKind) =>
+      describeStudioEditableRasterSelectionSurface(result.plan, toolKind)
+    );
+    expect(surfaces.map((surface) => surface.toolKind)).toEqual([
+      "rect",
+      "ellipse",
+      "lasso",
+      "poly-lasso",
+      "brush",
+      "wand",
+      "color-range",
+    ]);
+    for (const surface of surfaces) {
+      expect(surface.frame).toBe(result.plan.frame);
+      expect(surface.sourceBounds).toBe(result.plan.sourceBounds);
+      expect(surface.sourceSummary).toBe(result.plan.sourceSummary);
+      expect(surface.sourceFingerprint).toBe(result.plan.sourceFingerprint);
+    }
   });
 
   it("plans an opaque full-page visible copy while preserving original elements", () => {
@@ -236,19 +598,31 @@ describe("editable raster copy planning", () => {
     expect(result.plan.sourceElementCount).toBe(1);
   });
 
-  it("filters hidden items and honors an explicit selected-layer source set", () => {
-    const result = planStudioEditableRasterCopy({
+  it("filters ordinary hidden items but fails closed when an explicit source is hidden", () => {
+    const hiddenFiltered = planStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line("visible"), line("hidden", { hidden: true }), text("other")],
+      includeBackground: false,
+    });
+    expect(hiddenFiltered).toMatchObject({
+      ok: true,
+      plan: { sourceIds: ["visible", "other"], includeBackground: false },
+    });
+
+    expect(planStudioEditableRasterCopy({
       pageId: "page-1",
       width: 320,
       height: 480,
       elements: [line("visible"), line("hidden", { hidden: true }), text("other")],
       sourceIds: ["visible", "hidden"],
       includeBackground: false,
+    })).toMatchObject({
+      ok: false,
+      code: "source-selection-mismatch",
+      reason: expect.stringMatching(/hidden|숨김/u),
     });
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.plan.sourceIds).toEqual(["visible"]);
-    expect(result.plan.includeBackground).toBe(false);
   });
 
   it("allows background-only merged filters but rejects an empty transparent copy", () => {
@@ -619,6 +993,55 @@ describe("editable raster copy commit contract", () => {
     expect(applied.elements[1]).toBe(originals[1]);
     expect(applied.elements[2]).toBe(composite);
     expect(originals).toEqual([line(), text()]);
+  });
+
+  it("can hide exact source objects while inserting one editable full-page raster copy", async () => {
+    const originals: El[] = [line(), text()];
+    const current = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: originals,
+      includeBackground: true,
+      sourceDisposition: "hide-originals" as const,
+      name: "픽셀 선택용 합성본",
+    };
+    const planned = planStudioEditableRasterCopy(current);
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+    const rendered = await renderStudioEditableRasterCopy(
+      planned.plan,
+      renderStudioVectorReference,
+      {
+        workerFactory: null,
+        rasterize: async (request) => ({
+          dataUrl: PNG,
+          width: request.width,
+          height: request.height,
+        }),
+      },
+    );
+    const composite = materializeStudioEditableRasterCopy({
+      plan: planned.plan,
+      rendered,
+      newId: "pixel-selection-copy",
+    });
+    const applied = applyStudioEditableRasterCopy({
+      plan: planned.plan,
+      current,
+      composite,
+    });
+
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(applied.elements).toHaveLength(3);
+    expect(applied.elements.slice(0, 2)).toEqual([
+      { ...originals[0], hidden: true },
+      { ...originals[1], hidden: true },
+    ]);
+    expect(applied.elements[2]).toBe(composite);
+    expect(originals[0]?.hidden).not.toBe(true);
+    expect(originals[1]?.hidden).not.toBe(true);
   });
 
   it("fingerprints a visible master underlay without inserting it into the authored page", async () => {

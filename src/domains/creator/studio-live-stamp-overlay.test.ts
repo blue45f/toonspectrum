@@ -206,6 +206,66 @@ afterEach(() => {
 });
 
 describe("StudioLiveStampOverlayRenderer", () => {
+  it("does not authorize native geometry when a 2D context is unavailable", () => {
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => null,
+    } as unknown as HTMLCanvasElement;
+    const renderer = new StudioLiveStampOverlayRenderer();
+    renderer.attach(canvas);
+    renderer.setSurface(SURFACE);
+
+    expect(renderer.surfaceResolutionDecision?.ok).toBe(true);
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+    expect(renderer.begin(style("ink"), 10, 10, 0.5)).toBe(false);
+  });
+
+  it("keeps mobile native DPR and fails closed instead of accepting a reduced 4K surface", () => {
+    vi.stubGlobal("devicePixelRatio", 3);
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveStampOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface({
+      ...SURFACE,
+      width: 430,
+      height: 932,
+      documentWidth: 430,
+    });
+
+    expect(renderer.isNativeSurfaceReady).toBe(true);
+    expect(renderer.surfaceResolutionDecision).toMatchObject({
+      ok: true,
+      mode: "native",
+      devicePixelRatio: 3,
+    });
+    expect(recording.canvas.width).toBe(1_290);
+    expect(recording.canvas.height).toBe(2_796);
+    expect(renderer.begin(style("ink"), 10, 10, 0.5)).toBe(true);
+    renderer.resetActive();
+    const nativeMarkCount = recording.marks.length;
+
+    vi.stubGlobal("devicePixelRatio", 2);
+    renderer.setSurface({
+      ...SURFACE,
+      width: 3_840,
+      height: 2_160,
+      documentWidth: 3_840,
+    });
+
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+    expect(renderer.surfaceResolutionDecision).toEqual({
+      ok: false,
+      mode: "retained-exact-fallback",
+      reason: "native-backing-pixel-budget-exceeded",
+    });
+    expect(recording.canvas.width).toBe(1);
+    expect(recording.canvas.height).toBe(1);
+    expect(renderer.begin(style("watercolor"), 10, 10, 0.5)).toBe(false);
+    expect(renderer.isActive).toBe(false);
+    expect(recording.marks).toHaveLength(nativeMarkCount);
+  });
+
   it.each(["airbrush", "pencil", "ink", "watercolor"] as const)(
     "keeps a tap-only %s mark identical across live, settled, and replay handoff",
     (kind) => {

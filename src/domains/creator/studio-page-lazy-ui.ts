@@ -461,6 +461,14 @@ const StudioLiveStampOverlayHost = lazyRetry(
   () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
   "StudioLiveStampOverlayHost"
 );
+const StudioLiveDynamicBrushOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveDynamicBrushOverlayHost })),
+  "StudioLiveDynamicBrushOverlayHost"
+);
+const StudioLiveWetInkOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveWetInkOverlayHost })),
+  "StudioLiveWetInkOverlayHost"
+);
 const StudioLiveInkPredictionHost = lazyRetry(
   () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
   "StudioLiveInkPredictionHost"
@@ -798,6 +806,8 @@ export {
   StudioLayerNavigator,
   StudioLiquifyPanel,
   StudioLiveInkOverlayHost,
+  StudioLiveDynamicBrushOverlayHost,
+  StudioLiveWetInkOverlayHost,
   StudioLiveInkPredictionHost,
   StudioLivePresenceDockConnected,
   StudioLivePressureHudPill,

@@ -1,7 +1,6 @@
 import type {
   StudioHistoryJournalNavigationTarget,
   StudioHistoryJournalTransitionInput,
-  StudioPagesHistoryCommandJournal,
 } from "./studio-pages-history-command-journal";
 
 export type {
@@ -28,18 +27,27 @@ interface StudioPagesHistoryCommandJournalRuntime {
   recordRedo(target: StudioHistoryJournalNavigationTarget): unknown;
   rebase(target: StudioHistoryJournalNavigationTarget): void;
   reset(): void;
+  dispose?(): void;
 }
 
 export interface StudioPagesHistoryCommandJournalClientOptions {
-  readonly loadRuntime?: () => Promise<StudioPagesHistoryCommandJournalRuntime>;
+  readonly loadRuntime?: (
+    initialTarget: StudioHistoryJournalNavigationTarget | null
+  ) => Promise<StudioPagesHistoryCommandJournalRuntime>;
   readonly onError?: (cause: unknown) => void;
 }
 
-async function loadDefaultRuntime(): Promise<StudioPagesHistoryCommandJournal> {
-  const { createStudioPagesHistoryCommandJournal } = await import(
-    "./studio-pages-history-command-journal"
+async function loadDefaultRuntime(
+  initialTarget: StudioHistoryJournalNavigationTarget | null,
+  onError?: (cause: unknown) => void
+): Promise<StudioPagesHistoryCommandJournalRuntime> {
+  const { createDefaultStudioPagesHistoryDurableRuntime } = await import(
+    "./studio-pages-history-durable-runtime"
   );
-  return createStudioPagesHistoryCommandJournal();
+  return createDefaultStudioPagesHistoryDurableRuntime({
+    initialTarget,
+    onError,
+  });
 }
 
 function actionTarget(
@@ -62,7 +70,9 @@ function actionTarget(
  * authoritative snapshot instead of retaining a large sequence of page graphs.
  */
 export class StudioPagesHistoryCommandJournalClient {
-  private readonly loadRuntime: () => Promise<StudioPagesHistoryCommandJournalRuntime>;
+  private readonly loadRuntime: (
+    initialTarget: StudioHistoryJournalNavigationTarget | null
+  ) => Promise<StudioPagesHistoryCommandJournalRuntime>;
   private readonly onError: ((cause: unknown) => void) | undefined;
   private runtime: StudioPagesHistoryCommandJournalRuntime | null = null;
   private loadPromise: Promise<boolean> | null = null;
@@ -72,7 +82,9 @@ export class StudioPagesHistoryCommandJournalClient {
   private disposed = false;
 
   constructor(options: StudioPagesHistoryCommandJournalClientOptions = {}) {
-    this.loadRuntime = options.loadRuntime ?? loadDefaultRuntime;
+    this.loadRuntime = options.loadRuntime ?? (
+      (initialTarget) => loadDefaultRuntime(initialTarget, options.onError)
+    );
     this.onError = options.onError;
   }
 
@@ -143,7 +155,7 @@ export class StudioPagesHistoryCommandJournalClient {
     const loadPromise = Promise.resolve()
       // A custom loader is allowed for tests/alternate runtimes. Normalize a synchronous throw into
       // this fail-open promise boundary rather than letting it escape from recordTransition().
-      .then(() => this.disposed ? null : this.loadRuntime())
+      .then(() => this.disposed ? null : this.loadRuntime(this.latestTarget))
       .then((runtime) => {
         if (this.disposed || !runtime) return false;
         this.runtime = runtime;
@@ -258,6 +270,7 @@ export class StudioPagesHistoryCommandJournalClient {
    */
   dispose(): void {
     this.disposed = true;
+    this.runtime?.dispose?.();
     this.runtime = null;
     this.pending = [];
     this.latestTarget = null;

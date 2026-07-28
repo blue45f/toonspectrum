@@ -11,14 +11,24 @@ const noop = () => {
 
 function renderNavigator(
   layout: StudioInspectorLayout,
-  selectedType: string | null = "image"
+  selectedType: string | null = "image",
+  imageToolsAvailable?: boolean,
+  imageToolsStatus?: Readonly<{
+    label: string;
+    description: string;
+    tone: "neutral" | "accent" | "good" | "warn";
+  }>,
 ): string {
   return renderToStaticMarkup(
     <StudioInspectorNavigator
       layout={layout}
       selectedType={selectedType}
       selectionLabel={selectedType ? "이미지" : null}
-      drawing={selectedType === null}
+      drawing={false}
+      imageToolsAvailable={imageToolsAvailable}
+      imageToolsStatusLabel={imageToolsStatus?.label}
+      imageToolsStatusDescription={imageToolsStatus?.description}
+      imageToolsStatusTone={imageToolsStatus?.tone}
       layerCount={128}
       onChange={noop}
     />
@@ -62,6 +72,27 @@ describe("StudioInspectorNavigator", () => {
     expect(imageHtml).toContain("변형");
     expect(imageHtml).toContain('aria-selected="true"');
     expect(textHtml).not.toContain('aria-label="이미지 전문 도구"');
+  });
+
+  it("keeps professional pixel tools discoverable before a raster target is selected", () => {
+    const html = renderNavigator(
+      { primary: "properties", image: "retouch", document: "canvas" },
+      null,
+      true,
+      {
+        label: "합성본 준비",
+        description: "페이지 합성본 준비 후 실행",
+        tone: "accent",
+      },
+    );
+
+    expect(html).toContain('aria-label="이미지 전문 도구"');
+    expect(html).toContain("채우기·선화");
+    expect(html).toContain("선택·리터치");
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain("합성본 준비");
+    expect(html).toContain("페이지 합성본 준비 후 실행");
+    expect(html).toMatch(/aria-describedby="[^"]*-image-tools-status"/u);
   });
 
   it("shows all image tabs for draw selections", () => {

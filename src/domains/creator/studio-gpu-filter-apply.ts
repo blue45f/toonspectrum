@@ -9,17 +9,25 @@
  *    (Worker/Konva)를 그대로 태우면 된다. GPU 경로가 틀린 픽셀을 돌려주는 일은 없어야
  *    하므로 검증 오류는 error scope 로 감지해 null 로 강등한다(fail-closed).
  *  - 체인 순서는 buildImageFilters(studio-konva-filters.ts)가 같은 필드를 적용하는 순서와
- *    동일하다: Brighten→Contrast → HSL → Levels → Curve → ColorBalance
+ *    동일하다: Gaussian → Morphology → Convolution → Brighten→Contrast → HSL → Levels
+ *    → Curve → ColorBalance
  *    (계약 테스트가 buildImageFilters 실물과 대조한다). 인접한 LUT 스텝(밝기대비/레벨/커브)
  *    은 LUT 합성으로 한 lut3 디스패치에 융합된다 — 합성은 순차 실행과 비트 동일하므로
  *    체인 순서 의미가 보존된다.
- *  - 지원 5필드 외의 보정이 하나라도 활성이면 전체를 CPU 로 넘긴다(부분 GPU 실행 금지 —
+ *  - 지원 필드 외의 보정이 하나라도 활성이면 전체를 CPU 로 넘긴다(부분 GPU 실행 금지 —
  *    중간 순서에 끼어드는 미지원 필터와 결과가 달라질 수 있기 때문).
  *
  * 이 모듈은 konva 를 import 하지 않는다 — 게이트는 경량 studio-konva-filter-fields 의
  * 후보 판정(보수적: 애매하면 CPU 폴백)을 쓴다.
  */
 
+import {
+  isIdentityStudioConvolution,
+  isIdentityStudioMorphology,
+  normalizeStudioConvolution,
+  normalizeStudioMorphology,
+} from "./studio-advanced-pixel-filters";
+import { isIdentityBlurFx, normalizeBlurFx } from "./studio-blur";
 import { isIdentityColorBalance, normalizeColorBalance } from "./studio-color-balance";
 import { isIdentityCurve, isIdentityCurveChannels, normalizeCurve } from "./studio-curves";
 import {
@@ -37,12 +45,25 @@ import {
   patchStudioGpuFilterPixelCount,
 } from "./studio-gpu-filter-kernels";
 import { acquireStudioGpuFilterRuntime } from "./studio-gpu-filter-runtime";
+import {
+  STUDIO_GPU_GAUSSIAN_FLOAT_BYTES_PER_PIXEL,
+  STUDIO_GPU_SPATIAL_FILTER_KERNELS,
+  packStudioGpuConvolutionParams,
+  packStudioGpuGaussianResolveParams,
+  packStudioGpuMorphologyParams,
+  packStudioGpuSpatialParams,
+  studioGpuGaussianBoxRadii,
+} from "./studio-gpu-filter-spatial-kernels";
 import { hasActiveImageFilters } from "./studio-konva-filter-fields";
 import { isIdentityLevels, isIdentityLevelsChannels, normalizeLevels } from "./studio-levels";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { StudioGpuFilterKernelId } from "./studio-gpu-filter-kernels";
 import type { StudioGpuFilterRuntimeOptions } from "./studio-gpu-filter-runtime";
+import type {
+  StudioGpuSpatialFilterKernelId,
+  StudioGpuSpatialFilterKernelSpec,
+} from "./studio-gpu-filter-spatial-kernels";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 /** GPU 경로가 담당하는 보정 필드(이 외의 활성 필드가 있으면 전체 CPU 폴백). */
@@ -60,10 +81,17 @@ export const STUDIO_GPU_FILTER_SUPPORTED_FIELDS = [
   "curve",
   "curveCh",
   "colorBalance",
+  "blurFx",
+  "morphology",
+  "convolution",
 ] as const satisfies readonly (keyof ImageFilterFields)[];
 
+export type StudioGpuFilterPlanKernelId =
+  | StudioGpuFilterKernelId
+  | StudioGpuSpatialFilterKernelId;
+
 export interface StudioGpuFilterPlanStep {
-  readonly kernelId: StudioGpuFilterKernelId;
+  readonly kernelId: StudioGpuFilterPlanKernelId;
   /** offset 0 은 pixelCount 자리표시자 — apply 가 이미지별로 패치한다. */
   readonly uniform: ArrayBuffer;
   readonly lut?: Uint32Array;
@@ -71,10 +99,19 @@ export interface StudioGpuFilterPlanStep {
    * "lut-fused" 스텝에만 존재 — 이 스텝으로 합성된 원본 LUT 커널들의 체인 순서.
    * 순차 실행과의 동치는 LUT 합성(composeStudioGpuLut3)이 보장한다.
    */
-  readonly fusedKernelIds?: readonly StudioGpuFilterKernelId[];
+  readonly fusedKernelIds?: readonly StudioGpuFilterPlanKernelId[];
 }
 
 export type StudioGpuFilterPlan = readonly StudioGpuFilterPlanStep[];
+
+export interface StudioGpuFilterApplyOptions extends StudioGpuFilterRuntimeOptions {
+  /** Aborted work is discarded and reported as null so the CPU/current request may take over. */
+  readonly signal?: AbortSignal;
+  /** Optional editor revision captured when the request starts. */
+  readonly sourceRevision?: string | number;
+  /** False means a newer edit superseded this request; stale pixels are never published. */
+  readonly isSourceRevisionCurrent?: (revision: string | number) => boolean;
+}
 
 // buildImageFilters 의 isActiveNumber 복제(비공개 함수).
 function isActiveNumber(value: number | undefined): boolean {
@@ -105,12 +142,39 @@ function hasActiveColorBalanceFields(el: ImageFilterFields): boolean {
   return !!el.colorBalance && !isIdentityColorBalance(normalizeColorBalance(el.colorBalance));
 }
 
+function activeGaussianBlurFx(el: ImageFilterFields) {
+  if (!el.blurFx) return null;
+  const normalized = normalizeBlurFx(el.blurFx);
+  return !isIdentityBlurFx(normalized) && normalized.type === "gaussian" ? normalized : null;
+}
+
+function hasUnsupportedActiveBlurFx(el: ImageFilterFields): boolean {
+  if (!el.blurFx) return false;
+  const normalized = normalizeBlurFx(el.blurFx);
+  return !isIdentityBlurFx(normalized) && normalized.type !== "gaussian";
+}
+
+function activeMorphology(el: ImageFilterFields) {
+  if (!el.morphology) return null;
+  const normalized = normalizeStudioMorphology(el.morphology);
+  return isIdentityStudioMorphology(normalized) ? null : normalized;
+}
+
+function activeConvolution(el: ImageFilterFields) {
+  if (!el.convolution) return null;
+  const normalized = normalizeStudioConvolution(el.convolution);
+  return isIdentityStudioConvolution(normalized) ? null : normalized;
+}
+
 /**
  * 지원 필드를 제거한 사본에 활성 보정이 남아 있으면 true — 즉 GPU 체인이 감당 못 하는
  * 필터가 켜져 있다. 경량 후보 판정(hasActiveImageFilters)은 엔진 판정보다 넓어서, 애매한
  * 값(정규화하면 항등인 객체 등)도 "활성"으로 보고 CPU 폴백시킨다 — 안전한 방향의 오탐이다.
  */
 function hasUnsupportedActiveFilters(el: ImageFilterFields): boolean {
+  // blurFx is a tagged union: only its premultiplied Gaussian variant has a GPU kernel.
+  // Delete the field below only after rejecting the other active variants.
+  if (hasUnsupportedActiveBlurFx(el)) return true;
   const rest: ImageFilterFields = { ...el };
   for (const field of STUDIO_GPU_FILTER_SUPPORTED_FIELDS) {
     delete rest[field];
@@ -149,13 +213,63 @@ function fuseAdjacentLutSteps(steps: readonly StudioGpuFilterPlanStep[]): Studio
  * 보정 필드 → GPU 커널 체인 계획. buildImageFilters 가 같은 필드를 태우는 순서와 동일한
  * 순서로 스텝을 만들고, 인접한 LUT 스텝(밝기대비/레벨/커브)은 한 lut3 디스패치로 융합해
  * 돌려준다(fusedKernelIds 가 원본 순서를 보존). 다음의 경우 null(호출부는 CPU 경로):
- *  - 지원 5필드 중 활성이 하나도 없음
+ *  - 지원 필드 중 활성이 하나도 없음
  *  - 지원 외 보정이 하나라도 활성
  */
 export function planStudioGpuFilterChain(el: ImageFilterFields): StudioGpuFilterPlan | null {
   if (hasUnsupportedActiveFilters(el)) return null;
 
   const steps: StudioGpuFilterPlanStep[] = [];
+  const gaussian = activeGaussianBlurFx(el);
+  if (gaussian) {
+    steps.push({
+      kernelId: "gaussian-decode",
+      uniform: new ArrayBuffer(16),
+    });
+    for (const radius of studioGpuGaussianBoxRadii(gaussian.radius)) {
+      if (radius <= 0) continue;
+      steps.push({
+        kernelId: "gaussian-box-horizontal",
+        uniform: packStudioGpuSpatialParams({
+          width: 0,
+          height: 0,
+          radius,
+          direction: "horizontal",
+        }),
+      });
+      steps.push({
+        kernelId: "gaussian-box-vertical",
+        uniform: packStudioGpuSpatialParams({
+          width: 0,
+          height: 0,
+          radius,
+          direction: "vertical",
+        }),
+      });
+    }
+    steps.push({
+      kernelId: "gaussian-resolve",
+      uniform: packStudioGpuGaussianResolveParams(gaussian.strength),
+    });
+  }
+  const morphology = activeMorphology(el);
+  if (morphology) {
+    steps.push({
+      kernelId: "morphology-horizontal",
+      uniform: packStudioGpuMorphologyParams(0, 0, morphology, "horizontal"),
+    });
+    steps.push({
+      kernelId: "morphology-vertical",
+      uniform: packStudioGpuMorphologyParams(0, 0, morphology, "vertical"),
+    });
+  }
+  const convolution = activeConvolution(el);
+  if (convolution) {
+    steps.push({
+      kernelId: "convolution-3x3",
+      uniform: packStudioGpuConvolutionParams(0, 0, convolution),
+    });
+  }
   if (isActiveNumber(el.brightness) || isActiveNumber(el.contrast)) {
     steps.push({
       kernelId: "brightness-contrast",
@@ -219,6 +333,9 @@ export function isStudioGpuFilterChainEligible(el: ImageFilterFields): boolean {
     || hasActiveLevelsFields(el)
     || hasActiveCurveFields(el)
     || hasActiveColorBalanceFields(el)
+    || activeGaussianBlurFx(el) !== null
+    || activeMorphology(el) !== null
+    || activeConvolution(el) !== null
   );
 }
 
@@ -234,6 +351,52 @@ function isValidImageData(imageData: StudioImageDataLike): boolean {
   );
 }
 
+function isSpatialKernelId(
+  id: StudioGpuFilterPlanKernelId,
+): id is StudioGpuSpatialFilterKernelId {
+  return Object.prototype.hasOwnProperty.call(STUDIO_GPU_SPATIAL_FILTER_KERNELS, id);
+}
+
+function executableKernel(
+  id: StudioGpuFilterPlanKernelId,
+): (typeof STUDIO_GPU_FILTER_KERNELS)[StudioGpuFilterKernelId] | StudioGpuSpatialFilterKernelSpec {
+  return isSpatialKernelId(id)
+    ? STUDIO_GPU_SPATIAL_FILTER_KERNELS[id]
+    : STUDIO_GPU_FILTER_KERNELS[id];
+}
+
+function patchSpatialDimensions(
+  kernelId: StudioGpuFilterPlanKernelId,
+  uniform: ArrayBuffer,
+  width: number,
+  height: number,
+): void {
+  if (
+    kernelId !== "gaussian-box-horizontal"
+    && kernelId !== "gaussian-box-vertical"
+    && kernelId !== "morphology-horizontal"
+    && kernelId !== "morphology-vertical"
+    && kernelId !== "convolution-3x3"
+  ) {
+    return;
+  }
+  const view = new DataView(uniform);
+  view.setUint32(4, width >>> 0, true);
+  view.setUint32(8, height >>> 0, true);
+}
+
+function requestSuperseded(options?: StudioGpuFilterApplyOptions): boolean {
+  if (options?.signal?.aborted) return true;
+  if (
+    options?.sourceRevision !== undefined
+    && options.isSourceRevisionCurrent
+    && !options.isSourceRevisionCurrent(options.sourceRevision)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * 보정 체인을 WebGPU 컴퓨트로 실행한다. 커널들은 하나의 커맨드 인코더 안에서 픽셀 버퍼
  * ping-pong 으로 이어지며(중간 readback 없음) 마지막 버퍼만 한 번 read back 한다.
@@ -244,9 +407,9 @@ function isValidImageData(imageData: StudioImageDataLike): boolean {
 export async function applyGpuFilterChain(
   imageData: StudioImageDataLike,
   el: ImageFilterFields,
-  options?: StudioGpuFilterRuntimeOptions,
+  options?: StudioGpuFilterApplyOptions,
 ): Promise<StudioImageDataLike | null> {
-  if (!isValidImageData(imageData)) return null;
+  if (!isValidImageData(imageData) || requestSuperseded(options)) return null;
   const plan = planStudioGpuFilterChain(el);
   if (!plan) return null;
 
@@ -255,28 +418,45 @@ export async function applyGpuFilterChain(
   const ownsRuntime = options !== undefined && "gpu" in options;
   const runtime = await acquireStudioGpuFilterRuntime(options);
   if (!runtime) return null;
-  if (runtime.lost) {
+  if (runtime.lost || requestSuperseded(options)) {
     if (ownsRuntime) runtime.dispose();
     return null;
   }
 
   const pixelCount = imageData.width * imageData.height;
   const byteLength = pixelCount * 4;
+  const needsGaussianScratch = plan.some((step) => (
+    step.kernelId === "gaussian-decode"
+    || step.kernelId === "gaussian-box-horizontal"
+    || step.kernelId === "gaussian-box-vertical"
+    || step.kernelId === "gaussian-resolve"
+  ));
+  const gaussianByteLength = pixelCount * STUDIO_GPU_GAUSSIAN_FLOAT_BYTES_PER_PIXEL;
   const workgroupsX = STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS / STUDIO_GPU_FILTER_WORKGROUP_SIZE;
   const workgroupsY = Math.ceil(pixelCount / STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS);
   const limits = runtime.device.limits;
   if (
     byteLength > limits.maxStorageBufferBindingSize
     || byteLength > limits.maxBufferSize
+    || (
+      needsGaussianScratch
+      && (
+        gaussianByteLength > limits.maxStorageBufferBindingSize
+        || gaussianByteLength > limits.maxBufferSize
+      )
+    )
+    || workgroupsX > limits.maxComputeWorkgroupsPerDimension
     || workgroupsY > limits.maxComputeWorkgroupsPerDimension
+    || STUDIO_GPU_FILTER_WORKGROUP_SIZE > (limits.maxComputeInvocationsPerWorkgroup ?? Number.POSITIVE_INFINITY)
+    || STUDIO_GPU_FILTER_WORKGROUP_SIZE > (limits.maxComputeWorkgroupSizeX ?? Number.POSITIVE_INFINITY)
   ) {
     if (ownsRuntime) runtime.dispose();
     return null;
   }
 
   const transientBuffers: GPUBuffer[] = [];
-  const pixelBuffers: GPUBuffer[] = [];
-  let recyclePixelBuffers = false;
+  const leasedBuffers: { buffer: GPUBuffer; byteLength: number }[] = [];
+  let recycleLeasedBuffers = false;
   let pushedErrorScopes = 0;
   try {
     // 검증/OOM 오류는 예외를 던지지 않는다 — error scope 로 잡아 fail-closed(null) 한다.
@@ -287,26 +467,60 @@ export async function applyGpuFilterChain(
     pushedErrorScopes += 1;
 
     let current = runtime.acquirePixelBuffer(byteLength, "studio-gpu-filter/ping");
-    pixelBuffers.push(current);
+    leasedBuffers.push({ buffer: current, byteLength });
     let other = runtime.acquirePixelBuffer(byteLength, "studio-gpu-filter/pong");
-    pixelBuffers.push(other);
+    leasedBuffers.push({ buffer: other, byteLength });
+    let gaussianCurrent: GPUBuffer | null = null;
+    let gaussianOther: GPUBuffer | null = null;
+    if (needsGaussianScratch) {
+      gaussianCurrent = runtime.acquirePixelBuffer(
+        gaussianByteLength,
+        "studio-gpu-filter/gaussian-float-ping",
+      );
+      leasedBuffers.push({ buffer: gaussianCurrent, byteLength: gaussianByteLength });
+      gaussianOther = runtime.acquirePixelBuffer(
+        gaussianByteLength,
+        "studio-gpu-filter/gaussian-float-pong",
+      );
+      leasedBuffers.push({ buffer: gaussianOther, byteLength: gaussianByteLength });
+    }
     runtime.uploadPixels(current, imageData.data);
 
     const encoder = runtime.device.createCommandEncoder({ label: "studio-gpu-filter/chain" });
     for (const step of plan) {
-      const kernel = STUDIO_GPU_FILTER_KERNELS[step.kernelId];
+      if (runtime.lost || requestSuperseded(options)) return null;
+      const kernel = executableKernel(step.kernelId);
       // Plans and their LUTs are immutable/reusable. Only the image-size word is request-specific;
       // patch a tiny uniform copy instead of contaminating a cached/shared plan.
       const requestUniform = step.uniform.slice(0);
       patchStudioGpuFilterPixelCount(requestUniform, pixelCount);
+      patchSpatialDimensions(
+        step.kernelId,
+        requestUniform,
+        imageData.width,
+        imageData.height,
+      );
       const uniformBuffer = runtime.createUniformBuffer(
         requestUniform,
         `studio-gpu-filter/${step.kernelId}/params`,
       );
       transientBuffers.push(uniformBuffer);
+      const layout = isSpatialKernelId(step.kernelId)
+        ? STUDIO_GPU_SPATIAL_FILTER_KERNELS[step.kernelId].bufferLayout
+        : "packed";
+      let sourceBuffer = current;
+      let destinationBuffer = other;
+      if (layout === "gaussian-decode") {
+        if (!gaussianCurrent) return null;
+        destinationBuffer = gaussianCurrent;
+      } else if (layout === "gaussian-box") {
+        if (!gaussianCurrent || !gaussianOther) return null;
+        sourceBuffer = gaussianCurrent;
+        destinationBuffer = gaussianOther;
+      }
       const entries: GPUBindGroupEntry[] = [
-        { binding: STUDIO_GPU_FILTER_BINDINGS.src, resource: { buffer: current } },
-        { binding: STUDIO_GPU_FILTER_BINDINGS.dst, resource: { buffer: other } },
+        { binding: STUDIO_GPU_FILTER_BINDINGS.src, resource: { buffer: sourceBuffer } },
+        { binding: STUDIO_GPU_FILTER_BINDINGS.dst, resource: { buffer: destinationBuffer } },
         { binding: STUDIO_GPU_FILTER_BINDINGS.params, resource: { buffer: uniformBuffer } },
       ];
       if (kernel.usesLut) {
@@ -317,6 +531,12 @@ export async function applyGpuFilterChain(
         );
         transientBuffers.push(lutBuffer);
         entries.push({ binding: STUDIO_GPU_FILTER_BINDINGS.lut, resource: { buffer: lutBuffer } });
+      } else if (layout === "gaussian-resolve") {
+        if (!gaussianCurrent) return null;
+        entries.push({
+          binding: STUDIO_GPU_FILTER_BINDINGS.lut,
+          resource: { buffer: gaussianCurrent },
+        });
       }
       const pipeline = runtime.getComputePipeline(kernel);
       const bindGroup = runtime.device.createBindGroup({
@@ -329,9 +549,15 @@ export async function applyGpuFilterChain(
       pass.setBindGroup(0, bindGroup);
       pass.dispatchWorkgroups(workgroupsX, workgroupsY);
       pass.end();
-      const written = other;
-      other = current;
-      current = written;
+      if (layout === "gaussian-box") {
+        const written = gaussianOther;
+        gaussianOther = gaussianCurrent;
+        gaussianCurrent = written;
+      } else if (layout === "packed" || layout === "gaussian-resolve") {
+        const written = other;
+        other = current;
+        current = written;
+      }
     }
     runtime.device.queue.submit([encoder.finish()]);
 
@@ -339,11 +565,11 @@ export async function applyGpuFilterChain(
     pushedErrorScopes -= 1;
     const oomError = await runtime.device.popErrorScope();
     pushedErrorScopes -= 1;
-    if (validationError || oomError || runtime.lost) return null;
+    if (validationError || oomError || runtime.lost || requestSuperseded(options)) return null;
 
     const bytes = await runtime.readbackPixels(current, byteLength);
-    if (bytes.length !== byteLength) return null;
-    recyclePixelBuffers = true;
+    if (bytes.length !== byteLength || runtime.lost || requestSuperseded(options)) return null;
+    recycleLeasedBuffers = true;
     return { data: bytes, width: imageData.width, height: imageData.height };
   } catch {
     return null;
@@ -364,11 +590,11 @@ export async function applyGpuFilterChain(
         // destroy 는 제출된 작업이 끝난 뒤 내부적으로 해제된다 — 폐기 실패는 무시.
       }
     }
-    for (const buffer of pixelBuffers) {
-      if (recyclePixelBuffers) runtime.releasePixelBuffer(buffer, byteLength);
+    for (const lease of leasedBuffers) {
+      if (recycleLeasedBuffers) runtime.releasePixelBuffer(lease.buffer, lease.byteLength);
       else {
         try {
-          buffer.destroy();
+          lease.buffer.destroy();
         } catch {
           // 검증/OOM/lost 경로에서는 오염 가능성이 있는 lease를 절대 풀에 되돌리지 않는다.
         }

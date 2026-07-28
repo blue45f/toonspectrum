@@ -77,7 +77,8 @@ describe("Studio inspector canvas-controls boundary", () => {
     // (3_400 → 3_480).
     // 의도적 변경(2026-07-25): live collaboration overlay & fallback glue (3_500 → 3_600).
     // 의도적 변경(2026-07-27): 공통 inspector interaction policy 배선(3_600 → 3_620).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_620);
+    // 의도적 변경(2026-07-28): 선택 없는 래스터 도구 복구 경로와 패널 배선(3_620 → 3_960).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(3_960);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");

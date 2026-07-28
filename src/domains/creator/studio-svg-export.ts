@@ -148,6 +148,7 @@ import {
 } from "./studio-pixel-pencil";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import {
+  isStudioBoundedFlowPaintModelCompatible,
   isStudioStrokePaintModelCompatible,
   type StudioStrokePaintModel,
 } from "./studio-stroke-paint-model";
@@ -1204,6 +1205,7 @@ function serializeFreehand(
     ));
     const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
     const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
+    const boundedFlow = isStudioBoundedFlowPaintModelCompatible(el);
     const marks: string[] = [];
     const grainAt = (x: number, y: number) => resolveNormalizedStudioBrushGrainAlphaMultiplier({
       x,
@@ -1231,7 +1233,10 @@ function serializeFreehand(
         const tipIndex = composedTip.role === "primary" ? 0 : composedTip.layerIndex + 1;
         const baseOpacity = Math.min(
           1,
-          Math.max(0, composedDab.opacity * composedDab.flow * strokeOpacity)
+          Math.max(
+            0,
+            composedDab.opacity * composedDab.flow * (boundedFlow ? 1 : strokeOpacity)
+          )
         );
         const alphaMap = tipAlphaMaps[tipIndex] ?? null;
         if (tipUsesEllipse[tipIndex] || !alphaMap) {
@@ -1258,7 +1263,9 @@ function serializeFreehand(
         }
       }
     }
-    return `<g>${marks.join("")}</g>`;
+    return boundedFlow
+      ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${marks.join("")}</g>`
+      : `<g>${marks.join("")}</g>`;
   }
 
   const perfectProfile = resolveStudioPerfectFreehandProfile(brush);

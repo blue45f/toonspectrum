@@ -207,7 +207,9 @@ describe("studio draw rendering ownership boundary", () => {
     expect(drawNode.source).toContain("dynamicBrushSettingsBySnapshot.get(source)");
     expect(drawNode.source).toContain("dynamicBrushDefaultSettingsById.get(brushId)");
     expect(drawNode.source).toContain("studioDynamicBrushDabVariationsFromTransforms(");
-    expect(drawNode.source).toContain("for (const dabs of dabVariations)");
+    expect(drawNode.source).toContain("planStudioDynamicBrushCoverageAndLegacyMarks({");
+    expect(drawNode.source).toContain("renderStudioDynamicBrushCoverage(");
+    expect(drawNode.source).toContain("renderStudioDynamicBrushLegacyMarks(");
     expect(drawNode.source).not.toContain("planNormalizedStudioBrushTipComposition(");
   });
 });

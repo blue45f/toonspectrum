@@ -651,7 +651,11 @@ function parseFdxXmlTag(source: string): ParsedFdxXmlTag {
     }
     const end = source.indexOf(quote, offset + 1);
     if (end < 0) return fail("INVALID_FORMAT", "FDX XML attribute 값이 닫히지 않았습니다.");
-    const value = decodeFdxXmlText(source.slice(offset + 1, end));
+    const rawValue = source.slice(offset + 1, end);
+    if (rawValue.includes("<")) {
+      return fail("INVALID_FORMAT", "FDX XML attribute 값에는 raw '<' 문자를 사용할 수 없습니다.");
+    }
+    const value = decodeFdxXmlText(rawValue);
     attributes.set(attributeName, value);
     if (attributes.size > STUDIO_DIALOGUE_INTERCHANGE_LIMITS.maxFdxXmlAttributesPerElement) {
       return fail(
@@ -670,6 +674,9 @@ function appendFdxText(
   state: { textFragments: number }
 ): void {
   if (!value) return;
+  if (value.includes("]]>")) {
+    fail("INVALID_FORMAT", "FDX XML 일반 텍스트에 CDATA 종료 토큰이 있습니다.");
+  }
   const decoded = decodeFdxXmlText(value);
   if (!decoded) return;
   if (!frame?.capturesText || !frame.paragraph) {
@@ -724,7 +731,9 @@ function parseFdxParagraphs(xml: string): readonly ParsedFdxParagraph[] {
     if (!frame || frame.name !== expectedName) {
       fail("INVALID_FORMAT", "FDX XML 요소의 닫는 순서가 올바르지 않습니다.");
     }
-    if (frame.paragraph) finalizeFdxParagraph(frame.paragraph, paragraphs);
+    if (frame.name === "Paragraph" && frame.paragraph) {
+      finalizeFdxParagraph(frame.paragraph, paragraphs);
+    }
     if (frame.name === "FinalDraft") rootClosed = true;
   };
 
@@ -741,13 +750,17 @@ function parseFdxParagraphs(xml: string): readonly ParsedFdxParagraph[] {
     }
     const rawText = xml.slice(offset, tagStart);
     appendFdxText(stack.at(-1), rawText, textState);
-    if (!rootSeen && rawText.trim()) sawNonWhitespaceBeforeDeclaration = true;
+    if (!rootSeen && rawText.trim()) {
+      sawNonWhitespaceBeforeDeclaration = true;
+      fail("INVALID_FORMAT", "FDX XML 루트 앞에 텍스트가 있습니다.");
+    }
 
     if (xml.startsWith("<!--", tagStart)) {
       const end = xml.indexOf("-->", tagStart + 4);
       if (end < 0 || xml.slice(tagStart + 4, end).includes("--")) {
         fail("INVALID_FORMAT", "FDX XML 주석이 올바르게 닫히지 않았습니다.");
       }
+      if (!rootSeen) sawNonWhitespaceBeforeDeclaration = true;
       offset = end + 3;
       continue;
     }

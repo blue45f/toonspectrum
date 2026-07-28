@@ -18,12 +18,23 @@ interface CapturedKonvaNode {
 
 class StampSceneContext {
   readonly arcs: string[] = [];
+  readonly drawImages: Array<{ alpha: number; args: readonly number[] }> = [];
   readonly fills: Array<{ alpha: number; color: string }> = [];
   readonly transforms: string[] = [];
   saveCount = 0;
   restoreCount = 0;
   fillStyleWrites = 0;
   globalAlpha = 1;
+  _context = {
+    getTransform: () => ({
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 0,
+      f: 0,
+    }) as DOMMatrix,
+  };
   private currentFillStyle: string | CanvasGradient | CanvasPattern = "";
 
   get fillStyle(): string | CanvasGradient | CanvasPattern {
@@ -46,6 +57,15 @@ class StampSceneContext {
   arc(x: number, y: number, radius: number): void {
     this.arcs.push(`${x},${y},${radius}`);
   }
+  drawImage(
+    _image: CanvasImageSource,
+    ...args: [number, number, number, number, number, number, number, number]
+  ): void {
+    this.drawImages.push({ alpha: this.globalAlpha, args });
+  }
+  translate(): void {}
+  rotate(): void {}
+  scale(): void {}
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
     this.transforms.push(`${a},${b},${c},${d},${e},${f}`);
   }
@@ -210,7 +230,10 @@ beforeEach(() => {
   watercolorCapture.causalPlan.mockClear();
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("StudioDrawNode pattern image lifecycle", () => {
   it("ignores stale loads, reuses a scale-independent tile, and clears removed patterns", async () => {
@@ -723,6 +746,66 @@ describe("StudioDrawNode orchestration", () => {
     expect(new Set(layeredContext.fills.map((fill) => fill.color)).size).toBeGreaterThan(2);
     expect(new Set(layeredContext.fills.map((fill) => fill.alpha.toFixed(4))).size).toBeGreaterThan(5);
     expect(layeredContext.fills.every((fill) => fill.alpha >= 0 && fill.alpha <= 1)).toBe(true);
+  });
+
+  it("routes bounded-flow-v2 dynamics through stroke-local coverage with one final opacity", () => {
+    const surfaceFills: number[] = [];
+    class CoverageSurface {
+      width: number;
+      height: number;
+      private readonly context = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over",
+        fillStyle: "",
+        setTransform: () => undefined,
+        clearRect: () => undefined,
+        beginPath: () => undefined,
+        ellipse: () => undefined,
+        fill: () => {
+          surfaceFills.push(this.context.globalAlpha);
+        },
+      };
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext(): typeof this.context {
+        return this.context;
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", CoverageSurface);
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip: { shape: "round" },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 8, mappings: [] },
+      opacity: { base: 0.5, mappings: [] },
+      flow: { base: 0.4, mappings: [] },
+    });
+    render(<StudioDrawNode el={drawEl({
+      id: "bounded-flow-v2-canvas",
+      brush: "ink-particle",
+      mode: "pen",
+      points: [10, 20, 50, 20],
+      pressures: [0.7, 0.7],
+      stroke: "#356dcc",
+      opacity: 0.3,
+      sampleSpacing: 0.5,
+      paintModel: "bounded-flow-v2",
+      brushDynamics,
+    })} />);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    expect(surfaceFills.length).toBeGreaterThan(2);
+    expect(surfaceFills.every((alpha) => alpha === 0.2)).toBe(true);
+    expect(context.arcs).toHaveLength(0);
+    expect(context.drawImages.length).toBeGreaterThan(0);
+    expect(context.drawImages.every(({ alpha }) => alpha === 0.3)).toBe(true);
   });
 
   it("renders custom alpha tips without a Canvas save/restore pair for every sample", () => {

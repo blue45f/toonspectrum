@@ -39,10 +39,6 @@ import {
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
 import {
-  resolveNormalizedStudioBrushDabColor,
-  resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
-} from "./studio-brush-material-dynamics";
-import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
@@ -55,18 +51,6 @@ import {
   studioBrushSymmetryTransforms,
   studioDynamicBrushDabVariationsFromTransforms,
 } from "./studio-brush-symmetry";
-import {
-  composeNormalizedStudioBrushTipLayerDab,
-  composeStudioBrushDualTipAlphaMap,
-  studioBrushDualTipUsesSolidEllipse,
-  type StudioBrushComposableDab,
-} from "./studio-brush-tip-composition";
-import {
-  buildStudioBrushTipAlphaMap,
-  studioBrushTipUsesSolidEllipse,
-  visitStudioBrushTipStampSamples,
-  type NormalizedStudioBrushTipSettings,
-} from "./studio-brush-tip-stamp";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -78,6 +62,11 @@ import {
   drawStudioCausalInkDabs,
   getSymmetricPoints,
 } from "./studio-draw-rendering";
+import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  renderStudioDynamicBrushCoverage,
+  renderStudioDynamicBrushLegacyMarks,
+} from "./studio-dynamic-brush-coverage-renderer";
 import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
@@ -112,7 +101,10 @@ import {
   studioRoughSeedFromElementId,
   studioSketchStyleOfElement,
 } from "./studio-rough-shape";
-import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
+import {
+  isStudioBoundedFlowPaintModelCompatible,
+  isStudioStrokePaintModelCompatible,
+} from "./studio-stroke-paint-model";
 import {
   effectiveCornerRadius,
   lineArrowHeadGeoms,
@@ -125,6 +117,10 @@ import {
   planWatercolorBrushDabs,
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
+import {
+  planStudioWetInkBrushReplay,
+  renderStudioWetInkBrushReplay,
+} from "./studio-wet-ink-brush-runtime";
 import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
@@ -378,33 +374,19 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         };
       })()
     : null;
-  const dynamicDabVariations = dynamicBrushPlan?.dabVariations ?? null;
-  const dynamicTipRenderPlan = dynamicBrushPlan
-    ? (() => {
-        const tipDefinitions = [
-          dynamicBrushPlan.dynamics.tip,
-          ...dynamicBrushPlan.dynamics.tipLayers.map((layer) => layer.tip),
-        ];
-        const grainActive = dynamicBrushPlan.dynamics.grain.amount > 0;
-        // 듀얼 브러시는 1차 팁(index 0)에만 합성한다 — 비활성 시 두 함수 모두 기존과 동일 반환.
-        const dualBrush = dynamicBrushPlan.dynamics.dualBrush;
-        const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
-          !grainActive && (tipIndex === 0
-            ? studioBrushDualTipUsesSolidEllipse(tip, dualBrush)
-            : studioBrushTipUsesSolidEllipse(tip))
-        ));
-        return {
-          tipUsesEllipse,
-          tipAlphaMaps: tipDefinitions.map((tip, tipIndex) => (
-            tipUsesEllipse[tipIndex]
-              ? null
-              : tipIndex === 0
-                ? composeStudioBrushDualTipAlphaMap(tip, dualBrush)
-                : buildStudioBrushTipAlphaMap(tip)
-          )),
-        };
-      })()
+  const dynamicCoverageAndLegacyMarkPlan = dynamicBrushPlan
+    ? planStudioDynamicBrushCoverageAndLegacyMarks({
+        dabVariations: dynamicBrushPlan.dabVariations,
+        dynamics: dynamicBrushPlan.dynamics,
+        dynamicSeed: dynamicBrushPlan.seed,
+        stroke,
+        stampGrid: dynamicBrushPlan.renderBudget.stampGrid,
+        markBudget: activeDraft
+          ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+          : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+      })
     : null;
+  const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
 
   return (
     <Group studioElementId={el.id} listening={false}>
@@ -882,100 +864,31 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (dynamicBrush && el.mode !== "eraser") {
-            const dabVariations = dynamicDabVariations ?? [];
-            const dynamics = dynamicBrushPlan!.dynamics;
-            const dynamicSeed = dynamicBrushPlan!.seed;
-            const stampGrid = dynamicBrushPlan!.renderBudget.stampGrid;
-            const tipUsesEllipse = dynamicTipRenderPlan!.tipUsesEllipse;
-            const tipAlphaMaps = dynamicTipRenderPlan!.tipAlphaMaps;
+            const legacyMarks = dynamicCoverageAndLegacyMarkPlan?.legacyMarks ?? [];
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  context.save();
-                  const inheritedAlpha = context.globalAlpha;
-                  for (const dabs of dabVariations) {
-                    const strokeOriginX = dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
-                    const strokeOriginY = dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
-                    const grainAt = dynamics.grain.amount <= 0
-                      ? () => 1
-                      : (x: number, y: number) => (
-                          resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
-                            x,
-                            y,
-                            strokeOriginX,
-                            strokeOriginY,
-                            dynamicSeed,
-                            dynamics.grain
-                          )
-                        );
-                    const renderTipDab = (
-                      composedDab: StudioBrushComposableDab,
-                      tip: NormalizedStudioBrushTipSettings,
-                      tipIndex: number,
-                      dabColor: string
-                    ) => {
-                      const baseAlpha = inheritedAlpha
-                        * Math.min(1, Math.max(
-                          0,
-                          composedDab.opacity * composedDab.flow * opacity
-                        ));
-                      const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
-                      if (tipUsesEllipse[tipIndex] || !tipAlphaMap) {
-                        context.save();
-                        context.globalAlpha = baseAlpha * grainAt(composedDab.x, composedDab.y);
-                        context.translate(composedDab.x, composedDab.y);
-                        context.rotate(composedDab.angle * Math.PI / 180);
-                        context.scale(1, composedDab.roundness);
-                        context.beginPath();
-                        context.arc(
-                          0,
-                          0,
-                          Math.max(0.25, composedDab.size / 2),
-                          0,
-                          Math.PI * 2
-                        );
-                        context.fillStyle = dabColor;
-                        context.fill();
-                        context.restore();
-                        return;
-                      }
-                      // PNG-alpha/procedural tip path. Grain is sampled in world coordinates after
-                      // multi-tip transforms, so canvas-fixed and stroke-fixed remain distinguishable.
-                      context.fillStyle = dabColor;
-                      visitStudioBrushTipStampSamples(
-                        composedDab,
-                        tipAlphaMap,
-                        (dx, dy, alpha, radius) => {
-                          const sampleX = composedDab.x + dx;
-                          const sampleY = composedDab.y + dy;
-                          context.globalAlpha = baseAlpha
-                            * alpha
-                            * grainAt(sampleX, sampleY);
-                          context.beginPath();
-                          context.arc(sampleX, sampleY, radius, 0, Math.PI * 2);
-                          context.fill();
-                        },
-                        { grid: stampGrid }
-                      );
-                    };
-                    for (const dab of dabs) {
-                      const dabColor = resolveNormalizedStudioBrushDabColor(
-                        stroke,
-                        dab.index,
-                        dynamicSeed,
-                        dynamics.colorDynamics
-                      );
-                      renderTipDab(dab, dynamics.tip, 0, dabColor);
-                      for (const [layerIndex, layer] of dynamics.tipLayers.entries()) {
-                        const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
-                        if (composedDab) {
-                          renderTipDab(composedDab, layer.tip, layerIndex + 1, dabColor);
-                        }
-                      }
+                  if (
+                    dynamicCoverageMarkPlan?.ok
+                    && isStudioBoundedFlowPaintModelCompatible(el)
+                  ) {
+                    const coverageResult = renderStudioDynamicBrushCoverage(
+                      context,
+                      dynamicCoverageMarkPlan.marks,
+                      { activeDraft, opacity }
+                    );
+                    if (
+                      coverageResult.status === "rendered"
+                      || coverageResult.status === "empty"
+                      || coverageResult.status === "partial"
+                    ) {
+                      return;
                     }
                   }
-                  context.restore();
+                  // Omitted/legacy models and every v2 preflight failure retain historical pixels.
+                  // A malformed mark plan is empty rather than partially replayed.
+                  renderStudioDynamicBrushLegacyMarks(context, legacyMarks, opacity);
                 }}
                 globalCompositeOperation={composite}
                 listening={false}
@@ -1299,6 +1212,10 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "watercolor" && el.mode !== "eraser") {
             const causalWatercolor = el.watercolorPipeline === "causal-walker-v2";
+            const wetInkReplayPlan = planStudioWetInkBrushReplay(
+              { ...el, points },
+              { phase: activeDraft ? "live" : "committed" },
+            );
             const aliasPlanSettings = resolveStudioBrushAliasWatercolorPlanSettings(
               brush,
               strokeWidth,
@@ -1334,6 +1251,19 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  if (wetInkReplayPlan.ok) {
+                    const wetInkResult = renderStudioWetInkBrushReplay(
+                      context,
+                      wetInkReplayPlan.value,
+                      {
+                        hidden: el.hidden === true,
+                        expectedRevision: wetInkReplayPlan.value.revision,
+                        currentRevision: wetInkReplayPlan.value.revision,
+                      },
+                    );
+                    if (wetInkResult.status !== "fallback") return;
+                  }
+                  // Unsupported/legacy snapshots and every preflight failure retain exact old dabs.
                   if (dabs.length === 0) return;
                   context.save();
                   for (const dab of dabs) {

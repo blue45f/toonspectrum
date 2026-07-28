@@ -37,7 +37,11 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
-import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
+import {
+  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+  isStudioBoundedFlowSymmetryCompatible,
+} from "./studio-stroke-paint-model";
 
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
 import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
@@ -156,6 +160,12 @@ export function planStudioDrawPointerStart(
     && !hasBrushDynamics
     && stampKind === null
     && symmetry.type === "none";
+  const boundedDynamicFlowPaintEligible =
+    drawMode === "pen"
+    && hasBrushDynamics
+    && stampKind === null
+    && !causalWatercolor
+    && isStudioBoundedFlowSymmetryCompatible(symmetry);
   const resolvedPressure = resolveBrushPressureSample({
     pointerType: pointer.pointerType,
     rawPressure: pointer.pressure,
@@ -237,9 +247,11 @@ export function planStudioDrawPointerStart(
         fill: drawMode === "lasso-fill" ? color : undefined,
         pressures: [drawMode === "pixel" ? 1 : pressure],
         pressureModel,
-        paintModel: layeredFlowPaintEligible
-          ? STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
-          : undefined,
+        paintModel: boundedDynamicFlowPaintEligible
+          ? STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
+          : layeredFlowPaintEligible
+            ? STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
+            : undefined,
         sampleSpacing: drawMode === "pixel"
           ? 1
           : causalInputPlan.sampleSpacing

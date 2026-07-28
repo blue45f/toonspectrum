@@ -851,6 +851,10 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
 }
 
 function yArray(record: Y.Map<unknown>, key: StudioCrdtSampleArrayKey): Y.Array<number> | null {
+  // Yjs preliminary shared types deliberately allow writes but warn on reads. Out-of-order
+  // collaboration updates and local create→history-reconcile bursts can briefly surface one of
+  // those preliminary maps to bookkeeping code, so admission must fail closed until integration.
+  if (record.doc === null) return null;
   const value = record.get(key);
   return value instanceof Y.Array ? (value as Y.Array<number>) : null;
 }
@@ -1030,7 +1034,10 @@ function deepFreeze<T>(value: T): T {
 }
 
 function orderEntryValue(entry: unknown, key: string): string | null {
-  if (!(entry instanceof Y.Map)) return null;
+  // Reading a detached Y.Map logs Yjs' "Add Yjs type to a document" warning and yields incomplete
+  // preliminary content. The integrating root-array event will register the entry once `doc` is
+  // available, so ignoring it at this transient boundary is both quieter and more correct.
+  if (!(entry instanceof Y.Map) || entry.doc === null) return null;
   const value = entry.get(key);
   return typeof value === "string" ? value : null;
 }
@@ -3338,7 +3345,7 @@ export class StudioCrdtDocument {
   }
 
   private registerRecord(id: string, value: unknown): void {
-    if (!(value instanceof Y.Map)) return;
+    if (!(value instanceof Y.Map) || value.doc === null) return;
     this.strokeIdByType.set(value, id);
     for (const key of SAMPLE_ARRAY_KEYS) {
       const samples = yArray(value, key);
@@ -3347,7 +3354,7 @@ export class StudioCrdtDocument {
   }
 
   private registerOrderEntry(value: unknown): void {
-    if (!(value instanceof Y.Map)) return;
+    if (!(value instanceof Y.Map) || value.doc === null) return;
     const id = orderEntryValue(value, "strokeId");
     if (id) this.strokeIdByType.set(value, id);
   }

@@ -9,7 +9,10 @@ import type {
   StudioInterchangeLossPreviewInput,
 } from "./studio-interchange-loss-preview";
 import type { StudioOpenRasterImportResult } from "./studio-openraster-interchange";
-import type { PsdImportResult } from "./studio-psd-import";
+import type {
+  PsdImportResult,
+  PsdInterchangeFeature,
+} from "./studio-psd-import";
 
 export interface StudioDocumentInterchangePreviewOptions {
   readonly canvasWidth: number;
@@ -95,13 +98,34 @@ function canvasHeightConstraint(height: number): StudioInterchangeLossConstraint
   };
 }
 
+function psdFeatureCategory(
+  feature: PsdInterchangeFeature,
+): StudioInterchangeLossConstraint["category"] {
+  if (feature === "layers" || feature === "groups" || feature === "blend-mode") return "layers";
+  if (feature === "resolution") return "resolution";
+  if (feature === "layer-mask") return "alpha";
+  if (feature === "color-space" || feature === "bit-depth") return "color-space";
+  return "editability";
+}
+
 export function createStudioPsdImportLossPreview(
   fileName: string,
   result: PsdImportResult,
   options: StudioDocumentInterchangePreviewOptions,
 ): StudioInterchangeLossPreviewInput {
   const displayed = scaledDimensions(result.sourceWidth, result.sourceHeight, options.canvasWidth);
-  const constraints = boundedMessages(result.skipped, "editability");
+  const constraints: StudioInterchangeLossConstraint[] =
+    result.lossManifest?.decisions
+      .filter((decision) => decision.disposition !== "preserved")
+      .map((decision) => ({
+        category: psdFeatureCategory(decision.feature),
+        ...(decision.disposition === "blocked" ? { gate: "blocking" as const } : {}),
+        severity: "warning" as const,
+        message: decision.alternative
+          ? `${decision.message} 대안: ${decision.alternative}`
+          : decision.message,
+      })) ?? [];
+  constraints.push(...boundedMessages(result.skipped, "editability"));
   const embeddedBytes = result.elements.reduce(
     (total, element) =>
       total
@@ -122,7 +146,9 @@ export function createStudioPsdImportLossPreview(
       width: result.sourceWidth,
       height: result.sourceHeight,
       alpha: "unknown",
-      colorSpace: "PSD 내장 프로필 또는 미확인",
+      colorSpace: result.lossManifest
+        ? `${result.lossManifest.source.colorMode} ${result.lossManifest.source.bitsPerChannel}bit`
+        : "PSD 내장 프로필 또는 미확인",
       editability: "layered",
     },
     result: {
@@ -131,7 +157,9 @@ export function createStudioPsdImportLossPreview(
       width: displayed.width,
       height: displayed.height,
       alpha: "present",
-      colorSpace: "sRGB 캔버스",
+      colorSpace: result.lossManifest
+        ? `${result.lossManifest.target.colorMode} ${result.lossManifest.target.bitsPerChannel}bit`
+        : "sRGB 캔버스",
       editability: "layered",
     },
     proxy: {

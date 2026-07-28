@@ -122,6 +122,13 @@ describe("StudioFloodFillPanel advanced-fill presentation", () => {
     expect(html).toContain("캔버스 가장자리를 경계로 사용");
   });
 
+  it("does not expose a selected-layer reference action when no layer is selected", () => {
+    const html = renderPanel({ canToggleSelectedReference: false });
+
+    expect(html).not.toContain("선택 레이어를 참조로 설정");
+    expect(html).toContain("참조 범위");
+  });
+
   it("disables unavailable reference scopes while retaining an escape to the current layer", () => {
     const emptyHtml = renderPanel();
     const referenceOption = emptyHtml.match(/<option value="reference"[^>]*>/)?.[0] ?? "";

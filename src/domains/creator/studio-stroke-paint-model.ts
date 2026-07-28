@@ -1,4 +1,5 @@
 import { resolveStudioBrushRenderFamily } from "./studio-brush";
+import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 
 /**
@@ -8,16 +9,32 @@ import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
  * dab-local opacity are multiplied into every dab before it is painted directly onto the
  * destination. Existing documents must keep that behavior.
  *
- * `layered-flow-v1` is opt-in. Flow and dab-local opacity build coverage on a transparent,
+ * `layered-flow-v1` is opt-in for ordinary single-colour ink. Flow and dab-local opacity build
+ * coverage on a transparent,
  * stroke-local surface; the element/stroke opacity is then applied exactly once when that surface
  * is composited onto the document. This matches painting applications where flow controls pigment
  * deposition while opacity controls the completed stroke as a whole.
+ *
+ * `bounded-flow-v2` extends the same alpha contract to versioned dynamic brushes through sparse,
+ * budgeted stroke-local RGBA tiles. It is a distinct persisted value so old dynamic strokes, which
+ * omitted a paint model and painted opacity into every dab, remain byte-for-byte legacy.
  */
 
 export const STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 = "layered-flow-v1" as const;
+/**
+ * Dynamic-brush-only coverage contract.
+ *
+ * Unlike v1's single-colour compound ink path, v2 is rendered into bounded stroke-local RGBA
+ * tiles. Dynamic opacity/flow, tip alpha, grain, colour dynamics and every symmetry copy build the
+ * tiles first; the persisted element opacity is applied exactly once when those tiles are
+ * composited. A renderer that cannot satisfy the bounded-surface contract must use the frozen
+ * legacy per-dab path instead of partially applying v2.
+ */
+export const STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 = "bounded-flow-v2" as const;
 
 export type StudioStrokePaintModel =
-  typeof STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1;
+  | typeof STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
+  | typeof STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2;
 
 function clampAlpha(value: unknown): number {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) return 0;
@@ -27,7 +44,8 @@ function clampAlpha(value: unknown): number {
 
 /** Accepts only paint contracts whose persisted pixel meaning this build understands. */
 export function isStudioStrokePaintModel(value: unknown): value is StudioStrokePaintModel {
-  return value === STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1;
+  return value === STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
+    || value === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2;
 }
 
 export interface StudioStrokePaintModelCompatibilityInput {
@@ -51,29 +69,79 @@ function hasNonIdentitySymmetry(value: unknown): boolean {
   return type !== undefined && type !== "none";
 }
 
+export function isStudioBoundedFlowSymmetryCompatible(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const source = value as {
+    type?: unknown;
+    centerX?: unknown;
+    centerY?: unknown;
+    radialCount?: unknown;
+  };
+  if (source.type === undefined || source.type === "none") return true;
+  if (
+    source.type !== "vertical"
+    && source.type !== "horizontal"
+    && source.type !== "radial"
+    && source.type !== "kaleidoscope"
+  ) return false;
+  if (
+    typeof source.centerX !== "number"
+    || !Number.isFinite(source.centerX)
+    || typeof source.centerY !== "number"
+    || !Number.isFinite(source.centerY)
+  ) return false;
+  if (source.type === "vertical" || source.type === "horizontal") return true;
+  return typeof source.radialCount === "number"
+    && Number.isInteger(source.radialCount)
+    && source.radialCount >= 1
+    && source.radialCount <= 32;
+}
+
+function hasCausalGeometry(input: StudioStrokePaintModelCompatibilityInput): boolean {
+  return (
+    typeof input.sampleSpacing === "number"
+    && Number.isFinite(input.sampleSpacing)
+    && input.sampleSpacing >= 0
+  ) || isStudioInkPressureModel(input.pressureModel);
+}
+
+/** Dynamic-only v2 guard used by the retained Canvas renderer. */
+export function isStudioBoundedFlowPaintModelCompatible(
+  input: StudioStrokePaintModelCompatibilityInput
+): input is StudioStrokePaintModelCompatibilityInput & {
+  paintModel: typeof STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2;
+} {
+  if (input.paintModel !== STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2) return false;
+  if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") return false;
+  if (input.fill !== undefined && input.fill !== null) return false;
+  if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
+  if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
+  if (typeof input.brushDynamics !== "object" || input.brushDynamics === null) return false;
+  if (resolveStudioBrushDynamicsPresetId(input.brush) === null) return false;
+  if (!hasCausalGeometry(input)) return false;
+  return isStudioBoundedFlowSymmetryCompatible(input.symmetry);
+}
+
 /**
  * Cross-field guard for every persistence and renderer boundary.
  *
- * The current compound-coverage implementation is intentionally limited to ordinary freehand
- * pen/marker strokes. Erasers, closed fills, symmetry, stamp/watercolor engines and dynamics have
- * different deposition semantics and must retain the legacy per-dab compositor.
+ * v1 remains intentionally limited to ordinary freehand pen/marker strokes. v2 admits only
+ * snapshotted dynamic-brush presets and renderer-bounded symmetry. Erasers, closed fills,
+ * stamp/watercolor engines and unknown combinations retain the legacy per-dab compositor.
  */
 export function isStudioStrokePaintModelCompatible(
   input: StudioStrokePaintModelCompatibilityInput
 ): input is StudioStrokePaintModelCompatibilityInput & { paintModel: StudioStrokePaintModel } {
-  if (!isStudioStrokePaintModel(input.paintModel)) return false;
+  if (isStudioBoundedFlowPaintModelCompatible(input)) return true;
+  if (input.paintModel !== STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1) return false;
   if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") return false;
   if (input.fill !== undefined && input.fill !== null) return false;
   if (input.brushDynamics !== undefined && input.brushDynamics !== null) return false;
   if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
   if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
   if (hasNonIdentitySymmetry(input.symmetry)) return false;
-  const hasCausalGeometry = (
-    typeof input.sampleSpacing === "number"
-    && Number.isFinite(input.sampleSpacing)
-    && input.sampleSpacing >= 0
-  ) || isStudioInkPressureModel(input.pressureModel);
-  if (!hasCausalGeometry) return false;
+  if (!hasCausalGeometry(input)) return false;
   const family = resolveStudioBrushRenderFamily(input.brush ?? "pen");
   return family === "pen" || family === "marker";
 }

@@ -177,17 +177,23 @@ describe("StudioPage page-composite filter integration boundary", () => {
     );
   });
 
-  it("forwards live collaboration and visibility guards to the extracted page context", () => {
-    const context = nestedFunction("currentStudioFilterPageRasterContext");
-    const text = context.getText(pageFile);
+  it("forwards filter purpose plus live collaboration and visibility guards to the shared page context", () => {
+    const sharedContext = nestedFunction("currentStudioEditablePageRasterContext")
+      .getText(pageFile);
+    const filterContext = nestedFunction("currentStudioFilterPageRasterContext")
+      .getText(pageFile);
 
-    expect(text).toContain("rasterRuntime.createStudioEditablePageRasterContext({");
-    expect(text).toContain("localHiddenElementIds: localHiddenElementIdsRef.current");
-    expect(text).toContain("sharedDocument: sharedDocumentRef.current !== null");
-    expect(text).toContain("collaborationLockedReason: collaborationAccessRef.current.locked");
-    expect(text).toContain("masterEditMode: masterEditModeRef.current");
-    expect(text).toContain("timelinePlaying: timelinePlayingRef.current");
-    expect(text).toContain("viewTransformSuppressed: viewTransformSuppressedRef.current");
+    expect(sharedContext).toContain("rasterRuntime.createStudioEditablePageRasterContext({");
+    expect(sharedContext).toContain("localHiddenElementIds: localHiddenElementIdsRef.current");
+    expect(sharedContext).toContain("sharedDocument: sharedDocumentRef.current !== null");
+    expect(sharedContext).toContain("collaborationLockedReason: collaborationAccessRef.current.locked");
+    expect(sharedContext).toContain("masterEditMode: masterEditModeRef.current");
+    expect(sharedContext).toContain("timelinePlaying: timelinePlayingRef.current");
+    expect(sharedContext).toContain("viewTransformSuppressed: viewTransformSuppressedRef.current");
+    expect(sharedContext).toContain("purpose,");
+    expect(filterContext).toContain(
+      'currentStudioEditablePageRasterContext(name, rasterRuntime, "page-filter")',
+    );
   });
 
   it("keeps the direct selected-image filter path ahead of page-composite guards", () => {

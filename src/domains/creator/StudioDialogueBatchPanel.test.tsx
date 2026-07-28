@@ -571,14 +571,14 @@ describe("StudioDialogueBatchPanel file interchange", () => {
     return rendered;
   }
 
-  it("keeps eight formats collapsed until requested and exports the current lettering", () => {
+  it("keeps nine formats collapsed until requested and exports the current lettering", () => {
     Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:test") });
     Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     renderInterchange();
 
     expect(screen.getByRole("combobox", { name: "대사 내보내기 형식" })).toHaveProperty("value", "csv");
-    expect(screen.getByText("8종")).toBeTruthy();
+    expect(screen.getByText("9종")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "내보내기" }));
 
     expect(click).toHaveBeenCalledTimes(1);
@@ -619,5 +619,75 @@ describe("StudioDialogueBatchPanel file interchange", () => {
       "id"
     );
     expect(screen.getByText(/1개 대사를 한 번에 반영했어요/u)).toBeTruthy();
+  });
+
+  it("shows an FDX loss preview and applies only after explicit confirmation", async () => {
+    const onImportInterchange = vi.fn().mockResolvedValue({
+      pages: PAGES,
+      matched: 1,
+      changed: 1,
+      locked: 0,
+      missing: 0,
+      droppedMetadata: 0,
+    });
+    const { container } = renderInterchange(onImportInterchange);
+    const payload = `<?xml version="1.0" encoding="UTF-8"?>
+      <FinalDraft DocumentType="Script">
+        <Content>
+          <Paragraph Type="Scene Heading"><Text>INT. 교실 - 낮</Text></Paragraph>
+          <Paragraph Type="Action"><Text>창문에 비가 내린다.</Text></Paragraph>
+          <Paragraph Type="Character"><Text>하나</Text></Paragraph>
+          <Paragraph Type="Dialogue"><Text>안녕.</Text></Paragraph>
+          <Paragraph Type="Transition"><Text>CUT TO:</Text></Paragraph>
+        </Content>
+      </FinalDraft>`;
+    const file = new File([payload], "episode-01.fdx", { type: "application/xml" });
+    Object.defineProperty(file, "arrayBuffer", {
+      configurable: true,
+      value: async () => new TextEncoder().encode(payload).buffer,
+    });
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input?.accept).toContain(".fdx");
+    fireEvent.change(input!, { target: { files: [file] } });
+
+    expect(await screen.findByRole("heading", { name: "FDX 손실 미리보기" })).toBeTruthy();
+    expect(onImportInterchange).not.toHaveBeenCalled();
+    expect(screen.getByText("episode-01.fdx")).toBeTruthy();
+    expect(screen.getByText("가져올 대사").nextElementSibling?.textContent).toBe("1");
+    expect(screen.getByText("문맥만 사용").nextElementSibling?.textContent).toBe("2");
+    expect(screen.getAllByText("제외")[0]?.nextElementSibling?.textContent).toBe("1");
+
+    fireEvent.click(screen.getByRole("button", { name: "확인하고 적용" }));
+    await waitFor(() => expect(onImportInterchange).toHaveBeenCalledTimes(1));
+    expect(onImportInterchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cues: [expect.objectContaining({ page: 1, panel: 1, speaker: "하나", text: "안녕." })],
+      }),
+      "auto"
+    );
+    expect(screen.queryByRole("heading", { name: "FDX 손실 미리보기" })).toBeNull();
+    expect(screen.getByText(/1개 대사를 한 번에 반영했어요/u)).toBeTruthy();
+  });
+
+  it("cancels a pending FDX import without mutating the document", async () => {
+    const onImportInterchange = vi.fn();
+    const { container } = renderInterchange(onImportInterchange);
+    const payload = `<FinalDraft DocumentType="Script"><Content>
+      <Paragraph Type="Character"><Text>하나</Text></Paragraph>
+      <Paragraph Type="Dialogue"><Text>취소할 대사</Text></Paragraph>
+    </Content></FinalDraft>`;
+    const file = new File([payload], "cancel.fdx", { type: "application/xml" });
+    Object.defineProperty(file, "arrayBuffer", {
+      configurable: true,
+      value: async () => new TextEncoder().encode(payload).buffer,
+    });
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    fireEvent.change(input!, { target: { files: [file] } });
+
+    expect(await screen.findByRole("heading", { name: "FDX 손실 미리보기" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(onImportInterchange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "FDX 손실 미리보기" })).toBeNull();
+    expect(screen.getByText(/문서는 변경되지 않았습니다/u)).toBeTruthy();
   });
 });

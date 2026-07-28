@@ -16,8 +16,16 @@ describe("Studio pixel-selection pointer lifecycle", () => {
   it("commits only the owner release and cancels without mutating the selection", () => {
     expect(pageSource).toContain("session.pointerId !== pointerId");
     expect(pageSource).toContain("if (!cancelled) {");
-    expect(pageSource).toContain("commitSelectionDrag(previous, session.drag) ?? previous");
+    expect(pageSource).toContain("commitSelectionDragAtPoint(");
+    expect(pageSource).toContain("commitSelectionDrag(previous, session.drag)");
     expect(pageSource).toContain('session.drag.tool === "lasso"');
     expect(pageSource).toContain("releasePixelSelectionPointerCapture(session)");
+  });
+
+  it("samples the owning pointerup coordinate before committing a rectangle or ellipse", () => {
+    expect(pageSource).toContain("stage.setPointersPositions(pointerEvent)");
+    expect(pageSource).toContain("stage.getRelativePointerPosition()");
+    expect(pageSource).toContain("commitSelectionDragAtPoint(");
+    expect(pageSource).toContain("canvasPointToNormalized(position.x, position.y, session.frame)");
   });
 });

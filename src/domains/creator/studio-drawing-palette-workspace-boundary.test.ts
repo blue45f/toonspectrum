@@ -350,7 +350,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     const inspectorDrawingSurface = sourceBetween(
       inspectorSource,
       '{inspectorContentMode === "drawing" && (',
-      'inspectorContentMode === "empty" &&',
+      "imageInspectorRouteWithoutImageSelection ? (",
       "inspector drawing surface",
     );
 

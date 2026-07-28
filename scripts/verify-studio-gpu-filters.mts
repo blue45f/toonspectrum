@@ -4,15 +4,17 @@
  * applyImageFilters) and the WebGPU compute chain (applyGpuFilterChain) for each of the five
  * supported adjustments (brightness/contrast, HSL, levels incl. channels, curves incl.
  * channels, color balance) plus an all-LUT fused chain (single lut3 dispatch) and a full
- * five-adjustment chain, inside a real headless Chromium WebGPU context.
+ * five-adjustment chain, plus premultiplied Gaussian, morphology, convolution, and a composed
+ * spatial chain, inside a real headless Chromium WebGPU context.
  *
  * Gates:
  *  - every case must run on GPU (null fallback on a WebGPU browser fails the run)
  *  - lutOnly plans (brightness/contrast + levels + curves, alone or fused): maxChannelDelta
  *    === 0 — these stages are exact CPU-built byte LUTs routed through the integer-lookup
  *    lut3 kernel, so any nonzero delta is a real regression
- *  - single formula kernels (HSL, color balance): maxChannelDelta <= 2 (f32-vs-f64 rounding
- *    boundary tolerance; observed worst case is 1 on a single color-balance pixel)
+ *  - single formula kernels (HSL, color balance, convolution): maxChannelDelta <= 1
+ *    (the only permitted difference is an f32-vs-f64 rounding boundary)
+ *  - integer morphology cases: maxChannelDelta === 0
  *  - mixed chains (formula kernel + LUT stages): maxChannelDelta <= 1 — the old contrast f32
  *    tie seed is gone now that brightness/contrast is an exact LUT; the only remaining noise
  *    source is an HSL/color-balance rounding boundary; observed worst case is 0 (gate is
@@ -35,8 +37,9 @@ const HARNESS_PATH = "/__studio_gpu_filters_parity__";
 const RESULT_TIMEOUT_MS = 45_000;
 /** LUT-only plans are exact CPU byte maps — parity must be bit-identical. */
 const MAX_CHANNEL_DELTA_LUT_EXACT = 0;
-const MAX_CHANNEL_DELTA_SINGLE_KERNEL = 2;
+const MAX_CHANNEL_DELTA_SINGLE_KERNEL = 1;
 const MAX_CHANNEL_DELTA_CHAIN = 1;
+const EXACT_SPATIAL_CASE_IDS = new Set(["morphology-dilate", "morphology-erode", "convolution-edge"]);
 
 interface FilterParityCaseResult {
   readonly id: string;
@@ -148,7 +151,7 @@ async function main(): Promise<void> {
 
     const failures: string[] = [];
     for (const parityCase of result.cases) {
-      const gate = parityCase.lutOnly
+      const gate = parityCase.lutOnly || EXACT_SPATIAL_CASE_IDS.has(parityCase.id)
         ? MAX_CHANNEL_DELTA_LUT_EXACT
         : parityCase.kernelCount > 1
           ? MAX_CHANNEL_DELTA_CHAIN

@@ -395,7 +395,13 @@ describe("sanitizeBrushSnapshot", () => {
 
     expect(adjustedFields).toEqual([]);
     expect(snapshot.brushDynamics.colorDynamics).toEqual(validSnapshot.brushDynamics.colorDynamics);
-    expect(snapshot.brushDynamics.grain).toEqual(validSnapshot.brushDynamics.grain);
+    expect(snapshot.brushDynamics.grain).toEqual({
+      space: "canvas-fixed",
+      amount: 0,
+      scale: 8,
+      contrast: 0.35,
+      seed: 1,
+    });
     expect(snapshot.brushDynamics.tipLayers).toEqual([]);
   });
 

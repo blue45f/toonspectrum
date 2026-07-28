@@ -353,6 +353,32 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     notes: ["대사 일괄 편집 패널에서 가져오기·내보내기가 연결되어 있습니다."],
   },
   {
+    id: "dialogue-fdx",
+    label: "Final Draft XML (FDX) safe subset",
+    extensions: [".fdx"],
+    mime: ["application/xml", "text/xml"],
+    category: "document",
+    import: "available",
+    export: "available",
+    roundTrip: "partial",
+    lossModel: [
+      "Scene Heading은 페이지, Action 순서는 컷 문맥으로만 매핑",
+      "Character/Dialogue/Parenthetical 외 Paragraph와 서식·제작 메타데이터는 loss preview로 보고 후 제외",
+      "출력은 ToonSpectrum 페이지·컷 marker를 사용하는 공개 구조 안전 부분집합",
+    ],
+    runtimeRequirement: ["fatal UTF-8", "bounded clean-room XML parser"],
+    sizeBudget: {
+      maxFileBytes: 8 * MiB,
+      maxItems: 20_000,
+      notes: "XML 요소 100,000개, 깊이 32, Paragraph 60,000개 예산",
+    },
+    status: "available",
+    notes: [
+      "공식 공개 XSD가 확인되지 않아 FinalDraft/Content/Paragraph/Text 일반 공개 구조만 처리합니다.",
+      "대사 일괄 편집 패널에서 손실 미리보기를 확인한 뒤 가져오며 안전 부분집합으로 내보냅니다.",
+    ],
+  },
+  {
     id: "subtitles",
     label: "SRT / WebVTT subtitles",
     extensions: [".srt", ".vtt"],

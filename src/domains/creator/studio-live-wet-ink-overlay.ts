@@ -1,0 +1,968 @@
+/**
+ * Low-latency physical wet-ink overlay.
+ *
+ * Pointer frames consume only the unseen accepted-sample suffix through the same seeded causal
+ * walker as committed wet ink. Newly emitted dabs are deposited into a sparse 4x water/pigment
+ * field and only its dirty tiles are simulated/uploaded. Pointer-up replaces the disposable live
+ * field with the complete `studio-wet-ink-brush-runtime` replay before flattening, so endpoint,
+ * seed, runtime version and digest are byte-identical to StudioDrawNode's committed snapshot.
+ */
+
+import { mapStudioBrushAliasPressure } from "./studio-brush-alias-profile";
+import {
+  appendCausalWatercolorBrush,
+  beginCausalWatercolorBrush,
+  type StudioCausalWatercolorState,
+} from "./studio-causal-watercolor-brush";
+import {
+  acquireStudioLowLatencyCanvas2dContext,
+  decideStudioNativeLiveSurfaceResolution,
+  STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
+} from "./studio-low-latency-canvas";
+import {
+  planStudioWetInkBrushReplay,
+  resolveStudioWetInkBrushPhysicalRecipe,
+  STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+  type StudioWetInkBrushPhysicalRecipe,
+  type StudioWetInkBrushReplayPlan,
+  type StudioWetInkBrushSurface,
+  type StudioWetInkBrushSurfaceFactory,
+} from "./studio-wet-ink-brush-runtime";
+import {
+  consumeStudioWetInkDirtyBounds,
+  createStudioWetInkField,
+  depositStudioWetInkDabs,
+  planStudioWetInkTileUploads,
+  simulateStudioWetInkField,
+  type StudioWetInkBounds,
+  type StudioWetInkField,
+  type StudioWetInkTileUpload,
+} from "./studio-wet-ink-field";
+
+import type { DrawEl } from "./studio-element-model";
+import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
+import type { WatercolorBrushDab } from "./studio-watercolor-brush";
+
+const MAX_LIVE_DABS = 4_096;
+const MAX_LIVE_TILES = 4_096;
+const MAX_LIVE_CELLS = 4_194_304;
+const MAX_LIVE_UPLOAD_BYTES = 64 * 1024 * 1024;
+const MAX_COORDINATE_ABS = 1_000_000;
+const LIVE_SIMULATION_STEPS_PER_SUFFIX = 1;
+const POINT_EPSILON = 1e-6;
+
+export interface StudioLiveWetInkOverlayCanvases {
+  readonly activeCanvas: HTMLCanvasElement;
+  readonly settledCanvas: HTMLCanvasElement;
+}
+
+export interface StudioLiveWetInkAuthority {
+  readonly pageEpoch: string | number;
+  readonly signal?: Pick<AbortSignal, "aborted"> | null;
+  readonly hidden?: boolean | (() => boolean);
+}
+
+export interface StudioLiveWetInkOverlayOptions {
+  readonly surfaceFactory?: StudioWetInkBrushSurfaceFactory;
+}
+
+export type StudioLiveWetInkFallbackReason =
+  | "unsupported-snapshot"
+  | "surface-unavailable"
+  | "surface-budget"
+  | "native-scale-unsupported"
+  | "hidden"
+  | "aborted"
+  | "stale-page"
+  | "stroke-identity"
+  | "source-prefix"
+  | "invalid-sample"
+  | "field-budget"
+  | "dab-budget"
+  | "simulation-budget"
+  | "upload-budget"
+  | "surface-render"
+  | "exact-replay";
+
+export type StudioLiveWetInkBeginResult =
+  | {
+      readonly status: "started";
+      readonly consumedSourcePoints: number;
+      readonly appendedDabs: number;
+    }
+  | {
+      readonly status: "fallback";
+      readonly reason: StudioLiveWetInkFallbackReason;
+    };
+
+export type StudioLiveWetInkAppendResult =
+  | {
+      readonly status: "appended" | "noop";
+      readonly consumedSourcePoints: number;
+      readonly appendedDabs: number;
+      readonly uploadedTiles: number;
+    }
+  | {
+      readonly status: "fallback";
+      readonly reason: StudioLiveWetInkFallbackReason;
+    };
+
+export type StudioLiveWetInkEndResult =
+  | {
+      readonly status: "settled";
+      readonly fieldDigest: string;
+      readonly revision: number;
+      readonly seed: number;
+      readonly uploadedTiles: number;
+    }
+  | {
+      readonly status: "fallback";
+      readonly reason: StudioLiveWetInkFallbackReason;
+    };
+
+interface ActiveWetInkStroke {
+  readonly recipe: StudioWetInkBrushPhysicalRecipe;
+  readonly styleSignature: string;
+  readonly pageEpoch: string | number;
+  readonly field: StudioWetInkField;
+  readonly fieldOriginCellX: number;
+  readonly fieldOriginCellY: number;
+  readonly causal: StudioCausalWatercolorState;
+  consumedSourcePoints: number;
+  previousSourceX: number;
+  previousSourceY: number;
+}
+
+interface PreparedUpload {
+  readonly upload: StudioWetInkTileUpload;
+  readonly surface: StudioWetInkBrushSurface;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function clamp01(value: number): number {
+  return clamp(value, 0, 1);
+}
+
+function finiteCoordinate(value: unknown): number | null {
+  return typeof value === "number"
+    && Number.isFinite(value)
+    && Math.abs(value) <= MAX_COORDINATE_ABS
+    ? value
+    : null;
+}
+
+function authorityGuard(
+  authority: StudioLiveWetInkAuthority,
+): "hidden" | "aborted" | null {
+  if (authority.signal?.aborted) return "aborted";
+  try {
+    const hidden = typeof authority.hidden === "function"
+      ? authority.hidden()
+      : authority.hidden === true;
+    return hidden ? "hidden" : null;
+  } catch {
+    return "hidden";
+  }
+}
+
+function styleSignature(
+  element: DrawEl,
+  recipe: StudioWetInkBrushPhysicalRecipe,
+): string {
+  return [
+    recipe.runtimeVersion,
+    element.id,
+    element.kind ?? "freehand",
+    element.mode ?? "pen",
+    recipe.brushId,
+    element.watercolorPipeline ?? "",
+    element.stroke,
+    element.strokeWidth,
+    element.opacity ?? 1,
+    recipe.compositeOpacity,
+    recipe.seed,
+  ].join("\u001f");
+}
+
+function defaultSurfaceFactory(
+  width: number,
+  height: number,
+): StudioWetInkBrushSurface | null {
+  try {
+    if (typeof globalThis.OffscreenCanvas === "function") {
+      const surface = new globalThis.OffscreenCanvas(width, height);
+      if (surface.getContext("2d")) return surface as StudioWetInkBrushSurface;
+    }
+    if (typeof globalThis.document !== "undefined") {
+      const surface = globalThis.document.createElement("canvas");
+      surface.width = width;
+      surface.height = height;
+      return surface as StudioWetInkBrushSurface;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function surfaceChanged(
+  left: StudioLiveInkSurface | null,
+  right: StudioLiveInkSurface | null,
+): boolean {
+  return !left || !right
+    || left.left !== right.left
+    || left.top !== right.top
+    || left.width !== right.width
+    || left.height !== right.height
+    || left.documentScale !== right.documentScale
+    || left.documentWidth !== right.documentWidth
+    || left.flipX !== right.flipX;
+}
+
+function liveFieldGeometry(
+  surface: StudioLiveInkSurface,
+  recipe: StudioWetInkBrushPhysicalRecipe,
+): {
+  readonly originCellX: number;
+  readonly originCellY: number;
+  readonly width: number;
+  readonly height: number;
+} | null {
+  const scale = surface.documentScale;
+  if (!Number.isFinite(scale) || scale <= 0) return null;
+  const visibleWidth = surface.width / scale;
+  const visibleHeight = surface.height / scale;
+  const visibleLeft = surface.flipX
+    ? surface.documentWidth - (surface.left + surface.width) / scale
+    : surface.left / scale;
+  const visibleTop = surface.top / scale;
+  if (
+    !Number.isFinite(visibleLeft)
+    || !Number.isFinite(visibleTop)
+    || !Number.isFinite(visibleWidth)
+    || !Number.isFinite(visibleHeight)
+  ) return null;
+  const fieldScale = STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+  const margin = Math.max(
+    fieldScale * 4,
+    Math.ceil(recipe.baseWidth * fieldScale * 0.75) + 6,
+  );
+  const originCellX = Math.floor(visibleLeft * fieldScale) - margin;
+  const originCellY = Math.floor(visibleTop * fieldScale) - margin;
+  const width = Math.ceil(visibleWidth * fieldScale) + margin * 2 + 1;
+  const height = Math.ceil(visibleHeight * fieldScale) + margin * 2 + 1;
+  if (
+    !Number.isSafeInteger(originCellX)
+    || !Number.isSafeInteger(originCellY)
+    || !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width <= 0
+    || height <= 0
+    || width > MAX_COORDINATE_ABS
+    || height > MAX_COORDINATE_ABS
+    || !Number.isSafeInteger(width * height)
+  ) return null;
+  return { originCellX, originCellY, width, height };
+}
+
+function fullFieldBounds(field: StudioWetInkField): StudioWetInkBounds {
+  return { x: 0, y: 0, width: field.config.width, height: field.config.height };
+}
+
+/**
+ * Exact support gate used by StudioPage before hiding its retained draft.
+ */
+export function studioLiveWetInkOverlaySupportsElement(element: DrawEl): boolean {
+  return resolveStudioWetInkBrushPhysicalRecipe(element) !== null
+    && element.hidden !== true;
+}
+
+export class StudioLiveWetInkOverlayRenderer {
+  private readonly surfaceFactory: StudioWetInkBrushSurfaceFactory;
+  private activeCanvas: HTMLCanvasElement | null = null;
+  private settledCanvas: HTMLCanvasElement | null = null;
+  private activeContext: CanvasRenderingContext2D | null = null;
+  private settledContext: CanvasRenderingContext2D | null = null;
+  private surface: StudioLiveInkSurface | null = null;
+  private dpr = 1;
+  private surfaceUsable = false;
+  private surfaceFailure: StudioLiveWetInkFallbackReason = "surface-unavailable";
+  private active: ActiveWetInkStroke | null = null;
+  private settled: StudioWetInkBrushReplayPlan[] = [];
+  private fallbackReason: StudioLiveWetInkFallbackReason | null = null;
+
+  constructor(options: StudioLiveWetInkOverlayOptions = {}) {
+    this.surfaceFactory = options.surfaceFactory ?? defaultSurfaceFactory;
+  }
+
+  attach(canvases: StudioLiveWetInkOverlayCanvases | null): void {
+    this.activeCanvas = canvases?.activeCanvas ?? null;
+    this.settledCanvas = canvases?.settledCanvas ?? null;
+    this.activeContext = this.activeCanvas
+      ? acquireStudioLowLatencyCanvas2dContext(this.activeCanvas)
+      : null;
+    this.settledContext = this.settledCanvas
+      ? acquireStudioLowLatencyCanvas2dContext(this.settledCanvas)
+      : null;
+    this.applySurface();
+    if (this.active || this.settled.length > 0) this.replay();
+  }
+
+  setSurface(surface: StudioLiveInkSurface | null): void {
+    const previous = this.surface;
+    this.surface = surface;
+    if (!surfaceChanged(previous, surface)) return;
+    this.applySurface();
+    if (this.active || this.settled.length > 0) this.replay();
+  }
+
+  get isActive(): boolean {
+    return this.active !== null;
+  }
+
+  get hasSettledStrokes(): boolean {
+    return this.settled.length > 0;
+  }
+
+  get settledStrokeCount(): number {
+    return this.settled.length;
+  }
+
+  get lastFallbackReason(): StudioLiveWetInkFallbackReason | null {
+    return this.fallbackReason;
+  }
+
+  get isNativeSurfaceReady(): boolean {
+    return this.surfaceReady();
+  }
+
+  begin(
+    element: DrawEl,
+    authority: StudioLiveWetInkAuthority,
+  ): StudioLiveWetInkBeginResult {
+    const guarded = authorityGuard(authority);
+    if (guarded) return { status: "fallback", reason: guarded };
+    const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
+    if (!recipe || element.hidden === true) {
+      return { status: "fallback", reason: "unsupported-snapshot" };
+    }
+    if (!this.surfaceReady()) {
+      return { status: "fallback", reason: this.surfaceFailure };
+    }
+    const firstX = finiteCoordinate(element.points[0]);
+    const firstY = finiteCoordinate(element.points[1]);
+    if (firstX === null || firstY === null) {
+      return { status: "fallback", reason: "invalid-sample" };
+    }
+    const geometry = liveFieldGeometry(this.surface!, recipe);
+    if (!geometry) return { status: "fallback", reason: "field-budget" };
+    const field = createStudioWetInkField({
+      width: geometry.width,
+      height: geometry.height,
+      tileSize: 64,
+      seed: recipe.seed,
+      maxTiles: MAX_LIVE_TILES,
+      maxCells: MAX_LIVE_CELLS,
+      maxSimulationSteps: 1_000_000,
+      maxUploadBytes: MAX_LIVE_UPLOAD_BYTES,
+      absorption: recipe.material.absorption,
+      bleed: recipe.material.bleed,
+      dryingRate: recipe.material.dryingRate,
+      edgeDarkening: recipe.material.edgeDarkening,
+      fixationRate: recipe.material.fixationRate,
+      granulation: recipe.material.granulation,
+      paperRoughness: recipe.material.paperRoughness,
+      inkColor: recipe.inkColor,
+    });
+    if (!field.ok) return { status: "fallback", reason: "field-budget" };
+    const firstPressure = mapStudioBrushAliasPressure(
+      recipe.brushId,
+      element.pressures?.[0],
+      0.55,
+    );
+    const started = beginCausalWatercolorBrush(
+      {
+        x: firstX * recipe.fieldScale - geometry.originCellX,
+        y: firstY * recipe.fieldScale - geometry.originCellY,
+        pressure: firstPressure,
+      },
+      {
+        baseWidth: recipe.baseWidth * recipe.fieldScale,
+        spacing: recipe.spacing * recipe.fieldScale,
+        seed: recipe.seed,
+        maxDabs: MAX_LIVE_DABS,
+        diffuse: true,
+      },
+    );
+    if (!started) return { status: "fallback", reason: "invalid-sample" };
+
+    this.resetActiveState();
+    this.clearActiveRect();
+    const active: ActiveWetInkStroke = {
+      recipe,
+      styleSignature: styleSignature(element, recipe),
+      pageEpoch: authority.pageEpoch,
+      field: field.value,
+      fieldOriginCellX: geometry.originCellX,
+      fieldOriginCellY: geometry.originCellY,
+      causal: started.state,
+      consumedSourcePoints: 1,
+      previousSourceX: firstX,
+      previousSourceY: firstY,
+    };
+    this.active = active;
+    this.setActiveCanvasOpacity(recipe.compositeOpacity);
+    const painted = this.depositAndPaint(active, started.dabs);
+    if (painted.status === "fallback") return painted;
+    this.fallbackReason = null;
+    return {
+      status: "started",
+      consumedSourcePoints: 1,
+      appendedDabs: started.dabs.length,
+    };
+  }
+
+  appendFrom(
+    element: DrawEl,
+    authority: StudioLiveWetInkAuthority,
+  ): StudioLiveWetInkAppendResult {
+    const active = this.active;
+    if (!active) {
+      return {
+        status: "fallback",
+        reason: this.fallbackReason ?? "surface-unavailable",
+      };
+    }
+    const guarded = authorityGuard(authority);
+    if (guarded) return this.failActive(guarded);
+    if (!Object.is(active.pageEpoch, authority.pageEpoch)) {
+      return this.failActive("stale-page");
+    }
+    const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
+    if (
+      !recipe
+      || element.hidden === true
+      || styleSignature(element, recipe) !== active.styleSignature
+    ) {
+      return this.failActive("stroke-identity");
+    }
+    const total = Math.floor(element.points.length / 2);
+    if (total < active.consumedSourcePoints) return this.failActive("source-prefix");
+    if (total === active.consumedSourcePoints) {
+      return {
+        status: "noop",
+        consumedSourcePoints: total,
+        appendedDabs: 0,
+        uploadedTiles: 0,
+      };
+    }
+    const previousIndex = active.consumedSourcePoints - 1;
+    if (
+      finiteCoordinate(element.points[previousIndex * 2]) !== active.previousSourceX
+      || finiteCoordinate(element.points[previousIndex * 2 + 1]) !== active.previousSourceY
+    ) {
+      return this.failActive("source-prefix");
+    }
+
+    const appendedDabs: WatercolorBrushDab[] = [];
+    for (
+      let sourceIndex = active.consumedSourcePoints;
+      sourceIndex < total;
+      sourceIndex += 1
+    ) {
+      const x = finiteCoordinate(element.points[sourceIndex * 2]);
+      const y = finiteCoordinate(element.points[sourceIndex * 2 + 1]);
+      if (x === null || y === null) return this.failActive("invalid-sample");
+      const pressure = mapStudioBrushAliasPressure(
+        recipe.brushId,
+        element.pressures?.[sourceIndex],
+        0.55,
+      );
+      appendedDabs.push(...appendCausalWatercolorBrush(active.causal, {
+        x: x * recipe.fieldScale - active.fieldOriginCellX,
+        y: y * recipe.fieldScale - active.fieldOriginCellY,
+        pressure,
+      }));
+      active.consumedSourcePoints = sourceIndex + 1;
+      active.previousSourceX = x;
+      active.previousSourceY = y;
+    }
+    if (active.causal.capped) return this.failActive("dab-budget");
+    return this.depositAndPaint(active, appendedDabs);
+  }
+
+  end(
+    element: DrawEl,
+    authority: StudioLiveWetInkAuthority,
+  ): StudioLiveWetInkEndResult {
+    const active = this.active;
+    if (!active) return { status: "fallback", reason: "surface-unavailable" };
+    const guardedBeforePlan = authorityGuard(authority);
+    if (guardedBeforePlan) return this.failActive(guardedBeforePlan);
+    if (!Object.is(active.pageEpoch, authority.pageEpoch)) {
+      return this.failActive("stale-page");
+    }
+    const recipe = resolveStudioWetInkBrushPhysicalRecipe(element);
+    if (
+      !recipe
+      || element.hidden === true
+      || styleSignature(element, recipe) !== active.styleSignature
+    ) {
+      return this.failActive("stroke-identity");
+    }
+    const total = Math.floor(element.points.length / 2);
+    const previousIndex = active.consumedSourcePoints - 1;
+    const appendCompatible =
+      total >= active.consumedSourcePoints
+      && finiteCoordinate(element.points[previousIndex * 2]) === active.previousSourceX
+      && finiteCoordinate(element.points[previousIndex * 2 + 1]) === active.previousSourceY;
+    if (appendCompatible) {
+      const appended = this.appendFrom(element, authority);
+      if (appended.status === "fallback") return appended;
+    }
+    // Release-time stabilization/post-correction may replace an already visible prefix. The live
+    // suffix field is disposable; the exact full replay below is the only safe rewrite and avoids
+    // treating a legitimate sealed geometry replacement as endpoint loss.
+    const exact = planStudioWetInkBrushReplay(element, { phase: "live" });
+    if (!exact.ok) return this.failActive("exact-replay");
+    const guarded = authorityGuard(authority);
+    if (guarded) return this.failActive(guarded);
+    if (!Object.is(active.pageEpoch, authority.pageEpoch)) {
+      return this.failActive("stale-page");
+    }
+    if (!this.drawExactPlanToActive(exact.value)) {
+      return this.failActive("surface-render");
+    }
+    if (!this.flattenActiveToSettled(exact.value.compositeOpacity)) {
+      return this.failActive("surface-render");
+    }
+    this.settled.push(exact.value);
+    const result: StudioLiveWetInkEndResult = {
+      status: "settled",
+      fieldDigest: exact.value.fieldDigest,
+      revision: exact.value.revision,
+      seed: exact.value.seed,
+      uploadedTiles: exact.value.uploads.length,
+    };
+    this.resetActiveState();
+    this.clearActiveRect();
+    return result;
+  }
+
+  releaseSettledPrefix(count: number): number {
+    const requested = count === Number.POSITIVE_INFINITY
+      ? this.settled.length
+      : Number.isFinite(count)
+        ? Math.max(0, Math.floor(count))
+        : 0;
+    const released = Math.min(requested, this.settled.length);
+    if (released === 0) return 0;
+    this.settled = this.settled.slice(released);
+    this.replay();
+    return released;
+  }
+
+  clearSettled(): number {
+    return this.releaseSettledPrefix(this.settled.length);
+  }
+
+  resetActive(): boolean {
+    if (!this.active) return false;
+    this.resetActiveState();
+    this.clearActiveRect();
+    return true;
+  }
+
+  clear(): void {
+    this.resetActiveState();
+    this.settled = [];
+    this.clearActiveRect();
+    this.clearSettledRect();
+  }
+
+  private depositAndPaint(
+    active: ActiveWetInkStroke,
+    dabs: readonly WatercolorBrushDab[],
+  ): StudioLiveWetInkAppendResult {
+    if (dabs.length === 0) {
+      return {
+        status: "noop",
+        consumedSourcePoints: active.consumedSourcePoints,
+        appendedDabs: 0,
+        uploadedTiles: 0,
+      };
+    }
+    const deposited = depositStudioWetInkDabs(active.field, {
+      dabs,
+      hardness: active.recipe.material.hardness,
+      waterLoad: active.recipe.material.waterLoad,
+      pigmentLoad: active.recipe.material.pigmentLoad,
+      wetnessLoad: active.recipe.material.wetnessLoad,
+      maxDabs: MAX_LIVE_DABS,
+    });
+    if (!deposited.ok) {
+      return this.failActive(
+        deposited.code === "dab-budget-exceeded" ? "dab-budget" : "field-budget",
+      );
+    }
+    if (!deposited.value.dirtyBounds) {
+      return {
+        status: "noop",
+        consumedSourcePoints: active.consumedSourcePoints,
+        appendedDabs: dabs.length,
+        uploadedTiles: 0,
+      };
+    }
+    // Live transport is deliberately local to the newest dirty suffix. Older wet tiles retain
+    // their material until exact pointer-up replay, keeping pointer-frame cost independent of the
+    // already accepted prefix.
+    active.field.activeBounds = deposited.value.dirtyBounds;
+    const simulated = simulateStudioWetInkField(
+      active.field,
+      LIVE_SIMULATION_STEPS_PER_SUFFIX,
+    );
+    if (!simulated.ok) return this.failActive("simulation-budget");
+    const dirty = active.field.dirtyBounds;
+    const uploads = planStudioWetInkTileUploads(active.field, dirty);
+    if (!uploads.ok) return this.failActive("upload-budget");
+    if (!this.drawUploadsToActive(
+      uploads.value,
+      active.fieldOriginCellX / active.recipe.fieldScale,
+      active.fieldOriginCellY / active.recipe.fieldScale,
+      true,
+    )) {
+      return this.failActive("surface-render");
+    }
+    consumeStudioWetInkDirtyBounds(active.field);
+    return {
+      status: "appended",
+      consumedSourcePoints: active.consumedSourcePoints,
+      appendedDabs: dabs.length,
+      uploadedTiles: uploads.value.length,
+    };
+  }
+
+  private prepareUploads(
+    uploads: readonly StudioWetInkTileUpload[],
+  ): PreparedUpload[] | null {
+    const bytes = uploads.reduce(
+      (sum, upload) => sum + upload.width * upload.height * 4,
+      0,
+    );
+    if (bytes > MAX_LIVE_UPLOAD_BYTES) return null;
+    const prepared: PreparedUpload[] = [];
+    try {
+      for (const upload of uploads) {
+        const surface = this.surfaceFactory(upload.width, upload.height);
+        const context = surface?.getContext("2d", { willReadFrequently: false });
+        if (!surface || !context) return null;
+        const imageData = context.createImageData(upload.width, upload.height);
+        imageData.data.set(upload.rgba);
+        context.putImageData(imageData, 0, 0);
+        prepared.push({ upload, surface });
+      }
+      return prepared;
+    } catch {
+      return null;
+    }
+  }
+
+  private drawUploadsToActive(
+    uploads: readonly StudioWetInkTileUpload[],
+    originX: number,
+    originY: number,
+    replaceTiles: boolean,
+  ): boolean {
+    const prepared = this.prepareUploads(uploads);
+    if (!prepared) return false;
+    const context = this.preparedActive();
+    if (!context) return false;
+    try {
+      for (const item of prepared) {
+        const destinationX =
+          originX + item.upload.x / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+        const destinationY =
+          originY + item.upload.y / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+        const destinationWidth =
+          item.upload.width / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+        const destinationHeight =
+          item.upload.height / STUDIO_WET_INK_BRUSH_FIELD_SCALE;
+        if (replaceTiles) {
+          context.clearRect(
+            destinationX,
+            destinationY,
+            destinationWidth,
+            destinationHeight,
+          );
+        }
+        context.drawImage(
+          item.surface,
+          0,
+          0,
+          item.upload.width,
+          item.upload.height,
+          destinationX,
+          destinationY,
+          destinationWidth,
+          destinationHeight,
+        );
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      context.restore();
+    }
+  }
+
+  private drawExactPlanToActive(plan: StudioWetInkBrushReplayPlan): boolean {
+    const prepared = this.prepareUploads(plan.uploads);
+    if (!prepared) return false;
+    const context = this.preparedActive();
+    if (!context) return false;
+    try {
+      // Preparation happens before this mutation, so allocation/upload failures leave the current
+      // live surface intact and the retained fallback can be exposed without a blank flash.
+      context.restore();
+      this.clearActiveRect();
+      this.setActiveCanvasOpacity(plan.compositeOpacity);
+      return this.drawPreparedUploads(plan.uploads, prepared, plan.originX, plan.originY);
+    } catch {
+      try {
+        context.restore();
+      } catch {
+        // Fail closed; caller clears active authority.
+      }
+      return false;
+    }
+  }
+
+  private drawPreparedUploads(
+    uploads: readonly StudioWetInkTileUpload[],
+    prepared: readonly PreparedUpload[],
+    originX: number,
+    originY: number,
+  ): boolean {
+    if (uploads.length !== prepared.length) return false;
+    const context = this.preparedActive();
+    if (!context) return false;
+    try {
+      for (const item of prepared) {
+        context.drawImage(
+          item.surface,
+          0,
+          0,
+          item.upload.width,
+          item.upload.height,
+          originX + item.upload.x / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+          originY + item.upload.y / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+          item.upload.width / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+          item.upload.height / STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+        );
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      context.restore();
+    }
+  }
+
+  private flattenActiveToSettled(opacity: number): boolean {
+    const context = this.settledContext;
+    const canvas = this.activeCanvas;
+    if (!context || !canvas) return false;
+    try {
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.globalCompositeOperation = "source-over";
+      context.globalAlpha = clamp01(opacity);
+      context.drawImage(canvas, 0, 0);
+      context.restore();
+      return true;
+    } catch {
+      try {
+        context.restore();
+      } catch {
+        // Fail closed; caller exposes the retained renderer.
+      }
+      return false;
+    }
+  }
+
+  private replay(): void {
+    this.clearActiveRect();
+    this.clearSettledRect();
+    if (!this.surfaceReady()) return;
+    for (const plan of this.settled) {
+      if (
+        !this.drawExactPlanToActive(plan)
+        || !this.flattenActiveToSettled(plan.compositeOpacity)
+      ) {
+        this.fallbackReason = "surface-render";
+        this.clearActiveRect();
+        this.clearSettledRect();
+        return;
+      }
+      this.clearActiveRect();
+    }
+    const active = this.active;
+    if (!active) return;
+    const uploads = planStudioWetInkTileUploads(
+      active.field,
+      fullFieldBounds(active.field),
+    );
+    if (
+      !uploads.ok
+      || !this.drawUploadsToActive(
+        uploads.value,
+        active.fieldOriginCellX / active.recipe.fieldScale,
+        active.fieldOriginCellY / active.recipe.fieldScale,
+        false,
+      )
+    ) {
+      this.failActive(uploads.ok ? "surface-render" : "upload-budget");
+      return;
+    }
+    this.setActiveCanvasOpacity(active.recipe.compositeOpacity);
+  }
+
+  private failActive(
+    reason: StudioLiveWetInkFallbackReason,
+  ): {
+    readonly status: "fallback";
+    readonly reason: StudioLiveWetInkFallbackReason;
+  } {
+    this.fallbackReason = reason;
+    this.resetActiveState();
+    this.clearActiveRect();
+    return { status: "fallback", reason };
+  }
+
+  private resetActiveState(): void {
+    this.active = null;
+    this.setActiveCanvasOpacity(1);
+  }
+
+  private surfaceReady(): boolean {
+    return this.surfaceUsable
+      && this.surface !== null
+      && this.activeCanvas !== null
+      && this.settledCanvas !== null
+      && this.activeContext !== null
+      && this.settledContext !== null;
+  }
+
+  private preparedActive(): CanvasRenderingContext2D | null {
+    const context = this.activeContext;
+    const surface = this.surface;
+    if (!context || !surface || !this.surfaceUsable) return null;
+    const scale = this.dpr * surface.documentScale;
+    context.save();
+    if (surface.flipX) {
+      context.setTransform(
+        -scale,
+        0,
+        0,
+        scale,
+        (surface.documentWidth * surface.documentScale - surface.left) * this.dpr,
+        -surface.top * this.dpr,
+      );
+    } else {
+      context.setTransform(
+        scale,
+        0,
+        0,
+        scale,
+        -surface.left * this.dpr,
+        -surface.top * this.dpr,
+      );
+    }
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = 1;
+    return context;
+  }
+
+  private applySurface(): void {
+    const activeCanvas = this.activeCanvas;
+    const settledCanvas = this.settledCanvas;
+    const surface = this.surface;
+    this.surfaceUsable = false;
+    this.surfaceFailure = "surface-unavailable";
+    if (!activeCanvas || !settledCanvas || !surface) return;
+    const devicePixelRatio =
+      typeof globalThis.devicePixelRatio === "number"
+      && Number.isFinite(globalThis.devicePixelRatio)
+        ? globalThis.devicePixelRatio
+        : 1;
+    const decision = decideStudioNativeLiveSurfaceResolution({
+      cssWidth: surface.width,
+      cssHeight: surface.height,
+      devicePixelRatio,
+      maximumBackingPixels: STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 2,
+    });
+    if (!decision.ok) {
+      this.surfaceFailure = "surface-budget";
+      return;
+    }
+    if (
+      !Number.isFinite(surface.documentScale)
+      || surface.documentScale <= 0
+      || decision.devicePixelRatio * surface.documentScale
+        > STUDIO_WET_INK_BRUSH_FIELD_SCALE + POINT_EPSILON
+    ) {
+      this.surfaceFailure = "native-scale-unsupported";
+      return;
+    }
+    this.dpr = decision.devicePixelRatio;
+    if (activeCanvas.width !== decision.backingWidth) {
+      activeCanvas.width = decision.backingWidth;
+    }
+    if (activeCanvas.height !== decision.backingHeight) {
+      activeCanvas.height = decision.backingHeight;
+    }
+    if (settledCanvas.width !== decision.backingWidth) {
+      settledCanvas.width = decision.backingWidth;
+    }
+    if (settledCanvas.height !== decision.backingHeight) {
+      settledCanvas.height = decision.backingHeight;
+    }
+    this.surfaceUsable =
+      decision.backingPixels * 2 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
+    this.surfaceFailure = this.surfaceUsable ? "surface-unavailable" : "surface-budget";
+  }
+
+  private setActiveCanvasOpacity(opacity: number): void {
+    if (this.activeCanvas) this.activeCanvas.style.opacity = String(clamp01(opacity));
+  }
+
+  private clearActiveRect(): void {
+    this.clearCanvas(this.activeContext, this.activeCanvas);
+  }
+
+  private clearSettledRect(): void {
+    this.clearCanvas(this.settledContext, this.settledCanvas);
+  }
+
+  private clearCanvas(
+    context: CanvasRenderingContext2D | null,
+    canvas: HTMLCanvasElement | null,
+  ): void {
+    if (!context || !canvas) return;
+    try {
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.restore();
+    } catch {
+      try {
+        context.restore();
+      } catch {
+        // Detached/failed surfaces are already non-authoritative.
+      }
+    }
+  }
+}

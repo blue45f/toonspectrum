@@ -7,8 +7,8 @@
  *
  * 픽셀 규약은 Konva Default(pen/marker)와 WebGPU가 공유하는 causal round-dab 계획을 쓴다.
  * 새 샘플은 과거 픽셀을 다시 쓰지 않고 직전 권위 점에서 현재 점까지 즉시 도달한다. 보통은
- * 기기 DPR을 그대로 쓰고, 16M backing pixel을 넘는 초대형 화면에서만 라이브 표면을 낮춰
- * 입력 프레임을 보호한다. 지우개
+ * 기기 DPR을 그대로 쓴다. 16M backing pixel을 넘는 초대형 화면은 해상도를 몰래 낮추지
+ * 않고 시작을 거부해 정확한 retained 초안으로 넘긴다. 지우개
  * (destination-out)와 라쏘 필(내부 채움 미리보기)은
  * 이 오버레이 대상이 아니다 — 각각 메인 레이어/Konva 초안 경로가 담당한다.
  *
@@ -37,7 +37,8 @@ import {
 } from "./studio-ink-pressure-model";
 import {
   acquireStudioLowLatencyCanvas2dContext,
-  resolveStudioLiveSurfaceDevicePixelRatio,
+  decideStudioNativeLiveSurfaceResolution,
+  type StudioNativeLiveSurfaceResolutionDecision,
 } from "./studio-low-latency-canvas";
 
 import type {
@@ -140,14 +141,16 @@ function liveInkSettledStrokeMatches(
     && liveInkNumberArraysEqual(stroke.ps, ps);
 }
 
-function liveInkDevicePixelRatio(surface: StudioLiveInkSurface): number {
-  return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-    ? resolveStudioLiveSurfaceDevicePixelRatio({
-        cssWidth: surface.width,
-        cssHeight: surface.height,
-        devicePixelRatio: globalThis.devicePixelRatio,
-      })
-    : 1;
+function liveInkSurfaceResolution(
+  surface: StudioLiveInkSurface
+): StudioNativeLiveSurfaceResolutionDecision {
+  return decideStudioNativeLiveSurfaceResolution({
+    cssWidth: surface.width,
+    cssHeight: surface.height,
+    devicePixelRatio: typeof globalThis.devicePixelRatio === "number"
+      ? globalThis.devicePixelRatio
+      : 1,
+  });
 }
 
 export class StudioLiveInkOverlayRenderer {
@@ -155,6 +158,7 @@ export class StudioLiveInkOverlayRenderer {
   private context: CanvasRenderingContext2D | null = null;
   private surface: StudioLiveInkSurface | null = null;
   private dpr = 1;
+  private resolutionDecision: StudioNativeLiveSurfaceResolutionDecision | null = null;
   private style: StudioLiveInkStrokeStyle | null = null;
   /** thinning 을 통과해 유지된 문서 좌표 점들(재생용). */
   private keptX: number[] = [];
@@ -209,9 +213,21 @@ export class StudioLiveInkOverlayRenderer {
     return this.settled.length;
   }
 
+  /** False means the exact retained draft must remain visible for the current surface. */
+  get isNativeSurfaceReady(): boolean {
+    return this.context !== null
+      && this.surface !== null
+      && this.resolutionDecision?.ok === true;
+  }
+
+  get surfaceResolutionDecision(): StudioNativeLiveSurfaceResolutionDecision | null {
+    return this.resolutionDecision;
+  }
+
   begin(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): boolean {
     if (
       !this.context || !this.surface ||
+      !this.isNativeSurfaceReady ||
       !studioLiveInkFastOverlaySupportsStyle(style)
     ) return false;
     const resolvedPressure = resolveStudioInkPressure(pressure, style.pressureModel);
@@ -233,6 +249,7 @@ export class StudioLiveInkOverlayRenderer {
   beginDeferred(style: StudioLiveInkStrokeStyle): boolean {
     if (
       !this.context || !this.surface ||
+      !this.isNativeSurfaceReady ||
       !studioLiveInkFastOverlaySupportsStyle(style)
     ) return false;
     this.style = style;
@@ -585,7 +602,7 @@ export class StudioLiveInkOverlayRenderer {
   private prepared(style: StudioLiveInkStrokeStyle): CanvasRenderingContext2D | null {
     const context = this.context;
     const surface = this.surface;
-    if (!context || !surface) return null;
+    if (!context || !surface || !this.isNativeSurfaceReady) return null;
     const k = this.dpr * surface.documentScale;
     context.save();
     if (surface.flipX) {
@@ -610,12 +627,24 @@ export class StudioLiveInkOverlayRenderer {
   private applySurface(): void {
     const canvas = this.canvas;
     const surface = this.surface;
-    if (!canvas || !surface) return;
-    this.dpr = liveInkDevicePixelRatio(surface);
-    const width = Math.max(1, Math.round(surface.width * this.dpr));
-    const height = Math.max(1, Math.round(surface.height * this.dpr));
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    if (!canvas || !surface) {
+      this.resolutionDecision = null;
+      return;
+    }
+    const decision = liveInkSurfaceResolution(surface);
+    this.resolutionDecision = decision;
+    if (!decision.ok) {
+      this.dpr = 1;
+      // Never leave a reduced-resolution viewport looking authoritative. Resizing also releases
+      // the oversized backing allocation and clears any stale pixels from an earlier surface.
+      if (canvas.width !== 1) canvas.width = 1;
+      if (canvas.height !== 1) canvas.height = 1;
+      this.resetActiveState();
+      return;
+    }
+    this.dpr = decision.devicePixelRatio;
+    if (canvas.width !== decision.backingWidth) canvas.width = decision.backingWidth;
+    if (canvas.height !== decision.backingHeight) canvas.height = decision.backingHeight;
   }
 
   private clearRect(): void {
@@ -653,6 +682,7 @@ export class StudioLiveInkPredictionRenderer {
   private context: CanvasRenderingContext2D | null = null;
   private surface: StudioLiveInkSurface | null = null;
   private dpr = 1;
+  private resolutionDecision: StudioNativeLiveSurfaceResolutionDecision | null = null;
   private style: StudioLiveInkStrokeStyle | null = null;
   private tail: StudioLiveInkPredictionTail | null = null;
   private dirtyRect: StudioLiveInkDirtyRect | null = null;
@@ -681,9 +711,20 @@ export class StudioLiveInkPredictionRenderer {
     this.replay();
   }
 
+  /** Prediction never substitutes a lower-density surface for the authoritative retained draft. */
+  get isNativeSurfaceReady(): boolean {
+    return this.context !== null
+      && this.surface !== null
+      && this.resolutionDecision?.ok === true;
+  }
+
+  get surfaceResolutionDecision(): StudioNativeLiveSurfaceResolutionDecision | null {
+    return this.resolutionDecision;
+  }
+
   /** Applies only the transient-surface half of the pure prediction state transition. */
   apply(update: StudioPredictedInkSurfaceUpdate, style: StudioLiveInkStrokeStyle): void {
-    if (!studioLiveInkFastOverlaySupportsStyle(style)) {
+    if (!this.isNativeSurfaceReady || !studioLiveInkFastOverlaySupportsStyle(style)) {
       this.clear();
       return;
     }
@@ -705,7 +746,7 @@ export class StudioLiveInkPredictionRenderer {
     style: StudioLiveInkStrokeStyle,
     pressures: readonly number[] | undefined
   ): void {
-    if (!studioLiveInkFastOverlaySupportsStyle(style)) {
+    if (!this.isNativeSurfaceReady || !studioLiveInkFastOverlaySupportsStyle(style)) {
       this.clear();
       return;
     }
@@ -763,7 +804,10 @@ export class StudioLiveInkPredictionRenderer {
     const surface = this.surface;
     const style = this.style;
     const tail = this.tail;
-    if (!context || !surface || !style || !tail || tail.samples.length === 0) return;
+    if (
+      !context || !surface || !this.isNativeSurfaceReady ||
+      !style || !tail || tail.samples.length === 0
+    ) return;
 
     const samples: StudioCausalInkSample[] = [
       ...(tail.anchor ? [tail.anchor] : []),
@@ -841,12 +885,24 @@ export class StudioLiveInkPredictionRenderer {
   private applySurface(): void {
     const canvas = this.canvas;
     const surface = this.surface;
-    if (!canvas || !surface) return;
-    this.dpr = liveInkDevicePixelRatio(surface);
-    const width = Math.max(1, Math.round(surface.width * this.dpr));
-    const height = Math.max(1, Math.round(surface.height * this.dpr));
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    if (!canvas || !surface) {
+      this.resolutionDecision = null;
+      return;
+    }
+    const decision = liveInkSurfaceResolution(surface);
+    this.resolutionDecision = decision;
+    if (!decision.ok) {
+      this.dpr = 1;
+      if (canvas.width !== 1) canvas.width = 1;
+      if (canvas.height !== 1) canvas.height = 1;
+      this.style = null;
+      this.tail = null;
+      this.dirtyRect = null;
+      return;
+    }
+    this.dpr = decision.devicePixelRatio;
+    if (canvas.width !== decision.backingWidth) canvas.width = decision.backingWidth;
+    if (canvas.height !== decision.backingHeight) canvas.height = decision.backingHeight;
     this.dirtyRect = null;
   }
 

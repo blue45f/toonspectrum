@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   flattenPsdLayers,
   importPsdFile,
+  inspectPsdHeader,
   mapPsdBlendMode,
   placementForLayer,
+  preflightPsdImport,
   PSD_IMPORT_MAX_DECODED_BYTES,
+  PSD_IMPORT_MAX_DIMENSION_PX,
   PSD_IMPORT_MAX_FILE_BYTES,
   psdImportResultMessage,
   type PsdImportDeps,
@@ -37,6 +40,80 @@ function group(children: Layer[], over: Partial<Layer> = {}): Layer {
 function samplePsd(children: Layer[] = [], overrides: Partial<Psd> = {}): Psd {
   return { width: 720, height: 1080, children, ...overrides };
 }
+
+function psdHeader(overrides: {
+  version?: 1 | 2;
+  channels?: number;
+  width?: number;
+  height?: number;
+  bitsPerChannel?: 1 | 8 | 16 | 32;
+  colorMode?: number;
+} = {}): ArrayBuffer {
+  const buffer = new ArrayBuffer(26);
+  const view = new DataView(buffer);
+  view.setUint32(0, 0x38425053, false);
+  view.setUint16(4, overrides.version ?? 1, false);
+  view.setUint16(12, overrides.channels ?? 4, false);
+  view.setUint32(14, overrides.height ?? 1080, false);
+  view.setUint32(18, overrides.width ?? 720, false);
+  view.setUint16(22, overrides.bitsPerChannel ?? 8, false);
+  view.setUint16(24, overrides.colorMode ?? 3, false);
+  return buffer;
+}
+
+describe("PSD/PSB clean-room header preflight", () => {
+  it("reads the public 8BPS header without invoking the bitmap decoder", () => {
+    expect(inspectPsdHeader(psdHeader())).toEqual({
+      container: "psd",
+      version: 1,
+      width: 720,
+      height: 1080,
+      channels: 4,
+      bitsPerChannel: 8,
+      colorModeCode: 3,
+      colorMode: "RGB",
+    });
+  });
+
+  it("fails PSB, high bit depth, unsupported color space, and unsafe dimensions closed", () => {
+    expect(preflightPsdImport(psdHeader({ version: 2 }), "large.psb")).toMatchObject({
+      canImport: false,
+      header: { container: "psb" },
+      blockingReasons: [expect.stringContaining("PSB")],
+    });
+    expect(preflightPsdImport(psdHeader({ bitsPerChannel: 16 }))).toMatchObject({
+      canImport: false,
+      blockingReasons: [expect.stringContaining("16bit")],
+    });
+    expect(preflightPsdImport(psdHeader({ colorMode: 4 }))).toMatchObject({
+      canImport: false,
+      blockingReasons: [expect.stringContaining("CMYK")],
+    });
+    expect(preflightPsdImport(
+      psdHeader({ width: PSD_IMPORT_MAX_DIMENSION_PX + 1 }),
+    )).toMatchObject({
+      canImport: false,
+      blockingReasons: [expect.stringContaining("안전 한 변")],
+    });
+  });
+
+  it("allows bounded grayscale/indexed input but records the sRGB raster conversion", () => {
+    const preflight = preflightPsdImport(psdHeader({ colorMode: 1 }));
+    expect(preflight.canImport).toBe(true);
+    expect(preflight.lossManifest.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        feature: "color-space",
+        disposition: "rasterized",
+        message: expect.stringContaining("Grayscale"),
+      }),
+    ]));
+    expect(preflight.lossManifest.target).toMatchObject({
+      container: "studio",
+      bitsPerChannel: 8,
+      colorMode: "sRGB",
+    });
+  });
+});
 
 describe("flattenPsdLayers", () => {
   it("빈 문서는 빈 배열을 반환한다", () => {
@@ -211,6 +288,34 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     const result = await importPsdFile(new File([], "t.psd"), 720, depsFor(psd));
     expect(result.elements).toHaveLength(0);
     expect(result.skipped).toEqual(["톤보정: 조정 레이어라 제외됨"]);
+    expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        feature: "adjustment-layer",
+        disposition: "dropped",
+        count: 1,
+      }),
+    ]));
+  });
+
+  it("text/smart object/effects/group losses are aggregated without parsing skipped strings", async () => {
+    const psd = samplePsd([
+      group([
+        leaf({
+          name: "복합 레이어",
+          text: {} as Layer["text"],
+          placedLayer: {} as Layer["placedLayer"],
+          effects: {} as Layer["effects"],
+        }),
+      ], { name: "폴더" }),
+    ]);
+    const result = await importPsdFile(new File([], "t.psd"), 720, depsFor(psd));
+    const byFeature = new Map(
+      result.lossManifest?.decisions.map((decision) => [decision.feature, decision]),
+    );
+    expect(byFeature.get("groups")).toMatchObject({ disposition: "dropped", count: 1 });
+    expect(byFeature.get("text")).toMatchObject({ disposition: "rasterized", count: 1 });
+    expect(byFeature.get("smart-object")).toMatchObject({ disposition: "rasterized", count: 1 });
+    expect(byFeature.get("layer-effects")).toMatchObject({ disposition: "dropped", count: 1 });
   });
 
   it("불투명도<1·블렌드 모드·(그룹 유래) 숨김을 El 필드로 반영한다", async () => {
@@ -474,6 +579,17 @@ describe("importPsdFile (readPsd/downscaleDataUrl 을 deps 로 주입 — DOM/�
     await expect(importPsdFile(new File([], "t.psd"), 720, badDeps)).rejects.toThrow(
       "PSD 파일을 해석하지 못했어요"
     );
+  });
+
+  it("does not let a .psb file bypass the explicit unsupported-container boundary", async () => {
+    let parsed = false;
+    await expect(importPsdFile(new File([], "large.psb"), 720, {
+      readPsdImpl: () => {
+        parsed = true;
+        return samplePsd([]);
+      },
+    })).rejects.toThrow("PSB(대용량 문서)");
+    expect(parsed).toBe(false);
   });
 
   it("ag-psd를 bounded bitmap decode와 불필요한 payload 생략 옵션으로 호출한다", async () => {

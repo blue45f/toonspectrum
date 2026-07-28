@@ -80,6 +80,71 @@ export interface PsdImportResult {
   scale: number;
   /** 재현 불가/제외 항목 고지 — studio-psd-export.ts 의 skipped 와 동일한 정직성 규약. */
   skipped: string[];
+  /** PSD 전용 구조화 손실 명세. skipped의 사람용 상세와 달리 기능별 보존 수준을 집계한다. */
+  lossManifest?: PsdInterchangeLossManifest;
+}
+
+export type PsdInterchangeContainer = "psd" | "psb" | "studio";
+export type PsdInterchangeDisposition = "preserved" | "rasterized" | "dropped" | "blocked";
+export type PsdInterchangeFeature =
+  | "adjustment-layer"
+  | "bit-depth"
+  | "blend-mode"
+  | "color-space"
+  | "groups"
+  | "layer-effects"
+  | "layer-mask"
+  | "layers"
+  | "resolution"
+  | "smart-object"
+  | "text";
+
+export interface PsdInterchangeProfile {
+  readonly container: PsdInterchangeContainer;
+  readonly width: number;
+  readonly height: number;
+  readonly channels: number;
+  readonly bitsPerChannel: number;
+  readonly colorMode: string;
+}
+
+export interface PsdInterchangeLossDecision {
+  readonly feature: PsdInterchangeFeature;
+  readonly disposition: PsdInterchangeDisposition;
+  readonly count: number;
+  readonly message: string;
+  readonly alternative?: string;
+}
+
+/**
+ * PSD/PSB 교환에서 기능별로 무엇을 보존하고, 픽셀로 굽고, 제외하거나 차단했는지 나타낸다.
+ * `skipped: string[]`은 개별 레이어 이름을 포함한 상세 로그로 유지하고, 이 명세는 UI/보고서가
+ * 문자열을 다시 파싱하지 않아도 되는 집계 계약이다.
+ */
+export interface PsdInterchangeLossManifest {
+  readonly direction: "import" | "export";
+  readonly source: PsdInterchangeProfile;
+  readonly target: PsdInterchangeProfile;
+  readonly decisions: readonly PsdInterchangeLossDecision[];
+  readonly budgets: {
+    readonly maxFileBytes: number;
+    readonly maxDecodedBytes: number;
+    readonly maxDimensionPx: number;
+  };
+  readonly alternatives: readonly string[];
+}
+
+export interface PsdHeaderInfo extends PsdInterchangeProfile {
+  readonly container: "psd" | "psb";
+  readonly version: 1 | 2;
+  readonly colorModeCode: number;
+}
+
+export interface PsdImportPreflight {
+  readonly canImport: boolean;
+  readonly header: PsdHeaderInfo;
+  readonly lossManifest: PsdInterchangeLossManifest;
+  readonly blockingReasons: readonly string[];
 }
 
 // ── 테스트 주입 지점 — studio-brand-kit.ts 류 DI 패턴 ────────────────────────
@@ -95,6 +160,11 @@ export interface PsdImportDeps {
   rasterizeMaskImpl?: (
     input: PsdLayerMaskRasterInput,
   ) => PsdLayerMaskRasterResult | Promise<PsdLayerMaskRasterResult>;
+  /**
+   * 테스트/검증용 헤더 검사 주입점. readPsdImpl만 주입한 기존 DOM-free 픽스처는 헤더가 없는
+   * 가상 파일이므로 검사를 생략한다. 실제 런타임 경로는 항상 inspectPsdHeader를 사용한다.
+   */
+  inspectHeaderImpl?: (buffer: ArrayBuffer, fileName: string) => PsdImportPreflight;
 }
 
 // ── 평탄화 ──────────────────────────────────────────────────────────────────
@@ -319,6 +389,204 @@ const IMPORTED_LAYER_MAX_DIM = 1280;
  * independently bounded before editable proxies are admitted to the project. */
 export const PSD_IMPORT_MAX_FILE_BYTES = 128 * 1024 * 1024;
 export const PSD_IMPORT_MAX_DECODED_BYTES = 128 * 1024 * 1024;
+export const PSD_IMPORT_MAX_DIMENSION_PX = 30_000;
+
+const PSD_HEADER_BYTES = 26;
+const PSD_SIGNATURE = 0x38425053; // ASCII "8BPS"
+const PSD_IMPORT_ALTERNATIVES = Object.freeze([
+  "Photoshop·Photopea에서 복사본을 8-bit RGB PSD(한 변 30,000px 이하)로 저장",
+  "레이어 구조가 중요하면 OpenRaster(.ora), 합성 결과만 필요하면 PNG로 변환",
+] as const);
+
+const PSD_COLOR_MODE_LABELS: Readonly<Record<number, string>> = Object.freeze({
+  0: "Bitmap",
+  1: "Grayscale",
+  2: "Indexed",
+  3: "RGB",
+  4: "CMYK",
+  7: "Multichannel",
+  8: "Duotone",
+  9: "Lab",
+});
+
+function psdColorModeLabel(code: number): string {
+  return PSD_COLOR_MODE_LABELS[code] ?? `Unknown(${code})`;
+}
+
+function psdProfile(
+  container: PsdInterchangeContainer,
+  width: number,
+  height: number,
+  channels: number,
+  bitsPerChannel: number,
+  colorMode: string,
+): PsdInterchangeProfile {
+  return { container, width, height, channels, bitsPerChannel, colorMode };
+}
+
+function psdDecision(
+  feature: PsdInterchangeFeature,
+  disposition: PsdInterchangeDisposition,
+  count: number,
+  message: string,
+  alternative?: string,
+): PsdInterchangeLossDecision {
+  return alternative
+    ? { feature, disposition, count, message, alternative }
+    : { feature, disposition, count, message };
+}
+
+/**
+ * ag-psd에 전체 파일을 넘기기 전에 공개 PSD/PSB 헤더 26바이트만 독립적으로 읽는다.
+ * 대형/고비트/미지원 색 공간 파일을 디코더가 메모리를 할당하기 전에 판별하기 위한 경계다.
+ */
+export function inspectPsdHeader(buffer: ArrayBuffer): PsdHeaderInfo {
+  if (buffer.byteLength < PSD_HEADER_BYTES) {
+    throw new Error("PSD 헤더가 26바이트보다 짧아 손상된 파일로 판단했어요.");
+  }
+  const view = new DataView(buffer, 0, PSD_HEADER_BYTES);
+  if (view.getUint32(0, false) !== PSD_SIGNATURE) {
+    throw new Error("PSD/PSB 서명(8BPS)을 찾지 못했어요.");
+  }
+  const version = view.getUint16(4, false);
+  if (version !== 1 && version !== 2) {
+    throw new Error(`지원하지 않는 Photoshop 문서 버전 ${version}이에요.`);
+  }
+  for (let offset = 6; offset < 12; offset += 1) {
+    if (view.getUint8(offset) !== 0) {
+      throw new Error("PSD 예약 헤더 영역이 올바르지 않아 안전하게 열지 않았어요.");
+    }
+  }
+  const channels = view.getUint16(12, false);
+  const height = view.getUint32(14, false);
+  const width = view.getUint32(18, false);
+  const bitsPerChannel = view.getUint16(22, false);
+  const colorModeCode = view.getUint16(24, false);
+  if (channels < 1 || channels > 56) {
+    throw new Error(`PSD 채널 수 ${channels}개는 사양 범위(1~56)를 벗어났어요.`);
+  }
+  if (width < 1 || height < 1) {
+    throw new Error("PSD 캔버스 크기가 비어 있어 안전하게 열 수 없어요.");
+  }
+  if (![1, 8, 16, 32].includes(bitsPerChannel)) {
+    throw new Error(`PSD 채널 비트 깊이 ${bitsPerChannel}bit는 사양 범위를 벗어났어요.`);
+  }
+  return {
+    container: version === 2 ? "psb" : "psd",
+    version,
+    width,
+    height,
+    channels,
+    bitsPerChannel,
+    colorModeCode,
+    colorMode: psdColorModeLabel(colorModeCode),
+  };
+}
+
+/**
+ * 실제 디코딩 전 fail-closed 사전검사. ag-psd 자체는 PSB 쓰기/읽기 코드가 존재하지만 Studio의
+ * 대형 문서 메모리·왕복 테스트 계약은 아직 PSD에만 있으므로 PSB를 지원한다고 간주하지 않는다.
+ */
+export function preflightPsdImport(
+  buffer: ArrayBuffer,
+  fileName = "",
+): PsdImportPreflight {
+  const header = inspectPsdHeader(buffer);
+  const decisions: PsdInterchangeLossDecision[] = [];
+  const blockingReasons: string[] = [];
+  const extensionClaimsPsb = /\.psb$/iu.test(fileName.trim());
+  if (header.container === "psb" || extensionClaimsPsb) {
+    blockingReasons.push(
+      "PSB(대용량 문서)는 메모리·레이어 왕복 검증이 끝나지 않아 현재 안전하게 열지 않습니다.",
+    );
+    decisions.push(psdDecision(
+      "layers",
+      "blocked",
+      1,
+      "PSB의 64-bit 길이 필드와 대형 레이어 구조는 현재 Studio PSD 경계에서 지원하지 않습니다.",
+      PSD_IMPORT_ALTERNATIVES[0],
+    ));
+  }
+  if (header.width > PSD_IMPORT_MAX_DIMENSION_PX || header.height > PSD_IMPORT_MAX_DIMENSION_PX) {
+    blockingReasons.push(
+      `PSD 캔버스 ${header.width.toLocaleString("ko-KR")}×${header.height.toLocaleString("ko-KR")}px가 안전 한 변 ${PSD_IMPORT_MAX_DIMENSION_PX.toLocaleString("ko-KR")}px를 넘습니다.`,
+    );
+    decisions.push(psdDecision(
+      "resolution",
+      "blocked",
+      1,
+      "캔버스를 나누거나 축소하기 전에는 디코딩하지 않습니다.",
+      PSD_IMPORT_ALTERNATIVES[0],
+    ));
+  }
+
+  const supportedBitDepth =
+    header.bitsPerChannel === 8
+    || (header.colorModeCode === 0 && header.bitsPerChannel === 1);
+  if (!supportedBitDepth) {
+    blockingReasons.push(
+      `${header.bitsPerChannel}bit PSD는 8-bit Studio 캔버스에서 원본 비트 깊이를 보존할 수 없어 열지 않습니다.`,
+    );
+    decisions.push(psdDecision(
+      "bit-depth",
+      "blocked",
+      1,
+      `${header.bitsPerChannel}bit/channel 데이터를 8-bit로 조용히 절삭하지 않습니다.`,
+      PSD_IMPORT_ALTERNATIVES[0],
+    ));
+  } else {
+    decisions.push(psdDecision(
+      "bit-depth",
+      header.bitsPerChannel === 8 ? "preserved" : "rasterized",
+      1,
+      header.bitsPerChannel === 8
+        ? "8-bit/channel 픽셀 깊이를 유지합니다."
+        : "1-bit Bitmap을 8-bit Studio 래스터로 확장합니다.",
+    ));
+  }
+
+  const supportedColorMode = [0, 1, 2, 3].includes(header.colorModeCode);
+  if (!supportedColorMode) {
+    blockingReasons.push(
+      `${header.colorMode} PSD는 현재 브라우저 디코더에서 신뢰성 있게 변환할 수 없어 열지 않습니다.`,
+    );
+    decisions.push(psdDecision(
+      "color-space",
+      "blocked",
+      1,
+      `${header.colorMode} 채널을 RGB로 조용히 변환하지 않습니다.`,
+      PSD_IMPORT_ALTERNATIVES[0],
+    ));
+  } else {
+    decisions.push(psdDecision(
+      "color-space",
+      "rasterized",
+      1,
+      header.colorModeCode === 3
+        ? "RGB 픽셀은 가져오지만 내장 ICC 프로필은 Studio sRGB 캔버스에 포함되지 않습니다."
+        : `${header.colorMode} 픽셀을 Studio sRGB 래스터로 변환합니다.`,
+      "색상 관리가 중요한 원본은 PSD와 함께 보관하세요.",
+    ));
+  }
+
+  return {
+    canImport: blockingReasons.length === 0,
+    header,
+    blockingReasons,
+    lossManifest: {
+      direction: "import",
+      source: header,
+      target: psdProfile("studio", header.width, header.height, 4, 8, "sRGB"),
+      decisions,
+      budgets: {
+        maxFileBytes: PSD_IMPORT_MAX_FILE_BYTES,
+        maxDecodedBytes: PSD_IMPORT_MAX_DECODED_BYTES,
+        maxDimensionPx: PSD_IMPORT_MAX_DIMENSION_PX,
+      },
+      alternatives: PSD_IMPORT_ALTERNATIVES,
+    },
+  };
+}
 
 const PSD_READ_OPTIONS: ReadOptions = Object.freeze({
   skipCompositeImageData: true,
@@ -326,6 +594,159 @@ const PSD_READ_OPTIONS: ReadOptions = Object.freeze({
   skipLinkedFilesData: true,
   totalMemoryLimit: PSD_IMPORT_MAX_DECODED_BYTES,
 });
+
+interface PsdImportLossMetrics {
+  maskPreserved: number;
+  maskRasterized: number;
+  maskDropped: number;
+  proxyRasterized: number;
+  unsupportedBlendModes: number;
+}
+
+function countPsdGroups(layers: readonly Layer[]): number {
+  let count = 0;
+  for (const layer of layers) {
+    if (!isGroupLayer(layer)) continue;
+    count += 1 + countPsdGroups(layer.children);
+  }
+  return count;
+}
+
+function psdImportLossManifest(
+  preflight: PsdImportPreflight | null,
+  psd: Psd,
+  flattened: readonly FlattenedPsdLayer[],
+  importedLayerCount: number,
+  metrics: PsdImportLossMetrics,
+): PsdInterchangeLossManifest {
+  const width = Math.max(1, Math.round(psd.width || 0));
+  const height = Math.max(1, Math.round(psd.height || 0));
+  const fallbackSource = psdProfile("psd", width, height, 4, 8, "RGB");
+  const base = preflight?.lossManifest;
+  const decisions = [...(base?.decisions ?? [
+    psdDecision(
+      "bit-depth",
+      "preserved",
+      1,
+      "테스트 주입 경로의 PSD를 8-bit/channel로 처리합니다.",
+    ),
+    psdDecision(
+      "color-space",
+      "rasterized",
+      1,
+      "테스트 주입 경로의 PSD를 Studio sRGB 캔버스로 처리합니다.",
+    ),
+  ])];
+  if (importedLayerCount > 0) {
+    decisions.push(psdDecision(
+      "layers",
+      "preserved",
+      importedLayerCount,
+      `래스터 레이어 ${importedLayerCount.toLocaleString("ko-KR")}개를 개별 Studio 레이어로 유지합니다.`,
+    ));
+  }
+  const groupCount = countPsdGroups(psd.children ?? []);
+  if (groupCount > 0) {
+    decisions.push(psdDecision(
+      "groups",
+      "dropped",
+      groupCount,
+      `그룹 ${groupCount.toLocaleString("ko-KR")}개의 폴더 구조는 평탄화하고 자식 레이어 순서만 유지합니다.`,
+      "그룹 편집 구조가 중요하면 원본 PSD를 함께 보관하세요.",
+    ));
+  }
+  const usable = flattened.filter((entry) => entry.skipReason === undefined);
+  const textCount = usable.filter((entry) => !!entry.layer.text).length;
+  if (textCount > 0) {
+    decisions.push(psdDecision(
+      "text",
+      "rasterized",
+      textCount,
+      `텍스트 레이어 ${textCount.toLocaleString("ko-KR")}개는 글자 편집 정보 대신 화면 픽셀로 가져옵니다.`,
+    ));
+  }
+  const smartObjectCount = usable.filter((entry) => !!entry.layer.placedLayer).length;
+  if (smartObjectCount > 0) {
+    decisions.push(psdDecision(
+      "smart-object",
+      "rasterized",
+      smartObjectCount,
+      `스마트 오브젝트 ${smartObjectCount.toLocaleString("ko-KR")}개는 연결 원본 대신 미리보기 픽셀로 가져옵니다.`,
+      "연결/포함 원본은 원본 PSD에서 별도로 보관하세요.",
+    ));
+  }
+  const adjustmentCount = flattened.filter((entry) => entry.skipReason === "adjustment").length;
+  if (adjustmentCount > 0) {
+    decisions.push(psdDecision(
+      "adjustment-layer",
+      "dropped",
+      adjustmentCount,
+      `조정 레이어 ${adjustmentCount.toLocaleString("ko-KR")}개는 비파괴 파라미터와 합성 결과를 가져오지 않습니다.`,
+    ));
+  }
+  const effectsCount = usable.filter((entry) => !!entry.layer.effects).length;
+  if (effectsCount > 0) {
+    decisions.push(psdDecision(
+      "layer-effects",
+      "dropped",
+      effectsCount,
+      `레이어 스타일 ${effectsCount.toLocaleString("ko-KR")}개는 편집 파라미터와 효과 합성을 가져오지 않습니다.`,
+    ));
+  }
+  if (metrics.maskPreserved > 0) {
+    decisions.push(psdDecision(
+      "layer-mask",
+      "preserved",
+      metrics.maskPreserved,
+      `래스터 마스크 ${metrics.maskPreserved.toLocaleString("ko-KR")}개를 편집 가능한 무손실 PNG 마스크로 유지합니다.`,
+    ));
+  }
+  if (metrics.maskRasterized > 0) {
+    decisions.push(psdDecision(
+      "layer-mask",
+      "rasterized",
+      metrics.maskRasterized,
+      `벡터·이중 마스크 ${metrics.maskRasterized.toLocaleString("ko-KR")}개를 단일 래스터 마스크로 합성합니다.`,
+    ));
+  }
+  if (metrics.maskDropped > 0) {
+    decisions.push(psdDecision(
+      "layer-mask",
+      "dropped",
+      metrics.maskDropped,
+      `픽셀 채널이 없거나 변환에 실패한 마스크 ${metrics.maskDropped.toLocaleString("ko-KR")}개는 적용하지 않습니다.`,
+    ));
+  }
+  if (metrics.proxyRasterized > 0) {
+    decisions.push(psdDecision(
+      "resolution",
+      "rasterized",
+      metrics.proxyRasterized,
+      `대형 레이어 ${metrics.proxyRasterized.toLocaleString("ko-KR")}개를 장변 ${IMPORTED_LAYER_MAX_DIM.toLocaleString("ko-KR")}px 표시 프록시로 변환합니다.`,
+      "원본 픽셀 편집이 필요하면 원본 PSD를 함께 보관하세요.",
+    ));
+  }
+  if (metrics.unsupportedBlendModes > 0) {
+    decisions.push(psdDecision(
+      "blend-mode",
+      "dropped",
+      metrics.unsupportedBlendModes,
+      `Canvas에 대응하지 않는 블렌드 모드 ${metrics.unsupportedBlendModes.toLocaleString("ko-KR")}개를 일반 합성으로 바꿉니다.`,
+    ));
+  }
+  return {
+    direction: "import",
+    source: base?.source ?? fallbackSource,
+    target: psdProfile("studio", width, height, 4, 8, "sRGB"),
+    decisions,
+    budgets: base?.budgets ?? {
+      maxFileBytes: PSD_IMPORT_MAX_FILE_BYTES,
+      maxDecodedBytes: PSD_IMPORT_MAX_DECODED_BYTES,
+      maxDimensionPx: PSD_IMPORT_MAX_DIMENSION_PX,
+    },
+    alternatives: base?.alternatives ?? PSD_IMPORT_ALTERNATIVES,
+  };
+}
 
 // ── 메인 진입점 ──────────────────────────────────────────────────────────────
 
@@ -344,6 +765,11 @@ export async function importPsdFile(
   const downscaleImpl = deps.downscaleImpl ?? downscaleDataUrl;
   const rasterizeMaskImpl = deps.rasterizeMaskImpl ?? rasterizePsdLayerMasks;
 
+  if (/\.psb$/iu.test(file.name?.trim() ?? "")) {
+    throw new Error(
+      `PSB(대용량 문서)는 현재 안전하게 열지 않습니다. ${PSD_IMPORT_ALTERNATIVES.join(" 또는 ")}해 주세요.`,
+    );
+  }
   if (
     typeof file.size === "number"
     && (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > PSD_IMPORT_MAX_FILE_BYTES)
@@ -361,6 +787,27 @@ export async function importPsdFile(
     throw new Error(`PSD 파일은 최대 ${PSD_IMPORT_MAX_FILE_BYTES / 1024 / 1024}MB까지 가져올 수 있어요.`);
   }
 
+  let preflight: PsdImportPreflight | null = null;
+  // readPsdImpl만 주입한 기존 테스트 픽스처에는 실제 26-byte 헤더가 없다. 프로덕션은 주입이
+  // 없으므로 반드시 헤더 사전검사를 통과해야 디코더로 진입한다.
+  const inspectHeaderImpl =
+    deps.inspectHeaderImpl ?? (deps.readPsdImpl ? null : preflightPsdImport);
+  if (inspectHeaderImpl) {
+    try {
+      preflight = inspectHeaderImpl(buffer, file.name);
+    } catch (err) {
+      throw new Error(
+        `PSD 파일을 해석하지 못했어요: ${err instanceof Error ? err.message : String(err)}`,
+        { cause: err },
+      );
+    }
+    if (!preflight.canImport) {
+      throw new Error(
+        `${preflight.blockingReasons.join(" ")} ${preflight.lossManifest.alternatives.join(" 또는 ")}해 주세요.`,
+      );
+    }
+  }
+
   let psd: Psd;
   try {
     psd = readPsdImpl(buffer, PSD_READ_OPTIONS);
@@ -370,11 +817,26 @@ export async function importPsdFile(
 
   const sourceWidth = Math.max(1, Math.round(psd.width || 0));
   const sourceHeight = Math.max(1, Math.round(psd.height || 0));
+  if (
+    preflight
+    && (preflight.header.width !== sourceWidth || preflight.header.height !== sourceHeight)
+  ) {
+    throw new Error(
+      `PSD 헤더(${preflight.header.width}×${preflight.header.height}px)와 디코딩 결과(${sourceWidth}×${sourceHeight}px)가 달라 안전하게 열지 않았어요.`,
+    );
+  }
   const scale = uniformScale(sourceWidth, targetWidth);
 
   const flattened = flattenPsdLayers(psd);
   const skipped: string[] = [];
   const elements: PsdImportedElement[] = [];
+  const lossMetrics: PsdImportLossMetrics = {
+    maskPreserved: 0,
+    maskRasterized: 0,
+    maskDropped: 0,
+    proxyRasterized: 0,
+    unsupportedBlendModes: 0,
+  };
 
   for (const entry of flattened) {
     if (entry.skipReason === "adjustment") {
@@ -425,6 +887,12 @@ export async function importPsdFile(
     const sourcePixelWidth = canvas.width || entry.width;
     const sourcePixelHeight = canvas.height || entry.height;
     const sourceStayedOriginal = src === rawDataUrl;
+    if (
+      !sourceStayedOriginal
+      && (sourcePixelWidth > IMPORTED_LAYER_MAX_DIM || sourcePixelHeight > IMPORTED_LAYER_MAX_DIM)
+    ) {
+      lossMetrics.proxyRasterized += 1;
+    }
     if (sourceStayedOriginal && sourcePixelWidth > IMPORTED_LAYER_MAX_DIM && !proxyFallbackWarning) {
       proxyFallbackWarning = "이미지 프록시 변환에 실패해 원본 PNG를 유지했어요.";
     }
@@ -449,9 +917,25 @@ export async function importPsdFile(
     if (entry.opacity < 1) el.opacity = entry.opacity;
     const blendMode = mapPsdBlendMode(entry.layer.blendMode);
     if (blendMode !== "source-over") el.blendMode = blendMode;
+    if (
+      entry.layer.blendMode
+      && entry.layer.blendMode !== "normal"
+      && blendMode === "source-over"
+    ) {
+      lossMetrics.unsupportedBlendModes += 1;
+      skipped.push(`${entry.name}: ${entry.layer.blendMode} 블렌드 모드는 일반 합성으로 가져왔어요.`);
+    }
     if (entry.hidden) el.hidden = true;
 
     const maskSelection = layerMaskSources(entry.layer);
+    const hasRasterizedVectorOrDualMask =
+      !!entry.layer.mask?.fromVectorData
+      || !!entry.layer.realMask?.fromVectorData
+      || (!!entry.layer.mask && !!entry.layer.realMask);
+    const hasDroppedVectorPath =
+      !!entry.layer.vectorMask
+      && !entry.layer.mask?.fromVectorData
+      && !entry.layer.realMask?.fromVectorData;
     for (const warning of maskEditabilityWarnings(entry.layer)) {
       skipped.push(`${entry.name}: ${warning}`);
     }
@@ -478,10 +962,16 @@ export async function importPsdFile(
       if (maskResult.maskSrc) {
         el.maskSrc = maskResult.maskSrc;
         if (maskResult.disabled) el.maskEnabled = false;
+        if (hasRasterizedVectorOrDualMask) lossMetrics.maskRasterized += 1;
+        else lossMetrics.maskPreserved += 1;
+        if (hasDroppedVectorPath) lossMetrics.maskDropped += 1;
+      } else {
+        lossMetrics.maskDropped += 1;
       }
       for (const warning of maskResult.warnings) skipped.push(`${entry.name}: ${warning}`);
     } else if (entry.layer.vectorMask) {
       // vector-only masks have no decoded pixel channel for the bounded Canvas bridge.
+      lossMetrics.maskDropped += 1;
       skipped.push(`${entry.name}: 벡터 전용 마스크는 래스터 픽셀이 없어 원본 레이어를 가리지 않고 가져왔어요.`);
     }
     elements.push(el);
@@ -503,5 +993,18 @@ export async function importPsdFile(
     skipped.push("PSD에서 가져올 레이어를 찾지 못했어요.");
   }
 
-  return { elements, sourceWidth, sourceHeight, scale, skipped };
+  return {
+    elements,
+    sourceWidth,
+    sourceHeight,
+    scale,
+    skipped,
+    lossManifest: psdImportLossManifest(
+      preflight,
+      psd,
+      flattened,
+      elements.length,
+      lossMetrics,
+    ),
+  };
 }

@@ -104,6 +104,32 @@ describe("StudioMainMenu tooltips", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
+  it("moves across top-level menus with ArrowLeft and ArrowRight, including open menus", () => {
+    renderMenu();
+    const file = screen.getByRole("button", { name: "파일" });
+    const edit = screen.getByRole("button", { name: "편집" });
+    const filter = screen.getByRole("button", { name: "필터" });
+
+    fireEvent.focus(file);
+    fireEvent.keyDown(file, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(edit);
+    fireEvent.keyDown(edit, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(file);
+    fireEvent.keyDown(file, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(filter);
+
+    fireEvent.click(file);
+    const save = screen.getByRole("menuitem", { name: "임시저장" });
+    expect(document.activeElement).toBe(save);
+    fireEvent.keyDown(save, { key: "ArrowRight" });
+
+    expect(screen.queryByRole("menu", { name: "파일" })).toBeNull();
+    expect(screen.getByRole("menu", { name: "편집" })).not.toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("menuitem", { name: "실행취소" })
+    );
+  });
+
   it("exposes exclusive color-vision choices as radio menuitems with exact coaches", () => {
     render(
       <StudioToolHintPreferencesProvider

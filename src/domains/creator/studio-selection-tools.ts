@@ -1033,6 +1033,22 @@ export function commitSelectionDrag(sel: PixelSelection | null, drag: SelectionD
   return next === sel ? null : next;
 }
 
+/**
+ * Finalizes a drag from the release sample itself.
+ *
+ * Browsers may coalesce a short press-drag-release into pointerdown + pointerup without delivering
+ * pointermove. Replaying the release point through the same reducer prevents rect/ellipse from
+ * remaining a zero-area polygon and also preserves the last lasso/brush segment.
+ */
+export function commitSelectionDragAtPoint(
+  sel: PixelSelection | null,
+  drag: SelectionDragState,
+  releasePoint: SelPoint,
+  modifiers?: SelectionDragModifiers,
+): PixelSelection | null {
+  return commitSelectionDrag(sel, updateSelectionDrag(drag, releasePoint, modifiers));
+}
+
 // ---------------------------------------------------------------------------
 // (5) 좌표 변환 — 캔버스 포인터 ↔ 정규화 (요소 회전 포함)
 // ---------------------------------------------------------------------------

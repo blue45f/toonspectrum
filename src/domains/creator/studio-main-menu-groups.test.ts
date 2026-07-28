@@ -419,6 +419,46 @@ describe("buildStudioMainMenuGroups", () => {
     });
   });
 
+  it("gives every disabled command an actionable unavailable reason", () => {
+    const { groups } = buildMenu({
+      sharedNonOwnerSave: true,
+      saving: true,
+      collaborationDocumentLocked: true,
+      projectArchiveBusy: true,
+      interchangeImportBusy: true,
+      psdImportBusy: true,
+      edit: Object.fromEntries(
+        Object.keys(AVAILABLE_EDIT_ACTIONS).map((key) => [key, true]),
+      ) as unknown as StudioMainMenuEditAvailability,
+      filterDisabled: true,
+      filterUnavailableReason: "현재 문서 검사가 끝난 뒤 필터를 적용하세요.",
+      viewTransformSuppressed: true,
+      quickAccessPaletteLoading: true,
+    });
+    const disabledItems = groups.flatMap((group) =>
+      group.items
+        .filter((item) => item.disabled)
+        .map((item) => ({ groupId: group.id, item }))
+    );
+
+    expect(disabledItems.length).toBeGreaterThan(20);
+    for (const { groupId, item } of disabledItems) {
+      expect(
+        item.unavailableReason?.trim(),
+        `${groupId}/${item.id} should explain why it is unavailable`,
+      ).toBeTruthy();
+    }
+    expect(menuItem(groups, "file", "publish").unavailableReason).toContain(
+      "협업 잠금"
+    );
+    expect(menuItem(groups, "edit", "invert-selection").unavailableReason).toContain(
+      "픽셀 선택"
+    );
+    expect(menuItem(groups, "view", "restore-view").unavailableReason).toContain(
+      "보기 변환"
+    );
+  });
+
   it("routes file, edit, insert, and drawing commands to their injected owners", () => {
     const { editor, groups, ui } = buildMenu();
 

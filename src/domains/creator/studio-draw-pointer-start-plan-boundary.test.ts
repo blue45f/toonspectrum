@@ -62,8 +62,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       expect(planner.source).not.toContain(pageOwnedAction);
     }
     // 의도적 변경(2026-07-27): CSP pressure min size + brush-family input cadence remain pure
-    // capture-time policy. The planner stays below 270 lines without taking renderer ownership.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(270);
+    // capture-time policy. The bounded-flow-v2 paint-model snapshot adds a small, explicit
+    // capture contract, while renderer ownership still remains outside this pure planner.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(290);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {
@@ -97,7 +98,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-24): CSP 교점까지 지우기 원샷 분기(지우개+토글) 추가(940 → 945).
     // 의도적 변경(2026-07-24): auto-color 캔버스 시드 찍기 분기 추가(945 → 1_000).
     // 의도적 변경(2026-07-24): CSP 스트로크/도형 객체 스냅 — stroke origin reauthor after plan (1_000 → 1_050).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_050);
+    // 의도적 변경(2026-07-27): 벡터-only 문서의 첫 픽셀 선택 제스처를 합성 준비 동안
+    // journal/replay하고 도구 전환 시 안전하게 취소하는 경계 추가(1_050 → 1_120).
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_120);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

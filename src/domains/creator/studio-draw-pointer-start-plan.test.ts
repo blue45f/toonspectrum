@@ -13,7 +13,10 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
-import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
+import {
+  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+} from "./studio-stroke-paint-model";
 
 function input(
   overrides: Partial<StudioDrawPointerStartInput> = {}
@@ -60,7 +63,7 @@ describe("planStudioDrawPointerStart", () => {
       usesFixedRateClock: false,
       quantizeImmediately: true,
     });
-    expect(plan.strokeOrigin).toEqual({ x: 12.03125, y: 34.03125 });
+    expect(plan.strokeOrigin).toEqual({ x: 12.03125, y: 34.046875 });
     expect(plan.pressure).toBe(1);
     expect(plan.stylus).toEqual({
       pointerType: "mouse",
@@ -74,7 +77,7 @@ describe("planStudioDrawPointerStart", () => {
       type: "draw",
       kind: "freehand",
       mode: "pen",
-      points: [12.03125, 34.03125],
+      points: [12.03125, 34.046875],
       pressures: [1],
       stroke: "#123456",
       strokeWidth: 8,
@@ -280,13 +283,37 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.causalInputPlan.mode).toBe("legacy");
     expect(plan.capturePointerDynamics).toBe(true);
     expect(plan.element.sampleSpacing).toBe(0.5);
-    expect(plan.element.paintModel).toBeUndefined();
+    expect(plan.element.paintModel).toBe(STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2);
     expect(plan.element.brushDynamics?.version).toBe(1);
     expect(plan.element.tiltXs).toEqual([20]);
     expect(plan.element.tiltYs).toEqual([10]);
     expect(plan.element.twists).toEqual([90]);
     expect(plan.element.speeds).toEqual([0]);
     expect(plan.element.tangentialPressures).toEqual([1]);
+  });
+
+  it("opts bounded dynamics symmetry into v2 only while its variation count is supported", () => {
+    const supported = planStudioDrawPointerStart(input({
+      brush: "airbrush",
+      symmetry: {
+        type: "kaleidoscope",
+        centerX: 100,
+        centerY: 200,
+        radialCount: 32,
+      },
+    }));
+    const unsupported = planStudioDrawPointerStart(input({
+      brush: "airbrush",
+      symmetry: {
+        type: "kaleidoscope",
+        centerX: 100,
+        centerY: 200,
+        radialCount: 33,
+      },
+    }));
+
+    expect(supported.element.paintModel).toBe(STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2);
+    expect(unsupported.element.paintModel).toBeUndefined();
   });
 
   it("captures a denser versioned source route for pressure outlines than broad material brushes", () => {

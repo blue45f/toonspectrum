@@ -52,6 +52,7 @@ function localizeText(
 
 type MenuCoords = { top: number; left: number; minWidth: number };
 type MenuOpenFocusIntent = "first" | "preserve";
+type MenuGroupNavigationDirection = "next" | "previous";
 export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
 
 type StudioMainMenuHintMeta = Omit<StudioToolHintSpec, "title" | "description" | "tip"> & {
@@ -202,6 +203,7 @@ function MenuDropdown({
   open,
   onOpen,
   onClose,
+  onNavigateGroup,
   barActive,
   t,
 }: {
@@ -209,6 +211,10 @@ function MenuDropdown({
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
+  onNavigateGroup: (
+    direction: MenuGroupNavigationDirection,
+    openNextMenu: boolean,
+  ) => void;
   barActive: boolean;
   t: (key: string) => string;
 }): ReactElement {
@@ -318,6 +324,12 @@ function MenuDropdown({
   }, [open]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      event.stopPropagation();
+      onNavigateGroup(event.key === "ArrowRight" ? "next" : "previous", true);
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -496,6 +508,15 @@ function MenuDropdown({
               closeMenu();
               return;
             }
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              event.stopPropagation();
+              onNavigateGroup(
+                event.key === "ArrowRight" ? "next" : "previous",
+                barActive,
+              );
+              return;
+            }
             if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
             event.preventDefault();
             event.stopPropagation();
@@ -539,16 +560,38 @@ function MenuDropdown({
 export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
   const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
+  const menuBarRef = useRef<HTMLElement>(null);
   const barActive = openId !== null;
+
+  const navigateGroup = (
+    currentIndex: number,
+    direction: MenuGroupNavigationDirection,
+    openNextMenu: boolean,
+  ) => {
+    if (groups.length === 0) return;
+    const offset = direction === "next" ? 1 : -1;
+    const nextIndex = (currentIndex + offset + groups.length) % groups.length;
+    const nextGroup = groups[nextIndex];
+    if (!nextGroup) return;
+    if (openNextMenu) {
+      setOpenId(nextGroup.id);
+      return;
+    }
+    const triggers = menuBarRef.current?.querySelectorAll<HTMLButtonElement>(
+      "[data-studio-main-menu-trigger]"
+    );
+    triggers?.[nextIndex]?.focus({ preventScroll: true });
+  };
 
   return (
     <nav
+      ref={menuBarRef}
       aria-label={localizeText(t, "Main menu", "studio.mainMenu.aria")}
       data-studio-main-menu="true"
       data-studio-shortcut-boundary="true"
       className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
     >
-      {groups.map((group) => (
+      {groups.map((group, groupIndex) => (
         <MenuDropdown
           key={group.id}
           group={group}
@@ -556,6 +599,9 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
           barActive={barActive}
           onOpen={() => setOpenId(group.id)}
           onClose={() => setOpenId((id) => (id === group.id ? null : id))}
+          onNavigateGroup={(direction, openNextMenu) =>
+            navigateGroup(groupIndex, direction, openNextMenu)
+          }
           t={t}
         />
       ))}

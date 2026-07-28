@@ -390,6 +390,46 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain(`>${label}<`);
   });
 
+  it.each([
+    ["pen", "브러시 크기", "브러시 불투명도", true],
+    ["pixel", null, "픽셀 불투명도", false],
+    ["eraser", "지우개 크기", "지우개 불투명도", true],
+    ["shape", "도형 선 굵기", "도형 불투명도", false],
+  ] as const)(
+    "keeps %s properties contextual and hides irrelevant advanced brush settings",
+    (drawMode, sizeLabel, opacityLabel, advancedAvailable) => {
+      render(
+        <StudioDrawOptionsBar
+          drawMode={drawMode}
+          brushId="pen"
+          strokeWidth={6}
+          brushOpacity={0.8}
+          stabilizer={4}
+          color="#112233"
+          quickShapeActive={false}
+          shapeKind="rect"
+          onShapeKindChange={vi.fn()}
+          onSelectBrush={vi.fn()}
+          onStrokeWidthChange={vi.fn()}
+          onOpacityChange={vi.fn()}
+          onStabilizerChange={vi.fn()}
+          onColorChange={vi.fn()}
+          onToggleQuickShape={vi.fn()}
+        />
+      );
+
+      if (sizeLabel) {
+        expect(screen.getByRole("slider", { name: sizeLabel })).toBeTruthy();
+      } else {
+        expect(screen.queryByRole("slider", { name: /크기|굵기/ })).toBeNull();
+      }
+      expect(screen.getByRole("slider", { name: opacityLabel })).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "빠른 세부 옵션 펼치기" }) !== null
+      ).toBe(advancedAvailable);
+    }
+  );
+
   it("uses the StudioPage-owned catalog session instead of mounting a second sheet", () => {
     expect(drawOptionsSource).toContain("brushCatalogOpen?: boolean");
     expect(drawOptionsSource).toContain("onToggleBrushCatalog?: (trigger: HTMLButtonElement) => void");

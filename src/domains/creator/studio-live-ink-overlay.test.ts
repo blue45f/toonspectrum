@@ -112,6 +112,66 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("does not authorize native geometry when a 2D context is unavailable", () => {
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => null,
+    } as unknown as HTMLCanvasElement;
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(canvas);
+    renderer.setSurface(SURFACE);
+
+    expect(renderer.surfaceResolutionDecision?.ok).toBe(true);
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+    expect(renderer.begin(STYLE, 0, 0, 0.5)).toBe(false);
+  });
+
+  it("uses exact native DPR for ordinary surfaces and fails closed for 4K DPR2", () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface({
+      ...SURFACE,
+      width: 1_920,
+      height: 1_080,
+      documentWidth: 1_920,
+    });
+
+    expect(renderer.isNativeSurfaceReady).toBe(true);
+    expect(renderer.surfaceResolutionDecision).toMatchObject({
+      ok: true,
+      mode: "native",
+      devicePixelRatio: 2,
+    });
+    expect(recording.canvas.width).toBe(3_840);
+    expect(recording.canvas.height).toBe(2_160);
+    expect(renderer.begin(STYLE, 0, 0, 0.5)).toBe(true);
+    renderer.resetActive();
+    const nativeDabCount = recording.dabs.length;
+
+    renderer.setSurface({
+      ...SURFACE,
+      width: 3_840,
+      height: 2_160,
+      documentWidth: 3_840,
+    });
+
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+    expect(renderer.surfaceResolutionDecision).toEqual({
+      ok: false,
+      mode: "retained-exact-fallback",
+      reason: "native-backing-pixel-budget-exceeded",
+    });
+    expect(recording.canvas.width).toBe(1);
+    expect(recording.canvas.height).toBe(1);
+    expect(renderer.begin(STYLE, 0, 0, 0.5)).toBe(false);
+    expect(renderer.beginDeferred(STYLE)).toBe(false);
+    expect(renderer.isActive).toBe(false);
+    expect(recording.dabs).toHaveLength(nativeDabCount);
+  });
+
   it("fails closed for layered-flow without painting or mutating a settled stable prefix", () => {
     const recording = recordingCanvas();
     const renderer = new StudioLiveInkOverlayRenderer();
@@ -535,6 +595,43 @@ describe("StudioLiveInkOverlayRenderer", () => {
 });
 
 describe("StudioLiveInkPredictionRenderer", () => {
+  it("does not authorize prediction when a 2D context is unavailable", () => {
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => null,
+    } as unknown as HTMLCanvasElement;
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(canvas);
+    renderer.setSurface(SURFACE);
+
+    expect(renderer.surfaceResolutionDecision?.ok).toBe(true);
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+  });
+
+  it("does not paint a lower-resolution prediction when native 4K DPR2 exceeds the budget", () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface({
+      ...SURFACE,
+      width: 3_840,
+      height: 2_160,
+      documentWidth: 3_840,
+    });
+
+    expect(renderer.isNativeSurfaceReady).toBe(false);
+    expect(recording.canvas.width).toBe(1);
+    expect(recording.canvas.height).toBe(1);
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 0, y: 0, pressure: 0.5 },
+      samples: [{ x: 20, y: 20, pressure: 0.75 }],
+    }, STYLE);
+    expect(recording.dabs).toEqual([]);
+  });
+
   it("clears and rejects layered-flow prediction tails instead of darkening canonical ink", () => {
     const recording = recordingCanvas();
     const renderer = new StudioLiveInkPredictionRenderer();

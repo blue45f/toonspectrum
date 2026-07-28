@@ -65,6 +65,16 @@ describe("Studio vector line-art advanced fill entry boundary", () => {
     expect(run).toContain("virtualTarget: vectorTarget");
   });
 
+  it("includes the same visible vector reference when filling an existing raster target", () => {
+    const run = nestedFunction("runAdvancedFillAt");
+
+    expect(run).toContain("renderStudioAdvancedFillVectorReference(vectorInput");
+    expect(run).toContain("composeStudioFillReferenceImageWithPageReferences(");
+    expect(run).toContain("pageWidth: vectorInput.width");
+    expect(run).toContain("pageHeight: vectorInput.height");
+    expect(run).toContain("fillReference: true");
+  });
+
   it("keeps preview paint-only and applies exactly one image layer in one history commit", () => {
     const apply = nestedFunction("applyAdvancedFillPreview");
     const cancel = nestedFunction("cancelAdvancedFillPreview");

@@ -255,7 +255,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setMannequinPoserOpen,
   setPoserVrmOpen,
   setBg3dOpen,
-  setStrokeWidth,
   setTool,
   setViewTool,
   dodgeBurnActive,
@@ -303,6 +302,17 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const rotateViewToolHintProps = rotateViewToolOpen
     ? { hintPreview: "view-hud" as const, hintPreviewVariant: "rotate-close" as const }
     : { hintPreview: "view-hud" as const, hintPreviewVariant: "rotate-open" as const };
+  const selectionSubtoolActive =
+    advancedFillActive
+    || cropActive
+    || eyedropperActive
+    || commentPinArmed
+    || pixelTool !== null
+    || smudgeActive
+    || wetMixActive
+    || dodgeBurnActive
+    || liquifyActive;
+  const drawToolTemporarilyOverridden = eyedropperActive || commentPinArmed;
   const railMoreDialogRef = useRef<HTMLDivElement>(null);
   const [railMorePosition, setRailMorePosition] = useState<PositionedStudioRailMore>({
     left: 56,
@@ -519,7 +529,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={MousePointer2}
               label="선택 (V)"
               description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
-              active={tool === "select" && !advancedFillActive && !eyedropperActive}
+              active={tool === "select" && !selectionSubtoolActive}
               onClick={() => {
                 disarmAllPixelTools();
                 setTool("select");
@@ -617,7 +627,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={Pencil}
               label="펜 (B)"
               description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
-              active={tool === "draw" && drawMode === "pen"}
+              active={tool === "draw" && drawMode === "pen" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               grouped
@@ -635,14 +645,13 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={Grid3X3}
               label="픽셀 펜 (P)"
               description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
-              active={tool === "draw" && drawMode === "pixel"}
+              active={tool === "draw" && drawMode === "pixel" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("pixel");
-                setStrokeWidth(1);
                 setEyedropperActive(false);
                 setMenu(null);
               }}
@@ -653,7 +662,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={Eraser}
               label="지우개 (E)"
               description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
-              active={tool === "draw" && drawMode === "eraser"}
+              active={tool === "draw" && drawMode === "eraser" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
@@ -671,9 +680,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="혼합 (스머지) (N)"
               description="이미지 픽셀을 문질러 색을 섞습니다."
               active={smudgeActive}
-              disabled={!pixelToolTargetAvailable}
+              disabled={!smudgeActive && !pixelToolTargetAvailable}
               unavailableReason={
-                selected?.type !== "image"
+                smudgeActive
+                  ? undefined
+                  : selected?.type !== "image"
                   ? "색을 섞을 이미지 레이어를 먼저 고르세요."
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
@@ -688,9 +699,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="혼색 브러시 (Shift+N)"
               description="바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
               active={wetMixActive}
-              disabled={!pixelToolTargetAvailable}
+              disabled={!wetMixActive && !pixelToolTargetAvailable}
               unavailableReason={
-                selected?.type !== "image"
+                wetMixActive
+                  ? undefined
+                  : selected?.type !== "image"
                   ? "칠할 이미지 레이어를 먼저 고르세요."
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
@@ -705,9 +718,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="닷지/번 (O)"
               description="어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
               active={dodgeBurnActive}
-              disabled={!pixelToolTargetAvailable}
+              disabled={!dodgeBurnActive && !pixelToolTargetAvailable}
               unavailableReason={
-                selected?.type !== "image"
+                dodgeBurnActive
+                  ? undefined
+                  : selected?.type !== "image"
                   ? "보정할 이미지 레이어를 먼저 고르세요."
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
@@ -722,9 +737,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="리퀴파이 (J)"
               description="이미지 위를 밀어 국소 왜곡합니다."
               active={liquifyActive}
-              disabled={!pixelToolTargetAvailable}
+              disabled={!liquifyActive && !pixelToolTargetAvailable}
               unavailableReason={
-                selected?.type !== "image"
+                liquifyActive
+                  ? undefined
+                  : selected?.type !== "image"
                   ? "왜곡할 이미지 레이어를 먼저 고르세요."
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON

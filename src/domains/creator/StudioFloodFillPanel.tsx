@@ -35,6 +35,7 @@ export interface StudioFloodFillPanelProps {
   referenceLayerCount: number;
   visibleRasterCount: number;
   selectedIsReference: boolean;
+  canToggleSelectedReference?: boolean;
   targetUnsupportedReason?: string | null;
   statusMessage?: string | null;
   diagnostics?: AdvancedFillDiagnostics | null;
@@ -134,6 +135,7 @@ export function StudioFloodFillPanel({
   referenceLayerCount,
   visibleRasterCount,
   selectedIsReference,
+  canToggleSelectedReference = true,
   targetUnsupportedReason = null,
   statusMessage = null,
   diagnostics = null,
@@ -552,29 +554,31 @@ export function StudioFloodFillPanel({
           </fieldset>
         </details>
 
-        <button
-          type="button"
-          aria-pressed={selectedIsReference}
-          aria-describedby={targetUnsupportedReason ? unsupportedId : undefined}
-          onClick={onToggleSelectedReference}
-          disabled={referenceToggleDisabled}
-          className={cx(
-            "inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
-            selectedIsReference
-              ? "border-cool/40 bg-cool/10 text-cool hover:bg-cool/15"
-              : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            controlFocusClass
-          )}
-        >
-          <Target size={15} className="shrink-0" aria-hidden="true" />
-          <span className="min-w-0 truncate">
-            {selectedIsReference ? "선택 레이어 참조 해제" : "선택 레이어를 참조로 설정"}
-          </span>
-          <span className="shrink-0 font-mono text-[0.65rem] tabular-nums opacity-75">
-            {safeReferenceLayerCount}
-          </span>
-        </button>
+        {canToggleSelectedReference ? (
+          <button
+            type="button"
+            aria-pressed={selectedIsReference}
+            aria-describedby={targetUnsupportedReason ? unsupportedId : undefined}
+            onClick={onToggleSelectedReference}
+            disabled={referenceToggleDisabled}
+            className={cx(
+              "inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
+              selectedIsReference
+                ? "border-cool/40 bg-cool/10 text-cool hover:bg-cool/15"
+                : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg",
+              "disabled:cursor-not-allowed disabled:opacity-50",
+              controlFocusClass
+            )}
+          >
+            <Target size={15} className="shrink-0" aria-hidden="true" />
+            <span className="min-w-0 truncate">
+              {selectedIsReference ? "선택 레이어 참조 해제" : "선택 레이어를 참조로 설정"}
+            </span>
+            <span className="shrink-0 font-mono text-[0.65rem] tabular-nums opacity-75">
+              {safeReferenceLayerCount}
+            </span>
+          </button>
+        ) : null}
 
         <p className="flex min-w-0 items-start gap-2 border-y border-line/60 py-2.5 text-[0.67rem] leading-relaxed text-fg-3">
           <Info size={14} className="mt-0.5 shrink-0 text-cool" aria-hidden="true" />

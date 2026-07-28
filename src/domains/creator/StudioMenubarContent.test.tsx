@@ -408,6 +408,19 @@ describe("StudioMenubarContent", () => {
     expect(actions?.className).not.toContain("gap-0.5");
   });
 
+  it("keeps the horizontal-menu continuation cue through compact laptop widths", () => {
+    const { container } = render(
+      <StudioMenubarContent {...createProps()} />
+    );
+
+    const cue = container.querySelector(
+      '[data-studio-menubar-overflow-cue="true"]'
+    );
+    expect(cue).not.toBeNull();
+    expect(cue?.className).toContain("xl:hidden");
+    expect(cue?.className).not.toContain("lg:hidden");
+  });
+
   it("preloads the asset surface before delegating the desktop insert shortcut", () => {
     const setMenu = vi.fn();
     render(<StudioMenubarContent {...createProps({ setMenu })} />);

@@ -36,6 +36,20 @@ export type StudioFillReferenceLayer = {
   fillReference?: boolean;
 };
 
+/**
+ * A rasterized page-space boundary source, such as the exact PNG produced from visible DrawEl
+ * line art. Unlike an authored ImageEl it always occupies the page coordinate system.
+ */
+export type StudioFillPageReference = {
+  id: string;
+  name: string;
+  src: string;
+  pageWidth: number;
+  pageHeight: number;
+  opacity?: number;
+  fillReference?: boolean;
+};
+
 export type StudioFillNaturalSize = { width: number; height: number };
 
 /** Canvas2D-compatible affine matrix: x' = a*x + c*y + e, y' = b*x + d*y + f. */
@@ -246,6 +260,47 @@ export function collectOverlappingStudioFillReferenceLayers(
   );
 }
 
+/**
+ * Adds transient page-space references without mutating the authored raster-layer array.
+ *
+ * The resulting layers can pass through the existing affine/overlap/composition pipeline, which
+ * keeps vector reference PNGs aligned to a scaled, rotated, flipped, or high-DPR raster target.
+ */
+export function withStudioFillPageReferenceLayers(
+  layers: readonly StudioFillReferenceLayer[],
+  pageReferences: readonly StudioFillPageReference[],
+): StudioFillReferenceLayer[] {
+  const ids = new Set(layers.map((layer) => layer.id));
+  const result = [...layers];
+  for (const reference of pageReferences) {
+    if (!reference.id.trim() || ids.has(reference.id)) {
+      throw new Error("채우기 페이지 참조 id가 없거나 다른 레이어와 겹칩니다.");
+    }
+    if (
+      !Number.isFinite(reference.pageWidth)
+      || !Number.isFinite(reference.pageHeight)
+      || reference.pageWidth <= 0
+      || reference.pageHeight <= 0
+    ) {
+      throw new RangeError("채우기 페이지 참조 크기가 올바르지 않습니다.");
+    }
+    ids.add(reference.id);
+    result.push({
+      id: reference.id,
+      name: reference.name,
+      src: reference.src,
+      x: 0,
+      y: 0,
+      width: reference.pageWidth,
+      height: reference.pageHeight,
+      rotation: 0,
+      opacity: reference.opacity,
+      fillReference: reference.fillReference,
+    });
+  }
+  return result;
+}
+
 function defaultCanvasFactory(width: number, height: number): StudioFillReferenceCanvas | null {
   if (typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
@@ -416,4 +471,27 @@ export async function composeStudioFillReferenceImage(
     output.width = 0;
     output.height = 0;
   }
+}
+
+/**
+ * Raster + page-space vector boundary composition.
+ *
+ * Page references are transient and never materialized in the document. They are appended above
+ * raster references so anti-aliased ink remains an authoritative boundary at the final composite.
+ */
+export async function composeStudioFillReferenceImageWithPageReferences(
+  layers: readonly StudioFillReferenceLayer[],
+  targetId: string,
+  scope: Exclude<StudioFillReferenceScope, "current">,
+  pageReferences: readonly StudioFillPageReference[],
+  canvasFactory: StudioFillReferenceCanvasFactory = defaultCanvasFactory,
+  abort?: AbortSignal,
+): Promise<{ dataUrl: string; layerCount: number }> {
+  return composeStudioFillReferenceImage(
+    withStudioFillPageReferenceLayers(layers, pageReferences),
+    targetId,
+    scope,
+    canvasFactory,
+    abort,
+  );
 }

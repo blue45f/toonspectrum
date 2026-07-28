@@ -258,6 +258,21 @@ import {
   StudioBg3dLtRenderWorkerError,
 } from "./studio-bg3d-lt-render-worker-client";
 import {
+  STUDIO_BG3D_MEASUREMENT_MAX_REFERENCES,
+  classifyStudioBg3dMeasurementInference,
+  createStudioBg3dMeasurementDocument,
+  formatStudioBg3dMeasurementLength,
+  lockStudioBg3dMeasurementLength,
+  measureStudioBg3dWorldPoints,
+  resolveStudioBg3dMeasurementGuide,
+  type StudioBg3dMeasurementDocument,
+  type StudioBg3dMeasurementInferenceReference,
+  type StudioBg3dMeasurementInferenceSuccess,
+  type StudioBg3dMeasurementVec3,
+  type StudioBg3dWorldMeasurement,
+} from "./studio-bg3d-measurement";
+import { readStudioBg3dMeasurementPointFromThreeEvent } from "./studio-bg3d-measurement-three-adapter";
+import {
   combineStudioBg3dAbortSignals,
   StudioBg3dStaleModalOperationError,
   studioBg3dGlobalAssetLoadGate,
@@ -470,6 +485,8 @@ import {
 } from "./studio-generic-3d-workflow-metadata";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";
+import { StudioBg3dMeasurementPanel } from "./StudioBg3dMeasurementPanel";
+import { StudioBg3dMeasurementViewport } from "./StudioBg3dMeasurementViewport";
 import {
   StudioBg3dPhysicsPanel,
   StudioBg3dPhysicsTransport,
@@ -1952,6 +1969,7 @@ interface BgPrimitiveMeshProps {
   selected: boolean;
   onSelect: (id: string, isMulti: boolean) => void;
   onSurfacePick: (id: string, event: ThreeEvent<MouseEvent>) => boolean;
+  onSurfacePreview?: (event: ThreeEvent<PointerEvent>) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   children?: React.ReactNode;
 }
@@ -1961,7 +1979,7 @@ interface BgPrimitiveMeshProps {
    바꾸는 게 핵심: 깊이쓰기가 계속 켜져 있어 (1) 가려진 도형의 엣지가 앞 도형에 정확히 가려지는
    hidden-line-removal이 유지되고 (2) three.js/R3F가 invisible 오브젝트는 레이캐스트에서 제외하므로
    라인아트 미리보기 중에도 클릭 선택이 계속 동작한다. */
-function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, selected, onSelect, onSurfacePick, registerRef, children }: BgPrimitiveMeshProps) {
+function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, selected, onSelect, onSurfacePick, onSurfacePreview, registerRef, children }: BgPrimitiveMeshProps) {
   const { geometry, edges } = geometryPool.get(prim.kind);
   const groupRef = useRef<THREE.Group>(null);
   useLayoutEffect(() => {
@@ -1986,6 +2004,7 @@ function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, selected, onS
         if (onSurfacePick(prim.id, e)) return;
         onSelect(prim.id, e.shiftKey || e.metaKey || e.ctrlKey);
       }}
+      onPointerMove={onSurfacePreview}
     >
       <mesh geometry={geometry} castShadow receiveShadow>
         {lineArt ? (
@@ -2014,6 +2033,7 @@ interface BgCustomModelMeshProps {
   lodBias: number;
   onSelect: (id: string, isMulti: boolean) => void;
   onSurfacePick: (id: string, event: ThreeEvent<MouseEvent>) => boolean;
+  onSurfacePreview?: (event: ThreeEvent<PointerEvent>) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   registerAnimationTime: (id: string, reader: (() => number) | null) => void;
   registerRigBake: (id: string, reader: StudioBg3dRigBakeReader | null) => void;
@@ -2038,7 +2058,7 @@ function studioBg3dMatricesDiffer(
   );
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, lodBias, onSelect, onSurfacePick, registerRef, registerAnimationTime, registerRigBake, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
+function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, lodBias, onSelect, onSurfacePick, onSurfacePreview, registerRef, registerAnimationTime, registerRigBake, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
   // Geometry/textures stay cache-owned, while each render instance owns cloned materials so its
   // adjustments cannot leak into sibling placements or the verified source cache.
   const [editableClone, setEditableClone] = useState<StudioBg3dEditableThreeClone | null>(null);
@@ -2342,6 +2362,7 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
         if (onSurfacePick(instance.id, e)) return;
         onSelect(instance.id, e.shiftKey || e.metaKey || e.ctrlKey);
       }}
+      onPointerMove={onSurfacePreview}
     >
       {editableClone ? <primitive object={editableClone.root} /> : null}
       {children}
@@ -2355,6 +2376,7 @@ function BgCustomModelInstanceBatch({
   instances,
   onSelect,
   onSurfacePick,
+  onSurfacePreview,
   onCloneStatus,
   onUnavailable,
 }: {
@@ -2363,6 +2385,7 @@ function BgCustomModelInstanceBatch({
   instances: readonly BgCustomModelInstance[];
   onSelect: (id: string, isMulti: boolean) => void;
   onSurfacePick: (id: string, event: ThreeEvent<MouseEvent>) => boolean;
+  onSurfacePreview?: (event: ThreeEvent<PointerEvent>) => void;
   onCloneStatus: (
     ids: readonly string[],
     status: "pending" | "ready" | "failed",
@@ -2411,6 +2434,7 @@ function BgCustomModelInstanceBatch({
         if (onSurfacePick(id, event)) return;
         onSelect(id, event.shiftKey || event.metaKey || event.ctrlKey);
       }}
+      onPointerMove={onSurfacePreview}
     />
   );
 }
@@ -2510,6 +2534,22 @@ export function StudioBackground3D({
     DEFAULT_STUDIO_BG3D_SECTION_PLANE_STATE,
   );
   const [scaleGuideVisible, setScaleGuideVisible] = useState(false);
+  // Persistent guides and transient two-point capture intentionally remain outside scene geometry.
+  const [measurementDocument, setMeasurementDocument] =
+    useState<StudioBg3dMeasurementDocument>(() => createStudioBg3dMeasurementDocument("cm"));
+  const [measurementActive, setMeasurementActive] = useState(false);
+  const [measurementStartWorld, setMeasurementStartWorld] =
+    useState<StudioBg3dMeasurementVec3 | null>(null);
+  const [measurementDraft, setMeasurementDraft] =
+    useState<StudioBg3dWorldMeasurement | null>(null);
+  const [measurementInference, setMeasurementInference] =
+    useState<StudioBg3dMeasurementInferenceSuccess | null>(null);
+  const [measurementLockedLengthMeters, setMeasurementLockedLengthMeters] =
+    useState<number | null>(null);
+  const [measurementStatus, setMeasurementStatus] = useState(
+    "줄자를 켠 뒤 첫 번째 점을 선택하세요.",
+  );
+  const measurementActiveRef = useRef(false);
   // CSP-style move/rotate step snap + 레이어 목록 검색.
   const [snapSettings, setSnapSettings] = useState<StudioBg3dSnapSettings>(() => ({
     ...DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
@@ -2584,6 +2624,11 @@ export function StudioBackground3D({
     if (!open) {
       primitiveGeometryPool.dispose();
       setAdaptiveDprScale(1);
+      measurementActiveRef.current = false;
+      setMeasurementActive(false);
+      setMeasurementStartWorld(null);
+      setMeasurementDraft(null);
+      setMeasurementInference(null);
       const idlePlacement = createStudioBg3dPlacementSession();
       placementSessionRef.current = idlePlacement;
       setPlacementSession(idlePlacement);
@@ -6682,9 +6727,14 @@ export function StudioBackground3D({
         return;
       }
       const lower = e.key.toLowerCase();
-      if (lower === "t") setTransformMode("translate");
-      else if (lower === "r") setTransformMode("rotate");
-      else if (lower === "s") setTransformMode("scale");
+      if (lower === "t" || lower === "r" || lower === "s") {
+        if (measurementActiveRef.current) {
+          cancelMeasurement("변형 도구로 전환해 줄자 측정을 취소했습니다.");
+        }
+        if (lower === "t") setTransformMode("translate");
+        else if (lower === "r") setTransformMode("rotate");
+        else setTransformMode("scale");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -6728,6 +6778,10 @@ export function StudioBackground3D({
   };
 
   function requestModalDismiss() {
+    if (measurementActiveRef.current) {
+      cancelMeasurement("줄자 측정을 취소했습니다.");
+      return;
+    }
     if (surfaceSnapArmedRef.current) {
       cancelSurfaceSnap("표면 붙이기를 취소했습니다.");
       return;
@@ -6753,6 +6807,7 @@ export function StudioBackground3D({
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) {
       resetPhysicsPreview();
     }
+    if (measurementActiveRef.current) cancelMeasurement();
     cancelSurfaceSnap();
     invalidateModalAssetSession();
     onClose();
@@ -7593,6 +7648,17 @@ export function StudioBackground3D({
                       })
                       ? "선택한 객체의 지오메트리를 준비하는 중입니다."
                       : null;
+  const measurementDisabledReason = isQuadView
+    ? "줄자는 단일 뷰에서만 사용할 수 있습니다."
+    : isCapturing || isBatchRenderingShots
+      ? "3D 장면을 캡처하는 중에는 줄자를 사용할 수 없습니다."
+      : isRestoringScene || isUploadingModel || applyingTemplateId !== null ||
+          deletingModelId !== null || isSavingTemplate
+        ? "3D 장면 또는 모델 작업이 끝난 뒤 줄자를 사용해 주세요."
+        : physicsInteractionLocked || isTransforming ||
+            (placementSession.phase === "preview" && placementPreviewAsset !== null)
+          ? "배치·물리·변형 작업이 끝난 뒤 줄자를 사용해 주세요."
+          : null;
   const focusSelectionDisabledReason = isCapturing || isBatchRenderingShots || isRestoringScene ||
       physicsInteractionLocked
     ? "다른 3D 작업이 끝난 뒤 화면 맞춤을 사용해 주세요."
@@ -7608,10 +7674,150 @@ export function StudioBackground3D({
             ? "선택한 객체의 지오메트리를 준비하는 중입니다."
             : null;
 
+  function cancelMeasurement(message = "줄자를 켠 뒤 첫 번째 점을 선택하세요."): void {
+    measurementActiveRef.current = false;
+    setMeasurementActive(false);
+    setMeasurementStartWorld(null);
+    setMeasurementDraft(null);
+    setMeasurementInference(null);
+    setMeasurementStatus(message);
+  }
+
+  function measurementInferenceReferences(): StudioBg3dMeasurementInferenceReference[] {
+    const references: StudioBg3dMeasurementInferenceReference[] = [];
+    for (const guide of measurementDocument.guides) {
+      if (references.length >= STUDIO_BG3D_MEASUREMENT_MAX_REFERENCES) break;
+      const resolved = resolveStudioBg3dMeasurementGuide(guide, measurementDocument.unit);
+      const direction = resolved.ok
+        ? resolved.resolved.measurement.directionWorld
+        : null;
+      if (!direction) continue;
+      references.push({ id: guide.id, directionWorld: direction });
+    }
+    return references;
+  }
+
+  function resolveMeasurementCandidate(
+    point: StudioBg3dMeasurementVec3,
+    lockedLengthMeters = measurementLockedLengthMeters,
+  ): {
+    readonly measurement: StudioBg3dWorldMeasurement;
+    readonly inference: StudioBg3dMeasurementInferenceSuccess | null;
+  } | null {
+    if (!measurementStartWorld) return null;
+    const measured = lockedLengthMeters === null
+      ? measureStudioBg3dWorldPoints(measurementStartWorld, point)
+      : lockStudioBg3dMeasurementLength({
+          startWorld: measurementStartWorld,
+          proposedEndWorld: point,
+          lockedLengthMeters,
+          fallbackDirectionWorld: measurementDraft?.directionWorld ?? [1, 0, 0],
+        });
+    if (!measured.ok) {
+      setMeasurementStatus(measured.message);
+      return null;
+    }
+    const measurement = measured.measurement;
+    const inferred = classifyStudioBg3dMeasurementInference({
+      startWorld: measurement.startWorld,
+      endWorld: measurement.endWorld,
+      references: measurementInferenceReferences(),
+    });
+    return {
+      measurement,
+      inference: inferred.ok ? inferred : null,
+    };
+  }
+
+  function updateMeasurementPreview(point: StudioBg3dMeasurementVec3): void {
+    if (!measurementActiveRef.current || !measurementStartWorld) return;
+    const candidate = resolveMeasurementCandidate(point);
+    if (!candidate) return;
+    setMeasurementDraft(candidate.measurement);
+    setMeasurementInference(candidate.inference);
+    const label = formatStudioBg3dMeasurementLength(
+      candidate.measurement.distanceMeters,
+      measurementDocument.unit,
+    );
+    setMeasurementStatus(
+      `${label ?? "측정 중"} · 두 번째 점을 클릭해 확정하세요.`,
+    );
+  }
+
+  function pickMeasurementPoint(point: StudioBg3dMeasurementVec3): void {
+    if (!measurementActiveRef.current) return;
+    if (!measurementStartWorld) {
+      setMeasurementStartWorld(point);
+      setMeasurementDraft(null);
+      setMeasurementInference(null);
+      setMeasurementStatus("시작점을 잡았습니다. 두 번째 점을 움직여 거리와 방향을 확인하세요.");
+      return;
+    }
+    const candidate = resolveMeasurementCandidate(point);
+    if (!candidate) return;
+    measurementActiveRef.current = false;
+    setMeasurementActive(false);
+    setMeasurementDraft(candidate.measurement);
+    setMeasurementInference(candidate.inference);
+    const label = formatStudioBg3dMeasurementLength(
+      candidate.measurement.distanceMeters,
+      measurementDocument.unit,
+    );
+    setMeasurementStatus(
+      `${label ?? "측정"} 확정 · 길이를 잠그거나 영구 가이드로 고정할 수 있습니다.`,
+    );
+  }
+
+  function handleMeasurementSurfacePreview(event: ThreeEvent<PointerEvent>): void {
+    if (!measurementActiveRef.current || !measurementStartWorld) return;
+    const point = readStudioBg3dMeasurementPointFromThreeEvent(event);
+    if (point) updateMeasurementPreview(point);
+  }
+
+  function handleMeasurementLengthLockChange(lockedLengthMeters: number | null): void {
+    setMeasurementLockedLengthMeters(lockedLengthMeters);
+    if (lockedLengthMeters === null || !measurementStartWorld || !measurementDraft) return;
+    const candidate = resolveMeasurementCandidate(
+      measurementDraft.endWorld,
+      lockedLengthMeters,
+    );
+    if (!candidate) return;
+    setMeasurementDraft(candidate.measurement);
+    setMeasurementInference(candidate.inference);
+    const label = formatStudioBg3dMeasurementLength(
+      candidate.measurement.distanceMeters,
+      measurementDocument.unit,
+    );
+    setMeasurementStatus(`${label ?? "측정"} 길이를 정확히 잠갔습니다.`);
+  }
+
+  function toggleMeasurement(): void {
+    if (measurementActiveRef.current) {
+      cancelMeasurement("줄자 측정을 취소했습니다.");
+      return;
+    }
+    if (measurementDisabledReason) {
+      setMeasurementStatus(measurementDisabledReason);
+      return;
+    }
+    if (surfaceSnapArmedRef.current) cancelSurfaceSnap();
+    measurementActiveRef.current = true;
+    setMeasurementActive(true);
+    setMeasurementStartWorld(null);
+    setMeasurementDraft(null);
+    setMeasurementInference(null);
+    setMeasurementStatus("첫 번째 점을 선택하세요. 객체 표면과 바닥을 모두 찍을 수 있습니다.");
+    handlePanelTabChange("view");
+    setError(null);
+  }
+
   function toggleSurfaceSnap(): void {
     if (surfaceSnapArmedRef.current) {
       cancelSurfaceSnap("표면 붙이기를 취소했습니다.");
       return;
+    }
+    if (measurementActiveRef.current) {
+      cancelMeasurement("표면 붙이기로 전환해 줄자 측정을 취소했습니다.");
     }
     if (surfaceSnapDisabledReason) {
       setSurfaceSnapStatus({ tone: "error", message: surfaceSnapDisabledReason });
@@ -7630,6 +7836,12 @@ export function StudioBackground3D({
     targetId: string,
     event: ThreeEvent<MouseEvent>,
   ): boolean {
+    if (measurementActiveRef.current) {
+      const point = readStudioBg3dMeasurementPointFromThreeEvent(event);
+      if (point) pickMeasurementPoint(point);
+      else setMeasurementStatus("클릭한 표면의 안전한 world 좌표를 읽지 못했습니다.");
+      return true;
+    }
     if (!surfaceSnapArmedRef.current) return false;
     if (surfaceSnapDisabledReason || selectedEntities.length === 0) {
       cancelSurfaceSnap();
@@ -8374,6 +8586,9 @@ export function StudioBackground3D({
           selected={selectedIds.has(id)}
           onSelect={selectSceneEntity}
           onSurfacePick={handleSurfaceSnapPick}
+          onSurfacePreview={
+            measurementActive ? handleMeasurementSurfacePreview : undefined
+          }
           registerRef={registerPrimitiveRef}
         >
           {children}
@@ -8394,6 +8609,9 @@ export function StudioBackground3D({
         lodBias={deviceQuality.lodBias}
         onSelect={selectSceneEntity}
         onSurfacePick={handleSurfaceSnapPick}
+        onSurfacePreview={
+          measurementActive ? handleMeasurementSurfacePreview : undefined
+        }
         registerRef={registerPrimitiveRef}
         registerAnimationTime={registerModelAnimationTime}
         registerRigBake={registerModelRigBake}
@@ -8441,6 +8659,15 @@ export function StudioBackground3D({
       <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
       <BgSectionPlaneController state={sectionPlane} />
       <BgScaleGuide visible={scaleGuideVisible && !isCapturing} />
+      <StudioBg3dMeasurementViewport
+        active={measurementActive && !effectiveIsQuadView}
+        capturing={isCapturing}
+        document={measurementDocument}
+        draftMeasurement={measurementDraft}
+        startWorld={measurementStartWorld}
+        onPointPick={pickMeasurementPoint}
+        onPointPreview={updateMeasurementPreview}
+      />
       {placementSession.phase === "preview" && placementPreviewAsset ? (
         <BgPlacementPreview asset={placementPreviewAsset} preview={placementSession} />
       ) : null}
@@ -8452,6 +8679,9 @@ export function StudioBackground3D({
           instances={batch.instances}
           onSelect={selectSceneEntity}
           onSurfacePick={handleSurfaceSnapPick}
+          onSurfacePreview={
+            measurementActive ? handleMeasurementSurfacePreview : undefined
+          }
           onCloneStatus={updateModelCloneStatuses}
           onUnavailable={() => {
             setUnbatchableModelIds((current) => new Set(current).add(batch.modelId));
@@ -8462,6 +8692,7 @@ export function StudioBackground3D({
       {!isCapturing &&
       !physicsInteractionLocked &&
       !surfaceSnapArmed &&
+      !measurementActive &&
       !placementActive &&
       firstSelectedId &&
       !selectedIsLocked &&
@@ -8554,7 +8785,7 @@ export function StudioBackground3D({
       enableDamping
       dampingFactor={0.08}
       enablePan
-      enabled={!isTransforming && !isCapturing && !placementActive}
+      enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive}
       minDistance={2}
       maxDistance={60}
     />
@@ -8647,7 +8878,7 @@ export function StudioBackground3D({
                   }}
                   className={cx(
                     "h-full w-full",
-                    (surfaceSnapArmed || placementActive) && "cursor-crosshair",
+                    (surfaceSnapArmed || placementActive || measurementActive) && "cursor-crosshair",
                     effectiveIsQuadView && "pointer-events-none absolute inset-0 z-10",
                   )}
                   dpr={deviceQuality.effectiveDpr * adaptiveDprScale}
@@ -8693,17 +8924,17 @@ export function StudioBackground3D({
                       <View track={viewTopRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[0, 15, 0]} rotation={[-Math.PI / 2, 0, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive} />
                       </View>
                       <View track={viewFrontRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[0, 0, 15]} rotation={[0, 0, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive} />
                       </View>
                       <View track={viewRightRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[15, 0, 0]} rotation={[0, Math.PI / 2, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive} />
                       </View>
                       <View track={viewPerspRef as unknown as React.RefObject<HTMLElement>}>
                         {mainCameraNode}
@@ -8822,7 +9053,12 @@ export function StudioBackground3D({
                               "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
                               isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
                             )}
-                            onClick={() => setTransformMode(m.id)}
+                            onClick={() => {
+                              if (measurementActiveRef.current) {
+                                cancelMeasurement("변형 도구로 전환해 줄자 측정을 취소했습니다.");
+                              }
+                              setTransformMode(m.id);
+                            }}
                           >
                             <ModeIcon size={15} aria-hidden />
                           </button>
@@ -8840,7 +9076,12 @@ export function StudioBackground3D({
                         VIEWPORT_BTN,
                         isQuadView && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
                       )}
-                      onClick={() => setIsQuadView((prev) => !prev)}
+                      onClick={() => {
+                        if (measurementActiveRef.current) {
+                          cancelMeasurement("4분할 뷰로 전환해 줄자 측정을 취소했습니다.");
+                        }
+                        setIsQuadView((prev) => !prev);
+                      }}
                     >
                       <LayoutTemplate size={16} aria-hidden />
                     </button>
@@ -8979,6 +9220,41 @@ export function StudioBackground3D({
                   </StudioToolHintTarget>
                   <StudioToolHintTarget
                     hint={{
+                      id: "bg3d:measure:tape",
+                      title: measurementActive ? "줄자 측정 취소" : "줄자 · 추론 가이드",
+                      description: measurementActive
+                        ? "현재 두 점 측정을 취소하고 카메라 조작으로 돌아갑니다."
+                        : "객체 표면이나 바닥의 두 점을 찍어 실제 거리와 축·평행·수직 추론을 확인합니다.",
+                      preview: "object-snap",
+                      previewVariant: measurementActive ? "disable" : undefined,
+                      tip: "확정한 측정은 오른쪽 보기 탭에서 길이를 잠그거나 영구 가이드로 남길 수 있어요.",
+                    }}
+                    disabled={Boolean(measurementDisabledReason) && !measurementActive}
+                    unavailableReason={
+                      measurementActive ? undefined : measurementDisabledReason ?? undefined
+                    }
+                    preferredSide="right"
+                  >
+                    <button
+                      type="button"
+                      aria-label={measurementActive ? "줄자 측정 취소" : "줄자 측정 시작"}
+                      aria-pressed={measurementActive}
+                      data-testid="bg3d-measurement-toggle"
+                      disabled={Boolean(measurementDisabledReason) && !measurementActive}
+                      className={cx(
+                        VIEWPORT_BTN,
+                        "min-h-11 min-w-11 sm:size-11",
+                        "disabled:cursor-not-allowed disabled:opacity-40",
+                        measurementActive &&
+                          "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                      )}
+                      onClick={toggleMeasurement}
+                    >
+                      <Ruler size={17} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={{
                       id: "bg3d:object:surface-snap-normal",
                       title: "법선 정렬",
                       description: "표면에 붙일 때 객체 위쪽을 법선 방향으로 맞춥니다.",
@@ -9085,6 +9361,17 @@ export function StudioBackground3D({
                   >
                     {surfaceSnapStatus.message}
                   </div>
+                ) : null}
+
+                {measurementActive || measurementStartWorld || measurementDraft ? (
+                  <output
+                    aria-live="polite"
+                    aria-atomic="true"
+                    data-testid="bg3d-measurement-status"
+                    className="pointer-events-none absolute inset-x-3 bottom-12 z-20 mx-auto max-w-md rounded-xl border border-accent/50 bg-panel/95 px-3 py-2 text-center text-xs font-semibold leading-relaxed text-accent shadow-lg backdrop-blur"
+                  >
+                    {measurementStatus}
+                  </output>
                 ) : null}
 
                 <StudioBg3dPhysicsTransport
@@ -9514,7 +9801,7 @@ export function StudioBackground3D({
                 )}
               </section>
 
-<StudioBg3dViewPanel
+              <StudioBg3dViewPanel
                 hidden={hideOnTab("view")}
                 context={{
                   VIEW_EDITOR_SECTIONS,
@@ -9634,7 +9921,22 @@ export function StudioBackground3D({
                 }}
               />
 
-<StudioBg3dLtPanel
+              <section
+                hidden={hideOnTab("view")}
+                className="border-t border-line pt-4"
+              >
+                <StudioBg3dMeasurementPanel
+                  document={measurementDocument}
+                  draftMeasurement={measurementDraft}
+                  inference={measurementInference}
+                  lockedLengthMeters={measurementLockedLengthMeters}
+                  disabled={Boolean(measurementDisabledReason) && !measurementActive}
+                  onDocumentChange={setMeasurementDocument}
+                  onLengthLockChange={handleMeasurementLengthLockChange}
+                />
+              </section>
+
+              <StudioBg3dLtPanel
                 hidden={hideOnTab("lt")}
                 context={{
                   ScanLine,

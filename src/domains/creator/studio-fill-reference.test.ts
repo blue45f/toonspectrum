@@ -13,6 +13,7 @@ import {
   studioFillLayerToTargetMatrix,
   studioFillPageBoundsIntersect,
   studioFillPageToLayerMatrix,
+  withStudioFillPageReferenceLayers,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
 
@@ -150,6 +151,50 @@ describe("collectStudioFillReferenceLayers", () => {
         (item) => item.id,
       ),
     ).toEqual(["near"]);
+  });
+
+  it("adds a page-space vector raster as a boundary in both non-current scopes", () => {
+    const layers = withStudioFillPageReferenceLayers(
+      [
+        layer({
+          id: "target",
+          x: 100,
+          y: 200,
+          width: 200,
+          height: 100,
+        }),
+        layer({ id: "raster-line", fillReference: true }),
+      ],
+      [{
+        id: "visible-vector-lines",
+        name: "표시 벡터 선화",
+        src: "data:image/png;base64,vector",
+        pageWidth: 800,
+        pageHeight: 1_200,
+        fillReference: true,
+      }],
+    );
+
+    expect(
+      collectOverlappingStudioFillReferenceLayers(layers, "target", "all-visible")
+        .map((item) => item.id),
+    ).toContain("visible-vector-lines");
+    expect(
+      collectOverlappingStudioFillReferenceLayers(layers, "target", "reference")
+        .map((item) => item.id),
+    ).toContain("visible-vector-lines");
+    expect(
+      collectOverlappingStudioFillReferenceLayers(layers, "target", "current")
+        .map((item) => item.id),
+    ).toEqual(["target"]);
+
+    const vectorLayer = layers.find((item) => item.id === "visible-vector-lines");
+    expect(vectorLayer).toMatchObject({
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 1_200,
+    });
   });
 });
 

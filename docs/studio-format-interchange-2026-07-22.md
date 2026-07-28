@@ -122,15 +122,39 @@ Canvas 한 변 16,384px 한도 안에서 배율을 낮추거나 여러 파일로
 | 대사 CSV/TSV | 사용 가능 | 사용 가능 | 수식 실행 위험 셀을 apostrophe로 중립화, quoted newline/quote 검증 |
 | TXT/Markdown | 사용 가능 | 사용 가능 | 메모·시간 정보 손실 |
 | Fountain | 사용 가능 | 사용 가능 | 페이지·컷 주석은 보존하지만 캔버스 좌표는 없음 |
+| Final Draft XML (`.fdx`) | 사용 가능 | 사용 가능 | 공개 XSD가 아닌 안전 부분집합. 적용 전 Scene Heading·Action 문맥과 제외 요소의 손실 미리보기를 확인 |
 | SRT/WebVTT | 사용 가능 | 사용 가능 | 페이지·컷 좌표가 없어 순서로 연결, 시간 미지정 출력은 3초 간격 생성 |
 | `.toonaction.json` | 사용 가능 | 사용 가능 | 128,000 code units, 명령 64개, tree node/depth/work-unit 예산 |
 | 연재 일정 `.ics` | 미지원 | 사용 가능 | RFC 5545, 최대 500건/2MB. 외부 플랫폼 예약 게시를 생성하지 않음 |
 | 성과 CSV | 사용 가능 | 미지원 | 최대 10,000건. 원문 대신 허용된 정규화 지표/출처만 로컬 저장 |
 | `.toonpkg.zip` 게시 패키지 | 미지원 | 사용 가능 | 결과 이미지·review PDF·manifest·공개 AI 요약용. 프로젝트 복구 포맷은 아님 |
 
-대사 포맷은 `StudioDialogueBatchPanel`에 실제 연결되어 있다. CSV/TSV/JSON/Fountain/SRT/VTT/
-Markdown/TXT parser는 8MB, cue 20,000개, field/timestamp 한도를 공유하고 malformed UTF-8,
+대사 포맷은 `StudioDialogueBatchPanel`에 실제 연결되어 있다. CSV/TSV/JSON/Fountain/FDX/
+SRT/VTT/Markdown/TXT parser는 8MB, cue 20,000개, field/timestamp 한도를 공유하고 malformed UTF-8,
 NUL, 닫히지 않은 quote, 뒤집힌 시간 범위를 문서 변경 전에 거부한다.
+
+FDX는 Final Draft가 공개한 정식 XSD를 확인할 수 없어, 일반적으로 공개된
+`FinalDraft > Content > Paragraph(Type) > Text` 구조만 clean-room으로 처리한다. Final Draft의
+공식 도움말이 설명하는 핵심 요소인 Scene Heading, Action, Character, Parenthetical, Dialogue만
+지원한다. Scene Heading의 순서는 1-based 페이지, 같은 장면의 Action 순서는 1-based 컷,
+Character/Dialogue/Parenthetical은 각각 cue의 화자/본문/메모가 된다. 장면 제목과 Action 본문,
+Transition·Shot 등 지원하지 않는 Paragraph는 조용히 버리지 않고 구조화된 loss preview에 원본
+순서·미리보기·처리 결과를 남긴다.
+
+파서는 DOM이나 외부 entity resolver를 사용하지 않는다. DTD·ENTITY 선언을 거부하고, 잘못된
+UTF-8·XML 문자·entity·닫힘 순서·중복 attribute를 fail-closed한다. 파일 8MB, 요소 100,000개,
+깊이 32, attribute 100,000개, Paragraph 60,000개, Text fragment 200,000개, cue 20,000개의
+독립 예산을 적용한다. 출력은 페이지와 컷을 `TOONSPECTRUM PAGE n` Scene Heading 및
+`TOONSPECTRUM PANEL n` Action marker로 보존하는 결정적 안전 부분집합이다. Final Draft는
+타사 생성 FDX가 열릴 수 있지만 기대한 서식·동작을 보장하지 않는다고 명시하므로, 대사 패널은
+파싱 직후 문서를 바꾸지 않는다. 원본 문단·가져올 cue·문맥 전용·제외 항목과 bounded 상세 목록을
+먼저 보여주고 사용자가 확인한 경우에만 한 번의 문서 기록으로 적용한다. 따라서 capability는
+가져오기·내보내기 `available`, 왕복은 `partial`로 기록한다.
+
+- Final Draft 공식 요소 설명:
+  <https://kb.finaldraft.com/hc/en-us/articles/44713357935764-I-am-brand-new-to-Final-Draft-What-are-the-basics-of-writing-a-script-in-Final-Draft-Writer>
+- 타사 생성 FDX에 대한 Final Draft 공식 주의:
+  <https://kb.finaldraft.com/hc/en-us/articles/15575076862228-Can-Final-Draft-import-a-file-written-in-a-Fountain-based-screenwriting-program>
 
 ### 3D
 
@@ -232,7 +256,7 @@ PSD/ORA/CBZ는 공통 손실 미리보기에서 해상도·알파·색공간·�
 
 - AVIF/HEIC: `ImageDecoder`·Canvas encoder capability detection, 품질·알파 golden test와 WASM
   fallback의 번들·메모리 비용을 측정한 뒤 opt-in
-- FDX: 현재의 대사 cue 모델로 매핑하되 Final Draft XML의 scene/character/action 구조 손실 preview 필요
+- FDX 다음 단계: 위치가 없는 cue의 말풍선 자동 매핑 preview와 scene/action을 컷 메모로 보존하는 opt-in
 - 대사 포맷 다음 단계: 위치가 없는 cue의 말풍선 자동 매핑 preview와 SRT/VTT 타임라인 drag sync
 - 팔레트 다음 단계: ICC profile-aware color 관리 또는 Display-P3 내부 색 모델을 도입할 때만
   광색역 왕복을 `lossless`로 승격

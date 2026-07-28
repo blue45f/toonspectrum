@@ -6,6 +6,7 @@ import {
   disposeStudioGpuFilterRuntime,
   supportsStudioGpuFilters,
 } from "./studio-gpu-filter-runtime";
+import { STUDIO_GPU_SPATIAL_FILTER_KERNELS } from "./studio-gpu-filter-spatial-kernels";
 
 interface FakeDeviceHarness {
   readonly device: GPUDevice;
@@ -130,6 +131,27 @@ describe("studio-gpu-filter-runtime: 파이프라인 캐시", () => {
 
     runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
     runtime!.getComputePipeline(STUDIO_GPU_FILTER_KERNELS.hsl);
+    expect(harness.createComputePipeline).toHaveBeenCalledTimes(2);
+    runtime!.dispose();
+  });
+
+  it("Gaussian/morphology의 가로·세로 패스는 각각 동일 파이프라인을 공유한다", async () => {
+    const harness = createFakeDevice();
+    const runtime = await acquireStudioGpuFilterRuntime({ gpu: fakeGpuFor(harness.device) });
+    expect(runtime).not.toBeNull();
+
+    const gaussianHorizontal = runtime!.getComputePipeline(
+      STUDIO_GPU_SPATIAL_FILTER_KERNELS["gaussian-box-horizontal"],
+    );
+    expect(runtime!.getComputePipeline(
+      STUDIO_GPU_SPATIAL_FILTER_KERNELS["gaussian-box-vertical"],
+    )).toBe(gaussianHorizontal);
+    const morphologyHorizontal = runtime!.getComputePipeline(
+      STUDIO_GPU_SPATIAL_FILTER_KERNELS["morphology-horizontal"],
+    );
+    expect(runtime!.getComputePipeline(
+      STUDIO_GPU_SPATIAL_FILTER_KERNELS["morphology-vertical"],
+    )).toBe(morphologyHorizontal);
     expect(harness.createComputePipeline).toHaveBeenCalledTimes(2);
     runtime!.dispose();
   });

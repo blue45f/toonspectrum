@@ -51,6 +51,9 @@ function createProps(
     onRestoreAutosave: vi.fn(),
     onClearAutosave: vi.fn(),
     onGroupSelection: vi.fn(),
+    onUngroupSelection: vi.fn(),
+    onToggleSelectionLock: vi.fn(),
+    onReorderSelection: vi.fn(),
     onAlignSelection: vi.fn(),
     onDuplicateSelection: vi.fn(),
     onRemoveSelection: vi.fn(),
@@ -104,6 +107,9 @@ describe("StudioCanvasStatusRail", () => {
 
     rerender(<StudioCanvasStatusRail {...props} selectionCount={3} />);
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 그룹화" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 잠금" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 맨 앞으로" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 요소 맨 뒤로" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 왼쪽 정렬" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 가로 가운데 정렬" }));
     fireEvent.click(screen.getByRole("button", { name: "선택 요소 오른쪽 정렬" }));
@@ -117,6 +123,9 @@ describe("StudioCanvasStatusRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "해제" }));
 
     expect(props.onGroupSelection).toHaveBeenCalledOnce();
+    expect(props.onToggleSelectionLock).toHaveBeenCalledOnce();
+    expect(props.onReorderSelection).toHaveBeenNthCalledWith(1, "front");
+    expect(props.onReorderSelection).toHaveBeenNthCalledWith(2, "back");
     expect(props.onAlignSelection).toHaveBeenNthCalledWith(1, "left");
     expect(props.onAlignSelection).toHaveBeenNthCalledWith(2, "hcenter");
     expect(props.onAlignSelection).toHaveBeenNthCalledWith(3, "right");
@@ -128,6 +137,42 @@ describe("StudioCanvasStatusRail", () => {
     expect(props.onDuplicateSelection).toHaveBeenCalledOnce();
     expect(props.onRemoveSelection).toHaveBeenCalledOnce();
     expect(props.onClearSelection).toHaveBeenCalledOnce();
+  });
+
+  it("switches a complete group between ungroup and lock recovery actions", () => {
+    const props = createProps({
+      selectionCount: 2,
+      selectionGroupName: "주인공",
+      selectionLockState: "locked",
+    });
+
+    render(<StudioCanvasStatusRail {...props} />);
+
+    expect(screen.queryByRole("button", { name: "선택 요소 그룹화" })).toBeNull();
+    expect(screen.getByText("주인공")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "선택 그룹 해제" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 잠금 해제" }));
+
+    expect(props.onUngroupSelection).toHaveBeenCalledOnce();
+    expect(props.onToggleSelectionLock).toHaveBeenCalledOnce();
+  });
+
+  it("labels mixed lock state without adding another vertical toolbar row", () => {
+    const { container } = render(
+      <StudioCanvasStatusRail
+        {...createProps({
+          selectionCount: 2,
+          selectionLockState: "mixed",
+        })}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "선택 잠금 통일" })).toBeTruthy();
+    expect(screen.getByText("혼합")).toBeTruthy();
+    const actionStrip = screen.getByRole("button", { name: "선택 잠금 통일" }).parentElement
+      ?.parentElement;
+    expect(actionStrip?.className).toContain("overflow-x-auto");
+    expect(container.querySelector("[data-studio-canvas-status-rail]")).toBeTruthy();
   });
 
   it("exposes the bubble-merge action only when armed and gates it on the reason", () => {

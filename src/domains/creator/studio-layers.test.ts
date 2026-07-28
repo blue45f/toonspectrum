@@ -18,6 +18,7 @@ import {
   removeItemsFromGroups,
   removeLayerItems,
   reorderLayerItem,
+  reorderLayerSelection,
   setItemGroup,
   ungroupItems,
   type LayerGroup,
@@ -576,6 +577,48 @@ describe("reorderLayerItem", () => {
     expect(ids(toBack)).toEqual(["front", "g1", "g2", "loose"]);
     expect(hasContiguousLayerGroups(toFront)).toBe(true);
     expect(hasContiguousLayerGroups(toBack)).toBe(true);
+  });
+});
+
+describe("reorderLayerSelection", () => {
+  it("moves a multi-selection as one stable block to the front or back", () => {
+    const input = makeItems(["back", "a", "middle", "b", "front"]);
+
+    expect(ids(reorderLayerSelection(input, ["a", "b"], "front"))).toEqual([
+      "back",
+      "middle",
+      "front",
+      "a",
+      "b",
+    ]);
+    expect(ids(reorderLayerSelection(input, ["a", "b"], "back"))).toEqual([
+      "a",
+      "b",
+      "back",
+      "middle",
+      "front",
+    ]);
+  });
+
+  it("expands a selected group child to the complete group block", () => {
+    const input = makeItems([
+      "back",
+      { id: "g1", groupId: "g" },
+      { id: "g2", groupId: "g" },
+      "front",
+    ]);
+
+    const next = reorderLayerSelection(input, ["g1"], "front");
+    expect(ids(next)).toEqual(["back", "front", "g1", "g2"]);
+    expect(hasContiguousLayerGroups(next)).toBe(true);
+  });
+
+  it("preserves the original reference for empty and already terminal selections", () => {
+    const input = makeItems(["back", "front"]);
+
+    expect(reorderLayerSelection(input, [], "front")).toBe(input);
+    expect(reorderLayerSelection(input, ["front"], "front")).toBe(input);
+    expect(reorderLayerSelection(input, ["back", "front"], "back")).toBe(input);
   });
 });
 

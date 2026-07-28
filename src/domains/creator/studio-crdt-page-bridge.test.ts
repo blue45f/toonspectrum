@@ -374,6 +374,57 @@ describe("studio CRDT page bridge", () => {
     expect(decoded.stroke).toBe(element.stroke);
   });
 
+  it("round-trips bounded-flow-v2 only with its snapshotted dynamic brush contract", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip: { shape: "round" },
+      grain: { amount: 0.4, scale: 8 },
+      taper: { enabled: false },
+      flow: { base: 0.35, mappings: [] },
+    });
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-bounded-airbrush",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 12, 8],
+      pressures: [0.5, 0.8],
+      paintModel: "bounded-flow-v2",
+      stroke: "#285080",
+      strokeWidth: 24,
+      opacity: 0.55,
+      brush: "airbrush",
+      brushDynamics,
+      sampleSpacing: 0.5,
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(studioDrawElementToCrdtStroke("page-a", element)).toEqual(encoded);
+    expect(encoded.payload).toMatchObject({
+      version: 2,
+      brush: "airbrush",
+      brushDynamics,
+      extensions: { paintModel: "bounded-flow-v2" },
+    });
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded).toMatchObject({
+      brush: "airbrush",
+      brushDynamics,
+      paintModel: "bounded-flow-v2",
+    });
+
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      id: "stroke-bounded-missing-dynamics",
+      brushDynamics: undefined,
+    })).toThrow(/페인트 모델과 브러시 합성 모드가 호환되지/u);
+  });
+
   it("round-trips the causal watercolor pipeline as an explicit CRDT extension", () => {
     const element: StudioCrdtCompatibleDrawElement = {
       id: "watercolor-v2",

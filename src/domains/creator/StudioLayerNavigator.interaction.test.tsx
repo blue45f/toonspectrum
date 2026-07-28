@@ -4,7 +4,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { StudioLayerNavigator } from "./StudioLayerNavigator";
+import { createLayerGroup } from "./studio-layers";
+import {
+  StudioLayerNavigator,
+  type StudioLayerNavigatorAction,
+} from "./StudioLayerNavigator";
 
 import type { StudioLayerNavigatorItem } from "./studio-layer-navigator";
 
@@ -37,6 +41,55 @@ function row(name: RegExp): HTMLElement {
 afterEach(cleanup);
 
 describe("StudioLayerNavigator selection interaction", () => {
+  it("selects a whole group from its row and exposes one-click group lock and collapse", () => {
+    const initialGroup = createLayerGroup("character", "캐릭터");
+    const groupedItems: StudioLayerNavigatorItem[] = [
+      { id: "ink", type: "draw", label: "선화", zIndex: 1, groupId: initialGroup.id },
+      { id: "color", type: "image", label: "채색", zIndex: 0, groupId: initialGroup.id },
+    ];
+
+    function GroupHarness() {
+      const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
+      const [groups, setGroups] = useState([initialGroup]);
+      const handleAction = (action: StudioLayerNavigatorAction) => {
+        if (action.type !== "set-group-flag") return;
+        setGroups((current) =>
+          current.map((group) =>
+            group.id === action.groupId
+              ? { ...group, [action.flag]: action.value }
+              : group
+          )
+        );
+      };
+      return (
+        <StudioLayerNavigator
+          items={groupedItems}
+          groups={groups}
+          selectedIds={selectedIds}
+          pageKey="page-group"
+          localHiddenIds={new Set()}
+          onToggleLocalHidden={() => {}}
+          onSelectionChange={setSelectedIds}
+          onAction={handleAction}
+        />
+      );
+    }
+
+    render(<GroupHarness />);
+
+    fireEvent.click(row(/캐릭터, 그룹, 2개 레이어/));
+    expect(row(/선화/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/채색/).getAttribute("aria-selected")).toBe("true");
+    expect(row(/캐릭터, 그룹, 2개 레이어/).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 그룹 잠금" }));
+    expect(screen.getByRole("button", { name: "캐릭터 그룹 잠금 해제" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 그룹 접기" }));
+    expect(screen.queryByRole("treeitem", { name: /선화/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "캐릭터 그룹 펼치기" })).toBeTruthy();
+  });
+
   it("keeps click, modifier, range, and keyboard focus as distinct states", () => {
     render(<Harness />);
 

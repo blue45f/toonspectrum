@@ -44,6 +44,7 @@ describe("Studio advanced fill entry boundary", () => {
     expect(targetPolicy).toContain("target.frames?.length");
     expect(targetPolicy).toContain("timelinePlaying");
     expect(targetPolicy).toContain("collectOverlappingStudioFillReferenceLayers(");
+    expect(targetPolicy).toContain("advancedFillHasVisibleVectorLineArt");
     expect(targetPolicy).toContain('advancedFillSettings.referenceScope === "reference"');
     expect(targetPolicy).toContain('advancedFillSettings.referenceScope === "all-visible"');
   });

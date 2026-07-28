@@ -119,7 +119,10 @@ describe("studio-gpu-filter-apply: 체인 계획", () => {
       expect(plan!.map((step) => step.kernelId), label).toEqual(expectedIds);
       for (const [index, step] of plan!.entries()) {
         // LUT 커널 스텝은 항상 768칸 LUT 를 동반한다.
-        if (STUDIO_GPU_FILTER_KERNELS[step.kernelId].usesLut) {
+        if (
+          step.kernelId in STUDIO_GPU_FILTER_KERNELS
+          && STUDIO_GPU_FILTER_KERNELS[step.kernelId as StudioGpuFilterKernelId].usesLut
+        ) {
           expect(step.lut, label).toBeInstanceOf(Uint32Array);
           expect(step.lut!.length, label).toBe(768);
         } else {
@@ -194,6 +197,72 @@ describe("studio-gpu-filter-apply: 체인 계획", () => {
     expect(withColorBalance![0]!.fusedKernelIds).toEqual(["brightness-contrast", "levels"]);
   });
 
+  it("Gaussian→morphology→convolution을 CPU 필터 순서로 확장하고 LUT 체인은 뒤에 둔다", () => {
+    const plan = planStudioGpuFilterChain({
+      blurFx: { type: "gaussian", strength: 73, radius: 6, angle: 0 },
+      morphology: { mode: "erode", radius: 2 },
+      convolution: {
+        kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+        divisor: 1,
+        bias: 128,
+      },
+      brightness: 0.2,
+      levelsBlack: 12,
+    });
+    expect(plan).not.toBeNull();
+    expect(plan!.map((step) => step.kernelId)).toEqual([
+      "gaussian-decode",
+      "gaussian-box-horizontal",
+      "gaussian-box-vertical",
+      "gaussian-box-horizontal",
+      "gaussian-box-vertical",
+      "gaussian-box-horizontal",
+      "gaussian-box-vertical",
+      "gaussian-resolve",
+      "morphology-horizontal",
+      "morphology-vertical",
+      "convolution-3x3",
+      "lut-fused",
+    ]);
+    expect(plan!.at(-1)?.fusedKernelIds).toEqual(["brightness-contrast", "levels"]);
+    expect(new DataView(plan![1]!.uniform).getUint32(12, true)).toBe(5);
+    expect(new DataView(plan![5]!.uniform).getUint32(12, true)).toBe(6);
+  });
+
+  it("공간 필터 항등은 계획에서 빠지고 non-Gaussian blur는 전체 CPU 폴백한다", () => {
+    expect(planStudioGpuFilterChain({
+      blurFx: { type: "gaussian", strength: 0, radius: 40, angle: 0 },
+      morphology: { mode: "dilate", radius: 0 },
+      convolution: { kernel: [0, 0, 0, 0, 1, 0, 0, 0, 0], divisor: 1, bias: 0 },
+    })).toBeNull();
+    expect(planStudioGpuFilterChain({
+      blurFx: { type: "motion", strength: 50, radius: 12, angle: 45 },
+      brightness: 0.2,
+    })).toBeNull();
+    expect(isStudioGpuFilterChainEligible({
+      blurFx: { type: "motion", strength: 50, radius: 12, angle: 45 },
+    })).toBe(false);
+  });
+
+  it("raw Gaussian radius 0/과대값도 CPU normalizer 경계(1..40)를 그대로 따른다", () => {
+    const minimum = planStudioGpuFilterChain({
+      blurFx: { type: "gaussian", strength: 100, radius: 0, angle: 0 },
+    });
+    expect(minimum?.map((step) => step.kernelId)).toEqual([
+      "gaussian-decode",
+      "gaussian-box-horizontal",
+      "gaussian-box-vertical",
+      "gaussian-resolve",
+    ]);
+    expect(new DataView(minimum![1]!.uniform).getUint32(12, true)).toBe(1);
+
+    const maximum = planStudioGpuFilterChain({
+      blurFx: { type: "gaussian", strength: 100, radius: 999, angle: 0 },
+    });
+    expect(maximum).toHaveLength(8);
+    expect(new DataView(maximum![5]!.uniform).getUint32(12, true)).toBe(40);
+  });
+
   it("활성 보정이 없으면 null — 항등 값(0/항등 곡선/항등 레벨)도 비활성으로 본다", () => {
     expect(planStudioGpuFilterChain({})).toBeNull();
     expect(planStudioGpuFilterChain({ brightness: 0, contrast: 0 })).toBeNull();
@@ -235,26 +304,42 @@ interface FakeGpuHarness {
   readonly gpu: GPU;
   readonly requestAdapter: ReturnType<typeof vi.fn>;
   readonly dispatchCalls: [number, number][];
+  readonly createBuffer: ReturnType<typeof vi.fn>;
   popErrorScopeResults: (object | null)[];
 }
 
-function createFakeGpu(overrides?: { createBufferThrows?: boolean }): FakeGpuHarness {
+function createFakeGpu(overrides?: {
+  createBufferThrows?: boolean;
+  loseOnPopErrorScope?: boolean;
+  limits?: Partial<{
+    maxStorageBufferBindingSize: number;
+    maxBufferSize: number;
+    maxComputeWorkgroupsPerDimension: number;
+    maxComputeInvocationsPerWorkgroup: number;
+    maxComputeWorkgroupSizeX: number;
+  }>;
+}): FakeGpuHarness {
   const dispatchCalls: [number, number][] = [];
   const harness: { popErrorScopeResults: (object | null)[] } = { popErrorScopeResults: [null, null] };
+  let resolveLost: ((info: GPUDeviceLostInfo) => void) | null = null;
+  const lost = new Promise<GPUDeviceLostInfo>((resolve) => {
+    resolveLost = resolve;
+  });
+  const createBuffer = vi.fn((descriptor: { size: number }) => {
+    if (overrides?.createBufferThrows) throw new Error("out of memory");
+    return {
+      size: descriptor.size,
+      destroy: vi.fn(),
+      mapAsync: vi.fn(async () => undefined),
+      getMappedRange: vi.fn(() => new ArrayBuffer(descriptor.size)),
+      unmap: vi.fn(),
+    };
+  });
   const device = {
     createShaderModule: vi.fn(() => ({})),
     createComputePipeline: vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) })),
     createBindGroup: vi.fn(() => ({})),
-    createBuffer: vi.fn((descriptor: { size: number }) => {
-      if (overrides?.createBufferThrows) throw new Error("out of memory");
-      return {
-        size: descriptor.size,
-        destroy: vi.fn(),
-        mapAsync: vi.fn(async () => undefined),
-        getMappedRange: vi.fn(() => new ArrayBuffer(descriptor.size)),
-        unmap: vi.fn(),
-      };
-    }),
+    createBuffer,
     createCommandEncoder: vi.fn(() => ({
       beginComputePass: vi.fn(() => ({
         setPipeline: vi.fn(),
@@ -269,20 +354,31 @@ function createFakeGpu(overrides?: { createBufferThrows?: boolean }): FakeGpuHar
     })),
     queue: { writeBuffer: vi.fn(), submit: vi.fn() },
     destroy: vi.fn(),
-    lost: new Promise<GPUDeviceLostInfo>(() => undefined),
+    lost,
     limits: {
       maxStorageBufferBindingSize: 128 * 1024 * 1024,
       maxBufferSize: 256 * 1024 * 1024,
       maxComputeWorkgroupsPerDimension: 65_535,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupSizeX: 256,
+      ...overrides?.limits,
     },
     pushErrorScope: vi.fn(),
-    popErrorScope: vi.fn(async () => harness.popErrorScopeResults.shift() ?? null),
+    popErrorScope: vi.fn(async () => {
+      if (overrides?.loseOnPopErrorScope && resolveLost) {
+        resolveLost({ reason: "unknown", message: "test loss" } as GPUDeviceLostInfo);
+        resolveLost = null;
+        await Promise.resolve();
+      }
+      return harness.popErrorScopeResults.shift() ?? null;
+    }),
   };
   const requestAdapter = vi.fn(async () => ({ requestDevice: async () => device }));
   return {
     gpu: { requestAdapter } as unknown as GPU,
     requestAdapter,
     dispatchCalls,
+    createBuffer,
     get popErrorScopeResults() {
       return harness.popErrorScopeResults;
     },
@@ -324,6 +420,133 @@ describe("studio-gpu-filter-apply: 폴백 경로", () => {
     const harness = createFakeGpu();
     harness.popErrorScopeResults = [{ message: "validation failed" }, null];
     expect(await applyGpuFilterChain(imageData(), { brightness: 0.2 }, { gpu: harness.gpu })).toBeNull();
+  });
+
+  it("가우시안 float4 scratch가 storage/buffer limit을 넘으면 할당 전에 CPU 폴백한다", async () => {
+    const harness = createFakeGpu({
+      limits: {
+        // 4x3 packed=48 bytes는 들어가지만 float4 scratch=192 bytes는 들어가지 않는다.
+        maxStorageBufferBindingSize: 100,
+        maxBufferSize: 100,
+      },
+    });
+    const result = await applyGpuFilterChain(
+      imageData(),
+      { blurFx: { type: "gaussian", strength: 100, radius: 40, angle: 0 } },
+      { gpu: harness.gpu },
+    );
+    expect(result).toBeNull();
+    expect(harness.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(harness.createBuffer).not.toHaveBeenCalled();
+  });
+
+  it("workgroup 크기나 2D dispatch limit을 넘으면 제출하지 않고 CPU 폴백한다", async () => {
+    const tooSmallWorkgroup = createFakeGpu({
+      limits: { maxComputeInvocationsPerWorkgroup: 32, maxComputeWorkgroupSizeX: 32 },
+    });
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { gpu: tooSmallWorkgroup.gpu },
+    )).toBeNull();
+    expect(tooSmallWorkgroup.createBuffer).not.toHaveBeenCalled();
+
+    const tooFewRows = createFakeGpu({
+      limits: { maxComputeWorkgroupsPerDimension: 256 },
+    });
+    expect(await applyGpuFilterChain(
+      imageData(4_194_305, 1),
+      { brightness: 0.2 },
+      { gpu: tooFewRows.gpu },
+    )).toBeNull();
+    expect(tooFewRows.createBuffer).not.toHaveBeenCalled();
+
+    const tooNarrowDispatch = createFakeGpu({
+      limits: { maxComputeWorkgroupsPerDimension: 128 },
+    });
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { gpu: tooNarrowDispatch.gpu },
+    )).toBeNull();
+    expect(tooNarrowDispatch.createBuffer).not.toHaveBeenCalled();
+  });
+
+  it("이미 취소됐거나 stale인 요청은 디바이스 획득 전 fail-closed한다", async () => {
+    const abortedHarness = createFakeGpu();
+    const controller = new AbortController();
+    controller.abort();
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { gpu: abortedHarness.gpu, signal: controller.signal },
+    )).toBeNull();
+    expect(abortedHarness.requestAdapter).not.toHaveBeenCalled();
+
+    const staleHarness = createFakeGpu();
+    const isSourceRevisionCurrent = vi.fn(() => false);
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      {
+        gpu: staleHarness.gpu,
+        sourceRevision: 7,
+        isSourceRevisionCurrent,
+      },
+    )).toBeNull();
+    expect(isSourceRevisionCurrent).toHaveBeenCalledWith(7);
+    expect(staleHarness.requestAdapter).not.toHaveBeenCalled();
+  });
+
+  it("GPU 제출 뒤 revision이 stale해져도 readback 픽셀을 게시하지 않는다", async () => {
+    const harness = createFakeGpu();
+    let checks = 0;
+    const isSourceRevisionCurrent = vi.fn(() => {
+      checks += 1;
+      return checks < 4;
+    });
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      {
+        gpu: harness.gpu,
+        sourceRevision: "rev-a",
+        isSourceRevisionCurrent,
+      },
+    )).toBeNull();
+    expect(harness.dispatchCalls).toHaveLength(1);
+    expect(isSourceRevisionCurrent).toHaveBeenCalledWith("rev-a");
+  });
+
+  it("제출 중 device loss가 발생하면 readback 결과를 게시하지 않고 null", async () => {
+    const harness = createFakeGpu({ loseOnPopErrorScope: true });
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { morphology: { mode: "dilate", radius: 2 } },
+      { gpu: harness.gpu },
+    )).toBeNull();
+    expect(harness.dispatchCalls).toHaveLength(2);
+  });
+
+  it("가우시안은 packed 2개+float4 2개를 사용하고 모든 분리 패스를 디스패치한다", async () => {
+    const harness = createFakeGpu();
+    const img = imageData(5, 3);
+    const el: ImageFilterFields = {
+      blurFx: { type: "gaussian", strength: 73, radius: 6, angle: 0 },
+    };
+    const plan = planStudioGpuFilterChain(el);
+    expect(plan).not.toBeNull();
+    expect(plan).toHaveLength(8);
+
+    const result = await applyGpuFilterChain(img, el, { gpu: harness.gpu });
+    expect(result).not.toBeNull();
+    expect(harness.dispatchCalls).toHaveLength(8);
+    const sizes = harness.createBuffer.mock.calls.map(([descriptor]) => (
+      descriptor as { size: number }
+    ).size);
+    // packed ping/pong (60) + float4 ping/pong (240); other small entries are uniforms/readback.
+    expect(sizes.filter((size) => size === 60)).toHaveLength(3);
+    expect(sizes.filter((size) => size === 240)).toHaveLength(2);
   });
 
   it("정상 경로 — 스텝 수만큼 디스패치하고 치수 보존 버퍼를 돌려준다", async () => {

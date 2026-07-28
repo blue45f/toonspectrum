@@ -310,6 +310,39 @@ export function moveLayerGroup<T extends LayerItemLike>(
 export type LayerItemReorderDirection = "front" | "back" | "forward" | "backward";
 
 /**
+ * 다중 선택을 한 개의 시각적 블록처럼 문서 맨 앞/뒤로 이동한다.
+ *
+ * PPT/Figma 계열 편집기처럼 그룹 자식 하나가 선택 집합에 들어오면 그 그룹 전체를
+ * 이동 단위에 포함한다. 그래야 다중 선택의 z-order 명령이 기존 그룹의 연속 구간을
+ * 찢지 않는다. 선택된 항목과 선택되지 않은 항목 안의 상대 순서는 모두 보존한다.
+ */
+export function reorderLayerSelection<T extends LayerItemLike>(
+  items: T[],
+  selectedIds: readonly string[],
+  direction: "front" | "back"
+): T[] {
+  const requestedIds = new Set(selectedIds);
+  if (requestedIds.size === 0) return items;
+
+  const selectedGroupIds = new Set(
+    items
+      .filter((item) => requestedIds.has(item.id) && item.groupId !== undefined)
+      .map((item) => item.groupId!)
+  );
+  const isSelectedUnit = (item: T) =>
+    requestedIds.has(item.id) ||
+    (item.groupId !== undefined && selectedGroupIds.has(item.groupId));
+  const selected = items.filter(isSelectedUnit);
+  if (selected.length === 0 || selected.length === items.length) return items;
+  const unselected = items.filter((item) => !isSelectedUnit(item));
+  const next = direction === "front"
+    ? [...unselected, ...selected]
+    : [...selected, ...unselected];
+
+  return next.every((item, index) => item === items[index]) ? items : next;
+}
+
+/**
  * 단일 레이어의 모든 순서 명령을 그룹 블록 불변식에 맞춰 처리한다.
  * - 그룹 자식: 자기 그룹 안에서만 이동(front/back은 그룹 내부 양 끝).
  * - 무그룹 레이어: 이웃 그룹을 넘을 때 그룹 전체 블록을 한 번에 건넌다.

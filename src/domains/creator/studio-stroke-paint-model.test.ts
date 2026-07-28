@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+  isStudioBoundedFlowPaintModelCompatible,
   isStudioStrokePaintModelCompatible,
   isStudioStrokePaintModel,
   resolveStudioLayeredFlowDepositionAlpha,
@@ -13,11 +15,50 @@ import {
 } from "./studio-stroke-paint-model";
 
 describe("studio stroke paint model", () => {
-  it("accepts only the exact persisted layered-flow-v1 contract", () => {
+  it("accepts only the two exact persisted paint contracts", () => {
     expect(isStudioStrokePaintModel(STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1)).toBe(true);
+    expect(isStudioStrokePaintModel(STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2)).toBe(true);
     expect(isStudioStrokePaintModel(undefined)).toBe(false);
     expect(isStudioStrokePaintModel("layered-flow-v2")).toBe(false);
     expect(isStudioStrokePaintModel({ paintModel: "layered-flow-v1" })).toBe(false);
+  });
+
+  it("admits bounded-flow-v2 only for snapshotted dynamics and bounded symmetry", () => {
+    const base = {
+      paintModel: STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+      kind: "freehand",
+      mode: "pen",
+      brush: "airbrush",
+      sampleSpacing: 0.5,
+      brushDynamics: { version: 1 },
+    };
+    expect(isStudioBoundedFlowPaintModelCompatible(base)).toBe(true);
+    expect(isStudioStrokePaintModelCompatible({
+      ...base,
+      symmetry: {
+        type: "kaleidoscope",
+        centerX: 100,
+        centerY: 200,
+        radialCount: 32,
+      },
+    })).toBe(true);
+    expect(isStudioStrokePaintModelCompatible({ ...base, brush: "marker" })).toBe(false);
+    expect(isStudioStrokePaintModelCompatible({ ...base, brushDynamics: undefined })).toBe(false);
+    expect(isStudioStrokePaintModelCompatible({
+      ...base,
+      symmetry: {
+        type: "radial",
+        centerX: 0,
+        centerY: 0,
+        radialCount: 33,
+      },
+    })).toBe(false);
+    expect(isStudioStrokePaintModelCompatible({
+      ...base,
+      symmetry: { type: "future-symmetry" },
+    })).toBe(false);
+    expect(isStudioStrokePaintModelCompatible({ ...base, stampPipeline: "causal-walker-v2" }))
+      .toBe(false);
   });
 
   it("allows the model only for ordinary freehand pen and marker strokes", () => {

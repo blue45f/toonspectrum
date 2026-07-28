@@ -542,11 +542,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
-          {/* 모바일: 제목·작업공간 레인이 좁게 눌려 스크롤될 때 오른쪽 페이드로 이어짐을 알린다
-              (툴벨트의 좌측 페이드와 같은 계열, 스크롤바는 숨겨져 있음). */}
+          {/* 태블릿·컴팩트 노트북까지 제목·앱 메뉴 레인이 스크롤될 때 오른쪽 페이드로
+              이어짐을 알린다. xl부터는 삽입 바로가기까지 안정적으로 들어오므로 숨긴다. */}
           <span
             aria-hidden
-            className="pointer-events-none sticky right-0 -mr-2 h-8 w-3 shrink-0 self-center bg-gradient-to-l from-panel to-transparent lg:hidden"
+            data-studio-menubar-overflow-cue="true"
+            className="pointer-events-none sticky right-0 -mr-2 h-8 w-4 shrink-0 self-center bg-gradient-to-l from-panel to-transparent xl:hidden"
           />
         </div>
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}

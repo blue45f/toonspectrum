@@ -13,12 +13,14 @@ import {
 import { StudioHudPill } from "./studio-chrome-ui";
 import { studioPressureHudRatio } from "./studio-draw-hud";
 
+import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
 import type {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
   StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
 import type { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
+import type { StudioLiveWetInkOverlayRenderer } from "./studio-live-wet-ink-overlay";
 
 import { lazyRetry } from "@/lib/lazy-retry";
 
@@ -89,6 +91,96 @@ export const StudioLiveStampOverlayHost = memo(function StudioLiveStampOverlayHo
     />
   );
 });
+
+export const StudioLiveDynamicBrushOverlayHost = memo(
+  function StudioLiveDynamicBrushOverlayHost({
+    renderer,
+    left,
+    top,
+    width,
+    height,
+    documentScale,
+    documentWidth,
+    flipX,
+  }: StudioLiveInkSurface & { renderer: StudioLiveDynamicBrushOverlayRenderer }) {
+    const activeCanvasRef = useRef<HTMLCanvasElement>(null);
+    const settledCanvasRef = useRef<HTMLCanvasElement>(null);
+    useLayoutEffect(() => {
+      if (!activeCanvasRef.current || !settledCanvasRef.current) return undefined;
+      renderer.attach({
+        activeCanvas: activeCanvasRef.current,
+        settledCanvas: settledCanvasRef.current,
+      });
+      return () => renderer.attach(null);
+    }, [renderer]);
+    useLayoutEffect(() => {
+      renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+    });
+    return (
+      <>
+        <canvas
+          ref={settledCanvasRef}
+          aria-hidden="true"
+          data-studio-live-dynamic-settled="true"
+          className="pointer-events-none absolute z-10"
+          style={{ left, top, width, height }}
+        />
+        <canvas
+          ref={activeCanvasRef}
+          aria-hidden="true"
+          data-studio-live-dynamic-active="true"
+          className="pointer-events-none absolute z-[11]"
+          style={{ left, top, width, height }}
+        />
+      </>
+    );
+  },
+);
+
+export const StudioLiveWetInkOverlayHost = memo(
+  function StudioLiveWetInkOverlayHost({
+    renderer,
+    left,
+    top,
+    width,
+    height,
+    documentScale,
+    documentWidth,
+    flipX,
+  }: StudioLiveInkSurface & { renderer: StudioLiveWetInkOverlayRenderer }) {
+    const activeCanvasRef = useRef<HTMLCanvasElement>(null);
+    const settledCanvasRef = useRef<HTMLCanvasElement>(null);
+    useLayoutEffect(() => {
+      if (!activeCanvasRef.current || !settledCanvasRef.current) return undefined;
+      renderer.attach({
+        activeCanvas: activeCanvasRef.current,
+        settledCanvas: settledCanvasRef.current,
+      });
+      return () => renderer.attach(null);
+    }, [renderer]);
+    useLayoutEffect(() => {
+      renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+    });
+    return (
+      <>
+        <canvas
+          ref={settledCanvasRef}
+          aria-hidden="true"
+          data-studio-live-wet-ink-settled="true"
+          className="pointer-events-none absolute z-10"
+          style={{ left, top, width, height }}
+        />
+        <canvas
+          ref={activeCanvasRef}
+          aria-hidden="true"
+          data-studio-live-wet-ink-active="true"
+          className="pointer-events-none absolute z-[11]"
+          style={{ left, top, width, height }}
+        />
+      </>
+    );
+  },
+);
 
 export const StudioLiveInkPredictionHost = memo(function StudioLiveInkPredictionHost({
   renderer,

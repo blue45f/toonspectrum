@@ -9,7 +9,8 @@
  * then the raw byte buffers are diffed per channel. The Node orchestrator gates:
  *  - lutOnly plans (brightness/contrast, levels, curves, and their fused combinations are all
  *    exact CPU-built byte LUTs routed through the integer-lookup lut3 kernel): delta === 0
- *  - single formula kernels (HSL, color balance): maxChannelDelta <= 2 (f32 vs f64
+ *  - integer spatial kernels (morphology and the integral edge convolution case): delta === 0
+ *  - formula kernels (HSL, color balance, Gaussian): maxChannelDelta <= 1 (f32 vs f64
  *    rounding-boundary tolerance)
  *  - mixed chains: a +-1 f32 tie seed from a formula kernel can be amplified by downstream
  *    LUT slopes — gate is observed+1
@@ -29,8 +30,9 @@ import {
   type KonvaLike,
 } from "@/src/domains/creator/studio-konva-filters";
 
-const WIDTH = 192;
-const HEIGHT = 128;
+// Odd dimensions exercise row tails and 2D dispatch indexing rather than only aligned extents.
+const WIDTH = 193;
+const HEIGHT = 127;
 
 interface FilterParityCaseResult {
   readonly id: string;
@@ -74,7 +76,11 @@ function buildTestImage(): { data: Uint8ClampedArray; width: number; height: num
       data[index] = (x * 255 / (WIDTH - 1)) | 0;
       data[index + 1] = (y * 255 / (HEIGHT - 1)) | 0;
       data[index + 2] = (x * 41 + y * 13) % 256;
-      data[index + 3] = y % 4 === 0 ? 255 : 40 + ((x * 7 + y * 3) % 216);
+      data[index + 3] = (x + y) % 17 === 0
+        ? 0
+        : y % 4 === 0
+          ? 255
+          : 40 + ((x * 7 + y * 3) % 216);
     }
   }
   return { data, width: WIDTH, height: HEIGHT };
@@ -86,6 +92,44 @@ interface FilterParityCase {
 }
 
 const PARITY_CASES: readonly FilterParityCase[] = [
+  {
+    id: "gaussian-premultiplied",
+    el: { blurFx: { type: "gaussian", strength: 73, radius: 6, angle: 0 } },
+  },
+  {
+    id: "gaussian-large-radius",
+    el: { blurFx: { type: "gaussian", strength: 100, radius: 40, angle: 0 } },
+  },
+  {
+    id: "morphology-dilate",
+    el: { morphology: { mode: "dilate", radius: 3 } },
+  },
+  {
+    id: "morphology-erode",
+    el: { morphology: { mode: "erode", radius: 2 } },
+  },
+  {
+    id: "convolution-edge",
+    el: {
+      convolution: {
+        kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+        divisor: 1,
+        bias: 128,
+      },
+    },
+  },
+  {
+    id: "spatial-chain",
+    el: {
+      blurFx: { type: "gaussian", strength: 61, radius: 3, angle: 0 },
+      morphology: { mode: "dilate", radius: 1 },
+      convolution: {
+        kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+        divisor: 1,
+        bias: 0,
+      },
+    },
+  },
   { id: "brightness", el: { brightness: 0.3 } },
   { id: "brightness-negative", el: { brightness: -0.35 } },
   { id: "contrast", el: { contrast: 45 } },

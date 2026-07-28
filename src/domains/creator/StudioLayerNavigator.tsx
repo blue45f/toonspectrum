@@ -431,6 +431,12 @@ export function StudioLayerNavigator({
     setSelectionAnchorId(itemIds[0] ?? null);
   }
 
+  function replaceWithGroupItems(itemIds: readonly string[]) {
+    if (itemIds.length === 0) return;
+    onSelectionChange([...new Set(itemIds)].slice(0, 500));
+    setSelectionAnchorId(itemIds[0] ?? null);
+  }
+
   function focusRow(key: string) {
     setFocusedKey(key);
     rowRefs.current.get(key)?.focus();
@@ -1291,8 +1297,12 @@ export function StudioLayerNavigator({
                     onFocus={() => setFocusedKey(key)}
                     onKeyDown={(event) => handleTreeItemKeyDown(event, target)}
                     onClick={(event) => {
-                      if (isLayerRowControl(event.target) || filterActive || node.empty) return;
-                      setGroupCollapsed(node.group.id, node.expanded);
+                      if (isLayerRowControl(event.target) || node.empty) return;
+                      replaceWithGroupItems(
+                        displayItems
+                          .filter((item) => item.groupId === node.group.id)
+                          .map((item) => item.id)
+                      );
                     }}
                     onDoubleClick={(event) => {
                       if (isLayerRowControl(event.target)) return;
@@ -1308,9 +1318,33 @@ export function StudioLayerNavigator({
                       focusRing
                     )}
                   >
-                    <span className="grid size-7 shrink-0 place-items-center text-fg-3" aria-hidden>
-                      {!node.empty && node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </span>
+                    {node.empty ? (
+                      <span className="grid size-7 shrink-0 place-items-center text-fg-3" aria-hidden>
+                        <ChevronRight size={14} />
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        data-layer-row-control
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setGroupCollapsed(node.group.id, node.expanded);
+                        }}
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised",
+                          coarseTarget,
+                          focusRing
+                        )}
+                        aria-label={
+                          node.expanded
+                            ? `${node.group.name} 그룹 접기`
+                            : `${node.group.name} 그룹 펼치기`
+                        }
+                      >
+                        {node.expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </button>
+                    )}
                     <span
                       aria-hidden
                       className={cn(
@@ -1348,6 +1382,34 @@ export function StudioLayerNavigator({
                         {selectedChildCount}
                       </span>
                     ) : null}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      data-layer-row-control
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onAction({
+                          type: "set-group-flag",
+                          groupId: node.group.id,
+                          flag: "locked",
+                          value: !node.group.locked,
+                        });
+                      }}
+                      disabled={readOnly}
+                      className={cn(
+                        "grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-35",
+                        coarseTarget,
+                        focusRing
+                      )}
+                      aria-label={
+                        node.group.locked
+                          ? `${node.group.name} 그룹 잠금 해제`
+                          : `${node.group.name} 그룹 잠금`
+                      }
+                      aria-pressed={node.group.locked === true}
+                    >
+                      {node.group.locked ? <Lock size={13} /> : <LockOpen size={13} />}
+                    </button>
                     <button
                       type="button"
                       tabIndex={-1}

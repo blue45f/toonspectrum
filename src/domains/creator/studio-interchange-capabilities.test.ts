@@ -151,6 +151,16 @@ describe("Studio interchange capability registry", () => {
         roundTrip: "partial",
       });
     }
+    expect(studioInterchangeCapability("dialogue-fdx")).toMatchObject({
+      import: "available",
+      export: "available",
+      roundTrip: "partial",
+      status: "available",
+      sizeBudget: { maxFileBytes: 8 * 1024 * 1024, maxItems: 20_000 },
+    });
+    expect(studioInterchangeCapabilitiesForExtension(".fdx").map((item) => item.id)).toEqual([
+      "dialogue-fdx",
+    ]);
     expect(studioInterchangeCapability("release-calendar")).toMatchObject({ import: "unsupported", export: "available" });
     expect(studioInterchangeCapability("publication-analytics-csv")).toMatchObject({ import: "available", export: "unsupported" });
   });

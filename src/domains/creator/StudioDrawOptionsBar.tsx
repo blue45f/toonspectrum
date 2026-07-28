@@ -282,6 +282,21 @@ export function StudioDrawOptionsBar({
   const isFavorite = favoriteBrushIds.includes(catalogBrushId);
   const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
   const pixelMode = drawMode === "pixel";
+  const advancedAvailable = drawMode === "pen" || drawMode === "eraser";
+  const strokeWidthLabel =
+    drawMode === "eraser"
+      ? "지우개 크기"
+      : drawMode === "shape"
+        ? "도형 선 굵기"
+        : "브러시 크기";
+  const opacityLabel =
+    drawMode === "pixel"
+      ? "픽셀 불투명도"
+      : drawMode === "eraser"
+        ? "지우개 불투명도"
+        : drawMode === "shape"
+          ? "도형 불투명도"
+          : "브러시 불투명도";
   const legacyBrushPresetModified =
     Boolean(catalogBrushItem) &&
     ((!sizeLocked &&
@@ -777,8 +792,10 @@ export function StudioDrawOptionsBar({
             <StudioToolHintTarget
               className="shrink-0"
               hint={studioToolHintFromLabel(
-                "브러시 크기",
-                `현재 ${strokeWidth}px입니다. 슬라이더나 [ · ] 단축키로 획 굵기를 조절하며 왼쪽 원에서 실제 상대 크기를 확인할 수 있어요.`,
+                strokeWidthLabel,
+                `현재 ${strokeWidth}px입니다. 슬라이더나 [ · ] 단축키로 ${
+                  drawMode === "shape" ? "새 도형의 윤곽선 굵기" : "획 굵기"
+                }를 조절하며 왼쪽 원에서 실제 상대 크기를 확인할 수 있어요.`,
                 "[  ]",
                 "brush-size"
               )}
@@ -797,7 +814,7 @@ export function StudioDrawOptionsBar({
                   value={strokeWidth}
                   onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
                   className="studio-range w-16 sm:w-20"
-                  aria-label="브러시 크기"
+                  aria-label={strokeWidthLabel}
                   aria-valuetext={`${strokeWidth}픽셀`}
                 />
                 <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
@@ -812,7 +829,7 @@ export function StudioDrawOptionsBar({
         <StudioToolHintTarget
           className="shrink-0"
           hint={studioToolHintFromLabel(
-            pixelMode ? "픽셀 불투명도" : "브러시 불투명도",
+            opacityLabel,
             pixelMode
               ? `현재 ${Math.round(brushOpacity * 100)}%입니다. 픽셀 모양은 1px로 유지되고 색 농도만 바뀝니다.`
               : `현재 ${Math.round(brushOpacity * 100)}%입니다. 낮추면 획 아래의 색이 비쳐 여러 번 덧칠할수록 농도가 자연스럽게 쌓여요.`,
@@ -835,7 +852,7 @@ export function StudioDrawOptionsBar({
               value={Math.round(brushOpacity * 100)}
               onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
               className="studio-range w-14 sm:w-16"
-            aria-label={pixelMode ? "픽셀 불투명도" : "브러시 불투명도"}
+            aria-label={opacityLabel}
             />
             <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
               {Math.round(brushOpacity * 100)}%
@@ -926,7 +943,7 @@ export function StudioDrawOptionsBar({
           ) : null}
 
           {/* Explicit overflow: unlike a hidden horizontal scroll, this control is always pinned. */}
-          {!pixelMode ? <StudioToolHintTarget
+          {advancedAvailable ? <StudioToolHintTarget
             hint={studioToolHintFromLabel(
               advancedOpen ? "세부 그리기 옵션 접기" : "세부 그리기 옵션",
               advancedOpen
@@ -1054,7 +1071,7 @@ export function StudioDrawOptionsBar({
       </div>
 
       {/* Advanced row — stabilizer, pressure, slots (collapsed by default) */}
-      {advancedOpen && !pixelMode ? (
+      {advancedOpen && advancedAvailable ? (
         <div
           id="studio-draw-advanced"
           data-studio-draw-advanced="true"
@@ -1289,7 +1306,7 @@ export function StudioDrawOptionsBar({
             </div>
           ) : null}
 
-          {onRecallBrushSlot ? (
+          {drawMode === "pen" && onRecallBrushSlot ? (
             <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="최근 브러시 슬롯 1–6">
               {Array.from({ length: 6 }, (_, index) => {
                 const slot = brushSlots[index] ?? null;

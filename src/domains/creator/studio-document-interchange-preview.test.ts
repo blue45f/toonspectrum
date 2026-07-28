@@ -35,6 +35,62 @@ describe("studio document interchange preview adapters", () => {
     );
   });
 
+  it("maps the structured PSD feature manifest into loss-preview categories", () => {
+    const preview = createStudioPsdImportLossPreview("profile.psd", {
+      elements: [{ id: "layer", type: "image" } as never],
+      sourceWidth: 1_080,
+      sourceHeight: 1_920,
+      scale: 1,
+      skipped: [],
+      lossManifest: {
+        direction: "import",
+        source: {
+          container: "psd",
+          width: 1_080,
+          height: 1_920,
+          channels: 4,
+          bitsPerChannel: 8,
+          colorMode: "RGB",
+        },
+        target: {
+          container: "studio",
+          width: 1_080,
+          height: 1_920,
+          channels: 4,
+          bitsPerChannel: 8,
+          colorMode: "sRGB",
+        },
+        decisions: [
+          {
+            feature: "layer-mask",
+            disposition: "rasterized",
+            count: 2,
+            message: "벡터 마스크 2개를 래스터화합니다.",
+          },
+          {
+            feature: "color-space",
+            disposition: "rasterized",
+            count: 1,
+            message: "ICC 프로필은 유지하지 않습니다.",
+          },
+        ],
+        budgets: {
+          maxFileBytes: 128,
+          maxDecodedBytes: 128,
+          maxDimensionPx: 30_000,
+        },
+        alternatives: ["원본 PSD 보관"],
+      },
+    } satisfies PsdImportResult, OPTIONS);
+
+    expect(preview.source.colorSpace).toBe("RGB 8bit");
+    expect(preview.result.colorSpace).toBe("sRGB 8bit");
+    expect(preview.constraints).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "alpha", message: expect.stringContaining("벡터 마스크") }),
+      expect.objectContaining({ category: "color-space", message: expect.stringContaining("ICC") }),
+    ]));
+  });
+
   it("blocks PSD application when converted layer payloads exceed the durable project budget", () => {
     const preview = createStudioPsdImportLossPreview("large.psd", {
       elements: [{

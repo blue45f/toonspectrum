@@ -3,20 +3,39 @@
  *
  * Browser pointer events are delivered in device- and browser-dependent batches. This module
  * separates event delivery from filtering by evaluating an immutable cascade on a 5ms logical
- * clock. Callers append the returned samples; a later transition never revises an emitted prefix.
+ * clock. Raw samples bracket a piecewise-linear input path, so irregular/coalesced delivery does
+ * not turn a smooth move into a zero-order-hold staircase. Callers append the returned samples; a
+ * later transition never revises an emitted prefix.
  *
  * The API is deliberately renderer-neutral. It has no DOM, React, Konva, brush, or persistence
  * dependency, so it can sit behind the current Studio stabilizer API or a future GPU input path.
  */
 
 export const FIXED_RATE_STROKE_FILTER_TICK_MS = 5;
-export const FIXED_RATE_STROKE_POSITION_QUANTUM = 1 / 16;
+/**
+ * A 1/32 CSS-pixel source grid keeps deterministic replay without stair-stepping low-speed detail.
+ *
+ * The former 1/16 grid was harmless on broad gestures, but a 2 CSS-pixel-radius circle sampled at
+ * 240Hz collapsed roughly one in six consecutive positions and inflated polyline length by about
+ * 11%. Halving the grid removes those collapsed steps while remaining far below a visible pixel.
+ * Persisted strokes already contain their accepted coordinates, so this is a new-input precision
+ * change rather than a reinterpretation of stored geometry.
+ */
+export const FIXED_RATE_STROKE_POSITION_QUANTUM = 1 / 32;
 export const FIXED_RATE_STROKE_TILT_QUANTUM = 1 / 16;
 export const FIXED_RATE_STROKE_PRESSURE_STEPS = 1_023;
 export const FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON = 1;
 export const FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON = 1 / FIXED_RATE_STROKE_PRESSURE_STEPS;
 export const FIXED_RATE_STROKE_RELEASE_TILT_EPSILON = FIXED_RATE_STROKE_TILT_QUANTUM;
 export const FIXED_RATE_STROKE_RELEASE_MAX_TICKS = 4_096;
+/**
+ * Maximum raw interval reconstructed as one linear move.
+ *
+ * Ordinary 120/240Hz input stays well below this bound. A suspended tab or driver clock jump first
+ * advances the settled hold in O(1), then reconstructs only this constant-size suffix instead of
+ * manufacturing minutes of intermediate work when the next sample arrives.
+ */
+export const FIXED_RATE_STROKE_INTERPOLATION_MAX_MS = 64;
 
 const MIN_NORMALIZED_STRENGTH = 0.01;
 const MIN_RESPONSE = 20;
@@ -36,7 +55,7 @@ const MAX_ALPHA_COMPLEMENT = 0.45;
 export interface FixedRateStrokeRawSample {
   readonly x: number;
   readonly y: number;
-  /** CSS surface pixels per document unit; positions retain a 1/16 CSS px input grid. */
+  /** CSS surface pixels per document unit; positions retain a 1/32 CSS px input grid. */
   readonly positionScale?: number;
   readonly pressure?: number;
   readonly tiltX?: number;
@@ -61,7 +80,12 @@ export interface FixedRateStrokeFilteredSample {
   readonly tiltY: number;
   /** Timestamp on the fixed 5ms logical grid. */
   readonly timeStamp: number;
-  /** Timestamp of the zero-order-held raw sample that fed this tick. */
+  /**
+   * Timestamp of the newest authoritative raw sample consulted for this tick.
+   *
+   * It can be newer than `timeStamp` by less than one input interval when that sample closes a
+   * piecewise-linear coalesced segment. Held/frame-pump ticks keep the historical <= relationship.
+   */
   readonly sourceTimeStamp: number;
   /** Zero-based tick index. The initial sample is tick zero. */
   readonly logicalTick: number;
@@ -332,7 +356,9 @@ function evaluateCascade(
 }
 
 function evaluateLogicalTick(
-  state: FixedRateStrokeFilterState
+  state: FixedRateStrokeFilterState,
+  inputSample: FixedRateStrokeQuantizedSample = state.heldSample,
+  sourceTimeStamp = inputSample.timeStamp
 ): {
   readonly state: FixedRateStrokeFilterState;
   readonly emitted: FixedRateStrokeFilteredSample;
@@ -340,13 +366,13 @@ function evaluateLogicalTick(
   const timeStamp = logicalTickTime(state);
   const cascade = evaluateCascade(
     state.stages,
-    state.heldSample,
+    inputSample,
     state.parameters.alpha
   );
   const emitted = filteredSample(
     cascade.output,
     timeStamp,
-    state.heldSample.timeStamp,
+    sourceTimeStamp,
     state.nextLogicalTick
   );
   return {
@@ -421,6 +447,68 @@ function advanceThrough(
   return { state, emitted };
 }
 
+function interpolateSample(
+  start: FixedRateStrokeQuantizedSample,
+  end: FixedRateStrokeQuantizedSample,
+  ratio: number,
+  timeStamp: number
+): FixedRateStrokeQuantizedSample {
+  const progress = clamp(ratio, 0, 1);
+  const interpolate = (from: number, to: number) => weightedChannel(from, to, progress);
+  return {
+    x: interpolate(start.x, end.x),
+    y: interpolate(start.y, end.y),
+    pressure: interpolate(start.pressure, end.pressure),
+    tiltX: interpolate(start.tiltX, end.tiltX),
+    tiltY: interpolate(start.tiltY, end.tiltY),
+    timeStamp,
+  };
+}
+
+/**
+ * Advances ticks closed by one newly authoritative sample.
+ *
+ * A zero-order hold presents each tick with the preceding point and therefore adds up to one tick
+ * of avoidable phase delay. Worse, uneven 120/240Hz samples become uneven spatial steps before the
+ * cascade sees them. Reconstruct the quantized source segment at each still-unpublished tick.
+ * This is causal at delivery time (the closing sample is already authoritative), preserves the
+ * immutable emitted prefix, and remains batch-independent because samples are ingested in source
+ * order.
+ */
+function advanceAlongSampleSegment(
+  initialState: FixedRateStrokeFilterState,
+  sample: FixedRateStrokeQuantizedSample
+): {
+  readonly state: FixedRateStrokeFilterState;
+  readonly emitted: readonly FixedRateStrokeFilteredSample[];
+} {
+  const startSample = initialState.heldSample;
+  const rawSpan = sample.timeStamp - startSample.timeStamp;
+  if (!(rawSpan > 0)) return advanceThrough(initialState, sample.timeStamp);
+
+  const interpolationSpan = Math.min(rawSpan, FIXED_RATE_STROKE_INTERPOLATION_MAX_MS);
+  const interpolationStartTime = sample.timeStamp - interpolationSpan;
+  const heldPrefix = advanceThrough(initialState, interpolationStartTime);
+  let state = heldPrefix.state;
+  const emitted = [...heldPrefix.emitted];
+
+  while (logicalTickTime(state) <= sample.timeStamp) {
+    const tickTimeStamp = logicalTickTime(state);
+    const progress = (tickTimeStamp - interpolationStartTime) / interpolationSpan;
+    const inputSample = interpolateSample(
+      startSample,
+      sample,
+      progress,
+      tickTimeStamp
+    );
+    const tick = evaluateLogicalTick(state, inputSample, sample.timeStamp);
+    state = tick.state;
+    emitted.push(tick.emitted);
+  }
+
+  return { state, emitted };
+}
+
 function ingestSample(
   initialState: FixedRateStrokeFilterState,
   rawSample: FixedRateStrokeRawSample
@@ -435,10 +523,7 @@ function ingestSample(
     ...quantized,
     timeStamp: Math.max(initialState.heldSample.timeStamp, quantized.timeStamp),
   };
-  // The traced sampler switches raw targets only when `sample.timeStamp < logicalTickTime`.
-  // Therefore a sample landing exactly on a 5 ms boundary becomes eligible on the *next* tick;
-  // evaluate the boundary tick with the previous hold before installing this sample.
-  const advanced = advanceThrough(initialState, sample.timeStamp);
+  const advanced = advanceAlongSampleSegment(initialState, sample);
   return {
     state: { ...advanced.state, heldSample: sample },
     emitted: advanced.emitted,
@@ -566,11 +651,10 @@ function releaseFilter(
 /**
  * Applies an input, logical-clock, or release command without mutating prior state or emissions.
  *
- * Append transitions advance ticks through the newest raw timestamp using the previous hold, then
- * install the sample. This implements the traced strict `sample.timeStamp < logicalTickTime`
- * boundary while still letting the last equal-timestamp sample win on the next tick. At every
- * evaluated tick, the last eligible raw sample is supplied unchanged to the cascade (zero-order
- * hold).
+ * Append transitions reconstruct the quantized line segment closed by the newest raw sample at
+ * each still-unpublished tick, then install the sample as the new hold. Equal-timestamp samples
+ * still let the last source-order value win on the next tick. Frame-clock advances use the latest
+ * hold, while ordinary coalesced input avoids the extra tick of ZOH phase delay.
  */
 export function transitionFixedRateStrokeFilter(
   state: FixedRateStrokeFilterState,

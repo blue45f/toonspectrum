@@ -71,6 +71,7 @@ import {
 
 import { STUDIO_EDIT_MENU_COMMANDS } from "./studio-edit-controls";
 import { localizeStudioMainMenuGroups } from "./studio-main-menu-localization";
+import { withDisabledMainMenuReasons } from "./studio-main-menu-unavailable";
 
 import type { CvdMode } from "./studio-color-vision-model";
 import type { DrawMode, StudioMenu } from "./studio-editor-tool-model";
@@ -1084,6 +1085,5 @@ export function buildStudioMainMenuGroups({
       ],
     },
   ];
-
-  return localizeStudioMainMenuGroups(groups, state, t);
+  return localizeStudioMainMenuGroups(withDisabledMainMenuReasons(groups, state), state, t);
 }
