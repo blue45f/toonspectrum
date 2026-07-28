@@ -6,12 +6,15 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { parse as parseYaml } from "yaml";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIRECTORY, "..");
@@ -21,20 +24,6 @@ const REPOSITORY_NOTICE_PATH = join(
   REPOSITORY_ROOT,
   "THIRD_PARTY_NOTICES.md",
 );
-
-const OUTPUT_FLAG = process.argv.indexOf("--output");
-const outputPath =
-  OUTPUT_FLAG >= 0 && process.argv[OUTPUT_FLAG + 1]
-    ? resolve(REPOSITORY_ROOT, process.argv[OUTPUT_FLAG + 1])
-    : null;
-const checkOnly = process.argv.includes("--check");
-
-if (OUTPUT_FLAG >= 0 && !outputPath) {
-  throw new Error("--output requires a repository-relative file path.");
-}
-if (!checkOnly && !outputPath) {
-  throw new Error("Use --check or --output <path>.");
-}
 
 const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "0BSD",
@@ -49,6 +38,13 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "MPL-2.0",
   "Public Domain",
   "Unlicense",
+]);
+
+const REVIEWED_LICENSE_FILE_DIGESTS = new Map([
+  [
+    "422fa324bf754acb2f48918039858f39bc31cc1a710b492906889f9363d6b09e",
+    "MIT",
+  ],
 ]);
 
 const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
@@ -103,6 +99,238 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+function normalizeAuthor(author) {
+  if (typeof author === "object" && author !== null) {
+    return typeof author.name === "string" ? author.name.trim() : "";
+  }
+  if (typeof author !== "string") return "";
+  return author.split(/[<(]/u, 1)[0].trim();
+}
+
+function normalizeHomepage(packageJson) {
+  if (typeof packageJson.homepage === "string") {
+    return packageJson.homepage.trim();
+  }
+  const repository =
+    typeof packageJson.repository === "string"
+      ? packageJson.repository
+      : packageJson.repository?.url;
+  if (typeof repository !== "string") return "";
+  return repository
+    .replace(/^git\+/u, "")
+    .replace(/^git:\/\//u, "https://")
+    .replace(/\.git$/u, "");
+}
+
+function normalizeLicenseExpression(license) {
+  if (typeof license === "string") return license.trim();
+  if (Array.isArray(license)) {
+    return [
+      ...new Set(
+        license
+          .map((entry) => normalizeLicenseExpression(entry))
+          .filter(Boolean),
+      ),
+    ].join(" OR ");
+  }
+  if (
+    typeof license === "object"
+    && license !== null
+    && (
+      typeof license.type === "string"
+      || typeof license.name === "string"
+    )
+  ) {
+    return String(license.type ?? license.name).trim();
+  }
+  return "";
+}
+
+function inferLicenseExpressionFromFiles(packagePath) {
+  for (const path of findRootLicenseFiles(packagePath)) {
+    const normalized = readFileSync(path, "utf8")
+      .replaceAll("\r\n", "\n")
+      .trim();
+    const reviewedExpression = REVIEWED_LICENSE_FILE_DIGESTS.get(
+      sha256(normalized),
+    );
+    if (reviewedExpression) return reviewedExpression;
+  }
+  return "";
+}
+
+function resolveInstalledPackagePath(packageName, fromDirectory) {
+  let currentDirectory = resolve(fromDirectory);
+  while (true) {
+    const candidate = join(
+      currentDirectory,
+      "node_modules",
+      ...packageName.split("/"),
+    );
+    if (existsSync(join(candidate, "package.json"))) {
+      return realpathSync(candidate);
+    }
+    if (currentDirectory === REPOSITORY_ROOT) break;
+    const parentDirectory = dirname(currentDirectory);
+    const repositoryRelativeParent = relative(
+      REPOSITORY_ROOT,
+      parentDirectory,
+    );
+    if (
+      parentDirectory === currentDirectory
+      || repositoryRelativeParent === ".."
+      || repositoryRelativeParent.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)
+    ) {
+      break;
+    }
+    currentDirectory = parentDirectory;
+  }
+  return null;
+}
+
+function readWorkspaceImporterDirectories() {
+  const lockfile = parseYaml(readFileSync(LOCKFILE_PATH, "utf8"));
+  if (
+    typeof lockfile !== "object"
+    || lockfile === null
+    || typeof lockfile.importers !== "object"
+    || lockfile.importers === null
+  ) {
+    throw new Error("pnpm-lock.yaml is missing its workspace importer graph.");
+  }
+  return Object.keys(lockfile.importers)
+    .sort()
+    .map((importer) => {
+      const directory = resolve(REPOSITORY_ROOT, importer);
+      const relativeDirectory = relative(REPOSITORY_ROOT, directory);
+      if (
+        relativeDirectory === ".."
+        || relativeDirectory.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`)
+      ) {
+        throw new Error(`Workspace importer escapes the repository: ${importer}`);
+      }
+      if (!existsSync(join(directory, "package.json"))) {
+        throw new Error(`Workspace importer has no package.json: ${importer}`);
+      }
+      return directory;
+    });
+}
+
+export function readFilesystemLicenseInventory() {
+  const pendingPackagePaths = [];
+  for (const importerDirectory of readWorkspaceImporterDirectories()) {
+    const importerPackageJson = readJson(
+      join(importerDirectory, "package.json"),
+    );
+    const directDependencies = {
+      ...(importerPackageJson.dependencies ?? {}),
+      ...(importerPackageJson.optionalDependencies ?? {}),
+    };
+    for (const packageName of Object.keys(directDependencies).sort()) {
+      const packagePath = resolveInstalledPackagePath(
+        packageName,
+        importerDirectory,
+      );
+      if (!packagePath) {
+        if (packageName in (importerPackageJson.optionalDependencies ?? {})) {
+          continue;
+        }
+        throw new Error(
+          `Required production dependency is not installed: ${packageName}`,
+        );
+      }
+      pendingPackagePaths.push(packagePath);
+    }
+  }
+
+  const visitedPackagePaths = new Set();
+  const groupedPackages = new Map();
+  while (pendingPackagePaths.length > 0) {
+    const packagePath = realpathSync(pendingPackagePaths.shift());
+    if (visitedPackagePaths.has(packagePath)) continue;
+    visitedPackagePaths.add(packagePath);
+
+    const packageJson = readJson(join(packagePath, "package.json"));
+    if (
+      typeof packageJson.name !== "string"
+      || packageJson.name.length === 0
+      || typeof packageJson.version !== "string"
+      || packageJson.version.length === 0
+    ) {
+      throw new Error(`Installed package metadata is malformed: ${packagePath}`);
+    }
+
+    if (!packageJson.private) {
+      const license =
+        normalizeLicenseExpression(
+          packageJson.license ?? packageJson.licenses,
+        )
+        || inferLicenseExpressionFromFiles(packagePath);
+      if (!REVIEWED_LICENSE_EXPRESSIONS.has(license)) {
+        throw new Error(
+          `Unreviewed production license expression: ${license || "(missing)"} (${packageJson.name}@${packageJson.version})`,
+        );
+      }
+      const key = `${packageJson.name}\u0000${license}`;
+      const existing = groupedPackages.get(key) ?? {
+        name: packageJson.name,
+        versions: new Set(),
+        paths: new Set(),
+        license,
+        authors: new Set(),
+        homepages: new Set(),
+      };
+      existing.versions.add(packageJson.version);
+      existing.paths.add(packagePath);
+      const author = normalizeAuthor(packageJson.author);
+      const homepage = normalizeHomepage(packageJson);
+      if (author) existing.authors.add(author);
+      if (homepage) existing.homepages.add(homepage);
+      groupedPackages.set(key, existing);
+    }
+
+    const optionalDependencies = packageJson.optionalDependencies ?? {};
+    const requiredDependencies = packageJson.dependencies ?? {};
+    for (const packageName of Object.keys(requiredDependencies).sort()) {
+      const dependencyPath = resolveInstalledPackagePath(packageName, packagePath);
+      if (!dependencyPath) {
+        if (packageName in optionalDependencies) continue;
+        throw new Error(
+          `Required production dependency is not installed: ${packageJson.name}@${packageJson.version} -> ${packageName}`,
+        );
+      }
+      pendingPackagePaths.push(dependencyPath);
+    }
+    for (const packageName of Object.keys(optionalDependencies).sort()) {
+      const dependencyPath = resolveInstalledPackagePath(packageName, packagePath);
+      if (dependencyPath) pendingPackagePaths.push(dependencyPath);
+    }
+    for (const packageName of Object.keys(packageJson.peerDependencies ?? {}).sort()) {
+      const dependencyPath = resolveInstalledPackagePath(packageName, packagePath);
+      if (dependencyPath) pendingPackagePaths.push(dependencyPath);
+    }
+  }
+
+  if (groupedPackages.size === 0) {
+    throw new Error("Installed production dependency graph is empty.");
+  }
+
+  return [...groupedPackages.values()]
+    .map((entry) => ({
+      name: entry.name,
+      versions: [...entry.versions].sort(),
+      paths: [...entry.paths].sort(),
+      license: entry.license,
+      author: [...entry.authors].sort()[0] ?? "",
+      homepage: [...entry.homepages].sort()[0] ?? "",
+    }))
+    .sort(
+      (left, right) =>
+        left.name.localeCompare(right.name)
+        || left.versions.join(",").localeCompare(right.versions.join(",")),
+    );
+}
+
 function findRootLicenseFiles(packagePath) {
   let names;
   try {
@@ -150,17 +378,7 @@ function collectMplFallback() {
   return null;
 }
 
-function readResolvedLicenseInventory() {
-  const raw = execFileSync(
-    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-    ["licenses", "list", "--prod", "--json"],
-    {
-      cwd: REPOSITORY_ROOT,
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "inherit"],
-    },
-  );
+export function parsePnpmLicenseInventory(raw) {
   const grouped = JSON.parse(raw);
   const entries = [];
   for (const [licenseExpression, packages] of Object.entries(grouped)) {
@@ -205,6 +423,53 @@ function readResolvedLicenseInventory() {
       left.name.localeCompare(right.name)
       || left.versions.join(",").localeCompare(right.versions.join(",")),
   );
+}
+
+export function isRecoverablePnpmLicenseInventoryError(error) {
+  const stderr =
+    typeof error?.stderr === "string"
+      ? error.stderr
+      : Buffer.isBuffer(error?.stderr)
+        ? error.stderr.toString("utf8")
+        : "";
+  return `${String(error?.message ?? "")}\n${stderr}`.includes(
+    "ERR_PNPM_MISSING_PACKAGE_INDEX_FILE",
+  );
+}
+
+export function readResolvedLicenseInventory({
+  source = "pnpm",
+  runPnpmLicenseList = () =>
+    execFileSync(
+      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+      ["licenses", "list", "--prod", "--json"],
+      {
+        cwd: REPOSITORY_ROOT,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    ),
+} = {}) {
+  if (source === "filesystem") {
+    return readFilesystemLicenseInventory();
+  }
+  if (source !== "pnpm") {
+    throw new Error(`Unsupported license inventory source: ${source}`);
+  }
+  try {
+    const raw = runPnpmLicenseList();
+    return parsePnpmLicenseInventory(raw);
+  } catch (error) {
+    if (!isRecoverablePnpmLicenseInventoryError(error)) {
+      if (error?.stderr) process.stderr.write(error.stderr);
+      throw error;
+    }
+    process.stderr.write(
+      "pnpm's cached package index is incomplete; verifying the installed production dependency graph directly.\n",
+    );
+    return readFilesystemLicenseInventory();
+  }
 }
 
 function validateDirectDependencies(packageJson, inventory) {
@@ -434,35 +699,71 @@ ${licenseTexts}
 `;
 }
 
-const packageJson = readJson(PACKAGE_JSON_PATH);
-const inventory = readResolvedLicenseInventory();
-validateDirectDependencies(packageJson, inventory);
-validateRepositoryPolicy();
-const { documents, missing } = collectLicenseDocuments(inventory);
-const generatedNotice = renderNotice(
-  packageJson,
-  inventory,
-  documents,
-  missing,
-);
+export function main(argumentsList = process.argv.slice(2)) {
+  const outputFlag = argumentsList.indexOf("--output");
+  const outputPath =
+    outputFlag >= 0 && argumentsList[outputFlag + 1]
+      ? resolve(REPOSITORY_ROOT, argumentsList[outputFlag + 1])
+      : null;
+  const checkOnly = argumentsList.includes("--check");
+  const inventorySourceFlag = argumentsList.indexOf("--inventory-source");
+  const inventorySource =
+    inventorySourceFlag >= 0
+      ? argumentsList[inventorySourceFlag + 1]
+      : "pnpm";
 
-if (generatedNotice.length < 50_000) {
-  throw new Error("Generated notice is unexpectedly incomplete.");
+  if (outputFlag >= 0 && !outputPath) {
+    throw new Error("--output requires a repository-relative file path.");
+  }
+  if (!checkOnly && !outputPath) {
+    throw new Error("Use --check or --output <path>.");
+  }
+  if (!inventorySource) {
+    throw new Error("--inventory-source requires pnpm or filesystem.");
+  }
+
+  const packageJson = readJson(PACKAGE_JSON_PATH);
+  const inventory = readResolvedLicenseInventory({
+    source: inventorySource,
+  });
+  validateDirectDependencies(packageJson, inventory);
+  validateRepositoryPolicy();
+  const { documents, missing } = collectLicenseDocuments(inventory);
+  const generatedNotice = renderNotice(
+    packageJson,
+    inventory,
+    documents,
+    missing,
+  );
+
+  if (generatedNotice.length < 50_000) {
+    throw new Error("Generated notice is unexpectedly incomplete.");
+  }
+
+  if (outputPath) {
+    mkdirSync(dirname(outputPath), { recursive: true });
+    writeFileSync(outputPath, generatedNotice, "utf8");
+    if (
+      !existsSync(outputPath)
+      || readFileSync(outputPath, "utf8") !== generatedNotice
+    ) {
+      throw new Error("Generated notice could not be verified after writing.");
+    }
+    validateBrowserDistribution();
+    process.stdout.write(
+      `Wrote ${relative(REPOSITORY_ROOT, outputPath)} (${inventory.length} entries, ${documents.length} license texts).\n`,
+    );
+  } else {
+    validateBrowserDistribution();
+    process.stdout.write(
+      `License audit passed (${inventory.length} entries, ${documents.length} license texts, ${missing.length} packages without a root license file).\n`,
+    );
+  }
 }
 
-if (outputPath) {
-  mkdirSync(dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, generatedNotice, "utf8");
-  if (!existsSync(outputPath) || readFileSync(outputPath, "utf8") !== generatedNotice) {
-    throw new Error("Generated notice could not be verified after writing.");
-  }
-  validateBrowserDistribution();
-  process.stdout.write(
-    `Wrote ${relative(REPOSITORY_ROOT, outputPath)} (${inventory.length} entries, ${documents.length} license texts).\n`,
-  );
-} else {
-  validateBrowserDistribution();
-  process.stdout.write(
-    `License audit passed (${inventory.length} entries, ${documents.length} license texts, ${missing.length} packages without a root license file).\n`,
-  );
+if (
+  process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main();
 }
