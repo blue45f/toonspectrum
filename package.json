@@ -59,6 +59,7 @@
     "verify:studio-engine-webgpu-filter-parity": "node scripts/verify-studio-engine-webgpu-filter-parity.mjs",
     "verify:studio-engine-webgpu-textured-brush": "node scripts/verify-studio-engine-webgpu-textured-brush.mjs",
     "verify:studio-engine-webgpu-tile-provider": "node scripts/verify-studio-engine-webgpu-tile-provider.mjs",
+    "verify:studio-professional-bristle-webgpu": "node scripts/verify-studio-professional-bristle-webgpu.mjs",
     "verify:studio-engine-tile-storage-opfs-v2": "node scripts/verify-studio-engine-tile-storage-opfs-v2.mjs",
     "verify:studio-canvaskit-quality-worker": "node scripts/verify-studio-canvaskit-quality-worker.mjs",
     "verify:studio-gpu-filters": "tsx scripts/verify-studio-gpu-filters.mts",

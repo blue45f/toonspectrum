@@ -151,6 +151,7 @@ describe("studio wet-media two-well model", () => {
       model,
       initial,
       contact({
+        sequence: 1,
         contactMeasure: 1,
         canvas: {
           color: [0, 0, 0, 0],
@@ -178,6 +179,7 @@ describe("studio wet-media two-well model", () => {
       model,
       firstHalf.value.state,
       contact({
+        sequence: 1,
         contactMeasure: 0.5,
         canvas: {
           color: [0, 0, 0, 0],
@@ -242,6 +244,7 @@ describe("studio wet-media two-well model", () => {
       settings({ wetness: 0, pickupRate: 0, mix: 0, depositionRate: 1 }),
       sampled.value.state,
       contact({
+        sequence: 1,
         canvas: {
           color: [0, 0, 0, 0],
           availablePigmentMass: 0,
@@ -253,6 +256,7 @@ describe("studio wet-media two-well model", () => {
       settings({ wetness: 0, pickupRate: 0, mix: 1, depositionRate: 1 }),
       sampled.value.state,
       contact({
+        sequence: 1,
         canvas: {
           color: [0, 0, 0, 0],
           availablePigmentMass: 0,
@@ -287,6 +291,7 @@ describe("studio wet-media two-well model", () => {
       kind: "studio-wet-media-two-well-state",
       version: 1,
       strokeSequence: 0,
+      lastContactSequence: null,
       reservoir: {
         color: [0.1, 0.1, 0.1, 1],
         pigmentMass: 1,
@@ -353,6 +358,7 @@ describe("studio wet-media two-well model", () => {
     const advancedState = {
       ...state,
       strokeSequence: 2,
+      lastContactSequence: 2,
     };
     expect(advanceStudioWetMediaTwoWellContact(
       settings(),

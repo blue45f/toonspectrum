@@ -58,6 +58,7 @@ export interface StudioWetMediaTwoWellState {
   readonly kind: "studio-wet-media-two-well-state";
   readonly version: typeof STUDIO_WET_MEDIA_TWO_WELL_VERSION;
   readonly strokeSequence: number;
+  readonly lastContactSequence: number | null;
   readonly reservoir: StudioWetMediaWell;
   readonly pickup: StudioWetMediaWell;
 }
@@ -146,6 +147,7 @@ const STATE_KEYS = [
   "kind",
   "version",
   "strokeSequence",
+  "lastContactSequence",
   "reservoir",
   "pickup",
 ] as const;
@@ -282,6 +284,7 @@ function freezeWell(
 
 function freezeState(
   strokeSequence: number,
+  lastContactSequence: number | null,
   reservoir: StudioWetMediaWell,
   pickup: StudioWetMediaWell,
 ): StudioWetMediaTwoWellState {
@@ -289,6 +292,7 @@ function freezeState(
     kind: "studio-wet-media-two-well-state",
     version: STUDIO_WET_MEDIA_TWO_WELL_VERSION,
     strokeSequence,
+    lastContactSequence,
     reservoir: freezeWell(
       reservoir.color,
       reservoir.pigmentMass,
@@ -378,6 +382,10 @@ export function parseStudioWetMediaTwoWellState(
   if (
     record.value.kind !== "studio-wet-media-two-well-state"
     || !nonNegativeSafeInteger(record.value.strokeSequence)
+    || (
+      record.value.lastContactSequence !== null
+      && !nonNegativeSafeInteger(record.value.lastContactSequence)
+    )
   ) {
     return failure("invalid-field", "$.strokeSequence");
   }
@@ -399,6 +407,7 @@ export function parseStudioWetMediaTwoWellState(
     ok: true,
     value: freezeState(
       record.value.strokeSequence,
+      record.value.lastContactSequence,
       reservoir.value,
       pickup.value,
     ),
@@ -499,6 +508,7 @@ export function createStudioWetMediaTwoWellState(
     ok: true,
     value: freezeState(
       0,
+      null,
       freezeWell(
         loadedColor.value,
         settings.value.reservoirPigmentCapacity * settings.value.load,
@@ -535,7 +545,12 @@ export function beginStudioWetMediaStroke(
     : state.value.pickup;
   return {
     ok: true,
-    value: freezeState(state.value.strokeSequence + 1, reservoir, pickup),
+    value: freezeState(
+      state.value.strokeSequence + 1,
+      null,
+      reservoir,
+      pickup,
+    ),
   };
 }
 
@@ -601,7 +616,10 @@ export function advanceStudioWetMediaTwoWellContact(
   if (!state.ok) return state;
   const contact = inspectContact(contactInput);
   if (!contact.ok) return contact;
-  if (contact.value.sequence < state.value.strokeSequence) {
+  if (
+    state.value.lastContactSequence !== null
+    && contact.value.sequence <= state.value.lastContactSequence
+  ) {
     return failure("sequence-regression", "$.contact.sequence");
   }
 
@@ -697,6 +715,7 @@ export function advanceStudioWetMediaTwoWellContact(
   const result: StudioWetMediaContactResult = Object.freeze({
     state: freezeState(
       state.value.strokeSequence,
+      contact.value.sequence,
       nextReservoir,
       nextPickup,
     ),

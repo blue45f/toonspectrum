@@ -429,6 +429,8 @@ describe("StudioEngineVNextBrushProviderRouter", () => {
       "porter-duff:source-over",
     ]);
     const subject = router([provider]);
+    (provider.descriptor.capabilities as
+      StudioEngineVNextBrushProviderCapability[]).push("media:wet");
     const [descriptor] = subject.descriptors();
 
     expect(descriptor?.capabilities).toEqual(ANALYTIC_CAPABILITIES);
@@ -505,6 +507,23 @@ describe("StudioEngineVNextBrushProviderRouter", () => {
       hostileExecute as unknown as StudioEngineVNextBrushProvider,
     ])).toThrow(/execute/u);
     expect(executeGetter).not.toHaveBeenCalled();
+
+    const optionGetter = vi.fn(() => 7);
+    const hostileOptions = {
+      deviceEpoch: 5,
+      resizeEpoch: 3,
+      providers: [one],
+    };
+    Object.defineProperty(hostileOptions, "sessionEpoch", {
+      enumerable: true,
+      get: optionGetter,
+    });
+    expect(() => new StudioEngineVNextBrushProviderRouter(
+      hostileOptions as unknown as ConstructorParameters<
+        typeof StudioEngineVNextBrushProviderRouter
+      >[0],
+    )).toThrow(/options/u);
+    expect(optionGetter).not.toHaveBeenCalled();
   });
 
   it("fails closed on accessors, unknown keys, symbols, cycles, and depth", async () => {
@@ -866,6 +885,27 @@ describe("StudioEngineVNextBrushProviderRouter", () => {
     subject.notifyDeviceLoss("ignored");
     expect(provider.notifyDeviceLoss).toHaveBeenCalledTimes(1);
     gate.resolve(null);
+  });
+
+  it("keeps a terminal device epoch safe at integer exhaustion", () => {
+    const provider = testProvider("epoch-overflow", ANALYTIC_CAPABILITIES);
+    const subject = new StudioEngineVNextBrushProviderRouter({
+      sessionEpoch: 7,
+      deviceEpoch: Number.MAX_SAFE_INTEGER,
+      resizeEpoch: 3,
+      providers: [provider],
+    });
+
+    subject.notifyDeviceLoss("epoch-exhausted");
+
+    expect(subject.snapshot()).toMatchObject({
+      phase: "device-lost",
+      deviceEpoch: Number.MAX_SAFE_INTEGER,
+    });
+    expect(provider.notifyDeviceLoss).toHaveBeenCalledWith({
+      deviceEpoch: Number.MAX_SAFE_INTEGER,
+      reason: "epoch-exhausted",
+    });
   });
 
   it("disposes active and queued work exactly once", async () => {
