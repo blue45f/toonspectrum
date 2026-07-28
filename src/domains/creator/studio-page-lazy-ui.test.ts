@@ -65,6 +65,11 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
   "./StudioWebGpuCanvas",
 ] as const;
 
+const USER_TRIGGERED_STUDIO_RUNTIMES = [
+  "./studio-capture-readiness",
+  "./studio-save-payload",
+] as const;
+
 describe("StudioPage optional UI registry", () => {
   it("keeps StudioPage orchestration separate from the optional loader catalog", () => {
     const page = moduleEdges("./StudioPage.tsx");
@@ -88,6 +93,34 @@ describe("StudioPage optional UI registry", () => {
         specifier,
       ]);
     }
+  });
+
+  it("defers capture readiness and save projection until user intent", () => {
+    const page = moduleEdges("./StudioPage.tsx");
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
+
+    for (const specifier of USER_TRIGGERED_STUDIO_RUNTIMES) {
+      expect(page.valueImports, `${specifier} must leave the StudioPage static graph`).not.toContain(
+        specifier
+      );
+      expect(page.dynamicImports, `${specifier} must keep one registry-owned loader`).not.toContain(
+        specifier
+      );
+      expect(
+        registry.dynamicImports.filter((candidate) => candidate === specifier),
+        `${specifier} must retain one literal Vite boundary`
+      ).toEqual([specifier]);
+    }
+
+    expect(registry.source).toContain("studioCaptureReadinessRuntimeLoader.preload()");
+    expect(registry.source).toContain("studioSavePayloadRuntimeLoader.preload()");
+    expect(registry.source).toMatch(
+      /function preloadStudioExportMenuPanel\(\): void \{[\s\S]*?preloadStudioCaptureReadinessRuntime\(\);[\s\S]*?\}/u
+    );
+    expect(page.source).toContain("await loadStudioCaptureReadinessRuntime()");
+    expect(page.source).toContain("await loadStudioSavePayloadRuntime()");
+    expect(page.source).toContain("preloadStudioCaptureReadinessRuntime();");
+    expect(page.source).toContain("preloadStudioSavePayloadRuntime();");
   });
 
   it("keeps shared preload promises in the registry instead of recreating them per render", () => {

@@ -11,9 +11,33 @@ import type { ComponentType } from "react";
 import { lazyRetry } from "@/lib/lazy-retry";
 
 /**
- * Optional Studio surfaces live in this explicit registry so StudioPage stays focused on
- * orchestration. Every feature keeps a literal import() boundary for Vite/Rolldown analysis.
+ * Optional Studio surfaces and user-triggered runtimes live in this explicit registry so
+ * StudioPage stays focused on orchestration. Every feature keeps a literal import() boundary
+ * for Vite/Rolldown analysis.
  */
+const studioCaptureReadinessRuntimeLoader = createStudioIntentLazyLoader(
+  () => import("./studio-capture-readiness")
+);
+const studioSavePayloadRuntimeLoader = createStudioIntentLazyLoader(
+  () => import("./studio-save-payload")
+);
+
+function loadStudioCaptureReadinessRuntime() {
+  return studioCaptureReadinessRuntimeLoader.load();
+}
+
+function preloadStudioCaptureReadinessRuntime(): void {
+  studioCaptureReadinessRuntimeLoader.preload();
+}
+
+function loadStudioSavePayloadRuntime() {
+  return studioSavePayloadRuntimeLoader.load();
+}
+
+function preloadStudioSavePayloadRuntime(): void {
+  studioSavePayloadRuntimeLoader.preload();
+}
+
 const StudioPageThumbnail = lazyRetry(
   () => import("./StudioPageThumbnails").then((mod) => ({ default: mod.StudioPageThumbnail })),
   "StudioPageThumbnail"
@@ -688,6 +712,7 @@ const StudioExportMenuPanel = lazyRetry(loadStudioExportMenuPanel, "StudioExport
 
 function preloadStudioExportMenuPanel(): void {
   void loadStudioExportMenuPanel();
+  preloadStudioCaptureReadinessRuntime();
 }
 
 type StudioWebtoonGuidesModule = typeof import("./studio-webtoon-guides");
@@ -876,6 +901,8 @@ export {
   loadStudioBrushStudio,
   loadStudioComipoAssembly,
   loadStudioComipoShipped,
+  loadStudioCaptureReadinessRuntime,
+  loadStudioSavePayloadRuntime,
   loadStudioTeamCommentClient,
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
@@ -887,8 +914,10 @@ export {
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioPaletteLibraryPanel,
   preloadStudioCommentThreadPopover,
+  preloadStudioCaptureReadinessRuntime,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
+  preloadStudioSavePayloadRuntime,
   preloadStudioStockImagePanel,
   preloadStudioTextEditOverlay,
 };

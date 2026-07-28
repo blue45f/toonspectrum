@@ -35,11 +35,14 @@ describe("studio save payload ownership boundary", () => {
 
   it("keeps capture, freshness, transport, CRDT, and cleanup ordering in StudioPage", () => {
     const page = source("./StudioPage.tsx");
+    const lazyRegistry = source("./studio-page-lazy-ui.ts");
     const saveStart = page.indexOf('async function handleSave(status: "published" | "draft")');
     const saveEnd = page.indexOf("// 터치 기기(작은 폰)", saveStart);
     const save = page.slice(saveStart, saveEnd);
 
-    expect(page).toContain('from "./studio-save-payload"');
+    expect(page).not.toContain('from "./studio-save-payload"');
+    expect(lazyRegistry.match(/import\("\.\/studio-save-payload"\)/gu)).toHaveLength(1);
+    expect(save).toContain("await loadStudioSavePayloadRuntime()");
     expect(save).toContain("validateStudioPublishPreflight(");
     expect(save).toContain("publishComplianceResult.readyForDestinationReview");
     expect(save).toContain("new AbortController()");
@@ -59,6 +62,7 @@ describe("studio save payload ownership boundary", () => {
       "await authoritativeSaveBarrier(10_000)",
       "await captureReadyStageForPage(page)",
       "await downscaleStudioCanvasDataUrl(pageImages[0] || \"\", 480)",
+      "await loadStudioSavePayloadRuntime()",
       "buildStudioSavePayload({",
     ]);
 

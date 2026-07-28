@@ -254,10 +254,6 @@ import {
 } from "./studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
 import {
-  collectStudioCaptureAssetSources,
-  waitForStudioCaptureReady,
-} from "./studio-capture-readiness";
-import {
   selectStudioCausalInkSamples,
   shouldAppendStudioCausalInkSample,
 } from "./studio-causal-ink";
@@ -740,16 +736,20 @@ import {
   StudioUnifiedBrushPicker,
   StudioUploadPublish,
   loadStudioBrushStudio,
+  loadStudioCaptureReadinessRuntime,
   loadStudioComipoAssembly,
   loadStudioComipoShipped,
+  loadStudioSavePayloadRuntime,
   loadStudioTeamCommentClient,
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
   preloadStudioCommentsPanelSession,
   preloadStudioCommentThreadPopover,
+  preloadStudioCaptureReadinessRuntime,
   preloadStudioPointCommentComposer,
   preloadStudioReferencePanel,
+  preloadStudioSavePayloadRuntime,
   preloadStudioTextEditOverlay,
   StudioCanvasRulerBars,
   type StudioComipoAssemblyModule,
@@ -985,11 +985,6 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
-import {
-  buildStudioDirectWorkSavePlan,
-  buildStudioSavePayload,
-  buildStudioSharedSavePatch,
-} from "./studio-save-payload";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   clampCanvasPlacementCenter,
@@ -17604,6 +17599,8 @@ const puppetWarpArmed =
     dismissQuickStart();
   }
   function openPublishStep() {
+    preloadStudioCaptureReadinessRuntime();
+    preloadStudioSavePayloadRuntime();
     setTool("select");
     setMenu(null);
     if (isMobile) {
@@ -27979,6 +27976,10 @@ const puppetWarpArmed =
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 캡처할 수 있어요.");
     }
+    const {
+      collectStudioCaptureAssetSources,
+      waitForStudioCaptureReady,
+    } = await loadStudioCaptureReadinessRuntime();
     return waitForStudioCaptureReady({
       pageId: page.id,
       getRenderedPageId: () => {
@@ -27997,6 +27998,10 @@ const puppetWarpArmed =
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 타임랩스를 만들 수 있어요.");
     }
+    const {
+      collectStudioCaptureAssetSources,
+      waitForStudioCaptureReady,
+    } = await loadStudioCaptureReadinessRuntime();
     const renderKey = `${page.id}:${historyIndex}`;
     return waitForStudioCaptureReady({
       pageId: renderKey,
@@ -28042,6 +28047,10 @@ const puppetWarpArmed =
       openPublishStep();
       return;
     }
+    // 저장 DTO와 캡처 준비 검사는 첫 화면에 필요 없는 사용자 의도 런타임이다. 캡처가 시작되기
+    // 전에 두 요청을 함께 데워 첫 저장에서 순차 import waterfall이 생기지 않게 한다.
+    preloadStudioCaptureReadinessRuntime();
+    preloadStudioSavePayloadRuntime();
     // A deferred stroke is still outside React history. Flush it before installing the save lock;
     // otherwise `commit` correctly rejects the flush and the server doc/images diverge. flushSync
     // also gives the capture stage the projected page before the first screenshot is requested.
@@ -28141,6 +28150,12 @@ const puppetWarpArmed =
       setMasterEditMode(originalMasterEditMode);
 
       const cover = await downscaleStudioCanvasDataUrl(pageImages[0] || "", 480);
+      const {
+        buildStudioDirectWorkSavePlan,
+        buildStudioSavePayload,
+        buildStudioSharedSavePatch,
+      } = await loadStudioSavePayloadRuntime();
+      if (!saveScopeStillCurrent()) return;
       const payload = buildStudioSavePayload({
         title,
         description,
