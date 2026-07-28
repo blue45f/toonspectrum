@@ -1,5 +1,3 @@
-import { BUSINESS_INFO } from "@toonspectrum/core";
-
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { spectrumGradient } from "@/lib/genre-color";
@@ -110,44 +108,8 @@ export function SiteFooter() {
         ))}
       </div>
       <div className="border-t border-line/60">
-        <div className="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 text-[11px] text-fg-3 space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 leading-relaxed">
-            {/* 사업자 표기 = @toonspectrum/core BUSINESS_INFO를 사용하는 웹 푸터의 단일 소스 */}
-            <div>
-              <p className="font-semibold text-fg-2">
-                {t("footer.business.company")}: {BUSINESS_INFO.name}
-              </p>
-              <p>
-                {t("footer.business.representative")}: {BUSINESS_INFO.ceo} |{" "}
-                {t("footer.business.privacyOfficer")}: {BUSINESS_INFO.privacyOfficer}
-              </p>
-            </div>
-            <div>
-              <p>
-                {t("footer.business.registrationNumber")}: {BUSINESS_INFO.registrationNumber}
-              </p>
-              <p>
-                {t("footer.business.address")}: {BUSINESS_INFO.address}
-              </p>
-            </div>
-            <div>
-              <p>
-                {t("footer.business.email")}: {BUSINESS_INFO.email}
-              </p>
-              <p>
-                {t("footer.business.phone")}: {BUSINESS_INFO.phone}
-              </p>
-            </div>
-            <div>
-              <p>
-                {t("footer.business.hosting")}: {BUSINESS_INFO.hosting}
-              </p>
-              <p>
-                {t("footer.business.serviceType")}: {BUSINESS_INFO.serviceType}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 border-t border-line/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6 text-[11px] text-fg-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>{t("footer.copyrightLine").replace("{year}", String(year))}</span>
             <span className="inline-flex items-center gap-2">
               <span
