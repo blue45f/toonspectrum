@@ -1,50 +1,69 @@
 import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 
 import type {
-  StudioGpuBatch,
+  StudioCanonicalBrushSpecialistLoweringRequirement,
+  StudioCanonicalBrushWebGpuLoweringRejectionReason,
+  StudioCanonicalBrushWebGpuLoweringResult,
+  StudioCanonicalWebGpuAnalyticBatch,
+  StudioCanonicalWebGpuAnalyticDab,
+  StudioCanonicalWebGpuAnalyticShape,
+  StudioCanonicalWebGpuLinearColorSpace,
+  StudioCanonicalWebGpuPorterDuff,
+} from "./studio-canonical-brush-webgpu-lowering";
+import type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,
 } from "./studio-webgpu-dab-plan-contract";
 
 /**
- * Worker-owned brush execution kernel.
+ * Worker-owned, future-first WebGPU brush execution kernel.
  *
- * This module deliberately has no Canvas2D, HTMLCanvasElement, Konva, document, or persistence
- * dependency. The caller owns canonical commands and may rebuild this disposable GPU state after
- * device loss from those commands.
+ * The authoritative input is the engine-neutral canonical lowering result. Canvas2D, Konva,
+ * encoded-sRGB legacy dabs and compatibility fallbacks are intentionally outside the production
+ * boundary. Unsupported colour spaces, blend modes and specialist brush paths fail closed.
  */
 
-export const STUDIO_ENGINE_WEBGPU_BRUSH_RECEIPT_REVISION = 1;
+export const STUDIO_ENGINE_WEBGPU_BRUSH_RECEIPT_REVISION = 2 as const;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT = "rgba16float" as const;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL = "linear-premultiplied" as const;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING = "scene-linear-straight" as const;
-export const STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_FLOATS = 9;
+export const STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE = "linear-srgb" as const;
+export const STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE = "srgb" as const;
+export const STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_FLOATS = 16;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_BYTES =
   STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_DABS = 65_536;
 export const STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_SURFACE_PIXELS = 16_777_216;
+export const STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_IN_FLIGHT_SUBMISSIONS = 3;
 
 const GPU_TEXTURE_BINDING = 0x04;
+const GPU_TEXTURE_COPY_SRC = 0x01;
 const GPU_TEXTURE_RENDER_ATTACHMENT = 0x10;
 const GPU_BUFFER_COPY_DST = 0x08;
 const GPU_BUFFER_VERTEX = 0x20;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
+const INSTANCE_SHAPE_ROUND = 0;
+const INSTANCE_SHAPE_ELLIPSE = 1;
+const INSTANCE_SHAPE_SQUARE = 2;
 
 const BRUSH_SHADER = /* wgsl */ `
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) local: vec2f,
   @location(1) color: vec4f,
-  @location(2) @interpolate(flat) nominal_radius_ratio: f32,
+  @location(2) @interpolate(flat) tip: vec4f,
+  @location(3) @interpolate(flat) diagnostics: vec2f,
 };
 
 @vertex
 fn vs_main(
   @builtin(vertex_index) vertex_index: u32,
   @location(0) center: vec2f,
-  @location(1) quad_radius: vec2f,
-  @location(2) color: vec4f,
-  @location(3) nominal_radius_ratio: f32,
+  @location(1) basis_x: vec2f,
+  @location(2) basis_y: vec2f,
+  @location(3) color: vec4f,
+  @location(4) tip: vec4f,
+  @location(5) diagnostics: vec2f,
 ) -> VertexOutput {
   let corners = array<vec2f, 6>(
     vec2f(-1.0, -1.0),
@@ -54,25 +73,36 @@ fn vs_main(
     vec2f( 1.0, -1.0),
     vec2f( 1.0,  1.0),
   );
-  let corner = corners[vertex_index];
+  let local = corners[vertex_index] * tip.w;
   var output: VertexOutput;
-  output.position = vec4f(center + corner * quad_radius, 0.0, 1.0);
-  output.local = corner;
+  output.position = vec4f(center + basis_x * local.x + basis_y * local.y, 0.0, 1.0);
+  output.local = local;
   output.color = color;
-  output.nominal_radius_ratio = nominal_radius_ratio;
+  output.tip = tip;
+  output.diagnostics = diagnostics;
   return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4f {
-  let distance_from_center = length(input.local);
-  let edge_width = max(fwidth(distance_from_center), 0.0005);
-  let half_edge_width = edge_width * 0.5;
+  // Round and ellipse share the analytic unit-circle metric; the full affine basis carries
+  // ellipse scale, rotation, reflection and shear. Square uses the unit-box metric.
+  let radial_metric = length(input.local);
+  let square_metric = max(abs(input.local.x), abs(input.local.y));
+  let metric = select(radial_metric, square_metric, input.tip.x > 1.5);
+  let hardness = clamp(input.tip.y, 0.0, 1.0);
+  let edge_softness = clamp(input.tip.z, 0.0, 1.0);
+  // Edge softness remains meaningful across the full hardness range instead of being collapsed
+  // by a max/min shortcut: hardness controls the firm core and softness expands its feather.
+  let feather = clamp((1.0 - hardness) + edge_softness * hardness, 0.0, 1.0);
+  let inner_edge = 1.0 - feather;
+  let antialias = max(fwidth(metric) * 0.5, 0.00025);
   let coverage = 1.0 - smoothstep(
-    input.nominal_radius_ratio - half_edge_width,
-    input.nominal_radius_ratio + half_edge_width,
-    distance_from_center,
+    inner_edge - antialias,
+    1.0 + antialias,
+    metric,
   );
+  // Colour is already premultiplied scene-linear data. Coverage multiplies RGB and alpha once.
   return input.color * coverage;
 }
 `;
@@ -129,26 +159,21 @@ export interface StudioEngineWebGpuBrushSurface {
   getContext(contextId: "webgpu"): GPUCanvasContext | null;
 }
 
-/**
- * Direct injection is useful for a worker device arbiter and fake-GPU tests. All three values must
- * be supplied together. The provider/device/context never appear in a receipt or other durable DTO.
- */
 export interface StudioEngineWebGpuBrushDeviceBoundary {
   readonly device: GPUDevice;
   readonly context: GPUCanvasContext;
   readonly canvasFormat: GPUTextureFormat;
-  /** A shared device arbiter normally leaves this false. Dedicated worker acquisition uses true. */
   readonly ownsDevice?: boolean;
 }
 
 export interface StudioEngineWebGpuBrushRuntimeOptions {
   readonly surface: StudioEngineWebGpuBrushSurface;
-  /** `null` explicitly disables ambient Worker WebGPU acquisition. */
   readonly gpu?: GPU | null;
   readonly boundary?: StudioEngineWebGpuBrushDeviceBoundary | null;
   readonly initialResizeEpoch?: number;
   readonly maxDabs?: number;
   readonly maxSurfacePixels?: number;
+  readonly maxInFlightSubmissions?: number;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
 }
 
@@ -160,31 +185,21 @@ export interface StudioEngineWebGpuBrushRasterRect {
 }
 
 /**
- * Canonical brush-kernel input. RGB is straight (not premultiplied) scene-linear light in [0, 1].
- * This is intentionally distinct from legacy `StudioGpuDab`, whose RGB channels are encoded sRGB.
+ * Production render plan. It can only be produced without loss by
+ * `adaptLoweredStudioCanonicalBrushWebGpuDabs`.
  */
-export interface StudioEngineWebGpuBrushDab {
-  readonly x: number;
-  readonly y: number;
-  readonly radius: number;
-  readonly red: number;
-  readonly green: number;
-  readonly blue: number;
-  readonly alpha: number;
-  readonly composite: "normal" | "erase";
-}
-
 export interface StudioEngineWebGpuBrushPlan {
+  readonly kind: "studio-engine-webgpu-canonical-plan";
   readonly mode: "append" | "rebuild";
-  readonly dabs: readonly StudioEngineWebGpuBrushDab[];
-  readonly batches: readonly StudioGpuBatch[];
-  readonly complete: boolean;
+  readonly loweringVersion: number;
+  readonly strokeId: string;
+  readonly dabs: readonly StudioCanonicalWebGpuAnalyticDab[];
+  readonly batches: readonly StudioCanonicalWebGpuAnalyticBatch[];
 }
 
 export interface StudioEngineWebGpuBrushFrame {
   readonly requestSequence: number;
   readonly resizeEpoch: number;
-  /** Logical document/tile rectangle mapped onto the complete physical RGBA16F target. */
   readonly rasterRect: StudioEngineWebGpuBrushRasterRect;
   readonly update: StudioEngineWebGpuBrushPlan;
 }
@@ -200,13 +215,57 @@ export interface StudioEngineWebGpuBrushReceipt {
   readonly height: number;
   readonly textureFormat: typeof STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT;
   readonly colorModel: typeof STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL;
+  readonly workingColorSpace: typeof STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE;
   readonly inputColorEncoding: typeof STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING;
+  readonly presentationColorSpace: typeof STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE;
   readonly mode: "append" | "rebuild";
+  readonly strokeId: string;
+  readonly loweringVersion: number;
   readonly dabCount: number;
   readonly batchCount: number;
-  readonly batchOrder: readonly ("normal" | "erase")[];
+  readonly batchOrder: readonly StudioCanonicalWebGpuPorterDuff[];
   readonly planFingerprint: string;
+  /** Submission was accepted by the ordered WebGPU queue; durability is a separate tile receipt. */
+  readonly queueState: "submitted";
   readonly complete: true;
+}
+
+export type StudioEngineWebGpuBrushPlanAdaptationResult =
+  | {
+      readonly status: "ready";
+      readonly plan: StudioEngineWebGpuBrushPlan;
+    }
+  | {
+      readonly status: "lowering-required";
+      readonly strokeId: string;
+      readonly requirements: readonly StudioCanonicalBrushSpecialistLoweringRequirement[];
+    }
+  | {
+      readonly status: "unsupported";
+      readonly reason: "unsupported-blend-mode";
+      readonly blendMode: string;
+    }
+  | {
+      readonly status: "unsupported";
+      readonly reason: "unsupported-color-space";
+      readonly colorSpace: string;
+    }
+  | {
+      readonly status: "rejected";
+      readonly reason:
+        | "canonical-lowering-rejected"
+        | "dab-limit-exceeded"
+        | "invalid-lowered-plan";
+      readonly loweringReason?: StudioCanonicalBrushWebGpuLoweringRejectionReason;
+    };
+
+/**
+ * Explicitly branded test/oracle bridge. It is intentionally not accepted by `execute`; callers
+ * must opt into `.plan`, making legacy use visible in code review and dependency searches.
+ */
+export interface StudioEngineWebGpuLegacyDiagnosticOracle {
+  readonly kind: "studio-engine-webgpu-legacy-diagnostic-oracle";
+  readonly plan: StudioEngineWebGpuBrushPlan;
 }
 
 export type StudioEngineWebGpuBrushUnsupportedReason =
@@ -242,6 +301,7 @@ export type StudioEngineWebGpuBrushResizeResult =
       readonly reason:
         | "device-lost"
         | "disposed"
+        | "gpu-backpressure"
         | "invalid-resize"
         | "runtime-failed"
         | "stale-resize-epoch";
@@ -249,10 +309,9 @@ export type StudioEngineWebGpuBrushResizeResult =
 
 export type StudioEngineWebGpuBrushExecutionRejection =
   | "append-without-base"
-  | "busy"
   | "device-lost"
   | "disposed"
-  | "incomplete-plan"
+  | "gpu-backpressure"
   | "invalid-plan"
   | "invalid-raster-rect"
   | "invalid-request-sequence"
@@ -284,6 +343,9 @@ export interface StudioEngineWebGpuBrushStats {
   readonly instanceBufferAllocations: number;
   readonly surfaceTextureAllocations: number;
   readonly submissions: number;
+  readonly completedSubmissionSequence: number;
+  readonly inFlightSubmissions: number;
+  readonly maxInFlightSubmissions: number;
 }
 
 interface RuntimeResources {
@@ -294,11 +356,13 @@ interface RuntimeResources {
 }
 
 interface ValidPlan {
-  readonly dabs: readonly StudioEngineWebGpuBrushDab[];
-  readonly batches: readonly StudioGpuBatch[];
+  readonly loweringVersion: number;
+  readonly strokeId: string;
+  readonly dabs: readonly StudioCanonicalWebGpuAnalyticDab[];
+  readonly batches: readonly StudioCanonicalWebGpuAnalyticBatch[];
 }
 
-type StudioEngineWebGpuBrushFrameSnapshotResult =
+type FrameSnapshotResult =
   | {
       readonly status: "ready";
       readonly frame: StudioEngineWebGpuBrushFrame;
@@ -306,19 +370,23 @@ type StudioEngineWebGpuBrushFrameSnapshotResult =
     }
   | {
       readonly status: "rejected";
-      readonly reason:
-        | "incomplete-plan"
-        | "invalid-plan"
-        | "invalid-raster-rect"
-        | "request-limit";
+      readonly reason: "invalid-plan" | "invalid-raster-rect" | "request-limit";
     };
 
 function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Number.isFinite(Math.fround(value));
 }
 
+function unit(value: unknown): value is number {
+  return finite(value) && value >= 0 && value <= 1;
+}
+
 function positiveSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0;
+}
+
+function nonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
 function validRasterRect(rect: StudioEngineWebGpuBrushRasterRect): boolean {
@@ -341,85 +409,261 @@ function sameRasterRect(
     && Object.is(left.height, right.height);
 }
 
-function validDab(dab: StudioEngineWebGpuBrushDab): boolean {
-  return finite(dab.x)
-    && finite(dab.y)
-    && finite(dab.radius)
-    && dab.radius >= 0
-    && finite(dab.red)
-    && dab.red >= 0
-    && dab.red <= 1
-    && finite(dab.green)
-    && dab.green >= 0
-    && dab.green <= 1
-    && finite(dab.blue)
-    && dab.blue >= 0
-    && dab.blue <= 1
-    && finite(dab.alpha)
-    && dab.alpha >= 0
-    && dab.alpha <= 1
-    && (dab.composite === "normal" || dab.composite === "erase");
+function validShape(value: unknown): value is StudioCanonicalWebGpuAnalyticShape {
+  return value === "round" || value === "ellipse" || value === "square";
 }
 
-/**
- * Exact contiguous coverage is required. Reordering, merging, gaps, overlaps, and a batch whose
- * composite disagrees with one of its dabs are all rejected before any queue write or submission.
- */
-export function validateStudioEngineWebGpuBrushPlan(
+function validPorterDuff(value: unknown): value is StudioCanonicalWebGpuPorterDuff {
+  return value === "source-over" || value === "destination-out";
+}
+
+function validColorSpace(value: unknown): value is StudioCanonicalWebGpuLinearColorSpace {
+  return value === "linear-srgb" || value === "linear-display-p3";
+}
+
+function nonSingularGpuBasis(basis: readonly number[]): boolean {
+  const [xx, xy, yx, yy] = basis.map(Math.fround);
+  return [xx, xy, yx, yy].every((value) => Number.isFinite(value))
+    && Math.fround(xx! * yy! - xy! * yx!) !== 0;
+}
+
+function validDab(dab: StudioCanonicalWebGpuAnalyticDab, expectedIndex: number): boolean {
+  const components = dab.color.components;
+  const basis = dab.tip.localToDocument;
+  return nonNegativeSafeInteger(dab.index)
+    && dab.index === expectedIndex
+    && finite(dab.stationX)
+    && finite(dab.stationY)
+    && finite(dab.x)
+    && finite(dab.y)
+    && unit(dab.pressure)
+    && finite(dab.diameter)
+    && dab.diameter > 0
+    && finite(dab.opacity)
+    && finite(dab.flow)
+    && dab.color.alphaMode === "straight"
+    && validColorSpace(dab.color.space)
+    && Array.isArray(components)
+    && components.length === 4
+    && components.every(unit)
+    && validPorterDuff(dab.composite.porterDuff)
+    && typeof dab.composite.blendMode === "string"
+    && validShape(dab.tip.shape)
+    && unit(dab.tip.hardness)
+    && unit(dab.tip.edgeSoftness)
+    && unit(dab.tip.roundness)
+    && dab.tip.roundness > 0
+    && finite(dab.tip.angleRadians)
+    && Array.isArray(basis)
+    && basis.length === 4
+    && basis.every(finite)
+    && nonSingularGpuBasis(basis);
+}
+
+function sameComposite(
+  left: StudioCanonicalWebGpuAnalyticDab["composite"],
+  right: StudioCanonicalWebGpuAnalyticBatch["composite"],
+): boolean {
+  return left.porterDuff === right.porterDuff && left.blendMode === right.blendMode;
+}
+
+function validatePlan(
   update: StudioEngineWebGpuBrushPlan,
   maxDabs: number,
 ): ValidPlan | null {
   try {
     if (
-      !update
+      update.kind !== "studio-engine-webgpu-canonical-plan"
       || (update.mode !== "append" && update.mode !== "rebuild")
+      || !positiveSafeInteger(update.loweringVersion)
+      || typeof update.strokeId !== "string"
+      || update.strokeId.length === 0
       || !Array.isArray(update.dabs)
       || !Array.isArray(update.batches)
       || update.dabs.length > maxDabs
       || !update.dabs.every(validDab)
-    ) {
-      return null;
-    }
+    ) return null;
 
     let nextInstance = 0;
     for (const batch of update.batches) {
       if (
-        (batch.composite !== "normal" && batch.composite !== "erase")
-        || !Number.isSafeInteger(batch.firstInstance)
+        !batch
+        || !validPorterDuff(batch.composite?.porterDuff)
+        || typeof batch.composite?.blendMode !== "string"
+        || !validColorSpace(batch.colorSpace)
+        || !nonNegativeSafeInteger(batch.firstInstance)
         || !positiveSafeInteger(batch.instanceCount)
         || batch.firstInstance !== nextInstance
         || batch.firstInstance + batch.instanceCount > update.dabs.length
-      ) {
-        return null;
-      }
+      ) return null;
       const end = batch.firstInstance + batch.instanceCount;
       for (let index = batch.firstInstance; index < end; index += 1) {
-        if (update.dabs[index]?.composite !== batch.composite) return null;
+        const dab = update.dabs[index];
+        if (
+          !dab
+          || !sameComposite(dab.composite, batch.composite)
+          || dab.color.space !== batch.colorSpace
+        ) return null;
       }
       nextInstance = end;
     }
     if (nextInstance !== update.dabs.length) return null;
-    return { dabs: update.dabs, batches: update.batches };
+    return {
+      loweringVersion: update.loweringVersion,
+      strokeId: update.strokeId,
+      dabs: update.dabs,
+      batches: update.batches,
+    };
   } catch {
-    // Public validation is also used at Worker message boundaries. Hostile getters/proxies are
-    // malformed input, not an exception that may escape the command actor.
     return null;
   }
 }
 
-function snapshotStudioEngineWebGpuBrushFrame(
+function copyDab(dab: StudioCanonicalWebGpuAnalyticDab): StudioCanonicalWebGpuAnalyticDab {
+  return {
+    index: dab.index,
+    stationX: dab.stationX,
+    stationY: dab.stationY,
+    x: dab.x,
+    y: dab.y,
+    pressure: dab.pressure,
+    diameter: dab.diameter,
+    opacity: dab.opacity,
+    flow: dab.flow,
+    color: {
+      space: dab.color.space,
+      alphaMode: dab.color.alphaMode,
+      components: [...dab.color.components],
+    },
+    composite: { ...dab.composite },
+    tip: {
+      shape: dab.tip.shape,
+      hardness: dab.tip.hardness,
+      edgeSoftness: dab.tip.edgeSoftness,
+      roundness: dab.tip.roundness,
+      angleRadians: dab.tip.angleRadians,
+      localToDocument: [...dab.tip.localToDocument],
+    },
+  };
+}
+
+function copyBatch(batch: StudioCanonicalWebGpuAnalyticBatch): StudioCanonicalWebGpuAnalyticBatch {
+  return {
+    composite: { ...batch.composite },
+    colorSpace: batch.colorSpace,
+    firstInstance: batch.firstInstance,
+    instanceCount: batch.instanceCount,
+  };
+}
+
+function freezePlan(plan: StudioEngineWebGpuBrushPlan): StudioEngineWebGpuBrushPlan {
+  for (const dab of plan.dabs) {
+    Object.freeze(dab.color.components);
+    Object.freeze(dab.color);
+    Object.freeze(dab.composite);
+    Object.freeze(dab.tip.localToDocument);
+    Object.freeze(dab.tip);
+    Object.freeze(dab);
+  }
+  for (const batch of plan.batches) {
+    Object.freeze(batch.composite);
+    Object.freeze(batch);
+  }
+  Object.freeze(plan.dabs);
+  Object.freeze(plan.batches);
+  return Object.freeze(plan);
+}
+
+/**
+ * The only production adapter into this kernel. It preserves the complete analytic footprint and
+ * explicitly exposes specialist, gamut and blend gaps instead of drawing an approximation.
+ */
+export function adaptLoweredStudioCanonicalBrushWebGpuDabs(
+  mode: "append" | "rebuild",
+  lowering: StudioCanonicalBrushWebGpuLoweringResult,
+  maxDabs = STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_DABS,
+): StudioEngineWebGpuBrushPlanAdaptationResult {
+  try {
+    if (
+      (mode !== "append" && mode !== "rebuild")
+      || !positiveSafeInteger(maxDabs)
+      || !lowering
+    ) return { status: "rejected", reason: "invalid-lowered-plan" };
+    if (lowering.status === "lowering-required") {
+      return Object.freeze({
+        status: "lowering-required",
+        strokeId: lowering.strokeId,
+        requirements: Object.freeze([...lowering.requirements]),
+      });
+    }
+    if (lowering.status === "rejected") {
+      return {
+        status: "rejected",
+        reason: "canonical-lowering-rejected",
+        loweringReason: lowering.reason,
+      };
+    }
+    if (lowering.status !== "lowered") {
+      return { status: "rejected", reason: "invalid-lowered-plan" };
+    }
+    if (lowering.dabs.length > maxDabs) {
+      return { status: "rejected", reason: "dab-limit-exceeded" };
+    }
+    const dabs = lowering.dabs.map(copyDab);
+    const batches = lowering.batches.map(copyBatch);
+    const plan: StudioEngineWebGpuBrushPlan = {
+      kind: "studio-engine-webgpu-canonical-plan",
+      mode,
+      loweringVersion: lowering.version,
+      strokeId: lowering.strokeId,
+      dabs,
+      batches,
+    };
+    if (!validatePlan(plan, maxDabs)) {
+      return { status: "rejected", reason: "invalid-lowered-plan" };
+    }
+    const unsupportedColorSpace = dabs.find(
+      (dab) => dab.color.space !== STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
+    )?.color.space ?? batches.find(
+      (batch) => batch.colorSpace !== STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
+    )?.colorSpace;
+    if (unsupportedColorSpace) {
+      return {
+        status: "unsupported",
+        reason: "unsupported-color-space",
+        colorSpace: unsupportedColorSpace,
+      };
+    }
+    const unsupportedBlend = dabs.find(
+      (dab) => dab.composite.blendMode !== "normal",
+    )?.composite.blendMode ?? batches.find(
+      (batch) => batch.composite.blendMode !== "normal",
+    )?.composite.blendMode;
+    if (unsupportedBlend) {
+      return {
+        status: "unsupported",
+        reason: "unsupported-blend-mode",
+        blendMode: unsupportedBlend,
+      };
+    }
+    return { status: "ready", plan: freezePlan(plan) };
+  } catch {
+    return { status: "rejected", reason: "invalid-lowered-plan" };
+  }
+}
+
+export function validateStudioEngineWebGpuBrushPlan(
+  update: StudioEngineWebGpuBrushPlan,
+  maxDabs: number,
+): ValidPlan | null {
+  return validatePlan(update, maxDabs);
+}
+
+function snapshotFrame(
   input: StudioEngineWebGpuBrushFrame,
   maxDabs: number,
-): StudioEngineWebGpuBrushFrameSnapshotResult {
+): FrameSnapshotResult {
   try {
-    const update = input.update;
-    if (!update || !Array.isArray(update.dabs) || !Array.isArray(update.batches)) {
-      return { status: "rejected", reason: "invalid-plan" };
-    }
-    if (!update.complete) return { status: "rejected", reason: "incomplete-plan" };
-    if (update.dabs.length > maxDabs) {
-      return { status: "rejected", reason: "request-limit" };
-    }
     const rasterRect = {
       x: input.rasterRect.x,
       y: input.rasterRect.y,
@@ -429,36 +673,32 @@ function snapshotStudioEngineWebGpuBrushFrame(
     if (!validRasterRect(rasterRect)) {
       return { status: "rejected", reason: "invalid-raster-rect" };
     }
-    const dabs: StudioEngineWebGpuBrushDab[] = update.dabs.map((dab) => ({
-      x: dab.x,
-      y: dab.y,
-      radius: dab.radius,
-      red: dab.red,
-      green: dab.green,
-      blue: dab.blue,
-      alpha: dab.alpha,
-      composite: dab.composite,
-    }));
-    const batches: StudioGpuBatch[] = update.batches.map((batch) => ({
-      composite: batch.composite,
-      firstInstance: batch.firstInstance,
-      instanceCount: batch.instanceCount,
-    }));
-    const safeUpdate: StudioEngineWebGpuBrushPlan = {
-      mode: update.mode,
-      dabs,
-      batches,
-      complete: update.complete,
+    if (input.update.dabs.length > maxDabs) {
+      return { status: "rejected", reason: "request-limit" };
+    }
+    const update: StudioEngineWebGpuBrushPlan = {
+      kind: input.update.kind,
+      mode: input.update.mode,
+      loweringVersion: input.update.loweringVersion,
+      strokeId: input.update.strokeId,
+      dabs: input.update.dabs.map(copyDab),
+      batches: input.update.batches.map(copyBatch),
     };
-    const plan = validateStudioEngineWebGpuBrushPlan(safeUpdate, maxDabs);
+    const plan = validatePlan(update, maxDabs);
     if (!plan) return { status: "rejected", reason: "invalid-plan" };
+    for (const dab of plan.dabs) {
+      if (
+        dab.color.space !== STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE
+        || dab.composite.blendMode !== "normal"
+      ) return { status: "rejected", reason: "invalid-plan" };
+    }
     return {
       status: "ready",
       frame: {
         requestSequence: input.requestSequence,
         resizeEpoch: input.resizeEpoch,
         rasterRect,
-        update: safeUpdate,
+        update,
       },
       plan,
     };
@@ -499,41 +739,52 @@ function hashString(hash: number, value: string): number {
   return next >>> 0;
 }
 
-/** Pure, provider-free fingerprint suitable for the real-browser parity harness. */
+/** Pure provider-free fingerprint over the full rich analytic contract. */
 export function fingerprintStudioEngineWebGpuBrushPlan(
   frame: StudioEngineWebGpuBrushFrame,
 ): string {
-  // One 8-byte workspace per fingerprint, regardless of dab count. This path is included in every
-  // receipt and must not create seven tiny allocations per dab in long-stroke workloads.
   const numberView = new DataView(new ArrayBuffer(Float64Array.BYTES_PER_ELEMENT));
   let hash = 0x811c9dc5;
   hash = hashNumber(hash, frame.requestSequence, numberView);
   hash = hashNumber(hash, frame.resizeEpoch, numberView);
+  hash = hashString(hash, frame.update.kind);
   hash = hashString(hash, frame.update.mode);
+  hash = hashString(hash, frame.update.strokeId);
+  hash = hashNumber(hash, frame.update.loweringVersion, numberView);
   for (const value of [
     frame.rasterRect.x,
     frame.rasterRect.y,
     frame.rasterRect.width,
     frame.rasterRect.height,
-  ]) {
-    hash = hashNumber(hash, value, numberView);
-  }
+  ]) hash = hashNumber(hash, value, numberView);
   for (const dab of frame.update.dabs) {
     for (const value of [
+      dab.index,
+      dab.stationX,
+      dab.stationY,
       dab.x,
       dab.y,
-      dab.radius,
-      dab.red,
-      dab.green,
-      dab.blue,
-      dab.alpha,
-    ]) {
-      hash = hashNumber(hash, value, numberView);
-    }
-    hash = hashString(hash, dab.composite);
+      dab.pressure,
+      dab.diameter,
+      dab.opacity,
+      dab.flow,
+      ...dab.color.components,
+      dab.tip.hardness,
+      dab.tip.edgeSoftness,
+      dab.tip.roundness,
+      dab.tip.angleRadians,
+      ...dab.tip.localToDocument,
+    ]) hash = hashNumber(hash, value, numberView);
+    hash = hashString(hash, dab.color.space);
+    hash = hashString(hash, dab.color.alphaMode);
+    hash = hashString(hash, dab.composite.porterDuff);
+    hash = hashString(hash, dab.composite.blendMode);
+    hash = hashString(hash, dab.tip.shape);
   }
   for (const batch of frame.update.batches) {
-    hash = hashString(hash, batch.composite);
+    hash = hashString(hash, batch.composite.porterDuff);
+    hash = hashString(hash, batch.composite.blendMode);
+    hash = hashString(hash, batch.colorSpace);
     hash = hashNumber(hash, batch.firstInstance, numberView);
     hash = hashNumber(hash, batch.instanceCount, numberView);
   }
@@ -542,12 +793,28 @@ export function fingerprintStudioEngineWebGpuBrushPlan(
     .padStart(8, "0")}`;
 }
 
+function shapeCode(shape: StudioCanonicalWebGpuAnalyticShape): number {
+  if (shape === "ellipse") return INSTANCE_SHAPE_ELLIPSE;
+  if (shape === "square") return INSTANCE_SHAPE_SQUARE;
+  return INSTANCE_SHAPE_ROUND;
+}
+
+function smallestSingularValue(basis: readonly [number, number, number, number]): number {
+  const [xx, xy, yx, yy] = basis;
+  const a = xx * xx + xy * xy;
+  const b = xx * yx + xy * yy;
+  const d = yx * yx + yy * yy;
+  const discriminant = Math.hypot(a - d, 2 * b);
+  return Math.sqrt(Math.max(0, (a + d - discriminant) / 2));
+}
+
 /**
- * Packs renderer-neutral sRGB dabs into premultiplied linear-light RGBA16F render instances.
- * The returned view is valid only until the caller reuses the same scratch array.
+ * Packs the full affine analytic tip into the GPU instance layout. RGB is premultiplied exactly
+ * once. The two diagnostic floats retain canonical roundness and angle even though the affine
+ * basis is the raster authority for those properties.
  */
 export function packStudioEngineWebGpuBrushDabs(
-  dabs: readonly StudioEngineWebGpuBrushDab[],
+  dabs: readonly StudioCanonicalWebGpuAnalyticDab[],
   rasterRect: StudioEngineWebGpuBrushRasterRect,
   physicalWidth: number,
   physicalHeight: number,
@@ -565,43 +832,92 @@ export function packStudioEngineWebGpuBrushDabs(
   for (let index = 0; index < dabs.length; index += 1) {
     const dab = dabs[index]!;
     const offset = index * STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_FLOATS;
-    const quadRadius = dab.radius > 0 ? dab.radius + logicalPixel : 0;
+    const [xx, xy, yx, yy] = dab.tip.localToDocument;
+    const minimumScale = smallestSingularValue(dab.tip.localToDocument);
+    const quadScale = 1 + Math.min(4, logicalPixel / Math.max(minimumScale, 0.000001));
+    const [red, green, blue, alpha] = dab.color.components;
     packed[offset] = ((dab.x - rasterRect.x) / rasterRect.width) * 2 - 1;
     packed[offset + 1] = 1 - ((dab.y - rasterRect.y) / rasterRect.height) * 2;
-    packed[offset + 2] = (quadRadius / rasterRect.width) * 2;
-    packed[offset + 3] = (quadRadius / rasterRect.height) * 2;
-    packed[offset + 4] = dab.red * dab.alpha;
-    packed[offset + 5] = dab.green * dab.alpha;
-    packed[offset + 6] = dab.blue * dab.alpha;
-    packed[offset + 7] = dab.alpha;
-    packed[offset + 8] = quadRadius > 0 ? dab.radius / quadRadius : 0;
+    packed[offset + 2] = (xx / rasterRect.width) * 2;
+    packed[offset + 3] = (-xy / rasterRect.height) * 2;
+    packed[offset + 4] = (yx / rasterRect.width) * 2;
+    packed[offset + 5] = (-yy / rasterRect.height) * 2;
+    packed[offset + 6] = red * alpha;
+    packed[offset + 7] = green * alpha;
+    packed[offset + 8] = blue * alpha;
+    packed[offset + 9] = alpha;
+    packed[offset + 10] = shapeCode(dab.tip.shape);
+    packed[offset + 11] = dab.tip.hardness;
+    packed[offset + 12] = dab.tip.edgeSoftness;
+    packed[offset + 13] = quadScale;
+    packed[offset + 14] = dab.tip.roundness;
+    packed[offset + 15] = dab.tip.angleRadians;
   }
   return packed;
 }
 
 /**
- * Explicit migration adapter for the old renderer-neutral dab contract. Legacy RGB is encoded
- * sRGB, so it is decoded exactly once here. Canonical scene-linear plans must never pass through
- * this function.
+ * Encoded-sRGB legacy bridge for pixel-oracle tests only. Production command paths must lower a
+ * canonical plan and call `adaptLoweredStudioCanonicalBrushWebGpuDabs`.
  */
-export function convertLegacyStudioGpuDabPlanToLinear(
+export function convertLegacyStudioGpuDabPlanToWebGpuDiagnosticOracle(
   legacy: StudioGpuDabRenderUpdate,
-): StudioEngineWebGpuBrushPlan {
-  return {
-    mode: legacy.mode,
-    dabs: legacy.dabs.map((dab: StudioGpuDab): StudioEngineWebGpuBrushDab => ({
+): StudioEngineWebGpuLegacyDiagnosticOracle {
+  const dabs: StudioCanonicalWebGpuAnalyticDab[] = legacy.dabs.map(
+    (dab: StudioGpuDab, index): StudioCanonicalWebGpuAnalyticDab => ({
+      index,
+      stationX: dab.x,
+      stationY: dab.y,
       x: dab.x,
       y: dab.y,
-      radius: dab.radius,
-      red: studioHighBitSrgbToLinear(dab.red),
-      green: studioHighBitSrgbToLinear(dab.green),
-      blue: studioHighBitSrgbToLinear(dab.blue),
-      alpha: dab.alpha,
-      composite: dab.composite,
-    })),
-    batches: legacy.batches.map((batch) => ({ ...batch })),
-    complete: legacy.complete,
-  };
+      pressure: 1,
+      diameter: dab.radius * 2,
+      opacity: dab.alpha,
+      flow: 1,
+      color: {
+        space: "linear-srgb",
+        alphaMode: "straight",
+        components: [
+          studioHighBitSrgbToLinear(dab.red),
+          studioHighBitSrgbToLinear(dab.green),
+          studioHighBitSrgbToLinear(dab.blue),
+          dab.alpha,
+        ],
+      },
+      composite: {
+        porterDuff: dab.composite === "erase" ? "destination-out" : "source-over",
+        blendMode: "normal",
+      },
+      tip: {
+        shape: "round",
+        hardness: 1,
+        edgeSoftness: 0,
+        roundness: 1,
+        angleRadians: 0,
+        localToDocument: [dab.radius, 0, 0, dab.radius],
+      },
+    }),
+  );
+  const batches: StudioCanonicalWebGpuAnalyticBatch[] = legacy.batches.map((batch) => ({
+    composite: {
+      porterDuff: batch.composite === "erase" ? "destination-out" : "source-over",
+      blendMode: "normal",
+    },
+    colorSpace: "linear-srgb",
+    firstInstance: batch.firstInstance,
+    instanceCount: batch.instanceCount,
+  }));
+  return Object.freeze({
+    kind: "studio-engine-webgpu-legacy-diagnostic-oracle",
+    plan: freezePlan({
+      kind: "studio-engine-webgpu-canonical-plan",
+      mode: legacy.mode,
+      loweringVersion: 1,
+      strokeId: "legacy-diagnostic-oracle",
+      dabs,
+      batches,
+    }),
+  });
 }
 
 function safeDestroyBuffer(buffer: GPUBuffer | null): void {
@@ -644,7 +960,7 @@ function createResources(
   canvasFormat: GPUTextureFormat,
 ): RuntimeResources {
   const brushModule = device.createShaderModule({
-    label: "Studio Engine Worker analytic dab shader",
+    label: "Studio Engine Worker rich analytic dab shader",
     code: BRUSH_SHADER,
   });
   const vertex: GPUVertexState = {
@@ -656,13 +972,15 @@ function createResources(
       attributes: [
         { shaderLocation: 0, offset: 0, format: "float32x2" },
         { shaderLocation: 1, offset: 8, format: "float32x2" },
-        { shaderLocation: 2, offset: 16, format: "float32x4" },
-        { shaderLocation: 3, offset: 32, format: "float32" },
+        { shaderLocation: 2, offset: 16, format: "float32x2" },
+        { shaderLocation: 3, offset: 24, format: "float32x4" },
+        { shaderLocation: 4, offset: 40, format: "float32x4" },
+        { shaderLocation: 5, offset: 56, format: "float32x2" },
       ],
     }],
   };
   const normalPipeline = device.createRenderPipeline({
-    label: "Studio Engine Worker normal analytic dab pipeline",
+    label: "Studio Engine Worker source-over rich analytic dab pipeline",
     layout: "auto",
     vertex,
     fragment: {
@@ -679,7 +997,7 @@ function createResources(
     primitive: { topology: "triangle-list" },
   });
   const erasePipeline = device.createRenderPipeline({
-    label: "Studio Engine Worker erase analytic dab pipeline",
+    label: "Studio Engine Worker destination-out rich analytic dab pipeline",
     layout: "auto",
     vertex,
     fragment: {
@@ -704,7 +1022,7 @@ function createResources(
     }],
   });
   const presentationModule = device.createShaderModule({
-    label: "Studio Engine Worker linear presentation shader",
+    label: "Studio Engine Worker linear-sRGB presentation shader",
     code: PRESENTATION_SHADER,
   });
   const presentationPipeline = device.createRenderPipeline({
@@ -741,9 +1059,13 @@ export async function createStudioEngineWebGpuBrushRuntime(
   const maxDabs = options.maxDabs ?? STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_DABS;
   const maxSurfacePixels =
     options.maxSurfacePixels ?? STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_SURFACE_PIXELS;
-  if (!positiveSafeInteger(maxDabs) || !positiveSafeInteger(maxSurfacePixels)) {
-    return { status: "failed", reason: "invalid-configuration" };
-  }
+  const maxInFlightSubmissions = options.maxInFlightSubmissions
+    ?? STUDIO_ENGINE_WEBGPU_BRUSH_DEFAULT_MAX_IN_FLIGHT_SUBMISSIONS;
+  if (
+    !positiveSafeInteger(maxDabs)
+    || !positiveSafeInteger(maxSurfacePixels)
+    || !positiveSafeInteger(maxInFlightSubmissions)
+  ) return { status: "failed", reason: "invalid-configuration" };
 
   let device: GPUDevice;
   let context: GPUCanvasContext;
@@ -759,10 +1081,7 @@ export async function createStudioEngineWebGpuBrushRuntime(
       return { status: "unsupported", reason: "invalid-boundary" };
     }
   } else {
-    const gpu = ambientGpu(
-      options.gpu,
-      Object.prototype.hasOwnProperty.call(options, "gpu"),
-    );
+    const gpu = ambientGpu(options.gpu, Object.prototype.hasOwnProperty.call(options, "gpu"));
     if (!gpu) return { status: "unsupported", reason: "webgpu-unavailable" };
     let adapter: GPUAdapter | null;
     try {
@@ -797,6 +1116,7 @@ export async function createStudioEngineWebGpuBrushRuntime(
       resources,
       maxDabs,
       maxSurfacePixels,
+      maxInFlightSubmissions,
       onDeviceLost: options.onDeviceLost,
     });
     const initialResize = runtime.resize({
@@ -825,6 +1145,7 @@ interface RuntimeConstructorOptions {
   readonly resources: RuntimeResources;
   readonly maxDabs: number;
   readonly maxSurfacePixels: number;
+  readonly maxInFlightSubmissions: number;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
 }
 
@@ -837,6 +1158,7 @@ export class StudioEngineWebGpuBrushRuntime {
   private readonly resources: RuntimeResources;
   private readonly maxDabs: number;
   private readonly maxSurfacePixels: number;
+  private readonly maxInFlightSubmissions: number;
   private readonly onDeviceLost: ((info: GPUDeviceLostInfo) => void) | undefined;
 
   private status: StudioEngineWebGpuBrushStats["status"] = "ready";
@@ -852,10 +1174,11 @@ export class StudioEngineWebGpuBrushRuntime {
   private instanceBufferAllocations = 0;
   private surfaceTextureAllocations = 0;
   private submissions = 0;
+  private completedSubmissionSequence = 0;
   private lastPresentedRequestSequence = 0;
   private retainedRasterRect: StudioEngineWebGpuBrushRasterRect | null = null;
   private hasRetainedBase = false;
-  private busy = false;
+  private fencePending = false;
 
   public constructor(options: RuntimeConstructorOptions) {
     this.surface = options.surface;
@@ -866,6 +1189,7 @@ export class StudioEngineWebGpuBrushRuntime {
     this.resources = options.resources;
     this.maxDabs = options.maxDabs;
     this.maxSurfacePixels = options.maxSurfacePixels;
+    this.maxInFlightSubmissions = options.maxInFlightSubmissions;
     this.onDeviceLost = options.onDeviceLost;
     void this.device.lost.then((info) => this.handleDeviceLost(info));
   }
@@ -883,6 +1207,9 @@ export class StudioEngineWebGpuBrushRuntime {
       instanceBufferAllocations: this.instanceBufferAllocations,
       surfaceTextureAllocations: this.surfaceTextureAllocations,
       submissions: this.submissions,
+      completedSubmissionSequence: this.completedSubmissionSequence,
+      inFlightSubmissions: this.submissions - this.completedSubmissionSequence,
+      maxInFlightSubmissions: this.maxInFlightSubmissions,
     });
   }
 
@@ -905,11 +1232,12 @@ export class StudioEngineWebGpuBrushRuntime {
       || input.height > Number(
         this.device.limits.maxTextureDimension2D ?? DEFAULT_MAX_TEXTURE_DIMENSION,
       )
-    ) {
-      return { status: "rejected", reason: "invalid-resize" };
-    }
+    ) return { status: "rejected", reason: "invalid-resize" };
     if (input.resizeEpoch <= this.resizeEpoch) {
       return { status: "rejected", reason: "stale-resize-epoch" };
+    }
+    if (this.submissions !== this.completedSubmissionSequence) {
+      return { status: "rejected", reason: "gpu-backpressure" };
     }
 
     let replacement: GPUTexture | null = null;
@@ -922,7 +1250,10 @@ export class StudioEngineWebGpuBrushRuntime {
           depthOrArrayLayers: 1,
         },
         format: STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
-        usage: GPU_TEXTURE_RENDER_ATTACHMENT | GPU_TEXTURE_BINDING,
+        usage:
+          GPU_TEXTURE_RENDER_ATTACHMENT
+          | GPU_TEXTURE_BINDING
+          | GPU_TEXTURE_COPY_SRC,
       });
       const replacementBindGroup = this.device.createBindGroup({
         label: `Studio Engine Worker brush presentation bindings epoch ${input.resizeEpoch}`,
@@ -935,7 +1266,7 @@ export class StudioEngineWebGpuBrushRuntime {
         device: this.device,
         format: this.canvasFormat,
         alphaMode: "premultiplied",
-        colorSpace: "srgb",
+        colorSpace: STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE,
         usage: GPU_TEXTURE_RENDER_ATTACHMENT,
       });
       safeDestroyTexture(this.targetTexture);
@@ -961,9 +1292,7 @@ export class StudioEngineWebGpuBrushRuntime {
     }
   }
 
-  public execute(
-    input: StudioEngineWebGpuBrushFrame,
-  ): Promise<StudioEngineWebGpuBrushExecutionResult> {
+  public execute(input: StudioEngineWebGpuBrushFrame): Promise<StudioEngineWebGpuBrushExecutionResult> {
     if (this.status === "disposed") {
       return Promise.resolve({ status: "rejected", reason: "disposed" });
     }
@@ -973,16 +1302,18 @@ export class StudioEngineWebGpuBrushRuntime {
     if (this.status !== "ready") {
       return Promise.resolve({ status: "rejected", reason: "runtime-failed" });
     }
-    if (this.busy) return Promise.resolve({ status: "rejected", reason: "busy" });
-    const snapshot = snapshotStudioEngineWebGpuBrushFrame(input, this.maxDabs);
+    if (this.submissions - this.completedSubmissionSequence >= this.maxInFlightSubmissions) {
+      return Promise.resolve({ status: "rejected", reason: "gpu-backpressure" });
+    }
+    const snapshot = snapshotFrame(input, this.maxDabs);
     if (snapshot.status === "rejected") return Promise.resolve(snapshot);
-    return this.executeSnapshot(snapshot.frame, snapshot.plan);
+    return Promise.resolve(this.executeSnapshot(snapshot.frame, snapshot.plan));
   }
 
-  private async executeSnapshot(
+  private executeSnapshot(
     frame: StudioEngineWebGpuBrushFrame,
     plan: ValidPlan,
-  ): Promise<StudioEngineWebGpuBrushExecutionResult> {
+  ): StudioEngineWebGpuBrushExecutionResult {
     if (!positiveSafeInteger(frame.requestSequence)) {
       return { status: "rejected", reason: "invalid-request-sequence" };
     }
@@ -995,15 +1326,12 @@ export class StudioEngineWebGpuBrushRuntime {
     if (
       frame.update.mode === "append"
       && (!this.hasRetainedBase || !sameRasterRect(this.retainedRasterRect, frame.rasterRect))
-    ) {
-      return { status: "rejected", reason: "append-without-base" };
-    }
+    ) return { status: "rejected", reason: "append-without-base" };
     if (!this.targetTexture || !this.presentationBindGroup) {
       this.failClosed();
       return { status: "rejected", reason: "runtime-failed" };
     }
 
-    this.busy = true;
     try {
       const instanceBuffer = this.ensureInstanceBuffer(plan.dabs.length);
       if (plan.dabs.length > 0 && !instanceBuffer) {
@@ -1045,7 +1373,7 @@ export class StudioEngineWebGpuBrushRuntime {
         brushPass.setVertexBuffer(0, instanceBuffer);
         for (const batch of plan.batches) {
           brushPass.setPipeline(
-            batch.composite === "erase"
+            batch.composite.porterDuff === "destination-out"
               ? this.resources.erasePipeline
               : this.resources.normalPipeline,
           );
@@ -1070,20 +1398,7 @@ export class StudioEngineWebGpuBrushRuntime {
 
       this.device.queue.submit([encoder.finish()]);
       this.submissions += 1;
-      if (typeof this.device.queue.onSubmittedWorkDone === "function") {
-        await this.device.queue.onSubmittedWorkDone();
-      }
-      // The loss/dispose callbacks may run while the fence is pending. Read through the public
-      // snapshot so TypeScript does not preserve the pre-await property narrowing.
-      const settledStatus = this.stats().status;
-      if (settledStatus === "disposed") return { status: "rejected", reason: "disposed" };
-      if (settledStatus === "device-lost") {
-        return { status: "rejected", reason: "device-lost" };
-      }
-      if (settledStatus !== "ready") {
-        return { status: "rejected", reason: "submission-failed" };
-      }
-
+      this.scheduleFence();
       this.hasRetainedBase = true;
       this.retainedRasterRect = Object.freeze({ ...frame.rasterRect });
       this.lastPresentedRequestSequence = frame.requestSequence;
@@ -1098,20 +1413,25 @@ export class StudioEngineWebGpuBrushRuntime {
         height: this.height,
         textureFormat: STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
         colorModel: STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
+        workingColorSpace: STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
         inputColorEncoding: STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING,
+        presentationColorSpace: STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE,
         mode: frame.update.mode,
+        strokeId: plan.strokeId,
+        loweringVersion: plan.loweringVersion,
         dabCount: plan.dabs.length,
         batchCount: plan.batches.length,
-        batchOrder: Object.freeze(plan.batches.map((batch) => batch.composite)),
+        batchOrder: Object.freeze(
+          plan.batches.map((batch) => batch.composite.porterDuff),
+        ),
         planFingerprint: fingerprintStudioEngineWebGpuBrushPlan(frame),
+        queueState: "submitted",
         complete: true,
       });
       return { status: "presented", receipt };
     } catch {
       this.failClosed();
       return { status: "rejected", reason: "submission-failed" };
-    } finally {
-      this.busy = false;
     }
   }
 
@@ -1128,7 +1448,7 @@ export class StudioEngineWebGpuBrushRuntime {
     if (this.instanceBuffer && this.instanceCapacity >= required) return this.instanceBuffer;
     const capacity = nextCapacity(required, this.maxDabs);
     const replacement = this.device.createBuffer({
-      label: `Studio Engine Worker brush instances ${capacity}`,
+      label: `Studio Engine Worker rich brush instances ${capacity}`,
       size: capacity * STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_BYTES,
       usage: GPU_BUFFER_VERTEX | GPU_BUFFER_COPY_DST,
     });
@@ -1137,6 +1457,32 @@ export class StudioEngineWebGpuBrushRuntime {
     this.instanceCapacity = capacity;
     this.instanceBufferAllocations += 1;
     return replacement;
+  }
+
+  /**
+   * One asynchronous fence covers a bounded generation of ordered submissions. Live append returns
+   * after queue acceptance instead of paying a full GPU round trip. A rejected fence invalidates
+   * the disposable GPU mirror; canonical commands remain the rebuild authority.
+   */
+  private scheduleFence(): void {
+    if (this.fencePending || this.status !== "ready") return;
+    this.fencePending = true;
+    const targetSubmission = this.submissions;
+    void this.device.queue.onSubmittedWorkDone().then(
+      () => {
+        this.fencePending = false;
+        if (this.status !== "ready") return;
+        this.completedSubmissionSequence = Math.max(
+          this.completedSubmissionSequence,
+          targetSubmission,
+        );
+        if (this.completedSubmissionSequence < this.submissions) this.scheduleFence();
+      },
+      () => {
+        this.fencePending = false;
+        this.failClosed();
+      },
+    );
   }
 
   private handleDeviceLost(info: GPUDeviceLostInfo): void {

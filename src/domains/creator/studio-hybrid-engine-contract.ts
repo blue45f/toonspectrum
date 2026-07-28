@@ -1109,8 +1109,8 @@ export const STUDIO_HYBRID_ENGINE_REFERENCE_CANDIDATES = Object.freeze([
     label: "CanvasKit WASM candidate",
     implementation: "wasm-library",
     availability: unprobed(
-      "not-installed",
-      "No package or artifact is imported by this contract.",
+      "installed",
+      "canvaskit-wasm 0.41.1 and its isolated quality-provider adapter are installed; a runtime probe is still required per session.",
     ),
     intendedRoles: Object.freeze([
       "vector-quality",

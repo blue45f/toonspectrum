@@ -1,21 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  convertLegacyStudioGpuDabPlanToLinear,
+  adaptLoweredStudioCanonicalBrushWebGpuDabs,
+  convertLegacyStudioGpuDabPlanToWebGpuDiagnosticOracle,
   createStudioEngineWebGpuBrushRuntime,
   fingerprintStudioEngineWebGpuBrushPlan,
   packStudioEngineWebGpuBrushDabs,
   STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
   STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING,
   STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_BYTES,
+  STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE,
   STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
+  STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
   validateStudioEngineWebGpuBrushPlan,
   type StudioEngineWebGpuBrushFrame,
+  type StudioEngineWebGpuBrushPlan,
   type StudioEngineWebGpuBrushRuntime,
 } from "./studio-engine-webgpu-brush-runtime";
 import { studioHighBitSrgbToLinear } from "./studio-highbit-transfer";
 
-import type { StudioGpuDab, StudioGpuDabRenderUpdate } from "./studio-webgpu-dab-plan-contract";
+import type {
+  LoweredStudioCanonicalBrushWebGpuDabs,
+  StudioCanonicalBrushWebGpuLoweringResult,
+  StudioCanonicalWebGpuAnalyticDab,
+} from "./studio-canonical-brush-webgpu-lowering";
+import type {
+  StudioGpuDab,
+  StudioGpuDabRenderUpdate,
+} from "./studio-webgpu-dab-plan-contract";
 
 interface Deferred<Value> {
   readonly promise: Promise<Value>;
@@ -59,6 +71,7 @@ interface FakeGpuHarness {
   readonly textures: FakeTexture[];
   readonly passes: FakePass[];
   readonly pipelineDescriptors: GPURenderPipelineDescriptor[];
+  readonly shaderDescriptors: GPUShaderModuleDescriptor[];
   readonly writeBuffer: ReturnType<typeof vi.fn>;
   readonly uploaded: Float32Array[];
   readonly submit: ReturnType<typeof vi.fn>;
@@ -90,6 +103,7 @@ function fakeGpuHarness(
   const textures: FakeTexture[] = [];
   const passes: FakePass[] = [];
   const pipelineDescriptors: GPURenderPipelineDescriptor[] = [];
+  const shaderDescriptors: GPUShaderModuleDescriptor[] = [];
   const uploaded: Float32Array[] = [];
   const configure = vi.fn();
   const unconfigure = vi.fn();
@@ -114,17 +128,9 @@ function fakeGpuHarness(
     dataOffset = 0,
     size?: number,
   ) => {
-    const byteLength = size ?? (
-      ArrayBuffer.isView(data)
-        ? data.byteLength - dataOffset
-        : data.byteLength - dataOffset
-    );
-    const source = ArrayBuffer.isView(data)
-      ? data.buffer
-      : data;
-    uploaded.push(
-      new Float32Array(source.slice(dataOffset, dataOffset + byteLength)),
-    );
+    const byteLength = size ?? data.byteLength - dataOffset;
+    const source = ArrayBuffer.isView(data) ? data.buffer : data;
+    uploaded.push(new Float32Array(source.slice(dataOffset, dataOffset + byteLength)));
   });
   const submit = vi.fn();
   const onSubmittedWorkDone = vi.fn(options.fence ?? (async () => undefined));
@@ -132,12 +138,11 @@ function fakeGpuHarness(
   const device = {
     lost: lost.promise,
     limits: { maxTextureDimension2D: 8_192 },
-    queue: {
-      writeBuffer,
-      submit,
-      onSubmittedWorkDone,
-    },
-    createShaderModule: vi.fn((descriptor: GPUShaderModuleDescriptor) => ({ descriptor })),
+    queue: { writeBuffer, submit, onSubmittedWorkDone },
+    createShaderModule: vi.fn((descriptor: GPUShaderModuleDescriptor) => {
+      shaderDescriptors.push(descriptor);
+      return { descriptor };
+    }),
     createBindGroupLayout: vi.fn((descriptor: GPUBindGroupLayoutDescriptor) => ({
       descriptor,
     })),
@@ -191,6 +196,7 @@ function fakeGpuHarness(
     textures,
     passes,
     pipelineDescriptors,
+    shaderDescriptors,
     writeBuffer,
     uploaded,
     submit,
@@ -201,7 +207,104 @@ function fakeGpuHarness(
   };
 }
 
-function dab(overrides: Partial<StudioGpuDab> = {}): StudioGpuDab {
+function analyticDab(
+  overrides: Partial<StudioCanonicalWebGpuAnalyticDab> = {},
+): StudioCanonicalWebGpuAnalyticDab {
+  const base: StudioCanonicalWebGpuAnalyticDab = {
+    index: 0,
+    stationX: 8,
+    stationY: 4,
+    x: 8,
+    y: 4,
+    pressure: 0.7,
+    diameter: 4,
+    opacity: 0.8,
+    flow: 0.5,
+    color: {
+      space: "linear-srgb",
+      alphaMode: "straight",
+      components: [0.5, 0.25, 1, 0.4],
+    },
+    composite: {
+      porterDuff: "source-over",
+      blendMode: "normal",
+    },
+    tip: {
+      shape: "ellipse",
+      hardness: 0.65,
+      edgeSoftness: 0.2,
+      roundness: 0.5,
+      angleRadians: 0.25,
+      localToDocument: [2, 0.5, -0.75, 1],
+    },
+  };
+  return {
+    ...base,
+    ...overrides,
+    color: overrides.color ?? base.color,
+    composite: overrides.composite ?? base.composite,
+    tip: overrides.tip ?? base.tip,
+  };
+}
+
+function lowered(
+  inputDabs: readonly StudioCanonicalWebGpuAnalyticDab[] = [analyticDab()],
+  overrides: Partial<LoweredStudioCanonicalBrushWebGpuDabs> = {},
+): LoweredStudioCanonicalBrushWebGpuDabs {
+  const dabs = inputDabs.map((dab, index) => ({ ...dab, index }));
+  const batches: LoweredStudioCanonicalBrushWebGpuDabs["batches"][number][] = [];
+  for (let index = 0; index < dabs.length;) {
+    const composite = dabs[index]!.composite;
+    const colorSpace = dabs[index]!.color.space;
+    let end = index + 1;
+    while (
+      end < dabs.length
+      && dabs[end]!.composite.porterDuff === composite.porterDuff
+      && dabs[end]!.composite.blendMode === composite.blendMode
+      && dabs[end]!.color.space === colorSpace
+    ) end += 1;
+    batches.push({
+      composite,
+      colorSpace,
+      firstInstance: index,
+      instanceCount: end - index,
+    });
+    index = end;
+  }
+  return {
+    status: "lowered",
+    version: 1,
+    strokeId: "stroke-rich-1",
+    dabs,
+    batches,
+    ...overrides,
+  };
+}
+
+function plan(
+  mode: "append" | "rebuild",
+  dabs: readonly StudioCanonicalWebGpuAnalyticDab[] = [analyticDab()],
+): StudioEngineWebGpuBrushPlan {
+  const result = adaptLoweredStudioCanonicalBrushWebGpuDabs(mode, lowered(dabs));
+  if (result.status !== "ready") throw new Error(`plan adaptation failed: ${result.status}`);
+  return result.plan;
+}
+
+function frame(
+  requestSequence: number,
+  update: StudioEngineWebGpuBrushPlan = plan("rebuild"),
+  overrides: Partial<StudioEngineWebGpuBrushFrame> = {},
+): StudioEngineWebGpuBrushFrame {
+  return {
+    requestSequence,
+    resizeEpoch: 1,
+    rasterRect: { x: 0, y: 0, width: 64, height: 32 },
+    update,
+    ...overrides,
+  };
+}
+
+function legacyDab(overrides: Partial<StudioGpuDab> = {}): StudioGpuDab {
   return {
     x: 8,
     y: 4,
@@ -215,7 +318,7 @@ function dab(overrides: Partial<StudioGpuDab> = {}): StudioGpuDab {
   };
 }
 
-function update(
+function legacyUpdate(
   mode: "append" | "rebuild",
   dabs: readonly StudioGpuDab[],
 ): StudioGpuDabRenderUpdate {
@@ -224,33 +327,10 @@ function update(
     const composite = dabs[index]!.composite;
     let end = index + 1;
     while (end < dabs.length && dabs[end]!.composite === composite) end += 1;
-    batches.push({
-      composite,
-      firstInstance: index,
-      instanceCount: end - index,
-    });
+    batches.push({ composite, firstInstance: index, instanceCount: end - index });
     index = end;
   }
-  return {
-    mode,
-    dabs: [...dabs],
-    batches,
-    complete: true,
-  };
-}
-
-function frame(
-  requestSequence: number,
-  renderUpdate: StudioGpuDabRenderUpdate,
-  overrides: Partial<StudioEngineWebGpuBrushFrame> = {},
-): StudioEngineWebGpuBrushFrame {
-  return {
-    requestSequence,
-    resizeEpoch: 1,
-    rasterRect: { x: 0, y: 0, width: 64, height: 32 },
-    update: renderUpdate,
-    ...overrides,
-  };
+  return { mode, dabs: [...dabs], batches, complete: true };
 }
 
 async function readyRuntime(
@@ -258,6 +338,7 @@ async function readyRuntime(
   options: {
     readonly maxDabs?: number;
     readonly maxSurfacePixels?: number;
+    readonly maxInFlightSubmissions?: number;
     readonly ownsDevice?: boolean;
     readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
   } = {},
@@ -272,6 +353,7 @@ async function readyRuntime(
     },
     maxDabs: options.maxDabs,
     maxSurfacePixels: options.maxSurfacePixels,
+    maxInFlightSubmissions: options.maxInFlightSubmissions,
     onDeviceLost: options.onDeviceLost,
   });
   expect(result.status).toBe("ready");
@@ -283,22 +365,20 @@ function attachment(pass: FakePass): GPURenderPassColorAttachment {
   return pass.descriptor.colorAttachments[0] as GPURenderPassColorAttachment;
 }
 
-describe("Studio Engine Worker WebGPU brush runtime", () => {
+describe("Studio Engine Worker rich WebGPU brush runtime", () => {
   it("fails closed with an explicit unsupported result when WebGPU is absent", async () => {
     const harness = fakeGpuHarness();
-    const result = await createStudioEngineWebGpuBrushRuntime({
+    await expect(createStudioEngineWebGpuBrushRuntime({
       surface: harness.surface,
       gpu: null,
-    });
-
-    expect(result).toEqual({
+    })).resolves.toEqual({
       status: "unsupported",
       reason: "webgpu-unavailable",
     });
     expect(harness.surface.getContext).not.toHaveBeenCalled();
   });
 
-  it("creates only WebGPU RGBA16F linear-premultiplied brush resources", async () => {
+  it("creates RGBA16F affine-tip pipelines and a readback-capable authority texture", async () => {
     const harness = fakeGpuHarness();
     const runtime = await readyRuntime(harness);
 
@@ -307,6 +387,7 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
       format: STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
       size: { width: 64, height: 32, depthOrArrayLayers: 1 },
     });
+    expect(Number(harness.textures[0]!.descriptor.usage) & 0x01).toBe(0x01);
     expect(harness.configure).toHaveBeenCalledWith(expect.objectContaining({
       device: harness.device,
       format: "bgra8unorm",
@@ -315,11 +396,24 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     }));
 
     const normal = harness.pipelineDescriptors.find(
-      (descriptor) => descriptor.label === "Studio Engine Worker normal analytic dab pipeline",
+      (descriptor) =>
+        descriptor.label === "Studio Engine Worker source-over rich analytic dab pipeline",
     );
     const erase = harness.pipelineDescriptors.find(
-      (descriptor) => descriptor.label === "Studio Engine Worker erase analytic dab pipeline",
+      (descriptor) =>
+        descriptor.label === "Studio Engine Worker destination-out rich analytic dab pipeline",
     );
+    expect(normal?.vertex.buffers?.[0]).toMatchObject({
+      arrayStride: STUDIO_ENGINE_WEBGPU_BRUSH_INSTANCE_BYTES,
+      attributes: [
+        { shaderLocation: 0, offset: 0, format: "float32x2" },
+        { shaderLocation: 1, offset: 8, format: "float32x2" },
+        { shaderLocation: 2, offset: 16, format: "float32x2" },
+        { shaderLocation: 3, offset: 24, format: "float32x4" },
+        { shaderLocation: 4, offset: 40, format: "float32x4" },
+        { shaderLocation: 5, offset: 56, format: "float32x2" },
+      ],
+    });
     expect(normal?.fragment?.targets?.[0]).toMatchObject({
       format: "rgba16float",
       blend: {
@@ -334,6 +428,10 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
         alpha: { srcFactor: "zero", dstFactor: "one-minus-src-alpha" },
       },
     });
+    const shader = String(harness.shaderDescriptors[0]!.code);
+    expect(shader).toContain("basis_x * local.x + basis_y * local.y");
+    expect(shader).toContain("square_metric");
+    expect(shader).toContain("edge_softness");
     expect(runtime.stats()).toMatchObject({
       status: "ready",
       surfaceBytes: 64 * 32 * 8,
@@ -341,53 +439,130 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     });
   });
 
-  it("premultiplies canonical scene-linear input without a second transfer decode", () => {
+  it("adapts canonical analytic lowering without losing affine, hardness, or shape data", () => {
+    const source = lowered([
+      analyticDab({
+        tip: {
+          shape: "square",
+          hardness: 0.37,
+          edgeSoftness: 0.42,
+          roundness: 0.63,
+          angleRadians: -0.75,
+          localToDocument: [-3, 1.25, 0.5, 2],
+        },
+      }),
+    ]);
+    const result = adaptLoweredStudioCanonicalBrushWebGpuDabs("rebuild", source);
+
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.plan.dabs[0]!.tip).toEqual(source.dabs[0]!.tip);
+    expect(result.plan.dabs[0]!.color).toEqual(source.dabs[0]!.color);
+    expect(result.plan.dabs[0]).not.toBe(source.dabs[0]);
+    expect(result.plan.dabs[0]!.tip).not.toBe(source.dabs[0]!.tip);
+    expect(Object.isFrozen(result.plan)).toBe(true);
+    expect(Object.isFrozen(result.plan.dabs[0]!.tip.localToDocument)).toBe(true);
+  });
+
+  it("fails closed for specialist paths, Display-P3, and unsupported blend modes", () => {
+    const specialist: StudioCanonicalBrushWebGpuLoweringResult = {
+      status: "lowering-required",
+      strokeId: "wet-1",
+      requirements: ["texture-tip", "grain", "wet-media"],
+    };
+    expect(adaptLoweredStudioCanonicalBrushWebGpuDabs("rebuild", specialist)).toEqual({
+      status: "lowering-required",
+      strokeId: "wet-1",
+      requirements: ["texture-tip", "grain", "wet-media"],
+    });
+
+    const p3 = lowered([analyticDab({
+      color: {
+        space: "linear-display-p3",
+        alphaMode: "straight",
+        components: [1, 0.2, 0.1, 1],
+      },
+    })]);
+    expect(adaptLoweredStudioCanonicalBrushWebGpuDabs("rebuild", p3)).toEqual({
+      status: "unsupported",
+      reason: "unsupported-color-space",
+      colorSpace: "linear-display-p3",
+    });
+
+    const multiply = lowered([analyticDab({
+      composite: { porterDuff: "source-over", blendMode: "multiply" },
+    })]);
+    expect(adaptLoweredStudioCanonicalBrushWebGpuDabs("rebuild", multiply)).toEqual({
+      status: "unsupported",
+      reason: "unsupported-blend-mode",
+      blendMode: "multiply",
+    });
+  });
+
+  it("packs reflected/sheared affine bases, tip metadata, and straight-linear colour exactly once", () => {
     const packed = packStudioEngineWebGpuBrushDabs(
-      [dab()],
+      [analyticDab({
+        tip: {
+          shape: "square",
+          hardness: 0.4,
+          edgeSoftness: 0.25,
+          roundness: 0.5,
+          angleRadians: -0.75,
+          localToDocument: [-2, 0.5, 1, 1.5],
+        },
+      })],
       { x: 0, y: 0, width: 64, height: 32 },
       64,
       32,
     );
 
-    expect(packed).toHaveLength(9);
+    expect(packed).toHaveLength(16);
     expect(packed[0]).toBeCloseTo(-0.75);
     expect(packed[1]).toBeCloseTo(0.75);
-    expect(packed[2]).toBeCloseTo(6 / 64);
-    expect(packed[3]).toBeCloseTo(6 / 32);
-    expect(packed[4]).toBeCloseTo(0.5 * 0.4);
-    expect(packed[5]).toBeCloseTo(0.25 * 0.4);
-    expect(packed[6]).toBeCloseTo(0.4);
-    expect(packed[7]).toBeCloseTo(0.4);
-    expect(packed[8]).toBeCloseTo(2 / 3);
+    expect(packed[2]).toBeCloseTo(-4 / 64);
+    expect(packed[3]).toBeCloseTo(-1 / 32);
+    expect(packed[4]).toBeCloseTo(2 / 64);
+    expect(packed[5]).toBeCloseTo(-3 / 32);
+    expect(packed.slice(6, 10)).toEqual(new Float32Array([0.2, 0.1, 0.4, 0.4]));
+    expect(packed[10]).toBe(2);
+    expect(packed[11]).toBeCloseTo(0.4);
+    expect(packed[12]).toBeCloseTo(0.25);
+    expect(packed[13]).toBeGreaterThan(1);
+    expect(packed[14]).toBeCloseTo(0.5);
+    expect(packed[15]).toBeCloseTo(-0.75);
   });
 
-  it("keeps legacy encoded-sRGB conversion behind an explicit one-way adapter", () => {
-    const legacy = update("rebuild", [dab()]);
-    const canonical = convertLegacyStudioGpuDabPlanToLinear(legacy);
-
-    expect(canonical.dabs[0]).toMatchObject({
-      red: studioHighBitSrgbToLinear(0.5),
-      green: studioHighBitSrgbToLinear(0.25),
-      blue: 1,
-      alpha: 0.4,
-    });
-    const packed = packStudioEngineWebGpuBrushDabs(
-      canonical.dabs,
-      { x: 0, y: 0, width: 64, height: 32 },
-      64,
-      32,
+  it("keeps encoded-sRGB legacy conversion behind a branded diagnostic oracle", () => {
+    const diagnostic = convertLegacyStudioGpuDabPlanToWebGpuDiagnosticOracle(
+      legacyUpdate("rebuild", [legacyDab()]),
     );
-    expect(packed[4]).toBeCloseTo(studioHighBitSrgbToLinear(0.5) * 0.4);
+
+    expect(diagnostic.kind).toBe("studio-engine-webgpu-legacy-diagnostic-oracle");
+    expect(diagnostic.plan.strokeId).toBe("legacy-diagnostic-oracle");
+    expect(diagnostic.plan.dabs[0]!.color.components).toEqual([
+      studioHighBitSrgbToLinear(0.5),
+      studioHighBitSrgbToLinear(0.25),
+      1,
+      0.4,
+    ]);
+    expect(diagnostic.plan.dabs[0]!.tip.localToDocument).toEqual([2, 0, 0, 2]);
   });
 
-  it("submits normal and erase batches in exact analytic plan order and returns a pure receipt", async () => {
+  it("submits source-over and destination-out batches in canonical order with a pure receipt", async () => {
     const harness = fakeGpuHarness();
     const runtime = await readyRuntime(harness);
-    const renderFrame = frame(1, update("rebuild", [
-      dab({ x: 2 }),
-      dab({ x: 3 }),
-      dab({ x: 4, composite: "erase", alpha: 0.25 }),
-      dab({ x: 5, composite: "normal", alpha: 0.75 }),
+    const renderFrame = frame(1, plan("rebuild", [
+      analyticDab(),
+      analyticDab(),
+      analyticDab({
+        composite: { porterDuff: "destination-out", blendMode: "normal" },
+        color: {
+          space: "linear-srgb",
+          alphaMode: "straight",
+          components: [0, 0, 0, 0.25],
+        },
+      }),
+      analyticDab(),
     ]));
 
     const result = await runtime.execute(renderFrame);
@@ -395,7 +570,7 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     expect(result.status).toBe("presented");
     if (result.status !== "presented") return;
     expect(harness.writeBuffer).toHaveBeenCalledTimes(1);
-    expect(harness.uploaded[0]).toHaveLength(4 * 9);
+    expect(harness.uploaded[0]).toHaveLength(4 * 16);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(harness.passes).toHaveLength(2);
     expect(attachment(harness.passes[0]!).loadOp).toBe("clear");
@@ -408,14 +583,13 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
       harness.passes[0]!.setPipeline.mock.calls.map(([pipeline]) =>
         (pipeline as { descriptor: GPURenderPipelineDescriptor }).descriptor.label),
     ).toEqual([
-      "Studio Engine Worker normal analytic dab pipeline",
-      "Studio Engine Worker erase analytic dab pipeline",
-      "Studio Engine Worker normal analytic dab pipeline",
+      "Studio Engine Worker source-over rich analytic dab pipeline",
+      "Studio Engine Worker destination-out rich analytic dab pipeline",
+      "Studio Engine Worker source-over rich analytic dab pipeline",
     ]);
-    expect(harness.passes[1]!.draw).toHaveBeenCalledWith(3, 1, 0, 0);
     expect(result.receipt).toEqual({
       kind: "studio-engine-webgpu-brush-receipt",
-      revision: 1,
+      revision: 2,
       backend: "webgpu",
       requestSequence: 1,
       resizeEpoch: 1,
@@ -424,12 +598,17 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
       height: 32,
       textureFormat: STUDIO_ENGINE_WEBGPU_BRUSH_TEXTURE_FORMAT,
       colorModel: STUDIO_ENGINE_WEBGPU_BRUSH_COLOR_MODEL,
+      workingColorSpace: STUDIO_ENGINE_WEBGPU_BRUSH_WORKING_COLOR_SPACE,
       inputColorEncoding: STUDIO_ENGINE_WEBGPU_BRUSH_INPUT_COLOR_ENCODING,
+      presentationColorSpace: STUDIO_ENGINE_WEBGPU_BRUSH_PRESENTATION_COLOR_SPACE,
       mode: "rebuild",
+      strokeId: "stroke-rich-1",
+      loweringVersion: 1,
       dabCount: 4,
       batchCount: 3,
-      batchOrder: ["normal", "erase", "normal"],
+      batchOrder: ["source-over", "destination-out", "source-over"],
       planFingerprint: fingerprintStudioEngineWebGpuBrushPlan(renderFrame),
+      queueState: "submitted",
       complete: true,
     });
     expect(Object.isFrozen(result.receipt)).toBe(true);
@@ -437,47 +616,65 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     expect(JSON.parse(JSON.stringify(result.receipt))).toEqual(result.receipt);
     expect(Object.keys(result.receipt)).not.toContain("device");
     expect(Object.keys(result.receipt)).not.toContain("context");
-    expect(Object.values(result.receipt)).not.toContain(harness.device);
-    expect(Object.values(result.receipt)).not.toContain(harness.context);
   });
 
-  it("uses one numeric fingerprint workspace regardless of dab count", () => {
-    const NativeDataView = DataView;
-    let dataViewConstructions = 0;
-    const CountingDataView = new Proxy(NativeDataView, {
-      construct(target, argumentsList) {
-        dataViewConstructions += 1;
-        return Reflect.construct(target, argumentsList);
-      },
+  it("does not await a full GPU fence per append and applies bounded queue backpressure", async () => {
+    const fence = deferred<void>();
+    const harness = fakeGpuHarness({ fence: () => fence.promise });
+    const runtime = await readyRuntime(harness, { maxInFlightSubmissions: 2 });
+
+    await expect(runtime.execute(frame(1, plan("rebuild")))).resolves.toMatchObject({
+      status: "presented",
+      receipt: { queueState: "submitted" },
     });
-    vi.stubGlobal("DataView", CountingDataView);
-    try {
-      const renderFrame = frame(1, update("rebuild", Array.from(
-        { length: 2_048 },
-        (_, index) => dab({ x: index % 64, y: Math.floor(index / 64) }),
-      )));
-      expect(fingerprintStudioEngineWebGpuBrushPlan(renderFrame)).toMatch(/^2048:1:/);
-      expect(dataViewConstructions).toBe(1);
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await expect(runtime.execute(frame(2, plan("append")))).resolves.toMatchObject({
+      status: "presented",
+      receipt: { queueState: "submitted" },
+    });
+    expect(harness.onSubmittedWorkDone).toHaveBeenCalledTimes(1);
+    expect(runtime.stats()).toMatchObject({
+      submissions: 2,
+      inFlightSubmissions: 2,
+      completedSubmissionSequence: 0,
+    });
+    expect(runtime.resize({ width: 128, height: 64, resizeEpoch: 2 })).toEqual({
+      status: "rejected",
+      reason: "gpu-backpressure",
+    });
+    await expect(runtime.execute(frame(3, plan("append")))).resolves.toEqual({
+      status: "rejected",
+      reason: "gpu-backpressure",
+    });
+
+    fence.resolve();
+    await fence.promise;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runtime.stats()).toMatchObject({
+      submissions: 2,
+      inFlightSubmissions: 0,
+      completedSubmissionSequence: 2,
+    });
+    await expect(runtime.execute(frame(3, plan("append")))).resolves.toMatchObject({
+      status: "presented",
+    });
   });
 
-  it("retains the RGBA16F surface for append and preserves bounded grow-only allocations", async () => {
+  it("retains the RGBA16F surface for append with bounded grow-only instance allocations", async () => {
     const harness = fakeGpuHarness();
     const runtime = await readyRuntime(harness, { maxDabs: 4 });
 
-    await expect(runtime.execute(frame(1, update("append", [dab()])))).resolves.toEqual({
+    await expect(runtime.execute(frame(1, plan("append")))).resolves.toEqual({
       status: "rejected",
       reason: "append-without-base",
     });
-    await expect(runtime.execute(frame(1, update("rebuild", [dab()])))).resolves.toMatchObject({
+    await expect(runtime.execute(frame(1, plan("rebuild")))).resolves.toMatchObject({
       status: "presented",
     });
-    await expect(runtime.execute(frame(2, update("append", [
-      dab({ x: 9 }),
-      dab({ x: 10 }),
-      dab({ x: 11 }),
+    await expect(runtime.execute(frame(2, plan("append", [
+      analyticDab(),
+      analyticDab(),
+      analyticDab(),
     ])))).resolves.toMatchObject({
       status: "presented",
       receipt: { mode: "append", requestSequence: 2 },
@@ -492,73 +689,29 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
       surfaceTextureAllocations: 1,
       submissions: 2,
     });
-
-    await expect(runtime.execute(frame(3, update("append", Array.from(
-      { length: 5 },
-      (_, index) => dab({ x: index }),
-    ))))).resolves.toEqual({
-      status: "rejected",
-      reason: "request-limit",
-    });
-    expect(harness.submit).toHaveBeenCalledTimes(2);
-    expect(harness.buffers).toHaveLength(1);
   });
 
-  it("rejects non-contiguous, composite-mismatched, and incomplete plans before GPU mutation", async () => {
+  it("rejects malformed coverage and hostile getters before GPU mutation", async () => {
     const harness = fakeGpuHarness();
     const runtime = await readyRuntime(harness);
-    const mismatched: StudioGpuDabRenderUpdate = {
-      mode: "rebuild",
-      dabs: [dab({ composite: "erase" })],
-      batches: [{ composite: "normal", firstInstance: 0, instanceCount: 1 }],
-      complete: true,
+    const valid = plan("rebuild");
+    const gapped: StudioEngineWebGpuBrushPlan = {
+      ...valid,
+      batches: [{ ...valid.batches[0]!, firstInstance: 1 }],
     };
-    const gapped: StudioGpuDabRenderUpdate = {
-      mode: "rebuild",
-      dabs: [dab(), dab()],
-      batches: [{ composite: "normal", firstInstance: 1, instanceCount: 1 }],
-      complete: true,
-    };
-
-    expect(validateStudioEngineWebGpuBrushPlan(mismatched, 8)).toBeNull();
-    expect(validateStudioEngineWebGpuBrushPlan(gapped, 8)).toBeNull();
-    await expect(runtime.execute(frame(1, mismatched))).resolves.toEqual({
-      status: "rejected",
-      reason: "invalid-plan",
-    });
-    await expect(runtime.execute(frame(1, { ...update("rebuild", [dab()]), complete: false })))
-      .resolves.toEqual({
-        status: "rejected",
-        reason: "incomplete-plan",
-      });
-    expect(harness.writeBuffer).not.toHaveBeenCalled();
-    expect(harness.submit).not.toHaveBeenCalled();
-  });
-
-  it("contains hostile proxy and getter failures at the public validation boundary", async () => {
-    const harness = fakeGpuHarness();
-    const runtime = await readyRuntime(harness);
-    const hostileFrame = new Proxy(frame(1, update("rebuild", [dab()])), {
+    const hostileFrame = new Proxy(frame(1), {
       get(target, property, receiver) {
         if (property === "update") throw new Error("hostile update getter");
         return Reflect.get(target, property, receiver);
       },
     });
-    const hostileDab = new Proxy(dab(), {
-      get(target, property, receiver) {
-        if (property === "red") throw new Error("hostile color getter");
-        return Reflect.get(target, property, receiver);
-      },
-    });
-    const hostilePlan = update("rebuild", [hostileDab]);
 
-    expect(() => validateStudioEngineWebGpuBrushPlan(hostilePlan, 8)).not.toThrow();
-    expect(validateStudioEngineWebGpuBrushPlan(hostilePlan, 8)).toBeNull();
-    await expect(runtime.execute(hostileFrame)).resolves.toEqual({
+    expect(validateStudioEngineWebGpuBrushPlan(gapped, 8)).toBeNull();
+    await expect(runtime.execute(frame(1, gapped))).resolves.toEqual({
       status: "rejected",
       reason: "invalid-plan",
     });
-    await expect(runtime.execute(frame(1, hostilePlan))).resolves.toEqual({
+    await expect(runtime.execute(hostileFrame)).resolves.toEqual({
       status: "rejected",
       reason: "invalid-plan",
     });
@@ -567,10 +720,11 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     expect(runtime.stats().status).toBe("ready");
   });
 
-  it("makes resize epochs monotonic, destroys the prior surface, and requires a rebuild", async () => {
+  it("makes resize epochs monotonic, destroys prior surfaces, and requires a rebuild", async () => {
     const harness = fakeGpuHarness();
     const runtime = await readyRuntime(harness);
-    await runtime.execute(frame(1, update("rebuild", [dab()])));
+    await runtime.execute(frame(1));
+    await Promise.resolve();
     const originalTexture = harness.textures[0]!;
 
     expect(runtime.resize({ width: 128, height: 64, resizeEpoch: 1 })).toEqual({
@@ -588,63 +742,20 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
       format: "rgba16float",
       size: { width: 128, height: 64 },
     });
-    await expect(runtime.execute(frame(2, update("append", [dab()]), {
+    await expect(runtime.execute(frame(2, plan("append"), {
       resizeEpoch: 2,
       rasterRect: { x: 0, y: 0, width: 128, height: 64 },
     }))).resolves.toEqual({
       status: "rejected",
       reason: "append-without-base",
     });
-    await expect(runtime.execute(frame(2, update("rebuild", [dab()]), {
-      resizeEpoch: 2,
-      rasterRect: { x: 0, y: 0, width: 128, height: 64 },
-    }))).resolves.toMatchObject({
-      status: "presented",
-      receipt: { resizeEpoch: 2, width: 128, height: 64 },
-    });
   });
 
-  it("rejects surface allocation beyond explicit pixel and device limits without replacing state", async () => {
-    const harness = fakeGpuHarness({ width: 16, height: 16 });
-    const runtime = await readyRuntime(harness, { maxSurfacePixels: 512 });
-
-    expect(runtime.resize({ width: 32, height: 32, resizeEpoch: 2 })).toEqual({
-      status: "rejected",
-      reason: "invalid-resize",
-    });
-    expect(harness.textures).toHaveLength(1);
-    expect(runtime.stats()).toMatchObject({
-      status: "ready",
-      width: 16,
-      height: 16,
-      surfaceBytes: 16 * 16 * 8,
-      resizeEpoch: 1,
-    });
-  });
-
-  it("rejects concurrent work instead of allowing receipt or staging-buffer reordering", async () => {
-    const fence = deferred<void>();
-    const harness = fakeGpuHarness({ fence: () => fence.promise });
-    const runtime = await readyRuntime(harness);
-    const first = runtime.execute(frame(1, update("rebuild", [dab()])));
-
-    await expect(runtime.execute(frame(2, update("rebuild", [dab()])))).resolves.toEqual({
-      status: "rejected",
-      reason: "busy",
-    });
-    fence.resolve();
-    await expect(first).resolves.toMatchObject({
-      status: "presented",
-      receipt: { requestSequence: 1 },
-    });
-    expect(harness.submit).toHaveBeenCalledTimes(1);
-  });
-
-  it("device loss invalidates all resources and leaves no fallback-authorized receipt", async () => {
+  it("device loss invalidates resources and owns no compatibility fallback", async () => {
     const harness = fakeGpuHarness();
     const onDeviceLost = vi.fn();
     const runtime = await readyRuntime(harness, { onDeviceLost });
-    await runtime.execute(frame(1, update("rebuild", [dab()])));
+    await runtime.execute(frame(1));
     const texture = harness.textures[0]!;
     const buffer = harness.buffers[0]!;
     const info = { reason: "unknown", message: "test loss" } as GPUDeviceLostInfo;
@@ -662,37 +773,13 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     expect(buffer.destroy).toHaveBeenCalledTimes(1);
     expect(harness.unconfigure).toHaveBeenCalledTimes(1);
     expect(onDeviceLost).toHaveBeenCalledWith(info);
-    await expect(runtime.execute(frame(2, update("rebuild", [dab()])))).resolves.toEqual({
+    await expect(runtime.execute(frame(2))).resolves.toEqual({
       status: "rejected",
       reason: "device-lost",
     });
-    expect(harness.destroyDevice).not.toHaveBeenCalled();
   });
 
-  it("dispose during a fence rejects the pending receipt and respects device ownership", async () => {
-    const fence = deferred<void>();
-    const shared = fakeGpuHarness({ fence: () => fence.promise });
-    const runtime = await readyRuntime(shared);
-    const pending = runtime.execute(frame(1, update("rebuild", [dab()])));
-
-    runtime.dispose();
-    fence.resolve();
-
-    await expect(pending).resolves.toEqual({
-      status: "rejected",
-      reason: "disposed",
-    });
-    expect(shared.destroyDevice).not.toHaveBeenCalled();
-    expect(runtime.stats().status).toBe("disposed");
-
-    const dedicated = fakeGpuHarness();
-    const ownedRuntime = await readyRuntime(dedicated, { ownsDevice: true });
-    ownedRuntime.dispose();
-    ownedRuntime.dispose();
-    expect(dedicated.destroyDevice).toHaveBeenCalledTimes(1);
-  });
-
-  it("turns a rejected queue fence into a fail-closed runtime", async () => {
+  it("turns a rejected batched fence into a fail-closed disposable mirror", async () => {
     const harness = fakeGpuHarness({
       fence: async () => {
         throw new Error("validation failure");
@@ -700,16 +787,31 @@ describe("Studio Engine Worker WebGPU brush runtime", () => {
     });
     const runtime = await readyRuntime(harness);
 
-    await expect(runtime.execute(frame(1, update("rebuild", [dab()])))).resolves.toEqual({
-      status: "rejected",
-      reason: "submission-failed",
+    await expect(runtime.execute(frame(1))).resolves.toMatchObject({
+      status: "presented",
+      receipt: { queueState: "submitted" },
     });
+    await Promise.resolve();
+    await Promise.resolve();
     expect(runtime.stats().status).toBe("failed");
     expect(harness.textures[0]!.destroy).toHaveBeenCalledTimes(1);
     expect(harness.buffers[0]!.destroy).toHaveBeenCalledTimes(1);
-    await expect(runtime.execute(frame(2, update("rebuild", [dab()])))).resolves.toEqual({
+    await expect(runtime.execute(frame(2))).resolves.toEqual({
       status: "rejected",
       reason: "runtime-failed",
     });
+  });
+
+  it("respects shared versus owned device disposal", async () => {
+    const shared = fakeGpuHarness();
+    const sharedRuntime = await readyRuntime(shared);
+    sharedRuntime.dispose();
+    expect(shared.destroyDevice).not.toHaveBeenCalled();
+
+    const dedicated = fakeGpuHarness();
+    const ownedRuntime = await readyRuntime(dedicated, { ownsDevice: true });
+    ownedRuntime.dispose();
+    ownedRuntime.dispose();
+    expect(dedicated.destroyDevice).toHaveBeenCalledTimes(1);
   });
 });

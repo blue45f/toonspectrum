@@ -261,18 +261,18 @@ describe("엔진 해석 — lazy 로더", () => {
 });
 
 describe("번들 비용 고지", () => {
-  it("변형별 수치를 내되 실측이 아님을 분명히 한다", () => {
+  it("설치된 변형별 WASM 실측과 압축 참고치를 구분한다", () => {
     expect(CANVASKIT_BUNDLE_FACTS.length).toBeGreaterThanOrEqual(2);
     for (const fact of CANVASKIT_BUNDLE_FACTS) {
       expect(fact.approxBrotliBytes).toBeLessThan(fact.approxRawBytes);
       expect(fact.approxRawBytes).toBeGreaterThan(1_000_000);
     }
-    expect(CANVASKIT_BUNDLE_FACTS[0]!.note).toContain("실측하지 않은");
+    expect(CANVASKIT_BUNDLE_FACTS[0]!.note).toContain("로컬 실측");
     expect(CANVASKIT_ADOPTION_NOTE).toContain("lazy");
-    expect(CANVASKIT_ADOPTION_NOTE).toContain("실측한 값이 아니");
+    expect(CANVASKIT_ADOPTION_NOTE).toContain("WASM 원본 크기는 실측");
   });
 
-  it("커스텀 빌드가 기본 배포본보다 작다", () => {
-    expect(CANVASKIT_BUNDLE_FACTS[1]!.approxRawBytes).toBeLessThan(CANVASKIT_BUNDLE_FACTS[0]!.approxRawBytes);
+  it("full 배포본은 기본 배포본보다 크다", () => {
+    expect(CANVASKIT_BUNDLE_FACTS[1]!.approxRawBytes).toBeGreaterThan(CANVASKIT_BUNDLE_FACTS[0]!.approxRawBytes);
   });
 });

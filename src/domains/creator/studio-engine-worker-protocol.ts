@@ -17,7 +17,7 @@ import {
  * transfer slots. The adapter that calls postMessage owns the actual transfer
  * list and must resolve every required slot separately.
  */
-export const STUDIO_ENGINE_WORKER_PROTOCOL_REVISION = 1 as const;
+export const STUDIO_ENGINE_WORKER_PROTOCOL_REVISION = 2 as const;
 
 export const STUDIO_ENGINE_WORKER_BUDGETS = Object.freeze({
   maxInFlightCommands: 1_024,
@@ -41,28 +41,56 @@ export const STUDIO_ENGINE_WORKER_BUDGETS = Object.freeze({
 export const STUDIO_ENGINE_SURFACE_TRANSFER_CONTRACT =
   "attach-surface carries only a numbered runtime slot; the OffscreenCanvas-like object and transfer list stay in the host adapter";
 
-export type StudioEngineCapabilityTier =
-  | "ultra"
-  | "standard"
-  | "compatibility";
+export const STUDIO_ENGINE_EXECUTION_PROFILE =
+  "webgpu-worker-rgba16float-vnext" as const;
 
 export interface StudioEngineCapabilitySnapshot {
   readonly offscreenCanvas: boolean;
   readonly sharedArrayBuffer: boolean;
   readonly crossOriginIsolated: boolean;
   readonly webGpu: boolean;
-  readonly webGl2: boolean;
   readonly wasmSimd: boolean;
   readonly memory64: boolean;
   readonly hardwareConcurrency: number;
   readonly maxTextureDimension2D: number;
 }
 
+/**
+ * vNext is intentionally future-only. These capabilities are execution prerequisites rather than
+ * signals for choosing a lower-quality renderer. WebGL2/Canvas capability probes are intentionally
+ * absent from this writable-engine contract.
+ */
+export const STUDIO_ENGINE_FUTURE_REQUIRED_CAPABILITIES = Object.freeze([
+  "offscreenCanvas",
+  "sharedArrayBuffer",
+  "crossOriginIsolated",
+  "webGpu",
+  "wasmSimd",
+  "memory64",
+] as const);
+
+export type StudioEngineFutureRequiredCapability =
+  (typeof STUDIO_ENGINE_FUTURE_REQUIRED_CAPABILITIES)[number];
+
+export function missingStudioEngineFutureCapabilities(
+  capabilities: StudioEngineCapabilitySnapshot,
+): readonly StudioEngineFutureRequiredCapability[] {
+  try {
+    return Object.freeze(
+      STUDIO_ENGINE_FUTURE_REQUIRED_CAPABILITIES.filter(
+        (capability) => capabilities[capability] !== true,
+      ),
+    );
+  } catch {
+    return STUDIO_ENGINE_FUTURE_REQUIRED_CAPABILITIES;
+  }
+}
+
 export interface StudioEngineHelloMessage {
   readonly type: "studio-engine/hello";
   readonly protocolRevision: typeof STUDIO_ENGINE_WORKER_PROTOCOL_REVISION;
   readonly sessionEpoch: number;
-  readonly requestedTier: StudioEngineCapabilityTier;
+  readonly executionProfile: typeof STUDIO_ENGINE_EXECUTION_PROFILE;
   readonly clientBuild: string;
   readonly capabilities: StudioEngineCapabilitySnapshot;
 }
@@ -78,8 +106,7 @@ export interface StudioEngineHelloAckMessage {
   readonly type: "studio-engine/hello-ack";
   readonly protocolRevision: typeof STUDIO_ENGINE_WORKER_PROTOCOL_REVISION;
   readonly sessionEpoch: number;
-  readonly selectedTier: StudioEngineCapabilityTier;
-  readonly supportedTiers: readonly StudioEngineCapabilityTier[];
+  readonly executionProfile: typeof STUDIO_ENGINE_EXECUTION_PROFILE;
   readonly engineBuild: string;
   readonly limits: StudioEngineNegotiatedLimits;
 }
@@ -129,6 +156,7 @@ export interface StudioEnginePointerBatch {
 
 export interface StudioEnginePointerBatchCommand {
   readonly kind: "pointer-batch";
+  /** Deterministic replay/test ingress only; live vNext input requires the SAB ring. */
   readonly batch: StudioEnginePointerBatch;
 }
 
@@ -236,7 +264,7 @@ export interface StudioEngineOverflowSignal {
 
 export interface StudioEngineDeviceLostSignal {
   readonly kind: "device-lost";
-  readonly backend: "webgpu" | "webgl2" | "canvas2d";
+  readonly backend: "webgpu";
   readonly reason: string;
   readonly recoverable: boolean;
 }
@@ -425,14 +453,6 @@ function isBoundedMessage(value: unknown): value is string {
   );
 }
 
-function isCapabilityTier(value: unknown): value is StudioEngineCapabilityTier {
-  return (
-    value === "ultra"
-    || value === "standard"
-    || value === "compatibility"
-  );
-}
-
 function validateRevision(
   value: UnknownRecord,
 ): StudioEngineProtocolParseResult<true> {
@@ -461,7 +481,6 @@ function validateCapabilities(
       "sharedArrayBuffer",
       "crossOriginIsolated",
       "webGpu",
-      "webGl2",
       "wasmSimd",
       "memory64",
       "hardwareConcurrency",
@@ -475,7 +494,6 @@ function validateCapabilities(
     && typeof value.sharedArrayBuffer === "boolean"
     && typeof value.crossOriginIsolated === "boolean"
     && typeof value.webGpu === "boolean"
-    && typeof value.webGl2 === "boolean"
     && typeof value.wasmSimd === "boolean"
     && typeof value.memory64 === "boolean"
     && isFiniteInRange(value.hardwareConcurrency, 1, 1_024)
@@ -487,28 +505,6 @@ function validateCapabilities(
     )
     && Number.isInteger(value.maxTextureDimension2D)
   );
-}
-
-export function selectStudioEngineCapabilityTier(
-  capabilities: StudioEngineCapabilitySnapshot,
-): StudioEngineCapabilityTier {
-  if (
-    capabilities.offscreenCanvas
-    && capabilities.sharedArrayBuffer
-    && capabilities.crossOriginIsolated
-    && capabilities.webGpu
-    && capabilities.wasmSimd
-    && capabilities.memory64
-  ) {
-    return "ultra";
-  }
-  if (
-    capabilities.offscreenCanvas
-    && (capabilities.webGpu || capabilities.webGl2)
-  ) {
-    return "standard";
-  }
-  return "compatibility";
 }
 
 export function parseStudioEngineHello(
@@ -523,7 +519,7 @@ export function parseStudioEngineHello(
       "type",
       "protocolRevision",
       "sessionEpoch",
-      "requestedTier",
+      "executionProfile",
       "clientBuild",
       "capabilities",
     ])
@@ -535,8 +531,8 @@ export function parseStudioEngineHello(
   if (!isPositiveSafeInteger(input.sessionEpoch)) {
     return fail("invalid-field", "sessionEpoch");
   }
-  if (!isCapabilityTier(input.requestedTier)) {
-    return fail("invalid-field", "requestedTier");
+  if (input.executionProfile !== STUDIO_ENGINE_EXECUTION_PROFILE) {
+    return fail("invalid-field", "executionProfile");
   }
   if (
     !isIdentifier(
@@ -607,8 +603,7 @@ export function parseStudioEngineHelloAck(
       "type",
       "protocolRevision",
       "sessionEpoch",
-      "selectedTier",
-      "supportedTiers",
+      "executionProfile",
       "engineBuild",
       "limits",
     ])
@@ -620,16 +615,8 @@ export function parseStudioEngineHelloAck(
   if (input.sessionEpoch !== expectedSessionEpoch) {
     return fail("stale-session-epoch", "sessionEpoch");
   }
-  if (
-    !isCapabilityTier(input.selectedTier)
-    || !Array.isArray(input.supportedTiers)
-    || input.supportedTiers.length < 1
-    || input.supportedTiers.length > 3
-    || !input.supportedTiers.every(isCapabilityTier)
-    || new Set(input.supportedTiers).size !== input.supportedTiers.length
-    || !input.supportedTiers.includes(input.selectedTier)
-  ) {
-    return fail("invalid-field", "supportedTiers");
+  if (input.executionProfile !== STUDIO_ENGINE_EXECUTION_PROFILE) {
+    return fail("invalid-field", "executionProfile");
   }
   if (
     !isIdentifier(
@@ -1335,11 +1322,7 @@ function validateSignal(
           "reason",
           "recoverable",
         ])
-        || (
-          value.backend !== "webgpu"
-          && value.backend !== "webgl2"
-          && value.backend !== "canvas2d"
-        )
+        || value.backend !== "webgpu"
         || !isBoundedMessage(value.reason)
         || typeof value.recoverable !== "boolean"
       ) {

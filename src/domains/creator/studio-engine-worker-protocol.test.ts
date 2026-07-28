@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   describeStudioEngineCommandTransport,
+  missingStudioEngineFutureCapabilities,
   parseStudioEngineCommand,
   parseStudioEngineHello,
   parseStudioEngineHelloAck,
   parseStudioEngineWorkerMessage,
-  selectStudioEngineCapabilityTier,
+  STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   STUDIO_ENGINE_SURFACE_TRANSFER_CONTRACT,
@@ -29,7 +30,6 @@ const ULTRA_CAPABILITIES: StudioEngineCapabilitySnapshot = {
   sharedArrayBuffer: true,
   crossOriginIsolated: true,
   webGpu: true,
-  webGl2: true,
   wasmSimd: true,
   memory64: true,
   hardwareConcurrency: 12,
@@ -41,7 +41,7 @@ function hello(overrides: Record<string, unknown> = {}) {
     type: "studio-engine/hello",
     protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
     sessionEpoch: 41,
-    requestedTier: "ultra",
+    executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
     clientBuild: "studio-2026.07.27",
     capabilities: ULTRA_CAPABILITIES,
     ...overrides,
@@ -115,26 +115,16 @@ const INITIAL_WORKER_STATE: StudioEngineWorkerValidationState = {
 };
 
 describe("studio engine capability handshake", () => {
-  it("selects Ultra, Standard, and Compatibility from clone-safe facts", () => {
-    expect(selectStudioEngineCapabilityTier(ULTRA_CAPABILITIES)).toBe(
-      "ultra",
-    );
+  it("reports every missing future-only capability without selecting a fallback", () => {
+    expect(missingStudioEngineFutureCapabilities(ULTRA_CAPABILITIES)).toEqual([]);
     expect(
-      selectStudioEngineCapabilityTier({
+      missingStudioEngineFutureCapabilities({
         ...ULTRA_CAPABILITIES,
         sharedArrayBuffer: false,
         crossOriginIsolated: false,
         memory64: false,
       }),
-    ).toBe("standard");
-    expect(
-      selectStudioEngineCapabilityTier({
-        ...ULTRA_CAPABILITIES,
-        offscreenCanvas: false,
-        webGpu: false,
-        webGl2: false,
-      }),
-    ).toBe("compatibility");
+    ).toEqual(["sharedArrayBuffer", "crossOriginIsolated", "memory64"]);
   });
 
   it("accepts a structured-cloned hello and rejects future revisions", () => {
@@ -142,11 +132,11 @@ describe("studio engine capability handshake", () => {
       ok: true,
       value: {
         sessionEpoch: 41,
-        requestedTier: "ultra",
+        executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
       },
     });
     expect(
-      parseStudioEngineHello(hello({ protocolRevision: 2 })),
+      parseStudioEngineHello(hello({ protocolRevision: 3 })),
     ).toEqual({
       ok: false,
       reason: "future-protocol-revision",
@@ -180,8 +170,7 @@ describe("studio engine capability handshake", () => {
       type: "studio-engine/hello-ack",
       protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
       sessionEpoch: 40,
-      selectedTier: "standard",
-      supportedTiers: ["ultra", "standard", "compatibility"],
+      executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
       engineBuild: "engine-1.0.0",
       limits: {
         maxInFlightCommands: 256,
@@ -199,7 +188,34 @@ describe("studio engine capability handshake", () => {
       parseStudioEngineHelloAck({ ...ack, sessionEpoch: 41 }, 41),
     ).toMatchObject({
       ok: true,
-      value: { selectedTier: "standard" },
+      value: { executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE },
+    });
+  });
+
+  it("rejects retired compatibility profile fields at the protocol boundary", () => {
+    expect(parseStudioEngineHello(hello({
+      executionProfile: "webgl2-compatibility",
+    }))).toEqual({
+      ok: false,
+      reason: "invalid-field",
+      path: "executionProfile",
+    });
+    expect(parseStudioEngineHelloAck({
+      type: "studio-engine/hello-ack",
+      protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
+      sessionEpoch: 41,
+      executionProfile: "webgl2-compatibility",
+      engineBuild: "retired-engine",
+      limits: {
+        maxInFlightCommands: 1,
+        maxPointerBatchSamples: 1,
+        maxPointerRingSamples: 2,
+        maxDocumentPatchBytes: 1,
+      },
+    }, 41)).toEqual({
+      ok: false,
+      reason: "invalid-field",
+      path: "executionProfile",
     });
   });
 
@@ -208,8 +224,7 @@ describe("studio engine capability handshake", () => {
       type: "studio-engine/hello-ack",
       protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
       sessionEpoch: 41,
-      selectedTier: "ultra",
-      supportedTiers: ["ultra"],
+      executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
       engineBuild: "engine-1.0.0",
       limits: {
         maxInFlightCommands:
@@ -571,7 +586,7 @@ describe("studio engine command prefix validation", () => {
       parseStudioEngineCommand(
         {
           ...commandMessage(surfaceCommand),
-          protocolRevision: 2,
+          protocolRevision: 3,
         },
         INITIAL_COMMAND_STATE,
       ),
@@ -777,8 +792,8 @@ describe("studio engine worker receipts and failure signals", () => {
           signalSequence: 4,
           signal: {
             kind: "device-lost",
-            backend: "native-metal",
-            reason: "unsupported backend",
+            backend: "webgl2",
+            reason: "retired compatibility backend",
             recoverable: false,
           },
         },

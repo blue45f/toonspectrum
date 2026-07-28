@@ -5,6 +5,7 @@ import {
   type StudioEngineWorkerLike,
 } from "./studio-engine-worker-client";
 import {
+  STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   type StudioEngineCapabilitySnapshot,
@@ -88,7 +89,6 @@ const CAPABILITIES: StudioEngineCapabilitySnapshot = {
   sharedArrayBuffer: true,
   crossOriginIsolated: true,
   webGpu: true,
-  webGl2: true,
   wasmSimd: true,
   memory64: true,
   hardwareConcurrency: 8,
@@ -106,8 +106,7 @@ function ack(sessionEpoch = 17): StudioEngineHelloAckMessage {
     type: "studio-engine/hello-ack",
     protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
     sessionEpoch,
-    selectedTier: "ultra",
-    supportedTiers: ["ultra", "standard", "compatibility"],
+    executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
     engineBuild: "engine-test",
     limits: {
       maxInFlightCommands: STUDIO_ENGINE_WORKER_BUDGETS.maxInFlightCommands,
@@ -166,19 +165,46 @@ class FakeSurface implements StudioEngineOffscreenSurface {
 }
 
 describe("Studio Engine Worker client handshake and ownership", () => {
+  it("fails before Worker construction when a future-only capability is missing", async () => {
+    const worker = new FakeWorker();
+    let factoryCalls = 0;
+    const session = createStudioEngineWorkerSession({
+      capabilities: { ...CAPABILITIES, memory64: false },
+      clientBuild: "client-test",
+      sessionEpoch: 17,
+      pointerRingCapacity: 8,
+      pointerRingEnvironment: RING_ENVIRONMENT,
+      workerFactory: () => {
+        factoryCalls += 1;
+        return worker;
+      },
+    });
+
+    await expect(session.ready).rejects.toMatchObject({
+      code: "future-capabilities-required",
+      message: expect.stringContaining("memory64"),
+    });
+    expect(factoryCalls).toBe(0);
+    expect(worker.posted).toEqual([]);
+    expect(session.snapshot()).toMatchObject({
+      phase: "failed",
+      failure: { code: "future-capabilities-required" },
+    });
+  });
+
   it("posts hello, configures SAB without transferring it, then transfers the surface exactly once", async () => {
     const worker = new FakeWorker();
     const { session } = createSession(worker);
     expect(worker.posted[0]).toMatchObject({
       type: "studio-engine/hello",
-      requestedTier: "ultra",
+      executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
       sessionEpoch: 17,
     });
     expect(worker.transfers[0]).toEqual([]);
 
     worker.emit(ack());
     await expect(session.ready).resolves.toMatchObject({
-      selectedTier: "ultra",
+      executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
     });
     expect(worker.posted[1]).toMatchObject({
       type: "studio-engine/command",

@@ -1,9 +1,10 @@
 import {
+  STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
+  missingStudioEngineFutureCapabilities,
   parseStudioEngineCommand,
   parseStudioEngineHello,
-  selectStudioEngineCapabilityTier,
   validateStudioEngineSurfaceAgainstRuntime,
   type StudioEngineAttachSurfaceCommand,
   type StudioEngineCommandMessage,
@@ -99,7 +100,7 @@ export interface StudioEngineWorkerRuntime {
   handleMessage(input: unknown): void;
   pollPointerRing(): void;
   failDevice(
-    backend: "webgpu" | "webgl2" | "canvas2d",
+    backend: "webgpu",
     reason: string,
     recoverable?: boolean,
   ): void;
@@ -210,31 +211,6 @@ function pressureLevel(
     return "soft";
   }
   return "none";
-}
-
-const CAPABILITY_TIER_ORDER = Object.freeze([
-  "compatibility",
-  "standard",
-  "ultra",
-] as const);
-
-function negotiateCapabilityTier(
-  requestedTier: (typeof CAPABILITY_TIER_ORDER)[number],
-  maximumTier: (typeof CAPABILITY_TIER_ORDER)[number],
-): {
-  readonly selectedTier: (typeof CAPABILITY_TIER_ORDER)[number];
-  readonly supportedTiers: readonly (typeof CAPABILITY_TIER_ORDER)[number][];
-} {
-  const requestedIndex = CAPABILITY_TIER_ORDER.indexOf(requestedTier);
-  const maximumIndex = CAPABILITY_TIER_ORDER.indexOf(maximumTier);
-  const selectedIndex = Math.min(requestedIndex, maximumIndex);
-  const selectedTier = CAPABILITY_TIER_ORDER[selectedIndex];
-  return {
-    selectedTier,
-    supportedTiers: CAPABILITY_TIER_ORDER
-      .slice(0, selectedIndex + 1)
-      .reverse(),
-  };
 }
 
 export function createStudioEngineWorkerRuntime(
@@ -770,22 +746,20 @@ export function createStudioEngineWorkerRuntime(
           sessionEpoch,
           lastAcceptedCommandSequence: 0,
         };
-        const maximumTier = selectStudioEngineCapabilityTier(
+        const missingCapabilities = missingStudioEngineFutureCapabilities(
           hello.value.capabilities,
         );
-        const { selectedTier, supportedTiers } =
-          negotiateCapabilityTier(
-            hello.value.requestedTier,
-            maximumTier,
-          );
+        if (missingCapabilities.length > 0) {
+          phase = "failed";
+          return;
+        }
         phase = "ready";
         post({
           type: "studio-engine/hello-ack",
           protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
           sessionEpoch,
-          selectedTier,
-          supportedTiers,
-          engineBuild: options.engineBuild ?? "engine-worker-v1",
+          executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
+          engineBuild: options.engineBuild ?? "engine-worker-vnext",
           limits: {
             maxInFlightCommands: STUDIO_ENGINE_WORKER_BUDGETS.maxInFlightCommands,
             maxPointerBatchSamples: STUDIO_ENGINE_WORKER_BUDGETS.maxPointerBatchSamples,

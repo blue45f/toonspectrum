@@ -1,12 +1,12 @@
 import {
+  STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   describeStudioEngineCommandTransport,
+  missingStudioEngineFutureCapabilities,
   parseStudioEngineHelloAck,
   parseStudioEngineWorkerMessage,
-  selectStudioEngineCapabilityTier,
   type StudioEngineAttachSurfaceCommand,
   type StudioEngineCapabilitySnapshot,
-  type StudioEngineCapabilityTier,
   type StudioEngineCommand,
   type StudioEngineCommandMessage,
   type StudioEngineHelloAckMessage,
@@ -56,6 +56,7 @@ export type StudioEngineWorkerClientFailureCode =
   | "disposed"
   | "handshake-timeout"
   | "protocol"
+  | "future-capabilities-required"
   | "pointer-ring-unavailable"
   | "surface-already-transferred"
   | "transport"
@@ -71,7 +72,6 @@ export interface StudioEngineWorkerSessionOptions {
   readonly capabilities: StudioEngineCapabilitySnapshot;
   readonly clientBuild: string;
   readonly sessionEpoch?: number;
-  readonly requestedTier?: StudioEngineCapabilityTier;
   readonly pointerRingCapacity?: number;
   readonly pointerRingEnvironment?: StudioSharedPointerRingEnvironment;
   readonly workerFactory?: (() => StudioEngineWorkerLike | null) | null;
@@ -381,7 +381,15 @@ export function createStudioEngineWorkerSession(
     options.workerFactory === undefined
       ? defaultWorkerFactory
       : options.workerFactory;
-  if (!ring.ok) {
+  const missingFutureCapabilities = missingStudioEngineFutureCapabilities(
+    options.capabilities,
+  );
+  if (missingFutureCapabilities.length > 0) {
+    fail(
+      "future-capabilities-required",
+      `Studio Engine vNext requires: ${missingFutureCapabilities.join(", ")}.`,
+    );
+  } else if (!ring.ok) {
     fail(
       "pointer-ring-unavailable",
       `Shared pointer ring is unavailable: ${ring.reason}.`,
@@ -410,9 +418,7 @@ export function createStudioEngineWorkerSession(
           type: "studio-engine/hello",
           protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
           sessionEpoch,
-          requestedTier:
-            options.requestedTier
-            ?? selectStudioEngineCapabilityTier(options.capabilities),
+          executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
           clientBuild: options.clientBuild,
           capabilities: options.capabilities,
         }, []);

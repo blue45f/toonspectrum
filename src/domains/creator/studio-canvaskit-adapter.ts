@@ -6,9 +6,9 @@
  * **인터페이스 뒤로 숨긴다**. 오늘은 순수 폴백이 그 자리를 채우고, canvaskit-wasm 을 넣는 날
  * 폴백 대신 어댑터 하나만 등록하면 호출부는 한 줄도 바뀌지 않는다.
  *
- * ── 지금 이 저장소의 실제 상태(2026-07-24 실측) ─────────────────────────────
- *  - `canvaskit-wasm` 은 package.json 에도 node_modules 에도 **없다**. 이 모듈은 의존성을 추가하지
- *    않으며, 어디에서도 `import("canvaskit-wasm")` 을 하지 않는다(정적 그래프 오염 금지).
+ * ── 지금 이 저장소의 실제 상태(2026-07-28 실측) ─────────────────────────────
+ *  - `canvaskit-wasm@0.41.1` 과 실제 quality provider가 설치돼 있다. provider만 동적 import하고
+ *    이 계약 모듈은 CanvasKit을 import하지 않아 Studio 초기 정적 그래프는 오염시키지 않는다.
  *  - 텍스트는 `StudioKonvaTextNodes.tsx`(Konva `Text` = canvas `fillText`)와
  *    `studio-svg-export.ts`(`<text>`)로 그려진다. 둘 다 셰이핑 엔진이 아니라 **플랫폼 텍스트
  *    렌더러**라, 어떤 OpenType 피처를 켤지 지정할 수 없다. `studio-vertical-text.ts` 의 주석이
@@ -363,7 +363,7 @@ export function qualityEngineNow(fallbackOptions?: StudioFallbackEngineOptions):
 }
 
 // ---------------------------------------------------------------------------
-// 번들 비용 — 채택 판단에 쓰는 숫자. **이 저장소에서 측정한 값이 아니다**(의존성 미설치).
+// 번들 비용 — 실제 설치된 0.41.1 기본/full WASM의 로컬 파일 크기를 반영한다.
 // ---------------------------------------------------------------------------
 
 export interface StudioCanvasKitBundleFacts {
@@ -377,33 +377,25 @@ export interface StudioCanvasKitBundleFacts {
 }
 
 /**
- * **측정되지 않은 참고치**다. `canvaskit-wasm` 이 이 저장소에 설치돼 있지 않아
- * (package.json·node_modules 양쪽에 없음) 실측할 수 없었다. 채택을 결정하기 전에
- * 반드시 다음 절차로 **직접 재야 한다**:
- *
- *   1) `pnpm add -D canvaskit-wasm`
- *   2) `ls -l node_modules/canvaskit-wasm/bin/**\/canvaskit.wasm` (full / profiling 변형 비교)
- *   3) `brotli -q 11 -c canvaskit.wasm | wc -c`
- *   4) lazy 청크로 들어갔는지 `pnpm build` 후 `scripts/check-studio-bundle.mjs` 로 확인
- *      — **정적 그래프에 들어가면 즉시 되돌린다**(스튜디오 초기 로드가 무너진다).
- *
- * 아래 수치는 "이 정도 규모" 라는 감각을 주기 위한 것이고, 소수점 정확도를 주장하지 않는다.
+ * `canvaskit-wasm@0.41.1` 기본 바이너리는 로컬에서 7,159,342 byte, full 바이너리는
+ * 8,080,104 byte다. 압축 수치는 여전히 참고치이며 배포물 검증에서 다시 측정한다. 번들 크기는
+ * 품질 채택 게이트가 아니지만, JS glue와 WASM이 lazy 자산으로 남는지는 빌드에서 검증한다.
  */
 export const CANVASKIT_BUNDLE_FACTS: readonly StudioCanvasKitBundleFacts[] = [
   {
-    variant: "canvaskit (full, 기본 배포본)",
-    approxRawBytes: 8_000_000,
-    approxBrotliBytes: 2_800_000,
-    note: "폰트·문단(Paragraph)·패스옵스 전부 포함. 이 저장소에서 실측하지 않은 참고치.",
+    variant: "canvaskit 0.41.1 (기본 배포본)",
+    approxRawBytes: 7_159_342,
+    approxBrotliBytes: 2_500_000,
+    note: "WASM 원본 크기는 로컬 실측, brotli 크기는 참고치. PathOps·Paragraph를 포함합니다.",
   },
   {
-    variant: "canvaskit (커스텀 빌드, Paragraph+PathOps만)",
-    approxRawBytes: 3_500_000,
-    approxBrotliBytes: 1_200_000,
-    note: "Skia 를 직접 emscripten 빌드해야 얻는 값. 빌드 파이프라인 유지비가 든다.",
+    variant: "canvaskit 0.41.1/full",
+    approxRawBytes: 8_080_104,
+    approxBrotliBytes: 2_900_000,
+    note: "WASM 원본 크기는 로컬 실측. Skottie 등 추가 모듈이 포함된 비교용 변형입니다.",
   },
 ];
 
 /** 채택 판단 요약(한국어) — 숫자가 미측정이라는 사실을 항상 함께 낸다. */
 export const CANVASKIT_ADOPTION_NOTE =
-  "CanvasKit은 별도 lazy 청크로만 불러야 하며(정적 그래프 금지), 인쇄 출고·복합 문자 조판처럼 사용자가 명시적으로 요청한 순간에만 로드합니다. 위 용량은 이 저장소에서 실측한 값이 아니라 참고치입니다.";
+  "CanvasKit 0.41.1은 별도 lazy JS/WASM 자산으로 불러오며, 현재 Skia PathOps와 획→채움 경로 품질 공급자로 사용합니다. WASM 원본 크기는 실측했고 압축 수치는 참고치입니다.";

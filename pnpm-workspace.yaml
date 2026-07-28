@@ -24,6 +24,9 @@ onlyBuiltDependencies:
 allowBuilds:
   '@firebase/util': false
   protobufjs: false
+  # image-js의 브라우저 분석 경로에는 선택적 네이티브 Node 캔버스가 필요하지 않다.
+  # 품질/분석 Worker는 ImageData/TypedArray만 사용하므로 다운로드 빌드 스크립트를 실행하지 않는다.
+  skia-canvas: false
   "@nestjs/core": true
   '@sentry/cli': true
   '@swc/core': true

@@ -15,7 +15,9 @@
     "jsx": "react-jsx",
     "incremental": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "canvaskit-wasm": ["./src/types/canvaskit-wasm-shim.d.ts"],
+      "canvaskit-wasm/bin/canvaskit.wasm?url": ["./src/types/canvaskit-wasm-url-shim.d.ts"]
     }
   },
   "include": [

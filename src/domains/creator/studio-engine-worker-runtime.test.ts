@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_ENGINE_EXECUTION_PROFILE,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   type StudioEngineCapabilitySnapshot,
@@ -27,7 +28,6 @@ const CAPABILITIES: StudioEngineCapabilitySnapshot = {
   sharedArrayBuffer: true,
   crossOriginIsolated: true,
   webGpu: true,
-  webGl2: true,
   wasmSimd: true,
   memory64: true,
   hardwareConcurrency: 8,
@@ -102,14 +102,14 @@ function createHarness() {
 
 function hello(
   sessionEpoch = 7,
-  requestedTier: "ultra" | "standard" | "compatibility" = "ultra",
+  executionProfile: string = STUDIO_ENGINE_EXECUTION_PROFILE,
   capabilities: StudioEngineCapabilitySnapshot = CAPABILITIES,
 ) {
   return {
     type: "studio-engine/hello",
     protocolRevision: STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
     sessionEpoch,
-    requestedTier,
+    executionProfile,
     clientBuild: "test-client",
     capabilities,
   } as const;
@@ -170,8 +170,7 @@ describe("Studio Engine Worker runtime handshake and serial actor", () => {
     harness.runtime.handleMessage(hello());
     expect(harness.outbound[0]).toMatchObject({
       type: "studio-engine/hello-ack",
-      selectedTier: "ultra",
-      supportedTiers: ["ultra", "standard", "compatibility"],
+      executionProfile: STUDIO_ENGINE_EXECUTION_PROFILE,
     });
 
     const attach = command(1, {
@@ -203,16 +202,16 @@ describe("Studio Engine Worker runtime handshake and serial actor", () => {
     });
   });
 
-  it("never promotes above the request and explicitly demotes unsupported Ultra", () => {
+  it("rejects retired profiles and missing future capabilities instead of silently demoting", () => {
     const lowerRequest = createHarness();
-    lowerRequest.runtime.handleMessage(hello(7, "standard"));
-    expect(lowerRequest.outbound[0]).toMatchObject({
-      type: "studio-engine/hello-ack",
-      selectedTier: "standard",
-      supportedTiers: ["standard", "compatibility"],
+    lowerRequest.runtime.handleMessage(hello(7, "webgl2-compatibility"));
+    expect(lowerRequest.runtime.snapshot()).toMatchObject({
+      phase: "failed",
+      acceptedThroughCommandSequence: 0,
     });
+    expect(lowerRequest.outbound).toEqual([]);
 
-    const standardCapabilities: StudioEngineCapabilitySnapshot = {
+    const incompleteCapabilities: StudioEngineCapabilitySnapshot = {
       ...CAPABILITIES,
       sharedArrayBuffer: false,
       crossOriginIsolated: false,
@@ -221,23 +220,13 @@ describe("Studio Engine Worker runtime handshake and serial actor", () => {
     };
     const unsupportedUltra = createHarness();
     unsupportedUltra.runtime.handleMessage(
-      hello(8, "ultra", standardCapabilities),
+      hello(8, STUDIO_ENGINE_EXECUTION_PROFILE, incompleteCapabilities),
     );
-    expect(unsupportedUltra.outbound[0]).toMatchObject({
-      type: "studio-engine/hello-ack",
+    expect(unsupportedUltra.runtime.snapshot()).toMatchObject({
+      phase: "failed",
       sessionEpoch: 8,
-      selectedTier: "standard",
-      supportedTiers: ["standard", "compatibility"],
     });
-
-    const compatibilityRequest = createHarness();
-    compatibilityRequest.runtime.handleMessage(
-      hello(9, "compatibility"),
-    );
-    expect(compatibilityRequest.outbound[0]).toMatchObject({
-      selectedTier: "compatibility",
-      supportedTiers: ["compatibility"],
-    });
+    expect(unsupportedUltra.outbound).toEqual([]);
   });
 
   it("rejects a missing/mismatched surface transfer and never acknowledges it", () => {

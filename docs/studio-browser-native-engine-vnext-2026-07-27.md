@@ -13,16 +13,44 @@ The target is not “use WebGPU where convenient.” The target is:
 3. A Storage Worker owns OPFS shards, the write-ahead journal, checkpoints, and crash recovery.
 4. Bounded WASM kernels own profiled contiguous CPU work; Memory64 owns large logical address
    arithmetic and windowed working sets, not a permanently committed multi-gigabyte heap.
-5. WebGPU is the primary Ultra backend. WebGL2 and the current Canvas/Konva path remain measured
-   recovery paths until the replacement passes pixel, latency, persistence, and device-loss gates.
+5. WebGPU is the only production raster authority targeted by vNext. WebGL2 and the current
+   Canvas/Konva path may remain as diagnostic comparison or temporary document-view adapters, but
+   vNext quality, persistence, and release decisions are not constrained by their ceilings.
 
 This decision supersedes the long-term “Konva remains the durable scene authority” conclusion in
-`studio-canvas-engine-decision-2026-07-24.md`. Konva remains the shipping recovery authority during
-the migration, but it is no longer the final architecture.
+`studio-canvas-engine-decision-2026-07-24.md`. Konva remains a temporary shipping bridge during the
+migration, but it is no longer a recovery authority that vNext must preserve or reproduce.
 
 The superseded decision is not a constraint on new engine work. New drawing, document, persistence,
-and collaboration capabilities must target the worker-owned tile architecture first; compatibility
-adapters may project that authority back into the legacy scene only while migration gates require it.
+and collaboration capabilities must target the worker-owned tile architecture first. Read-only
+migration adapters may inspect receipts, but they may not feed state back into the authority or
+delay an engine capability because the legacy scene cannot represent it.
+
+## Previous-engine compatibility boundary
+
+The new authority does not preserve the previous ToonSpectrum engine's internal contracts:
+
+- legacy brush IDs, Canvas/Konva nodes, scene serialization, caches, history snapshots, and
+  renderer-owned objects are not valid vNext document state;
+- old live-stroke pixels are not a golden target when the canonical rich brush produces a
+  higher-quality result;
+- vNext does not keep duplicate writable code paths merely so old and new brush settings remain
+  interchangeable; and
+- old documents and browser environments are supported later through one-way importers, export
+  bridges, and read-only receipt adapters. Those adapters cannot reintroduce legacy authority.
+
+Storage durability is not deferred with that compatibility work. Canonical commands, RGBA16F tile
+deltas, WAL records, OPFS checkpoints, and crash recovery are part of the new engine's correctness
+and are developed in parallel with brush and filter quality.
+
+Implementation reuse is encouraged even when compatibility is not. A previous-engine module or an
+additional library may remain when it wins a named quality/performance corpus and is placed behind a
+canonical provider boundary. Duplicate libraries are acceptable during the quality phase; brush
+resampling, wet media, vector geometry, text shaping, filter kernels, codecs, and export may each
+use a different best-in-class provider. What may not be reused is provider-owned document
+authority, opaque serialization, or a lossy adapter that lowers the new engine to the old model.
+Permissively licensed code can be integrated directly under its license; restricted or proprietary
+implementations are treated only as behavioral references for an independent implementation.
 
 ## Why the decision changed
 
@@ -62,11 +90,10 @@ memory are themselves product quality. A provider that loses work, corrupts a do
 pen path, or produces inconsistent export output is lower quality even when it exposes more
 features.
 
-Ultra-only capabilities may ship without a lower-tier equivalent. Standard and Compatibility
-backends are recovery or migration aids, not reasons to reduce the Ultra implementation. A feature
-can therefore require WebGPU, cross-origin isolation, SharedArrayBuffer, Memory64, OPFS sync access,
-SIMD, threads, or a large specialist WASM engine when that combination produces the best measured
-result.
+vNext capabilities ship without a lower-tier equivalent. Retired renderers are outside the vNext
+protocol and implementation scope. A feature can therefore require WebGPU, cross-origin isolation,
+SharedArrayBuffer, Memory64, OPFS sync access, SIMD, threads, or a large specialist WASM engine when
+that combination produces the best measured result.
 
 ## Current-to-target gap
 
@@ -76,7 +103,7 @@ result.
 | Pointer capture | DOM Pointer Events on the main thread | Keep; write normalized samples to SAB |
 | Live rendering | Main-thread Canvas2D/WebGPU hybrid | Engine Worker + OffscreenCanvas |
 | Document authority | `PageState[][]` + Konva scene | Versioned tile document in Engine Worker |
-| Input transport | JS callbacks/owned arrays | SPSC SharedArrayBuffer ring; transferable batches as fallback |
+| Input transport | JS callbacks/owned arrays | SPSC SharedArrayBuffer ring; transferable batches are replay/test ingress only |
 | Large address space | Memory64 kernels and seam-only window runtime | Memory64 window allocator backed by OPFS shards |
 | Persistence | snapshot/API paths plus OPFS utilities | Storage Worker journal + incremental tile checkpoints |
 | Undo/redo | page/object snapshots and operation history | command log + changed-tile deltas + checkpoints |
@@ -99,7 +126,7 @@ Engine Worker
   authoritative tile document
   brush engine and transient prediction
   OffscreenCanvas
-  WebGPU primary / WebGL2 fallback
+  WebGPU production authority
   dirty-region compositor
           |
           +---- bounded transferable jobs ----> WASM Worker Pool
@@ -125,15 +152,15 @@ Memory64 removes the 4 GiB address-width ceiling; it does not make browser RAM u
 - Resident tiles have explicit CPU/GPU byte budgets and an eviction policy.
 - Data outside the working set lives in sharded OPFS files whose local offsets remain safely
   representable by JavaScript and the File System API.
-- A missing Memory64 capability fails closed for Ultra mode. Standard mode must be explicitly
-  selected and uses the Memory32/transferable path.
+- A missing Memory64 capability fails closed for the vNext writable profile. Memory32 is permitted
+  only inside bounded specialist kernels that never own document addressing.
 - No feature may advertise “huge document support” merely because a Memory64 probe succeeds.
   The document is huge only after journal recovery, shard hydration, eviction, export, and undo
   pass end-to-end tests above 4 GiB logical offsets.
 
-## Capability tiers
+## Writable execution profile
 
-### Ultra
+`webgpu-worker-rgba16float-vnext` is the only profile accepted by protocol revision 2:
 
 - Chromium secure context
 - cross-origin isolation
@@ -143,24 +170,10 @@ Memory64 removes the 4 GiB address-width ceiling; it does not make browser RAM u
 - Memory64 and WASM SIMD/threads where the selected kernel requires them
 - OPFS `FileSystemSyncAccessHandle` in a dedicated Storage Worker
 
-Ultra is the quality-first default only after all release gates pass.
-
-### Standard
-
-- OffscreenCanvas Worker
-- WebGL2
-- transferable input batches
-- Memory32 bounded kernels
-- async OPFS or IndexedDB persistence
-
-### Compatibility
-
-- current main-thread Canvas2D/Konva path
-- no claim of Ultra latency or large-document capacity
-- retained as recovery and migration comparison, not the final authority
-
-Capability selection is probe-based and immutable for an active document session. A failure can
-demote to a recovery backend only after the current accepted prefix and dirty-tile journal are safe.
+Capability admission is probe-based and immutable for an active document session. Missing
+prerequisites reject the writable session before Worker construction. A WebGPU device failure
+rebuilds the same vNext authority from the current accepted prefix and dirty-tile journal; it does
+not silently demote the writable document to Canvas2D or WebGL2.
 
 ## Hybrid engine portfolio
 
@@ -177,11 +190,13 @@ graphs, caches, and opaque serialization are never durable document state.
 
 | Responsibility | Preferred engine | Secondary/specialist use | Boundary |
 | --- | --- | --- | --- |
-| Live raster ink and tile composition | ToonSpectrum raw WebGPU | WebGL2 compatibility backend | One worker-owned tile/frame authority |
+| Live raster ink and tile composition | ToonSpectrum raw WebGPU | CPU/Skia diagnostic oracle only | One worker-owned tile/frame authority |
 | GPU effect prototypes and animated assets | PixiJS v8 WebGL | WebGPU only in an isolated experiment until its production gate passes | Emits textures/tile commands; never owns document history |
 | High-quality vector/text rasterization and export oracle | CanvasKit/Skia WASM | software surface for deterministic export | Separate Quality/Export Worker consumes canonical paths/glyph runs |
 | Editable Bézier/path geometry | `polygon-clipping`, `flatten-js`, `bezier-js`, Earcut | Paper.js only after a headless geometry PoC | Geometry Worker returns versioned paths/meshes; no Paper scene authority |
 | Freehand outline seed | `perfect-freehand` | custom Rust/WASM fitter for long/high-quality strokes | Source samples stay canonical so the fitter is replaceable |
+| Color parsing, conversion, gamut mapping, palette metrics | Color.js + Culori | independent conversion oracle and golden corpus | Plain scene-linear tuples only; no library color object crosses a Worker or document boundary |
+| Image resampling and CPU analysis | pica + image-js | Rust/WASM SIMD or WebGPU compute after profiling | Bounded `ImageData`/typed arrays only; optional native Node canvas is disabled |
 | Multilingual shaping | HarfBuzz WASM | `opentype.js` for font inspection/path extraction; CanvasKit for raster | Canonical output is glyph IDs, clusters, offsets, and advances |
 | 3D pose/background | Three.js + React Three Fiber | Babylon.js is an isolated lab, not a parallel production scene owner | Raster/depth/normal/line-art attachments cross a 3D bridge |
 | Physics | deterministic Rapier WASM | engine-specific adapters | Fixed-step scene commands; no renderer-owned physics state |
@@ -194,6 +209,45 @@ experimental. CanvasKit is valuable for Skia paths, paint, filters, and publicat
 rasterization, but its WebGL/WASM lifetime and explicit object disposal make it a separate
 Quality/Export Worker rather than a second owner inside the raw WebGPU hot path. HarfBuzz owns
 canonical shaping; CanvasKit Paragraph must not independently reshape editable text.
+
+### Commercial-product behavior references
+
+Commercial applications and restricted libraries are quality references, not code suppliers.
+ToonSpectrum may reproduce a documented user-facing capability or independently derive an
+algorithm from public standards and measured input/output behavior, but it must not translate,
+rename, decompile, or paste proprietary implementation code. The result must use a ToonSpectrum
+schema, ToonSpectrum tests, and a clean implementation history.
+
+| Public behavior reference | Independently owned implementation status |
+| --- | --- |
+| [CLIP STUDIO PAINT brush customization](https://help.clip-studio.com/en-us/manual_en/240_brushes/Customizing_brush_tools.htm) and documented input dynamics/start-end behavior | Versioned professional-dynamics plan, monotone response curves, accepted-sample timing, velocity smoothing, length/percentage taper, and deterministic deposition are implemented as provider-neutral code; live Studio authority integration remains gated. |
+| [Adobe Photoshop textured and dual brushes](https://helpx.adobe.com/photoshop/using/creating-textured-brushes.html) | A content-addressed R8 texture-tip and document/stroke-grain plan, deterministic professional-dynamics lowering, zero-border bilinear sampling, and RGBA16F WebGPU specialist runtime are implemented and pass an independent CPU/actual-Chromium parity corpus. A separate deterministic R8 compiler covers baked two-tip affine masks and documented intersection/blend families. Dynamic second-tip spacing, scatter, and count remain an explicit runtime extension rather than being approximated by one tip; live authority routing remains gated on the provider actor. |
+| [Adobe Photoshop Mixer Brush](https://helpx.adobe.com/photoshop/using/painting-mixer-brush.html) | A strict provider-neutral two-well state model now separates the loaded reservoir from canvas pickup, implements load/wet/mix/clean/reload behavior, uses optical-density pigment mixing, composes contact response without frame-rate-dependent reservoir depletion, and emits mass-conservation receipts. It is material-state groundwork, not yet a claim of live vNext pixel authority: canonical tile-field pickup/deposition and the GPU replay corpus remain release gates. |
+| [Corel Painter spacing controls](https://product.corel.com/help/Painter/540235477/707000/EN/Doc/Spacing_Controls.html), [bristle controls](https://product.corel.com/help/Painter/540219480/Main/EN/Win-Documentation/Corel-Painter-Bristle-controls.html), and [rake controls](https://product.corel.com/help/Painter/540111155/Corel-Painter-en/Corel-Painter-Rake-controls.html) | Arc-length motion spacing and stationary time deposition are implemented in the professional plan. A separate clean-room bristle/rake contract implements density, fanning, contact angle, pressure/tilt spread, fixed or brush-relative feature scaling, turn displacement, outer-edge softening, deterministic per-bristle variation, and affine footprints. Its gamut-safe per-bristle color variation and RGBA16F analytic lowering are implemented; actual-browser parity and live authority routing remain release gates. RealBristle deformation and material pickup are not claimed. |
+| [Corel Painter water controls](https://product.corel.com/help/Painter/540215550/Main/EN/Win-Documentation/Corel-Painter-Water-controls.html) and [paper interaction](https://product.corel.com/help/Painter/540215550/Main/EN/Win-Documentation/Corel-Painter-Watercolor-and-Paper-Texture.html) | The canonical recipe already versions fixed-rate pigment/water fields, absorption, bleed, drying, fixation, granulation, roughness, pigment load, water load, and wetness load. The new two-well model supplies deterministic brush-side mass exchange. Diffusion, capillary/grain flow, edge pooling, evaporation, and fixation still require an independently tested tile-field provider before they are marked implemented. |
+
+The clean-room brush corpus is defined to cover the common professional behaviors publicly
+documented by CLIP STUDIO PAINT, Photoshop, and Corel Painter. An item is implemented only after its
+canonical contract, provider, independent oracle, and replay tests are all present; this list is the
+acceptance scope rather than a claim that every item is already live:
+
+- pressure, tilt, velocity, tangential pressure, twist, and deterministic random input curves for
+  size, opacity, flow, spacing, roundness, angle, texture depth, and scatter;
+- arc-length dab placement, minimum spacing, cubic path interpolation, optional post-correction,
+  and explicit quality/performance budgets instead of frame-rate-dependent spacing;
+- dual-tip masks, per-tip or document-space texture, depth/invert/blend controls, captured tips,
+  rendered analytic tips, and deterministic spray counts;
+- start/end dynamics by length or percentage, speed-sensitive taper, minimum one-pixel policy, and
+  stationary continuous deposition for airbrush and wet-media tools;
+- reference-mask anti-overflow, watercolor edge accumulation, pickup/reservoir color mixing,
+  bristle/rake families, and fixed-step wet-media simulation; and
+- real-time dab/stroke previews plus one-click preset reset without mutating the shipped default.
+
+These are separate provider capabilities. A recipe may request several of them, but unsupported
+combinations fail before the stroke starts instead of silently degrading to a round Canvas brush.
+Every stochastic choice is seeded, every time-dependent effect uses accepted sample timestamps or a
+fixed simulation clock, and live, committed, recovery, export, and collaboration paths consume the
+same canonical recipe.
 
 ### Adoption rules
 
@@ -219,7 +273,8 @@ canonical shaping; CanvasKit Paragraph must not independently reshape editable t
 - Record p50/p95/p99 input-to-visible latency, long tasks, event delay, CPU/GPU memory, dropped
   samples, journal lag, and tile-cache churn.
 - Version sample, command, frame-receipt, tile, and persistence protocols.
-- Keep the current renderer as the pixel and recovery oracle.
+- Use CPU/Skia and independently specified color/filter mathematics as quality oracles. The current
+  renderer is diagnostic evidence only and cannot define vNext output.
 
 ### Slice 1 — zero-copy input
 
@@ -261,7 +316,8 @@ canonical shaping; CanvasKit Paragraph must not independently reshape editable t
 
 - GPU dab instancing, smudge/wet media, mipmaps, non-destructive filters, Float16 working tiles,
   wide-gamut surfaces, and deterministic export conversion.
-- Add only after the authority and recovery path is stable.
+- Build these providers in parallel behind canonical plans, but do not make them production
+  authority until tile commit, journal recovery, and device-loss gates pass.
 
 ## Non-negotiable release gates
 
@@ -269,7 +325,7 @@ canonical shaping; CanvasKit Paragraph must not independently reshape editable t
    worker restart, or device loss.
 2. No predicted point in undo, persistence, export, or collaboration.
 3. Pixel-difference budgets pass for every blend, eraser, mask, transform, filter, and export
-   corpus used by the compatibility renderer.
+   corpus against canonical CPU/Skia quality oracles; legacy Canvas output is not the target.
 4. p95 input-to-visible latency improves on representative pen hardware; small strokes must not
    regress due to worker or WASM overhead.
 5. A 30-second stroke, a 10-minute session, and a large multi-layer replay remain within explicit
@@ -292,8 +348,9 @@ GPU-native workflows.
   generation, GPU submission, visible-tile composition, and overlays must fit within one 8.33 ms
   display interval at p95 for the normal pen corpus.
 - The main thread must have no drawing-induced long task above 50 ms during a 30-second stroke.
-- The accepted authoritative sample stream must be bit-for-bit identical across SAB and
-  transferable transports. Predicted overlays may differ but must disappear on correction.
+- The accepted authoritative sample stream must be bit-for-bit reproducible from its journal.
+  Transferable replay/test ingress must reproduce the SAB-accepted prefix, but is not a live-input
+  fallback. Predicted overlays may differ but must disappear on correction.
 - G-pen, pencil, marker, airbrush, textured/scatter, watercolor, smudge, eraser, vector ink, and
   ruler-assisted strokes each get separate curvature, opacity, pressure, and replay golden sets.
 
@@ -324,8 +381,8 @@ GPU-native workflows.
 
 ### Months 1–3
 
-1. Move transient normal/erase ink to an OffscreenCanvas Engine Worker, then connect the SAB ring
-   and existing WebGL2 fallback after transferable parity is proven.
+1. Move transient normal/erase ink to an OffscreenCanvas Engine Worker and connect the SAB ring.
+   Unsupported hosts fail the vNext capability gate rather than receiving a writable WebGL2 path.
 2. Add a surface arbiter so the 2D document surface and active Three/motion surface are the only
    heavyweight contexts; hidden engines stop animation and release caches.
 3. Build separate CanvasKit Quality/Export, HarfBuzz/opentype Text, and Geometry Workers. Keep all
@@ -349,14 +406,24 @@ GPU-native workflows.
 6. Finish forced Worker termination, GPU loss, torn journal, offline PWA, huge-document hydration,
    and multi-user replay gates before removing the legacy authority.
 
-## Immediate implementation order
+## Current implementation order
 
-1. Shared pointer ring and deterministic replay tests.
-2. OPFS sync-access shard primitive restricted to a Storage Worker.
-3. Versioned Engine Worker control and frame-receipt protocol.
-4. OffscreenCanvas transient-ink vertical slice.
-5. Tile-document live mirror and journaled persistence.
-6. Authority switch only after the gates above pass.
+1. Keep the completed SAB input, versioned Worker protocol, canonical brush command, RGBA16F WebGPU
+   dab runtime, authoritative tile model, and OPFS v2 journal/checkpoint contracts green.
+2. Finish the canonical RGBA16F filter DAG, vector-ink geometry provider, CanvasKit Quality Worker,
+   and color-quality provider as replaceable specialist engines.
+3. Add a WebGPU dirty-tile readback provider that returns complete padded-row-safe RGBA16F tiles
+   with device/request epochs, queue fences, cancellation, and bounded staging resources.
+4. Connect canonical brush lowering, WebGPU execution, tile revisions, WAL records, commit markers,
+   and exact acknowledgements inside the Engine/Storage Worker actor graph.
+5. Replace the transient Canvas2D stroke path with the same canonical plan used for committed
+   tiles; predicted samples remain presentation-only and are reconciled to the accepted prefix.
+6. Expand the recipe and GPU providers with texture/dual tips, time deposition, wet media, smudge,
+   pickup/reservoir mixing, and independently implemented professional dynamics.
+7. Run real-device 120 Hz latency, browser WebGPU pixel parity, device-loss, torn-journal,
+   multi-gigabyte logical-address, export, and collaboration replay gates before switching live
+   document authority.
 
-This ordering deliberately separates irreversible ownership changes from reusable performance
-primitives. Each completed slice remains useful even if a later backend is replaced.
+This ordering separates provider experimentation from durable ownership while still developing
+quality, storage, and compatibility work in parallel. Every completed specialist remains
+replaceable because the canonical command, tile, color, path, and journal schemas are ours.
