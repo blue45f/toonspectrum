@@ -29,6 +29,27 @@ export interface StudioHokusaiNaturalMediaTextureMetrics {
   readonly directionIndexCellReferences: number;
 }
 
+export interface StudioHokusaiNaturalMediaPixelLayout {
+  /**
+   * Raster-space rectangle represented by the tightly packed `pixels` buffer.
+   * A full-frame caller uses `[0, 0, rasterWidth, rasterHeight]`; the Worker
+   * uses the smaller Hokusai dirty rectangle.
+   */
+  readonly frameBounds: readonly [
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ];
+  /** Raster-space rectangle that may be changed by this material pass. */
+  readonly dirtyBounds: readonly [
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ];
+}
+
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
@@ -438,9 +459,37 @@ function materialCoverage(
 export function applyStudioHokusaiNaturalMediaTextureV2(
   pixels: Uint8Array,
   plan: StudioHokusaiNaturalMediaRenderPlan,
-  dirtyBounds: readonly [number, number, number, number],
+  layout: StudioHokusaiNaturalMediaPixelLayout,
 ): StudioHokusaiNaturalMediaTextureMetrics {
-  const [dirtyX, dirtyY, dirtyWidth, dirtyHeight] = dirtyBounds;
+  const [frameX, frameY, frameWidth, frameHeight] = layout.frameBounds;
+  const [dirtyX, dirtyY, dirtyWidth, dirtyHeight] = layout.dirtyBounds;
+  if (
+    ![
+      frameX,
+      frameY,
+      frameWidth,
+      frameHeight,
+      dirtyX,
+      dirtyY,
+      dirtyWidth,
+      dirtyHeight,
+    ].every(Number.isSafeInteger)
+    || frameX < 0
+    || frameY < 0
+    || frameWidth <= 0
+    || frameHeight <= 0
+    || dirtyX < frameX
+    || dirtyY < frameY
+    || dirtyWidth <= 0
+    || dirtyHeight <= 0
+    || dirtyX + dirtyWidth > frameX + frameWidth
+    || dirtyY + dirtyHeight > frameY + frameHeight
+    || frameX + frameWidth > plan.raster.width
+    || frameY + frameHeight > plan.raster.height
+    || pixels.byteLength !== frameWidth * frameHeight * 4
+  ) {
+    throw new RangeError("Hokusai material texture pixel layout is invalid.");
+  }
   const directionRadians = dominantStrokeDirection(plan.samples);
   if (
     plan.presetId !== "pencil"
@@ -449,7 +498,11 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
   ) {
     let visiblePixels = 0;
     for (let y = dirtyY; y < dirtyY + dirtyHeight; y += 1) {
-      let index = (y * plan.raster.width + dirtyX) * 4 + 3;
+      let index = (
+        (y - frameY) * frameWidth
+        + dirtyX
+        - frameX
+      ) * 4 + 3;
       for (let x = 0; x < dirtyWidth; x += 1, index += 4) {
         if ((pixels[index] ?? 0) > 0) visiblePixels += 1;
       }
@@ -476,7 +529,11 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
     : null;
   for (let y = dirtyY; y < dirtyY + dirtyHeight; y += 1) {
     const documentY = plan.logicalBounds.y + y * inverseScale;
-    let index = (y * plan.raster.width + dirtyX) * 4;
+    let index = (
+      (y - frameY) * frameWidth
+      + dirtyX
+      - frameX
+    ) * 4;
     for (let x = dirtyX; x < dirtyX + dirtyWidth; x += 1, index += 4) {
       const alpha = pixels[index + 3] ?? 0;
       if (alpha <= 0) continue;

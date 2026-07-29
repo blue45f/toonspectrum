@@ -4,9 +4,11 @@ import { BRUSH_PRESETS } from "./studio-brush";
 import {
   STUDIO_BRUSH_BACKEND_FAMILY_POLICIES,
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
+  STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION,
   STUDIO_BRUSH_BACKEND_ROUTE_CANDIDATES,
   STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES,
   STUDIO_HOKUSAI_MYB_PROVIDER_POLICY,
+  STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION,
   classifyStudioBrushBackendQuality,
   resolveStudioBrushBackendQualityRoute,
   type StudioBrushBackendAvailability,
@@ -46,9 +48,9 @@ function hokusaiOptIn(): StudioHokusaiMybProviderOptIn {
     backendId: "hokusai-myb-worker",
     mode: "settled",
     engineVersion: "0.3.0",
-    adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1",
-    customBinding: "toonspectrum-transparent-dirty-tile",
-    surfaceContract: "transparent-straight-rgba8-dirty-tiles",
+    adapterVersion: "0.3.0-packed-dirty-frame-adapter.2",
+    customBinding: "toonspectrum-packed-dirty-frame",
+    surfaceContract: "packed-dirty-rgba8",
   };
 }
 
@@ -110,7 +112,7 @@ describe("studio brush backend integration audit", () => {
     });
     expect(auditById.get("hokusai-myb-worker")).toMatchObject({
       implementation:
-        "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a transparent-tile Dedicated Worker",
+        "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
       connection: "active-settled-tool",
       phases: ["settled"],
       asynchronous: true,
@@ -119,6 +121,10 @@ describe("studio brush backend integration audit", () => {
     });
     expect(auditById.get("hokusai-myb-worker")?.evidence)
       .toContain("original vector remains recoverable");
+    expect(auditById.get("hokusai-myb-worker")?.evidence)
+      .toContain("crop-sized transparent PNG");
+    expect(auditById.get("hokusai-myb-worker")?.evidence)
+      .toContain("output dimensions");
   });
 });
 
@@ -280,21 +286,26 @@ describe("studio brush material backend policy", () => {
 });
 
 describe("Hokusai .myb provider admission", () => {
-  it("pins the auditable crate and forbids the stock opaque-white surface", () => {
+  it("pins the v2 packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
+    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(4);
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(3);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY).toMatchObject({
+      policyVersion: 3,
       backendId: "hokusai-myb-worker",
       crate: "hokusai-wasm",
       exactVersion: "0.3.0",
       exactCargoRequirement: "=0.3.0",
       license: "MIT OR Apache-2.0",
       brushFormat: ".myb/libmypaint-v3",
-      execution: "dedicated-worker-wasm",
-      adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1",
-      customBinding: "toonspectrum-transparent-dirty-tile",
+      execution: "dedicated-worker-wasm-packed-dirty-frame",
+      adapterVersion: "0.3.0-packed-dirty-frame-adapter.2",
+      customBinding: "toonspectrum-packed-dirty-frame",
       surface: {
         internalTileSize: 64,
         internalFormat: "premultiplied-linear-rgba-fix15",
-        transferFormat: "transparent-straight-rgba8-dirty-tiles",
+        transferFormat: "packed-dirty-rgba8",
+        productBoundary:
+          "verified-transparent-packed-dirty-png-plus-receipt",
         stockOpaqueWhiteFlatteningAllowed: false,
       },
       rollout: {
@@ -321,6 +332,30 @@ describe("Hokusai .myb provider admission", () => {
     expect(Object.isFrozen(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY)).toBe(true);
     expect(Object.isFrozen(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.surface))
       .toBe(true);
+  });
+
+  it("fails closed for the retired adapter v1 opt-in metadata", () => {
+    const retiredV1OptIn = {
+      backendId: "hokusai-myb-worker",
+      mode: "settled",
+      engineVersion: "0.3.0",
+      adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1",
+      customBinding: "toonspectrum-transparent-dirty-tile",
+      surfaceContract: "transparent-straight-rgba8-dirty-tiles",
+    } as unknown as StudioHokusaiMybProviderOptIn;
+
+    expect(resolveStudioBrushBackendQualityRoute({
+      brushId: "chalk",
+      availability: {
+        "hokusai-myb-worker": "ready",
+      },
+      naturalMediaProviderOptIn: retiredV1OptIn,
+    })).toMatchObject({
+      status: "rejected",
+      reason: "provider-opt-in-invalid",
+      preserveExistingSurface: true,
+      emitApproximation: false,
+    });
   });
 
   it("does not alter any default brush route even when the provider is ready", () => {

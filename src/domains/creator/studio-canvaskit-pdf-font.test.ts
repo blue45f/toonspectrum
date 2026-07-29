@@ -5,8 +5,10 @@ import {
   buildCidWidthArray,
   encodeIdentityHText,
   estimateSubsetSaving,
+  evaluatePdfFontEmbedding,
   fontDescriptorFlags,
   glyphWidthToPdf,
+  parseSfntEmbeddingPolicy,
   planFontSubset,
   readSfntMetrics,
   resolveStandardFontFallback,
@@ -28,6 +30,8 @@ interface SyntheticFontOptions {
   segments?: [number, number, number][];
   version?: number;
   tag?: string;
+  /** null/undefined면 OS/2 테이블 자체를 넣지 않는다. */
+  fsType?: number | null;
 }
 
 function be16(value: number): number[] {
@@ -95,6 +99,10 @@ function buildSyntheticFont(options: SyntheticFontOptions = {}): Uint8Array {
   for (let i = 0; i < numberOfHMetrics; i++) hmtx.push(...be16(advances[i] ?? 0), ...be16(0));
   for (let i = numberOfHMetrics; i < numGlyphs; i++) hmtx.push(...be16(0));
 
+  const os2: number[] | null =
+    options.fsType === null || options.fsType === undefined ? null : new Array<number>(10).fill(0);
+  if (os2) os2.splice(8, 2, ...be16(options.fsType!));
+
   const tables: { tag: string; data: number[] }[] = [
     { tag: "cmap", data: buildCmapFormat4(segments) },
     { tag: "head", data: head },
@@ -102,6 +110,7 @@ function buildSyntheticFont(options: SyntheticFontOptions = {}): Uint8Array {
     { tag: "hmtx", data: hmtx },
     { tag: "maxp", data: maxp },
   ];
+  if (os2) tables.push({ tag: "OS/2", data: os2 });
 
   const out: number[] = [];
   out.push(...be32(options.version ?? 0x00010000));
@@ -207,6 +216,131 @@ describe("sfnt 메트릭 읽기", () => {
     const result = readSfntMetrics(buildSyntheticFont({ numGlyphs: 3, numberOfHMetrics: 9 }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("hmtx");
+  });
+
+  it("OS/2.fsType의 기본 권한과 독립 제한 비트를 읽는다", () => {
+    const installable = metricsOf(buildSyntheticFont({ fsType: 0 })).embeddingPolicy;
+    expect(installable).toMatchObject({
+      fsType: 0,
+      permission: "installable",
+      noSubsetting: false,
+      bitmapOnly: false,
+      valid: true,
+    });
+
+    const previewNoSubset = metricsOf(buildSyntheticFont({ fsType: 0x0104 })).embeddingPolicy;
+    expect(previewNoSubset).toMatchObject({
+      fsType: 0x0104,
+      permission: "preview-print",
+      noSubsetting: true,
+      bitmapOnly: false,
+      valid: true,
+    });
+
+    const editableBitmap = metricsOf(buildSyntheticFont({ fsType: 0x0208 })).embeddingPolicy;
+    expect(editableBitmap).toMatchObject({
+      fsType: 0x0208,
+      permission: "editable",
+      noSubsetting: false,
+      bitmapOnly: true,
+      valid: true,
+    });
+  });
+
+  it("OS/2 테이블이 없거나 fsType 권한 비트가 모순되면 정책을 fail-closed로 표시한다", () => {
+    expect(metricsOf(buildSyntheticFont()).embeddingPolicy).toMatchObject({
+      fsType: null,
+      permission: "unknown",
+      valid: false,
+    });
+    expect(metricsOf(buildSyntheticFont({ fsType: 0x000c })).embeddingPolicy).toMatchObject({
+      fsType: 0x000c,
+      permission: "invalid",
+      valid: false,
+    });
+    expect(metricsOf(buildSyntheticFont({ fsType: 0x0010 })).embeddingPolicy).toMatchObject({
+      fsType: 0x0010,
+      permission: "invalid",
+      valid: false,
+    });
+  });
+});
+
+describe("OS/2.fsType PDF 임베딩 정책", () => {
+  const request = {
+    documentIntent: "editable" as const,
+    embeddingMode: "full" as const,
+    payloadKind: "outline" as const,
+  };
+
+  it("Installable은 읽기 전용·편집 문서 모두, Editable은 편집 문서를 허용한다", () => {
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(0), request).allowed).toBe(true);
+    expect(
+      evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(8), {
+        ...request,
+        documentIntent: "preview-print",
+      }).allowed,
+    ).toBe(true);
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(8), request).allowed).toBe(true);
+  });
+
+  it("Restricted는 모든 임베딩을 거절하고 Preview & Print는 편집 문서를 거절한다", () => {
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(2), request)).toMatchObject({
+      allowed: false,
+      code: "restricted-license",
+    });
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(4), request)).toMatchObject({
+      allowed: false,
+      code: "preview-print-only",
+    });
+    expect(
+      evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(4), {
+        ...request,
+        documentIntent: "preview-print",
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it("No Subsetting은 전체 임베드는 허용하고 서브셋만 거절한다", () => {
+    const policy = parseSfntEmbeddingPolicy(0x0108);
+    expect(evaluatePdfFontEmbedding(policy, request).allowed).toBe(true);
+    expect(
+      evaluatePdfFontEmbedding(policy, {
+        ...request,
+        embeddingMode: "subset",
+      }),
+    ).toMatchObject({ allowed: false, code: "no-subsetting" });
+  });
+
+  it("Bitmap-only는 비트맵 페이로드만 허용하고 아웃라인 임베딩을 거절한다", () => {
+    const policy = parseSfntEmbeddingPolicy(0x0208);
+    expect(evaluatePdfFontEmbedding(policy, request)).toMatchObject({
+      allowed: false,
+      code: "bitmap-only",
+    });
+    expect(
+      evaluatePdfFontEmbedding(policy, {
+        ...request,
+        payloadKind: "bitmap",
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it("문서 의도 누락·fsType 누락·예약 비트는 추측하지 않고 거절한다", () => {
+    expect(
+      evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(0), {
+        embeddingMode: "full",
+        payloadKind: "outline",
+      }),
+    ).toMatchObject({ allowed: false, code: "missing-document-intent" });
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(null), request)).toMatchObject({
+      allowed: false,
+      code: "unknown-license",
+    });
+    expect(evaluatePdfFontEmbedding(parseSfntEmbeddingPolicy(0x0010), request)).toMatchObject({
+      allowed: false,
+      code: "invalid-fstype",
+    });
   });
 });
 

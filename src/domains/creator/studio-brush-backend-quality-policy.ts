@@ -20,7 +20,7 @@ import {
 } from "./studio-brush-runtime-contract";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
-export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 3 as const;
+export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 4 as const;
 
 export type StudioBrushBackendQualityFamily =
   | "continuous-ink"
@@ -90,16 +90,17 @@ export interface StudioBrushBackendIntegrationAudit {
   readonly evidence: string;
 }
 
-export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 2 as const;
+export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 3 as const;
 
 /**
  * Admission policy for the installed Hokusai/libmypaint natural-media provider.
  *
  * The upstream 0.3.0 WASM facade returns a full surface composited over opaque white. That stock
  * facade is intentionally not admissible for Studio. The installed local wrapper pins the three
- * Hokusai crates exactly, reads transparent dirty tiles inside a Dedicated Worker and returns a
- * verified transparent PNG plus a deterministic receipt. It is an explicit selected-stroke
- * settled transform; it is not installed as the full live brush core or as a default shelf route.
+ * Hokusai crates exactly, reads the dirty rectangle as packed transparent RGBA8 inside a Dedicated
+ * Worker and returns a verified crop-sized transparent PNG plus a deterministic receipt. It is an
+ * explicit selected-stroke settled transform; it is not installed as the full live brush core or
+ * as a default shelf route.
  */
 export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   policyVersion: STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION,
@@ -109,9 +110,9 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   exactCargoRequirement: "=0.3.0" as const,
   license: "MIT OR Apache-2.0" as const,
   brushFormat: ".myb/libmypaint-v3" as const,
-  execution: "dedicated-worker-wasm" as const,
-  adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1" as const,
-  customBinding: "toonspectrum-transparent-dirty-tile" as const,
+  execution: "dedicated-worker-wasm-packed-dirty-frame" as const,
+  adapterVersion: "0.3.0-packed-dirty-frame-adapter.2" as const,
+  customBinding: "toonspectrum-packed-dirty-frame" as const,
   eligibleFamilies: Object.freeze([
     "dry-media",
     "wet-media",
@@ -119,8 +120,9 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   surface: Object.freeze({
     internalTileSize: 64 as const,
     internalFormat: "premultiplied-linear-rgba-fix15" as const,
-    transferFormat: "transparent-straight-rgba8-dirty-tiles" as const,
-    productBoundary: "verified-transparent-png-plus-receipt" as const,
+    transferFormat: "packed-dirty-rgba8" as const,
+    productBoundary:
+      "verified-transparent-packed-dirty-png-plus-receipt" as const,
     stockOpaqueWhiteFlatteningAllowed: false as const,
   }),
   rollout: Object.freeze({
@@ -148,9 +150,9 @@ export interface StudioHokusaiMybProviderOptIn {
   readonly backendId: "hokusai-myb-worker";
   readonly mode: "settled";
   readonly engineVersion: "0.3.0";
-  readonly adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1";
-  readonly customBinding: "toonspectrum-transparent-dirty-tile";
-  readonly surfaceContract: "transparent-straight-rgba8-dirty-tiles";
+  readonly adapterVersion: "0.3.0-packed-dirty-frame-adapter.2";
+  readonly customBinding: "toonspectrum-packed-dirty-frame";
+  readonly surfaceContract: "packed-dirty-rgba8";
 }
 
 /**
@@ -373,15 +375,16 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
   {
     id: "hokusai-myb-worker",
     implementation:
-      "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a transparent-tile Dedicated Worker",
+      "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
     connection: "active-settled-tool",
     phases: ["settled"],
     asynchronous: true,
     defaultAvailability: "loading",
     brushPixelAuthority: false,
     evidence:
-      "The Inspector can transform one selected DrawEl into a verified transparent PNG with input, "
-      + "pixel and PNG hashes; the original vector remains recoverable and no live brush route changes.",
+      "The Inspector can transform one selected DrawEl into a crop-sized transparent PNG whose "
+      + "packed dirty RGBA pixels, output dimensions, dirty bounds, input and PNG are receipted; "
+      + "the original vector remains recoverable and no live brush route changes.",
   },
   {
     id: "vnext-provider-router",

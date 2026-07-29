@@ -12,8 +12,10 @@
  * 2) EBML은 "ID + 가변길이 크기 + 페이로드"의 단순 재귀 구조라 minimal writer가 수백 줄이면 끝난다.
  *    MP4/ISOBMFF는 moov/trak/mdia/minf/stbl(stts·stsc·stsz·stco·stss) 테이블 전체와 코덱별
  *    extradata 박스(avcC/av1C/vpcC)를 정확히 써야 하고, 샘플 오프셋 패치까지 필요하다.
- * 3) WebM은 VP8·VP9·AV1을 모두 담을 수 있다. 이 셋은 WebCodecs가 로열티 없이 노출하는 코덱이고,
- *    H.264는 컨테이너 규약상 WebM에 넣을 수 없다 → H.264를 쓰려면 MP4 box writer가 전제다
+ * 3) WebM은 VP8·VP9·AV1을 모두 담을 수 있다. 인코더는 브라우저 WebCodecs 런타임이 제공하며,
+ *    기술 지원 여부와 구현 배포 상태는 studio-codec-legal-profile에서 별도로 검증한다. 이는
+ *    로열티·특허·상표·라이선스 판단이나 공식 인증을 의미하지 않는다. H.264는 컨테이너 규약상
+ *    WebM에 넣을 수 없다 → H.264를 쓰려면 MP4 box writer가 전제다
  *    (§알려진 한계: Safari처럼 H.264만 인코딩 가능한 런타임은 WebCodecs 경로를 못 타고
  *     studio-webcodecs-capability의 폴백 계약에 따라 기존 MediaRecorder/GIF 경로로 내려간다).
  *
@@ -28,6 +30,11 @@
  * SeekPosition을 고정 8바이트 uint으로 쓰기 때문에 SeekHead 크기가 입력과 무관하게 상수(68B)다
  * → 오프셋을 한 번에 확정할 수 있어 2-pass 반복 수렴이 필요 없다.
  */
+
+import {
+  studioWebmCodecLegalProfile,
+  type StudioWebmCodecId,
+} from "./studio-codec-legal-profile";
 
 // ── EBML 요소 ID(마커 비트 포함 정식 바이트열) ────────────────────────────
 
@@ -79,7 +86,7 @@ export const EBML_ID = {
 } as const;
 
 /** WebM이 담을 수 있는 비디오 코덱 ID(Matroska codec mapping). */
-export type WebmVideoCodecId = "V_AV1" | "V_VP8" | "V_VP9";
+export type WebmVideoCodecId = StudioWebmCodecId;
 
 /** 트랙 번호는 1로 고정한다(비디오 단일 트랙 muxer). */
 export const WEBM_VIDEO_TRACK_NUMBER = 1;
@@ -408,6 +415,9 @@ export function ticksFromMicroseconds(timestampUs: number, timestampScaleNs: num
  */
 export function muxWebm(options: WebmMuxOptions): WebmMuxResult {
   const { track, frames } = options;
+  // TypeScript types do not protect persisted/plugin/worker data at runtime. Resolve the explicit
+  // technical/distribution profile before writing any bytes, and fail closed for unknown codecs.
+  studioWebmCodecLegalProfile(track.codecId);
   if (frames.length === 0) throw new Error("WebM으로 묶을 프레임이 없어요.");
   if (!frames[0]!.keyFrame) throw new Error("첫 프레임은 키프레임이어야 해요.");
   const timestampScaleNs = Math.max(1, Math.round(options.timestampScaleNs ?? WEBM_DEFAULT_TIMESTAMP_SCALE_NS));

@@ -13,6 +13,8 @@ import {
 
 describe("studio drawing library strategy", () => {
   it("keeps an extensible specialist inventory without document or brush-pixel authority", () => {
+    expect(STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION)
+      .toBe("studio-drawing-library-strategy-v5");
     const requiredIds = [
       "perfect-freehand",
       "lazy-brush",
@@ -82,12 +84,17 @@ describe("studio drawing library strategy", () => {
       brushPixelAuthority: false,
     });
     expect(hokusai?.maintenanceNote).toContain("pins Hokusai 0.3.0 exactly");
+    expect(hokusai?.maintenanceNote)
+      .toContain("0.3.0-packed-dirty-frame-adapter.2");
+    expect(hokusai?.maintenanceNote).toContain("packed dirty RGBA8");
     expect(hokusai?.maintenanceNote).toContain("verified transparent PNG");
     expect(hokusai?.riskNotes.join(" ")).toContain(
       "not the normal live brush core",
     );
     expect(hokusai?.riskNotes.join(" ")).toContain("real-browser runtime QA");
     expect(hokusai?.riskNotes.join(" ")).toContain("cross-platform bit identity");
+    expect(hokusai?.riskNotes.join(" ")).toContain("Worker protocol v2");
+    expect(hokusai?.riskNotes.join(" ")).toContain("output dimensions");
     const p5Brush = resolveStudioDrawingLibraryStrategy("p5-brush");
     expect(p5Brush).toMatchObject({
       productLayer: "settled-procedural-raster",
@@ -229,6 +236,8 @@ describe("studio drawing source adoption audit", () => {
   ] as const;
 
   it("freezes the complete reviewed candidate set and provenance fields", () => {
+    expect(STUDIO_DRAWING_SOURCE_AUDIT_VERSION)
+      .toBe("studio-drawing-source-audit-v4");
     expect(STUDIO_DRAWING_SOURCE_AUDIT.map(({ id }) => id)).toEqual(
       candidateIds,
     );
@@ -311,6 +320,12 @@ describe("studio drawing source adoption audit", () => {
     });
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
       .toContain("selected-stroke natural-media transform");
+    expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
+      .toContain("0.3.0-packed-dirty-frame-adapter.2");
+    expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
+      .toContain("packed-dirty-rgba8");
+    expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
+      .toContain("output dimensions");
     expect(resolveStudioDrawingSourceAudit("hokusai")?.rationale)
       .toContain("not the full live brush core");
   });

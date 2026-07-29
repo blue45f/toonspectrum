@@ -31,9 +31,15 @@
  * `creationDate` 로 고정 문자열을 주입한다(테스트가 이 두 경로를 모두 잠근다).
  */
 
-import { buildCidWidthArray, encodeIdentityHText, fontDescriptorFlags, glyphWidthToPdf } from "./studio-canvaskit-pdf-font";
+import {
+  buildCidWidthArray,
+  encodeIdentityHText,
+  evaluatePdfFontEmbedding,
+  fontDescriptorFlags,
+  glyphWidthToPdf,
+} from "./studio-canvaskit-pdf-font";
 
-import type { StudioPdfFontResource } from "./studio-canvaskit-pdf-font";
+import type { StudioPdfFontDocumentIntent, StudioPdfFontResource } from "./studio-canvaskit-pdf-font";
 
 /** px→pt — `studio-pdf-export.ts` 의 PDF_PX_TO_PT 와 반드시 같은 값이어야 한다. */
 export const STUDIO_PDF_PX_TO_PT = 0.75;
@@ -166,6 +172,11 @@ export interface StudioPdfDocument {
    */
   creationDate?: string;
   fonts?: readonly StudioPdfFontResource[];
+  /**
+   * 임베드 글꼴이 들어간 문서의 사용 범위. OS/2.fsType의 Preview & Print와 Editable 권한을
+   * 혼동하지 않도록 CID 글꼴 출고 때는 반드시 명시한다. 표준 14 폰트만 쓰면 필요 없다.
+   */
+  fontEmbeddingIntent?: StudioPdfFontDocumentIntent;
   images?: readonly StudioPdfImage[];
   outputIntent?: StudioPdfOutputIntent;
   /** 기본 true — 스튜디오(좌상단 원점) 좌표를 그대로 받는다. */
@@ -499,6 +510,24 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
   for (const font of fontList) {
     if (fontMap.has(font.resourceName)) {
       throw new Error(`PDF 글꼴 이름이 겹쳐요(${font.resourceName}).`);
+    }
+    if (font.kind === "truetype-cid") {
+      if (font.metrics.hasCffOutlines) {
+        throw new Error(
+          `PDF 글꼴 '${font.baseFont}'을 임베드할 수 없어요: `
+          + "CFF 윤곽선은 CIDFontType0/FontFile3 writer가 필요하며 현재 TrueType FontFile2 경로로는 안전하게 출력할 수 없어요.",
+        );
+      }
+      // 이 writer는 현재 sfnt 원본 전체를 FontFile2에 넣는다. 따라서 subset은 false이고,
+      // bitmap-only 폰트가 요구하는 비트맵 스트림 경로는 제공하지 않는다.
+      const embedding = evaluatePdfFontEmbedding(font.metrics.embeddingPolicy, {
+        documentIntent: document.fontEmbeddingIntent,
+        embeddingMode: "full",
+        payloadKind: "outline",
+      });
+      if (!embedding.allowed) {
+        throw new Error(`PDF 글꼴 '${font.baseFont}'을 임베드할 수 없어요: ${embedding.message}`);
+      }
     }
     fontMap.set(font.resourceName, font);
   }

@@ -6,13 +6,14 @@
  * artifact admitted back into the document transaction.
  */
 import {
-  STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
   planStudioHokusaiNaturalMediaRender,
+  type StudioHokusaiNaturalMediaRenderPlan,
   type StudioHokusaiNaturalMediaSettings,
 } from "./studio-hokusai-natural-media-contract";
 import {
   STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
   STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION,
+  snapshotStudioHokusaiWorkerResultMessage,
   type StudioHokusaiWorkerFailureMessage,
   type StudioHokusaiWorkerReadyMessage,
   type StudioHokusaiWorkerReceipt,
@@ -108,10 +109,6 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function isSha256(value: unknown): value is `sha256:${string}` {
-  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/u.test(value);
-}
-
 function snapshotReady(candidate: unknown): StudioHokusaiWorkerReadyMessage | null {
   if (
     !isPlainRecord(candidate)
@@ -125,6 +122,7 @@ function snapshotReady(candidate: unknown): StudioHokusaiWorkerReadyMessage | nu
     || candidate.runtime.dedicatedWorker !== true
     || candidate.runtime.transparentRgba !== true
     || candidate.runtime.dirtyTiles !== true
+    || candidate.runtime.packedDirtyFrame !== true
     || candidate.runtime.mainThreadFallback !== false
   ) {
     return null;
@@ -159,70 +157,6 @@ function snapshotFailure(
     return null;
   }
   return candidate as unknown as StudioHokusaiWorkerFailureMessage;
-}
-
-function snapshotResult(
-  candidate: unknown,
-  expected: Readonly<{
-    requestId: number;
-    engineEpoch: number;
-    sourceElementId: string;
-    presetId: string;
-    seed: number;
-    rasterWidth: number;
-    rasterHeight: number;
-  }>,
-): StudioHokusaiWorkerResultMessage | null {
-  if (
-    !isPlainRecord(candidate)
-    || candidate.type !== "studio-hokusai/result"
-    || candidate.version !== STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION
-    || candidate.requestId !== expected.requestId
-    || candidate.engineEpoch !== expected.engineEpoch
-    || !(candidate.pngBytes instanceof ArrayBuffer)
-    || candidate.pngBytes.byteLength <= 0
-    || candidate.pngBytes.byteLength
-      > STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS.maxPngBytes
-    || !isPlainRecord(candidate.receipt)
-  ) {
-    return null;
-  }
-  const receipt = candidate.receipt;
-  if (
-    receipt.kind !== "studio-hokusai/receipt"
-    || receipt.version !== STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION
-    || receipt.requestId !== expected.requestId
-    || receipt.engineEpoch !== expected.engineEpoch
-    || receipt.sourceElementId !== expected.sourceElementId
-    || receipt.presetId !== expected.presetId
-    || receipt.seed !== expected.seed
-    || receipt.rasterWidth !== expected.rasterWidth
-    || receipt.rasterHeight !== expected.rasterHeight
-    || !Array.isArray(receipt.dirtyBounds)
-    || receipt.dirtyBounds.length !== 4
-    || !receipt.dirtyBounds.every((value) =>
-      typeof value === "number" && Number.isSafeInteger(value))
-    || !isSha256(receipt.inputHash)
-    || !isSha256(receipt.pixelHash)
-    || !isSha256(receipt.pngHash)
-    || receipt.adapterVersion !== STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION
-    || receipt.execution
-      !== "dedicated-worker-wasm-transparent-dirty-tiles"
-    || receipt.complete !== true
-  ) {
-    return null;
-  }
-  const png = new Uint8Array(candidate.pngBytes);
-  if (
-    png.length < 24
-    || png[0] !== 0x89
-    || png[1] !== 0x50
-    || png[2] !== 0x4e
-    || png[3] !== 0x47
-  ) {
-    return null;
-  }
-  return candidate as unknown as StudioHokusaiWorkerResultMessage;
 }
 
 function waitForReady(
@@ -312,7 +246,7 @@ function renderInWorker(
       new Error("Hokusai Worker 결과를 읽지 못했습니다."),
     ));
     const onMessage = (event: MessageEvent<unknown>): void => {
-      const result = snapshotResult(event.data, {
+      const result = snapshotStudioHokusaiWorkerResultMessage(event.data, {
         requestId: message.requestId,
         engineEpoch: message.engineEpoch,
         sourceElementId: message.plan.source.elementId,
@@ -358,8 +292,7 @@ async function hashPng(
   if (typeof globalThis.crypto?.subtle?.digest !== "function") {
     throw new Error("PNG 무결성 검증을 위한 Web Crypto를 사용할 수 없습니다.");
   }
-  const copy = pngBytes.slice(0);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", copy);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", pngBytes);
   throwIfAborted(signal);
   return `sha256:${bytesToHex(new Uint8Array(digest))}`;
 }
@@ -418,6 +351,56 @@ function pngToDataUrl(
   });
 }
 
+export function projectStudioHokusaiDirtyLogicalBounds(
+  plan: Pick<
+    StudioHokusaiNaturalMediaRenderPlan,
+    "logicalBounds" | "raster"
+  >,
+  dirtyBounds: readonly [number, number, number, number],
+): StudioHokusaiNaturalMediaProductResult["logicalBounds"] {
+  const [dirtyX, dirtyY, dirtyWidth, dirtyHeight] = dirtyBounds;
+  const inverseScale = 1 / plan.raster.scale;
+  const right = Math.min(
+    plan.logicalBounds.x + plan.logicalBounds.width,
+    plan.logicalBounds.x + (dirtyX + dirtyWidth) * inverseScale,
+  );
+  const bottom = Math.min(
+    plan.logicalBounds.y + plan.logicalBounds.height,
+    plan.logicalBounds.y + (dirtyY + dirtyHeight) * inverseScale,
+  );
+  const x = plan.logicalBounds.x + dirtyX * inverseScale;
+  const y = plan.logicalBounds.y + dirtyY * inverseScale;
+  if (
+    ![
+      x,
+      y,
+      right,
+      bottom,
+      dirtyX,
+      dirtyY,
+      dirtyWidth,
+      dirtyHeight,
+    ].every(Number.isFinite)
+    || plan.raster.scale <= 0
+    || dirtyX < 0
+    || dirtyY < 0
+    || dirtyWidth <= 0
+    || dirtyHeight <= 0
+    || dirtyX + dirtyWidth > plan.raster.width
+    || dirtyY + dirtyHeight > plan.raster.height
+    || right <= x
+    || bottom <= y
+  ) {
+    throw new Error("Hokusai dirty-frame placement is invalid.");
+  }
+  return Object.freeze({
+    x,
+    y,
+    width: right - x,
+    height: bottom - y,
+  });
+}
+
 export async function probeStudioHokusaiNaturalMediaProduct(
   signal: AbortSignal,
 ): Promise<StudioHokusaiNaturalMediaProbeResult> {
@@ -429,7 +412,7 @@ export async function probeStudioHokusaiNaturalMediaProduct(
     return Object.freeze({
       available: true,
       message:
-        "Hokusai 0.3.0 · 투명 dirty-tile WASM · 전용 Worker를 사용할 수 있습니다.",
+        "Hokusai 0.3.0 · packed dirty-frame WASM · 전용 Worker를 사용할 수 있습니다.",
       runtime: ready.runtime,
     });
   } catch (error) {
@@ -485,6 +468,10 @@ export async function generateStudioHokusaiNaturalMediaProduct(
       throw new Error("Hokusai PNG 무결성 검증에 실패했습니다.");
     }
     const src = await pngToDataUrl(result.pngBytes, options.signal);
+    const logicalBounds = projectStudioHokusaiDirtyLogicalBounds(
+      plan,
+      result.receipt.dirtyBounds,
+    );
     const presetLabel =
       plan.presetId === "pencil"
         ? "연필"
@@ -497,9 +484,9 @@ export async function generateStudioHokusaiNaturalMediaProduct(
               : "마커";
     return Object.freeze({
       src,
-      rasterWidth: plan.raster.width,
-      rasterHeight: plan.raster.height,
-      logicalBounds: plan.logicalBounds,
+      rasterWidth: result.receipt.outputRasterWidth,
+      rasterHeight: result.receipt.outputRasterHeight,
+      logicalBounds,
       sourceElementId: plan.source.elementId,
       sourceRevision: plan.source.revision,
       name: `Hokusai ${presetLabel} · ${source.name ?? source.brush ?? "선화"}`,

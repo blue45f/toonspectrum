@@ -32,6 +32,44 @@ describe("Studio interchange capability registry", () => {
     }
   });
 
+  it("format/container/codec와 구현·UI·metadata·규격·외부 경계를 모든 행에 materialize한다", () => {
+    for (const capability of STUDIO_INTERCHANGE_CAPABILITIES) {
+      expect(capability.technicalLayers.format.length).toBeGreaterThan(0);
+      expect(Array.isArray(capability.technicalLayers.container)).toBe(true);
+      expect(Array.isArray(capability.technicalLayers.codec)).toBe(true);
+      expect(capability.conformance.thirdPartyCertification).toBe("not-claimed");
+      expect(capability.implementation.import).toBeTruthy();
+      expect(capability.implementation.export).toBeTruthy();
+      expect(capability.uiWiring.import).toBeTruthy();
+      expect(capability.uiWiring.export).toBeTruthy();
+      expect(capability.metadata.general).toBeTruthy();
+      expect(capability.metadata.icc).toBeTruthy();
+      expect(capability.externalRequirements.provider).toBeTruthy();
+      expect(capability.externalRequirements.license).toBeTruthy();
+
+      if (capability.import === "unsupported") {
+        expect(capability.implementation.import).toBe("not-implemented");
+        expect(capability.uiWiring.import).toBe("not-applicable");
+      }
+      if (capability.export === "unsupported") {
+        expect(capability.implementation.export).toBe("not-implemented");
+        expect(capability.uiWiring.export).toBe("not-applicable");
+      }
+      if (capability.uiWiring.import === "wired") {
+        expect(capability.implementation.import).not.toBe("not-implemented");
+      }
+      if (capability.uiWiring.export === "wired") {
+        expect(capability.implementation.export).not.toBe("not-implemented");
+      }
+      if (
+        capability.externalRequirements.provider === "browser-runtime" ||
+        capability.externalRequirements.provider === "bundled-library"
+      ) {
+        expect(capability.externalRequirements.providers.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("독점 CLIP/SUT/AI를 직접 지원한다고 과장하지 않고 bridge를 제시한다", () => {
     for (const id of ["clip", "sut", "ai"]) {
       const capability = studioInterchangeCapability(id)!;
@@ -171,34 +209,154 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapabilitiesForExtension("unknown")).toEqual([]);
   });
 
-  it("direct support filter excludes bridge-only rows and includes the GIF/APNG export row", () => {
+  it("direct support filter excludes bridge-only rows and includes only implemented GIF/APNG export", () => {
     const ids = studioDirectlySupportedInterchangeCapabilities().map((capability) => capability.id);
     expect(ids).toContain("toonproject-archive");
     expect(ids).toContain("toonink");
     expect(ids).toContain("inkml");
     expect(ids).toContain("ase");
+    expect(ids).toContain("avif");
     expect(ids).not.toContain("clip");
-    expect(ids).toContain("gif-apng-mp4-export");
+    expect(ids).not.toContain("heic");
+    expect(ids).not.toContain("mp4");
+    expect(ids).toContain("gif-apng-export");
   });
 
-  it("GIF/APNG는 내보내기 전용으로, 가져오기와 MP4는 미지원으로 정직하게 표시한다", () => {
-    const capability = studioInterchangeCapability("gif-apng-mp4-export")!;
+  it("GIF/APNG 내보내기와 미구현 MP4를 독립 capability로 분리한다", () => {
+    const capability = studioInterchangeCapability("gif-apng-export")!;
     expect(capability).toMatchObject({
       import: "unsupported",
       export: "partial",
       roundTrip: "none",
       status: "partial",
+      implementation: {
+        import: "not-implemented",
+        export: "partial",
+      },
+      uiWiring: {
+        import: "not-applicable",
+        export: "wired",
+      },
     });
     expect(capability.lossModel.join(" ")).toContain("256색");
     expect(capability.lossModel.join(" ")).toContain("1비트 투명");
-    expect(capability.lossModel.join(" ")).toContain("MP4 내보내기는 구현 전");
     expect(capability.runtimeRequirement.join(" ")).toContain("GIF89a");
     expect(capability.runtimeRequirement.join(" ")).toContain("NETSCAPE2.0");
     expect(capability.runtimeRequirement.join(" ")).toContain("acTL/fcTL/fdAT");
     expect(capability.runtimeRequirement.join(" ")).toContain("CRC32");
     expect(capability.notes.join(" ")).toContain("무한 반복");
-    expect(capability.notes.join(" ")).toContain("MP4 지원으로 오표시하지 않습니다");
     expect(capability.sizeBudget.maxItems).toBe(60);
+    expect(capability.extensions).not.toContain(".mp4");
+    expect(capability.mime).not.toContain("video/mp4");
+
+    expect(studioInterchangeCapability("mp4")).toMatchObject({
+      extensions: [".mp4"],
+      mime: ["video/mp4"],
+      import: "unsupported",
+      export: "unsupported",
+      status: "bridge-only",
+      implementation: {
+        import: "not-implemented",
+        export: "not-implemented",
+      },
+      uiWiring: {
+        import: "not-applicable",
+        export: "not-applicable",
+      },
+      conformance: {
+        publicSpec: "not-claimed",
+        thirdPartyCertification: "not-claimed",
+      },
+      externalRequirements: {
+        provider: "not-selected",
+        providers: [],
+        license: "external-review-required",
+      },
+    });
+    expect(studioInterchangeCapabilitiesForExtension(".mp4").map((item) => item.id)).toEqual([
+      "mp4",
+    ]);
+  });
+
+  it("AVIF browser pipeline과 미구현 HEIC를 같은 지원으로 과장하지 않는다", () => {
+    expect(studioInterchangeCapability("avif")).toMatchObject({
+      import: "engine-ready",
+      export: "unsupported",
+      status: "engine-ready",
+      technicalLayers: {
+        format: ["AVIF"],
+        container: ["ISO Base Media File Format / HEIF"],
+        codec: ["AV1 image item (browser-provided)"],
+      },
+      implementation: {
+        import: "runtime-dependent",
+        export: "not-implemented",
+      },
+      uiWiring: {
+        import: "not-wired",
+        export: "not-applicable",
+      },
+      metadata: {
+        general: "discarded",
+        icc: "discarded",
+      },
+      conformance: {
+        publicSpec: "runtime-provider-dependent",
+        thirdPartyCertification: "not-claimed",
+      },
+      externalRequirements: {
+        provider: "browser-runtime",
+        license: "runtime-provider-terms",
+      },
+    });
+
+    expect(studioInterchangeCapability("heic")).toMatchObject({
+      import: "unsupported",
+      export: "unsupported",
+      status: "bridge-only",
+      implementation: {
+        import: "not-implemented",
+        export: "not-implemented",
+      },
+      conformance: {
+        publicSpec: "not-claimed",
+        thirdPartyCertification: "not-claimed",
+      },
+      externalRequirements: {
+        provider: "not-selected",
+        license: "external-review-required",
+      },
+    });
+    expect(studioInterchangeCapabilitiesForExtension("heif").map((item) => item.id)).toEqual([
+      "heic",
+    ]);
+  });
+
+  it("WebM container implementation과 browser codec 제공자를 별도 경계로 기록한다", () => {
+    expect(studioInterchangeCapability("webm")).toMatchObject({
+      technicalLayers: {
+        format: ["WebM video"],
+        container: ["Matroska/WebM"],
+        codec: ["VP8", "VP9", "AV1 (runtime-dependent WebCodecs path)"],
+      },
+      implementation: {
+        import: "not-implemented",
+        export: "runtime-dependent",
+      },
+      uiWiring: {
+        import: "not-applicable",
+        export: "wired",
+      },
+      conformance: {
+        publicSpec: "tested-public-subset",
+        thirdPartyCertification: "not-claimed",
+      },
+      externalRequirements: {
+        provider: "browser-runtime",
+        providers: ["MediaRecorder", "VideoEncoder"],
+        license: "runtime-provider-terms",
+      },
+    });
   });
 
   it("known hard limits match the audited runtime boundaries", () => {

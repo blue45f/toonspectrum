@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 
+import {
+  parseSfntEmbeddingPolicy,
+  type StudioPdfFontResource,
+  type StudioSfntMetrics,
+} from "./studio-canvaskit-pdf-font";
 import { inspectPdf, readPdf, type StudioPdfReadDocument } from "./studio-canvaskit-pdf-reader";
 import {
   STUDIO_PDF_PX_TO_PT,
@@ -15,8 +20,6 @@ import {
   type StudioPdfDocument,
   type StudioPdfOp,
 } from "./studio-canvaskit-pdf-vector";
-
-import type { StudioPdfFontResource, StudioSfntMetrics } from "./studio-canvaskit-pdf-font";
 
 // ── 바이트 유틸 — latin1(바이트↔문자 1:1)이라 문자열 인덱스가 곧 바이트 오프셋이다 ──
 
@@ -64,6 +67,7 @@ const metrics: StudioSfntMetrics = {
   bbox: [0, -200, 1000, 800],
   capHeight: 700,
   hasCffOutlines: false,
+  embeddingPolicy: parseSfntEmbeddingPolicy(0),
 };
 
 const cidFont: StudioPdfFontResource = {
@@ -394,6 +398,7 @@ describe("글꼴 임베드", () => {
         },
       ],
       fonts: [cidFont],
+      fontEmbeddingIntent: "editable",
     });
     const document = readOk(bytes);
     const bodies = [...document.objectBodies.values()];
@@ -414,6 +419,53 @@ describe("글꼴 임베드", () => {
     expect(fontStream).toBeDefined();
     expect(Array.from(fontStream!)).toEqual(Array.from(cidFont.kind === "truetype-cid" ? cidFont.fontBytes : []));
     expect(latin1(bytes)).toContain("/Length1 7");
+  });
+
+  it("CID 글꼴은 문서 의도를 생략하면 임베딩하지 않는다(fail-closed)", () => {
+    expect(() => buildVectorPdf(simpleDoc({ fonts: [cidFont] }))).toThrow("읽기·인쇄 전용인지");
+  });
+
+  it("CFF 윤곽선을 TrueType CIDFontType2/FontFile2로 잘못 포장하지 않는다", () => {
+    const cffFont: StudioPdfFontResource = {
+      ...cidFont,
+      metrics: { ...metrics, hasCffOutlines: true },
+    };
+    expect(() =>
+      buildVectorPdf(simpleDoc({
+        fonts: [cffFont],
+        fontEmbeddingIntent: "editable",
+      })),
+    ).toThrow("CIDFontType0/FontFile3");
+  });
+
+  it("Restricted·Bitmap-only 글꼴은 FontFile2 아웃라인 스트림 생성을 막는다", () => {
+    const restricted: StudioPdfFontResource = {
+      ...cidFont,
+      metrics: { ...metrics, embeddingPolicy: parseSfntEmbeddingPolicy(2) },
+    };
+    const bitmapOnly: StudioPdfFontResource = {
+      ...cidFont,
+      metrics: { ...metrics, embeddingPolicy: parseSfntEmbeddingPolicy(0x0208) },
+    };
+    expect(() =>
+      buildVectorPdf(simpleDoc({ fonts: [restricted], fontEmbeddingIntent: "preview-print" })),
+    ).toThrow("Restricted License");
+    expect(() =>
+      buildVectorPdf(simpleDoc({ fonts: [bitmapOnly], fontEmbeddingIntent: "editable" })),
+    ).toThrow("내장 비트맵만");
+  });
+
+  it("Preview & Print 글꼴은 읽기·인쇄 의도만 허용한다", () => {
+    const previewPrint: StudioPdfFontResource = {
+      ...cidFont,
+      metrics: { ...metrics, embeddingPolicy: parseSfntEmbeddingPolicy(4) },
+    };
+    expect(() =>
+      buildVectorPdf(simpleDoc({ fonts: [previewPrint], fontEmbeddingIntent: "editable" })),
+    ).toThrow("읽기·인쇄 전용 PDF");
+    expect(() =>
+      buildVectorPdf(simpleDoc({ fonts: [previewPrint], fontEmbeddingIntent: "preview-print" })),
+    ).not.toThrow();
   });
 
   it("텍스트가 없는 글꼴을 참조하면 조립 단계에서 막는다", () => {
@@ -513,6 +565,7 @@ describe("사전검사 리포트", () => {
           },
         ],
         fonts: [cidFont],
+        fontEmbeddingIntent: "editable",
         outputIntent: {
           profileBytes: Uint8Array.from([0, 1]),
           identifier: "FOGRA39",

@@ -15,6 +15,15 @@ const WIDTH = 96;
 const HEIGHT = 48;
 const DIRTY = [4, 4, 88, 40] as const;
 
+function fullLayout(
+  dirtyBounds: readonly [number, number, number, number] = DIRTY,
+) {
+  return {
+    frameBounds: [0, 0, WIDTH, HEIGHT] as const,
+    dirtyBounds,
+  };
+}
+
 function plan(
   presetId: StudioHokusaiNaturalMediaPresetId,
   seed = 0x1234_5678,
@@ -66,6 +75,39 @@ function ribbon(alpha: number): Uint8Array {
     }
   }
   return pixels;
+}
+
+function packedFrame(
+  source: Uint8Array,
+  bounds: readonly [number, number, number, number],
+): Uint8Array {
+  const [x, y, width, height] = bounds;
+  const packed = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const sourceStart = ((y + row) * WIDTH + x) * 4;
+    packed.set(
+      source.subarray(sourceStart, sourceStart + width * 4),
+      row * width * 4,
+    );
+  }
+  return packed;
+}
+
+function compositePackedFrame(
+  destination: Uint8Array,
+  packed: Uint8Array,
+  bounds: readonly [number, number, number, number],
+): void {
+  const [x, y, width, height] = bounds;
+  expect(packed.byteLength).toBe(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const sourceStart = row * width * 4;
+    const destinationStart = ((y + row) * WIDTH + x) * 4;
+    destination.set(
+      packed.subarray(sourceStart, sourceStart + width * 4),
+      destinationStart,
+    );
+  }
 }
 
 function channelValues(
@@ -120,12 +162,12 @@ describe("Studio Hokusai natural-media texture v2", () => {
       const firstMetrics = applyStudioHokusaiNaturalMediaTextureV2(
         first,
         plan(presetId),
-        DIRTY,
+        fullLayout(),
       );
       const secondMetrics = applyStudioHokusaiNaturalMediaTextureV2(
         second,
         plan(presetId),
-        DIRTY,
+        fullLayout(),
       );
       expect(first).toEqual(second);
       expect(firstMetrics).toEqual(secondMetrics);
@@ -148,12 +190,12 @@ describe("Studio Hokusai natural-media texture v2", () => {
       applyStudioHokusaiNaturalMediaTextureV2(
         onePass,
         plan(presetId),
-        DIRTY,
+        fullLayout(),
       );
       applyStudioHokusaiNaturalMediaTextureV2(
         retraced,
         plan(presetId),
-        DIRTY,
+        fullLayout(),
       );
       for (let y = 10; y < 38; y += 1) {
         for (let x = 4; x < 92; x += 1) {
@@ -167,12 +209,104 @@ describe("Studio Hokusai natural-media texture v2", () => {
     }
   });
 
+  it("renders a packed dirty frame byte-identically to the same full-frame region", () => {
+    for (const presetId of ["pencil", "charcoal", "oil"] as const) {
+      const full = ribbon(196);
+      const packed = packedFrame(full, DIRTY);
+      const fullMetrics = applyStudioHokusaiNaturalMediaTextureV2(
+        full,
+        plan(presetId),
+        fullLayout(),
+      );
+      const packedMetrics = applyStudioHokusaiNaturalMediaTextureV2(
+        packed,
+        plan(presetId),
+        {
+          frameBounds: DIRTY,
+          dirtyBounds: DIRTY,
+        },
+      );
+      expect(packed).toEqual(packedFrame(full, DIRTY));
+      expect(packedMetrics).toEqual(fullMetrics);
+    }
+  });
+
+  it("matches a fresh irregular patch partition across the 64px tile boundary", () => {
+    const partition = [
+      [4, 4, 60, 16],
+      [64, 4, 28, 16],
+      [4, 20, 34, 24],
+      [38, 20, 54, 24],
+    ] as const;
+    for (const presetId of ["pencil", "charcoal", "oil"] as const) {
+      const source = ribbon(196);
+      const full = source.slice();
+      const composed = source.slice();
+      applyStudioHokusaiNaturalMediaTextureV2(
+        full,
+        plan(presetId),
+        fullLayout(),
+      );
+      for (const bounds of partition) {
+        const patch = packedFrame(source, bounds);
+        applyStudioHokusaiNaturalMediaTextureV2(
+          patch,
+          plan(presetId),
+          {
+            frameBounds: bounds,
+            dirtyBounds: bounds,
+          },
+        );
+        compositePackedFrame(composed, patch, bounds);
+      }
+      expect(composed).toEqual(full);
+    }
+  });
+
+  it("rejects malformed, overflowing and mismatched packed layouts", () => {
+    const base = ribbon(196);
+    const renderPlan = plan("pencil");
+    const invalidLayouts = [
+      {
+        frameBounds: [4, 4, 88, 40] as const,
+        dirtyBounds: [3, 4, 1, 1] as const,
+      },
+      {
+        frameBounds: [4, 4, 88, 40] as const,
+        dirtyBounds: [4, 4, 89, 40] as const,
+      },
+      {
+        frameBounds: [95, 0, 2, 1] as const,
+        dirtyBounds: [95, 0, 2, 1] as const,
+      },
+      {
+        frameBounds: [4, 4, 0, 40] as const,
+        dirtyBounds: [4, 4, 1, 1] as const,
+      },
+    ];
+    for (const layout of invalidLayouts) {
+      expect(() => applyStudioHokusaiNaturalMediaTextureV2(
+        base,
+        renderPlan,
+        layout,
+      )).toThrowError(RangeError);
+    }
+    expect(() => applyStudioHokusaiNaturalMediaTextureV2(
+      new Uint8Array(DIRTY[2] * DIRTY[3] * 4 - 1),
+      renderPlan,
+      {
+        frameBounds: DIRTY,
+        dirtyBounds: DIRTY,
+      },
+    )).toThrowError(RangeError);
+  });
+
   it("makes oil bristles vary across the dominant stroke more than along it", () => {
     const pixels = ribbon(220);
     const metrics = applyStudioHokusaiNaturalMediaTextureV2(
       pixels,
       plan("oil"),
-      DIRTY,
+      fullLayout(),
     );
     const along = meanNeighbourDifference(pixels, 1, 0);
     const across = meanNeighbourDifference(pixels, 0, 1);
@@ -211,7 +345,10 @@ describe("Studio Hokusai natural-media texture v2", () => {
     const zigzagMetrics = applyStudioHokusaiNaturalMediaTextureV2(
       zigzagPixel,
       zigzagPlan,
-      [0, 0, 1, 1],
+      {
+        frameBounds: [0, 0, 1, 1],
+        dirtyBounds: [0, 0, 1, 1],
+      },
     );
     expect(zigzagMetrics.directionIndexMode)
       .toBe("global-budget-fallback");
@@ -239,7 +376,10 @@ describe("Studio Hokusai natural-media texture v2", () => {
     const overSegmentMetrics = applyStudioHokusaiNaturalMediaTextureV2(
       overSegmentPixel,
       { ...base, samples: overSegmentSamples },
-      [0, 0, 1, 1],
+      {
+        frameBounds: [0, 0, 1, 1],
+        dirtyBounds: [0, 0, 1, 1],
+      },
     );
     expect(overSegmentMetrics).toMatchObject({
       directionIndexMode: "global-budget-fallback",
@@ -255,7 +395,7 @@ describe("Studio Hokusai natural-media texture v2", () => {
     const metrics = applyStudioHokusaiNaturalMediaTextureV2(
       flat,
       plan("calligraphy"),
-      DIRTY,
+      fullLayout(),
     );
     expect(flat).toEqual(before);
     expect(metrics).toMatchObject({
@@ -273,7 +413,7 @@ describe("Studio Hokusai natural-media texture v2", () => {
     applyStudioHokusaiNaturalMediaTextureV2(
       pencil,
       plan("pencil"),
-      DIRTY,
+      fullLayout(),
     );
     expect(Array.from(pencil.slice(outsideIndex, outsideIndex + 4)))
       .toEqual([100, 80, 60, 200]);

@@ -1,8 +1,11 @@
 /**
  * Audited interchange registry for Studio.
  *
- * `engine-ready` means a tested codec exists but a visible menu may still need wiring. It is kept
- * separate from `available` so product copy never promises a button that does not exist yet.
+ * `engine-ready` means a tested interchange pipeline exists but a visible menu may still need
+ * wiring. A browser-provided codec can still be runtime-gated; `implementation` and
+ * `externalRequirements` expose that distinction instead of treating a MIME name as a bundled
+ * codec. It is kept separate from `available` so product copy never promises a button that does
+ * not exist yet.
  */
 export type StudioInterchangeCategory =
   | "3d"
@@ -29,6 +32,89 @@ export type StudioInterchangeStatus =
   | "planned"
   | "unsupported";
 
+export type StudioInterchangeImplementationStatus =
+  | "implemented"
+  | "not-implemented"
+  | "partial"
+  | "runtime-dependent";
+
+export type StudioInterchangeUiWiring =
+  | "not-applicable"
+  | "not-wired"
+  | "partial"
+  | "wired";
+
+export type StudioInterchangeMetadataPreservation =
+  | "discarded"
+  | "not-applicable"
+  | "not-audited"
+  | "partial"
+  | "preserved";
+
+export type StudioInterchangePublicSpecConformance =
+  | "not-claimed"
+  | "project-profile-tested"
+  | "runtime-provider-dependent"
+  | "tested-public-subset";
+
+export type StudioInterchangeExternalProviderBoundary =
+  | "browser-runtime"
+  | "bundled-library"
+  | "none"
+  | "not-audited"
+  | "not-selected";
+
+export type StudioInterchangeExternalLicenseBoundary =
+  | "bundled-dependency-terms"
+  | "external-review-required"
+  | "not-audited"
+  | "project-implementation-only"
+  | "runtime-provider-terms";
+
+export interface StudioInterchangeTechnicalLayers {
+  /** 사용자가 파일명/메뉴에서 보는 교환 규격 또는 application profile. */
+  readonly format: readonly string[];
+  /** 파일을 감싸는 container. 단일 이미지/텍스트 규격처럼 별도 container가 없으면 빈 배열. */
+  readonly container: readonly string[];
+  /** 압축·영상·오디오 codec. codec이 없거나 아직 선택하지 않았으면 빈 배열. */
+  readonly codec: readonly string[];
+}
+
+export interface StudioInterchangeImplementation {
+  readonly import: StudioInterchangeImplementationStatus;
+  readonly export: StudioInterchangeImplementationStatus;
+  readonly notes: readonly string[];
+}
+
+export interface StudioInterchangeUiAvailability {
+  readonly import: StudioInterchangeUiWiring;
+  readonly export: StudioInterchangeUiWiring;
+  readonly notes: readonly string[];
+}
+
+export interface StudioInterchangeMetadataPolicy {
+  readonly general: StudioInterchangeMetadataPreservation;
+  readonly icc: StudioInterchangeMetadataPreservation;
+  readonly notes: readonly string[];
+}
+
+export interface StudioInterchangeConformance {
+  readonly publicSpec: StudioInterchangePublicSpecConformance;
+  /**
+   * ToonSpectrum 자체 테스트/서명은 여기에 제3자 인증으로 기록하지 않는다. 인증 기관 또는
+   * 권리자가 실제로 발급한 근거가 생기기 전까지 항상 `not-claimed`다.
+   */
+  readonly thirdPartyCertification: "not-claimed";
+  readonly notes: readonly string[];
+}
+
+export interface StudioInterchangeExternalRequirements {
+  readonly provider: StudioInterchangeExternalProviderBoundary;
+  readonly providers: readonly string[];
+  readonly license: StudioInterchangeExternalLicenseBoundary;
+  readonly notes: readonly string[];
+}
+
 export interface StudioInterchangeSizeBudget {
   readonly maxBatchBytes?: number;
   readonly maxDecodedBytes?: number;
@@ -53,13 +139,41 @@ export interface StudioInterchangeCapability {
   readonly sizeBudget: StudioInterchangeSizeBudget;
   readonly status: StudioInterchangeStatus;
   readonly notes: readonly string[];
+  readonly technicalLayers: StudioInterchangeTechnicalLayers;
+  readonly implementation: StudioInterchangeImplementation;
+  readonly uiWiring: StudioInterchangeUiAvailability;
+  readonly metadata: StudioInterchangeMetadataPolicy;
+  readonly conformance: StudioInterchangeConformance;
+  readonly externalRequirements: StudioInterchangeExternalRequirements;
   readonly recommendedBridge?: readonly string[];
   readonly proprietary?: boolean;
 }
 
 const MiB = 1024 * 1024;
 
-export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapability[] = Object.freeze([
+type StudioInterchangeCapabilityDefinition =
+  Omit<
+    StudioInterchangeCapability,
+    | "conformance"
+    | "externalRequirements"
+    | "implementation"
+    | "metadata"
+    | "technicalLayers"
+    | "uiWiring"
+  > &
+  Partial<
+    Pick<
+      StudioInterchangeCapability,
+      | "conformance"
+      | "externalRequirements"
+      | "implementation"
+      | "metadata"
+      | "technicalLayers"
+      | "uiWiring"
+    >
+  >;
+
+const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapabilityDefinition[] = [
   {
     id: "toonproject-archive",
     label: "ToonSpectrum 프로젝트 아카이브",
@@ -139,6 +253,109 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     status: "available",
     notes: ["정적 WebP를 안전 검사하며 내보내기 기본 품질은 0.92입니다."],
   },
+  {
+    id: "avif",
+    label: "AVIF",
+    extensions: [".avif"],
+    mime: ["image/avif"],
+    category: "raster",
+    import: "engine-ready",
+    export: "unsupported",
+    roundTrip: "none",
+    lossModel: [
+      "ImageDecoder가 제공하는 픽셀·프레임 시간만 materialize하며 원본 ISOBMFF item 구조와 metadata는 보존하지 않음",
+      "브라우저별 ImageDecoder AVIF 지원 여부가 달라 지원되지 않는 런타임에서는 사용할 수 없음",
+    ],
+    runtimeRequirement: ["ImageDecoder", "브라우저 AV1/AVIF decoder", "OffscreenCanvas materializer"],
+    sizeBudget: { maxItems: 120, notes: "generic frame decode orchestrator의 기본 프레임 상한" },
+    status: "engine-ready",
+    notes: [
+      "프레임 디코드 orchestration과 예산 테스트는 있으나 Studio 가져오기 메뉴에는 연결되지 않았습니다.",
+      "ToonSpectrum이 AV1 decoder를 번들하거나 AVIF 규격 적합성을 인증했다는 뜻이 아닙니다.",
+    ],
+    recommendedBridge: ["현재 사용자 작업 흐름에서는 PNG 또는 WebP로 변환 후 가져오기"],
+    technicalLayers: {
+      format: ["AVIF"],
+      container: ["ISO Base Media File Format / HEIF"],
+      codec: ["AV1 image item (browser-provided)"],
+    },
+    implementation: {
+      import: "runtime-dependent",
+      export: "not-implemented",
+      notes: ["generic ImageDecoder pipeline only; bundled AV1 decoder 없음"],
+    },
+    uiWiring: {
+      import: "not-wired",
+      export: "not-applicable",
+      notes: ["범용 Studio 파일 가져오기/내보내기 UI에는 노출하지 않음"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["materialized frame pixel과 duration 외 AVIF item/property metadata는 전달하지 않음"],
+    },
+    conformance: {
+      publicSpec: "runtime-provider-dependent",
+      thirdPartyCertification: "not-claimed",
+      notes: ["브라우저 decoder 결과를 소비하며 독립 AVIF conformance를 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["ImageDecoder implementation"],
+      license: "runtime-provider-terms",
+      notes: ["AV1 decode 구현·배포 조건은 선택한 브라우저/runtime 제공자 경계에 있음"],
+    },
+  },
+  {
+    id: "heic",
+    label: "HEIC / HEIF (HEVC image)",
+    extensions: [".heic", ".heif"],
+    mime: ["image/heic", "image/heif"],
+    category: "raster",
+    import: "unsupported",
+    export: "unsupported",
+    roundTrip: "none",
+    lossModel: ["decoder·encoder·metadata bridge를 구현하지 않음"],
+    runtimeRequirement: [],
+    sizeBudget: {},
+    status: "bridge-only",
+    notes: [
+      "MIME/확장자를 인식 가능한 후보로 기록할 뿐 codec 지원으로 표시하지 않습니다.",
+      "HEVC codec 배포·특허·라이선스 조건을 검토하고 provider를 선택하기 전에는 제품 codec으로 활성화하지 않습니다.",
+    ],
+    recommendedBridge: ["PNG, JPEG 또는 AVIF로 외부 변환"],
+    technicalLayers: {
+      format: ["HEIC / HEIF image profile"],
+      container: ["ISO Base Media File Format / HEIF"],
+      codec: ["HEVC image item (not implemented)"],
+    },
+    implementation: {
+      import: "not-implemented",
+      export: "not-implemented",
+      notes: ["container parser와 HEVC codec 모두 제품에 없음"],
+    },
+    uiWiring: {
+      import: "not-applicable",
+      export: "not-applicable",
+      notes: ["지원 메뉴 없음"],
+    },
+    metadata: {
+      general: "not-applicable",
+      icc: "not-applicable",
+      notes: ["미구현이므로 보존을 주장하지 않음"],
+    },
+    conformance: {
+      publicSpec: "not-claimed",
+      thirdPartyCertification: "not-claimed",
+      notes: ["HEIF/HEVC 적합성 또는 상표 인증을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "not-selected",
+      providers: [],
+      license: "external-review-required",
+      notes: ["향후 HEVC codec을 배포하려면 선택 구현과 사용 지역에 맞는 별도 권리 검토가 필요"],
+    },
+  },
   ...([
     {
       id: "bmp",
@@ -200,7 +417,7 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
       status: "partial",
       notes: ["QOI 3/4-channel sRGB 계열을 교환합니다."],
     },
-  ] satisfies readonly StudioInterchangeCapability[]),
+  ] satisfies readonly StudioInterchangeCapabilityDefinition[]),
   {
     id: "tiff",
     label: "TIFF 6.0 baseline",
@@ -542,7 +759,7 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     status: "available",
     notes: ["투명 알파 또는 흑백 명도를 펜촉 알파 마스크로 변환합니다."],
   },
-  ...(["gpl", "ase", "aco", "act", "jasc-pal", "css-palette", "json-palette"] as const).map((id): StudioInterchangeCapability => {
+  ...(["gpl", "ase", "aco", "act", "jasc-pal", "css-palette", "json-palette"] as const).map((id): StudioInterchangeCapabilityDefinition => {
     const spec = {
       gpl: { label: "GIMP Palette", ext: [".gpl"], mime: ["text/plain"] },
       ase: { label: "Adobe Swatch Exchange", ext: [".ase"], mime: ["application/octet-stream"] },
@@ -571,7 +788,7 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
       notes: ["검증된 codec과 팔레트 라이브러리 가져오기·내보내기 UI가 연결되어 있습니다."],
     };
   }),
-  ...(["glb", "gltf", "obj", "fbx", "dae", "stl", "ply", "3ds"] as const).map((id): StudioInterchangeCapability => ({
+  ...(["glb", "gltf", "obj", "fbx", "dae", "stl", "ply", "3ds"] as const).map((id): StudioInterchangeCapabilityDefinition => ({
     id: `3d-${id}`,
     label: id === "glb" ? "glTF Binary" : id === "gltf" ? "glTF JSON" : id.toUpperCase(),
     extensions: [`.${id}`],
@@ -611,7 +828,7 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     ["clip", "CLIP STUDIO FORMAT", [".clip"], ["PSD", "PNG", "SVG"]],
     ["sut", "CLIP STUDIO brush", [".sut"], ["ABR", "PNG 펜촉 + Studio 브러시 설정"]],
     ["ai", "Adobe Illustrator", [".ai"], ["SVG", "PDF", "PSD", "PNG"]],
-  ] as const).map(([id, label, extensions, bridge]): StudioInterchangeCapability => ({
+  ] as const).map(([id, label, extensions, bridge]): StudioInterchangeCapabilityDefinition => ({
     id,
     label,
     extensions,
@@ -705,10 +922,10 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     ],
   },
   {
-    id: "gif-apng-mp4-export",
-    label: "GIF / APNG / MP4 animation export",
-    extensions: [".gif", ".apng", ".mp4"],
-    mime: ["image/gif", "image/apng", "video/mp4"],
+    id: "gif-apng-export",
+    label: "GIF / APNG animation export",
+    extensions: [".gif", ".apng"],
+    mime: ["image/gif", "image/apng"],
     category: "animation",
     import: "unsupported",
     export: "partial",
@@ -716,7 +933,6 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     lossModel: [
       "GIF는 median-cut ≤256색 양자화와 1비트 투명으로 평탄화됨(선택적 ordered/Floyd–Steinberg 디더링, 지연 시간은 centisecond 정밀도)",
       "APNG는 프레임별 무손실 PNG지만 레이어·벡터·프레임 편집성은 평탄화됨",
-      "MP4 내보내기는 구현 전",
     ],
     runtimeRequirement: [
       "Canvas 2D",
@@ -730,10 +946,521 @@ export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapabili
     status: "partial",
     notes: [
       "프레임 애니메이션 패널에서 GIF와 APNG를 무한 반복으로 내보냅니다(프레임별 지연 시간 유지, 투명 배경 지원).",
-      "GIF/APNG 가져오기와 MP4 내보내기는 지원하지 않으며, WebM 출력을 MP4 지원으로 오표시하지 않습니다.",
+      "GIF/APNG 가져오기는 이 행에서 지원하지 않으며 별도 정적 GIF 가져오기 행과 혼동하지 않습니다.",
     ],
+    technicalLayers: {
+      format: ["GIF89a", "APNG"],
+      container: ["GIF data stream", "PNG chunk stream"],
+      codec: ["GIF LZW + palette quantization", "PNG image data"],
+    },
+    implementation: {
+      import: "not-implemented",
+      export: "partial",
+      notes: ["GIF/APNG encoder subset만 구현; 범용 animated image importer는 UI 미연결"],
+    },
+    uiWiring: {
+      import: "not-applicable",
+      export: "wired",
+      notes: ["프레임 애니메이션 패널의 WebM·GIF·APNG 내보내기 선택기에 연결"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["프레임 duration·loop·픽셀만 출력하고 편집/저작 metadata와 ICC는 쓰지 않음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["GIF89a/APNG chunk subset을 바이트 테스트하지만 제3자 적합성 인증은 없음"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["Canvas PNG encoder"],
+      license: "runtime-provider-terms",
+      notes: ["GIF encoder/APNG assembler는 제품 구현, APNG PNG frame encoding은 browser runtime 제공"],
+    },
   },
-]);
+  {
+    id: "mp4",
+    label: "MP4 / ISO BMFF video",
+    extensions: [".mp4"],
+    mime: ["video/mp4"],
+    category: "animation",
+    import: "unsupported",
+    export: "unsupported",
+    roundTrip: "none",
+    lossModel: ["MP4 muxer와 제품 codec 경로를 구현하지 않음"],
+    runtimeRequirement: [],
+    sizeBudget: {},
+    status: "bridge-only",
+    notes: [
+      "WebM encoder/muxer가 존재해도 MP4 container 또는 H.264/AAC 지원을 뜻하지 않습니다.",
+      "MP4 box writer, codec configuration record, sample table, 실제 codec provider가 모두 미구현입니다.",
+    ],
+    recommendedBridge: ["영상 출력은 WebM 사용", "필요하면 외부 도구에서 WebM을 MP4로 변환"],
+    technicalLayers: {
+      format: ["MP4 video file"],
+      container: ["ISO Base Media File Format / MP4"],
+      codec: [],
+    },
+    implementation: {
+      import: "not-implemented",
+      export: "not-implemented",
+      notes: ["container와 codec 모두 제품 경로에 없음"],
+    },
+    uiWiring: {
+      import: "not-applicable",
+      export: "not-applicable",
+      notes: ["MP4 메뉴를 노출하지 않음"],
+    },
+    metadata: {
+      general: "not-applicable",
+      icc: "not-applicable",
+      notes: ["미구현이므로 metadata/ICC 보존을 주장하지 않음"],
+    },
+    conformance: {
+      publicSpec: "not-claimed",
+      thirdPartyCertification: "not-claimed",
+      notes: ["ISO BMFF/MP4 적합성 또는 codec 인증을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "not-selected",
+      providers: [],
+      license: "external-review-required",
+      notes: ["향후 선택할 video/audio codec과 배포 지역에 따라 provider·특허·라이선스 검토 필요"],
+    },
+  },
+];
+
+type StudioInterchangeAuditFields = Pick<
+  StudioInterchangeCapability,
+  | "conformance"
+  | "externalRequirements"
+  | "implementation"
+  | "metadata"
+  | "technicalLayers"
+  | "uiWiring"
+>;
+
+const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
+  Record<string, Partial<StudioInterchangeAuditFields>>
+> = {
+  "toonproject-archive": {
+    technicalLayers: {
+      format: ["ToonSpectrum project archive"],
+      container: ["deterministic ZIP32 STORE subset"],
+      codec: [],
+    },
+    metadata: {
+      general: "preserved",
+      icc: "preserved",
+      notes: ["포함 자산 원본 바이트와 프로젝트 metadata를 hash manifest와 함께 보존"],
+    },
+    conformance: {
+      publicSpec: "project-profile-tested",
+      thirdPartyCertification: "not-claimed",
+      notes: ["ToonSpectrum profile 자체 검증이며 일반 ZIP 또는 제3자 인증을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "none",
+      providers: [],
+      license: "project-implementation-only",
+      notes: ["제품의 bounded ZIP writer/reader만 사용"],
+    },
+  },
+  png: {
+    technicalLayers: {
+      format: ["PNG"],
+      container: ["PNG chunk stream"],
+      codec: ["DEFLATE-compressed image data (browser-provided)"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["Studio Canvas decode/encode 경로는 ancillary chunk와 ICC profile을 왕복하지 않음"],
+    },
+    conformance: {
+      publicSpec: "runtime-provider-dependent",
+      thirdPartyCertification: "not-claimed",
+      notes: ["PNG codec 적합성은 browser runtime 경계이며 ToonSpectrum 인증을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["browser PNG decoder/encoder"],
+      license: "runtime-provider-terms",
+      notes: ["제품 bundle에 별도 PNG codec을 포함하지 않음"],
+    },
+  },
+  jpeg: {
+    technicalLayers: {
+      format: ["JPEG image"],
+      container: ["JPEG marker stream"],
+      codec: ["JPEG image codec (browser-provided)"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["Canvas 경로에서 EXIF/XMP/ICC와 원본 quantization table을 왕복하지 않음"],
+    },
+    conformance: {
+      publicSpec: "runtime-provider-dependent",
+      thirdPartyCertification: "not-claimed",
+      notes: ["JPEG codec 적합성은 browser runtime 경계"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["browser JPEG decoder/encoder"],
+      license: "runtime-provider-terms",
+      notes: ["제품 bundle에 별도 JPEG codec을 포함하지 않음"],
+    },
+  },
+  webp: {
+    technicalLayers: {
+      format: ["WebP image"],
+      container: ["RIFF/WebP"],
+      codec: ["VP8/VP8L image codec (browser-provided)"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["Canvas 경로에서 EXIF/XMP/ICC chunk를 왕복하지 않음"],
+    },
+    conformance: {
+      publicSpec: "runtime-provider-dependent",
+      thirdPartyCertification: "not-claimed",
+      notes: ["WebP codec 적합성은 browser runtime 경계"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["browser WebP decoder/encoder"],
+      license: "runtime-provider-terms",
+      notes: ["제품 bundle에 별도 WebP codec을 포함하지 않음"],
+    },
+  },
+  bmp: {
+    technicalLayers: {
+      format: ["BMP / DIB subset"],
+      container: ["BITMAPFILEHEADER + DIB"],
+      codec: ["uncompressed 24/32-bit RGB"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["지원 header/bit-depth subset만 바이트 테스트"],
+    },
+  },
+  tga: {
+    technicalLayers: {
+      format: ["TGA true-color subset"],
+      container: ["TGA header + pixel stream"],
+      codec: ["uncompressed 24/32-bit true-color"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["uncompressed true-color subset만 바이트 테스트"],
+    },
+  },
+  netpbm: {
+    technicalLayers: {
+      format: ["Netpbm P6/P7 subset"],
+      container: ["PPM/PAM header + raster"],
+      codec: ["uncompressed 8-bit RGB/RGBA"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["P6/P7 safe subset만 바이트 테스트"],
+    },
+  },
+  qoi: {
+    technicalLayers: {
+      format: ["Quite OK Image"],
+      container: ["QOI byte stream"],
+      codec: ["QOI operation stream"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["bounded QOI 3/4-channel implementation을 바이트 테스트"],
+    },
+  },
+  tiff: {
+    technicalLayers: {
+      format: ["TIFF 6.0 baseline subset"],
+      container: ["TIFF IFD / strip layout"],
+      codec: ["uncompressed 8-bit RGB/RGBA"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["지원 pixel/geometry tag 외 arbitrary metadata와 ICC는 보존하지 않음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["baseline RGB/RGBA subset만 바이트 테스트"],
+    },
+  },
+  gif: {
+    technicalLayers: {
+      format: ["GIF image"],
+      container: ["GIF data stream"],
+      codec: ["GIF LZW (browser-provided decode)"],
+    },
+    implementation: {
+      import: "runtime-dependent",
+      export: "not-implemented",
+      notes: ["정적/재생 요소 decode는 browser runtime 제공; 이 행은 encoder를 제공하지 않음"],
+    },
+    metadata: {
+      general: "partial",
+      icc: "discarded",
+      notes: ["원본 재생 bytes는 자산으로 유지할 수 있으나 Studio 편집 metadata/ICC 왕복은 없음"],
+    },
+    conformance: {
+      publicSpec: "runtime-provider-dependent",
+      thirdPartyCertification: "not-claimed",
+      notes: ["decode conformance는 browser runtime 경계"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["browser GIF decoder"],
+      license: "runtime-provider-terms",
+      notes: ["제품 bundle에 별도 GIF decoder를 포함하지 않음"],
+    },
+  },
+  psd: {
+    technicalLayers: {
+      format: ["Adobe Photoshop Document subset"],
+      container: ["PSD/PSB image resource and layer records"],
+      codec: ["ag-psd supported compression modes"],
+    },
+    metadata: {
+      general: "partial",
+      icc: "not-audited",
+      notes: ["허용 layer/mask 필드만 매핑하고 arbitrary Photoshop resource metadata는 왕복하지 않음"],
+    },
+    conformance: {
+      publicSpec: "not-claimed",
+      thirdPartyCertification: "not-claimed",
+      notes: ["Adobe 공식 호환성 또는 인증을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "bundled-library",
+      providers: ["ag-psd"],
+      license: "bundled-dependency-terms",
+      notes: ["지원 범위와 배포 조건은 고정된 dependency version 및 해당 라이선스 경계"],
+    },
+  },
+  toonink: {
+    technicalLayers: {
+      format: ["ToonSpectrum InkEnvelope v1"],
+      container: ["canonical UTF-8 JSON envelope"],
+      codec: [],
+    },
+    conformance: {
+      publicSpec: "project-profile-tested",
+      thirdPartyCertification: "not-claimed",
+      notes: ["ToonSpectrum self-conformance/attestation이며 외부 SDK·상표 인증이 아님"],
+    },
+    externalRequirements: {
+      provider: "none",
+      providers: [],
+      license: "project-implementation-only",
+      notes: ["선택 서명 키의 소유·운영 책임은 호출 조직에 있음"],
+    },
+  },
+  inkml: {
+    technicalLayers: {
+      format: ["ToonSpectrum InkML safe profile"],
+      container: ["UTF-8 XML"],
+      codec: [],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["공개 InkML에서 정의한 제한 profile만 검증하며 full processor conformance는 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["DOMParser"],
+      license: "runtime-provider-terms",
+      notes: ["상용 ink SDK 또는 비공개 wire format을 사용하지 않음"],
+    },
+  },
+  pdf: {
+    technicalLayers: {
+      format: ["PDF 1.4 image publication subset"],
+      container: ["PDF object/xref structure"],
+      codec: ["JPEG page image"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["편집 구조·문서 metadata·output intent/ICC를 쓰지 않는 이미지 PDF"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["PDF/X·PDF/A 또는 인쇄소 인증을 주장하지 않음"],
+    },
+  },
+  webm: {
+    technicalLayers: {
+      format: ["WebM video"],
+      container: ["Matroska/WebM"],
+      codec: ["VP8", "VP9", "AV1 (runtime-dependent WebCodecs path)"],
+    },
+    implementation: {
+      import: "not-implemented",
+      export: "runtime-dependent",
+      notes: [
+        "visible export는 MediaRecorder WebM 경로",
+        "first-party EBML muxer + WebCodecs VP8/VP9/AV1 경로는 engine implementation이며 runtime capability gate를 사용",
+      ],
+    },
+    uiWiring: {
+      import: "not-applicable",
+      export: "wired",
+      notes: ["프레임 애니메이션/모션/타임랩스 WebM 내보내기 UI 연결"],
+    },
+    metadata: {
+      general: "discarded",
+      icc: "discarded",
+      notes: ["타임라인을 최종 영상으로 렌더하며 편집 metadata·ICC를 container에 기록하지 않음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["first-party WebM muxer 구조를 테스트하지만 WebM/codec 제3자 인증은 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "browser-runtime",
+      providers: ["MediaRecorder", "VideoEncoder"],
+      license: "runtime-provider-terms",
+      notes: ["container muxer는 제품 구현, 실제 video encoder는 browser runtime 제공"],
+    },
+  },
+  ora: {
+    technicalLayers: {
+      format: ["OpenRaster subset"],
+      container: ["ZIP32 STORE/DEFLATE"],
+      codec: ["PNG layers"],
+    },
+    metadata: {
+      general: "partial",
+      icc: "not-audited",
+      notes: ["허용 stack/layer metadata만 보존; 중첩 그룹 효과와 arbitrary metadata는 왕복하지 않음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["bounded OpenRaster subset이며 공식 인증을 주장하지 않음"],
+    },
+  },
+  cbz: {
+    technicalLayers: {
+      format: ["Comic Book ZIP subset"],
+      container: ["ZIP32 STORE/DEFLATE"],
+      codec: ["PNG", "JPEG", "WebP", "GIF page images"],
+    },
+    metadata: {
+      general: "partial",
+      icc: "not-audited",
+      notes: ["ComicInfo.xml 허용 필드만 요약하며 page image color metadata는 별도 보존 보장 없음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["bounded CBZ/ComicInfo safe subset이며 제3자 인증을 주장하지 않음"],
+    },
+  },
+};
+
+function implementationStatusFor(
+  direction: StudioInterchangeDirectionSupport
+): StudioInterchangeImplementationStatus {
+  if (direction === "available" || direction === "engine-ready") return "implemented";
+  if (direction === "partial") return "partial";
+  return "not-implemented";
+}
+
+function uiWiringFor(direction: StudioInterchangeDirectionSupport): StudioInterchangeUiWiring {
+  if (direction === "available") return "wired";
+  if (direction === "engine-ready") return "not-wired";
+  if (direction === "partial") return "partial";
+  return "not-applicable";
+}
+
+function auditedCapability(
+  definition: StudioInterchangeCapabilityDefinition
+): StudioInterchangeCapability {
+  const override = STUDIO_INTERCHANGE_AUDIT_OVERRIDES[definition.id];
+  const proprietaryExternalRequirements: StudioInterchangeExternalRequirements | undefined =
+    definition.proprietary
+      ? {
+          provider: "not-selected",
+          providers: [],
+          license: "external-review-required",
+          notes: ["직접 codec/provider를 선택하지 않았으며 권리자 공식 지원·인증을 주장하지 않음"],
+        }
+      : undefined;
+  const metadata: StudioInterchangeMetadataPolicy =
+    definition.metadata ??
+    override?.metadata ?? {
+      general: "not-audited",
+      icc: "not-audited",
+      notes: ["metadata/ICC 왕복 여부를 별도 검증하기 전에는 보존을 주장하지 않음"],
+    };
+  const conformance: StudioInterchangeConformance =
+    definition.conformance ??
+    override?.conformance ?? {
+      publicSpec: "not-claimed",
+      thirdPartyCertification: "not-claimed",
+      notes: ["공개 규격 전체 적합성 또는 제3자 인증을 주장하지 않음"],
+    };
+  const externalRequirements: StudioInterchangeExternalRequirements =
+    definition.externalRequirements ??
+    override?.externalRequirements ??
+    proprietaryExternalRequirements ?? {
+      provider: "not-audited",
+      providers: [],
+      license: "not-audited",
+      notes: ["provider/배포 라이선스 경계를 감사하기 전에는 자유로운 사용을 주장하지 않음"],
+    };
+
+  return Object.freeze({
+    ...definition,
+    technicalLayers:
+      definition.technicalLayers ??
+      override?.technicalLayers ?? {
+        format: [definition.label],
+        container: [],
+        codec: [],
+      },
+    implementation:
+      definition.implementation ??
+      override?.implementation ?? {
+        import: implementationStatusFor(definition.import),
+        export: implementationStatusFor(definition.export),
+        notes: [],
+      },
+    uiWiring:
+      definition.uiWiring ??
+      override?.uiWiring ?? {
+        import: uiWiringFor(definition.import),
+        export: uiWiringFor(definition.export),
+        notes: [],
+      },
+    metadata,
+    conformance,
+    externalRequirements,
+  });
+}
+
+export const STUDIO_INTERCHANGE_CAPABILITIES: readonly StudioInterchangeCapability[] =
+  Object.freeze(STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS.map(auditedCapability));
 
 export function studioInterchangeCapability(id: string): StudioInterchangeCapability | undefined {
   return STUDIO_INTERCHANGE_CAPABILITIES.find((capability) => capability.id === id);

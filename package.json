@@ -72,6 +72,7 @@
     "test:studio-hokusai-wasm": "node scripts/verify-studio-hokusai-wasm.mjs --test",
     "verify:studio-hokusai-wasm": "node scripts/verify-studio-hokusai-wasm.mjs --check",
     "verify:studio-hokusai-wasm:rebuild": "node scripts/verify-studio-hokusai-wasm.mjs --rebuild",
+    "verify:studio-hokusai-natural-media-quality": "node scripts/verify-studio-hokusai-natural-media-quality.mjs",
     "verify:studio-engine-webgpu-tile-provider": "node scripts/verify-studio-engine-webgpu-tile-provider.mjs",
     "verify:studio-professional-bristle-webgpu": "node scripts/verify-studio-professional-bristle-webgpu.mjs",
     "verify:studio-dynamic-dual-tip-webgpu": "node scripts/verify-studio-dynamic-dual-tip-webgpu.mjs",

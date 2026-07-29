@@ -260,7 +260,49 @@ impl HokusaiCanvas {
             .as_ref()
             .ok_or_else(|| js_error("active stroke has no brush snapshot"))?;
         self.surface.begin_atomic();
-        let painted = brush.finish_stroke(&mut self.state, &mut self.surface);
+        // Hokusai 0.3.0's stock `finish_stroke` pumps eight same-position
+        // idle events through `stroke_to`. A tracking-noise skip window is
+        // distance based, so those events can all be swallowed: the pointer
+        // does not move and the accumulated 128 ms never reaches the 5 s
+        // forced-resolution threshold. Disarm that coalescer before every
+        // idle step while preserving any time already accumulated by a
+        // skipped real sample. This keeps tracking noise during input and
+        // still lets slow tracking finish the visible pointer-up tail.
+        let pressure = self.state.last_pressure;
+        let mut painted = false;
+        for step in 0..8 {
+            let pending_dtime = if step == 0 {
+                self.state.skipped_dtime.max(0.0)
+            } else {
+                0.0
+            };
+            self.state.skip_distance = 0.0;
+            self.state.skip_last_x = 0.0;
+            self.state.skip_last_y = 0.0;
+            self.state.skipped_dtime = 0.0;
+            let target_x = self.state.last_event_x;
+            let target_y = self.state.last_event_y;
+            painted |= brush.stroke_to(
+                &mut self.state,
+                &mut self.surface,
+                target_x,
+                target_y,
+                pressure,
+                0.0,
+                0.0,
+                0.016 + pending_dtime,
+            );
+            let lag = ((target_x - self.state.actual_x).powi(2)
+                + (target_y - self.state.actual_y).powi(2))
+            .sqrt();
+            if lag < 0.5 {
+                break;
+            }
+        }
+        self.state.skip_distance = 0.0;
+        self.state.skip_last_x = 0.0;
+        self.state.skip_last_y = 0.0;
+        self.state.skipped_dtime = 0.0;
         let dirty_tiles = self.surface.end_atomic();
         self.merge_dirty_tiles(dirty_tiles);
         self.stroke_active = false;

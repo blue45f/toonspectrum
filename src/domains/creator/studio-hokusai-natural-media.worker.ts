@@ -39,8 +39,8 @@ interface StudioHokusaiCanvasHandle {
     timeMilliseconds: number,
   ): void;
   finishStroke(brush: StudioHokusaiBrushHandle): void;
-  fullFrame(): Uint8Array;
   dirtyBounds(): Int32Array;
+  dirtyFrame(): Uint8Array;
   reset(): void;
   dispose?(): void;
   free?(): void;
@@ -106,9 +106,16 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 async function sha256(bytes: Uint8Array): Promise<`sha256:${string}`> {
-  const copy = new Uint8Array(bytes.byteLength);
-  copy.set(bytes);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", copy);
+  const digestSource =
+    bytes.buffer instanceof ArrayBuffer
+    && bytes.byteOffset === 0
+    && bytes.byteLength === bytes.buffer.byteLength
+      ? bytes.buffer
+      : bytes.slice().buffer as ArrayBuffer;
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    digestSource,
+  );
   return `sha256:${bytesToHex(new Uint8Array(digest))}`;
 }
 
@@ -278,20 +285,24 @@ async function render(
       plan.raster.height,
     );
     if (!dirtyBounds) throw new Error("Hokusai returned no valid dirty tiles.");
-    const pixels = canvas.fullFrame();
+    const [, , dirtyWidth, dirtyHeight] = dirtyBounds;
+    const pixels = canvas.dirtyFrame();
     if (
       !(pixels instanceof Uint8Array)
-      || pixels.byteLength !== plan.raster.width * plan.raster.height * 4
+      || pixels.byteLength !== dirtyWidth * dirtyHeight * 4
     ) {
-      throw new Error("Hokusai returned an invalid transparent RGBA frame.");
+      throw new Error("Hokusai returned an invalid packed dirty RGBA frame.");
     }
     applyOpacity(pixels, plan.opacity);
-    applyStudioHokusaiNaturalMediaTextureV2(pixels, plan, dirtyBounds);
+    applyStudioHokusaiNaturalMediaTextureV2(pixels, plan, {
+      frameBounds: dirtyBounds,
+      dirtyBounds,
+    });
     if (!hasVisiblePixel(pixels)) throw new Error("Hokusai returned a blank frame.");
     const pngBytes = await encodePng(
       pixels,
-      plan.raster.width,
-      plan.raster.height,
+      dirtyWidth,
+      dirtyHeight,
     );
     return Object.freeze({ pixels, pngBytes, dirtyBounds });
   } finally {
@@ -349,6 +360,7 @@ async function main(): Promise<void> {
       dedicatedWorker: true,
       transparentRgba: true,
       dirtyTiles: true,
+      packedDirtyFrame: true,
       mainThreadFallback: false,
     },
   });
@@ -407,12 +419,15 @@ async function main(): Promise<void> {
             seed: message.plan.seed,
             rasterWidth: message.plan.raster.width,
             rasterHeight: message.plan.raster.height,
+            outputRasterWidth: output.dirtyBounds[2],
+            outputRasterHeight: output.dirtyBounds[3],
             dirtyBounds: output.dirtyBounds,
+            pixelLayout: "packed-dirty-rgba8",
             inputHash,
             pixelHash,
             pngHash,
             adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-            execution: "dedicated-worker-wasm-transparent-dirty-tiles",
+            execution: "dedicated-worker-wasm-packed-dirty-frame",
             complete: true,
           },
         };

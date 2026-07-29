@@ -860,7 +860,11 @@ const EXPANSION_TUNING: Readonly<
         { source: "speed", from: 1.04, to: 0.54 },
       ],
     },
-    taper: { startLength: 0.05, endLength: 0.32, minSizeRatio: 0.04, minOpacityRatio: 0.3, curve: 1.7 },
+    // A 7 px mouse flick replaces the initial tap with start-taper deposits. The previous
+    // 4% diameter / 30% opacity floor could quantize the multiplied sumi × bristle tip to
+    // 0–3 alpha for otherwise valid seeds, making a released short stroke appear to vanish.
+    // Keep the body, grain, flow, dual-tip and long tail unchanged; only lift that start floor.
+    taper: { startLength: 0.05, endLength: 0.32, minSizeRatio: 0.12, minOpacityRatio: 0.62, curve: 1.7 },
     grain: { space: "stroke-fixed", amount: 0.38, scale: 4.1, contrast: 0.64, seed: 0x4b0a_210c },
     dualBrush: {
       enabled: true,

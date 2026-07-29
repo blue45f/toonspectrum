@@ -6,9 +6,9 @@ import {
   type StudioHokusaiNaturalMediaRenderPlan,
 } from "./studio-hokusai-natural-media-contract";
 
-export const STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION = 1 as const;
+export const STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION =
-  "0.3.0-transparent-dirty-tile-adapter.1" as const;
+  "0.3.0-packed-dirty-frame-adapter.2" as const;
 
 export interface StudioHokusaiWorkerRenderMessage {
   readonly type: "studio-hokusai/render";
@@ -29,6 +29,7 @@ export interface StudioHokusaiWorkerReadyMessage {
     readonly dedicatedWorker: true;
     readonly transparentRgba: true;
     readonly dirtyTiles: true;
+    readonly packedDirtyFrame: true;
     readonly mainThreadFallback: false;
   }>;
 }
@@ -43,12 +44,15 @@ export interface StudioHokusaiWorkerReceipt {
   readonly seed: number;
   readonly rasterWidth: number;
   readonly rasterHeight: number;
+  readonly outputRasterWidth: number;
+  readonly outputRasterHeight: number;
   readonly dirtyBounds: readonly [number, number, number, number];
+  readonly pixelLayout: "packed-dirty-rgba8";
   readonly inputHash: `sha256:${string}`;
   readonly pixelHash: `sha256:${string}`;
   readonly pngHash: `sha256:${string}`;
   readonly adapterVersion: typeof STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION;
-  readonly execution: "dedicated-worker-wasm-transparent-dirty-tiles";
+  readonly execution: "dedicated-worker-wasm-packed-dirty-frame";
   readonly complete: true;
 }
 
@@ -310,6 +314,163 @@ export function snapshotStudioHokusaiWorkerRenderMessage(
     engineEpoch: candidate.engineEpoch,
     plan,
   });
+}
+
+export interface StudioHokusaiWorkerResultExpectation {
+  readonly requestId: number;
+  readonly engineEpoch: number;
+  readonly sourceElementId: string;
+  readonly presetId: StudioHokusaiNaturalMediaRenderPlan["presetId"];
+  readonly seed: number;
+  readonly rasterWidth: number;
+  readonly rasterHeight: number;
+}
+
+function sha256Digest(value: unknown): value is `sha256:${string}` {
+  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/u.test(value);
+}
+
+function arrayBufferBytes(value: unknown): Uint8Array | null {
+  if (
+    typeof value !== "object"
+    || value === null
+    || Object.prototype.toString.call(value) !== "[object ArrayBuffer]"
+  ) return null;
+  try {
+    return new Uint8Array(value as ArrayBuffer);
+  } catch {
+    return null;
+  }
+}
+
+function pngDimensions(
+  bytes: Uint8Array,
+): readonly [width: number, height: number] | null {
+  if (
+    bytes.byteLength < 33
+    || bytes[0] !== 0x89
+    || bytes[1] !== 0x50
+    || bytes[2] !== 0x4e
+    || bytes[3] !== 0x47
+    || bytes[4] !== 0x0d
+    || bytes[5] !== 0x0a
+    || bytes[6] !== 0x1a
+    || bytes[7] !== 0x0a
+    || bytes[8] !== 0
+    || bytes[9] !== 0
+    || bytes[10] !== 0
+    || bytes[11] !== 13
+    || bytes[12] !== 0x49
+    || bytes[13] !== 0x48
+    || bytes[14] !== 0x44
+    || bytes[15] !== 0x52
+  ) return null;
+  const width = (
+    ((bytes[16] ?? 0) << 24)
+    | ((bytes[17] ?? 0) << 16)
+    | ((bytes[18] ?? 0) << 8)
+    | (bytes[19] ?? 0)
+  ) >>> 0;
+  const height = (
+    ((bytes[20] ?? 0) << 24)
+    | ((bytes[21] ?? 0) << 16)
+    | ((bytes[22] ?? 0) << 8)
+    | (bytes[23] ?? 0)
+  ) >>> 0;
+  return width > 0 && height > 0 ? [width, height] : null;
+}
+
+export function snapshotStudioHokusaiWorkerResultMessage(
+  candidate: unknown,
+  expected: StudioHokusaiWorkerResultExpectation,
+): StudioHokusaiWorkerResultMessage | null {
+  if (
+    !isPlainRecord(candidate)
+    || !exactKeys(candidate, [
+      "type",
+      "version",
+      "requestId",
+      "engineEpoch",
+      "pngBytes",
+      "receipt",
+    ])
+    || candidate.type !== "studio-hokusai/result"
+    || candidate.version !== STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION
+    || candidate.requestId !== expected.requestId
+    || candidate.engineEpoch !== expected.engineEpoch
+    || !isPlainRecord(candidate.receipt)
+  ) return null;
+
+  const png = arrayBufferBytes(candidate.pngBytes);
+  const receipt = candidate.receipt;
+  if (
+    !png
+    || png.byteLength <= 0
+    || png.byteLength > STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS.maxPngBytes
+    || !exactKeys(receipt, [
+      "kind",
+      "version",
+      "requestId",
+      "engineEpoch",
+      "sourceElementId",
+      "presetId",
+      "seed",
+      "rasterWidth",
+      "rasterHeight",
+      "outputRasterWidth",
+      "outputRasterHeight",
+      "dirtyBounds",
+      "pixelLayout",
+      "inputHash",
+      "pixelHash",
+      "pngHash",
+      "adapterVersion",
+      "execution",
+      "complete",
+    ])
+    || receipt.kind !== "studio-hokusai/receipt"
+    || receipt.version !== STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION
+    || receipt.requestId !== expected.requestId
+    || receipt.engineEpoch !== expected.engineEpoch
+    || receipt.sourceElementId !== expected.sourceElementId
+    || receipt.presetId !== expected.presetId
+    || receipt.seed !== expected.seed
+    || receipt.rasterWidth !== expected.rasterWidth
+    || receipt.rasterHeight !== expected.rasterHeight
+    || !safeInteger(receipt.outputRasterWidth)
+    || !safeInteger(receipt.outputRasterHeight)
+    || !Array.isArray(receipt.dirtyBounds)
+    || receipt.dirtyBounds.length !== 4
+    || !receipt.dirtyBounds.every((value) => safeInteger(value, 0))
+    || receipt.pixelLayout !== "packed-dirty-rgba8"
+    || !sha256Digest(receipt.inputHash)
+    || !sha256Digest(receipt.pixelHash)
+    || !sha256Digest(receipt.pngHash)
+    || receipt.adapterVersion !== STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION
+    || receipt.execution !== "dedicated-worker-wasm-packed-dirty-frame"
+    || receipt.complete !== true
+  ) return null;
+
+  const [x, y, width, height] = receipt.dirtyBounds;
+  if (
+    x === undefined
+    || y === undefined
+    || width === undefined
+    || height === undefined
+    || width <= 0
+    || height <= 0
+    || x + width > expected.rasterWidth
+    || y + height > expected.rasterHeight
+    || receipt.outputRasterWidth !== width
+    || receipt.outputRasterHeight !== height
+  ) return null;
+  const encodedDimensions = pngDimensions(png);
+  if (
+    !encodedDimensions
+    || encodedDimensions[0] !== width
+    || encodedDimensions[1] !== height
+  ) return null;
+  return candidate as unknown as StudioHokusaiWorkerResultMessage;
 }
 
 export function studioHokusaiWorkerResultTransfers(

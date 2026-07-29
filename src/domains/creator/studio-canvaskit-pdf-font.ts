@@ -12,7 +12,8 @@
  *   maxp  — numGlyphs
  *   hmtx  — 글리프별 전진폭(마지막 longHorMetric 이후는 그 값을 반복 — 스펙 규정)
  *   cmap  — 유니코드 → 글리프 인덱스. format 4(BMP)와 format 12(SMP 이상) 지원.
- *   OS/2  — capHeight/typo 메트릭(선택)
+ *   OS/2  — capHeight/typo 메트릭 + fsType 임베딩 권한(선택). 테이블이 없거나 fsType 이
+ *           모순되면 메트릭은 읽되 PDF 임베딩은 fail-closed 로 막는다.
  * `glyf`/`loca`/`CFF ` 아웃라인 자체는 읽지 않는다 — 전체 임베드에서는 원본 바이트를 그대로
  * 스트림에 넣기 때문이다.
  *
@@ -60,9 +61,182 @@ export interface StudioSfntMetrics {
   capHeight: number | null;
   /** CFF(OTTO) 아웃라인이면 true — PDF 에서는 FontFile3 경로가 필요하다. */
   hasCffOutlines: boolean;
+  /** OS/2.fsType 에 선언된 임베딩 권한. PDF writer 는 이 정책을 반드시 검사한다. */
+  embeddingPolicy: StudioSfntEmbeddingPolicy;
 }
 
 export type StudioSfntReadResult = { ok: true; metrics: StudioSfntMetrics } | { ok: false; error: string };
+
+/**
+ * OS/2.fsType bits 0..3의 사용 권한.
+ *
+ * `unknown`은 OS/2 테이블/필드가 없어 권한을 입증할 수 없는 상태, `invalid`는 예약 비트나
+ * 상호 배타적인 권한 비트가 함께 켜진 손상·비표준 상태다. 둘 다 임베딩에서는 fail-closed다.
+ */
+export type StudioSfntEmbeddingPermission =
+  | "installable"
+  | "restricted"
+  | "preview-print"
+  | "editable"
+  | "unknown"
+  | "invalid";
+
+export interface StudioSfntEmbeddingPolicy {
+  /** OS/2.fsType 원시 uint16. OS/2 테이블/필드가 없으면 null. */
+  fsType: number | null;
+  permission: StudioSfntEmbeddingPermission;
+  /** bit 8(0x0100): 원본 전체만 임베드할 수 있고 서브셋은 금지. */
+  noSubsetting: boolean;
+  /** bit 9(0x0200): 내장 비트맵만 가능하고 glyf/CFF 아웃라인 임베드는 금지. */
+  bitmapOnly: boolean;
+  /** false면 `issue`가 원인을 설명하며 어떤 임베딩 요청도 허용하지 않는다. */
+  valid: boolean;
+  issue: string | null;
+}
+
+export type StudioPdfFontDocumentIntent = "preview-print" | "editable";
+export type StudioPdfFontEmbeddingMode = "full" | "subset";
+export type StudioPdfFontPayloadKind = "outline" | "bitmap";
+
+export interface StudioPdfFontEmbeddingRequest {
+  /**
+   * 내보낸 문서를 읽기·인쇄 전용으로 다룰지, 수신자가 텍스트까지 편집할 수 있게 할지.
+   * 명시하지 않으면 Preview & Print 권한을 임의로 가정하지 않고 거절한다.
+   */
+  documentIntent?: StudioPdfFontDocumentIntent;
+  embeddingMode: StudioPdfFontEmbeddingMode;
+  payloadKind: StudioPdfFontPayloadKind;
+}
+
+export type StudioPdfFontEmbeddingDenialCode =
+  | "missing-document-intent"
+  | "unknown-license"
+  | "invalid-fstype"
+  | "restricted-license"
+  | "preview-print-only"
+  | "no-subsetting"
+  | "bitmap-only";
+
+export type StudioPdfFontEmbeddingDecision =
+  | { allowed: true; policy: StudioSfntEmbeddingPolicy }
+  | {
+      allowed: false;
+      code: StudioPdfFontEmbeddingDenialCode;
+      message: string;
+      policy: StudioSfntEmbeddingPolicy;
+    };
+
+const FSTYPE_USAGE_MASK = 0x000f;
+const FSTYPE_NO_SUBSETTING = 0x0100;
+const FSTYPE_BITMAP_ONLY = 0x0200;
+const FSTYPE_RESERVED_MASK = 0xfcf1;
+
+/**
+ * OS/2.fsType uint16을 제품 정책으로 정규화한다.
+ *
+ * OpenType 규격상 유효한 usage 값은 0, 2, 4, 8뿐이고 예약 비트는 0이어야 한다. 오래된
+ * 비표준 폰트가 bit 0을 잘못 쓴 경우도 여기서는 추측해 완화하지 않는다. PDF에 원본 폰트
+ * 프로그램을 넣는 행위는 되돌릴 수 없으므로 불명확한 권한은 거절하는 편이 안전하다.
+ */
+export function parseSfntEmbeddingPolicy(fsType: number | null): StudioSfntEmbeddingPolicy {
+  if (fsType === null) {
+    return {
+      fsType: null,
+      permission: "unknown",
+      noSubsetting: false,
+      bitmapOnly: false,
+      valid: false,
+      issue: "OS/2 테이블에 fsType 임베딩 권한 정보가 없어요.",
+    };
+  }
+  if (!Number.isInteger(fsType) || fsType < 0 || fsType > 0xffff) {
+    return {
+      fsType: null,
+      permission: "invalid",
+      noSubsetting: false,
+      bitmapOnly: false,
+      valid: false,
+      issue: "OS/2.fsType 값이 uint16 범위를 벗어났어요.",
+    };
+  }
+
+  const usage = fsType & FSTYPE_USAGE_MASK;
+  const noSubsetting = (fsType & FSTYPE_NO_SUBSETTING) !== 0;
+  const bitmapOnly = (fsType & FSTYPE_BITMAP_ONLY) !== 0;
+  if ((fsType & FSTYPE_RESERVED_MASK) !== 0 || (usage !== 0 && usage !== 2 && usage !== 4 && usage !== 8)) {
+    return {
+      fsType,
+      permission: "invalid",
+      noSubsetting,
+      bitmapOnly,
+      valid: false,
+      issue: "OS/2.fsType에 예약 비트나 서로 양립할 수 없는 사용 권한이 설정되어 있어요.",
+    };
+  }
+
+  const permission: StudioSfntEmbeddingPermission =
+    usage === 0 ? "installable" : usage === 2 ? "restricted" : usage === 4 ? "preview-print" : "editable";
+  return { fsType, permission, noSubsetting, bitmapOnly, valid: true, issue: null };
+}
+
+/**
+ * 하나의 PDF 폰트 임베딩 요청이 OS/2.fsType을 만족하는지 순수하게 판정한다.
+ * 호출부는 `allowed:false`를 경고로만 소비하지 말고 출고를 중단해야 한다.
+ */
+export function evaluatePdfFontEmbedding(
+  policy: StudioSfntEmbeddingPolicy,
+  request: StudioPdfFontEmbeddingRequest,
+): StudioPdfFontEmbeddingDecision {
+  if (!request.documentIntent) {
+    return {
+      allowed: false,
+      code: "missing-document-intent",
+      message: "PDF가 읽기·인쇄 전용인지 편집 가능한 문서인지 명시해야 해요.",
+      policy,
+    };
+  }
+  if (!policy.valid) {
+    return {
+      allowed: false,
+      code: policy.permission === "unknown" ? "unknown-license" : "invalid-fstype",
+      message: policy.issue ?? "글꼴 임베딩 권한을 확인할 수 없어요.",
+      policy,
+    };
+  }
+  if (policy.permission === "restricted") {
+    return {
+      allowed: false,
+      code: "restricted-license",
+      message: "Restricted License 글꼴은 권리자의 명시적 허락 없이 PDF에 임베드할 수 없어요.",
+      policy,
+    };
+  }
+  if (policy.permission === "preview-print" && request.documentIntent === "editable") {
+    return {
+      allowed: false,
+      code: "preview-print-only",
+      message: "Preview & Print 글꼴은 읽기·인쇄 전용 PDF에만 임베드할 수 있어요.",
+      policy,
+    };
+  }
+  if (policy.noSubsetting && request.embeddingMode === "subset") {
+    return {
+      allowed: false,
+      code: "no-subsetting",
+      message: "이 글꼴은 OS/2.fsType에서 서브셋 임베딩을 금지했어요. 원본 전체를 임베드해야 해요.",
+      policy,
+    };
+  }
+  if (policy.bitmapOnly && request.payloadKind === "outline") {
+    return {
+      allowed: false,
+      code: "bitmap-only",
+      message: "이 글꼴은 내장 비트맵만 임베드할 수 있어 아웃라인 FontFile2/FontFile3로 내보낼 수 없어요.",
+      policy,
+    };
+  }
+  return { allowed: true, policy };
+}
 
 // ---------------------------------------------------------------------------
 // sfnt 읽기
@@ -166,11 +340,23 @@ function readChecked(bytes: Uint8Array): StudioSfntMetrics {
   const advanceWidths = readHmtx(bytes, tables.get("hmtx"), numberOfHMetrics, numGlyphs);
   const cmap = readCmap(bytes, tables.get("cmap"));
   const os2 = tables.get("OS/2");
+  const embeddingPolicy = parseSfntEmbeddingPolicy(os2 && os2.length >= 10 ? u16(bytes, os2.offset + 8) : null);
   // capHeight 는 OS/2 version 2 이상에서만 유효(offset 88). 그 미만이면 null.
   const capHeight =
     os2 && os2.length >= 90 && u16(bytes, os2.offset) >= 2 ? i16(bytes, os2.offset + 88) : null;
 
-  return { unitsPerEm, numGlyphs, advanceWidths, cmap, ascender, descender, bbox, capHeight, hasCffOutlines };
+  return {
+    unitsPerEm,
+    numGlyphs,
+    advanceWidths,
+    cmap,
+    ascender,
+    descender,
+    bbox,
+    capHeight,
+    hasCffOutlines,
+    embeddingPolicy,
+  };
 }
 
 function readHmtx(

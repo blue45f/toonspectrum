@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v4" as const;
+  "studio-drawing-library-strategy-v5" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
@@ -129,12 +129,12 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-settled-first-natural-media-provider",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly, reads transparent dirty 64×64 tiles inside a Dedicated Worker and returns a verified transparent PNG plus receipt for an explicit selected-stroke transform.",
+        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly; adapter 0.3.0-packed-dirty-frame-adapter.2 reads a crop-sized packed dirty RGBA8 frame inside a Dedicated Worker and returns a verified transparent PNG plus receipt for an explicit selected-stroke transform.",
       riskNotes: [
         "This is an active settled selected-stroke natural-media transform, not the normal live brush core or a default brush route.",
-        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own transparent tile adapter and fail-closed Worker protocol.",
+        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own packed dirty-frame binding and fail-closed Worker protocol v2.",
         "License inventory, checked-in integrity hashes, byte-reproducible release build and real-browser runtime QA gate the local provider.",
-        "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter and output hashes must be receipted.",
+        "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter, dirty bounds, output dimensions, pixel layout and output hashes must be receipted.",
       ],
     }),
     strategy({
@@ -286,7 +286,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
  * libraries, while GPL/proprietary references may be useful without being product dependencies.
  */
 export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
-  "studio-drawing-source-audit-v3" as const;
+  "studio-drawing-source-audit-v4" as const;
 
 export type StudioDrawingSourceKind =
   | "first-party"
@@ -508,7 +508,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "brush-renderer-overlap",
     rationale:
-      "The installed custom transparent-tile Rust/WASM adapter powers an explicit selected-stroke natural-media transform in a Dedicated Worker and returns only a verified transparent PNG plus receipt; it is not the full live brush core or a default shelf route.",
+      "The installed 0.3.0-packed-dirty-frame-adapter.2 Rust/WASM binding powers an explicit selected-stroke natural-media transform in a Dedicated Worker and returns only a crop-sized transparent PNG plus protocol-v2 receipt with dirty bounds, output dimensions and packed-dirty-rgba8 layout; it is not the full live brush core or a default shelf route.",
   }),
   sourceAudit({
     id: "p5-brush",

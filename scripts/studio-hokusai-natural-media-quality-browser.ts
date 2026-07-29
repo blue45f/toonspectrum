@@ -25,6 +25,9 @@ interface DecodedRender {
   readonly maxMainThreadDelayMilliseconds: number;
   readonly pixelHash: string;
   readonly plan: StudioHokusaiNaturalMediaRenderPlan;
+  readonly dirtyBounds: readonly [number, number, number, number];
+  readonly sourceRgbaBytes: number;
+  readonly packedRgbaBytes: number;
 }
 
 interface QualityMetrics {
@@ -383,6 +386,14 @@ async function renderBaseline(
         pixels.byteLength,
       )),
       plan: renderPlan,
+      dirtyBounds: [
+        0,
+        0,
+        renderPlan.raster.width,
+        renderPlan.raster.height,
+      ],
+      sourceRgbaBytes: pixels.byteLength,
+      packedRgbaBytes: pixels.byteLength,
     };
   } finally {
     canvas.free();
@@ -458,7 +469,20 @@ async function renderCurrentDirect(
     applyStudioHokusaiNaturalMediaTextureV2(
       textured,
       renderPlan,
-      [0, 0, renderPlan.raster.width, renderPlan.raster.height],
+      {
+        frameBounds: [
+          0,
+          0,
+          renderPlan.raster.width,
+          renderPlan.raster.height,
+        ],
+        dirtyBounds: [
+          0,
+          0,
+          renderPlan.raster.width,
+          renderPlan.raster.height,
+        ],
+      },
     );
     const sourcePixels = new Uint8ClampedArray(textured.buffer);
     const pngBytes = await encodePixels(
@@ -481,6 +505,14 @@ async function renderCurrentDirect(
         normalized.pixels.byteLength,
       )),
       plan: renderPlan,
+      dirtyBounds: [
+        0,
+        0,
+        renderPlan.raster.width,
+        renderPlan.raster.height,
+      ],
+      sourceRgbaBytes: normalized.pixels.byteLength,
+      packedRgbaBytes: normalized.pixels.byteLength,
     };
   } finally {
     canvas.free();
@@ -509,6 +541,44 @@ async function decode(
     height: bitmap.height,
     bitmap,
   };
+}
+
+function reconstructPackedDirtyFrame(
+  packed: Uint8ClampedArray,
+  packedWidth: number,
+  packedHeight: number,
+  renderPlan: StudioHokusaiNaturalMediaRenderPlan,
+  dirtyBounds: readonly [number, number, number, number],
+): Uint8ClampedArray {
+  const [dirtyX, dirtyY, dirtyWidth, dirtyHeight] = dirtyBounds;
+  if (
+    packedWidth !== dirtyWidth
+    || packedHeight !== dirtyHeight
+    || packed.byteLength !== dirtyWidth * dirtyHeight * 4
+    || dirtyX < 0
+    || dirtyY < 0
+    || dirtyWidth <= 0
+    || dirtyHeight <= 0
+    || dirtyX + dirtyWidth > renderPlan.raster.width
+    || dirtyY + dirtyHeight > renderPlan.raster.height
+  ) {
+    throw new Error("Hokusai packed dirty-frame geometry is invalid.");
+  }
+  const full = new Uint8ClampedArray(
+    renderPlan.raster.width * renderPlan.raster.height * 4,
+  );
+  for (let row = 0; row < dirtyHeight; row += 1) {
+    const sourceStart = row * dirtyWidth * 4;
+    const destinationStart = (
+      (dirtyY + row) * renderPlan.raster.width
+      + dirtyX
+    ) * 4;
+    full.set(
+      packed.subarray(sourceStart, sourceStart + dirtyWidth * 4),
+      destinationStart,
+    );
+  }
+  return full;
 }
 
 async function render(
@@ -570,19 +640,30 @@ async function render(
     const pngBytes = new Uint8Array(response.pngBytes);
     const decoded = await decode(pngBytes);
     decoded.bitmap.close();
+    const pixels = reconstructPackedDirtyFrame(
+      decoded.pixels,
+      decoded.width,
+      decoded.height,
+      renderPlan,
+      response.receipt.dirtyBounds,
+    );
     return {
-      pixels: decoded.pixels,
+      pixels,
       pngBytes,
-      width: decoded.width,
-      height: decoded.height,
+      width: renderPlan.raster.width,
+      height: renderPlan.raster.height,
       elapsedMilliseconds: performance.now() - startedAt,
       maxMainThreadDelayMilliseconds: maximumDelay,
       pixelHash: await sha256(new Uint8Array(
-        decoded.pixels.buffer,
-        decoded.pixels.byteOffset,
-        decoded.pixels.byteLength,
+        pixels.buffer,
+        pixels.byteOffset,
+        pixels.byteLength,
       )),
       plan: renderPlan,
+      dirtyBounds: response.receipt.dirtyBounds,
+      sourceRgbaBytes:
+        renderPlan.raster.width * renderPlan.raster.height * 4,
+      packedRgbaBytes: decoded.pixels.byteLength,
     };
   } finally {
     window.clearInterval(timer);
@@ -986,6 +1067,11 @@ async function main(): Promise<void> {
       elapsedMilliseconds: onePass.elapsedMilliseconds,
       maxMainThreadDelayMilliseconds: onePass.maxMainThreadDelayMilliseconds,
       pixelHash: onePass.pixelHash,
+      dirtyBounds: onePass.dirtyBounds,
+      sourceRgbaBytes: onePass.sourceRgbaBytes,
+      packedRgbaBytes: onePass.packedRgbaBytes,
+      packedRgbaRatio:
+        onePass.packedRgbaBytes / onePass.sourceRgbaBytes,
       deterministicPixel:
         onePass.pixelHash === deterministic.pixelHash
         && onePass.pixels.every((value, byteIndex) =>
@@ -1032,7 +1118,8 @@ async function main(): Promise<void> {
 
   window.__studioHokusaiNaturalMediaQualityResult = {
     status: "ok",
-    backend: "real-chromium-dedicated-worker-hokusai-wasm-texture-v2",
+    backend:
+      "real-chromium-dedicated-worker-hokusai-wasm-packed-dirty-frame-v2",
     firstLoadMilliseconds,
     maximumMainThreadDelayMilliseconds: maximumMainThreadDelay,
     before: beforeResults,

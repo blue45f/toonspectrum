@@ -368,6 +368,20 @@ describe("muxWebm 방어 규칙", () => {
     expect(() => muxWebm({ track: TRACK, frames: [frame(0, false)] })).toThrow(/키프레임/);
   });
 
+  it("검증된 capability/distribution 프로파일이 없는 코덱은 바이트를 쓰기 전에 거부한다", () => {
+    expect(() =>
+      muxWebm({
+        track: { ...TRACK, codecId: "V_H264" as typeof TRACK.codecId },
+        frames: [frame(0, true)],
+      })
+    ).toThrowError(
+      expect.objectContaining({
+        code: "UNSUPPORTED_WEBM_CODEC_PROFILE",
+        path: "/codecId",
+      })
+    );
+  });
+
   it("타임스탬프가 역행하면 거부한다(시간축이 조용히 깨지는 것보다 낫다)", () => {
     expect(() =>
       muxWebm({ track: TRACK, frames: [frame(1000, true), frame(500, false)] })
@@ -386,5 +400,12 @@ describe("muxWebm 방어 규칙", () => {
     const source = readFileSync(path.join(here, "studio-webcodecs-webm.ts"), "utf-8");
     const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(code).not.toMatch(/Date\.now|performance\.now|Math\.random|new Date\(/);
+  });
+
+  it("기술 지원을 로열티 또는 공식 인증으로 단정하지 않는다", () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(path.join(here, "studio-webcodecs-webm.ts"), "utf-8");
+    expect(source).not.toContain("WebCodecs가 로열티 없이 노출");
+    expect(source).toContain("공식 인증을 의미하지 않는다");
   });
 });

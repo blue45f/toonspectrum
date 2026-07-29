@@ -130,7 +130,7 @@ function validate(result, diagnostics) {
   if (
     result?.status !== "ok"
     || result?.backend
-      !== "real-chromium-dedicated-worker-hokusai-wasm-texture-v2"
+      !== "real-chromium-dedicated-worker-hokusai-wasm-packed-dirty-frame-v2"
   ) {
     failures.push("real Worker/WASM quality harness did not complete");
     return failures;
@@ -154,11 +154,33 @@ function validate(result, diagnostics) {
   }
 
   const afterHashes = new Set();
+  let observedPackedReduction = false;
   for (const presetId of ["pencil", "charcoal", "oil", "calligraphy", "marker"]) {
     const entry = result.after?.[presetId];
     if (entry?.pixelHash) afterHashes.add(entry.pixelHash);
+    const dirtyBounds = entry?.dirtyBounds;
+    const packedGeometryValid =
+      Array.isArray(dirtyBounds)
+      && dirtyBounds.length === 4
+      && dirtyBounds.every(Number.isSafeInteger)
+      && dirtyBounds[0] >= 0
+      && dirtyBounds[1] >= 0
+      && dirtyBounds[2] > 0
+      && dirtyBounds[3] > 0
+      && Number.isSafeInteger(entry?.sourceRgbaBytes)
+      && Number.isSafeInteger(entry?.packedRgbaBytes)
+      && entry.sourceRgbaBytes > 0
+      && entry.packedRgbaBytes === dirtyBounds[2] * dirtyBounds[3] * 4
+      && entry.packedRgbaBytes <= entry.sourceRgbaBytes
+      && Number.isFinite(entry?.packedRgbaRatio)
+      && entry.packedRgbaRatio > 0
+      && entry.packedRgbaRatio <= 1;
+    if (packedGeometryValid && entry.packedRgbaRatio < 0.99) {
+      observedPackedReduction = true;
+    }
     if (
       !entry
+      || !packedGeometryValid
       || entry.deterministicPixel !== true
       || entry.deterministicPng !== true
       || entry.centerlineGaps !== 0
@@ -172,6 +194,9 @@ function validate(result, diagnostics) {
     }
   }
   if (afterHashes.size !== 5) failures.push("the five presets are not distinct");
+  if (!observedPackedReduction) {
+    failures.push("the Worker did not demonstrate a smaller packed dirty frame");
+  }
 
   for (const presetId of ["pencil", "charcoal", "oil"]) {
     const before = result.before?.[presetId];
