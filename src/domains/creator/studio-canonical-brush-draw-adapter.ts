@@ -1,9 +1,9 @@
 /**
- * Pure DrawEl -> canonical brush v1 boundary.
+ * Pure DrawEl -> versioned canonical brush boundary.
  *
- * This adapter deliberately does less than the retained renderers. It emits a canonical plan only
- * when every persisted visual input has an exact v1 representation. Unsupported paint models,
- * dynamics or layer effects are rejected instead of being approximated by round Canvas dabs.
+ * Legacy direct-dab strokes retain recipe v1. Stroke-local layered/bounded flow uses recipe v2 and
+ * carries the exact normalized dynamics program. Any consumer without explicit v2 compositor and
+ * retained-dynamics capabilities must reject it instead of approximating round Canvas dabs.
  */
 
 import { resolveStudioBrushRenderFamily } from "./studio-brush";
@@ -24,6 +24,8 @@ import {
   parseStudioCanonicalBrushPlan,
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
   STUDIO_CANONICAL_BRUSH_PLAN_VERSION,
+  STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION,
+  STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION,
 } from "./studio-canonical-brush-plan";
 import { parseStudioColorToLinear } from "./studio-color-quality-engine";
 import {
@@ -32,6 +34,11 @@ import {
   studioInkUsesResidualDabSpacing,
 } from "./studio-ink-pressure-model";
 import { sha256HexPortable } from "./studio-sha256";
+import {
+  isStudioStrokePaintModelCompatible,
+  STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+} from "./studio-stroke-paint-model";
 import {
   STUDIO_WET_INK_BRUSH_FIXED_RATE_HZ,
   STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
@@ -50,7 +57,9 @@ import type {
   StudioCanonicalBrushComposite,
   StudioCanonicalBrushGrain,
   StudioCanonicalBrushPlan,
+  StudioCanonicalBrushPaintContractV2,
   StudioCanonicalBrushRecipe,
+  StudioCanonicalBrushRecipeV1,
   StudioCanonicalBrushResponseCurve,
   StudioCanonicalBrushSourceSampleCandidate,
   StudioCanonicalBrushTip,
@@ -60,7 +69,7 @@ import type { StudioLinearColorSpace } from "./studio-color-quality-engine";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioEngineWebGpuTexturedBrushAssetPayload } from "./studio-engine-webgpu-textured-brush-plan";
 
-export const STUDIO_CANONICAL_BRUSH_DRAW_ADAPTER_VERSION = 1 as const;
+export const STUDIO_CANONICAL_BRUSH_DRAW_ADAPTER_VERSION = 2 as const;
 
 const MAX_RUNTIME_SPEED = 64;
 const MAX_SOURCE_IDENTIFIER_CHARACTERS = 4_096;
@@ -311,11 +320,14 @@ function linearColor(
 }
 
 function layerEffectsAreRepresentable(element: DrawEl): BuildResult<true> {
-  if (element.paintModel !== undefined) {
+  if (
+    element.paintModel !== undefined
+    && !isStudioStrokePaintModelCompatible(element)
+  ) {
     return reject(
       "unsupported-paint-model",
       "element.paintModel",
-      "Canonical brush v1 has no stroke-local layered-flow/bounded-flow compositor contract.",
+      "The persisted stroke-local paint model is incompatible with this brush snapshot.",
     );
   }
   if (
@@ -718,6 +730,81 @@ function taperIsIdentity(settings: NormalizedStudioBrushDynamicsSettings): boole
     || (taper.minSizeRatio === 1 && taper.minOpacityRatio === 1);
 }
 
+type StudioCanonicalBrushRecipeV1Base =
+  Omit<StudioCanonicalBrushRecipeV1, "version">;
+
+function paintContract(
+  model:
+    | typeof STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
+    | typeof STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+): StudioCanonicalBrushPaintContractV2 {
+  return {
+    model,
+    depositionAlpha: "flow-times-dab-opacity",
+    accumulation: "source-over-stroke-local-rgba",
+    finalCompositeOpacity: "plan-composite-opacity-once",
+    surface: model === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
+      ? "bounded-sparse-rgba-tiles"
+      : "stroke-local-rgba",
+  };
+}
+
+function versionedRecipe(
+  element: DrawEl,
+  base: StudioCanonicalBrushRecipeV1Base,
+  retainedDynamics: NormalizedStudioBrushDynamicsSettings | null,
+): BuildResult<StudioCanonicalBrushRecipe> {
+  if (element.paintModel === undefined) {
+    if (retainedDynamics !== null) {
+      return reject(
+        "unsupported-paint-model",
+        "element.paintModel",
+        "Retained dynamics require an explicit bounded-flow-v2 paint contract.",
+      );
+    }
+    return {
+      ok: true,
+      value: {
+        version: STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION,
+        ...base,
+      },
+    };
+  }
+  if (
+    element.paintModel === STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
+    && retainedDynamics === null
+  ) {
+    return {
+      ok: true,
+      value: {
+        version: STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION,
+        ...base,
+        paint: paintContract(element.paintModel),
+        retainedDynamics: null,
+      },
+    };
+  }
+  if (
+    element.paintModel === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
+    && retainedDynamics !== null
+  ) {
+    return {
+      ok: true,
+      value: {
+        version: STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION,
+        ...base,
+        paint: paintContract(element.paintModel),
+        retainedDynamics,
+      },
+    };
+  }
+  return reject(
+    "unsupported-paint-model",
+    "element.paintModel",
+    "Layered flow accepts ordinary ink only; bounded flow requires retained dynamic settings.",
+  );
+}
+
 function dynamicRecipe(
   request: StudioCanonicalBrushDrawAdapterRequest,
 ): BuildResult<RecipeBuild> {
@@ -750,6 +837,94 @@ function dynamicRecipe(
     seed,
     width: { ...initial.width, base: runtimeWidth },
   });
+  const material = presetId === "airbrush"
+    ? "air"
+    : presetId === "dry-media"
+      ? "graphite"
+      : "ink";
+  if (element.paintModel === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2) {
+    const tip = tipAndAsset(settings);
+    if (!tip.ok) return tip;
+    const color = linearColor(element.stroke, request.colorSpace);
+    if (!color.ok) return color;
+    const composite = canonicalBlendMode(element);
+    if (!composite.ok) return composite;
+    const spacingRatioValue = settings.spacingRatio
+      ?? settings.spacing.base / settings.width.base;
+    const scatterRatioValue = settings.scatterRatio
+      ?? settings.scatter.base / settings.width.base;
+    if (
+      !inRange(
+        spacingRatioValue,
+        0.001,
+        STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxSpacingRatio,
+      )
+      || !inRange(
+        scatterRatioValue,
+        0,
+        STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxScatterRatio,
+      )
+    ) {
+      return reject(
+        "unsupported-dynamics",
+        "element.brushDynamics",
+        "Retained dynamics summary ratios exceed canonical recipe budgets.",
+      );
+    }
+    const grain: StudioCanonicalBrushGrain | null = settings.grain.amount > 0
+      ? {
+          kind: "procedural-noise",
+          assetId: null,
+          contentHash: null,
+          space: settings.grain.space === "canvas-fixed" ? "document" : "stroke",
+          scale: settings.grain.scale,
+          depth: settings.grain.amount,
+          contrast: settings.grain.contrast,
+          seed: settings.grain.seed,
+        }
+      : null;
+    const recipe = versionedRecipe(element, {
+      brushId: canonicalIdentifier("brush", element.brush ?? presetId),
+      engine: "dab-v1",
+      material,
+      tip: tip.value.tip,
+      size: settings.width.base,
+      flow: 1,
+      hardness: 1,
+      spacingRatio: spacingRatioValue,
+      scatter: {
+        radiusRatio: scatterRatioValue,
+        distribution: "uniform-disk",
+      },
+      angleRadians: settings.angle.base * Math.PI / 180,
+      roundness: settings.roundness.base,
+      pressure: {
+        size: IDENTITY_CURVE,
+        opacity: IDENTITY_CURVE,
+        flow: IDENTITY_CURVE,
+      },
+      grain,
+      wetMedia: null,
+    }, settings);
+    if (!recipe.ok) return recipe;
+    const requirements: StudioCanonicalBrushDrawAdapterRequirement[] = [
+      ...tip.value.requirements,
+    ];
+    if (grain) requirements.push("grain");
+    requirements.push("retained-dynamics", "stroke-local-compositor");
+    return {
+      ok: true,
+      value: {
+        seed,
+        color: color.value,
+        composite: composite.value,
+        requirements,
+        assets: tip.value.assets,
+        fallbackPressure: settings.fallbackPressure,
+        recipe: recipe.value,
+      },
+    };
+  }
   if (!colorDynamicsAreIdentity(settings)) {
     return reject(
       "unsupported-dynamics",
@@ -800,11 +975,30 @@ function dynamicRecipe(
     };
     requirements.push("grain");
   }
-  const material = presetId === "airbrush"
-    ? "air"
-    : presetId === "dry-media"
-      ? "graphite"
-      : "ink";
+  const recipe = versionedRecipe(element, {
+    brushId: canonicalIdentifier("brush", element.brush ?? presetId),
+    engine: "dab-v1",
+    material,
+    tip: tip.value.tip,
+    size: settings.width.base,
+    flow: 1,
+    hardness: 1,
+    spacingRatio: spacing.value,
+    scatter: {
+      radiusRatio: scatter.value,
+      distribution: "uniform-disk",
+    },
+    angleRadians: angle.value * Math.PI / 180,
+    roundness: roundness.value,
+    pressure: {
+      size: size.value,
+      opacity: opacity.value,
+      flow: flow.value,
+    },
+    grain,
+    wetMedia: null,
+  }, null);
+  if (!recipe.ok) return recipe;
   return {
     ok: true,
     value: {
@@ -814,30 +1008,7 @@ function dynamicRecipe(
       requirements,
       assets: tip.value.assets,
       fallbackPressure: settings.fallbackPressure,
-      recipe: {
-        version: 1,
-        brushId: canonicalIdentifier("brush", element.brush ?? presetId),
-        engine: "dab-v1",
-        material,
-        tip: tip.value.tip,
-        size: settings.width.base,
-        flow: 1,
-        hardness: 1,
-        spacingRatio: spacing.value,
-        scatter: {
-          radiusRatio: scatter.value,
-          distribution: "uniform-disk",
-        },
-        angleRadians: angle.value * Math.PI / 180,
-        roundness: roundness.value,
-        pressure: {
-          size: size.value,
-          opacity: opacity.value,
-          flow: flow.value,
-        },
-        grain,
-        wetMedia: null,
-      },
+      recipe: recipe.value,
     },
   };
 }
@@ -1097,38 +1268,45 @@ function simpleRecipe(
     : renderFamily === "marker"
       ? "marker"
       : "ink";
+  const recipe = versionedRecipe(element, {
+    brushId: element.mode === "eraser"
+      ? "eraser"
+      : canonicalIdentifier("brush", brush),
+    engine: "dab-v1",
+    material,
+    tip: { kind: "analytic", shape: "round", edgeSoftness: 0 },
+    size,
+    flow: 1,
+    hardness: 1,
+    spacingRatio: spacingRatioValue,
+    scatter: { radiusRatio: 0, distribution: "uniform-disk" },
+    angleRadians: 0,
+    roundness: 1,
+    pressure: {
+      size: pressure.value,
+      opacity: IDENTITY_CURVE,
+      flow: IDENTITY_CURVE,
+    },
+    grain: null,
+    wetMedia: null,
+  }, null);
+  if (!recipe.ok) return recipe;
+  const requirements: StudioCanonicalBrushDrawAdapterRequirement[] = residualSpacing
+    ? ["causal-residual-spacing"]
+    : [];
+  if (element.paintModel === STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1) {
+    requirements.push("stroke-local-compositor");
+  }
   return {
     ok: true,
     value: {
       seed: studioBrushDynamicsSeedFromKey(`${element.id}:${brush}:canonical-draw-v1`),
       color: color.value,
       composite: composite.value,
-      requirements: residualSpacing ? ["causal-residual-spacing"] : [],
+      requirements,
       assets: [],
       fallbackPressure: studioInkFallbackPressure(element.pressureModel),
-      recipe: {
-        version: 1,
-        brushId: element.mode === "eraser"
-          ? "eraser"
-          : canonicalIdentifier("brush", brush),
-        engine: "dab-v1",
-        material,
-        tip: { kind: "analytic", shape: "round", edgeSoftness: 0 },
-        size,
-        flow: 1,
-        hardness: 1,
-        spacingRatio: spacingRatioValue,
-        scatter: { radiusRatio: 0, distribution: "uniform-disk" },
-        angleRadians: 0,
-        roundness: 1,
-        pressure: {
-          size: pressure.value,
-          opacity: IDENTITY_CURVE,
-          flow: IDENTITY_CURVE,
-        },
-        grain: null,
-        wetMedia: null,
-      },
+      recipe: recipe.value,
     },
   };
 }
@@ -1218,7 +1396,7 @@ export function adaptStudioDrawElementToCanonicalBrushPlan(
       status: "rejected",
       reason: "canonical-validation",
       path: parsed.path,
-      detail: `Canonical v1 parser rejected the detached adapter candidate (${parsed.reason}).`,
+      detail: `The canonical parser rejected the detached versioned adapter candidate (${parsed.reason}).`,
     };
   }
   return Object.freeze({

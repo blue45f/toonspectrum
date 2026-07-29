@@ -53,6 +53,18 @@ const CHANNEL_NAMES = [
 
 type StudioInkMlChannelName = (typeof CHANNEL_NAMES)[number];
 
+/**
+ * Canonical InkML channel ordering uses JavaScript/JSON UTF-16 code-unit order, never the host
+ * locale. Keeping the comparator public lets the byte transport validator and XML decoder share
+ * exactly one deterministic rule.
+ */
+export function compareStudioInkMlChannelNames(
+  left: string,
+  right: string,
+): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export interface StudioInkMlTraceInput {
   readonly id: string;
   readonly points: readonly number[];
@@ -1504,7 +1516,9 @@ export function decodeStudioInkMl(
       ? STUDIO_INKML_PROFILE
       : "inkml-basic",
     traces: Object.freeze(traces),
-    ignoredChannels: Object.freeze([...ignoredChannels].sort()),
+    ignoredChannels: Object.freeze(
+      [...ignoredChannels].sort(compareStudioInkMlChannelNames),
+    ),
   });
 }
 

@@ -7,7 +7,15 @@
  * are transport-only and are rejected at this boundary.
  */
 
+import {
+  normalizeStudioBrushDynamicsSettings,
+  type NormalizedStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
+import { canonicalStudioCommandJson } from "./studio-command-journal";
+
 export const STUDIO_CANONICAL_BRUSH_PLAN_VERSION = 1 as const;
+export const STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION = 1 as const;
+export const STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION = 2 as const;
 
 export const STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS = Object.freeze({
   maxSamples: 65_536,
@@ -20,6 +28,7 @@ export const STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS = Object.freeze({
   maxTextureDimension: 16_384,
   maxWetSimulationSteps: 4_096,
   maxWetFieldScale: 16,
+  maxRetainedDynamicsBytes: 512 * 1024,
 } as const);
 
 export type StudioCanonicalSampleRole = "authoritative" | "predicted";
@@ -160,12 +169,7 @@ export interface StudioCanonicalWetMedia {
   readonly wetnessLoad: number;
 }
 
-/**
- * Exact normalized settings for one stroke. Nullable extension blocks are explicit so adding a
- * texture or wet-media backend later does not change the meaning of an older dab recipe.
- */
-export interface StudioCanonicalBrushRecipe {
-  readonly version: 1;
+interface StudioCanonicalBrushRecipeBase {
   readonly brushId: string;
   readonly engine: "dab-v1" | "wet-media-v1";
   readonly material: "ink" | "graphite" | "marker" | "air" | "pigment" | "eraser";
@@ -182,6 +186,38 @@ export interface StudioCanonicalBrushRecipe {
   readonly grain: StudioCanonicalBrushGrain | null;
   readonly wetMedia: StudioCanonicalWetMedia | null;
 }
+
+/**
+ * Historical canonical recipe. Composite opacity is multiplied into every lowered dab before it
+ * reaches the destination. The exact field set remains frozen for old files and provider proofs.
+ */
+export interface StudioCanonicalBrushRecipeV1 extends StudioCanonicalBrushRecipeBase {
+  readonly version: typeof STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION;
+}
+
+export interface StudioCanonicalBrushPaintContractV2 {
+  readonly model: "layered-flow-v1" | "bounded-flow-v2";
+  readonly depositionAlpha: "flow-times-dab-opacity";
+  readonly accumulation: "source-over-stroke-local-rgba";
+  readonly finalCompositeOpacity: "plan-composite-opacity-once";
+  readonly surface: "stroke-local-rgba" | "bounded-sparse-rgba-tiles";
+}
+
+/**
+ * Paint-aware recipe. `retainedDynamics` is the complete normalized per-stroke program, including
+ * causal deposit version, taper, pressure/speed/tilt/twist mappings, seeded jitter, grain and tip
+ * settings. Summary fields in the base recipe aid classification only; a v2 consumer must execute
+ * both the paint contract and the retained program or fail closed.
+ */
+export interface StudioCanonicalBrushRecipeV2 extends StudioCanonicalBrushRecipeBase {
+  readonly version: typeof STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION;
+  readonly paint: StudioCanonicalBrushPaintContractV2;
+  readonly retainedDynamics: NormalizedStudioBrushDynamicsSettings | null;
+}
+
+export type StudioCanonicalBrushRecipe =
+  | StudioCanonicalBrushRecipeV1
+  | StudioCanonicalBrushRecipeV2;
 
 export interface StudioCanonicalBrushPlan {
   readonly kind: "studio-canonical-brush-plan";
@@ -597,10 +633,94 @@ function validateWetMedia(
   };
 }
 
+function validatePaintContractV2(
+  input: unknown,
+  path: string,
+): ValidationResult<StudioCanonicalBrushPaintContractV2> {
+  const record = inspectRecord(
+    input,
+    [
+      "model",
+      "depositionAlpha",
+      "accumulation",
+      "finalCompositeOpacity",
+      "surface",
+    ],
+    path,
+  );
+  if (!record.ok) return record;
+  const model = record.value.model;
+  if (
+    (model !== "layered-flow-v1" && model !== "bounded-flow-v2")
+    || record.value.depositionAlpha !== "flow-times-dab-opacity"
+    || record.value.accumulation !== "source-over-stroke-local-rgba"
+    || record.value.finalCompositeOpacity !== "plan-composite-opacity-once"
+    || (
+      model === "layered-flow-v1"
+      && record.value.surface !== "stroke-local-rgba"
+    )
+    || (
+      model === "bounded-flow-v2"
+      && record.value.surface !== "bounded-sparse-rgba-tiles"
+    )
+  ) return fail("invalid-field", path);
+  return {
+    ok: true,
+    value: {
+      model,
+      depositionAlpha: "flow-times-dab-opacity",
+      accumulation: "source-over-stroke-local-rgba",
+      finalCompositeOpacity: "plan-composite-opacity-once",
+      surface: model === "bounded-flow-v2"
+        ? "bounded-sparse-rgba-tiles"
+        : "stroke-local-rgba",
+    },
+  };
+}
+
+function validateRetainedDynamics(
+  input: unknown,
+  path: string,
+): ValidationResult<NormalizedStudioBrushDynamicsSettings | null> {
+  if (input === null) return { ok: true, value: null };
+  try {
+    const canonical = canonicalStudioCommandJson(
+      input,
+      STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxRetainedDynamicsBytes,
+    );
+    const detached = JSON.parse(canonical) as unknown;
+    const normalized = normalizeStudioBrushDynamicsSettings(detached);
+    const normalizedCanonical = canonicalStudioCommandJson(
+      normalized,
+      STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxRetainedDynamicsBytes,
+    );
+    if (normalizedCanonical !== canonical) return fail("invalid-field", path);
+    return { ok: true, value: normalized };
+  } catch (error) {
+    return fail(
+      (
+        typeof error === "object"
+        && error !== null
+        && Object.getOwnPropertyDescriptor(error, "code")?.value === "PAYLOAD_TOO_LARGE"
+      )
+        ? "budget-exceeded"
+        : "not-plain-data",
+      path,
+    );
+  }
+}
+
 function validateRecipe(
   input: unknown,
   path: string,
 ): ValidationResult<StudioCanonicalBrushRecipe> {
+  const version = inspectRecordByDiscriminator(input, "version", path);
+  if (!version.ok) return version;
+  if (
+    version.value !== STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION
+    && version.value !== STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION
+  ) return fail("unsupported-version", `${path}.version`);
+  const versionTwo = version.value === STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION;
   const record = inspectRecord(
     input,
     [
@@ -619,11 +739,11 @@ function validateRecipe(
       "pressure",
       "grain",
       "wetMedia",
+      ...(versionTwo ? ["paint", "retainedDynamics"] : []),
     ],
     path,
   );
   if (!record.ok) return record;
-  if (record.value.version !== 1) return fail("unsupported-version", `${path}.version`);
   if (
     !identifier(record.value.brushId)
     || (record.value.engine !== "dab-v1" && record.value.engine !== "wet-media-v1")
@@ -676,27 +796,58 @@ function validateRecipe(
     (record.value.engine === "wet-media-v1") !== (wetMedia.value !== null)
     || (wetMedia.value !== null && record.value.material !== "pigment")
   ) return fail("invalid-field", `${path}.wetMedia`);
+  const base: Omit<StudioCanonicalBrushRecipeV1, "version"> = {
+    brushId: record.value.brushId,
+    engine: record.value.engine as StudioCanonicalBrushRecipeV1["engine"],
+    material: record.value.material as StudioCanonicalBrushRecipeV1["material"],
+    tip: tip.value,
+    size: canonicalNumber(record.value.size),
+    flow: canonicalNumber(record.value.flow),
+    hardness: canonicalNumber(record.value.hardness),
+    spacingRatio: canonicalNumber(record.value.spacingRatio),
+    scatter: {
+      radiusRatio: canonicalNumber(scatterRecord.value.radiusRatio),
+      distribution: "uniform-disk" as const,
+    },
+    angleRadians: canonicalNumber(record.value.angleRadians),
+    roundness: canonicalNumber(record.value.roundness),
+    pressure: pressure.value,
+    grain: grain.value,
+    wetMedia: wetMedia.value,
+  };
+  if (!versionTwo) {
+    return {
+      ok: true,
+      value: {
+        version: STUDIO_CANONICAL_BRUSH_RECIPE_LEGACY_VERSION,
+        ...base,
+      },
+    };
+  }
+  const paint = validatePaintContractV2(record.value.paint, `${path}.paint`);
+  if (!paint.ok) return paint;
+  const retainedDynamics = validateRetainedDynamics(
+    record.value.retainedDynamics,
+    `${path}.retainedDynamics`,
+  );
+  if (!retainedDynamics.ok) return retainedDynamics;
+  if (
+    (paint.value.model === "bounded-flow-v2") !== (retainedDynamics.value !== null)
+    || (
+      paint.value.model === "layered-flow-v1"
+      && retainedDynamics.value !== null
+    )
+    || record.value.engine !== "dab-v1"
+    || record.value.material === "pigment"
+    || record.value.material === "eraser"
+  ) return fail("invalid-field", path);
   return {
     ok: true,
     value: {
-      version: 1,
-      brushId: record.value.brushId,
-      engine: record.value.engine,
-      material: record.value.material,
-      tip: tip.value,
-      size: canonicalNumber(record.value.size),
-      flow: canonicalNumber(record.value.flow),
-      hardness: canonicalNumber(record.value.hardness),
-      spacingRatio: canonicalNumber(record.value.spacingRatio),
-      scatter: {
-        radiusRatio: canonicalNumber(scatterRecord.value.radiusRatio),
-        distribution: "uniform-disk",
-      },
-      angleRadians: canonicalNumber(record.value.angleRadians),
-      roundness: canonicalNumber(record.value.roundness),
-      pressure: pressure.value,
-      grain: grain.value,
-      wetMedia: wetMedia.value,
+      version: STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION,
+      ...base,
+      paint: paint.value,
+      retainedDynamics: retainedDynamics.value,
     },
   };
 }

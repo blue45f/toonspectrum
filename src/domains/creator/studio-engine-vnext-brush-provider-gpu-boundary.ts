@@ -48,6 +48,8 @@ const SPECIALIST_REQUIREMENT_ORDER = [
   "texture-tip",
   "grain",
   "wet-media",
+  "retained-dynamics",
+  "stroke-local-compositor",
 ] as const satisfies readonly StudioCanonicalBrushSpecialistLoweringRequirement[];
 const PROVIDER_GPU_REQUEST_KEYS = [
   "kind",
@@ -421,6 +423,10 @@ function requirementsForPlan(
   if (plan.recipe.engine === "wet-media-v1" || plan.recipe.wetMedia !== null) {
     requirements.push("wet-media");
   }
+  if (plan.recipe.version === 2) {
+    if (plan.recipe.retainedDynamics !== null) requirements.push("retained-dynamics");
+    requirements.push("stroke-local-compositor");
+  }
   return Object.freeze(requirements);
 }
 
@@ -465,6 +471,14 @@ function requiredCapabilities(
     `color:${plan.color.space}`,
     `porter-duff:${plan.composite.porterDuff}`,
     `blend:${plan.composite.blendMode}`,
+    ...(plan.recipe.version === 2
+      ? [
+          "paint:stroke-local" as const,
+          ...(plan.recipe.retainedDynamics === null
+            ? []
+            : ["dynamics:retained" as const]),
+        ]
+      : []),
     "intent:professional",
   ]);
 }

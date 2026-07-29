@@ -341,22 +341,77 @@ describe("Studio DrawEl canonical brush adapter", () => {
     });
   });
 
-  it("fails closed for paint models, non-pressure dynamics, dual tips and incomplete channels", () => {
+  it("captures layered and bounded flow as recipe v2 without flattening dynamic mappings", () => {
+    const bounded = ready(adaptStudioDrawElementToCanonicalBrushPlan(request({
+      ...dynamicElement(),
+      paintModel: "bounded-flow-v2",
+      sampleSpacing: 0,
+      pressureModel: "linear-residual-path-v3",
+    })));
+    expect(bounded.requirements).toEqual([
+      "texture-tip",
+      "grain",
+      "retained-dynamics",
+      "stroke-local-compositor",
+    ]);
+    expect(bounded.plan.recipe).toMatchObject({
+      version: 2,
+      paint: {
+        model: "bounded-flow-v2",
+        depositionAlpha: "flow-times-dab-opacity",
+        accumulation: "source-over-stroke-local-rgba",
+        finalCompositeOpacity: "plan-composite-opacity-once",
+        surface: "bounded-sparse-rgba-tiles",
+      },
+      retainedDynamics: {
+        width: {
+          base: 12,
+          mappings: [{
+            source: "pressure",
+            from: 0.4,
+            to: 1.2,
+            curve: 1.4,
+          }],
+        },
+        grain: { amount: 0.35, seed: 77 },
+      },
+    });
+
+    const layered = ready(adaptStudioDrawElementToCanonicalBrushPlan(request({
+      id: "layered-pen",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 4, 3],
+      pressures: [0.3, 0.9],
+      stroke: "#334155",
+      strokeWidth: 7,
+      opacity: 0.45,
+      brush: "pen",
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+      paintModel: "layered-flow-v1",
+    })));
+    expect(layered.requirements).toEqual([
+      "causal-residual-spacing",
+      "stroke-local-compositor",
+    ]);
+    expect(layered.plan.recipe).toMatchObject({
+      version: 2,
+      paint: {
+        model: "layered-flow-v1",
+        surface: "stroke-local-rgba",
+      },
+      retainedDynamics: null,
+    });
+  });
+
+  it("fails closed for unversioned non-pressure dynamics, dual tips and incomplete channels", () => {
     const cases: Array<{
       readonly element: DrawEl;
       readonly reason: string;
       readonly path: string;
     }> = [
-      {
-        element: {
-          ...dynamicElement(),
-          paintModel: "bounded-flow-v2",
-          sampleSpacing: 0,
-          pressureModel: "linear-residual-path-v3",
-        },
-        reason: "unsupported-paint-model",
-        path: "element.paintModel",
-      },
       {
         element: dynamicElement({
           brushDynamics: normalizeStudioBrushDynamicsSettings({

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   hashStudioCanonicalBrushPlan,
   parseStudioCanonicalBrushPlan,
@@ -38,7 +39,7 @@ function curve() {
 
 function canonicalPlan(
   commandSequence: number,
-  kind: "texture" | "grain" | "wet",
+  kind: "texture" | "grain" | "wet" | "paint",
 ): StudioCanonicalBrushPlan {
   const plan: Record<string, unknown> = {
     kind: "studio-canonical-brush-plan",
@@ -69,7 +70,7 @@ function canonicalPlan(
       opacity: 1,
     },
     recipe: {
-      version: 1,
+      version: kind === "paint" ? 2 : 1,
       brushId: `specialist-${kind}`,
       engine: kind === "wet" ? "wet-media-v1" : "dab-v1",
       material: kind === "wet" ? "pigment" : "ink",
@@ -129,6 +130,28 @@ function canonicalPlan(
           wetnessLoad: 0.9,
         }
         : null,
+      ...(kind === "paint"
+        ? {
+            paint: {
+              model: "bounded-flow-v2",
+              depositionAlpha: "flow-times-dab-opacity",
+              accumulation: "source-over-stroke-local-rgba",
+              finalCompositeOpacity: "plan-composite-opacity-once",
+              surface: "bounded-sparse-rgba-tiles",
+            },
+            retainedDynamics: normalizeStudioBrushDynamicsSettings({
+              depositPipeline: "causal-deposit-v3-segmented",
+              seed: 202,
+              spacingRatio: 0.145,
+              scatterRatio: 0.04,
+              width: {
+                base: 8,
+                mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
+                jitter: { mode: "multiply", amount: 0.1 },
+              },
+            }),
+          }
+        : {}),
     },
     source: {
       encoding: "accepted-authoritative-samples-v1",
@@ -188,6 +211,14 @@ function requirements(
         ? ["wet-media" as const]
         : []
     ),
+    ...(plan.recipe.version === 2
+      ? [
+          ...(plan.recipe.retainedDynamics === null
+            ? []
+            : ["retained-dynamics" as const]),
+          "stroke-local-compositor" as const,
+        ]
+      : []),
   ]);
 }
 
@@ -222,6 +253,8 @@ const SPECIALIST_CAPABILITIES = [
   "color:linear-srgb",
   "porter-duff:source-over",
   "blend:normal",
+  "paint:stroke-local",
+  "dynamics:retained",
   "intent:professional",
 ] as const satisfies readonly StudioEngineVNextBrushProviderCapability[];
 
@@ -291,7 +324,7 @@ function boundary(fixture: ReturnType<typeof provider>) {
 }
 
 describe("StudioEngineVNextBrushProviderGpuBoundaryAdapter", () => {
-  it("projects texture, grain and wet provider completions into exact WebGPU receipts", async () => {
+  it("projects texture, grain, wet and paint-aware provider completions into exact WebGPU receipts", async () => {
     const fixture = provider();
     const subject = boundary(fixture);
     const controller = new AbortController();
@@ -299,17 +332,19 @@ describe("StudioEngineVNextBrushProviderGpuBoundaryAdapter", () => {
       canonicalPlan(1, "texture"),
       canonicalPlan(2, "grain"),
       canonicalPlan(3, "wet"),
+      canonicalPlan(4, "paint"),
     ];
 
     const results = await Promise.all([
       subject.boundary.execute(request(plans[0]!, 41), controller.signal),
       subject.boundary.execute(request(plans[1]!, 87), controller.signal),
       subject.boundary.execute(request(plans[2]!, 103), controller.signal),
+      subject.boundary.execute(request(plans[3]!, 144), controller.signal),
     ]);
 
     expect(results.map((result) => (
       result.status === "presented" ? "presented" : result.reason
-    ))).toEqual(["presented", "presented", "presented"]);
+    ))).toEqual(["presented", "presented", "presented", "presented"]);
     expect(results).toMatchObject([
       {
         status: "presented",
@@ -338,9 +373,17 @@ describe("StudioEngineVNextBrushProviderGpuBoundaryAdapter", () => {
         },
         proof: { globalRequestSequence: 3, providerLocalSequence: 3 },
       },
+      {
+        status: "presented",
+        receipt: {
+          requestSequence: 144,
+          strokeId: plans[3]!.strokeId,
+        },
+        proof: { globalRequestSequence: 4, providerLocalSequence: 4 },
+      },
     ]);
-    expect(fixture.execute).toHaveBeenCalledTimes(3);
-    expect(subject.router.snapshot().nextGlobalRequestSequence).toBe(4);
+    expect(fixture.execute).toHaveBeenCalledTimes(4);
+    expect(subject.router.snapshot().nextGlobalRequestSequence).toBe(5);
   });
 
   it("fails closed on forged provider proof and mismatched plain GPU output", async () => {

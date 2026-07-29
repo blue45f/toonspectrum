@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   encodeStudioCanonicalBrushPlan,
   hashStudioCanonicalBrushPlan,
@@ -197,6 +198,98 @@ describe("studio canonical brush plan", () => {
       simulationSteps: 16,
     });
     expect(hashStudioCanonicalBrushPlan(plan)).toMatch(/^fnv1a32-utf16:[0-9a-f]{8}$/);
+  });
+
+  it("parses recipe v2 paint and exact retained dynamics while preserving recipe v1 bytes", () => {
+    const legacy = ready(candidate("g-pen"));
+    expect(legacy.recipe.version).toBe(1);
+    expect(encodeStudioCanonicalBrushPlan(legacy)).not.toContain("retainedDynamics");
+
+    const input = candidate("airbrush");
+    const recipe = input.recipe as unknown as Record<string, unknown>;
+    recipe.version = 2;
+    recipe.paint = {
+      model: "bounded-flow-v2",
+      depositionAlpha: "flow-times-dab-opacity",
+      accumulation: "source-over-stroke-local-rgba",
+      finalCompositeOpacity: "plan-composite-opacity-once",
+      surface: "bounded-sparse-rgba-tiles",
+    };
+    recipe.retainedDynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: "causal-deposit-v3-segmented",
+      seed: 202,
+      spacingRatio: 0.145,
+      scatterRatio: 0.04,
+      taper: {
+        enabled: true,
+        startLength: 0.06,
+        endLength: 0.1,
+        minSizeRatio: 0.45,
+        minOpacityRatio: 0.35,
+        curve: 0.9,
+      },
+      tip: { shape: "soft", softness: 0.42 },
+      width: {
+        base: 32,
+        mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+      opacity: { base: 0.65, mappings: [{ source: "pressure", from: 0.4, to: 1 }] },
+      flow: { base: 0.5, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
+      spacing: { mappings: [] },
+      scatter: { mappings: [{ source: "pressure", from: 1, to: 0.7 }] },
+      angle: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+    });
+    const parsed = ready(input);
+
+    expect(parsed.recipe).toMatchObject({
+      version: 2,
+      paint: {
+        model: "bounded-flow-v2",
+        surface: "bounded-sparse-rgba-tiles",
+      },
+      retainedDynamics: {
+        depositPipeline: "causal-deposit-v3-segmented",
+        seed: 202,
+        taper: { enabled: true },
+        width: {
+          mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
+          jitter: { mode: "multiply", amount: 0.1 },
+        },
+      },
+    });
+    if (parsed.recipe.version !== 2) throw new Error("Expected recipe v2.");
+    expect(Object.isFrozen(parsed.recipe.retainedDynamics)).toBe(true);
+  });
+
+  it("never treats v1 paint fields or non-canonical v2 dynamics as a legacy fallback", () => {
+    const v1WithPaint = candidate("g-pen");
+    (v1WithPaint.recipe as unknown as Record<string, unknown>).paint = {
+      model: "layered-flow-v1",
+    };
+    expect(parseStudioCanonicalBrushPlan(v1WithPaint, STATE)).toEqual({
+      ok: false,
+      reason: "unknown-field",
+      path: "$.recipe.paint",
+    });
+
+    const v2 = candidate("airbrush");
+    const recipe = v2.recipe as unknown as Record<string, unknown>;
+    recipe.version = 2;
+    recipe.paint = {
+      model: "bounded-flow-v2",
+      depositionAlpha: "flow-times-dab-opacity",
+      accumulation: "source-over-stroke-local-rgba",
+      finalCompositeOpacity: "plan-composite-opacity-once",
+      surface: "bounded-sparse-rgba-tiles",
+    };
+    recipe.retainedDynamics = { version: 1, seed: 202 };
+    expect(parseStudioCanonicalBrushPlan(v2, STATE)).toMatchObject({
+      ok: false,
+      reason: "invalid-field",
+      path: "$.recipe.retainedDynamics",
+    });
   });
 
   it("rejects predicted input instead of filtering it into durable history", () => {

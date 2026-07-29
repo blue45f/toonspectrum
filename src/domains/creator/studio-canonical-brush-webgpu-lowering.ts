@@ -88,7 +88,9 @@ export interface LoweredStudioCanonicalBrushWebGpuDabs {
 export type StudioCanonicalBrushSpecialistLoweringRequirement =
   | "texture-tip"
   | "grain"
-  | "wet-media";
+  | "wet-media"
+  | "retained-dynamics"
+  | "stroke-local-compositor";
 
 export interface StudioCanonicalBrushWebGpuLoweringRequired {
   readonly status: "lowering-required";
@@ -204,7 +206,7 @@ function validPlan(plan: StudioCanonicalBrushPlan): boolean {
       ))
       || !finite(transform.m11 * transform.m22 - transform.m12 * transform.m21)
       || Math.abs(transform.m11 * transform.m22 - transform.m12 * transform.m21) < 1e-12
-      || recipe.version !== 1
+      || (recipe.version !== 1 && recipe.version !== 2)
       || (recipe.engine !== "dab-v1" && recipe.engine !== "wet-media-v1")
       || !inRange(recipe.size, 0.01, STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxBrushSize)
       || !inRange(recipe.flow, 0, 1)
@@ -269,6 +271,33 @@ function validPlan(plan: StudioCanonicalBrushPlan): boolean {
       || !unsignedSafeInteger(source.firstSequence)
       || !unsignedSafeInteger(source.lastSequence)
     ) return false;
+    if (
+      recipe.version === 2
+      && (
+        recipe.engine !== "dab-v1"
+        || (
+          recipe.paint.model !== "layered-flow-v1"
+          && recipe.paint.model !== "bounded-flow-v2"
+        )
+        || recipe.paint.depositionAlpha !== "flow-times-dab-opacity"
+        || recipe.paint.accumulation !== "source-over-stroke-local-rgba"
+        || recipe.paint.finalCompositeOpacity !== "plan-composite-opacity-once"
+        || (
+          recipe.paint.model === "layered-flow-v1"
+          && (
+            recipe.paint.surface !== "stroke-local-rgba"
+            || recipe.retainedDynamics !== null
+          )
+        )
+        || (
+          recipe.paint.model === "bounded-flow-v2"
+          && (
+            recipe.paint.surface !== "bounded-sparse-rgba-tiles"
+            || recipe.retainedDynamics === null
+          )
+        )
+      )
+    ) return false;
 
     let previousSequence = -1;
     let previousTime = -1;
@@ -314,6 +343,10 @@ function specialistRequirements(
   if (plan.recipe.grain !== null) requirements.push("grain");
   if (plan.recipe.engine === "wet-media-v1" || plan.recipe.wetMedia !== null) {
     requirements.push("wet-media");
+  }
+  if (plan.recipe.version === 2) {
+    if (plan.recipe.retainedDynamics !== null) requirements.push("retained-dynamics");
+    requirements.push("stroke-local-compositor");
   }
   return requirements;
 }

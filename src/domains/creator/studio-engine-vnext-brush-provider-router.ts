@@ -40,6 +40,8 @@ export type StudioEngineVNextBrushProviderCapability =
   | "blend:overlay"
   | "blend:darken"
   | "blend:lighten"
+  | "paint:stroke-local"
+  | "dynamics:retained"
   | "intent:canonical"
   | "intent:professional"
   | "intent:bristle-rake";
@@ -249,6 +251,8 @@ const CAPABILITY_ORDER: readonly StudioEngineVNextBrushProviderCapability[] = [
   "blend:overlay",
   "blend:darken",
   "blend:lighten",
+  "paint:stroke-local",
+  "dynamics:retained",
   "intent:canonical",
   "intent:professional",
   "intent:bristle-rake",
@@ -642,6 +646,14 @@ function requiredCapabilities(
     `color:${plan.color.space}`,
     `porter-duff:${plan.composite.porterDuff}`,
     `blend:${plan.composite.blendMode}`,
+    ...(plan.recipe.version === 2
+      ? [
+          "paint:stroke-local" as const,
+          ...(plan.recipe.retainedDynamics === null
+            ? []
+            : ["dynamics:retained" as const]),
+        ]
+      : []),
     `intent:${intent}`,
   ];
   values.sort(

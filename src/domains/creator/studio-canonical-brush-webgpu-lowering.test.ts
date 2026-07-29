@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushPlan,
@@ -139,6 +140,51 @@ function lowered(value: StudioCanonicalBrushPlan) {
   const result = lowerStudioCanonicalBrushPlanToWebGpuDabs(value);
   if (result.status !== "lowered") throw new Error(result.status);
   return result;
+}
+
+function paintPlan(
+  model: "layered-flow-v1" | "bounded-flow-v2",
+): StudioCanonicalBrushPlan {
+  const candidate = structuredClone(plan({
+    brushId: model === "bounded-flow-v2" ? "airbrush" : "pen",
+    material: model === "bounded-flow-v2" ? "air" : "ink",
+  })) as unknown as Record<string, unknown>;
+  const recipe = candidate.recipe as Record<string, unknown>;
+  recipe.version = 2;
+  recipe.paint = {
+    model,
+    depositionAlpha: "flow-times-dab-opacity",
+    accumulation: "source-over-stroke-local-rgba",
+    finalCompositeOpacity: "plan-composite-opacity-once",
+    surface: model === "bounded-flow-v2"
+      ? "bounded-sparse-rgba-tiles"
+      : "stroke-local-rgba",
+  };
+  recipe.retainedDynamics = model === "bounded-flow-v2"
+    ? normalizeStudioBrushDynamicsSettings({
+        seed: 202,
+        tip: { shape: "soft", softness: 0.42 },
+        spacingRatio: 0.145,
+        scatterRatio: 0.04,
+        width: {
+          base: 10,
+          mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
+          jitter: { mode: "multiply", amount: 0.1 },
+        },
+      })
+    : null;
+  const source = candidate.source as Record<string, unknown>;
+  source.samples = (source.samples as Array<Record<string, unknown>>).map((sampleValue) => ({
+    role: "authoritative",
+    ...sampleValue,
+  }));
+  const parsed = parseStudioCanonicalBrushPlan(candidate, {
+    sessionEpoch: 1,
+    strokeEpoch: 1,
+    lastAcceptedCommandSequence: 0,
+  });
+  if (!parsed.ok) throw new Error(`${parsed.reason}: ${parsed.path}`);
+  return parsed.value.plan;
 }
 
 describe("canonical brush WebGPU lowering", () => {
@@ -293,6 +339,21 @@ describe("canonical brush WebGPU lowering", () => {
     )).toMatchObject({
       status: "lowering-required",
       requirements,
+    });
+  });
+
+  it("requires explicit paint/dynamics specialists for recipe v2 instead of multiplying opacity per dab", () => {
+    expect(lowerStudioCanonicalBrushPlanToWebGpuDabs(
+      paintPlan("layered-flow-v1"),
+    )).toMatchObject({
+      status: "lowering-required",
+      requirements: ["stroke-local-compositor"],
+    });
+    expect(lowerStudioCanonicalBrushPlanToWebGpuDabs(
+      paintPlan("bounded-flow-v2"),
+    )).toMatchObject({
+      status: "lowering-required",
+      requirements: ["retained-dynamics", "stroke-local-compositor"],
     });
   });
 

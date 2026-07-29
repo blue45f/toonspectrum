@@ -170,6 +170,7 @@ import {
   type StudioAutosavePayload,
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
+import { type StudioAutosaveOpfsSession } from "./studio-autosave-opfs-session";
 import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
@@ -2905,6 +2906,27 @@ function StudioCuttoonEditor() {
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
+  const autosaveOpfsSessionRef =
+    useRef<Promise<StudioAutosaveOpfsSession | null> | null>(null);
+  useEffect(() => {
+    const sessionPromise = import("./studio-autosave-opfs-session")
+      .then(({ createStudioAutosaveOpfsSession }) =>
+        createStudioAutosaveOpfsSession(autosaveKey)
+      )
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio OPFS autosave session is unavailable.", cause);
+        }
+        return null;
+      });
+    autosaveOpfsSessionRef.current = sessionPromise;
+    return () => {
+      if (autosaveOpfsSessionRef.current === sessionPromise) {
+        autosaveOpfsSessionRef.current = null;
+      }
+      void sessionPromise.then((session) => session?.dispose());
+    };
+  }, [autosaveKey]);
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
     useState<StudioAiImageReferenceDocument>(() =>
       workId
@@ -8508,34 +8530,69 @@ function StudioCuttoonEditor() {
       ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
       : "";
     const timer = setTimeout(() => {
-      try {
-        if (
-          scheduledGeneration <= studioLifecycleDurableGenerationRef.current
-          && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
-        ) {
-          return;
-        }
-        const payload: StudioAutosavePayload = {
-          ...buildCurrentStudioProjectFileSnapshot(
-            durablePages,
-            new Date().toISOString()
-          ),
-          ...(workId && sharedDocument
-            ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
-            : {}),
-        };
-        localStorage.setItem(autosaveKey, serializeStudioAutosave(payload));
-        // A normal autosave only runs after recovery was explicitly resolved (`hasAutosave=false`).
-        // It therefore owns the primary slot and can retire a lifecycle sidecar from that decision.
-        localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
-        studioLifecycleDurableGenerationRef.current = Math.max(
-          studioLifecycleDurableGenerationRef.current,
-          scheduledGeneration
-        );
-        studioLifecycleDurablePendingFingerprintRef.current = scheduledPendingFingerprint;
-      } catch (e) {
-        console.error("Auto-save failed:", e);
+      if (
+        scheduledGeneration <= studioLifecycleDurableGenerationRef.current
+        && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
+      ) {
+        return;
       }
+      const payload: StudioAutosavePayload = {
+        ...buildCurrentStudioProjectFileSnapshot(
+          durablePages,
+          new Date().toISOString()
+        ),
+        ...(workId && sharedDocument
+          ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
+          : {}),
+      };
+      const sessionPromise = autosaveOpfsSessionRef.current;
+      void import("./studio-autosave-opfs-session")
+        .then(async ({ persistStudioAutosaveWithOpfsPrimary }) => {
+          const session = await (sessionPromise ?? Promise.resolve(null));
+          await persistStudioAutosaveWithOpfsPrimary({
+            session,
+            storage: globalThis.localStorage,
+            key: autosaveKey,
+            payload,
+          });
+          if (
+            sessionPromise !== null
+            && autosaveOpfsSessionRef.current !== sessionPromise
+          ) return;
+          studioLifecycleDurableGenerationRef.current = Math.max(
+            studioLifecycleDurableGenerationRef.current,
+            scheduledGeneration
+          );
+          studioLifecycleDurablePendingFingerprintRef.current =
+            scheduledPendingFingerprint;
+        })
+        .catch((cause: unknown) => {
+          // Module/session initialization is intentionally outside the hot edit path. If it
+          // cannot start, preserve the established synchronous recovery slot.
+          try {
+            globalThis.localStorage.setItem(
+              autosaveKey,
+              serializeStudioAutosave(payload)
+            );
+            globalThis.localStorage.removeItem(
+              studioLifecycleAutosaveSidecarKey(autosaveKey)
+            );
+            if (
+              sessionPromise === null
+              || autosaveOpfsSessionRef.current === sessionPromise
+            ) {
+              studioLifecycleDurableGenerationRef.current = Math.max(
+                studioLifecycleDurableGenerationRef.current,
+                scheduledGeneration
+              );
+              studioLifecycleDurablePendingFingerprintRef.current =
+                scheduledPendingFingerprint;
+            }
+          } catch {
+            // The diagnostic below reports both an unavailable OPFS authority and fallback.
+          }
+          console.error("Auto-save failed:", cause);
+        });
     }, 1500);
     return () => clearTimeout(timer);
   }, [
@@ -8633,21 +8690,54 @@ function StudioCuttoonEditor() {
       return;
     }
     setAutosaveChecked(false);
-    return scheduleIdle(() => {
-      const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
-      const compatibility =
-        saved && workId && sharedDocument
-          ? studioSharedAutosaveCompatibility(saved.payload, {
-              workId,
-              revision: sharedDocument.revision,
-            })
-          : null;
-      setAutosaveRestoreBlockedReason(
-        compatibility && !compatibility.compatible ? compatibility.reason : null
-      );
-      setHasAutosave(Boolean(saved));
-      setAutosaveChecked(true);
+    let cancelled = false;
+    const sessionPromise = autosaveOpfsSessionRef.current;
+    const cancelIdle = scheduleIdle(() => {
+      void (async () => {
+        let saved = readStudioAutosave(
+          globalThis.localStorage,
+          autosaveKey,
+          !workId && !remixId
+        );
+        try {
+          const [
+            { reconcileStudioAutosaveWithOpfsPrimary },
+            session,
+          ] = await Promise.all([
+            import("./studio-autosave-opfs-session"),
+            sessionPromise ?? Promise.resolve(null),
+          ]);
+          const reconciliation = await reconcileStudioAutosaveWithOpfsPrimary({
+            session,
+            storage: globalThis.localStorage,
+            key: autosaveKey,
+            allowLegacy: !workId && !remixId,
+          });
+          saved = reconciliation.candidate;
+        } catch (cause) {
+          if (import.meta.env.DEV) {
+            console.warn("Studio OPFS autosave reconciliation fell back.", cause);
+          }
+        }
+        if (cancelled) return;
+        const compatibility =
+          saved && workId && sharedDocument
+            ? studioSharedAutosaveCompatibility(saved.payload, {
+                workId,
+                revision: sharedDocument.revision,
+              })
+            : null;
+        setAutosaveRestoreBlockedReason(
+          compatibility && !compatibility.compatible ? compatibility.reason : null
+        );
+        setHasAutosave(Boolean(saved));
+        setAutosaveChecked(true);
+      })();
     });
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
   }, [
     autosaveKey,
     collaborationDocumentLocked,
@@ -8797,7 +8887,20 @@ function StudioCuttoonEditor() {
     }
   }
 
+  function clearAutosaveDurableAuthority() {
+    const sessionPromise = autosaveOpfsSessionRef.current;
+    if (!sessionPromise) return;
+    void sessionPromise
+      .then((session) => session?.clear())
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio OPFS autosave tombstone could not be written.", cause);
+        }
+      });
+  }
+
   function clearAutosave() {
+    clearAutosaveDurableAuthority();
     try {
       localStorage.removeItem(autosaveKey);
       localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
@@ -30836,6 +30939,7 @@ const puppetWarpArmed =
         { workId: savedWorkId, userScope: saveAuthScopeKey },
         scenarioImageReferenceDocument
       );
+      clearAutosaveDurableAuthority();
       try {
         localStorage.removeItem(autosaveKey);
         localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
@@ -32764,6 +32868,18 @@ function clearSelectionForEdit() {
               !autosaveChecked || hasAutosave || autosaveRestoreBlockedReason !== null,
           }
         );
+        const sessionPromise = autosaveOpfsSessionRef.current;
+        if (sessionPromise) {
+          void sessionPromise
+            .then((session) => session?.write(emergency.payload))
+            .catch((cause: unknown) => {
+              // pagehide cannot await OPFS. The synchronous lifecycle sidecar remains the
+              // authoritative fallback and is reconciled into OPFS on the next Studio launch.
+              if (import.meta.env.DEV && reason !== "pagehide") {
+                console.warn("Studio lifecycle autosave stayed in the fallback slot.", cause);
+              }
+            });
+        }
         studioLifecycleDurableGenerationRef.current =
           studioRevisionProjectGenerationRef.current;
         studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;

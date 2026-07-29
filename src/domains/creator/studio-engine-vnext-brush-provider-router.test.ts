@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, type Mock } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import {
   STUDIO_ENGINE_VNEXT_BRUSH_PROVIDER_ROUTER_BUDGETS,
   StudioEngineVNextBrushProviderRouter,
@@ -323,7 +324,75 @@ function wetPlan(commandSequence: number): Record<string, unknown> {
   });
 }
 
+function boundedFlowPlan(commandSequence: number): Record<string, unknown> {
+  const result = brushPlan(commandSequence, {
+    material: "ink",
+  });
+  const recipe = (result.recipe as Record<string, unknown>);
+  recipe.version = 2;
+  recipe.paint = {
+    model: "bounded-flow-v2",
+    depositionAlpha: "flow-times-dab-opacity",
+    accumulation: "source-over-stroke-local-rgba",
+    finalCompositeOpacity: "plan-composite-opacity-once",
+    surface: "bounded-sparse-rgba-tiles",
+  };
+  recipe.retainedDynamics = normalizeStudioBrushDynamicsSettings({
+    depositPipeline: "causal-deposit-v3-segmented",
+    seed: 202,
+    spacingRatio: 0.145,
+    scatterRatio: 0.04,
+    tip: { shape: "soft", softness: 0.42 },
+    width: {
+      base: 4,
+      mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
+      jitter: { mode: "multiply", amount: 0.1 },
+    },
+  });
+  return result;
+}
+
 describe("StudioEngineVNextBrushProviderRouter", () => {
+  it("requires explicit stroke-local paint and retained-dynamics capabilities for recipe v2", async () => {
+    const legacyOnly = testProvider("legacy-only", ANALYTIC_CAPABILITIES);
+    const unsupported = router([legacyOnly]);
+    await expect(unsupported.submit(request(1, {
+      canonicalPlan: boundedFlowPlan(1),
+    }))).resolves.toMatchObject({
+      status: "rejected",
+      reason: "unsupported",
+      consumed: false,
+    });
+    expect(legacyOnly.execute).not.toHaveBeenCalled();
+
+    const paintAware = testProvider("paint-aware", [
+      ...ANALYTIC_CAPABILITIES,
+      "paint:stroke-local",
+      "dynamics:retained",
+    ]);
+    const supported = router([paintAware]);
+    await expect(supported.submit(request(1, {
+      canonicalPlan: boundedFlowPlan(1),
+    }))).resolves.toMatchObject({
+      status: "completed",
+      consumed: true,
+      proof: {
+        providerId: "paint-aware",
+        requiredCapabilities: [
+          "tip:analytic",
+          "grain:none",
+          "media:dry",
+          "color:linear-srgb",
+          "porter-duff:source-over",
+          "blend:normal",
+          "paint:stroke-local",
+          "dynamics:retained",
+          "intent:canonical",
+        ],
+      },
+    });
+  });
+
   it("routes analytic, textured, wet, and bristle intents deterministically", async () => {
     const analytic = testProvider("analytic", ANALYTIC_CAPABILITIES);
     const textured = testProvider("textured", [

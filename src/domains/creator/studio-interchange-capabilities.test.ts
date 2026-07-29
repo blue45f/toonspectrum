@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_FIRST_PARTY_INK_CODEC_PROVIDERS } from "./studio-first-party-ink-codec-provider";
+import { STUDIO_FIRST_PARTY_RASTER_CODEC_PROVIDERS } from "./studio-first-party-raster-codec-provider";
+import { STUDIO_FIRST_PARTY_WILL_V1_CODEC_PROVIDER } from "./studio-first-party-will-v1-codec-provider";
+import { STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_PROVIDER } from "./studio-first-party-will-v1-document-codec-provider";
 import {
   STUDIO_INTERCHANGE_CAPABILITIES,
   studioDirectlySupportedInterchangeCapabilities,
   studioInterchangeCapabilitiesForExtension,
   studioInterchangeCapability,
 } from "./studio-interchange-capabilities";
+import { STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS } from "./studio-product-codec-certification";
 
 describe("Studio interchange capability registry", () => {
   it("id와 extension은 정규화되고 id가 중복되지 않는다", () => {
@@ -38,6 +43,20 @@ describe("Studio interchange capability registry", () => {
       expect(Array.isArray(capability.technicalLayers.container)).toBe(true);
       expect(Array.isArray(capability.technicalLayers.codec)).toBe(true);
       expect(capability.conformance.thirdPartyCertification).toBe("not-claimed");
+      expect(capability.productAssurance.officialThirdPartyCertification).toBe(false);
+      expect(capability.productAssurance.vendorTrademarkAuthorization).toBe(false);
+      expect(capability.productAssurance.externalEvidenceRequiredForVendorClaims).toBe(true);
+      if (capability.productAssurance.firstPartyCodecProvider === "implemented") {
+        expect(capability.productAssurance.firstPartyProviderIds.length).toBeGreaterThan(0);
+      } else {
+        expect(capability.productAssurance.firstPartyProviderIds).toEqual([]);
+      }
+      if (
+        capability.productAssurance.toonSpectrumProductCertification
+        !== "not-connected"
+      ) {
+        expect(capability.productAssurance.firstPartyCodecProvider).toBe("implemented");
+      }
       expect(capability.implementation.import).toBeTruthy();
       expect(capability.implementation.export).toBeTruthy();
       expect(capability.uiWiring.import).toBeTruthy();
@@ -68,6 +87,83 @@ describe("Studio interchange capability registry", () => {
         expect(capability.externalRequirements.providers.length).toBeGreaterThan(0);
       }
     }
+  });
+
+  it("자체 codec provider와 ToonSpectrum 제품 인증을 외부 공급사 인증과 분리한다", () => {
+    const exactByteCertifiedProviders = new Map([
+      ["bmp", ["toonspectrum.raster.bmp.v1"]],
+      ["tga", ["toonspectrum.raster.tga.v1"]],
+      [
+        "netpbm",
+        ["toonspectrum.raster.ppm.v1", "toonspectrum.raster.pam.v1"],
+      ],
+      ["qoi", ["toonspectrum.raster.qoi.v1"]],
+      ["tiff", ["toonspectrum.raster.tiff.v1"]],
+      ["will-v1-path-stream", ["toonspectrum.will-v1-annex-a.v1"]],
+      [
+        "will-v1-document",
+        ["toonspectrum.will-v1-annex-b-document.v1"],
+      ],
+    ] as const);
+
+    for (const [id, providerIds] of exactByteCertifiedProviders) {
+      expect(studioInterchangeCapability(id)?.productAssurance).toEqual(
+        expect.objectContaining({
+          firstPartyCodecProvider: "implemented",
+          firstPartyProviderIds: providerIds,
+          toonSpectrumProductCertification: "exact-byte-execution-tested",
+          officialThirdPartyCertification: false,
+          vendorTrademarkAuthorization: false,
+          externalEvidenceRequiredForVendorClaims: true,
+        }),
+      );
+      expect(
+        studioInterchangeCapability(id)?.externalRequirements,
+      ).toMatchObject({
+        provider: "none",
+        providers: [],
+        license: "project-implementation-only",
+      });
+    }
+
+    expect(studioInterchangeCapability("toonink")?.productAssurance).toEqual(
+      expect.objectContaining({
+        firstPartyCodecProvider: "implemented",
+        firstPartyProviderIds: ["toonspectrum.ink-envelope.v1"],
+        toonSpectrumProductCertification: "exact-byte-execution-tested",
+        officialThirdPartyCertification: false,
+        vendorTrademarkAuthorization: false,
+      }),
+    );
+    expect(studioInterchangeCapability("inkml")?.productAssurance).toEqual(
+      expect.objectContaining({
+        firstPartyCodecProvider: "implemented",
+        firstPartyProviderIds: ["toonspectrum.public-inkml-subset.v1"],
+        toonSpectrumProductCertification: "exact-byte-execution-tested",
+        officialThirdPartyCertification: false,
+        vendorTrademarkAuthorization: false,
+      }),
+    );
+
+    const registeredProviderIds = STUDIO_INTERCHANGE_CAPABILITIES.flatMap(
+      (capability) => capability.productAssurance.firstPartyProviderIds,
+    ).sort();
+    const implementedProviderIds = [
+      ...STUDIO_FIRST_PARTY_RASTER_CODEC_PROVIDERS,
+      ...STUDIO_FIRST_PARTY_INK_CODEC_PROVIDERS,
+      STUDIO_FIRST_PARTY_WILL_V1_CODEC_PROVIDER,
+      STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_PROVIDER,
+    ].map((provider) => provider.manifest.providerId).sort();
+    expect(registeredProviderIds).toEqual(implementedProviderIds);
+
+    expect(STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS).toMatchObject({
+      authority: "ToonSpectrum",
+      officialToonSpectrumProductCertification: true,
+      thirdPartyCodecCertification: false,
+      codecVendorCertification: false,
+      officialCodecVendorClaim: false,
+      trademarkAuthorization: false,
+    });
   });
 
   it("독점 CLIP/SUT/AI를 직접 지원한다고 과장하지 않고 bridge를 제시한다", () => {
@@ -464,6 +560,41 @@ describe("Studio interchange capability registry", () => {
         maxFileBytes: 32 * 1024 * 1024 + 32 * 1024,
       },
     });
+    expect(studioInterchangeCapability("will-v1-path-stream")).toMatchObject({
+      import: "engine-ready",
+      export: "engine-ready",
+      roundTrip: "partial",
+      status: "engine-ready",
+      extensions: [".willpb"],
+      mime: ["application/vnd.willfileformat.path+protobuf"],
+      sizeBudget: {
+        maxFileBytes: 32 * 1024 * 1024,
+        maxItems: 100_000,
+      },
+    });
+    expect(
+      studioInterchangeCapability("will-v1-path-stream")?.notes.join(" "),
+    ).toContain("전체 .will");
+    expect(studioInterchangeCapability("will-v1-document")).toMatchObject({
+      import: "engine-ready",
+      export: "engine-ready",
+      roundTrip: "partial",
+      status: "engine-ready",
+      extensions: [".will"],
+      mime: ["application/vnd.toonspectrum.will-v1-bounded+zip"],
+      sizeBudget: {
+        maxFileBytes: 40 * 1024 * 1024,
+        maxFiles: 7,
+        maxItems: 100_000,
+      },
+      conformance: {
+        publicSpec: "tested-public-subset",
+        thirdPartyCertification: "not-claimed",
+      },
+    });
+    expect(
+      studioInterchangeCapability("will-v1-document")?.notes.join(" "),
+    ).toContain("Wacom SDK");
     expect(studioInterchangeCapability("abr")?.sizeBudget.maxFileBytes).toBe(32 * 1024 * 1024);
     expect(studioInterchangeCapability("3d-glb")?.sizeBudget.maxFileBytes).toBe(100 * 1024 * 1024);
     expect(studioInterchangeCapability("vrm")?.sizeBudget.maxFileBytes).toBe(128 * 1024 * 1024);
