@@ -200,13 +200,20 @@ describe("studio draw rendering ownership boundary", () => {
 
   it("keeps dynamic live drafts on the single-normalization bounded-compositor path", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
+    const renderPlan = moduleEdges("./studio-dynamic-brush-render-plan.ts");
 
     expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind || dynamicBrushId");
-    expect(drawNode.source).toContain("planNormalizedStudioDynamicBrushDabs(");
+    expect(drawNode.valueImports).toContain("./studio-dynamic-brush-render-plan");
+    expect(drawNode.source).toContain("planStudioDynamicBrushRender(");
+    expect(drawNode.source).not.toContain("planNormalizedStudioDynamicBrushDabs(");
     expect(drawNode.source).not.toContain("planStudioDynamicBrushDabs(");
-    expect(drawNode.source).toContain("dynamicBrushSettingsBySnapshot.get(source)");
-    expect(drawNode.source).toContain("dynamicBrushDefaultSettingsById.get(brushId)");
-    expect(drawNode.source).toContain("studioDynamicBrushDabVariationsFromTransforms(");
+    expect(drawNode.source).not.toContain("dynamicBrushSettingsBySnapshot.get(source)");
+    expect(drawNode.source).not.toContain("dynamicBrushDefaultSettingsById.get(brushId)");
+    expect(drawNode.source).not.toContain("studioDynamicBrushDabVariationsFromTransforms(");
+    expect(renderPlan.source).toContain("planNormalizedStudioDynamicBrushDabs(");
+    expect(renderPlan.source).toContain("dynamicsBySnapshot.get(source)");
+    expect(renderPlan.source).toContain("defaultDynamicsByBrushId.get(brushId)");
+    expect(renderPlan.source).toContain("studioDynamicBrushDabVariationsFromTransforms(");
     expect(drawNode.source).toContain("planStudioDynamicBrushCoverageAndLegacyMarks({");
     expect(drawNode.source).toContain("renderStudioDynamicBrushCoverage(");
     expect(drawNode.source).toContain("renderStudioDynamicBrushLegacyMarks(");

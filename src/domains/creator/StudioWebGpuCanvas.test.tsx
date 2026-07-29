@@ -62,6 +62,7 @@ describe("StudioWebGpuCanvas", () => {
     expect(html).toContain('data-studio-gpu-readback="disabled"');
     expect(html).toContain('data-studio-gpu-frame-authorized="false"');
     expect(html).toContain("invisible");
+    expect(html).toContain("opacity-0");
     expect(html).toContain('data-studio-gpu-surface="webgpu"');
     expect(html).toContain('data-studio-gpu-surface="canvas2d"');
     expect(html).not.toContain("WebGPU 미지원");
@@ -80,6 +81,7 @@ describe("StudioWebGpuCanvas", () => {
 
     expect(html).toContain('data-studio-gpu-frame-authorized="true"');
     expect(html).not.toContain("invisible");
+    expect(html).not.toContain("opacity-0");
   });
 
   it("renders a bounded viewport surface instead of a full-height document surface", () => {
@@ -120,6 +122,7 @@ describe("StudioWebGpuCanvas", () => {
     );
     expect(emptyHtml).toContain('data-studio-gpu-active="false"');
     expect(emptyHtml).toContain("invisible");
+    expect(emptyHtml).toContain("opacity-0");
   });
 
   it("exposes allocation/reuse metrics imperatively without adding render subscriptions", () => {
@@ -182,5 +185,40 @@ describe("StudioWebGpuCanvas", () => {
     expect(webGpuCanvasSource).toContain("pinnedJournalActiveRef.current");
     expect(webGpuCanvasSource).toContain("function resumedPinnedFeedCommand(");
     expect(webGpuCanvasSource).toContain('if (journalActive) return { mode: "retain" }');
+  });
+
+  it("separates temporary compositor hiding from pinned-journal authority release", () => {
+    const temporaryGateStart = webGpuCanvasSource.indexOf(
+      "setPinnedPresentationVisible: (visible) => {"
+    );
+    const releaseGateStart = webGpuCanvasSource.indexOf(
+      "setPinnedVisible: (visible) => {",
+      temporaryGateStart + 1,
+    );
+    const temporaryGate = webGpuCanvasSource.slice(
+      temporaryGateStart,
+      releaseGateStart,
+    );
+    const releaseGate = webGpuCanvasSource.slice(releaseGateStart);
+
+    expect(temporaryGateStart).toBeGreaterThan(-1);
+    expect(releaseGateStart).toBeGreaterThan(temporaryGateStart);
+    expect(temporaryGate).toContain("setPinnedVisibleState(visible)");
+    expect(temporaryGate).toContain(
+      'root.style.visibility = visible ? "visible" : "hidden"'
+    );
+    expect(temporaryGate).toContain(
+      'root.style.opacity = visible ? "1" : "0"'
+    );
+    expect(temporaryGate).not.toContain("pinnedStrokesRef.current = null");
+    expect(temporaryGate).not.toContain("issueLatestRequestRef.current");
+    expect(releaseGate).toContain("pinnedStrokesRef.current = null");
+    expect(releaseGate).toContain("issueLatestRequestRef.current?.()");
+    expect(releaseGate.indexOf('root.style.visibility = "hidden"')).toBeLessThan(
+      releaseGate.indexOf("pinnedStrokesRef.current = null")
+    );
+    expect(releaseGate.indexOf('root.style.opacity = "0"')).toBeLessThan(
+      releaseGate.indexOf("pinnedStrokesRef.current = null")
+    );
   });
 });

@@ -77,7 +77,7 @@ describe("dry-media anisotropic grain v1", () => {
     expect(resolveStudioDryMediaAnisotropicPresetIdV1(
       "dry-media",
       "precision-pencil",
-    )).toBeNull();
+    )).toBe("charcoal");
     expect(resolveStudioDryMediaAnisotropicPresetIdV1("dry-media")).toBeNull();
   });
 

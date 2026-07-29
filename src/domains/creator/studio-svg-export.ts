@@ -129,11 +129,17 @@ import {
 } from "./studio-causal-watercolor-brush";
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
+  resolveStudioDynamicBrushMaterialIdentity,
+  type StudioDynamicBrushMaterialIdentity,
+} from "./studio-dry-media-dynamic-bridge";
+import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   type StudioDynamicBrushCoverageMark,
   type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
 import {
+  FX_OIL_DAB_CAP,
+  FX_PASTEL_DAB_CAP,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
@@ -169,6 +175,14 @@ import {
   type StudioMaterialMinimumDiameterRatio,
   type StudioMaterialPressureModel,
 } from "./studio-material-pressure-model";
+import {
+  planStudioOilRibbonCarrier,
+  studioOilRibbonPathData,
+} from "./studio-oil-ribbon-carrier";
+import {
+  planStudioPerfectFreehandRender,
+  type StudioPerfectFreehandRenderPlan,
+} from "./studio-outline-stroke-contract";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
 import {
   buildStudioPerfectFreehandPathData,
@@ -228,6 +242,10 @@ import {
   planWatercolorBrushDabs,
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
+import {
+  planStudioWetRibbonCarrier,
+  studioWetRibbonCarrierBatchPathData,
+} from "./studio-wet-ribbon-carrier";
 
 import type { BubbleVariant } from "./studio-assets";
 
@@ -373,6 +391,9 @@ export interface SvgDrawElLike extends SvgElMeta {
   gradient?: StudioGradientSpec;
   pattern?: StudioPatternSpec;
   brush?: string;
+  brushCatalogId?: string;
+  /** Renderer-significant durable outline contract; unknown values receive an explicit skip. */
+  outlineStroke?: unknown;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
   materialPressureModel?: StudioMaterialPressureModel;
@@ -993,6 +1014,36 @@ function serializeStudioDynamicCoverageMark(
   const angleDegrees = mark.angleRadians * 180 / Math.PI;
   const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
 
+  if (
+    "ribbon" in mark
+    && (
+      mark.ribbon?.kind === "flat-nib-ribbon-polygon"
+      || mark.ribbon?.kind === "paint-roller-ribbon-polygon"
+    )
+  ) {
+    let path = "";
+    for (const points of mark.ribbon.polygons) {
+      const [firstX, firstY, ...remaining] = points;
+      if (firstX === undefined || firstY === undefined) return null;
+      path += `M${fmtCoverageNumber(firstX)} ${fmtCoverageNumber(firstY)}`;
+      for (let index = 0; index < remaining.length; index += 2) {
+        const x = remaining[index];
+        const y = remaining[index + 1];
+        if (x === undefined || y === undefined) return null;
+        path += `L${fmtCoverageNumber(x)} ${fmtCoverageNumber(y)}`;
+      }
+      path += "Z";
+    }
+    return (
+      `<path data-brush-coverage="${
+        mark.ribbon.kind === "paint-roller-ribbon-polygon"
+          ? "paint-roller-ribbon"
+          : "flat-nib-ribbon"
+      }" d="${path}"`
+      + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"/>`
+    );
+  }
+
   if (mark.texture?.kind === "alpha-map") {
     const asset = svgAlphaMapTextureAsset(
       ctx,
@@ -1093,6 +1144,7 @@ function serializeStudioR8DynamicCoverageMarks(
   input: Readonly<{
     dabVariations: readonly StudioSvgR8DabVariation[];
     dynamics: NormalizedStudioBrushDynamicsSettings;
+    materialIdentity?: StudioDynamicBrushMaterialIdentity;
     dynamicSeed: number;
     stroke: string;
     markBudget: number;
@@ -1429,12 +1481,27 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   let dynamicPlanFailed = false;
   const dynamicPlan = dynamicBrushId
     ? (() => {
-        const dynamics = normalizeStudioBrushDynamicsSettings(
+        const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
+          el.brush ?? dynamicBrushId,
+          el.brushCatalogId,
+        ) ?? resolveStudioDynamicBrushMaterialIdentity(dynamicBrushId)!;
+        const sourceDynamics = normalizeStudioBrushDynamicsSettings(
           el.brushDynamics
             ?? studioBrushDynamicsSettingsForBrushId(el.brush)
             ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
-        const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
+        const seed = studioBrushDynamicsSeedFromKey(
+          `${el.id}:${sourceDynamics.seed}`,
+        );
+        // Match the renderer-neutral retained/live planner exactly. The document owns the selected
+        // stroke width and each stroke owns its hashed seed; a catalogue snapshot is only the
+        // immutable source profile. Leaving either value on the source snapshot made SVG texture
+        // geometry diverge from the pointer-up Canvas replay.
+        const dynamics = normalizeStudioBrushDynamicsSettings({
+          ...sourceDynamics,
+          seed,
+          width: { ...sourceDynamics.width, base: strokeWidth },
+        });
         const dabPlanInput = {
           points: el.points,
           pressures: el.pressures,
@@ -1563,6 +1630,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             {
               dabVariations: coverageDabVariations,
               dynamics,
+              materialIdentity,
               dynamicSeed: seed,
               stroke,
               markBudget,
@@ -1574,9 +1642,13 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             dynamicPlanFailed = true;
             return null;
           }
-        } else if (usesCausalDepositPlan) {
+        } else if (
+          usesCausalDepositPlan
+          || materialIdentity.dryMediaPresetId !== null
+        ) {
           const sharedCoverageInput = {
             dynamics,
+            materialIdentity,
             dynamicSeed: seed,
             stroke,
             stampGrid: renderBudget.stampGrid,
@@ -1617,6 +1689,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         }
         return {
           dynamics,
+          materialIdentity,
           seed,
           renderBudget,
           dabVariations,
@@ -1846,6 +1919,74 @@ function scaledPencilJitterPoints(
   });
 }
 
+function serializeStudioOutlineStrokePlan(
+  ctx: ExportCtx,
+  el: SvgDrawElLike,
+  plan: StudioPerfectFreehandRenderPlan,
+  stroke: string,
+  opacityAttr: string,
+): string | null {
+  if (plan.kind === "legacy-contract") return null;
+  if (plan.kind === "unsupported-contract") {
+    addSkip(
+      ctx,
+      el,
+      "skipped",
+      `외곽선 획 계약을 지원하지 않아 제외했어요 (${plan.issue.code}).`,
+    );
+    return "";
+  }
+  if (plan.kind === "invalid-input") {
+    addSkip(
+      ctx,
+      el,
+      "skipped",
+      `외곽선 획의 저장 입력이 손상되어 제외했어요 (${plan.reason}).`,
+    );
+    return "";
+  }
+  if (plan.kind === "outline") {
+    return (
+      `<path d="${plan.pathData}" fill="${escapeXml(stroke)}"`
+      + ` data-brush-engine="perfect-outline-contract-v1"`
+      + ` data-brush-profile="${escapeXml(plan.contract.profile.id)}"${opacityAttr}/>`
+    );
+  }
+
+  const line = plan.line;
+  const pathData = tensionPathD(line.points, line.tension);
+  const lineMarkup = pathData
+    ? (
+        `<path d="${pathData}" fill="none" stroke="${escapeXml(stroke)}"`
+        + ` stroke-width="${fmt(line.strokeWidth)}"`
+        + ' stroke-linecap="round" stroke-linejoin="round"/>'
+      )
+    : "";
+  const capRadius = line.endpointCapRadius;
+  const capMarkup: string[] = [];
+  if (capRadius !== null && line.points.length >= 2) {
+    const startX = line.points[0]!;
+    const startY = line.points[1]!;
+    capMarkup.push(
+      `<circle cx="${fmt(startX)}" cy="${fmt(startY)}" r="${fmt(capRadius)}"`
+      + ` fill="${escapeXml(stroke)}"/>`,
+    );
+    const endX = line.points[line.points.length - 2]!;
+    const endY = line.points[line.points.length - 1]!;
+    if (endX !== startX || endY !== startY) {
+      capMarkup.push(
+        `<circle cx="${fmt(endX)}" cy="${fmt(endY)}" r="${fmt(capRadius)}"`
+        + ` fill="${escapeXml(stroke)}"/>`,
+      );
+    }
+  }
+  return (
+    `<g data-brush-engine="perfect-outline-contract-v1"`
+    + ` data-brush-fallback="${plan.reason}"${opacityAttr}>`
+    + `${lineMarkup}${capMarkup.join("")}</g>`
+  );
+}
+
 /** 자유곡선(브러시별) — 캔버스 렌더 경로와 같은 지오메트리 소스(studio-brush)를 쓴다. */
 function serializeFreehand(
   ctx: ExportCtx,
@@ -1875,7 +2016,10 @@ function serializeFreehand(
   });
 
   if (isStudioPixelPencilRenderMode(brush) && el.mode !== "eraser") {
-    const pixelPlan = planStudioPixelPencilCells({ points });
+    const pixelPlan = planStudioPixelPencilCells({
+      points,
+      strokeWidth: aliasStrokeWidth,
+    });
     if (!pixelPlan.complete) {
       addSkip(ctx, el, "skipped", "픽셀 펜 셀 예산을 초과해 SVG에서 안전하게 제외했어요.");
       return "";
@@ -1886,6 +2030,28 @@ function serializeFreehand(
     return path
       ? `<path d="${path}" fill="${escapeXml(stroke)}" shape-rendering="crispEdges"${opacityAttr}/>`
       : "";
+  }
+
+  if (el.outlineStroke !== undefined) {
+    const outlineMarkup = serializeStudioOutlineStrokePlan(
+      ctx,
+      el,
+      planStudioPerfectFreehandRender({
+        contract: el.outlineStroke,
+        stroker: peekStudioPerfectFreehandStroker(),
+        points,
+        // `recorded` means DrawEl already owns canonical renderer pressure. Alias mappings belong
+        // to the legacy no-contract path below and must never be applied twice.
+        pressures: el.pressures,
+        // The durable contract, rather than the mutable brush catalogue, owns alias scale.
+        strokeWidth,
+        sampleSpacing: el.sampleSpacing,
+        legacyMinDistance: renderSampleDistance,
+      }),
+      stroke,
+      opacityAttr,
+    );
+    if (outlineMarkup !== null) return outlineMarkup;
   }
 
   if (
@@ -2011,12 +2177,7 @@ function serializeFreehand(
         ?? studioBrushDynamicsSettingsForBrushId(brush)
         ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
-    if (
-      isStudioDynamicBrushCausalDepositPipeline(
-        normalizedDynamics.depositPipeline,
-      )
-      && causalCoverageMarks
-    ) {
+    if (causalCoverageMarks) {
       const exactCoverage = serializeStudioDynamicCoverageMarks(
         ctx,
         causalCoverageMarks,
@@ -2162,29 +2323,43 @@ function serializeFreehand(
       brush,
       strokeWidth
     ) ?? { baseWidth: strokeWidth, spacing: Math.max(0.25, strokeWidth * 0.34) };
+    const watercolorSeed = watercolorBrushSeedFromKey(el.id);
     const watercolorPressures = mapStudioBrushAliasPressureSamples(
       brush,
       el.pressures,
       Math.floor(points.length / 2),
       0.55
     );
-    const plannedDabs = el.watercolorPipeline === "causal-walker-v2"
-      ? planCausalWatercolorBrushDabs({
+    if (el.watercolorPipeline === "causal-walker-v2") {
+      const plannedDabs = planCausalWatercolorBrushDabs({
           points,
           pressures: watercolorPressures,
           baseWidth: watercolorSettings.baseWidth,
           spacing: watercolorSettings.spacing,
-          seed: watercolorBrushSeedFromKey(el.id),
+          seed: watercolorSeed,
           maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
-        }, true)
-      : planWatercolorBrushDabs({
-          points: processFreehandPoints(points, renderSampleDistance),
-          pressures: watercolorPressures,
-          baseWidth: watercolorSettings.baseWidth,
-          spacing: watercolorSettings.spacing,
-          seed: watercolorBrushSeedFromKey(el.id),
-          maxDabs: 512,
-        });
+        }, true);
+      const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+      const wetRibbonPlan = planStudioWetRibbonCarrier(dabs, {
+        seed: watercolorSeed,
+      });
+      if (wetRibbonPlan.batches.length === 0) return "";
+      const ribbonPaths = wetRibbonPlan.batches.map((batch) => (
+        `<path d="${studioWetRibbonCarrierBatchPathData(batch)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(batch.opacity * strokeOpacity)}"/>`
+      )).join("");
+      return `<g data-brush-engine="wet-ribbon-carrier-v1">${ribbonPaths}</g>`;
+    }
+
+    // Persisted watercolor without the causal marker is intentionally byte-compatible with the
+    // fitted legacy circle plan. Only new v2 strokes may use the directional ribbon carrier.
+    const plannedDabs = planWatercolorBrushDabs({
+      points: processFreehandPoints(points, renderSampleDistance),
+      pressures: watercolorPressures,
+      baseWidth: watercolorSettings.baseWidth,
+      spacing: watercolorSettings.spacing,
+      seed: watercolorSeed,
+      maxDabs: 512,
+    });
     const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
@@ -2607,20 +2782,15 @@ function serializeFreehand(
       pressures: el.pressures,
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
-      maxDabs: 512,
+      maxDabs: FX_OIL_DAB_CAP,
     });
-    const bodies = dabs.map((dab) => (
-      `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}" transform="rotate(${fmt((dab.angleRad * 180) / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`
+    const carrier = planStudioOilRibbonCarrier(dabs);
+    if (!carrier.body) return "";
+    const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
+    const bristles = carrier.bristleLanes.map((lane) => (
+      `<path data-paint-bristle-lane="true" d="${studioOilRibbonPathData(lane)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
     )).join("");
-    const bristles = dabs.flatMap((dab) => dab.bristles.map((bristle) => {
-      const angleDegrees = (dab.angleRad * 180) / Math.PI;
-      const normalX = -Math.sin(dab.angleRad) * dab.radiusY * bristle.offsetRatio;
-      const normalY = Math.cos(dab.angleRad) * dab.radiusY * bristle.offsetRatio;
-      const x = dab.x + normalX;
-      const y = dab.y + normalY;
-      return `<ellipse cx="${fmt(x)}" cy="${fmt(y)}" rx="${fmt(dab.radiusX * bristle.radiusXRatio)}" ry="${fmt(Math.max(0.12, dab.radiusY * bristle.radiusYRatio))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity * bristle.opacity)}" transform="rotate(${fmt(angleDegrees)} ${fmt(x)} ${fmt(y)})"/>`;
-    })).join("");
-    return `<g>${bodies}<g style="mix-blend-mode:multiply">${bristles}</g></g>`;
+    return `<g data-brush-engine="oil-ribbon-carrier-v1">${body}<g style="mix-blend-mode:multiply">${bristles}</g></g>`;
   }
 
   if (brushFamily === "airbrush") {
@@ -2656,17 +2826,17 @@ function serializeFreehand(
       pressures: el.pressures,
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
-      maxDabs: 512,
+      maxDabs: FX_PASTEL_DAB_CAP,
     });
     if (dabs.length === 0) return "";
     const softId = nextId(ctx, "sp");
     ctx.defs.push(
       `<radialGradient id="${softId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="55%" stop-color="${escapeXml(stroke)}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
     );
-    const circles = dabs.map((dab) => (
-      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="url(#${softId})" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}"/>`
+    const fibres = dabs.map((dab) => (
+      `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" transform="rotate(${fmt(dab.angleRad * 180 / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})" fill="url(#${softId})" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}"/>`
     )).join("");
-    return `<g>${circles}</g>`;
+    return `<g>${fibres}</g>`;
   }
 
   // 새 기본 펜/마커 — live Canvas, WebGPU, Konva가 공유하는 round-dab footprint 그대로.

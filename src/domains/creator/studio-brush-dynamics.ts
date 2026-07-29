@@ -400,12 +400,40 @@ export interface StudioDynamicBrushPlanInput {
   maxDabs?: number;
 }
 
+/**
+ * Immutable geometry receipt for the station immediately preceding one dynamic dab.
+ *
+ * It is runtime-only metadata: DrawEl persistence still stores source points and dynamics, then
+ * regenerates dabs. Connected carriers use the receipt so a suffix can reproduce the exact start
+ * cross-section without reading a discarded live prefix or deriving it from the current tangent.
+ */
+export interface StudioDynamicBrushSegmentStartFrame {
+  readonly index: number;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly direction: number;
+  readonly size: number;
+  readonly roundness: number;
+}
+
 export interface StudioDynamicBrushDab {
   index: number;
   progress: number;
   /** Exact unscattered arc-length station, useful for editing and endpoint checks. */
   sourceX: number;
   sourceY: number;
+  /**
+   * Travel tangent at this station, in degrees. New planners persist it on the ephemeral dab so a
+   * connected carrier can reproduce a suffix without looking behind the accepted live prefix.
+   */
+  direction?: number;
+  /** Arc-length travelled from the preceding dab; zero for the initial tap. */
+  distanceFromPrevious?: number;
+  /**
+   * Exact previous-station frame for a non-initial segment. New canonical and causal planners
+   * populate it; absence is retained only for legacy/manual dab fixtures and the initial tap.
+   */
+  segmentStartFrame?: StudioDynamicBrushSegmentStartFrame;
   x: number;
   y: number;
   size: number;
@@ -560,10 +588,10 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         minOpacityRatio: 0.35,
         curve: 0.9,
       },
-      // Widen the analytic shoulder instead of raising the centre valve: the previous 0.85
-      // exponent concentrated nearly all paint into a small hotspot while the footprint mean
-      // stayed almost white. The centre remains normalized to one; opacity/flow still own density.
-      tip: { shape: "soft", softness: 0.55 },
+      // Keep a broad analytic shoulder instead of raising only the centre valve. A narrower
+      // carrier made a moving stroke read as pale circular puffs even though its centre alpha was
+      // technically visible. The centre remains normalized to one; opacity/flow still own density.
+      tip: { shape: "soft", softness: 0.42 },
       width: {
         base: 32,
         mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
@@ -577,8 +605,13 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
       flow: { base: 0.5, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
       spacingRatio: 0.145,
       spacing: { mappings: [] },
-      scatterRatio: 0.32,
-      scatter: { mappings: [{ source: "pressure", from: 1.4, to: 0.6 }] },
+      // Soft spray is one continuous envelope. Wide independent centre scatter belongs to the
+      // dedicated spray/splatter variants; here it exposed the round dab lattice while moving.
+      scatterRatio: 0.04,
+      scatter: {
+        mappings: [{ source: "pressure", from: 1, to: 0.7 }],
+        jitter: null,
+      },
       angle: { base: 0, mappings: [] },
       roundness: { base: 1, mappings: [] },
     },
@@ -602,12 +635,12 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
       width: {
         base: 6,
         mappings: [{ source: "pressure", from: 0.15, to: 1.45 }],
-        jitter: { mode: "multiply", amount: 0.22 },
+        jitter: { mode: "multiply", amount: 0.14 },
       },
       opacity: {
         base: 0.85,
         mappings: [{ source: "pressure", from: 0.35, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.25 },
+        jitter: { mode: "multiply", amount: 0.16 },
       },
       flow: { base: 0.55, mappings: [{ source: "pressure", from: 0.5, to: 1 }] },
       // Stroke-fixed tooth follows the mark when it is transformed instead of appearing to slide
@@ -619,18 +652,30 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         contrast: 0.55,
         seed: 303,
       },
-      spacingRatio: 0.21,
+      spacingRatio: 0.16,
       // Keep a restrained velocity tooth, but cap it below one quarter of the nominal tip width.
       // Roughness comes primarily from grain/scatter rather than discontinuous high-speed gaps.
-      spacing: { mappings: [{ source: "speed", from: 0.92, to: 1.1 }] },
-      scatterRatio: 0.23,
-      scatter: { mappings: [{ source: "speed", from: 0.6, to: 1.4 }] },
+      spacing: {
+        mappings: [{ source: "speed", from: 0.95, to: 1.12 }],
+        jitter: null,
+      },
+      // Paper tooth and the textured tip create the broken edge. Large white-noise displacement
+      // moved complete oval carriers apart and revealed them as beads during long strokes.
+      scatterRatio: 0.08,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.8, to: 1.15 }],
+        jitter: null,
+      },
       angle: {
         base: 0,
         mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
-        jitter: { mode: "add", amount: 14 },
+        jitter: { mode: "add", amount: 8 },
       },
-      roundness: { base: 0.32, mappings: [{ source: "tilt-magnitude", from: 1, to: 0.35 }] },
+      roundness: {
+        base: 0.32,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.35 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
     },
   },
 ];
@@ -1119,12 +1164,12 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         mappings: [{ source: "pressure", from: 0.75, to: 1 }],
         jitter: { mode: "multiply", amount: 0.06 },
       },
-      spacingRatio: 0.13,
+      spacingRatio: 0.11,
       spacing: {
         mappings: [{ source: "speed", from: 0.9, to: 1.3 }],
         jitter: { mode: "multiply", amount: 0.05 },
       },
-      scatterRatio: 0.075,
+      scatterRatio: 0.05,
       scatter: {
         mappings: [{ source: "speed", from: 0.7, to: 1.2 }],
         jitter: { mode: "multiply", amount: 0.04 },
@@ -1149,37 +1194,37 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       width: {
         base: 14,
         mappings: [{ source: "pressure", from: 0.55, to: 1.18 }],
-        jitter: { mode: "multiply", amount: 0.24 },
+        jitter: { mode: "multiply", amount: 0.16 },
       },
       opacity: {
         base: 0.78,
         mappings: [{ source: "pressure", from: 0.45, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.34 },
+        jitter: { mode: "multiply", amount: 0.2 },
       },
       flow: {
         base: 0.44,
         mappings: [{ source: "pressure", from: 0.6, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.2 },
+        jitter: { mode: "multiply", amount: 0.14 },
       },
-      spacingRatio: 0.29,
+      spacingRatio: 0.18,
       spacing: {
-        mappings: [{ source: "speed", from: 0.72, to: 1.8 }],
-        jitter: { mode: "multiply", amount: 0.22 },
+        mappings: [{ source: "speed", from: 0.95, to: 1.12 }],
+        jitter: { mode: "multiply", amount: 0.08 },
       },
-      scatterRatio: 0.36,
+      scatterRatio: 0.1,
       scatter: {
-        mappings: [{ source: "speed", from: 0.65, to: 1.6 }],
-        jitter: { mode: "multiply", amount: 0.3 },
+        mappings: [{ source: "speed", from: 0.8, to: 1.15 }],
+        jitter: { mode: "multiply", amount: 0.12 },
       },
       angle: {
         base: 0,
         mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
-        jitter: { mode: "add", amount: 18 },
+        jitter: { mode: "add", amount: 10 },
       },
       roundness: {
         base: 0.5,
         mappings: [{ source: "tilt-magnitude", from: 1, to: 0.42 }],
-        jitter: { mode: "multiply", amount: 0.14 },
+        jitter: { mode: "multiply", amount: 0.1 },
       },
     },
   },
@@ -1191,27 +1236,27 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       width: {
         base: 18,
         mappings: [{ source: "pressure", from: 0.28, to: 1.38 }],
-        jitter: { mode: "multiply", amount: 0.32 },
+        jitter: { mode: "multiply", amount: 0.15 },
       },
       opacity: {
         base: 0.82,
         mappings: [{ source: "pressure", from: 0.32, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.38 },
+        jitter: { mode: "multiply", amount: 0.19 },
       },
       flow: {
         base: 0.62,
         mappings: [{ source: "pressure", from: 0.4, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.28 },
+        jitter: { mode: "multiply", amount: 0.13 },
       },
-      spacingRatio: 0.165,
+      spacingRatio: 0.14,
       spacing: {
-        mappings: [{ source: "speed", from: 0.85, to: 1.55 }],
-        jitter: { mode: "multiply", amount: 0.15 },
+        mappings: [{ source: "speed", from: 0.95, to: 1.12 }],
+        jitter: { mode: "multiply", amount: 0.08 },
       },
-      scatterRatio: 0.52,
+      scatterRatio: 0.075,
       scatter: {
-        mappings: [{ source: "speed", from: 0.55, to: 1.75 }],
-        jitter: { mode: "multiply", amount: 0.4 },
+        mappings: [{ source: "speed", from: 0.8, to: 1.15 }],
+        jitter: { mode: "multiply", amount: 0.12 },
       },
       angle: {
         base: 0,
@@ -1219,12 +1264,12 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
           { source: "direction", mode: "add", from: 0, to: 360 },
           { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.15 },
         ],
-        jitter: { mode: "add", amount: 28 },
+        jitter: { mode: "add", amount: 9 },
       },
       roundness: {
         base: 0.24,
         mappings: [{ source: "tilt-magnitude", from: 1, to: 0.24 }],
-        jitter: { mode: "multiply", amount: 0.18 },
+        jitter: { mode: "multiply", amount: 0.09 },
       },
     },
   },
@@ -1777,7 +1822,8 @@ function planStudioDynamicBrushFromInput(
   // Point taps and zero-length runs have no travel axis, so shared start/end taper would
   // incorrectly force the minimum tip size on the only dab.
   const applyStrokeTaper = totalLength > POINT_EPSILON;
-  const dabs = plannedStations.map(({ station, recipe }, index): StudioDynamicBrushDab => {
+  let previousSegmentFrame: StudioDynamicBrushSegmentStartFrame | undefined;
+  const dabs = plannedStations.map(({ station, recipe, distance }, index): StudioDynamicBrushDab => {
     const taper = applyStrokeTaper
       ? studioBrushTaperFactors(station.progress, settings.taper)
       : { size: 1, opacity: 1 };
@@ -1794,11 +1840,18 @@ function planStudioDynamicBrushFromInput(
       STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.max
     );
     const opacity = clamp01(recipe.opacity * taper.opacity);
-    return {
+    const dab: StudioDynamicBrushDab = {
       index,
       progress: station.progress,
       sourceX: station.x,
       sourceY: station.y,
+      direction: station.direction,
+      distanceFromPrevious: index === 0
+        ? 0
+        : Math.max(0, distance - plannedStations[index - 1]!.distance),
+      ...(previousSegmentFrame
+        ? { segmentStartFrame: previousSegmentFrame }
+        : {}),
       x: station.x + recipe.scatterOffsetX,
       y: station.y + recipe.scatterOffsetY,
       size,
@@ -1809,6 +1862,15 @@ function planStudioDynamicBrushFromInput(
       angle: recipe.angle,
       roundness: recipe.roundness,
     };
+    previousSegmentFrame = Object.freeze({
+      index,
+      sourceX: station.x,
+      sourceY: station.y,
+      direction: station.direction,
+      size,
+      roundness: recipe.roundness,
+    });
+    return dab;
   });
 
   return { dabs, sourcePointCount: points.length, totalLength, capped, settings };

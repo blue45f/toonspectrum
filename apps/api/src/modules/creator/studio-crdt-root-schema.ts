@@ -6,6 +6,12 @@ import {
 } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import { hasValidStudioCrdtRasterDocument } from "../../../../../lib/studio-crdt-raster-document-contract";
 import {
+  STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+  STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
+  isStudioInkInputContractV2,
+  normalizeStudioInkInputContract,
+} from "../../../../../lib/studio-ink-input-contract";
+import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
@@ -21,7 +27,7 @@ import type { StudioWorkAssetReference } from "../../../../../lib/studio-work-as
 
 export const STUDIO_CRDT_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const STUDIO_CRDT_STROKE_SAMPLE_MAX_COUNT = 100_000;
-const STUDIO_CRDT_STROKE_SAMPLE_KEYS = [
+const STUDIO_CRDT_STROKE_BASE_SAMPLE_KEYS = [
   "points",
   "pressures",
   "tiltXs",
@@ -29,6 +35,17 @@ const STUDIO_CRDT_STROKE_SAMPLE_KEYS = [
   "twists",
   "speeds",
   "tangentialPressures",
+] as const;
+const STUDIO_CRDT_STROKE_EXTENDED_INK_SAMPLE_KEYS = [
+  "altitudeAngles",
+  "azimuthAngles",
+  "contactWidths",
+  "contactHeights",
+  "sampleTimeOffsets",
+] as const;
+const STUDIO_CRDT_STROKE_SAMPLE_KEYS = [
+  ...STUDIO_CRDT_STROKE_BASE_SAMPLE_KEYS,
+  ...STUDIO_CRDT_STROKE_EXTENDED_INK_SAMPLE_KEYS,
 ] as const;
 const STUDIO_CRDT_STROKE_JSON_KEYS = [
   "gradient",
@@ -1555,6 +1572,16 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
       symmetry: record.get("symmetry"),
     })
   ) return false;
+  const inkInput = extensions?.inkInput;
+  const normalizedInkInput = inkInput === undefined
+    ? null
+    : normalizeStudioInkInputContract(inkInput);
+  if (
+    inkInput !== undefined
+    && normalizedInkInput === null
+  ) return false;
+  const requiresExtendedInkChannels =
+    isStudioInkInputContractV2(normalizedInkInput);
   const metadata: Record<string, unknown> = {
     version: payloadVersion,
     type: "draw",
@@ -1577,7 +1604,20 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   const arrays = Object.fromEntries(
     STUDIO_CRDT_STROKE_SAMPLE_KEYS.map((key) => [key, record.get(key)])
   ) as Record<(typeof STUDIO_CRDT_STROKE_SAMPLE_KEYS)[number], unknown>;
-  if (STUDIO_CRDT_STROKE_SAMPLE_KEYS.some((key) => !(arrays[key] instanceof Y.Array))) {
+  if (
+    STUDIO_CRDT_STROKE_BASE_SAMPLE_KEYS.some(
+      (key) => !(arrays[key] instanceof Y.Array),
+    )
+    || (
+      requiresExtendedInkChannels
+      && STUDIO_CRDT_STROKE_EXTENDED_INK_SAMPLE_KEYS.some(
+        (key) => !(arrays[key] instanceof Y.Array),
+      )
+    )
+    || STUDIO_CRDT_STROKE_EXTENDED_INK_SAMPLE_KEYS.some(
+      (key) => arrays[key] !== undefined && !(arrays[key] instanceof Y.Array),
+    )
+  ) {
     return false;
   }
   const points = arrays.points as Y.Array<unknown>;
@@ -1587,8 +1627,14 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   ) return false;
   const sampleCount = points.length / 2;
   if (
-    STUDIO_CRDT_STROKE_SAMPLE_KEYS.slice(1).some(
+    STUDIO_CRDT_STROKE_BASE_SAMPLE_KEYS.slice(1).some(
       (key) => (arrays[key] as Y.Array<unknown>).length !== sampleCount
+    )
+    || STUDIO_CRDT_STROKE_EXTENDED_INK_SAMPLE_KEYS.some(
+      (key) => (
+        arrays[key] instanceof Y.Array
+        && arrays[key].length !== sampleCount
+      ),
     )
   ) return false;
   const ranges: Record<(typeof STUDIO_CRDT_STROKE_SAMPLE_KEYS)[number], readonly [number, number]> = {
@@ -1599,14 +1645,34 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     twists: [0, 359],
     speeds: [0, 1_000_000],
     tangentialPressures: [-1, 1],
+    altitudeAngles: [0, Math.PI / 2],
+    azimuthAngles: [0, Math.PI * 2],
+    contactWidths: [0, STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION],
+    contactHeights: [0, STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION],
+    sampleTimeOffsets: [0, STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS],
   };
   for (const key of STUDIO_CRDT_STROKE_SAMPLE_KEYS) {
+    if (!(arrays[key] instanceof Y.Array)) continue;
     const [minimum, maximum] = ranges[key];
+    const values = arrays[key].toArray();
     if (
-      (arrays[key] as Y.Array<unknown>).toArray().some(
-        (value) => !finiteNumberInRange(value, minimum, maximum)
+      values.some(
+        (value) => (
+          !finiteNumberInRange(value, minimum, maximum)
+          || (key === "azimuthAngles" && value === maximum)
+        )
       )
     ) return false;
+  }
+  const sampleTimeOffsets = arrays.sampleTimeOffsets;
+  if (sampleTimeOffsets instanceof Y.Array) {
+    const values = sampleTimeOffsets.toArray();
+    if (requiresExtendedInkChannels && sampleCount > 0 && values[0] !== 0) {
+      return false;
+    }
+    for (let index = 1; index < values.length; index += 1) {
+      if ((values[index] as number) < (values[index - 1] as number)) return false;
+    }
   }
   return true;
 }

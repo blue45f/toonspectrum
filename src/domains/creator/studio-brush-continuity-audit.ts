@@ -55,8 +55,15 @@ export interface StudioBrushContinuityProfile {
   sourcePointCount: number;
   markCount: number;
   inputSampleSpacing: number;
+  /** Arc-length station gap before scatter; protects source sampling continuity. */
   maxInteriorGapRatio: number;
   meanInteriorGapRatio: number;
+  /**
+   * Distance between the actual rendered carrier centres after deterministic scatter. This catches
+   * the circular-dab/beading failure that source-station-only audits cannot see.
+   */
+  maxRenderedCarrierGapRatio: number;
+  meanRenderedCarrierGapRatio: number;
   meanEffectiveAlpha: number;
   meanSizeRatio: number;
   meanScatterRatio: number;
@@ -100,6 +107,11 @@ const INTENTIONALLY_DISCONTINUOUS_PREVIEWS = new Set([
   "dots",
   "glitter",
   "tone",
+]);
+
+const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
+  "spray",
+  "splatter",
 ]);
 
 const INTERIOR_START = 0.08;
@@ -154,6 +166,7 @@ function dynamicProfile(
     maxDabs: 4096,
   }, candidate.brushDynamics!);
   const gapRatios: number[] = [];
+  const renderedCarrierGapRatios: number[] = [];
   for (let index = 1; index < dabs.length; index += 1) {
     const current = dabs[index]!;
     if (current.progress < INTERIOR_START || current.progress > INTERIOR_END) continue;
@@ -162,16 +175,28 @@ function dynamicProfile(
       current.sourceX - previous.sourceX,
       current.sourceY - previous.sourceY
     );
-    gapRatios.push(gap / Math.max(0.05, (current.size + previous.size) / 2));
+    const meanDiameter = Math.max(0.05, (current.size + previous.size) / 2);
+    gapRatios.push(gap / meanDiameter);
+    renderedCarrierGapRatios.push(
+      Math.hypot(current.x - previous.x, current.y - previous.y)
+      / meanDiameter,
+    );
   }
-  return summarizeDabs(candidate, curve, dabs, gapRatios);
+  return summarizeDabs(
+    candidate,
+    curve,
+    dabs,
+    gapRatios,
+    renderedCarrierGapRatios,
+  );
 }
 
 function summarizeDabs(
   candidate: StudioBrushContinuityAuditCandidate,
   curve: CurveProfile,
   dabs: readonly StudioDynamicBrushDab[],
-  gapRatios: readonly number[]
+  gapRatios: readonly number[],
+  renderedCarrierGapRatios: readonly number[],
 ): StudioBrushContinuityProfile {
   return {
     speed: curve.speed,
@@ -180,6 +205,10 @@ function summarizeDabs(
     inputSampleSpacing: 0,
     maxInteriorGapRatio: rounded(Math.max(0, ...gapRatios)),
     meanInteriorGapRatio: rounded(mean(gapRatios)),
+    maxRenderedCarrierGapRatio: rounded(
+      Math.max(0, ...renderedCarrierGapRatios),
+    ),
+    meanRenderedCarrierGapRatio: rounded(mean(renderedCarrierGapRatios)),
     meanEffectiveAlpha: rounded(mean(
       dabs.map((dab) => candidate.defaultOpacity * dab.opacity * dab.flow)
     )),
@@ -228,6 +257,8 @@ function summarizeStampDabs(
     inputSampleSpacing: 0,
     maxInteriorGapRatio: rounded(Math.max(0, ...gapRatios)),
     meanInteriorGapRatio: rounded(mean(gapRatios)),
+    maxRenderedCarrierGapRatio: rounded(Math.max(0, ...gapRatios)),
+    meanRenderedCarrierGapRatio: rounded(mean(gapRatios)),
     meanEffectiveAlpha: rounded(mean(dabs.map((dab) => dab.alpha))),
     meanSizeRatio: rounded(mean(
       dabs.map((dab) => (dab.radius * 2) / Math.max(0.05, candidate.defaultWidth))
@@ -251,6 +282,8 @@ function connectedPathProfile(
     inputSampleSpacing,
     maxInteriorGapRatio: 0,
     meanInteriorGapRatio: 0,
+    maxRenderedCarrierGapRatio: 0,
+    meanRenderedCarrierGapRatio: 0,
     meanEffectiveAlpha: rounded(candidate.defaultOpacity),
     meanSizeRatio: 1,
     meanScatterRatio: 0,
@@ -279,6 +312,7 @@ function behaviorFingerprint(
     profiles: result.profiles.map((profile) => [
       profile.markCount,
       rounded(profile.meanInteriorGapRatio, 2),
+      rounded(profile.meanRenderedCarrierGapRatio, 2),
       rounded(profile.meanEffectiveAlpha, 2),
       rounded(profile.meanSizeRatio, 2),
       rounded(profile.meanScatterRatio, 2),
@@ -312,6 +346,7 @@ export function auditStudioBrushContinuity(
     intentionalDiscontinuity:
       INTENTIONALLY_DISCONTINUOUS_CATEGORIES.has(candidate.category ?? "")
       || INTENTIONALLY_DISCONTINUOUS_PREVIEWS.has(candidate.previewStyle ?? "")
+      || INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS.has(candidate.catalogId)
       || renderFamily === "glitter"
       || renderFamily === "screentone"
       || renderFamily === "pixel",

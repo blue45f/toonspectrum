@@ -46,6 +46,12 @@ const StudioWebGpuCanvas = lazyRetry(
   () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
   "StudioWebGpuCanvas"
 );
+const StudioCanonicalVNextDryMediaCanvas = lazyRetry(
+  () => import("./StudioCanonicalVNextDryMediaCanvas").then((mod) => ({
+    default: mod.StudioCanonicalVNextDryMediaCanvas,
+  })),
+  "StudioCanonicalVNextDryMediaCanvas"
+);
 const StudioRasterCrdtSurface = lazyRetry(
   () => import("./StudioRasterCrdtSurface").then((mod) => ({ default: mod.StudioRasterCrdtSurface })),
   "StudioRasterCrdtSurface"
@@ -513,6 +519,13 @@ const StudioProceduralArtisticBrushController = lazyRetry(
     })),
   "StudioProceduralArtisticBrushController"
 );
+const StudioHokusaiNaturalMediaInspectorSection = lazyRetry(
+  () =>
+    import("./StudioHokusaiNaturalMediaInspectorSection").then((mod) => ({
+      default: mod.StudioHokusaiNaturalMediaInspectorSection,
+    })),
+  "StudioHokusaiNaturalMediaInspectorSection"
+);
 const QuickStartPanel = lazyRetry(
   () =>
     import("./StudioQuickStartPanel").then((module) => ({
@@ -792,6 +805,7 @@ export {
   StudioBrushCatalogPortal,
   StudioBrushLibraryPanel,
   StudioBrushStudio,
+  StudioHokusaiNaturalMediaInspectorSection,
   StudioProceduralArtisticBrushController,
   StudioBubbleAnchorPanel,
   StudioBubbleAutoShrinkPanel,
@@ -903,6 +917,7 @@ export {
   StudioUploadPublish,
   StudioVrmPoser,
   StudioMannequinPoserPanel,
+  StudioCanonicalVNextDryMediaCanvas,
   StudioWebGpuCanvas,
   StudioWriterRoomPanel,
   WorkFxPanel,

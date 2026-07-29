@@ -338,15 +338,25 @@ describe("off-destination tile composition", () => {
 });
 
 describe("StudioDrawNode leaf integration boundary", () => {
-  it("attempts wet-ink replay before its frozen watercolor fallback", () => {
+  it("attempts physical wet replay before the exact ribbon and legacy fallbacks", () => {
     const source = readFileSync(new URL("./StudioDrawNode.tsx", import.meta.url), "utf8");
-    const plan = source.indexOf("planStudioWetInkBrushReplay(");
+    const plan = source.indexOf("planStudioInteractiveWetInkBrushReplay(");
+    const ribbonPlan = source.indexOf("planStudioWetRibbonCarrier(", plan);
     const render = source.indexOf("renderStudioWetInkBrushReplay(", plan);
-    const fallback = source.indexOf("for (const dab of dabs)", render);
+    const ribbonRender = source.indexOf(
+      "traceStudioWetRibbonCarrierBatch(",
+      render,
+    );
+    const legacyFallback = source.indexOf("for (const dab of dabs)", ribbonRender);
 
     expect(plan).toBeGreaterThan(-1);
+    expect(ribbonPlan).toBeGreaterThan(plan);
     expect(render).toBeGreaterThan(plan);
-    expect(fallback).toBeGreaterThan(render);
+    expect(render).toBeGreaterThan(ribbonPlan);
+    expect(ribbonRender).toBeGreaterThan(ribbonPlan);
+    expect(legacyFallback).toBeGreaterThan(ribbonRender);
+    expect(source).toContain("wetInkReplayPlan?.ok");
+    expect(source).toContain("if (wetRibbonPlan)");
     expect(source).toContain('wetInkResult.status !== "fallback"');
   });
 });

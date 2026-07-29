@@ -103,9 +103,11 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-27): 벡터-only 문서의 첫 픽셀 선택 제스처를 합성 준비 동안
     // journal/replay하고 도구 전환 시 안전하게 취소하는 경계 추가(1_050 → 1_120).
     // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
-    // 의도적 변경(2026-07-29): 사용자 선택 precision 획의 mutable lazy-brush authority를
-    // pointerdown에서 한 번 만들고 실제 샘플에만 연결하는 수명주기 경계 추가(1_130 → 1_157).
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_160);
+    // 의도적 변경(2026-07-29): 사용자 선택 precision 획의 mutable lazy-brush authority와
+    // specialty native overlay가 generic live tap을 즉시 지우는 권위 전환 경계를
+    // pointerdown에 함께 고정했다. 이 블록을 다시 키우기 전에 별도 lifecycle 함수 추출을
+    // 우선 검토해야 한다.
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_190);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

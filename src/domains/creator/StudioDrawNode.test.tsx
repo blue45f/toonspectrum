@@ -4,6 +4,9 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  mapStudioBrushAliasPressureSamples,
+} from "./studio-brush-alias-profile";
+import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
@@ -24,6 +27,11 @@ import {
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+import {
+  captureStudioOutlineStrokeContractV1,
+  planStudioPerfectFreehandRender,
+} from "./studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg } from "./studio-svg-export";
 import { StudioDrawNode } from "./StudioDrawNode";
 
@@ -625,32 +633,56 @@ describe("StudioDrawNode orchestration", () => {
     expect(new Set([gpen, mapping, kabura, liner]).size).toBe(4);
   });
 
-  it("renders newly authored G-pen through the causal residual dab path", () => {
-    render(
+  it("renders equal-input equal-width pen and G-pen with visibly distinct geometry", async () => {
+    const points = [0, 24, 8, 8, 20, 2, 34, 8, 42, 24, 38, 39, 24, 47, 10, 41];
+    const pressures = [0.2, 0.36, 0.7, 0.92, 0.74, 0.5, 0.28, 0.14];
+    const strokeWidth = 12;
+    const penView = render(
       <StudioDrawNode
         el={drawEl({
-          brush: "gpen",
+          brush: "pen",
           mode: "pen",
-          points: [0, 24, 8, 8, 20, 2, 34, 8, 42, 24],
-          pressures: [0.2, 0.36, 0.7, 0.92, 0.74],
+          points,
+          pressures,
+          strokeWidth,
           pressureModel: "linear-residual-path-v3",
           sampleSpacing: 0,
         })}
       />,
     );
-
-    expect(captured("Path")).toHaveLength(0);
-    const shapes = captured("Shape");
-    expect(shapes).toHaveLength(1);
-    const context = new AliasSceneContext();
-    const sceneFunc = shapes[0]!.props.sceneFunc as (
+    const penContext = new AliasSceneContext();
+    const penSceneFunc = captured("Shape")[0]!.props.sceneFunc as (
       context: CanvasRenderingContext2D
     ) => void;
-    sceneFunc(context as unknown as CanvasRenderingContext2D);
-    expect(context.arcs.length).toBeGreaterThan(8);
-    expect(Math.max(...context.arcs.map((arc) => arc.radius))).toBeGreaterThan(
-      Math.min(...context.arcs.map((arc) => arc.radius)) * 2
+    penSceneFunc(penContext as unknown as CanvasRenderingContext2D);
+    expect(captured("Path")).toHaveLength(0);
+    expect(penContext.arcs.length).toBeGreaterThan(8);
+    penView.unmount();
+    konvaCapture.nodes.length = 0;
+
+    const { loadStudioPerfectFreehandStroker } = await import("./studio-perfect-freehand");
+    await act(async () => {
+      await loadStudioPerfectFreehandStroker();
+    });
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "gpen",
+          mode: "pen",
+          points,
+          pressures,
+          strokeWidth,
+          sampleSpacing: 0,
+        })}
+      />,
     );
+
+    expect(captured("Shape")).toHaveLength(0);
+    const gpenPaths = captured("Path");
+    expect(gpenPaths).toHaveLength(1);
+    const gpenOutline = gpenPaths[0]!.props.data as string;
+    expect(gpenOutline.match(/Q/g)?.length).toBeGreaterThan(4);
+    expect(gpenOutline.endsWith("Z")).toBe(true);
   });
 
   it("fills a multi-sample calligraphy stroke once instead of compounding round-cap opacity", () => {
@@ -829,13 +861,24 @@ describe("StudioDrawNode orchestration", () => {
       context: CanvasRenderingContext2D
     ) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
-    expect(context.arcs).toHaveLength(2);
-    expect(context.arcs[0]).toMatchObject({ x: 1, y: 2 });
-    expect(context.arcs[0]!.radius).toBeCloseTo(7.8);
-    expect(context.arcs[0]!.alpha).toBeCloseTo(0.93);
-    expect(context.arcs[1]).toMatchObject({ x: 3, y: 4 });
-    expect(context.arcs[1]!.radius).toBeCloseTo(18.6);
-    expect(context.arcs[1]!.alpha).toBeCloseTo(0.124);
+    expect(context.arcs).toHaveLength(0);
+    expect(context.fillPolygons).toHaveLength(4);
+    expect(context.fillAlphas).toEqual([
+      0.03125,
+      0.0625,
+      0.0625,
+      0.9375,
+    ]);
+    const polygonSpan = (polygon: readonly number[]) => {
+      const xs = polygon.filter((_, coordinateIndex) => coordinateIndex % 2 === 0);
+      const ys = polygon.filter((_, coordinateIndex) => coordinateIndex % 2 === 1);
+      return Math.max(
+        Math.max(...xs) - Math.min(...xs),
+        Math.max(...ys) - Math.min(...ys),
+      );
+    };
+    expect(polygonSpan(context.fillPolygons[0]!))
+      .toBeGreaterThan(polygonSpan(context.fillPolygons[3]!) * 2);
   });
 
   it("renders soft pencil as a pale wide skirt plus a rough core", () => {
@@ -1892,7 +1935,10 @@ describe("StudioDrawNode orchestration", () => {
 
       expect(watercolorCapture.causalPlan).toHaveBeenCalledTimes(1);
       expect(watercolorCapture.causalPlan).toHaveBeenCalledWith(
-        expect.objectContaining({ points: [0, 0, 8, 0] }),
+        expect.objectContaining({
+          points: [0, 0, 8, 0],
+          previewEndpoint: activeDraft,
+        }),
         expectedFinalize,
       );
     },
@@ -2042,5 +2088,212 @@ describe("StudioDrawNode perfect-freehand outline brush", () => {
     );
     expect(captured("Path")).toHaveLength(0);
     expect(captured("Circle")).toHaveLength(1);
+  });
+});
+
+describe("StudioDrawNode durable outline contract", () => {
+  const contractFor = (brushId: string) => {
+    const contract = captureStudioOutlineStrokeContractV1({
+      brushId,
+      pressureSource: "recorded",
+    });
+    if (!contract) throw new Error(`missing outline contract for ${brushId}`);
+    return contract;
+  };
+
+  it("uses one immutable path for active draft, committed replay, and SVG export", () => {
+    const element = drawEl({
+      id: "durable-outline-parity",
+      brush: "gpen",
+      mode: "pen",
+      points: [0, 24, 8, 8, 20, 2, 34, 8, 42, 24, 38, 39, 24, 47, 10, 41],
+      pressures: [0.2, 0.36, 0.7, 0.92, 0.74, 0.5, 0.28, 0.14],
+      stroke: "#26384a",
+      strokeWidth: 12,
+      sampleSpacing: 0,
+      outlineStroke: contractFor("gpen"),
+    });
+
+    const active = render(<StudioDrawNode activeDraft el={element} />);
+    const activePath = captured("Path")[0]!.props.data as string;
+    active.unmount();
+    konvaCapture.nodes.length = 0;
+
+    render(<StudioDrawNode el={element} />);
+    const committedPath = captured("Path")[0]!.props.data as string;
+    const exported = exportPageToSvg({
+      width: 160,
+      height: 100,
+      bg: "#ffffff",
+      elements: [element],
+    });
+    const svgPath = /<path d="([^"]+)" fill="#26384a" data-brush-engine="perfect-outline-contract-v1"/u
+      .exec(exported.svg)?.[1];
+
+    expect(activePath).toBe(committedPath);
+    expect(svgPath).toBe(committedPath);
+    expect(committedPath).toMatch(/^M.*Q.*Z$/u);
+    expect(exported.skipped).toEqual([]);
+  });
+
+  it("does not apply the mutable alias pressure adapter a second time", () => {
+    const points = [0, 18, 12, 4, 28, 0, 44, 9, 56, 25, 48, 40, 28, 46];
+    const recordedPressures = [0.08, 0.2, 0.48, 0.9, 0.75, 0.38, 0.12];
+    const strokeWidth = 17;
+    const element = drawEl({
+      id: "recorded-pressure-not-remapped",
+      brush: "mapping-pen",
+      mode: "pen",
+      points,
+      pressures: recordedPressures,
+      strokeWidth,
+      sampleSpacing: 0,
+      outlineStroke: contractFor("mapping-pen"),
+    });
+    const stroker = peekStudioPerfectFreehandStroker();
+    const direct = planStudioPerfectFreehandRender({
+      contract: element.outlineStroke,
+      stroker,
+      points,
+      pressures: recordedPressures,
+      strokeWidth,
+      sampleSpacing: 0,
+    });
+    const doubleMapped = planStudioPerfectFreehandRender({
+      contract: element.outlineStroke,
+      stroker,
+      points,
+      pressures: mapStudioBrushAliasPressureSamples(
+        "mapping-pen",
+        recordedPressures,
+        recordedPressures.length,
+        0.6,
+      ),
+      strokeWidth,
+      sampleSpacing: 0,
+    });
+    expect(direct.kind).toBe("outline");
+    expect(doubleMapped.kind).toBe("outline");
+    if (direct.kind !== "outline" || doubleMapped.kind !== "outline") return;
+    expect(direct.pathData).not.toBe(doubleMapped.pathData);
+
+    render(<StudioDrawNode el={element} />);
+    expect(captured("Path")[0]!.props.data).toBe(direct.pathData);
+  });
+
+  it("renders the shared compact fallback with the same line and endpoint caps as SVG", () => {
+    const element = drawEl({
+      id: "durable-outline-compact",
+      brush: "perfect-ink",
+      mode: "pen",
+      points: [10, 10, 14, 14],
+      pressures: [0.5, 0.5],
+      stroke: "#654321",
+      strokeWidth: 4,
+      sampleSpacing: 1,
+      outlineStroke: contractFor("perfect-ink"),
+    });
+
+    render(<StudioDrawNode activeDraft el={element} />);
+    const line = captured("Line")[0]!;
+    expect(line.props).toMatchObject({
+      points: [10, 10, 14, 14],
+      tension: 0.32,
+      strokeWidth: 4,
+    });
+    expect(captured("Circle").map((node) => node.props.radius)).toEqual([2, 2]);
+
+    const exported = exportPageToSvg({
+      width: 64,
+      height: 64,
+      bg: "#ffffff",
+      elements: [element],
+    });
+    expect(exported.svg).toContain('data-brush-fallback="very-short-perfect"');
+    expect(exported.svg).toContain('d="M 10 10 L 14 14"');
+    expect(exported.svg).toContain('stroke-width="4"');
+    expect(exported.svg.match(/r="2"/gu)).toHaveLength(2);
+    expect(exported.skipped).toEqual([]);
+  });
+
+  it("keeps a one-point G-pen tap visible as the same single cap in live, commit, and SVG", () => {
+    const element = drawEl({
+      id: "durable-outline-tap",
+      brush: "gpen",
+      mode: "pen",
+      points: [12, 18],
+      pressures: [0.45],
+      stroke: "#3d2b22",
+      strokeWidth: 7,
+      sampleSpacing: 0,
+      outlineStroke: contractFor("gpen"),
+    });
+
+    const active = render(<StudioDrawNode activeDraft el={element} />);
+    expect(captured("Circle")).toHaveLength(1);
+    expect(captured("Circle")[0]!.props).toMatchObject({
+      x: 12,
+      y: 18,
+      radius: 3.22875,
+      fill: "#3d2b22",
+    });
+    active.unmount();
+    konvaCapture.nodes.length = 0;
+
+    render(<StudioDrawNode el={element} />);
+    expect(captured("Circle")).toHaveLength(1);
+    expect(captured("Circle")[0]!.props.radius).toBe(3.22875);
+
+    const exported = exportPageToSvg({
+      width: 48,
+      height: 48,
+      bg: "#ffffff",
+      elements: [element],
+    });
+    expect(exported.svg).toContain('data-brush-fallback="insufficient-points"');
+    expect(exported.svg).toContain(
+      '<circle cx="12" cy="18" r="3.23" fill="#3d2b22"/>',
+    );
+    expect(exported.skipped).toEqual([]);
+  });
+
+  it("shows damaged or future contracts as diagnostics instead of legacy geometry", () => {
+    const futureContract = {
+      ...contractFor("gpen"),
+      version: 99,
+    };
+    const element = drawEl({
+      id: "future-outline-contract",
+      brush: "gpen",
+      mode: "pen",
+      points: [4, 30, 24, 4, 48, 28],
+      pressures: [0.3, 0.9, 0.4],
+      outlineStroke: futureContract as unknown as DrawEl["outlineStroke"],
+    });
+
+    render(<StudioDrawNode el={element} />);
+    expect(captured("Path")).toHaveLength(0);
+    expect(captured("Group")).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        props: expect.objectContaining({
+          name: "studio-outline-contract-error:unsupported-version",
+        }),
+      }),
+    ]));
+
+    const exported = exportPageToSvg({
+      width: 80,
+      height: 60,
+      bg: "#ffffff",
+      elements: [element],
+    });
+    expect(exported.svg).not.toContain('data-brush-engine="perfect-outline"');
+    expect(exported.skipped).toEqual([
+      expect.objectContaining({
+        id: element.id,
+        mode: "skipped",
+        label: expect.stringContaining("unsupported-version"),
+      }),
+    ]);
   });
 });

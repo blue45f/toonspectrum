@@ -17,6 +17,10 @@ describe("Studio live dynamic brush integration boundary", () => {
       "liveDynamicBrushOverlayRendererRef.current.begin(next).status === \"started\"",
     );
     expect(pointerStart).toContain("liveDynamicBrushDraftDirectRef.current = dynamicBrushDirect");
+    expect(pointerStart).toContain(
+      "if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted)",
+    );
+    expect(pointerStart).toContain("liveDraftLayerRef.current?.drawScene()");
 
     const flush = page.slice(
       page.indexOf("const flushDirectLiveDraft ="),
@@ -54,6 +58,15 @@ describe("Studio live dynamic brush integration boundary", () => {
     expect(hosts).toContain("renderer.attach({");
     expect(viewport).toContain("<StudioLiveDynamicBrushOverlayHost");
     expect(viewport).toContain("renderer={liveDynamicBrushOverlayRenderer}");
+    const liveDraftScene = viewport.slice(
+      viewport.indexOf("<Layer ref={liveDraftLayerRef}"),
+      viewport.indexOf("</Layer>", viewport.indexOf("<Layer ref={liveDraftLayerRef}")),
+    );
+    expect(liveDraftScene).toContain(
+      "liveDynamicBrushOverlayRenderer.isActive",
+    );
+    expect(liveDraftScene).toContain("liveWetInkOverlayRenderer.isActive");
+    expect(liveDraftScene).toContain("liveStampOverlayRenderer.isActive");
     expect(lazyUi).toContain("default: mod.StudioLiveDynamicBrushOverlayHost");
   });
 });

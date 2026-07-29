@@ -81,6 +81,8 @@ export interface StudioDynamicBrushAcceptedPrefixReceipt {
   readonly acceptedDabsPerVariation: number;
   readonly rejectedDabsPerVariation: number;
   readonly marksPerDab: number;
+  /** Fixed non-dab marks reserved once for every non-empty symmetry variation. */
+  readonly fixedMarksPerVariation: number;
   readonly symmetryCount: number;
   readonly markBudget: number;
   readonly acceptedMarkBudget: number;
@@ -98,6 +100,13 @@ export interface StudioDynamicBrushRenderBudgetInput {
   dabCount: number;
   /** Number of Canvas/SVG symmetry copies that will be rendered. */
   symmetryCount: number;
+  /**
+   * Deterministic non-dab marks emitted once for every non-empty variation.
+   *
+   * This is intentionally separate from `marksPerDab`: origin/end-cap material contracts must
+   * not halve a long stroke's affordable dab count merely because one extra mark is required.
+   */
+  fixedMarksPerVariation?: number;
   markBudget: number;
 }
 
@@ -105,6 +114,7 @@ export interface StudioDynamicBrushRenderBudgetPlan {
   stampGrid: StudioDynamicBrushRenderStampGrid;
   maxDabsPerVariation: number;
   marksPerDab: number;
+  fixedMarksPerVariation: number;
   symmetryCount: number;
   estimatedMarks: number;
   estimatedUnbudgetedMarks: number;
@@ -170,6 +180,7 @@ function gridWorkPlans(
   settings: NormalizedStudioBrushDynamicsSettings,
   dabCount: number,
   symmetryCount: number,
+  fixedMarksPerVariation: number,
   markBudget: number,
   stampGrids: readonly StudioDynamicBrushRenderStampGrid[],
   allowEmptyAcceptedPrefix: boolean,
@@ -177,7 +188,12 @@ function gridWorkPlans(
   return stampGrids.map((grid) => {
     const marksPerDab = countStudioDynamicBrushMarksPerDab(settings, grid);
     const marksPerSymmetricDab = symmetryCount * marksPerDab;
-    const affordableDabs = Math.floor(markBudget / marksPerSymmetricDab);
+    const fixedMarks = dabCount > 0
+      ? symmetryCount * fixedMarksPerVariation
+      : 0;
+    const affordableDabs = Math.floor(
+      Math.max(0, markBudget - fixedMarks) / marksPerSymmetricDab,
+    );
     const maxDabs = dabCount === 0
       ? 0
       : Math.max(
@@ -188,7 +204,9 @@ function gridWorkPlans(
       grid,
       marksPerDab,
       maxDabs,
-      estimatedMarks: maxDabs * marksPerSymmetricDab,
+      estimatedMarks:
+        maxDabs * marksPerSymmetricDab
+        + (maxDabs > 0 ? fixedMarks : 0),
     };
   });
 }
@@ -224,11 +242,18 @@ export function planStudioDynamicBrushRenderBudget(
       : 4_096,
   );
   const symmetryCount = finiteInteger(input.symmetryCount, 1, 1, 64);
+  const fixedMarksPerVariation = finiteInteger(
+    input.fixedMarksPerVariation ?? 0,
+    0,
+    0,
+    64,
+  );
   const markBudget = finiteInteger(input.markBudget, 1, 1, 100_000_000);
   const candidates = gridWorkPlans(
     input.settings,
     admittedDabCount,
     symmetryCount,
+    fixedMarksPerVariation,
     markBudget,
     causal
       ? [STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID]
@@ -266,6 +291,7 @@ export function planStudioDynamicBrushRenderBudget(
         rejectedDabsPerVariation:
           receiptRequestedDabCount - selected.maxDabs,
         marksPerDab: selected.marksPerDab,
+        fixedMarksPerVariation,
         symmetryCount,
         markBudget,
         acceptedMarkBudget: selected.estimatedMarks,
@@ -276,10 +302,16 @@ export function planStudioDynamicBrushRenderBudget(
     stampGrid: selected.grid,
     maxDabsPerVariation: selected.maxDabs,
     marksPerDab: selected.marksPerDab,
+    fixedMarksPerVariation,
     symmetryCount,
     estimatedMarks: selected.estimatedMarks,
     estimatedUnbudgetedMarks:
-      receiptRequestedDabCount * symmetryCount * defaultPlan.marksPerDab,
+      receiptRequestedDabCount * symmetryCount * defaultPlan.marksPerDab
+      + (
+        receiptRequestedDabCount > 0
+          ? symmetryCount * fixedMarksPerVariation
+          : 0
+      ),
     dabCapped,
     stampGridReduced,
     capped: dabCapped || stampGridReduced,

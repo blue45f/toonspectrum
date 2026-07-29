@@ -9,7 +9,9 @@ import {
   isStudioTopLevelWindowBlur,
   isStudioLeftContactDown,
   isStudioStrokePointerEvent,
+  normalizeStudioPointerSampleChannelsV2,
   resolveStudioPointerCaptureLoss,
+  STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   shouldCommitStudioStrokeOnPointerCancel,
   shouldEndStudioStrokeForReleasedContact,
@@ -47,6 +49,130 @@ function sample(
 }
 
 describe("studio pointer input", () => {
+  it("normalizes the full Pointer Events sensor set without retaining a device identifier", () => {
+    const result = normalizeStudioPointerSampleChannelsV2(sample(-0, {
+      clientX: -0,
+      clientY: 12,
+      pressure: 0.75,
+      tangentialPressure: -0.4,
+      tiltX: -35,
+      tiltY: 18,
+      altitudeAngle: Math.PI / 3,
+      azimuthAngle: Math.PI * 2,
+      twist: 360,
+      width: 8.5,
+      height: 4.25,
+      timeStamp: 12_345.5,
+    }), "authoritative");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toEqual({
+      authority: "authoritative",
+      persistence: "durable",
+      pointerId: 7,
+      pointerType: "pen",
+      clientX: 0,
+      clientY: 12,
+      pressure: 0.75,
+      tangentialPressure: -0.4,
+      tiltX: -35,
+      tiltY: 18,
+      altitudeAngle: Math.PI / 3,
+      azimuthAngle: 0,
+      twist: 0,
+      contactWidth: 8.5,
+      contactHeight: 4.25,
+      sourceTimeMilliseconds: 12_345.5,
+    });
+    expect(Object.isFrozen(result.value)).toBe(true);
+    expect("persistentDeviceId" in result.value).toBe(false);
+  });
+
+  it("marks predictions preview-only and materializes only Pointer Events neutral defaults", () => {
+    const result = normalizeStudioPointerSampleChannelsV2({
+      pointerId: undefined,
+      pointerType: "future-vendor-pointer",
+      clientX: 10,
+      clientY: 20,
+    }, "predicted-preview");
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        authority: "predicted-preview",
+        persistence: "preview-only",
+        pointerId: 1,
+        pointerType: "unknown",
+        clientX: 10,
+        clientY: 20,
+        pressure: 0,
+        tangentialPressure: 0,
+        tiltX: 0,
+        tiltY: 0,
+        altitudeAngle: Math.PI / 2,
+        azimuthAngle: 0,
+        twist: 0,
+        contactWidth: 1,
+        contactHeight: 1,
+        sourceTimeMilliseconds: 0,
+      },
+    });
+  });
+
+  it("fails closed on malformed, unbounded, or accessor-backed sensor channels", () => {
+    const normalize = (overrides: Partial<StudioPointerEventLike>) =>
+      normalizeStudioPointerSampleChannelsV2(sample(1, overrides), "authoritative");
+
+    expect(normalize({ pressure: 1.01 })).toEqual({
+      ok: false,
+      reason: "invalid-pressure",
+    });
+    expect(normalize({ tangentialPressure: -1.01 })).toEqual({
+      ok: false,
+      reason: "invalid-pressure",
+    });
+    expect(normalize({ altitudeAngle: Math.PI })).toEqual({
+      ok: false,
+      reason: "invalid-orientation",
+    });
+    expect(normalize({ azimuthAngle: -0.01 })).toEqual({
+      ok: false,
+      reason: "invalid-orientation",
+    });
+    expect(normalize({
+      width: STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxContactDimension + 1,
+    })).toEqual({
+      ok: false,
+      reason: "invalid-contact-geometry",
+    });
+    expect(normalize({ timeStamp: Number.POSITIVE_INFINITY })).toEqual({
+      ok: false,
+      reason: "invalid-timestamp",
+    });
+    expect(normalize({
+      clientX:
+        STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxClientCoordinateAbsolute + 1,
+    })).toEqual({
+      ok: false,
+      reason: "invalid-coordinate",
+    });
+
+    const detached = {
+      ...sample(1),
+      get altitudeAngle(): never {
+        throw new Error("detached PointerEvent");
+      },
+    };
+    expect(normalizeStudioPointerSampleChannelsV2(
+      detached,
+      "authoritative",
+    )).toEqual({
+      ok: false,
+      reason: "invalid-pointer",
+    });
+  });
+
   it("opens only a primary left-contact stroke and keeps a legacy Safari pointer fallback", () => {
     expect(beginStudioStrokePointerSession(sample(1, { isPrimary: false }))).toBeNull();
     expect(beginStudioStrokePointerSession(sample(1, { button: 2 }))).toBeNull();

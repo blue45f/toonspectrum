@@ -210,8 +210,12 @@ const EXPANSION_TUNING: Readonly<
     taper: { startLength: 0.03, endLength: 0.06, minSizeRatio: 0.6, curve: 1 },
   },
   "pencil-colored-soft": {
-    // Wax colored pencil: subtle deterministic hue drift between dabs.
+    // Wax colored pencil: subtle deterministic hue drift between dabs. Preserve the deliberately
+    // translucent wax flow while keeping a short click-flick from spending its whole 14px route at
+    // a sub-pixel taper. These floors only affect the two endpoint ramps; long-stroke grain,
+    // pressure swell and source-over accumulation keep their authored channels below.
     colorDynamics: { hueJitter: 6, saturationJitter: 0.05, valueJitter: 0.05 },
+    taper: { minSizeRatio: 0.36, minOpacityRatio: 0.92 },
     width: {
       mappings: [{ source: "pressure", from: 0.4, to: 1.5, curve: 1.1 }],
       jitter: { mode: "multiply", amount: 0.1 },
@@ -378,10 +382,24 @@ const EXPANSION_TUNING: Readonly<
     grain: { space: "canvas-fixed", amount: 0.44, scale: 3, contrast: 0.68, seed: 0x4b0a_1204 },
   },
   "pastel-paper-soft": {
-    // Soft pastel: strong paper tooth pinned to the canvas, powder-light flow.
+    // Soft pastel: strong paper tooth pinned to the canvas, powder-light flow. The old near-round
+    // sponge (roundness≈.85) exposed every station as a circle on long strokes. A tangent-aligned
+    // low-roundness fibre keeps the same R8 paper grain while forming one continuous powder band.
     tipSoftness: 0.55,
+    spacingRatio: 0.12,
+    scatterRatio: 0.04,
     flow: { base: 0.38, mappings: [{ source: "pressure", from: 0.55, to: 1 }] },
     width: { mappings: [{ source: "pressure", from: 0.7, to: 1.2 }] },
+    angle: {
+      base: 0,
+      mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+      jitter: { mode: "add", amount: 4 },
+    },
+    roundness: {
+      base: 0.24,
+      mappings: [{ source: "pressure", from: 0.2, to: 0.3 }],
+      jitter: { mode: "multiply", amount: 0.06 },
+    },
     grain: { space: "canvas-fixed", amount: 0.55, scale: 6, contrast: 0.5, seed: 0x4b0a_1205 },
   },
   "crayon-wax-bold": {
@@ -690,7 +708,11 @@ const EXPANSION_TUNING: Readonly<
       jitter: { mode: "multiply", amount: 0.16 },
     },
     opacity: { jitter: { mode: "multiply", amount: 0.2 } },
-    flow: { base: 0.52, mappings: [{ source: "pressure", from: 0.42, to: 1 }] },
+    // Browser pixel QA showed the previous 0.52 base left the committed paper-granule carrier at
+    // mean Δ6.9/P95 Δ12 on white paper. Raise pigment load—not element opacity—so pressure,
+    // texture holes and layer compositing remain honest while useful grains clear the perceptual
+    // contrast floor.
+    flow: { base: 0.68, mappings: [{ source: "pressure", from: 0.42, to: 1 }] },
     grain: { space: "canvas-fixed", amount: 0.5, scale: 4.8, contrast: 0.66, seed: 0x4b0a_2105 },
     colorDynamics: { hueJitter: 2.5, saturationJitter: 0.025, valueJitter: 0.045 },
     dualBrush: {
@@ -1046,15 +1068,22 @@ const EXPANSION_TUNING: Readonly<
   },
   "snow-powder-drift": {
     tipSoftness: 0.38,
-    spacingRatio: 0.62,
-    scatterRatio: 0.88,
+    // Snow remains a sparse flake carrier, but its former 0.62 spacing × 1.62 speed multiplier
+    // plus 0.88 scatter could move the last meaningful deposit more than one 84 px audit segment
+    // behind a fast pointer endpoint. Keep the irregular size/opacity field while bounding the
+    // longitudinal hole so one sparse one-move stroke still reaches every route segment.
+    spacingRatio: 0.36,
+    scatterRatio: 0.46,
     width: {
       mappings: [{ source: "pressure", from: 0.62, to: 1.32 }],
       jitter: { mode: "multiply", amount: 0.52 },
     },
     opacity: { jitter: { mode: "multiply", amount: 0.26 } },
     angle: { jitter: { mode: "add", amount: 180 } },
-    scatter: { mappings: [{ source: "speed", from: 0.58, to: 1.62 }], jitter: { mode: "add", amount: 0.5 } },
+    scatter: {
+      mappings: [{ source: "speed", from: 0.76, to: 1.2 }],
+      jitter: { mode: "add", amount: 0.24 },
+    },
     colorDynamics: { hueJitter: 2, saturationJitter: 0.015, valueJitter: 0.1 },
     dualBrush: {
       enabled: true,

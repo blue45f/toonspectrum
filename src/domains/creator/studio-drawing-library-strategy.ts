@@ -7,14 +7,16 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v1" as const;
+  "studio-drawing-library-strategy-v4" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
   | "input-stabilization"
   | "rough-shape-rendering"
+  | "natural-media-worker"
   | "settled-procedural-raster"
   | "object-selection-overlay"
+  | "path-quality-worker"
   | "vector-geometry"
   | "quality-benchmark"
   | "scene-model";
@@ -30,8 +32,11 @@ export type StudioDrawingLibraryDecision =
   | "runtime-pressure-outline"
   | "opt-in-input-stabilizer"
   | "runtime-rough-shape-renderer"
+  | "isolated-settled-first-natural-media-provider"
   | "isolated-settled-only-provider"
   | "runtime-object-selection-overlay"
+  | "isolated-gpu-scene-overlay-provider"
+  | "isolated-worker-path-quality-provider"
   | "isolated-vector-geometry-provider"
   | "benchmark-oracle-only"
   | "rejected-duplicate-scene-model";
@@ -47,6 +52,8 @@ export interface StudioDrawingLibraryStrategy {
   readonly runtimeInstallation: StudioDrawingLibraryRuntimeInstallation;
   /** External libraries must never own persisted/replayed document meaning. */
   readonly canonicalAuthority: false;
+  /** Brush pixels remain owned by ToonSpectrum's versioned live/committed render contracts. */
+  readonly brushPixelAuthority: false;
   readonly maintenanceNote: string;
   readonly riskNotes: readonly string[];
 }
@@ -54,13 +61,14 @@ export interface StudioDrawingLibraryStrategy {
 function strategy(
   value: Omit<
     StudioDrawingLibraryStrategy,
-    "registryVersion" | "canonicalAuthority"
+    "registryVersion" | "canonicalAuthority" | "brushPixelAuthority"
   >
 ): StudioDrawingLibraryStrategy {
   return Object.freeze({
     registryVersion: STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION,
     ...value,
     canonicalAuthority: false,
+    brushPixelAuthority: false,
     riskNotes: Object.freeze([...value.riskNotes]),
   });
 }
@@ -76,7 +84,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "runtime-pressure-outline",
       runtimeInstallation: "installed-active",
       maintenanceNote:
-        "Stable, focused outline generator with a deliberately small renderer-neutral API.",
+        "Stable, focused outline generator, statically ready before the first live frame and synchronous export.",
       riskNotes: [
         "It emits outline coordinates and does not own compositing, texture, history or persistence.",
         "Real pointer pressure requires simulatePressure=false at the adapter boundary.",
@@ -113,6 +121,23 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       ],
     }),
     strategy({
+      id: "hokusai",
+      displayName: "Hokusai",
+      packageName: "studio-hokusai-wasm",
+      license: "MIT OR Apache-2.0",
+      productLayer: "natural-media-worker",
+      decision: "isolated-settled-first-natural-media-provider",
+      runtimeInstallation: "installed-isolated-provider",
+      maintenanceNote:
+        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly, reads transparent dirty 64×64 tiles inside a Dedicated Worker and returns a verified transparent PNG plus receipt for an explicit selected-stroke transform.",
+      riskNotes: [
+        "This is an active settled selected-stroke natural-media transform, not the normal live brush core or a default brush route.",
+        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own transparent tile adapter and fail-closed Worker protocol.",
+        "License inventory, checked-in integrity hashes, byte-reproducible release build and real-browser runtime QA gate the local provider.",
+        "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter and output hashes must be receipted.",
+      ],
+    }),
+    strategy({
       id: "p5-brush",
       displayName: "p5.brush",
       packageName: "p5.brush",
@@ -124,6 +149,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
         "Actively maintained specialist; verified adapter 2.2.1-adapter.3 exposes flow fields, hatching, mass strokes, watercolor fills and flat washes.",
       riskNotes: [
         "Runs only in a dedicated Worker on a private OffscreenCanvas WebGL2 surface.",
+        "Every special-effect family remains behind browser capability, quality and bounded-memory gates.",
         "Live-stage execution is forbidden; only copied settled pixels and deterministic receipts cross the provider boundary.",
         "Image and custom tips remain fail-closed until their real adapter path passes the same browser quality gates.",
         "Composited fills use a stricter eight-frame resident-memory admission budget.",
@@ -145,6 +171,22 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       ],
     }),
     strategy({
+      id: "pixi",
+      displayName: "PixiJS",
+      packageName: "pixi.js",
+      license: "MIT",
+      productLayer: "object-selection-overlay",
+      decision: "isolated-gpu-scene-overlay-provider",
+      runtimeInstallation: "installed-isolated-provider",
+      maintenanceNote:
+        "pixi.js 8.19 is installed and a lazy WebGPU-first/WebGL-fallback selectable-scene provider is implemented. A production-source import audit finds no normal Studio host for createStudioPixiSceneProvider yet, so this remains implemented but unwired.",
+      riskNotes: [
+        "It owns only a dedicated transparent pointer-inactive overlay canvas; the document, selection commands and hit-test meaning remain ToonSpectrum-owned.",
+        "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
+        "The provider requires an explicit product host, lifecycle owner and browser receipt gate before it can be described as active.",
+      ],
+    }),
+    strategy({
       id: "paper",
       displayName: "Paper.js",
       packageName: "paper",
@@ -157,6 +199,22 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       riskNotes: [
         "Keep it dynamically isolated so its global/project state cannot own the Studio scene.",
         "Simplification tolerance changes geometry and must be explicit in canonical commands.",
+      ],
+    }),
+    strategy({
+      id: "canvaskit",
+      displayName: "CanvasKit/Skia",
+      packageName: "canvaskit-wasm",
+      license: "BSD-3-Clause",
+      productLayer: "path-quality-worker",
+      decision: "isolated-worker-path-quality-provider",
+      runtimeInstallation: "installed-isolated-provider",
+      maintenanceNote:
+        "canvaskit-wasm 0.41.1 is installed behind a module Worker/WASM protocol and implements bounded Skia PathOps plus stroke-to-fill conversion. A production-source import audit finds no normal Studio caller of StudioQualityWorkerClient yet, so this remains implemented but unwired.",
+      riskNotes: [
+        "Only plain SVG path data and structured receipts may cross the Worker boundary; Embind objects and WASM pointers never enter the document.",
+        "It has no live or committed brush-pixel authority and cannot replace the canonical stroke plan.",
+        "Every allocated CanvasKit path must be deleted inside the Worker epoch, and unsupported text shaping continues through the ToonSpectrum fallback.",
       ],
     }),
     strategy({
@@ -221,14 +279,494 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
     }),
   ]);
 
+/**
+ * Broader source audit used when deciding whether a library belongs in the product, remains an
+ * implementation oracle, or must stay out of the bundle. This is deliberately separate from the
+ * runtime strategy list: browser standards and first-party infrastructure are not third-party
+ * libraries, while GPL/proprietary references may be useful without being product dependencies.
+ */
+export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
+  "studio-drawing-source-audit-v3" as const;
+
+export type StudioDrawingSourceKind =
+  | "first-party"
+  | "browser-standard"
+  | "open-source"
+  | "commercial-sdk";
+
+export type StudioDrawingSourceDisposition =
+  | "adopted-active"
+  | "adopted-opt-in"
+  | "reference-only"
+  | "excluded";
+
+export type StudioDrawingSourceCodePolicy =
+  | "first-party-authority"
+  | "browser-native"
+  | "runtime-import"
+  | "isolated-runtime"
+  | "behavioral-reference-only"
+  | "excluded-from-product-code";
+
+export type StudioDrawingSourceActivity =
+  | "first-party-active"
+  | "browser-standard"
+  | "active"
+  | "low-churn"
+  | "young-fast-moving"
+  | "stale"
+  | "commercial-release";
+
+export type StudioDrawingSourceBrushAuthorityOverlap =
+  | "canonical-owner"
+  | "none-infrastructure"
+  | "input-only"
+  | "geometry-only"
+  | "shape-style-only"
+  | "brush-renderer-overlap"
+  | "path-renderer-overlap"
+  | "scene-model-overlap"
+  | "document-and-brush-overlap";
+
+export interface StudioDrawingSourceAuditEntry {
+  readonly auditVersion: typeof STUDIO_DRAWING_SOURCE_AUDIT_VERSION;
+  readonly id: string;
+  readonly displayName: string;
+  readonly sourceKind: StudioDrawingSourceKind;
+  readonly officialSource: string;
+  readonly versionEvidence: string;
+  readonly license: string;
+  readonly activity: StudioDrawingSourceActivity;
+  readonly disposition: StudioDrawingSourceDisposition;
+  readonly codePolicy: StudioDrawingSourceCodePolicy;
+  readonly brushAuthorityOverlap: StudioDrawingSourceBrushAuthorityOverlap;
+  readonly rationale: string;
+}
+
+function sourceAudit(
+  value: Omit<StudioDrawingSourceAuditEntry, "auditVersion">
+): StudioDrawingSourceAuditEntry {
+  return Object.freeze({
+    auditVersion: STUDIO_DRAWING_SOURCE_AUDIT_VERSION,
+    ...value,
+  });
+}
+
+export const STUDIO_DRAWING_SOURCE_AUDIT:
+readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
+  sourceAudit({
+    id: "toonspectrum-canonical-core",
+    displayName: "ToonSpectrum tile/layer/history/preset core",
+    sourceKind: "first-party",
+    officialSource: "src/domains/creator",
+    versionEvidence: "versioned canonical contracts and receipts",
+    license: "First-party product code",
+    activity: "first-party-active",
+    disposition: "adopted-active",
+    codePolicy: "first-party-authority",
+    brushAuthorityOverlap: "canonical-owner",
+    rationale:
+      "The first-party tile, layer, history, preset and stroke-plan formats remain the sole persisted, replayed and collaborative authority.",
+  }),
+  sourceAudit({
+    id: "pointer-events-l3",
+    displayName: "Pointer Events Level 3",
+    sourceKind: "browser-standard",
+    officialSource: "https://www.w3.org/TR/pointerevents3/",
+    versionEvidence: "Pointer Events Level 3 plus deployed browser capability checks",
+    license: "W3C Document License / browser implementation",
+    activity: "browser-standard",
+    disposition: "adopted-active",
+    codePolicy: "browser-native",
+    brushAuthorityOverlap: "input-only",
+    rationale:
+      "Pointer capture, pointerrawupdate and getCoalescedEvents are the primary low-latency input transport; prediction never mutates committed samples.",
+  }),
+  sourceAudit({
+    id: "toonspectrum-adaptive-stabilizer",
+    displayName: "ToonSpectrum adaptive stabilizer",
+    sourceKind: "first-party",
+    officialSource: "src/domains/creator/studio-stroke-stabilizer.ts",
+    versionEvidence: "first-party adaptive time-constant and lag-bound implementation",
+    license: "First-party product code",
+    activity: "first-party-active",
+    disposition: "adopted-active",
+    codePolicy: "first-party-authority",
+    brushAuthorityOverlap: "input-only",
+    rationale:
+      "The product-owned adaptive causal path remains the default stabilizer; stronger lazy precision is explicit opt-in so the normal pen path does not inherit avoidable lag.",
+  }),
+  sourceAudit({
+    id: "worker-offscreen-canvas",
+    displayName: "Dedicated Worker + OffscreenCanvas",
+    sourceKind: "browser-standard",
+    officialSource: "https://html.spec.whatwg.org/multipage/canvas.html#the-offscreencanvas-interface",
+    versionEvidence: "browser-native capability gate",
+    license: "WHATWG specification / browser implementation",
+    activity: "browser-standard",
+    disposition: "adopted-active",
+    codePolicy: "browser-native",
+    brushAuthorityOverlap: "none-infrastructure",
+    rationale:
+      "Heavy settled raster, path and procedural providers run behind bounded Worker protocols instead of owning UI-thread document state.",
+  }),
+  sourceAudit({
+    id: "raw-webgl2",
+    displayName: "Raw WebGL2",
+    sourceKind: "browser-standard",
+    officialSource: "https://registry.khronos.org/webgl/specs/latest/2.0/",
+    versionEvidence: "WebGL 2.0 browser capability gate",
+    license: "Khronos specification / browser implementation",
+    activity: "browser-standard",
+    disposition: "adopted-active",
+    codePolicy: "browser-native",
+    brushAuthorityOverlap: "none-infrastructure",
+    rationale:
+      "Raw WebGL2 is retained as an isolated GPU surface and fallback transport, never as an independent document or history model.",
+  }),
+  sourceAudit({
+    id: "raw-webgpu",
+    displayName: "Raw WebGPU",
+    sourceKind: "browser-standard",
+    officialSource: "https://www.w3.org/TR/webgpu/",
+    versionEvidence:
+      "browser-native capability plus receipt-gated RGBA16F presentation contracts",
+    license: "W3C Document License / browser implementation",
+    activity: "browser-standard",
+    disposition: "adopted-opt-in",
+    codePolicy: "browser-native",
+    brushAuthorityOverlap: "none-infrastructure",
+    rationale:
+      "The textured dry-media vertical slice uses ToonSpectrum-owned WebGPU lowering and a shared RGBA16F presentation surface behind capability, receipt and atomic fallback gates. The normal Studio viewport conditionally promotes one selected, top-most, unclipped dry-media stroke after exact parity receipts; pointer-live drawing and the default shelf remain on their retained product routes.",
+  }),
+  sourceAudit({
+    id: "perfect-freehand",
+    displayName: "perfect-freehand",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/steveruizok/perfect-freehand",
+    versionEvidence: "manifest exact 1.2.3; resolved 1.2.3",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "adopted-active",
+    codePolicy: "runtime-import",
+    brushAuthorityOverlap: "geometry-only",
+    rationale:
+      "It supplies pressure-aware outline coordinates synchronously while ToonSpectrum owns samples, compositing, persistence and replay.",
+  }),
+  sourceAudit({
+    id: "lazy-brush",
+    displayName: "lazy-brush",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/dulnan/lazy-brush",
+    versionEvidence: "manifest ^2.0.2; resolved 2.0.2",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "adopted-opt-in",
+    codePolicy: "runtime-import",
+    brushAuthorityOverlap: "input-only",
+    rationale:
+      "The stateful leash is restricted to an explicit precision mode because mandatory use adds visible lag and duplicates direct-pen dynamics.",
+  }),
+  sourceAudit({
+    id: "stroke-stabilizer-core",
+    displayName: "@stroke-stabilizer/core",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/usapopopooon/stroke-stabilizer",
+    versionEvidence: "0.3.1 observed during the 2026-07 audit; not installed",
+    license: "MIT",
+    activity: "young-fast-moving",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "input-only",
+    rationale:
+      "Useful benchmark for stabilizer behavior, but a second mutable sampler would overlap the first-party adaptive stabilizer and parity receipts.",
+  }),
+  sourceAudit({
+    id: "roughjs",
+    displayName: "Rough.js",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/rough-stuff/rough",
+    versionEvidence: "manifest ^4.6.6; resolved 4.6.6",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "adopted-active",
+    codePolicy: "runtime-import",
+    brushAuthorityOverlap: "shape-style-only",
+    rationale:
+      "Seeded hand-drawn shape styling is narrow and does not compete with the freehand brush engine.",
+  }),
+  sourceAudit({
+    id: "hokusai",
+    displayName: "Hokusai",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/reearth/hokusai",
+    versionEvidence:
+      "local studio-hokusai-wasm 0.1.0; hokusai-core/brush/tile-mem exact =0.3.0",
+    license: "MIT OR Apache-2.0",
+    activity: "young-fast-moving",
+    disposition: "adopted-opt-in",
+    codePolicy: "isolated-runtime",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "The installed custom transparent-tile Rust/WASM adapter powers an explicit selected-stroke natural-media transform in a Dedicated Worker and returns only a verified transparent PNG plus receipt; it is not the full live brush core or a default shelf route.",
+  }),
+  sourceAudit({
+    id: "p5-brush",
+    displayName: "p5.brush",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/acamposuribe/p5.brush",
+    versionEvidence: "exact package pin 2.2.1 and adapter 2.2.1-adapter.3",
+    license: "MIT",
+    activity: "active",
+    disposition: "adopted-active",
+    codePolicy: "isolated-runtime",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Flow fields, hatching and watercolor generators are accepted only as browser-gated settled pixels from a private Worker OffscreenCanvas.",
+  }),
+  sourceAudit({
+    id: "konva",
+    displayName: "Konva",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/konvajs/konva",
+    versionEvidence: "manifest ^10.3.0; resolved 10.3.0",
+    license: "MIT",
+    activity: "active",
+    disposition: "adopted-active",
+    codePolicy: "runtime-import",
+    brushAuthorityOverlap: "scene-model-overlap",
+    rationale:
+      "Konva remains the retained selection/text/transform overlay and is explicitly barred from canonical raster brush ownership.",
+  }),
+  sourceAudit({
+    id: "pixi",
+    displayName: "PixiJS",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/pixijs/pixijs",
+    versionEvidence: "manifest ^8.19.0; resolved 8.19.0",
+    license: "MIT",
+    activity: "active",
+    disposition: "adopted-opt-in",
+    codePolicy: "isolated-runtime",
+    brushAuthorityOverlap: "scene-model-overlap",
+    rationale:
+      "The WebGPU-first selectable overlay provider is isolated and implemented, but remains unwired until a product host and receipt gate own its lifecycle.",
+  }),
+  sourceAudit({
+    id: "paper",
+    displayName: "Paper.js",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/paperjs/paper.js",
+    versionEvidence: "exact package pin 0.12.18",
+    license: "MIT",
+    activity: "low-churn",
+    disposition: "adopted-opt-in",
+    codePolicy: "isolated-runtime",
+    brushAuthorityOverlap: "path-renderer-overlap",
+    rationale:
+      "Vector simplify, smooth and Boolean operations run as explicit settled tools without owning the scene.",
+  }),
+  sourceAudit({
+    id: "canvaskit",
+    displayName: "CanvasKit/Skia",
+    sourceKind: "open-source",
+    officialSource: "https://skia.org/docs/user/modules/canvaskit/",
+    versionEvidence: "exact package pin 0.41.1",
+    license: "BSD-3-Clause",
+    activity: "active",
+    disposition: "adopted-opt-in",
+    codePolicy: "isolated-runtime",
+    brushAuthorityOverlap: "path-renderer-overlap",
+    rationale:
+      "Bounded PathOps and stroke-to-fill run behind a module Worker; no Embind object, pointer or Skia scene enters the document.",
+  }),
+  sourceAudit({
+    id: "wacom-will",
+    displayName: "Wacom WILL Ink SDK",
+    sourceKind: "commercial-sdk",
+    officialSource: "https://github.com/Wacom-Developer/will-ink-sdk-js-samples",
+    versionEvidence: "WILL SDK 2.0.0 release line; samples audited 2026-07",
+    license: "MIT sample code; proprietary/commercial SDK EULA and domain license",
+    activity: "commercial-release",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Particle ink and UIM behavior are quality references only; the private registry, token and deployment license prevent silent runtime adoption.",
+  }),
+  sourceAudit({
+    id: "brushlib-wasm",
+    displayName: "brushlib-wasm",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/eliot-akira/brushlib-wasm",
+    versionEvidence: "repository package version 1.0.0; last activity observed 2022",
+    license: "Package metadata says ISC; repository has no authoritative LICENSE file",
+    activity: "stale",
+    disposition: "excluded",
+    codePolicy: "excluded-from-product-code",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Vendored libmypaint provenance and absent repository license evidence are unacceptable; Hokusai is the auditable replacement path.",
+  }),
+  sourceAudit({
+    id: "glbrush",
+    displayName: "glbrush.js",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/Oletus/glbrush.js",
+    versionEvidence: "repository last activity observed 2020",
+    license: "MIT",
+    activity: "stale",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Its 16-bit soft-brush and replay behavior are useful oracles, but its own layer/history serialization would create a second canonical document.",
+  }),
+  sourceAudit({
+    id: "wickbrush",
+    displayName: "WickBrush",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/Wicklets/WickBrush",
+    versionEvidence: "repository last activity observed 2021",
+    license: "MIT",
+    activity: "stale",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Spring-node and custom-tip behavior can inform tests, but its circle-dab carrier and dormant maintenance are not a production engine.",
+  }),
+  sourceAudit({
+    id: "fuderu",
+    displayName: "Fuderu",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/tejasbenibagde/fuderu",
+    versionEvidence: "upstream moving from 1.2.2 toward 1.3.0 during the 2026-07 audit; not installed",
+    license: "MIT",
+    activity: "young-fast-moving",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Its natural-media UX is worth benchmarking, but its layer/history/document surface overlaps first-party authority and the release line was moving during audit.",
+  }),
+  sourceAudit({
+    id: "signature-pad",
+    displayName: "Signature Pad",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/szimek/signature_pad",
+    versionEvidence: "5.1.3 observed during the 2026-07 audit; not installed",
+    license: "MIT",
+    activity: "active",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "brush-renderer-overlap",
+    rationale:
+      "Velocity-filtered cubic Bézier handwriting remains a benchmark, not a replacement for pressure-recorded canonical samples.",
+  }),
+  sourceAudit({
+    id: "atrament",
+    displayName: "Atrament",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/jakubfiala/atrament.js",
+    versionEvidence: "5.1.0 observed during the 2026-07 audit; not installed",
+    license: "MIT upstream; package metadata says SEE LICENSE",
+    activity: "low-churn",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Adaptive thickness, pressure smoothing, erase and fill interactions are behavior oracles; direct Canvas ownership would break replay parity.",
+  }),
+  sourceAudit({
+    id: "croquis",
+    displayName: "croquis.js",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/tennisonchan/croquis.js",
+    versionEvidence: "0.0.3; last package activity observed 2020",
+    license: "MIT OR Apache-2.0",
+    activity: "stale",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Pulled-string and snake smoothing remain useful benchmark behaviors, but stale maintenance and duplicate layer/history ownership block adoption.",
+  }),
+  sourceAudit({
+    id: "js-draw",
+    displayName: "js-draw",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/personalizedrefrigerator/js-draw",
+    versionEvidence: "1.33.0 observed during the 2026-07 audit; not installed",
+    license: "MIT",
+    activity: "active",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "The complete vector editor is a UX and accessibility reference, not a second scene, command, history and export authority.",
+  }),
+  sourceAudit({
+    id: "drauu",
+    displayName: "Drauu",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/antfu/drauu",
+    versionEvidence: "1.0.0 observed during the 2026-07 audit; not installed",
+    license: "MIT",
+    activity: "active",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Its headless SVG board is a compact interaction reference, but its SVG scene and undo model overlap canonical commands.",
+  }),
+  sourceAudit({
+    id: "chickenpaint",
+    displayName: "ChickenPaint",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/thenickdude/chickenpaint",
+    versionEvidence: "0.4.1 observed; low recent package activity",
+    license: "GPL-3.0-or-later",
+    activity: "stale",
+    disposition: "reference-only",
+    codePolicy: "behavioral-reference-only",
+    brushAuthorityOverlap: "document-and-brush-overlap",
+    rationale:
+      "Only externally observed behavior may inform independent tests; ChickenPaint code, bundle, copied structure and derived implementation are excluded from product code.",
+  }),
+  sourceAudit({
+    id: "fabric",
+    displayName: "Fabric.js",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/fabricjs/fabric.js",
+    versionEvidence: "active upstream; not installed",
+    license: "MIT",
+    activity: "active",
+    disposition: "excluded",
+    codePolicy: "excluded-from-product-code",
+    brushAuthorityOverlap: "scene-model-overlap",
+    rationale:
+      "A second retained object canvas duplicates Konva selection, serialization and hit-testing without improving the canonical brush carrier.",
+  }),
+]);
+
 const STRATEGY_BY_ID = new Map(
   STUDIO_DRAWING_LIBRARY_STRATEGIES.map((entry) => [entry.id, entry])
+);
+const SOURCE_AUDIT_BY_ID = new Map(
+  STUDIO_DRAWING_SOURCE_AUDIT.map((entry) => [entry.id, entry])
 );
 
 export function resolveStudioDrawingLibraryStrategy(
   id: unknown
 ): StudioDrawingLibraryStrategy | null {
   return typeof id === "string" ? STRATEGY_BY_ID.get(id) ?? null : null;
+}
+
+export function resolveStudioDrawingSourceAudit(
+  id: unknown
+): StudioDrawingSourceAuditEntry | null {
+  return typeof id === "string" ? SOURCE_AUDIT_BY_ID.get(id) ?? null : null;
 }
 
 export function listStudioDrawingLibraryStrategiesByLayer(

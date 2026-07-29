@@ -179,6 +179,8 @@ export class StudioLiveInkOverlayRenderer {
   private active = false;
   /** 펜을 뗐지만 React 커밋 동기화 전이라 표면에 유지 중인 획들. */
   private settled: SettledLiveInkStroke[] = [];
+  /** Canonical-drawn prefix retained solely for FIFO accounting and therefore not repainted. */
+  private suppressedSettledPrefixCount = 0;
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
     this.context = canvas ? acquireStudioLowLatencyCanvas2dContext(canvas) : null;
@@ -399,8 +401,28 @@ export class StudioLiveInkOverlayRenderer {
     const released = Math.min(requested, this.settled.length);
     if (released === 0) return 0;
     this.settled = this.settled.slice(released);
+    this.suppressedSettledPrefixCount = Math.max(
+      0,
+      this.suppressedSettledPrefixCount - released,
+    );
     this.replay();
     return released;
+  }
+
+  /**
+   * Stops presenting an exact canonical-drawn prefix while keeping its release accounting intact.
+   * Repeated retained-retry passes are idempotent, and any newer settled or active ink remains
+   * visible because replay skips only the proven FIFO prefix.
+   */
+  suppressSettledPrefix(count: number): number {
+    const requested = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    const suppressed = Math.min(requested, this.settled.length);
+    if (suppressed <= this.suppressedSettledPrefixCount) {
+      return this.suppressedSettledPrefixCount;
+    }
+    this.suppressedSettledPrefixCount = suppressed;
+    this.replay();
+    return suppressed;
   }
 
   /** 모든 settled 획을 원자적으로 제거하고, 존재하는 active 획만 backing 에 다시 그린다. */
@@ -430,6 +452,7 @@ export class StudioLiveInkOverlayRenderer {
   clear(): void {
     this.resetActiveState();
     this.settled = [];
+    this.suppressedSettledPrefixCount = 0;
     this.clearRect();
   }
 
@@ -590,7 +613,7 @@ export class StudioLiveInkOverlayRenderer {
   /** 뷰포트 이동/줌/반전 등 표면 변화 시에만 전체 재생한다(빈도 낮음). */
   private replay(): void {
     this.clearRect();
-    for (const stroke of this.settled) {
+    for (const stroke of this.settled.slice(this.suppressedSettledPrefixCount)) {
       this.drawStrokePath(stroke.style, stroke.xs, stroke.ys, stroke.ps);
     }
     const style = this.style;

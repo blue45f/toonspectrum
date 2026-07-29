@@ -72,6 +72,12 @@ export interface StudioCausalWatercolorPlanInput {
   readonly maxDabs?: number;
   readonly spacing?: number;
   readonly diffuse?: boolean;
+  /**
+   * Adds the current exact endpoint to this disposable replay without sealing or mutating the
+   * causal walker. Retained live previews use this to match pointer-up bounds while permanent
+   * pigment remains an append-only station prefix.
+   */
+  readonly previewEndpoint?: boolean;
 }
 
 export interface StudioCausalWatercolorPlan {
@@ -319,6 +325,35 @@ export function finishCausalWatercolorBrush(
 }
 
 /**
+ * Peeks the exact dab(s) that `finishCausalWatercolorBrush` would emit without changing any part
+ * of the authoritative causal state. The returned geometry is disposable: callers must redraw it
+ * on the next accepted sample rather than append it to retained pigment.
+ */
+export function previewCausalWatercolorBrushEndpoint(
+  state: StudioCausalWatercolorState,
+): WatercolorBrushDab[] {
+  if (state.finished || !state.travelled) return [];
+  if (
+    Math.hypot(
+      state.lastX - state.lastStationX,
+      state.lastY - state.lastStationY,
+    ) <= POINT_EPSILON
+  ) {
+    return [];
+  }
+  const previewState: StudioCausalWatercolorState = {
+    ...state,
+    settings: state.settings,
+  };
+  return emitStation(
+    previewState,
+    previewState.lastX,
+    previewState.lastY,
+    previewState.lastPressure,
+  );
+}
+
+/**
  * Deterministic replay for committed (`finalized=true`) or still-active (`false`) strokes.
  * Incremental append and this replay function intentionally share the exact same walker.
  */
@@ -351,7 +386,11 @@ export function planCausalWatercolorBrush(
     dabs.push(...appendCausalWatercolorBrush(started.state, sample));
   }
 
-  if (started && finalized) dabs.push(...finishCausalWatercolorBrush(started.state));
+  if (started && finalized) {
+    dabs.push(...finishCausalWatercolorBrush(started.state));
+  } else if (started && input?.previewEndpoint === true) {
+    dabs.push(...previewCausalWatercolorBrushEndpoint(started.state));
+  }
   return {
     dabs,
     sourcePointCount: acceptedPointCount,

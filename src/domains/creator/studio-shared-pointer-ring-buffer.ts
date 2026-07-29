@@ -15,9 +15,14 @@
 export const STUDIO_SHARED_POINTER_RING_TRANSPORT_CONTRACT =
   "structured-clone the descriptor; never include its SharedArrayBuffer in a transfer list";
 
-export const STUDIO_SHARED_POINTER_RING_VERSION = 1;
+/**
+ * V2 appends Pointer Events sensor channels after the original twelve-field prefix. Keeping the
+ * prefix stable lets an older positional visitor ignore the extension, while the descriptor and
+ * aligned header reject a V1-sized buffer instead of decoding it with the wrong stride.
+ */
+export const STUDIO_SHARED_POINTER_RING_VERSION = 2;
 export const STUDIO_SHARED_POINTER_RING_HEADER_BYTES = 64;
-export const STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S = 12;
+export const STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S = 17;
 export const STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES =
   STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S * Float64Array.BYTES_PER_ELEMENT;
 export const STUDIO_SHARED_POINTER_RING_MIN_CAPACITY = 2;
@@ -59,6 +64,11 @@ const enum SampleField {
   Role = 9,
   Channel = 10,
   Flags = 11,
+  TangentialPressure = 12,
+  AltitudeAngle = 13,
+  AzimuthAngle = 14,
+  ContactWidth = 15,
+  ContactHeight = 16,
 }
 
 export const STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE = 0;
@@ -66,6 +76,19 @@ export const STUDIO_POINTER_SAMPLE_ROLE_PREDICTED = 1;
 export type StudioPointerSampleRole =
   | typeof STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE
   | typeof STUDIO_POINTER_SAMPLE_ROLE_PREDICTED;
+
+export const STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS = Object.freeze({
+  tangentialPressure: 0,
+  altitudeAngle: Math.PI / 2,
+  azimuthAngle: 0,
+  contactWidth: 1,
+  contactHeight: 1,
+} as const);
+
+export const STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS = Object.freeze({
+  maxContactDimension: 65_536,
+  maxSourceTimeMilliseconds: Number.MAX_SAFE_INTEGER,
+} as const);
 
 export interface StudioSharedPointerSample {
   readonly x: number;
@@ -80,6 +103,15 @@ export interface StudioSharedPointerSample {
   readonly role: StudioPointerSampleRole;
   readonly channel: number;
   readonly flags: number;
+  /**
+   * Optional for source compatibility with the V1 producer API. V2 storage always materializes
+   * normalized Pointer Events defaults when an older caller omits these channels.
+   */
+  readonly tangentialPressure?: number;
+  readonly altitudeAngle?: number;
+  readonly azimuthAngle?: number;
+  readonly contactWidth?: number;
+  readonly contactHeight?: number;
 }
 
 /**
@@ -99,6 +131,11 @@ export type StudioSharedPointerSampleVisitor = (
   role: StudioPointerSampleRole,
   channel: number,
   flags: number,
+  tangentialPressure: number,
+  altitudeAngle: number,
+  azimuthAngle: number,
+  contactWidth: number,
+  contactHeight: number,
 ) => void;
 
 /**
@@ -435,6 +472,11 @@ function isValidPackedSample(
   role: number,
   channel: number,
   flags: number,
+  tangentialPressure: number,
+  altitudeAngle: number,
+  azimuthAngle: number,
+  contactWidth: number,
+  contactHeight: number,
 ): role is StudioPointerSampleRole {
   return (
     Number.isFinite(x)
@@ -453,6 +495,7 @@ function isValidPackedSample(
     && twist < 360
     && Number.isFinite(time)
     && time >= 0
+    && time <= STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS.maxSourceTimeMilliseconds
     && Number.isSafeInteger(pointerId)
     && pointerId >= 0
     && Number.isSafeInteger(sequence)
@@ -463,6 +506,23 @@ function isValidPackedSample(
     )
     && isUint32(channel)
     && isUint32(flags)
+    && Number.isFinite(tangentialPressure)
+    && tangentialPressure >= -1
+    && tangentialPressure <= 1
+    && Number.isFinite(altitudeAngle)
+    && altitudeAngle >= 0
+    && altitudeAngle <= Math.PI / 2
+    && Number.isFinite(azimuthAngle)
+    && azimuthAngle >= 0
+    && azimuthAngle < Math.PI * 2
+    && Number.isFinite(contactWidth)
+    && contactWidth >= 0
+    && contactWidth
+      <= STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS.maxContactDimension
+    && Number.isFinite(contactHeight)
+    && contactHeight >= 0
+    && contactHeight
+      <= STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS.maxContactDimension
   );
 }
 
@@ -552,12 +612,25 @@ export class StudioSharedPointerRingProducer {
       sample.role,
       sample.channel,
       sample.flags,
+      sample.tangentialPressure
+        ?? STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.tangentialPressure,
+      sample.altitudeAngle
+        ?? STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.altitudeAngle,
+      sample.azimuthAngle
+        ?? STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.azimuthAngle,
+      sample.contactWidth
+        ?? STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.contactWidth,
+      sample.contactHeight
+        ?? STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.contactHeight,
     );
   }
 
   /**
    * Allocation-free producer entry point. The write counter is published only
-   * after all twelve Float64 fields have been stored.
+   * after the complete V2 Float64 record has been stored.
+   *
+   * Extended channels are trailing optional arguments so legacy V1 callers remain source
+   * compatible. A V2 descriptor and stride still prevent binary layout confusion.
    */
   public writePacked(
     x: number,
@@ -572,6 +645,12 @@ export class StudioSharedPointerRingProducer {
     role: StudioPointerSampleRole,
     channel: number,
     flags: number,
+    tangentialPressure: number =
+      STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.tangentialPressure,
+    altitudeAngle: number = STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.altitudeAngle,
+    azimuthAngle: number = STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.azimuthAngle,
+    contactWidth: number = STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.contactWidth,
+    contactHeight: number = STUDIO_SHARED_POINTER_RING_SENSOR_DEFAULTS.contactHeight,
   ): StudioSharedPointerWriteResult {
     const { header, samples, descriptor, capacityMask } = this.ring;
     if (
@@ -588,6 +667,11 @@ export class StudioSharedPointerRingProducer {
         role,
         channel,
         flags,
+        tangentialPressure,
+        altitudeAngle,
+        azimuthAngle,
+        contactWidth,
+        contactHeight,
       )
     ) {
       incrementUnsigned(header, HeaderIndex.InvalidSampleCount);
@@ -627,6 +711,11 @@ export class StudioSharedPointerRingProducer {
     samples[offset + SampleField.Role] = role;
     samples[offset + SampleField.Channel] = channel;
     samples[offset + SampleField.Flags] = flags;
+    samples[offset + SampleField.TangentialPressure] = tangentialPressure;
+    samples[offset + SampleField.AltitudeAngle] = altitudeAngle;
+    samples[offset + SampleField.AzimuthAngle] = azimuthAngle;
+    samples[offset + SampleField.ContactWidth] = contactWidth;
+    samples[offset + SampleField.ContactHeight] = contactHeight;
 
     const nextWriteCounter = (writeCounter + 1) >>> 0;
     Atomics.store(
@@ -735,6 +824,12 @@ export class StudioSharedPointerRingConsumer {
     const role = samples[offset + SampleField.Role] as number;
     const channel = samples[offset + SampleField.Channel] as number;
     const flags = samples[offset + SampleField.Flags] as number;
+    const tangentialPressure =
+      samples[offset + SampleField.TangentialPressure] as number;
+    const altitudeAngle = samples[offset + SampleField.AltitudeAngle] as number;
+    const azimuthAngle = samples[offset + SampleField.AzimuthAngle] as number;
+    const contactWidth = samples[offset + SampleField.ContactWidth] as number;
+    const contactHeight = samples[offset + SampleField.ContactHeight] as number;
     if (
       !isValidPackedSample(
         x,
@@ -749,6 +844,11 @@ export class StudioSharedPointerRingConsumer {
         role,
         channel,
         flags,
+        tangentialPressure,
+        altitudeAngle,
+        azimuthAngle,
+        contactWidth,
+        contactHeight,
       )
     ) {
       incrementUnsigned(header, HeaderIndex.CorruptStateCount);
@@ -768,6 +868,11 @@ export class StudioSharedPointerRingConsumer {
         role,
         channel,
         flags,
+        tangentialPressure,
+        altitudeAngle,
+        azimuthAngle,
+        contactWidth,
+        contactHeight,
       );
     } catch {
       return "visitor-threw";
@@ -825,6 +930,11 @@ export class StudioSharedPointerRingConsumer {
         role,
         channel,
         flags,
+        tangentialPressure,
+        altitudeAngle,
+        azimuthAngle,
+        contactWidth,
+        contactHeight,
       ) => {
         samples.push({
           x,
@@ -839,6 +949,11 @@ export class StudioSharedPointerRingConsumer {
           role,
           channel,
           flags,
+          tangentialPressure,
+          altitudeAngle,
+          azimuthAngle,
+          contactWidth,
+          contactHeight,
         });
       },
       maximumSamples,

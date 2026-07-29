@@ -20,7 +20,6 @@ import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
 import {
   studioInkFallbackPressure,
-  studioInkUsesPathResidualDabSpacing,
 } from "./studio-ink-pressure-model";
 import {
   fillStudioPixelPencilCells,
@@ -264,10 +263,7 @@ export function isDirectLiveDraftEl(el: DrawEl): boolean {
   if (el.mode === "eraser") return true;
   if (isStudioPixelPencilRenderMode(el.brush)) return true;
   const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
-  const causalGpen =
-    family === "gpen"
-    && studioInkUsesPathResidualDabSpacing(el.pressureModel);
-  if (family !== "pen" && family !== "marker" && !causalGpen) return false;
+  if (family !== "pen" && family !== "marker") return false;
   return resolveStudioBrushDynamicsPresetId(el.brush) === null;
 }
 

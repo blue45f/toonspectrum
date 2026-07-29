@@ -12,12 +12,12 @@ import {
   type StudioPerfectFreehandStroker,
 } from "./studio-perfect-freehand";
 
-// 로더 상태는 모듈 전역이므로, 로드 전 peek 검증이 항상 첫 테스트로 실행돼야 한다.
 describe("loadStudioPerfectFreehandStroker / peekStudioPerfectFreehandStroker", () => {
-  it("로드 전에는 null, 로드 후에는 같은 함수를 캐시한다", async () => {
-    expect(peekStudioPerfectFreehandStroker()).toBeNull();
+  it("첫 동기 프레임부터 준비된 같은 스트로커를 반환한다", async () => {
+    const peeked = peekStudioPerfectFreehandStroker();
+    expect(typeof peeked).toBe("function");
     const stroker = await loadStudioPerfectFreehandStroker();
-    expect(typeof stroker).toBe("function");
+    expect(stroker).toBe(peeked);
     expect(peekStudioPerfectFreehandStroker()).toBe(stroker);
     await expect(loadStudioPerfectFreehandStroker()).resolves.toBe(stroker);
   });

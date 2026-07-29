@@ -8,6 +8,7 @@ import {
   parseStudioEngineHelloAck,
   parseStudioEngineWorkerMessage,
   STUDIO_ENGINE_EXECUTION_PROFILE,
+  STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S,
   STUDIO_ENGINE_WORKER_BUDGETS,
   STUDIO_ENGINE_WORKER_PROTOCOL_REVISION,
   STUDIO_ENGINE_SURFACE_TRANSFER_CONTRACT,
@@ -23,6 +24,7 @@ import {
   STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
   STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
   STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES,
+  STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
 } from "./studio-shared-pointer-ring-buffer";
 
 const ULTRA_CAPABILITIES: StudioEngineCapabilitySnapshot = {
@@ -63,11 +65,13 @@ function commandMessage(
 }
 
 function pointerBatch(sampleCount = 3) {
-  const samples = new Float64Array(sampleCount * 12);
+  const samples = new Float64Array(
+    sampleCount * STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S,
+  );
   let authoritativeCount = 0;
   let predictedCount = 0;
   for (let index = 0; index < sampleCount; index += 1) {
-    const offset = index * 12;
+    const offset = index * STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S;
     const role =
       index % 2 === 0
         ? STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE
@@ -426,6 +430,11 @@ describe("studio engine command prefix validation", () => {
 
   it("validates and exposes an exact transferable pointer batch", () => {
     const batch = pointerBatch();
+    expect(STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S).toBe(12);
+    expect(STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S).toBe(17);
+    expect(batch.samples).toHaveLength(
+      batch.sampleCount * STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S,
+    );
     const message = commandMessage({
       kind: "pointer-batch",
       batch,

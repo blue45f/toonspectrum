@@ -15,6 +15,14 @@ export interface StudioGpuPendingAuthorityPromotionInput {
   readonly uncommittedOrderIds: readonly string[];
 }
 
+export type StudioGpuPendingAuthorityPromotionRejectionReason =
+  | "invalid-count"
+  | "authority-count-mismatch"
+  | "partial-authority-reservation"
+  | "authority-reservation-element-mismatch"
+  | "draft-reservation-element-mismatch"
+  | "draft-reservation-overflow";
+
 export type StudioGpuPendingAuthorityPromotion =
   | {
       readonly status: "promoted";
@@ -24,13 +32,20 @@ export type StudioGpuPendingAuthorityPromotion =
     }
   | {
       readonly status: "rejected";
-      readonly reason:
-        | "invalid-count"
-        | "authority-count-mismatch"
-        | "partial-authority-reservation"
-        | "authority-reservation-element-mismatch"
-        | "draft-reservation-element-mismatch"
-        | "draft-reservation-overflow";
+      readonly reason: StudioGpuPendingAuthorityPromotionRejectionReason;
+    };
+
+export type StudioGpuPendingAuthorityCanvasReconciliation =
+  | {
+      readonly status: "promoted";
+      readonly settledDrafts: readonly DrawEl[];
+      readonly handoffs: readonly StudioCommittedInkSurfaceHandoff[];
+      readonly promotedElementCount: number;
+      readonly recoveredFrom: StudioGpuPendingAuthorityPromotionRejectionReason;
+    }
+  | {
+      readonly status: "rejected";
+      readonly reason: "missing-draw-authority";
     };
 
 export interface StudioGpuPendingAuthorityReleaseInput {
@@ -182,6 +197,72 @@ export function promoteStudioGpuPendingAuthority(
     settledDrafts: nextSettledDrafts,
     handoffs: nextHandoffs,
     promotedElementCount: input.authorities.length,
+  };
+}
+
+/**
+ * Last-resort semantic reconciliation for a corrupt numeric surface reservation.
+ *
+ * The strict planner above remains the ordinary authority transition. This fallback is used only
+ * when its count bookkeeping is already inconsistent and a newer physical stroke must not be
+ * composited underneath the retained DOM GPU canvas. It never invents pixels: every recovered
+ * Canvas item must come from an exact retained DrawEl authority. Handoff ownership is rebuilt from
+ * semantic stroke ids, while unmatched drafts are retained at the tail instead of being released.
+ */
+export function reconcileStudioGpuPendingAuthorityToCanvas(
+  input: StudioGpuPendingAuthorityPromotionInput,
+  recoveredFrom: StudioGpuPendingAuthorityPromotionRejectionReason,
+): StudioGpuPendingAuthorityCanvasReconciliation {
+  const retainedGpuStrokeCount = normalizedCount(input.gpuStrokeCount);
+  const recoverableGpuStrokeCount = authorityStrokeCount(input.authorities);
+  if (
+    retainedGpuStrokeCount === null
+    || recoverableGpuStrokeCount === null
+    || retainedGpuStrokeCount !== recoverableGpuStrokeCount
+  ) {
+    return { status: "rejected", reason: "missing-draw-authority" };
+  }
+
+  const combined = orderedUniqueElements(
+    [
+      ...input.settledDrafts,
+      ...input.authorities.map((authority) => authority.element),
+    ],
+    [
+      ...input.handoffs.flatMap((handoff) => handoff.strokeIds),
+      ...input.uncommittedOrderIds,
+    ],
+  );
+  const elementById = new Map(combined.map((element) => [element.id, element]));
+  const assigned = new Set<string>();
+  const settledDrafts: DrawEl[] = [];
+  const handoffs = input.handoffs.map((handoff) => {
+    const owned = orderedUniqueElements(
+      handoff.strokeIds.flatMap((strokeId) => {
+        const element = elementById.get(strokeId);
+        return element && !assigned.has(strokeId) ? [element] : [];
+      }),
+      handoff.strokeIds,
+    );
+    for (const element of owned) assigned.add(element.id);
+    settledDrafts.push(...owned);
+    return {
+      ...handoff,
+      draftSettledCount: owned.length,
+      gpuSettledCount: 0,
+    };
+  });
+  settledDrafts.push(...orderedUniqueElements(
+    combined.filter((element) => !assigned.has(element.id)),
+    input.uncommittedOrderIds,
+  ));
+
+  return {
+    status: "promoted",
+    settledDrafts,
+    handoffs,
+    promotedElementCount: input.authorities.length,
+    recoveredFrom,
   };
 }
 

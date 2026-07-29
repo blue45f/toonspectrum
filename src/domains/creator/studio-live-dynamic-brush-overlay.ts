@@ -51,6 +51,10 @@ import {
   type StudioCausalDynamicBrushDepositStateV3,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
+  resolveStudioDynamicBrushMaterialIdentity,
+  type StudioDynamicBrushMaterialIdentity,
+} from "./studio-dry-media-dynamic-bridge";
+import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
@@ -62,6 +66,9 @@ import {
   resolveStudioLiveSurfaceDevicePixelRatio,
   STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
 } from "./studio-low-latency-canvas";
+import {
+  studioSplatterOriginAnchorMarkCount,
+} from "./studio-splatter-origin-anchor";
 import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { DrawEl } from "./studio-element-model";
@@ -72,7 +79,10 @@ const MAX_LEGACY_LIVE_DABS = STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max;
 const MAX_COORDINATE_ABS = 1_000_000_000;
 
 export interface StudioLiveDynamicBrushOverlayCanvases {
+  /** Full-opacity stroke-local coverage accumulator. This surface is never presented directly. */
   readonly activeCanvas: HTMLCanvasElement;
+  /** Canvas2D-alpha-composited live pixels presented above the retained scene. */
+  readonly presentationCanvas: HTMLCanvasElement;
   readonly settledCanvas: HTMLCanvasElement;
 }
 
@@ -138,6 +148,7 @@ interface DynamicSourceSample {
 interface DetachedDynamicStrokeStyle {
   readonly strokeId: string;
   readonly brushId: string;
+  readonly materialIdentity: StudioDynamicBrushMaterialIdentity;
   readonly color: string;
   readonly width: number;
   readonly opacity: number;
@@ -200,6 +211,13 @@ interface ExactDynamicPlan {
   readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
 }
 
+interface PresentationPixelRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -215,6 +233,109 @@ function finiteNumber(value: unknown, fallback: number): number {
 function finiteCoordinate(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value)
     ? clamp(value, -MAX_COORDINATE_ABS, MAX_COORDINATE_ABS)
+    : null;
+}
+
+function rotatedEllipseExtent(
+  radiusX: number,
+  radiusY: number,
+  angleRadians: number,
+): Readonly<{ x: number; y: number }> {
+  const cosine = Math.cos(angleRadians);
+  const sine = Math.sin(angleRadians);
+  return {
+    x: Math.hypot(radiusX * cosine, radiusY * sine),
+    y: Math.hypot(radiusX * sine, radiusY * cosine),
+  };
+}
+
+function presentationRectForMarks(
+  marks: readonly StudioDynamicBrushCoverageMark[],
+  surface: StudioLiveInkSurface,
+  dpr: number,
+  canvas: Pick<HTMLCanvasElement, "width" | "height">,
+): PresentationPixelRect | null {
+  let minimumDocumentX = Number.POSITIVE_INFINITY;
+  let minimumDocumentY = Number.POSITIVE_INFINITY;
+  let maximumDocumentX = Number.NEGATIVE_INFINITY;
+  let maximumDocumentY = Number.NEGATIVE_INFINITY;
+  for (const mark of marks) {
+    if (mark.ribbon) {
+      for (const polygon of mark.ribbon.polygons) {
+        for (let index = 0; index < polygon.length; index += 2) {
+          const x = polygon[index];
+          const y = polygon[index + 1];
+          if (x === undefined || y === undefined) continue;
+          minimumDocumentX = Math.min(minimumDocumentX, x);
+          minimumDocumentY = Math.min(minimumDocumentY, y);
+          maximumDocumentX = Math.max(maximumDocumentX, x);
+          maximumDocumentY = Math.max(maximumDocumentY, y);
+        }
+      }
+      continue;
+    }
+    const radiusX = Math.max(0, mark.radiusX);
+    const radiusY = Math.max(0, mark.radiusY);
+    const cosine = Math.cos(mark.angleRadians);
+    const sine = Math.sin(mark.angleRadians);
+    // Texture stamps are rotated rectangles, not ellipses. Use the complete corner footprint so
+    // a dirty presentation crop never omits a grain texel that the committed tile path retains.
+    const extent = mark.texture
+      ? {
+          x: Math.abs(radiusX * cosine) + Math.abs(radiusY * sine),
+          y: Math.abs(radiusX * sine) + Math.abs(radiusY * cosine),
+        }
+      : rotatedEllipseExtent(radiusX, radiusY, mark.angleRadians);
+    minimumDocumentX = Math.min(minimumDocumentX, mark.x - extent.x);
+    minimumDocumentY = Math.min(minimumDocumentY, mark.y - extent.y);
+    maximumDocumentX = Math.max(maximumDocumentX, mark.x + extent.x);
+    maximumDocumentY = Math.max(maximumDocumentY, mark.y + extent.y);
+  }
+  if (
+    !Number.isFinite(minimumDocumentX)
+    || !Number.isFinite(minimumDocumentY)
+    || !Number.isFinite(maximumDocumentX)
+    || !Number.isFinite(maximumDocumentY)
+  ) return null;
+
+  const scale = dpr * surface.documentScale;
+  const translateX = surface.flipX
+    ? (surface.documentWidth * surface.documentScale - surface.left) * dpr
+    : -surface.left * dpr;
+  const translateY = -surface.top * dpr;
+  const firstPixelX = (surface.flipX ? -scale : scale) * minimumDocumentX + translateX;
+  const secondPixelX = (surface.flipX ? -scale : scale) * maximumDocumentX + translateX;
+  const firstPixelY = scale * minimumDocumentY + translateY;
+  const secondPixelY = scale * maximumDocumentY + translateY;
+  // Canvas antialiasing and filtered alpha-map samples may touch the next pixel outside the
+  // analytic footprint. Three physical pixels cover that fringe without turning an append into a
+  // full-surface presentation copy.
+  const fringe = 3;
+  const minimumPixelX = Math.max(
+    0,
+    Math.floor(Math.min(firstPixelX, secondPixelX)) - fringe,
+  );
+  const minimumPixelY = Math.max(
+    0,
+    Math.floor(Math.min(firstPixelY, secondPixelY)) - fringe,
+  );
+  const maximumPixelX = Math.min(
+    canvas.width,
+    Math.ceil(Math.max(firstPixelX, secondPixelX)) + fringe,
+  );
+  const maximumPixelY = Math.min(
+    canvas.height,
+    Math.ceil(Math.max(firstPixelY, secondPixelY)) + fringe,
+  );
+  const width = maximumPixelX - minimumPixelX;
+  const height = maximumPixelY - minimumPixelY;
+  return width > 0 && height > 0
+    ? {
+        x: minimumPixelX,
+        y: minimumPixelY,
+        width,
+        height,
+      }
     : null;
 }
 
@@ -351,6 +472,7 @@ function styleIdentityMatches(element: DrawEl, style: DetachedDynamicStrokeStyle
       === style.dynamicsSignature;
   return element.id === style.strokeId
     && element.brush === style.brushId
+    && element.brushCatalogId === style.materialIdentity.brushCatalogId
     && element.stroke === style.color
     && Math.max(1, finiteNumber(element.strokeWidth, 1)) === style.width
     && clamp01(finiteNumber(element.opacity, 1)) === style.opacity
@@ -383,6 +505,11 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
   const firstY = finiteCoordinate(element.points[1]);
   if (firstX === null || firstY === null) return null;
   const sourceDynamics = element.brushDynamics;
+  const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
+    element.brush,
+    element.brushCatalogId,
+  );
+  if (!materialIdentity) return null;
   const normalized = normalizeStudioBrushDynamicsSettings(sourceDynamics);
   const width = Math.max(1, finiteNumber(element.strokeWidth, 1));
   const seed = studioBrushDynamicsSeedFromKey(`${element.id}:${normalized.seed}`);
@@ -401,6 +528,7 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
   return {
     strokeId: element.id,
     brushId: element.brush!,
+    materialIdentity,
     color: element.stroke,
     width,
     opacity: clamp01(finiteNumber(element.opacity, 1)),
@@ -432,6 +560,10 @@ function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrush
     settings: style.dynamics,
     dabCount: 1,
     symmetryCount: style.transforms.length,
+    fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
+      style.materialIdentity,
+      true,
+    ),
     markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   }).stampGrid;
 }
@@ -456,8 +588,8 @@ function liveDynamicDevicePixelRatio(surface: StudioLiveInkSurface): number {
     cssWidth: surface.width,
     cssHeight: surface.height,
     devicePixelRatio,
-    // Two simultaneously allocated canvases share the ordinary live-surface backing budget.
-    maximumBackingPixels: STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 2,
+    // Coverage, Canvas2D presentation and settled surfaces share the transient backing budget.
+    maximumBackingPixels: STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 3,
   });
 }
 
@@ -472,8 +604,10 @@ function nativeStudioDevicePixelRatio(): number {
 
 export class StudioLiveDynamicBrushOverlayRenderer {
   private activeCanvas: HTMLCanvasElement | null = null;
+  private presentationCanvas: HTMLCanvasElement | null = null;
   private settledCanvas: HTMLCanvasElement | null = null;
   private activeContext: CanvasRenderingContext2D | null = null;
+  private presentationContext: CanvasRenderingContext2D | null = null;
   private settledContext: CanvasRenderingContext2D | null = null;
   private surface: StudioLiveInkSurface | null = null;
   private surfaceUsable = false;
@@ -484,9 +618,13 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   attach(canvases: StudioLiveDynamicBrushOverlayCanvases | null): void {
     this.activeCanvas = canvases?.activeCanvas ?? null;
+    this.presentationCanvas = canvases?.presentationCanvas ?? null;
     this.settledCanvas = canvases?.settledCanvas ?? null;
     this.activeContext = this.activeCanvas
       ? acquireStudioLowLatencyCanvas2dContext(this.activeCanvas)
+      : null;
+    this.presentationContext = this.presentationCanvas
+      ? acquireStudioLowLatencyCanvas2dContext(this.presentationCanvas)
       : null;
     this.settledContext = this.settledCanvas
       ? acquireStudioLowLatencyCanvas2dContext(this.settledCanvas)
@@ -530,6 +668,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   get backingPixelCount(): number {
     return (this.activeCanvas?.width ?? 0) * (this.activeCanvas?.height ?? 0)
+      + (this.presentationCanvas?.width ?? 0) * (this.presentationCanvas?.height ?? 0)
       + (this.settledCanvas?.width ?? 0) * (this.settledCanvas?.height ?? 0);
   }
 
@@ -612,10 +751,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       transitionedFromTap: false,
     };
     this.active = active;
-    this.setActiveCanvasOpacity(style.opacity);
     let initialMarkCount: number;
     if (exactInitial) {
-      if (!this.drawMarksToActive(exactInitial.marks)) {
+      if (!this.drawMarksToActive(exactInitial.marks, style.opacity)) {
         return this.failActive("surface-render");
       }
       active.markCount = exactInitial.marks.length;
@@ -762,6 +900,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           settings: active.style.dynamics,
           dabCount: active.plannedCausalDabCount,
           symmetryCount: active.style.transforms.length,
+          fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
+            active.style.materialIdentity,
+            active.plannedCausalDabCount > 0,
+          ),
           markBudget,
         })
       : null;
@@ -812,6 +954,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       dabVariations: variations,
       strokeOrigins: active.style.strokeOrigins,
       dynamics: active.style.dynamics,
+      materialIdentity: active.style.materialIdentity,
       dynamicSeed: active.style.seed,
       stroke: active.style.color,
       stampGrid: active.stampGrid,
@@ -830,7 +973,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (active.markCount + plan.marks.length > markBudget) {
       return this.failActive("mark-budget");
     }
-    if (!this.drawMarksToActive(plan.marks)) return this.failActive("surface-render");
+    if (!this.drawMarksToActive(plan.marks, active.style.opacity)) {
+      return this.failActive("surface-render");
+    }
     const acceptedDabs = plan.acceptedPrefixReceipt
       ? plan.acceptedPrefixReceipt.acceptedDabsPerVariation
       : acceptedDabPrefix.length;
@@ -984,7 +1129,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     this.clearActiveRect();
     active.markCount = 0;
     active.stampGrid = exact.stampGrid;
-    if (!this.drawMarksToActive(exact.marks)) {
+    if (!this.drawMarksToActive(exact.marks, active.style.opacity)) {
       return this.failActive("surface-render");
     }
     active.markCount = exact.marks.length;
@@ -1044,6 +1189,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         settings: style.dynamics,
         dabCount: causalDabCount,
         symmetryCount: style.transforms.length,
+        fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
+          style.materialIdentity,
+          causalDabCount > 0,
+        ),
         markBudget: causalMarkBudget(style.dynamics),
       });
       const acceptedDabCount = renderBudget.acceptedPrefixReceipt
@@ -1065,6 +1214,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         dabVariations,
         strokeOrigins: style.strokeOrigins,
         dynamics: style.dynamics,
+        materialIdentity: style.materialIdentity,
         dynamicSeed: style.seed,
         stroke: style.color,
         stampGrid,
@@ -1115,6 +1265,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       settings: style.dynamics,
       dabCount: dabs.length,
       symmetryCount: style.transforms.length,
+      fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
+        style.materialIdentity,
+        dabs.some((dab) => dab.index === 0),
+      ),
       markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
     });
     if (renderBudget.maxDabsPerVariation < dabs.length) {
@@ -1130,6 +1284,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       ),
       strokeOrigins: style.strokeOrigins,
       dynamics: style.dynamics,
+      materialIdentity: style.materialIdentity,
       dynamicSeed: style.seed,
       stroke: style.color,
       stampGrid: renderBudget.stampGrid,
@@ -1150,6 +1305,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   private drawMarksToActive(
     marks: readonly StudioDynamicBrushCoverageMark[],
+    presentationOpacity?: number,
   ): boolean {
     const context = this.preparedActive();
     if (!context) return false;
@@ -1157,11 +1313,55 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       for (const mark of marks) {
         renderStudioDynamicBrushCoverageMark(context, mark);
       }
-      return true;
     } catch {
       return false;
     } finally {
       context.restore();
+    }
+    return presentationOpacity === undefined
+      || this.presentActiveRect(marks, presentationOpacity);
+  }
+
+  private presentActiveRect(
+    marks: readonly StudioDynamicBrushCoverageMark[],
+    opacity: number,
+  ): boolean {
+    const context = this.presentationContext;
+    const source = this.activeCanvas;
+    const destination = this.presentationCanvas;
+    const surface = this.surface;
+    if (!context || !source || !destination || !surface) return false;
+    const rect = presentationRectForMarks(marks, surface, this.dpr, destination);
+    // A valid suffix may be fully outside the clipped live viewport. Its coverage is still kept
+    // in the source surface and will be presented after a viewport replay; there is simply no
+    // visible destination crop to update in this frame.
+    if (!rect) return true;
+    try {
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(rect.x, rect.y, rect.width, rect.height);
+      context.globalCompositeOperation = "source-over";
+      context.globalAlpha = clamp01(opacity);
+      context.drawImage(
+        source,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+      );
+      context.restore();
+      return true;
+    } catch {
+      try {
+        context.restore();
+      } catch {
+        // The fail-closed caller removes the transient authority.
+      }
+      return false;
     }
   }
 
@@ -1206,12 +1406,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       this.clearActiveRect();
     }
     const active = this.active;
-    if (!active) {
-      this.setActiveCanvasOpacity(1);
-      return;
-    }
+    if (!active) return;
     const exact = this.exactPlan(active.style, active.source);
-    if (!exact || !this.drawMarksToActive(exact.marks)) {
+    if (!exact || !this.drawMarksToActive(exact.marks, active.style.opacity)) {
       this.failActive("surface-render");
       return;
     }
@@ -1220,7 +1417,6 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.acceptedCausalDabCount = exact.dabCount;
     active.acceptedPrefixReceipt = exact.acceptedPrefixReceipt;
     active.stampGrid = exact.stampGrid;
-    this.setActiveCanvasOpacity(active.style.opacity);
   }
 
   private failActive(
@@ -1237,15 +1433,16 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   private resetActiveState(): void {
     this.active = null;
-    this.setActiveCanvasOpacity(1);
   }
 
   private surfaceReady(): boolean {
     return this.surfaceUsable
       && this.surface !== null
       && this.activeCanvas !== null
+      && this.presentationCanvas !== null
       && this.settledCanvas !== null
       && this.activeContext !== null
+      && this.presentationContext !== null
       && this.settledContext !== null;
   }
 
@@ -1280,40 +1477,65 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
   private applySurface(): void {
     const activeCanvas = this.activeCanvas;
+    const presentationCanvas = this.presentationCanvas;
     const settledCanvas = this.settledCanvas;
     const surface = this.surface;
-    if (!activeCanvas || !settledCanvas || !surface) {
+    if (!activeCanvas || !presentationCanvas || !settledCanvas || !surface) {
       this.surfaceUsable = false;
       return;
     }
     const cssPixels = Math.max(1, surface.width) * Math.max(1, surface.height);
-    this.surfaceUsable = cssPixels * 2 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
-    if (!this.surfaceUsable) return;
+    this.surfaceUsable = cssPixels * 3 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
+    if (!this.surfaceUsable) {
+      this.releaseSurfaceBackingStores();
+      return;
+    }
     this.dpr = liveDynamicDevicePixelRatio(surface);
     // Dynamic tip/grain/dual material must not become visibly softer while the pointer is down.
-    // If both live canvases cannot retain native density, fail closed before painting a pixel and
-    // let the exact retained renderer remain authoritative.
+    // If all three live canvases cannot retain native density, fail closed before painting a
+    // pixel and let the exact retained renderer remain authoritative.
     if (this.dpr + POINT_EPSILON < nativeStudioDevicePixelRatio()) {
       this.surfaceUsable = false;
+      this.releaseSurfaceBackingStores();
       return;
     }
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (activeCanvas.width !== width) activeCanvas.width = width;
     if (activeCanvas.height !== height) activeCanvas.height = height;
+    if (presentationCanvas.width !== width) presentationCanvas.width = width;
+    if (presentationCanvas.height !== height) presentationCanvas.height = height;
     if (settledCanvas.width !== width) settledCanvas.width = width;
     if (settledCanvas.height !== height) settledCanvas.height = height;
     this.surfaceUsable =
-      width * height * 2 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
+      width * height * 3 <= STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS;
+    if (!this.surfaceUsable) this.releaseSurfaceBackingStores();
   }
 
-  private setActiveCanvasOpacity(opacity: number): void {
-    if (!this.activeCanvas) return;
-    this.activeCanvas.style.opacity = String(clamp01(opacity));
+  private releaseSurfaceBackingStores(): void {
+    this.dpr = 1;
+    for (
+      const canvas of [
+        this.activeCanvas,
+        this.presentationCanvas,
+        this.settledCanvas,
+      ]
+    ) {
+      if (!canvas) continue;
+      // Resizing releases the old RGBA allocation and clears the bitmap. Keep a real 1 × 1
+      // surface so a context acquired by the long-lived host remains valid for a later viewport.
+      if (canvas.width !== 1) canvas.width = 1;
+      if (canvas.height !== 1) canvas.height = 1;
+    }
+    // A mock canvas or an already-minimal real canvas may not observe a dimension mutation.
+    // Explicitly clear all three authorities so no stale live/settled pixel can survive fallback.
+    this.clearActiveRect();
+    this.clearSettledRect();
   }
 
   private clearActiveRect(): void {
     this.clearCanvas(this.activeContext, this.activeCanvas);
+    this.clearCanvas(this.presentationContext, this.presentationCanvas);
   }
 
   private clearSettledRect(): void {

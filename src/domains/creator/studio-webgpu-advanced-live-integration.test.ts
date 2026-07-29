@@ -14,9 +14,6 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).not.toContain('import { planStudioGpuLiveStroke } from "./studio-webgpu-stroke"');
     expect(page).toContain("preparedStroke: gpuStartPlan?.preparation");
     expect(page).toContain("direct: overlayCandidate && gpuStartPlan !== null");
-    expect(page).toContain(
-      'const gpuStartEligible = STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"'
-    );
     expect(page).toContain('webGpuBackendRef.current === "webgpu"');
     expect(page).toContain("const direct =");
     expect(page).toContain("|| liveInkOverlayStarted");
@@ -25,6 +22,65 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("|| dynamicBrushDirect");
     expect(page).toContain("overlayCandidate\n          && !gpuPin");
     expect(page).toContain('destination: "transparent-overlay"');
+    expect(page).toContain(
+      "const gpuStartEligible = pendingGpuAuthorityPromoted"
+    );
+  });
+
+  it("keeps an exact Konva shadow until dual receipt authority swaps surfaces atomically", () => {
+    const page = source("./StudioPage.tsx");
+    const viewport = source("./StudioCanvasViewport.tsx");
+    const applyStart = page.indexOf(
+      "function applyLiveStrokeBackendPresentationEffects()"
+    );
+    const applyEnd = page.indexOf(
+      "function retireLiveStrokeBackendAudit",
+      applyStart,
+    );
+    const applySource = page.slice(applyStart, applyEnd);
+
+    expect(page).toContain("const gpuCanvasShadowVisibleRef = useRef(false)");
+    expect(viewport).toContain("gpuCanvasShadowVisibleRef.current");
+    expect(viewport).toContain(
+      "gpuLiveInkPinnedRef.current\n                        && !gpuCanvasShadowVisibleRef.current"
+    );
+    expect(applySource).toContain("activeGpuReceiptExact");
+    expect(applySource).toContain("activeSnapshot.gpuOverlayVisible");
+    expect(applySource).toContain("liveDraftLayerRef.current?.drawScene()");
+    expect(applySource.indexOf("liveDraftLayerRef.current?.drawScene()"))
+      .toBeLessThan(applySource.indexOf(
+        "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(gpuOverlayVisible)"
+      ));
+    expect(applySource).not.toContain(".setPinnedVisible(");
+    expect(page).toContain("function prepareLiveStrokeGpuSubmission(strokeId: string)");
+    expect(page).toContain(
+      "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
+    );
+    expect(page).toContain("if (!prepareLiveStrokeGpuSubmission(el.id)) return false");
+    expect(page).toContain(
+      "if (!prepareLiveStrokeGpuSubmission(activeDrawing.id))"
+    );
+    expect(page).toContain("active: liveStrokeBackendAuditActiveIdRef.current");
+    expect(page).toContain("if (!auditReceipt.active) {");
+    const promotion = page.indexOf(
+      "const pendingGpuAuthorityPromoted = ("
+    );
+    const stampStart = page.indexOf(
+      "const stampDirect = Boolean(",
+      promotion,
+    );
+    expect(promotion).toBeGreaterThan(-1);
+    expect(stampStart).toBeGreaterThan(promotion);
+    expect(page).toContain(") || promotePendingGpuAuthoritiesToKonva()");
+    expect(page).toContain(
+      "const gpuStartEligible = pendingGpuAuthorityPromoted"
+    );
+    expect(page).toContain(
+      "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
+    );
+    expect(page).toContain(
+      "Source-over order is global, not backend-specific."
+    );
   });
 
   it("starts one compact journal root and submits every symmetry suffix atomically", () => {
@@ -62,7 +118,10 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("appendGpuLiveSourceJournalSuffix(source, true)");
     expect(page).toContain("draftPreviewStoreRef.current.settle(finished)");
     expect(page).toContain("relinquishGpuLiveInkToKonva(true)");
-    expect(page).toContain("handle?.replacePinnedStrokes(pendingGpu)");
+    expect(page).toContain(
+      "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
+    );
+    expect(page).not.toContain("handle?.replacePinnedStrokes(pendingGpu)");
     expect(page).toContain("liveDraftLayerRef.current?.batchDraw()");
     expect(page).toContain("if (gpuLiveInkPinnedRef.current) relinquishGpuLiveInkToKonva(true)");
   });
@@ -83,6 +142,23 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       "beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current)"
     );
     expect(viewport).toContain("onFrameInvalid={onWebGpuFrameInvalid}");
+    expect(viewport).toContain("onFrameRequest={onWebGpuFrameRequest}");
+    expect(page).toContain(
+      "function onWebGpuFrameRequest(request: StudioWebGpuSurfaceFrameRequest)"
+    );
+    expect(page).toContain(
+      "!registerLiveStrokeGpuRequest(activeStrokeId, request.requestId)"
+    );
+    expect(page).toContain(
+      "session.gpuRequest?.requestId === requestId"
+    );
+    expect(page).toContain(
+      "liveStrokeBackendAuditGpuOwnersRef.current.get(requestId) === session"
+    );
+    expect(page).toContain("armGpuPinnedRequestWatchdog(request.requestId)");
+    expect(page).toContain(
+      "const gpuOverlayVisible = receiptedSessionVisible"
+    );
   });
 
   it("assigns live operations a monotonic terminal key independent of random element ids", () => {
@@ -133,8 +209,10 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(lossSource).toContain("relinquishGpuLiveInkToKonva(true)");
     expect(lossSource).toContain("gpuHandleBaselineRecoveryPendingRef.current = !promoted");
     expect(handleSource).toContain("failOverGpuAuthorityAfterSurfaceLoss()");
-    expect(handleSource).toContain("restoreStudioGpuPendingBaselineOnHandle({");
-    expect(handleSource).toContain("pendingStrokes: pendingGpuStrokesRef.current");
+    expect(handleSource).toContain("handle.setPinnedPresentationVisible(false)");
+    expect(handleSource).toContain("!promotePendingGpuAuthoritiesToKonva()");
+    expect(handleSource).not.toContain("replacePinnedStrokes(");
+    expect(handleSource).not.toContain("setPinnedVisible(true)");
 
     const deviceLostStart = page.indexOf("function onWebGpuDeviceLost()");
     const deviceLostEnd = page.indexOf("function onWebGpuFrameReady", deviceLostStart);
@@ -166,6 +244,10 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(releaseSource.indexOf("replacePinnedJournalBaseline(nextGpuStrokes)")).toBeLessThan(
       releaseSource.indexOf("overlayRenderer.releaseSettledPrefix(released.overlay)")
     );
+    expect(releaseSource).not.toContain("syncPinnedStrokes(nextGpuStrokes)");
+    expect(releaseSource).not.toContain("setPinnedVisible(true)");
+    expect(releaseSource).toContain("promotePostContactRemainder");
+    expect(releaseSource).toContain('reason: "post-contact-rebaseline-forbidden"');
     expect(releaseSource.match(/released\.overlay > overlayRenderer\.settledStrokeCount/g)).toHaveLength(2);
     expect(releaseSource).toContain(
       "const releasedOverlayCount = overlayRenderer.releaseSettledPrefix(released.overlay)"
@@ -188,6 +270,12 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("committedInkSurfaceHandoffsRef.current = [...queue]");
     expect(page).toContain('if (releaseOutcome.status === "released") {');
     expect(page).toContain('} else if (releaseOutcome.status === "promoted") {');
+    expect(page).toContain(
+      "liveInkOverlayRendererRef.current.suppressSettledPrefix(released.overlay)"
+    );
+    expect(page).toContain(
+      "draftPreviewStoreRef.current.suppressSettledPrefix(released.draft)"
+    );
   });
 
   it("requires the full active journal identity before rebaselining a settled prefix", () => {

@@ -3,10 +3,26 @@ import {
   serializeStudioBrushR8TextureGrainSourceCanonical,
 } from "./studio-brush-r8-grain-asset-contract";
 import {
+  acquireStudioEngineWebGpuPresentationProducerWrite,
+  fingerprintStudioEngineWebGpuPresentationContent,
+  settleStudioEngineWebGpuPresentationProducerWrite,
+  STUDIO_ENGINE_WEBGPU_PRESENTATION_COLOR_MODEL,
+  STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_FORMAT,
+  STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_REVISION,
+  STUDIO_ENGINE_WEBGPU_PRESENTATION_WORK_SURFACE_USAGE,
+  STUDIO_ENGINE_WEBGPU_PRESENTATION_WORKING_COLOR_SPACE,
+  type StudioEngineWebGpuDocumentToSurfaceTransform,
+  type StudioEngineWebGpuPresentationFrameLease,
+  type StudioEngineWebGpuPresentationProducerWriteClaim,
+} from "./studio-engine-webgpu-presentation-surface";
+import {
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
+  type StudioEngineWebGpuTexturedBrushBatch,
+  type StudioEngineWebGpuTexturedBrushPlan,
+  type StudioEngineWebGpuTexturedBrushResolvedAsset,
 } from "./studio-engine-webgpu-textured-brush-plan";
 import { sha256HexPortable } from "./studio-sha256";
 import {
@@ -15,12 +31,6 @@ import {
   type StudioWebGpuR8GrainNativeInput,
   type StudioWebGpuR8GrainTextureLease,
 } from "./studio-webgpu-r8-grain-native";
-
-import type {
-  StudioEngineWebGpuTexturedBrushBatch,
-  StudioEngineWebGpuTexturedBrushPlan,
-  StudioEngineWebGpuTexturedBrushResolvedAsset,
-} from "./studio-engine-webgpu-textured-brush-plan";
 
 export const STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_RUNTIME_REVISION = 1 as const;
 export const STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_TEXTURE_FORMAT = "rgba16float" as const;
@@ -36,6 +46,11 @@ const GPU_BUFFER_COPY_DST = 0x08;
 const GPU_BUFFER_VERTEX = 0x20;
 const GPU_BUFFER_UNIFORM = 0x40;
 const ROW_ALIGNMENT = 256;
+/**
+ * Plans are lowered through f32 channels before reaching this runtime. Keep the admission
+ * tolerance large enough for two f32 multiplications, but far below one 8-bit alpha step.
+ */
+const PAINT_CHANNEL_F32_EPSILON = 2e-6;
 
 /**
  * R8 sampling semantics mirror the CPU oracle:
@@ -48,6 +63,8 @@ const TEXTURED_BRUSH_SHADER = /* wgsl */ `
 struct Viewport {
   size: vec2f,
   inverse_size: vec2f,
+  document_scale: vec2f,
+  document_offset: vec2f,
 };
 @group(0) @binding(0) var tip_texture: texture_2d<f32>;
 @group(0) @binding(1) var grain_texture: texture_2d<f32>;
@@ -90,9 +107,10 @@ fn vs_main(
   let local = corners[vertex_index];
   let document_offset = basis_x * local.x + basis_y * local.y;
   let document = center + document_offset;
+  let surface = document * viewport.document_scale + viewport.document_offset;
   let clip = vec2f(
-    document.x * viewport.inverse_size.x * 2.0 - 1.0,
-    1.0 - document.y * viewport.inverse_size.y * 2.0,
+    surface.x * viewport.inverse_size.x * 2.0 - 1.0,
+    1.0 - surface.y * viewport.inverse_size.y * 2.0,
   );
   var output: VertexOutput;
   output.position = vec4f(clip, 0.0, 1.0);
@@ -187,13 +205,21 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
 
 export interface StudioEngineWebGpuTexturedBrushRuntimeOptions {
   readonly device: GPUDevice;
-  readonly width: number;
-  readonly height: number;
+  /**
+   * Legacy private-target dimensions. They remain required unless `presentationOnly` is enabled.
+   */
+  readonly width?: number;
+  readonly height?: number;
   readonly initialDeviceEpoch?: number;
   readonly maximumDabs?: number;
   readonly maximumInFlightSubmissions?: number;
   readonly maximumResidentAssetBytes?: number;
   readonly ownsDevice?: boolean;
+  /**
+   * Strict shared-surface mode. No private RGBA16F authority is allocated and every execution
+   * must carry a valid presentation lease from the same request/device/fingerprint authority.
+   */
+  readonly presentationOnly?: boolean;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
   /**
    * Optional shared durable-R8 cache. When omitted the runtime creates and owns a device-local
@@ -207,6 +233,11 @@ export interface StudioEngineWebGpuTexturedBrushFrame {
   readonly requestSequence: number;
   readonly deviceEpoch: number;
   readonly plan: StudioEngineWebGpuTexturedBrushPlan;
+  /**
+   * Optional shared linear presentation target. A supplied-but-invalid lease always fails closed;
+   * the runtime never silently paints a private surface instead.
+   */
+  readonly presentationLease?: StudioEngineWebGpuPresentationFrameLease;
 }
 
 export interface StudioEngineWebGpuTexturedBrushReceipt {
@@ -231,6 +262,13 @@ export interface StudioEngineWebGpuTexturedBrushReceipt {
     | "durable-r8-cpu-parity-v1";
   readonly nativeR8GrainSourceKey: string | null;
   readonly nativeR8GrainTextureBytes: number;
+  readonly renderTarget: "private" | "presentation";
+  readonly sourceFrameFingerprint: string;
+  readonly workSurfaceEpoch: number | null;
+  readonly baseContentGeneration: number | null;
+  readonly baseContentFingerprint: `sha256:${string}` | null;
+  readonly contentGeneration: number | null;
+  readonly contentFingerprint: `sha256:${string}` | null;
   readonly queueState: "completed";
   readonly complete: true;
 }
@@ -243,9 +281,13 @@ export type StudioEngineWebGpuTexturedBrushExecutionResult =
         | "invalid-frame"
         | "request-sequence"
         | "device-epoch"
+        | "content-generation-exhausted"
         | "request-limit"
         | "resident-asset-budget"
-        | "native-r8-grain-unavailable";
+        | "native-r8-grain-unavailable"
+        | "content-uninitialized"
+        | "presentation-lease-required"
+        | "presentation-lease-invalid";
       detail?: string;
     }>
   | Readonly<{ status: "busy"; inFlight: number; maximum: number }>
@@ -272,8 +314,148 @@ function finite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function unitPaintChannel(value: unknown): value is number {
+  return finite(value) && value >= 0 && value <= 1;
+}
+
+/**
+ * A lowered dab stores final straight alpha, while opacity and flow remain as diagnostic channels.
+ *
+ * `alpha = sourceColorAlpha × opacity × flow`, where sourceColorAlpha is in [0, 1]. The source
+ * alpha is not retained separately, so the strongest fail-closed invariant available here is that
+ * final alpha cannot exceed the opacity×flow ceiling (apart from f32 lowering error), and a zero
+ * ceiling must produce zero alpha.
+ */
+function dabAlphaMatchesPaintChannels(
+  alpha: number,
+  opacity: number,
+  flow: number,
+): boolean {
+  if (
+    !unitPaintChannel(alpha)
+    || !unitPaintChannel(opacity)
+    || !unitPaintChannel(flow)
+  ) return false;
+  const ceiling = opacity * flow;
+  return ceiling <= PAINT_CHANNEL_F32_EPSILON
+    ? alpha <= PAINT_CHANNEL_F32_EPSILON
+    : alpha <= ceiling + PAINT_CHANNEL_F32_EPSILON;
+}
+
 function positiveSafeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) > 0;
+}
+
+function finiteF32(value: unknown): value is number {
+  return finite(value) && Number.isFinite(Math.fround(value));
+}
+
+const IDENTITY_DOCUMENT_TO_SURFACE_TRANSFORM:
+  Readonly<StudioEngineWebGpuDocumentToSurfaceTransform> = Object.freeze({
+    m11: 1,
+    m12: 0,
+    m21: 0,
+    m22: 1,
+    dx: 0,
+    dy: 0,
+  });
+
+/**
+ * Packs the exact document-to-physical-surface affine used by the textured-brush vertex stage.
+ * Grain sampling deliberately remains in document space; only raster placement is transformed.
+ */
+export function packStudioEngineWebGpuTexturedBrushViewportUniform(
+  width: number,
+  height: number,
+  documentToSurface: Readonly<StudioEngineWebGpuDocumentToSurfaceTransform> =
+    IDENTITY_DOCUMENT_TO_SURFACE_TRANSFORM,
+): Float32Array {
+  if (
+    !positiveSafeInteger(width)
+    || !positiveSafeInteger(height)
+    || !documentToSurface
+    || documentToSurface.m12 !== 0
+    || documentToSurface.m21 !== 0
+    || ![
+      documentToSurface.m11,
+      documentToSurface.m22,
+      documentToSurface.dx,
+      documentToSurface.dy,
+    ].every(finiteF32)
+    || documentToSurface.m11 === 0
+    || documentToSurface.m22 === 0
+  ) {
+    throw new RangeError("invalid-textured-brush-viewport");
+  }
+  return new Float32Array([
+    width,
+    height,
+    1 / width,
+    1 / height,
+    documentToSurface.m11,
+    documentToSurface.m22,
+    documentToSurface.dx,
+    documentToSurface.dy,
+  ]);
+}
+
+function semanticFingerprint(
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+): `sha256:${string}` | null {
+  return fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(plan);
+}
+
+function validPresentationLease(
+  lease: StudioEngineWebGpuPresentationFrameLease,
+  frame: StudioEngineWebGpuTexturedBrushFrame,
+  expectedFingerprint: string,
+): boolean {
+  try {
+    const surface = lease?.workSurface;
+    const configuration = lease?.configuration;
+    return Boolean(
+      lease
+      && lease.kind === "studio-engine-webgpu-presentation-frame-lease"
+      && lease.revision === STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_REVISION
+      && lease.requestSequence === frame.requestSequence
+      && lease.deviceEpoch === frame.deviceEpoch
+      && lease.sourceFrameFingerprint === expectedFingerprint
+      && positiveSafeInteger(lease.presentationEpoch)
+      && positiveSafeInteger(lease.resizeEpoch)
+      && positiveSafeInteger(lease.viewportEpoch)
+      && positiveSafeInteger(lease.flipEpoch)
+      && surface
+      && surface.kind === "studio-engine-webgpu-shared-linear-work-surface"
+      && surface.revision === STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_REVISION
+      && surface.format === STUDIO_ENGINE_WEBGPU_PRESENTATION_SURFACE_FORMAT
+      && surface.usage === STUDIO_ENGINE_WEBGPU_PRESENTATION_WORK_SURFACE_USAGE
+      && surface.colorModel === STUDIO_ENGINE_WEBGPU_PRESENTATION_COLOR_MODEL
+      && surface.workingColorSpace
+        === STUDIO_ENGINE_WEBGPU_PRESENTATION_WORKING_COLOR_SPACE
+      && positiveSafeInteger(surface.width)
+      && positiveSafeInteger(surface.height)
+      && positiveSafeInteger(surface.workSurfaceEpoch)
+      && surface.byteLength === surface.width * surface.height * 8
+      && surface.texture
+      && surface.view
+      && configuration
+      && configuration.presentationEpoch === lease.presentationEpoch
+      && configuration.resizeEpoch === lease.resizeEpoch
+      && configuration.viewportEpoch === lease.viewportEpoch
+      && configuration.flipEpoch === lease.flipEpoch
+      && configuration.physicalWidth === surface.width
+      && configuration.physicalHeight === surface.height
+      && configuration.surfacePixels === surface.width * surface.height
+      && configuration.surfaceBytes === surface.byteLength
+      && packStudioEngineWebGpuTexturedBrushViewportUniform(
+        surface.width,
+        surface.height,
+        configuration.documentToSurface,
+      )
+    );
+  } catch {
+    return false;
+  }
 }
 
 function nextAligned(value: number, alignment: number): number {
@@ -417,6 +599,7 @@ function planIsValid(plan: StudioEngineWebGpuTexturedBrushPlan, maximumDabs: num
     }
     for (let index = 0; index < plan.dabs.length; index += 1) {
       const dab = plan.dabs[index]!;
+      const [red, green, blue, alpha] = dab.color.components;
       if (
         dab.index !== index
         || ![
@@ -436,6 +619,17 @@ function planIsValid(plan: StudioEngineWebGpuTexturedBrushPlan, maximumDabs: num
           ...dab.tip.localToDocument,
         ].every(finite)
         || dab.diameter <= 0
+        || !unitPaintChannel(dab.pressure)
+        || !unitPaintChannel(dab.opacity)
+        || !unitPaintChannel(dab.flow)
+        || !unitPaintChannel(dab.grainDepth)
+        || !unitPaintChannel(red)
+        || !unitPaintChannel(green)
+        || !unitPaintChannel(blue)
+        || !dabAlphaMatchesPaintChannels(alpha, dab.opacity, dab.flow)
+        || !unitPaintChannel(dab.tip.hardness)
+        || !unitPaintChannel(dab.tip.roundness)
+        || dab.tip.roundness <= 0
         || dab.color.space !== "linear-srgb"
         || dab.color.alphaMode !== "straight"
         || dab.composite.blendMode !== "normal"
@@ -583,18 +777,45 @@ function blendState(
   };
 }
 
+function validPrivateSurfaceDimensions(
+  options:
+    | Pick<StudioEngineWebGpuTexturedBrushRuntimeOptions, "width" | "height">
+    | null
+    | undefined,
+): boolean {
+  return positiveSafeInteger(options?.width)
+    && positiveSafeInteger(options?.height)
+    && options.width <= STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxAssetDimension
+    && options.height <= STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxAssetDimension;
+}
+
 export function createStudioEngineWebGpuTexturedBrushRuntime(
   options: StudioEngineWebGpuTexturedBrushRuntimeOptions,
 ): StudioEngineWebGpuTexturedBrushRuntimeCreationResult {
   try {
+    const presentationOnly = options?.presentationOnly === true;
+    const hasPrivateDimensions = validPrivateSurfaceDimensions(options);
     if (
       typeof options !== "object"
       || options === null
       || !options.device
-      || !positiveSafeInteger(options.width)
-      || !positiveSafeInteger(options.height)
-      || options.width > STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxAssetDimension
-      || options.height > STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxAssetDimension
+      || typeof options.device.pushErrorScope !== "function"
+      || typeof options.device.popErrorScope !== "function"
+      || (
+        options.presentationOnly !== undefined
+        && typeof options.presentationOnly !== "boolean"
+      )
+      || (!presentationOnly && !hasPrivateDimensions)
+      || (
+        presentationOnly
+        && (
+          (options.width === undefined) !== (options.height === undefined)
+          || (
+            options.width !== undefined
+            && !hasPrivateDimensions
+          )
+        )
+      )
     ) return Object.freeze({ status: "rejected", reason: "invalid-options" });
     return Object.freeze({
       status: "ready",
@@ -609,6 +830,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   readonly #device: GPUDevice;
   readonly #width: number;
   readonly #height: number;
+  readonly #presentationOnly: boolean;
   #deviceEpoch: number;
   readonly #maximumDabs: number;
   readonly #maximumInFlight: number;
@@ -616,8 +838,8 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   readonly #ownsDevice: boolean;
   readonly #nativeR8GrainTextureCache: StudioWebGpuR8GrainTextureCache;
   readonly #ownsNativeR8GrainTextureCache: boolean;
-  readonly #surfaceTexture: GPUTexture;
-  readonly #surfaceView: GPUTextureView;
+  readonly #surfaceTexture: GPUTexture | null;
+  readonly #surfaceView: GPUTextureView | null;
   readonly #uniformBuffer: GPUBuffer;
   readonly #tipSampler: GPUSampler;
   readonly #grainSampler: GPUSampler;
@@ -630,13 +852,19 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   #residentAssetBytes = 0;
   #inFlight = 0;
   #lastRequestSequence = 0;
+  #privateContentInitialized = false;
+  #privateContentGeneration = 0;
+  #privateContentFingerprint: `sha256:${string}` | null = null;
   #disposed = false;
   #lost = false;
+  #failed = false;
+  #submissionTail: Promise<void> = Promise.resolve();
 
   public constructor(options: StudioEngineWebGpuTexturedBrushRuntimeOptions) {
     this.#device = options.device;
-    this.#width = options.width;
-    this.#height = options.height;
+    this.#width = options.width ?? 1;
+    this.#height = options.height ?? 1;
+    this.#presentationOnly = options.presentationOnly ?? false;
     this.#deviceEpoch = options.initialDeviceEpoch ?? 1;
     this.#maximumDabs = options.maximumDabs
       ?? STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxDabs;
@@ -645,7 +873,21 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       ?? STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxTotalAssetBytes;
     this.#ownsDevice = options.ownsDevice ?? false;
     if (
-      !positiveSafeInteger(this.#deviceEpoch)
+      (
+        !this.#presentationOnly
+        && !validPrivateSurfaceDimensions(options)
+      )
+      || (
+        this.#presentationOnly
+        && (
+          (options.width === undefined) !== (options.height === undefined)
+          || (
+            options.width !== undefined
+            && !validPrivateSurfaceDimensions(options)
+          )
+        )
+      )
+      || !positiveSafeInteger(this.#deviceEpoch)
       || this.#deviceEpoch === Number.MAX_SAFE_INTEGER
       || !positiveSafeInteger(this.#maximumDabs)
       || this.#maximumDabs > STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS.maxDabs
@@ -659,27 +901,27 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
         maxResidentBytes: this.#maximumResidentAssetBytes,
       });
 
-    this.#surfaceTexture = this.#device.createTexture({
-      label: "Studio textured brush rgba16float authority",
-      size: { width: this.#width, height: this.#height, depthOrArrayLayers: 1 },
-      format: STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_TEXTURE_FORMAT,
-      usage: GPU_TEXTURE_RENDER_ATTACHMENT | GPU_TEXTURE_COPY_SRC | GPU_TEXTURE_BINDING,
-    });
-    this.#surfaceView = this.#surfaceTexture.createView();
+    this.#surfaceTexture = this.#presentationOnly
+      ? null
+      : this.#device.createTexture({
+        label: "Studio textured brush rgba16float authority",
+        size: { width: this.#width, height: this.#height, depthOrArrayLayers: 1 },
+        format: STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_TEXTURE_FORMAT,
+        usage: GPU_TEXTURE_RENDER_ATTACHMENT | GPU_TEXTURE_COPY_SRC | GPU_TEXTURE_BINDING,
+      });
+    this.#surfaceView = this.#surfaceTexture?.createView() ?? null;
     this.#uniformBuffer = this.#device.createBuffer({
       label: "Studio textured brush viewport uniform",
-      size: 16,
+      size: 32,
       usage: GPU_BUFFER_UNIFORM | GPU_BUFFER_COPY_DST,
     });
     this.#device.queue.writeBuffer(
       this.#uniformBuffer,
       0,
-      new Float32Array([
+      packStudioEngineWebGpuTexturedBrushViewportUniform(
         this.#width,
         this.#height,
-        1 / this.#width,
-        1 / this.#height,
-      ]),
+      ),
     );
     this.#tipSampler = this.#device.createSampler({
       label: "Studio textured brush zero-border bilinear tip sampler",
@@ -744,6 +986,8 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       if (this.#disposed) return;
       this.#deviceEpoch += 1;
       this.#lost = true;
+      this.#privateContentInitialized = false;
+      this.#privateContentFingerprint = null;
       options.onDeviceLost?.(info);
     });
   }
@@ -754,6 +998,16 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
 
   public get inFlight(): number {
     return this.#inFlight;
+  }
+
+  async #acquireSubmissionSlot(): Promise<() => void> {
+    const previous = this.#submissionTail;
+    let release!: () => void;
+    this.#submissionTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    return release;
   }
 
   #ensureInstanceBuffer(dabCount: number): GPUBuffer {
@@ -889,6 +1143,9 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     if (this.#lost) {
       return Object.freeze({ status: "device-lost", deviceEpoch: this.#deviceEpoch });
     }
+    if (this.#failed) {
+      return Object.freeze({ status: "failed", reason: "gpu-error" });
+    }
     if (signal?.aborted) return Object.freeze({ status: "cancelled" });
     if (
       !frame
@@ -896,8 +1153,31 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       || !positiveSafeInteger(frame.deviceEpoch)
       || !planIsValid(frame.plan, this.#maximumDabs)
     ) return Object.freeze({ status: "rejected", reason: "invalid-frame" });
+    const sourceFrameFingerprint = semanticFingerprint(frame.plan);
+    if (!sourceFrameFingerprint) {
+      return Object.freeze({ status: "rejected", reason: "invalid-frame" });
+    }
     if (frame.deviceEpoch !== this.#deviceEpoch) {
       return Object.freeze({ status: "rejected", reason: "device-epoch" });
+    }
+    if (this.#presentationOnly && !frame.presentationLease) {
+      return Object.freeze({
+        status: "rejected",
+        reason: "presentation-lease-required",
+      });
+    }
+    if (
+      frame.presentationLease
+      && !validPresentationLease(
+        frame.presentationLease,
+        frame,
+        sourceFrameFingerprint,
+      )
+    ) {
+      return Object.freeze({
+        status: "rejected",
+        reason: "presentation-lease-invalid",
+      });
     }
     if (frame.requestSequence <= this.#lastRequestSequence) {
       return Object.freeze({ status: "rejected", reason: "request-sequence" });
@@ -962,7 +1242,125 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
 
     this.#inFlight += 1;
     this.#lastRequestSequence = frame.requestSequence;
+    let errorScopeDepth = 0;
+    const pendingScopes: Array<Promise<GPUError | null>> = [];
+    let releaseSubmissionSlot: (() => void) | null = null;
+    let producerClaim:
+      StudioEngineWebGpuPresentationProducerWriteClaim | null = null;
+    let producerClaimSettled = false;
+    let privateWriteReserved = false;
+    let privateWriteSettled = false;
+    let baseContentGeneration: number | null;
+    let baseContentFingerprint: `sha256:${string}` | null;
+    let contentGeneration: number | null = null;
+    let contentFingerprint: `sha256:${string}` | null;
     try {
+      // WebGPU error scopes are device-global and LIFO. Serialize the push/submit/pop section even
+      // when callers allow several queued executions, otherwise concurrent requests can consume
+      // each other's validation result and certify the wrong work-surface generation.
+      releaseSubmissionSlot = await this.#acquireSubmissionSlot();
+      if (signal?.aborted) return Object.freeze({ status: "cancelled" });
+      if (this.#disposed) return Object.freeze({ status: "disposed" });
+      if (this.#lost) {
+        return Object.freeze({ status: "device-lost", deviceEpoch: this.#deviceEpoch });
+      }
+      if (this.#failed) {
+        return Object.freeze({ status: "failed", reason: "gpu-error" });
+      }
+      const presentationLease = frame.presentationLease;
+      const targetView = presentationLease?.workSurface.view ?? this.#surfaceView;
+      if (!targetView) {
+        return Object.freeze({
+          status: "rejected",
+          reason: "presentation-lease-required",
+        });
+      }
+      const targetWidth = presentationLease?.workSurface.width ?? this.#width;
+      const targetHeight = presentationLease?.workSurface.height ?? this.#height;
+      const documentToSurface = presentationLease
+        ?.configuration.documentToSurface
+        ?? IDENTITY_DOCUMENT_TO_SURFACE_TRANSFORM;
+      if (presentationLease) {
+        const acquired =
+          acquireStudioEngineWebGpuPresentationProducerWrite(
+            presentationLease,
+            {
+              mode: frame.plan.mode,
+              sourceFrameFingerprint,
+            },
+          );
+        if (acquired.status === "rejected") {
+          return Object.freeze({
+            status: "rejected",
+            reason:
+              acquired.reason === "content-uninitialized"
+                ? "content-uninitialized"
+                : acquired.reason === "content-generation-exhausted"
+                  ? "content-generation-exhausted"
+                  : "presentation-lease-invalid",
+          });
+        }
+        producerClaim = acquired.claim;
+        baseContentGeneration = producerClaim.baseContentGeneration;
+        baseContentFingerprint = producerClaim.baseContentFingerprint;
+        contentGeneration = producerClaim.contentGeneration;
+        contentFingerprint = producerClaim.contentFingerprint;
+      } else {
+        if (
+          frame.plan.mode === "append"
+          && (
+            !this.#privateContentInitialized
+            || !this.#privateContentFingerprint
+          )
+        ) {
+          return Object.freeze({
+            status: "rejected",
+            reason: "content-uninitialized",
+          });
+        }
+        if (this.#privateContentGeneration === Number.MAX_SAFE_INTEGER) {
+          return Object.freeze({
+            status: "rejected",
+            reason: "content-generation-exhausted",
+          });
+        }
+        baseContentGeneration = this.#privateContentGeneration;
+        baseContentFingerprint =
+          frame.plan.mode === "append"
+            ? this.#privateContentFingerprint
+            : null;
+        contentGeneration = this.#privateContentGeneration + 1;
+        contentFingerprint =
+          fingerprintStudioEngineWebGpuPresentationContent({
+            mode: frame.plan.mode,
+            baseContentFingerprint,
+            sourceFrameFingerprint,
+            width: targetWidth,
+            height: targetHeight,
+            documentToSurface,
+          });
+        if (!contentFingerprint) {
+          return Object.freeze({ status: "rejected", reason: "invalid-frame" });
+        }
+        privateWriteReserved = true;
+      }
+      for (const filter of [
+        "internal",
+        "out-of-memory",
+        "validation",
+      ] as const satisfies readonly GPUErrorFilter[]) {
+        this.#device.pushErrorScope(filter);
+        errorScopeDepth += 1;
+      }
+      this.#device.queue.writeBuffer(
+        this.#uniformBuffer,
+        0,
+        packStudioEngineWebGpuTexturedBrushViewportUniform(
+          targetWidth,
+          targetHeight,
+          documentToSurface,
+        ),
+      );
       const instanceBuffer = this.#ensureInstanceBuffer(frame.plan.dabs.length);
       const packed = packStudioEngineWebGpuTexturedBrushDabs(
         frame.plan,
@@ -976,7 +1374,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       const pass = encoder.beginRenderPass({
         label: `Studio textured brush ${frame.plan.mode}`,
         colorAttachments: [{
-          view: this.#surfaceView,
+          view: targetView,
           loadOp: frame.plan.mode === "rebuild" ? "clear" : "load",
           storeOp: "store",
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
@@ -993,11 +1391,47 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       }
       pass.end();
       this.#device.queue.submit([encoder.finish()]);
-      await this.#device.queue.onSubmittedWorkDone();
-      if (signal?.aborted) return Object.freeze({ status: "cancelled" });
+      const queueCompletion = this.#device.queue.onSubmittedWorkDone();
+      while (errorScopeDepth > 0) {
+        pendingScopes.push(this.#device.popErrorScope());
+        errorScopeDepth -= 1;
+      }
+      const [, scopedErrors] = await Promise.all([
+        queueCompletion,
+        Promise.all(pendingScopes),
+      ]);
       if (this.#disposed) return Object.freeze({ status: "disposed" });
       if (this.#lost) {
         return Object.freeze({ status: "device-lost", deviceEpoch: this.#deviceEpoch });
+      }
+      if (scopedErrors.some((error) => error !== null)) {
+        // A scoped validation/OOM/internal failure means the shared target cannot be certified.
+        // Retire the runtime so partially-mutated GPU state can never yield a later receipt.
+        this.#failed = true;
+        return Object.freeze({ status: "failed", reason: "gpu-error" });
+      }
+      if (producerClaim) {
+        const settled =
+          settleStudioEngineWebGpuPresentationProducerWrite(
+            producerClaim,
+            "completed",
+          );
+        producerClaimSettled = true;
+        if (settled.status !== "completed") {
+          return Object.freeze({
+            status: "rejected",
+            reason: "presentation-lease-invalid",
+          });
+        }
+        baseContentGeneration = producerClaim.baseContentGeneration;
+        baseContentFingerprint = producerClaim.baseContentFingerprint;
+        contentGeneration = settled.content.generation;
+        contentFingerprint = settled.content.fingerprint;
+      } else {
+        this.#privateContentGeneration = contentGeneration!;
+        this.#privateContentInitialized = true;
+        this.#privateContentFingerprint = contentFingerprint;
+        privateWriteSettled = true;
       }
       const receipt: StudioEngineWebGpuTexturedBrushReceipt = {
         kind: "studio-engine-webgpu-textured-brush-receipt",
@@ -1022,16 +1456,49 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
         nativeR8GrainTextureBytes: nativeR8GrainLease
           ? nativeR8GrainLease.width * nativeR8GrainLease.height
           : 0,
+        renderTarget: presentationLease ? "presentation" : "private",
+        sourceFrameFingerprint,
+        workSurfaceEpoch:
+          presentationLease?.workSurface.workSurfaceEpoch ?? null,
+        baseContentGeneration,
+        baseContentFingerprint,
+        contentGeneration,
+        contentFingerprint,
         queueState: "completed",
         complete: true,
       };
       return Object.freeze({ status: "completed", receipt: Object.freeze(receipt) });
     } catch (error) {
+      while (errorScopeDepth > 0) {
+        try {
+          pendingScopes.push(this.#device.popErrorScope());
+        } catch {
+          // This execution fails closed below; an already-collapsed scope stack is harmless.
+        }
+        errorScopeDepth -= 1;
+      }
+      if (pendingScopes.length > 0) await Promise.allSettled(pendingScopes);
       if (error instanceof RangeError && error.message === "resident-asset-budget") {
         return Object.freeze({ status: "rejected", reason: "resident-asset-budget" });
       }
+      this.#failed = true;
       return Object.freeze({ status: "failed", reason: "gpu-error" });
     } finally {
+      if (producerClaim && !producerClaimSettled) {
+        settleStudioEngineWebGpuPresentationProducerWrite(
+          producerClaim,
+          "failed",
+        );
+      }
+      if (privateWriteReserved && !privateWriteSettled) {
+        this.#privateContentGeneration = Math.max(
+          this.#privateContentGeneration,
+          contentGeneration ?? this.#privateContentGeneration,
+        );
+        this.#privateContentInitialized = false;
+        this.#privateContentFingerprint = null;
+      }
+      releaseSubmissionSlot?.();
       nativeR8GrainLease?.release();
       this.#inFlight -= 1;
     }
@@ -1040,9 +1507,11 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   public dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#privateContentInitialized = false;
+    this.#privateContentFingerprint = null;
     this.#instanceBuffer?.destroy();
     this.#uniformBuffer.destroy();
-    this.#surfaceTexture.destroy();
+    this.#surfaceTexture?.destroy();
     for (const resource of this.#assetTextures.values()) resource.texture.destroy();
     this.#assetTextures.clear();
     this.#bindGroups.clear();

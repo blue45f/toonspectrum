@@ -27,8 +27,8 @@ import {
   isStudioMaterialMinimumDiameterRatio,
   isStudioMaterialPressureModel,
 } from "./studio-material-pressure-model";
+import { normalizeStudioOutlineStrokeContract } from "./studio-outline-stroke-contract";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
-
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -41,6 +41,7 @@ import type {
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
+import { normalizeStudioInkInputContract } from "@/lib/studio-ink-input-contract";
 import {
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_TYPES,
@@ -189,6 +190,21 @@ export function studioCrdtStrokeToDrawElement(
     tangentialPressures: payload.tangentialPressures
       ? [...payload.tangentialPressures]
       : undefined,
+    altitudeAngles: payload.altitudeAngles
+      ? [...payload.altitudeAngles]
+      : undefined,
+    azimuthAngles: payload.azimuthAngles
+      ? [...payload.azimuthAngles]
+      : undefined,
+    contactWidths: payload.contactWidths
+      ? [...payload.contactWidths]
+      : undefined,
+    contactHeights: payload.contactHeights
+      ? [...payload.contactHeights]
+      : undefined,
+    sampleTimeOffsets: payload.sampleTimeOffsets
+      ? [...payload.sampleTimeOffsets]
+      : undefined,
     opacity: payload.opacity,
     fill: payload.fill,
     gradient: payload.gradient,
@@ -210,6 +226,25 @@ export function studioCrdtStrokeToDrawElement(
   }
   const pressureModel = extensions.pressureModel;
   if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
+  if (extensions.outlineStroke !== undefined) {
+    if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) {
+      throw new Error("외곽선 획 계약과 페이로드 버전이 호환되지 않습니다.");
+    }
+    const outlineStroke = normalizeStudioOutlineStrokeContract(
+      extensions.outlineStroke,
+    );
+    if (!outlineStroke) {
+      throw new Error("외곽선 획 계약이 올바르지 않습니다.");
+    }
+    result.outlineStroke = outlineStroke;
+  }
+  if (extensions.inkInput !== undefined) {
+    const inkInput = normalizeStudioInkInputContract(extensions.inkInput);
+    if (!inkInput) {
+      throw new Error("획 입력 센서 계약이 올바르지 않습니다.");
+    }
+    result.inkInput = inkInput;
+  }
   const dynamicMinimumDiameterRatio =
     payload.brushDynamics?.minimumDiameterRatio;
   if (

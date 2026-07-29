@@ -28,6 +28,65 @@ export interface StudioPointerEventLike {
   getPredictedEvents?: unknown;
 }
 
+export const STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS = Object.freeze({
+  maxClientCoordinateAbsolute: 1_000_000,
+  maxContactDimension: 65_536,
+  maxPointerId: 0xffff_ffff,
+  maxSourceTimeMilliseconds: Number.MAX_SAFE_INTEGER,
+} as const);
+
+export type StudioPointerSampleAuthorityV2 =
+  | "authoritative"
+  | "predicted-preview";
+
+/**
+ * Plain, renderer-neutral Pointer Events channels.
+ *
+ * `pointerId` identifies only the active pointer stream. It is not a hardware/device identifier,
+ * and this contract intentionally has no `persistentDeviceId` or vendor-specific fields.
+ */
+export interface StudioNormalizedPointerSampleChannelsV2 {
+  readonly authority: StudioPointerSampleAuthorityV2;
+  readonly persistence: "durable" | "preview-only";
+  readonly pointerId: number;
+  readonly pointerType: "pen" | "touch" | "mouse" | "unknown";
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly pressure: number;
+  readonly tangentialPressure: number;
+  readonly tiltX: number;
+  readonly tiltY: number;
+  /** Pointer Events altitude in radians: 0 (parallel) through PI / 2 (perpendicular). */
+  readonly altitudeAngle: number;
+  /** Pointer Events clockwise azimuth in radians, normalized to [0, 2 * PI). */
+  readonly azimuthAngle: number;
+  /** Pointer Events clockwise barrel rotation in degrees, normalized to [0, 360). */
+  readonly twist: number;
+  /** Contact geometry in CSS pixels. */
+  readonly contactWidth: number;
+  readonly contactHeight: number;
+  /** Browser event timestamp. Durable only when `authority === "authoritative"`. */
+  readonly sourceTimeMilliseconds: number;
+}
+
+export type StudioPointerSampleChannelsV2FailureReason =
+  | "invalid-contact-geometry"
+  | "invalid-coordinate"
+  | "invalid-orientation"
+  | "invalid-pointer"
+  | "invalid-pressure"
+  | "invalid-timestamp";
+
+export type StudioPointerSampleChannelsV2Result =
+  | Readonly<{
+      ok: true;
+      value: StudioNormalizedPointerSampleChannelsV2;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioPointerSampleChannelsV2FailureReason;
+    }>;
+
 export interface StudioStrokePointerSession {
   readonly pointerId: number;
   readonly pointerType: "pen" | "touch" | "mouse" | "unknown";
@@ -111,9 +170,170 @@ export type StudioPointerCaptureLossOutcome = "foreign" | "retain" | "finish";
 
 const LEGACY_POINTER_ID = 1;
 const PREVIOUS_DELIVERY_SAMPLE_LIMIT = 128;
+const QUARTER_TURN_RADIANS = Math.PI / 2;
+const FULL_TURN_RADIANS = Math.PI * 2;
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function canonicalNumber(value: number): number {
+  return Object.is(value, -0) ? 0 : value;
+}
+
+function optionalBoundedNumber(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number | null {
+  if (value === undefined || value === null) return fallback;
+  if (
+    typeof value !== "number"
+    || !Number.isFinite(value)
+    || value < minimum
+    || value > maximum
+  ) return null;
+  return canonicalNumber(value);
+}
+
+function normalizedFullTurn(
+  value: unknown,
+  fallback: number,
+  fullTurn: number,
+): number | null {
+  const bounded = optionalBoundedNumber(value, fallback, 0, fullTurn);
+  if (bounded === null) return null;
+  return bounded === fullTurn ? 0 : bounded;
+}
+
+/**
+ * Converts one Pointer Events sample into bounded plain data without retaining a DOM object.
+ *
+ * Missing optional channels receive the defaults defined by PointerEvent construction
+ * (neutral orientation/pressure, 1 CSS-pixel contact). Explicit malformed or out-of-range values
+ * fail closed. Prediction authority is encoded separately and can never be mistaken for durable
+ * input by a serializer.
+ */
+export function normalizeStudioPointerSampleChannelsV2(
+  event: StudioPointerEventLike,
+  authority: StudioPointerSampleAuthorityV2,
+): StudioPointerSampleChannelsV2Result {
+  try {
+    if (authority !== "authoritative" && authority !== "predicted-preview") {
+      return Object.freeze({ ok: false, reason: "invalid-pointer" });
+    }
+    const pointerId = event.pointerId === undefined || event.pointerId === null
+      ? LEGACY_POINTER_ID
+      : event.pointerId;
+    if (
+      typeof pointerId !== "number"
+      || !Number.isSafeInteger(pointerId)
+      || pointerId < 0
+      || pointerId > STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxPointerId
+    ) {
+      return Object.freeze({ ok: false, reason: "invalid-pointer" });
+    }
+
+    const clientX = optionalBoundedNumber(
+      event.clientX,
+      Number.NaN,
+      -STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxClientCoordinateAbsolute,
+      STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxClientCoordinateAbsolute,
+    );
+    const clientY = optionalBoundedNumber(
+      event.clientY,
+      Number.NaN,
+      -STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxClientCoordinateAbsolute,
+      STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxClientCoordinateAbsolute,
+    );
+    if (clientX === null || clientY === null || Number.isNaN(clientX) || Number.isNaN(clientY)) {
+      return Object.freeze({ ok: false, reason: "invalid-coordinate" });
+    }
+
+    const pressure = optionalBoundedNumber(event.pressure, 0, 0, 1);
+    const tangentialPressure = optionalBoundedNumber(
+      event.tangentialPressure,
+      0,
+      -1,
+      1,
+    );
+    if (pressure === null || tangentialPressure === null) {
+      return Object.freeze({ ok: false, reason: "invalid-pressure" });
+    }
+
+    const tiltX = optionalBoundedNumber(event.tiltX, 0, -90, 90);
+    const tiltY = optionalBoundedNumber(event.tiltY, 0, -90, 90);
+    const altitudeAngle = optionalBoundedNumber(
+      event.altitudeAngle,
+      QUARTER_TURN_RADIANS,
+      0,
+      QUARTER_TURN_RADIANS,
+    );
+    const azimuthAngle = normalizedFullTurn(
+      event.azimuthAngle,
+      0,
+      FULL_TURN_RADIANS,
+    );
+    const twist = normalizedFullTurn(event.twist, 0, 360);
+    if (
+      tiltX === null
+      || tiltY === null
+      || altitudeAngle === null
+      || azimuthAngle === null
+      || twist === null
+    ) {
+      return Object.freeze({ ok: false, reason: "invalid-orientation" });
+    }
+
+    const contactWidth = optionalBoundedNumber(
+      event.width,
+      1,
+      0,
+      STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxContactDimension,
+    );
+    const contactHeight = optionalBoundedNumber(
+      event.height,
+      1,
+      0,
+      STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxContactDimension,
+    );
+    if (contactWidth === null || contactHeight === null) {
+      return Object.freeze({ ok: false, reason: "invalid-contact-geometry" });
+    }
+
+    const sourceTimeMilliseconds = optionalBoundedNumber(
+      event.timeStamp,
+      0,
+      0,
+      STUDIO_POINTER_SAMPLE_CHANNELS_V2_LIMITS.maxSourceTimeMilliseconds,
+    );
+    if (sourceTimeMilliseconds === null) {
+      return Object.freeze({ ok: false, reason: "invalid-timestamp" });
+    }
+
+    const value: StudioNormalizedPointerSampleChannelsV2 = Object.freeze({
+      authority,
+      persistence: authority === "authoritative" ? "durable" : "preview-only",
+      pointerId,
+      pointerType: pointerTypeOf(event),
+      clientX,
+      clientY,
+      pressure,
+      tangentialPressure,
+      tiltX,
+      tiltY,
+      altitudeAngle,
+      azimuthAngle,
+      twist,
+      contactWidth,
+      contactHeight,
+      sourceTimeMilliseconds,
+    });
+    return Object.freeze({ ok: true, value });
+  } catch {
+    return Object.freeze({ ok: false, reason: "invalid-pointer" });
+  }
 }
 
 function pointerIdOf(event: StudioPointerEventLike, fallback = LEGACY_POINTER_ID): number {

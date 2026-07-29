@@ -8,6 +8,11 @@ import {
 
 import type { DrawEl } from "./studio-element-model";
 
+import {
+  captureStudioInkInputContractV1,
+  captureStudioInkInputContractV2,
+} from "@/lib/studio-ink-input-contract";
+
 function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
     id: "stroke-1",
@@ -177,5 +182,82 @@ describe("planStudioPointerReleaseEndpoint", () => {
     expect(result.stroke.twists).toBe(twists);
     expect(result.stroke.speeds).toBe(speeds);
     expect(result.stroke.tangentialPressures).toBe(tangentialPressures);
+  });
+
+  it("aligns all persisted sensor channels for a new regular pen stroke", () => {
+    const completed = stroke({
+      inkInput: captureStudioInkInputContractV1("pen"),
+      tiltXs: [11],
+      tiltYs: [-9],
+      twists: [45],
+      speeds: [2.5],
+      tangentialPressures: [-0.2],
+    });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.5,
+        tiltX: 35,
+        tiltY: -28,
+        twist: 300,
+        tangentialPressure: 0.4,
+      },
+    });
+
+    expect(result.stroke.tiltXs).toEqual([11, 0, 35]);
+    expect(result.stroke.tiltYs).toEqual([-9, 0, -28]);
+    expect(result.stroke.twists).toEqual([45, 0, 300]);
+    expect(result.stroke.speeds).toEqual([2.5, 0, 2.5]);
+    expect(result.stroke.tangentialPressures).toEqual([-0.2, 0, 0.4]);
+  });
+
+  it("aligns v2 altitude, azimuth, contact geometry and gesture-relative time", () => {
+    const completed = stroke({
+      inkInput: captureStudioInkInputContractV2("pen"),
+      altitudeAngles: [0.8],
+      azimuthAngles: [1.2],
+      contactWidths: [3],
+      contactHeights: [2],
+      sampleTimeOffsets: [0],
+    });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.5,
+        altitudeAngle: 0.45,
+        azimuthAngle: 2.75,
+        width: 4.5,
+        height: 3.5,
+        sampleTimeOffset: 24,
+      },
+    });
+
+    expect(result.stroke.altitudeAngles).toEqual([0.8, Math.PI / 2, 0.45]);
+    expect(result.stroke.azimuthAngles).toEqual([1.2, 0, 2.75]);
+    expect(result.stroke.contactWidths).toEqual([3, 1, 4.5]);
+    expect(result.stroke.contactHeights).toEqual([2, 1, 3.5]);
+    expect(result.stroke.sampleTimeOffsets).toEqual([0, 0, 24]);
+  });
+
+  it("does not reinterpret a legacy v1 contract as persisted v2 sensor arrays", () => {
+    const completed = stroke({
+      inkInput: captureStudioInkInputContractV1("pen"),
+    });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "pen",
+        altitudeAngle: 0.45,
+        azimuthAngle: 2.75,
+        width: 4.5,
+        height: 3.5,
+        sampleTimeOffset: 24,
+      },
+    });
+
+    expect(result.stroke.altitudeAngles).toBeUndefined();
+    expect(result.stroke.azimuthAngles).toBeUndefined();
+    expect(result.stroke.contactWidths).toBeUndefined();
+    expect(result.stroke.contactHeights).toBeUndefined();
+    expect(result.stroke.sampleTimeOffsets).toBeUndefined();
   });
 });

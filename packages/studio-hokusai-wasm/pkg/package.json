@@ -1,0 +1,22 @@
+{
+  "name": "studio-hokusai-wasm",
+  "type": "module",
+  "description": "Transparent deterministic Hokusai natural-media renderer for ToonSpectrum Studio",
+  "version": "0.1.0",
+  "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+  "files": [
+    "INTEGRITY.sha256",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "LICENSE-UNICODE",
+    "README.md",
+    "studio_hokusai_wasm.d.ts",
+    "studio_hokusai_wasm.js",
+    "studio_hokusai_wasm_bg.wasm",
+    "studio_hokusai_wasm_bg.wasm.d.ts"
+  ],
+  "main": "studio_hokusai_wasm.js",
+  "types": "studio_hokusai_wasm.d.ts",
+  "sideEffects": false,
+  "private": true
+}

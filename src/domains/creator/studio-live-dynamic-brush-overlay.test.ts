@@ -23,7 +23,12 @@ import {
 } from "./studio-brush-render-budget";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS } from "./studio-causal-dynamic-brush-deposit-v2";
-import { STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET } from "./studio-dynamic-brush-coverage-renderer";
+import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  renderStudioDynamicBrushCoverageMark,
+  STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
+} from "./studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
@@ -49,9 +54,16 @@ interface RecordedComposite {
   readonly marks: readonly RecordedEllipse[];
 }
 
+interface RecordedCopy {
+  readonly opacity: number;
+  readonly sourceRect: readonly [number, number, number, number];
+  readonly destinationRect: readonly [number, number, number, number];
+}
+
 interface RecordingCanvas extends HTMLCanvasElement {
   readonly recordedMarks: RecordedEllipse[];
   readonly recordedComposites: RecordedComposite[];
+  readonly recordedCopies: RecordedCopy[];
   readonly clearCount: () => number;
   readonly radialGradientCount: () => number;
   textureStamp: boolean;
@@ -65,6 +77,7 @@ function rounded(value: number): number {
 function recordingCanvas(): RecordingCanvas {
   const recordedMarks: RecordedEllipse[] = [];
   const recordedComposites: RecordedComposite[] = [];
+  const recordedCopies: RecordedCopy[] = [];
   let clears = 0;
   let radialGradients = 0;
   let alpha = 1;
@@ -76,6 +89,7 @@ function recordingCanvas(): RecordingCanvas {
   let scaleX = 1;
   let scaleY = 1;
   let path: Omit<RecordedEllipse, "alpha" | "color"> | null = null;
+  let polygonPath: number[] = [];
   const stack: Array<{
     readonly alpha: number;
     readonly color: string;
@@ -93,6 +107,7 @@ function recordingCanvas(): RecordingCanvas {
     style: { opacity: "1" },
     recordedMarks,
     recordedComposites,
+    recordedCopies,
     clearCount: () => clears,
     radialGradientCount: () => radialGradients,
     textureStamp: false,
@@ -139,7 +154,15 @@ function recordingCanvas(): RecordingCanvas {
     },
     beginPath: () => {
       path = null;
+      polygonPath = [];
     },
+    moveTo: (x: number, y: number) => {
+      polygonPath.push(x, y);
+    },
+    lineTo: (x: number, y: number) => {
+      polygonPath.push(x, y);
+    },
+    closePath: () => undefined,
     createRadialGradient: () => {
       radialGradients += 1;
       return {
@@ -186,6 +209,21 @@ function recordingCanvas(): RecordingCanvas {
       scaleY *= y;
     },
     fill: () => {
+      if (!path && polygonPath.length >= 6) {
+        const xs = polygonPath.filter((_, index) => index % 2 === 0);
+        const ys = polygonPath.filter((_, index) => index % 2 === 1);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        path = {
+          x: rounded((minX + maxX) / 2),
+          y: rounded((minY + maxY) / 2),
+          radiusX: rounded((maxX - minX) / 2),
+          radiusY: rounded((maxY - minY) / 2),
+          angleRadians: 0,
+        };
+      }
       if (!path) return;
       recordedMarks.push({
         ...path,
@@ -237,6 +275,23 @@ function recordingCanvas(): RecordingCanvas {
           color: sourceCanvas.textureColor,
         });
         return;
+      }
+      if (args.length === 8) {
+        recordedCopies.push({
+          opacity: rounded(alpha),
+          sourceRect: [
+            args[0] ?? 0,
+            args[1] ?? 0,
+            args[2] ?? 0,
+            args[3] ?? 0,
+          ],
+          destinationRect: [
+            args[4] ?? 0,
+            args[5] ?? 0,
+            args[6] ?? 0,
+            args[7] ?? 0,
+          ],
+        });
       }
       recordedComposites.push({
         opacity: rounded(alpha),
@@ -373,11 +428,12 @@ function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
     }
   });
   const activeCanvas = recordingCanvas();
+  const presentationCanvas = recordingCanvas();
   const settledCanvas = recordingCanvas();
   const renderer = new StudioLiveDynamicBrushOverlayRenderer();
-  renderer.attach({ activeCanvas, settledCanvas });
+  renderer.attach({ activeCanvas, presentationCanvas, settledCanvas });
   renderer.setSurface(surface);
-  return { activeCanvas, renderer, settledCanvas };
+  return { activeCanvas, presentationCanvas, renderer, settledCanvas };
 }
 
 function maximumLongitudinalCoverageGap(
@@ -548,6 +604,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         [12, 30, 25, 31, 40, 35, 58, 43, 79, 50, 103, 47, 128, 37, 154, 25],
         {
           brush: selection.runtimeBrushId,
+          brushCatalogId: selection.catalogId,
           brushDynamics: selection.brushDynamics,
           strokeWidth: selection.defaultWidth,
           opacity: selection.defaultOpacity,
@@ -823,6 +880,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       const id = `stream-${descriptor.catalogId}`;
       const prefix = drawElement(id, prefixPoints, {
         brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
         brushDynamics: selection.brushDynamics,
         strokeWidth: selection.defaultWidth,
         opacity: selection.defaultOpacity,
@@ -847,6 +905,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       );
       const extended = drawElement(id, points, {
         brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
         brushDynamics: selection.brushDynamics,
         strokeWidth: selection.defaultWidth,
         opacity: selection.defaultOpacity,
@@ -1075,6 +1134,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         const points = pointPairs.slice(0, count).flat();
         return drawElement(`texture-prefix-${catalogId}`, points, {
           brush: selection.runtimeBrushId,
+          brushCatalogId: selection.catalogId,
           brushDynamics: selection.brushDynamics,
           strokeWidth: selection.defaultWidth,
           opacity: selection.defaultOpacity,
@@ -1144,6 +1204,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
       const element = drawElement(`pack-${descriptor.catalogId}`, points, {
         brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
         brushDynamics: selection.brushDynamics,
         strokeWidth: selection.defaultWidth,
         opacity: selection.defaultOpacity,
@@ -1186,6 +1247,72 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     }
   });
 
+  it.each([
+    "chalk-rough",
+    "watercolor-dry-granule",
+  ] as const)(
+    "matches the retained StudioDrawNode plan for a resized seeded %s stroke",
+    (catalogId) => {
+    const selection = materializeStudioBrushPackSelection(catalogId);
+    if (!selection) throw new Error(`missing ${catalogId} selection`);
+    const pointPairs = Array.from({ length: 54 }, (_, index) => [
+      8 + index * 6,
+      72 + Math.sin(index / 4) * 9,
+    ]);
+    const element = drawElement(`${catalogId}-retained-parity`, pointPairs.flat(), {
+      brush: selection.runtimeBrushId,
+      brushCatalogId: selection.catalogId,
+      brushDynamics: selection.brushDynamics,
+      // Brush-size changes are persisted on DrawEl independently from the immutable catalog
+      // dynamics snapshot. Live and retained planners must therefore derive one stroke identity
+      // from this authored width instead of silently using different bases.
+      strokeWidth: selection.defaultWidth * 1.6,
+      opacity: selection.defaultOpacity,
+      pressures: Array.from({ length: pointPairs.length }, (_, index) =>
+        0.34 + (index % 9) * 0.065
+      ),
+      speeds: Array.from({ length: pointPairs.length }, (_, index) =>
+        2 + (index % 7) * 1.4
+      ),
+      tiltXs: Array.from({ length: pointPairs.length }, () => 17),
+      tiltYs: Array.from({ length: pointPairs.length }, () => -11),
+    });
+
+    const live = attachedRenderer();
+    expect(live.renderer.begin(element).status).toBe("started");
+    expect(live.renderer.end(element).status).toBe("settled");
+    const liveMarks = live.settledCanvas.recordedComposites[0]?.marks;
+    expect(liveMarks?.length).toBeGreaterThan(0);
+
+    const retainedPlan = planStudioDynamicBrushRender(
+      element,
+      selection.runtimeBrushId,
+      false,
+    );
+    expect(retainedPlan.status).toBe("ready");
+    if (retainedPlan.status !== "ready") return;
+    const retainedMarks = planStudioDynamicBrushCoverageAndLegacyMarks({
+      dabVariations: retainedPlan.plan.dabVariations,
+      dynamics: retainedPlan.plan.dynamics,
+      materialIdentity: retainedPlan.plan.materialIdentity,
+      dynamicSeed: retainedPlan.plan.seed,
+      stroke: element.stroke,
+      stampGrid: retainedPlan.plan.renderBudget.stampGrid,
+      markBudget: retainedPlan.plan.markBudget,
+    }).coveragePlan;
+    expect(retainedMarks.ok).toBe(true);
+    if (!retainedMarks.ok) return;
+    const retainedCanvas = recordingCanvas();
+    const retainedContext = retainedCanvas.getContext("2d");
+    if (!retainedContext) throw new Error("missing retained recording context");
+    for (const mark of retainedMarks.marks) {
+      renderStudioDynamicBrushCoverageMark(retainedContext, mark);
+    }
+
+    expect(retainedCanvas.recordedMarks).toEqual(liveMarks);
+    },
+  );
+
   it("accepts canonical-equivalent dynamics clones while rejecting material mutations", () => {
     const { renderer } = attachedRenderer();
     const element = drawElement("clone", [5, 8, 24, 12]);
@@ -1205,7 +1332,12 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
   });
 
   it("preserves complex tip, grain, dual, colour, symmetry and stroke opacity through seal and replay", () => {
-    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer();
     const element = drawElement(
       "quality",
       [15, 30, 29, 33, 46, 41, 66, 48, 89, 54, 115, 66],
@@ -1220,7 +1352,10 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(liveMarks.length).toBeGreaterThan(4);
     expect(new Set(liveMarks.map((mark) => mark.color)).size).toBeGreaterThan(1);
     expect(new Set(liveMarks.map((mark) => mark.alpha)).size).toBeGreaterThan(1);
-    expect(activeCanvas.style.opacity).toBe(String(element.opacity));
+    expect(activeCanvas.style.opacity).toBe("1");
+    expect(presentationCanvas.style.opacity).toBe("1");
+    expect(presentationCanvas.recordedCopies.length).toBeGreaterThan(0);
+    expect(presentationCanvas.recordedCopies.at(-1)?.opacity).toBe(element.opacity);
 
     const sealed = renderer.end(element);
     expect(sealed.status).toBe("settled");
@@ -1254,6 +1389,80 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       .toEqual(sealedComposite.marks.map((mark) => mark.color));
   });
 
+  it("recomposites only the changed live crop with Canvas2D alpha and clears it on cancel", () => {
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+    } = attachedRenderer();
+    const element = drawElement(
+      "dirty-presentation",
+      [30, 50, 42, 52, 56, 55, 72, 58],
+      { opacity: 0.43, symmetry: { type: "none", centerX: 0, centerY: 0 } },
+    );
+
+    expect(renderer.begin(element).status).toBe("started");
+    expect(renderer.appendFrom(element).status).toBe("appended");
+    const copy = presentationCanvas.recordedCopies.at(-1);
+    expect(copy).toBeDefined();
+    expect(copy?.opacity).toBe(element.opacity);
+    expect(copy?.sourceRect).toEqual(copy?.destinationRect);
+    expect((copy?.sourceRect[2] ?? activeCanvas.width) * (copy?.sourceRect[3] ?? activeCanvas.height))
+      .toBeLessThan(activeCanvas.width * activeCanvas.height);
+    expect(activeCanvas.style.opacity).toBe("1");
+    expect(presentationCanvas.style.opacity).toBe("1");
+
+    const coverageClears = activeCanvas.clearCount();
+    const presentationClears = presentationCanvas.clearCount();
+    expect(renderer.resetActive()).toBe(true);
+    expect(activeCanvas.clearCount()).toBe(coverageClears + 1);
+    expect(presentationCanvas.clearCount()).toBe(presentationClears + 1);
+    expect(activeCanvas.recordedMarks).toEqual([]);
+    expect(presentationCanvas.recordedComposites).toEqual([]);
+  });
+
+  it("mirrors the dirty crop under flipX and clears live authority after settling", () => {
+    const element = drawElement(
+      "mirrored-dirty-presentation",
+      [30, 50, 42, 52, 56, 55, 72, 58],
+      { opacity: 0.43, symmetry: { type: "none", centerX: 0, centerY: 0 } },
+    );
+    const normal = attachedRenderer();
+    expect(normal.renderer.begin(element).status).toBe("started");
+    expect(normal.renderer.appendFrom(element).status).toBe("appended");
+    const normalCopy = normal.presentationCanvas.recordedCopies.at(-1);
+    expect(normalCopy).toBeDefined();
+
+    const mirrored = attachedRenderer({ ...SURFACE, flipX: true });
+    expect(mirrored.renderer.begin(element).status).toBe("started");
+    expect(mirrored.renderer.appendFrom(element).status).toBe("appended");
+    const mirroredCopy = mirrored.presentationCanvas.recordedCopies.at(-1);
+    expect(mirroredCopy).toBeDefined();
+    expect(mirroredCopy?.sourceRect).toEqual(mirroredCopy?.destinationRect);
+    expect(mirroredCopy?.sourceRect[0]).toBe(
+      mirrored.activeCanvas.width
+        - (normalCopy?.sourceRect[0] ?? 0)
+        - (normalCopy?.sourceRect[2] ?? 0),
+    );
+    expect(mirroredCopy?.sourceRect.slice(1)).toEqual(normalCopy?.sourceRect.slice(1));
+    expect(
+      (mirroredCopy?.sourceRect[2] ?? mirrored.activeCanvas.width)
+        * (mirroredCopy?.sourceRect[3] ?? mirrored.activeCanvas.height),
+    ).toBeLessThan(mirrored.activeCanvas.width * mirrored.activeCanvas.height);
+
+    const activeClears = mirrored.activeCanvas.clearCount();
+    const presentationClears = mirrored.presentationCanvas.clearCount();
+    expect(mirrored.renderer.end(element).status).toBe("settled");
+    expect(mirrored.activeCanvas.clearCount()).toBeGreaterThan(activeClears);
+    expect(mirrored.presentationCanvas.clearCount()).toBeGreaterThan(presentationClears);
+    expect(mirrored.activeCanvas.recordedMarks).toEqual([]);
+    expect(mirrored.presentationCanvas.recordedComposites).toEqual([]);
+    expect(mirrored.settledCanvas.recordedComposites).toHaveLength(1);
+
+    expect(mirrored.renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(mirrored.settledCanvas.recordedComposites).toEqual([]);
+  });
+
   it("releases only the acknowledged settled FIFO prefix", () => {
     const { renderer, settledCanvas } = attachedRenderer();
     const first = drawElement("first", [10, 12, 34, 18, 62, 26]);
@@ -1274,23 +1483,35 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(settledCanvas.recordedComposites).toEqual([]);
   });
 
-  it.each([2, 3])("keeps both live canvases at native DPR %i", (devicePixelRatio) => {
+  it.each([2, 3])("keeps all three live canvases at native DPR %i", (devicePixelRatio) => {
     vi.stubGlobal("devicePixelRatio", devicePixelRatio);
-    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer();
     expect(renderer.begin(drawElement(`dpr-${devicePixelRatio}`, [4, 4])).status)
       .toBe("started");
     expect(activeCanvas.width).toBe(SURFACE.width * devicePixelRatio);
     expect(activeCanvas.height).toBe(SURFACE.height * devicePixelRatio);
+    expect(presentationCanvas.width).toBe(SURFACE.width * devicePixelRatio);
+    expect(presentationCanvas.height).toBe(SURFACE.height * devicePixelRatio);
     expect(settledCanvas.width).toBe(SURFACE.width * devicePixelRatio);
     expect(settledCanvas.height).toBe(SURFACE.height * devicePixelRatio);
   });
 
-  it("fails closed instead of lowering DPR when the two native surfaces exceed budget", () => {
+  it("fails closed and keeps only three cleared 1x1 stores when native DPR exceeds budget", () => {
     vi.stubGlobal("devicePixelRatio", 3);
     const dimension = Math.floor(
-      Math.sqrt(STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 2),
+      Math.sqrt(STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 3),
     );
-    const { activeCanvas, renderer, settledCanvas } = attachedRenderer({
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer({
       ...SURFACE,
       width: dimension,
       height: dimension,
@@ -1300,8 +1521,100 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       status: "fallback",
       reason: "surface-budget",
     });
-    expect(renderer.backingPixelCount).toBe(0);
+    expect(renderer.backingPixelCount).toBe(3);
+    expect([
+      activeCanvas.width,
+      activeCanvas.height,
+      presentationCanvas.width,
+      presentationCanvas.height,
+      settledCanvas.width,
+      settledCanvas.height,
+    ]).toEqual([1, 1, 1, 1, 1, 1]);
     expect(activeCanvas.recordedMarks).toEqual([]);
+    expect(presentationCanvas.recordedComposites).toEqual([]);
     expect(settledCanvas.recordedComposites).toEqual([]);
+  });
+
+  it("releases an existing 64MiB-class backing allocation on surface-budget fallback", () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const dimension = Math.floor(
+      Math.sqrt(STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 3),
+    );
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer({
+      ...SURFACE,
+      width: dimension,
+      height: dimension,
+      documentWidth: dimension,
+    });
+    expect(renderer.backingPixelCount).toBeGreaterThan(15_000_000);
+
+    renderer.setSurface({
+      ...SURFACE,
+      width: dimension + 1,
+      height: dimension + 1,
+      documentWidth: dimension + 1,
+    });
+
+    expect(renderer.begin(drawElement("surface-budget-release", [4, 4]))).toEqual({
+      status: "fallback",
+      reason: "surface-budget",
+    });
+    expect(renderer.backingPixelCount).toBe(3);
+    expect([
+      activeCanvas.width,
+      activeCanvas.height,
+      presentationCanvas.width,
+      presentationCanvas.height,
+      settledCanvas.width,
+      settledCanvas.height,
+    ]).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(activeCanvas.clearCount()).toBeGreaterThan(0);
+    expect(presentationCanvas.clearCount()).toBeGreaterThan(0);
+    expect(settledCanvas.clearCount()).toBeGreaterThan(0);
+  });
+
+  it("releases existing stores when a DPR increase would require a reduced live surface", () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const dimension = 2_200;
+    const {
+      activeCanvas,
+      presentationCanvas,
+      renderer,
+      settledCanvas,
+    } = attachedRenderer({
+      ...SURFACE,
+      width: dimension,
+      height: dimension,
+      documentWidth: dimension,
+    });
+    expect(renderer.backingPixelCount).toBe(3 * dimension * dimension);
+
+    vi.stubGlobal("devicePixelRatio", 3);
+    renderer.setSurface({
+      ...SURFACE,
+      left: 1,
+      width: dimension,
+      height: dimension,
+      documentWidth: dimension,
+    });
+
+    expect(renderer.begin(drawElement("native-dpr-release", [4, 4]))).toEqual({
+      status: "fallback",
+      reason: "surface-budget",
+    });
+    expect(renderer.backingPixelCount).toBe(3);
+    expect([
+      activeCanvas.width,
+      activeCanvas.height,
+      presentationCanvas.width,
+      presentationCanvas.height,
+      settledCanvas.width,
+      settledCanvas.height,
+    ]).toEqual([1, 1, 1, 1, 1, 1]);
   });
 });

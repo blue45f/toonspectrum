@@ -228,7 +228,7 @@ describe("planOilBrushDabs", () => {
 });
 
 describe("planPastelBrushDabs", () => {
-  it("renders a deterministic pressure-sensitive tooth for a point tap", () => {
+  it("renders deterministic crossed anisotropic fibres for a pressure-sensitive point tap", () => {
     const low = planPastelBrushDabs({
       points: [10, 12],
       pressures: [0],
@@ -249,7 +249,9 @@ describe("planPastelBrushDabs", () => {
       baseWidth: 18,
       seed: 11,
     })).toEqual(low);
-    expect(high[0]!.radius).toBeGreaterThan(low[0]!.radius);
+    expect(high[0]!.radiusX).toBeGreaterThan(low[0]!.radiusX);
+    expect(low.every((dab) => dab.radiusX / dab.radiusY >= 3.2)).toBe(true);
+    expect(low[1]!.angleRad - low[0]!.angleRad).toBeCloseTo(Math.PI / 2, 8);
     expect(high[0]!.opacity).toBeGreaterThan(low[0]!.opacity);
   });
 
@@ -261,6 +263,8 @@ describe("planPastelBrushDabs", () => {
     });
     expect(dabs.length).toBeGreaterThan(2);
     expect(dabs.every((d) => d.opacity <= 0.5)).toBe(true);
+    expect(dabs.every((d) => d.radiusX / d.radiusY >= 3.2)).toBe(true);
+    expect(dabs.every((d) => Math.abs(d.angleRad) <= 0.08)).toBe(true);
   });
 
   it("reserves a visible end dab instead of exhausting a tiny cap at the stroke head", () => {
@@ -275,7 +279,34 @@ describe("planPastelBrushDabs", () => {
     expect(dabs).toHaveLength(2);
     expect(Math.hypot(dabs[0]!.x, dabs[0]!.y)).toBeLessThan(6);
     expect(Math.hypot(dabs[1]!.x - 1_000, dabs[1]!.y)).toBeLessThan(6);
-    expect(dabs[1]!.radius).toBeGreaterThan(dabs[0]!.radius);
+    expect(dabs[1]!.radiusX).toBeGreaterThan(dabs[0]!.radiusX);
     expect(dabs[1]!.opacity).toBeGreaterThan(dabs[0]!.opacity);
+  });
+
+  it("keeps a long stroke dense without exposing the shared 512-circle budget", () => {
+    const dabs = planPastelBrushDabs({
+      points: [0, 0, 8_000, 0],
+      pressures: [0.62, 0.62],
+      baseWidth: 20,
+      seed: 23,
+    });
+
+    expect(dabs.length).toBeGreaterThan(3_000);
+    expect(dabs.length).toBeLessThanOrEqual(4_096);
+    expect(dabs.every((dab) => dab.radiusX / dab.radiusY >= 3.2)).toBe(true);
+    let maximumGap = 0;
+    for (let index = 1; index < dabs.length; index += 1) {
+      const previous = dabs[index - 1]!;
+      const current = dabs[index]!;
+      maximumGap = Math.max(
+        maximumGap,
+        Math.hypot(current.x - previous.x, current.y - previous.y),
+      );
+    }
+    expect(maximumGap).toBeLessThan(
+      Math.min(...dabs.map((dab) => dab.radiusX)),
+    );
+    expect(Math.hypot(dabs[0]!.x, dabs[0]!.y)).toBeLessThan(1);
+    expect(Math.hypot(dabs.at(-1)!.x - 8_000, dabs.at(-1)!.y)).toBeLessThan(1);
   });
 });

@@ -56,6 +56,45 @@ function input(
 }
 
 describe("planStudioDrawPointerStart", () => {
+  it("captures browser-standard pen sensor provenance and aligned channels for every new pen stroke", () => {
+    const plan = planStudioDrawPointerStart(input({
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.42,
+        tiltX: 31,
+        tiltY: -22,
+        twist: 271,
+        tangentialPressure: -0.35,
+        altitudeAngle: 0.63,
+        azimuthAngle: 2.4,
+        width: 3.5,
+        height: 2.25,
+        timeStamp: 456,
+      },
+    }));
+
+    expect(plan.capturePointerDynamics).toBe(false);
+    expect(plan.element.inkInput).toMatchObject({
+      kind: "studio-ink-input-contract",
+      version: 2,
+      pointerType: "pen",
+      pressureSource: "device-or-browser",
+      authoritativeSamples: "coalesced-or-dispatched-v1",
+      predictedSamples: "preview-only-never-persisted-v1",
+      privacy: "no-device-identifier-v1",
+    });
+    expect(plan.element.tiltXs).toEqual([31]);
+    expect(plan.element.tiltYs).toEqual([-22]);
+    expect(plan.element.twists).toEqual([271]);
+    expect(plan.element.speeds).toEqual([0]);
+    expect(plan.element.tangentialPressures).toEqual([-0.35]);
+    expect(plan.element.altitudeAngles).toEqual([0.63]);
+    expect(plan.element.azimuthAngles).toEqual([2.4]);
+    expect(plan.element.contactWidths).toEqual([3.5]);
+    expect(plan.element.contactHeights).toEqual([2.25]);
+    expect(plan.element.sampleTimeOffsets).toEqual([0]);
+  });
+
   it("creates a quantized immediate pen start with the versioned path pressure model", () => {
     const plan = planStudioDrawPointerStart(input());
 
@@ -409,7 +448,7 @@ describe("planStudioDrawPointerStart", () => {
     expect(unsupported.element.paintModel).toBeUndefined();
   });
 
-  it("routes G-pen through the same zero-latency residual engine while retaining dense specialty sampling", () => {
+  it("keeps dense G-pen input while delegating geometry to the perfect-freehand profile", () => {
     const gpen = planStudioDrawPointerStart(input({ brush: "gpen" }));
     const calligraphy = planStudioDrawPointerStart(input({ brush: "calligraphy" }));
     const highlighter = planStudioDrawPointerStart(input({ brush: "highlighter" }));
@@ -422,13 +461,39 @@ describe("planStudioDrawPointerStart", () => {
       quantizeImmediately: true,
     });
     expect(gpen.element.sampleSpacing).toBe(0);
-    expect(gpen.element.pressureModel).toBe(
-      STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
-    );
+    expect(gpen.element.pressureModel).toBeUndefined();
+    expect(gpen.pressure).toBeCloseTo(0.5, 2);
     expect(calligraphy.element.sampleSpacing).toBe(0.25);
     expect(highlighter.element.sampleSpacing).toBe(0.375);
     expect(airbrush.element.sampleSpacing).toBe(0.5);
     expect(gpen.element.sampleSpacing).toBeLessThan(airbrush.element.sampleSpacing!);
+  });
+
+  it("captures an immutable recorded-pressure outline contract only for owned line-art brushes", () => {
+    const gpen = planStudioDrawPointerStart(input({ brush: "gpen" }));
+    const mappingPen = planStudioDrawPointerStart(input({ brush: "mapping-pen" }));
+    const ordinaryPen = planStudioDrawPointerStart(input({ brush: "pen" }));
+    const eraser = planStudioDrawPointerStart(input({
+      brush: "gpen",
+      drawMode: "eraser",
+    }));
+
+    expect(gpen.element.outlineStroke).toMatchObject({
+      kind: "studio-outline-stroke-contract",
+      version: 1,
+      engine: "perfect-freehand-outline",
+      packageAlgorithm: "perfect-freehand@1.2.3:getStroke",
+      pressureSource: "recorded",
+      profile: { id: "gpen", diameterScale: 1 },
+    });
+    expect(mappingPen.element.outlineStroke).toMatchObject({
+      profile: { id: "gpen", diameterScale: 0.45 },
+    });
+    expect(mappingPen.element.outlineStroke).not.toEqual(gpen.element.outlineStroke);
+    expect(Object.isFrozen(gpen.element.outlineStroke)).toBe(true);
+    expect(Object.isFrozen(gpen.element.outlineStroke?.profile)).toBe(true);
+    expect(ordinaryPen.element.outlineStroke).toBeUndefined();
+    expect(eraser.element.outlineStroke).toBeUndefined();
   });
 
   it("captures a sanitized, bounded catalog identity only for authored pen strokes", () => {

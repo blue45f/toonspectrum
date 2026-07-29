@@ -23,6 +23,7 @@ import {
   type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
 import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
+import { captureStudioPointerStartInkChannels } from "./studio-draw-pointer-start-ink-channels";
 import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "./studio-element-model";
 import {
   resolveStudioCausalInkInputPlan,
@@ -37,6 +38,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { captureStudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
@@ -54,6 +56,10 @@ export interface StudioDrawPointerStartSample {
   readonly tiltY?: unknown;
   readonly twist?: unknown;
   readonly tangentialPressure?: unknown;
+  readonly altitudeAngle?: unknown;
+  readonly azimuthAngle?: unknown;
+  readonly width?: unknown;
+  readonly height?: unknown;
   readonly timeStamp: number;
 }
 
@@ -102,12 +108,6 @@ export interface StudioDrawPointerStartPlan {
   readonly capturePointerDynamics: boolean;
 }
 
-function tangentialPressureOf(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value)
-    ? Math.min(1, Math.max(-1, value))
-    : 0;
-}
-
 /** Builds one immutable stroke-start snapshot without touching browser, renderer, or app state. */
 export function planStudioDrawPointerStart(
   input: StudioDrawPointerStartInput
@@ -151,7 +151,6 @@ export function planStudioDrawPointerStart(
       && (
         brushFamily === "pen"
         || brushFamily === "marker"
-        || brushFamily === "gpen"
       )
     );
   const residualPressureEligible =
@@ -159,7 +158,6 @@ export function planStudioDrawPointerStart(
     && (
       brushFamily === "pen"
       || brushFamily === "marker"
-      || brushFamily === "gpen"
     );
   const pressureModel = linearPressureEligible
     ? residualPressureEligible
@@ -222,11 +220,18 @@ export function planStudioDrawPointerStart(
     : { x: position.x, y: position.y };
   const pressure = causalInitialSample?.pressure ?? resolvedPressure;
   const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
+  const captureInkSensorChannels = drawMode === "pen";
   const pressureContract = captureStudioDrawPointerPressureContract(input, capturePointerDynamics);
-  const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
+  const startInkChannels = captureInkSensorChannels
+    ? captureStudioPointerStartInkChannels(pointer, stylus)
+    : {};
   const brushCatalogIdentity = drawMode === "pen"
     ? normalizeStudioBrushCatalogIdentityMetadata(input)
     : {};
+  // Resolved causal pressure is already persisted, including the mouse velocity fallback.
+  const outlineStroke = drawMode === "pen"
+    ? captureStudioOutlineStrokeContractV1({ brushId: brush, pressureSource: "recorded" })
+    : null;
   const common = {
     id: input.id,
     type: "draw" as const,
@@ -240,6 +245,7 @@ export function planStudioDrawPointerStart(
         : undefined,
     ...pressureContract,
     ...brushCatalogIdentity,
+    ...(outlineStroke ? { outlineStroke } : {}),
     brushTip: drawMode === "pen" && brush === "calligraphy" ? { ...brushTip } : undefined,
     stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,
@@ -284,13 +290,7 @@ export function planStudioDrawPointerStart(
                 ? strokeSampleDistanceForBrushFamily(positionScale, brushFamily)
                 : strokeSampleDistanceForScale(positionScale)
             ),
-        tiltXs: captureStylus ? [stylus.tiltX] : undefined,
-        tiltYs: captureStylus ? [stylus.tiltY] : undefined,
-        twists: captureStylus ? [stylus.twist] : undefined,
-        speeds: capturePointerDynamics ? [0] : undefined,
-        tangentialPressures: capturePointerDynamics
-          ? [tangentialPressureOf(pointer.tangentialPressure)]
-          : undefined,
+        ...startInkChannels,
       };
 
   return {

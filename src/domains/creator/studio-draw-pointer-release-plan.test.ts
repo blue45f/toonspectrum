@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { smoothStrokePoints } from "./studio-brush";
+import { studioDrawElementToCrdtStroke } from "./studio-crdt-draw-bridge";
 import {
   planStudioDrawPointerRelease,
   type StudioDrawPointerReleasePlanInput,
@@ -8,6 +9,8 @@ import {
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 import type { DrawEl } from "./studio-element-model";
+
+import { captureStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 
 function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
   return {
@@ -185,7 +188,7 @@ describe("planStudioDrawPointerRelease", () => {
     expect(result.stroke).toBe(completed);
   });
 
-  it("promotes a release-recognized freehand line and clears only the established shape metadata", () => {
+  it("promotes a release-recognized freehand line and clears every sample-aligned input channel", () => {
     const linePoints = [0, 0, 10, 0.2, 20, -0.1, 30, 0.1, 40, 0, 50, 0];
     const completed = stroke({
       points: linePoints,
@@ -202,6 +205,12 @@ describe("planStudioDrawPointerRelease", () => {
       twists: [0, 10, 20, 30, 40, 50],
       speeds: [0, 1, 2, 3, 4, 5],
       tangentialPressures: [0, 0.1, 0.2, 0.3, 0.4, 0.5],
+      altitudeAngles: [0.7, 0.65, 0.6, 0.55, 0.5, 0.45],
+      azimuthAngles: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+      contactWidths: [2, 2, 2.5, 2.5, 3, 3],
+      contactHeights: [1, 1, 1.5, 1.5, 2, 2],
+      sampleTimeOffsets: [0, 4, 8, 12, 16, 20],
+      inkInput: captureStudioInkInputContractV2("pen"),
       pressureModel: "linear-full-v1",
       sampleSpacing: 0,
       shapeParams: { starPoints: 8, starInnerRatio: 0.3, polygonSides: 8, cornerRadius: 9 },
@@ -224,9 +233,20 @@ describe("planStudioDrawPointerRelease", () => {
     for (const clearedField of [
       "brush",
       "pressures",
+      "inkInput",
+      "pressureModel",
+      "outlineStroke",
       "tiltXs",
       "tiltYs",
       "twists",
+      "speeds",
+      "tangentialPressures",
+      "altitudeAngles",
+      "azimuthAngles",
+      "contactWidths",
+      "contactHeights",
+      "sampleTimeOffsets",
+      "sampleSpacing",
       "brushTip",
       "stamp",
       "stampPipeline",
@@ -237,11 +257,7 @@ describe("planStudioDrawPointerRelease", () => {
     ] as const) {
       expect(result.stroke[clearedField]).toBeUndefined();
     }
-    // Preserve the historical promotion contract: replay channels not cleared by StudioPage stay.
-    expect(result.stroke.speeds).toBe(completed.speeds);
-    expect(result.stroke.tangentialPressures).toBe(completed.tangentialPressures);
-    expect(result.stroke.pressureModel).toBe("linear-full-v1");
-    expect(result.stroke.sampleSpacing).toBe(0);
+    expect(() => studioDrawElementToCrdtStroke("page-a", result.stroke)).not.toThrow();
     expect(result.postCorrectionApplied).toBe(false);
     expect(result.commitMode).toBe("deferred");
   });

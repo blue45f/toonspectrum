@@ -1,4 +1,7 @@
 import {
+  applyStudioBrushContinuousCarrierQualityPolicy,
+} from "./studio-brush-carrier-quality";
+import {
   normalizeStudioBrushDynamicsSettings,
   serializeStudioBrushDynamicsSettingsCanonical,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
@@ -1572,13 +1575,23 @@ export function materializeStudioBrushPackDynamics(
     // width and the neutral dynamics opacity stay invariant so the toolbar remains the artist's
     // outer control (same contract as the formula path above).
     const tuned = applyStudioBrushPackExpansionTuning(settings, tuning);
-    return normalizeStudioBrushDynamicsSettings({
-      ...tuned,
-      width: { ...tuned.width, base: descriptor.defaultWidth },
-      opacity: { ...tuned.opacity, base: 1 },
+    return applyStudioBrushContinuousCarrierQualityPolicy({
+      runtimeBrushId: descriptor.runtimeBrushId,
+      category: descriptor.category,
+      previewStyle: descriptor.previewStyle,
+      settings: normalizeStudioBrushDynamicsSettings({
+        ...tuned,
+        width: { ...tuned.width, base: descriptor.defaultWidth },
+        opacity: { ...tuned.opacity, base: 1 },
+      }),
     });
   }
-  return normalizeStudioBrushDynamicsSettings(settings);
+  return applyStudioBrushContinuousCarrierQualityPolicy({
+    runtimeBrushId: descriptor.runtimeBrushId,
+    category: descriptor.category,
+    previewStyle: descriptor.previewStyle,
+    settings: normalizeStudioBrushDynamicsSettings(settings),
+  });
 }
 
 /**

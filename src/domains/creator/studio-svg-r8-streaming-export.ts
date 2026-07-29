@@ -26,6 +26,10 @@ import {
   buildStudioBrushTipAlphaMap,
   type StudioBrushTipAlphaMap,
 } from "./studio-brush-tip-stamp";
+import {
+  bridgeStudioDynamicDabVariationToDryMediaV1,
+  type StudioDynamicBrushMaterialIdentity,
+} from "./studio-dry-media-dynamic-bridge";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
@@ -70,6 +74,7 @@ export interface StudioSvgR8StreamingCoverageMark {
 export interface StudioSvgR8StreamingExportInput {
   readonly dabVariations: readonly StudioSvgR8DabVariation[];
   readonly dynamics: NormalizedStudioBrushDynamicsSettings;
+  readonly materialIdentity?: StudioDynamicBrushMaterialIdentity;
   readonly dynamicSeed: number;
   readonly stroke: string;
   readonly markBudget: number;
@@ -100,6 +105,7 @@ export type StudioSvgR8StreamingExportResult =
       ok: false;
       reason:
         | "invalid-input"
+        | "dry-media-bridge"
         | "r8-grain-unavailable"
         | "mark-budget"
         | "embedded-rgba-budget"
@@ -208,6 +214,23 @@ export function visitStudioSvgR8StreamingCoverage(
     return { ok: false, reason: "invalid-input" };
   }
 
+  let dabVariations: readonly StudioSvgR8DabVariation[] = input.dabVariations;
+  if (input.materialIdentity) {
+    const bridgedVariations: StudioSvgR8DabVariation[] = [];
+    for (const variation of input.dabVariations) {
+      const bridged = bridgeStudioDynamicDabVariationToDryMediaV1({
+        materialIdentity: input.materialIdentity,
+        seed: input.dynamicSeed,
+        variation,
+      });
+      if (!bridged.ok) {
+        return { ok: false, reason: "dry-media-bridge" };
+      }
+      bridgedVariations.push(bridged.variation);
+    }
+    dabVariations = bridgedVariations;
+  }
+
   const source = input.dynamics.grain.amount > 0
     ? input.dynamics.grain.source
     : undefined;
@@ -234,7 +257,7 @@ export function visitStudioSvgR8StreamingCoverage(
     )),
   ];
   let maximumMarks = 0;
-  for (const variation of input.dabVariations) {
+  for (const variation of dabVariations) {
     const count = variationDabCount(variation);
     const variationMaximum = safeProduct(count, enabledTipIndexes.length);
     if (variationMaximum === null) {
@@ -262,7 +285,7 @@ export function visitStudioSvgR8StreamingCoverage(
     }
   }
   const maximumEmbeddedRgbaBytes = safeProduct(
-    input.dabVariations.reduce(
+    dabVariations.reduce(
       (total, variation) => total + variationDabCount(variation),
       0,
     ),
@@ -275,7 +298,7 @@ export function visitStudioSvgR8StreamingCoverage(
     return { ok: false, reason: "embedded-rgba-budget" };
   }
 
-  const marksPerVariation = input.dabVariations.map(() => 0);
+  const marksPerVariation = dabVariations.map(() => 0);
   let totalMarks = 0;
   let generatedAlphaMapBytes = 0;
   let peakTransientAlphaMapBytes = 0;
@@ -352,10 +375,10 @@ export function visitStudioSvgR8StreamingCoverage(
 
   for (
     let variationIndex = 0;
-    variationIndex < input.dabVariations.length;
+    variationIndex < dabVariations.length;
     variationIndex += 1
   ) {
-    const variation = input.dabVariations[variationIndex]!;
+    const variation = dabVariations[variationIndex]!;
     const firstDab = variationFirstDab(variation);
     const strokeOriginX = firstDab?.sourceX ?? firstDab?.x ?? 0;
     const strokeOriginY = firstDab?.sourceY ?? firstDab?.y ?? 0;

@@ -22,6 +22,7 @@ import {
 import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
+  StudioDynamicBrushSegmentStartFrame,
 } from "./studio-brush-dynamics";
 
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION = 2 as const;
@@ -64,6 +65,8 @@ export interface StudioCausalDynamicBrushSampleV2 {
 
 interface StudioCausalDynamicBrushDepositStateFields {
   readonly previousSample: StudioCausalDynamicBrushSampleV2;
+  /** Runtime-only frame of the last emitted dab, carried across incremental append calls. */
+  readonly lastDabFrame: StudioDynamicBrushSegmentStartFrame;
   readonly totalDistance: number;
   readonly distanceSinceLastDab: number;
   readonly nextDabIndex: number;
@@ -249,6 +252,24 @@ function sampleIsValid(sample: StudioCausalDynamicBrushSampleV2): boolean {
     && sample.twist <= 359;
 }
 
+function segmentFrameIsValid(
+  frame: StudioDynamicBrushSegmentStartFrame,
+): boolean {
+  return Number.isSafeInteger(frame?.index)
+    && frame.index >= 0
+    && Number.isFinite(frame.sourceX)
+    && Math.abs(frame.sourceX) <= MAX_COORDINATE_ABS
+    && Number.isFinite(frame.sourceY)
+    && Math.abs(frame.sourceY) <= MAX_COORDINATE_ABS
+    && Number.isFinite(frame.direction)
+    && Number.isFinite(frame.size)
+    && frame.size >= 0.05
+    && frame.size <= 4_096
+    && Number.isFinite(frame.roundness)
+    && frame.roundness >= 0.01
+    && frame.roundness <= 1;
+}
+
 function stateFieldsAreValid(
   state:
     | StudioCausalDynamicBrushDepositStateV2
@@ -257,6 +278,7 @@ function stateFieldsAreValid(
 ): boolean {
   return state?.kind === "studio-causal-dynamic-brush-deposit-state"
     && sampleIsValid(state.previousSample)
+    && segmentFrameIsValid(state.lastDabFrame)
     && Number.isFinite(state.totalDistance)
     && state.totalDistance >= 0
     && Number.isFinite(state.distanceSinceLastDab)
@@ -291,6 +313,25 @@ function frozenSample(
   return Object.freeze({ ...sample });
 }
 
+function frozenSegmentFrame(
+  frame: StudioDynamicBrushSegmentStartFrame,
+): StudioDynamicBrushSegmentStartFrame {
+  return Object.freeze({ ...frame });
+}
+
+function segmentFrameFromDab(
+  dab: StudioDynamicBrushDab,
+): StudioDynamicBrushSegmentStartFrame {
+  return frozenSegmentFrame({
+    index: dab.index,
+    sourceX: dab.sourceX,
+    sourceY: dab.sourceY,
+    direction: dab.direction ?? dab.angle,
+    size: dab.size,
+    roundness: dab.roundness,
+  });
+}
+
 function frozenStateV2(
   state: StudioCausalDynamicBrushDepositStateFields,
 ): StudioCausalDynamicBrushDepositStateV2 {
@@ -299,6 +340,7 @@ function frozenStateV2(
     version: STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION,
     ...state,
     previousSample: frozenSample(state.previousSample),
+    lastDabFrame: frozenSegmentFrame(state.lastDabFrame),
   });
 }
 
@@ -310,6 +352,7 @@ function frozenStateV3(
     version: STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION,
     ...state,
     previousSample: frozenSample(state.previousSample),
+    lastDabFrame: frozenSegmentFrame(state.lastDabFrame),
   });
 }
 
@@ -357,7 +400,9 @@ function dabAt(
   direction: number,
   index: number,
   cumulativeDistance: number,
-  applyStartTaper: boolean
+  applyStartTaper: boolean,
+  distanceFromPrevious = 0,
+  segmentStartFrame?: StudioDynamicBrushSegmentStartFrame,
 ): Readonly<{ dab: StudioDynamicBrushDab; spacing: number }> | null {
   const recipe = resolveStudioBrushDynamics({
     pressure: sample.pressure,
@@ -402,6 +447,11 @@ function dabAt(
       progress: 0,
       sourceX: sample.x,
       sourceY: sample.y,
+      direction,
+      distanceFromPrevious: Math.max(0, distanceFromPrevious),
+      ...(segmentStartFrame
+        ? { segmentStartFrame: frozenSegmentFrame(segmentStartFrame) }
+        : {}),
       x: sample.x + recipe.scatterOffsetX,
       y: sample.y + recipe.scatterOffsetY,
       size,
@@ -442,6 +492,7 @@ export function beginStudioCausalDynamicBrushDepositV2(
     dab: initial.dab,
     state: frozenStateV2({
       previousSample: sample,
+      lastDabFrame: segmentFrameFromDab(initial.dab),
       totalDistance: 0,
       distanceSinceLastDab: 0,
       nextDabIndex: 1,
@@ -471,6 +522,7 @@ export function beginStudioCausalDynamicBrushDepositV3(
     dab: initial.dab,
     state: frozenStateV3({
       previousSample: sample,
+      lastDabFrame: segmentFrameFromDab(initial.dab),
       totalDistance: 0,
       distanceSinceLastDab: 0,
       nextDabIndex: 1,
@@ -501,6 +553,7 @@ function appendStudioCausalDynamicBrushDepositsCore(
 ): StudioCausalDynamicBrushDepositAppendCoreResult {
   if (!Array.isArray(samples)) return failure("invalid-state");
   let previousSample = state.previousSample;
+  let lastDabFrame = state.lastDabFrame;
   let totalDistance = state.totalDistance;
   let distanceSinceLastDab = state.distanceSinceLastDab;
   let nextDabIndex = state.nextDabIndex;
@@ -531,9 +584,11 @@ function appendStudioCausalDynamicBrushDepositsCore(
         0,
         0,
         true,
+        0,
       );
       if (!taperedStart) return failure("numeric-overflow");
       dabs.push(taperedStart.dab);
+      lastDabFrame = segmentFrameFromDab(taperedStart.dab);
       lastSpacing = taperedStart.spacing;
       transitionedFromTap = true;
       replaceInitialTap = true;
@@ -564,9 +619,12 @@ function appendStudioCausalDynamicBrushDepositsCore(
         nextDabIndex,
         cumulativeDistance,
         true,
+        lastSpacing,
+        lastDabFrame,
       );
       if (!planned) return failure("numeric-overflow");
       dabs.push(planned.dab);
+      lastDabFrame = segmentFrameFromDab(planned.dab);
       nextDabIndex += 1;
       lastSpacing = planned.spacing;
       distanceSinceLastDab = 0;
@@ -585,6 +643,7 @@ function appendStudioCausalDynamicBrushDepositsCore(
     dabCapped,
     state: {
       previousSample,
+      lastDabFrame,
       totalDistance,
       distanceSinceLastDab,
       nextDabIndex,

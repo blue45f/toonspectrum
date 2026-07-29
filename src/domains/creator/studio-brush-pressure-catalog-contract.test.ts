@@ -40,6 +40,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+import { planStudioOilRibbonCarrier } from "./studio-oil-ribbon-carrier";
 import {
   buildStudioPerfectFreehandOutline,
   loadStudioPerfectFreehandStroker,
@@ -231,7 +232,7 @@ function corePressureAxes(brushId: string, pressure: number): readonly number[] 
         sum(dabs.map(({ opacity }) => opacity)),
       ];
     }
-    case "oil-dabs": {
+    case "oil-ribbon": {
       const dabs = planOilBrushDabs({
         points: PROBE_POINTS,
         pressures,
@@ -239,10 +240,14 @@ function corePressureAxes(brushId: string, pressure: number): readonly number[] 
         seed: 73,
         maxDabs: 512,
       });
+      const carrier = planStudioOilRibbonCarrier(dabs);
       return [
-        dabs.length,
-        sum(dabs.map(({ radiusX, radiusY }) => radiusX * radiusY)),
-        sum(dabs.map(({ opacity }) => opacity)),
+        carrier.sourceStationCount,
+        carrier.body
+          ? Math.abs(studioStrokeLocalCoverageSignedArea(carrier.body.points))
+          : 0,
+        carrier.bodyOpacity,
+        sum(carrier.bristleLanes.map(({ lineWidth }) => lineWidth)),
       ];
     }
     case "dynamic-dabs": {
@@ -289,7 +294,7 @@ function corePressureAxes(brushId: string, pressure: number): readonly number[] 
       });
       return [
         dabs.length,
-        sum(dabs.map(({ radius }) => radius)),
+        sum(dabs.map(({ radiusX, radiusY }) => radiusX + radiusY)),
         sum(dabs.map(({ opacity }) => opacity)),
       ];
     }

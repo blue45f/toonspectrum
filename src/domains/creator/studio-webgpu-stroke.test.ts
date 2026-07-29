@@ -410,6 +410,7 @@ describe("studio WebGPU stroke authority helpers", () => {
       correctedPoints: [0, 0, 1, 1, 2, 2],
       correctedPressures: [0.5, 0.6],
     }],
+    ["unsupported stroke-local paint model", { paintModel: "layered-flow-v1" }],
   ] as const)("fails closed for %s instead of emitting a partial GPU operation", (
     _label,
     overrides

@@ -239,6 +239,137 @@ describe("StudioWebGpuEngine", () => {
     );
   });
 
+  it("binds an active surface resize to a fresh request before either backing store changes", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const events: string[] = [];
+    const onFrameReady = vi.fn((receipt: StudioGpuFrameReceipt) => {
+      events.push(`ready:${receipt.requestId}:${gpuSurface.width}`);
+    });
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameInvalid: () => {
+        events.push(`invalid:${gpuSurface.width}:${fallback.canvas.width}`);
+      },
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "resize:old");
+    events.length = 0;
+    onFrameReady.mockClear();
+
+    const outcome = engine.resize(
+      {
+        logicalWidth: 120,
+        logicalHeight: 80,
+        cssWidth: 120,
+        cssHeight: 80,
+      },
+      {
+        requestId: "resize:new",
+        onBeforeSurfaceMutation: (requestId) => {
+          events.push(`before:${requestId}:${gpuSurface.width}:${fallback.canvas.width}`);
+        },
+      }
+    );
+
+    expect(outcome).toEqual({
+      status: "resized",
+      requestId: "resize:new",
+      rerendered: true,
+    });
+    expect(events).toEqual([
+      "before:resize:new:100:100",
+      "invalid:100:100",
+      "ready:resize:new:120",
+    ]);
+    expect(onFrameReady).toHaveBeenCalledTimes(1);
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "resize:new",
+      physicalWidth: 120,
+      physicalHeight: 80,
+    }));
+  });
+
+  it("defers resize rasterization to the exact following journal request without an old-feed receipt", () => {
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const onFrameInvalid = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(null),
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameInvalid,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed([stroke()], "journal:old");
+    onFrameReady.mockClear();
+    onFrameInvalid.mockClear();
+
+    const outcome = engine.resize(
+      {
+        logicalWidth: 100,
+        logicalHeight: 80,
+        scaleX: 1.25,
+      },
+      {
+        requestId: "journal:resized",
+        render: false,
+      }
+    );
+
+    expect(outcome).toEqual({
+      status: "resized",
+      requestId: "journal:resized",
+      rerendered: false,
+    });
+    expect(onFrameInvalid).toHaveBeenCalledTimes(1);
+    expect(onFrameReady).not.toHaveBeenCalled();
+
+    engine.retainStrokeFeed("journal:resized");
+
+    expect(onFrameInvalid).toHaveBeenCalledTimes(1);
+    expect(onFrameReady).toHaveBeenCalledTimes(1);
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "journal:resized",
+      complete: true,
+    }));
+  });
+
+  it("does not mint a resize boundary or receipt when the normalized viewport is unchanged", () => {
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(null),
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "stable:old");
+    onFrameReady.mockClear();
+    const onBeforeSurfaceMutation = vi.fn();
+
+    const outcome = engine.resize(
+      { logicalWidth: 100, logicalHeight: 80 },
+      {
+        requestId: "stable:unused",
+        onBeforeSurfaceMutation,
+      }
+    );
+
+    expect(outcome).toEqual({
+      status: "unchanged",
+      requestId: "stable:unused",
+      rerendered: false,
+    });
+    expect(onBeforeSurfaceMutation).not.toHaveBeenCalled();
+    expect(onFrameReady).not.toHaveBeenCalled();
+  });
+
   it("captures only the exact current Canvas2D receipt and rejects stale receipt objects", async () => {
     const fallback = fakeCanvas2d();
     const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);

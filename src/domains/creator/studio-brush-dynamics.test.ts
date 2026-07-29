@@ -45,7 +45,15 @@ function expectFiniteRecipe(recipe: StudioBrushDynamicsRecipe): void {
 function expectFinitePlan(plan: StudioDynamicBrushPlan): void {
   expect(Number.isFinite(plan.totalLength)).toBe(true);
   for (const dab of plan.dabs) {
-    for (const value of Object.values(dab)) expect(Number.isFinite(value)).toBe(true);
+    for (const value of Object.values(dab)) {
+      if (typeof value === "number") {
+        expect(Number.isFinite(value)).toBe(true);
+        continue;
+      }
+      for (const frameValue of Object.values(value)) {
+        expect(Number.isFinite(frameValue)).toBe(true);
+      }
+    }
     expect(dab.size).toBeGreaterThan(0);
     expect(dab.opacity).toBeGreaterThanOrEqual(0);
     expect(dab.opacity).toBeLessThanOrEqual(1);
@@ -417,7 +425,7 @@ describe("studio brush dynamics settings safety", () => {
       flow: { base: 0.3 },
     });
     expect(studioBrushDynamicsPresetSettings("airbrush")).toMatchObject({
-      tip: { shape: "soft", softness: 0.55 },
+      tip: { shape: "soft", softness: 0.42 },
       flow: { base: 0.5 },
     });
   });
@@ -494,7 +502,9 @@ describe("studio brush dynamics settings safety", () => {
     ) / accumulatedAtInteriorDabCentres.length;
     expect(Math.min(...accumulatedAtInteriorDabCentres)).toBeGreaterThanOrEqual(0.1);
     expect(meanAccumulatedAlpha).toBeGreaterThanOrEqual(0.14);
-    expect(meanAccumulatedAlpha).toBeLessThanOrEqual(0.22);
+    // The broader, centre-aligned envelope remains translucent but no longer reads as a row of
+    // pale circular puffs while the pointer is moving.
+    expect(meanAccumulatedAlpha).toBeLessThanOrEqual(0.25);
   });
 
   it("keeps exported defaults detached from runtime normalization", () => {

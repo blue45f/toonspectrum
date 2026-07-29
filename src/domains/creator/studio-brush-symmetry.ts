@@ -130,7 +130,42 @@ export function transformStudioDynamicBrushDab(
   const transformedAxisX = transform.a * axisX + transform.c * axisY;
   const transformedAxisY = transform.b * axisX + transform.d * axisY;
   const angle = Math.atan2(transformedAxisY, transformedAxisX) * 180 / Math.PI;
-  return { ...dab, sourceX, sourceY, x, y, angle };
+  const transformDirection = (degrees: number): number => {
+    const radians = degrees * Math.PI / 180;
+    const directionAxisX = Math.cos(radians);
+    const directionAxisY = Math.sin(radians);
+    return Math.atan2(
+      transform.b * directionAxisX + transform.d * directionAxisY,
+      transform.a * directionAxisX + transform.c * directionAxisY,
+    ) * 180 / Math.PI;
+  };
+  const direction = transformDirection(dab.direction ?? dab.angle);
+  const segmentStartFrame = dab.segmentStartFrame
+    ? (() => {
+        const [frameSourceX, frameSourceY] =
+          transformStudioBrushSymmetryPoint(
+            dab.segmentStartFrame.sourceX,
+            dab.segmentStartFrame.sourceY,
+            transform,
+          );
+        return {
+          ...dab.segmentStartFrame,
+          sourceX: frameSourceX,
+          sourceY: frameSourceY,
+          direction: transformDirection(dab.segmentStartFrame.direction),
+        };
+      })()
+    : undefined;
+  return {
+    ...dab,
+    sourceX,
+    sourceY,
+    x,
+    y,
+    angle,
+    ...(dab.direction !== undefined ? { direction } : {}),
+    ...(segmentStartFrame ? { segmentStartFrame } : {}),
+  };
 }
 
 /** Builds every exact affine copy from one deterministic base plan. */

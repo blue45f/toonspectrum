@@ -53,14 +53,21 @@ describe("StudioDraftPreviewStore", () => {
     expect(store.getSnapshot()).toEqual({ active: null, settled: [first, second, third] });
     expect(store.hasSettled).toBe(true);
     expect(store.settledCount).toBe(3);
+    expect(store.visibleSettled).toEqual([first, second, third]);
+
+    expect(store.suppressSettledPrefix(2)).toBe(2);
+    expect(store.getSnapshot().settled).toEqual([first, second, third]);
+    expect(store.visibleSettled).toEqual([third]);
 
     expect(store.releaseSettledPrefix(Number.NaN)).toBe(0);
     expect(store.releaseSettledPrefix(-1)).toBe(0);
     expect(store.releaseSettledPrefix(1.9)).toBe(1);
     expect(store.getSnapshot().settled).toEqual([second, third]);
+    expect(store.visibleSettled).toEqual([third]);
 
     expect(store.releaseSettledPrefix(99)).toBe(2);
     expect(store.getSnapshot().settled).toEqual([]);
+    expect(store.visibleSettled).toEqual([]);
     expect(store.hasSettled).toBe(false);
   });
 

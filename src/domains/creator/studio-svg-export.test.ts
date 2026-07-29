@@ -8,10 +8,10 @@ import { parsePngChunks } from "./studio-apng-encoder";
 import { screentoneDotsForStroke } from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
+  resolveStudioBrushDynamicsPresetId,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
-  studioBrushDynamicsSeedFromKey,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
@@ -35,8 +35,17 @@ import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
-import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
+import {
+  captureStudioOutlineStrokeContractV1,
+  planStudioPerfectFreehandRender,
+} from "./studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
+import {
+  planStudioPixelPencilCells,
+  STUDIO_PIXEL_PENCIL_RENDER_MODE,
+} from "./studio-pixel-pencil";
 import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import {
   SVG_EXPORT_MIME,
@@ -49,7 +58,7 @@ import {
   type SvgExportResult,
 } from "./studio-svg-export";
 
-import type { El } from "./studio-element-model";
+import type { DrawEl, El } from "./studio-element-model";
 
 // ---------------------------------------------------------------------------
 // 헬퍼 — 페이지 입력/요소 빌더
@@ -299,37 +308,24 @@ type SvgDrawTestEl = Extract<SvgExportEl, { type: "draw" }>;
 function canvasCoverageMarksForSvgFixture(
   el: SvgDrawTestEl,
 ): readonly StudioDynamicBrushCoverageMark[] {
-  const dynamics = normalizeStudioBrushDynamicsSettings(el.brushDynamics);
-  const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
-  const causal = planStudioCausalDynamicBrushDepositsV2({
-    points: el.points,
-    pressures: el.pressures,
-    tangentialPressures: el.tangentialPressures,
-    speeds: el.speeds,
-    tiltXs: el.tiltXs,
-    tiltYs: el.tiltYs,
-    twists: el.twists,
-    settings: dynamics,
-    maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-  });
-  if (!causal.ok) throw new Error(`causal fixture rejected: ${causal.reason}`);
-  const dabVariations = studioDynamicBrushDabVariations(
-    causal.dabs,
-    el.symmetry,
+  const dynamicBrushId = resolveStudioBrushDynamicsPresetId(el.brush);
+  if (!dynamicBrushId) throw new Error("fixture is not a dynamic brush");
+  const retainedPlan = planStudioDynamicBrushRender(
+    el as DrawEl,
+    dynamicBrushId,
+    false,
   );
-  const renderBudget = planStudioDynamicBrushRenderBudget({
-    settings: dynamics,
-    dabCount: causal.dabs.length,
-    symmetryCount: dabVariations.length,
-    markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-  });
+  if (retainedPlan.status !== "ready") {
+    throw new Error(`retained fixture rejected: ${retainedPlan.reason}`);
+  }
   const coverage = planStudioDynamicBrushCoverageAndLegacyMarks({
-    dabVariations,
-    dynamics,
-    dynamicSeed: seed,
+    dabVariations: retainedPlan.plan.dabVariations,
+    dynamics: retainedPlan.plan.dynamics,
+    materialIdentity: retainedPlan.plan.materialIdentity,
+    dynamicSeed: retainedPlan.plan.seed,
     stroke: el.stroke,
-    stampGrid: renderBudget.stampGrid,
-    markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+    stampGrid: retainedPlan.plan.renderBudget.stampGrid,
+    markBudget: retainedPlan.plan.markBudget,
   }).coveragePlan;
   if (!coverage.ok) {
     throw new Error(`coverage fixture rejected: ${coverage.reason}`);
@@ -643,6 +639,36 @@ describe("도형 직렬화", () => {
     expect(svg).toContain('opacity="0.7"');
     expect(svg).toContain('d="M0 2h1v1h-1ZM1 2h1v1h-1ZM2 2h1v1h-1ZM3 2h1v1h-1Z"');
     expect(svg).not.toContain("<circle");
+  });
+
+  it("픽셀 펜 — 넓은 촉의 Canvas 셀 합집합을 SVG에서도 그대로 보존한다", () => {
+    const points = [2.2, 4.1, 6.3, 4.2];
+    const strokeWidth = 3;
+    const pixel = rectEl({
+      id: "pixel-wide",
+      kind: "freehand",
+      mode: "pen",
+      brush: STUDIO_PIXEL_PENCIL_RENDER_MODE,
+      points,
+      stroke: "#654321",
+      strokeWidth,
+      fill: undefined,
+      opacity: 1,
+      pressures: [1, 1],
+    });
+    const expectedPlan = planStudioPixelPencilCells({ points, strokeWidth });
+    const expectedPath = expectedPlan.cells
+      .map((cell) => `M${cell.x} ${cell.y}h1v1h-1Z`)
+      .join("");
+
+    const { svg, skipped } = exportPageToSvg(page([pixel]));
+
+    expect(expectedPlan.complete).toBe(true);
+    expect(expectedPlan.cells.length).toBeGreaterThan(5);
+    expect(skipped).toEqual([]);
+    expect(svg).toContain(`d="${expectedPath}"`);
+    expect(svg).toContain('fill="#654321"');
+    expect(svg).toContain('shape-rendering="crispEdges"');
   });
 
   it("한 점 탭 — 필압 굵기의 원으로 보존한다", () => {
@@ -1003,6 +1029,83 @@ describe("도형 직렬화", () => {
     );
   });
 
+  it("durable outline 계약은 공용 계획의 raw recorded pressure path를 그대로 내보낸다", () => {
+    const points = [0, 20, 12, 4, 28, 0, 46, 10, 58, 28, 48, 42, 26, 48];
+    const pressures = [0.08, 0.22, 0.48, 0.91, 0.72, 0.36, 0.11];
+    const strokeWidth = 17;
+    const outlineStroke = captureStudioOutlineStrokeContractV1({
+      brushId: "mapping-pen",
+      pressureSource: "recorded",
+    });
+    expect(outlineStroke).not.toBeNull();
+    if (!outlineStroke) return;
+    const fixture = rectEl({
+      id: "durable-outline-svg",
+      kind: "freehand",
+      mode: "pen",
+      brush: "mapping-pen",
+      outlineStroke,
+      points,
+      pressures,
+      stroke: "#29445f",
+      strokeWidth,
+      sampleSpacing: 0,
+      fill: undefined,
+    });
+    const expected = planStudioPerfectFreehandRender({
+      contract: outlineStroke,
+      stroker: peekStudioPerfectFreehandStroker(),
+      points,
+      pressures,
+      strokeWidth,
+      sampleSpacing: 0,
+    });
+    expect(expected.kind).toBe("outline");
+    if (expected.kind !== "outline") return;
+
+    const result = exportPageToSvg(page([fixture]));
+    const serializedPath = /<path d="([^"]+)" fill="#29445f" data-brush-engine="perfect-outline-contract-v1"/u
+      .exec(result.svg)?.[1];
+    expect(serializedPath).toBe(expected.pathData);
+    expect(result.skipped).toEqual([]);
+  });
+
+  it("future durable outline 계약은 legacy G펜으로 조용히 강등하지 않고 skip receipt를 남긴다", () => {
+    const current = captureStudioOutlineStrokeContractV1({
+      brushId: "gpen",
+      pressureSource: "recorded",
+    });
+    expect(current).not.toBeNull();
+    if (!current) return;
+    const fixture = rectEl({
+      id: "future-outline-svg",
+      kind: "freehand",
+      mode: "pen",
+      brush: "gpen",
+      outlineStroke: {
+        ...current,
+        version: 99,
+      },
+      points: [0, 20, 20, 0, 44, 24],
+      pressures: [0.2, 0.9, 0.35],
+      stroke: "#aabbcc",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+
+    const result = exportPageToSvg(page([fixture]));
+    expect(result.svg).not.toContain("#aabbcc");
+    expect(result.svg).not.toContain('data-brush-engine="perfect-outline"');
+    expect(result.skipped).toEqual([
+      {
+        id: fixture.id,
+        type: "draw",
+        mode: "skipped",
+        label: "외곽선 획 계약을 지원하지 않아 제외했어요 (unsupported-version).",
+      },
+    ]);
+  });
+
   it("스탬프 튜닝 — flow·hardness·minSize를 SVG 농도·팁 경도·탭 반경에 반영한다", () => {
     const { svg } = exportPageToSvg(page([rectEl({
       id: "stamp-tuning-svg",
@@ -1133,11 +1236,16 @@ describe("도형 직렬화", () => {
       watercolorPipeline: "causal-walker-v2",
     }]));
 
-    // width 10의 causal 기본 spacing은 3.4px이다. 첫 raw 수직 구간을 보존할 때만 이 core가
-    // 생긴다. legacy는 sampleSpacing=128로 중간점을 제거해 대각선 전체 계획을 유지한다.
-    expect(causal.svg).toMatch(/<circle cx="0" cy="3\.4"[^>]+fill="#315f73"/);
-    expect(legacy.svg).not.toMatch(/<circle cx="0" cy="3\.4"[^>]+fill="#315f73"/);
-    expect(causal.svg).toContain('<circle cx="10" cy="10"');
+    // width 10의 causal 기본 spacing은 3.4px이다. 첫 raw 수직 구간을 보존할 때만 이 ribbon
+    // 단면이 생긴다. legacy는 sampleSpacing=128로 중간점을 제거해 과거 원형 계획을 유지한다.
+    expect(causal.svg).toContain('data-brush-engine="wet-ribbon-carrier-v1"');
+    expect(causal.svg).toMatch(/L-?[0-9.]+ 3\.4/);
+    expect(causal.svg).not.toContain("<circle");
+    expect(legacy.svg).not.toContain('data-brush-engine="wet-ribbon-carrier-v1"');
+    expect(legacy.svg).toContain("<circle");
+    // The continuous ribbon preserves the accepted endpoint as its terminal cross-section rather
+    // than adding a centre-point triangle that would double-paint the join.
+    expect(causal.svg).toContain("L10 ");
     expect(causal.svg).not.toBe(legacy.svg);
     expect(repeated.svg).toBe(causal.svg);
     expect(causal.skipped).toEqual([]);
@@ -1149,10 +1257,10 @@ describe("도형 직렬화", () => {
       pressures: [0.5, 0.5],
       watercolorPipeline: "causal-walker-v2",
     }]));
-    const longStrokeDabCount = (longStroke.svg.match(/<circle\b/g) ?? []).length;
-    expect(longStrokeDabCount).toBeGreaterThan(512);
-    expect(longStrokeDabCount).toBeLessThanOrEqual(8_192);
-    expect(longStroke.svg).toContain('<circle cx="5000" cy="0"');
+    const longStrokePolygonCount = (longStroke.svg.match(/Z/g) ?? []).length;
+    expect(longStrokePolygonCount).toBeGreaterThan(512);
+    expect(longStrokePolygonCount).toBeLessThanOrEqual(8_192 * 4);
+    expect(longStroke.svg).toMatch(/L5000 -?[0-9.]+/);
   });
 
   it("입자 브러시 — Canvas와 같은 결정적 타원형 dab·회전·유량을 SVG로 보존한다", () => {
@@ -1244,7 +1352,7 @@ describe("도형 직렬화", () => {
     ["glitter", "glitter-opacity"],
     ["oil", "oil-opacity"],
     ["pastel", "pastel-opacity"],
-  ] as const)("%s — Canvas처럼 획 투명도를 겹치는 각 dab에 적용한다", (brush, id) => {
+  ] as const)("%s — Canvas처럼 획 투명도를 각 재료 mark에 적용한다", (brush, id) => {
     const dynamic = rectEl({
       id,
       kind: "freehand",
@@ -1258,7 +1366,7 @@ describe("도형 직렬화", () => {
     const full = exportPageToSvg(page([{ ...dynamic, opacity: 1 }])).svg;
     const half = exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg;
     const dabOpacities = (svg: string) => Array.from(
-      svg.matchAll(/<(?:circle|ellipse|rect) [^>]*opacity="([0-9.]+)"/g),
+      svg.matchAll(/<(?:circle|ellipse|rect|path) [^>]*opacity="([0-9.]+)"/g),
       (match) => Number(match[1])
     );
     const fullOpacities = dabOpacities(full);
@@ -1270,6 +1378,57 @@ describe("도형 직렬화", () => {
     halfOpacities.forEach((value, index) => {
       expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
     });
+  });
+
+  it("아크릴 장획은 반복 타원 대신 Canvas와 같은 연속 body와 강모 lane을 직렬화한다", () => {
+    const { svg } = exportPageToSvg(page([rectEl({
+      id: "acrylic-contiguous-ribbon",
+      kind: "freehand",
+      brush: "acrylic",
+      points: [8, 18, 120, 45, 240, 8, 380, 60, 520, 20],
+      pressures: [0.35, 0.72, 0.5, 0.9, 0.62],
+      stroke: "#8b3f31",
+      strokeWidth: 20,
+      fill: undefined,
+    })]));
+
+    expect(svg).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
+    expect(svg).toContain('data-paint-carrier="contiguous-variable-width-ribbon"');
+    expect((svg.match(/data-paint-bristle-lane="true"/gu) ?? [])).toHaveLength(5);
+    expect(svg).not.toContain("<ellipse");
+    expect(exportPageToSvg(page([rectEl({
+      id: "acrylic-contiguous-ribbon",
+      kind: "freehand",
+      brush: "acrylic",
+      points: [8, 18, 120, 45, 240, 8, 380, 60, 520, 20],
+      pressures: [0.35, 0.72, 0.5, 0.9, 0.62],
+      stroke: "#8b3f31",
+      strokeWidth: 20,
+      fill: undefined,
+    })])).svg).toBe(svg);
+  });
+
+  it("파스텔은 원형 스탬프 열 대신 Canvas와 같은 방향성 안료 섬유를 직렬화한다", () => {
+    const { svg } = exportPageToSvg(page([rectEl({
+      id: "pastel-anisotropic-fibres",
+      kind: "freehand",
+      brush: "pastel",
+      points: [8, 12, 40, 20, 72, 12],
+      pressures: [0.45, 0.8, 0.6],
+      stroke: "#4455aa",
+      strokeWidth: 20,
+      fill: undefined,
+    })]));
+    const fibres = Array.from(svg.matchAll(
+      /<ellipse [^>]*rx="([^"]+)" ry="([^"]+)" transform="rotate\(([^ ]+) /gu,
+    ));
+
+    expect(fibres.length).toBeGreaterThan(10);
+    expect(fibres.every((match) => (
+      Number(match[1]) / Number(match[2]) >= 3.19
+      && Number.isFinite(Number(match[3]))
+    ))).toBe(true);
+    expect(svg).not.toMatch(/<circle [^>]*fill="url\(#sp/u);
   });
 
   it("기본 에어브러시 — 필압 0·툴바 투명도 70%의 저농도 dab을 0으로 반올림하지 않는다", () => {
@@ -1296,18 +1455,20 @@ describe("도형 직렬화", () => {
   });
 
   it("얇고 기울어진 드라이 미디어 — Canvas처럼 반지름 최소값 적용 뒤 roundness로 ry를 축소한다", () => {
-    const { svg } = exportPageToSvg(page([rectEl({
+    const fixture = rectEl({
       id: "thin-dry-media",
       kind: "freehand",
-      brush: "dry-media",
+      brush: "chalk",
       points: [5, 7],
       pressures: [0],
       tiltXs: [90],
       tiltYs: [0],
       stroke: "#21160f",
       strokeWidth: 0.1,
+      paintModel: "bounded-flow-v2",
       brushDynamics: ellipseDynamics("dry-media"),
-    })]));
+    });
+    const { svg } = exportPageToSvg(page([fixture]));
 
     const ellipse = /<ellipse data-brush-coverage="ellipse"[^>]*rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) /u
       .exec(svg);
@@ -1315,11 +1476,104 @@ describe("도형 직렬화", () => {
     const radiusY = Number(ellipse?.[2]);
     const angle = Number(ellipse?.[3]);
 
-    // Causal Canvas planner의 완성 dab 직경을 그대로 쓰며, ry만 tilt roundness로 축소한다.
+    const retainedPlan = planStudioDynamicBrushRender(
+      fixture as DrawEl,
+      "dry-media",
+      false,
+    );
+    expect(retainedPlan.status).toBe("ready");
+    if (retainedPlan.status !== "ready") return;
+    const canonicalCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+      dabVariations: retainedPlan.plan.dabVariations,
+      dynamics: retainedPlan.plan.dynamics,
+      materialIdentity: retainedPlan.plan.materialIdentity,
+      dynamicSeed: retainedPlan.plan.seed,
+      stroke: fixture.stroke,
+      stampGrid: retainedPlan.plan.renderBudget.stampGrid,
+      markBudget: retainedPlan.plan.markBudget,
+    }).coveragePlan;
+    expect(canonicalCoverage.ok).toBe(true);
+    if (!canonicalCoverage.ok) return;
+    const canonicalMark = canonicalCoverage.marks[0]!;
+
+    // SVG is not allowed to carry its own hard-coded dry-media roundness. The retained Canvas
+    // coverage planner—including the canonical anisotropic bridge—is the geometry authority.
+    expectNear(radiusX, canonicalMark.radiusX, 0.000_001);
+    expectNear(radiusY, canonicalMark.radiusY, 0.000_001);
+    expectNear(angle, canonicalMark.angleRadians * 180 / Math.PI, 0.000_001);
     expect(radiusX).toBeGreaterThanOrEqual(0.25);
-    expect(radiusY / radiusX).toBeCloseTo(0.112, 3);
-    expect(Math.abs(angle)).toBeGreaterThan(0);
     expect(radiusY).toBeLessThan(radiusX);
+  });
+
+  it("크레용·초크·목탄 SVG가 retained Canvas의 동일 anisotropic coverage를 직렬화한다", () => {
+    const signatures: string[] = [];
+    for (const brush of ["crayon", "chalk", "charcoal"] as const) {
+      const fixture = rectEl({
+        id: `svg-retained-${brush}`,
+        kind: "freehand",
+        brush,
+        points: [8, 12, 34, 18, 62, 11, 92, 24],
+        pressures: [0.42, 0.7, 0.9, 0.58],
+        speeds: [0.2, 0.5, 0.8, 0.4],
+        tiltXs: [8, 14, 19, 11],
+        tiltYs: [-3, -8, -6, -4],
+        stroke: "#3f2a20",
+        strokeWidth: 18,
+        paintModel: "bounded-flow-v2",
+        brushDynamics: ellipseDynamics("dry-media"),
+      });
+      const { svg, skipped } = exportPageToSvg(page([fixture]));
+      expect(skipped).toEqual([]);
+      const svgMarks = Array.from(svg.matchAll(
+        /<ellipse data-brush-coverage="ellipse" cx="([^"]+)" cy="([^"]+)" rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) /gu,
+      ), (match) => ({
+        x: Number(match[1]),
+        y: Number(match[2]),
+        radiusX: Number(match[3]),
+        radiusY: Number(match[4]),
+        angleDegrees: Number(match[5]),
+      }));
+
+      const retainedPlan = planStudioDynamicBrushRender(
+        fixture as DrawEl,
+        "dry-media",
+        false,
+      );
+      expect(retainedPlan.status).toBe("ready");
+      if (retainedPlan.status !== "ready") continue;
+      const coverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+        dabVariations: retainedPlan.plan.dabVariations,
+        dynamics: retainedPlan.plan.dynamics,
+        materialIdentity: retainedPlan.plan.materialIdentity,
+        dynamicSeed: retainedPlan.plan.seed,
+        stroke: fixture.stroke,
+        stampGrid: retainedPlan.plan.renderBudget.stampGrid,
+        markBudget: retainedPlan.plan.markBudget,
+      }).coveragePlan;
+      expect(coverage.ok).toBe(true);
+      if (!coverage.ok) continue;
+      expect(svgMarks).toHaveLength(coverage.marks.length);
+      for (const [index, svgMark] of svgMarks.entries()) {
+        const retainedMark = coverage.marks[index]!;
+        expectNear(svgMark.x, retainedMark.x, 0.000_001);
+        expectNear(svgMark.y, retainedMark.y, 0.000_001);
+        expectNear(svgMark.radiusX, retainedMark.radiusX, 0.000_001);
+        expectNear(svgMark.radiusY, retainedMark.radiusY, 0.000_001);
+        expectNear(
+          svgMark.angleDegrees,
+          retainedMark.angleRadians * 180 / Math.PI,
+          0.000_001,
+        );
+      }
+      const signatureMark = coverage.marks[Math.floor(coverage.marks.length / 2)]!;
+      signatures.push([
+        signatureMark.radiusX,
+        signatureMark.radiusY,
+        signatureMark.angleRadians,
+        signatureMark.alpha,
+      ].map((value) => value.toFixed(8)).join(":"));
+    }
+    expect(new Set(signatures).size).toBe(3);
   });
 
   it("causal PNG 알파 팁은 희소 texel 전부를 한 번의 무손실 defs 자산과 dab별 use로 보존한다", () => {
@@ -2243,10 +2497,18 @@ describe("도형 직렬화", () => {
       paintModel: "bounded-flow-v2",
       brushDynamics: dynamics,
     });
+    const retainedAuthority = planStudioDynamicBrushRender(
+      dynamic as DrawEl,
+      "ink-particle",
+      false,
+    );
+    expect(retainedAuthority.status).toBe("ready");
+    if (retainedAuthority.status !== "ready") return;
+    const replayDynamics = retainedAuthority.plan.dynamics;
     const continuation = planStudioCausalDynamicBrushDepositSegmentsV3({
       points,
       pressures,
-      settings: dynamics,
+      settings: replayDynamics,
     });
     expect(continuation.ok).toBe(true);
     if (!continuation.ok) throw new Error(continuation.reason);
@@ -2271,7 +2533,7 @@ describe("도형 직렬화", () => {
       dynamic.symmetry,
     );
     const renderBudget = planStudioDynamicBrushRenderBudget({
-      settings: dynamics,
+      settings: replayDynamics,
       dabCount: continuation.dabCount,
       symmetryCount: referenceVariations.length,
       markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
@@ -2280,10 +2542,9 @@ describe("도형 직렬화", () => {
     const referenceCoverage =
       planStudioDynamicBrushCoverageAndLegacyMarks({
         dabVariations: referenceVariations,
-        dynamics,
-        dynamicSeed: studioBrushDynamicsSeedFromKey(
-          `${dynamic.id}:${dynamics.seed}`,
-        ),
+        dynamics: replayDynamics,
+        materialIdentity: retainedAuthority.plan.materialIdentity,
+        dynamicSeed: retainedAuthority.plan.seed,
         stroke: dynamic.stroke,
         stampGrid: renderBudget.stampGrid,
         markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,

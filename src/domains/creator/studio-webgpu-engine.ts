@@ -135,6 +135,24 @@ export interface StudioWebGpuEngineOptions {
   readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
 }
 
+/**
+ * A surface rewrite must belong to a fresh frame request. `onBeforeSurfaceMutation` runs
+ * synchronously after a real viewport/physical-size change has been proven, but before either
+ * canvas backing store or the engine viewport is mutated. Callers use that boundary to revoke the
+ * currently visible compositor frame and publish `requestId` to their receipt coordinator.
+ */
+export interface StudioWebGpuResizeOptions {
+  readonly requestId?: string;
+  readonly render?: boolean;
+  readonly onBeforeSurfaceMutation?: (requestId: string) => void;
+}
+
+export interface StudioWebGpuResizeOutcome {
+  readonly status: "unchanged" | "resized";
+  readonly requestId: string;
+  readonly rerendered: boolean;
+}
+
 /** Suffix-only journal contract; the engine supplies the private revision token itself. */
 export interface StudioGpuStrokeJournalSuffixPatch {
   readonly strokeIndex: number;
@@ -687,6 +705,15 @@ export class StudioWebGpuEngine {
   private renderedFrameInvalid = true;
   private frameGeneration = 0;
   private lastRequestId = "initial";
+  /**
+   * A resize may invalidate the current receipt before mutating the backing store while deferring
+   * raster work to an immediately-following journal command. That command consumes this exact
+   * generation so the old feed is never rendered once under the new request id.
+   */
+  private deferredResizeInvalidation: {
+    readonly requestId: string;
+    readonly frameGeneration: number;
+  } | null = null;
   private strokeFeedSequence = 0;
   private authorityFrame: StudioGpuAuthorityFrame | null = null;
   private readonly readbackSnapshotPool: StudioGpuFrameSnapshot[] = [];
@@ -767,8 +794,14 @@ export class StudioWebGpuEngine {
     return initialization;
   }
 
-  public resize(input: StudioGpuViewport): void {
-    if (this.disposed) return;
+  public resize(
+    input: StudioGpuViewport,
+    options: StudioWebGpuResizeOptions = {}
+  ): StudioWebGpuResizeOutcome {
+    const requestId = options.requestId ?? this.lastRequestId;
+    if (this.disposed) {
+      return { status: "unchanged", requestId, rerendered: false };
+    }
     const nextViewport = normalizeViewport(input);
     const textureLimit = Math.max(
       1,
@@ -787,9 +820,18 @@ export class StudioWebGpuEngine {
       this.canvas.height !== physicalHeight ||
       this.fallbackCanvas.width !== physicalWidth ||
       this.fallbackCanvas.height !== physicalHeight;
-    this.viewport = nextViewport;
-    if (!viewportChanged && !physicalSizeChanged) return;
+    if (!viewportChanged && !physicalSizeChanged) {
+      return { status: "unchanged", requestId, rerendered: false };
+    }
 
+    // This is deliberately before `this.viewport = ...` and canvas width/height writes. Reassigning
+    // either canvas backing size synchronously discards its pixels, so the owner must be able to
+    // hide/revoke the old presentation first and know the exact receipt id that can reopen it.
+    options.onBeforeSurfaceMutation?.(requestId);
+    this.lastRequestId = requestId;
+    const frameGeneration = this.invalidateFrameReceipt();
+    this.deferredResizeInvalidation = null;
+    this.viewport = nextViewport;
     for (const surface of new Set([this.canvas, this.fallbackCanvas])) {
       if (surface.width !== physicalWidth) surface.width = physicalWidth;
       if (surface.height !== physicalHeight) surface.height = physicalHeight;
@@ -803,7 +845,14 @@ export class StudioWebGpuEngine {
     // Resizing discards presentation pixels; transforms also change visible-tile selection/quads.
     this.invalidateRenderedFrame();
     this.configureContext();
-    if (!this.suspended) this.render(this.lastStrokes);
+    if (!this.suspended && options.render !== false) {
+      this.renderPreparedStrokes(this.lastStrokes, requestId, frameGeneration);
+      return { status: "resized", requestId, rerendered: true };
+    }
+    if (options.render === false) {
+      this.deferredResizeInvalidation = { requestId, frameGeneration };
+    }
+    return { status: "resized", requestId, rerendered: false };
   }
 
   public render(strokes: readonly StudioGpuStroke[], requestId = this.lastRequestId): void {
@@ -1063,7 +1112,8 @@ export class StudioWebGpuEngine {
 
   private renderPreparedStrokes(
     strokeSnapshot: readonly StudioGpuStroke[],
-    requestId: string
+    requestId: string,
+    preInvalidatedGeneration?: number
   ): void {
     if (this.suspended) {
       this.suspended = false;
@@ -1071,7 +1121,14 @@ export class StudioWebGpuEngine {
     }
     this.lastStrokes = strokeSnapshot;
     this.lastRequestId = requestId;
-    const frameGeneration = this.invalidateFrameReceipt();
+    const deferred = this.deferredResizeInvalidation;
+    this.deferredResizeInvalidation = null;
+    const frameGeneration = preInvalidatedGeneration
+      ?? (
+        deferred?.requestId === requestId
+          ? deferred.frameGeneration
+          : this.invalidateFrameReceipt()
+      );
     if (
       this.backend === "webgpu" &&
       this.device &&
@@ -1117,6 +1174,7 @@ export class StudioWebGpuEngine {
       || this.authorityFrame !== null;
     this.lastStrokes = [];
     this.lastRequestId = requestId;
+    this.deferredResizeInvalidation = null;
     if (this.suspended && !requestChanged) return;
 
     this.suspended = true;
@@ -1987,6 +2045,7 @@ export class StudioWebGpuEngine {
   }
 
   private invalidateFrameReceipt(): number {
+    this.deferredResizeInvalidation = null;
     this.invalidateAuthorityFrame();
     this.frameGeneration += 1;
     this.options.onFrameInvalid?.();

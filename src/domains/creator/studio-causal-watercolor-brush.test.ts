@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyStudioBrushAliasWatercolorMaterial,
+  resolveStudioBrushAliasWatercolorPlanSettings,
+} from "./studio-brush-alias-profile";
+import {
   appendCausalWatercolorBrush,
   beginCausalWatercolorBrush,
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -8,6 +12,7 @@ import {
   normalizeStudioCausalWatercolorSettings,
   planCausalWatercolorBrush,
   planCausalWatercolorBrushDabs,
+  previewCausalWatercolorBrushEndpoint,
   STUDIO_CAUSAL_WATERCOLOR_DAB_CAP_RANGE,
   type StudioCausalWatercolorSample,
 } from "./studio-causal-watercolor-brush";
@@ -133,6 +138,25 @@ describe("causal watercolor prefix contract", () => {
     )).toEqual([]);
   });
 
+  it("previews the exact finish endpoint without mutating causal state", () => {
+    const started = beginCausalWatercolorBrush(
+      { x: 10, y: 20, pressure: 0.25 },
+      { ...SETTINGS, spacing: 10 },
+    )!;
+    appendCausalWatercolorBrush(
+      started.state,
+      { x: 16, y: 23, pressure: 0.85 },
+    );
+    const stateBeforePreview = structuredClone(started.state);
+
+    const firstPreview = previewCausalWatercolorBrushEndpoint(started.state);
+    const secondPreview = previewCausalWatercolorBrushEndpoint(started.state);
+
+    expect(firstPreview).toEqual(secondPreview);
+    expect(started.state).toEqual(stateBeforePreview);
+    expect(finishCausalWatercolorBrush(started.state)).toEqual(firstPreview);
+  });
+
   it("does not add a duplicate endpoint when a permanent station lands on it", () => {
     const started = beginCausalWatercolorBrush(
       { x: 0, y: 0, pressure: 0.5 },
@@ -143,8 +167,55 @@ describe("causal watercolor prefix contract", () => {
       { x: SETTINGS.spacing * 2, y: 0, pressure: 0.5 },
     );
     expect(crossed.filter(({ role }) => role === "core")).toHaveLength(2);
+    expect(previewCausalWatercolorBrushEndpoint(started.state)).toEqual([]);
     expect(finishCausalWatercolorBrush(started.state)).toEqual([]);
   });
+
+  it("does not preview a tap before travel", () => {
+    const started = beginCausalWatercolorBrush(
+      { x: 4, y: 7, pressure: 0.6 },
+      SETTINGS,
+    )!;
+    const before = structuredClone(started.state);
+    expect(previewCausalWatercolorBrushEndpoint(started.state)).toEqual([]);
+    expect(started.state).toEqual(before);
+  });
+
+  it.each(["watercolor", "ink-wash", "gouache"] as const)(
+    "keeps the disposable %s endpoint identical to committed alias geometry",
+    (brush) => {
+      const alias = resolveStudioBrushAliasWatercolorPlanSettings(brush, 20);
+      if (!alias) throw new Error(`missing watercolor alias ${brush}`);
+      const input = {
+        ...SETTINGS,
+        ...alias,
+        points: [10, 20, 47.3, 26.7],
+        pressures: [0.25, 0.87],
+      };
+      const permanent = applyStudioBrushAliasWatercolorMaterial(
+        brush,
+        planCausalWatercolorBrushDabs(input, false),
+      );
+      const preview = applyStudioBrushAliasWatercolorMaterial(
+        brush,
+        planCausalWatercolorBrushDabs(
+          { ...input, previewEndpoint: true },
+          false,
+        ),
+      );
+      const committed = applyStudioBrushAliasWatercolorMaterial(
+        brush,
+        planCausalWatercolorBrushDabs(input, true),
+      );
+
+      expect(preview.slice(0, permanent.length)).toEqual(permanent);
+      expect(preview).toEqual(committed);
+      expect(preview.findLast(({ role }) => role === "core")).toMatchObject({
+        x: 47.3,
+        y: 26.7,
+      });
+    },
+  );
 });
 
 describe("causal watercolor safety and cap behavior", () => {
@@ -192,6 +263,26 @@ describe("causal watercolor safety and cap behavior", () => {
     expect(extended.dabs).toHaveLength(6);
     expect(extended.dabs).toEqual(short.dabs);
     expect(extended.capped).toBe(true);
+  });
+
+  it("fails the disposable endpoint closed at the same dab ceiling without mutating the plan", () => {
+    const input = {
+      ...SETTINGS,
+      maxDabs: 2,
+      points: [0, 0, 100, 0],
+      pressures: [0.5, 0.5],
+    };
+    const permanent = planCausalWatercolorBrush(input, false);
+    const preview = planCausalWatercolorBrush(
+      { ...input, previewEndpoint: true },
+      false,
+    );
+    const committed = planCausalWatercolorBrush(input, true);
+
+    expect(preview.dabs).toEqual(permanent.dabs);
+    expect(preview.dabs).toEqual(committed.dabs);
+    expect(preview.capped).toBe(true);
+    expect(preview.finalized).toBe(false);
   });
 
   it("returns a well-formed empty plan for missing or fully invalid input", () => {

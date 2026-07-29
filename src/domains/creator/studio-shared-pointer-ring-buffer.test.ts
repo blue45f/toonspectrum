@@ -9,7 +9,10 @@ import {
   STUDIO_POINTER_SAMPLE_ROLE_PREDICTED,
   STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
   STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES,
+  STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
+  STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS,
   STUDIO_SHARED_POINTER_RING_TRANSPORT_CONTRACT,
+  STUDIO_SHARED_POINTER_RING_VERSION,
   type StudioSharedPointerRingDescriptor,
   type StudioSharedPointerRingEnvironment,
   type StudioSharedPointerSample,
@@ -63,6 +66,11 @@ function sample(
     role,
     channel: sequence % 4,
     flags: sequence % 8,
+    tangentialPressure: ((sequence % 21) - 10) / 10,
+    altitudeAngle: (sequence % 91) / 90 * (Math.PI / 2),
+    azimuthAngle: (sequence % 360) / 360 * (Math.PI * 2),
+    contactWidth: 1 + sequence % 8,
+    contactHeight: 1 + sequence % 6,
   };
 }
 
@@ -129,8 +137,10 @@ describe("SharedArrayBuffer pointer ring capability and descriptor", () => {
     const cloned = structuredClone(created.descriptor);
     expect(cloned).toMatchObject({
       kind: "toonspectrum-studio-pointer-spsc",
+      version: STUDIO_SHARED_POINTER_RING_VERSION,
       capacity: 8,
       headerBytes: STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
+      sampleFloat64s: STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S,
       sampleBytes: STUDIO_SHARED_POINTER_RING_SAMPLE_BYTES,
     });
     expect(cloned.buffer).toBeInstanceOf(SharedArrayBuffer);
@@ -155,9 +165,116 @@ describe("SharedArrayBuffer pointer ring capability and descriptor", () => {
       attachStudioSharedPointerRingConsumer(descriptor),
     ).toEqual({ ok: false, reason: "consumer-already-attached" });
   });
+
+  it("rejects a V1 descriptor instead of decoding it with the V2 stride", () => {
+    const created = createStudioSharedPointerRingBuffer({
+      capacity: 8,
+      environment: ISOLATED_ENVIRONMENT,
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    expect(attachStudioSharedPointerRingConsumer({
+      ...created.descriptor,
+      version: 1,
+    })).toEqual({ ok: false, reason: "invalid-descriptor" });
+  });
 });
 
 describe("SharedArrayBuffer pointer ring ordering", () => {
+  it("round-trips extended sensor channels while preserving the V1 positional prefix", () => {
+    const { producer, consumer } = createRing(4);
+    const current = sample(17, STUDIO_POINTER_SAMPLE_ROLE_AUTHORITATIVE);
+    expect(producer.write(current)).toBe("written");
+
+    const prefix: number[] = [];
+    const extension: number[] = [];
+    expect(consumer.readOne((
+      x,
+      y,
+      pressure,
+      tiltX,
+      tiltY,
+      twist,
+      time,
+      pointerId,
+      sequence,
+      role,
+      channel,
+      flags,
+      tangentialPressure,
+      altitudeAngle,
+      azimuthAngle,
+      contactWidth,
+      contactHeight,
+    ) => {
+      prefix.push(
+        x,
+        y,
+        pressure,
+        tiltX,
+        tiltY,
+        twist,
+        time,
+        pointerId,
+        sequence,
+        role,
+        channel,
+        flags,
+      );
+      extension.push(
+        tangentialPressure,
+        altitudeAngle,
+        azimuthAngle,
+        contactWidth,
+        contactHeight,
+      );
+    })).toBe("read");
+    expect(prefix).toEqual([
+      current.x,
+      current.y,
+      current.pressure,
+      current.tiltX,
+      current.tiltY,
+      current.twist,
+      current.time,
+      current.pointerId,
+      current.sequence,
+      current.role,
+      current.channel,
+      current.flags,
+    ]);
+    expect(extension).toEqual([
+      current.tangentialPressure,
+      current.altitudeAngle,
+      current.azimuthAngle,
+      current.contactWidth,
+      current.contactHeight,
+    ]);
+  });
+
+  it("materializes neutral sensor defaults for a source-compatible V1 caller", () => {
+    const { producer, consumer } = createRing(4);
+    const legacy = sample(4);
+    const {
+      altitudeAngle: _altitudeAngle,
+      azimuthAngle: _azimuthAngle,
+      contactHeight: _contactHeight,
+      contactWidth: _contactWidth,
+      tangentialPressure: _tangentialPressure,
+      ...v1
+    } = legacy;
+
+    expect(producer.write(v1)).toBe("written");
+    expect(consumer.drainToArray()).toEqual([{
+      ...v1,
+      tangentialPressure: 0,
+      altitudeAngle: Math.PI / 2,
+      azimuthAngle: 0,
+      contactWidth: 1,
+      contactHeight: 1,
+    }]);
+  });
+
   it("preserves a 120 Hz authoritative/predicted burst without object reads", () => {
     const { producer, consumer } = createRing(256);
     for (let sequence = 0; sequence < 120; sequence += 1) {
@@ -176,6 +293,11 @@ describe("SharedArrayBuffer pointer ring ordering", () => {
           current.role,
           current.channel,
           current.flags,
+          current.tangentialPressure,
+          current.altitudeAngle,
+          current.azimuthAngle,
+          current.contactWidth,
+          current.contactHeight,
         ),
       ).toBe("written");
     }
@@ -327,9 +449,35 @@ describe("SharedArrayBuffer pointer ring overload and shutdown", () => {
         role: 9,
       } as unknown as StudioSharedPointerSample),
     ).toBe("invalid-sample");
+    expect(
+      producer.write({
+        ...sample(3),
+        tangentialPressure: 1.1,
+      }),
+    ).toBe("invalid-sample");
+    expect(
+      producer.write({
+        ...sample(4),
+        altitudeAngle: Math.PI,
+      }),
+    ).toBe("invalid-sample");
+    expect(
+      producer.write({
+        ...sample(5),
+        contactWidth:
+          STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS.maxContactDimension + 1,
+      }),
+    ).toBe("invalid-sample");
+    expect(
+      producer.write({
+        ...sample(6),
+        time:
+          STUDIO_SHARED_POINTER_RING_SENSOR_LIMITS.maxSourceTimeMilliseconds + 1,
+      }),
+    ).toBe("invalid-sample");
     expect(producer.diagnostics()).toMatchObject({
       available: 0,
-      invalidSamples: 2,
+      invalidSamples: 6,
     });
     expect(consumer.readOne(() => undefined)).toBe("empty");
   });
@@ -448,6 +596,22 @@ describe("SharedArrayBuffer pointer ring malformed descriptor rejection", () => 
     );
     // Role is Float64 field 9 in the first physical sample.
     payload[9] = 99;
+    expect(consumer.readOne(() => undefined)).toBe("corrupt-state");
+    expect(consumer.diagnostics()).toMatchObject({
+      available: 1,
+      corruptStates: 1,
+    });
+  });
+
+  it("fails closed when an appended V2 sensor field is externally corrupted", () => {
+    const { descriptor, producer, consumer } = createRing(4);
+    expect(producer.write(sample(1))).toBe("written");
+    const payload = new Float64Array(
+      descriptor.buffer,
+      STUDIO_SHARED_POINTER_RING_HEADER_BYTES,
+    );
+    // Altitude is appended Float64 field 13 in the V2 record.
+    payload[13] = Math.PI;
     expect(consumer.readOne(() => undefined)).toBe("corrupt-state");
     expect(consumer.diagnostics()).toMatchObject({
       available: 1,

@@ -53,6 +53,23 @@ import {
   type NormalizedStudioBrushTipSettings,
   type StudioBrushTipAlphaMap,
 } from "./studio-brush-tip-stamp";
+import {
+  bridgeStudioDynamicDabVariationToDryMediaV1,
+  type StudioDynamicBrushMaterialIdentity,
+} from "./studio-dry-media-dynamic-bridge";
+import {
+  planStudioFlatNibRibbonCarrier,
+  type StudioFlatNibRibbonPolygon,
+} from "./studio-flat-nib-ribbon-carrier";
+import {
+  planStudioPaintRollerRibbonCarrier,
+  studioPaintRollerRibbonCarrierOwnsMaterial,
+  type StudioPaintRollerRibbonPolygon,
+} from "./studio-paint-roller-ribbon-carrier";
+import {
+  planStudioSplatterOriginAnchorDab,
+  studioSplatterOriginAnchorMarkCount,
+} from "./studio-splatter-origin-anchor";
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
@@ -118,6 +135,11 @@ export interface StudioDynamicBrushCoverageMark {
   readonly alpha: number;
   readonly color: string;
   /**
+   * Connected hard flat/chisel carrier. It is mutually exclusive with texture/falloff and carries
+   * the exact polygon shared by live, retained Canvas and SVG export.
+   */
+  readonly ribbon?: StudioFlatNibRibbonPolygon | StudioPaintRollerRibbonPolygon;
+  /**
    * Full alpha-map stamp rendered by one affine `drawImage`. The immutable map is shared by every
    * dab; deterministic world/stroke grain is footprint-integrated into `alpha` so Canvas and SVG
    * share the same pulse-resistant material response.
@@ -161,6 +183,11 @@ export interface StudioDynamicBrushR8TextureAlphaMapReceipt {
 
 export interface StudioDynamicBrushCoverageMarkPlanInput {
   readonly dabVariations: readonly StudioDynamicBrushDabVariation[];
+  /**
+   * Explicit persisted/runtime material identity. A mapped dry medium is lowered through the
+   * anisotropic bridge; an unsupported identity keeps its authored tip renderer unchanged.
+   */
+  readonly materialIdentity?: StudioDynamicBrushMaterialIdentity;
   /**
    * Optional full-stroke origins for suffix-only planning. Without this, each variation's first
    * supplied dab is the origin, which is correct for full plans but would shift stroke-fixed grain
@@ -267,6 +294,7 @@ export type StudioDynamicBrushCoverageMarkPlan =
   | {
       readonly ok: false;
       readonly reason:
+        | "dry-media-bridge"
         | "invalid-mark"
         | "mark-budget"
         | "r8-grain-unavailable"
@@ -325,6 +353,9 @@ export interface StudioDynamicBrushLegacyDestinationContext
   extends StudioDynamicBrushCoverageDestinationContext {
   fillStyle: string | CanvasGradient | CanvasPattern;
   beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  closePath(): void;
   createRadialGradient(
     x0: number,
     y0: number,
@@ -489,6 +520,21 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
     && typeof mark.color === "string"
     && mark.color.length > 0
     && (
+      mark.ribbon === undefined
+      || (
+        (
+          mark.ribbon.kind === "flat-nib-ribbon-polygon"
+          || mark.ribbon.kind === "paint-roller-ribbon-polygon"
+        )
+        && mark.ribbon.polygons.length > 0
+        && mark.ribbon.polygons.every((points) => (
+          points.length >= 6
+          && points.length % 2 === 0
+          && points.every(Number.isFinite)
+        ))
+      )
+    )
+    && (
       mark.texture === undefined
       || (
         mark.texture.kind === "alpha-map"
@@ -496,6 +542,7 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
       )
     )
     && !(mark.texture && mark.falloff)
+    && !(mark.ribbon && (mark.texture || mark.falloff))
     && (
       mark.falloff === undefined
       || (
@@ -543,6 +590,24 @@ export function renderStudioDynamicBrushCoverageMark(
     defaultSurfaceFactory,
 ): void {
   context.globalAlpha = clampAlpha(mark.alpha * alphaMultiplier);
+  if (mark.ribbon) {
+    if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
+    context.beginPath();
+    for (const points of mark.ribbon.polygons) {
+      const [firstX, firstY, ...remaining] = points;
+      if (firstX === undefined || firstY === undefined) continue;
+      context.moveTo(firstX, firstY);
+      for (let index = 0; index < remaining.length; index += 2) {
+        const x = remaining[index];
+        const y = remaining[index + 1];
+        if (x === undefined || y === undefined) break;
+        context.lineTo(x, y);
+      }
+      context.closePath();
+    }
+    context.fill();
+    return;
+  }
   if (mark.texture) {
     const alphaMap = mark.texture.alphaMap;
     const surface = acquireStudioBrushTextureStampSurface(
@@ -694,6 +759,13 @@ export function planStudioDynamicBrushCoverageMarks(
           0,
         ),
         symmetryCount: dabVariations.length,
+        fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
+          input.materialIdentity,
+          dabVariations.some(
+            (variation) =>
+              studioDynamicBrushDabVariationFirst(variation)?.index === 0,
+          ),
+        ),
         markBudget: boundedMarkBudget,
       })
     : null;
@@ -709,6 +781,25 @@ export function planStudioDynamicBrushCoverageMarks(
         )
       ))
     : dabVariations;
+  let materialDabVariations = acceptedDabVariations;
+  const paintRollerRibbonAuthority =
+    studioPaintRollerRibbonCarrierOwnsMaterial(
+      input.materialIdentity,
+      dynamics,
+    );
+  if (input.materialIdentity && !paintRollerRibbonAuthority) {
+    const bridgedVariations: StudioDynamicBrushDabVariation[] = [];
+    for (const variation of acceptedDabVariations) {
+      const bridged = bridgeStudioDynamicDabVariationToDryMediaV1({
+        materialIdentity: input.materialIdentity,
+        seed: dynamicSeed,
+        variation,
+      });
+      if (!bridged.ok) return { ok: false, reason: "dry-media-bridge" };
+      bridgedVariations.push(bridged.variation);
+    }
+    materialDabVariations = bridgedVariations;
+  }
   const tipDefinitions = [
     dynamics.tip,
     ...dynamics.tipLayers.map((layer) => layer.tip),
@@ -757,7 +848,7 @@ export function planStudioDynamicBrushCoverageMarks(
       }
       return total + (map?.alphas.byteLength ?? 0);
     }, 0);
-    const acceptedDabCount = acceptedDabVariations.reduce(
+    const acceptedDabCount = materialDabVariations.reduce(
       (total, variation) => (
         total + studioDynamicBrushDabVariationCount(variation)
       ),
@@ -785,7 +876,9 @@ export function planStudioDynamicBrushCoverageMarks(
     return true;
   };
 
-  for (const [variationIndex, dabs] of acceptedDabVariations.entries()) {
+  for (const [variationIndex, dabs] of materialDabVariations.entries()) {
+    const variationMarksStart = marks.length;
+    const visiblePrimaryDabs: StudioDynamicBrushDab[] = [];
     const suppliedOrigin = input.strokeOrigins?.[variationIndex];
     const firstDab = studioDynamicBrushDabVariationFirst(dabs);
     const strokeOriginX = suppliedOrigin?.x ?? firstDab?.sourceX ?? firstDab?.x ?? 0;
@@ -1025,8 +1118,10 @@ export function planStudioDynamicBrushCoverageMarks(
         dynamicSeed,
         dynamics.colorDynamics
       );
+      const primaryMarkStart = marks.length;
       const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
+      if (marks.length === primaryMarkStart + 1) visiblePrimaryDabs.push(dab);
       for (const [layerIndex, layer] of dynamics.tipLayers.entries()) {
         const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
         if (!composedDab) continue;
@@ -1038,6 +1133,55 @@ export function planStudioDynamicBrushCoverageMarks(
         );
         if (layerResult !== "ok") return { ok: false, reason: layerResult };
       }
+    }
+    const originAnchor = planStudioSplatterOriginAnchorDab(
+      input.materialIdentity,
+      firstDab,
+    );
+    if (originAnchor) {
+      const anchorColor = resolveNormalizedStudioBrushDabColor(
+        stroke,
+        originAnchor.index,
+        dynamicSeed,
+        dynamics.colorDynamics,
+      );
+      const anchorResult = appendTipDab(
+        originAnchor,
+        dynamics.tip,
+        0,
+        anchorColor,
+      );
+      if (anchorResult !== "ok") {
+        return { ok: false, reason: anchorResult };
+      }
+    }
+    const variationMarks = marks.slice(variationMarksStart);
+    const ribbonPlan = planStudioFlatNibRibbonCarrier({
+      dabs: visiblePrimaryDabs,
+      marks: variationMarks,
+      materialIdentity: input.materialIdentity,
+      dynamics,
+    });
+    if (ribbonPlan.applied) {
+      marks.splice(
+        variationMarksStart,
+        variationMarks.length,
+        ...ribbonPlan.marks,
+      );
+      continue;
+    }
+    const paintRollerPlan = planStudioPaintRollerRibbonCarrier({
+      dabs: visiblePrimaryDabs,
+      marks: variationMarks,
+      materialIdentity: input.materialIdentity,
+      dynamics,
+    });
+    if (paintRollerPlan.applied) {
+      marks.splice(
+        variationMarksStart,
+        variationMarks.length,
+        ...paintRollerPlan.marks,
+      );
     }
   }
   const r8TextureAlphaMapReceipt = r8GrainSampler
@@ -1091,6 +1235,23 @@ export function planStudioDynamicBrushCoverageAndLegacyMarks(
 }
 
 function markBounds(mark: StudioDynamicBrushCoverageMark): MarkBounds {
+  if (mark.ribbon) {
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const points of mark.ribbon.polygons) {
+      for (let index = 0; index < points.length; index += 2) {
+        const x = points[index]!;
+        const y = points[index + 1]!;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+    return { minX, minY, maxX, maxY };
+  }
   const cosine = Math.cos(mark.angleRadians);
   const sine = Math.sin(mark.angleRadians);
   // Alpha maps occupy their complete square/rectangular footprint. Ellipse equations under-bound
@@ -1414,6 +1575,25 @@ function committedCoverageMarksEqual(
         && Object.is(leftTextureMap.revision, rightTextureMap.revision)
         && leftTextureMap.size === rightTextureMap.size
       );
+    const leftRibbon = leftMark.ribbon;
+    const rightRibbon = rightMark.ribbon;
+    const ribbonEqual = leftRibbon === rightRibbon
+      || (
+        leftRibbon?.kind === rightRibbon?.kind
+        && leftRibbon?.version === rightRibbon?.version
+        && leftRibbon?.role === rightRibbon?.role
+        && leftRibbon?.polygons.length === rightRibbon?.polygons.length
+        && leftRibbon?.polygons.every(
+          (points, polygonIndex) => (
+            points.length === rightRibbon?.polygons[polygonIndex]?.length
+            && points.every(
+              (point, pointIndex) => (
+                point === rightRibbon?.polygons[polygonIndex]?.[pointIndex]
+              ),
+            )
+          ),
+        )
+      );
     if (
       leftMark.x !== rightMark.x
       || leftMark.y !== rightMark.y
@@ -1426,6 +1606,7 @@ function committedCoverageMarksEqual(
       || leftMark.falloff?.exponent !== rightMark.falloff?.exponent
       || leftMark.texture?.kind !== rightMark.texture?.kind
       || !textureEqual
+      || !ribbonEqual
     ) {
       return false;
     }

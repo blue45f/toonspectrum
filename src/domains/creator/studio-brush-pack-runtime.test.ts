@@ -176,8 +176,8 @@ describe("procedural brush pack runtime", () => {
       const replay = planNormalizedStudioDynamicBrushDabs(input, selection.brushDynamics);
       expect(first, `${selection.catalogId}: no planned dabs`).not.toHaveLength(0);
       expect(replay, `${selection.catalogId}: non-deterministic dabs`).toEqual(first);
-      for (const dab of first) {
-        expect(Object.values(dab).every(Number.isFinite), `${selection.catalogId}: invalid dab`).toBe(true);
+      for (const [dabIndex, dab] of first.entries()) {
+        expectFiniteNumbers(dab, `${selection.catalogId}.dabs[${dabIndex}]`);
         expect(dab.size, `${selection.catalogId}: invisible size`).toBeGreaterThan(0);
         expect(dab.opacity * dab.flow, `${selection.catalogId}: invisible flow`).toBeGreaterThan(0);
       }
@@ -342,10 +342,20 @@ describe("procedural brush pack runtime", () => {
     expect(tiltPencil.width.mappings.some((mapping) => mapping.source === "tilt-magnitude")).toBe(true);
 
     // Grain pin-mode contrast: pastel tooth stays canvas-pinned, crayon wax drags with the stroke.
-    expect(dynamicsById("pastel-paper-soft").grain).toMatchObject({
+    const paperPastel = dynamicsById("pastel-paper-soft");
+    expect(paperPastel.grain).toMatchObject({
       space: "canvas-fixed",
       amount: 0.55,
     });
+    expect(paperPastel.spacingRatio).toBe(0.12);
+    expect(paperPastel.scatterRatio).toBe(0.04);
+    expect(paperPastel.roundness.base).toBe(0.24);
+    expect(paperPastel.roundness.mappings).toMatchObject([
+      { source: "pressure", mode: "multiply", from: 0.2, to: 0.3, curve: 1 },
+    ]);
+    expect(paperPastel.angle.mappings).toMatchObject([
+      { source: "direction", mode: "add", from: 0, to: 360, curve: 1 },
+    ]);
     expect(dynamicsById("crayon-wax-bold").grain.space).toBe("stroke-fixed");
     expect(dynamicsById("oil-impasto-heavy").spacingRatio).toBeLessThan(0.06);
     expect(dynamicsById("airbrush-grand-soft")).toMatchObject({
@@ -354,8 +364,9 @@ describe("procedural brush pack runtime", () => {
       flow: { base: 0.37 },
     });
 
-    // Colour dynamics land on the colored pencil and the autumn leaf scatter.
-    expect(dynamicsById("pencil-colored-soft").colorDynamics.hueJitter).toBeGreaterThan(0);
+    // Continuous pigment keeps one stable colour per stroke so overlapping carriers cannot appear
+    // to erase one another. Authored discrete leaf stamps retain their intentional colour spread.
+    expect(dynamicsById("pencil-colored-soft").colorDynamics.hueJitter).toBe(0);
     expect(dynamicsById("leaf-fall-flurry").colorDynamics.hueJitter).toBeGreaterThanOrEqual(10);
 
     // Stamps and scatters: rope dabs sit one tip-width apart, splatter bursts under pressure,
@@ -484,7 +495,9 @@ describe("procedural brush pack runtime", () => {
       expect(first, `${id}: empty representative stroke`).not.toHaveLength(0);
       expect(first.length, `${id}: dab planner exceeded budget`).toBeLessThanOrEqual(384);
       expect(replay, `${id}: non-deterministic representative stroke`).toEqual(first);
-      expect(first.every((dab) => Object.values(dab).every(Number.isFinite))).toBe(true);
+      first.forEach((dab, dabIndex) => {
+        expectFiniteNumbers(dab, `${id}.dabs[${dabIndex}]`);
+      });
     }
 
     expect(signatures.size).toBe(STUDIO_BRUSH_PACK_MATERIAL_WAVE_IDS.length);
@@ -553,7 +566,7 @@ describe("procedural brush pack runtime", () => {
       { id: "palette-knife-edge", tip: "c344c2cf", dabs: "ae46755f", count: 70 },
       { id: "watercolor-salt-bloom", tip: "206daca6", dabs: "c11da11a", count: 7 },
       { id: "ribbon-satin-fold", tip: "30f1532a", dabs: "ac5ec2b4", count: 17 },
-      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "5d523b4f", count: 11 },
+      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "899572e2", count: 16 },
       { id: "flower-petal-scatter", tip: "a7be40ba", dabs: "616763b3", count: 9 },
       { id: "halftone-gradient-dot", tip: "ea3c1dbd", dabs: "96b49af2", count: 13 },
       { id: "focus-ray-streak", tip: "194e1e56", dabs: "9d9ff412", count: 27 },

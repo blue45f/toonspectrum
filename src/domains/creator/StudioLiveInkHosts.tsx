@@ -12,6 +12,7 @@ import {
 
 import { StudioHudPill } from "./studio-chrome-ui";
 import { studioPressureHudRatio } from "./studio-draw-hud";
+import { STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY } from "./studio-wet-ink-backend-capability";
 
 import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
 import type {
@@ -103,12 +104,18 @@ export const StudioLiveDynamicBrushOverlayHost = memo(
     documentWidth,
     flipX,
   }: StudioLiveInkSurface & { renderer: StudioLiveDynamicBrushOverlayRenderer }) {
-    const activeCanvasRef = useRef<HTMLCanvasElement>(null);
+    const coverageCanvasRef = useRef<HTMLCanvasElement>(null);
+    const presentationCanvasRef = useRef<HTMLCanvasElement>(null);
     const settledCanvasRef = useRef<HTMLCanvasElement>(null);
     useLayoutEffect(() => {
-      if (!activeCanvasRef.current || !settledCanvasRef.current) return undefined;
+      if (
+        !coverageCanvasRef.current
+        || !presentationCanvasRef.current
+        || !settledCanvasRef.current
+      ) return undefined;
       renderer.attach({
-        activeCanvas: activeCanvasRef.current,
+        activeCanvas: coverageCanvasRef.current,
+        presentationCanvas: presentationCanvasRef.current,
         settledCanvas: settledCanvasRef.current,
       });
       return () => renderer.attach(null);
@@ -126,7 +133,13 @@ export const StudioLiveDynamicBrushOverlayHost = memo(
           style={{ left, top, width, height }}
         />
         <canvas
-          ref={activeCanvasRef}
+          ref={coverageCanvasRef}
+          aria-hidden="true"
+          data-studio-live-dynamic-coverage="true"
+          className="hidden"
+        />
+        <canvas
+          ref={presentationCanvasRef}
           aria-hidden="true"
           data-studio-live-dynamic-active="true"
           className="pointer-events-none absolute z-[11]"
@@ -148,19 +161,40 @@ export const StudioLiveWetInkOverlayHost = memo(
     documentWidth,
     flipX,
   }: StudioLiveInkSurface & { renderer: StudioLiveWetInkOverlayRenderer }) {
+    const backendAvailable =
+      STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY.availability === "available";
     const activeCanvasRef = useRef<HTMLCanvasElement>(null);
     const settledCanvasRef = useRef<HTMLCanvasElement>(null);
     useLayoutEffect(() => {
-      if (!activeCanvasRef.current || !settledCanvasRef.current) return undefined;
+      if (
+        !backendAvailable
+        || !activeCanvasRef.current
+        || !settledCanvasRef.current
+      ) {
+        renderer.attach(null);
+        return undefined;
+      }
       renderer.attach({
         activeCanvas: activeCanvasRef.current,
         settledCanvas: settledCanvasRef.current,
       });
       return () => renderer.attach(null);
-    }, [renderer]);
+    }, [backendAvailable, renderer]);
     useLayoutEffect(() => {
+      if (!backendAvailable) return;
       renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
-    });
+    }, [
+      backendAvailable,
+      documentScale,
+      documentWidth,
+      flipX,
+      height,
+      left,
+      renderer,
+      top,
+      width,
+    ]);
+    if (!backendAvailable) return null;
     return (
       <>
         <canvas

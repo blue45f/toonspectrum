@@ -1,5 +1,5 @@
 import { Clapperboard, Maximize2, Minimize2, Eraser, BookOpen, FlipHorizontal2, Grid3X3, ImagePlus, Lock, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Sparkles, Square, Unlock, Wind, Shapes, MessageSquare } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useRef, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, memo, useEffect, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -41,7 +41,7 @@ import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "./studio-master-page";
 import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { vignetteCss, type PageGrade } from "./studio-page-grade";
-import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
+import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
 import { isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { type PanelSplitPreview } from "./studio-panel-split";
@@ -88,9 +88,13 @@ import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type { PageState } from "./studio-page-state";
 import type { StudioGpuBackend, StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import type { StudioCanonicalVNextDryMediaCanvasAuthority } from "./StudioCanonicalVNextDryMediaCanvas";
 import type { StudioCommentPinClickPayload, StudioCommentPinReanchorPayload } from "./StudioLiveCanvasOverlay";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
-import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
+import type {
+  StudioWebGpuCanvasHandle,
+  StudioWebGpuSurfaceFrameRequest,
+} from "./StudioWebGpuCanvas";
 import type Konva from "konva";
 
 import { useMediaQuery } from "@/components/use-media-query";
@@ -308,6 +312,7 @@ export interface StudioCanvasViewportHandlers {
   ) => void;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
+  onWebGpuFrameRequest: (request: StudioWebGpuSurfaceFrameRequest) => void;
   onWebGpuFrameReady: (receipt: StudioGpuFrameReceipt) => void;
   onWebGpuDeviceLost: () => void;
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
@@ -485,6 +490,7 @@ export interface StudioCanvasViewportProps {
   frameAnimEl: ImageEl | null;
   frameAnimOpen: boolean;
   frameAnimTargetId: string | null;
+  gpuCanvasShadowVisibleRef: import("react").RefObject<boolean>;
   gpuLiveInkPinnedRef: import("react").RefObject<boolean>;
   gridSize: number;
   groups: LayerGroup[];
@@ -780,6 +786,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   frameAnimEl,
   frameAnimOpen,
   frameAnimTargetId,
+  gpuCanvasShadowVisibleRef,
   gpuLiveInkPinnedRef,
   gridSize,
   groups,
@@ -1106,8 +1113,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onWebGpuBackendChange,
     onWebGpuDeviceLost,
     onWebGpuFrameInvalid,
+    onWebGpuFrameRequest,
     onWebGpuFrameReady,
   } = stableHandlers;
+  const [
+    canonicalDryMediaCanvasAuthority,
+    setCanonicalDryMediaCanvasAuthority,
+  ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
+
   function splitDialogueText(pageId: string, elementId: string, text: string, offset: number) {
     const newElementId = uid();
     const next = splitDialogueElement(pages, {
@@ -1287,6 +1300,84 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const brushCursorStyle = appSettings.general.brushCursorStyle;
   const t = useT();
   const hasCoarsePointer = useMediaQuery("(pointer: coarse)");
+  /*
+   * First product-visible canonical-vNext slice.
+   *
+   * The separate WebGPU canvas is intentionally authorized only for one selected, top-most,
+   * unclipped dry-media DrawEl. Keeping this gate narrower than the product compiler prevents a
+   * presentation-only surface from changing layer, clipping, mask, preview or rotation semantics.
+   * DrawEl/CRDT stays authoritative; until the child returns an exact completed parity receipt the
+   * ordinary Konva node below remains visible.
+   */
+  const canonicalDryMediaAuthoredElements = masterEditMode
+    ? elements
+    : studioWorkAssetRenderProjection.elements;
+  const canonicalDryMediaVisibleElements =
+    canonicalDryMediaAuthoredElements.filter(
+      (element) =>
+        !isEffectivelyHidden(element, groups)
+        && !localHiddenElementIds.has(element.id),
+    );
+  const canonicalDryMediaTopElement =
+    canonicalDryMediaVisibleElements[
+      canonicalDryMediaVisibleElements.length - 1
+    ] ?? null;
+  const canonicalDryMediaSelectedElement =
+    canonicalDryMediaTopElement?.id === selectedId
+      && canonicalDryMediaTopElement.type === "draw"
+      ? canonicalDryMediaTopElement
+      : null;
+  const canonicalDryMediaPanelClip =
+    canonicalDryMediaSelectedElement
+      && !canonicalDryMediaSelectedElement.noClip
+      ? containingPanel(
+          canonicalDryMediaSelectedElement,
+          canonicalDryMediaAuthoredElements,
+        )
+      : null;
+  const canonicalDryMediaCandidate =
+    webGpuViewportSurface
+    && tool === "select"
+    && marqueeIds.length === 0
+    && !masterEditMode
+    && !isExporting
+    && !saving
+    && !timelapseCapturing
+    && !sourceHydrationPending
+    && !collaborationDocumentUnavailable
+    && canvasRotation === 0
+    && !timelinePlaying
+    && studioFilterPreview === null
+    && studioFilterPageComposite === null
+    && advancedFillPreview === null
+    && !webGpuPreviewAuthorized
+    && studioRasterHiddenOperationIds.size === 0
+    && canonicalDryMediaSelectedElement !== null
+    && canonicalDryMediaSelectedElement.clipBelow !== true
+    && canonicalDryMediaSelectedElement.maskSrc === undefined
+    && canonicalDryMediaPanelClip === null
+      ? canonicalDryMediaSelectedElement
+      : null;
+  const canonicalDryMediaLayoutKey = webGpuViewportSurface
+    ? [
+        activePage.id,
+        CANVAS_W,
+        canvasH,
+        webGpuViewportSurface.surface.left,
+        webGpuViewportSurface.surface.top,
+        webGpuViewportSurface.surface.width,
+        webGpuViewportSurface.surface.height,
+        effScale,
+        canvasFlipH ? 1 : 0,
+      ].join(":")
+    : "unavailable";
+  const canonicalDryMediaAuthorized =
+    canonicalDryMediaCanvasAuthority?.element === canonicalDryMediaCandidate
+    && canonicalDryMediaCanvasAuthority.layoutKey === canonicalDryMediaLayoutKey
+      ? canonicalDryMediaCanvasAuthority
+      : null;
+  const canonicalDryMediaHiddenElementId =
+    canonicalDryMediaAuthorized?.element.id ?? null;
   // 말풍선 병합 액션 게이트 — 다중 선택에 말풍선이 2개 이상 섞였을 때만 노출하고, 비활성
   // 사유(혼합 선택·개수 범위)는 bubbleMergeUnavailableReason으로 툴팁에 안내한다.
   const canvasSelectionIds =
@@ -2631,6 +2722,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // A verified raster frame and these vector fallbacks switch in one React commit.
                   // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
                   if (studioRasterHiddenOperationIds.has(el.id)) return null;
+                  // The canonical-vNext dry-media canvas receives authority only after its
+                  // RGBA16F producer fence and exact live/final/commit parity receipt complete.
+                  // This derived id and the child's `visible` prop flip in the same React commit,
+                  // so one stroke never exposes two tips or a transparent handoff frame.
+                  if (canonicalDryMediaHiddenElementId === el.id) return null;
                   const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
@@ -2977,8 +3073,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       !el
                       || el.mode === "eraser"
                       || !liveDraftDirectRef.current
-                      || gpuLiveInkPinnedRef.current
+                      || (
+                        gpuLiveInkPinnedRef.current
+                        && !gpuCanvasShadowVisibleRef.current
+                      )
                       || liveInkOverlayRendererRef.current.isActive
+                      || liveStampOverlayRenderer.isActive
+                      || liveDynamicBrushOverlayRenderer.isActive
+                      || liveWetInkOverlayRenderer.isActive
                     ) {
                       return;
                     }
@@ -3393,6 +3495,21 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           </Suspense>
           {webGpuViewportSurface ? (
             <Suspense fallback={null}>
+              <StudioCanonicalVNextDryMediaCanvas
+                element={canonicalDryMediaCandidate}
+                layoutKey={canonicalDryMediaLayoutKey}
+                visible={canonicalDryMediaAuthorized !== null}
+                surfaceBounds={webGpuViewportSurface.surface}
+                documentWidth={CANVAS_W}
+                documentHeight={canvasH}
+                documentScale={effScale}
+                flipX={canvasFlipH}
+                onAuthorityChange={setCanonicalDryMediaCanvasAuthority}
+              />
+            </Suspense>
+          ) : null}
+          {webGpuViewportSurface ? (
+            <Suspense fallback={null}>
               <StudioWebGpuCanvas
                 className="pointer-events-none z-10"
                 width={CANVAS_W}
@@ -3410,6 +3527,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 onBackendChange={onWebGpuBackendChange}
                 onDeviceLost={onWebGpuDeviceLost}
                 onFrameInvalid={onWebGpuFrameInvalid}
+                onFrameRequest={onWebGpuFrameRequest}
                 onFrameReady={onWebGpuFrameReady}
               />
             </Suspense>

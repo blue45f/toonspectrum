@@ -28,9 +28,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
+import { decodePng } from "image-js";
 import {
   chromium,
   type Browser,
@@ -39,18 +40,29 @@ import {
   type Page,
 } from "playwright";
 
+import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
 import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/studio-brush-library";
+import { studioBrushPackDescriptorById } from "../src/domains/creator/studio-brush-pack-index";
 import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "../src/domains/creator/studio-brush-selection";
 import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/studio-draw-pointer-pressure-contract";
+import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/studio-dry-media-anisotropic-grain-v1";
+
+import {
+  analyzeStudioLongBrushQuality,
+  classifyStudioLongBrushQualityPolicy,
+  STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION,
+  type StudioLongBrushQualityResult,
+} from "./studio-brush-long-matrix-quality";
 
 const BUILT_IN_BRUSH_PRESET_COUNT = BRUSH_PRESETS.length;
 const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
@@ -106,6 +118,40 @@ interface LongBrushStrokeEvidence {
   persistedDynamicsMatched: boolean | null;
   persistedPathDistance: number;
   undoRestoredPixels: boolean;
+  qualityPolicy: StudioLongBrushQualityResult["policy"]["kind"];
+  qualityOk: boolean;
+}
+
+interface LongBrushArtifactPath {
+  absolute: string;
+  relativeToScratch: string;
+}
+
+interface LongBrushQualityArtifacts {
+  baseline: LongBrushArtifactPath;
+  live: LongBrushArtifactPath;
+  released: LongBrushArtifactPath;
+  settled: LongBrushArtifactPath;
+}
+
+interface LongBrushQualityEvidence {
+  id: string;
+  name: string;
+  source: StudioBrushCatalogItem["source"];
+  runtimeBrushId: string;
+  capture: Readonly<{
+    clip: Readonly<{ x: number; y: number; width: number; height: number }>;
+    localRouteStart: Readonly<{ x: number; y: number }>;
+    localRouteEnd: Readonly<{ x: number; y: number }>;
+    brushCursorStyle: "none";
+    endpointExclusion: Readonly<{
+      enabled: false;
+      center: { x: number; y: number };
+      radius: 0;
+    }>;
+  }>;
+  quality: StudioLongBrushQualityResult;
+  artifacts: LongBrushQualityArtifacts;
 }
 
 interface PixelDiff {
@@ -140,6 +186,9 @@ interface LongBrushResult {
   presetCount: number;
   evidence: LongBrushStrokeEvidence[];
   screenshot: string;
+  qualityRunDirectory: LongBrushArtifactPath;
+  qualityReport: LongBrushArtifactPath;
+  qualityPolicyCounts: Readonly<Record<StudioLongBrushQualityResult["policy"]["kind"], number>>;
   errorCount: number;
 }
 
@@ -373,11 +422,43 @@ async function installCleanStudioState(page: Page): Promise<void> {
       cleanSessionKey,
       mobileHintKey,
       quickstartKey,
+      studioAppSettingsKey,
       debugPerfectInk,
     }) => {
       try {
         window.localStorage.setItem(quickstartKey, "1");
         window.localStorage.setItem(mobileHintKey, "1");
+        // Quality screenshots must contain ink only. Persist this verifier-only preference before
+        // Studio reads settings so the live pointer-down frame cannot include a Konva cursor whose
+        // size/softness varies by brush and then disappears from released/settled frames.
+        let persistedSettings: Record<string, unknown> = {};
+        try {
+          const parsed = JSON.parse(
+            window.localStorage.getItem(studioAppSettingsKey) ?? "{}",
+          ) as unknown;
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            persistedSettings = parsed as Record<string, unknown>;
+          }
+        } catch {
+          // A malformed verifier profile is replaced by the canonical partial preference below.
+        }
+        const persistedGeneral = (
+          persistedSettings.general
+          && typeof persistedSettings.general === "object"
+          && !Array.isArray(persistedSettings.general)
+        )
+          ? persistedSettings.general as Record<string, unknown>
+          : {};
+        window.localStorage.setItem(
+          studioAppSettingsKey,
+          JSON.stringify({
+            ...persistedSettings,
+            general: {
+              ...persistedGeneral,
+              brushCursorStyle: "none",
+            },
+          }),
+        );
         if (debugPerfectInk) {
           (window as { __debugPerfectInk?: boolean }).__debugPerfectInk = true;
         }
@@ -399,6 +480,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
       cleanSessionKey: CLEAN_SESSION_KEY,
       mobileHintKey: MOBILE_HINT_KEY,
       quickstartKey: QUICKSTART_KEY,
+      studioAppSettingsKey: STUDIO_APP_SETTINGS_STORAGE_KEY,
       debugPerfectInk: DEBUG_BRUSH_VERIFIER,
     },
   );
@@ -662,8 +744,16 @@ async function compareScreenshotCoverage(
   second: Buffer,
   segmentCount = 6,
   channelTolerance = 3,
+  segmentXRange?: Readonly<{ start: number; end: number }>,
 ): Promise<PixelCoverage> {
-  return page.evaluate(async ({ firstBase64, secondBase64, segments, tolerance }) => {
+  return page.evaluate(async ({
+    firstBase64,
+    secondBase64,
+    segments,
+    tolerance,
+    segmentStartX,
+    segmentEndX,
+  }) => {
     const [firstResponse, secondResponse] = await Promise.all([
       fetch(`data:image/png;base64,${firstBase64}`),
       fetch(`data:image/png;base64,${secondBase64}`),
@@ -699,6 +789,12 @@ async function compareScreenshotCoverage(
     secondBitmap.close();
 
     const segmentChangedPixels = Array.from({ length: segments }, () => 0);
+    const resolvedSegmentStartX = Number.isFinite(segmentStartX)
+      ? Number(segmentStartX)
+      : 0;
+    const resolvedSegmentEndX = Number.isFinite(segmentEndX)
+      ? Number(segmentEndX)
+      : width;
     let changedPixels = 0;
     let maxChannelDelta = 0;
     let left = width;
@@ -715,7 +811,13 @@ async function compareScreenshotCoverage(
         maxChannelDelta = Math.max(maxChannelDelta, pixelDelta);
         if (pixelDelta <= tolerance) continue;
         changedPixels += 1;
-        const segment = Math.min(segments - 1, Math.floor((x / Math.max(1, width)) * segments));
+        const segmentProgress = (
+          x - resolvedSegmentStartX
+        ) / Math.max(1, resolvedSegmentEndX - resolvedSegmentStartX);
+        const segment = Math.min(
+          segments - 1,
+          Math.max(0, Math.floor(segmentProgress * segments)),
+        );
         segmentChangedPixels[segment]! += 1;
         left = Math.min(left, x);
         top = Math.min(top, y);
@@ -736,6 +838,8 @@ async function compareScreenshotCoverage(
     secondBase64: second.toString("base64"),
     segments: Math.max(1, Math.trunc(segmentCount)),
     tolerance: channelTolerance,
+    segmentStartX: segmentXRange?.start ?? null,
+    segmentEndX: segmentXRange?.end ?? null,
   });
 }
 
@@ -1364,10 +1468,207 @@ function persistedStrokePathDistance(points: readonly number[]): number {
   return distance;
 }
 
+function longBrushArtifactPath(
+  scratch: string,
+  path: string,
+): LongBrushArtifactPath {
+  return {
+    absolute: resolve(path),
+    relativeToScratch: relative(resolve(scratch), resolve(path)),
+  };
+}
+
+function decodeLongBrushQualityImage(buffer: Buffer) {
+  const image = decodePng(new Uint8Array(
+    buffer.buffer,
+    buffer.byteOffset,
+    buffer.byteLength,
+  ));
+  const raw = image.getRawImage();
+  return {
+    width: image.width,
+    height: image.height,
+    channels: image.channels,
+    data: raw.data,
+  };
+}
+
+function saveLongBrushQualityArtifacts(
+  runDirectory: string,
+  index: number,
+  id: string,
+  images: Readonly<{
+    baseline: Buffer;
+    live: Buffer;
+    released: Buffer;
+    settled: Buffer;
+  }>,
+): LongBrushQualityArtifacts {
+  const safeId = id.replaceAll(/[^a-zA-Z0-9_-]/g, "_");
+  const directory = join(
+    runDirectory,
+    `${String(index + 1).padStart(3, "0")}-${safeId}`,
+  );
+  mkdirSync(directory, { recursive: true });
+  const paths = {
+    baseline: join(directory, "00-baseline.png"),
+    live: join(directory, "01-live-pointer-down.png"),
+    released: join(directory, "02-released-immediate.png"),
+    settled: join(directory, "03-settled-autosaved.png"),
+  };
+  writeFileSync(paths.baseline, images.baseline);
+  writeFileSync(paths.live, images.live);
+  writeFileSync(paths.released, images.released);
+  writeFileSync(paths.settled, images.settled);
+  return {
+    baseline: longBrushArtifactPath(SCRATCH, paths.baseline),
+    live: longBrushArtifactPath(SCRATCH, paths.live),
+    released: longBrushArtifactPath(SCRATCH, paths.released),
+    settled: longBrushArtifactPath(SCRATCH, paths.settled),
+  };
+}
+
+function summarizeLongBrushQualityTransition(
+  evidence: readonly LongBrushQualityEvidence[],
+  key: keyof StudioLongBrushQualityResult["transitions"],
+) {
+  const transitions = evidence.map((entry) => entry.quality.transitions[key]);
+  const mean = (values: readonly number[]) => values.length > 0
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0;
+  const maximum = (values: readonly number[]) => Math.max(0, ...values);
+  return {
+    analyzedBrushCount: transitions.length,
+    exactPixelParityBrushCount: transitions.filter(
+      ({ rawChangedPixels }) => rawChangedPixels === 0,
+    ).length,
+    maximumRawChangedPixels: maximum(
+      transitions.map(({ rawChangedPixels }) => rawChangedPixels),
+    ),
+    maximumRawChangedPixelRatio: maximum(
+      transitions.map(({ rawChangedPixelRatio }) => rawChangedPixelRatio),
+    ),
+    maximumChannelDelta: maximum(
+      transitions.map(({ maxChannelDelta }) => maxChannelDelta),
+    ),
+    meanEnergyRatio: mean(transitions.map(({ energyRatio }) => energyRatio)),
+    meanPerPixelDifferenceRatio: mean(
+      transitions.map(({ perPixelDifferenceRatio }) => perPixelDifferenceRatio),
+    ),
+    meanShapeDifferenceRatio: mean(
+      transitions.map(({ shapeDifferenceRatio }) => shapeDifferenceRatio),
+    ),
+    maximumBoundsDriftPx: maximum(
+      transitions.flatMap(({ boundsDriftPx }) =>
+        boundsDriftPx === null ? [] : [boundsDriftPx]
+      ),
+    ),
+    maximumCentroidDriftPx: maximum(
+      transitions.flatMap(({ centroidDriftPx }) =>
+        centroidDriftPx === null ? [] : [centroidDriftPx]
+      ),
+    ),
+    maximumCenterlineDriftPx: maximum(
+      transitions.flatMap(({ centerlineDriftPx }) =>
+        centerlineDriftPx === null ? [] : [centerlineDriftPx]
+      ),
+    ),
+  };
+}
+
+function writeLongBrushQualityReport(input: Readonly<{
+  reportPath: string;
+  runDirectory: string;
+  evidence: readonly LongBrushQualityEvidence[];
+  completed: boolean;
+}>): void {
+  const policyCounts: Record<
+    StudioLongBrushQualityResult["policy"]["kind"],
+    number
+  > = {
+    "strict-continuous": 0,
+    "soft-wet-continuous": 0,
+    "record-only-discrete": 0,
+  };
+  for (const entry of input.evidence) {
+    policyCounts[entry.quality.policy.kind] += 1;
+  }
+  writeFileSync(input.reportPath, `${JSON.stringify({
+    schemaVersion: STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION,
+    generatedAt: new Date().toISOString(),
+    mode: ALL_BRUSH_LONG_MATRIX ? "all-214" : "core-only",
+    expectedPresetCount: LONG_BRUSH_CATALOG_COUNT,
+    analyzedPresetCount: input.evidence.length,
+    completed: input.completed,
+    runDirectory: longBrushArtifactPath(SCRATCH, input.runDirectory),
+    reportPath: longBrushArtifactPath(SCRATCH, input.reportPath),
+    measurementContract: {
+      capturesPerBrush: [
+        "00-baseline",
+        "01-live-pointer-down",
+        "02-released-immediate",
+        "03-settled-autosaved",
+      ],
+      identicalCropWithinBrush: true,
+      uiContamination:
+        "The crop is confined to the exposed central canvas, both route endpoints must pass "
+        + "elementFromPoint(.konvajs-content), and the baseline is stability-polled after hover "
+        + "is moved to (4,4). Fixed editor chrome therefore never contributes to the ROI.",
+      cursorIsolation:
+        "The isolated browser context persists brushCursorStyle='none' in an init script before "
+        + "Studio initializes. All transition metrics therefore compare the complete ink ROI; "
+        + "no endpoint pixels are masked.",
+      startCirclePolicy:
+        "No route pixels are masked; a live-only circular start deposit is a hard "
+        + "continuous-carrier failure.",
+      exactTransitionPolicy:
+        "Every transition reports rawChangedPixels/maxChannelDelta at zero RGB tolerance as well "
+        + "as perceptible changedPixels. released-to-settled exact parity therefore cannot be "
+        + "hidden by the perceptual threshold.",
+      intentionalDiscretePolicy:
+        "Authored particles, motifs, tones, and stamps retain metrics and PNGs but new "
+        + "continuous-carrier findings are record-only.",
+    },
+    policyCounts,
+    qualityFailureCount: input.evidence.filter((entry) => !entry.quality.ok).length,
+    transitionSummary: {
+      liveToReleased: summarizeLongBrushQualityTransition(
+        input.evidence,
+        "liveToReleased",
+      ),
+      liveToSettled: summarizeLongBrushQualityTransition(
+        input.evidence,
+        "liveToSettled",
+      ),
+      releasedToSettled: summarizeLongBrushQualityTransition(
+        input.evidence,
+        "releasedToSettled",
+      ),
+    },
+    representativeFailures: input.evidence
+      .filter((entry) => !entry.quality.ok)
+      .slice(0, 12)
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        policy: entry.quality.policy,
+        findings: entry.quality.findings.filter(({ level }) => level === "error"),
+        artifacts: entry.artifacts,
+      })),
+    evidence: input.evidence,
+  }, null, 2)}\n`);
+}
+
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "long-brushes", studioUrl);
+  const qualityRunDirectory = join(
+    resolve(SCRATCH),
+    `long-brush-matrix-${ALL_BRUSH_LONG_MATRIX ? "all-214" : "core"}-${Date.now()}`,
+  );
+  const qualityReportPath = join(qualityRunDirectory, "long-brush-quality-report.json");
+  mkdirSync(qualityRunDirectory, { recursive: true });
   const screenshot = join(
     SCRATCH,
     `studio-brush-desktop-long-${LONG_BRUSH_CATALOG_COUNT}.png`,
@@ -1394,6 +1695,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     );
 
     const evidence: LongBrushStrokeEvidence[] = [];
+    const qualityEvidence: LongBrushQualityEvidence[] = [];
     for (const [index, preset] of LONG_BRUSH_CATALOG_ITEMS.entries()) {
       const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
       invariant(expectedSelection, `${preset.id}: long-route catalogue selection did not materialize`);
@@ -1410,11 +1712,23 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       const y = safeTop + (safeBottom - safeTop) / 2;
       const startX = safeLeft;
       const endX = safeRight;
-      const clip = {
-        x: Math.floor(startX),
-        y: Math.max(0, Math.floor(y - 48)),
-        width: Math.ceil(endX - startX),
-        height: 96,
+      const qualityMarginX = Math.max(
+        32,
+        Math.min(90, expectedSelection.defaultWidth * 1.25),
+      );
+      const qualityMarginY = Math.max(
+        48,
+        Math.min(104, expectedSelection.defaultWidth * 1.65),
+      );
+      const clip = sanitizeEvidenceClip({
+        x: Math.floor(startX - qualityMarginX),
+        y: Math.floor(y - qualityMarginY),
+        width: Math.ceil(endX - startX + qualityMarginX * 2),
+        height: Math.ceil(qualityMarginY * 2 + 4),
+      }, viewport);
+      const routeSegmentXRange = {
+        start: startX - clip.x,
+        end: endX - clip.x,
       };
       const before = await captureStableEvidence(page, clip);
       const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
@@ -1431,10 +1745,22 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       await page.mouse.move(startX, y);
       await page.mouse.down();
       await page.mouse.move(endX, y + 4);
+      // Capture the renderer's real pointer-down authority before pointerup can swap it for the
+      // retained/committed representation. brushCursorStyle='none' was installed before Studio
+      // initialized, so the complete live ROI is compared without an endpoint exclusion.
+      await page.waitForTimeout(50);
+      const live = await page.screenshot({ animations: "disabled", clip });
       await page.mouse.up();
+      const released = await page.screenshot({ animations: "disabled", clip });
       await page.mouse.move(4, 4);
-      const immediate = await page.screenshot({ animations: "disabled", clip });
-      const immediateCoverage = await compareScreenshotCoverage(page, before, immediate, 6);
+      const immediateCoverage = await compareScreenshotCoverage(
+        page,
+        before,
+        released,
+        6,
+        3,
+        routeSegmentXRange,
+      );
       invariant(
         hasMeaningfulPixelChange(immediateCoverage),
         `${preset.id}: fast long stroke produced no immediate visible pixels`,
@@ -1476,13 +1802,108 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         );
         log(`DEBUG ${preset.id} long-settled:${JSON.stringify(settledPerfectDebugState)}`);
       }
+      const saved = await waitForPersistedSingleLongStroke(
+        page,
+        expectedSelection,
+        preset.source === "pro",
+      );
       const settled = await page.screenshot({ animations: "disabled", clip });
-      const coverage = await compareScreenshotCoverage(page, before, settled, 6);
+      const descriptor = studioBrushPackDescriptorById(preset.id);
+      const dryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
+      const intentionalDiscrete = dryMediaClassification
+        ? dryMediaClassification.kind === "intentional-discrete"
+        : descriptor
+          ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
+          : false;
+      const qualityPolicy = classifyStudioLongBrushQualityPolicy({
+        id: preset.id,
+        source: preset.source,
+        runtimeBrushId: expectedSelection.runtimeBrushId,
+        mediaGroup: preset.mediaGroup,
+        previewStyle: preset.previewStyle,
+        intentionalDiscrete,
+      });
+      const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
+      const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
+        const amount = sampleIndex / Math.max(1, sampleCount - 1);
+        return {
+          x: startX - clip.x + (endX - startX) * amount,
+          y: y - clip.y + 4 * amount,
+        };
+      });
+      const crossSectionRadius = Math.max(
+        10,
+        Math.min(46, expectedSelection.defaultWidth * 1.5),
+      );
+      const cursorIgnoreRadius = 0;
+      const quality = analyzeStudioLongBrushQuality({
+        policy: qualityPolicy,
+        baseline: decodeLongBrushQualityImage(before),
+        live: decodeLongBrushQualityImage(live),
+        released: decodeLongBrushQualityImage(released),
+        settled: decodeLongBrushQualityImage(settled),
+        route: {
+          points: localRoutePoints,
+          crossSectionRadius,
+          cursorIgnoreRadius,
+          nominalWidth: expectedSelection.defaultWidth,
+        },
+      });
+      const qualityArtifacts = saveLongBrushQualityArtifacts(
+        qualityRunDirectory,
+        index,
+        preset.id,
+        {
+          baseline: before,
+          live,
+          released,
+          settled,
+        },
+      );
+      qualityEvidence.push({
+        id: preset.id,
+        name: preset.name,
+        source: preset.source,
+        runtimeBrushId: expectedSelection.runtimeBrushId,
+        capture: {
+          clip,
+          localRouteStart: localRoutePoints[0]!,
+          localRouteEnd: localRoutePoints.at(-1)!,
+          brushCursorStyle: "none",
+          endpointExclusion: {
+            enabled: false,
+            center: localRoutePoints.at(-1)!,
+            radius: 0,
+          },
+        },
+        quality,
+        artifacts: qualityArtifacts,
+      });
+      writeLongBrushQualityReport({
+        reportPath: qualityReportPath,
+        runDirectory: qualityRunDirectory,
+        evidence: qualityEvidence,
+        completed: false,
+      });
+      for (const finding of quality.findings) {
+        log(
+          `${preset.id}: quality ${finding.level.toUpperCase()} `
+            + `${finding.code} — ${finding.message}`,
+        );
+      }
+      const coverage = await compareScreenshotCoverage(
+        page,
+        before,
+        settled,
+        6,
+        3,
+        routeSegmentXRange,
+      );
       if (coverage.visibleSegments !== 6) {
         writeFileSync(join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-before.png`), before);
         writeFileSync(
           join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-immediate.png`),
-          immediate,
+          released,
         );
         writeFileSync(
           join(SCRATCH, `studio-brush-long-diagnostic-${preset.id}-settled.png`),
@@ -1506,15 +1927,23 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         }
       }
       invariant(hasMeaningfulPixelChange(coverage), `${preset.id}: long stroke disappeared before commit`);
-      invariant(
-        coverage.visibleSegments === 6,
-        `${preset.id}: long stroke has missing visual segments (${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`,
-      );
-      const saved = await waitForPersistedSingleLongStroke(
-        page,
-        expectedSelection,
-        preset.source === "pro",
-      );
+      /*
+       * A continuous carrier must cover every route segment. Intentionally discrete particle,
+       * motif and stamp brushes are different: a valid deterministic long stroke may leave one
+       * sampled sixth empty between authored marks (for example rain-mist-combo). Requiring 6/6
+       * there turns the verifier into a request to fill deliberate negative space. We still
+       * require meaningful output above, persist the full 300 px route below, capture all four
+       * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
+       */
+      if (qualityPolicy.kind !== "record-only-discrete") {
+        invariant(
+          coverage.visibleSegments === 6,
+          `${preset.id}: long stroke has missing visual segments (${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`,
+        );
+      }
+      // Visual-quality findings are aggregate failures, not loop breakers. The exhaustive run must
+      // still capture every remaining brush so one early scallop does not hide 213 later results.
+      // Functional absence, route coverage, persistence identity and Undo remain immediate failures.
       const expectedPersistedDynamics = preset.source === "pro"
         ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
         : null;
@@ -1573,25 +2002,44 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         persistedDynamicsMatched,
         persistedPathDistance,
         undoRestoredPixels,
+        qualityPolicy: quality.policy.kind,
+        qualityOk: quality.ok,
       });
       log(
         `long ${index + 1}/${LONG_BRUSH_CATALOG_COUNT} `
-          + `${preset.id} → ${expectedSelection.runtimeBrushId}: 6/6 visible + `
+          + `${preset.id} → ${expectedSelection.runtimeBrushId}: `
+          + `${coverage.visibleSegments}/6 route segments visible`
+          + `${quality.policy.kind === "record-only-discrete" ? " (discrete)" : ""} + `
           + `${persistedPathDistance.toFixed(1)}px persisted + Undo OK`,
       );
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });
+    writeLongBrushQualityReport({
+      reportPath: qualityReportPath,
+      runDirectory: qualityRunDirectory,
+      evidence: qualityEvidence,
+      completed: true,
+    });
+    const qualityFailureCount = qualityEvidence.filter((entry) => !entry.quality.ok).length;
+    log(
+      `long-brush quality report: ${qualityReportPath} · `
+        + `${qualityFailureCount}/${qualityEvidence.length} continuous-policy failures`,
+    );
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "long-brush browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "long-brush browser received unexpected 5xx responses");
     return {
       ok: evidence.length === LONG_BRUSH_CATALOG_COUNT && evidence.every((entry) =>
         entry.visualChanged
-        && entry.visibleSegments === entry.totalSegments
+        && (
+          entry.visibleSegments === entry.totalSegments
+          || entry.qualityPolicy === "record-only-discrete"
+        )
         && entry.persistedBrushId === entry.expectedRuntimeBrushId
         && entry.persistedPathDistance >= 300
         && entry.undoRestoredPixels
+        && entry.qualityOk
         && (
           entry.source === "core"
           || (
@@ -1603,6 +2051,19 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       presetCount: evidence.length,
       evidence,
       screenshot,
+      qualityRunDirectory: longBrushArtifactPath(SCRATCH, qualityRunDirectory),
+      qualityReport: longBrushArtifactPath(SCRATCH, qualityReportPath),
+      qualityPolicyCounts: {
+        "strict-continuous": qualityEvidence.filter((entry) =>
+          entry.quality.policy.kind === "strict-continuous"
+        ).length,
+        "soft-wet-continuous": qualityEvidence.filter((entry) =>
+          entry.quality.policy.kind === "soft-wet-continuous"
+        ).length,
+        "record-only-discrete": qualityEvidence.filter((entry) =>
+          entry.quality.policy.kind === "record-only-discrete"
+        ).length,
+      },
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
   } finally {

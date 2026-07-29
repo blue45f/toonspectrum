@@ -26,7 +26,7 @@ export type StudioBrushRuntimeEngine =
   | "particle-scatter"
   | "angled-ribbon"
   | "watercolor-dabs"
-  | "oil-dabs"
+  | "oil-ribbon"
   | "dynamic-dabs"
   | "pencil-path"
   | "pastel-dabs"
@@ -136,8 +136,8 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "watercolor", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "unique" },
   { id: "ink-wash", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
   { id: "gouache", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
-  { id: "oil", family: "oil", engine: "oil-dabs", engineVariant: "bristle", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "unique" },
-  { id: "acrylic", family: "oil", engine: "oil-dabs", engineVariant: "bristle", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "profile-variant" },
+  { id: "oil", family: "oil", engine: "oil-ribbon", engineVariant: "bristle-lanes", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "unique" },
+  { id: "acrylic", family: "oil", engine: "oil-ribbon", engineVariant: "bristle-lanes", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "profile-variant" },
   { id: "airbrush", family: "airbrush", engine: "dynamic-dabs", engineVariant: "airbrush", canonicalId: "airbrush", preview: "soft", tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "airbrush-fine", family: "stamp", engine: "stamp-dabs", engineVariant: "airbrush", canonicalId: "airbrush-fine", preview: "soft", tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "wash-brush", family: "stamp", engine: "stamp-dabs", engineVariant: "watercolor", canonicalId: "wash-brush", preview: "soft", tip: "stamp-wet-edge", texture: "wet-edge", dynamics: "stamp-pressure-flow", distinctness: "unique" },
@@ -221,8 +221,8 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   "watercolor-dabs": {
     diffuse: { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure" },
   },
-  "oil-dabs": {
-    bristle: { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+  "oil-ribbon": {
+    "bristle-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },

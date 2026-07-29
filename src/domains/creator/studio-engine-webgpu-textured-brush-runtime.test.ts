@@ -2,12 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
 import {
+  createStudioEngineWebGpuPresentationSurface,
+  type StudioEngineWebGpuPresentationFrameLease,
+  type StudioEngineWebGpuPresentationLayout,
+  type StudioEngineWebGpuPresentationSurface,
+} from "./studio-engine-webgpu-presentation-surface";
+import {
   fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   type StudioEngineWebGpuTexturedBrushPlan,
 } from "./studio-engine-webgpu-textured-brush-plan";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime,
   packStudioEngineWebGpuTexturedBrushDabs,
+  packStudioEngineWebGpuTexturedBrushViewportUniform,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS,
 } from "./studio-engine-webgpu-textured-brush-runtime";
 import { sha256HexPortable } from "./studio-sha256";
@@ -37,6 +44,8 @@ interface FakePass {
 
 interface FakeGpuHarness {
   readonly device: GPUDevice;
+  readonly context: GPUCanvasContext;
+  readonly canvas: { width: number; height: number };
   readonly lost: Deferred<GPUDeviceLostInfo>;
   readonly textures: FakeTexture[];
   readonly buffers: Array<{
@@ -52,6 +61,9 @@ interface FakeGpuHarness {
   readonly uploadedBuffers: Uint8Array[];
   readonly submitted: ReturnType<typeof vi.fn>;
   readonly onSubmittedWorkDone: ReturnType<typeof vi.fn>;
+  readonly pushErrorScope: ReturnType<typeof vi.fn>;
+  readonly popErrorScope: ReturnType<typeof vi.fn>;
+  readonly scopeErrors: Array<GPUError | null>;
   readonly destroyDevice: ReturnType<typeof vi.fn>;
 }
 
@@ -87,6 +99,9 @@ function fakeGpuHarness(
   const writeTexture = vi.fn();
   const submitted = vi.fn();
   const onSubmittedWorkDone = vi.fn(fence);
+  const scopeErrors: Array<GPUError | null> = [];
+  const pushErrorScope = vi.fn();
+  const popErrorScope = vi.fn(async () => scopeErrors.shift() ?? null);
   const destroyDevice = vi.fn();
   const device = {
     lost: lost.promise,
@@ -96,6 +111,8 @@ function fakeGpuHarness(
       submit: submitted,
       onSubmittedWorkDone,
     },
+    pushErrorScope,
+    popErrorScope,
     createTexture: vi.fn((descriptor: GPUTextureDescriptor) => {
       const destroy = vi.fn();
       textures.push({ descriptor, destroy });
@@ -146,8 +163,17 @@ function fakeGpuHarness(
     })),
     destroy: destroyDevice,
   } as unknown as GPUDevice;
+  const context = {
+    configure: vi.fn(),
+    unconfigure: vi.fn(),
+    getCurrentTexture: vi.fn(() => ({
+      createView: vi.fn(() => ({ presentationView: true })),
+    })),
+  } as unknown as GPUCanvasContext;
   return {
     device,
+    context,
+    canvas: { width: 1, height: 1 },
     lost,
     textures,
     buffers,
@@ -160,6 +186,9 @@ function fakeGpuHarness(
     uploadedBuffers,
     submitted,
     onSubmittedWorkDone,
+    pushErrorScope,
+    popErrorScope,
+    scopeErrors,
     destroyDevice,
   };
 }
@@ -274,7 +303,102 @@ function fingerprinted(
   return { ...plan, semanticFingerprint };
 }
 
+function presentationLease(
+  harness: FakeGpuHarness,
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+  overrides: Partial<StudioEngineWebGpuPresentationFrameLease> = {},
+): Readonly<{
+  lease: StudioEngineWebGpuPresentationFrameLease;
+  owner: StudioEngineWebGpuPresentationSurface;
+  texture: FakeTexture;
+  view: GPUTextureView;
+}> {
+  const sourceFrameFingerprint =
+    fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(plan);
+  if (!sourceFrameFingerprint) throw new Error("semantic fingerprint failed");
+  const activeLayout: StudioEngineWebGpuPresentationLayout = {
+    presentationEpoch: 4,
+    resizeEpoch: 2,
+    viewportEpoch: 3,
+    flipEpoch: 1,
+    cssWidth: 160,
+    cssHeight: 90,
+    dpr: 2,
+    viewport: {
+      logicalWidth: 64,
+      logicalHeight: 32,
+      scaleX: 1.5,
+      scaleY: 2,
+      offsetX: 7,
+      offsetY: 11,
+      flipX: false,
+      flipY: true,
+    },
+  };
+  const created = createStudioEngineWebGpuPresentationSurface({
+    device: harness.device,
+    context: harness.context,
+    canvas: harness.canvas,
+    canvasFormat: "bgra8unorm",
+    ownsDevice: false,
+  });
+  if (created.status !== "ready") throw new Error(created.reason);
+  const configured = created.surface.configure(activeLayout);
+  if (configured.status !== "ready") throw new Error(configured.status);
+  const begun = created.surface.beginFrame({
+    requestSequence: 1,
+    deviceEpoch: 1,
+    presentationEpoch: activeLayout.presentationEpoch,
+    resizeEpoch: activeLayout.resizeEpoch,
+    viewportEpoch: activeLayout.viewportEpoch,
+    flipEpoch: activeLayout.flipEpoch,
+    sourceFrameFingerprint,
+  });
+  if (begun.status !== "ready") throw new Error(begun.reason);
+  const authoritativeLease = begun.frame;
+  const lease = Object.keys(overrides).length > 0
+    ? { ...authoritativeLease, ...overrides }
+    : authoritativeLease;
+  const texture = harness.textures.at(-1)!;
+  return {
+    lease,
+    owner: created.surface,
+    texture,
+    view: authoritativeLease.workSurface.view,
+  };
+}
+
 describe("textured RGBA16F WebGPU specialist runtime", () => {
+  it("packs a document-to-surface affine independently from document-space grain", () => {
+    expect([
+      ...packStudioEngineWebGpuTexturedBrushViewportUniform(320, 180, {
+        m11: 3,
+        m12: 0,
+        m21: 0,
+        m22: -4,
+        dx: 14,
+        dy: 150,
+      }),
+    ]).toEqual([
+      320,
+      180,
+      Math.fround(1 / 320),
+      Math.fround(1 / 180),
+      3,
+      -4,
+      14,
+      150,
+    ]);
+    expect(() => packStudioEngineWebGpuTexturedBrushViewportUniform(320, 180, {
+      m11: 1,
+      m12: 1 as 0,
+      m21: 0,
+      m22: 1,
+      dx: 0,
+      dy: 0,
+    })).toThrow("invalid-textured-brush-viewport");
+  });
+
   it("packs premultiplied colour, grain flags, seeds and texture dimensions", () => {
     const packed = packStudioEngineWebGpuTexturedBrushDabs(texturedPlan());
 
@@ -317,6 +441,70 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(Number.isInteger(low)).toBe(true);
     expect(Number.isInteger(high)).toBe(true);
     expect(((high << 16) | low) >>> 0).toBe(0xffff_ffff);
+  });
+
+  it("rejects malformed paint channels and impossible opacity-flow alpha before GPU mutation", async () => {
+    const harness = fakeGpuHarness();
+    const target = runtime(harness);
+    const initialWriteBufferCalls = harness.writeBuffer.mock.calls.length;
+    const base = texturedPlan();
+    const baseDab = base.dabs[0]!;
+    const malformedDabs: StudioEngineWebGpuTexturedBrushPlan["dabs"][] = [
+      [{ ...baseDab, pressure: -0.01 }],
+      [{ ...baseDab, opacity: 1.01 }],
+      [{ ...baseDab, flow: -0.01 }],
+      [{ ...baseDab, grainDepth: 1.01 }],
+      [{
+        ...baseDab,
+        color: { ...baseDab.color, components: [1.01, 0.25, 1, 0.4] },
+      }],
+      [{
+        ...baseDab,
+        // opacity × flow is 0.4, so no straight source alpha in [0, 1] can produce 0.41.
+        color: { ...baseDab.color, components: [0.5, 0.25, 1, 0.41] },
+      }],
+      [{
+        ...baseDab,
+        tip: { ...baseDab.tip, hardness: 1.01 },
+      }],
+      [{
+        ...baseDab,
+        tip: { ...baseDab.tip, roundness: 0 },
+      }],
+    ];
+
+    for (const dabs of malformedDabs) {
+      await expect(target.execute({
+        requestSequence: 1,
+        deviceEpoch: 1,
+        plan: texturedPlan({ dabs }),
+      })).resolves.toEqual({ status: "rejected", reason: "invalid-frame" });
+    }
+    expect(harness.writeBuffer).toHaveBeenCalledTimes(initialWriteBufferCalls);
+    expect(harness.submitted).not.toHaveBeenCalled();
+  });
+
+  it("admits translucent source alpha when it remains within the opacity-flow ceiling", async () => {
+    const harness = fakeGpuHarness();
+    const target = runtime(harness);
+    const base = texturedPlan();
+    const result = await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: texturedPlan({
+        dabs: [{
+          ...base.dabs[0]!,
+          // 0.2 = source alpha 0.5 × opacity 0.8 × flow 0.5.
+          color: {
+            ...base.dabs[0]!.color,
+            components: [0.5, 0.25, 1, 0.2],
+          },
+        }],
+      }),
+    });
+
+    expect(result.status).toBe("completed");
+    expect(harness.submitted).toHaveBeenCalledTimes(1);
   });
 
   it("packs a wrapped durable centre UV before million-pixel f32 precision is lost", () => {
@@ -424,9 +612,14 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
       batchCount: 1,
       assetCount: 1,
       assetBytes: 4,
+      renderTarget: "private",
+      workSurfaceEpoch: null,
       queueState: "completed",
       complete: true,
     });
+    expect(result.receipt.sourceFrameFingerprint).toBe(
+      fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(texturedPlan()),
+    );
     expect(harness.pipelineDescriptors).toHaveLength(2);
     expect(harness.pipelineDescriptors.map((descriptor) => descriptor.label)).toEqual([
       "Studio textured brush source-over pipeline",
@@ -494,6 +687,278 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
       storeOp: "store",
     });
     expect(harness.submitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders directly into an exact shared presentation lease and packs its affine", async () => {
+    const harness = fakeGpuHarness();
+    const plan = texturedPlan();
+    const shared = presentationLease(harness, plan);
+    const texturesBeforeRuntime = harness.textures.length;
+    const created = createStudioEngineWebGpuTexturedBrushRuntime({
+      device: harness.device,
+      presentationOnly: true,
+    });
+    expect(created.status).toBe("ready");
+    if (created.status !== "ready") return;
+    const target = created.runtime;
+
+    expect(harness.textures).toHaveLength(texturesBeforeRuntime);
+    expect(harness.textures.some((texture) => (
+      texture.descriptor.label === "Studio textured brush rgba16float authority"
+    ))).toBe(false);
+
+    const result = await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: shared.lease,
+    });
+
+    expect(result.status).toBe("completed");
+    if (result.status !== "completed") return;
+    expect(result.receipt).toMatchObject({
+      renderTarget: "presentation",
+      sourceFrameFingerprint: shared.lease.sourceFrameFingerprint,
+      workSurfaceEpoch: shared.lease.workSurface.workSurfaceEpoch,
+    });
+    expect(
+      harness.passes[0]!.descriptor.colorAttachments[0]!.view,
+    ).toBe(shared.view);
+    const viewportWrites = harness.uploadedBuffers
+      .filter((bytes) => bytes.byteLength === 32)
+      .map((bytes) => new Float32Array(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength / Float32Array.BYTES_PER_ELEMENT,
+      ));
+    expect([...viewportWrites.at(-1)!]).toEqual([
+      320,
+      180,
+      Math.fround(1 / 320),
+      Math.fround(1 / 180),
+      3,
+      -4,
+      14,
+      150,
+    ]);
+    expect(harness.shaderDescriptors.find((descriptor) => (
+      descriptor.label === "Studio textured brush clean-room shader"
+    ))?.code).toContain(
+      "let surface = document * viewport.document_scale + viewport.document_offset",
+    );
+  });
+
+  it("requires a rebuild on a new shared surface and chains later append content", async () => {
+    const harness = fakeGpuHarness();
+    const appendOnlyPlan = texturedPlan({ mode: "append" });
+    const fresh = presentationLease(harness, appendOnlyPlan);
+    const target = runtime(harness, { presentationOnly: true });
+
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: appendOnlyPlan,
+      presentationLease: fresh.lease,
+    })).toEqual({ status: "rejected", reason: "content-uninitialized" });
+    expect(harness.submitted).not.toHaveBeenCalled();
+    expect(fresh.owner.abortFrame(fresh.lease)).toEqual({ status: "aborted" });
+
+    const rebuildPlan = texturedPlan({
+      strokeId: "content-chain-rebuild",
+      commandSequence: 2,
+    });
+    const rebuildFingerprint =
+      fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(rebuildPlan);
+    if (!rebuildFingerprint) throw new Error("rebuild fingerprint failed");
+    const rebuildFrame = fresh.owner.beginFrame({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      presentationEpoch: fresh.lease.presentationEpoch,
+      resizeEpoch: fresh.lease.resizeEpoch,
+      viewportEpoch: fresh.lease.viewportEpoch,
+      flipEpoch: fresh.lease.flipEpoch,
+      sourceFrameFingerprint: rebuildFingerprint,
+    });
+    expect(rebuildFrame.status).toBe("ready");
+    if (rebuildFrame.status !== "ready") return;
+    const rebuilt = await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: rebuildPlan,
+      presentationLease: rebuildFrame.frame,
+    });
+    expect(rebuilt.status).toBe("completed");
+    if (rebuilt.status !== "completed") return;
+    expect(rebuilt.receipt).toMatchObject({
+      mode: "rebuild",
+      baseContentFingerprint: null,
+      contentGeneration: expect.any(Number),
+      contentFingerprint: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+    });
+    expect((await fresh.owner.presentFrame(
+      rebuildFrame.frame,
+      rebuilt.receipt,
+    )).status).toBe("presented");
+
+    const appendPlan = texturedPlan({
+      mode: "append",
+      strokeId: "content-chain-append",
+      commandSequence: 3,
+    });
+    const appendFingerprint =
+      fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(appendPlan);
+    if (!appendFingerprint) throw new Error("append fingerprint failed");
+    const appendFrame = fresh.owner.beginFrame({
+      requestSequence: 3,
+      deviceEpoch: 1,
+      presentationEpoch: fresh.lease.presentationEpoch,
+      resizeEpoch: fresh.lease.resizeEpoch,
+      viewportEpoch: fresh.lease.viewportEpoch,
+      flipEpoch: fresh.lease.flipEpoch,
+      sourceFrameFingerprint: appendFingerprint,
+    });
+    expect(appendFrame.status).toBe("ready");
+    if (appendFrame.status !== "ready") return;
+    const appended = await target.execute({
+      requestSequence: 3,
+      deviceEpoch: 1,
+      plan: appendPlan,
+      presentationLease: appendFrame.frame,
+    });
+    expect(appended.status).toBe("completed");
+    if (appended.status !== "completed") return;
+    expect(appended.receipt.baseContentGeneration).toBe(
+      rebuilt.receipt.contentGeneration,
+    );
+    expect(appended.receipt.baseContentFingerprint).toBe(
+      rebuilt.receipt.contentFingerprint,
+    );
+    expect(appended.receipt.contentGeneration).toBeGreaterThan(
+      rebuilt.receipt.contentGeneration!,
+    );
+    expect(appended.receipt.contentFingerprint).not.toBe(
+      rebuilt.receipt.contentFingerprint,
+    );
+    expect((await fresh.owner.presentFrame(
+      appendFrame.frame,
+      appended.receipt,
+    )).status).toBe("presented");
+  });
+
+  it("withholds completion when an owner aborts a submitted shared write", async () => {
+    const gate = deferred<void>();
+    const harness = fakeGpuHarness(() => gate.promise);
+    const plan = texturedPlan();
+    const shared = presentationLease(harness, plan);
+    const target = runtime(harness, { presentationOnly: true });
+    const pending = target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: shared.lease,
+    });
+    await vi.waitFor(() => expect(harness.submitted).toHaveBeenCalledTimes(1));
+
+    expect(shared.owner.abortFrame(shared.lease)).toEqual({ status: "aborted" });
+    expect(shared.owner.stats()).toMatchObject({
+      producerWriteInFlight: true,
+      contentInitialized: false,
+    });
+    gate.resolve();
+    expect(await pending).toEqual({
+      status: "rejected",
+      reason: "presentation-lease-invalid",
+    });
+    expect(shared.owner.stats()).toMatchObject({
+      producerWriteInFlight: false,
+      contentInitialized: false,
+      contentFingerprint: null,
+    });
+  });
+
+  it("fails closed for missing, stale or mismatched presentation authority", async () => {
+    const harness = fakeGpuHarness();
+    const plan = texturedPlan();
+    const target = runtime(harness, { presentationOnly: true });
+
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+    })).toEqual({
+      status: "rejected",
+      reason: "presentation-lease-required",
+    });
+
+    const stale = presentationLease(harness, plan, { requestSequence: 2 });
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: stale.lease,
+    })).toEqual({
+      status: "rejected",
+      reason: "presentation-lease-invalid",
+    });
+
+    const wrongDevice = presentationLease(harness, plan, { deviceEpoch: 2 });
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: wrongDevice.lease,
+    })).toEqual({
+      status: "rejected",
+      reason: "presentation-lease-invalid",
+    });
+
+    const wrongFingerprint = presentationLease(harness, plan, {
+      sourceFrameFingerprint:
+        "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    });
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: wrongFingerprint.lease,
+    })).toEqual({
+      status: "rejected",
+      reason: "presentation-lease-invalid",
+    });
+
+    const valid = presentationLease(harness, plan);
+    expect((await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: valid.lease,
+    })).status).toBe("completed");
+    expect(harness.submitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("never destroys a presentation-owned work surface", async () => {
+    const harness = fakeGpuHarness();
+    const plan = texturedPlan();
+    const shared = presentationLease(harness, plan);
+    const target = runtime(harness, { presentationOnly: true });
+    expect((await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan,
+      presentationLease: shared.lease,
+    })).status).toBe("completed");
+
+    target.dispose();
+    target.dispose();
+
+    expect(shared.texture.destroy).not.toHaveBeenCalled();
+    const runtimeTextures = harness.textures.filter(
+      (texture) => texture !== shared.texture,
+    );
+    expect(runtimeTextures.length).toBeGreaterThan(0);
+    expect(runtimeTextures.every((texture) => (
+      texture.destroy.mock.calls.length === 1
+    ))).toBe(true);
   });
 
   it("reuses resident textures and stable bind groups across request sequences", async () => {
@@ -646,9 +1111,52 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     // Durable bind groups are intentionally request-scoped to the texture lease.
     expect(harness.bindGroupDescriptors).toHaveLength(bindGroups + 1);
 
+    heldFence = deferred<void>();
+    const controller = new AbortController();
+    const submissionsBeforeCancellation = harness.submitted.mock.calls.length;
+    const cancelledPromise = target.execute({
+      requestSequence: 3,
+      deviceEpoch: 1,
+      plan: fingerprinted({
+        ...nativePlan,
+        semanticFingerprint: undefined,
+        mode: "append",
+      }),
+    }, controller.signal);
+    await vi.waitFor(() => {
+      expect(nativeCache.stats().activeLeases).toBe(1);
+      expect(harness.submitted).toHaveBeenCalledTimes(
+        submissionsBeforeCancellation + 1,
+      );
+    });
+    controller.abort("cancel-after-submit");
+    heldFence.resolve(undefined);
+    // Submission is an irreversible mutation boundary. A later AbortSignal cannot relabel
+    // certified pixels as cancelled; the caller may discard the completed receipt instead.
+    expect((await cancelledPromise).status).toBe("completed");
+    expect(nativeCache.stats().activeLeases).toBe(0);
+    heldFence = null;
+
+    expect(await target.execute({
+      requestSequence: 4,
+      deviceEpoch: 1,
+      plan: {
+        ...nativePlan,
+        semanticFingerprint:
+          "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      },
+    })).toEqual({ status: "rejected", reason: "invalid-frame" });
+    expect(await target.execute({
+      requestSequence: 4,
+      deviceEpoch: 1,
+      plan: {
+        ...nativePlan,
+        durableR8GrainSource: undefined,
+      },
+    })).toEqual({ status: "rejected", reason: "invalid-frame" });
     failFence = true;
     const failed = await target.execute({
-      requestSequence: 3,
+      requestSequence: 4,
       deviceEpoch: 1,
       plan: fingerprinted({
         ...nativePlan,
@@ -659,44 +1167,6 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(failed).toEqual({ status: "failed", reason: "gpu-error" });
     expect(nativeCache.stats().activeLeases).toBe(0);
     failFence = false;
-
-    heldFence = deferred<void>();
-    const controller = new AbortController();
-    const cancelledPromise = target.execute({
-      requestSequence: 4,
-      deviceEpoch: 1,
-      plan: fingerprinted({
-        ...nativePlan,
-        semanticFingerprint: undefined,
-        mode: "append",
-      }),
-    }, controller.signal);
-    await vi.waitFor(() => {
-      expect(nativeCache.stats().activeLeases).toBe(1);
-    });
-    controller.abort("cancel-after-submit");
-    heldFence.resolve(undefined);
-    expect(await cancelledPromise).toEqual({ status: "cancelled" });
-    expect(nativeCache.stats().activeLeases).toBe(0);
-    heldFence = null;
-
-    expect(await target.execute({
-      requestSequence: 5,
-      deviceEpoch: 1,
-      plan: {
-        ...nativePlan,
-        semanticFingerprint:
-          "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      },
-    })).toEqual({ status: "rejected", reason: "invalid-frame" });
-    expect(await target.execute({
-      requestSequence: 5,
-      deviceEpoch: 1,
-      plan: {
-        ...nativePlan,
-        durableR8GrainSource: undefined,
-      },
-    })).toEqual({ status: "rejected", reason: "invalid-frame" });
     const nativeTexture = harness.textures.find(
       (texture) => texture.descriptor.format === "r8unorm",
     );
@@ -798,10 +1268,15 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect((await target.execute({
       requestSequence: 1,
       deviceEpoch: 1,
+      plan: base,
+    })).status).toBe("completed");
+    expect((await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
       plan: destinationOut,
     })).status).toBe("completed");
 
-    const pipeline = harness.passes[0]!.setPipeline.mock.calls[0]![0] as {
+    const pipeline = harness.passes[1]!.setPipeline.mock.calls[0]![0] as {
       descriptor: GPURenderPipelineDescriptor;
     };
     expect(pipeline.descriptor.label).toBe(
@@ -831,6 +1306,33 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
       deviceEpoch: 1,
       plan: texturedPlan({ mode: "append" }),
     })).status).toBe("completed");
+  });
+
+  it("serializes device-global GPU error scopes while allowing a bounded execution queue", async () => {
+    const gate = deferred<void>();
+    const harness = fakeGpuHarness(() => gate.promise);
+    const target = runtime(harness, { maximumInFlightSubmissions: 2 });
+    const first = target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: texturedPlan(),
+    });
+    await vi.waitFor(() => expect(harness.pushErrorScope).toHaveBeenCalledTimes(3));
+    const second = target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: texturedPlan({ mode: "append" }),
+    });
+    await Promise.resolve();
+    expect(target.inFlight).toBe(2);
+    expect(harness.pushErrorScope).toHaveBeenCalledTimes(3);
+
+    gate.resolve();
+    expect((await first).status).toBe("completed");
+    expect((await second).status).toBe("completed");
+    expect(harness.pushErrorScope).toHaveBeenCalledTimes(6);
+    expect(harness.popErrorScope).toHaveBeenCalledTimes(6);
+    expect(harness.submitted).toHaveBeenCalledTimes(2);
   });
 
   it("rejects cancellation, stale request/device epochs and resident asset overflow", async () => {
@@ -866,6 +1368,34 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
       deviceEpoch: 1,
       plan: texturedPlan(),
     })).toEqual({ status: "rejected", reason: "resident-asset-budget" });
+  });
+
+  it("requires a clean queue fence and nested GPU error scopes before certifying pixels", async () => {
+    const harness = fakeGpuHarness();
+    harness.scopeErrors.push(
+      { message: "validation failed" } as GPUError,
+      null,
+      null,
+    );
+    const target = runtime(harness);
+
+    expect(await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: texturedPlan(),
+    })).toEqual({ status: "failed", reason: "gpu-error" });
+    expect(harness.pushErrorScope.mock.calls.map(([filter]) => filter)).toEqual([
+      "internal",
+      "out-of-memory",
+      "validation",
+    ]);
+    expect(harness.popErrorScope).toHaveBeenCalledTimes(3);
+    expect(await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: texturedPlan({ mode: "append" }),
+    })).toEqual({ status: "failed", reason: "gpu-error" });
+    expect(harness.submitted).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed on device loss and disposes every owned resource exactly once", async () => {

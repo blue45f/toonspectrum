@@ -239,7 +239,7 @@ describe("shipped brush runtime output quality", () => {
         settings: studioBrushDynamicsPresetSettings("airbrush"),
         width: 32,
         opacity: 0.7,
-        minimumMean: 0.095,
+        minimumMean: 0.1,
         maximumPeak: 0.36,
       },
       {
@@ -345,11 +345,44 @@ describe("shipped brush runtime output quality", () => {
     };
 
     expect(settings.spacing.mappings).toEqual([
-      expect.objectContaining({ source: "speed", from: 0.92, to: 1.1 }),
+      expect.objectContaining({ source: "speed", from: 0.95, to: 1.12 }),
     ]);
     expect(fast.length).toBeLessThan(slow.length);
     expect(maximumBodyGapRatio(slow)).toBeLessThanOrEqual(0.35);
     expect(maximumBodyGapRatio(fast)).toBeLessThanOrEqual(0.35);
+  });
+
+  it("keeps pressure expressive across every continuous textured core medium", () => {
+    for (const brushId of [
+      "airbrush",
+      "dry-media",
+      "crayon",
+      "chalk",
+      "charcoal",
+    ] as const) {
+      const settings = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!settings) throw new Error(`${brushId}: missing dynamics`);
+      const planAtPressure = (pressure: number) => (
+        planNormalizedStudioDynamicBrushDabs({
+          baseOpacity: 1,
+          baseWidth: settings.width.base,
+          maxDabs: 1,
+          points: [0, 0],
+          pressures: [pressure],
+          seed: settings.seed,
+          speeds: [0.4],
+        }, settings)[0]!
+      );
+      const light = planAtPressure(0.15);
+      const firm = planAtPressure(0.9);
+
+      expect(firm.size, `${brushId}: pressure does not change diameter`)
+        .toBeGreaterThan(light.size);
+      expect(
+        firm.opacity * firm.flow,
+        `${brushId}: pressure does not load more pigment`,
+      ).toBeGreaterThan(light.opacity * light.flow);
+    }
   });
 
   it("ships dry-media grain in stroke-fixed space so transformed marks keep their tooth", () => {

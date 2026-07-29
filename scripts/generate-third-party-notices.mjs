@@ -16,6 +16,14 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseYaml } from "yaml";
 
+import {
+  HOKUSAI_PACKAGE_DIRECTORY,
+  validateHokusaiReleaseContract,
+} from "./studio-hokusai-wasm-release-contract.mjs";
+import {
+  verifyCheckedInHokusaiArtifacts,
+} from "./verify-studio-hokusai-wasm.mjs";
+
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIRECTORY, "..");
 const PACKAGE_JSON_PATH = join(REPOSITORY_ROOT, "package.json");
@@ -36,6 +44,7 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "LGPL-2.1",
   "LGPL-3.0-or-later",
   "MIT",
+  "MIT OR Apache-2.0",
   "MPL-2.0",
   "Public Domain",
   "SGI-B-2.0",
@@ -60,6 +69,7 @@ const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
   "onnxruntime-web": "1.27.0",
   "p5.brush": "2.2.1",
   paper: "0.12.18",
+  "perfect-freehand": "1.2.3",
   rbush: "4.0.1",
   "three-mesh-bvh": "0.9.13",
   xatlasjs: "0.2.0",
@@ -86,6 +96,54 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`;
+
+const HOKUSAI_MIT_NOTICE = `MIT License
+
+Copyright (c) 2026 Re:Earth and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+const WASM_BINDGEN_MIT_NOTICE = `Copyright (c) 2014 Alex Crichton
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.`;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -539,6 +597,40 @@ function collectLicenseDocuments(inventory) {
     "https://github.com/microsoft/onnxruntime/blob/v1.27.0/LICENSE",
     ONNX_RUNTIME_MIT_NOTICE,
   );
+  addDocument(
+    "Hokusai brush/core/tile-mem 0.3.0 — MIT option",
+    "https://github.com/reearth/hokusai/blob/f7e998173c0e7427b95afe0b6947e3103da60f00/LICENSE-MIT",
+    HOKUSAI_MIT_NOTICE,
+  );
+  addDocument(
+    "wasm-bindgen 0.2.123 family — MIT option",
+    "https://github.com/wasm-bindgen/wasm-bindgen/blob/0.2.123/LICENSE-MIT",
+    WASM_BINDGEN_MIT_NOTICE,
+  );
+  addDocument(
+    "Hokusai brush/core/tile-mem 0.3.0 — Apache-2.0 option",
+    "https://github.com/reearth/hokusai/blob/f7e998173c0e7427b95afe0b6947e3103da60f00/LICENSE-APACHE",
+    readFileSync(
+      join(HOKUSAI_PACKAGE_DIRECTORY, "LICENSE-APACHE"),
+      "utf8",
+    ),
+  );
+  addDocument(
+    "wasm-bindgen 0.2.123 family — Apache-2.0 option",
+    "https://github.com/wasm-bindgen/wasm-bindgen/blob/0.2.123/LICENSE-APACHE",
+    readFileSync(
+      join(HOKUSAI_PACKAGE_DIRECTORY, "LICENSE-APACHE"),
+      "utf8",
+    ),
+  );
+  addDocument(
+    "unicode-ident 1.0.24 data tables — Unicode-3.0",
+    "https://github.com/dtolnay/unicode-ident/blob/1.0.24/LICENSE-UNICODE",
+    readFileSync(
+      join(HOKUSAI_PACKAGE_DIRECTORY, "LICENSE-UNICODE"),
+      "utf8",
+    ),
+  );
 
   const mplFallback = collectMplFallback();
   if (!mplFallback) {
@@ -589,9 +681,16 @@ function validateRepositoryPolicy() {
     "https://github.com/yisibl/resvg-js/tree/v2.6.2",
     "https://github.com/microsoft/onnxruntime/tree/v1.27.0",
     "https://github.com/dulnan/lazy-brush",
+    "https://github.com/steveruizok/perfect-freehand",
     "https://github.com/acamposuribe/p5.brush",
     "https://github.com/processing/p5.js",
     "https://github.com/brendankenny/libtess.js",
+    "https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00",
+    "https://github.com/wasm-bindgen/wasm-bindgen/tree/0.2.123",
+    "`hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem`",
+    "`wasm-bindgen` family",
+    "`unicode-ident` data tables",
+    "pnpm run verify:studio-hokusai-wasm",
     "does not statically import the resolved `p5` peer",
     "Comlink runtime embedded by `xatlasjs`",
     "pnpm run audit:licenses",
@@ -642,7 +741,13 @@ function validateBrowserDistribution() {
   }
 }
 
-function renderNotice(packageJson, inventory, documents, missing) {
+function renderNotice(
+  packageJson,
+  inventory,
+  rustInventory,
+  documents,
+  missing,
+) {
   const lockfileHash = sha256(readFileSync(LOCKFILE_PATH));
   const rows = inventory
     .map(
@@ -655,6 +760,13 @@ function renderNotice(packageJson, inventory, documents, missing) {
     .map(
       (entry) =>
         `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.versions.join(", "))} | ${escapeTableCell(entry.license)} | ${entry.homepage ? `<${escapeTableCell(entry.homepage)}>` : "not supplied"} |`,
+    )
+    .join("\n");
+
+  const rustRows = rustInventory
+    .map(
+      (entry) =>
+        `| \`${escapeTableCell(entry.name)}\` | ${escapeTableCell(entry.version)} | ${escapeTableCell(entry.license)} | \`${escapeTableCell(entry.checksum)}\` | <${escapeTableCell(entry.homepage)}> |`,
     )
     .join("\n");
 
@@ -683,18 +795,35 @@ explicitly; reviewed canonical/source notices are included below.
 - Application: \`${packageJson.name}@${packageJson.version}\`
 - Lockfile SHA-256: \`${lockfileHash}\`
 - Production inventory entries: ${inventory.length}
+- Pinned Hokusai Rust/WASM dependency entries: ${rustInventory.length}
 - Distinct collected license texts: ${documents.length}
 - Packages without a root license file: ${missing.length}
 - Exact MPL-2.0 source for unmodified resvg 2.6.2:
   <https://github.com/yisibl/resvg-js/tree/v2.6.2>
 - Exact ONNX Runtime 1.27.0 source:
   <https://github.com/microsoft/onnxruntime/tree/v1.27.0>
+- Exact Hokusai 0.3.0 source commit:
+  <https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00>
+- Exact wasm-bindgen 0.2.123 source:
+  <https://github.com/wasm-bindgen/wasm-bindgen/tree/0.2.123>
 
 ## Resolved production inventory
 
 | Package | Version(s) | SPDX/license expression | Metadata author | Homepage |
 | --- | --- | --- | --- | --- |
 ${rows}
+
+## Pinned Hokusai Rust/WASM inventory
+
+This inventory is validated against
+\`packages/studio-hokusai-wasm/Cargo.toml\` and its checked-in Cargo v4 lockfile.
+The Hokusai provider crates resolve exactly to 0.3.0 and the complete
+\`wasm-bindgen\` family resolves exactly to 0.2.123. A new or changed Cargo
+package fails the release audit until its license is reviewed.
+
+| Crate | Version | SPDX/license expression | crates.io checksum | Upstream source |
+| --- | --- | --- | --- | --- |
+${rustRows}
 
 ## Packages whose npm archive has no root license file
 
@@ -740,12 +869,15 @@ export function main(argumentsList = process.argv.slice(2)) {
   const inventory = readResolvedLicenseInventory({
     source: inventorySource,
   });
+  const rustInventory = validateHokusaiReleaseContract();
+  verifyCheckedInHokusaiArtifacts();
   validateDirectDependencies(packageJson, inventory);
   validateRepositoryPolicy();
   const { documents, missing } = collectLicenseDocuments(inventory);
   const generatedNotice = renderNotice(
     packageJson,
     inventory,
+    rustInventory,
     documents,
     missing,
   );

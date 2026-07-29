@@ -19,6 +19,12 @@ import {
  */
 export const STUDIO_ENGINE_WORKER_PROTOCOL_REVISION = 2 as const;
 
+/**
+ * Transferable replay/test batches keep their original float64-v1 twelve-field wire shape.
+ * The live SharedArrayBuffer ring has independent layout versioning and may append sensor fields.
+ */
+export const STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S = 12 as const;
+
 export const STUDIO_ENGINE_WORKER_BUDGETS = Object.freeze({
   maxInFlightCommands: 1_024,
   maxPointerBatchSamples: 4_096,
@@ -143,8 +149,9 @@ export interface StudioEngineConfigurePointerRingCommand {
 export interface StudioEnginePointerBatch {
   readonly encoding: "float64-v1";
   /**
-   * Twelve Float64 fields in the same order as the SPSC ring. The host adapter
-   * may transfer `samples.buffer`; the protocol never exposes DOM Transferable.
+   * Twelve Float64 fields in the original SPSC V1 prefix order. The live V2 ring appends sensor
+   * channels independently. The host adapter may transfer `samples.buffer`; the protocol never
+   * exposes DOM Transferable.
    */
   readonly samples: Float64Array<ArrayBuffer>;
   readonly sampleCount: number;
@@ -713,7 +720,7 @@ function validatePointerBatch(
       > STUDIO_ENGINE_WORKER_BUDGETS.maxPointerBatchSamples
     || value.samples.length
       !== (value.sampleCount as number)
-        * STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S
+        * STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S
     || !isSafeUnsignedInteger(value.firstSampleSequence)
     || !isSafeUnsignedInteger(value.lastSampleSequence)
     || value.lastSampleSequence
@@ -735,7 +742,7 @@ function validatePointerBatch(
   const sampleCount = value.sampleCount as number;
   const firstSequence = value.firstSampleSequence as number;
   for (let index = 0; index < sampleCount; index += 1) {
-    const offset = index * STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S;
+    const offset = index * STUDIO_ENGINE_POINTER_BATCH_V1_FLOAT64S;
     const x = samples[offset];
     const y = samples[offset + 1];
     const pressure = samples[offset + 2];

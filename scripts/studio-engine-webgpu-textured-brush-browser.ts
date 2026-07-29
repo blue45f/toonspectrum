@@ -177,6 +177,14 @@ interface AppendRebuildEvidence {
   readonly diffPng: string;
 }
 
+interface UninitializedAppendEvidence {
+  readonly status: string;
+  readonly reason: string | null;
+  readonly assetTextureCreations: number;
+  readonly nativeR8TextureCreations: number;
+  readonly nonZeroHalfWords: number;
+}
+
 interface AnchorEvidence {
   readonly proceduralDocumentVsStrokeHalfWordMismatches: number;
   readonly assetDocumentVsStrokeHalfWordMismatches: number;
@@ -223,6 +231,7 @@ type BrowserTexturedBrushResult =
       readonly cases: readonly BrowserCaseEvidence[];
       readonly anchors: AnchorEvidence;
       readonly durableR8Identity: DurableR8IdentityEvidence;
+      readonly uninitializedAppend: UninitializedAppendEvidence;
       readonly appendRebuild: AppendRebuildEvidence;
       readonly cacheBudgetEpochs: CacheBudgetEpochEvidence;
       readonly flowControl: FlowControlEvidence;
@@ -1038,7 +1047,31 @@ async function executeCompleted(
     plan,
   });
   if (result.status !== "completed") {
-    throw new Error(`request ${requestSequence} did not complete: ${result.status}`);
+    const firstDab = plan.dabs[0];
+    const diagnostics = firstDab
+      ? {
+          status: result.status,
+          reason: "reason" in result ? result.reason : null,
+          planFingerprint: plan.semanticFingerprint ?? null,
+          dab: {
+            pressure: firstDab.pressure,
+            opacity: firstDab.opacity,
+            flow: firstDab.flow,
+            grainDepth: firstDab.grainDepth,
+            color: firstDab.color.components,
+            hardness: firstDab.tip.hardness,
+            roundness: firstDab.tip.roundness,
+          },
+        }
+      : {
+          status: result.status,
+          reason: "reason" in result ? result.reason : null,
+          planFingerprint: plan.semanticFingerprint ?? null,
+          dab: null,
+        };
+    throw new Error(
+      `request ${requestSequence} did not complete: ${JSON.stringify(diagnostics)}`,
+    );
   }
   return result.receipt;
 }
@@ -1192,6 +1225,33 @@ async function appendRebuildEvidence(
   };
   appendTarget.runtime.dispose();
   rebuildTarget.runtime.dispose();
+  return evidence;
+}
+
+async function uninitializedAppendEvidence(
+  rawDevice: GPUDevice,
+  shaderModules: GPUShaderModule[],
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+): Promise<UninitializedAppendEvidence> {
+  const observed = observeDevice(rawDevice, shaderModules);
+  const target = createRuntime(observed);
+  const result = await target.runtime.execute({
+    requestSequence: 1,
+    deviceEpoch: INITIAL_DEVICE_EPOCH,
+    plan: withSemanticFingerprint({ ...plan, mode: "append" }),
+  });
+  const words = await readRgba16Float(rawDevice, target.texture);
+  const evidence = {
+    status: result.status,
+    reason: result.status === "rejected" ? result.reason : null,
+    assetTextureCreations: observed.assetTextureLabels.length,
+    nativeR8TextureCreations: observed.nativeR8TextureLabels.length,
+    nonZeroHalfWords: words.reduce(
+      (count, value) => count + (value === 0 ? 0 : 1),
+      0,
+    ),
+  };
+  target.runtime.dispose();
   return evidence;
 }
 
@@ -1553,12 +1613,6 @@ async function run(): Promise<BrowserTexturedBrushResult> {
 
   const caseRuns = [
     await runCase(rawDevice, shaderModules, "zero-border-source-over", [noGrain]),
-    await runCase(
-      rawDevice,
-      shaderModules,
-      "first-append-zero-init",
-      [withSemanticFingerprint({ ...noGrain, mode: "append" })],
-    ),
     await runCase(rawDevice, shaderModules, "procedural-document", [proceduralDocument]),
     await runCase(rawDevice, shaderModules, "procedural-stroke", [proceduralStroke]),
     await runCase(rawDevice, shaderModules, "asset-document", [assetDocument]),
@@ -1591,23 +1645,28 @@ async function run(): Promise<BrowserTexturedBrushResult> {
   ];
   const anchors = {
     proceduralDocumentVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[1]!.gpuWords,
       caseRuns[2]!.gpuWords,
-      caseRuns[3]!.gpuWords,
     ),
     assetDocumentVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[3]!.gpuWords,
       caseRuns[4]!.gpuWords,
-      caseRuns[5]!.gpuWords,
     ),
     durableAlphaCanvasVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[5]!.gpuWords,
       caseRuns[6]!.gpuWords,
-      caseRuns[7]!.gpuWords,
     ),
     durableLuminanceCanvasVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[7]!.gpuWords,
       caseRuns[8]!.gpuWords,
-      caseRuns[9]!.gpuWords,
     ),
   };
   resetStudioBrushR8GrainRegistry();
+  const uninitializedAppend = await uninitializedAppendEvidence(
+    rawDevice,
+    shaderModules,
+    noGrain,
+  );
   const appendRebuild = await appendRebuildEvidence(
     rawDevice,
     shaderModules,
@@ -1693,6 +1752,7 @@ async function run(): Promise<BrowserTexturedBrushResult> {
     cases: caseRuns.map((caseRun) => caseRun.evidence),
     anchors,
     durableR8Identity,
+    uninitializedAppend,
     appendRebuild,
     cacheBudgetEpochs,
     flowControl,

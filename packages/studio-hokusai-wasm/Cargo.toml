@@ -1,0 +1,38 @@
+[package]
+name = "studio-hokusai-wasm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+description = "Transparent deterministic Hokusai natural-media renderer for ToonSpectrum Studio"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hokusai-brush = "=0.3.0"
+hokusai-core = "=0.3.0"
+hokusai-tile-mem = "=0.3.0"
+wasm-bindgen = "=0.2.123"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+# wasm-pack 0.15.0 currently bundles a Binaryen build that rejects the
+# bulk-memory/nontrapping instructions emitted by Rust 1.97. LLVM release
+# optimization and LTO above remain enabled; only that incompatible optional
+# post-pass is skipped.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"

@@ -11,6 +11,7 @@ export const STUDIO_CANONICAL_STROKE_V2_VERSION = 2 as const;
 export const STUDIO_CANONICAL_STROKE_V2_BUDGETS = Object.freeze({
   maxIdentifierCharacters: 128,
   maxCoordinateAbsolute: 1_000_000,
+  maxContactDimension: 65_536,
   maxRawSamples: 65_536,
   maxAuthoritativeSamples: 65_536,
   maxPredictedSamples: 1_024,
@@ -48,7 +49,16 @@ export interface StudioCanonicalStrokeSampleCandidateV2 {
   readonly tangentialPressure: number;
   readonly tiltX: number;
   readonly tiltY: number;
+  /** Optional at the old-producer boundary; normalized samples always contain these channels. */
+  readonly altitudeAngle?: number;
+  readonly azimuthAngle?: number;
   readonly twist: number;
+  readonly contactWidth?: number;
+  readonly contactHeight?: number;
+  /**
+   * Per-gesture PointerEvent identity. It is not a persistent hardware/device identifier.
+   * Persistent device identifiers are intentionally absent from the canonical schema.
+   */
   readonly pointerId: number;
   readonly pointerType: StudioCanonicalStrokePointerTypeV2;
   /** PointerEvent.button, including -1 for events with no changed button. */
@@ -61,6 +71,10 @@ export interface StudioCanonicalStrokeSampleCandidateV2 {
 
 export interface StudioCanonicalStrokeSampleV2
   extends StudioCanonicalStrokeSampleCandidateV2 {
+  readonly altitudeAngle: number;
+  readonly azimuthAngle: number;
+  readonly contactWidth: number;
+  readonly contactHeight: number;
   /** Monotonic time relative to the pointer-down clock origin. */
   readonly timeMilliseconds: number;
 }
@@ -137,14 +151,67 @@ function uint32(value: unknown): value is number {
   return unsignedSafeInteger(value) && (value as number) <= 0xffff_ffff;
 }
 
+function optionalFiniteInRange(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number | null {
+  if (value === undefined || value === null) return fallback;
+  return finiteInRange(value, minimum, maximum) ? canonicalNumber(value) : null;
+}
+
+function optionalFullTurn(
+  value: unknown,
+  fallback: number,
+  fullTurn: number,
+): number | null {
+  const bounded = optionalFiniteInRange(value, fallback, 0, fullTurn);
+  if (bounded === null) return null;
+  return bounded === fullTurn ? 0 : bounded;
+}
+
 function isArrayValue(value: unknown): boolean {
   return Array.isArray(value);
 }
 
-function sampleCandidateIsValid(
+interface NormalizedStudioCanonicalStrokeSampleCandidateV2
+  extends StudioCanonicalStrokeSampleCandidateV2 {
+  readonly altitudeAngle: number;
+  readonly azimuthAngle: number;
+  readonly contactWidth: number;
+  readonly contactHeight: number;
+}
+
+function normalizeSampleCandidate(
   sample: StudioCanonicalStrokeSampleCandidateV2,
-): boolean {
-  return (
+): NormalizedStudioCanonicalStrokeSampleCandidateV2 | null {
+  const altitudeAngle = optionalFiniteInRange(
+    sample.altitudeAngle,
+    Math.PI / 2,
+    0,
+    Math.PI / 2,
+  );
+  const azimuthAngle = optionalFullTurn(sample.azimuthAngle, 0, Math.PI * 2);
+  const contactWidth = optionalFiniteInRange(
+    sample.contactWidth,
+    1,
+    0,
+    STUDIO_CANONICAL_STROKE_V2_BUDGETS.maxContactDimension,
+  );
+  const contactHeight = optionalFiniteInRange(
+    sample.contactHeight,
+    1,
+    0,
+    STUDIO_CANONICAL_STROKE_V2_BUDGETS.maxContactDimension,
+  );
+  if (
+    altitudeAngle === null
+    || azimuthAngle === null
+    || contactWidth === null
+    || contactHeight === null
+  ) return null;
+  if (!(
     (sample.role === "raw"
       || sample.role === "authoritative"
       || sample.role === "predicted")
@@ -172,12 +239,19 @@ function sampleCandidateIsValid(
     && sample.button <= 31
     && uint32(sample.buttons)
     && uint32(sample.flags)
-  );
+  )) return null;
+  return {
+    ...sample,
+    altitudeAngle,
+    azimuthAngle,
+    contactWidth,
+    contactHeight,
+  };
 }
 
 function sameCandidate(
   left: StudioCanonicalStrokeSampleV2,
-  right: StudioCanonicalStrokeSampleCandidateV2,
+  right: NormalizedStudioCanonicalStrokeSampleCandidateV2,
 ): boolean {
   return left.role === right.role
     && left.sequence === right.sequence
@@ -188,7 +262,11 @@ function sameCandidate(
     && left.tangentialPressure === right.tangentialPressure
     && left.tiltX === right.tiltX
     && left.tiltY === right.tiltY
+    && left.altitudeAngle === right.altitudeAngle
+    && left.azimuthAngle === right.azimuthAngle
     && left.twist === right.twist
+    && left.contactWidth === right.contactWidth
+    && left.contactHeight === right.contactHeight
     && left.pointerId === right.pointerId
     && left.pointerType === right.pointerType
     && left.button === right.button
@@ -257,40 +335,52 @@ export function normalizeStudioCanonicalStrokeV2(
 
     for (let sampleIndex = 0; sampleIndex < input.samples.length; sampleIndex += 1) {
       const candidate = input.samples[sampleIndex];
-      if (!candidate || !sampleCandidateIsValid(candidate)) {
+      if (!candidate) {
         return failed("invalid-sample", sampleIndex);
       }
-      if (pointerId === null) pointerId = candidate.pointerId;
-      else if (pointerId !== candidate.pointerId) {
+      const normalizedCandidate = normalizeSampleCandidate(candidate);
+      if (!normalizedCandidate) {
+        return failed("invalid-sample", sampleIndex);
+      }
+      if (pointerId === null) pointerId = normalizedCandidate.pointerId;
+      else if (pointerId !== normalizedCandidate.pointerId) {
         return failed("pointer-mismatch", sampleIndex);
       }
 
-      const state = states[candidate.role];
-      const duplicate = state.bySequence.get(candidate.sequence);
+      const state = states[normalizedCandidate.role];
+      const duplicate = state.bySequence.get(normalizedCandidate.sequence);
       if (duplicate) {
-        if (!sameCandidate(duplicate, candidate)) {
+        if (!sameCandidate(duplicate, normalizedCandidate)) {
           return failed("conflicting-duplicate", sampleIndex);
         }
         continue;
       }
-      if (candidate.sequence < state.lastSequence) {
+      if (normalizedCandidate.sequence < state.lastSequence) {
         return failed("sample-order", sampleIndex);
       }
 
       const relativeTime = Math.max(
         0,
-        candidate.sourceTimeMilliseconds - input.timeOriginMilliseconds,
+        normalizedCandidate.sourceTimeMilliseconds - input.timeOriginMilliseconds,
       );
       const sample: StudioCanonicalStrokeSampleV2 = {
-        ...candidate,
-        sourceTimeMilliseconds: canonicalNumber(candidate.sourceTimeMilliseconds),
-        x: canonicalNumber(candidate.x),
-        y: canonicalNumber(candidate.y),
-        pressure: canonicalNumber(candidate.pressure),
-        tangentialPressure: canonicalNumber(candidate.tangentialPressure),
-        tiltX: canonicalNumber(candidate.tiltX),
-        tiltY: canonicalNumber(candidate.tiltY),
-        twist: canonicalNumber(candidate.twist),
+        ...normalizedCandidate,
+        sourceTimeMilliseconds: canonicalNumber(
+          normalizedCandidate.sourceTimeMilliseconds,
+        ),
+        x: canonicalNumber(normalizedCandidate.x),
+        y: canonicalNumber(normalizedCandidate.y),
+        pressure: canonicalNumber(normalizedCandidate.pressure),
+        tangentialPressure: canonicalNumber(
+          normalizedCandidate.tangentialPressure,
+        ),
+        tiltX: canonicalNumber(normalizedCandidate.tiltX),
+        tiltY: canonicalNumber(normalizedCandidate.tiltY),
+        altitudeAngle: canonicalNumber(normalizedCandidate.altitudeAngle),
+        azimuthAngle: canonicalNumber(normalizedCandidate.azimuthAngle),
+        twist: canonicalNumber(normalizedCandidate.twist),
+        contactWidth: canonicalNumber(normalizedCandidate.contactWidth),
+        contactHeight: canonicalNumber(normalizedCandidate.contactHeight),
         timeMilliseconds: canonicalNumber(Math.max(state.lastTimeMilliseconds, relativeTime)),
       };
       state.samples.push(sample);
@@ -354,7 +444,11 @@ function candidateFromCanonical(
     tangentialPressure: sample.tangentialPressure,
     tiltX: sample.tiltX,
     tiltY: sample.tiltY,
+    altitudeAngle: sample.altitudeAngle,
+    azimuthAngle: sample.azimuthAngle,
     twist: sample.twist,
+    contactWidth: sample.contactWidth,
+    contactHeight: sample.contactHeight,
     pointerId: sample.pointerId,
     pointerType: sample.pointerType,
     button: sample.button,

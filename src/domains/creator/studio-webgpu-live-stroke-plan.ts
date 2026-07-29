@@ -14,6 +14,8 @@ import {
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 
+import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
+
 /** Bounded imported symmetry fan; malformed presets cannot exhaust the live GPU dab budget. */
 export const STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS =
   STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS;
@@ -24,6 +26,12 @@ export interface StudioGpuLiveStrokePlanInput extends StudioGpuLiveStrokeInput {
   readonly correctedPoints?: readonly number[];
   readonly correctedPressures?: readonly number[];
   readonly destination?: "transparent-overlay" | "retained-layer";
+  /**
+   * Stroke-local paint models require a coverage surface before element opacity is composited.
+   * The current round-dab GPU pipeline applies opacity per dab, so it must fail closed until it
+   * can reproduce that persisted compositing contract exactly.
+   */
+  readonly paintModel?: StudioStrokePaintModel;
 }
 
 export interface StudioGpuLiveStrokePreparation {
@@ -97,7 +105,11 @@ function transformPoints(
 
 /** Builds the exact ordered live operation group after the WebGPU capability boundary is warm. */
 export const planStudioGpuLiveStroke: StudioGpuLiveStrokePlanner = (input) => {
-  if (!validStyle(input) || (input.correctedPressures !== undefined && input.correctedPoints === undefined)) {
+  if (
+    input.paintModel !== undefined
+    || !validStyle(input)
+    || (input.correctedPressures !== undefined && input.correctedPoints === undefined)
+  ) {
     return null;
   }
   const renderedPoints = input.correctedPoints ?? input.points;

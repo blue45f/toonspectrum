@@ -199,6 +199,10 @@ import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shap
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import {
+  StudioHokusaiNaturalMediaInspectorMount,
+  type StudioHokusaiNaturalMediaReplaceHandler,
+} from "./StudioHokusaiNaturalMediaInspectorMount";
 import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
 import { StudioInspectorBubbleShapeControls } from "./StudioInspectorBubbleShapeControls";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
@@ -250,6 +254,7 @@ export interface StudioInspectorAsideHandlers {
     kind: StudioInspectorPixelSelectionToolId,
   ) => void;
   addProceduralArtisticBrushRaster: (src: string, width: number, height: number, name: string, targetPageId: string, targetMasterEditMode: boolean) => boolean;
+  replaceDrawWithHokusaiNaturalMedia: StudioHokusaiNaturalMediaReplaceHandler;
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addBubbleShapePointFromInspector: () => void;
   addFilterMask: (fill: FilterMaskPaintMode) => void;
@@ -1067,6 +1072,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const {
     activatePixelSelectionToolFromInspector,
     addProceduralArtisticBrushRaster,
+    replaceDrawWithHokusaiNaturalMedia,
     addAdvancedRuler,
     addBubbleShapePointFromInspector,
     addFilterMask,
@@ -3574,6 +3580,16 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     />
                   </Suspense>
                 ) : null}
+                <StudioHokusaiNaturalMediaInspectorMount
+                  visible={drawMode !== "shape" && drawMode !== "pixel"}
+                  selected={selected} currentColor={color}
+                  documentWidth={CANVAS_W} documentHeight={canvasH}
+                  pageId={currentPageId} masterEditMode={masterEditMode}
+                  locks={{ collaboration: collaborationDocumentLocked,
+                    surfaceReview: activeSurfaceReviewLocked,
+                    selectedContent: selectedContentMutationLocked }}
+                  onReplace={replaceDrawWithHokusaiNaturalMedia}
+                />
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
                   <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요." : activeSurfaceReviewLocked ? "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요." : null} onInsert={addProceduralArtisticBrushRaster} />
                 ) : null}

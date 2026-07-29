@@ -25,8 +25,8 @@ describe("Studio interchange capability registry", () => {
         expect(capability.import !== "unsupported" || capability.export !== "unsupported").toBe(true);
       }
       if (capability.roundTrip === "lossless") {
-        expect(capability.import).toBe("available");
-        expect(capability.export).toBe("available");
+        expect(["available", "engine-ready"]).toContain(capability.import);
+        expect(["available", "engine-ready"]).toContain(capability.export);
         expect(capability.lossModel).toEqual([]);
       }
     }
@@ -174,6 +174,8 @@ describe("Studio interchange capability registry", () => {
   it("direct support filter excludes bridge-only rows and includes the GIF/APNG export row", () => {
     const ids = studioDirectlySupportedInterchangeCapabilities().map((capability) => capability.id);
     expect(ids).toContain("toonproject-archive");
+    expect(ids).toContain("toonink");
+    expect(ids).toContain("inkml");
     expect(ids).toContain("ase");
     expect(ids).not.toContain("clip");
     expect(ids).toContain("gif-apng-mp4-export");
@@ -201,6 +203,31 @@ describe("Studio interchange capability registry", () => {
 
   it("known hard limits match the audited runtime boundaries", () => {
     expect(studioInterchangeCapability("toonproject-archive")?.sizeBudget.maxFileBytes).toBe(280_000_000);
+    expect(studioInterchangeCapability("inkml")).toMatchObject({
+      label: "InkML (ToonSpectrum 안전 부분집합)",
+      import: "engine-ready",
+      export: "engine-ready",
+      status: "engine-ready",
+      mime: ["application/inkml+xml"],
+      sizeBudget: {
+        maxFileBytes: 32 * 1024 * 1024,
+        maxItems: 2_000_000,
+      },
+    });
+    expect(studioInterchangeCapability("inkml")?.lossModel.join(" ")).toContain(
+      "전체 InkML processor conformance를 주장하지 않음",
+    );
+    expect(studioInterchangeCapability("toonink")).toMatchObject({
+      import: "engine-ready",
+      export: "engine-ready",
+      roundTrip: "lossless",
+      status: "engine-ready",
+      extensions: [".toonink"],
+      mime: ["application/vnd.toonspectrum.ink+json"],
+      sizeBudget: {
+        maxFileBytes: 32 * 1024 * 1024 + 32 * 1024,
+      },
+    });
     expect(studioInterchangeCapability("abr")?.sizeBudget.maxFileBytes).toBe(32 * 1024 * 1024);
     expect(studioInterchangeCapability("3d-glb")?.sizeBudget.maxFileBytes).toBe(100 * 1024 * 1024);
     expect(studioInterchangeCapability("vrm")?.sizeBudget.maxFileBytes).toBe(128 * 1024 * 1024);

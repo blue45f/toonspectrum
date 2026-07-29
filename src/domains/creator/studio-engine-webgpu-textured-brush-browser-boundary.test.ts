@@ -45,7 +45,6 @@ describe("textured-brush real Chromium WebGPU boundary", () => {
   it("covers zero-border R8 tips, both grain kinds and both anchor spaces", () => {
     for (const id of [
       "zero-border-source-over",
-      "first-append-zero-init",
       "procedural-document",
       "procedural-stroke",
       "asset-document",
@@ -75,9 +74,13 @@ describe("textured-brush real Chromium WebGPU boundary", () => {
   it("checks source-over, destination-out, first append initialization and exact rebuild", () => {
     expect(browserEntry).toContain('dab.composite.porterDuff === "destination-out"');
     expect(browserEntry).toContain("doublePlan");
+    expect(browserEntry).toContain("uninitializedAppendEvidence");
     expect(browserEntry).toContain("appendRebuildEvidence");
     expect(verifier).toContain('["source-over", "destination-out"]');
-    expect(verifier).toContain("deterministic zero-initialized surface");
+    expect(verifier).toContain(
+      "an append without canonical base content did not fail closed before GPU mutation",
+    );
+    expect(verifier).toContain("uninitializedAppendFailsClosed: true");
     expect(verifier).toContain("exactHalfWordMismatches !== 0");
   });
 

@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -116,6 +122,25 @@ describe("generated third-party notice inventory", () => {
     ]);
   });
 
+  it("accepts the reviewed dual-license expression used by Hokusai WASM", () => {
+    const inventory = parsePnpmLicenseInventory(
+      JSON.stringify({
+        "MIT OR Apache-2.0": [
+          {
+            name: "dual-licensed-wasm-provider",
+            versions: ["0.3.0"],
+            paths: ["/tmp/dual-licensed-wasm-provider"],
+          },
+        ],
+      }),
+    );
+
+    expect(inventory[0]).toMatchObject({
+      name: "dual-licensed-wasm-provider",
+      license: "MIT OR Apache-2.0",
+    });
+  });
+
   it("reconstructs a complete reviewed production graph from installed packages", () => {
     const inventory = readFilesystemLicenseInventory();
 
@@ -156,5 +181,44 @@ describe("generated third-party notice inventory", () => {
     expect(output).toMatch(
       /^License audit passed \(\d+ entries, \d+ license texts, \d+ packages without a root license file\)\.\n$/u,
     );
+  });
+
+  it("writes the complete pinned Hokusai Rust/WASM inventory and notices", () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), "toonspectrum-third-party-notice-test-"),
+    );
+    const outputPath = join(directory, "THIRD_PARTY_NOTICES.generated.md");
+    try {
+      execFileSync(
+        process.execPath,
+        [
+          SCRIPT_PATH,
+          "--output",
+          outputPath,
+          "--inventory-source",
+          "filesystem",
+        ],
+        {
+          cwd: REPOSITORY_ROOT,
+          encoding: "utf8",
+        },
+      );
+      const notice = readFileSync(outputPath, "utf8");
+      expect(notice).toContain("## Pinned Hokusai Rust/WASM inventory");
+      expect(notice).toContain(
+        "| `hokusai-core` | 0.3.0 | MIT OR Apache-2.0 |",
+      );
+      expect(notice).toContain(
+        "| `wasm-bindgen` | 0.2.123 | MIT OR Apache-2.0 |",
+      );
+      expect(notice).toContain(
+        "Copyright (c) 2026 Re:Earth and contributors",
+      );
+      expect(notice).toContain("Copyright (c) 2014 Alex Crichton");
+      expect(notice).toContain("UNICODE LICENSE V3");
+      expect(notice).toContain("Copyright © 1991-2023 Unicode, Inc.");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

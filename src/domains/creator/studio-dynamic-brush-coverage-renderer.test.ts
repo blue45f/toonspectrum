@@ -189,8 +189,10 @@ class RecordingDestination {
   fillStyle: string | CanvasGradient | CanvasPattern = "";
   readonly draws: Array<{ alpha: number; args: readonly number[] }> = [];
   readonly legacyFills: Array<{ alpha: number; color: string }> = [];
+  readonly polygonPaths: Array<readonly { x: number; y: number }[]> = [];
   readonly gradients: RecordedGradient[] = [];
   private alphaStack: number[] = [];
+  private activePolygon: Array<{ x: number; y: number }> | null = null;
   _context = {
     getTransform: () => ({
       a: 2,
@@ -214,7 +216,24 @@ class RecordingDestination {
   ): void {
     this.draws.push({ alpha: this.globalAlpha, args });
   }
-  beginPath(): void {}
+  beginPath(): void {
+    this.activePolygon = null;
+  }
+  moveTo(x: number, y: number): void {
+    if (this.activePolygon?.length) {
+      this.polygonPaths.push(this.activePolygon);
+    }
+    this.activePolygon = [{ x, y }];
+  }
+  lineTo(x: number, y: number): void {
+    this.activePolygon?.push({ x, y });
+  }
+  closePath(): void {
+    if (this.activePolygon?.length) {
+      this.polygonPaths.push(this.activePolygon);
+      this.activePolygon = null;
+    }
+  }
   arc(): void {}
   ellipse(): void {}
   createRadialGradient(...args: readonly number[]): CanvasGradient {
@@ -303,6 +322,9 @@ class AlphaOracleDestination {
     this.alpha = sourceOverAlpha(this.alpha, sourceAlpha);
   }
   beginPath(): void {}
+  moveTo(): void {}
+  lineTo(): void {}
+  closePath(): void {}
   arc(): void {}
   ellipse(): void {}
   translate(): void {}

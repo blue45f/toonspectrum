@@ -31,36 +31,13 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
 import {
-  DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
-  normalizeStudioBrushDynamicsSettings,
-  planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  isStudioDynamicBrushCausalDepositPipeline,
-  studioDynamicBrushDepositPipelineUsesContinuation,
-  studioBrushDynamicsSettingsForBrushId,
-  studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
-import {
-  planStudioDynamicBrushRenderBudget,
-  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
-  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
-  STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
-} from "./studio-brush-render-budget";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
-import {
-  studioBrushSymmetryTransforms,
-  studioDynamicBrushDabVariationsFromTransforms,
-} from "./studio-brush-symmetry";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
-import {
-  planStudioCausalDynamicBrushDepositSegmentsV3,
-  planStudioCausalDynamicBrushDepositsV2,
-  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-} from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
@@ -75,9 +52,13 @@ import {
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   renderStudioDynamicBrushCoverage,
+  renderStudioDynamicBrushCoverageMark,
   renderStudioDynamicBrushLegacyMarks,
 } from "./studio-dynamic-brush-coverage-renderer";
+import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
 import {
+  FX_OIL_DAB_CAP,
+  FX_PASTEL_DAB_CAP,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
@@ -90,10 +71,12 @@ import {
   resolveStudioFxPressurePassResponse,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
-import {
-  studioInkUsesPathResidualDabSpacing,
-} from "./studio-ink-pressure-model";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+import {
+  planStudioOilRibbonCarrier,
+  traceStudioOilRibbonPath,
+} from "./studio-oil-ribbon-carrier";
+import { planStudioPerfectFreehandRender } from "./studio-outline-stroke-contract";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -140,21 +123,17 @@ import {
   planWatercolorBrushDabs,
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
+import { planStudioInteractiveWetInkBrushReplay } from "./studio-wet-ink-backend-capability";
 import {
-  planStudioWetInkBrushReplay,
   renderStudioWetInkBrushReplay,
 } from "./studio-wet-ink-brush-runtime";
+import {
+  planStudioWetRibbonCarrier,
+  traceStudioWetRibbonCarrierBatch,
+} from "./studio-wet-ribbon-carrier";
 import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
-import type {
-  NormalizedStudioBrushDynamicsSettings,
-  StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
-import type { StudioBrushSymmetryTransform } from "./studio-brush-symmetry";
-import type {
-  StudioDynamicBrushSegmentedDabVariation,
-} from "./studio-dynamic-brush-coverage-renderer";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioFxPressurePathSegment } from "./studio-fx-brush";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
@@ -182,101 +161,6 @@ function setPerfectInkDebugState(state: PerfectInkDebugState | null): void {
 }
 
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
-const dynamicBrushSettingsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
-const dynamicBrushDefaultSettingsById = new Map<string, NormalizedStudioBrushDynamicsSettings>();
-
-function studioDrawNodeSegmentedDabCount(
-  segments: readonly (readonly StudioDynamicBrushDab[])[],
-): number {
-  return segments.reduce((count, segment) => count + segment.length, 0);
-}
-
-/**
- * Keeps complete immutable continuation segments and only copies the one segment that crosses the
- * accepted-prefix boundary. This avoids flattening and then slicing a potentially million-dab
- * pointer-up plan.
- */
-function studioDrawNodeSegmentedDabPrefix(
-  segments: readonly (readonly StudioDynamicBrushDab[])[],
-  maximumDabs: number,
-): readonly (readonly StudioDynamicBrushDab[])[] {
-  const accepted: Array<readonly StudioDynamicBrushDab[]> = [];
-  let remaining = Math.max(0, Math.floor(maximumDabs));
-  for (const segment of segments) {
-    if (remaining <= 0) break;
-    if (segment.length <= remaining) {
-      accepted.push(segment);
-      remaining -= segment.length;
-      continue;
-    }
-    accepted.push(segment.slice(0, remaining));
-    remaining = 0;
-  }
-  return accepted;
-}
-
-/**
- * Transforms each causal continuation segment independently. Variation-major segment lists preserve
- * the exact causal order without allocating the previous second whole-stroke `flatMap` array.
- */
-function studioDrawNodeSegmentedDabVariations(
-  segments: readonly (readonly StudioDynamicBrushDab[])[],
-  transforms: readonly StudioBrushSymmetryTransform[],
-): readonly StudioDynamicBrushSegmentedDabVariation[] {
-  const variationSegments = transforms.map(
-    () => [] as Array<readonly StudioDynamicBrushDab[]>,
-  );
-  for (const segment of segments) {
-    const transformedSegmentVariations =
-      studioDynamicBrushDabVariationsFromTransforms(segment, transforms);
-    for (
-      let variationIndex = 0;
-      variationIndex < transformedSegmentVariations.length;
-      variationIndex += 1
-    ) {
-      variationSegments[variationIndex]!.push(
-        transformedSegmentVariations[variationIndex]!,
-      );
-    }
-  }
-  return variationSegments.map((transformedSegments) => ({
-    kind: "studio-dynamic-brush-segmented-dab-variation",
-    segments: transformedSegments,
-  }));
-}
-
-/**
- * Active drafts replace the DrawEl shell while retaining immutable settings snapshots. Normalize
- * each custom snapshot once; built-in runtime profiles are likewise stable per brush id. This
- * avoids walking every mapping, tip and alpha payload again on each animation frame.
- */
-function studioDrawNodeDynamicBrushSettings(
-  el: DrawEl,
-  dynamicBrushId: string
-): NormalizedStudioBrushDynamicsSettings {
-  const source = el.brushDynamics;
-  if (typeof source === "object" && source !== null) {
-    const cached = dynamicBrushSettingsBySnapshot.get(source);
-    if (cached) return cached;
-    const normalized = normalizeStudioBrushDynamicsSettings(source);
-    dynamicBrushSettingsBySnapshot.set(source, normalized);
-    return normalized;
-  }
-  if (source !== undefined && source !== null) {
-    return normalizeStudioBrushDynamicsSettings(source);
-  }
-
-  const brushId = typeof el.brush === "string" && el.brush
-    ? el.brush
-    : dynamicBrushId;
-  const cached = dynamicBrushDefaultSettingsById.get(brushId);
-  if (cached) return cached;
-  const normalized = studioBrushDynamicsSettingsForBrushId(brushId)
-    ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
-    ?? normalizeStudioBrushDynamicsSettings();
-  dynamicBrushDefaultSettingsById.set(brushId, normalized);
-  return normalized;
-}
 
 /**
  * `processPencilPoints` is the frozen legacy 0.75 px graphite texture. Alias profiles scale its
@@ -464,13 +348,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   // 닫힌 윤곽으로 이어진다. 프로필이 있으면 스트로커를 지연 로드한다.
   const perfectProfile = kind === "freehand"
     && el.mode !== "eraser"
-    && !(
-      resolveStudioBrushRenderFamily(el.brush ?? "pen") === "gpen"
-      && studioInkUsesPathResidualDabSpacing(el.pressureModel)
-    )
     ? resolveStudioPerfectFreehandProfile(el.brush)
     : null;
-  const perfectStroker = useStudioPerfectFreehandStroker(perfectProfile !== null);
+  const outlineContractPresent = kind === "freehand"
+    && el.outlineStroke !== undefined;
+  const perfectStroker = useStudioPerfectFreehandStroker(
+    perfectProfile !== null || outlineContractPresent,
+  );
 
   const stampBrushKind = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioStampBrushKind(el.brush)
@@ -483,141 +367,18 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const symmetricVariations = stampBrushKind || dynamicBrushId
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
-  let dynamicBrushPlanFailed = false;
-  const dynamicBrushPlan = dynamicBrushId
-    ? (() => {
-        const dynamics = studioDrawNodeDynamicBrushSettings(el, dynamicBrushId);
-        const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
-        const dabPlanInput = {
-          points: el.points,
-          pressures: el.pressures,
-          tangentialPressures: el.tangentialPressures,
-          speeds: el.speeds,
-          tiltXs: el.tiltXs,
-          tiltYs: el.tiltYs,
-          twists: el.twists,
-          baseWidth: strokeWidth,
-          baseOpacity: dynamics.opacity.base,
-          seed,
-        };
-        const causalDepositPlan = isStudioDynamicBrushCausalDepositPipeline(
-          dynamics.depositPipeline,
-        )
-          ? studioDynamicBrushDepositPipelineUsesContinuation(
-              dynamics.depositPipeline,
-            )
-            ? planStudioCausalDynamicBrushDepositSegmentsV3({
-                points: el.points,
-                pressures: el.pressures,
-                tangentialPressures: el.tangentialPressures,
-                speeds: el.speeds,
-                tiltXs: el.tiltXs,
-                tiltYs: el.tiltYs,
-                twists: el.twists,
-                settings: dynamics,
-              })
-            : planStudioCausalDynamicBrushDepositsV2({
-                points: el.points,
-                pressures: el.pressures,
-                tangentialPressures: el.tangentialPressures,
-                speeds: el.speeds,
-                tiltXs: el.tiltXs,
-                tiltYs: el.tiltYs,
-                twists: el.twists,
-                settings: dynamics,
-                maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-              })
-          : null;
-        if (causalDepositPlan && !causalDepositPlan.ok) {
-          dynamicBrushPlanFailed = true;
-          return null;
-        }
-        const usesCausalDepositPlan = causalDepositPlan?.ok === true;
-        let causalDabSegments:
-          | readonly (readonly StudioDynamicBrushDab[])[]
-          | null =
-          causalDepositPlan?.ok === true && "segments" in causalDepositPlan
-            ? causalDepositPlan.segments.map((segment) => segment.dabs)
-            : null;
-        let baseDabs = causalDabSegments
-          ? [] as readonly StudioDynamicBrushDab[]
-          : causalDepositPlan?.ok === true && "dabs" in causalDepositPlan
-            ? causalDepositPlan.dabs
-            : planNormalizedStudioDynamicBrushDabs(
-                { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
-                dynamics
-              );
-        const baseDabCount = causalDabSegments
-          ? studioDrawNodeSegmentedDabCount(causalDabSegments)
-          : baseDabs.length;
-        const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
-        // Causal deposits deliberately freeze the live surface's material grid and work ceiling.
-        // Retained redraw must not silently upgrade to a denser committed grid after pointer-up,
-        // otherwise the same immutable dabs still produce different pixels during handoff.
-        const markBudget = usesCausalDepositPlan
-          ? studioDynamicBrushDepositPipelineUsesContinuation(
-              dynamics.depositPipeline,
-            )
-            ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
-            : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
-          : activeDraft
-            ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
-            : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
-        const renderBudget = planStudioDynamicBrushRenderBudget({
-          settings: dynamics,
-          dabCount: baseDabCount,
-          symmetryCount: symmetryTransforms.length,
-          markBudget,
-        });
-        if (
-          usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabCount
-        ) {
-          // Causal overflow is a versioned accepted-prefix receipt. Never reject the complete
-          // element here: doing so made an already-visible long stroke disappear at pointer-up.
-          // The live overlay, retained Canvas and SVG all retain this exact immutable dab prefix.
-          if (causalDabSegments) {
-            causalDabSegments = studioDrawNodeSegmentedDabPrefix(
-              causalDabSegments,
-              renderBudget.maxDabsPerVariation,
-            );
-          } else {
-            baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
-          }
-        }
-        if (
-          !usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabCount
-        ) {
-          // The dynamics planner's bounded pass redistributes these stations across the whole
-          // stroke, retaining both endpoints instead of truncating a dense prefix.
-          baseDabs = planNormalizedStudioDynamicBrushDabs(
-            { ...dabPlanInput, maxDabs: renderBudget.maxDabsPerVariation },
-            dynamics
-          );
-        }
-        return {
-          dynamics,
-          seed,
-          markBudget,
-          renderBudget,
-          usesCausalDepositPlan,
-          dabVariations: causalDabSegments
-            ? studioDrawNodeSegmentedDabVariations(
-                causalDabSegments,
-                symmetryTransforms,
-              )
-            : studioDynamicBrushDabVariationsFromTransforms(
-                baseDabs,
-                symmetryTransforms,
-              ),
-        };
-      })()
+  const dynamicBrushPlanResult = dynamicBrushId
+    ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft)
+    : null;
+  const dynamicBrushPlanFailed = dynamicBrushPlanResult?.status === "rejected";
+  const dynamicBrushPlan = dynamicBrushPlanResult?.status === "ready"
+    ? dynamicBrushPlanResult.plan
     : null;
   const dynamicCoverageAndLegacyMarkPlan = dynamicBrushPlan
     ? planStudioDynamicBrushCoverageAndLegacyMarks({
         dabVariations: dynamicBrushPlan.dabVariations,
         dynamics: dynamicBrushPlan.dynamics,
+        materialIdentity: dynamicBrushPlan.materialIdentity,
         dynamicSeed: dynamicBrushPlan.seed,
         stroke,
         stampGrid: dynamicBrushPlan.renderBudget.stampGrid,
@@ -923,6 +684,149 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 perfectDrawEnabled={false}
               />
             );
+          }
+
+          if (outlineContractPresent) {
+            const outlinePlan = planStudioPerfectFreehandRender({
+              contract: el.outlineStroke,
+              stroker: perfectStroker,
+              points,
+              // New outline contracts record canonical renderer pressure at pointer capture.
+              // Applying the mutable brush-alias adapter again here would double-map that input.
+              pressures: el.pressures,
+              // The durable contract, rather than the mutable brush catalogue, owns alias scale.
+              strokeWidth,
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+            });
+            if (outlinePlan.kind === "outline") {
+              return (
+                <Path
+                  key={index}
+                  data={outlinePlan.pathData}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              );
+            }
+            if (outlinePlan.kind === "fallback-line") {
+              const capRadius = outlinePlan.line.endpointCapRadius;
+              const linePoints = outlinePlan.line.points;
+              const hasLineStart = linePoints.length >= 2;
+              const hasDistinctLineEnd = linePoints.length >= 4
+                && (
+                  linePoints[0] !== linePoints[linePoints.length - 2]
+                  || linePoints[1] !== linePoints[linePoints.length - 1]
+                );
+              return (
+                <Group
+                  key={index}
+                  name="studio-outline-contract-fallback"
+                  opacity={opacity}
+                  listening={false}
+                >
+                  <Line
+                    points={[...linePoints]}
+                    stroke={stroke}
+                    strokeWidth={outlinePlan.line.strokeWidth}
+                    lineCap="round"
+                    lineJoin="round"
+                    tension={outlinePlan.line.tension}
+                    globalCompositeOperation={composite}
+                    perfectDrawEnabled={false}
+                    shadowForStrokeEnabled={false}
+                  />
+                  {capRadius !== null && hasLineStart ? (
+                    <KCircle
+                      x={linePoints[0]!}
+                      y={linePoints[1]!}
+                      radius={capRadius}
+                      fill={stroke}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ) : null}
+                  {capRadius !== null && hasDistinctLineEnd ? (
+                    <KCircle
+                      x={linePoints[linePoints.length - 2]!}
+                      y={linePoints[linePoints.length - 1]!}
+                      radius={capRadius}
+                      fill={stroke}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ) : null}
+                </Group>
+              );
+            }
+            if (outlinePlan.kind !== "legacy-contract") {
+              const finitePairs = Array.from(
+                { length: Math.floor(points.length / 2) },
+                (_, pointIndex) => ({
+                  x: points[pointIndex * 2],
+                  y: points[pointIndex * 2 + 1],
+                }),
+              ).filter(
+                (point): point is { x: number; y: number } =>
+                  Number.isFinite(point.x) && Number.isFinite(point.y),
+              );
+              const minX = finitePairs.length > 0
+                ? Math.min(...finitePairs.map((point) => point.x))
+                : 0;
+              const minY = finitePairs.length > 0
+                ? Math.min(...finitePairs.map((point) => point.y))
+                : 0;
+              const maxX = finitePairs.length > 0
+                ? Math.max(...finitePairs.map((point) => point.x))
+                : minX;
+              const maxY = finitePairs.length > 0
+                ? Math.max(...finitePairs.map((point) => point.y))
+                : minY;
+              const width = Math.max(16, maxX - minX);
+              const height = Math.max(16, maxY - minY);
+              const issueName = outlinePlan.kind === "unsupported-contract"
+                ? outlinePlan.issue.code
+                : outlinePlan.reason;
+              // Unknown contract revisions and damaged recorded pressure must never be rendered as
+              // a plausible but different legacy stroke. A compact magenta diagnostic keeps the
+              // failure visible on canvas while SVG reports a structured skip receipt.
+              return (
+                <Group
+                  key={index}
+                  name={`studio-outline-contract-error:${issueName}`}
+                  listening={false}
+                >
+                  <Rect
+                    x={minX}
+                    y={minY}
+                    width={width}
+                    height={height}
+                    stroke="#ff2f7d"
+                    strokeWidth={1.5}
+                    dash={[4, 3]}
+                    opacity={0.9}
+                    listening={false}
+                  />
+                  <Line
+                    points={[minX, minY, minX + width, minY + height]}
+                    stroke="#ff2f7d"
+                    strokeWidth={1.5}
+                    opacity={0.9}
+                    listening={false}
+                  />
+                  <Line
+                    points={[minX + width, minY, minX, minY + height]}
+                    stroke="#ff2f7d"
+                    strokeWidth={1.5}
+                    opacity={0.9}
+                    listening={false}
+                  />
+                </Group>
+              );
+            }
           }
 
           if (
@@ -1516,7 +1420,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
 
           if (brushFamily === "watercolor" && el.mode !== "eraser") {
             const causalWatercolor = el.watercolorPipeline === "causal-walker-v2";
-            const wetInkReplayPlan = planStudioWetInkBrushReplay(
+            const wetInkReplayPlan = planStudioInteractiveWetInkBrushReplay(
               { ...el, points },
               { phase: activeDraft ? "live" : "committed" },
             );
@@ -1530,6 +1434,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               Math.floor(points.length / 2),
               0.55,
             );
+            const watercolorSeed = watercolorBrushSeedFromKey(el.id);
             // Legacy documents retain their fitted whole-stroke stations. New strokes use raw,
             // already-accepted samples and a residual arc-length cursor, so extending a prefix can
             // append pigment but can never move pigment that was already visible.
@@ -1540,22 +1445,28 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               pressures: watercolorPressures,
               baseWidth: aliasPlanSettings?.baseWidth ?? strokeWidth,
               spacing: aliasPlanSettings?.spacing,
-              seed: watercolorBrushSeedFromKey(el.id),
+              seed: watercolorSeed,
               // Causal stations do not redistribute at the cap, so they need the larger shared
               // bound. Legacy documents keep their historical 512-dab fit and exact old pixels.
               maxDabs: causalWatercolor
                 ? DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS
                 : 512,
+              // The endpoint cap belongs only to this replaceable active replay. Permanent causal
+              // stations stay prefix-stable, while pointer-up no longer grows the visible stroke.
+              previewEndpoint: causalWatercolor && activeDraft,
             };
             const plannedDabs = causalWatercolor
               ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
               : planWatercolorBrushDabs(watercolorInput);
             const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+            const wetRibbonPlan = causalWatercolor
+              ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
+              : null;
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  if (wetInkReplayPlan.ok) {
+                  if (wetInkReplayPlan?.ok) {
                     const wetInkResult = renderStudioWetInkBrushReplay(
                       context,
                       wetInkReplayPlan.value,
@@ -1570,6 +1481,22 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   // Unsupported/legacy snapshots and every preflight failure retain exact old dabs.
                   if (dabs.length === 0) return;
                   context.save();
+                  if (wetRibbonPlan) {
+                    // The v2 fail-closed carrier is a connected, direction-following ribbon. Its
+                    // four pigment bands soften the wet edge without exposing repeated circles.
+                    for (const batch of wetRibbonPlan.batches) {
+                      context.globalAlpha = Math.min(
+                        1,
+                        Math.max(0, batch.opacity * opacity),
+                      );
+                      context.beginPath();
+                      traceStudioWetRibbonCarrierBatch(context, batch);
+                      context.fillStyle = stroke;
+                      context.fill();
+                    }
+                    context.restore();
+                    return;
+                  }
                   for (const dab of dabs) {
                     context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
                     context.beginPath();
@@ -2240,56 +2167,41 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               pressures: el.pressures,
               baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
-              maxDabs: 512,
+              maxDabs: FX_OIL_DAB_CAP,
             });
+            const carrier = planStudioOilRibbonCarrier(dabs);
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  if (!carrier.body) return;
                   context.save();
-                  for (const dab of dabs) {
-                    context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
-                    context.save();
-                    context.translate(dab.x, dab.y);
-                    context.rotate(dab.angleRad);
-                    const rx = Math.max(0.25, dab.radiusX);
-                    const ry = Math.max(0.15, dab.radiusY);
-                    context.scale(1, ry / rx);
-                    context.beginPath();
-                    context.arc(0, 0, rx, 0, Math.PI * 2);
-                    context.fillStyle = stroke;
-                    context.fill();
-                    context.restore();
-                  }
-                  // Preserve the directional bristle relief after the continuous carrier is laid
-                  // down. A multiply pass makes the texture visible even for opaque paint without
-                  // changing the persisted colour or introducing non-deterministic colour jitter.
+                  // Body pigment is one variable-width outline rather than repeated ellipse fills.
+                  // Its directional caps and shared centreline remove length-dependent dab joints.
+                  context.globalAlpha = Math.min(
+                    1,
+                    Math.max(0, carrier.bodyOpacity * opacity),
+                  );
+                  context.beginPath();
+                  traceStudioOilRibbonPath(context, carrier.body, true);
+                  context.fillStyle = stroke;
+                  context.fill();
+
+                  // Bristle relief is likewise continuous: five lanes follow the entire centreline
+                  // instead of restarting a dark ellipse at every station.
                   context.globalCompositeOperation = "multiply";
-                  for (const dab of dabs) {
-                    const rx = Math.max(0.25, dab.radiusX);
-                    const ry = Math.max(0.15, dab.radiusY);
-                    context.save();
-                    context.translate(dab.x, dab.y);
-                    context.rotate(dab.angleRad);
-                    context.fillStyle = stroke;
-                    for (const bristle of dab.bristles) {
-                      context.globalAlpha = Math.min(
-                        1,
-                        Math.max(0, dab.opacity * opacity * bristle.opacity),
-                      );
-                      context.beginPath();
-                      context.ellipse(
-                        0,
-                        ry * bristle.offsetRatio,
-                        rx * bristle.radiusXRatio,
-                        Math.max(0.12, ry * bristle.radiusYRatio),
-                        0,
-                        0,
-                        Math.PI * 2,
-                      );
-                      context.fill();
-                    }
-                    context.restore();
+                  context.strokeStyle = stroke;
+                  context.lineCap = "butt";
+                  context.lineJoin = "round";
+                  for (const lane of carrier.bristleLanes) {
+                    context.globalAlpha = Math.min(
+                      1,
+                      Math.max(0, lane.opacity * opacity),
+                    );
+                    context.lineWidth = Math.max(0.12, lane.lineWidth);
+                    context.beginPath();
+                    traceStudioOilRibbonPath(context, lane);
+                    context.stroke();
                   }
                   context.restore();
                 }}
@@ -2309,7 +2221,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               pressures: el.pressures,
               baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
-              maxDabs: 512,
+              maxDabs: FX_PASTEL_DAB_CAP,
             });
             return (
               <Shape
@@ -2317,22 +2229,55 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 sceneFunc={(context) => {
                   context.save();
                   for (const dab of dabs) {
-                    context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
-                    const gradient = context.createRadialGradient(
-                      dab.x,
-                      dab.y,
-                      0,
-                      dab.x,
-                      dab.y,
-                      dab.radius
-                    );
-                    gradient.addColorStop(0, stroke);
-                    gradient.addColorStop(0.55, stroke);
-                    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-                    context.beginPath();
-                    context.arc(dab.x, dab.y, dab.radius, 0, Math.PI * 2);
-                    context.fillStyle = gradient;
-                    context.fill();
+                    try {
+                      // Reuse the same high-resolution colourless falloff mask as dynamic soft
+                      // brushes. This is one cached affine drawImage per fibre instead of creating
+                      // thousands of radial gradients again on every retained-layer repaint.
+                      renderStudioDynamicBrushCoverageMark(
+                        context,
+                        {
+                          x: dab.x,
+                          y: dab.y,
+                          radiusX: dab.radiusX,
+                          radiusY: dab.radiusY,
+                          angleRadians: dab.angleRad,
+                          alpha: dab.opacity,
+                          color: stroke,
+                          falloff: {
+                            kind: "analytic-radial",
+                            exponent: 0.72,
+                          },
+                        },
+                        opacity,
+                      );
+                    } catch {
+                      // Restricted Canvas hosts without an allocatable stamp surface retain a
+                      // deterministic analytic-gradient fallback rather than dropping pigment.
+                      context.globalAlpha = Math.min(
+                        1,
+                        Math.max(0, dab.opacity * opacity),
+                      );
+                      context.save();
+                      context.translate(dab.x, dab.y);
+                      context.rotate(dab.angleRad);
+                      context.scale(1, dab.radiusY / dab.radiusX);
+                      const gradient = context.createRadialGradient(
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        dab.radiusX,
+                      );
+                      gradient.addColorStop(0, stroke);
+                      gradient.addColorStop(0.55, stroke);
+                      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+                      context.beginPath();
+                      context.arc(0, 0, dab.radiusX, 0, Math.PI * 2);
+                      context.fillStyle = gradient;
+                      context.fill();
+                      context.restore();
+                    }
                   }
                   context.restore();
                 }}

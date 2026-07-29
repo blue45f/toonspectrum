@@ -12,6 +12,7 @@ import {
   hydrateStudioBrushR8GrainAsset,
   resetStudioBrushR8GrainRegistry,
 } from "./studio-brush-r8-grain-runtime";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
@@ -172,6 +173,66 @@ describe("SVG R8 bounded streaming coverage", () => {
       size: mark.texture?.alphaMap.size,
       alphas: [...(mark.texture?.alphaMap.alphas ?? [])],
     })));
+  });
+
+  it("uses the same anisotropic catalogue dabs as retained coverage", () => {
+    const grainSource = source();
+    expect(hydrateStudioBrushR8GrainAsset(grainSource, paperBytes).status)
+      .toBe("ready");
+    const normalized = dynamics(8);
+    const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
+      "dry-media",
+      "pastel-paper-soft",
+    );
+    if (!materialIdentity) throw new Error("missing pastel material identity");
+    const dabVariations = [{
+      kind: "studio-dynamic-brush-segmented-dab-variation" as const,
+      segments: [
+        [dab(0)],
+        [dab(1), dab(2)],
+      ],
+    }];
+    const retained = planStudioDynamicBrushCoverageMarks({
+      dabVariations,
+      dynamics: normalized,
+      materialIdentity,
+      dynamicSeed: 91,
+      stroke: "#6b486f",
+      stampGrid: 3,
+      // Pastel lowers every source dab into five deterministic pigment lanes.
+      markBudget: 15,
+    });
+    expect(retained.ok).toBe(true);
+    if (!retained.ok) throw new Error(retained.reason);
+
+    const streamedMarks: ReturnType<typeof snapshotMark>[] = [];
+    const streamed = visitStudioSvgR8StreamingCoverage({
+      dabVariations,
+      dynamics: normalized,
+      materialIdentity,
+      dynamicSeed: 91,
+      stroke: "#6b486f",
+      markBudget: 15,
+    }, (mark) => {
+      streamedMarks.push(snapshotMark(mark));
+      return true;
+    });
+    expect(streamed.ok).toBe(true);
+    if (!streamed.ok) throw new Error(streamed.reason);
+    expect(streamedMarks).toEqual(retained.marks.map((mark) => ({
+      x: mark.x,
+      y: mark.y,
+      radiusX: mark.radiusX,
+      radiusY: mark.radiusY,
+      angleRadians: mark.angleRadians,
+      alpha: mark.alpha,
+      color: mark.color,
+      revision: mark.texture?.alphaMap.revision,
+      size: mark.texture?.alphaMap.size,
+      alphas: [...(mark.texture?.alphaMap.alphas ?? [])],
+    })));
+    expect(streamedMarks.every((mark) => mark.radiusX > mark.radiusY * 3))
+      .toBe(true);
   });
 
   it("streams beyond the old 16 MiB retained-map ceiling with one Float32 map live", () => {

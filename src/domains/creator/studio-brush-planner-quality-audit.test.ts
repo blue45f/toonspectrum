@@ -65,6 +65,10 @@ describe("studio brush planner quality audit", () => {
         `${result.catalogId}: spacing exceeds its useful tip diameter`,
       ).toBeLessThanOrEqual(1);
       expect(
+        result.curve.worstRenderedCarrierGapRatio,
+        `${result.catalogId}: rendered carriers bead after scatter`,
+      ).toBeLessThanOrEqual(1);
+      expect(
         result.speed.densitySpan,
         `${result.catalogId}: speed collapses planner density`,
       ).toBeLessThanOrEqual(2.5);

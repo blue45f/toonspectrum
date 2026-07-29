@@ -7,17 +7,17 @@
  * 렌더된다 — 필압 굵기·테이퍼가 실제 지오메트리에 새겨져 확대/내보내기에서도 동일하다.
  *  - 결정성: getStroke는 입력만의 순수 함수다(난수 없음). 필압이 없을 때의 simulatePressure도
  *    점 간 거리 기반이라 같은 입력이면 협업 복제본·재렌더·내보내기에서 항상 같은 패스가 나온다.
- *  - 번들 규율: perfect-freehand 본체는 `loadStudioPerfectFreehandStroker()` 동적 import 뒤에만
- *    로드된다(rough.js와 같은 다이내믹 청크 패턴). 이 파일의 나머지(프로필·옵션·outline→path
- *    매핑)는 eager 그래프에 안전한 순수 코드다. 스트로커는 DI 파라미터로 받아 DOM 의존 없이
- *    단위 테스트할 수 있다.
+ *  - 첫 획 규율: perfect-freehand 본체를 이 어댑터와 함께 정적으로 준비한다. 라이브 첫 프레임과
+ *    동기 SVG export가 로더 완료 시점에 좌우되지 않으므로, 동일한 브러시가 첫 획에서만 평범한
+ *    Line으로 강등되는 품질 차이를 허용하지 않는다. 스트로커는 여전히 DI 파라미터로 받아 DOM
+ *    의존 없이 단위 테스트할 수 있다.
  *  - 라이브 계약: 다이렉트 핫패스 초안 파이프라인(임페러티브 sceneFunc/WebGPU — pen/marker
  *    전용)은 건드리지 않는다. "perfect" 패밀리는 direct-live 대상이 아니므로 리테인드 초안과
  *    커밋 렌더 모두 StudioDrawNode의 같은 어댑터 경로를 지난다(pointer-up 커밋 스왑 계약 유지).
  */
-import { resampleStrokePressures } from "./studio-brush";
+import { getStroke, type StrokeOptions } from "perfect-freehand";
 
-import type { StrokeOptions } from "perfect-freehand";
+import { resampleStrokePressures } from "./studio-brush";
 
 /** 렌더러가 perfect-freehand 타입에 직접 의존하지 않도록 재노출하는 스트로커 핸들 타입. */
 export type StudioPerfectFreehandStroker = (
@@ -292,31 +292,28 @@ export function buildStudioPerfectFreehandPathData(
 }
 
 // ---------------------------------------------------------------------------
-// perfect-freehand 로더 — 동적 import 뒤에만 라이브러리가 번들에 들어온다
+// perfect-freehand 정적 준비 어댑터
 // ---------------------------------------------------------------------------
 
-let cachedStroker: StudioPerfectFreehandStroker | null = null;
-let pendingStrokerLoad: Promise<StudioPerfectFreehandStroker> | null = null;
+const STUDIO_PERFECT_FREEHAND_STROKER: StudioPerfectFreehandStroker = getStroke;
+const STUDIO_PERFECT_FREEHAND_STROKER_PROMISE =
+  Promise.resolve(STUDIO_PERFECT_FREEHAND_STROKER);
 
-/** 이미 로드된 스트로커(없으면 null) — 렌더러/SVG export가 동기 프레임에서 사용. */
+/**
+ * 동기 프레임에서 즉시 쓸 수 있는 스트로커.
+ *
+ * 반환 타입의 `null`은 기존 호출자 호환성을 위해 유지하지만 정적 import 이후 실제 런타임에서는
+ * 항상 함수다. 따라서 StudioDrawNode와 SVG export의 기존 null 폴백은 정상 제품 경로에서
+ * 도달하지 않는다.
+ */
 export function peekStudioPerfectFreehandStroker(): StudioPerfectFreehandStroker | null {
-  return cachedStroker;
+  return STUDIO_PERFECT_FREEHAND_STROKER;
 }
 
 /**
- * perfect-freehand getStroke를 동적 import로 로드해 캐시한다. Studio eager 청크에
- * 라이브러리가 포함되지 않도록 하는 유일한 로드 경로. 실패하면 다음 호출이 재시도한다.
+ * 기존 비동기 호출 계약을 보존하는 정적 준비 핸들. 호출 시점과 관계없이 `peek`과 같은
+ * 스트로커로 이미 이행된 Promise를 반환한다.
  */
 export function loadStudioPerfectFreehandStroker(): Promise<StudioPerfectFreehandStroker> {
-  if (cachedStroker) return Promise.resolve(cachedStroker);
-  pendingStrokerLoad ??= import("perfect-freehand")
-    .then((module) => {
-      cachedStroker = module.getStroke;
-      return cachedStroker;
-    })
-    .catch((error: unknown) => {
-      pendingStrokerLoad = null;
-      throw error;
-    });
-  return pendingStrokerLoad;
+  return STUDIO_PERFECT_FREEHAND_STROKER_PROMISE;
 }

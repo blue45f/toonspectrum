@@ -22,6 +22,10 @@ import {
   type StudioMaterialPressureModel,
 } from "./studio-material-pressure-model";
 import {
+  normalizeStudioOutlineStrokeContract,
+  type StudioOutlineStrokeContractV1,
+} from "./studio-outline-stroke-contract";
+import {
   isStudioStrokePaintModel,
   isStudioStrokePaintModelCompatible,
   type StudioStrokePaintModel,
@@ -34,6 +38,14 @@ import type {
   StudioCrdtStrokeInput,
   StudioCrdtStrokeSamples,
 } from "./studio-crdt-document";
+
+import {
+  STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+  STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
+  isStudioInkInputContractV2,
+  normalizeStudioInkInputContract,
+  type StudioInkInputContract,
+} from "@/lib/studio-ink-input-contract";
 
 export interface StudioCrdtCompatibleDrawElement {
   id: string;
@@ -52,7 +64,9 @@ export interface StudioCrdtCompatibleDrawElement {
   brushCatalogId?: string;
   brushCatalogName?: string;
   pressures?: number[];
+  inkInput?: StudioInkInputContract;
   pressureModel?: StudioInkPressureModel;
+  outlineStroke?: StudioOutlineStrokeContractV1;
   materialPressureModel?: StudioMaterialPressureModel;
   materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   sampleSpacing?: number;
@@ -61,6 +75,11 @@ export interface StudioCrdtCompatibleDrawElement {
   twists?: number[];
   speeds?: number[];
   tangentialPressures?: number[];
+  altitudeAngles?: number[];
+  azimuthAngles?: number[];
+  contactWidths?: number[];
+  contactHeights?: number[];
+  sampleTimeOffsets?: number[];
   brushDynamics?: unknown;
   brushTip?: unknown;
   stamp?: unknown;
@@ -183,6 +202,61 @@ function aligned(values: number[] | undefined, count: number, fallback: number):
   });
 }
 
+function assertStudioInkV2AlignedChannels(
+  element: StudioCrdtCompatibleDrawElement,
+  sampleCount: number,
+): void {
+  if (!isStudioInkInputContractV2(element.inkInput)) return;
+  const channels = [
+    ["altitudeAngles", element.altitudeAngles, 0, Math.PI / 2],
+    ["azimuthAngles", element.azimuthAngles, 0, Math.PI * 2],
+    [
+      "contactWidths",
+      element.contactWidths,
+      0,
+      STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+    ],
+    [
+      "contactHeights",
+      element.contactHeights,
+      0,
+      STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+    ],
+    [
+      "sampleTimeOffsets",
+      element.sampleTimeOffsets,
+      0,
+      STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
+    ],
+  ] as const;
+  for (const [name, values, minimum, maximum] of channels) {
+    if (!Array.isArray(values) || values.length !== sampleCount) {
+      throw new Error(`${name} 채널이 획 좌표와 정렬되지 않았습니다.`);
+    }
+    for (const value of values) {
+      const upperBoundValid = name === "azimuthAngles"
+        ? value < maximum
+        : value <= maximum;
+      if (
+        typeof value !== "number"
+        || !Number.isFinite(value)
+        || value < minimum
+        || !upperBoundValid
+      ) {
+        throw new Error(`${name} 채널 범위가 올바르지 않습니다.`);
+      }
+    }
+  }
+  if (element.sampleTimeOffsets?.[0] !== 0) {
+    throw new Error("획 상대 시간은 포인터 시작의 0ms에서 시작해야 합니다.");
+  }
+  for (let index = 1; index < sampleCount; index += 1) {
+    if (element.sampleTimeOffsets[index]! < element.sampleTimeOffsets[index - 1]!) {
+      throw new Error("획 상대 시간이 역행했습니다.");
+    }
+  }
+}
+
 /**
  * Aligns only the append suffix that is about to enter the CRDT. Long in-progress strokes call
  * this for every pointer batch, so aligning the complete history here would turn streaming into
@@ -214,6 +288,20 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
   // never be persisted as if this client knew how to render its pressure semantics.
   if (isStudioInkPressureModel(element.pressureModel)) {
     extensions.pressureModel = element.pressureModel;
+  }
+  if (element.outlineStroke !== undefined) {
+    const outlineStroke = normalizeStudioOutlineStrokeContract(element.outlineStroke);
+    if (!outlineStroke) {
+      throw new Error("외곽선 획 계약이 올바르지 않습니다.");
+    }
+    extensions.outlineStroke = jsonObject(outlineStroke)!;
+  }
+  if (element.inkInput !== undefined) {
+    const inkInput = normalizeStudioInkInputContract(element.inkInput);
+    if (!inkInput) {
+      throw new Error("획 입력 센서 계약이 올바르지 않습니다.");
+    }
+    extensions.inkInput = jsonObject(inkInput)!;
   }
   const materialPressureModel = element.materialPressureModel;
   const materialMinimumDiameterRatio = element.materialMinimumDiameterRatio;
@@ -249,6 +337,7 @@ export function studioDrawElementToCrdtStroke(
     throw new Error("획 페인트 모델과 브러시 합성 모드가 호환되지 않습니다.");
   }
   const sampleCount = Math.floor(element.points.length / 2);
+  assertStudioInkV2AlignedChannels(element, sampleCount);
   const pressureFallback = studioInkFallbackPressure(element.pressureModel);
   const pressures = element.pressures === undefined
     && isStudioInkPressureModel(element.pressureModel)
@@ -282,7 +371,9 @@ export function studioDrawElementToCrdtStroke(
   // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
   // renderer-significant layered paint requires v2; material/dynamic geometry snapshots require
   // v3, while segmented causal continuation and immutable R8 grain require v4.
-  const payloadVersion = usesSegmentedCausalDeposit || usesR8TextureGrain
+  const payloadVersion = usesSegmentedCausalDeposit
+    || usesR8TextureGrain
+    || extensions?.outlineStroke !== undefined
     ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
     : extensions?.materialPressureModel !== undefined
       || dynamicMinimumDiameterRatio !== undefined
@@ -306,6 +397,21 @@ export function studioDrawElementToCrdtStroke(
     twists: aligned(element.twists, sampleCount, 0),
     speeds: aligned(element.speeds, sampleCount, 0),
     tangentialPressures: aligned(element.tangentialPressures, sampleCount, 0),
+    ...(element.altitudeAngles
+      ? { altitudeAngles: aligned(element.altitudeAngles, sampleCount, Math.PI / 2) }
+      : {}),
+    ...(element.azimuthAngles
+      ? { azimuthAngles: aligned(element.azimuthAngles, sampleCount, 0) }
+      : {}),
+    ...(element.contactWidths
+      ? { contactWidths: aligned(element.contactWidths, sampleCount, 1) }
+      : {}),
+    ...(element.contactHeights
+      ? { contactHeights: aligned(element.contactHeights, sampleCount, 1) }
+      : {}),
+    ...(element.sampleTimeOffsets
+      ? { sampleTimeOffsets: aligned(element.sampleTimeOffsets, sampleCount, 0) }
+      : {}),
   });
   if (element.opacity !== undefined) payload.opacity = element.opacity;
   if (element.fill !== undefined) payload.fill = element.fill;
@@ -341,6 +447,7 @@ export function studioDrawElementSampleSlice(
     : Math.max(0, Math.min(sampleCount, truncatedStart));
   if (start >= sampleCount) return null;
   const pressureFallback = studioInkFallbackPressure(element.pressureModel);
+  assertStudioInkV2AlignedChannels(element, sampleCount);
   const pressures = element.pressures === undefined
     && isStudioInkPressureModel(element.pressureModel)
     ? Array<number>(sampleCount - start).fill(pressureFallback)
@@ -353,5 +460,34 @@ export function studioDrawElementSampleSlice(
     twists: alignedSlice(element.twists, sampleCount, start, 0),
     speeds: alignedSlice(element.speeds, sampleCount, start, 0),
     tangentialPressures: alignedSlice(element.tangentialPressures, sampleCount, start, 0),
+    ...(element.altitudeAngles
+      ? {
+          altitudeAngles: alignedSlice(
+            element.altitudeAngles,
+            sampleCount,
+            start,
+            Math.PI / 2,
+          ),
+        }
+      : {}),
+    ...(element.azimuthAngles
+      ? { azimuthAngles: alignedSlice(element.azimuthAngles, sampleCount, start, 0) }
+      : {}),
+    ...(element.contactWidths
+      ? { contactWidths: alignedSlice(element.contactWidths, sampleCount, start, 1) }
+      : {}),
+    ...(element.contactHeights
+      ? { contactHeights: alignedSlice(element.contactHeights, sampleCount, start, 1) }
+      : {}),
+    ...(element.sampleTimeOffsets
+      ? {
+          sampleTimeOffsets: alignedSlice(
+            element.sampleTimeOffsets,
+            sampleCount,
+            start,
+            0,
+          ),
+        }
+      : {}),
   };
 }

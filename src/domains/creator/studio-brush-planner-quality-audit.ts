@@ -37,6 +37,7 @@ export interface StudioBrushPlannerQualityFinding {
   readonly level: StudioBrushPlannerQualityFindingLevel;
   readonly code:
     | "curve-gap"
+    | "carrier-beading"
     | "density-collapse"
     | "early-opacity-clipping"
     | "equivalent-fingerprint"
@@ -56,6 +57,7 @@ export interface StudioBrushPlannerTapQuality {
 export interface StudioBrushPlannerCurveQuality {
   readonly worstGapRatio: number;
   readonly worstMeanGapRatio: number;
+  readonly worstRenderedCarrierGapRatio: number;
   readonly spacingDiameterRatio: number;
 }
 
@@ -115,6 +117,7 @@ const FIRST_TAP_PEAK_DELTA_FLOOR = 4.5;
 const FIRST_TAP_SOFT_WARNING_DELTA = 12;
 const LOW_PIGMENT_FLOOR = 0.05;
 const CONTINUOUS_GAP_RATIO_LIMIT = 1;
+const CONTINUOUS_RENDERED_CARRIER_GAP_RATIO_LIMIT = 1;
 const CONTINUOUS_DENSITY_SPAN_WARNING = 2.5;
 const EARLY_CLIPPING_RATIO_WARNING = 0.985;
 
@@ -234,9 +237,15 @@ function curveQuality(
   const worstMeanGapRatio = maximum(
     continuity.profiles.map((profile) => profile.meanInteriorGapRatio),
   );
+  const worstRenderedCarrierGapRatio = maximum(
+    continuity.profiles.map((profile) => (
+      profile.maxRenderedCarrierGapRatio
+    )),
+  );
   return {
     worstGapRatio: rounded(worstGapRatio),
     worstMeanGapRatio: rounded(worstMeanGapRatio),
+    worstRenderedCarrierGapRatio: rounded(worstRenderedCarrierGapRatio),
     spacingDiameterRatio:
       continuity.renderStrategy === "connected-path"
       || continuity.renderStrategy === "pixel-grid"
@@ -321,6 +330,7 @@ function perceptualFingerprint(
     profiles: continuity.profiles.map((profile) => [
       quantized(profile.markCount, 4),
       quantized(profile.meanInteriorGapRatio, 0.025),
+      quantized(profile.meanRenderedCarrierGapRatio, 0.025),
       quantized(profile.meanEffectiveAlpha, 0.025),
       quantized(profile.meanSizeRatio, 0.025),
       quantized(profile.meanScatterRatio, 0.025),
@@ -391,6 +401,20 @@ function baseFindings(
   }
   if (
     !result.intentionalDiscontinuity
+    && result.curve.worstRenderedCarrierGapRatio
+      > CONTINUOUS_RENDERED_CARRIER_GAP_RATIO_LIMIT
+  ) {
+    findings.push({
+      level: "error",
+      code: "carrier-beading",
+      message:
+        `${result.catalogId}: scatter opens a `
+        + `${result.curve.worstRenderedCarrierGapRatio.toFixed(3)} diameter `
+        + "gap between rendered carriers",
+    });
+  }
+  if (
+    !result.intentionalDiscontinuity
     && result.speed.densitySpan > CONTINUOUS_DENSITY_SPAN_WARNING
   ) {
     findings.push({
@@ -442,6 +466,10 @@ function riskScore(
     errorCount * 100
     + warningCount * 12
     + Math.max(0, result.curve.worstGapRatio - 0.5) * 20
+    + Math.max(
+      0,
+      result.curve.worstRenderedCarrierGapRatio - 0.5,
+    ) * 20
     + faintRisk * 20
     + Math.max(0, 0.1 - result.opacity.minimumMeanEffectiveAlpha) * 80
     + densityRisk * 4,

@@ -12,8 +12,11 @@ import {
 import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { resolveStudioBrushReleasePressure } from "./studio-brush-velocity-pressure";
 import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
+import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
 
 import type { DrawEl } from "./studio-element-model";
+
+import { isStudioInkInputContractV2 } from "@/lib/studio-ink-input-contract";
 
 const RELEASE_ENDPOINT_EPSILON = 1e-6;
 
@@ -24,6 +27,12 @@ export interface StudioPointerReleaseEndpointSample {
   readonly tiltY?: unknown;
   readonly twist?: unknown;
   readonly tangentialPressure?: unknown;
+  readonly altitudeAngle?: unknown;
+  readonly azimuthAngle?: unknown;
+  readonly width?: unknown;
+  readonly height?: unknown;
+  /** Already privacy-normalized to the active pointer-down origin by the Studio coordinator. */
+  readonly sampleTimeOffset?: unknown;
 }
 
 export interface StudioPointerReleaseEndpointPlanInput {
@@ -81,14 +90,27 @@ export function planStudioPointerReleaseEndpoint(
     : lastPressure;
   const capturePointerDynamics =
     stroke.mode === "pen" && resolveStudioBrushDynamicsPresetId(stroke.brush) !== null;
+  const captureInkSensorChannels =
+    stroke.mode === "pen" && stroke.inkInput !== undefined;
+  const captureExtendedInkSensorChannels =
+    stroke.mode === "pen" && isStudioInkInputContractV2(stroke.inkInput);
   const captureStylus =
-    stroke.mode === "pen" && (stroke.brush === "calligraphy" || capturePointerDynamics);
+    stroke.mode === "pen"
+    && (stroke.brush === "calligraphy" || capturePointerDynamics || captureInkSensorChannels);
   const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointer) : null;
   const tangentialPressure =
     typeof pointer.tangentialPressure === "number"
     && Number.isFinite(pointer.tangentialPressure)
       ? Math.min(1, Math.max(-1, pointer.tangentialPressure))
       : (stroke.tangentialPressures?.at(-1) ?? 0);
+  const persistedPointerChannels = normalizeStudioPersistedPointerChannels(pointer, {
+    timeOriginMilliseconds: 0,
+    sourceTimeMilliseconds:
+      typeof pointer.sampleTimeOffset === "number"
+        ? pointer.sampleTimeOffset
+        : stroke.sampleTimeOffsets?.at(-1) ?? 0,
+    previousTimeOffsetMilliseconds: stroke.sampleTimeOffsets?.at(-1) ?? 0,
+  });
 
   return {
     appended: true,
@@ -110,20 +132,58 @@ export function planStudioPointerReleaseEndpoint(
       twists: stylus
         ? appendAlignedChannel(stroke.twists, previousPointCount, stylus.twist)
         : stroke.twists,
-      speeds: capturePointerDynamics
+      speeds: capturePointerDynamics || captureInkSensorChannels
         ? appendAlignedChannel(
             stroke.speeds,
             previousPointCount,
             stroke.speeds?.at(-1) ?? 0
           )
         : stroke.speeds,
-      tangentialPressures: capturePointerDynamics
+      tangentialPressures: capturePointerDynamics || captureInkSensorChannels
         ? appendAlignedChannel(
             stroke.tangentialPressures,
             previousPointCount,
             tangentialPressure
           )
         : stroke.tangentialPressures,
+      altitudeAngles: captureExtendedInkSensorChannels
+        ? appendAlignedChannel(
+            stroke.altitudeAngles,
+            previousPointCount,
+            persistedPointerChannels.altitudeAngle,
+            Math.PI / 2,
+          )
+        : stroke.altitudeAngles,
+      azimuthAngles: captureExtendedInkSensorChannels
+        ? appendAlignedChannel(
+            stroke.azimuthAngles,
+            previousPointCount,
+            persistedPointerChannels.azimuthAngle,
+          )
+        : stroke.azimuthAngles,
+      contactWidths: captureExtendedInkSensorChannels
+        ? appendAlignedChannel(
+            stroke.contactWidths,
+            previousPointCount,
+            persistedPointerChannels.contactWidth,
+            1,
+          )
+        : stroke.contactWidths,
+      contactHeights: captureExtendedInkSensorChannels
+        ? appendAlignedChannel(
+            stroke.contactHeights,
+            previousPointCount,
+            persistedPointerChannels.contactHeight,
+            1,
+          )
+        : stroke.contactHeights,
+      sampleTimeOffsets: captureExtendedInkSensorChannels
+        ? appendAlignedChannel(
+            stroke.sampleTimeOffsets,
+            previousPointCount,
+            persistedPointerChannels.timeOffsetMilliseconds,
+          )
+        : stroke.sampleTimeOffsets,
     },
   };
 }

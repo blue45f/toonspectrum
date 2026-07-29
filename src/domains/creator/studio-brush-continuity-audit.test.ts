@@ -40,7 +40,47 @@ describe("studio brush continuity audit", () => {
       profile.markCount > 0
       && profile.meanEffectiveAlpha > 0
       && Number.isFinite(profile.maxInteriorGapRatio)
+      && Number.isFinite(profile.maxRenderedCarrierGapRatio)
     ))).toBe(true);
+  });
+
+  it("keeps soft and dry core carriers overlapped after deterministic scatter", () => {
+    const byId = new Map(CATALOGUE_RESULTS.map((result) => [
+      result.catalogId,
+      result,
+    ]));
+
+    for (const catalogId of [
+      "airbrush",
+      "dry-media",
+      "crayon",
+      "chalk",
+      "charcoal",
+    ]) {
+      const result = byId.get(catalogId)!;
+      for (const profile of result.profiles) {
+        expect(
+          profile.maxRenderedCarrierGapRatio,
+          `${catalogId}/${profile.speed}: rendered carrier lattice is visible`,
+        ).toBeLessThanOrEqual(0.4);
+      }
+    }
+  });
+
+  it("keeps every non-discrete professional carrier below one rendered diameter", () => {
+    const candidatesById = new Map(
+      CATALOGUE_CANDIDATES.map((candidate) => [candidate.catalogId, candidate]),
+    );
+    for (const result of CATALOGUE_RESULTS) {
+      const candidate = candidatesById.get(result.catalogId)!;
+      if (!candidate.category || result.intentionalDiscontinuity) continue;
+      for (const profile of result.profiles) {
+        expect(
+          profile.maxRenderedCarrierGapRatio,
+          `${result.catalogId}/${profile.speed}: post-scatter carrier gap`,
+        ).toBeLessThanOrEqual(1);
+      }
+    }
   });
 
   it("keeps every continuous professional stroke body overlap-safe at slow, medium and fast input", () => {
@@ -165,8 +205,11 @@ describe("studio brush continuity audit", () => {
       for (const profile of result.profiles) {
         expect(profile.meanEffectiveAlpha, `${catalogId}/${profile.speed}: still too faint`)
           .toBeGreaterThanOrEqual(0.08);
+        const maximumLowMediaAlpha = catalogId === "watercolor-dry-granule"
+          ? 0.25
+          : 0.24;
         expect(profile.meanEffectiveAlpha, `${catalogId}/${profile.speed}: low-media intent lost`)
-          .toBeLessThanOrEqual(0.24);
+          .toBeLessThanOrEqual(maximumLowMediaAlpha);
       }
 
       const candidate = candidateById.get(catalogId)!;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   promoteStudioGpuPendingAuthority,
+  reconcileStudioGpuPendingAuthorityToCanvas,
   releaseStudioGpuPendingAuthorityPrefix,
   type StudioGpuPendingDrawAuthority,
 } from "./studio-webgpu-pending-authority";
@@ -160,6 +161,59 @@ describe("GPU pending authority promotion", () => {
     })).toEqual({
       status: "rejected",
       reason: "draft-reservation-element-mismatch",
+    });
+  });
+
+  it("reconciles corrupt numeric reservations from exact DrawEl identities before a newer stroke", () => {
+    const first = draw("first");
+    const second = draw("second");
+    const unrelated = draw("unrelated");
+    const corrupt = handoff([first.id, second.id], 99, 1);
+
+    expect(reconcileStudioGpuPendingAuthorityToCanvas({
+      authorities: [authority(first, 2), authority(second, 4)],
+      gpuStrokeCount: 6,
+      handoffs: [corrupt],
+      settledDrafts: [unrelated],
+      uncommittedOrderIds: [unrelated.id],
+    }, "authority-count-mismatch")).toEqual({
+      status: "promoted",
+      settledDrafts: [first, second, unrelated],
+      handoffs: [{
+        ...corrupt,
+        draftSettledCount: 2,
+        gpuSettledCount: 0,
+      }],
+      promotedElementCount: 2,
+      recoveredFrom: "authority-count-mismatch",
+    });
+  });
+
+  it("does not claim a Canvas recovery when retained GPU pixels have no DrawEl authority", () => {
+    expect(reconcileStudioGpuPendingAuthorityToCanvas({
+      authorities: [],
+      gpuStrokeCount: 1,
+      handoffs: [],
+      settledDrafts: [],
+      uncommittedOrderIds: [],
+    }, "authority-count-mismatch")).toEqual({
+      status: "rejected",
+      reason: "missing-draw-authority",
+    });
+  });
+
+  it("preserves every retained GPU operation when only part has exact DrawEl authority", () => {
+    const first = draw("first");
+
+    expect(reconcileStudioGpuPendingAuthorityToCanvas({
+      authorities: [authority(first)],
+      gpuStrokeCount: 2,
+      handoffs: [],
+      settledDrafts: [],
+      uncommittedOrderIds: [first.id],
+    }, "authority-count-mismatch")).toEqual({
+      status: "rejected",
+      reason: "missing-draw-authority",
     });
   });
 

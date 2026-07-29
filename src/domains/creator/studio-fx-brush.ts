@@ -25,6 +25,20 @@ export const FX_BRUSH_SEED_RANGE = { min: 0, max: 9999 } as const;
 export const DEFAULT_FX_BRUSH_SEED = 1;
 export const FX_BRUSH_PARTICLE_CAP = 768;
 export const FX_BRUSH_DAB_CAP = 512;
+/**
+ * Oil/acrylic stations feed a continuous ribbon, so they no longer pay one full body draw per
+ * station. Preserve a dense centreline on very long canvases instead of redistributing 512 large
+ * footprints across the whole path and exposing polygon corners.
+ */
+export const FX_OIL_DAB_CAP = 4096;
+/**
+ * Pastel is a continuous dry medium, not a decorative particle brush. A shared 512-dab ceiling
+ * previously limited it to at most 256 two-dot stations and then redistributed those circles over
+ * the complete arc. On a long stroke the spacing therefore grew with total length and exposed a
+ * row of round carriers. Keep a dedicated, still-bounded station budget for its anisotropic fibre
+ * carrier instead.
+ */
+export const FX_PASTEL_DAB_CAP = 4096;
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -758,7 +772,7 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
 }
 
 // ---------------------------------------------------------------------------
-// Oil — chunky elliptical pigment dabs
+// Oil/acrylic — pressure/material stations for the continuous ribbon carrier
 // ---------------------------------------------------------------------------
 
 export type FxOilDab = {
@@ -769,8 +783,8 @@ export type FxOilDab = {
   angleRad: number;
   opacity: number;
   /**
-   * Thin local-space ridges carried by the wet body. They are rendered in a second pass so later
-   * body dabs cannot erase the bristle direction established earlier in the stroke.
+   * Thin local-space ridge samples carried by the wet body. The ribbon adapter joins matching
+   * samples into continuous bristle lanes so station boundaries never appear in the final mark.
    */
   bristles: readonly FxOilBristle[];
 };
@@ -798,7 +812,11 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const seed = Math.floor(
     clamp(finiteNumber(input.seed, DEFAULT_FX_BRUSH_SEED), FX_BRUSH_SEED_RANGE.min, FX_BRUSH_SEED_RANGE.max)
   );
-  const maxDabs = Math.floor(clamp(finiteNumber(input.maxDabs, FX_BRUSH_DAB_CAP), 2, FX_BRUSH_DAB_CAP));
+  const maxDabs = Math.floor(clamp(
+    finiteNumber(input.maxDabs, FX_OIL_DAB_CAP),
+    2,
+    FX_OIL_DAB_CAP,
+  ));
   // A coarse 22%-of-diameter cadence exposed every individual ellipse along curves. Keep the
   // deterministic dab model, but make the wet carrier dense enough to read as one continuous load
   // of paint. Long strokes still remain bounded by sampleStations' whole-path redistribution.
@@ -854,13 +872,17 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
 }
 
 // ---------------------------------------------------------------------------
-// Pastel — soft overlapping circles (dry chalky build-up)
+// Pastel — direction-aligned soft pigment fibres (dry chalky build-up)
 // ---------------------------------------------------------------------------
 
 export type FxPastelDab = {
   x: number;
   y: number;
-  radius: number;
+  /** Tangent-aligned half-length. Always materially larger than radiusY. */
+  radiusX: number;
+  /** Cross-stroke half-thickness. */
+  radiusY: number;
+  angleRad: number;
   opacity: number;
 };
 
@@ -879,40 +901,72 @@ export function planPastelBrushDabs(input: FxPastelPlanInput): FxPastelDab[] {
   const seed = Math.floor(
     clamp(finiteNumber(input.seed, DEFAULT_FX_BRUSH_SEED), FX_BRUSH_SEED_RANGE.min, FX_BRUSH_SEED_RANGE.max)
   );
-  const maxDabs = Math.floor(clamp(finiteNumber(input.maxDabs, FX_BRUSH_DAB_CAP), 2, FX_BRUSH_DAB_CAP));
-  const spacing = Math.max(0.7, baseWidth * 0.18);
-  // Reserve at least one dab for every bounded station before adding the second tooth dab. This
-  // keeps both endpoints visible even with a tiny imported/test budget such as maxDabs=2.
-  const stations = sampleStations(
-    points,
-    spacing,
-    Math.max(2, Math.ceil(maxDabs / 2))
-  );
+  const maxDabs = Math.floor(clamp(
+    finiteNumber(input.maxDabs, FX_PASTEL_DAB_CAP),
+    2,
+    FX_PASTEL_DAB_CAP,
+  ));
+  // The carrier's longitudinal support is much wider than this step. Even if a very long stroke
+  // reaches the bounded station count and is fitted across the full arc, adjacent fibres continue
+  // to overlap instead of turning into isolated circular beads.
+  const spacing = Math.max(0.55, baseWidth * 0.12);
+  const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxPastelDab[] = [];
 
   for (let si = 0; si < stations.length; si++) {
     if (dabs.length >= maxDabs) break;
     const st = stations[si]!;
-    const remainingDabs = maxDabs - dabs.length;
-    const remainingStations = stations.length - si - 1;
-    const dabsAtStation = Math.min(2, Math.max(1, remainingDabs - remainingStations));
-    // Up to 2 soft dabs per station for tooth; a capped plan reserves one for every later station.
-    for (let k = 0; k < dabsAtStation; k++) {
-      if (dabs.length >= maxDabs) break;
-      const n1 = hash2(si, k * 7 + 3, seed);
-      const n2 = hash2(si, k * 7 + 5, seed);
-      const scatter = baseWidth * 0.22;
-      const r = Math.max(
-        0.5,
-        (baseWidth / 2) * (0.7 + st.pressure * 0.5) * (0.75 + n1 * 0.4)
-      );
-      dabs.push({
-        x: st.x + (n1 - 0.5) * scatter * 2,
-        y: st.y + (n2 - 0.5) * scatter * 2,
-        radius: r,
-        opacity: clamp(0.12 + st.pressure * 0.22 + n2 * 0.08, 0.08, 0.42),
-      });
-    }
+    const before = stations[Math.max(0, si - 1)]!;
+    const after = stations[Math.min(stations.length - 1, si + 1)]!;
+    const tangentX = after.x - before.x;
+    const tangentY = after.y - before.y;
+    const tangentLength = Math.hypot(tangentX, tangentY);
+    const tangent = tangentLength > POINT_EPS
+      ? Math.atan2(tangentY, tangentX)
+      : 0;
+    const normalX = -Math.sin(tangent);
+    const normalY = Math.cos(tangent);
+    const lengthNoise = hash2(si, 3, seed);
+    const thicknessNoise = hash2(si, 5, seed);
+    const offsetNoise = hash2(si, 7, seed);
+    const angleNoise = hash2(si, 11, seed);
+    const pressureScale = 0.72 + st.pressure * 0.48;
+    const radiusX = Math.max(
+      0.75,
+      baseWidth * pressureScale * (0.46 + lengthNoise * 0.1),
+    );
+    const radiusY = Math.max(
+      0.18,
+      Math.min(
+        radiusX / 3.2,
+        baseWidth * pressureScale * (0.09 + thicknessNoise * 0.035),
+      ),
+    );
+    const normalOffset = (offsetNoise - 0.5) * baseWidth * 0.07;
+    dabs.push({
+      x: st.x + normalX * normalOffset,
+      y: st.y + normalY * normalOffset,
+      radiusX,
+      radiusY,
+      angleRad: tangent + (angleNoise - 0.5) * 0.14,
+      opacity: clamp(
+        0.1 + st.pressure * 0.2 + thicknessNoise * 0.06,
+        0.08,
+        0.38,
+      ),
+    });
+  }
+  // A tap has no path tangent. Two crossed, individually anisotropic fibres make a compact chalk
+  // touch without falling back to the circular carrier that long strokes deliberately avoid.
+  if (stations.length === 1 && dabs.length === 1 && maxDabs >= 2) {
+    const first = dabs[0]!;
+    dabs.push({
+      ...first,
+      radiusX: first.radiusX * 0.78,
+      radiusY: first.radiusY * 0.86,
+      angleRad: first.angleRad + Math.PI / 2,
+      opacity: first.opacity * 0.72,
+    });
   }
   return dabs;
 }

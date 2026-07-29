@@ -225,17 +225,108 @@ export const STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1 = Object.freeze({
   Record<StudioDryMediaAnisotropicPresetIdV1, StudioDryMediaAnisotropicPresetV1>
 >);
 
-const STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1 = Object.freeze({
+export const STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1 = Object.freeze({
+  "powder-sketch": "chalk",
+  "round-sketch": "charcoal",
+  "fiber-sketch": "charcoal",
+  "precision-pencil": "charcoal",
+  "comfort-pencil": "charcoal",
+  "needle-graphite": "charcoal",
   "chalk-powder": "chalk",
   "chalk-rough": "chalk",
   "chalk-compressed": "chalk",
-  "willow-fiber": "charcoal",
   "velvet-charcoal": "charcoal",
+  "scattered-flat": "pastel",
+  "directional-flat": "pastel",
+  "fiber-marker": "pastel",
+  "rough-grain": "chalk",
+  "strong-rough-grain": "chalk",
+  "heavy-rough-grain": "chalk",
+  "plaster-texture": "chalk",
+  "paint-roller": "crayon",
+  "rough-ink": "charcoal",
+  "fine-rake": "charcoal",
+  "wide-rake": "charcoal",
+  "dry-rake": "charcoal",
+  "broken-nib-ink": "charcoal",
+  "side-graphite-shade": "charcoal",
   "compressed-charcoal-edge": "charcoal",
+  "oil-filbert": "crayon",
+  "taper-brush-marker": "pastel",
+  "cloth-fold-rake": "charcoal",
+  "pencil-4b-rough": "charcoal",
+  "pencil-hb-mechanical": "charcoal",
+  "pencil-colored-soft": "crayon",
   "pencil-charcoal-stick": "charcoal",
+  "pencil-tilt-shading": "charcoal",
+  "oil-dry-scumble": "crayon",
   "crayon-wax-bold": "crayon",
   "pastel-paper-soft": "pastel",
+  "wood-grain-flow": "charcoal",
+  "bristle-fan-dry": "charcoal",
+  "bristle-flat-streak": "pastel",
+  "watercolor-dry-granule": "chalk",
+  "gouache-grain-flat": "crayon",
+  "oil-linen-filbert": "crayon",
+  "sumi-wash-fray": "charcoal",
+  "wood-knot-rake": "charcoal",
+  "hatching-contour-rake": "charcoal",
 } as const satisfies Readonly<Record<string, StudioDryMediaAnisotropicPresetIdV1>>);
+
+/**
+ * These dry-media runtime brushes intentionally deposit recognisable motif/stamp particles.
+ * Passing them through a continuous fibre carrier would erase their authored visual language, so
+ * the product keeps their existing discrete renderer explicitly rather than treating them as an
+ * unknown fallback.
+ */
+export const STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_IDS_V1 =
+  Object.freeze([
+    "willow-fiber",
+    "fabric-texture",
+    "sand-texture",
+    "rock-texture",
+    "bumpy-grain",
+    "foliage-texture",
+    "loose-grass",
+    "dense-grass",
+    "rough-stripe",
+    "cross-hatch",
+    "canvas-weave",
+    "sponge-stipple-dab",
+    "fabric-knit-loop",
+    "metal-scratch-brush",
+    "tree-bark-crack",
+    "rock-shard-texture",
+  ] as const);
+
+const STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_ID_SET_V1 =
+  new Set<string>(STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_IDS_V1);
+
+export type StudioDryMediaCatalogClassificationV1 =
+  | Readonly<{
+      readonly kind: "anisotropic-continuous";
+      readonly presetId: StudioDryMediaAnisotropicPresetIdV1;
+    }>
+  | Readonly<{
+      readonly kind: "intentional-discrete";
+    }>;
+
+export function classifyStudioDryMediaCatalogIdV1(
+  catalogId: unknown,
+): StudioDryMediaCatalogClassificationV1 | null {
+  if (typeof catalogId !== "string") return null;
+  if (Object.hasOwn(STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1, catalogId)) {
+    return Object.freeze({
+      kind: "anisotropic-continuous",
+      presetId: STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1[
+        catalogId as keyof typeof STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1
+      ],
+    });
+  }
+  return STUDIO_DRY_MEDIA_INTENTIONAL_DISCRETE_CATALOG_ID_SET_V1.has(catalogId)
+    ? Object.freeze({ kind: "intentional-discrete" })
+    : null;
+}
 
 export function isStudioDryMediaAnisotropicPresetIdV1(
   value: unknown,
@@ -245,9 +336,11 @@ export function isStudioDryMediaAnisotropicPresetIdV1(
 }
 
 /**
- * Maps only brushes whose physical medium is unambiguous. Generic `dry-media` and pencil/rake
- * catalogue rows deliberately remain on their authored renderer instead of being guessed into a
- * charcoal or pastel material.
+ * Resolves core physical brush ids directly and every shipped `dry-media` catalogue id through the
+ * explicit classification table above. Continuous pencil, chalk, charcoal, crayon, dry-ink,
+ * roller and rake materials receive an anisotropic carrier; only entries explicitly classified as
+ * intentional motif/stamp deposits keep their authored discrete renderer. A generic `dry-media`
+ * id without catalogue provenance remains unsupported rather than being guessed.
  */
 export function resolveStudioDryMediaAnisotropicPresetIdV1(
   brushId: unknown,
@@ -260,18 +353,10 @@ export function resolveStudioDryMediaAnisotropicPresetIdV1(
     || brushId === "pastel"
   ) return brushId;
   if (brushId === "oil-pastel") return "pastel";
-  if (
-    typeof brushCatalogId === "string"
-    && Object.hasOwn(
-      STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1,
-      brushCatalogId,
-    )
-  ) {
-    return STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1[
-      brushCatalogId as keyof typeof STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1
-    ];
-  }
-  return null;
+  const classification = classifyStudioDryMediaCatalogIdV1(brushCatalogId);
+  return classification?.kind === "anisotropic-continuous"
+    ? classification.presetId
+    : null;
 }
 
 export interface StudioDryMediaAnisotropicDabResponseInputV1 {

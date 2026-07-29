@@ -39,6 +39,7 @@ import type {
   StudioMaterialPressureModel,
 } from "./studio-material-pressure-model";
 import type { Outline } from "./studio-outline";
+import type { StudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { PhotoFilter } from "./studio-photo-filter";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
@@ -55,6 +56,7 @@ import type { Stylize } from "./studio-stylize";
 import type { TextPathConfig } from "./studio-text-path";
 import type { Vibrance } from "./studio-vibrance";
 import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioInkInputContract } from "@/lib/studio-ink-input-contract";
 
 export interface ImageEl {
   id: string;
@@ -376,8 +378,18 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
+  /**
+   * Browser-standard input provenance captured at pointer-down. This records channel semantics and
+   * privacy policy; commercial SDK state and hardware identifiers never enter the document.
+   */
+  inkInput?: StudioInkInputContract;
   /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
   pressureModel?: StudioInkPressureModel;
+  /**
+   * Immutable outline-renderer snapshot captured at pointer start. New perfect-freehand/G-pen
+   * strokes replay this contract instead of re-resolving mutable brush catalog semantics.
+   */
+  outlineStroke?: StudioOutlineStrokeContractV1;
   /**
    * Versioned retained-media/FX pressure response. Omitted pencil/brush/highlighter/neon/glow
    * strokes retain their historical fixed appearance even when they contain pressure samples.
@@ -399,6 +411,17 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   /** 입자 브러시가 속도·배럴 압력을 문서와 함께 재생하기 위한 포인트별 입력. */
   speeds?: number[];
   tangentialPressures?: number[];
+  /** Pointer Events Level 3 pen orientation in radians, aligned one-to-one with `points`. */
+  altitudeAngles?: number[];
+  azimuthAngles?: number[];
+  /** Pointer contact ellipse dimensions in CSS pixels, aligned one-to-one with `points`. */
+  contactWidths?: number[];
+  contactHeights?: number[];
+  /**
+   * Monotonic authoritative event time relative to pointer-down. Absolute browser clock values and
+   * predicted samples are never retained.
+   */
+  sampleTimeOffsets?: number[];
   /** 입자 브러시의 입력→출력 매핑 스냅샷. 저장·협업·SVG 내보내기에서 같은 dab을 재현한다. */
   brushDynamics?: NormalizedStudioBrushDynamicsSettings;
   /** 이 획을 다시 열거나 내보낼 때도 같은 펜촉 결과를 재현하기 위한 스냅샷. */

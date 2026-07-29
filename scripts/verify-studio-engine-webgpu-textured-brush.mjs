@@ -31,7 +31,6 @@ const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-textured-brush-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;
 const EXPECTED_CASE_IDS = [
   "zero-border-source-over",
-  "first-append-zero-init",
   "procedural-document",
   "procedural-stroke",
   "asset-document",
@@ -182,9 +181,6 @@ function validateSuccess(result, diagnostics) {
   const zeroBorder = result.cases.find(
     (evidence) => evidence.id === "zero-border-source-over",
   );
-  const firstAppend = result.cases.find(
-    (evidence) => evidence.id === "first-append-zero-init",
-  );
   const edge = zeroBorder?.samples.find(
     (sample) => sample.label === "zero-border-edge",
   );
@@ -202,12 +198,15 @@ function validateSuccess(result, diagnostics) {
     failures.push("R8 tip zero-border bilinear evidence is incomplete");
   }
   if (
-    !firstAppend
-    || firstAppend.receipts[0]?.mode !== "append"
-    || firstAppend.metrics.violatingComponents !== 0
-    || Math.abs(centerAlpha(firstAppend) - centerAlpha(zeroBorder)) > 0.001
+    result.uninitializedAppend?.status !== "rejected"
+    || result.uninitializedAppend?.reason !== "content-uninitialized"
+    || result.uninitializedAppend?.assetTextureCreations !== 0
+    || result.uninitializedAppend?.nativeR8TextureCreations !== 0
+    || result.uninitializedAppend?.nonZeroHalfWords !== 0
   ) {
-    failures.push("a first append did not observe a deterministic zero-initialized surface");
+    failures.push(
+      "an append without canonical base content did not fail closed before GPU mutation",
+    );
   }
 
   const proceduralDocument = result.cases.find(
@@ -540,7 +539,7 @@ async function main() {
         durableRendererSemanticFingerprint: true,
         maximumUint32Seed: true,
         sourceOverAndDestinationOut: true,
-        firstAppendZeroInitialization: true,
+        uninitializedAppendFailsClosed: true,
         appendRebuildExactHalfWords: true,
         metadataAwareAssetCache: true,
         residentAssetBudget: true,

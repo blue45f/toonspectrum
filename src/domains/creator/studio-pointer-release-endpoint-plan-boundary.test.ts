@@ -45,7 +45,9 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
       "./studio-brush-dynamics",
       "./studio-brush-velocity-pressure",
       "./studio-ink-pressure-model",
+      "./studio-persisted-pointer-channels",
       "./studio-element-model",
+      "@/lib/studio-ink-input-contract",
     ]);
     expect(planner.source).not.toMatch(/from\s+["'](?:react|konva|react-konva)/u);
     expect(planner.source).not.toMatch(
@@ -64,7 +66,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
     ]) {
       expect(planner.source).not.toContain(pageOwnedAction);
     }
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(150);
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(210);
   });
 
   it("leaves stabilizer ownership, ref replacement, CRDT publication, and finalization in StudioPage", () => {

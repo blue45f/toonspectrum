@@ -9,6 +9,8 @@ export interface StudioDraftPreviewSnapshot {
 /** Narrow external-store contract required by the React preview layers. */
 export interface StudioDraftPreviewSource {
   readonly getSnapshot: () => StudioDraftPreviewSnapshot;
+  /** Visible subset after a proven canonical draw suppresses, but does not yet release, a prefix. */
+  readonly visibleSettled: readonly DrawEl[];
   readonly subscribe: (listener: () => void) => () => void;
 }
 
@@ -22,6 +24,7 @@ const EMPTY_DRAFT_PREVIEW: StudioDraftPreviewSnapshot = { active: null, settled:
  */
 export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
   private snapshot: StudioDraftPreviewSnapshot = EMPTY_DRAFT_PREVIEW;
+  private suppressedSettledPrefixCount = 0;
   private listeners = new Set<() => void>();
 
   subscribe = (listener: () => void): (() => void) => {
@@ -37,6 +40,10 @@ export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
 
   get hasSettled(): boolean {
     return this.snapshot.settled.length > 0;
+  }
+
+  get visibleSettled(): readonly DrawEl[] {
+    return this.snapshot.settled.slice(this.suppressedSettledPrefixCount);
   }
 
   get settledCount(): number {
@@ -58,11 +65,33 @@ export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
   /** Atomically replaces the settled FIFO while preserving any active non-GPU draft. */
   replaceSettled(elements: readonly DrawEl[]): void {
     if (
+      this.suppressedSettledPrefixCount === 0
+      &&
       this.snapshot.settled.length === elements.length
       && this.snapshot.settled.every((element, index) => element === elements[index])
     ) return;
+    this.suppressedSettledPrefixCount = 0;
     this.snapshot = { active: this.snapshot.active, settled: [...elements] };
     this.emit();
+  }
+
+  /**
+   * Hides an already-proven canonical prefix without releasing its FIFO accounting.
+   *
+   * A later retry can still consume the exact original queue, while the browser cannot composite
+   * the retained preview over the main-layer copy that has already produced a draw receipt.
+   */
+  suppressSettledPrefix(count: number): number {
+    const requested = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+    const suppressed = Math.min(requested, this.snapshot.settled.length);
+    if (suppressed <= this.suppressedSettledPrefixCount) {
+      return this.suppressedSettledPrefixCount;
+    }
+    this.suppressedSettledPrefixCount = suppressed;
+    // Publish a new immutable identity so useSyncExternalStore observes presentation-only changes.
+    this.snapshot = { ...this.snapshot };
+    this.emit();
+    return suppressed;
   }
 
   clearSettled(): void {
@@ -74,6 +103,10 @@ export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
     const requested = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
     const released = Math.min(requested, this.snapshot.settled.length);
     if (released === 0) return 0;
+    this.suppressedSettledPrefixCount = Math.max(
+      0,
+      this.suppressedSettledPrefixCount - released,
+    );
     this.snapshot = {
       active: this.snapshot.active,
       settled: this.snapshot.settled.slice(released),
@@ -84,6 +117,7 @@ export class StudioDraftPreviewStore implements StudioDraftPreviewSource {
 
   clear(): void {
     if (this.snapshot === EMPTY_DRAFT_PREVIEW) return;
+    this.suppressedSettledPrefixCount = 0;
     this.snapshot = EMPTY_DRAFT_PREVIEW;
     this.emit();
   }

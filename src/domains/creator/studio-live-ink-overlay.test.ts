@@ -565,6 +565,36 @@ describe("StudioLiveInkOverlayRenderer", () => {
     );
   });
 
+  it("suppresses a canonical-drawn prefix without releasing FIFO accounting or active ink", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    const first = [0, 4, 12, 4, 20, 8];
+    const second = [30, 10, 38, 14, 46, 10];
+    const third = [58, 16, 66, 20, 78, 18];
+    const pressures = [0.25, 0.5, 0.75];
+    addStroke(renderer, first, pressures);
+    addStroke(renderer, second, pressures);
+    addStroke(renderer, third, pressures);
+    const beforeSuppression = recording.dabs.length;
+    recording.clearRect.mockClear();
+
+    expect(renderer.suppressSettledPrefix(2)).toBe(2);
+    expect(renderer.settledStrokeCount).toBe(3);
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    expect(recording.dabs.slice(beforeSuppression)).toEqual(
+      canonicalStrokeDabs(third, pressures)
+    );
+
+    const beforeRelease = recording.dabs.length;
+    expect(renderer.releaseSettledPrefix(2)).toBe(2);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(recording.dabs.slice(beforeRelease)).toEqual(
+      canonicalStrokeDabs(third, pressures)
+    );
+  });
+
   it("preserves and exactly replays an active stroke while its settled prefix is released", () => {
     const recording = recordingCanvas();
     const renderer = new StudioLiveInkOverlayRenderer();

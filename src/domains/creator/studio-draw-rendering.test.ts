@@ -551,12 +551,12 @@ describe("direct-live eligibility", () => {
     ["default freehand pen", drawEl(), true],
     ["explicit fineliner", drawEl({ brush: "fineliner", mode: "pen" }), true],
     ["marker", drawEl({ brush: "marker", mode: "pen" }), true],
-    ["causal G-pen", drawEl({
+    ["G-pen with stale residual metadata", drawEl({
       brush: "gpen",
       mode: "pen",
       pressureModel: "linear-residual-path-v3",
       sampleSpacing: 0,
-    }), true],
+    }), false],
     ["legacy G-pen outline", drawEl({ brush: "gpen", mode: "pen" }), false],
     ["pixel pencil", drawEl({ brush: STUDIO_PIXEL_PENCIL_RENDER_MODE, mode: "pen" }), true],
     ["eraser ignores specialty family", drawEl({ brush: "watercolor", mode: "eraser" }), true],
@@ -594,7 +594,7 @@ describe("direct-live eligibility", () => {
 });
 
 describe("live freehand Canvas2D fixtures", () => {
-  it("uses one causal G-pen contract for live, overlay, and retained rendering", () => {
+  it("keeps the historical causal G-pen helper deterministic without direct-live admission", () => {
     const gpen = drawEl({
       brush: "gpen",
       mode: "pen",
@@ -612,6 +612,7 @@ describe("live freehand Canvas2D fixtures", () => {
     const live = new RecordingContext();
     drawLiveFreehandDraftToContext(asKonvaContext(live), gpen);
 
+    expect(isDirectLiveDraftEl(gpen)).toBe(false);
     expect(resolveStudioLiveInkStrokeStyle(gpen)).toEqual({
       color: contract.strokeColor,
       strokeWidthDoc: contract.strokeWidth,

@@ -136,12 +136,12 @@ afterEach(() => {
 });
 
 describe("StudioLiveWetInkOverlayRenderer", () => {
-  it("admits only exact causal watercolor/ink-wash snapshots", () => {
-    expect(studioLiveWetInkOverlaySupportsElement(wetStroke([10, 10]))).toBe(true);
+  it("keeps the interactive tile overlay fail-closed until its async backend is available", () => {
+    expect(studioLiveWetInkOverlaySupportsElement(wetStroke([10, 10]))).toBe(false);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
       [10, 10],
       { brush: "ink-wash" },
-    ))).toBe(true);
+    ))).toBe(false);
     expect(studioLiveWetInkOverlaySupportsElement(wetStroke(
       [10, 10],
       { watercolorPipeline: undefined },

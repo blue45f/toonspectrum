@@ -80,6 +80,25 @@ describe("StudioDraftPreviewLayers", () => {
     ]);
   });
 
+  it("keeps a canonical-drawn prefix in accounting while removing it from presentation", () => {
+    const store = new StudioDraftPreviewStore();
+    store.settle(draw("canonical"));
+    store.settle(draw("pending"));
+    const view = render(<StudioDraftPreviewLayers store={store} />);
+
+    act(() => {
+      store.suppressSettledPrefix(1);
+    });
+
+    expect(store.getSnapshot().settled.map((element) => element.id)).toEqual([
+      "canonical",
+      "pending",
+    ]);
+    expect(view.getAllByTestId("draw-node").map((node) => node.dataset.id)).toEqual([
+      "pending",
+    ]);
+  });
+
   it("isolates a live dynamics brush and applies the active-draft render budget", () => {
     const store = new StudioDraftPreviewStore();
     store.settle(draw("settled"));
@@ -102,6 +121,9 @@ describe("StudioDraftPreviewLayers", () => {
     const unsubscribe = vi.fn();
     const source: StudioDraftPreviewSource = {
       getSnapshot: store.getSnapshot,
+      get visibleSettled() {
+        return store.visibleSettled;
+      },
       subscribe: vi.fn((listener) => {
         const stop = store.subscribe(listener);
         return () => {

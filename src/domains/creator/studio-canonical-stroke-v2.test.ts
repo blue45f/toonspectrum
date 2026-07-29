@@ -56,7 +56,11 @@ describe("StudioCanonicalStrokeV2", () => {
         tangentialPressure: -0.25,
         tiltX: 30,
         tiltY: 18,
+        altitudeAngle: Math.PI / 3,
+        azimuthAngle: Math.PI * 1.75,
         twist: 10,
+        contactWidth: 8,
+        contactHeight: 4,
         button: 0,
         buttons: 3,
         flags: STUDIO_CANONICAL_STROKE_V2_SAMPLE_FLAGS.rulerSnapApplied,
@@ -75,7 +79,11 @@ describe("StudioCanonicalStrokeV2", () => {
       tangentialPressure: -0.25,
       tiltX: 30,
       tiltY: 18,
+      altitudeAngle: Math.PI / 3,
+      azimuthAngle: Math.PI * 1.75,
       twist: 10,
+      contactWidth: 8,
+      contactHeight: 4,
       pointerId: 7,
       pointerType: "pen",
       button: 0,
@@ -85,6 +93,18 @@ describe("StudioCanonicalStrokeV2", () => {
     expect(Object.isFrozen(stroke)).toBe(true);
     expect(Object.isFrozen(stroke.streams.authoritative)).toBe(true);
     expect(Object.isFrozen(stroke.streams.authoritative[0])).toBe(true);
+  });
+
+  it("materializes neutral extended-channel defaults for older producers", () => {
+    const stroke = ready([sample("authoritative", 1)]);
+
+    expect(stroke.streams.authoritative[0]).toMatchObject({
+      altitudeAngle: Math.PI / 2,
+      azimuthAngle: 0,
+      contactWidth: 1,
+      contactHeight: 1,
+    });
+    expect("persistentDeviceId" in stroke.streams.authoritative[0]!).toBe(false);
   });
 
   it("removes exact duplicates and clamps a regressing browser clock monotonically", () => {
@@ -128,6 +148,18 @@ describe("StudioCanonicalStrokeV2", () => {
       sample("authoritative", 1),
       sample("authoritative", 2, { pointerId: 8 }),
     ])).toMatchObject({ ok: false, reason: "pointer-mismatch", sampleIndex: 1 });
+    expect(normalize([
+      sample("authoritative", 1, { altitudeAngle: Math.PI }),
+    ])).toMatchObject({ ok: false, reason: "invalid-sample", sampleIndex: 0 });
+    expect(normalize([
+      sample("authoritative", 1, { azimuthAngle: -0.001 }),
+    ])).toMatchObject({ ok: false, reason: "invalid-sample", sampleIndex: 0 });
+    expect(normalize([
+      sample("authoritative", 1, {
+        contactWidth:
+          STUDIO_CANONICAL_STROKE_V2_BUDGETS.maxContactDimension + 1,
+      }),
+    ])).toMatchObject({ ok: false, reason: "invalid-sample", sampleIndex: 0 });
   });
 
   it("replaces the transient prediction suffix without changing accepted source channels", () => {

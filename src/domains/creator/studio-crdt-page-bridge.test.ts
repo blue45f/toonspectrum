@@ -34,7 +34,13 @@ import {
 } from "./studio-crdt-protocol";
 import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+import { captureStudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
 import { createStudioWorkAssetInitialImageDescriptor } from "./studio-work-asset-admission";
+
+import {
+  captureStudioInkInputContractV1,
+  captureStudioInkInputContractV2,
+} from "@/lib/studio-ink-input-contract";
 
 function record(
   id: string,
@@ -350,6 +356,91 @@ describe("studio CRDT page bridge", () => {
       stampPipeline: "causal-walker-v2",
     });
     expect(decoded.paintModel).toBeUndefined();
+  });
+
+  it("round-trips v2 authoritative Pointer Events channels without upgrading v1", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-input-v2",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0.4, 0.8],
+      stroke: "#123456",
+      strokeWidth: 6,
+      inkInput: captureStudioInkInputContractV2("pen"),
+      altitudeAngles: [0.7, 0.5],
+      azimuthAngles: [1.1, 2.2],
+      contactWidths: [3, 4],
+      contactHeights: [2, 2.5],
+      sampleTimeOffsets: [0, 8.5],
+    };
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...encoded,
+      status: "finalized",
+      deleted: false,
+      orderIndex: 0,
+    });
+
+    expect(encoded.payload.extensions?.inkInput).toEqual(element.inkInput);
+    expect(decoded).toMatchObject({
+      inkInput: { version: 2 },
+      altitudeAngles: [0.7, 0.5],
+      azimuthAngles: [1.1, 2.2],
+      contactWidths: [3, 4],
+      contactHeights: [2, 2.5],
+      sampleTimeOffsets: [0, 8.5],
+    });
+
+    const legacy = studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      id: "stroke-input-v1",
+      inkInput: captureStudioInkInputContractV1("pen"),
+      altitudeAngles: undefined,
+      azimuthAngles: undefined,
+      contactWidths: undefined,
+      contactHeights: undefined,
+      sampleTimeOffsets: undefined,
+    });
+    expect(legacy.payload.extensions?.inkInput).toMatchObject({ version: 1 });
+    expect(legacy.payload.altitudeAngles).toBeUndefined();
+    expect(legacy.payload.sampleTimeOffsets).toBeUndefined();
+  });
+
+  it("fails closed on missing, unaligned, out-of-range or regressing v2 sensor arrays", () => {
+    const base: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-input-invalid",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0.4, 0.8],
+      stroke: "#123456",
+      strokeWidth: 6,
+      inkInput: captureStudioInkInputContractV2("pen"),
+      altitudeAngles: [0.7, 0.5],
+      azimuthAngles: [1.1, 2.2],
+      contactWidths: [3, 4],
+      contactHeights: [2, 2.5],
+      sampleTimeOffsets: [0, 8.5],
+    };
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...base,
+      altitudeAngles: undefined,
+    })).toThrow("altitudeAngles 채널이 획 좌표와 정렬되지 않았습니다");
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...base,
+      contactWidths: [3, 70_000],
+    })).toThrow("contactWidths 채널 범위가 올바르지 않습니다");
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...base,
+      sampleTimeOffsets: [4, 3],
+    })).toThrow("포인터 시작의 0ms");
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...base,
+      sampleTimeOffsets: [0, -1],
+    })).toThrow("sampleTimeOffsets 채널 범위가 올바르지 않습니다");
   });
 
   it("round-trips normalized catalog identity without changing the canonical render brush", () => {
@@ -953,6 +1044,65 @@ describe("studio CRDT page bridge", () => {
     expect(decoded.pressureModel).toBe("linear-residual-path-v3");
     expect(decoded.sampleSpacing).toBe(0);
     expect(decoded.pressures).toEqual([1, 1, 0, 0]);
+  });
+
+  it("round-trips the renderer-significant outline snapshot only through the current payload", () => {
+    const outlineStroke = captureStudioOutlineStrokeContractV1({
+      brushId: "gpen",
+      pressureSource: "recorded",
+    });
+    expect(outlineStroke).not.toBeNull();
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-outline-v1",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 12, 4, 24, 0],
+      pressures: [0.2, 0.7, 0.4],
+      stroke: "#111827",
+      strokeWidth: 9,
+      brush: "gpen",
+      outlineStroke: outlineStroke!,
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
+    expect(encoded.payload.extensions?.outlineStroke).toEqual(outlineStroke);
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded.outlineStroke).toEqual(outlineStroke);
+    expect(decoded.outlineStroke).not.toBe(outlineStroke);
+    expect(Object.isFrozen(decoded.outlineStroke)).toBe(true);
+  });
+
+  it("rejects unknown outline renderer contracts instead of degrading them to legacy geometry", () => {
+    const outlineStroke = captureStudioOutlineStrokeContractV1({
+      brushId: "gpen",
+      pressureSource: "recorded",
+    })!;
+    const futureContract: StudioCrdtJsonObject = {
+      ...outlineStroke,
+      version: 2,
+      profile: { ...outlineStroke.profile },
+    };
+    expect(() => studioCrdtStrokeToDrawElement(record(
+      "stroke-future-outline",
+      "page-a",
+      0,
+      {
+        payload: {
+          ...record("future-outline-source", "page-a", 0).payload,
+          version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+          extensions: { outlineStroke: futureContract },
+        },
+      },
+    ))).toThrow(/외곽선/u);
   });
 
   it("streams explicit-model fallback pressure through begin and append while legacy stays 0.5", () => {

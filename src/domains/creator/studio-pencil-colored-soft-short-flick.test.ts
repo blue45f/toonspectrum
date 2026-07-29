@@ -1,0 +1,96 @@
+import { describe, expect, it } from "vitest";
+
+import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+import { bridgeStudioDynamicDabsToDryMediaV1 } from "./studio-dry-media-dynamic-bridge";
+
+const SEED = 0x13ad_beef;
+
+function requireColoredPencil() {
+  const selection = materializeStudioBrushPackSelection("pencil-colored-soft");
+  if (!selection) throw new Error("pencil-colored-soft did not materialize");
+  return selection;
+}
+
+describe("soft coloured-pencil endpoint visibility", () => {
+  it("keeps a 14px mouse flick visible without turning wax pigment opaque", () => {
+    const selection = requireColoredPencil();
+    const dabs = planNormalizedStudioDynamicBrushDabs({
+      baseWidth: selection.defaultWidth,
+      baseOpacity: selection.defaultOpacity,
+      points: [0, 0, 14, -2],
+      pressures: [0.5, 0.5],
+      speeds: [1.4, 1.4],
+      seed: SEED,
+      maxDabs: 512,
+    }, selection.brushDynamics);
+
+    expect(selection.brushDynamics.taper).toMatchObject({
+      enabled: true,
+      minSizeRatio: 0.36,
+      minOpacityRatio: 0.92,
+    });
+    expect(dabs).toHaveLength(11);
+    expect(Math.min(...dabs.map(({ size }) => size))).toBeGreaterThan(
+      selection.defaultWidth * 0.3,
+    );
+    expect(
+      dabs.reduce((sum, { opacity }) => sum + opacity, 0) / dabs.length,
+    ).toBeGreaterThan(0.48);
+
+    const bridged = bridgeStudioDynamicDabsToDryMediaV1({
+      brushId: selection.runtimeBrushId,
+      brushCatalogId: selection.catalogId,
+      seed: SEED,
+      dabs,
+    });
+    expect(bridged.ok).toBe(true);
+    if (!bridged.ok) return;
+
+    expect(bridged.receipt.laneCount).toBe(5);
+    expect(bridged.receipt.marks).toHaveLength(dabs.length * 5);
+    const integratedPigment = bridged.receipt.marks.reduce(
+      (sum, mark) => sum
+        + Math.PI * mark.radiusX * mark.radiusY * mark.alpha * 0.78,
+      0,
+    );
+    expect(integratedPigment).toBeGreaterThan(43.5);
+    expect(Math.max(...bridged.receipt.marks.map(({ alpha }) => alpha))).toBeLessThan(0.3);
+  });
+
+  it("does not change the pressure-mapped grain body away from the two taper zones", () => {
+    const selection = requireColoredPencil();
+    expect(selection.brushDynamics.flow).toMatchObject({
+      base: 0.58,
+      mappings: [{ source: "pressure", from: 0.5, to: 1 }],
+    });
+    expect(selection.brushDynamics.grain).toMatchObject({
+      space: "canvas-fixed",
+      amount: 0.3,
+      scale: 2.6,
+      contrast: 0.5,
+      seed: 0x4b0a_1103,
+    });
+
+    const input = {
+      baseWidth: selection.defaultWidth,
+      baseOpacity: selection.defaultOpacity,
+      points: [0, 0, 100, 6, 200, 0],
+      pressures: [0.25, 0.85, 0.4],
+      speeds: [0.35, 0.8, 0.45],
+      seed: SEED,
+      maxDabs: 1_024,
+    } as const;
+    const tapered = planNormalizedStudioDynamicBrushDabs(input, selection.brushDynamics);
+    const withoutTaper = planNormalizedStudioDynamicBrushDabs(input, {
+      ...selection.brushDynamics,
+      taper: { ...selection.brushDynamics.taper, enabled: false },
+    });
+
+    const body = (dabs: typeof tapered) => dabs.filter(
+      ({ progress }) => progress >= 0.2 && progress <= 0.8,
+    );
+    expect(body(tapered)).not.toHaveLength(0);
+    expect(body(tapered)).toEqual(body(withoutTaper));
+  });
+});

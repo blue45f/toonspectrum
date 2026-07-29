@@ -7,6 +7,7 @@ import {
   StudioWebGpuEngine,
   type StudioGpuStrokeJournalSuffixBatchPatch,
   type StudioGpuStrokeJournalSuffixPatch,
+  type StudioWebGpuResizeOutcome,
 } from "./studio-webgpu-engine";
 import {
   sameStudioGpuStrokes,
@@ -73,9 +74,20 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   readonly eagerInitialize?: boolean;
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
+  /**
+   * Fired synchronously before a resize/viewport change rewrites either backing surface. The
+   * parent must revoke the currently-visible GPU authority immediately and only reopen it after
+   * `onFrameReady` supplies this exact request id.
+   */
+  readonly onFrameRequest?: (request: StudioWebGpuSurfaceFrameRequest) => void;
   /** A matching receipt is the only safe signal for hiding the authoritative Konva preview. */
   readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
   readonly onFrameInvalid?: () => void;
+}
+
+export interface StudioWebGpuSurfaceFrameRequest {
+  readonly requestId: string;
+  readonly reason: "surface-resize" | "viewport-change";
 }
 
 export interface StudioWebGpuCanvasHandle {
@@ -90,7 +102,9 @@ export interface StudioWebGpuCanvasHandle {
    * live-ink path calls this once per pointer frame so a 30k-line parent never re-renders per
    * point; the declarative `strokes` prop remains authoritative outside a pinned stroke.
    */
-  readonly syncPinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  readonly syncPinnedStrokes: (
+    strokes: readonly StudioGpuStroke[]
+  ) => StudioWebGpuJournalFeedOutcome;
   /** Explicit zero-history-copy hot path for callers that already own a proven point suffix. */
   readonly appendPinnedStrokeSuffix: (patch: StudioGpuStrokeSuffixPatch) => void;
   /** Appends a terminal symmetry group's suffixes atomically and submits exactly one frame. */
@@ -106,17 +120,23 @@ export interface StudioWebGpuCanvasHandle {
   /** Appends newly-started operations while retaining earlier normal/erase pixels in place. */
   readonly appendPinnedStrokeOperations: (patch: StudioGpuStrokeOperationsAppendPatch) => void;
   /** Replaces the pinned baseline and deliberately pays one full validation/snapshot cost. */
-  readonly replacePinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  readonly replacePinnedStrokes: (
+    strokes: readonly StudioGpuStroke[]
+  ) => StudioWebGpuJournalFeedOutcome;
   /** Starts a root-only journal feed; subsequent journal calls retain no caller full history. */
   readonly replacePinnedJournalBaseline: (
     strokes: readonly StudioGpuStroke[]
   ) => StudioWebGpuJournalFeedOutcome;
   /** Clears pinned pixels while keeping the initialized backend warm. */
-  readonly resetPinnedStrokes: () => void;
+  readonly resetPinnedStrokes: () => StudioWebGpuJournalFeedOutcome;
   /**
-   * Imperative pinned-visibility toggle. Stroke start/end flips visibility without a parent
-   * render — only this small component re-renders, keeping the stroke hot path free of the
-   * host page's render cost.
+   * Compositor-only visibility gate. It preserves the pinned journal and never issues a
+   * replacement request, so an in-flight baseline can stay hidden until its exact receipt.
+   */
+  readonly setPinnedPresentationVisible: (visible: boolean) => void;
+  /**
+   * Authority release plus visibility toggle. Passing false restores the declarative request and
+   * invalidates the pinned journal; use `setPinnedPresentationVisible` for a temporary hide.
    */
   readonly setPinnedVisible: (visible: boolean) => void;
 }
@@ -164,7 +184,7 @@ function resumedPinnedFeedCommand(
   return currentStrokes.length > 0 ? { mode: "replace" } : { mode: "reset" };
 }
 
-function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
+function sameCanvasViewportRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
   return Object.is(left.width, right.width)
     && Object.is(left.height, right.height)
     && Object.is(left.scaleX, right.scaleX)
@@ -172,10 +192,12 @@ function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): b
     && Object.is(left.offsetX, right.offsetX)
     && Object.is(left.offsetY, right.offsetY)
     && left.flipX === right.flipX
-    && Object.is(left.surfaceLeft, right.surfaceLeft)
-    && Object.is(left.surfaceTop, right.surfaceTop)
     && Object.is(left.surfaceWidth, right.surfaceWidth)
-    && Object.is(left.surfaceHeight, right.surfaceHeight)
+    && Object.is(left.surfaceHeight, right.surfaceHeight);
+}
+
+function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
+  return sameCanvasViewportRequest(left, right)
     && sameStudioGpuStrokes(left.strokes, right.strokes);
 }
 
@@ -221,6 +243,7 @@ function StudioWebGpuCanvas({
   flipX,
   onBackendChange,
   onDeviceLost,
+  onFrameRequest,
   onFrameReady,
   onFrameInvalid,
 }: StudioWebGpuCanvasProps, ref) {
@@ -233,7 +256,13 @@ function StudioWebGpuCanvas({
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<StudioWebGpuEngine | null>(null);
-  const callbacksRef = useRef({ onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid });
+  const callbacksRef = useRef({
+    onBackendChange,
+    onDeviceLost,
+    onFrameRequest,
+    onFrameReady,
+    onFrameInvalid,
+  });
   const requestSequenceRef = useRef(0);
   const desiredRequestIdRef = useRef("frame:0");
   const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
@@ -257,7 +286,13 @@ function StudioWebGpuCanvas({
   });
   const latestEffectiveRequestRef = useRef<LatestCanvasProps>(declarativeRequestRef.current);
 
-  callbacksRef.current = { onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid };
+  callbacksRef.current = {
+    onBackendChange,
+    onDeviceLost,
+    onFrameRequest,
+    onFrameReady,
+    onFrameInvalid,
+  };
   const declarativeRequest: LatestCanvasProps = {
     width,
     height,
@@ -284,21 +319,32 @@ function StudioWebGpuCanvas({
   const queuePinnedRequest = (
     nextStrokes: readonly StudioGpuStroke[],
     command: StudioGpuEngineFeedCommand
-  ) => {
+  ): StudioWebGpuJournalFeedOutcome => {
     pinnedStrokesRef.current = nextStrokes;
     latestEffectiveRequestRef.current = {
       ...declarativeRequestRef.current,
       strokes: nextStrokes,
     };
+    lastIssuedRequestRef.current = {
+      ...latestEffectiveRequestRef.current,
+      strokes: EMPTY_STROKES,
+    };
     pendingEngineCommandRef.current = command;
     requestSequenceRef.current += 1;
     desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
-    issueLatestRequestRef.current?.();
+    return issueLatestRequestRef.current?.() ?? {
+      status: "rejected",
+      requestId: desiredRequestIdRef.current,
+    };
   };
 
   const queuePinnedJournalRequest = (
     command: StudioGpuEngineFeedCommand
   ): StudioWebGpuJournalFeedOutcome => {
+    lastIssuedRequestRef.current = {
+      ...latestEffectiveRequestRef.current,
+      strokes: EMPTY_STROKES,
+    };
     pendingEngineCommandRef.current = command;
     requestSequenceRef.current += 1;
     desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
@@ -322,15 +368,18 @@ function StudioWebGpuCanvas({
         nextStrokes
       );
       if (update.mode === "append") {
-        queuePinnedRequest(nextStrokes, { mode: "append", patch: update.patch });
+        return queuePinnedRequest(nextStrokes, { mode: "append", patch: update.patch });
       } else if (update.mode === "append-operations") {
-        queuePinnedRequest(nextStrokes, { mode: "append-operations", patch: update.patch });
+        return queuePinnedRequest(nextStrokes, {
+          mode: "append-operations",
+          patch: update.patch,
+        });
       } else if (update.mode === "retain") {
-        queuePinnedRequest(nextStrokes, { mode: "retain" });
+        return queuePinnedRequest(nextStrokes, { mode: "retain" });
       } else if (update.mode === "reset") {
-        queuePinnedRequest(nextStrokes, { mode: "reset" });
+        return queuePinnedRequest(nextStrokes, { mode: "reset" });
       } else {
-        queuePinnedRequest(nextStrokes, { mode: "replace" });
+        return queuePinnedRequest(nextStrokes, { mode: "replace" });
       }
     },
     appendPinnedStrokeSuffix: (patch) => {
@@ -359,7 +408,7 @@ function StudioWebGpuCanvas({
     },
     replacePinnedStrokes: (nextStrokes) => {
       pinnedJournalActiveRef.current = false;
-      queuePinnedRequest(nextStrokes, nextStrokes.length > 0
+      return queuePinnedRequest(nextStrokes, nextStrokes.length > 0
         ? { mode: "replace" }
         : { mode: "reset" });
     },
@@ -378,9 +427,26 @@ function StudioWebGpuCanvas({
     },
     resetPinnedStrokes: () => {
       pinnedJournalActiveRef.current = false;
-      queuePinnedRequest(EMPTY_STROKES, { mode: "reset" });
+      return queuePinnedRequest(EMPTY_STROKES, { mode: "reset" });
+    },
+    setPinnedPresentationVisible: (visible) => {
+      const root = rootRef.current;
+      if (root) {
+        root.style.visibility = visible ? "visible" : "hidden";
+        // The engine owns each child canvas and may set `visibility: visible` while switching
+        // WebGPU/Canvas2D backends. A visible child can override inherited `visibility: hidden`.
+        // Ancestor opacity cannot be resurrected by a child, so it is the hard presentation gate
+        // while the parent has not authorized the matching frame receipt.
+        root.style.opacity = visible ? "1" : "0";
+      }
+      setPinnedVisibleState(visible);
     },
     setPinnedVisible: (visible) => {
+      const root = rootRef.current;
+      if (!visible && root) {
+        root.style.visibility = "hidden";
+        root.style.opacity = "0";
+      }
       if (!visible && pinnedStrokesRef.current !== null) {
         // Pin release is an authority transition, not just a CSS visibility change. Restore the
         // newest declarative request immediately even when React can bail out of an unchanged
@@ -395,6 +461,10 @@ function StudioWebGpuCanvas({
         desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
         callbacksRef.current.onFrameInvalid?.();
         issueLatestRequestRef.current?.();
+      }
+      if (visible && root) {
+        root.style.visibility = "visible";
+        root.style.opacity = "1";
       }
       setPinnedVisibleState(visible);
     },
@@ -427,28 +497,68 @@ function StudioWebGpuCanvas({
     engine.suspend(desiredRequestIdRef.current);
     callbacksRef.current.onBackendChange?.(engine.getBackend());
 
-    const syncViewport = (observedWidth?: number, observedHeight?: number) => {
+    const syncViewport = (
+      observedWidth?: number,
+      observedHeight?: number,
+      resizeRequest?: {
+        readonly requestId: string;
+        readonly render: boolean;
+        readonly reason: StudioWebGpuSurfaceFrameRequest["reason"];
+        readonly commitRequestId?: boolean;
+      }
+    ): StudioWebGpuResizeOutcome => {
       const latest = latestEffectiveRequestRef.current;
       const measured = measuredCssSize(
         rootRef.current,
         latest.surfaceWidth ?? latest.width,
         latest.surfaceHeight ?? latest.height
       );
-      engine.resize({
-        logicalWidth: latest.width,
-        logicalHeight: latest.height,
-        cssWidth: observedWidth && observedWidth > 0 ? observedWidth : measured.width,
-        cssHeight: observedHeight && observedHeight > 0 ? observedHeight : measured.height,
-        dpr: devicePixelRatio(
-          observedWidth && observedWidth > 0 ? observedWidth : measured.width,
-          observedHeight && observedHeight > 0 ? observedHeight : measured.height
-        ),
-        scaleX: latest.scaleX,
-        scaleY: latest.scaleY,
-        offsetX: latest.offsetX,
-        offsetY: latest.offsetY,
-        flipX: latest.flipX,
-      });
+      const cssWidth = observedWidth && observedWidth > 0 ? observedWidth : measured.width;
+      const cssHeight = observedHeight && observedHeight > 0 ? observedHeight : measured.height;
+      return engine.resize(
+        {
+          logicalWidth: latest.width,
+          logicalHeight: latest.height,
+          cssWidth,
+          cssHeight,
+          dpr: devicePixelRatio(cssWidth, cssHeight),
+          scaleX: latest.scaleX,
+          scaleY: latest.scaleY,
+          offsetX: latest.offsetX,
+          offsetY: latest.offsetY,
+          flipX: latest.flipX,
+        },
+        resizeRequest ? {
+          requestId: resizeRequest.requestId,
+          render: resizeRequest.render,
+          onBeforeSurfaceMutation: (requestId) => {
+            if (resizeRequest.commitRequestId) {
+              requestSequenceRef.current += 1;
+              desiredRequestIdRef.current = requestId;
+            }
+            // The observer/window resize path is itself an issued viewport request. Record the
+            // geometry here, before React's following layout effect, so that effect cannot enqueue
+            // a second `retain` request for the same surface mutation. A duplicate retain can
+            // legitimately produce no engine frame (`resize: unchanged`), leaving its receipt
+            // unregistered and forcing the parent to abandon otherwise-valid GPU live ink.
+            lastIssuedRequestRef.current = pinnedStrokesRef.current !== null
+              ? { ...latest, strokes: EMPTY_STROKES }
+              : snapshotCanvasRequest(latest);
+            // Canvas width/height assignment destroys its backing pixels synchronously. Hide the
+            // compositor in the same stack before the engine reaches that assignment; the parent
+            // receives the exact receipt identity required to reopen it.
+            const root = rootRef.current;
+            if (root) {
+              root.style.visibility = "hidden";
+              root.style.opacity = "0";
+            }
+            callbacksRef.current.onFrameRequest?.({
+              requestId,
+              reason: resizeRequest.reason,
+            });
+          },
+        } : undefined
+      );
     };
 
     const requestInitialization = () => {
@@ -479,7 +589,14 @@ function StudioWebGpuCanvas({
         engine.resetStrokeFeed(requestId);
         return { status: "accepted", requestId };
       }
-      syncViewport();
+      // Resizing is part of this request, not a separate old-feed render. The engine invalidates
+      // before rewriting either surface and defers rasterization to the command below, preserving
+      // the journal hot path and preventing a same-id receipt for stale retained strokes.
+      syncViewport(undefined, undefined, {
+        requestId,
+        render: false,
+        reason: "viewport-change",
+      });
       let journalOutcome: StudioWebGpuJournalFeedOutcome["status"] = "accepted";
       if (command.mode === "append") {
         engine.appendStrokeFeedSuffix(command.patch, requestId);
@@ -530,10 +647,34 @@ function StudioWebGpuCanvas({
       : new ResizeObserver((entries) => {
           const entry = entries[0];
           if (!entry) return;
-          syncViewport(entry.contentRect.width, entry.contentRect.height);
+          const latest = latestEffectiveRequestRef.current;
+          if (!isStudioWebGpuCanvasActive(latest.strokes)) {
+            syncViewport(entry.contentRect.width, entry.contentRect.height);
+            return;
+          }
+          const requestId = `frame:${requestSequenceRef.current + 1}`;
+          syncViewport(entry.contentRect.width, entry.contentRect.height, {
+            requestId,
+            render: true,
+            reason: "surface-resize",
+            commitRequestId: true,
+          });
         });
     if (resizeObserver && rootRef.current) resizeObserver.observe(rootRef.current);
-    const handleWindowResize = () => syncViewport();
+    const handleWindowResize = () => {
+      const latest = latestEffectiveRequestRef.current;
+      if (!isStudioWebGpuCanvasActive(latest.strokes)) {
+        syncViewport();
+        return;
+      }
+      const requestId = `frame:${requestSequenceRef.current + 1}`;
+      syncViewport(undefined, undefined, {
+        requestId,
+        render: true,
+        reason: "surface-resize",
+        commitRequestId: true,
+      });
+    };
     globalThis.addEventListener?.("resize", handleWindowResize, { passive: true });
 
     return () => {
@@ -552,10 +693,28 @@ function StudioWebGpuCanvas({
   // same layout phase. This semantic comparison deliberately avoids a hash collision becoming an
   // authority decision and also tolerates parents rebuilding equivalent stroke arrays.
   useLayoutEffect(() => {
-    // Imperative pinning owns both pixels and request sequencing. Skipping this comparison avoids
-    // copying/comparing the growing live point arrays when an unrelated parent render occurs.
-    if (pinnedStrokesRef.current !== null) return;
     const latest = latestEffectiveRequestRef.current;
+    // Imperative pinning owns pixels, but viewport transforms still invalidate the backing
+    // presentation. Compare geometry only (never the growing point arrays) and re-present the
+    // engine-owned journal under a fresh request id.
+    if (pinnedStrokesRef.current !== null) {
+      if (
+        lastIssuedRequestRef.current
+        && sameCanvasViewportRequest(lastIssuedRequestRef.current, latest)
+      ) {
+        return;
+      }
+      lastIssuedRequestRef.current = {
+        ...latest,
+        strokes: EMPTY_STROKES,
+      };
+      requestSequenceRef.current += 1;
+      desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
+      pendingEngineCommandRef.current = { mode: "retain" };
+      callbacksRef.current.onFrameInvalid?.();
+      issueLatestRequestRef.current?.();
+      return;
+    }
     if (lastIssuedRequestRef.current && sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
       return;
     }
@@ -568,6 +727,15 @@ function StudioWebGpuCanvas({
     issueLatestRequestRef.current?.();
   });
 
+  useLayoutEffect(() => {
+    // Once authority release has committed, hand visibility back to the declarative class gate.
+    // The inline value exists only to make imperative GPU↔Canvas swaps synchronous.
+    if (pinnedStrokesRef.current === null) {
+      rootRef.current?.style.removeProperty("visibility");
+      rootRef.current?.style.removeProperty("opacity");
+    }
+  }, [frameAuthorized, pinnedVisibleState, strokes]);
+
   // 파인된 스트로크는 임페러티브 피드로만 흐르므로 strokes prop 이 비어 있어도 표시 대상이다.
   const pinnedShown = pinnedVisible || pinnedVisibleState;
   const presentationActive = isStudioWebGpuCanvasActive(strokes) || pinnedShown;
@@ -579,7 +747,8 @@ function StudioWebGpuCanvas({
       className={cn(
         "overflow-hidden",
         surfaceBounds ? "absolute" : "relative h-full w-full",
-        ((!frameAuthorized && !pinnedShown) || !presentationActive) && "invisible",
+        ((!frameAuthorized && !pinnedShown) || !presentationActive)
+          && "invisible opacity-0",
         className
       )}
       style={surfaceBounds ? {

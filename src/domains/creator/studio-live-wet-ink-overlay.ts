@@ -19,6 +19,7 @@ import {
   decideStudioNativeLiveSurfaceResolution,
   STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
 } from "./studio-low-latency-canvas";
+import { studioWetInkInteractiveBackendSupportsElement } from "./studio-wet-ink-backend-capability";
 import {
   planStudioWetInkBrushReplay,
   resolveStudioWetInkBrushPhysicalRecipe,
@@ -276,7 +277,7 @@ function fullFieldBounds(field: StudioWetInkField): StudioWetInkBounds {
  * Exact support gate used by StudioPage before hiding its retained draft.
  */
 export function studioLiveWetInkOverlaySupportsElement(element: DrawEl): boolean {
-  return resolveStudioWetInkBrushPhysicalRecipe(element) !== null
+  return studioWetInkInteractiveBackendSupportsElement(element)
     && element.hidden !== true;
 }
 

@@ -6,6 +6,12 @@ import {
 } from "./studio-brush-dynamics";
 import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
 import {
+  STUDIO_BRUSH_RENDER_PROVENANCE_LIMITS,
+  parseStudioBrushRenderProvenanceCrdtSidecar,
+  serializeStudioBrushRenderProvenanceCrdtSidecarCanonical,
+  type StudioBrushRenderProvenanceCrdtSidecar,
+} from "./studio-brush-render-provenance";
+import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
   decodeStudioCrdtUpdate,
@@ -56,6 +62,7 @@ import {
   isStudioMaterialMinimumDiameterRatio,
   isStudioMaterialPressureModel,
 } from "./studio-material-pressure-model";
+import { normalizeStudioOutlineStrokeContract } from "./studio-outline-stroke-contract";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
@@ -87,6 +94,12 @@ import {
   type StudioRasterUndoAcknowledgement,
   type StudioRasterUndoOperation,
 } from "@/lib/studio-crdt-raster-ops";
+import {
+  STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+  STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
+  isStudioInkInputContractV2,
+  normalizeStudioInkInputContract,
+} from "@/lib/studio-ink-input-contract";
 
 export {
   STUDIO_CRDT_ORIGIN_LOCAL,
@@ -131,6 +144,17 @@ export const STUDIO_CRDT_METADATA_MAX_BYTES = 16 * 1024;
 export const STUDIO_CRDT_DELETION_OPS_ROOT = "studio-deletion-ops";
 export const STUDIO_CRDT_DELETION_ACKS_ROOT = "studio-deletion-acks";
 export const STUDIO_CRDT_DELETION_OPERATION_MAX_ENTRIES = 100_000;
+/**
+ * Operation-keyed canonical R8 render provenance plus a grow-only content index. The second map
+ * preserves concurrent conflicting hashes that a plain Y.Map last-writer-wins value would hide,
+ * allowing every reader to reject the conflicted operation instead of silently accepting a winner.
+ */
+export const STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_ROOT =
+  "studio-brush-render-provenance-v1";
+export const STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_CONTENT_INDEX_ROOT =
+  "studio-brush-render-provenance-content-index-v1";
+export const STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES = 4_096;
+export const STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_BYTES = 16 * 1_024 * 1_024;
 /**
  * Flat grow-only semantic raster roots. Values are canonical JSON strings rather than nested Yjs
  * objects so one immutable event is one atomic CRDT value and raster bytes never enter the doc.
@@ -179,7 +203,7 @@ type StudioCrdtDeletionTarget =
   | { kind: "page"; id: string }
   | { kind: "group"; pageId: string; id: string };
 
-const SAMPLE_ARRAY_KEYS = [
+const BASE_SAMPLE_ARRAY_KEYS = [
   "points",
   "pressures",
   "tiltXs",
@@ -187,6 +211,17 @@ const SAMPLE_ARRAY_KEYS = [
   "twists",
   "speeds",
   "tangentialPressures",
+] as const;
+const EXTENDED_INK_SAMPLE_ARRAY_KEYS = [
+  "altitudeAngles",
+  "azimuthAngles",
+  "contactWidths",
+  "contactHeights",
+  "sampleTimeOffsets",
+] as const;
+const SAMPLE_ARRAY_KEYS = [
+  ...BASE_SAMPLE_ARRAY_KEYS,
+  ...EXTENDED_INK_SAMPLE_ARRAY_KEYS,
 ] as const;
 
 const JSON_PAYLOAD_KEYS = [
@@ -228,6 +263,11 @@ export interface StudioCrdtStrokeSamples {
   twists?: number[];
   speeds?: number[];
   tangentialPressures?: number[];
+  altitudeAngles?: number[];
+  azimuthAngles?: number[];
+  contactWidths?: number[];
+  contactHeights?: number[];
+  sampleTimeOffsets?: number[];
 }
 
 /** Versioned, JSON-safe representation of the complete StudioPage DrawEl surface. */
@@ -727,7 +767,12 @@ function payloadMetadataByteLength(payload: StudioCrdtDrawStrokePayload): number
   return TEXT_ENCODER.encode(JSON.stringify(metadata)).byteLength;
 }
 
-function sampleCount(samples: StudioCrdtStrokeSamples, allowEmpty: boolean): number {
+function sampleCount(
+  samples: StudioCrdtStrokeSamples,
+  allowEmpty: boolean,
+  requireExtendedInkChannels = false,
+  requireZeroTimeOrigin = false,
+): number {
   if (
     !Array.isArray(samples.points) ||
     samples.points.length % 2 !== 0 ||
@@ -747,6 +792,11 @@ function sampleCount(samples: StudioCrdtStrokeSamples, allowEmpty: boolean): num
     samples.twists,
     samples.speeds,
     samples.tangentialPressures,
+    samples.altitudeAngles,
+    samples.azimuthAngles,
+    samples.contactWidths,
+    samples.contactHeights,
+    samples.sampleTimeOffsets,
   ];
   for (const values of aligned) {
     if (values !== undefined && (!Array.isArray(values) || values.length !== count)) {
@@ -761,15 +811,65 @@ function sampleCount(samples: StudioCrdtStrokeSamples, allowEmpty: boolean): num
   for (const pressure of samples.tangentialPressures ?? []) {
     assertFiniteRange(pressure, -1, 1, "배럴 압력");
   }
+  if (
+    requireExtendedInkChannels
+    && EXTENDED_INK_SAMPLE_ARRAY_KEYS.some((key) => samples[key] === undefined)
+  ) {
+    throw new Error("v2 획 입력 센서 채널이 누락되었습니다.");
+  }
+  for (const angle of samples.altitudeAngles ?? []) {
+    assertFiniteRange(angle, 0, Math.PI / 2, "펜 고도각");
+  }
+  for (const angle of samples.azimuthAngles ?? []) {
+    if (
+      typeof angle !== "number"
+      || !Number.isFinite(angle)
+      || angle < 0
+      || angle >= Math.PI * 2
+    ) {
+      throw new Error("펜 방위각 값이 올바르지 않습니다.");
+    }
+  }
+  for (const dimension of [
+    ...(samples.contactWidths ?? []),
+    ...(samples.contactHeights ?? []),
+  ]) {
+    assertFiniteRange(
+      dimension,
+      0,
+      STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
+      "포인터 접촉 크기",
+    );
+  }
+  let previousTimeOffset = -1;
+  for (const timeOffset of samples.sampleTimeOffsets ?? []) {
+    assertFiniteRange(
+      timeOffset,
+      0,
+      STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
+      "획 상대 시간",
+    );
+    if (timeOffset < previousTimeOffset) {
+      throw new Error("획 상대 시간이 역행했습니다.");
+    }
+    previousTimeOffset = timeOffset;
+  }
+  if (
+    requireZeroTimeOrigin
+    && count > 0
+    && samples.sampleTimeOffsets?.[0] !== 0
+  ) {
+    throw new Error("획 상대 시간은 포인터 시작의 0ms에서 시작해야 합니다.");
+  }
   return count;
 }
 
 function normalizedSamples(
   samples: StudioCrdtStrokeSamples,
   allowEmpty: boolean,
-  storedPressureModel?: StudioInkPressureModel
+  storedPressureModel?: StudioInkPressureModel,
+  requireExtendedInkChannels?: boolean,
 ) {
-  const count = sampleCount(samples, allowEmpty);
   const extensions = "extensions" in samples && samples.extensions
     && typeof samples.extensions === "object"
     && !Array.isArray(samples.extensions)
@@ -781,6 +881,17 @@ function normalizedSamples(
   const pressureModel = storedPressureModel ?? (isStudioInkPressureModel(pressureModelValue)
     ? pressureModelValue
     : undefined);
+  const embeddedInkContract = normalizeStudioInkInputContract(
+    extensions && "inkInput" in extensions ? extensions.inkInput : undefined,
+  );
+  const embeddedV2 = isStudioInkInputContractV2(embeddedInkContract);
+  const requireExtended = requireExtendedInkChannels ?? embeddedV2;
+  const count = sampleCount(
+    samples,
+    allowEmpty,
+    requireExtended,
+    embeddedV2,
+  );
   return {
     points: [...samples.points],
     pressures: [
@@ -793,7 +904,32 @@ function normalizedSamples(
     tangentialPressures: [
       ...(samples.tangentialPressures ?? Array<number>(count).fill(0)),
     ],
-  } satisfies Record<StudioCrdtSampleArrayKey, number[]>;
+    altitudeAngles: samples.altitudeAngles
+      ? [...samples.altitudeAngles]
+      : requireExtended
+        ? Array<number>(count).fill(Math.PI / 2)
+        : undefined,
+    azimuthAngles: samples.azimuthAngles
+      ? [...samples.azimuthAngles]
+      : requireExtended
+        ? Array<number>(count).fill(0)
+        : undefined,
+    contactWidths: samples.contactWidths
+      ? [...samples.contactWidths]
+      : requireExtended
+        ? Array<number>(count).fill(1)
+        : undefined,
+    contactHeights: samples.contactHeights
+      ? [...samples.contactHeights]
+      : requireExtended
+        ? Array<number>(count).fill(1)
+        : undefined,
+    sampleTimeOffsets: samples.sampleTimeOffsets
+      ? [...samples.sampleTimeOffsets]
+      : requireExtended
+        ? Array<number>(count).fill(0)
+        : undefined,
+  };
 }
 
 function hasCanonicalRendererSignificantR8Grain(
@@ -908,6 +1044,26 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   ) {
     throw new Error("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다.");
   }
+  const outlineStroke = payload.extensions?.outlineStroke;
+  if (outlineStroke !== undefined) {
+    if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) {
+      throw new Error("외곽선 획 계약과 페이로드 버전이 호환되지 않습니다.");
+    }
+    const normalizedOutlineStroke = normalizeStudioOutlineStrokeContract(outlineStroke);
+    if (!normalizedOutlineStroke) {
+      throw new Error("외곽선 획 계약이 올바르지 않습니다.");
+    }
+  }
+  const inkInput = payload.extensions?.inkInput;
+  const normalizedInkInput = inkInput === undefined
+    ? null
+    : normalizeStudioInkInputContract(inkInput);
+  if (
+    inkInput !== undefined
+    && normalizedInkInput === null
+  ) {
+    throw new Error("획 입력 센서 계약이 올바르지 않습니다.");
+  }
   const paintModel = payload.extensions?.paintModel;
   if (
     paintModel !== undefined
@@ -958,7 +1114,14 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
       "획 메타데이터가 실시간 동기화 한도를 초과했습니다. 큰 마스크와 자산은 외부 참조로 저장해 주세요."
     );
   }
-  sampleCount(payload, allowEmpty);
+  const requiresExtendedInkChannels =
+    isStudioInkInputContractV2(normalizedInkInput);
+  sampleCount(
+    payload,
+    allowEmpty,
+    requiresExtendedInkChannels,
+    requiresExtendedInkChannels,
+  );
 }
 
 function yArray(record: Y.Map<unknown>, key: StudioCrdtSampleArrayKey): Y.Array<number> | null {
@@ -1089,17 +1252,25 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
     (mode !== "pen" && mode !== "eraser") ||
     !stroke ||
     strokeWidth === null ||
-    SAMPLE_ARRAY_KEYS.some((key) => sharedArrays[key] === null) ||
+    BASE_SAMPLE_ARRAY_KEYS.some((key) => sharedArrays[key] === null) ||
     pointsLength < 0 ||
     pointsLength % 2 !== 0 ||
     count > STUDIO_CRDT_STROKE_MAX_SAMPLES ||
-    SAMPLE_ARRAY_KEYS.slice(1).some((key) => sharedArrays[key]!.length !== count)
+    BASE_SAMPLE_ARRAY_KEYS.slice(1).some(
+      (key) => sharedArrays[key]!.length !== count,
+    )
+    || EXTENDED_INK_SAMPLE_ARRAY_KEYS.some(
+      (key) => sharedArrays[key] !== null && sharedArrays[key]!.length !== count,
+    )
   ) {
     return null;
   }
   const arrays = Object.fromEntries(
-    SAMPLE_ARRAY_KEYS.map((key) => [key, sharedArrays[key]!.toArray()])
-  ) as Record<StudioCrdtSampleArrayKey, number[]>;
+    SAMPLE_ARRAY_KEYS.flatMap((key) => {
+      const shared = sharedArrays[key];
+      return shared ? [[key, shared.toArray()]] : [];
+    }),
+  ) as Partial<Record<StudioCrdtSampleArrayKey, number[]>>;
   const payload: StudioCrdtDrawStrokePayload = {
     version,
     type,
@@ -1107,14 +1278,18 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
     mode,
     stroke,
     strokeWidth,
-    points: arrays.points,
-    pressures: arrays.pressures,
-    tiltXs: arrays.tiltXs,
-    tiltYs: arrays.tiltYs,
-    twists: arrays.twists,
-    speeds: arrays.speeds,
-    tangentialPressures: arrays.tangentialPressures,
+    points: arrays.points!,
+    pressures: arrays.pressures!,
+    tiltXs: arrays.tiltXs!,
+    tiltYs: arrays.tiltYs!,
+    twists: arrays.twists!,
+    speeds: arrays.speeds!,
+    tangentialPressures: arrays.tangentialPressures!,
   };
+  for (const key of EXTENDED_INK_SAMPLE_ARRAY_KEYS) {
+    const values = arrays[key];
+    if (values !== undefined) Object.assign(payload, { [key]: values });
+  }
   const opacity = readNumber(record, "opacity");
   const sampleSpacing = readNumber(record, "sampleSpacing");
   if (opacity !== null) payload.opacity = opacity;
@@ -1224,6 +1399,76 @@ interface StudioCrdtRasterMutation {
   readonly operations?: readonly { readonly id: string; readonly value: string }[];
   readonly undoOperations?: readonly { readonly id: string; readonly value: string }[];
   readonly undoAcknowledgements?: readonly { readonly id: string; readonly value: string }[];
+  readonly brushRenderProvenance?: {
+    readonly registry: readonly { readonly id: string; readonly value: string }[];
+    readonly contentIndex: readonly { readonly id: string; readonly value: string }[];
+  };
+}
+
+interface StudioCrdtBrushRenderProvenanceSnapshot {
+  readonly byOperationId: ReadonlyMap<
+    string,
+    Readonly<StudioBrushRenderProvenanceCrdtSidecar>
+  >;
+  readonly sidecars: readonly Readonly<StudioBrushRenderProvenanceCrdtSidecar>[];
+  readonly totalBytes: number;
+}
+
+interface StudioCrdtBrushRenderProvenanceMutation {
+  readonly sidecars: readonly Readonly<StudioBrushRenderProvenanceCrdtSidecar>[];
+  readonly registry: readonly { readonly id: string; readonly value: string }[];
+  readonly contentIndex: readonly { readonly id: string; readonly value: string }[];
+}
+
+function brushRenderProvenanceContentIndexKey(
+  sidecar: Readonly<StudioBrushRenderProvenanceCrdtSidecar>
+): string {
+  return `${sidecar.operationId}|${sidecar.provenanceSha256}`;
+}
+
+function brushRenderProvenanceOperationIdFromContentIndexKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const separator = value.indexOf("|");
+  if (separator <= 0) return null;
+  const operationId = value.slice(0, separator);
+  const provenanceSha256 = value.slice(separator + 1);
+  if (
+    operationId.length > STUDIO_BRUSH_RENDER_PROVENANCE_LIMITS.maxOperationIdLength ||
+    !RASTER_SAFE_ID_PATTERN.test(operationId) ||
+    !/^sha256:[a-f0-9]{64}$/u.test(provenanceSha256)
+  ) {
+    return null;
+  }
+  return operationId;
+}
+
+function crdtUtf8Bytes(value: string): number {
+  return TEXT_ENCODER.encode(value).byteLength;
+}
+
+function crdtMapEntryBytes(key: string, value: string): number {
+  return crdtUtf8Bytes(key) + crdtUtf8Bytes(value);
+}
+
+function parseCanonicalBrushRenderProvenanceSidecar(
+  value: unknown
+): Readonly<StudioBrushRenderProvenanceCrdtSidecar> | null {
+  if (
+    typeof value !== "string" ||
+    crdtUtf8Bytes(value) > STUDIO_BRUSH_RENDER_PROVENANCE_LIMITS.maxCrdtSidecarBytes
+  ) {
+    return null;
+  }
+  try {
+    const parsedJson: unknown = JSON.parse(value);
+    const parsed = parseStudioBrushRenderProvenanceCrdtSidecar(parsedJson);
+    if (parsed.status !== "ready") return null;
+    return serializeStudioBrushRenderProvenanceCrdtSidecarCanonical(parsed.sidecar) === value
+      ? parsed.sidecar
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function addRasterAsset(
@@ -1266,6 +1511,8 @@ export class StudioCrdtDocument {
   private readonly rasterUndoOperations: Y.Map<string>;
   private readonly rasterUndoAcknowledgements: Y.Map<string>;
   private readonly rasterCheckpoints: Y.Map<string>;
+  private readonly brushRenderProvenance: Y.Map<string>;
+  private readonly brushRenderProvenanceContentIndex: Y.Map<string>;
   private readonly deletionOpIdsByTarget = new Map<string, Set<string>>();
   private readonly cleanup = new Set<() => void>();
   private readonly strokeIdByType = new WeakMap<object, string>();
@@ -1316,6 +1563,12 @@ export class StudioCrdtDocument {
     this.rasterUndoOperations = this.doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT);
     this.rasterUndoAcknowledgements = this.doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT);
     this.rasterCheckpoints = this.doc.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT);
+    this.brushRenderProvenance = this.doc.getMap<string>(
+      STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_ROOT
+    );
+    this.brushRenderProvenanceContentIndex = this.doc.getMap<string>(
+      STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_CONTENT_INDEX_ROOT
+    );
     if (initialUpdate !== undefined) {
       const decoded =
         typeof initialUpdate === "string" ? decodeStudioCrdtUpdate(initialUpdate) : initialUpdate;
@@ -1835,7 +2088,29 @@ export class StudioCrdtDocument {
     const pressureModel = isStudioInkPressureModel(extensions?.pressureModel)
       ? extensions.pressureModel
       : undefined;
-    const normalized = normalizedSamples(samples, false, pressureModel);
+    const requireExtendedInkChannels = isStudioInkInputContractV2(
+      normalizeStudioInkInputContract(extensions?.inkInput),
+    );
+    const normalized = normalizedSamples(
+      samples,
+      false,
+      pressureModel,
+      requireExtendedInkChannels,
+    );
+    if (requireExtendedInkChannels) {
+      const storedTimeOffsets = yArray(record, "sampleTimeOffsets");
+      const previousTimeOffset = storedTimeOffsets?.length
+        ? storedTimeOffsets.get(storedTimeOffsets.length - 1)
+        : 0;
+      const nextTimeOffset = normalized.sampleTimeOffsets?.[0];
+      if (
+        typeof previousTimeOffset !== "number"
+        || typeof nextTimeOffset !== "number"
+        || nextTimeOffset < previousTimeOffset
+      ) {
+        throw new Error("추가할 획 상대 시간이 기존 권위 샘플보다 앞섭니다.");
+      }
+    }
     const appendedCount = normalized.points.length / 2;
     if (appendedCount > STUDIO_CRDT_APPEND_MAX_SAMPLES) {
       throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
@@ -1906,7 +2181,22 @@ export class StudioCrdtDocument {
       existing.set("status", "drawing");
       setPayloadMetadata(existing, input.payload);
       for (const key of SAMPLE_ARRAY_KEYS) {
-        const target = yArray(existing, key);
+        const nextValues = normalized[key];
+        let target = yArray(existing, key);
+        if (
+          (EXTENDED_INK_SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+          && nextValues === undefined
+        ) {
+          existing.delete(key);
+          continue;
+        }
+        if (
+          !target
+          && (EXTENDED_INK_SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+        ) {
+          existing.set(key, createSampleArray([]));
+          target = yArray(existing, key);
+        }
         if (!target) throw new Error("획 샘플 배열이 손상되었습니다.");
         if (target.length > 0) target.delete(0, target.length);
       }
@@ -1991,7 +2281,22 @@ export class StudioCrdtDocument {
       if (sampleChanged) {
         record.set("status", "drawing");
         for (const key of SAMPLE_ARRAY_KEYS) {
-          const target = yArray(record, key);
+          const nextValues = normalized?.[key];
+          let target = yArray(record, key);
+          if (
+            (EXTENDED_INK_SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+            && nextValues === undefined
+          ) {
+            record.delete(key);
+            continue;
+          }
+          if (
+            !target
+            && (EXTENDED_INK_SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+          ) {
+            record.set(key, createSampleArray([]));
+            target = yArray(record, key);
+          }
           if (!target) throw new Error("획 샘플 배열이 손상되었습니다.");
           if (target.length > 0) target.delete(0, target.length);
         }
@@ -2661,9 +2966,41 @@ export class StudioCrdtDocument {
    * transactions are atomic for observers but do not roll back JavaScript exceptions.
    */
   mergeRasterOperationLog(value: StudioRasterOperationLog): StudioRasterOperationLog {
+    return this.mergeRasterOperationLogInternal(value, []);
+  }
+
+  /**
+   * Atomically publishes raster operations and their matching canonical render provenance.
+   * Every sidecar must name an operation present in `value`; partial or unrelated attachment is
+   * rejected before the Yjs transaction begins.
+   */
+  mergeRasterOperationLogWithBrushRenderProvenance(
+    value: StudioRasterOperationLog,
+    sidecars: readonly unknown[]
+  ): StudioRasterOperationLog {
+    if (!Array.isArray(sidecars) || sidecars.length === 0) {
+      throw new Error("원자적으로 게시할 브러시 렌더 provenance가 없습니다.");
+    }
+    return this.mergeRasterOperationLogInternal(value, sidecars);
+  }
+
+  private mergeRasterOperationLogInternal(
+    value: StudioRasterOperationLog,
+    sidecars: readonly unknown[]
+  ): StudioRasterOperationLog {
     this.assertAlive();
     const incoming = createStudioRasterOperationLog(value);
     const snapshot = this.readExactRasterDocumentSnapshot();
+    const incomingOperationsById = new Map(
+      incoming.operations.map((operation) => [operation.operationId, operation])
+    );
+    const provenanceMutation = sidecars.length > 0
+      ? this.prepareBrushRenderProvenanceMutation(
+          sidecars,
+          snapshot,
+          incomingOperationsById
+        )
+      : null;
     const surfaceId = incoming.surface.surfaceId;
     const surfaceJson = canonicalStudioRasterJson(incoming.surface);
     const existingSurfaceValue = this.rasterSurfaces.get(surfaceId);
@@ -2726,13 +3063,21 @@ export class StudioCrdtDocument {
     this.assertRasterProjectedAssetBudget(snapshot, incoming.operations, []);
     if (
       writesSurface || missingOperations.length > 0 || missingUndos.length > 0 ||
-      missingAcknowledgements.length > 0
+      missingAcknowledgements.length > 0 ||
+      (provenanceMutation?.registry.length ?? 0) > 0 ||
+      (provenanceMutation?.contentIndex.length ?? 0) > 0
     ) {
       this.assertRasterMutationFitsTransport({
         surface: writesSurface ? { id: surfaceId, value: surfaceJson } : undefined,
         operations: missingOperations,
         undoOperations: missingUndos,
         undoAcknowledgements: missingAcknowledgements,
+        brushRenderProvenance: provenanceMutation
+          ? {
+              registry: provenanceMutation.registry,
+              contentIndex: provenanceMutation.contentIndex,
+            }
+          : undefined,
       });
       this.doc.transact(() => {
         if (writesSurface) this.rasterSurfaces.set(surfaceId, surfaceJson);
@@ -2741,9 +3086,34 @@ export class StudioCrdtDocument {
         for (const entry of missingAcknowledgements) {
           this.rasterUndoAcknowledgements.set(entry.id, entry.value);
         }
+        for (const entry of provenanceMutation?.registry ?? []) {
+          this.brushRenderProvenance.set(entry.id, entry.value);
+        }
+        for (const entry of provenanceMutation?.contentIndex ?? []) {
+          this.brushRenderProvenanceContentIndex.set(entry.id, entry.value);
+        }
       }, STUDIO_CRDT_ORIGIN_LOCAL);
     }
     return merged;
+  }
+
+  /**
+   * Strict full-registry read. Any malformed, non-canonical, orphaned, over-budget, deleted, or
+   * concurrently conflicted entry rejects the entire snapshot instead of returning partial truth.
+   */
+  getBrushRenderProvenanceSidecars():
+    readonly Readonly<StudioBrushRenderProvenanceCrdtSidecar>[] {
+    this.assertAlive();
+    return this.readExactBrushRenderProvenanceSnapshot().sidecars;
+  }
+
+  getBrushRenderProvenance(
+    operationId: string
+  ): Readonly<StudioBrushRenderProvenanceCrdtSidecar> | null {
+    this.assertAlive();
+    assertRasterSafeId(operationId, "래스터 작업");
+    return this.readExactBrushRenderProvenanceSnapshot()
+      .byOperationId.get(operationId) ?? null;
   }
 
   getRasterOperationLog(surfaceId: string): StudioRasterOperationLog | null {
@@ -2873,6 +3243,210 @@ export class StudioCrdtDocument {
     }
   }
 
+  private readExactBrushRenderProvenanceSnapshot(
+    rasterSnapshot: StudioCrdtRasterDocumentSnapshot =
+      this.readExactRasterDocumentSnapshot()
+  ): StudioCrdtBrushRenderProvenanceSnapshot {
+    if (
+      this.brushRenderProvenance.size >
+        STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES ||
+      this.brushRenderProvenanceContentIndex.size >
+        STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES
+    ) {
+      throw new Error("브러시 렌더 provenance CRDT 항목 수가 허용 한도를 초과했습니다.");
+    }
+
+    let totalBytes = 0;
+    for (const [key, value] of this.brushRenderProvenance) {
+      totalBytes += crdtMapEntryBytes(key, value);
+      if (totalBytes > STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_BYTES) {
+        throw new Error("브러시 렌더 provenance CRDT 바이트 예산을 초과했습니다.");
+      }
+    }
+    for (const [key, value] of this.brushRenderProvenanceContentIndex) {
+      totalBytes += crdtMapEntryBytes(key, value);
+      if (totalBytes > STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_BYTES) {
+        throw new Error("브러시 렌더 provenance CRDT 바이트 예산을 초과했습니다.");
+      }
+    }
+
+    const byOperationId = new Map<
+      string,
+      Readonly<StudioBrushRenderProvenanceCrdtSidecar>
+    >();
+    const rasterOperationsById = new Map<string, StudioRasterOperation>();
+    for (const log of rasterSnapshot.logs.values()) {
+      for (const operation of log.operations) {
+        rasterOperationsById.set(operation.operationId, operation);
+      }
+    }
+    for (const [operationId, value] of this.brushRenderProvenance) {
+      const sidecar = parseCanonicalBrushRenderProvenanceSidecar(value);
+      const rasterOperation = rasterOperationsById.get(operationId);
+      if (
+        !sidecar ||
+        sidecar.operationId !== operationId ||
+        rasterSnapshot.identityKinds.get(operationId) !== "operation" ||
+        !rasterOperation
+      ) {
+        throw new Error(
+          "브러시 렌더 provenance CRDT에 비정규 또는 고아 항목이 있습니다."
+        );
+      }
+      if (
+        rasterOperation.semanticParametersSha256 !==
+          sidecar.provenanceSha256.slice("sha256:".length)
+      ) {
+        throw new Error(
+          "래스터 작업 semantic hash가 브러시 렌더 provenance hash와 일치하지 않습니다."
+        );
+      }
+      const expectedIndexKey = brushRenderProvenanceContentIndexKey(sidecar);
+      if (
+        this.brushRenderProvenanceContentIndex.get(expectedIndexKey) !==
+          sidecar.provenanceSha256
+      ) {
+        throw new Error("브러시 렌더 provenance content index가 일치하지 않습니다.");
+      }
+      byOperationId.set(operationId, sidecar);
+    }
+
+    if (this.brushRenderProvenanceContentIndex.size !== byOperationId.size) {
+      throw new Error(
+        "브러시 렌더 provenance에 동시 충돌 또는 고아 content index가 있습니다."
+      );
+    }
+    for (const [indexKey, provenanceSha256] of this.brushRenderProvenanceContentIndex) {
+      const operationId =
+        brushRenderProvenanceOperationIdFromContentIndexKey(indexKey);
+      const sidecar = operationId ? byOperationId.get(operationId) : undefined;
+      if (
+        !sidecar ||
+        provenanceSha256 !== sidecar.provenanceSha256 ||
+        indexKey !== brushRenderProvenanceContentIndexKey(sidecar)
+      ) {
+        throw new Error(
+          "브러시 렌더 provenance content index가 비정규이거나 충돌했습니다."
+        );
+      }
+    }
+
+    const sidecars = Object.freeze(
+      [...byOperationId.values()].sort((left, right) =>
+        left.operationId.localeCompare(right.operationId)
+      )
+    );
+    return Object.freeze({ byOperationId, sidecars, totalBytes });
+  }
+
+  private prepareBrushRenderProvenanceMutation(
+    values: readonly unknown[],
+    rasterSnapshot: StudioCrdtRasterDocumentSnapshot,
+    incomingOperationsById: ReadonlyMap<string, StudioRasterOperation>
+  ): StudioCrdtBrushRenderProvenanceMutation {
+    if (values.length > STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES) {
+      throw new Error("브러시 렌더 provenance CRDT 항목 수가 허용 한도를 초과했습니다.");
+    }
+    const current = this.readExactBrushRenderProvenanceSnapshot(rasterSnapshot);
+    const canonicalByOperationId = new Map<string, {
+      readonly sidecar: Readonly<StudioBrushRenderProvenanceCrdtSidecar>;
+      readonly canonical: string;
+    }>();
+    for (const value of values) {
+      const parsed = parseStudioBrushRenderProvenanceCrdtSidecar(value);
+      if (parsed.status !== "ready") {
+        throw new Error(
+          `브러시 렌더 provenance sidecar가 거부되었습니다: ${parsed.reason} ${parsed.path}`
+        );
+      }
+      const operation = incomingOperationsById.get(parsed.sidecar.operationId);
+      if (!operation) {
+        throw new Error(
+          "브러시 렌더 provenance는 같은 원자 게시 요청의 래스터 작업을 가리켜야 합니다."
+        );
+      }
+      if (
+        operation.semanticParametersSha256 !==
+          parsed.sidecar.provenanceSha256.slice("sha256:".length)
+      ) {
+        throw new Error(
+          "래스터 작업 semantic hash가 브러시 렌더 provenance hash와 일치하지 않습니다."
+        );
+      }
+      const canonical =
+        serializeStudioBrushRenderProvenanceCrdtSidecarCanonical(parsed.sidecar);
+      if (!canonical) {
+        throw new Error("브러시 렌더 provenance를 정규 직렬화할 수 없습니다.");
+      }
+      const duplicate = canonicalByOperationId.get(parsed.sidecar.operationId);
+      if (duplicate && duplicate.canonical !== canonical) {
+        throw new Error(
+          "같은 래스터 작업 ID가 서로 다른 불변 브러시 렌더 provenance를 가리킵니다."
+        );
+      }
+      canonicalByOperationId.set(parsed.sidecar.operationId, {
+        sidecar: parsed.sidecar,
+        canonical,
+      });
+    }
+    if (canonicalByOperationId.size !== incomingOperationsById.size) {
+      throw new Error(
+        "원자 브러시 래스터 게시에는 모든 작업의 렌더 provenance가 필요합니다."
+      );
+    }
+
+    const registry: { id: string; value: string }[] = [];
+    const contentIndex: { id: string; value: string }[] = [];
+    for (const { sidecar, canonical } of canonicalByOperationId.values()) {
+      const existing = this.brushRenderProvenance.get(sidecar.operationId);
+      if (existing !== undefined && existing !== canonical) {
+        throw new Error(
+          "같은 래스터 작업 ID가 서로 다른 불변 브러시 렌더 provenance를 가리킵니다."
+        );
+      }
+      const indexKey = brushRenderProvenanceContentIndexKey(sidecar);
+      const existingIndex = this.brushRenderProvenanceContentIndex.get(indexKey);
+      if (
+        existingIndex !== undefined &&
+        existingIndex !== sidecar.provenanceSha256
+      ) {
+        throw new Error("브러시 렌더 provenance content index가 불변 값을 위반합니다.");
+      }
+      if (existing === undefined) {
+        registry.push({ id: sidecar.operationId, value: canonical });
+      }
+      if (existingIndex === undefined) {
+        contentIndex.push({ id: indexKey, value: sidecar.provenanceSha256 });
+      }
+    }
+
+    if (
+      this.brushRenderProvenance.size + registry.length >
+        STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES ||
+      this.brushRenderProvenanceContentIndex.size + contentIndex.length >
+        STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_ENTRIES
+    ) {
+      throw new Error("브러시 렌더 provenance CRDT 항목 수가 허용 한도를 초과했습니다.");
+    }
+    let projectedBytes = current.totalBytes;
+    for (const entry of registry) {
+      projectedBytes += crdtMapEntryBytes(entry.id, entry.value);
+    }
+    for (const entry of contentIndex) {
+      projectedBytes += crdtMapEntryBytes(entry.id, entry.value);
+    }
+    if (projectedBytes > STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_MAX_BYTES) {
+      throw new Error("브러시 렌더 provenance CRDT 바이트 예산을 초과했습니다.");
+    }
+    return Object.freeze({
+      sidecars: Object.freeze(
+        [...canonicalByOperationId.values()].map(({ sidecar }) => sidecar)
+      ),
+      registry: Object.freeze(registry),
+      contentIndex: Object.freeze(contentIndex),
+    });
+  }
+
   /**
    * Strict local-write preflight. Read APIs remain fail-closed for malformed remote state, while a
    * new local event is rejected until every existing raster root can be accounted for globally.
@@ -3000,6 +3574,18 @@ export class StudioCrdtDocument {
         for (const entry of mutation.undoAcknowledgements ?? []) {
           acknowledgements.set(entry.id, entry.value);
         }
+        const provenance = probe.getMap<string>(
+          STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_ROOT
+        );
+        for (const entry of mutation.brushRenderProvenance?.registry ?? []) {
+          provenance.set(entry.id, entry.value);
+        }
+        const provenanceContentIndex = probe.getMap<string>(
+          STUDIO_CRDT_BRUSH_RENDER_PROVENANCE_CONTENT_INDEX_ROOT
+        );
+        for (const entry of mutation.brushRenderProvenance?.contentIndex ?? []) {
+          provenanceContentIndex.set(entry.id, entry.value);
+        }
       });
       const encoded = Y.encodeStateAsUpdate(probe);
       if (encoded.byteLength + RASTER_LOCAL_UPDATE_ENCODING_HEADROOM_BYTES >
@@ -3061,6 +3647,11 @@ export class StudioCrdtDocument {
         twists: [],
         speeds: [],
         tangentialPressures: [],
+        ...(input.payload.altitudeAngles ? { altitudeAngles: [] } : {}),
+        ...(input.payload.azimuthAngles ? { azimuthAngles: [] } : {}),
+        ...(input.payload.contactWidths ? { contactWidths: [] } : {}),
+        ...(input.payload.contactHeights ? { contactHeights: [] } : {}),
+        ...(input.payload.sampleTimeOffsets ? { sampleTimeOffsets: [] } : {}),
       },
     };
   }
@@ -3071,7 +3662,19 @@ export class StudioCrdtDocument {
   ): void {
     const targets = new Map<StudioCrdtSampleArrayKey, Y.Array<number>>();
     for (const key of SAMPLE_ARRAY_KEYS) {
-      const target = yArray(record, key);
+      const values = normalized[key];
+      if (values === undefined) continue;
+      let target = yArray(record, key);
+      if (
+        !target
+        && (EXTENDED_INK_SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+      ) {
+        this.doc.transact(
+          () => record.set(key, createSampleArray([])),
+          STUDIO_CRDT_ORIGIN_LOCAL,
+        );
+        target = yArray(record, key);
+      }
       if (!target) throw new Error("획 샘플 배열이 손상되었습니다.");
       targets.set(key, target);
     }
@@ -3080,9 +3683,11 @@ export class StudioCrdtDocument {
       const end = Math.min(sampleTotal, start + STUDIO_CRDT_REPLACE_CHUNK_SAMPLES);
       this.doc.transact(() => {
         for (const key of SAMPLE_ARRAY_KEYS) {
+          const channel = normalized[key];
+          if (channel === undefined) continue;
           const values = key === "points"
             ? normalized.points.slice(start * 2, end * 2)
-            : normalized[key].slice(start, end);
+            : channel.slice(start, end);
           targets.get(key)!.push(values);
         }
       }, STUDIO_CRDT_ORIGIN_LOCAL);
@@ -3584,7 +4189,10 @@ export class StudioCrdtDocument {
     record.set("status", status);
     setPayloadMetadata(record, input.payload);
     const samples = normalizedSamples(input.payload, true);
-    for (const key of SAMPLE_ARRAY_KEYS) record.set(key, createSampleArray(samples[key]));
+    for (const key of SAMPLE_ARRAY_KEYS) {
+      const values = samples[key];
+      if (values !== undefined) record.set(key, createSampleArray(values));
+    }
     // Do not inspect/register this preliminary Y.Map yet. `strokes.set` integrates it and the
     // root observer registers every nested sample array without triggering Yjs detached-read
     // warnings.

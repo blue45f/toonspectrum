@@ -19,7 +19,8 @@ export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
   normalLayerRef,
   dynamicLayerRef,
 }: StudioDraftPreviewLayersProps) {
-  const { active, settled } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const { active } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const settled = store.visibleSettled;
   const isolatedDynamic =
     active?.mode === "pen" && resolveStudioBrushDynamicsPresetId(active.brush) !== null
       ? active
