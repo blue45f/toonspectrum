@@ -122,12 +122,23 @@ export interface StudioWorkAssetRepository {
     workId: string,
     assetIds: readonly string[]
   ): Promise<readonly StudioWorkAssetManifest[]>;
+  getContents(
+    actorUserId: string,
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioWorkAssetContent[]>;
   getManifestsInTransaction(
     transaction: DrizzleStudioCrdtTransaction,
     actorUserId: string,
     workId: string,
     assetIds: readonly string[]
   ): Promise<readonly StudioWorkAssetManifest[]>;
+  getContentsInTransaction(
+    transaction: DrizzleStudioCrdtTransaction,
+    actorUserId: string,
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioWorkAssetContent[]>;
   getContent(
     actorUserId: string,
     workId: string,
@@ -290,7 +301,30 @@ function copyBytes(value: Uint8Array): Uint8Array {
   return new Uint8Array(value);
 }
 
-function manifestFrom(row: typeof creatorWorkAssets.$inferSelect): StudioWorkAssetManifest {
+/**
+ * Metadata-only projection for admission preflight. Keep `payload` out of this object: an
+ * attacker-controlled ID list must not materialize binary columns before aggregate budgets and
+ * declared identities have been checked.
+ */
+export const STUDIO_WORK_ASSET_MANIFEST_PROJECTION = Object.freeze({
+  assetId: creatorWorkAssets.assetId,
+  elementType: creatorWorkAssets.elementType,
+  mimeType: creatorWorkAssets.mimeType,
+  descriptor: creatorWorkAssets.descriptor,
+  byteSize: creatorWorkAssets.byteSize,
+  sha256: creatorWorkAssets.sha256,
+  intrinsicWidth: creatorWorkAssets.intrinsicWidth,
+  intrinsicHeight: creatorWorkAssets.intrinsicHeight,
+  decodedRgbaBytes: creatorWorkAssets.decodedRgbaBytes,
+  updatedAt: creatorWorkAssets.updatedAt,
+});
+
+type StudioWorkAssetManifestRow = Pick<
+  typeof creatorWorkAssets.$inferSelect,
+  keyof typeof STUDIO_WORK_ASSET_MANIFEST_PROJECTION
+>;
+
+function manifestFrom(row: StudioWorkAssetManifestRow): StudioWorkAssetManifest {
   return {
     version: STUDIO_WORK_ASSET_CONTRACT_VERSION,
     assetId: row.assetId,
@@ -520,12 +554,49 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     );
   }
 
+  async getContents(
+    actorUserId: string,
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioWorkAssetContent[]> {
+    if (assetIds.length === 0) return [];
+    return db.transaction(
+      (transaction) => this.getContentsInTransaction(
+        transaction,
+        actorUserId,
+        workId,
+        assetIds
+      ),
+      { isolationLevel: "repeatable read", accessMode: "read only" }
+    );
+  }
+
   async getManifestsInTransaction(
     transaction: DrizzleStudioCrdtTransaction,
     actorUserId: string,
     workId: string,
     assetIds: readonly string[]
   ): Promise<readonly StudioWorkAssetManifest[]> {
+    if (assetIds.length === 0) return [];
+    await requireAccess(transaction, actorUserId, workId, "view", false);
+    const rows = await transaction
+      .select(STUDIO_WORK_ASSET_MANIFEST_PROJECTION)
+      .from(creatorWorkAssets)
+      .where(
+        and(
+          eq(creatorWorkAssets.workId, workId),
+          inArray(creatorWorkAssets.assetId, [...new Set(assetIds)])
+        )
+      );
+    return rows.map(manifestFrom);
+  }
+
+  async getContentsInTransaction(
+    transaction: DrizzleStudioCrdtTransaction,
+    actorUserId: string,
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioWorkAssetContent[]> {
     if (assetIds.length === 0) return [];
     await requireAccess(transaction, actorUserId, workId, "view", false);
     const rows = await transaction
@@ -537,7 +608,12 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
           inArray(creatorWorkAssets.assetId, [...new Set(assetIds)])
         )
       );
-    return rows.map(manifestFrom);
+    return rows.map((row) => ({
+      manifest: manifestFrom(row),
+      // The admission decoder owns and scrubs this transaction-local copy. Never expose the
+      // driver Buffer directly because its lifetime is not controlled by the validation seam.
+      payload: copyBytes(row.payload),
+    }));
   }
 
   async getContent(

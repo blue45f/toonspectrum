@@ -20,6 +20,7 @@ import {
   planStudioWorkAssetDeletion,
   resolveStudioWorkAssetAccess,
   STUDIO_WORK_ASSET_REPOSITORY,
+  STUDIO_WORK_ASSET_MANIFEST_PROJECTION,
   studioCrdtHydrationReferencesWorkAsset,
   StudioWorkAssetCleanupOwnershipError,
   StudioWorkAssetImmutableConflictError,
@@ -81,9 +82,28 @@ describe("studio work-scoped asset persistence contract", () => {
 
   it("exposes a swappable repository provider", () => {
     expect(studioWorkAssetRepositoryProvider.provide).toBe(STUDIO_WORK_ASSET_REPOSITORY);
-    expect(studioWorkAssetRepositoryProvider.useFactory()).toBeInstanceOf(
+    const repository = studioWorkAssetRepositoryProvider.useFactory();
+    expect(repository).toBeInstanceOf(
       DrizzleStudioWorkAssetRepository
     );
+    expect(repository).toHaveProperty("getContents");
+    expect(repository).toHaveProperty("getContentsInTransaction");
+  });
+
+  it("keeps manifest preflight queries metadata-only", () => {
+    expect(Object.keys(STUDIO_WORK_ASSET_MANIFEST_PROJECTION).sort()).toEqual([
+      "assetId",
+      "byteSize",
+      "decodedRgbaBytes",
+      "descriptor",
+      "elementType",
+      "intrinsicHeight",
+      "intrinsicWidth",
+      "mimeType",
+      "sha256",
+      "updatedAt",
+    ]);
+    expect(STUDIO_WORK_ASSET_MANIFEST_PROJECTION).not.toHaveProperty("payload");
   });
 
   it("exposes only receipt-bound orphan cleanup plus the trusted maintenance seam", () => {

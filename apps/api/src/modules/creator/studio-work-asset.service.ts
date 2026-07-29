@@ -27,6 +27,11 @@ import {
 } from "../../../../../lib/studio-work-asset-contract";
 
 import {
+  assertStudioR8GrainAdmissionContents,
+  assertStudioR8GrainAdmissionManifest,
+  assertStudioR8GrainAdmissionSourceBudget,
+} from "./studio-r8-grain-admission";
+import {
   STUDIO_WORK_ASSET_REPOSITORY,
   StudioWorkAssetCleanupOwnershipError,
   StudioWorkAssetForbiddenError,
@@ -615,9 +620,9 @@ export class StudioWorkAssetService {
 
   /**
    * Stronger durable admission for renderer-significant R8 paper grain. The generic work-asset
-   * identity check is insufficient because a canonical stroke also binds the encoded PNG hash,
-   * exact byte length and intrinsic dimensions. Decoded-R8 hashing remains a client/worker concern
-   * after decoding; this boundary proves that every collaborator will download the same PNG.
+   * identity check is insufficient because a canonical stroke also binds encoded and decoded
+   * content. The exact at-rest PNG is read under the append transaction, decoded serially, and
+   * accepted only when its alpha/luminance R8 bytes match the browser's deterministic hash.
    */
   async assertR8GrainReferencesStored(
     actorUserId: string,
@@ -662,6 +667,16 @@ export class StudioWorkAssetService {
     if (expectedById.size === 0) return;
 
     const assetIds = [...expectedById.keys()];
+    try {
+      assertStudioR8GrainAdmissionSourceBudget([...expectedById.values()]);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "R8 브러시 에셋 검증 예산이 올바르지 않습니다."
+      );
+    }
+
+    // Read only metadata first. A malicious set of otherwise-valid IDs cannot make the binary
+    // query materialize more bytes than the aggregate source budget.
     const manifests = await this.run(() => transaction
       ? this.repository.getManifestsInTransaction(
           transaction,
@@ -670,28 +685,69 @@ export class StudioWorkAssetService {
           assetIds
         )
       : this.repository.getManifests(actorUserId, workId, assetIds));
-    const storedById = new Map(manifests.map((value) => {
-      const stored = StudioWorkAssetManifestSchema.parse(value);
-      return [stored.assetId, stored] as const;
-    }));
-
-    for (const source of expectedById.values()) {
-      const expected = source.asset;
-      const stored = storedById.get(expected.assetId);
-      if (
-        !stored
-        || stored.elementType !== "image"
-        || stored.mimeType !== expected.mediaType
-        || stored.byteSize !== expected.byteLength
-        || stored.sha256 !== expected.encodedSha256.slice("sha256:".length)
-        || !stored.intrinsicImage
-        || stored.intrinsicImage.width !== expected.width
-        || stored.intrinsicImage.height !== expected.height
-      ) {
-        throw new BadRequestException(
-          "저장되지 않았거나 콘텐츠가 다른 R8 브러시 에셋 참조가 있습니다."
-        );
+    try {
+      const manifestById = new Map<string, StudioWorkAssetManifest>();
+      for (const value of manifests) {
+        const stored = StudioWorkAssetManifestSchema.parse(value);
+        if (manifestById.has(stored.assetId)) {
+          throw new Error("저장된 R8 브러시 에셋 조회 결과에 중복 ID가 있습니다.");
+        }
+        manifestById.set(stored.assetId, stored);
       }
+      if (manifestById.size !== expectedById.size) {
+        throw new Error("저장된 R8 브러시 에셋 조회 결과에 요청하지 않은 ID가 있습니다.");
+      }
+      for (const source of expectedById.values()) {
+        const stored = manifestById.get(source.asset.assetId);
+        if (!stored) throw new Error("저장되지 않은 R8 브러시 에셋 참조가 있습니다.");
+        assertStudioR8GrainAdmissionManifest(source, stored);
+      }
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : "저장되지 않았거나 콘텐츠가 다른 R8 브러시 에셋 참조가 있습니다."
+      );
+    }
+
+    const contents = await this.run(() => transaction
+      ? this.repository.getContentsInTransaction(
+          transaction,
+          actorUserId,
+          workId,
+          assetIds
+        )
+      : this.repository.getContents(actorUserId, workId, assetIds));
+    try {
+      const storedById = new Map<string, StudioWorkAssetContent>();
+      for (const content of contents) {
+        const manifest = StudioWorkAssetManifestSchema.parse(content.manifest);
+        if (storedById.has(manifest.assetId)) {
+          throw new Error("저장된 R8 브러시 에셋 조회 결과에 중복 ID가 있습니다.");
+        }
+        storedById.set(manifest.assetId, { manifest, payload: content.payload });
+      }
+      if (storedById.size !== expectedById.size) {
+        throw new Error("저장된 R8 브러시 에셋 조회 결과에 요청하지 않은 ID가 있습니다.");
+      }
+      const admissionContents = [...expectedById.values()].map((source) => {
+        const content = storedById.get(source.asset.assetId);
+        if (!content) {
+          throw new Error("저장되지 않은 R8 브러시 에셋 참조가 있습니다.");
+        }
+        return { source, content };
+      });
+      await assertStudioR8GrainAdmissionContents(admissionContents);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : "저장되지 않았거나 콘텐츠가 다른 R8 브러시 에셋 참조가 있습니다."
+      );
+    } finally {
+      // The repository promises private copies. Scrub even schema/missing-row failures that occur
+      // before the lower-level verifier takes ownership.
+      for (const content of contents) content.payload.fill(0);
     }
   }
 

@@ -1,9 +1,20 @@
 import {
+  normalizeStudioBrushR8TextureGrainSource,
+  serializeStudioBrushR8TextureGrainSourceCanonical,
+} from "./studio-brush-r8-grain-asset-contract";
+import {
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_BUDGETS,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_DUAL_TIP_CAPABILITY,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
 } from "./studio-engine-webgpu-textured-brush-plan";
 import { sha256HexPortable } from "./studio-sha256";
+import {
+  StudioWebGpuR8GrainTextureCache,
+  studioWebGpuR8GrainDabCenterUv,
+  type StudioWebGpuR8GrainNativeInput,
+  type StudioWebGpuR8GrainTextureLease,
+} from "./studio-webgpu-r8-grain-native";
 
 import type {
   StudioEngineWebGpuTexturedBrushBatch,
@@ -77,7 +88,8 @@ fn vs_main(
     vec2f( 1.0,  1.0),
   );
   let local = corners[vertex_index];
-  let document = center + basis_x * local.x + basis_y * local.y;
+  let document_offset = basis_x * local.x + basis_y * local.y;
+  let document = center + document_offset;
   let clip = vec2f(
     document.x * viewport.inverse_size.x * 2.0 - 1.0,
     1.0 - document.y * viewport.inverse_size.y * 2.0,
@@ -90,7 +102,12 @@ fn vs_main(
   output.dynamics = dynamics;
   output.grain_origin = grain_origin;
   output.flags = flags;
-  output.texture_info = texture_info;
+  let durable_r8 = (u32(flags.y + 0.5) & 4u) != 0u;
+  let native_grain_uv = texture_info.zw + document_offset / dynamics.z;
+  output.texture_info = vec4f(
+    texture_info.xy,
+    select(texture_info.zw, native_grain_uv, durable_r8),
+  );
   return output;
 }
 
@@ -110,8 +127,15 @@ fn integer_noise(cell: vec2i, seed: u32) -> f32 {
   return f32(hash_u32(mixed)) / 4294967296.0;
 }
 
-fn shaped_grain(value: f32, contrast: f32, invert: bool) -> f32 {
-  let contrasted = clamp(0.5 + (value - 0.5) * (1.0 + contrast * 3.0), 0.0, 1.0);
+fn shaped_grain(value: f32, contrast: f32, invert: bool, durable_r8: bool) -> f32 {
+  // The canonical specialist v1 contract retains its historical 3× contrast transfer. Durable
+  // Studio R8 assets use the Canvas/SVG contract's 4× transfer and are marked explicitly below.
+  let contrast_gain = select(3.0, 4.0, durable_r8);
+  let contrasted = clamp(
+    0.5 + (value - 0.5) * (1.0 + contrast * contrast_gain),
+    0.0,
+    1.0,
+  );
   return select(contrasted, 1.0 - contrasted, invert);
 }
 
@@ -135,16 +159,27 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
     grain_space == 1u,
   );
   let grain_invert = (packed_grain_flags & 2u) != 0u;
+  let durable_r8 = (packed_grain_flags & 4u) != 0u;
   let grain_cell = vec2i(floor(grain_position / input.dynamics.z));
   let procedural_grain = integer_noise(grain_cell, seed);
+  let asset_uv = select(
+    grain_position / input.dynamics.z,
+    input.texture_info.zw,
+    durable_r8,
+  );
   let asset_grain = textureSample(
     grain_texture,
     grain_sampler,
-    grain_position / input.dynamics.z,
+    asset_uv,
   ).r;
   var grain_value = select(1.0, procedural_grain, grain_kind == 1u);
   grain_value = select(grain_value, asset_grain, grain_kind == 2u);
-  let grain_shaped = shaped_grain(grain_value, input.dynamics.w, grain_invert);
+  let grain_shaped = shaped_grain(
+    grain_value,
+    input.dynamics.w,
+    grain_invert,
+    durable_r8,
+  );
   let grain_factor = mix(1.0, grain_shaped, input.dynamics.y);
   return input.color * (tip_coverage * grain_factor);
 }
@@ -160,6 +195,12 @@ export interface StudioEngineWebGpuTexturedBrushRuntimeOptions {
   readonly maximumResidentAssetBytes?: number;
   readonly ownsDevice?: boolean;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
+  /**
+   * Optional shared durable-R8 cache. When omitted the runtime creates and owns a device-local
+   * cache backed by the verified browser registry. Injecting one lets several specialist runtimes
+   * share the same content-addressed GPU texture residency.
+   */
+  readonly nativeR8GrainTextureCache?: StudioWebGpuR8GrainTextureCache;
 }
 
 export interface StudioEngineWebGpuTexturedBrushFrame {
@@ -184,6 +225,12 @@ export interface StudioEngineWebGpuTexturedBrushReceipt {
   readonly assetCount: number;
   readonly assetBytes: number;
   readonly batchKeys: readonly string[];
+  readonly planSemanticFingerprint: string | null;
+  readonly grainSamplingSemantics:
+    | "specialist-texture-v1"
+    | "durable-r8-cpu-parity-v1";
+  readonly nativeR8GrainSourceKey: string | null;
+  readonly nativeR8GrainTextureBytes: number;
   readonly queueState: "completed";
   readonly complete: true;
 }
@@ -197,7 +244,9 @@ export type StudioEngineWebGpuTexturedBrushExecutionResult =
         | "request-sequence"
         | "device-epoch"
         | "request-limit"
-        | "resident-asset-budget";
+        | "resident-asset-budget"
+        | "native-r8-grain-unavailable";
+      detail?: string;
     }>
   | Readonly<{ status: "busy"; inFlight: number; maximum: number }>
   | Readonly<{ status: "cancelled" }>
@@ -268,6 +317,55 @@ function paddedUpload(
   return { bytes, bytesPerRow, width, height };
 }
 
+function durableR8InputForPlan(
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+): StudioWebGpuR8GrainNativeInput | null {
+  if (plan.durableR8GrainSource === undefined) return null;
+  const source = normalizeStudioBrushR8TextureGrainSource(
+    plan.durableR8GrainSource,
+  );
+  const sourceKey = source
+    ? serializeStudioBrushR8TextureGrainSourceCanonical(source)
+    : null;
+  const grain = plan.grain;
+  if (
+    !source
+    || !sourceKey
+    || grain?.kind !== "asset-r8-repeat"
+    || !Number.isSafeInteger(plan.grainPhaseStrokeSeed)
+    || plan.grainPhaseStrokeSeed! < 0
+    || plan.grainPhaseStrokeSeed! > 0xffff_ffff
+  ) {
+    return null;
+  }
+  const asset = plan.assets[grain.assetIndex];
+  if (
+    !asset
+    || asset.role !== "grain"
+    || source.asset.assetId !== asset.assetId
+    || source.asset.decodedSha256 !== asset.contentHash
+    || source.asset.width !== asset.width
+    || source.asset.height !== asset.height
+    || source.asset.channel !== asset.channel
+    || source.asset.encoding !== asset.format
+    || asset.byteLength !== source.asset.width * source.asset.height
+    || plan.batches.some((batch) => batch.grainAssetIndex !== grain.assetIndex)
+  ) {
+    return null;
+  }
+  return {
+    source,
+    space: grain.space === "stroke" ? "stroke-fixed" : "canvas-fixed",
+    scale: grain.scale,
+    amount: grain.depth,
+    contrast: grain.contrast,
+    seed: grain.seed,
+    strokeOriginX: grain.originX,
+    strokeOriginY: grain.originY,
+    strokeSeed: plan.grainPhaseStrokeSeed!,
+  };
+}
+
 function planIsValid(plan: StudioEngineWebGpuTexturedBrushPlan, maximumDabs: number): boolean {
   try {
     if (
@@ -284,6 +382,26 @@ function planIsValid(plan: StudioEngineWebGpuTexturedBrushPlan, maximumDabs: num
       || plan.dabs.length > maximumDabs
       || !Array.isArray(plan.batches)
       || plan.tip.assetIndex !== 0
+    ) return false;
+    const durableR8Declared =
+      plan.durableR8GrainSource !== undefined
+      || plan.grainPhaseStrokeSeed !== undefined;
+    if (
+      durableR8Declared
+      && (
+        durableR8InputForPlan(plan) === null
+        || plan.grainSamplingSemantics !== "durable-r8-cpu-parity-v1"
+        || plan.semanticFingerprint === undefined
+      )
+    ) return false;
+    if (
+      !durableR8Declared
+      && plan.grainSamplingSemantics === "durable-r8-cpu-parity-v1"
+    ) return false;
+    if (
+      plan.semanticFingerprint !== undefined
+      && fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(plan)
+        !== plan.semanticFingerprint
     ) return false;
     for (let index = 0; index < plan.assets.length; index += 1) {
       const asset = plan.assets[index]!;
@@ -352,22 +470,35 @@ function planIsValid(plan: StudioEngineWebGpuTexturedBrushPlan, maximumDabs: num
 export function packStudioEngineWebGpuTexturedBrushDabs(
   plan: StudioEngineWebGpuTexturedBrushPlan,
   scratch?: Float32Array,
+  nativeR8Grain?: Pick<
+    StudioWebGpuR8GrainTextureLease,
+    "parameters" | "source"
+  >,
 ): Float32Array {
   const required = plan.dabs.length * STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS;
   const packed = scratch && scratch.length >= required
     ? scratch.subarray(0, required)
     : new Float32Array(required);
   const grain = plan.grain;
-  const grainKind = grain === null
+  const grainKind = nativeR8Grain
+    ? 2
+    : grain === null
     ? 0
     : grain.kind === "procedural-integer-noise"
       ? 1
       : 2;
-  const grainSpace = grain?.space === "stroke" ? 1 : 0;
-  const grainScale = grain?.scale ?? 1;
-  const grainContrast = grain?.contrast ?? 0;
-  const grainOriginX = grain?.originX ?? 0;
-  const grainOriginY = grain?.originY ?? 0;
+  // Durable R8 computes a wrapped dab-centre UV in JS f64. The VS adds only each corner's small
+  // local offset, avoiding the catastrophic fractional loss of `1e6 / 0.3` in fragment f32.
+  const nativeParameters = nativeR8Grain?.parameters;
+  const grainSpace = nativeParameters
+    ? 1
+    : grain?.space === "stroke"
+      ? 1
+      : 0;
+  const grainScale = nativeParameters?.scale ?? grain?.scale ?? 1;
+  const grainContrast = nativeParameters?.contrast ?? grain?.contrast ?? 0;
+  const grainOriginX = nativeParameters?.anchorX ?? grain?.originX ?? 0;
+  const grainOriginY = nativeParameters?.anchorY ?? grain?.originY ?? 0;
   const grainSeed = grain?.seed ?? 0;
   const tipAsset = plan.assets[plan.tip.assetIndex]!;
   const grainAsset = grain?.kind === "asset-r8-repeat"
@@ -388,6 +519,8 @@ export function packStudioEngineWebGpuTexturedBrushDabs(
     packed[offset + 8] = dab.color.components[2] * alpha;
     packed[offset + 9] = alpha;
     packed[offset + 10] = dab.tip.hardness;
+    // Per-dab texture-depth dynamics remain authoritative; the durable source changes only how
+    // that already-planned depth is sampled, never the plan's paint amount.
     packed[offset + 11] = dab.grainDepth;
     packed[offset + 12] = grainScale;
     packed[offset + 13] = grainContrast;
@@ -398,13 +531,21 @@ export function packStudioEngineWebGpuTexturedBrushDabs(
     packed[offset + 18] = dab.tip.roundness;
     packed[offset + 19] = dab.tip.angleRadians;
     packed[offset + 20] = grainKind;
-    packed[offset + 21] = grainSpace | (grain?.invert ? 2 : 0);
+    packed[offset + 21] = grainSpace
+      | (grain?.invert ? 2 : 0)
+      | (nativeParameters ? 4 : 0);
     packed[offset + 22] = grainSeed & 0xffff;
     packed[offset + 23] = grainSeed >>> 16;
     packed[offset + 24] = tipAsset.width;
     packed[offset + 25] = tipAsset.height;
-    packed[offset + 26] = grainAsset?.width ?? 1;
-    packed[offset + 27] = grainAsset?.height ?? 1;
+    const nativeCenterUv = nativeParameters
+      ? studioWebGpuR8GrainDabCenterUv(nativeParameters, dab.x, dab.y)
+      : null;
+    if (nativeParameters && !nativeCenterUv) {
+      throw new RangeError("invalid-native-r8-coordinate");
+    }
+    packed[offset + 26] = nativeCenterUv?.[0] ?? grainAsset?.width ?? 1;
+    packed[offset + 27] = nativeCenterUv?.[1] ?? grainAsset?.height ?? 1;
   }
   return packed;
 }
@@ -473,6 +614,8 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   readonly #maximumInFlight: number;
   readonly #maximumResidentAssetBytes: number;
   readonly #ownsDevice: boolean;
+  readonly #nativeR8GrainTextureCache: StudioWebGpuR8GrainTextureCache;
+  readonly #ownsNativeR8GrainTextureCache: boolean;
   readonly #surfaceTexture: GPUTexture;
   readonly #surfaceView: GPUTextureView;
   readonly #uniformBuffer: GPUBuffer;
@@ -509,6 +652,12 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       || !positiveSafeInteger(this.#maximumInFlight)
       || !positiveSafeInteger(this.#maximumResidentAssetBytes)
     ) throw new Error("invalid textured brush runtime options");
+    this.#ownsNativeR8GrainTextureCache = options.nativeR8GrainTextureCache === undefined;
+    this.#nativeR8GrainTextureCache = options.nativeR8GrainTextureCache
+      ?? new StudioWebGpuR8GrainTextureCache({
+        device: this.#device,
+        maxResidentBytes: this.#maximumResidentAssetBytes,
+      });
 
     this.#surfaceTexture = this.#device.createTexture({
       label: "Studio textured brush rgba16float authority",
@@ -698,26 +847,37 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
   #bindGroup(
     plan: StudioEngineWebGpuTexturedBrushPlan,
     batch: StudioEngineWebGpuTexturedBrushBatch,
+    nativeR8Grain?: Readonly<StudioWebGpuR8GrainTextureLease>,
   ): GPUBindGroup {
     const tip = this.#uploadAsset(plan.assets[batch.tipAssetIndex]!, "tip");
-    const grain = batch.grainAssetIndex === null
+    const grain = nativeR8Grain
+      ? null
+      : batch.grainAssetIndex === null
       ? this.#dummyGrainTexture()
       : this.#uploadAsset(plan.assets[batch.grainAssetIndex]!, "grain");
-    const key = `${batch.key}|${tip.key}|${grain.key}`;
-    const cached = this.#bindGroups.get(key);
-    if (cached) return cached;
+    const grainKey = nativeR8Grain
+      ? `durable-r8:${nativeR8Grain.sourceKey}`
+      : grain!.key;
+    const key = `${batch.key}|${tip.key}|${grainKey}`;
+    // A durable lease can be released and its LRU texture evicted immediately after the queue
+    // fence. Never retain a bind group that could outlive that texture. Generic runtime-owned
+    // textures share this runtime's lifetime and remain safe to cache.
+    if (!nativeR8Grain) {
+      const cached = this.#bindGroups.get(key);
+      if (cached) return cached;
+    }
     const bindGroup = this.#device.createBindGroup({
       label: `Studio textured brush batch ${batch.key}`,
       layout: this.#bindGroupLayout,
       entries: [
         { binding: 0, resource: tip.view },
-        { binding: 1, resource: grain.view },
+        { binding: 1, resource: nativeR8Grain?.view ?? grain!.view },
         { binding: 2, resource: this.#tipSampler },
-        { binding: 3, resource: this.#grainSampler },
+        { binding: 3, resource: nativeR8Grain?.sampler ?? this.#grainSampler },
         { binding: 4, resource: { buffer: this.#uniformBuffer } },
       ],
     });
-    this.#bindGroups.set(key, bindGroup);
+    if (!nativeR8Grain) this.#bindGroups.set(key, bindGroup);
     return bindGroup;
   }
 
@@ -752,7 +912,15 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     if (frame.plan.dabs.length > this.#maximumDabs) {
       return Object.freeze({ status: "rejected", reason: "request-limit" });
     }
+    const nativeR8GrainInput = durableR8InputForPlan(frame.plan);
+    const nativeR8AssetIndex = nativeR8GrainInput
+      && frame.plan.grain?.kind === "asset-r8-repeat"
+      ? frame.plan.grain.assetIndex
+      : null;
     const uncachedBytes = frame.plan.assets.reduce((total, asset) => {
+      // A durable R8 asset is resident in the strict native cache, never duplicated in the
+      // generic textured-asset cache.
+      if (asset.assetIndex === nativeR8AssetIndex) return total;
       const role = asset.role;
       return total + (
         this.#assetTextures.has(assetTextureIdentity(asset, role))
@@ -760,7 +928,35 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
           : asset.byteLength
       );
     }, 0);
-    if (this.#residentAssetBytes + uncachedBytes > this.#maximumResidentAssetBytes) {
+    if (
+      this.#residentAssetBytes + uncachedBytes > this.#maximumResidentAssetBytes
+    ) {
+      return Object.freeze({ status: "rejected", reason: "resident-asset-budget" });
+    }
+    const nativeResidentBudget = Math.max(
+      0,
+      this.#maximumResidentAssetBytes
+        - this.#residentAssetBytes
+        - uncachedBytes,
+    );
+
+    let nativeR8GrainLease: Readonly<StudioWebGpuR8GrainTextureLease> | null = null;
+    if (nativeR8GrainInput) {
+      const acquired = this.#nativeR8GrainTextureCache.acquire(
+        nativeR8GrainInput,
+        { maxResidentBytes: nativeResidentBudget },
+      );
+      if (acquired.status !== "ready") {
+        return Object.freeze({
+          status: "rejected",
+          reason: "native-r8-grain-unavailable",
+          detail: acquired.status === "rejected" ? acquired.reason : acquired.status,
+        });
+      }
+      nativeR8GrainLease = acquired.lease;
+    } else if (
+      !this.#nativeR8GrainTextureCache.trimToResidentBytes(nativeResidentBudget)
+    ) {
       return Object.freeze({ status: "rejected", reason: "resident-asset-budget" });
     }
 
@@ -768,7 +964,11 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     this.#lastRequestSequence = frame.requestSequence;
     try {
       const instanceBuffer = this.#ensureInstanceBuffer(frame.plan.dabs.length);
-      const packed = packStudioEngineWebGpuTexturedBrushDabs(frame.plan);
+      const packed = packStudioEngineWebGpuTexturedBrushDabs(
+        frame.plan,
+        undefined,
+        nativeR8GrainLease ?? undefined,
+      );
       this.#device.queue.writeBuffer(instanceBuffer, 0, packed);
       const encoder = this.#device.createCommandEncoder({
         label: `Studio textured brush request ${frame.requestSequence}`,
@@ -785,12 +985,16 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       pass.setVertexBuffer(0, instanceBuffer);
       for (const batch of frame.plan.batches) {
         pass.setPipeline(this.#pipelines[batch.porterDuff]);
-        pass.setBindGroup(0, this.#bindGroup(frame.plan, batch));
+        pass.setBindGroup(
+          0,
+          this.#bindGroup(frame.plan, batch, nativeR8GrainLease ?? undefined),
+        );
         pass.draw(6, batch.instanceCount, 0, batch.firstInstance);
       }
       pass.end();
       this.#device.queue.submit([encoder.finish()]);
       await this.#device.queue.onSubmittedWorkDone();
+      if (signal?.aborted) return Object.freeze({ status: "cancelled" });
       if (this.#disposed) return Object.freeze({ status: "disposed" });
       if (this.#lost) {
         return Object.freeze({ status: "device-lost", deviceEpoch: this.#deviceEpoch });
@@ -811,6 +1015,13 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
         assetCount: frame.plan.assets.length,
         assetBytes: frame.plan.assets.reduce((total, asset) => total + asset.byteLength, 0),
         batchKeys: frame.plan.batches.map((batch) => batch.key),
+        planSemanticFingerprint: frame.plan.semanticFingerprint ?? null,
+        grainSamplingSemantics: frame.plan.grainSamplingSemantics
+          ?? "specialist-texture-v1",
+        nativeR8GrainSourceKey: nativeR8GrainLease?.sourceKey ?? null,
+        nativeR8GrainTextureBytes: nativeR8GrainLease
+          ? nativeR8GrainLease.width * nativeR8GrainLease.height
+          : 0,
         queueState: "completed",
         complete: true,
       };
@@ -821,6 +1032,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
       }
       return Object.freeze({ status: "failed", reason: "gpu-error" });
     } finally {
+      nativeR8GrainLease?.release();
       this.#inFlight -= 1;
     }
   }
@@ -834,6 +1046,7 @@ export class StudioEngineWebGpuTexturedBrushRuntime {
     for (const resource of this.#assetTextures.values()) resource.texture.destroy();
     this.#assetTextures.clear();
     this.#bindGroups.clear();
+    if (this.#ownsNativeR8GrainTextureCache) this.#nativeR8GrainTextureCache.dispose();
     if (this.#ownsDevice) this.#device.destroy();
   }
 }

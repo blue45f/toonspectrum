@@ -36,6 +36,10 @@ const EXPECTED_CASE_IDS = [
   "procedural-stroke",
   "asset-document",
   "asset-stroke",
+  "durable-r8-alpha-canvas",
+  "durable-r8-alpha-stroke",
+  "durable-r8-luminance-canvas",
+  "durable-r8-luminance-stroke",
   "destination-out",
 ];
 const CSP =
@@ -237,6 +241,66 @@ function validateSuccess(result, diagnostics) {
     || result.anchors?.assetDocumentVsStrokeHalfWordMismatches <= 0
   ) {
     failures.push("asset R8 document/stroke grain anchoring was not evidenced");
+  }
+
+  const durableCases = result.cases.filter((evidence) => evidence.durableR8 === true);
+  const durableById = new Map(durableCases.map((evidence) => [evidence.id, evidence]));
+  for (const [id, channel, space] of [
+    ["durable-r8-alpha-canvas", "alpha", "document"],
+    ["durable-r8-alpha-stroke", "alpha", "stroke"],
+    ["durable-r8-luminance-canvas", "luminance", "document"],
+    ["durable-r8-luminance-stroke", "luminance", "stroke"],
+  ]) {
+    const evidence = durableById.get(id);
+    const receipt = evidence?.receipts?.[0];
+    const repeatLeft = evidence?.samples?.find(
+      (sample) => sample.label === "native-repeat-seam-left",
+    );
+    const repeatRight = evidence?.samples?.find(
+      (sample) => sample.label === "native-repeat-seam-right",
+    );
+    if (
+      evidence?.grainKind !== "asset-r8-repeat"
+      || evidence?.grainChannel !== channel
+      || evidence?.grainSpace !== space
+      || evidence?.nativeR8TextureCreations !== 1
+      || !Number.isFinite(evidence?.repeatSeamDocumentX)
+      || !repeatLeft
+      || !repeatRight
+      || repeatLeft.x + 1 !== repeatRight.x
+      || repeatLeft.maxAbsoluteDelta > result.tolerance.cpuAbsolute
+      || repeatRight.maxAbsoluteDelta > result.tolerance.cpuAbsolute
+      || receipt?.grainSamplingSemantics !== "durable-r8-cpu-parity-v1"
+      || typeof receipt?.nativeR8GrainSourceKey !== "string"
+      || receipt.nativeR8GrainSourceKey.length === 0
+      || typeof receipt?.planSemanticFingerprint !== "string"
+      || receipt.planSemanticFingerprint.length === 0
+      || receipt.nativeR8GrainTextureBytes !== 16
+      || evidence.metrics.violatingComponents !== 0
+      || evidence.metrics.unaffectedExactHalfWordMismatches !== 0
+    ) {
+      failures.push(
+        `${id}: durable native R8 identity/parity evidence is incomplete (repeat seam)`,
+      );
+    }
+  }
+  if (
+    durableCases.length !== 4
+    || result.anchors?.durableAlphaCanvasVsStrokeHalfWordMismatches <= 0
+    || result.anchors?.durableLuminanceCanvasVsStrokeHalfWordMismatches <= 0
+  ) {
+    failures.push("durable alpha/luminance canvas/stroke anchor coverage is incomplete");
+  }
+  if (
+    typeof result.durableR8Identity?.omittedSourceFingerprint !== "string"
+    || result.durableR8Identity.omittedSourceFingerprint.length === 0
+    || typeof result.durableR8Identity?.boundSourceFingerprint !== "string"
+    || result.durableR8Identity.boundSourceFingerprint.length === 0
+    || result.durableR8Identity.fingerprintsDiffer !== true
+    || result.durableR8Identity.omittedSourceFingerprint
+      === result.durableR8Identity.boundSourceFingerprint
+  ) {
+    failures.push("durable source omission/presence did not alter the renderer semantic fingerprint");
   }
 
   const erased = result.cases.find((evidence) => evidence.id === "destination-out");
@@ -470,6 +534,10 @@ async function main() {
         zeroBorderBilinearTip: true,
         proceduralDocumentAndStrokeGrain: true,
         assetDocumentAndStrokeGrain: true,
+        durableNativeR8AlphaAndLuminance: true,
+        durableNativeR8CanvasAndStrokeAnchors: true,
+        durableNativeR8RepeatBilinearCpuParity: true,
+        durableRendererSemanticFingerprint: true,
         maximumUint32Seed: true,
         sourceOverAndDestinationOut: true,
         firstAppendZeroInitialization: true,

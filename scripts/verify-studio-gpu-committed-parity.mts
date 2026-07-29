@@ -8,8 +8,9 @@
  * fillStudioCausalInkDabs) and a standalone StudioWebGpuEngine fed by the real
  * createStudioWebGpuCommittedHandoff conversion, in a real Chromium WebGPU context. Backend
  * fallback to Canvas2D, a missing/incomplete receipt, or a geometry-preflight mismatch always fail
- * the run; the pixel delta itself is reported per case, not yet gated, until a defensible
- * tolerance exists.
+ * the run. The fixed SwiftShader capture is also held to per-case alpha/premultiplied-colour
+ * budgets. Raw straight RGB at near-zero alpha is intentionally diagnostic-only because it is
+ * mathematically ill-conditioned and visually irrelevant.
  *
  * This is deliberately scoped to the disputed rasterization primitive only: no mounted StudioPage,
  * no Konva Stage, no DPR/zoom/flip matrix. See docs/studio-crdt-webgpu-architecture-2026-07-16.md.
@@ -36,6 +37,9 @@ const HARNESS_PATH = "/__studio_gpu_committed_parity__";
 // timeout (see RECEIPT_TIMEOUT_MS in studio-gpu-committed-parity-browser.ts). This outer timeout
 // must safely exceed every case's worst-case budget plus Vite/Playwright startup, not just one.
 const RESULT_TIMEOUT_MS = 45_000;
+const REVIEWED_CAPTURE_WIDTH = 128;
+const REVIEWED_CAPTURE_HEIGHT = 96;
+const REVIEWED_TOTAL_PIXELS = REVIEWED_CAPTURE_WIDTH * REVIEWED_CAPTURE_HEIGHT;
 
 interface RawPixelDiff {
   readonly changedPixels: number;
@@ -68,6 +72,40 @@ interface ParityCaseResult {
   readonly gpuPng: string;
   readonly diffPng: string;
 }
+
+interface ParityQualityBudget {
+  readonly maxAlphaDelta: number;
+  readonly maxTolerance2ChangedPixels: number;
+  readonly maxPremultipliedChannelDelta: number;
+  readonly maxStraightRgbDeltaAtModerateAlpha: number;
+}
+
+const QUALITY_BUDGETS = {
+  "opaque-black": {
+    maxAlphaDelta: 72,
+    maxTolerance2ChangedPixels: 210,
+    maxPremultipliedChannelDelta: 1,
+    maxStraightRgbDeltaAtModerateAlpha: 1,
+  },
+  "colored-alpha": {
+    maxAlphaDelta: 58,
+    maxTolerance2ChangedPixels: 380,
+    maxPremultipliedChannelDelta: 48,
+    maxStraightRgbDeltaAtModerateAlpha: 32,
+  },
+  "isolated-dab": {
+    maxAlphaDelta: 44,
+    maxTolerance2ChangedPixels: 36,
+    maxPremultipliedChannelDelta: 1,
+    maxStraightRgbDeltaAtModerateAlpha: 1,
+  },
+} as const satisfies Readonly<Record<string, ParityQualityBudget>>;
+
+const REVIEWED_DAB_COUNTS = {
+  "opaque-black": 99,
+  "colored-alpha": 99,
+  "isolated-dab": 1,
+} as const satisfies Readonly<Record<keyof typeof QUALITY_BUDGETS, number>>;
 
 type ParityResult =
   | {
@@ -170,12 +208,62 @@ async function main(): Promise<void> {
     }`);
     invariant(result.backend === "webgpu", `expected webgpu backend, got ${result.backend}`);
     invariant(
-      result.width > 0 && result.height > 0,
-      "capture reported non-positive dimensions"
+      result.width === REVIEWED_CAPTURE_WIDTH
+        && result.height === REVIEWED_CAPTURE_HEIGHT,
+      `capture dimensions ${result.width}x${result.height} do not match reviewed `
+        + `${REVIEWED_CAPTURE_WIDTH}x${REVIEWED_CAPTURE_HEIGHT}`
     );
-    invariant(result.cases.length > 0, "harness reported zero parity cases");
+    const reviewedCaseIds = Object.keys(QUALITY_BUDGETS);
+    const observedCaseIds = new Set(result.cases.map(({ id }) => id));
+    invariant(
+      result.cases.length === reviewedCaseIds.length
+        && observedCaseIds.size === reviewedCaseIds.length
+        && reviewedCaseIds.every((id) => observedCaseIds.has(id)),
+      "harness parity case count does not match the reviewed quality budget"
+    );
 
     const caseSummaries = result.cases.map((parityCase) => {
+      const budget = QUALITY_BUDGETS[parityCase.id as keyof typeof QUALITY_BUDGETS];
+      invariant(budget !== undefined, `missing reviewed quality budget for ${parityCase.id}`);
+      const reviewedDabCount =
+        REVIEWED_DAB_COUNTS[parityCase.id as keyof typeof REVIEWED_DAB_COUNTS];
+      invariant(
+        parityCase.dabCount === reviewedDabCount,
+        `[${parityCase.id}] dab count ${parityCase.dabCount} does not match reviewed ${
+          reviewedDabCount
+        }`
+      );
+      invariant(
+        parityCase.exact.totalPixels === REVIEWED_TOTAL_PIXELS
+          && parityCase.tolerance2.totalPixels === REVIEWED_TOTAL_PIXELS,
+        `[${parityCase.id}] pixel total does not match reviewed ${REVIEWED_TOTAL_PIXELS}`
+      );
+      invariant(
+        parityCase.exact.maxAlphaDelta <= budget.maxAlphaDelta,
+        `[${parityCase.id}] alpha delta ${parityCase.exact.maxAlphaDelta} exceeds ${
+          budget.maxAlphaDelta
+        }`
+      );
+      invariant(
+        parityCase.tolerance2.changedPixels <= budget.maxTolerance2ChangedPixels,
+        `[${parityCase.id}] tolerance-2 changed pixels ${
+          parityCase.tolerance2.changedPixels
+        } exceeds ${budget.maxTolerance2ChangedPixels}`
+      );
+      invariant(
+        parityCase.diagnostics.maxPremultipliedChannelDelta
+          <= budget.maxPremultipliedChannelDelta,
+        `[${parityCase.id}] premultiplied colour delta ${
+          parityCase.diagnostics.maxPremultipliedChannelDelta
+        } exceeds ${budget.maxPremultipliedChannelDelta}`
+      );
+      invariant(
+        parityCase.diagnostics.maxStraightRgbDeltaAtModerateAlpha
+          <= budget.maxStraightRgbDeltaAtModerateAlpha,
+        `[${parityCase.id}] moderate-alpha straight RGB delta ${
+          parityCase.diagnostics.maxStraightRgbDeltaAtModerateAlpha
+        } exceeds ${budget.maxStraightRgbDeltaAtModerateAlpha}`
+      );
       writeDataUrlPng(join(SCRATCH, `${parityCase.id}.canvas2d.png`), parityCase.canvasPng);
       writeDataUrlPng(join(SCRATCH, `${parityCase.id}.webgpu.png`), parityCase.gpuPng);
       writeDataUrlPng(join(SCRATCH, `${parityCase.id}.diff.png`), parityCase.diffPng);
@@ -193,6 +281,8 @@ async function main(): Promise<void> {
         maxPremultipliedChannelDelta: parityCase.diagnostics.maxPremultipliedChannelDelta,
         maxStraightRgbDeltaAtModerateAlpha: parityCase.diagnostics.maxStraightRgbDeltaAtModerateAlpha,
         moderateAlphaThreshold: parityCase.diagnostics.moderateAlphaThreshold,
+        qualityBudget: budget,
+        qualityGate: "passed" as const,
       };
     });
 
@@ -207,6 +297,7 @@ async function main(): Promise<void> {
     };
     console.log(JSON.stringify(summary, null, 2));
 
+    invariant(consoleErrors.length === 0, `browser console errors: ${consoleErrors.join("; ")}`);
     invariant(pageErrors.length === 0, `browser page errors: ${pageErrors.join("; ")}`);
   } finally {
     if (browser) await browser.close().catch(() => undefined);

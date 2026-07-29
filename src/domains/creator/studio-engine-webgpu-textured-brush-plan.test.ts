@@ -417,6 +417,89 @@ describe("content-addressed textured brush specialist planning", () => {
     expect(result.plan.dabs.every((dab) => dab.grainDepth === 0.25)).toBe(true);
   });
 
+  it("binds durable R8 identity and CPU-parity semantics into a distinct renderer fingerprint", async () => {
+    const canonical = canonicalPlan({
+      grain: {
+        kind: "texture",
+        assetId: "paper-grain",
+        contentHash: hash(GRAIN_BYTES),
+        space: "stroke",
+        scale: 32,
+        depth: 0.5,
+        contrast: 0.25,
+        seed: 9,
+      },
+    });
+    const source = {
+      kind: "r8-texture-v1" as const,
+      asset: {
+        assetId: "paper-grain",
+        encodedSha256:
+          "sha256:1111111111111111111111111111111111111111111111111111111111111111" as const,
+        decodedSha256: hash(GRAIN_BYTES) as `sha256:${string}`,
+        byteLength: 128,
+        mediaType: "image/png" as const,
+        width: 2,
+        height: 2,
+        channel: "luminance" as const,
+        encoding: "r8-unorm" as const,
+      },
+    };
+    const omitted = await buildStudioEngineWebGpuTexturedBrushPlan(
+      canonical,
+      dynamicsPlan({ textureDepth: 1 }),
+      resolver(),
+    );
+    const bound = await buildStudioEngineWebGpuTexturedBrushPlan(
+      canonical,
+      dynamicsPlan({ textureDepth: 1 }),
+      resolver(),
+      { durableR8GrainSource: source },
+    );
+    const replay = await buildStudioEngineWebGpuTexturedBrushPlan(
+      canonical,
+      dynamicsPlan({ textureDepth: 1 }),
+      resolver(),
+      { durableR8GrainSource: source },
+    );
+    expect(omitted.status).toBe("ready");
+    expect(bound.status).toBe("ready");
+    expect(replay).toEqual(bound);
+    if (omitted.status !== "ready" || bound.status !== "ready") return;
+    expect(bound.plan).toMatchObject({
+      durableR8GrainSource: source,
+      grainPhaseStrokeSeed: canonical.seed,
+      grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+    });
+    expect(bound.plan.semanticFingerprint).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(omitted.plan.semanticFingerprint).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(bound.plan.semanticFingerprint).not.toBe(omitted.plan.semanticFingerprint);
+
+    for (const mismatched of [
+      { ...source, asset: { ...source.asset, assetId: "other-paper" } },
+      {
+        ...source,
+        asset: {
+          ...source.asset,
+          decodedSha256:
+            "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        },
+      },
+      { ...source, asset: { ...source.asset, width: 1, height: 4 } },
+      { ...source, asset: { ...source.asset, channel: "alpha" } },
+    ]) {
+      await expect(buildStudioEngineWebGpuTexturedBrushPlan(
+        canonical,
+        dynamicsPlan({ textureDepth: 1 }),
+        resolver(),
+        { durableR8GrainSource: mismatched },
+      )).resolves.toMatchObject({
+        status: "rejected",
+        reason: "durable-r8-source-mismatch",
+      });
+    }
+  });
+
   it("preserves full affine footprint, deterministic scatter and fixed-tick deposits", async () => {
     const canonical = canonicalPlan({
       samples: [

@@ -8,11 +8,16 @@
  */
 
 import {
+  hydrateStudioBrushR8GrainAsset,
+  resetStudioBrushR8GrainRegistry,
+} from "../src/domains/creator/studio-brush-r8-grain-runtime";
+import {
   parseStudioCanonicalBrushPlan,
   type StudioCanonicalBrushGrain,
 } from "../src/domains/creator/studio-canonical-brush-plan";
 import {
   buildStudioEngineWebGpuTexturedBrushPlan,
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
   type StudioEngineWebGpuTexturedBrushAssetRequest,
   type StudioEngineWebGpuTexturedBrushPlan,
 } from "../src/domains/creator/studio-engine-webgpu-textured-brush-plan";
@@ -26,6 +31,8 @@ import {
   parseStudioProfessionalBrushDynamicsPlan,
 } from "../src/domains/creator/studio-professional-brush-dynamics";
 import { sha256HexPortable } from "../src/domains/creator/studio-sha256";
+
+import type { StudioBrushR8TextureGrainSource } from "../src/domains/creator/studio-brush-r8-grain-asset-contract";
 
 const WIDTH = 64;
 const HEIGHT = 48;
@@ -50,6 +57,27 @@ const GRAIN_BYTES = new Uint8Array([
 ]);
 const TIP_HASH = `sha256:${sha256HexPortable(TIP_BYTES)}`;
 const GRAIN_HASH = `sha256:${sha256HexPortable(GRAIN_BYTES)}`;
+
+function durableR8Source(
+  assetId: string,
+  channel: "alpha" | "luminance",
+): Readonly<StudioBrushR8TextureGrainSource> {
+  return {
+    kind: "r8-texture-v1",
+    asset: {
+      assetId,
+      encodedSha256:
+        "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      decodedSha256: GRAIN_HASH as `sha256:${string}`,
+      byteLength: 128,
+      mediaType: "image/png",
+      width: 4,
+      height: 4,
+      channel,
+      encoding: "r8-unorm",
+    },
+  };
+}
 
 interface BrowserCapabilities {
   readonly webgpu: boolean;
@@ -103,6 +131,10 @@ interface BrowserCaseEvidence {
   readonly grainKind: "none" | "procedural-integer-noise" | "asset-r8-repeat";
   readonly grainSpace: "none" | "document" | "stroke";
   readonly grainSeed: number | null;
+  readonly grainChannel: "none" | "alpha" | "luminance";
+  readonly durableR8: boolean;
+  readonly nativeR8TextureCreations: number;
+  readonly repeatSeamDocumentX: number | null;
   readonly porterDuffOrder: readonly ("source-over" | "destination-out")[];
   readonly receipts: readonly StudioEngineWebGpuTexturedBrushReceipt[];
   readonly metrics: PixelMetrics;
@@ -148,6 +180,14 @@ interface AppendRebuildEvidence {
 interface AnchorEvidence {
   readonly proceduralDocumentVsStrokeHalfWordMismatches: number;
   readonly assetDocumentVsStrokeHalfWordMismatches: number;
+  readonly durableAlphaCanvasVsStrokeHalfWordMismatches: number;
+  readonly durableLuminanceCanvasVsStrokeHalfWordMismatches: number;
+}
+
+interface DurableR8IdentityEvidence {
+  readonly omittedSourceFingerprint: string;
+  readonly boundSourceFingerprint: string;
+  readonly fingerprintsDiffer: boolean;
 }
 
 interface DeviceLossEvidence {
@@ -182,6 +222,7 @@ type BrowserTexturedBrushResult =
       };
       readonly cases: readonly BrowserCaseEvidence[];
       readonly anchors: AnchorEvidence;
+      readonly durableR8Identity: DurableR8IdentityEvidence;
       readonly appendRebuild: AppendRebuildEvidence;
       readonly cacheBudgetEpochs: CacheBudgetEpochEvidence;
       readonly flowControl: FlowControlEvidence;
@@ -220,6 +261,7 @@ interface ObservedDevice {
   readonly device: GPUDevice;
   readonly authorityTextures: GPUTexture[];
   readonly assetTextureLabels: string[];
+  readonly nativeR8TextureLabels: string[];
 }
 
 interface Deferred {
@@ -410,14 +452,24 @@ function independentGrainFactor(
 ): number {
   const grain = plan.grain;
   if (!grain) return 1;
+  const durable = plan.durableR8GrainSource !== undefined;
+  const phaseSeed = durable
+    ? ((plan.grainPhaseStrokeSeed! ^ grain.seed) >>> 0)
+    : 0;
+  const phaseX = durable
+    ? mixUint32(phaseSeed ^ 0x9e37_79b9) / 0x1_0000_0000
+    : 0;
+  const phaseY = durable
+    ? mixUint32(phaseSeed ^ 0x243f_6a88) / 0x1_0000_0000
+    : 0;
   const x = documentX - grain.originX;
   const y = documentY - grain.originY;
   let sampled: number;
   if (grain.kind === "asset-r8-repeat") {
     const asset = plan.assets[grain.assetIndex]!;
     sampled = bilinear(
-      (x / grain.scale) * asset.width - 0.5,
-      (y / grain.scale) * asset.height - 0.5,
+      (x / grain.scale + phaseX) * asset.width - 0.5,
+      (y / grain.scale + phaseY) * asset.height - 0.5,
       (texelX, texelY) =>
         repeatTexel(asset.bytes, asset.width, asset.height, texelX, texelY),
     );
@@ -429,7 +481,9 @@ function independentGrainFactor(
     );
   }
   const contrasted = clamp01(
-    0.5 + (sampled - 0.5) * (1 + grain.contrast * 3),
+    0.5 + (sampled - 0.5) * (
+      1 + grain.contrast * (durable ? 4 : 3)
+    ),
   );
   const shaped = grain.invert ? 1 - contrasted : contrasted;
   return 1 - depth + depth * shaped;
@@ -644,6 +698,7 @@ function observeDevice(
 ): ObservedDevice {
   const authorityTextures: GPUTexture[] = [];
   const assetTextureLabels: string[] = [];
+  const nativeR8TextureLabels: string[] = [];
   const queue = new Proxy(rawDevice.queue, {
     get(target, property) {
       if (property === "onSubmittedWorkDone" && fenceGate) {
@@ -667,6 +722,8 @@ function observeDevice(
           const label = String(descriptor.label ?? "");
           if (label === "Studio textured brush rgba16float authority") {
             authorityTextures.push(texture);
+          } else if (label.startsWith("Studio verified R8 grain ")) {
+            nativeR8TextureLabels.push(label);
           } else if (label.startsWith("Studio textured brush ")) {
             assetTextureLabels.push(label);
           }
@@ -686,7 +743,12 @@ function observeDevice(
         : value;
     },
   }) as unknown as GPUDevice;
-  return { device, authorityTextures, assetTextureLabels };
+  return {
+    device,
+    authorityTextures,
+    assetTextureLabels,
+    nativeR8TextureLabels,
+  };
 }
 
 function createRuntime(
@@ -906,6 +968,8 @@ async function buildPlan(
     porterDuff?: "source-over" | "destination-out";
     color?: readonly [number, number, number, number];
     grain?: StudioCanonicalBrushGrain | null;
+    grainChannel?: "alpha" | "luminance";
+    durableR8GrainSource?: Readonly<StudioBrushR8TextureGrainSource>;
   }> = {},
 ): Promise<StudioEngineWebGpuTexturedBrushPlan> {
   const grain = options.grain ?? null;
@@ -940,14 +1004,19 @@ async function buildPlan(
           contentHash: request.contentHash,
           width: request.expectedWidth ?? 4,
           height: request.expectedHeight ?? 4,
-          channel: request.expectedChannel ?? "luminance",
+          channel: request.expectedChannel ?? options.grainChannel ?? "luminance",
           format: "r8-unorm",
           byteLength: bytes.byteLength,
           bytes,
         };
       },
     },
-    { mode: options.mode ?? "rebuild" },
+    {
+      mode: options.mode ?? "rebuild",
+      ...(options.durableR8GrainSource
+        ? { durableR8GrainSource: options.durableR8GrainSource }
+        : {}),
+    },
   );
   if (result.status !== "ready") {
     throw new Error(`textured plan ${id} failed: ${result.status} ${"reason" in result ? result.reason : ""}`);
@@ -991,21 +1060,59 @@ async function runCase(
   const metrics = comparePixels(cpuWords, gpuWords);
   const first = plans[0]!;
   const grain = first.grain;
+  const durableSource = first.durableR8GrainSource;
+  const samples = [
+    samplePixel("center", 32, 24, cpuWords, gpuWords),
+    samplePixel("zero-border-edge", 20, 24, cpuWords, gpuWords),
+    samplePixel("outside-footprint", 18, 24, cpuWords, gpuWords),
+  ];
+  let repeatSeamDocumentX: number | null = null;
+  if (
+    durableSource
+    && grain?.kind === "asset-r8-repeat"
+    && first.grainPhaseStrokeSeed !== undefined
+  ) {
+    const phaseSeed = (first.grainPhaseStrokeSeed ^ grain.seed) >>> 0;
+    const phaseX =
+      mixUint32(phaseSeed ^ 0x9e37_79b9) / 0x1_0000_0000;
+    const nearestRepeat = Math.round(
+      (first.dabs[0]!.x - grain.originX) / grain.scale + phaseX,
+    );
+    repeatSeamDocumentX =
+      grain.originX + (nearestRepeat - phaseX) * grain.scale;
+    const leftX = Math.max(
+      0,
+      Math.min(WIDTH - 2, Math.floor(repeatSeamDocumentX - 0.5)),
+    );
+    const sampleY = Math.max(
+      0,
+      Math.min(HEIGHT - 1, Math.floor(first.dabs[0]!.y)),
+    );
+    samples.push(
+      samplePixel("native-repeat-seam-left", leftX, sampleY, cpuWords, gpuWords),
+      samplePixel("native-repeat-seam-right", leftX + 1, sampleY, cpuWords, gpuWords),
+    );
+  }
   const evidence: BrowserCaseEvidence = {
     id,
     grainKind: grain?.kind ?? "none",
     grainSpace: grain?.space ?? "none",
     grainSeed: grain?.seed ?? null,
+    grainChannel: durableSource?.asset.channel
+      ?? (
+        grain?.kind === "asset-r8-repeat"
+          ? first.assets[grain.assetIndex]!.channel
+          : "none"
+    ),
+    durableR8: durableSource !== undefined,
+    nativeR8TextureCreations: observed.nativeR8TextureLabels.length,
+    repeatSeamDocumentX,
     porterDuffOrder: plans.map(
       (plan) => plan.dabs[0]!.composite.porterDuff,
     ),
     receipts,
     metrics,
-    samples: [
-      samplePixel("center", 32, 24, cpuWords, gpuWords),
-      samplePixel("zero-border-edge", 20, 24, cpuWords, gpuWords),
-      samplePixel("outside-footprint", 18, 24, cpuWords, gpuWords),
-    ],
+    samples,
     cpuPng: await canvasPng(cpuWords),
     webgpuPng: await canvasPng(gpuWords),
     diffPng: await diffPng(cpuWords, gpuWords),
@@ -1014,11 +1121,24 @@ async function runCase(
   return { evidence, cpuWords, gpuWords };
 }
 
+function withSemanticFingerprint(
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+): StudioEngineWebGpuTexturedBrushPlan {
+  const { semanticFingerprint: _staleFingerprint, ...semanticPlan } = plan;
+  const semanticFingerprint =
+    fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(semanticPlan);
+  if (!semanticFingerprint) {
+    throw new Error(`could not fingerprint browser plan ${plan.strokeId}`);
+  }
+  return { ...semanticPlan, semanticFingerprint };
+}
+
 function doublePlan(
   plan: StudioEngineWebGpuTexturedBrushPlan,
 ): StudioEngineWebGpuTexturedBrushPlan {
-  return {
+  return withSemanticFingerprint({
     ...plan,
+    semanticFingerprint: undefined,
     mode: "rebuild",
     commandSequence: 2,
     dabs: [
@@ -1030,7 +1150,7 @@ function doublePlan(
       firstInstance: 0,
       instanceCount: 2,
     }],
-  };
+  });
 }
 
 function countHalfWordMismatches(left: Uint16Array, right: Uint16Array): number {
@@ -1051,7 +1171,7 @@ async function appendRebuildEvidence(
   const firstReceipt = await executeCompleted(appendTarget.runtime, base, 1);
   const secondReceipt = await executeCompleted(
     appendTarget.runtime,
-    { ...base, mode: "append" },
+    withSemanticFingerprint({ ...base, mode: "append" }),
     2,
   );
   const appendWords = await readRgba16Float(rawDevice, appendTarget.texture);
@@ -1094,10 +1214,10 @@ async function cacheBudgetEpochEvidence(
   const second = await target.runtime.execute({
     requestSequence: 2,
     deviceEpoch: 1,
-    plan: { ...plan, mode: "append" },
+    plan: withSemanticFingerprint({ ...plan, mode: "append" }),
   });
   const afterSecond = observed.assetTextureLabels.length;
-  const metadataAlias: StudioEngineWebGpuTexturedBrushPlan = {
+  const metadataAlias: StudioEngineWebGpuTexturedBrushPlan = withSemanticFingerprint({
     ...plan,
     mode: "rebuild",
     assets: [{
@@ -1105,7 +1225,7 @@ async function cacheBudgetEpochEvidence(
       width: 2,
       height: 8,
     }],
-  };
+  });
   const beforeAlias = observed.assetTextureLabels.length;
   const alias = await target.runtime.execute({
     requestSequence: 3,
@@ -1216,14 +1336,14 @@ async function flowControlEvidence(
   const busy = await busyTarget.runtime.execute({
     requestSequence: 2,
     deviceEpoch: 1,
-    plan: { ...plan, mode: "append" },
+    plan: withSemanticFingerprint({ ...plan, mode: "append" }),
   });
   gate.resolve();
   const firstResult = await first;
   const reusedBusySequence = await busyTarget.runtime.execute({
     requestSequence: 2,
     deviceEpoch: 1,
-    plan: { ...plan, mode: "append" },
+    plan: withSemanticFingerprint({ ...plan, mode: "append" }),
   });
   busyTarget.runtime.dispose();
   return {
@@ -1357,6 +1477,71 @@ async function run(): Promise<BrowserTexturedBrushResult> {
       seed: 37,
     },
   });
+  resetStudioBrushR8GrainRegistry();
+  const durableCases: Array<Readonly<{
+    id: string;
+    channel: "alpha" | "luminance";
+    canonicalSpace: "document" | "stroke";
+  }>> = [
+    { id: "durable-r8-alpha-canvas", channel: "alpha", canonicalSpace: "document" },
+    { id: "durable-r8-alpha-stroke", channel: "alpha", canonicalSpace: "stroke" },
+    {
+      id: "durable-r8-luminance-canvas",
+      channel: "luminance",
+      canonicalSpace: "document",
+    },
+    {
+      id: "durable-r8-luminance-stroke",
+      channel: "luminance",
+      canonicalSpace: "stroke",
+    },
+  ];
+  const durablePlans: StudioEngineWebGpuTexturedBrushPlan[] = [];
+  for (const descriptor of durableCases) {
+    const source = durableR8Source(
+      `browser-${descriptor.id}`,
+      descriptor.channel,
+    );
+    const hydrated = hydrateStudioBrushR8GrainAsset(source, GRAIN_BYTES);
+    if (hydrated.status !== "ready") {
+      throw new Error(
+        `durable R8 hydration ${descriptor.id} failed: ${hydrated.reason}`,
+      );
+    }
+    durablePlans.push(await buildPlan(descriptor.id, {
+      grain: {
+        kind: "texture",
+        assetId: source.asset.assetId,
+        contentHash: source.asset.decodedSha256,
+        space: descriptor.canonicalSpace,
+        scale: 13,
+        depth: 0.72,
+        contrast: 0.61,
+        seed: 37,
+      },
+      grainChannel: descriptor.channel,
+      durableR8GrainSource: source,
+    }));
+  }
+  const omittedSourcePeer = await buildPlan(durableCases[0]!.id, {
+    grain: {
+      kind: "texture",
+      assetId: durablePlans[0]!.durableR8GrainSource!.asset.assetId,
+      contentHash: durablePlans[0]!.durableR8GrainSource!.asset.decodedSha256,
+      space: "document",
+      scale: 13,
+      depth: 0.72,
+      contrast: 0.61,
+      seed: 37,
+    },
+    grainChannel: "alpha",
+  });
+  const durableR8Identity: DurableR8IdentityEvidence = {
+    omittedSourceFingerprint: omittedSourcePeer.semanticFingerprint ?? "",
+    boundSourceFingerprint: durablePlans[0]!.semanticFingerprint ?? "",
+    fingerprintsDiffer:
+      omittedSourcePeer.semanticFingerprint !== durablePlans[0]!.semanticFingerprint,
+  };
   const eraseBase = await buildPlan("erase-base", {
     color: [0.1, 0.35, 0.9, 0.8],
   });
@@ -1372,12 +1557,36 @@ async function run(): Promise<BrowserTexturedBrushResult> {
       rawDevice,
       shaderModules,
       "first-append-zero-init",
-      [{ ...noGrain, mode: "append" }],
+      [withSemanticFingerprint({ ...noGrain, mode: "append" })],
     ),
     await runCase(rawDevice, shaderModules, "procedural-document", [proceduralDocument]),
     await runCase(rawDevice, shaderModules, "procedural-stroke", [proceduralStroke]),
     await runCase(rawDevice, shaderModules, "asset-document", [assetDocument]),
     await runCase(rawDevice, shaderModules, "asset-stroke", [assetStroke]),
+    await runCase(
+      rawDevice,
+      shaderModules,
+      durableCases[0]!.id,
+      [durablePlans[0]!],
+    ),
+    await runCase(
+      rawDevice,
+      shaderModules,
+      durableCases[1]!.id,
+      [durablePlans[1]!],
+    ),
+    await runCase(
+      rawDevice,
+      shaderModules,
+      durableCases[2]!.id,
+      [durablePlans[2]!],
+    ),
+    await runCase(
+      rawDevice,
+      shaderModules,
+      durableCases[3]!.id,
+      [durablePlans[3]!],
+    ),
     await runCase(rawDevice, shaderModules, "destination-out", [eraseBase, erase]),
   ];
   const anchors = {
@@ -1389,7 +1598,16 @@ async function run(): Promise<BrowserTexturedBrushResult> {
       caseRuns[4]!.gpuWords,
       caseRuns[5]!.gpuWords,
     ),
+    durableAlphaCanvasVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[6]!.gpuWords,
+      caseRuns[7]!.gpuWords,
+    ),
+    durableLuminanceCanvasVsStrokeHalfWordMismatches: countHalfWordMismatches(
+      caseRuns[8]!.gpuWords,
+      caseRuns[9]!.gpuWords,
+    ),
   };
+  resetStudioBrushR8GrainRegistry();
   const appendRebuild = await appendRebuildEvidence(
     rawDevice,
     shaderModules,
@@ -1474,6 +1692,7 @@ async function run(): Promise<BrowserTexturedBrushResult> {
     tolerance: { cpuAbsolute: CPU_ABSOLUTE_TOLERANCE },
     cases: caseRuns.map((caseRun) => caseRun.evidence),
     anchors,
+    durableR8Identity,
     appendRebuild,
     cacheBudgetEpochs,
     flowControl,

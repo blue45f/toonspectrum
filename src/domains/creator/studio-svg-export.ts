@@ -209,6 +209,12 @@ import {
   type ShapeParams,
   type StrokeStyle,
 } from "./studio-stroke-shapes";
+import {
+  STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET,
+  visitStudioSvgR8StreamingCoverage,
+  type StudioSvgR8DabVariation,
+  type StudioSvgR8StreamingCoverageMark,
+} from "./studio-svg-r8-streaming-export";
 import { buildTextPathData, isFlatTextPath, normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   layoutVerticalText,
@@ -712,9 +718,24 @@ interface ExportCtx {
     StudioBrushTipAlphaMap,
     Readonly<{ symbolId: string; size: number }>
   >;
+  /**
+   * Worst-case UTF-16 storage retained by embedded brush definitions. This is deliberately
+   * separate from raw RGBA accounting: stored-DEFLATE + base64 strings and the final `join()` can
+   * otherwise multiply a valid pixel budget into a main-thread/mobile OOM.
+   */
+  brushTextureSerializedUtf16Bytes: number;
+  /**
+   * Raw RGBA represented by every streamed R8 mask admitted to this document. The streaming
+   * visitor owns the per-stroke preflight; this counter prevents many individually valid strokes
+   * from multiplying the 64 MiB document ceiling.
+   */
+  r8EmbeddedRgbaBytes: number;
   /** def id 일련번호 — 입력 순서에만 의존해 결정적. */
   seq: number;
 }
+
+const STUDIO_SVG_BRUSH_TEXTURE_SERIALIZED_UTF16_BYTE_BUDGET =
+  64 * 1_024 * 1_024;
 
 function nextId(ctx: ExportCtx, prefix: string): string {
   ctx.seq += 1;
@@ -852,23 +873,37 @@ function svgBrushTextureAsset(
   const symbolId = nextId(ctx, "sbt");
   const maskId = `${symbolId}m`;
   const asset = Object.freeze({ symbolId, size });
-  ctx.brushTextureAssets.set(cacheKey, asset);
-  ctx.defs.push(
+  const definition =
     `<symbol data-brush-tip-asset="full-alpha-map-v1" id="${symbolId}" viewBox="0 0 ${size} ${size}" preserveAspectRatio="none">`
       + `<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="${size}" height="${size}" mask-type="alpha">`
       + `<image x="0" y="0" width="${size}" height="${size}" preserveAspectRatio="none" href="${dataUrl}"/>`
       + `</mask><rect x="0" y="0" width="${size}" height="${size}" fill="currentColor" mask="url(#${maskId})"/>`
-      + `</symbol>`,
-  );
+      + `</symbol>`;
+  const definitionUtf16Bytes = definition.length * 2;
+  const nextSerializedUtf16Bytes =
+    ctx.brushTextureSerializedUtf16Bytes + definitionUtf16Bytes;
+  if (
+    !Number.isSafeInteger(nextSerializedUtf16Bytes)
+    || nextSerializedUtf16Bytes
+      > STUDIO_SVG_BRUSH_TEXTURE_SERIALIZED_UTF16_BYTE_BUDGET
+  ) {
+    return null;
+  }
+  ctx.brushTextureSerializedUtf16Bytes = nextSerializedUtf16Bytes;
+  ctx.brushTextureAssets.set(cacheKey, asset);
+  ctx.defs.push(definition);
   return asset;
 }
 
 function svgAlphaMapTextureAsset(
   ctx: ExportCtx,
   alphaMap: StudioBrushTipAlphaMap,
+  retainMapIdentity = true,
 ): Readonly<{ symbolId: string; size: number }> | null {
-  const identityHit = ctx.brushTextureAssetsByAlphaMap.get(alphaMap);
-  if (identityHit) return identityHit;
+  if (retainMapIdentity) {
+    const identityHit = ctx.brushTextureAssetsByAlphaMap.get(alphaMap);
+    if (identityHit) return identityHit;
+  }
   const revisionKey = alphaMap.revision === undefined
     ? null
     : JSON.stringify([
@@ -880,7 +915,9 @@ function svgAlphaMapTextureAsset(
   if (revisionKey) {
     const revisionHit = ctx.brushTextureAssets.get(revisionKey);
     if (revisionHit) {
-      ctx.brushTextureAssetsByAlphaMap.set(alphaMap, revisionHit);
+      if (retainMapIdentity) {
+        ctx.brushTextureAssetsByAlphaMap.set(alphaMap, revisionHit);
+      }
       return revisionHit;
     }
   }
@@ -914,7 +951,9 @@ function svgAlphaMapTextureAsset(
     alphaMap.size,
     createPixels,
   );
-  if (asset) ctx.brushTextureAssetsByAlphaMap.set(alphaMap, asset);
+  if (asset && retainMapIdentity) {
+    ctx.brushTextureAssetsByAlphaMap.set(alphaMap, asset);
+  }
   return asset;
 }
 
@@ -940,6 +979,67 @@ function svgSoftFalloffTextureAsset(
   );
 }
 
+function serializeStudioDynamicCoverageMark(
+  ctx: ExportCtx,
+  mark: StudioDynamicBrushCoverageMark | StudioSvgR8StreamingCoverageMark,
+  strokeOpacity: number,
+  boundedFlow: boolean,
+  retainAlphaMapIdentity = true,
+): string | null {
+  const opacity = Math.min(
+    1,
+    Math.max(0, mark.alpha * (boundedFlow ? 1 : strokeOpacity)),
+  );
+  const angleDegrees = mark.angleRadians * 180 / Math.PI;
+  const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
+
+  if (mark.texture?.kind === "alpha-map") {
+    const asset = svgAlphaMapTextureAsset(
+      ctx,
+      mark.texture.alphaMap,
+      retainAlphaMapIdentity,
+    );
+    if (!asset) return null;
+    return (
+      `<use data-brush-coverage="alpha-map" href="#${asset.symbolId}"`
+        + ` x="${fmtCoverageNumber(mark.x - mark.radiusX)}"`
+        + ` y="${fmtCoverageNumber(mark.y - mark.radiusY)}"`
+        + ` width="${fmtCoverageNumber(mark.radiusX * 2)}"`
+        + ` height="${fmtCoverageNumber(mark.radiusY * 2)}"`
+        + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
+        + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`
+    );
+  }
+
+  if ("falloff" in mark && mark.falloff?.kind === "analytic-radial") {
+    const asset = svgSoftFalloffTextureAsset(
+      ctx,
+      mark.falloff.exponent,
+    );
+    if (!asset) return null;
+    const overscan = asset.size / STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION;
+    const radiusX = mark.radiusX * overscan;
+    const radiusY = mark.radiusY * overscan;
+    return (
+      `<use data-brush-coverage="analytic-radial" href="#${asset.symbolId}"`
+        + ` x="${fmtCoverageNumber(mark.x - radiusX)}"`
+        + ` y="${fmtCoverageNumber(mark.y - radiusY)}"`
+        + ` width="${fmtCoverageNumber(radiusX * 2)}"`
+        + ` height="${fmtCoverageNumber(radiusY * 2)}"`
+        + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
+        + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`
+    );
+  }
+
+  return (
+    `<ellipse data-brush-coverage="ellipse"`
+      + ` cx="${fmtCoverageNumber(mark.x)}" cy="${fmtCoverageNumber(mark.y)}"`
+      + ` rx="${fmtCoverageNumber(mark.radiusX)}" ry="${fmtCoverageNumber(mark.radiusY)}"`
+      + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"`
+      + ` transform="${transform}"/>`
+  );
+}
+
 function serializeStudioDynamicCoverageMarks(
   ctx: ExportCtx,
   marks: readonly StudioDynamicBrushCoverageMark[],
@@ -950,9 +1050,11 @@ function serializeStudioDynamicCoverageMarks(
   const initialSequence = ctx.seq;
   const initialAssetKeys = new Set(ctx.brushTextureAssets.keys());
   const initialAlphaMapKeys = new Set(ctx.brushTextureAssetsByAlphaMap.keys());
+  const initialSerializedUtf16Bytes = ctx.brushTextureSerializedUtf16Bytes;
   const rollbackAssets = (): null => {
     ctx.defs.length = initialDefsLength;
     ctx.seq = initialSequence;
+    ctx.brushTextureSerializedUtf16Bytes = initialSerializedUtf16Bytes;
     for (const key of ctx.brushTextureAssets.keys()) {
       if (!initialAssetKeys.has(key)) ctx.brushTextureAssets.delete(key);
     }
@@ -966,64 +1068,89 @@ function serializeStudioDynamicCoverageMarks(
   const markup: string[] = [];
 
   for (const mark of marks) {
-    const opacity = Math.min(
-      1,
-      Math.max(0, mark.alpha * (boundedFlow ? 1 : strokeOpacity)),
+    const serialized = serializeStudioDynamicCoverageMark(
+      ctx,
+      mark,
+      strokeOpacity,
+      boundedFlow,
     );
-    const angleDegrees = mark.angleRadians * 180 / Math.PI;
-    const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
-
-    if (mark.texture?.kind === "alpha-map") {
-      const asset = svgAlphaMapTextureAsset(
-        ctx,
-        mark.texture.alphaMap,
-      );
-      if (!asset) return rollbackAssets();
-      markup.push(
-        `<use data-brush-coverage="alpha-map" href="#${asset.symbolId}"`
-          + ` x="${fmtCoverageNumber(mark.x - mark.radiusX)}"`
-          + ` y="${fmtCoverageNumber(mark.y - mark.radiusY)}"`
-          + ` width="${fmtCoverageNumber(mark.radiusX * 2)}"`
-          + ` height="${fmtCoverageNumber(mark.radiusY * 2)}"`
-          + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
-          + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`,
-      );
-      continue;
-    }
-
-    if (mark.falloff?.kind === "analytic-radial") {
-      const asset = svgSoftFalloffTextureAsset(
-        ctx,
-        mark.falloff.exponent,
-      );
-      if (!asset) return rollbackAssets();
-      const overscan = asset.size / STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION;
-      const radiusX = mark.radiusX * overscan;
-      const radiusY = mark.radiusY * overscan;
-      markup.push(
-        `<use data-brush-coverage="analytic-radial" href="#${asset.symbolId}"`
-          + ` x="${fmtCoverageNumber(mark.x - radiusX)}"`
-          + ` y="${fmtCoverageNumber(mark.y - radiusY)}"`
-          + ` width="${fmtCoverageNumber(radiusX * 2)}"`
-          + ` height="${fmtCoverageNumber(radiusY * 2)}"`
-          + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
-          + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`,
-      );
-      continue;
-    }
-
-    markup.push(
-      `<ellipse data-brush-coverage="ellipse"`
-        + ` cx="${fmtCoverageNumber(mark.x)}" cy="${fmtCoverageNumber(mark.y)}"`
-        + ` rx="${fmtCoverageNumber(mark.radiusX)}" ry="${fmtCoverageNumber(mark.radiusY)}"`
-        + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"`
-        + ` transform="${transform}"/>`,
-    );
+    if (serialized === null) return rollbackAssets();
+    markup.push(serialized);
   }
 
   return boundedFlow
     ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.join("")}</g>`
     : `<g>${markup.join("")}</g>`;
+}
+
+/**
+ * Encodes verified R8 paper one dab at a time. Unlike the retained Canvas plan, this path never
+ * stores the per-dab Float32 alpha maps in `brushTextureAssetsByAlphaMap`; only the deterministic
+ * PNG definition string and its tiny content-addressed cache record survive each callback.
+ */
+function serializeStudioR8DynamicCoverageMarks(
+  ctx: ExportCtx,
+  input: Readonly<{
+    dabVariations: readonly StudioSvgR8DabVariation[];
+    dynamics: NormalizedStudioBrushDynamicsSettings;
+    dynamicSeed: number;
+    stroke: string;
+    markBudget: number;
+  }>,
+  strokeOpacity: number,
+  boundedFlow: boolean,
+): readonly string[] | null {
+  const initialDefsLength = ctx.defs.length;
+  const initialSequence = ctx.seq;
+  const initialAssetKeys = new Set(ctx.brushTextureAssets.keys());
+  const initialAlphaMapKeys = new Set(ctx.brushTextureAssetsByAlphaMap.keys());
+  const initialR8EmbeddedRgbaBytes = ctx.r8EmbeddedRgbaBytes;
+  const initialSerializedUtf16Bytes = ctx.brushTextureSerializedUtf16Bytes;
+  const rollbackAssets = (): null => {
+    ctx.defs.length = initialDefsLength;
+    ctx.seq = initialSequence;
+    ctx.r8EmbeddedRgbaBytes = initialR8EmbeddedRgbaBytes;
+    ctx.brushTextureSerializedUtf16Bytes = initialSerializedUtf16Bytes;
+    for (const key of ctx.brushTextureAssets.keys()) {
+      if (!initialAssetKeys.has(key)) ctx.brushTextureAssets.delete(key);
+    }
+    for (const key of ctx.brushTextureAssetsByAlphaMap.keys()) {
+      if (!initialAlphaMapKeys.has(key)) {
+        ctx.brushTextureAssetsByAlphaMap.delete(key);
+      }
+    }
+    return null;
+  };
+  const markupByVariation = input.dabVariations.map(() => [] as string[]);
+  const remainingRgbaByteBudget =
+    STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET - initialR8EmbeddedRgbaBytes;
+  if (remainingRgbaByteBudget <= 0) return rollbackAssets();
+  const streamed = visitStudioSvgR8StreamingCoverage(
+    {
+      ...input,
+      rgbaByteBudget: remainingRgbaByteBudget,
+    },
+    (mark, variationIndex) => {
+      const serialized = serializeStudioDynamicCoverageMark(
+        ctx,
+        mark,
+        strokeOpacity,
+        boundedFlow,
+        false,
+      );
+      if (serialized === null) return false;
+      markupByVariation[variationIndex]!.push(serialized);
+      return true;
+    },
+  );
+  if (!streamed.ok) return rollbackAssets();
+  ctx.r8EmbeddedRgbaBytes =
+    initialR8EmbeddedRgbaBytes + streamed.embeddedRgbaBytes;
+  return markupByVariation.map((markup) => (
+    boundedFlow
+      ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.join("")}</g>`
+      : `<g>${markup.join("")}</g>`
+  ));
 }
 
 function addSkip(ctx: ExportCtx, el: { id: string; type: string }, mode: SvgExportSkip["mode"], label: string): void {
@@ -1427,7 +1554,27 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         // whole-stroke flatten merely to satisfy the legacy fallback parameter.
         let causalCoverageMarksByVariation:
           readonly (readonly StudioDynamicBrushCoverageMark[])[] | null = null;
-        if (usesCausalDepositPlan) {
+        let r8CoverageMarkupByVariation: readonly string[] | null = null;
+        const streamsR8Grain = dynamics.grain.amount > 0
+          && dynamics.grain.source !== undefined;
+        if (streamsR8Grain) {
+          r8CoverageMarkupByVariation = serializeStudioR8DynamicCoverageMarks(
+            ctx,
+            {
+              dabVariations: coverageDabVariations,
+              dynamics,
+              dynamicSeed: seed,
+              stroke,
+              markBudget,
+            },
+            opacity,
+            isStudioBoundedFlowPaintModelCompatible(el),
+          );
+          if (!r8CoverageMarkupByVariation) {
+            dynamicPlanFailed = true;
+            return null;
+          }
+        } else if (usesCausalDepositPlan) {
           const sharedCoverageInput = {
             dynamics,
             dynamicSeed: seed,
@@ -1474,6 +1621,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           renderBudget,
           dabVariations,
           causalCoverageMarksByVariation,
+          r8CoverageMarkupByVariation,
         };
       })()
     : null;
@@ -1614,20 +1762,22 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         `<g${opacityAttr}><path d="${pointsToPathD(points)}" fill="none"${strokeAttrs}${dashAttr} stroke-linecap="${strokeStyle.lineCap}"/>${head}</g>`
       );
     } else {
-      parts.push(serializeFreehand(
-        ctx,
-        el,
-        points,
-        stroke,
-        strokeWidth,
-        opacityAttr,
-        opacity,
-        dynamicDabVariations?.[variationIndex],
-        dynamicPlan?.dynamics,
-        dynamicPlan?.seed,
-        dynamicPlan?.renderBudget.stampGrid,
-        dynamicPlan?.causalCoverageMarksByVariation?.[variationIndex],
-      ));
+      const r8CoverageMarkup =
+        dynamicPlan?.r8CoverageMarkupByVariation?.[variationIndex];
+      parts.push(r8CoverageMarkup ?? serializeFreehand(
+          ctx,
+          el,
+          points,
+          stroke,
+          strokeWidth,
+          opacityAttr,
+          opacity,
+          dynamicDabVariations?.[variationIndex],
+          dynamicPlan?.dynamics,
+          dynamicPlan?.seed,
+          dynamicPlan?.renderBudget.stampGrid,
+          dynamicPlan?.causalCoverageMarksByVariation?.[variationIndex],
+        ));
     }
   }
   return parts.join("");
@@ -3192,6 +3342,8 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
     theme: input.theme ?? "classic",
     brushTextureAssets: new Map(),
     brushTextureAssetsByAlphaMap: new Map(),
+    brushTextureSerializedUtf16Bytes: 0,
+    r8EmbeddedRgbaBytes: 0,
     seq: 0,
   };
   const groups: LayerGroup[] = [...(input.groups ?? [])];

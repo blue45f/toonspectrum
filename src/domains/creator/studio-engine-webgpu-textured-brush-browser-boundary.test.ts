@@ -17,6 +17,7 @@ describe("textured-brush real Chromium WebGPU boundary", () => {
   it("uses the production clean-room plan and runtime against navigator.gpu", () => {
     expect(browserEntry).toContain("buildStudioEngineWebGpuTexturedBrushPlan");
     expect(browserEntry).toContain("createStudioEngineWebGpuTexturedBrushRuntime");
+    expect(browserEntry).toContain("hydrateStudioBrushR8GrainAsset");
     expect(browserEntry).toContain("navigator.gpu.requestAdapter");
     expect(browserEntry).toContain('backend: "webgpu-textured-brush-rgba16float"');
     expect(browserEntry).not.toContain("fakeGpuHarness");
@@ -49,6 +50,10 @@ describe("textured-brush real Chromium WebGPU boundary", () => {
       "procedural-stroke",
       "asset-document",
       "asset-stroke",
+      "durable-r8-alpha-canvas",
+      "durable-r8-alpha-stroke",
+      "durable-r8-luminance-canvas",
+      "durable-r8-luminance-stroke",
       "destination-out",
     ]) {
       expect(browserEntry).toContain(`"${id}"`);
@@ -61,6 +66,10 @@ describe("textured-brush real Chromium WebGPU boundary", () => {
     expect(verifier).toContain("R8 tip zero-border bilinear evidence");
     expect(verifier).toContain("procedural document/stroke grain");
     expect(verifier).toContain("asset R8 document/stroke grain");
+    expect(verifier).toContain("durable native R8 identity/parity evidence");
+    expect(verifier).toContain("durable source omission/presence");
+    expect(browserEntry).toContain('"native-repeat-seam-left"');
+    expect(browserEntry).toContain('"native-repeat-seam-right"');
   });
 
   it("checks source-over, destination-out, first append initialization and exact rebuild", () => {

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   BadRequestException,
   ConflictException,
@@ -5,6 +7,7 @@ import {
   NotFoundException,
   PayloadTooLargeException,
 } from "@nestjs/common";
+import { Image, encodePng } from "image-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -57,7 +60,9 @@ const repository = {
   upsert: vi.fn(),
   getManifest: vi.fn(),
   getManifests: vi.fn(),
+  getContents: vi.fn(),
   getManifestsInTransaction: vi.fn(),
+  getContentsInTransaction: vi.fn(),
   getContent: vi.fn(),
   deleteUnreferencedUpload: vi.fn(),
 };
@@ -77,6 +82,22 @@ function pngBytes(width = 1, height = 1): Uint8Array {
   bytes.set([8, 6, 0, 0, 0], 24);
   bytes.set([0x49, 0x45, 0x4e, 0x44], 37);
   return bytes;
+}
+
+function rgbaPng(
+  width: number,
+  height: number,
+  values: readonly number[]
+): Uint8Array {
+  return encodePng(new Image(width, height, {
+    colorModel: "RGBA",
+    bitDepth: 8,
+    data: Uint8Array.from(values),
+  }));
+}
+
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function apngBytes(): Uint8Array {
@@ -239,7 +260,9 @@ describe("StudioWorkAssetService", () => {
     repository.upsert.mockReset();
     repository.getManifest.mockReset();
     repository.getManifests.mockReset();
+    repository.getContents.mockReset();
     repository.getManifestsInTransaction.mockReset();
+    repository.getContentsInTransaction.mockReset();
     repository.getContent.mockReset();
     repository.deleteUnreferencedUpload.mockReset();
   });
@@ -362,49 +385,89 @@ describe("StudioWorkAssetService", () => {
     ])).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("binds R8 CRDT references to the exact stored PNG hash, bytes, and dimensions", async () => {
+  it("binds R8 CRDT references to the exact stored and decoded PNG identity", async () => {
+    const encoded = rgbaPng(2, 1, [
+      255, 0, 0, 40,
+      0, 255, 0, 230,
+    ]);
+    const decoded = Uint8Array.of(40, 230);
+    const storedManifest: StudioWorkAssetManifest = {
+      ...manifest,
+      assetId: "paper-r8",
+      byteSize: encoded.byteLength,
+      sha256: sha256(encoded),
+      intrinsicImage: { width: 2, height: 1, decodedRgbaBytes: 8 },
+      descriptor: {
+        ...manifest.descriptor,
+        element: {
+          ...manifest.descriptor.element,
+          id: "paper-r8",
+          width: 2,
+          height: 1,
+        },
+      },
+    };
     const source = {
       kind: "r8-texture-v1",
       asset: {
-        assetId: manifest.assetId,
-        encodedSha256: `sha256:${manifest.sha256}`,
-        decodedSha256: `sha256:${"b".repeat(64)}`,
-        byteLength: manifest.byteSize,
+        assetId: storedManifest.assetId,
+        encodedSha256: `sha256:${storedManifest.sha256}`,
+        decodedSha256: `sha256:${sha256(decoded)}`,
+        byteLength: storedManifest.byteSize,
         mediaType: "image/png",
-        width: manifest.intrinsicImage!.width,
-        height: manifest.intrinsicImage!.height,
-        channel: "luminance",
+        width: storedManifest.intrinsicImage!.width,
+        height: storedManifest.intrinsicImage!.height,
+        channel: "alpha",
         encoding: "r8-unorm",
       },
     } as const;
-    repository.getManifests.mockResolvedValue([manifest]);
+    repository.getManifests.mockResolvedValue([storedManifest]);
+    repository.getContents.mockResolvedValue([{
+      manifest: storedManifest,
+      payload: Uint8Array.from(encoded),
+    }]);
 
     await expect(service().assertR8GrainReferencesStored(
       "editor",
       "work-1",
       [source, source],
     )).resolves.toBeUndefined();
-    expect(repository.getManifests).toHaveBeenCalledWith(
+    expect(repository.getContents).toHaveBeenCalledWith(
       "editor",
       "work-1",
-      [manifest.assetId],
+      [storedManifest.assetId],
     );
 
-    for (const mismatched of [
-      { ...manifest, sha256: "a".repeat(64) },
-      { ...manifest, byteSize: manifest.byteSize + 1 },
+    repository.getManifests.mockResolvedValueOnce([{
+      ...storedManifest,
+      intrinsicImage: { width: 3, height: 1, decodedRgbaBytes: 12 },
+    }]);
+    repository.getContents.mockClear();
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [source],
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.getContents).not.toHaveBeenCalled();
+
+    for (const mismatchedManifest of [
+      { ...storedManifest, sha256: "a".repeat(64) },
+      { ...storedManifest, byteSize: storedManifest.byteSize + 1 },
       {
-        ...manifest,
+        ...storedManifest,
         intrinsicImage: {
-          ...manifest.intrinsicImage!,
-          width: manifest.intrinsicImage!.width + 1,
-          decodedRgbaBytes: (manifest.intrinsicImage!.width + 1)
-            * manifest.intrinsicImage!.height
+          ...storedManifest.intrinsicImage!,
+          width: storedManifest.intrinsicImage!.width + 1,
+          decodedRgbaBytes: (storedManifest.intrinsicImage!.width + 1)
+            * storedManifest.intrinsicImage!.height
             * 4,
         },
       },
     ]) {
-      repository.getManifests.mockResolvedValueOnce([mismatched]);
+      repository.getContents.mockResolvedValueOnce([{
+        manifest: mismatchedManifest,
+        payload: Uint8Array.from(encoded),
+      }]);
       await expect(service().assertR8GrainReferencesStored(
         "editor",
         "work-1",
@@ -412,7 +475,19 @@ describe("StudioWorkAssetService", () => {
       )).rejects.toBeInstanceOf(BadRequestException);
     }
 
-    repository.getManifests.mockClear();
+    const corrupted = Uint8Array.from(encoded);
+    corrupted[corrupted.length - 1] ^= 1;
+    repository.getContents.mockResolvedValueOnce([{
+      manifest: storedManifest,
+      payload: corrupted,
+    }]);
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [source],
+    )).rejects.toBeInstanceOf(BadRequestException);
+
+    repository.getContents.mockClear();
     await expect(service().assertR8GrainReferencesStored(
       "editor",
       "work-1",
@@ -422,12 +497,37 @@ describe("StudioWorkAssetService", () => {
           ...source,
           asset: {
             ...source.asset,
-            decodedSha256: `sha256:${"c".repeat(64)}`,
+            decodedSha256: `sha256:${sha256(Uint8Array.of(41, 230))}`,
           },
         },
       ],
     )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.getContents).not.toHaveBeenCalled();
+  });
+
+  it("rejects aggregate R8 decode work before manifest or binary storage reads", async () => {
+    const source = (assetId: string) => ({
+      kind: "r8-texture-v1",
+      asset: {
+        assetId,
+        encodedSha256: `sha256:${"a".repeat(64)}`,
+        decodedSha256: `sha256:${"b".repeat(64)}`,
+        byteLength: 40 * 1024 * 1024,
+        mediaType: "image/png",
+        width: 1,
+        height: 1,
+        channel: "alpha",
+        encoding: "r8-unorm",
+      },
+    } as const);
+
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [source("paper-budget-a"), source("paper-budget-b")]
+    )).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.getManifests).not.toHaveBeenCalled();
+    expect(repository.getContents).not.toHaveBeenCalled();
   });
 
   it("keeps new durable work-asset references default-off without the server opt-in token", async () => {
@@ -456,6 +556,66 @@ describe("StudioWorkAssetService", () => {
       ["asset-1"]
     );
     expect(repository.getManifests).not.toHaveBeenCalled();
+  });
+
+  it("reads and decodes R8 bytes inside the active CRDT append transaction", async () => {
+    const transaction = {} as DrizzleStudioCrdtTransaction;
+    const encoded = rgbaPng(1, 1, [10, 20, 30, 180]);
+    const decoded = Uint8Array.of(180);
+    const storedManifest: StudioWorkAssetManifest = {
+      ...manifest,
+      assetId: "paper-transaction",
+      byteSize: encoded.byteLength,
+      sha256: sha256(encoded),
+      intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
+      descriptor: {
+        ...manifest.descriptor,
+        element: {
+          ...manifest.descriptor.element,
+          id: "paper-transaction",
+        },
+      },
+    };
+    const source = {
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: storedManifest.assetId,
+        encodedSha256: `sha256:${storedManifest.sha256}`,
+        decodedSha256: `sha256:${sha256(decoded)}`,
+        byteLength: encoded.byteLength,
+        mediaType: "image/png",
+        width: 1,
+        height: 1,
+        channel: "alpha",
+        encoding: "r8-unorm",
+      },
+    } as const;
+    repository.getManifestsInTransaction.mockResolvedValue([storedManifest]);
+    repository.getContentsInTransaction.mockResolvedValue([{
+      manifest: storedManifest,
+      payload: Uint8Array.from(encoded),
+    }]);
+
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [source],
+      transaction
+    )).resolves.toBeUndefined();
+
+    expect(repository.getContentsInTransaction).toHaveBeenCalledWith(
+      transaction,
+      "editor",
+      "work-1",
+      ["paper-transaction"]
+    );
+    expect(repository.getContents).not.toHaveBeenCalled();
+    expect(repository.getManifestsInTransaction).toHaveBeenCalledWith(
+      transaction,
+      "editor",
+      "work-1",
+      ["paper-transaction"]
+    );
   });
 
   it("forwards exact receipt-bound cleanup and returns its idempotent outcome", async () => {

@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { StudioBrushR8GrainRegistry } from "./studio-brush-r8-grain-runtime";
+import {
+  fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics,
+  type StudioEngineWebGpuTexturedBrushPlan,
+} from "./studio-engine-webgpu-textured-brush-plan";
 import {
   createStudioEngineWebGpuTexturedBrushRuntime,
   packStudioEngineWebGpuTexturedBrushDabs,
   STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_INSTANCE_FLOATS,
 } from "./studio-engine-webgpu-textured-brush-runtime";
 import { sha256HexPortable } from "./studio-sha256";
-
-import type {
-  StudioEngineWebGpuTexturedBrushPlan,
-} from "./studio-engine-webgpu-textured-brush-plan";
+import {
+  planStudioWebGpuR8GrainNative,
+  StudioWebGpuR8GrainTextureCache,
+} from "./studio-webgpu-r8-grain-native";
 
 interface Deferred<Value> {
   readonly promise: Promise<Value>;
@@ -95,6 +100,7 @@ function fakeGpuHarness(
       const destroy = vi.fn();
       textures.push({ descriptor, destroy });
       return {
+        descriptor,
         createView: vi.fn(() => ({ textureLabel: descriptor.label })),
         destroy,
       } as unknown as GPUTexture;
@@ -256,6 +262,18 @@ function runtime(harness: FakeGpuHarness, overrides = {}) {
   return result.runtime;
 }
 
+function fingerprinted(
+  plan: StudioEngineWebGpuTexturedBrushPlan,
+): StudioEngineWebGpuTexturedBrushPlan {
+  const semanticFingerprint =
+    fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics({
+      ...plan,
+      semanticFingerprint: undefined,
+    });
+  if (!semanticFingerprint) throw new Error("semantic fingerprint failed");
+  return { ...plan, semanticFingerprint };
+}
+
 describe("textured RGBA16F WebGPU specialist runtime", () => {
   it("packs premultiplied colour, grain flags, seeds and texture dimensions", () => {
     const packed = packStudioEngineWebGpuTexturedBrushDabs(texturedPlan());
@@ -299,6 +317,89 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(Number.isInteger(low)).toBe(true);
     expect(Number.isInteger(high)).toBe(true);
     expect(((high << 16) | low) >>> 0).toBe(0xffff_ffff);
+  });
+
+  it("packs a wrapped durable centre UV before million-pixel f32 precision is lost", () => {
+    const bytes = new Uint8Array([0, 255]);
+    const source = {
+      kind: "r8-texture-v1" as const,
+      asset: {
+        assetId: "paper.large-anchor",
+        encodedSha256:
+          "sha256:1111111111111111111111111111111111111111111111111111111111111111" as const,
+        decodedSha256: `sha256:${sha256HexPortable(bytes)}` as const,
+        byteLength: 64,
+        mediaType: "image/png" as const,
+        width: 2,
+        height: 1,
+        channel: "alpha" as const,
+        encoding: "r8-unorm" as const,
+      },
+    };
+    const strokeOriginX = 999_999.91;
+    const strokeOriginY = -999_999.89;
+    const native = planStudioWebGpuR8GrainNative({
+      source,
+      space: "stroke-fixed",
+      scale: 0.3,
+      amount: 1,
+      contrast: 0,
+      seed: 0x1234,
+      strokeOriginX,
+      strokeOriginY,
+      strokeSeed: 0x5678,
+    });
+    expect(native.status).toBe("ready");
+    if (native.status !== "ready") return;
+    const base = texturedPlan();
+    const dabX = strokeOriginX - 0.09;
+    const dabY = strokeOriginY + 0.11;
+    const packed = packStudioEngineWebGpuTexturedBrushDabs(
+      texturedPlan({
+        dabs: [{
+          ...base.dabs[0]!,
+          x: dabX,
+          y: dabY,
+        }],
+      }),
+      undefined,
+      {
+        source: native.plan.source,
+        parameters: native.plan.parameters,
+      },
+    );
+    expect(native.plan.parameters.anchorX).toBe(strokeOriginX);
+    expect(native.plan.parameters.anchorY).toBe(strokeOriginY);
+    expect(packed[14]).toBe(Math.fround(strokeOriginX));
+    const wrap = (value: number) => ((value % 1) + 1) % 1;
+    const expectedCenterU = wrap(
+      (dabX - native.plan.parameters.anchorX) / native.plan.parameters.scale
+        + native.plan.parameters.phaseX
+    );
+    const expectedCenterV = wrap(
+      (dabY - native.plan.parameters.anchorY) / native.plan.parameters.scale
+        + native.plan.parameters.phaseY
+    );
+    expect(packed[26]).toBeCloseTo(expectedCenterU, 6);
+    expect(packed[27]).toBeCloseTo(expectedCenterV, 6);
+
+    const localOffsetX = 0.04;
+    const vertexUv = packed[26]! + localOffsetX / packed[12]!;
+    const expectedOffsetUv = wrap(
+      (dabX + localOffsetX - native.plan.parameters.anchorX)
+        / native.plan.parameters.scale
+        + native.plan.parameters.phaseX
+    );
+    expect(wrap(vertexUv)).toBeCloseTo(expectedOffsetUv, 5);
+
+    const lossyFragmentUv = (
+      (Math.fround(dabX) - Math.fround(native.plan.parameters.anchorX))
+        / native.plan.parameters.scale
+        + native.plan.parameters.phaseX
+    );
+    expect(
+      Math.abs(wrap(lossyFragmentUv) - packed[26]!),
+    ).toBeGreaterThan(0.05);
   });
 
   it("creates explicit source-over/destination-out pipelines and submits stable bound batches", async () => {
@@ -416,6 +517,194 @@ describe("textured RGBA16F WebGPU specialist runtime", () => {
     expect(harness.passes[1]!.descriptor.colorAttachments[0]).toMatchObject({
       loadOp: "load",
     });
+  });
+
+  it("executes durable R8 grain through one native texture and exact CPU-compatible parameters", async () => {
+    let failFence = false;
+    let heldFence: Deferred<void> | null = null;
+    const harness = fakeGpuHarness(async () => {
+      if (failFence) throw new Error("synthetic queue failure");
+      if (heldFence) await heldFence.promise;
+    });
+    const decodedBytes = new Uint8Array([0, 64, 192, 255]);
+    const source = {
+      kind: "r8-texture-v1" as const,
+      asset: {
+        assetId: "paper.runtime-native.v1",
+        encodedSha256:
+          "sha256:1111111111111111111111111111111111111111111111111111111111111111" as const,
+        decodedSha256: `sha256:${sha256HexPortable(decodedBytes)}` as const,
+        byteLength: 128,
+        mediaType: "image/png" as const,
+        width: 2,
+        height: 2,
+        channel: "alpha" as const,
+        encoding: "r8-unorm" as const,
+      },
+    };
+    const registry = new StudioBrushR8GrainRegistry();
+    expect(registry.hydrate(source, decodedBytes).status).toBe("ready");
+    const nativeCache = new StudioWebGpuR8GrainTextureCache({
+      device: harness.device,
+      snapshotForTransfer: (candidate) => registry.snapshotForTransfer(candidate),
+    });
+    const target = runtime(harness, { nativeR8GrainTextureCache: nativeCache });
+    const nativeR8Grain = {
+      space: "stroke" as const,
+      scale: 8,
+      depth: 0.75,
+      contrast: 0.5,
+      seed: 0x1234,
+      originX: 12,
+      originY: 6,
+    };
+    const base = texturedPlan();
+    const nativePlan = fingerprinted({
+      ...base,
+      grain: {
+        kind: "asset-r8-repeat",
+        assetIndex: 1,
+        ...nativeR8Grain,
+        invert: false,
+        filtering: "bilinear",
+        edgeMode: "repeat",
+      },
+      durableR8GrainSource: source,
+      grainPhaseStrokeSeed: 0x5678,
+      grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+      assets: [
+        base.assets[0]!,
+        {
+          assetIndex: 1,
+          role: "grain",
+          assetId: source.asset.assetId,
+          contentHash: source.asset.decodedSha256,
+          width: source.asset.width,
+          height: source.asset.height,
+          channel: source.asset.channel,
+          format: "r8-unorm",
+          byteLength: decodedBytes.byteLength,
+          bytes: new Uint8Array(decodedBytes),
+        },
+      ],
+      dabs: [{ ...base.dabs[0]!, grainDepth: nativeR8Grain.depth }],
+      batches: [{
+        ...base.batches[0]!,
+        key: `${base.assets[0]!.contentHash}|${source.asset.decodedSha256}|source-over`,
+        grainAssetIndex: 1,
+      }],
+    });
+    const result = await target.execute({
+      requestSequence: 1,
+      deviceEpoch: 1,
+      plan: nativePlan,
+    });
+    expect(result.status).toBe("completed");
+    if (result.status !== "completed") return;
+    expect(result.receipt).toMatchObject({
+      nativeR8GrainSourceKey: JSON.stringify(source),
+      nativeR8GrainTextureBytes: 4,
+      planSemanticFingerprint: nativePlan.semanticFingerprint,
+      grainSamplingSemantics: "durable-r8-cpu-parity-v1",
+    });
+    expect(nativeCache.stats()).toMatchObject({
+      entries: 1,
+      uploads: 1,
+      activeLeases: 0,
+    });
+    expect(harness.textures.some((texture) => texture.descriptor.format === "r8unorm")).toBe(true);
+    const nativeUpload = harness.writeTexture.mock.calls.find((call) => (
+      (call[0] as { texture?: { descriptor?: GPUTextureDescriptor } }).texture
+        ?.descriptor?.label === `Studio verified R8 grain ${source.asset.decodedSha256}`
+    ));
+    expect(nativeUpload).toBeDefined();
+
+    const packed = new Float32Array(harness.uploadedBuffers.at(-1)!.buffer);
+    expect(packed[11]).toBeCloseTo(nativeR8Grain.depth, 7);
+    expect(packed[12]).toBeCloseTo(nativeR8Grain.scale, 7);
+    expect(packed[13]).toBeCloseTo(nativeR8Grain.contrast, 7);
+    expect((packed[21]! | 0) & 4).toBe(4);
+    expect(packed[26]).toBeGreaterThanOrEqual(0);
+    expect(packed[26]).toBeLessThan(1);
+    expect(packed[27]).toBeGreaterThanOrEqual(0);
+    expect(packed[27]).toBeLessThan(1);
+
+    const writes = harness.writeTexture.mock.calls.length;
+    const bindGroups = harness.bindGroupDescriptors.length;
+    const replay = await target.execute({
+      requestSequence: 2,
+      deviceEpoch: 1,
+      plan: fingerprinted({
+        ...nativePlan,
+        semanticFingerprint: undefined,
+        mode: "append",
+        dabs: [{ ...nativePlan.dabs[0]!, grainDepth: 0.25 }],
+      }),
+    });
+    expect(replay.status).toBe("completed");
+    expect(harness.writeTexture).toHaveBeenCalledTimes(writes);
+    // Durable bind groups are intentionally request-scoped to the texture lease.
+    expect(harness.bindGroupDescriptors).toHaveLength(bindGroups + 1);
+
+    failFence = true;
+    const failed = await target.execute({
+      requestSequence: 3,
+      deviceEpoch: 1,
+      plan: fingerprinted({
+        ...nativePlan,
+        semanticFingerprint: undefined,
+        mode: "append",
+      }),
+    });
+    expect(failed).toEqual({ status: "failed", reason: "gpu-error" });
+    expect(nativeCache.stats().activeLeases).toBe(0);
+    failFence = false;
+
+    heldFence = deferred<void>();
+    const controller = new AbortController();
+    const cancelledPromise = target.execute({
+      requestSequence: 4,
+      deviceEpoch: 1,
+      plan: fingerprinted({
+        ...nativePlan,
+        semanticFingerprint: undefined,
+        mode: "append",
+      }),
+    }, controller.signal);
+    await vi.waitFor(() => {
+      expect(nativeCache.stats().activeLeases).toBe(1);
+    });
+    controller.abort("cancel-after-submit");
+    heldFence.resolve(undefined);
+    expect(await cancelledPromise).toEqual({ status: "cancelled" });
+    expect(nativeCache.stats().activeLeases).toBe(0);
+    heldFence = null;
+
+    expect(await target.execute({
+      requestSequence: 5,
+      deviceEpoch: 1,
+      plan: {
+        ...nativePlan,
+        semanticFingerprint:
+          "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      },
+    })).toEqual({ status: "rejected", reason: "invalid-frame" });
+    expect(await target.execute({
+      requestSequence: 5,
+      deviceEpoch: 1,
+      plan: {
+        ...nativePlan,
+        durableR8GrainSource: undefined,
+      },
+    })).toEqual({ status: "rejected", reason: "invalid-frame" });
+    const nativeTexture = harness.textures.find(
+      (texture) => texture.descriptor.format === "r8unorm",
+    );
+    expect(nativeTexture).toBeDefined();
+    target.dispose();
+    expect(nativeTexture!.destroy).not.toHaveBeenCalled();
+    nativeCache.dispose();
+    expect(nativeTexture!.destroy).toHaveBeenCalledTimes(1);
   });
 
   it("separates cache entries for hash aliases with different dimensions or channels", async () => {

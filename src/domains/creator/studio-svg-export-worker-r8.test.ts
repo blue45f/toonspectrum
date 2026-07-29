@@ -13,6 +13,7 @@ import {
   studioBrushR8GrainRegistryStats,
 } from "./studio-brush-r8-grain-runtime";
 import { sha256HexPortable } from "./studio-sha256";
+import { exportPageToSvg } from "./studio-svg-export";
 import {
   prepareStudioSvgExportWorkerR8Transfer,
   runStudioSvgExportWorker,
@@ -26,7 +27,11 @@ import {
 } from "./studio-svg-export-worker-protocol";
 
 import type { StudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
-import type { SvgExportPageInput, SvgExportResult } from "./studio-svg-export";
+import type {
+  SvgDrawElLike,
+  SvgExportPageInput,
+  SvgExportResult,
+} from "./studio-svg-export";
 
 const decodedBytes = new Uint8Array([
   0, 64,
@@ -83,6 +88,52 @@ function r8ExportInput(
     height: 40,
     transparentBg: true,
     elements: duplicate ? [draw("r8-a"), draw("r8-b")] : [draw("r8-a")],
+  };
+}
+
+function largeR8ExportInput(source = r8Source()): SvgExportPageInput {
+  return {
+    width: 80,
+    height: 32,
+    transparentBg: true,
+    elements: [{
+      id: "r8-large-streaming",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      brush: "dry-media",
+      points: [0, 16, 64, 16],
+      pressures: [0.7, 0.7],
+      stroke: "#263a54",
+      strokeWidth: 16,
+      opacity: 1,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        seed: 77,
+        width: { base: 16, mappings: [] },
+        opacity: { base: 0.8, mappings: [] },
+        flow: { base: 0.7, mappings: [] },
+        spacingRatio: null,
+        spacing: { base: 1, mappings: [] },
+        scatterRatio: null,
+        scatter: { base: 0, mappings: [] },
+        roundness: { base: 1, mappings: [] },
+        taper: { enabled: false },
+        tip: {
+          shape: "hard",
+          softness: 0,
+          alphaMapSize: 256,
+        },
+        grain: {
+          amount: 0.8,
+          scale: 12,
+          contrast: 0.45,
+          source,
+        },
+        tipLayers: [],
+        dualBrush: { enabled: false },
+      }),
+    }],
   };
 }
 
@@ -187,6 +238,40 @@ describe("SVG export Worker R8 transfer protocol", () => {
     expect(accessorRead).toBe(false);
   });
 
+  it("does not transfer R8 authority for invisible, erasing, or disabled grain", () => {
+    const drawElement = (source: StudioBrushR8TextureGrainSource): SvgDrawElLike =>
+      r8ExportInput(source).elements[0] as SvgDrawElLike;
+    const activeSource = r8Source("paper.active.v1");
+    const active = drawElement(activeSource);
+    const hidden = drawElement(r8Source("paper.hidden.v1"));
+    const groupHidden = drawElement(r8Source("paper.group-hidden.v1"));
+    const eraser = drawElement(r8Source("paper.eraser.v1"));
+    const disabled = drawElement(r8Source("paper.disabled.v1"));
+    const disabledDynamics = normalizeStudioBrushDynamicsSettings({
+      ...disabled.brushDynamics,
+      grain: {
+        ...disabled.brushDynamics?.grain,
+        amount: 0,
+      },
+    });
+
+    const sources = collectStudioSvgExportReferencedR8GrainSources({
+      ...r8ExportInput(activeSource),
+      groups: [{ id: "hidden-group", name: "Hidden", hidden: true }],
+      elements: [
+        active,
+        { ...hidden, id: "hidden", hidden: true },
+        { ...groupHidden, id: "group-hidden", groupId: "hidden-group" },
+        { ...eraser, id: "eraser", mode: "eraser" },
+        { ...disabled, id: "disabled", brushDynamics: disabledDynamics },
+      ],
+    });
+
+    expect(sources.map(({ source }) => source.asset.assetId)).toEqual([
+      activeSource.asset.assetId,
+    ]);
+  });
+
   it("copies only referenced verified bytes and posts their exact private buffers", async () => {
     const source = r8Source();
     const unrelated = r8Source("paper.unrelated.v1");
@@ -230,6 +315,59 @@ describe("SVG export Worker R8 transfer protocol", () => {
     expect(worker.terminated).toBe(true);
     expect([...worker.posted!.r8GrainAssets[0]!.decodedBytes]).toEqual([0, 0, 0, 0]);
   });
+
+  it("exports a product-path stroke beyond the former retained-Float32 ceiling", () => {
+    const source = r8Source();
+    expect(hydrateStudioBrushR8GrainAsset(source, decodedBytes).status).toBe("ready");
+
+    const result = exportPageToSvg(largeR8ExportInput(source));
+    const alphaMapUses = (
+      result.svg.match(/data-brush-coverage="alpha-map"/gu) ?? []
+    ).length;
+    const embeddedAssets = (
+      result.svg.match(/data-brush-tip-asset="full-alpha-map-v1"/gu) ?? []
+    ).length;
+
+    // A 256² Float32 map is 256 KiB, so mark 65 is the first one rejected by the former
+    // 16 MiB retained-map bridge. The SVG-only path encodes each verified map immediately.
+    expect(alphaMapUses).toBeGreaterThan(64);
+    expect(embeddedAssets).toBe(alphaMapUses);
+    expect(result.skipped).toEqual([]);
+    expect(result.svg).not.toContain(source.asset.assetId);
+  }, 30_000);
+
+  it("enforces the streamed R8 mask ceiling across the whole SVG document", () => {
+    const source = r8Source();
+    expect(hydrateStudioBrushR8GrainAsset(source, decodedBytes).status).toBe("ready");
+    const single = largeR8ExportInput(source);
+    const baseElement = single.elements[0]!;
+    const input: SvgExportPageInput = {
+      ...single,
+      elements: Array.from({ length: 4 }, (_, index) => ({
+        ...baseElement,
+        id: `r8-document-${index + 1}`,
+      })),
+    };
+
+    const result = exportPageToSvg(input);
+    const alphaMapUses = (
+      result.svg.match(/data-brush-coverage="alpha-map"/gu) ?? []
+    ).length;
+
+    // Each fixture stroke represents just over 16 MiB of 256² RGBA masks and roughly 45 MiB of
+    // worst-case UTF-16 base64 definitions. One fits; retaining the second would exceed the
+    // document-wide serialized-memory ceiling even though every stroke is valid in isolation.
+    expect(alphaMapUses).toBeGreaterThan(64);
+    expect(alphaMapUses).toBeLessThanOrEqual(64 * 2);
+    expect(result.skipped).toContainEqual(expect.objectContaining({
+      id: "r8-document-2",
+      mode: "skipped",
+    }));
+    expect(result.skipped).toContainEqual(expect.objectContaining({
+      id: "r8-document-4",
+      mode: "skipped",
+    }));
+  }, 60_000);
 });
 
 describe("short-lived SVG export Worker R8 hydration", () => {
@@ -289,6 +427,8 @@ describe("short-lived SVG export Worker R8 hydration", () => {
     expect(responses[0]?.type).toBe("studio-svg-export/success");
     if (responses[0]?.type === "studio-svg-export/success") {
       expect(responses[0].result.skipped).toEqual([]);
+      expect(responses[0].result.svg)
+        .toContain('data-brush-coverage="alpha-map"');
     }
     expect([...transfer.entries[0]!.decodedBytes]).toEqual([0, 0, 0, 0]);
     expect(studioBrushR8GrainRegistryStats()).toMatchObject({ entries: 0, bytes: 0 });
@@ -358,6 +498,27 @@ describe("short-lived SVG export Worker R8 hydration", () => {
     expect(overBudgetEntries.every(
       (entry) => entry.decodedBytes.every((value) => value === 0),
     )).toBe(true);
+    expect(studioBrushR8GrainRegistryStats()).toMatchObject({ entries: 0, bytes: 0 });
+  });
+
+  it("zeroizes transferred R8 bytes when a stale protocol version is rejected", async () => {
+    const source = r8Source();
+    expect(hydrateStudioBrushR8GrainAsset(source, decodedBytes).status).toBe("ready");
+    const input = r8ExportInput(source);
+    const transfer = prepareStudioSvgExportWorkerR8Transfer(input);
+    expect(transfer.entries).toHaveLength(1);
+
+    await workerHandler?.({
+      data: {
+        type: "studio-svg-export/run",
+        version: STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION + 1,
+        input,
+        r8GrainAssets: transfer.entries,
+      },
+    } as unknown as MessageEvent<StudioSvgExportWorkerRunMessage>);
+
+    expect(responses).toEqual([]);
+    expect([...transfer.entries[0]!.decodedBytes]).toEqual([0, 0, 0, 0]);
     expect(studioBrushR8GrainRegistryStats()).toMatchObject({ entries: 0, bytes: 0 });
   });
 });

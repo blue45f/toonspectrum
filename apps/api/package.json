@@ -20,6 +20,7 @@
     "@toonspectrum/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.0",
+    "image-js": "^1.7.0",
     "js-base64": "^3.9.0",
     "nestjs-pino": "^4.6.1",
     "nestjs-zod": "^5.4.0",

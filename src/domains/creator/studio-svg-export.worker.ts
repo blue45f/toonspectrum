@@ -121,13 +121,26 @@ export function hydrateStudioSvgExportWorkerR8Assets(
 }
 
 workerScope.onmessage = async (event) => {
-  const message = event.data;
+  const candidate = event.data as unknown;
   if (
-    message.type !== "studio-svg-export/run" ||
-    message.version !== STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION
+    typeof candidate !== "object"
+    || candidate === null
+    || (candidate as Partial<StudioSvgExportWorkerRunMessage>).type
+      !== "studio-svg-export/run"
+    || (candidate as Partial<StudioSvgExportWorkerRunMessage>).version
+      !== STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION
   ) {
+    // The client transfers private R8 buffers before the worker can validate the version. A stale
+    // or malformed envelope must not strand those bytes merely because it is rejected early.
+    zeroizeTransferredR8Assets(
+      typeof candidate === "object" && candidate !== null
+        ? (candidate as Partial<StudioSvgExportWorkerRunMessage>).r8GrainAssets
+        : undefined,
+    );
+    resetStudioBrushR8GrainRegistry();
     return;
   }
+  const message = candidate as StudioSvgExportWorkerRunMessage;
 
   try {
     hydrateStudioSvgExportWorkerR8Assets(message.input, message.r8GrainAssets);

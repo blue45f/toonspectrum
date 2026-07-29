@@ -52,10 +52,33 @@ export function collectStudioSvgExportReferencedR8GrainSources(
 ): readonly Readonly<StudioSvgExportReferencedR8GrainSource>[] {
   const collected = new Map<string, Readonly<StudioSvgExportReferencedR8GrainSource>>();
   const elements = Array.isArray(input.elements) ? input.elements : [];
+  const hiddenGroupIds = new Set<string>();
+  const groups = Array.isArray(input.groups) ? input.groups : [];
+  for (const group of groups) {
+    const groupId = ownEnumerableDataValue(group, "id");
+    if (
+      typeof groupId === "string"
+      && ownEnumerableDataValue(group, "hidden") === true
+    ) {
+      hiddenGroupIds.add(groupId);
+    }
+  }
   for (const element of elements) {
     if (ownEnumerableDataValue(element, "type") !== "draw") continue;
+    const groupId = ownEnumerableDataValue(element, "groupId");
+    if (
+      ownEnumerableDataValue(element, "hidden") === true
+      || ownEnumerableDataValue(element, "mode") === "eraser"
+      || (typeof groupId === "string" && hiddenGroupIds.has(groupId))
+    ) {
+      continue;
+    }
     const dynamics = ownEnumerableDataValue(element, "brushDynamics");
     const grain = ownEnumerableDataValue(dynamics, "grain");
+    const amount = ownEnumerableDataValue(grain, "amount");
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+      continue;
+    }
     const sourceCandidate = ownEnumerableDataValue(grain, "source");
     const source = normalizeStudioBrushR8TextureGrainSource(sourceCandidate);
     if (!source) continue;

@@ -1,4 +1,9 @@
 import {
+  normalizeStudioBrushR8TextureGrainSource,
+  serializeStudioBrushR8TextureGrainSourceCanonical,
+  type StudioBrushR8TextureGrainSource,
+} from "./studio-brush-r8-grain-asset-contract";
+import {
   STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS,
   STUDIO_CANONICAL_BRUSH_PLAN_VERSION,
 } from "./studio-canonical-brush-plan";
@@ -185,6 +190,22 @@ export interface StudioEngineWebGpuTexturedBrushPlan {
   readonly colorModel: "scene-linear-premultiplied";
   readonly tip: StudioEngineWebGpuTexturedBrushTip;
   readonly grain: StudioEngineWebGpuTexturedBrushGrain | null;
+  /**
+   * Optional durable identity for `grain.kind === "asset-r8-repeat"`. When present it is bound to
+   * the resolved grain asset and the canonical stroke seed; the runtime may replace the generic
+   * upload with the verified registry-backed native R8 texture, but may not alter grain semantics.
+   */
+  readonly durableR8GrainSource?: Readonly<StudioBrushR8TextureGrainSource>;
+  readonly grainPhaseStrokeSeed?: number;
+  readonly grainSamplingSemantics?:
+    | "specialist-texture-v1"
+    | "durable-r8-cpu-parity-v1";
+  /**
+   * Renderer-plan identity, distinct from the canonical authoring-plan hash. Provider proofs must
+   * bind this fingerprint because durable decoded-source identity changes pixel semantics without
+   * changing the renderer-neutral canonical plan.
+   */
+  readonly semanticFingerprint?: `sha256:${string}`;
   readonly assets: readonly StudioEngineWebGpuTexturedBrushResolvedAsset[];
   readonly dabs: readonly StudioEngineWebGpuTexturedBrushDab[];
   readonly batches: readonly StudioEngineWebGpuTexturedBrushBatch[];
@@ -198,6 +219,11 @@ export interface StudioEngineWebGpuTexturedBrushPlanOptions {
   readonly maximumCoordinateAbsolute?: number;
   readonly signal?: AbortSignal;
   readonly shouldCancel?: (progress: StudioProfessionalBrushResolveProgress) => boolean;
+  /**
+   * Strict persisted source identity for a texture grain. URLs and encoded payloads are not
+   * accepted; the resolved decoded asset must match this source byte-for-byte.
+   */
+  readonly durableR8GrainSource?: unknown;
 }
 
 export type StudioEngineWebGpuTexturedBrushPlanUnsupportedReason =
@@ -220,6 +246,7 @@ export type StudioEngineWebGpuTexturedBrushPlanRejectionReason =
   | "asset-channel-mismatch"
   | "asset-byte-length-mismatch"
   | "asset-content-hash-mismatch"
+  | "durable-r8-source-mismatch"
   | "asset-budget-exceeded"
   | "dab-limit-exceeded"
   | "coordinate-budget-exceeded"
@@ -318,6 +345,58 @@ function deepFreezePlan<T>(value: T): T {
   ) return value;
   for (const child of Object.values(value)) deepFreezePlan(child);
   return Object.freeze(value);
+}
+
+/**
+ * Content identity for every field consumed by the textured runtime. Raw R8 bytes are represented
+ * by their already-validated content hash, so the fingerprint stays compact while remaining
+ * collision-resistant. This is intentionally separate from the renderer-neutral canonical hash.
+ */
+export function fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(
+  plan: Omit<StudioEngineWebGpuTexturedBrushPlan, "semanticFingerprint">
+    | StudioEngineWebGpuTexturedBrushPlan,
+): `sha256:${string}` | null {
+  try {
+    const durableSource = plan.durableR8GrainSource === undefined
+      ? null
+      : serializeStudioBrushR8TextureGrainSourceCanonical(
+        plan.durableR8GrainSource,
+      );
+    if (plan.durableR8GrainSource !== undefined && durableSource === null) return null;
+    const canonical = JSON.stringify({
+      kind: plan.kind,
+      version: plan.version,
+      loweringVersion: plan.loweringVersion,
+      mode: plan.mode,
+      strokeId: plan.strokeId,
+      commandSequence: plan.commandSequence,
+      dualTip: plan.dualTip,
+      textureFormat: plan.textureFormat,
+      colorModel: plan.colorModel,
+      tip: plan.tip,
+      grain: plan.grain,
+      durableR8GrainSource: durableSource,
+      grainPhaseStrokeSeed: plan.grainPhaseStrokeSeed ?? null,
+      grainSamplingSemantics: plan.grainSamplingSemantics
+        ?? "specialist-texture-v1",
+      assets: plan.assets.map((asset) => ({
+        assetIndex: asset.assetIndex,
+        role: asset.role,
+        assetId: asset.assetId,
+        contentHash: asset.contentHash,
+        width: asset.width,
+        height: asset.height,
+        channel: asset.channel,
+        format: asset.format,
+        byteLength: asset.byteLength,
+      })),
+      dabs: plan.dabs,
+      batches: plan.batches,
+    });
+    return `sha256:${sha256HexPortable(new TextEncoder().encode(canonical))}`;
+  } catch {
+    return null;
+  }
 }
 
 function exactPayloadRecord(input: unknown): Readonly<Record<string, unknown>> | null {
@@ -1000,6 +1079,22 @@ function normalizedGrain(
   };
 }
 
+function durableR8SourceMatchesResolvedAsset(
+  source: Readonly<StudioBrushR8TextureGrainSource>,
+  asset: StudioEngineWebGpuTexturedBrushResolvedAsset,
+): boolean {
+  const digest = contentAddress(asset.contentHash);
+  return asset.role === "grain"
+    && source.asset.assetId === asset.assetId
+    && digest !== null
+    && source.asset.decodedSha256 === `sha256:${digest}`
+    && source.asset.width === asset.width
+    && source.asset.height === asset.height
+    && source.asset.channel === asset.channel
+    && source.asset.encoding === asset.format
+    && asset.byteLength === source.asset.width * source.asset.height;
+}
+
 function rejectUnsupported(
   canonical: StudioCanonicalBrushPlan,
 ): Extract<StudioEngineWebGpuTexturedBrushPlanResult, { status: "unsupported" }> | null {
@@ -1048,6 +1143,18 @@ export async function buildStudioEngineWebGpuTexturedBrushPlan(
   ) return Object.freeze({ status: "rejected", reason: "invalid-options" });
   const parsedOptions = parseOptions(options);
   if (!parsedOptions) return Object.freeze({ status: "rejected", reason: "invalid-options" });
+  const durableR8GrainSource = options.durableR8GrainSource === undefined
+    ? null
+    : normalizeStudioBrushR8TextureGrainSource(options.durableR8GrainSource);
+  if (
+    options.durableR8GrainSource !== undefined
+    && durableR8GrainSource === null
+  ) {
+    return Object.freeze({
+      status: "rejected",
+      reason: "durable-r8-source-mismatch",
+    });
+  }
   if (!canonicalPlanIsValidated(canonical)) {
     return Object.freeze({ status: "rejected", reason: "invalid-canonical-plan" });
   }
@@ -1092,6 +1199,12 @@ export async function buildStudioEngineWebGpuTexturedBrushPlan(
   const assets: StudioEngineWebGpuTexturedBrushResolvedAsset[] = [resolvedTip.asset];
 
   const canonicalGrain = canonical.recipe.grain;
+  if (durableR8GrainSource && canonicalGrain?.kind !== "texture") {
+    return Object.freeze({
+      status: "rejected",
+      reason: "durable-r8-source-mismatch",
+    });
+  }
   let grainAssetIndex: number | null = null;
   if (canonicalGrain?.kind === "texture") {
     const grainRequest = assetRequest(
@@ -1116,6 +1229,18 @@ export async function buildStudioEngineWebGpuTexturedBrushPlan(
     }
     grainAssetIndex = 1;
     assets.push(resolvedGrain.asset);
+    if (
+      durableR8GrainSource
+      && !durableR8SourceMatchesResolvedAsset(
+        durableR8GrainSource,
+        resolvedGrain.asset,
+      )
+    ) {
+      return Object.freeze({
+        status: "rejected",
+        reason: "durable-r8-source-mismatch",
+      });
+    }
   }
   const totalAssetBytes = assets.reduce((total, asset) => total + asset.byteLength, 0);
   if (totalAssetBytes > parsedOptions.maximumTotalAssetBytes) {
@@ -1327,7 +1452,7 @@ export async function buildStudioEngineWebGpuTexturedBrushPlan(
         firstInstance: 0,
         instanceCount: dabs.length,
       }];
-  const plan: StudioEngineWebGpuTexturedBrushPlan = {
+  const planWithoutFingerprint: StudioEngineWebGpuTexturedBrushPlan = {
     kind: "studio-engine-webgpu-textured-brush-plan",
     version: STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_PLAN_VERSION,
     loweringVersion: STUDIO_ENGINE_WEBGPU_TEXTURED_BRUSH_LOWERING_VERSION,
@@ -1345,9 +1470,25 @@ export async function buildStudioEngineWebGpuTexturedBrushPlan(
       hardnessTransfer: "zero-to-one-smoothstep",
     },
     grain,
+    ...(durableR8GrainSource
+      ? {
+          durableR8GrainSource,
+          grainPhaseStrokeSeed: canonical.seed,
+          grainSamplingSemantics: "durable-r8-cpu-parity-v1" as const,
+        }
+      : { grainSamplingSemantics: "specialist-texture-v1" as const }),
     assets,
     dabs,
     batches,
+  };
+  const semanticFingerprint =
+    fingerprintStudioEngineWebGpuTexturedBrushPlanSemantics(planWithoutFingerprint);
+  if (!semanticFingerprint) {
+    return Object.freeze({ status: "rejected", reason: "numeric-overflow" });
+  }
+  const plan: StudioEngineWebGpuTexturedBrushPlan = {
+    ...planWithoutFingerprint,
+    semanticFingerprint,
   };
   return deepFreezePlan({ status: "ready", plan });
 }
