@@ -1,6 +1,11 @@
-import { isStudioDynamicBrushMinimumDiameterRatio } from "./studio-brush-dynamics";
+import {
+  isStudioDynamicBrushMinimumDiameterRatio,
+  studioDynamicBrushDepositPipelineUsesContinuation,
+} from "./studio-brush-dynamics";
+import { normalizeStudioBrushR8TextureGrainSource } from "./studio-brush-r8-grain-asset-contract";
 import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
@@ -135,6 +140,41 @@ function dynamicMinimumDiameterRatioOf(value: unknown): unknown {
     : undefined;
 }
 
+function ownDataProperty(
+  value: unknown,
+  key: string,
+): { present: false } | { present: true; value: unknown } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { present: false };
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor) return { present: false };
+    if (!("value" in descriptor) || descriptor.enumerable !== true) return null;
+    return { present: true, value: descriptor.value };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeRendererSignificantR8GrainSource(
+  brushDynamics: unknown,
+): StudioCrdtJsonObject | null {
+  const grainProperty = ownDataProperty(brushDynamics, "grain");
+  if (grainProperty === null) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  if (!grainProperty.present) return null;
+  const sourceProperty = ownDataProperty(grainProperty.value, "source");
+  if (sourceProperty === null) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  if (!sourceProperty.present || sourceProperty.value == null) return null;
+  const normalized = normalizeStudioBrushR8TextureGrainSource(sourceProperty.value);
+  if (!normalized) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  return jsonObject(normalized)!;
+}
+
 function aligned(values: number[] | undefined, count: number, fallback: number): number[] | undefined {
   if (!values) return undefined;
   return Array.from({ length: count }, (_, index) => {
@@ -216,25 +256,42 @@ export function studioDrawElementToCrdtStroke(
     : aligned(element.pressures, sampleCount, pressureFallback);
   const extensions = extensionsOf(element);
   const brushCatalogIdentity = normalizeStudioBrushCatalogIdentityMetadata(element);
+  const r8TextureGrain =
+    normalizeRendererSignificantR8GrainSource(element.brushDynamics);
   const brushDynamics = jsonObject(element.brushDynamics);
+  if (r8TextureGrain) {
+    const grain = brushDynamics?.grain;
+    if (!grain || typeof grain !== "object" || Array.isArray(grain)) {
+      throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+    }
+    grain.source = r8TextureGrain;
+  }
+  const usesR8TextureGrain = r8TextureGrain !== null;
   const dynamicMinimumDiameterRatio =
     dynamicMinimumDiameterRatioOf(element.brushDynamics);
+  const usesSegmentedCausalDeposit =
+    studioDynamicBrushDepositPipelineUsesContinuation(
+      brushDynamics?.depositPipeline,
+    );
   if (
     dynamicMinimumDiameterRatio !== undefined
     && !isStudioDynamicBrushMinimumDiameterRatio(dynamicMinimumDiameterRatio)
   ) {
     throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
   }
-  const payload: StudioCrdtDrawStrokePayload = {
-    // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
-    // renderer-significant layered paint requires v2; material/dynamic geometry snapshots require
-    // v3 so v2 readers cannot silently ignore their meaning.
-    version: extensions?.materialPressureModel !== undefined
+  // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
+  // renderer-significant layered paint requires v2; material/dynamic geometry snapshots require
+  // v3, while segmented causal continuation and immutable R8 grain require v4.
+  const payloadVersion = usesSegmentedCausalDeposit || usesR8TextureGrain
+    ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    : extensions?.materialPressureModel !== undefined
       || dynamicMinimumDiameterRatio !== undefined
-      ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      ? STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
       : extensions?.paintModel !== undefined
         ? STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
-        : STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+        : STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION;
+  const payload: StudioCrdtDrawStrokePayload = {
+    version: payloadVersion,
     type: "draw",
     kind: element.kind ?? "freehand",
     mode: element.mode ?? "pen",

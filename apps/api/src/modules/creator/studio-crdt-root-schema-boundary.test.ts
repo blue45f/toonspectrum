@@ -54,6 +54,7 @@ describe("Studio CRDT root schema ownership boundary", () => {
     expect(service.valueImports).toContain("./studio-crdt-root-schema");
     expect(schema.valueImports).toEqual([
       "yjs",
+      "../../../../../lib/studio-brush-r8-grain-asset-contract",
       "../../../../../lib/studio-crdt-raster-document-contract",
       "../../../../../lib/studio-work-asset-contract",
     ]);
@@ -73,6 +74,7 @@ describe("Studio CRDT root schema ownership boundary", () => {
       "function validateLayerGroupRoot",
       "function validateStrokeRoot",
       "function validateStudioCrdtDeletionRoots",
+      "function snapshotStudioCrdtR8GrainReferences",
       "function snapshotStudioWorkAssetReferences",
     ]) {
       expect(schema).toContain(declaration);

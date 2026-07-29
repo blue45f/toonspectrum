@@ -1,6 +1,10 @@
 import * as Y from "yjs";
 
-import { isStudioDynamicBrushMinimumDiameterRatio } from "./studio-brush-dynamics";
+import {
+  isStudioDynamicBrushMinimumDiameterRatio,
+  studioDynamicBrushDepositPipelineUsesContinuation,
+} from "./studio-brush-dynamics";
+import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -11,6 +15,7 @@ import {
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
@@ -88,6 +93,7 @@ export {
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   type StudioCrdtStrokePayloadVersion,
@@ -790,9 +796,45 @@ function normalizedSamples(
   } satisfies Record<StudioCrdtSampleArrayKey, number[]>;
 }
 
+function hasCanonicalRendererSignificantR8Grain(
+  brushDynamics: StudioCrdtJsonObject | undefined,
+): boolean {
+  if (!brushDynamics) return false;
+  let grainDescriptor: PropertyDescriptor | undefined;
+  try {
+    grainDescriptor = Object.getOwnPropertyDescriptor(brushDynamics, "grain");
+  } catch {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  if (!grainDescriptor) return false;
+  if (!("value" in grainDescriptor) || grainDescriptor.enumerable !== true) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  const grain = grainDescriptor.value;
+  if (!grain || typeof grain !== "object" || Array.isArray(grain)) return false;
+  let sourceDescriptor: PropertyDescriptor | undefined;
+  try {
+    sourceDescriptor = Object.getOwnPropertyDescriptor(grain, "source");
+  } catch {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  if (!sourceDescriptor) return false;
+  if (!("value" in sourceDescriptor) || sourceDescriptor.enumerable !== true) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  const source = sourceDescriptor.value;
+  if (source == null) return false;
+  const canonical = serializeStudioBrushR8TextureGrainSourceCanonical(source);
+  if (canonical === null || canonical !== JSON.stringify(source)) {
+    throw new Error("R8 브러시 그레인 자산 참조가 올바르지 않습니다.");
+  }
+  return true;
+}
+
 function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boolean): void {
   if (
     (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
       && payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
       && payload.version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION)
     || payload.type !== "draw"
@@ -830,6 +872,8 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   ) {
     throw new Error("브러시 카탈로그 식별 정보가 올바르지 않습니다.");
   }
+  const usesR8TextureGrain =
+    hasCanonicalRendererSignificantR8Grain(payload.brushDynamics);
   for (const key of JSON_PAYLOAD_KEYS) {
     const value = payload[key];
     if (value !== undefined) cloneJsonObject(value);
@@ -839,7 +883,10 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   if (
     dynamicMinimumDiameterRatio !== undefined
     && (
-      payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      (
+        payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+        && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      )
       || !isStudioDynamicBrushMinimumDiameterRatio(
         dynamicMinimumDiameterRatio,
       )
@@ -847,12 +894,27 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   ) {
     throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
   }
+  if (
+    studioDynamicBrushDepositPipelineUsesContinuation(
+      payload.brushDynamics?.depositPipeline,
+    )
+    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다.");
+  }
+  if (
+    usesR8TextureGrain
+    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다.");
+  }
   const paintModel = payload.extensions?.paintModel;
   if (
     paintModel !== undefined
     && (
       (
         payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+        && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
         && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
       )
       || !isStudioStrokePaintModelCompatible({
@@ -874,6 +936,7 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
     || materialMinimumDiameterRatio !== undefined;
   if (
     hasMaterialPressureSnapshot
+    && payload.version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
     && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
   ) {
     throw new Error("획 재질 필압 모델과 페이로드 버전이 호환되지 않습니다.");
@@ -1018,6 +1081,7 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
   const count = pointsLength / 2;
   if (
     (version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && version !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
       && version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
       && version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION) ||
     type !== "draw" ||

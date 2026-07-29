@@ -6,6 +6,16 @@
  * remain JSON-only and the renderer does not need another random stream.
  */
 
+import {
+  normalizeStudioBrushR8TextureGrainSource,
+  type StudioBrushR8TextureGrainSource,
+} from "./studio-brush-r8-grain-asset-contract";
+
+export type {
+  StudioBrushR8GrainAssetReference,
+  StudioBrushR8TextureGrainSource,
+} from "./studio-brush-r8-grain-asset-contract";
+
 export const STUDIO_BRUSH_COLOR_DYNAMICS_LIMITS = {
   foregroundBackgroundMix: { min: 0, max: 1 },
   foregroundBackgroundJitter: { min: 0, max: 1 },
@@ -57,6 +67,11 @@ export interface StudioBrushGrainSettings {
   contrast?: number;
   /** Independent grain phase mixed with the stroke seed. */
   seed?: number;
+  /**
+   * Immutable paper asset identity. Omission/null retains the historical procedural grain bytes.
+   * Unknown or malformed sources fail closed to a disabled grain during normalization.
+   */
+  source?: StudioBrushR8TextureGrainSource | null;
 }
 
 export interface NormalizedStudioBrushGrainSettings {
@@ -65,6 +80,8 @@ export interface NormalizedStudioBrushGrainSettings {
   scale: number;
   contrast: number;
   seed: number;
+  /** Present only for a strictly admitted content-addressed R8 paper source. */
+  source?: Readonly<StudioBrushR8TextureGrainSource>;
 }
 
 export interface StudioBrushGrainSample {
@@ -140,6 +157,28 @@ function canonicalHexColor(value: unknown): string | null {
   return full ? `#${full[1]!.toLowerCase()}` : null;
 }
 
+type OwnDataProperty =
+  | Readonly<{ status: "absent" }>
+  | Readonly<{ status: "data"; value: unknown }>
+  | Readonly<{ status: "poisoned" }>;
+
+/** Reads one optional own data property without invoking accessors or proxy traps outside a guard. */
+function ownEnumerableDataProperty(
+  source: Record<string, unknown>,
+  key: string,
+): OwnDataProperty {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (!descriptor) return { status: "absent" };
+    if (!("value" in descriptor) || descriptor.enumerable !== true) {
+      return { status: "poisoned" };
+    }
+    return { status: "data", value: descriptor.value };
+  } catch {
+    return { status: "poisoned" };
+  }
+}
+
 export function normalizeStudioBrushColorDynamicsSettings(
   value?: unknown
 ): NormalizedStudioBrushColorDynamicsSettings {
@@ -186,7 +225,7 @@ export function normalizeStudioBrushGrainSettings(
   value?: unknown
 ): NormalizedStudioBrushGrainSettings {
   const source = asRecord(value) ?? {};
-  return {
+  const procedural = {
     space: source.space === "stroke-fixed" ? "stroke-fixed" : "canvas-fixed",
     amount: clamp(
       finiteNumber(source.amount, DEFAULT_GRAIN.amount),
@@ -204,7 +243,34 @@ export function normalizeStudioBrushGrainSettings(
       STUDIO_BRUSH_GRAIN_LIMITS.contrast.max
     ),
     seed: uint32(source.seed, DEFAULT_GRAIN.seed),
-  };
+  } satisfies NormalizedStudioBrushGrainSettings;
+  const sourceProperty = ownEnumerableDataProperty(source, "source");
+  if (
+    sourceProperty.status === "absent"
+    || (sourceProperty.status === "data" && sourceProperty.value == null)
+  ) {
+    // Do not add a discriminator for legacy procedural grain. Its canonical JSON is persisted in
+    // authored strokes and must stay byte-for-byte stable.
+    return procedural;
+  }
+  if (sourceProperty.status === "poisoned") {
+    return { ...procedural, amount: 0 };
+  }
+  const r8Source = normalizeStudioBrushR8TextureGrainSource(sourceProperty.value);
+  return r8Source
+    ? { ...procedural, source: r8Source }
+    : { ...procedural, amount: 0 };
+}
+
+/** Stable standalone grain JSON. Existing procedural snapshots retain their historical key order. */
+export function serializeStudioBrushGrainSettingsCanonical(value?: unknown): string {
+  return JSON.stringify(normalizeStudioBrushGrainSettings(value));
+}
+
+export function studioBrushGrainUsesR8Texture(
+  value?: unknown,
+): boolean {
+  return normalizeStudioBrushGrainSettings(value).source?.kind === "r8-texture-v1";
 }
 
 export function studioBrushColorDynamicsIsActive(value?: unknown): boolean {
@@ -407,7 +473,9 @@ export function resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
   strokeSeed: number,
   settings: NormalizedStudioBrushGrainSettings
 ): number {
-  if (settings.amount <= 0) return 1;
+  // This helper is the historical procedural sampler. An admitted R8 source must be sampled by an
+  // R8-aware renderer; falling back to unrelated noise would produce divergent replay pixels.
+  if (settings.amount <= 0 || settings.source?.kind === "r8-texture-v1") return 1;
   const x = finiteNumber(sampleX, 0);
   const y = finiteNumber(sampleY, 0);
   const anchorX = settings.space === "stroke-fixed"
@@ -442,7 +510,7 @@ export function resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
   strokeSeed: number,
   settings: NormalizedStudioBrushGrainSettings,
 ): number {
-  if (settings.amount <= 0) return 1;
+  if (settings.amount <= 0 || settings.source?.kind === "r8-texture-v1") return 1;
   const x = finiteNumber(centerX, 0);
   const y = finiteNumber(centerY, 0);
   const rx = clamp(Math.abs(finiteNumber(radiusX, 0)), 0, 1_000_000);

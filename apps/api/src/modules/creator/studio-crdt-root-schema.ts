@@ -1,5 +1,9 @@
 import * as Y from "yjs";
 
+import {
+  normalizeStudioBrushR8TextureGrainSource,
+  serializeStudioBrushR8TextureGrainSourceCanonical,
+} from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import { hasValidStudioCrdtRasterDocument } from "../../../../../lib/studio-crdt-raster-document-contract";
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
@@ -12,6 +16,7 @@ import {
   studioWorkAssetReferenceKey,
 } from "../../../../../lib/studio-work-asset-contract";
 
+import type { StudioBrushR8TextureGrainSource } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import type { StudioWorkAssetReference } from "../../../../../lib/studio-work-asset-contract";
 
 export const STUDIO_CRDT_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -67,10 +72,13 @@ const STUDIO_CRDT_STROKE_METADATA_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_STROKE_WIDTH_MAX = 8_192;
 const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1;
 const STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION = 2;
-const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 3;
+const STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION = 3;
+const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 4;
 const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
 const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
 const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
+const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE =
+  "causal-deposit-v3-segmented";
 const STUDIO_CRDT_CAUSAL_PRESSURE_MODELS = new Set([
   "linear-full-v1",
   "linear-residual-v2",
@@ -757,6 +765,59 @@ export interface StudioCrdtWorkAssetReferenceSnapshot {
   activeCount: number;
 }
 
+export interface StudioCrdtR8GrainReferenceSnapshot {
+  /** Canonical immutable source keyed by the durable stroke identity that owns it. */
+  byStrokeId: ReadonlyMap<string, Readonly<StudioBrushR8TextureGrainSource>>;
+  /** One canonical source per durable work-asset identity. */
+  byAssetId: ReadonlyMap<string, Readonly<StudioBrushR8TextureGrainSource>>;
+  /** True when one asset ID was poisoned with two different canonical content identities. */
+  hasConflictingAssetId: boolean;
+}
+
+/**
+ * Snapshots every canonical renderer-significant R8 source from the durable stroke map.
+ *
+ * Root-schema validation runs before callers consume this snapshot, but this helper still
+ * normalizes independently and ignores malformed candidates so it is safe to use while comparing
+ * a pre-update document with a candidate update.
+ */
+export function snapshotStudioCrdtR8GrainReferences(
+  doc: Y.Doc
+): StudioCrdtR8GrainReferenceSnapshot {
+  const byStrokeId = new Map<string, Readonly<StudioBrushR8TextureGrainSource>>();
+  const byAssetId = new Map<string, Readonly<StudioBrushR8TextureGrainSource>>();
+  let hasConflictingAssetId = false;
+  const strokes = materializeExistingMapRoot(doc, "strokes");
+  if (!(strokes instanceof Y.Map)) {
+    return { byStrokeId, byAssetId, hasConflictingAssetId };
+  }
+  for (const [strokeId, value] of strokes) {
+    if (!isBoundedStudioCrdtId(strokeId) || !(value instanceof Y.Map)) continue;
+    const brushDynamics = value.get("brushDynamics");
+    if (!brushDynamics || typeof brushDynamics !== "object" || Array.isArray(brushDynamics)) {
+      continue;
+    }
+    const grain = (brushDynamics as Record<string, unknown>).grain;
+    if (!grain || typeof grain !== "object" || Array.isArray(grain)) continue;
+    const source = normalizeStudioBrushR8TextureGrainSource(
+      (grain as Record<string, unknown>).source
+    );
+    if (!source) continue;
+    byStrokeId.set(strokeId, source);
+    const existing = byAssetId.get(source.asset.assetId);
+    if (
+      existing
+      && serializeStudioBrushR8TextureGrainSourceCanonical(existing)
+        !== serializeStudioBrushR8TextureGrainSourceCanonical(source)
+    ) {
+      hasConflictingAssetId = true;
+      continue;
+    }
+    byAssetId.set(source.asset.assetId, source);
+  }
+  return { byStrokeId, byAssetId, hasConflictingAssetId };
+}
+
 /** Returns every materialized identity plus the non-tombstoned count in a valid document. */
 export function snapshotStudioWorkAssetReferences(
   doc: Y.Doc
@@ -1301,6 +1362,23 @@ function isLayeredFlowStrokeBrushCompatible(brush: unknown): boolean {
     || !STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush);
 }
 
+function rendererSignificantR8GrainAdmission(
+  brushDynamics: unknown,
+): "absent" | "valid" | "invalid" {
+  if (!brushDynamics || typeof brushDynamics !== "object" || Array.isArray(brushDynamics)) {
+    return "absent";
+  }
+  const grain = (brushDynamics as Record<string, unknown>).grain;
+  if (!grain || typeof grain !== "object" || Array.isArray(grain)) return "absent";
+  if (!Object.prototype.hasOwnProperty.call(grain, "source")) return "absent";
+  const source = (grain as Record<string, unknown>).source;
+  if (source == null) return "absent";
+  const canonical = serializeStudioBrushR8TextureGrainSourceCanonical(source);
+  return canonical !== null && canonical === JSON.stringify(source)
+    ? "valid"
+    : "invalid";
+}
+
 /**
  * Server mirror of the browser's pure stroke-paint admission contract. Runtime imports stay
  * one-way at the API boundary; the service test pins this mirror against the browser oracle.
@@ -1310,6 +1388,24 @@ export function hasValidStudioCrdtStrokePaintContract(
 ): boolean {
   if (
     input.payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION
+    && input.payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) return false;
+  const brushDynamics = input.brushDynamics !== null
+    && typeof input.brushDynamics === "object"
+    && !Array.isArray(input.brushDynamics)
+    ? input.brushDynamics as Record<string, unknown>
+    : undefined;
+  const r8GrainAdmission = rendererSignificantR8GrainAdmission(input.brushDynamics);
+  if (
+    r8GrainAdmission === "invalid"
+    || (
+      r8GrainAdmission === "valid"
+      && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    )
+  ) return false;
+  if (
+    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE
     && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
   ) return false;
   if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") {
@@ -1351,6 +1447,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     (record.has("deleted") && typeof record.get("deleted") !== "boolean") ||
     (payloadVersion !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION &&
+      payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
@@ -1402,8 +1499,12 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     && Object.prototype.hasOwnProperty.call(extensions, "materialMinimumDiameterRatio");
   const hasDynamicMinimumDiameterRatio = brushDynamics !== undefined
     && Object.prototype.hasOwnProperty.call(brushDynamics, "minimumDiameterRatio");
+  const hasSegmentedCausalDeposit =
+    brushDynamics?.depositPipeline === STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE;
+  const r8GrainAdmission = rendererSignificantR8GrainAdmission(brushDynamicsValue);
   if (
-    payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    payloadVersion !== STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
     && (
       hasMaterialPressureModel
       || hasMaterialMinimumDiameterRatio
@@ -1411,7 +1512,10 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     )
   ) return false;
   if (
-    payloadVersion === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    (
+      payloadVersion === STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
+      || payloadVersion === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    )
     && (
       hasMaterialPressureModel !== hasMaterialMinimumDiameterRatio
       || (hasMaterialPressureModel
@@ -1420,6 +1524,17 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
         && !finiteNumberInRange(extensions?.materialMinimumDiameterRatio, 0, 1))
       || (hasDynamicMinimumDiameterRatio
         && !finiteNumberInRange(brushDynamics?.minimumDiameterRatio, 0, 1))
+    )
+  ) return false;
+  if (
+    hasSegmentedCausalDeposit
+    && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) return false;
+  if (
+    r8GrainAdmission === "invalid"
+    || (
+      r8GrainAdmission === "valid"
+      && payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
     )
   ) return false;
   const paintModel = extensions?.paintModel;

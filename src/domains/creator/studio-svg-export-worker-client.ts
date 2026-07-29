@@ -1,7 +1,12 @@
+import { serializeStudioBrushR8TextureGrainSourceCanonical } from "./studio-brush-r8-grain-asset-contract";
+import { snapshotStudioBrushR8GrainAssetsForTransfer } from "./studio-brush-r8-grain-runtime";
 import { loadStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg, type SvgExportPageInput, type SvgExportResult } from "./studio-svg-export";
 import {
+  collectStudioSvgExportReferencedR8GrainSources,
   STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
+  STUDIO_SVG_EXPORT_WORKER_R8_TRANSFER_LIMITS,
+  type StudioSvgExportWorkerR8GrainEntry,
   type StudioSvgExportWorkerResponseMessage,
   type StudioSvgExportWorkerRunMessage,
 } from "./studio-svg-export-worker-protocol";
@@ -15,7 +20,7 @@ export interface StudioSvgExportWorkerLike {
         preventDefault?(): void;
       }) => void)
     | null;
-  postMessage(message: StudioSvgExportWorkerRunMessage): void;
+  postMessage(message: StudioSvgExportWorkerRunMessage, transfer: ArrayBuffer[]): void;
   terminate(): void;
 }
 
@@ -30,6 +35,98 @@ export interface StudioSvgExportWorkerClientOptions {
 export interface StudioSvgExportWorkerClientResult {
   execution: "worker" | "direct";
   result: SvgExportResult;
+}
+
+export interface StudioSvgExportWorkerR8Transfer {
+  readonly entries: readonly Readonly<StudioSvgExportWorkerR8GrainEntry>[];
+  readonly buffers: ArrayBuffer[];
+}
+
+function isPrivateExactUint8Array(value: unknown): value is Uint8Array<ArrayBuffer> {
+  return (
+    value instanceof Uint8Array
+    && Object.getPrototypeOf(value) === Uint8Array.prototype
+    && value.buffer instanceof ArrayBuffer
+    && value.byteOffset === 0
+    && value.byteLength === value.buffer.byteLength
+  );
+}
+
+function zeroizeStudioSvgExportWorkerR8Transfer(
+  transfer: StudioSvgExportWorkerR8Transfer,
+): void {
+  for (const entry of transfer.entries) {
+    try {
+      if (isPrivateExactUint8Array(entry.decodedBytes)) entry.decodedBytes.fill(0);
+    } catch {
+      // A successful postMessage detaches the private buffer. Detached views are already cleared
+      // from this realm and some engines throw when their properties are inspected.
+    }
+  }
+}
+
+/**
+ * Produces an export-private, bounded transfer set. The runtime snapshot API copies verified bytes;
+ * this second boundary ensures that only sources referenced by this export cross into the worker.
+ */
+export function prepareStudioSvgExportWorkerR8Transfer(
+  input: SvgExportPageInput,
+): StudioSvgExportWorkerR8Transfer {
+  const referenced = collectStudioSvgExportReferencedR8GrainSources(input);
+  const referencedKeys = new Set(referenced.map((entry) => entry.sourceKey));
+  const snapshot = snapshotStudioBrushR8GrainAssetsForTransfer(
+    referenced.map((entry) => entry.source),
+  );
+  const entries: Readonly<StudioSvgExportWorkerR8GrainEntry>[] = [];
+  const buffers: ArrayBuffer[] = [];
+  const admittedKeys = new Set<string>();
+  let totalDecodedBytes = 0;
+
+  for (const candidate of snapshot.entries) {
+    const bytes = candidate.decodedBytes;
+    const nextTotal = totalDecodedBytes + bytes.byteLength;
+    const admissible = (
+      referencedKeys.has(candidate.sourceKey)
+      && !admittedKeys.has(candidate.sourceKey)
+      && serializeStudioBrushR8TextureGrainSourceCanonical(candidate.source)
+        === candidate.sourceKey
+      && isPrivateExactUint8Array(bytes)
+      && candidate.source.asset.width * candidate.source.asset.height === bytes.byteLength
+      && entries.length < STUDIO_SVG_EXPORT_WORKER_R8_TRANSFER_LIMITS.maxEntries
+      && Number.isSafeInteger(nextTotal)
+      && nextTotal <= STUDIO_SVG_EXPORT_WORKER_R8_TRANSFER_LIMITS.maxDecodedBytes
+    );
+    if (!admissible) {
+      try {
+        if (isPrivateExactUint8Array(bytes)) bytes.fill(0);
+      } catch {
+        // The runtime promises private attached copies; keep this boundary fail-closed regardless.
+      }
+      continue;
+    }
+    const entry = Object.freeze({
+      sourceKey: candidate.sourceKey,
+      source: candidate.source,
+      decodedBytes: bytes,
+    });
+    admittedKeys.add(candidate.sourceKey);
+    totalDecodedBytes = nextTotal;
+    entries.push(entry);
+    buffers.push(bytes.buffer);
+  }
+
+  if (
+    snapshot.totalDecodedBytes !== totalDecodedBytes
+    || snapshot.entries.length !== entries.length
+  ) {
+    zeroizeStudioSvgExportWorkerR8Transfer({ entries, buffers });
+    return Object.freeze({ entries: Object.freeze([]), buffers: [] });
+  }
+
+  return Object.freeze({
+    entries: Object.freeze(entries),
+    buffers,
+  });
 }
 
 /** Vite statically discovers this exact URL pattern and emits an isolated module-worker chunk. */
@@ -79,6 +176,7 @@ function runSvgExportWithWorker(
   worker: StudioSvgExportWorkerLike,
   input: SvgExportPageInput,
   signal: AbortSignal | undefined,
+  r8Transfer: StudioSvgExportWorkerR8Transfer,
 ): Promise<StudioSvgExportWorkerClientResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -88,6 +186,7 @@ function runSvgExportWithWorker(
       type: "studio-svg-export/run",
       version: STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
       input,
+      r8GrainAssets: r8Transfer.entries,
     };
 
     const cleanup = () => {
@@ -96,6 +195,7 @@ function runSvgExportWithWorker(
       worker.onmessage = null;
       worker.onerror = null;
       worker.terminate();
+      zeroizeStudioSvgExportWorkerR8Transfer(r8Transfer);
     };
     const finish = (callback: () => void) => {
       if (settled) return;
@@ -121,7 +221,7 @@ function runSvgExportWithWorker(
           readyTimer = null;
         }
         try {
-          worker.postMessage(message);
+          worker.postMessage(message, r8Transfer.buffers);
           requestPosted = true;
         } catch {
           resolveDirectFallback();
@@ -161,9 +261,9 @@ function runSvgExportWithWorker(
 }
 
 /**
- * 벡터 SVG 직렬화를 모듈 Worker에서 실행한다. 입력(요소 트리)·출력(SVG 문자열) 모두 구조적
- * 복제만으로 충분한 순수 JSON이라 transferable은 쓰지 않는다. Worker를 못 만들면(구형
- * 브라우저·CSP) outline 엔진 준비 뒤 동일한 exportPageToSvg를 메인 스레드에서 실행한다.
+ * 벡터 SVG 직렬화를 모듈 Worker에서 실행한다. 요소 트리는 구조적 복제로 전달하고, 실제
+ * 참조되는 검증된 R8 종이 질감만 private ArrayBuffer로 복사·이전한다. Worker를 못 만들면
+ * (구형 브라우저·CSP) 현재 main-realm registry를 보존한 채 동일한 exporter를 직접 실행한다.
  */
 export async function runStudioSvgExportWorker(
   input: SvgExportPageInput,
@@ -181,5 +281,12 @@ export async function runStudioSvgExportWorker(
     return runSvgExportDirect(input, options.signal);
   }
   if (!worker) return runSvgExportDirect(input, options.signal);
-  return runSvgExportWithWorker(worker, input, options.signal);
+  let r8Transfer: StudioSvgExportWorkerR8Transfer;
+  try {
+    r8Transfer = prepareStudioSvgExportWorkerR8Transfer(input);
+  } catch {
+    worker.terminate();
+    return runSvgExportDirect(input, options.signal);
+  }
+  return runSvgExportWithWorker(worker, input, options.signal, r8Transfer);
 }

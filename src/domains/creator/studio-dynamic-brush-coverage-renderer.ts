@@ -8,7 +8,7 @@
  */
 
 import {
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  isStudioDynamicBrushCausalDepositPipeline,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "./studio-brush-dynamics";
@@ -17,6 +17,11 @@ import {
   resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
   resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
 } from "./studio-brush-material-dynamics";
+import {
+  composeStudioBrushR8TipPaperAlphaMap,
+  resetStudioBrushR8GrainRegistry,
+  resolveStudioBrushR8GrainSampler,
+} from "./studio-brush-r8-grain-runtime";
 import {
   planStudioDynamicBrushRenderBudget,
   type StudioDynamicBrushAcceptedPrefixReceipt,
@@ -54,7 +59,8 @@ export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
 /**
  * Live and committed passes intentionally share the same surface policy. A lower live resolution
  * produced a visible sharpness/texture pop at pointer-up on Retina and zoomed canvases. Live work
- * remains lower because its upstream dab/mark ceiling is 4k rather than the committed 65k ceiling.
+ * remains bounded by its upstream draft mark ceiling; causal-v3 committed continuation can exceed
+ * the historical 65k ceiling and switches to the one-surface streaming compositor below.
  */
 export const STUDIO_DYNAMIC_COVERAGE_ACTIVE_BYTE_BUDGET = 64 * 1024 * 1024;
 export const STUDIO_DYNAMIC_COVERAGE_COMMITTED_BYTE_BUDGET =
@@ -62,6 +68,13 @@ export const STUDIO_DYNAMIC_COVERAGE_COMMITTED_BYTE_BUDGET =
 export const STUDIO_DYNAMIC_COVERAGE_ACTIVE_TILE_MARK_REFERENCE_BUDGET = 262_144;
 export const STUDIO_DYNAMIC_COVERAGE_COMMITTED_TILE_MARK_REFERENCE_BUDGET =
   STUDIO_DYNAMIC_COVERAGE_ACTIVE_TILE_MARK_REFERENCE_BUDGET;
+/**
+ * Temporary exact Canvas/SVG R8 bridge bakes paper into one Float32 tip map per retained dab.
+ * Bound that retained plan memory before allocating any per-dab maps; the future native GPU/SVG
+ * sampler can replace this bridge without changing persisted source identity.
+ */
+export const STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET =
+  16 * 1_024 * 1_024;
 /**
  * Retained dynamic strokes are redrawn whenever Konva repaints their layer. Rebuilding every
  * unchanged stroke into fresh coverage tiles on each cursor frame is both redundant and extremely
@@ -124,8 +137,30 @@ export interface StudioDynamicBrushCoverageMark {
   }>;
 }
 
+/**
+ * A variation can retain the causal-v3 continuation boundaries instead of flattening every dab
+ * into one second, million-entry array at pointer-up. Consumers iterate the immutable segments in
+ * order, and accepted-prefix truncation only slices the one boundary segment.
+ */
+export interface StudioDynamicBrushSegmentedDabVariation {
+  readonly kind: "studio-dynamic-brush-segmented-dab-variation";
+  readonly segments: readonly (readonly StudioDynamicBrushDab[])[];
+}
+
+export type StudioDynamicBrushDabVariation =
+  | readonly StudioDynamicBrushDab[]
+  | StudioDynamicBrushSegmentedDabVariation;
+
+export interface StudioDynamicBrushR8TextureAlphaMapReceipt {
+  readonly policy: "r8-texture-alpha-map-bytes-v1";
+  /** Identity-deduplicated maps actually retained by the returned marks. */
+  readonly uniqueAlphaMapCount: number;
+  readonly alphaMapBytes: number;
+  readonly alphaMapByteBudget: number;
+}
+
 export interface StudioDynamicBrushCoverageMarkPlanInput {
-  readonly dabVariations: readonly (readonly StudioDynamicBrushDab[])[];
+  readonly dabVariations: readonly StudioDynamicBrushDabVariation[];
   /**
    * Optional full-stroke origins for suffix-only planning. Without this, each variation's first
    * supplied dab is the origin, which is correct for full plans but would shift stroke-fixed grain
@@ -138,6 +173,79 @@ export interface StudioDynamicBrushCoverageMarkPlanInput {
   readonly stampGrid: StudioDynamicBrushRenderStampGrid;
   /** Same live/committed mark ceiling used to plan the dab count and stamp grid. */
   readonly markBudget: number;
+  /**
+   * Optional remaining stroke-wide R8 allocation. Full retained/export plans omit it and receive
+   * the global 16 MiB allowance; incremental live callers pass the unspent suffix budget.
+   */
+  readonly r8AlphaMapByteBudget?: number;
+}
+
+function isStudioDynamicBrushSegmentedDabVariation(
+  variation: StudioDynamicBrushDabVariation,
+): variation is StudioDynamicBrushSegmentedDabVariation {
+  return !Array.isArray(variation);
+}
+
+function studioDynamicBrushDabVariationCount(
+  variation: StudioDynamicBrushDabVariation,
+): number {
+  if (!isStudioDynamicBrushSegmentedDabVariation(variation)) {
+    return variation.length;
+  }
+  return variation.segments.reduce(
+    (count, segment) => count + segment.length,
+    0,
+  );
+}
+
+function studioDynamicBrushDabVariationFirst(
+  variation: StudioDynamicBrushDabVariation,
+): StudioDynamicBrushDab | undefined {
+  if (!isStudioDynamicBrushSegmentedDabVariation(variation)) {
+    return variation[0];
+  }
+  for (const segment of variation.segments) {
+    if (segment[0]) return segment[0];
+  }
+  return undefined;
+}
+
+function* studioDynamicBrushDabsInVariation(
+  variation: StudioDynamicBrushDabVariation,
+): Generator<StudioDynamicBrushDab, void> {
+  if (!isStudioDynamicBrushSegmentedDabVariation(variation)) {
+    yield* variation;
+    return;
+  }
+  for (const segment of variation.segments) {
+    yield* segment;
+  }
+}
+
+function studioDynamicBrushDabVariationPrefix(
+  variation: StudioDynamicBrushDabVariation,
+  maximumDabs: number,
+): StudioDynamicBrushDabVariation {
+  const boundedMaximum = Math.max(0, Math.floor(maximumDabs));
+  if (!isStudioDynamicBrushSegmentedDabVariation(variation)) {
+    return variation.slice(0, boundedMaximum);
+  }
+  const acceptedSegments: Array<readonly StudioDynamicBrushDab[]> = [];
+  let remaining = boundedMaximum;
+  for (const segment of variation.segments) {
+    if (remaining <= 0) break;
+    if (segment.length <= remaining) {
+      acceptedSegments.push(segment);
+      remaining -= segment.length;
+      continue;
+    }
+    acceptedSegments.push(segment.slice(0, remaining));
+    remaining = 0;
+  }
+  return {
+    kind: "studio-dynamic-brush-segmented-dab-variation",
+    segments: acceptedSegments,
+  };
 }
 
 export type StudioDynamicBrushCoverageMarkPlan =
@@ -149,10 +257,20 @@ export type StudioDynamicBrushCoverageMarkPlan =
        * dab-wave prefix. The receipt makes truncation explicit to live, retained and SVG callers.
        */
       readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
+      /**
+       * Actual generated R8 alpha-map memory. Incremental callers can sum immutable receipts
+       * across suffix plans instead of treating the per-call 16 MiB preflight as a stroke-wide
+       * allowance.
+       */
+      readonly r8TextureAlphaMapReceipt?: StudioDynamicBrushR8TextureAlphaMapReceipt;
     }
   | {
       readonly ok: false;
-      readonly reason: "invalid-mark" | "mark-budget";
+      readonly reason:
+        | "invalid-mark"
+        | "mark-budget"
+        | "r8-grain-unavailable"
+        | "r8-grain-memory-budget";
     };
 
 export interface StudioDynamicBrushCoverageAndLegacyMarkPlan {
@@ -276,7 +394,9 @@ export type StudioDynamicBrushCoverageRenderResult =
        * double-paint the completed prefix, so callers must not fallback for this result.
        */
       readonly status: "partial";
-      readonly reason: "destination-composite-failed";
+      readonly reason:
+        | "destination-composite-failed"
+        | "surface-render-failed";
     };
 
 interface MarkBounds {
@@ -287,6 +407,17 @@ interface MarkBounds {
 }
 
 interface TileBin {
+  readonly tileX: number;
+  readonly tileY: number;
+  /**
+   * Active/small committed plans use append-friendly arrays. Large committed plans use compact
+   * Uint32 storage so the one-million-dab V3 ceiling cannot expand into millions of boxed JS
+   * number references.
+   */
+  readonly markIndexes: readonly number[] | Uint32Array;
+}
+
+interface MutableTileBin {
   readonly tileX: number;
   readonly tileY: number;
   readonly markIndexes: number[];
@@ -526,13 +657,40 @@ export function planStudioDynamicBrushCoverageMarks(
   const boundedMarkBudget = Number.isFinite(markBudget)
     ? Math.max(1, Math.floor(markBudget))
     : 1;
-  const causalRenderBudget = dynamics.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+  const boundedR8AlphaMapByteBudget = Number.isFinite(
+    input.r8AlphaMapByteBudget,
+  )
+    ? Math.max(
+        0,
+        Math.min(
+          STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
+          Math.floor(input.r8AlphaMapByteBudget as number),
+        ),
+      )
+    : STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET;
+  const r8GrainSource = dynamics.grain.amount > 0
+    ? dynamics.grain.source
+    : undefined;
+  const r8GrainSampler = r8GrainSource
+    ? resolveStudioBrushR8GrainSampler(r8GrainSource)
+    : null;
+  if (r8GrainSource && !r8GrainSampler) {
+    // A collaborator or export worker without the exact verified decoded bytes must not silently
+    // substitute procedural or identity grain: doing so would make one persisted stroke produce
+    // different pixels in different realms.
+    return { ok: false, reason: "r8-grain-unavailable" };
+  }
+  const causalRenderBudget = isStudioDynamicBrushCausalDepositPipeline(
+    dynamics.depositPipeline,
+  )
     && dabVariations.length > 0
     ? planStudioDynamicBrushRenderBudget({
         settings: dynamics,
         dabCount: dabVariations.reduce(
-          (maximum, variation) => Math.max(maximum, variation.length),
+          (maximum, variation) => Math.max(
+            maximum,
+            studioDynamicBrushDabVariationCount(variation),
+          ),
           0,
         ),
         symmetryCount: dabVariations.length,
@@ -545,7 +703,10 @@ export function planStudioDynamicBrushCoverageMarks(
   const acceptedPrefixReceipt = causalRenderBudget?.acceptedPrefixReceipt;
   const acceptedDabVariations = acceptedPrefixReceipt
     ? dabVariations.map((variation) => (
-        variation.slice(0, acceptedDabsPerVariation)
+        studioDynamicBrushDabVariationPrefix(
+          variation,
+          acceptedDabsPerVariation,
+        )
       ))
     : dabVariations;
   const tipDefinitions = [
@@ -554,8 +715,9 @@ export function planStudioDynamicBrushCoverageMarks(
   ];
   const grainActive = dynamics.grain.amount > 0;
   const dualBrush = dynamics.dualBrush;
-  const fullTextureAuthority = dynamics.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
+  const fullTextureAuthority = isStudioDynamicBrushCausalDepositPipeline(
+    dynamics.depositPipeline,
+  );
   const decomposedLegacyScreenDual = !fullTextureAuthority
     && studioBrushDualBrushIsActive(dualBrush)
     && dualBrush?.blendMode === "screen"
@@ -568,12 +730,13 @@ export function planStudioDynamicBrushCoverageMarks(
         }
       : null;
   const tipUsesAnalyticFalloff = tipDefinitions.map((tip, tipIndex) => (
-    tipUsesAnalyticSoftFalloff(
-      tip,
-      tipIndex === 0,
-      dualBrush,
-      fullTextureAuthority,
-    )
+    r8GrainSampler === null
+    && tipUsesAnalyticSoftFalloff(
+        tip,
+        tipIndex === 0,
+        dualBrush,
+        fullTextureAuthority,
+      )
   ));
   const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
     !grainActive && (tipIndex === 0
@@ -587,6 +750,31 @@ export function planStudioDynamicBrushCoverageMarks(
         ? composeStudioBrushDualTipAlphaMap(tip, dualBrush)
         : buildStudioBrushTipAlphaMap(tip)
   ));
+  if (r8GrainSampler) {
+    const enabledMapBytesPerDab = tipAlphaMaps.reduce((total, map, tipIndex) => {
+      if (tipIndex > 0 && (dynamics.tipLayers[tipIndex - 1]?.opacity ?? 0) <= 0) {
+        return total;
+      }
+      return total + (map?.alphas.byteLength ?? 0);
+    }, 0);
+    const acceptedDabCount = acceptedDabVariations.reduce(
+      (total, variation) => (
+        total + studioDynamicBrushDabVariationCount(variation)
+      ),
+      0,
+    );
+    if (
+      !Number.isSafeInteger(enabledMapBytesPerDab)
+      || !Number.isSafeInteger(acceptedDabCount)
+      || enabledMapBytesPerDab <= 0
+      || acceptedDabCount > Math.floor(
+        boundedR8AlphaMapByteBudget
+          / enabledMapBytesPerDab,
+      )
+    ) {
+      return { ok: false, reason: "r8-grain-memory-budget" };
+    }
+  }
   const marks: StudioDynamicBrushCoverageMark[] = [];
 
   const appendMark = (mark: StudioDynamicBrushCoverageMark): boolean => {
@@ -599,8 +787,9 @@ export function planStudioDynamicBrushCoverageMarks(
 
   for (const [variationIndex, dabs] of acceptedDabVariations.entries()) {
     const suppliedOrigin = input.strokeOrigins?.[variationIndex];
-    const strokeOriginX = suppliedOrigin?.x ?? dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
-    const strokeOriginY = suppliedOrigin?.y ?? dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
+    const firstDab = studioDynamicBrushDabVariationFirst(dabs);
+    const strokeOriginX = suppliedOrigin?.x ?? firstDab?.sourceX ?? firstDab?.x ?? 0;
+    const strokeOriginY = suppliedOrigin?.y ?? firstDab?.sourceY ?? firstDab?.y ?? 0;
     const grainAt = dynamics.grain.amount <= 0
       ? () => 1
       : (x: number, y: number) => (
@@ -641,6 +830,41 @@ export function planStudioDynamicBrushCoverageMarks(
       const depositionAlpha = clampAlpha(composedDab.opacity * composedDab.flow);
       if (depositionAlpha <= 0) return "ok";
       const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
+      if (r8GrainSampler) {
+        if (!tipAlphaMap) return "invalid-mark";
+        const radiusX = Math.max(0.25, composedDab.size / 2);
+        const radiusY = radiusX * composedDab.roundness;
+        const angleRadians = composedDab.angle * Math.PI / 180;
+        const composedAlphaMap = composeStudioBrushR8TipPaperAlphaMap({
+          tip: tipAlphaMap,
+          sampler: r8GrainSampler,
+          grain: dynamics.grain,
+          centerX: composedDab.x,
+          centerY: composedDab.y,
+          radiusX,
+          radiusY,
+          angleRadians,
+          strokeOriginX,
+          strokeOriginY,
+          strokeSeed: dynamicSeed,
+        });
+        if (!composedAlphaMap) return "invalid-mark";
+        const mark: StudioDynamicBrushCoverageMark = {
+          x: composedDab.x,
+          y: composedDab.y,
+          radiusX,
+          radiusY,
+          angleRadians,
+          alpha: depositionAlpha,
+          color: dabColor,
+          texture: {
+            kind: "alpha-map",
+            alphaMap: composedAlphaMap,
+          },
+        };
+        if (!markIsValid(mark)) return "invalid-mark";
+        return appendMark(mark) ? "ok" : "mark-budget";
+      }
       const appendSampledTipMap = (
         sampledDab: StudioBrushComposableDab,
         alphaMap: StudioBrushTipAlphaMap,
@@ -794,7 +1018,7 @@ export function planStudioDynamicBrushCoverageMarks(
       return appendMark(texturedMark) ? "ok" : "mark-budget";
     };
 
-    for (const dab of dabs) {
+    for (const dab of studioDynamicBrushDabsInVariation(dabs)) {
       const dabColor = resolveNormalizedStudioBrushDabColor(
         stroke,
         dab.index,
@@ -816,10 +1040,29 @@ export function planStudioDynamicBrushCoverageMarks(
       }
     }
   }
+  const r8TextureAlphaMapReceipt = r8GrainSampler
+    ? (() => {
+        const uniqueMaps = new Set<StudioBrushTipAlphaMap>();
+        let alphaMapBytes = 0;
+        for (const plannedMark of marks) {
+          const alphaMap = plannedMark.texture?.alphaMap;
+          if (!alphaMap || uniqueMaps.has(alphaMap)) continue;
+          uniqueMaps.add(alphaMap);
+          alphaMapBytes += alphaMap.alphas.byteLength;
+        }
+        return {
+          policy: "r8-texture-alpha-map-bytes-v1" as const,
+          uniqueAlphaMapCount: uniqueMaps.size,
+          alphaMapBytes,
+          alphaMapByteBudget: boundedR8AlphaMapByteBudget,
+        };
+      })()
+    : undefined;
   return {
     ok: true,
     marks,
     ...(acceptedPrefixReceipt ? { acceptedPrefixReceipt } : {}),
+    ...(r8TextureAlphaMapReceipt ? { r8TextureAlphaMapReceipt } : {}),
   };
 }
 
@@ -831,8 +1074,9 @@ export function planStudioDynamicBrushCoverageAndLegacyMarks(
     return { coveragePlan, legacyMarks: coveragePlan.marks };
   }
   if (
-    input.dynamics.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    isStudioDynamicBrushCausalDepositPipeline(
+      input.dynamics.depositPipeline,
+    )
   ) {
     return { coveragePlan, legacyMarks: [] };
   }
@@ -907,6 +1151,53 @@ function candidateScales(
   ));
 }
 
+interface MarkTileRange {
+  readonly minTileX: number;
+  readonly minTileY: number;
+  readonly maxTileX: number;
+  readonly maxTileY: number;
+  readonly columns: number;
+  readonly rows: number;
+}
+
+function markTileRangeAtScale(
+  mark: StudioDynamicBrushCoverageMark,
+  scale: number,
+): MarkTileRange | null {
+  const bounds = markBounds(mark);
+  const tilePixels = STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE;
+  const antialiasPadding = 1 / scale;
+  const minTileX = Math.floor(
+    (bounds.minX - antialiasPadding) * scale / tilePixels,
+  );
+  const minTileY = Math.floor(
+    (bounds.minY - antialiasPadding) * scale / tilePixels,
+  );
+  const maxTileX = Math.floor(
+    (bounds.maxX + antialiasPadding) * scale / tilePixels,
+  );
+  const maxTileY = Math.floor(
+    (bounds.maxY + antialiasPadding) * scale / tilePixels,
+  );
+  const columns = maxTileX - minTileX + 1;
+  const rows = maxTileY - minTileY + 1;
+  if (
+    !Number.isSafeInteger(columns)
+    || !Number.isSafeInteger(rows)
+    || columns <= 0
+    || rows <= 0
+    || !Number.isSafeInteger(columns * rows)
+  ) return null;
+  return {
+    minTileX,
+    minTileY,
+    maxTileX,
+    maxTileY,
+    columns,
+    rows,
+  };
+}
+
 function planTilesAtScale(
   marks: readonly StudioDynamicBrushCoverageMark[],
   scale: number,
@@ -918,28 +1209,19 @@ function planTilesAtScale(
   const surfacePixels = tilePixels + bleedPixels * 2;
   const bytesPerTile = surfacePixels * surfacePixels * 4;
   const maximumTiles = Math.max(1, Math.floor(byteBudget / bytesPerTile));
-  const bins = new Map<string, TileBin>();
+  const bins = new Map<string, MutableTileBin>();
   let tileMarkReferences = 0;
-  const antialiasPadding = 1 / scale;
 
   for (const [markIndex, mark] of marks.entries()) {
-    const bounds = markBounds(mark);
-    const minTileX = Math.floor((bounds.minX - antialiasPadding) * scale / tilePixels);
-    const minTileY = Math.floor((bounds.minY - antialiasPadding) * scale / tilePixels);
-    const maxTileX = Math.floor((bounds.maxX + antialiasPadding) * scale / tilePixels);
-    const maxTileY = Math.floor((bounds.maxY + antialiasPadding) * scale / tilePixels);
-    const columns = maxTileX - minTileX + 1;
-    const rows = maxTileY - minTileY + 1;
+    const range = markTileRangeAtScale(mark, scale);
     if (
-      !Number.isSafeInteger(columns)
-      || !Number.isSafeInteger(rows)
-      || columns <= 0
-      || rows <= 0
-      || columns * rows > tileMarkReferenceBudget - tileMarkReferences
+      !range
+      || range.columns * range.rows
+        > tileMarkReferenceBudget - tileMarkReferences
     ) return "tile-mark-budget";
 
-    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
-      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+    for (let tileY = range.minTileY; tileY <= range.maxTileY; tileY += 1) {
+      for (let tileX = range.minTileX; tileX <= range.maxTileX; tileX += 1) {
         const key = `${tileX}:${tileY}`;
         let bin = bins.get(key);
         if (!bin) {
@@ -961,6 +1243,92 @@ function planTilesAtScale(
     allocatedBytes: bins.size * bytesPerTile,
     tileMarkReferences,
   };
+}
+
+/**
+ * Builds an exact committed tile index without the active renderer's surface/reference admission
+ * ceilings. Two passes replace append-heavy boxed number arrays with fixed Uint32 storage. The
+ * resulting memory is proportional to the finite persisted mark plan and no tile surface is
+ * allocated here; large plans are consumed one tile at a time below.
+ */
+function planCommittedStreamingTilesAtScale(
+  marks: readonly StudioDynamicBrushCoverageMark[],
+  scale: number,
+): TilePlan | null {
+  interface CountedBin {
+    readonly tileX: number;
+    readonly tileY: number;
+    count: number;
+    cursor: number;
+    markIndexes: Uint32Array;
+  }
+
+  try {
+    const counted = new Map<string, CountedBin>();
+    const emptyMarkIndexes = new Uint32Array(0);
+    let tileMarkReferences = 0;
+
+    for (const mark of marks) {
+      const range = markTileRangeAtScale(mark, scale);
+      if (!range) return null;
+      for (let tileY = range.minTileY; tileY <= range.maxTileY; tileY += 1) {
+        for (let tileX = range.minTileX; tileX <= range.maxTileX; tileX += 1) {
+          const key = `${tileX}:${tileY}`;
+          const bin = counted.get(key);
+          if (bin) {
+            bin.count += 1;
+          } else {
+            counted.set(key, {
+              tileX,
+              tileY,
+              count: 1,
+              cursor: 0,
+              markIndexes: emptyMarkIndexes,
+            });
+          }
+          tileMarkReferences += 1;
+        }
+      }
+      if (!Number.isSafeInteger(tileMarkReferences)) return null;
+    }
+
+    for (const bin of counted.values()) {
+      bin.markIndexes = new Uint32Array(bin.count);
+    }
+    for (const [markIndex, mark] of marks.entries()) {
+      const range = markTileRangeAtScale(mark, scale);
+      if (!range) return null;
+      for (let tileY = range.minTileY; tileY <= range.maxTileY; tileY += 1) {
+        for (let tileX = range.minTileX; tileX <= range.maxTileX; tileX += 1) {
+          const bin = counted.get(`${tileX}:${tileY}`)!;
+          bin.markIndexes[bin.cursor] = markIndex;
+          bin.cursor += 1;
+        }
+      }
+    }
+
+    const surfacePixels =
+      STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE
+      + STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS * 2;
+    const bytesPerTile = surfacePixels * surfacePixels * 4;
+    const allocatedBytes = counted.size * bytesPerTile;
+    if (!Number.isSafeInteger(allocatedBytes)) return null;
+    const bins = [...counted.values()].sort((left, right) => (
+      left.tileY - right.tileY || left.tileX - right.tileX
+    ));
+    counted.clear();
+    return {
+      bins,
+      scale,
+      // Aggregate bytes describe the equivalent all-at-once plan. The streaming renderer reports
+      // its actual one-surface peak allocation in the public result.
+      allocatedBytes,
+      tileMarkReferences,
+    };
+  } catch {
+    // A compact index allocation failure is an actual host allocation failure, not a policy cap.
+    return null;
+  }
 }
 
 function defaultSurfaceFactory(
@@ -1128,6 +1496,7 @@ export function disposeStudioDynamicCoverageCommittedCache(): void {
   for (const entry of entries) releasePreparedTiles(entry.prepared);
   clearStudioBrushTextureStampCache();
   clearStudioBrushSoftFalloffStampCache();
+  resetStudioBrushR8GrainRegistry();
 }
 
 /** Test/debug alias retained for focused renderer isolation. */
@@ -1232,6 +1601,115 @@ function compositePreparedTileSurfaces(
   }
 }
 
+type StudioCommittedCoverageStreamingResult =
+  | Readonly<{ status: "rendered"; peakAllocatedBytes: number }>
+  | Readonly<{
+      status: "failed";
+      reason: "surface-render-failed" | "destination-composite-failed";
+    }>
+  | Readonly<{
+      status: "partial";
+      reason: "surface-render-failed" | "destination-composite-failed";
+    }>;
+
+/**
+ * Renders an arbitrarily large committed tile plan through one reusable tile surface.
+ *
+ * Tile cores do not overlap at the destination, so setting inherited alpha × element opacity once
+ * for the complete loop preserves the stroke-local bounded-flow contract. The bleed area remains
+ * source-only antialias padding and is cropped from every draw. No dab is replayed directly and no
+ * per-dab element opacity is introduced.
+ */
+function compositeCommittedCoverageStreaming(
+  context: StudioDynamicBrushCoverageDestinationContext,
+  marks: readonly StudioDynamicBrushCoverageMark[],
+  plan: TilePlan,
+  opacity: number,
+  factory: StudioCoverageSurfaceFactory,
+): StudioCommittedCoverageStreamingResult {
+  const tilePixels = STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE;
+  const bleedPixels = STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS;
+  const surfacePixels = tilePixels + bleedPixels * 2;
+  const peakAllocatedBytes = surfacePixels * surfacePixels * 4;
+  let destinationStarted = false;
+  let phase: "surface" | "destination" = "surface";
+  let destinationSaved = false;
+  let surface: StudioCoverageSurface | null = null;
+  try {
+    surface = factory(surfacePixels, surfacePixels);
+    const surfaceContext = surface?.getContext("2d", { alpha: true });
+    if (!surface || !surfaceContext) {
+      return { status: "failed", reason: "surface-render-failed" };
+    }
+
+    phase = "destination";
+    context.save();
+    destinationSaved = true;
+    const inheritedAlpha = clampAlpha(context.globalAlpha);
+    context.globalAlpha = inheritedAlpha * opacity;
+    const tileLogicalSize = tilePixels / plan.scale;
+
+    for (const bin of plan.bins) {
+      phase = "surface";
+      surfaceContext.setTransform(1, 0, 0, 1, 0, 0);
+      surfaceContext.clearRect(0, 0, surfacePixels, surfacePixels);
+      surfaceContext.globalCompositeOperation = "source-over";
+      surfaceContext.setTransform(
+        plan.scale,
+        0,
+        0,
+        plan.scale,
+        bleedPixels - bin.tileX * tilePixels,
+        bleedPixels - bin.tileY * tilePixels,
+      );
+      for (const markIndex of bin.markIndexes) {
+        renderStudioDynamicBrushCoverageMark(
+          surfaceContext,
+          marks[markIndex]!,
+          1,
+          factory,
+        );
+      }
+
+      phase = "destination";
+      destinationStarted = true;
+      context.drawImage(
+        surface,
+        bleedPixels,
+        bleedPixels,
+        tilePixels,
+        tilePixels,
+        bin.tileX * tileLogicalSize,
+        bin.tileY * tileLogicalSize,
+        tileLogicalSize,
+        tileLogicalSize,
+      );
+    }
+    context.restore();
+    destinationSaved = false;
+    return { status: "rendered", peakAllocatedBytes };
+  } catch {
+    if (destinationSaved) {
+      try {
+        context.restore();
+      } catch {
+        // Preserve the explicit failure result even if the host context rejects restore().
+      }
+    }
+    const reason = phase === "destination"
+      ? "destination-composite-failed"
+      : "surface-render-failed";
+    return destinationStarted
+      ? { status: "partial", reason }
+      : { status: "failed", reason };
+  } finally {
+    if (surface) {
+      surface.width = 1;
+      surface.height = 1;
+    }
+  }
+}
+
 /**
  * Renders v2 coverage. Every fallback result is returned before destination mutation, so callers
  * can safely execute the frozen direct compositor. A partial destination failure is explicitly
@@ -1255,6 +1733,7 @@ export function renderStudioDynamicBrushCoverage(
     ? STUDIO_DYNAMIC_COVERAGE_ACTIVE_TILE_MARK_REFERENCE_BUDGET
     : STUDIO_DYNAMIC_COVERAGE_COMMITTED_TILE_MARK_REFERENCE_BUDGET;
   const cacheKey = !options.activeDraft ? options.committedCacheKey : undefined;
+  const factory = options.surfaceFactory ?? defaultSurfaceFactory;
   let selectedPlan: TilePlan | null = null;
   let selectedCacheEntry: CommittedCoverageCacheEntry | null = null;
   let lastFailure: "surface-budget" | "tile-mark-budget" = "surface-budget";
@@ -1267,6 +1746,46 @@ export function renderStudioDynamicBrushCoverage(
       selectedCacheEntry = cached;
       selectedPlan = cached.plan;
       break;
+    }
+    if (!options.activeDraft) {
+      // Build one compact fixed-width index up front. The former path first accumulated as many as
+      // 262,144 boxed number references, discarded them after admission failed, and then built the
+      // compact plan—a large pointer-up memory spike for exactly the strokes that need streaming.
+      const committedPlan = planCommittedStreamingTilesAtScale(marks, scale);
+      if (!committedPlan) {
+        return { status: "fallback", reason: "surface-render-failed" };
+      }
+      if (
+        committedPlan.allocatedBytes <= byteBudget
+        && committedPlan.tileMarkReferences <= tileMarkReferenceBudget
+      ) {
+        selectedPlan = committedPlan;
+        break;
+      }
+      const streamed = compositeCommittedCoverageStreaming(
+        context,
+        marks,
+        committedPlan,
+        opacity,
+        factory,
+      );
+      if (streamed.status !== "rendered") {
+        return streamed.status === "partial"
+          ? { status: "partial", reason: streamed.reason }
+          : {
+              status: "fallback",
+              reason: streamed.reason === "destination-composite-failed"
+                ? "surface-render-failed"
+                : streamed.reason,
+            };
+      }
+      return {
+        status: "rendered",
+        scale: committedPlan.scale,
+        tileCount: committedPlan.bins.length,
+        allocatedBytes: streamed.peakAllocatedBytes,
+        tileMarkReferences: committedPlan.tileMarkReferences,
+      };
     }
     const candidate = planTilesAtScale(
       marks,
@@ -1283,7 +1802,6 @@ export function renderStudioDynamicBrushCoverage(
   }
   if (!selectedPlan) return { status: "fallback", reason: lastFailure };
 
-  const factory = options.surfaceFactory ?? defaultSurfaceFactory;
   const prepared = selectedCacheEntry?.prepared
     ?? prepareTileSurfaces(selectedPlan, marks, factory);
   if (!prepared) {

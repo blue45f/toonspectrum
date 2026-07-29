@@ -235,4 +235,103 @@ describe("studio work-scoped asset persistence contract", () => {
       }],
     }, "asset-1")).toThrow();
   });
+
+  it("retains R8 grain uploads referenced only by deleted durable strokes", () => {
+    const source = {
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: "paper-r8",
+        encodedSha256: `sha256:${"a".repeat(64)}`,
+        decodedSha256: `sha256:${"b".repeat(64)}`,
+        byteLength: 128,
+        mediaType: "image/png",
+        width: 2,
+        height: 2,
+        channel: "luminance",
+        encoding: "r8-unorm",
+      },
+    };
+    const document = new Y.Doc();
+    const stroke = new Y.Map<unknown>();
+    stroke.set("deleted", true);
+    stroke.set("brushDynamics", { grain: { source } });
+    document.getMap<Y.Map<unknown>>("strokes").set("stroke-r8", stroke);
+    const state = {
+      snapshot: null,
+      updates: [{
+        workId: "work-r8",
+        sequence: 1n,
+        updateId: "update-r8",
+        actorUserId: "editor",
+        payload: Y.encodeStateAsUpdate(document),
+        createdAt: new Date(0),
+      }],
+    };
+    document.destroy();
+
+    expect(studioCrdtHydrationReferencesWorkAsset(state, "paper-r8")).toBe(true);
+    expect(studioCrdtHydrationReferencesWorkAsset(state, "unrelated")).toBe(false);
+  });
+
+  it("fails R8 cleanup closed for malformed or conflicting durable identities", () => {
+    const source = (decodedHash: string) => ({
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: "paper-r8",
+        encodedSha256: `sha256:${"a".repeat(64)}`,
+        decodedSha256: `sha256:${decodedHash}`,
+        byteLength: 128,
+        mediaType: "image/png",
+        width: 2,
+        height: 2,
+        channel: "luminance",
+        encoding: "r8-unorm",
+      },
+    });
+    const stateFor = (dynamics: readonly unknown[]) => {
+      const document = new Y.Doc();
+      const strokes = document.getMap<Y.Map<unknown>>("strokes");
+      dynamics.forEach((brushDynamics, index) => {
+        const stroke = new Y.Map<unknown>();
+        stroke.set("brushDynamics", brushDynamics);
+        strokes.set(`stroke-${index}`, stroke);
+      });
+      const state = {
+        snapshot: {
+          workId: "work-r8",
+          snapshot: Y.encodeStateAsUpdate(document),
+          compactedSequence: 1n,
+          updatedAt: new Date(0),
+        },
+        updates: [],
+      };
+      document.destroy();
+      return state;
+    };
+
+    const valid = source("b".repeat(64));
+    const malformed = stateFor([{
+      grain: {
+        source: {
+          ...valid,
+          asset: { ...valid.asset, decodedSha256: "sha256:bad" },
+        },
+      },
+    }]);
+    expect(studioCrdtHydrationReferencesWorkAsset(malformed, "paper-r8")).toBe(true);
+    expect(studioCrdtHydrationReferencesWorkAsset(malformed, "unrelated")).toBe(true);
+
+    const conflicting = stateFor([
+      { grain: { source: source("b".repeat(64)) } },
+      { grain: { source: source("c".repeat(64)) } },
+    ]);
+    expect(studioCrdtHydrationReferencesWorkAsset(conflicting, "paper-r8")).toBe(true);
+    expect(studioCrdtHydrationReferencesWorkAsset(conflicting, "unrelated")).toBe(true);
+
+    const procedural = stateFor([
+      { grain: { amount: 0.4, scale: 8 } },
+      { width: { base: 12 } },
+    ]);
+    expect(studioCrdtHydrationReferencesWorkAsset(procedural, "unrelated")).toBe(false);
+  });
 });

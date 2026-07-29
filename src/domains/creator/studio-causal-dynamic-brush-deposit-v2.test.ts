@@ -4,6 +4,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
@@ -13,9 +14,13 @@ import {
 } from "./studio-brush-render-budget";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
+  appendStudioCausalDynamicBrushDepositsV3,
   beginStudioCausalDynamicBrushDepositV2,
+  beginStudioCausalDynamicBrushDepositV3,
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS,
   type StudioCausalDynamicBrushSampleV2,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 
@@ -78,7 +83,7 @@ describe("causal dynamic-brush deposit v2", () => {
     "opts newly materialized %s into the causal contract while legacy snapshots stay omitted",
     (id) => {
       expect(selection(id).brushDynamics.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       );
     },
   );
@@ -295,5 +300,138 @@ describe("causal dynamic-brush deposit v2", () => {
     expect(capped.dabs[0]!.index).toBe(0);
     expect(capped.dabCapped).toBe(true);
     expect(capped.sourcePointCount).toBe(input.points.length / 2);
+  });
+
+  it("keeps every public V2 state and planner strictly inside the 65,536-dab contract", () => {
+    const input = planInput("g-pen-flex");
+    const first = sampleAt(0, input.settings.fallbackPressure);
+    const oversized = STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS + 1;
+
+    expect(beginStudioCausalDynamicBrushDepositV2(
+      first,
+      input.settings,
+      oversized,
+    )).toEqual({ ok: false, reason: "invalid-input" });
+    expect(planStudioCausalDynamicBrushDepositsV2({
+      ...input,
+      maximumDabs: oversized,
+    })).toEqual({ ok: false, reason: "invalid-input" });
+
+    const begun = beginStudioCausalDynamicBrushDepositV2(
+      first,
+      input.settings,
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(begun.ok).toBe(true);
+    if (!begun.ok) return;
+    expect(begun.state).toMatchObject({
+      version: 2,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(appendStudioCausalDynamicBrushDepositsV2(
+      { ...begun.state, maximumDabs: oversized },
+      [sampleAt(1, input.settings.fallbackPressure)],
+      input.settings,
+    )).toEqual({ ok: false, reason: "invalid-state" });
+  });
+
+  it("continues a V3 causal stroke after 65,536 dabs without renumbering its accepted prefix", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      width: { base: 1, mappings: [] },
+      opacity: { base: 1, mappings: [] },
+      flow: { base: 1, mappings: [] },
+      spacingRatio: null,
+      spacing: { base: 0.25, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      angle: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+      taper: { enabled: false },
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+    });
+    const first: StudioCausalDynamicBrushSampleV2 = {
+      x: 0,
+      y: 0,
+      pressure: 0.7,
+      tangentialPressure: 0,
+      speed: 0,
+      tiltX: 0,
+      tiltY: 0,
+      twist: 0,
+    };
+    const last: StudioCausalDynamicBrushSampleV2 = {
+      ...first,
+      x: 17_000,
+    };
+    const begun = beginStudioCausalDynamicBrushDepositV3(first, settings);
+    expect(begun.ok).toBe(true);
+    if (!begun.ok) throw new Error(begun.reason);
+    expect(begun.state).toMatchObject({
+      version: 3,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS,
+      nextDabIndex: 1,
+    });
+    const incremental = appendStudioCausalDynamicBrushDepositsV3(
+      begun.state,
+      [last],
+      settings,
+    );
+    expect(incremental.ok).toBe(true);
+    if (!incremental.ok) throw new Error(incremental.reason);
+    expect(incremental.state.version).toBe(3);
+    expect(incremental.state.nextDabIndex).toBeGreaterThan(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(incremental.dabCapped).toBe(false);
+
+    const segmented = planStudioCausalDynamicBrushDepositSegmentsV3({
+      points: [0, 0, 17_000, 0],
+      pressures: [0.7, 0.7],
+      settings,
+    });
+
+    expect(segmented.ok).toBe(true);
+    if (!segmented.ok) throw new Error(segmented.reason);
+    expect(segmented.dabCount).toBeGreaterThan(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(segmented.segments).toHaveLength(2);
+    expect(segmented.segments[0]!.dabs).toHaveLength(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(segmented.segments[0]).toMatchObject({
+      segmentIndex: 0,
+      firstDabIndex: 0,
+      nextDabIndex: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(segmented.segments[1]).toMatchObject({
+      segmentIndex: 1,
+      firstDabIndex: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+      nextDabIndex: segmented.dabCount,
+    });
+    const flattened = segmented.segments.flatMap((segment) => segment.dabs);
+    expect(flattened).toHaveLength(segmented.dabCount);
+    expect(incremental.replaceInitialTap).toBe(true);
+    expect(incremental.dabs).toEqual(flattened);
+    expect(flattened.map((dab) => dab.index)).toEqual(
+      Array.from({ length: segmented.dabCount }, (_, index) => index),
+    );
+
+    const frozenV2 = planStudioCausalDynamicBrushDepositsV2({
+      points: [0, 0, 17_000, 0],
+      pressures: [0.7, 0.7],
+      settings: normalizeStudioBrushDynamicsSettings({
+        ...settings,
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      }),
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(frozenV2.ok).toBe(true);
+    if (!frozenV2.ok) throw new Error(frozenV2.reason);
+    expect(flattened.slice(0, frozenV2.dabs.length)).toEqual(frozenV2.dabs);
   });
 });

@@ -1,7 +1,7 @@
 import {
   normalizeStudioBrushDynamicsSettings,
   serializeStudioBrushDynamicsSettingsCanonical,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsMappingSettings,
@@ -1486,7 +1486,7 @@ export function materializeStudioBrushPackDynamics(
       : 0.72 + (index % 4) * 0.055;
   const settings: StudioBrushDynamicsSettings = {
     ...base,
-    depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+    depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
     seed,
     fallbackPressure: 0.48 + (index % 5) * 0.025,
     maxSpeed: 1.2 + (index % 7) * 0.14,

@@ -48,10 +48,11 @@ import {
 } from "./studio-brush-alias-profile";
 import {
   DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+  isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
@@ -65,6 +66,7 @@ import {
 } from "./studio-brush-material-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   type StudioDynamicBrushRenderStampGrid,
@@ -85,9 +87,10 @@ import {
   type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
 import {
-  studioDynamicBrushDabVariations,
+  studioDynamicBrushDabVariationsFromTransforms,
   studioBrushSymmetryTransforms,
   transformStudioBrushSymmetryPoint,
+  type StudioBrushSymmetryTransform,
 } from "./studio-brush-symmetry";
 import { rasterizeStudioBrushTextureMaskRgba } from "./studio-brush-textured-stamp";
 import {
@@ -116,6 +119,7 @@ import {
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   planStudioCausalDynamicBrushDepositsV2,
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import { planStudioCausalInk } from "./studio-causal-ink";
@@ -127,6 +131,7 @@ import { calculateStudioCrc32 } from "./studio-crc32";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   type StudioDynamicBrushCoverageMark,
+  type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
 import {
   fxBrushSeedFromKey,
@@ -181,6 +186,11 @@ import {
   resolveStudioRetainedMediaPressureProfileId,
 } from "./studio-retained-media-pressure";
 import { planStudioRetainedMediaRibbon } from "./studio-retained-media-ribbon";
+import {
+  studioSketchStyleOfElement,
+  type StudioSketchStyle,
+} from "./studio-rough-shape";
+import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
@@ -376,6 +386,7 @@ export interface SvgDrawElLike extends SvgElMeta {
   brushTip?: CalligraphyTipSettings;
   strokeStyle?: StrokeStyle;
   shapeParams?: ShapeParams;
+  sketch?: StudioSketchStyle;
   symmetry?: {
     type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
     centerX: number;
@@ -1206,6 +1217,65 @@ function resolveDrawFill(
   return el.fill ?? "none";
 }
 
+function svgSegmentedDynamicDabCount(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+): number {
+  return segments.reduce((count, segment) => count + segment.length, 0);
+}
+
+/**
+ * Retains immutable causal-v3 continuation segments. An accepted prefix shares every complete
+ * segment and allocates only the one boundary slice instead of flattening and slicing the full
+ * stroke before SVG planning.
+ */
+function svgSegmentedDynamicDabPrefix(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  maximumDabs: number,
+): readonly (readonly StudioDynamicBrushDab[])[] {
+  const accepted: Array<readonly StudioDynamicBrushDab[]> = [];
+  let remaining = Math.max(0, Math.floor(maximumDabs));
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    if (segment.length <= remaining) {
+      accepted.push(segment);
+      remaining -= segment.length;
+      continue;
+    }
+    accepted.push(segment.slice(0, remaining));
+    remaining = 0;
+  }
+  return accepted;
+}
+
+/**
+ * Produces variation-major segment sequences in the same affine order as getSymmetricPoints.
+ * Coverage consumes the nested arrays directly, preserving the historical mark/SVG byte order
+ * without a second whole-stroke dab array.
+ */
+function svgSegmentedDynamicDabVariations(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  transforms: readonly StudioBrushSymmetryTransform[],
+): readonly StudioDynamicBrushSegmentedDabVariation[] {
+  const variationSegments = transforms.map(
+    () => [] as Array<readonly StudioDynamicBrushDab[]>,
+  );
+  for (const segment of segments) {
+    const transformed =
+      studioDynamicBrushDabVariationsFromTransforms(segment, transforms);
+    for (
+      let variationIndex = 0;
+      variationIndex < transformed.length;
+      variationIndex += 1
+    ) {
+      variationSegments[variationIndex]!.push(transformed[variationIndex]!);
+    }
+  }
+  return variationSegments.map((transformedSegments) => ({
+    kind: "studio-dynamic-brush-segmented-dab-variation",
+    segments: transformedSegments,
+  }));
+}
+
 function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   if (el.mode === "eraser") {
     addSkip(ctx, el, "skipped", "지우개 자국은 벡터로 재현할 수 없어 제외했어요.");
@@ -1221,6 +1291,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const dashAttr = dash ? att("stroke-dasharray", dash.map(fmt).join(" ")) : "";
   const opacityAttr = opacity !== 1 ? att("opacity", opacity) : "";
   const strokeAttrs = `${att("stroke", stroke)}${att("stroke-width", strokeWidth)}`;
+  const sketchStyle = kind !== "freehand"
+    ? studioSketchStyleOfElement(el)
+    : null;
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushId = kind === "freehand" ? resolveStudioBrushDynamicsPresetId(el.brush) : null;
@@ -1248,8 +1321,11 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           settings: dynamics,
           seed,
         };
-        const causalDepositPlan = dynamics.depositPipeline
-          === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+        const usesCausalDepositPlan =
+          isStudioDynamicBrushCausalDepositPipeline(dynamics.depositPipeline);
+        const usesContinuation =
+          studioDynamicBrushDepositPipelineUsesContinuation(dynamics.depositPipeline);
+        const causalDepositPlan = usesCausalDepositPlan && !usesContinuation
           ? planStudioCausalDynamicBrushDepositsV2({
               points: el.points,
               pressures: el.pressures,
@@ -1262,47 +1338,93 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
               maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
             })
           : null;
-        if (causalDepositPlan && !causalDepositPlan.ok) {
+        const continuationPlan = usesContinuation
+          ? planStudioCausalDynamicBrushDepositSegmentsV3({
+              points: el.points,
+              pressures: el.pressures,
+              tangentialPressures: el.tangentialPressures,
+              speeds: el.speeds,
+              tiltXs: el.tiltXs,
+              tiltYs: el.tiltYs,
+              twists: el.twists,
+              settings: dynamics,
+            })
+          : null;
+        if (
+          (causalDepositPlan && !causalDepositPlan.ok)
+          || (continuationPlan && !continuationPlan.ok)
+        ) {
           dynamicPlanFailed = true;
           return null;
         }
-        const usesCausalDepositPlan = causalDepositPlan?.ok === true;
-        let baseDabs = usesCausalDepositPlan
-          ? [...causalDepositPlan.dabs]
-          : planStudioDynamicBrushDabs({
-              ...dabPlanInput,
-              maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
-            });
+        let continuationSegments:
+          | readonly (readonly StudioDynamicBrushDab[])[]
+          | null = continuationPlan?.ok
+            ? continuationPlan.segments.map((segment) => segment.dabs)
+            : null;
+        let baseDabs: readonly StudioDynamicBrushDab[] = continuationSegments
+          ? []
+          : causalDepositPlan?.ok
+            ? [...causalDepositPlan.dabs]
+            : planStudioDynamicBrushDabs({
+                ...dabPlanInput,
+                maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+              });
+        const baseDabCount = continuationSegments
+          ? svgSegmentedDynamicDabCount(continuationSegments)
+          : baseDabs.length;
         const markBudget = usesCausalDepositPlan
-          ? STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
+          ? usesContinuation
+            ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
+            : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
           : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
-          dabCount: baseDabs.length,
+          dabCount: baseDabCount,
           symmetryCount: variations.length,
           markBudget,
         });
         if (
           usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabs.length
+          && renderBudget.maxDabsPerVariation < baseDabCount
         ) {
           // Preserve the same accepted-prefix-v1 receipt used by the live and retained renderers.
           // Skipping the element here would turn a bounded pathological stroke into an empty SVG.
-          baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+          if (continuationSegments) {
+            continuationSegments = svgSegmentedDynamicDabPrefix(
+              continuationSegments,
+              renderBudget.maxDabsPerVariation,
+            );
+          } else {
+            baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+          }
         }
         if (
           !usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabs.length
+          && renderBudget.maxDabsPerVariation < baseDabCount
         ) {
           baseDabs = planStudioDynamicBrushDabs({
             ...dabPlanInput,
             maxDabs: renderBudget.maxDabsPerVariation,
           });
         }
-        const dabVariations = studioDynamicBrushDabVariations(
-          baseDabs,
-          el.symmetry,
-        );
+        const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
+        const ordinaryDabVariations =
+          studioDynamicBrushDabVariationsFromTransforms(
+            baseDabs,
+            symmetryTransforms,
+          );
+        const dabVariations = continuationSegments
+          ? null
+          : ordinaryDabVariations;
+        const coverageDabVariations = continuationSegments
+          ? svgSegmentedDynamicDabVariations(
+              continuationSegments,
+              symmetryTransforms,
+            )
+          : ordinaryDabVariations;
+        // Causal-v3 serializes exact coverage marks below; keeping this null prevents a hidden
+        // whole-stroke flatten merely to satisfy the legacy fallback parameter.
         let causalCoverageMarksByVariation:
           readonly (readonly StudioDynamicBrushCoverageMark[])[] | null = null;
         if (usesCausalDepositPlan) {
@@ -1315,7 +1437,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           };
           const completeCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
             ...sharedCoverageInput,
-            dabVariations,
+            dabVariations: coverageDabVariations,
           }).coveragePlan;
           if (!completeCoverage.ok) {
             dynamicPlanFailed = true;
@@ -1324,7 +1446,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
 
           let completeOffset = 0;
           const partitions: (readonly StudioDynamicBrushCoverageMark[])[] = [];
-          for (const dabs of dabVariations) {
+          for (const dabs of coverageDabVariations) {
             const variationCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
               ...sharedCoverageInput,
               dabVariations: [dabs],
@@ -1367,6 +1489,62 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const dynamicDabVariations = dynamicPlan?.dabVariations ?? null;
   const parts: string[] = [];
   for (const [variationIndex, points] of variations.entries()) {
+    if (kind !== "freehand" && sketchStyle?.enabled) {
+      const roughPlan = buildStudioRoughSvgParityPlan({
+        elementId: el.id,
+        variationIndex,
+        kind,
+        points,
+        strokeWidth,
+        hasFill: Boolean(el.fill),
+        shapeParams,
+        style: sketchStyle,
+      });
+      if (roughPlan.paths.length > 0) {
+        const roughPaths = roughPlan.paths.map((path) => {
+          const data = escapeXml(path.data);
+          if (path.role === "outline") {
+            return (
+              `<path d="${data}" data-rough-role="${path.role}" fill="none" stroke="${escapeXml(stroke)}"` +
+              ` stroke-width="${fmt(path.strokeWidth)}"${dashAttr}` +
+              ` stroke-linecap="${strokeStyle.lineCap}" stroke-linejoin="round"/>`
+            );
+          }
+          if (path.role === "fill-hatch") {
+            return (
+              `<path d="${data}" data-rough-role="${path.role}" fill="none" stroke="${escapeXml(el.fill ?? "none")}"` +
+              ` stroke-width="${fmt(path.strokeWidth)}"` +
+              ` stroke-linecap="round" stroke-linejoin="round"/>`
+            );
+          }
+          return (
+            `<path d="${data}" data-rough-role="${path.role}" fill="${escapeXml(
+              path.role === "outline-fill" ? stroke : (el.fill ?? "none"),
+            )}"/>`
+          );
+        });
+        const lineHeads = kind === "line"
+          ? lineArrowHeadGeoms(points, strokeStyle, strokeWidth).map((head) =>
+              head.kind === "dot"
+                ? (
+                    `<circle cx="${fmt(head.cx)}" cy="${fmt(head.cy)}"` +
+                    ` r="${fmt(head.r)}" fill="${escapeXml(stroke)}"/>`
+                  )
+                : (
+                    `<path d="${pointsToPathD(head.points, true)}"` +
+                    ` fill="${escapeXml(stroke)}" stroke-linejoin="round"/>`
+                  )
+            )
+          : [];
+        parts.push(
+          `<g data-studio-rough-shape="v1" data-rough-seed="${roughPlan.seed}"${opacityAttr}>` +
+            roughPaths.join("") +
+            lineHeads.join("") +
+          `</g>`,
+        );
+        continue;
+      }
+    }
     if (kind === "rect") {
       const box = drawBounds(points);
       const w = Math.max(0.1, box.width);
@@ -1684,8 +1862,9 @@ function serializeFreehand(
         ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
     if (
-      normalizedDynamics.depositPipeline
-        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      isStudioDynamicBrushCausalDepositPipeline(
+        normalizedDynamics.depositPipeline,
+      )
       && causalCoverageMarks
     ) {
       const exactCoverage = serializeStudioDynamicCoverageMarks(

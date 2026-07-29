@@ -28,6 +28,7 @@ import {
   hasValidStudioCrdtRootSchema,
   isBoundedStudioCrdtId,
   preservesStudioCrdtDeletionRoots,
+  snapshotStudioCrdtR8GrainReferences,
   snapshotStudioCrdtDeletionRoots,
   snapshotStudioWorkAssetReferences,
 } from "./studio-crdt-root-schema";
@@ -46,6 +47,7 @@ import type {
   StudioCrdtRepository,
   StudioCrdtUpdateRecord,
 } from "./studio-crdt.repository";
+import type { StudioBrushR8TextureGrainSource } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import type {
   StudioRasterAssetReference,
   StudioRasterOperation,
@@ -68,6 +70,12 @@ export interface StudioCrdtWorkAssetAdmission {
     actorUserId: string,
     workId: string,
     references: readonly StudioWorkAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void>;
+  assertR8GrainReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly Readonly<StudioBrushR8TextureGrainSource>[],
     transaction?: DrizzleStudioCrdtTransaction
   ): Promise<void>;
 }
@@ -836,6 +844,7 @@ export class StudioCrdtService implements OnModuleDestroy {
     const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(doc);
     const rasterRootsBefore = snapshotStudioCrdtRasterRoots(doc);
     const workAssetReferencesBefore = snapshotStudioWorkAssetReferences(doc);
+    const r8GrainReferencesBefore = snapshotStudioCrdtR8GrainReferences(doc);
     try {
       Y.applyUpdate(candidate, update, "server-validation-candidate");
       if (conflictsWithStudioCrdtRasterRootSnapshot(rasterRootsBefore, candidate)) {
@@ -869,6 +878,12 @@ export class StudioCrdtService implements OnModuleDestroy {
       }
       assertStudioCrdtAppendedRasterLayersWritable(rasterRootsBefore?.operations, probe);
       const workAssetReferences = snapshotStudioWorkAssetReferences(probe);
+      const r8GrainReferences = snapshotStudioCrdtR8GrainReferences(probe);
+      if (r8GrainReferences.hasConflictingAssetId) {
+        throw new StudioCrdtInvalidPayloadError(
+          "one Studio R8 grain asset identity cannot bind different content"
+        );
+      }
       for (const [id, elementType] of workAssetReferencesBefore.identities) {
         if (workAssetReferences.identities.get(id) !== elementType) {
           throw new StudioCrdtInvalidPayloadError(
@@ -883,12 +898,33 @@ export class StudioCrdtService implements OnModuleDestroy {
           );
         }
       }
+      for (const [strokeId, source] of r8GrainReferencesBefore.byStrokeId) {
+        const candidateSource = r8GrainReferences.byStrokeId.get(strokeId);
+        if (JSON.stringify(candidateSource) !== JSON.stringify(source)) {
+          throw new StudioCrdtInvalidPayloadError(
+            "update cannot replace or remove a durable Studio R8 grain identity"
+          );
+        }
+      }
       if (
         workAssetReferences.activeCount >
         STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT
       ) {
         throw new StudioCrdtInvalidPayloadError(
           "update exceeds the active Studio work-asset reference limit"
+        );
+      }
+      const durableWorkAssetIds = new Set([
+        ...[...workAssetReferences.admittedReferences.values()]
+          .map((reference) => reference.assetId),
+        ...r8GrainReferences.byAssetId.keys(),
+      ]);
+      if (
+        durableWorkAssetIds.size >
+        STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT
+      ) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update exceeds the combined Studio work-asset reference limit"
         );
       }
       if (Y.encodeStateAsUpdate(probe).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
@@ -929,6 +965,23 @@ export class StudioCrdtService implements OnModuleDestroy {
         } catch {
           throw new StudioCrdtInvalidPayloadError(
             "update references a missing or mismatched Studio work asset"
+          );
+        }
+      }
+      const appendedR8GrainReferences = [...r8GrainReferences.byAssetId]
+        .filter(([assetId]) => !r8GrainReferencesBefore.byAssetId.has(assetId))
+        .map(([, source]) => source);
+      if (appendedR8GrainReferences.length > 0) {
+        try {
+          await this.workAssetAdmission.assertR8GrainReferencesStored(
+            actorUserId,
+            workId,
+            appendedR8GrainReferences,
+            transaction
+          );
+        } catch {
+          throw new StudioCrdtInvalidPayloadError(
+            "update references a missing or mismatched Studio R8 grain asset"
           );
         }
       }

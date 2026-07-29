@@ -4,10 +4,14 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
 import {
   countStudioDynamicBrushMarksPerDab,
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
@@ -191,6 +195,136 @@ describe("studio dynamic brush render budget", () => {
       dabCapped: false,
       capped: false,
     });
+  });
+
+  it("keeps v2 capped at 65,536 while v3 admits deterministic continuation work", () => {
+    const base = {
+      tip: { shape: "round" as const, softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+    };
+    const requestedDabs = STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET + 769;
+    const v2 = planStudioDynamicBrushRenderBudget({
+      settings: normalizeStudioBrushDynamicsSettings({
+        ...base,
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      }),
+      dabCount: requestedDabs,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+    const v3 = planStudioDynamicBrushRenderBudget({
+      settings: normalizeStudioBrushDynamicsSettings({
+        ...base,
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      }),
+      dabCount: requestedDabs,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+
+    expect(v2).toMatchObject({
+      maxDabsPerVariation: STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
+      estimatedMarks: STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
+      estimatedUnbudgetedMarks: requestedDabs,
+      dabCapped: true,
+      acceptedPrefixReceipt: {
+        requestedDabsPerVariation: requestedDabs,
+        acceptedDabsPerVariation: STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
+        rejectedDabsPerVariation: 769,
+      },
+    });
+    expect(v3).toMatchObject({
+      maxDabsPerVariation: requestedDabs,
+      estimatedMarks: requestedDabs,
+      dabCapped: false,
+    });
+  });
+
+  it("reports v3 work rejected above the sixteen-segment ceiling without admitting it", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+    });
+    const rejectedDabs = 513;
+    const requestedDabs =
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET + rejectedDabs;
+    const plan = planStudioDynamicBrushRenderBudget({
+      settings,
+      dabCount: requestedDabs,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+
+    expect(plan).toMatchObject({
+      maxDabsPerVariation:
+        STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
+      estimatedMarks: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+      estimatedUnbudgetedMarks: requestedDabs,
+      dabCapped: true,
+      capped: true,
+      acceptedPrefixReceipt: {
+        requestedDabsPerVariation: requestedDabs,
+        acceptedDabsPerVariation:
+          STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
+        rejectedDabsPerVariation: rejectedDabs,
+        symmetryCount: 1,
+        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+        acceptedMarkBudget:
+          STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+      },
+    });
+  });
+
+  it("combines the v3 version ceiling with a tighter symmetry mark ceiling in one receipt", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+    });
+    const requestedDabs =
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET + 257;
+    const symmetryCount = 4;
+    const acceptedDabs = Math.floor(
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET / symmetryCount,
+    );
+    const plan = planStudioDynamicBrushRenderBudget({
+      settings,
+      dabCount: requestedDabs,
+      symmetryCount,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+
+    expect(plan).toMatchObject({
+      maxDabsPerVariation: acceptedDabs,
+      estimatedMarks:
+        acceptedDabs * symmetryCount,
+      estimatedUnbudgetedMarks:
+        requestedDabs * symmetryCount,
+      dabCapped: true,
+      acceptedPrefixReceipt: {
+        requestedDabsPerVariation: requestedDabs,
+        acceptedDabsPerVariation: acceptedDabs,
+        rejectedDabsPerVariation: requestedDabs - acceptedDabs,
+        marksPerDab: 1,
+        symmetryCount,
+        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+        acceptedMarkBudget:
+          acceptedDabs * symmetryCount,
+      },
+    });
+    expect(plan.maxDabsPerVariation).toBeLessThan(
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
+    );
   });
 
   it("preserves every ordinary solid-tip dab and the existing seven-sample quality", () => {

@@ -13,17 +13,19 @@
  */
 
 import {
+  isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   serializeStudioBrushDynamicsSettingsCanonical,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "./studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
@@ -39,15 +41,21 @@ import {
 } from "./studio-brush-symmetry";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
+  appendStudioCausalDynamicBrushDepositsV3,
   beginStudioCausalDynamicBrushDepositV2,
+  beginStudioCausalDynamicBrushDepositV3,
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
   type StudioCausalDynamicBrushDepositStateV2,
+  type StudioCausalDynamicBrushDepositStateV3,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
+  STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
   type StudioDynamicBrushCoverageMark,
+  type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
 import {
   acquireStudioLowLatencyCanvas2dContext,
@@ -156,8 +164,10 @@ interface DynamicStrokeSource {
 interface ActiveDynamicStroke {
   readonly style: DetachedDynamicStrokeStyle;
   readonly source: DynamicStrokeSource;
-  /** Present only for new authored causal-deposit-v2 snapshots. */
-  causalState?: StudioCausalDynamicBrushDepositStateV2;
+  /** Version matches the persisted causal-v2 or segmented causal-v3 pipeline exactly. */
+  causalState?:
+    | StudioCausalDynamicBrushDepositStateV2
+    | StudioCausalDynamicBrushDepositStateV3;
   consumedSourcePoints: number;
   previousSample: DynamicSourceSample;
   totalDistance: number;
@@ -165,6 +175,8 @@ interface ActiveDynamicStroke {
   nextDabIndex: number;
   lastSpacing: number;
   markCount: number;
+  /** Stroke-wide sum of immutable R8 alpha-map receipts across incremental suffix plans. */
+  r8AlphaMapBytes: number;
   acceptedCausalDabCount: number;
   plannedCausalDabCount: number;
   acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
@@ -178,10 +190,13 @@ interface SettledDynamicStroke {
 }
 
 interface ExactDynamicPlan {
-  readonly dabs: readonly StudioDynamicBrushDab[];
+  readonly dabCount: number;
+  readonly firstDab?: StudioDynamicBrushDab;
+  readonly lastSpacing: number;
   readonly marks: readonly StudioDynamicBrushCoverageMark[];
   readonly stampGrid: StudioDynamicBrushRenderStampGrid;
   readonly dabCapped: boolean;
+  readonly r8AlphaMapBytes: number;
   readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
 }
 
@@ -260,6 +275,76 @@ function detachedSource(source: DynamicStrokeSource): DynamicStrokeSource {
   };
 }
 
+function segmentedDabCount(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+): number {
+  return segments.reduce((count, segment) => count + segment.length, 0);
+}
+
+function firstSegmentedDab(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+): StudioDynamicBrushDab | undefined {
+  for (const segment of segments) {
+    if (segment[0]) return segment[0];
+  }
+  return undefined;
+}
+
+function lastSegmentedDab(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+): StudioDynamicBrushDab | undefined {
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const last = segments[index]?.at(-1);
+    if (last) return last;
+  }
+  return undefined;
+}
+
+function segmentedDabPrefix(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  maximumDabs: number,
+): readonly (readonly StudioDynamicBrushDab[])[] {
+  const accepted: Array<readonly StudioDynamicBrushDab[]> = [];
+  let remaining = Math.max(0, Math.floor(maximumDabs));
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    if (segment.length <= remaining) {
+      accepted.push(segment);
+      remaining -= segment.length;
+      continue;
+    }
+    accepted.push(segment.slice(0, remaining));
+    remaining = 0;
+  }
+  return accepted;
+}
+
+function segmentedDabVariations(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  transforms: readonly StudioBrushSymmetryTransform[],
+): readonly StudioDynamicBrushSegmentedDabVariation[] {
+  const variationSegments = transforms.map(
+    () => [] as Array<readonly StudioDynamicBrushDab[]>,
+  );
+  for (const segment of segments) {
+    const transformed = studioDynamicBrushDabVariationsFromTransforms(
+      segment,
+      transforms,
+    );
+    for (
+      let variationIndex = 0;
+      variationIndex < transformed.length;
+      variationIndex += 1
+    ) {
+      variationSegments[variationIndex]!.push(transformed[variationIndex]!);
+    }
+  }
+  return variationSegments.map((segmentsForVariation) => ({
+    kind: "studio-dynamic-brush-segmented-dab-variation",
+    segments: segmentsForVariation,
+  }));
+}
+
 function styleIdentityMatches(element: DrawEl, style: DetachedDynamicStrokeStyle): boolean {
   const dynamicsMatches = element.brushDynamics === style.sourceDynamics
     || serializeStudioBrushDynamicsSettingsCanonical(element.brushDynamics)
@@ -332,8 +417,9 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
 
 function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrushRenderStampGrid {
   if (
-    style.dynamics.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    isStudioDynamicBrushCausalDepositPipeline(
+      style.dynamics.depositPipeline,
+    )
   ) {
     // A causal stroke cannot lower its stamp lattice after marks have already been accepted:
     // doing so would require an O(N) clear/replay and would make the live prefix differ from the
@@ -348,6 +434,16 @@ function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrush
     symmetryCount: style.transforms.length,
     markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   }).stampGrid;
+}
+
+function causalMarkBudget(
+  dynamics: NormalizedStudioBrushDynamicsSettings,
+): number {
+  return studioDynamicBrushDepositPipelineUsesContinuation(
+    dynamics.depositPipeline,
+  )
+    ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
+    : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET;
 }
 
 function liveDynamicDevicePixelRatio(surface: StudioLiveInkSurface): number {
@@ -464,14 +560,19 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       twists: [],
     };
     appendSourceSample(source, first);
-    const causalBegin = style.dynamics.depositPipeline
-      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-      ? beginStudioCausalDynamicBrushDepositV2(
-          first,
-          style.dynamics,
-          STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    const causalBegin = !isStudioDynamicBrushCausalDepositPipeline(
+      style.dynamics.depositPipeline,
+    )
+      ? null
+      : studioDynamicBrushDepositPipelineUsesContinuation(
+          style.dynamics.depositPipeline,
         )
-      : null;
+        ? beginStudioCausalDynamicBrushDepositV3(first, style.dynamics)
+        : beginStudioCausalDynamicBrushDepositV2(
+            first,
+            style.dynamics,
+            STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+          );
     if (causalBegin && !causalBegin.ok) {
       return {
         status: "fallback",
@@ -481,12 +582,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       };
     }
     const exactInitial = causalBegin?.ok ? null : this.exactPlan(style, source);
-    if (!causalBegin?.ok && (!exactInitial || exactInitial.dabs.length !== 1)) {
+    if (!causalBegin?.ok && (!exactInitial || exactInitial.dabCount !== 1)) {
       return { status: "fallback", reason: "material-plan" };
     }
     const initialDab = causalBegin?.ok
       ? causalBegin.dab
-      : exactInitial!.dabs[0]!;
+      : exactInitial!.firstDab!;
     const initialSpacing = causalBegin?.ok
       ? causalBegin.state.lastSpacing
       : Math.max(0.25, initialDab.spacing);
@@ -501,6 +602,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       nextDabIndex: 1,
       lastSpacing: initialSpacing,
       markCount: 0,
+      r8AlphaMapBytes: 0,
       // `appendDabs([initialDab])` below is the single authority that consumes the first causal
       // slot. Pre-counting it here would make the global prefix planner treat every pointer-down
       // dab as already accepted and render an empty tap.
@@ -517,6 +619,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         return this.failActive("surface-render");
       }
       active.markCount = exactInitial.marks.length;
+      active.r8AlphaMapBytes = exactInitial.r8AlphaMapBytes;
       initialMarkCount = exactInitial.marks.length;
     } else {
       const rendered = this.appendDabs(active, [initialDab]);
@@ -582,6 +685,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.stampGrid = exact.stampGrid;
     if (!this.drawMarksToActive(exact.marks)) return this.failActive("surface-render");
     active.markCount = exact.marks.length;
+    active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
     if (!this.flattenActiveToSettled(active.style.opacity)) {
       return this.failActive("surface-render");
     }
@@ -591,7 +695,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     });
     const result = {
       status: "settled" as const,
-      dabCount: exact.dabs.length,
+      dabCount: exact.dabCount,
       markCount: exact.marks.length,
       ...(exact.acceptedPrefixReceipt
         ? { acceptedPrefixReceipt: exact.acceptedPrefixReceipt }
@@ -645,12 +749,14 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         appendedMarks: 0,
       };
     }
-    const markBudget = active.style.dynamics.depositPipeline
-      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-      ? STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
+    const markBudget = isStudioDynamicBrushCausalDepositPipeline(
+      active.style.dynamics.depositPipeline,
+    )
+      ? causalMarkBudget(active.style.dynamics)
       : STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET;
-    const causal = active.style.dynamics.depositPipeline
-      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
+    const causal = isStudioDynamicBrushCausalDepositPipeline(
+      active.style.dynamics.depositPipeline,
+    );
     const causalBudget = causal
       ? planStudioDynamicBrushRenderBudget({
           settings: active.style.dynamics,
@@ -710,6 +816,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       stroke: active.style.color,
       stampGrid: active.stampGrid,
       markBudget: remainingMarks,
+      r8AlphaMapByteBudget: Math.max(
+        0,
+        STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET
+          - active.r8AlphaMapBytes,
+      ),
     });
     if (!plan.ok) {
       return this.failActive(
@@ -727,6 +838,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       active.acceptedCausalDabCount += acceptedDabs;
     }
     active.markCount += plan.marks.length;
+    active.r8AlphaMapBytes +=
+      plan.r8TextureAlphaMapReceipt?.alphaMapBytes ?? 0;
     return {
       status: acceptedDabs > 0 ? "appended" : "noop",
       consumedSourcePoints: active.consumedSourcePoints,
@@ -761,11 +874,25 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       appendSourceSample(active.source, next);
       active.consumedSourcePoints = sourceIndex + 1;
     }
-    const planned = appendStudioCausalDynamicBrushDepositsV2(
-      causalState,
-      samples,
-      active.style.dynamics,
+    const usesContinuation = studioDynamicBrushDepositPipelineUsesContinuation(
+      active.style.dynamics.depositPipeline,
     );
+    if (
+      usesContinuation !== (
+        causalState.version === 3
+      )
+    ) return this.failActive("material-plan");
+    const planned = causalState.version === 3
+      ? appendStudioCausalDynamicBrushDepositsV3(
+          causalState,
+          samples,
+          active.style.dynamics,
+        )
+      : appendStudioCausalDynamicBrushDepositsV2(
+          causalState,
+          samples,
+          active.style.dynamics,
+        );
     if (!planned.ok) {
       return this.failActive(
         planned.reason === "dab-budget"
@@ -790,6 +917,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     if (planned.replaceInitialTap) {
       this.clearActiveRect();
       active.markCount = 0;
+      active.r8AlphaMapBytes = 0;
       active.acceptedCausalDabCount = 0;
       active.acceptedPrefixReceipt = undefined;
       const [replacement, ...suffix] = planned.dabs;
@@ -860,14 +988,18 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       return this.failActive("surface-render");
     }
     active.markCount = exact.marks.length;
-    active.nextDabIndex = exact.dabs.length;
-    active.lastSpacing = Math.max(0.25, exact.dabs.at(-1)?.spacing ?? active.lastSpacing);
+    active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
+    active.nextDabIndex = exact.dabCount;
+    active.lastSpacing = Math.max(
+      0.25,
+      exact.lastSpacing,
+    );
     active.distanceSinceLastDab = 0;
     active.transitionedFromTap = active.totalDistance > POINT_EPSILON;
     return {
       status: "appended",
       consumedSourcePoints: active.consumedSourcePoints,
-      appendedDabs: Math.max(0, exact.dabs.length - previousDabCount),
+      appendedDabs: Math.max(0, exact.dabCount - previousDabCount),
       appendedMarks: exact.marks.length,
     };
   }
@@ -877,10 +1009,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     source: DynamicStrokeSource,
   ): ExactDynamicPlan | null {
     if (
-      style.dynamics.depositPipeline
-      === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      isStudioDynamicBrushCausalDepositPipeline(
+        style.dynamics.depositPipeline,
+      )
     ) {
-      const causal = planStudioCausalDynamicBrushDepositsV2({
+      const causalInput = {
         points: source.points,
         pressures: source.pressures,
         tangentialPressures: source.tangentialPressures,
@@ -889,40 +1022,74 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         tiltYs: source.tiltYs,
         twists: source.twists,
         settings: style.dynamics,
-        maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-      });
+      };
+      const causal = studioDynamicBrushDepositPipelineUsesContinuation(
+        style.dynamics.depositPipeline,
+      )
+        ? planStudioCausalDynamicBrushDepositSegmentsV3(causalInput)
+        : planStudioCausalDynamicBrushDepositsV2({
+            ...causalInput,
+            maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+          });
       if (!causal.ok) return null;
+      const causalSegments = "segments" in causal
+        ? causal.segments.map((segment) => segment.dabs)
+        : null;
+      const causalDabs = "dabs" in causal ? causal.dabs : null;
+      const causalDabCount = causalSegments
+        ? segmentedDabCount(causalSegments)
+        : causalDabs!.length;
       const stampGrid = initialStampGrid(style);
       const renderBudget = planStudioDynamicBrushRenderBudget({
         settings: style.dynamics,
-        dabCount: causal.dabs.length,
+        dabCount: causalDabCount,
         symmetryCount: style.transforms.length,
-        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+        markBudget: causalMarkBudget(style.dynamics),
       });
-      const acceptedDabs = renderBudget.acceptedPrefixReceipt
-        ? causal.dabs.slice(
-            0,
-            renderBudget.acceptedPrefixReceipt.acceptedDabsPerVariation,
-          )
-        : causal.dabs;
+      const acceptedDabCount = renderBudget.acceptedPrefixReceipt
+        ? renderBudget.acceptedPrefixReceipt.acceptedDabsPerVariation
+        : causalDabCount;
+      const acceptedSegments = causalSegments
+        ? segmentedDabPrefix(causalSegments, acceptedDabCount)
+        : null;
+      const acceptedDabs = acceptedSegments
+        ? null
+        : causalDabs!.slice(0, acceptedDabCount);
+      const dabVariations = acceptedSegments
+        ? segmentedDabVariations(acceptedSegments, style.transforms)
+        : studioDynamicBrushDabVariationsFromTransforms(
+            acceptedDabs!,
+            style.transforms,
+          );
       const marks = planStudioDynamicBrushCoverageMarks({
-        dabVariations: studioDynamicBrushDabVariationsFromTransforms(
-          acceptedDabs,
-          style.transforms,
-        ),
+        dabVariations,
         strokeOrigins: style.strokeOrigins,
         dynamics: style.dynamics,
         dynamicSeed: style.seed,
         stroke: style.color,
         stampGrid,
-        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+        markBudget: causalMarkBudget(style.dynamics),
       });
       if (!marks.ok) return null;
+      const firstDab = acceptedSegments
+        ? firstSegmentedDab(acceptedSegments)
+        : acceptedDabs?.[0];
+      const lastDab = acceptedSegments
+        ? lastSegmentedDab(acceptedSegments)
+        : acceptedDabs?.at(-1);
       return {
-        dabs: acceptedDabs,
+        dabCount: acceptedDabCount,
+        ...(firstDab ? { firstDab } : {}),
+        lastSpacing: Math.max(0.25, lastDab?.spacing ?? 0.25),
         marks: marks.marks,
         stampGrid,
-        dabCapped: causal.dabCapped || renderBudget.dabCapped,
+        r8AlphaMapBytes:
+          marks.r8TextureAlphaMapReceipt?.alphaMapBytes ?? 0,
+        dabCapped: (
+          "continuationCapped" in causal
+            ? causal.continuationCapped
+            : causal.dabCapped
+        ) || renderBudget.dabCapped,
         ...(renderBudget.acceptedPrefixReceipt
           ? { acceptedPrefixReceipt: renderBudget.acceptedPrefixReceipt }
           : {}),
@@ -970,9 +1137,13 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     });
     if (!marks.ok) return null;
     return {
-      dabs,
+      dabCount: dabs.length,
+      ...(dabs[0] ? { firstDab: dabs[0] } : {}),
+      lastSpacing: Math.max(0.25, dabs.at(-1)?.spacing ?? 0.25),
       marks: marks.marks,
       stampGrid: renderBudget.stampGrid,
+      r8AlphaMapBytes:
+        marks.r8TextureAlphaMapReceipt?.alphaMapBytes ?? 0,
       dabCapped: renderBudget.dabCapped || dabs.length >= MAX_LEGACY_LIVE_DABS,
     };
   }
@@ -1045,7 +1216,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       return;
     }
     active.markCount = exact.marks.length;
-    active.acceptedCausalDabCount = exact.dabs.length;
+    active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
+    active.acceptedCausalDabCount = exact.dabCount;
     active.acceptedPrefixReceipt = exact.acceptedPrefixReceipt;
     active.stampGrid = exact.stampGrid;
     this.setActiveCanvasOpacity(active.style.opacity);

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
 import {
   planStudioDeferredStrokePostprocess,
@@ -62,10 +63,18 @@ describe("planStudioDeferredStrokePostprocess", () => {
     ["stamp walker", stroke({ stampPipeline: "causal-walker-v2" })],
     ["watercolor walker", stroke({ watercolorPipeline: "causal-walker-v2" })],
     [
-      "causal dynamic deposit",
+      "v2 causal dynamic deposit",
       stroke({
         brushDynamics: normalizeStudioBrushDynamicsSettings({
           depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        }),
+      }),
+    ],
+    [
+      "v3 segmented causal dynamic deposit",
+      stroke({
+        brushDynamics: normalizeStudioBrushDynamicsSettings({
+          depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
         }),
       }),
     ],

@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+} from "./studio-brush-dynamics";
+import {
   STUDIO_CRDT_APPEND_MAX_SAMPLES,
   STUDIO_CRDT_DELETION_ACKS_ROOT,
   STUDIO_CRDT_DELETION_OPS_ROOT,
@@ -16,12 +19,14 @@ import {
   type StudioCrdtChange,
   type StudioCrdtChangeSummary,
   type StudioCrdtDrawStrokePayload,
+  type StudioCrdtJsonObject,
   type StudioCrdtPageInput,
   type StudioCrdtProjectedChange,
   type StudioCrdtSceneElementInput,
   type StudioCrdtStrokeInput,
 } from "./studio-crdt-document";
 import {
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
@@ -50,6 +55,23 @@ function payload(
     points,
     pressures: Array.from({ length: count }, (_, index) => 0.4 + index * 0.1),
     ...overrides,
+  };
+}
+
+function r8GrainSource() {
+  return {
+    kind: "r8-texture-v1" as const,
+    asset: {
+      assetId: "paper.canvas-fine.v1",
+      encodedSha256: `sha256:${"a".repeat(64)}`,
+      decodedSha256: `sha256:${"b".repeat(64)}`,
+      byteLength: 2_048,
+      mediaType: "image/png" as const,
+      width: 32,
+      height: 32,
+      channel: "luminance" as const,
+      encoding: "r8-unorm" as const,
+    },
   };
 }
 
@@ -331,7 +353,7 @@ describe("StudioCrdtDocument", () => {
     document.destroy();
   });
 
-  it("reads v1/v2 strokes and accepts compatible layered-flow paint in v2 or v3", () => {
+  it("reads v1/v2/v3 strokes and accepts compatible layered-flow paint through v4", () => {
     const document = new StudioCrdtDocument();
     expect(document.addStroke(stroke("legacy-stroke", "page-a")).payload.version).toBe(1);
     const layered = payload([10, 20, 14, 20], {
@@ -347,6 +369,13 @@ describe("StudioCrdtDocument", () => {
     }).payload.extensions?.paintModel).toBe("layered-flow-v1");
     expect(document.addStroke({
       ...stroke("layered-stroke-v3-reader", "page-a"),
+      payload: {
+        ...layered,
+        version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
+      },
+    }).payload.extensions?.paintModel).toBe("layered-flow-v1");
+    expect(document.addStroke({
+      ...stroke("layered-stroke-v4-reader", "page-a"),
       payload: {
         ...layered,
         version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
@@ -376,7 +405,7 @@ describe("StudioCrdtDocument", () => {
   it("requires v3 and a complete known snapshot for renderer-significant material pressure", () => {
     const document = new StudioCrdtDocument();
     const versioned = payload([10, 20, 14, 24], {
-      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
       brush: "pencil-2b",
       extensions: {
         materialPressureModel:
@@ -389,7 +418,7 @@ describe("StudioCrdtDocument", () => {
       ...stroke("material-pressure-v3", "page-a"),
       payload: versioned,
     }).payload).toMatchObject({
-      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
       extensions: {
         materialPressureModel:
           STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
@@ -459,7 +488,7 @@ describe("StudioCrdtDocument", () => {
   it("requires v3 and a bounded value for dynamic-brush minimum diameter", () => {
     const document = new StudioCrdtDocument();
     const versioned = payload([10, 20, 14, 24], {
-      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
       brush: "dry-media",
       brushDynamics: { minimumDiameterRatio: 0.64 },
     });
@@ -490,6 +519,110 @@ describe("StudioCrdtDocument", () => {
         },
       })).toThrow("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다");
     }
+    document.destroy();
+  });
+
+  it("admits segmented causal deposits only in stroke payload v4", () => {
+    const document = new StudioCrdtDocument();
+    const versioned = payload([10, 20, 14, 24], {
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brush: "dry-media",
+      sampleSpacing: 0,
+      brushDynamics: {
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      },
+      extensions: { paintModel: "bounded-flow-v2" },
+    });
+
+    expect(document.addStroke({
+      ...stroke("segmented-causal-v4", "page-a"),
+      payload: versioned,
+    }).payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
+
+    for (const legacyVersion of [
+      1,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(`forged-segmented-causal-v${legacyVersion}`, "page-a"),
+        payload: { ...versioned, version: legacyVersion },
+      })).toThrow("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다");
+    }
+    document.destroy();
+  });
+
+  it("admits only canonical R8 grain references in stroke payload v4", () => {
+    const document = new StudioCrdtDocument();
+    const versioned = payload([10, 20, 14, 24], {
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brush: "dry-media",
+      brushDynamics: {
+        grain: { source: r8GrainSource() },
+      },
+    });
+
+    expect(document.addStroke({
+      ...stroke("r8-grain-v4", "page-a"),
+      payload: versioned,
+    }).payload.brushDynamics).toMatchObject({
+      grain: { source: r8GrainSource() },
+    });
+    for (const legacyVersion of [
+      1,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(`forged-r8-grain-v${legacyVersion}`, "page-a"),
+        payload: { ...versioned, version: legacyVersion },
+      })).toThrow("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다");
+    }
+    expect(() => document.addStroke({
+      ...stroke("malformed-r8-grain-v4", "page-a"),
+      payload: {
+        ...versioned,
+        brushDynamics: {
+          grain: {
+            source: {
+              ...r8GrainSource(),
+              asset: { ...r8GrainSource().asset, decodedSha256: "sha256:bad" },
+            },
+          },
+        },
+      },
+    })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    for (const invalidSource of [
+      { kind: "r8-texture-v2", asset: r8GrainSource().asset },
+      "r8-texture-v1",
+    ]) {
+      expect(() => document.addStroke({
+        ...stroke(`invalid-r8-source-${typeof invalidSource}`, "page-a"),
+        payload: {
+          ...versioned,
+          brushDynamics: {
+            grain: { source: invalidSource },
+          },
+        },
+      })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    }
+    let sourceAccessorReads = 0;
+    const accessorGrain: Record<string, unknown> = {};
+    Object.defineProperty(accessorGrain, "source", {
+      enumerable: true,
+      get() {
+        sourceAccessorReads += 1;
+        return r8GrainSource();
+      },
+    });
+    expect(() => document.addStroke({
+      ...stroke("accessor-r8-grain-v4", "page-a"),
+      payload: {
+        ...versioned,
+        brushDynamics: { grain: accessorGrain } as StudioCrdtJsonObject,
+      },
+    })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    expect(sourceAccessorReads).toBe(0);
     document.destroy();
   });
 

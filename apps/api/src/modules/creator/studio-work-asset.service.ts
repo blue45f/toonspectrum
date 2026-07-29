@@ -11,6 +11,10 @@ import {
 } from "@nestjs/common";
 
 import {
+  normalizeStudioBrushR8TextureGrainSource,
+  serializeStudioBrushR8TextureGrainSourceCanonical,
+} from "../../../../../lib/studio-brush-r8-grain-asset-contract";
+import {
   parseStudioWorkAssetDescriptor,
   isStudioWorkAssetAdmissionOptedIn,
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
@@ -38,6 +42,7 @@ import type {
   StudioWorkAssetContent,
   StudioWorkAssetRepository,
 } from "./studio-work-asset.repository";
+import type { StudioBrushR8TextureGrainSource } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import type {
   StudioWorkAssetDescriptor,
   StudioWorkAssetManifest,
@@ -604,6 +609,88 @@ export class StudioWorkAssetService {
       const stored = storedById.get(reference.assetId);
       if (!stored || stored.elementType !== reference.elementType) {
         throw new BadRequestException("저장되지 않았거나 타입이 다른 작품 에셋 참조가 있습니다.");
+      }
+    }
+  }
+
+  /**
+   * Stronger durable admission for renderer-significant R8 paper grain. The generic work-asset
+   * identity check is insufficient because a canonical stroke also binds the encoded PNG hash,
+   * exact byte length and intrinsic dimensions. Decoded-R8 hashing remains a client/worker concern
+   * after decoding; this boundary proves that every collaborator will download the same PNG.
+   */
+  async assertR8GrainReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly Readonly<StudioBrushR8TextureGrainSource>[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
+    if (references.length > 0 && !isStudioWorkAssetAdmissionOptedIn(
+      process.env.STUDIO_WORK_ASSET_ADMISSION
+    )) {
+      throw new ForbiddenException(
+        "협업 R8 브러시 에셋 참조 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다."
+      );
+    }
+    if (references.length > STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK) {
+      throw new BadRequestException("한 작품에서 활성화할 수 있는 R8 브러시 에셋이 너무 많습니다.");
+    }
+
+    const expectedById = new Map<
+      string,
+      Readonly<StudioBrushR8TextureGrainSource>
+    >();
+    try {
+      for (const candidate of references) {
+        const source = normalizeStudioBrushR8TextureGrainSource(candidate);
+        if (!source) throw new Error("R8 브러시 에셋 참조가 올바르지 않습니다.");
+        const existing = expectedById.get(source.asset.assetId);
+        if (
+          existing
+          && serializeStudioBrushR8TextureGrainSourceCanonical(existing)
+            !== serializeStudioBrushR8TextureGrainSourceCanonical(source)
+        ) {
+          throw new Error("같은 R8 브러시 에셋 ID가 서로 다른 콘텐츠를 가리킵니다.");
+        }
+        expectedById.set(source.asset.assetId, source);
+      }
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "R8 브러시 에셋 참조가 올바르지 않습니다."
+      );
+    }
+    if (expectedById.size === 0) return;
+
+    const assetIds = [...expectedById.keys()];
+    const manifests = await this.run(() => transaction
+      ? this.repository.getManifestsInTransaction(
+          transaction,
+          actorUserId,
+          workId,
+          assetIds
+        )
+      : this.repository.getManifests(actorUserId, workId, assetIds));
+    const storedById = new Map(manifests.map((value) => {
+      const stored = StudioWorkAssetManifestSchema.parse(value);
+      return [stored.assetId, stored] as const;
+    }));
+
+    for (const source of expectedById.values()) {
+      const expected = source.asset;
+      const stored = storedById.get(expected.assetId);
+      if (
+        !stored
+        || stored.elementType !== "image"
+        || stored.mimeType !== expected.mediaType
+        || stored.byteSize !== expected.byteLength
+        || stored.sha256 !== expected.encodedSha256.slice("sha256:".length)
+        || !stored.intrinsicImage
+        || stored.intrinsicImage.width !== expected.width
+        || stored.intrinsicImage.height !== expected.height
+      ) {
+        throw new BadRequestException(
+          "저장되지 않았거나 콘텐츠가 다른 R8 브러시 에셋 참조가 있습니다."
+        );
       }
     }
   }

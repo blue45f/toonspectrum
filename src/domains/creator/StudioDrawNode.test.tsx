@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
@@ -17,6 +19,7 @@ import {
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
@@ -278,6 +281,38 @@ function drawEl(overrides: Partial<DrawEl> = {}): DrawEl {
     strokeWidth: 10,
     ...overrides,
   };
+}
+
+function segmentedCausalTestDynamics() {
+  return normalizeStudioBrushDynamicsSettings({
+    ...studioBrushDynamicsPresetSettings("ink-particle"),
+    depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+    width: { base: 2, mappings: [] },
+    opacity: { base: 1, mappings: [] },
+    flow: { base: 1, mappings: [] },
+    tip: { shape: "round", softness: 0 },
+    grain: { amount: 0 },
+    tipLayers: [],
+    dualBrush: { enabled: false },
+    taper: { enabled: false },
+    spacingRatio: null,
+    spacing: { base: 0.25, mappings: [] },
+    scatterRatio: null,
+    scatter: { base: 0, mappings: [] },
+    roundness: { base: 1, mappings: [] },
+  });
+}
+
+/**
+ * 148 alternating 112px legs produce 66,305 causal stations at 0.25px spacing. The path and its
+ * four radial copies stay inside one logical tile while crossing both the historical 65,536-dab
+ * document ceiling and the 262,144 tile-reference ceiling.
+ */
+function segmentedCausalLongRoute(): number[] {
+  return Array.from({ length: 149 }, (_, index) => [
+    index % 2 === 0 ? 8 : 120,
+    64,
+  ]).flat();
 }
 
 function pattern(overrides: Partial<StudioPatternSpec> = {}): StudioPatternSpec {
@@ -1624,6 +1659,143 @@ describe("StudioDrawNode orchestration", () => {
     expect(svgMarks.at(-1)!.x).toBeCloseTo(canvasEndX!, 3);
     expect(svgMarks.at(-1)!.y).toBeCloseTo(canvasEndY!, 3);
   });
+
+  it("retains one v3 DrawEl beyond 65,536 dabs with an exact v2 prefix and one final opacity", () => {
+    const points = segmentedCausalLongRoute();
+    const pointCount = points.length / 2;
+    const brushDynamics = segmentedCausalTestDynamics();
+    const v2Dynamics = normalizeStudioBrushDynamicsSettings({
+      ...brushDynamics,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+    });
+    const pressures = Array.from({ length: pointCount }, () => 0.72);
+    const v2 = planStudioCausalDynamicBrushDepositsV2({
+      points,
+      pressures,
+      settings: v2Dynamics,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    const segmented = planStudioCausalDynamicBrushDepositSegmentsV3({
+      points,
+      pressures,
+      settings: brushDynamics,
+    });
+
+    expect(v2.ok).toBe(true);
+    expect(segmented.ok).toBe(true);
+    if (!v2.ok || !segmented.ok) return;
+    expect(v2).toMatchObject({
+      dabCapped: true,
+      sourcePointCount: pointCount,
+    });
+    expect(v2.dabs).toHaveLength(STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS);
+    expect(segmented).toMatchObject({
+      continuationCapped: false,
+      sourcePointCount: pointCount,
+    });
+    expect(segmented.dabCount).toBeGreaterThan(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(segmented.segments).toHaveLength(2);
+    expect(segmented.segments[0]).toMatchObject({
+      segmentIndex: 0,
+      firstDabIndex: 0,
+      nextDabIndex: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(segmented.segments[0]!.dabs).toEqual(v2.dabs);
+    expect(segmented.segments[1]).toMatchObject({
+      segmentIndex: 1,
+      firstDabIndex: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+      nextDabIndex: segmented.dabCount,
+    });
+    expect(segmented.segments[1]!.dabs[0]!.index).toBe(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(segmented.segments[1]!.dabs.at(-1)!.index).toBe(
+      segmented.dabCount - 1,
+    );
+
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: brushDynamics,
+      dabCount: segmented.dabCount,
+      symmetryCount: 4,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+    expect(budget).toMatchObject({
+      maxDabsPerVariation: segmented.dabCount,
+      estimatedMarks: segmented.dabCount * 4,
+      dabCapped: false,
+    });
+
+    let depositedMarks = 0;
+    class CountingCoverageSurface {
+      width: number;
+      height: number;
+      private readonly context = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over" as GlobalCompositeOperation,
+        fillStyle: "",
+        save: () => undefined,
+        restore: () => undefined,
+        setTransform: () => undefined,
+        clearRect: () => undefined,
+        translate: () => undefined,
+        rotate: () => undefined,
+        scale: () => undefined,
+        beginPath: () => undefined,
+        ellipse: () => undefined,
+        fill: () => {
+          depositedMarks += 1;
+        },
+      };
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext(): typeof this.context {
+        return this.context;
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", CountingCoverageSurface);
+    const element = drawEl({
+      id: "causal-v3-segmented-retained",
+      kind: "freehand",
+      brush: "ink-particle",
+      mode: "pen",
+      points,
+      pressures,
+      stroke: "#3257d6",
+      strokeWidth: 2,
+      opacity: 0.37,
+      sampleSpacing: 1,
+      paintModel: "bounded-flow-v2",
+      brushDynamics,
+      symmetry: {
+        type: "radial",
+        centerX: 64,
+        centerY: 64,
+        radialCount: 4,
+      },
+    });
+
+    render(<StudioDrawNode el={element} />);
+    expect(captured("Group")[0]?.props).toMatchObject({
+      listening: false,
+      studioElementId: element.id,
+    });
+    expect(captured("Shape")).toHaveLength(1);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    expect(depositedMarks).toBe(segmented.dabCount * 4);
+    expect(context.arcs).toHaveLength(0);
+    expect(context.drawImages.length).toBeGreaterThan(0);
+    expect(context.drawImages.every(({ alpha }) => alpha === element.opacity))
+      .toBe(true);
+  }, 30_000);
 
   it("retains the bounded causal deposit prefix when the source exceeds the dab ceiling", () => {
     const brushDynamics = normalizeStudioBrushDynamicsSettings({

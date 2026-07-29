@@ -8,9 +8,31 @@ import {
   resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
   resolveStudioBrushDabColor,
   resolveStudioBrushGrainAlphaMultiplier,
+  serializeStudioBrushGrainSettingsCanonical,
   studioBrushColorDynamicsIsActive,
   studioBrushGrainIsActive,
+  studioBrushGrainUsesR8Texture,
 } from "./studio-brush-material-dynamics";
+
+const R8_ENCODED_HASH = `sha256:${"a".repeat(64)}`;
+const R8_DECODED_HASH = `sha256:${"b".repeat(64)}`;
+
+function r8Source() {
+  return {
+    kind: "r8-texture-v1",
+    asset: {
+      assetId: "paper.canvas-fine.v1",
+      encodedSha256: R8_ENCODED_HASH,
+      decodedSha256: R8_DECODED_HASH,
+      byteLength: 2_048,
+      mediaType: "image/png",
+      width: 32,
+      height: 32,
+      channel: "luminance",
+      encoding: "r8-unorm",
+    },
+  };
+}
 
 describe("studio brush material dynamics", () => {
   it("normalizes corrupt colour/grain snapshots into finite bounded contracts", () => {
@@ -111,6 +133,117 @@ describe("studio brush material dynamics", () => {
       y: 20,
       strokeSeed: 4,
     }, { amount: 0 })).toBe(1);
+  });
+
+  it("keeps procedural grain canonical bytes unchanged when the source is omitted or null", () => {
+    const legacy = {
+      space: "stroke-fixed",
+      amount: 0.375,
+      scale: 6.25,
+      contrast: 0.5,
+      seed: 73,
+    };
+    const expected = "{\"space\":\"stroke-fixed\",\"amount\":0.375,\"scale\":6.25,\"contrast\":0.5,\"seed\":73}";
+    expect(serializeStudioBrushGrainSettingsCanonical(legacy)).toBe(expected);
+    expect(serializeStudioBrushGrainSettingsCanonical({ ...legacy, source: null })).toBe(expected);
+    expect(normalizeStudioBrushGrainSettings(legacy)).not.toHaveProperty("source");
+  });
+
+  it("retains a strictly normalized R8 source in deterministic canonical grain JSON", () => {
+    const normalized = normalizeStudioBrushGrainSettings({
+      space: "canvas-fixed",
+      amount: 0.72,
+      scale: 128,
+      contrast: 0.61,
+      seed: 99,
+      source: r8Source(),
+    });
+    expect(normalized).toEqual({
+      space: "canvas-fixed",
+      amount: 0.72,
+      scale: 128,
+      contrast: 0.61,
+      seed: 99,
+      source: r8Source(),
+    });
+    expect(studioBrushGrainUsesR8Texture(normalized)).toBe(true);
+    expect(studioBrushGrainIsActive(normalized)).toBe(true);
+    expect(serializeStudioBrushGrainSettingsCanonical(normalized)).toBe(
+      `{"space":"canvas-fixed","amount":0.72,"scale":128,"contrast":0.61,"seed":99,"source":{"kind":"r8-texture-v1","asset":{"assetId":"paper.canvas-fine.v1","encodedSha256":"${R8_ENCODED_HASH}","decodedSha256":"${R8_DECODED_HASH}","byteLength":2048,"mediaType":"image/png","width":32,"height":32,"channel":"luminance","encoding":"r8-unorm"}}}`,
+    );
+  });
+
+  it("fails malformed or unknown R8 sources closed instead of substituting procedural noise", () => {
+    const poisoned = normalizeStudioBrushGrainSettings({
+      space: "stroke-fixed",
+      amount: 0.9,
+      scale: 4,
+      contrast: 0.8,
+      seed: 17,
+      source: {
+        ...r8Source(),
+        asset: { ...r8Source().asset, bytes: new Uint8Array([1, 2, 3]) },
+      },
+    });
+    expect(poisoned).toEqual({
+      space: "stroke-fixed",
+      amount: 0,
+      scale: 4,
+      contrast: 0.8,
+      seed: 17,
+    });
+    expect(studioBrushGrainIsActive(poisoned)).toBe(false);
+    expect(studioBrushGrainUsesR8Texture(poisoned)).toBe(false);
+    expect(normalizeStudioBrushGrainSettings({
+      amount: 1,
+      source: { kind: "r8-texture-v2", asset: r8Source().asset },
+    }).amount).toBe(0);
+  });
+
+  it("does not run a source accessor and disables that grain", () => {
+    let reads = 0;
+    const candidate: Record<string, unknown> = {
+      space: "canvas-fixed",
+      amount: 0.75,
+      scale: 8,
+      contrast: 0.4,
+      seed: 3,
+    };
+    Object.defineProperty(candidate, "source", {
+      enumerable: true,
+      get() {
+        reads += 1;
+        throw new Error("must not run");
+      },
+    });
+    expect(normalizeStudioBrushGrainSettings(candidate).amount).toBe(0);
+    expect(reads).toBe(0);
+  });
+
+  it("uses an explicit identity fallback when a procedural-only sampler receives R8 grain", () => {
+    const settings = normalizeStudioBrushGrainSettings({
+      amount: 0.8,
+      source: r8Source(),
+    });
+    expect(resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+      27,
+      31,
+      4,
+      9,
+      19,
+      settings,
+    )).toBe(1);
+    expect(resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+      27,
+      31,
+      12,
+      6,
+      0.4,
+      4,
+      9,
+      19,
+      settings,
+    )).toBe(1);
   });
 
   it("keeps the allocation-free grain renderer path exactly equal to the object API", () => {

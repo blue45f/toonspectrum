@@ -73,10 +73,10 @@ export const StudioLiveLockRequestIdSchema = z.uuid();
 export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 
-// v5 is the first room protocol that accepts stroke payload v3 material-pressure semantics.
-// Rejecting v1-v4 prevents stale tabs from sharing a Yjs room whose stroke schema they cannot
-// interpret safely. The base64-v4 label remains the name of the unchanged legacy wire format.
-export const STUDIO_CRDT_PROTOCOL_VERSION = 5 as const;
+// v6 is the first room protocol that accepts stroke payload v4 segmented causal continuation.
+// Rejecting v1-v5 prevents stale tabs from sharing a Yjs room whose dynamic strokes they would
+// silently truncate. The base64-v4 label remains the name of the unchanged legacy wire format.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 6 as const;
 export const STUDIO_CRDT_BINARY_WIRE_VERSION = 1 as const;
 export const STUDIO_CRDT_BINARY_WIRE_FORMAT = "binary-v1" as const;
 export const STUDIO_CRDT_LEGACY_WIRE_FORMAT = "base64-v4" as const;

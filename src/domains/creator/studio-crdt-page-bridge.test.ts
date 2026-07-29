@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { parseStudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  normalizeStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
 import {
   StudioCrdtDocument,
   type StudioCrdtPageRecord,
@@ -25,6 +28,7 @@ import {
 } from "./studio-crdt-page-bridge";
 import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
@@ -56,6 +60,26 @@ function record(
       strokeWidth: 7,
     },
     ...overrides,
+  };
+}
+
+const R8_ENCODED_HASH = `sha256:${"a".repeat(64)}`;
+const R8_DECODED_HASH = `sha256:${"b".repeat(64)}`;
+
+function r8GrainSource() {
+  return {
+    kind: "r8-texture-v1" as const,
+    asset: {
+      assetId: "paper.canvas-fine.v1",
+      encodedSha256: R8_ENCODED_HASH,
+      decodedSha256: R8_DECODED_HASH,
+      byteLength: 2_048,
+      mediaType: "image/png" as const,
+      width: 32,
+      height: 32,
+      channel: "luminance" as const,
+      encoding: "r8-unorm" as const,
+    },
   };
 }
 
@@ -137,7 +161,7 @@ describe("phase-two brush CRDT bridge", () => {
       orderIndex: 0,
     });
 
-    expect(input.payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
+    expect(input.payload.version).toBe(STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION);
     expect(input.payload.brushDynamics).toEqual(JSON.parse(JSON.stringify(brushDynamics)));
     expect(normalizeStudioBrushDynamicsSettings(restored.brushDynamics)).toEqual(brushDynamics);
     expect(restored.brushDynamics).toMatchObject({ minimumDiameterRatio: 0.68 });
@@ -409,7 +433,7 @@ describe("studio CRDT page bridge", () => {
       id: `${element.id}-v3`,
       payload: {
         ...encoded.payload,
-        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
       },
       orderIndex: 1,
       status: "finalized",
@@ -469,6 +493,166 @@ describe("studio CRDT page bridge", () => {
     })).toThrow(/페인트 모델과 브러시 합성 모드가 호환되지/u);
   });
 
+  it("writes segmented causal-deposit dynamics only as payload v4", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      tip: { shape: "grain" },
+      grain: { amount: 0.55, scale: 6 },
+      taper: { enabled: false },
+      flow: { base: 0.42, mappings: [] },
+    });
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-segmented-dry-media",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 12, 8],
+      pressures: [0.5, 0.8],
+      paintModel: "bounded-flow-v2",
+      stroke: "#285080",
+      strokeWidth: 24,
+      opacity: 0.55,
+      brush: "dry-media",
+      brushDynamics,
+      sampleSpacing: 0.25,
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload).toMatchObject({
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brushDynamics: {
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      },
+      extensions: { paintModel: "bounded-flow-v2" },
+    });
+    expect(studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    })).toMatchObject({
+      brushDynamics: {
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      },
+      paintModel: "bounded-flow-v2",
+    });
+
+    for (const legacyVersion of [
+      STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => studioCrdtStrokeToDrawElement({
+        ...record(`${element.id}-v${legacyVersion}`, "page-a", 0),
+        ...encoded,
+        id: `${element.id}-v${legacyVersion}`,
+        payload: { ...encoded.payload, version: legacyVersion },
+        orderIndex: 0,
+        status: "finalized",
+        deleted: false,
+      })).toThrow("분할 연속 브러시 파이프라인과 페이로드 버전이 호환되지 않습니다");
+    }
+  });
+
+  it("writes strict content-addressed R8 grain only as payload v4", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      grain: {
+        amount: 0.7,
+        scale: 64,
+        source: r8GrainSource(),
+      },
+    });
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-r8-paper-grain",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 12, 8],
+      pressures: [0.5, 0.8],
+      stroke: "#285080",
+      strokeWidth: 24,
+      brush: "dry-media",
+      brushDynamics,
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload).toMatchObject({
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brushDynamics: {
+        grain: { source: r8GrainSource() },
+      },
+    });
+    expect(studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    })).toMatchObject({
+      brushDynamics: {
+        grain: { source: r8GrainSource() },
+      },
+    });
+
+    for (const legacyVersion of [
+      STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => studioCrdtStrokeToDrawElement({
+        ...record(`${element.id}-v${legacyVersion}`, "page-a", 0),
+        ...encoded,
+        id: `${element.id}-v${legacyVersion}`,
+        payload: { ...encoded.payload, version: legacyVersion },
+        orderIndex: 0,
+        status: "finalized",
+        deleted: false,
+      })).toThrow("R8 브러시 그레인과 페이로드 버전이 호환되지 않습니다");
+    }
+
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      id: "stroke-malformed-r8-paper-grain",
+      brushDynamics: {
+        grain: {
+          amount: 0.7,
+          source: {
+            ...r8GrainSource(),
+            asset: { ...r8GrainSource().asset, decodedSha256: "sha256:bad" },
+          },
+        },
+      },
+    })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    for (const invalidSource of [
+      { kind: "r8-texture-v2", asset: r8GrainSource().asset },
+      "r8-texture-v1",
+    ]) {
+      expect(() => studioDrawElementToCrdtStroke("page-a", {
+        ...element,
+        id: `stroke-invalid-r8-source-${typeof invalidSource}`,
+        brushDynamics: {
+          grain: { amount: 0.7, source: invalidSource },
+        },
+      })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    }
+    let sourceAccessorReads = 0;
+    const accessorGrain: Record<string, unknown> = { amount: 0.7 };
+    Object.defineProperty(accessorGrain, "source", {
+      enumerable: true,
+      get() {
+        sourceAccessorReads += 1;
+        return r8GrainSource();
+      },
+    });
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      id: "stroke-r8-source-accessor",
+      brushDynamics: { grain: accessorGrain },
+    })).toThrow("R8 브러시 그레인 자산 참조가 올바르지 않습니다");
+    expect(sourceAccessorReads).toBe(0);
+  });
+
   it("round-trips the causal watercolor pipeline as an explicit CRDT extension", () => {
     const element: StudioCrdtCompatibleDrawElement = {
       id: "watercolor-v2",
@@ -519,7 +703,7 @@ describe("studio CRDT page bridge", () => {
       materialMinimumDiameterRatio: 0.73,
     };
     const encoded = studioDrawElementToCrdtStroke("page-a", element);
-    expect(encoded.payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
+    expect(encoded.payload.version).toBe(STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION);
     expect(encoded.payload.extensions?.materialPressureModel).toBe(
       STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
     );
@@ -539,7 +723,7 @@ describe("studio CRDT page bridge", () => {
     expect(() => studioCrdtStrokeToDrawElement(record("future-fx", "page-a", 0, {
       payload: {
         ...record("future-fx", "page-a", 0).payload,
-        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
         brush: "neon",
         extensions: {
           materialPressureModel: "canonical-material-v99",
@@ -598,7 +782,7 @@ describe("studio CRDT page bridge", () => {
       ...record("forged-minimum", "page-a", 0),
       payload: {
         ...record("forged-minimum", "page-a", 0).payload,
-        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
         brush: "neon",
         extensions: {
           materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,

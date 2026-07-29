@@ -252,6 +252,9 @@ const allowStoredWorkAssetReferences: StudioCrdtWorkAssetAdmission = {
   async assertReferencesStored() {
     // Unit tests outside work-asset storage admission exercise the CRDT contract in isolation.
   },
+  async assertR8GrainReferencesStored() {
+    // Unit tests outside R8 storage admission exercise the CRDT contract in isolation.
+  },
 };
 
 function service(
@@ -554,6 +557,10 @@ class ExactWorkAssetAdmission implements StudioCrdtWorkAssetAdmission {
         throw new Error("missing or mismatched work asset");
       }
     }
+  }
+
+  async assertR8GrainReferencesStored(): Promise<void> {
+    // Exact R8 admission has its own focused fixture; generic work-asset tests do not append it.
   }
 }
 
@@ -2466,7 +2473,7 @@ describe("StudioCrdtService", () => {
           brushDynamics: paintModel === "bounded-flow-v2" ? {} : undefined,
         };
         const expected = hasValidBrowserStrokePaintContract(browserContract);
-        for (const payloadVersion of [2, 3]) {
+        for (const payloadVersion of [2, 3, 4]) {
           expect(
             hasValidStudioCrdtStrokePaintContract({
               payloadVersion,
@@ -2527,8 +2534,8 @@ describe("StudioCrdtService", () => {
     }
   });
 
-  it("admits v2/v3 layered-flow strokes and rejects incompatible paint semantics", () => {
-    for (const payloadVersion of [2, 3]) {
+  it("admits v2/v3/v4 layered-flow strokes and rejects incompatible paint semantics", () => {
+    for (const payloadVersion of [2, 3, 4]) {
       const valid = createStrokeDocument();
       const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
       validStroke.set("payloadVersion", payloadVersion);
@@ -2581,22 +2588,22 @@ describe("StudioCrdtService", () => {
     missingCausalGeometry.destroy();
   });
 
-  it("admits causal bounded-flow dynamic paint in v2/v3 and rejects partial contracts", () => {
-    const createBoundedFlowDocument = (payloadVersion: 2 | 3): Y.Doc => {
+  it("admits causal bounded-flow dynamic paint in v2/v3/v4 and rejects partial contracts", () => {
+    const createBoundedFlowDocument = (payloadVersion: 2 | 3 | 4): Y.Doc => {
       const document = createStrokeDocument();
       const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
       stroke.set("payloadVersion", payloadVersion);
       stroke.set("opacity", 0.6);
       stroke.set("brush", "dry-media");
       stroke.set("sampleSpacing", 0);
-      stroke.set("brushDynamics", payloadVersion === 3
+      stroke.set("brushDynamics", payloadVersion >= 3
         ? { pressureSize: true, minimumDiameterRatio: 0.18 }
         : { pressureSize: true });
       stroke.set("extensions", { paintModel: "bounded-flow-v2" });
       return document;
     };
 
-    for (const payloadVersion of [2, 3] as const) {
+    for (const payloadVersion of [2, 3, 4] as const) {
       const valid = createBoundedFlowDocument(payloadVersion);
       expect(
         hasValidStudioCrdtRootSchema(valid),
@@ -2670,6 +2677,263 @@ describe("StudioCrdtService", () => {
       expect(hasValidStudioCrdtRootSchema(document), label).toBe(false);
       document.destroy();
     }
+  });
+
+  it("persists segmented causal deposits only in stroke payload v4", async () => {
+    const createSegmentedDocument = (payloadVersion: number): Y.Doc => {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", payloadVersion);
+      stroke.set("brush", "dry-media");
+      stroke.set("sampleSpacing", 0);
+      stroke.set("brushDynamics", {
+        depositPipeline: "causal-deposit-v3-segmented",
+      });
+      stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      return document;
+    };
+
+    for (const legacyVersion of [1, 2, 3]) {
+      const legacy = createSegmentedDocument(legacyVersion);
+      expect(
+        hasValidStudioCrdtRootSchema(legacy),
+        `segmented causal payload v${legacyVersion}`,
+      ).toBe(false);
+      legacy.destroy();
+    }
+
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createSegmentedDocument(4);
+    expect(hasValidStudioCrdtRootSchema(source)).toBe(true);
+    await expect(current.applyUpdate({
+      workId: "work-segmented-causal-v4",
+      updateId: "00000000-0000-4000-8000-000000000719",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-segmented-causal-v4"));
+    const restored = hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    expect(restored.get("payloadVersion")).toBe(4);
+    expect(restored.get("brushDynamics")).toEqual({
+      depositPipeline: "causal-deposit-v3-segmented",
+    });
+
+    const poison = createSegmentedDocument(3);
+    await expect(current.applyUpdate({
+      workId: "work-segmented-causal-v3-poison",
+      updateId: "00000000-0000-4000-8000-000000000720",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(poison)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-segmented-causal-v3-poison") ?? []).toEqual([]);
+
+    source.destroy();
+    hydrated.destroy();
+    poison.destroy();
+  });
+
+  it("persists strict content-addressed R8 grain only in stroke payload v4", async () => {
+    const r8Source = {
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: "paper.canvas-fine.v1",
+        encodedSha256: `sha256:${"a".repeat(64)}`,
+        decodedSha256: `sha256:${"b".repeat(64)}`,
+        byteLength: 2_048,
+        mediaType: "image/png",
+        width: 32,
+        height: 32,
+        channel: "luminance",
+        encoding: "r8-unorm",
+      },
+    };
+    const createR8Document = (
+      payloadVersion: number,
+      source: unknown = r8Source,
+    ): Y.Doc => {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", payloadVersion);
+      stroke.set("brush", "dry-media");
+      stroke.set("brushDynamics", {
+        grain: { source },
+      });
+      return document;
+    };
+
+    for (const legacyVersion of [1, 2, 3]) {
+      const legacy = createR8Document(legacyVersion);
+      expect(
+        hasValidStudioCrdtRootSchema(legacy),
+        `R8 grain payload v${legacyVersion}`,
+      ).toBe(false);
+      legacy.destroy();
+    }
+    const malformed = createR8Document(4, {
+      ...r8Source,
+      asset: { ...r8Source.asset, decodedSha256: "sha256:bad" },
+    });
+    expect(hasValidStudioCrdtRootSchema(malformed)).toBe(false);
+    malformed.destroy();
+    for (const invalidSource of [
+      { kind: "r8-texture-v2", asset: r8Source.asset },
+      "r8-texture-v1",
+    ]) {
+      const invalid = createR8Document(4, invalidSource);
+      expect(
+        hasValidStudioCrdtRootSchema(invalid),
+        `invalid R8 source ${typeof invalidSource}`,
+      ).toBe(false);
+      invalid.destroy();
+    }
+
+    const conflicting = createR8Document(4);
+    const secondStroke = new Y.Map<unknown>();
+    secondStroke.set("id", "stroke-2");
+    secondStroke.set("pageId", "page-1");
+    secondStroke.set("layerId", "page-root");
+    secondStroke.set("status", "finalized");
+    secondStroke.set("deleted", false);
+    secondStroke.set("payloadVersion", 4);
+    secondStroke.set("type", "draw");
+    secondStroke.set("mode", "pen");
+    secondStroke.set("kind", "freehand");
+    secondStroke.set("stroke", "#111111");
+    secondStroke.set("strokeWidth", 8);
+    secondStroke.set("brush", "dry-media");
+    secondStroke.set("brushDynamics", {
+      grain: {
+        source: {
+          ...r8Source,
+          asset: {
+            ...r8Source.asset,
+            decodedSha256: `sha256:${"c".repeat(64)}`,
+          },
+        },
+      },
+    });
+    for (const key of [
+      "points", "pressures", "tiltXs", "tiltYs", "twists", "speeds",
+      "tangentialPressures",
+    ]) secondStroke.set(key, new Y.Array<number>());
+    conflicting.getMap<Y.Map<unknown>>("strokes").set("stroke-2", secondStroke);
+    const secondOrder = new Y.Map<unknown>();
+    secondOrder.set("strokeId", "stroke-2");
+    secondOrder.set("pageId", "page-1");
+    secondOrder.set("layerId", "page-root");
+    secondOrder.set("active", true);
+    conflicting.getArray<Y.Map<unknown>>("stroke-order").push([secondOrder]);
+    expect(hasValidStudioCrdtRootSchema(conflicting)).toBe(true);
+    const conflictingRepository = new MemoryStudioCrdtRepository();
+    await expect(service(conflictingRepository).applyUpdate({
+      workId: "work-r8-grain-conflict",
+      updateId: "00000000-0000-4000-8000-000000000724",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(conflicting)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(conflictingRepository.updates.get("work-r8-grain-conflict") ?? [])
+      .toEqual([]);
+
+    const repository = new MemoryStudioCrdtRepository();
+    const admittedR8References: Array<{
+      actorUserId: string;
+      workId: string;
+      references: readonly unknown[];
+      transaction: DrizzleStudioCrdtTransaction | undefined;
+    }> = [];
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      {
+        async assertReferencesStored() {},
+        async assertR8GrainReferencesStored(
+          actorUserId,
+          workId,
+          references,
+          transaction,
+        ) {
+          admittedR8References.push({
+            actorUserId,
+            workId,
+            references: structuredClone(references),
+            transaction,
+          });
+        },
+      },
+    );
+    const source = createR8Document(4);
+    expect(hasValidStudioCrdtRootSchema(source)).toBe(true);
+    await expect(current.applyUpdate({
+      workId: "work-r8-grain-v4",
+      updateId: "00000000-0000-4000-8000-000000000721",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(admittedR8References).toEqual([{
+      actorUserId: "editor",
+      workId: "work-r8-grain-v4",
+      references: [r8Source],
+      transaction: expect.any(Object),
+    }]);
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-r8-grain-v4"));
+    expect(
+      hydrated
+        .getMap<Y.Map<unknown>>("strokes")
+        .get("stroke-1")!
+        .get("brushDynamics"),
+    ).toEqual({ grain: { source: r8Source } });
+
+    const sourceStateVector = Y.encodeStateVector(source);
+    source.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!.set("brushDynamics", {
+      grain: {
+        source: {
+          ...r8Source,
+          asset: {
+            ...r8Source.asset,
+            decodedSha256: `sha256:${"c".repeat(64)}`,
+          },
+        },
+      },
+    });
+    await expect(current.applyUpdate({
+      workId: "work-r8-grain-v4",
+      updateId: "00000000-0000-4000-8000-000000000723",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source, sourceStateVector)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admittedR8References).toHaveLength(1);
+
+    const rejectedRepository = new MemoryStudioCrdtRepository();
+    const rejectedCurrent = service(
+      rejectedRepository,
+      {},
+      allowStoredRasterAssetReferences,
+      {
+        async assertReferencesStored() {},
+        async assertR8GrainReferencesStored() {
+          throw new Error("missing R8 grain asset");
+        },
+      },
+    );
+    const missingAsset = createR8Document(4);
+    await expect(rejectedCurrent.applyUpdate({
+      workId: "work-r8-grain-missing",
+      updateId: "00000000-0000-4000-8000-000000000722",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(missingAsset)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(rejectedRepository.updates.get("work-r8-grain-missing") ?? []).toEqual([]);
+
+    source.destroy();
+    hydrated.destroy();
+    missingAsset.destroy();
+    conflicting.destroy();
   });
 
   it("persists and rehydrates a v3 bounded-flow dynamic stroke", async () => {

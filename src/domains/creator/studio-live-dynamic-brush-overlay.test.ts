@@ -3,24 +3,33 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
+  hydrateStudioBrushR8GrainAsset,
+  resetStudioBrushR8GrainRegistry,
+} from "./studio-brush-r8-grain-runtime";
+import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
 } from "./studio-brush-render-budget";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
+import { STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS } from "./studio-causal-dynamic-brush-deposit-v2";
+import { STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET } from "./studio-dynamic-brush-coverage-renderer";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
 } from "./studio-live-dynamic-brush-overlay";
 import { STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS } from "./studio-low-latency-canvas";
+import { sha256HexPortable } from "./studio-sha256";
 
 import type { DrawEl } from "./studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
@@ -298,6 +307,33 @@ function complexDynamics() {
   });
 }
 
+function segmentedCausalOverlayDynamics() {
+  return normalizeStudioBrushDynamicsSettings({
+    ...studioBrushDynamicsPresetSettings("ink-particle"),
+    depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+    width: { base: 2, mappings: [] },
+    opacity: { base: 1, mappings: [] },
+    flow: { base: 1, mappings: [] },
+    tip: { shape: "round", softness: 0 },
+    grain: { amount: 0 },
+    tipLayers: [],
+    dualBrush: { enabled: false },
+    taper: { enabled: false },
+    spacingRatio: null,
+    spacing: { base: 0.25, mappings: [] },
+    scatterRatio: null,
+    scatter: { base: 0, mappings: [] },
+    roundness: { base: 1, mappings: [] },
+  });
+}
+
+function segmentedCausalOverlayRoute(): number[] {
+  return Array.from({ length: 75 }, (_, index) => [
+    index % 2 === 0 ? 8 : 232,
+    24,
+  ]).flat();
+}
+
 function drawElement(
   id: string,
   points: readonly number[],
@@ -375,10 +411,86 @@ function maximumLongitudinalCoverageGap(
 
 afterEach(() => {
   clearStudioBrushTextureStampCache();
+  resetStudioBrushR8GrainRegistry();
   vi.unstubAllGlobals();
 });
 
 describe("StudioLiveDynamicBrushOverlayRenderer", () => {
+  it("enforces one stroke-wide R8 alpha-map budget across incremental pointer frames", () => {
+    const decoded = Uint8Array.from([
+      0, 64, 128, 255,
+      255, 128, 64, 0,
+      32, 96, 160, 224,
+      224, 160, 96, 32,
+    ]);
+    const source = {
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: "paper.live-budget.v1",
+        encodedSha256: `sha256:${"e".repeat(64)}`,
+        decodedSha256: `sha256:${sha256HexPortable(decoded)}`,
+        byteLength: 137,
+        mediaType: "image/png",
+        width: 4,
+        height: 4,
+        channel: "luminance",
+        encoding: "r8-unorm",
+      },
+    } as const;
+    expect(hydrateStudioBrushR8GrainAsset(source, decoded).status).toBe("ready");
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      width: { base: 16, mappings: [] },
+      opacity: { base: 1, mappings: [] },
+      flow: { base: 1, mappings: [] },
+      tip: { shape: "hard", softness: 0, alphaMapSize: 256 },
+      grain: {
+        amount: 0.8,
+        scale: 24,
+        contrast: 0.55,
+        seed: 17,
+        space: "canvas-fixed",
+        source,
+      },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 1, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+    });
+    const { renderer } = attachedRenderer();
+    const points = [10, 20];
+    expect(renderer.begin(drawElement("r8-live-budget", points, {
+      brush: "dry-media",
+      brushDynamics: dynamics,
+    }))).toMatchObject({ status: "started" });
+
+    let successfulFrames = 0;
+    let fallback: ReturnType<typeof renderer.appendFrom> | null = null;
+    for (let index = 1; index <= 96; index += 1) {
+      points.push(10 + index, 20);
+      const result = renderer.appendFrom(drawElement("r8-live-budget", points, {
+        brush: "dry-media",
+        brushDynamics: dynamics,
+      }));
+      if (result.status === "fallback") {
+        fallback = result;
+        break;
+      }
+      successfulFrames += 1;
+    }
+
+    const alphaMapBytesPerDab = 256 * 256 * Float32Array.BYTES_PER_ELEMENT;
+    expect(
+      STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET
+        / alphaMapBytesPerDab,
+    ).toBe(64);
+    expect(successfulFrames).toBeGreaterThan(1);
+    expect(successfulFrames).toBeLessThanOrEqual(63);
+    expect(fallback).toEqual({ status: "fallback", reason: "material-plan" });
+  });
+
   it("keeps legacy texture grids adaptive while causal-v2 starts and seals on grid3", () => {
     const authoredDynamics = studioBrushDynamicsSettingsForBrushId("charcoal");
     if (!authoredDynamics) throw new Error("missing charcoal dynamics");
@@ -498,6 +610,90 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     }]);
     expect(renderer.lastFallbackReason).toBeNull();
   });
+
+  it("streams v3 beyond 65,536 dabs, seals one opacity composite and releases it atomically", () => {
+    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+    const points = segmentedCausalOverlayRoute();
+    const pointCount = points.length / 2;
+    const brushDynamics = segmentedCausalOverlayDynamics();
+    const element = drawElement("causal-v3-segmented-live", points, {
+      brush: "ink-particle",
+      brushDynamics,
+      strokeWidth: 2,
+      opacity: 0.37,
+      pressures: Array.from({ length: pointCount }, () => 0.72),
+      tangentialPressures: Array.from({ length: pointCount }, () => 0),
+      speeds: Array.from({ length: pointCount }, () => 0.35),
+      tiltXs: Array.from({ length: pointCount }, () => 0),
+      tiltYs: Array.from({ length: pointCount }, () => 0),
+      twists: Array.from({ length: pointCount }, () => 0),
+    });
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: brushDynamics,
+      dabCount: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS + 1,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+    expect(budget).toMatchObject({
+      maxDabsPerVariation: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS + 1,
+      dabCapped: false,
+    });
+
+    expect(renderer.begin(element)).toMatchObject({
+      status: "started",
+      dabCount: 1,
+    });
+    const appended = renderer.appendFrom(element);
+    expect(appended.status).toBe("appended");
+    if (appended.status !== "appended") return;
+    expect(appended.appendedDabs).toBeGreaterThan(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    expect(activeCanvas.recordedMarks.length).toBe(appended.appendedDabs);
+    expect(renderer.lastFallbackReason).toBeNull();
+
+    const selectedIndexes = [
+      0,
+      127,
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS - 1,
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+      activeCanvas.recordedMarks.length - 1,
+    ];
+    const acceptedPrefixAndBoundary = selectedIndexes.map(
+      (index) => structuredClone(activeCanvas.recordedMarks[index]!),
+    );
+    expect(acceptedPrefixAndBoundary.every(Boolean)).toBe(true);
+
+    const sealed = renderer.end(element);
+    expect(sealed).toMatchObject({
+      status: "settled",
+      dabCount: appended.appendedDabs,
+      markCount: appended.appendedDabs,
+    });
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(settledCanvas.recordedComposites).toHaveLength(1);
+    expect(settledCanvas.recordedComposites[0]!.opacity).toBe(element.opacity);
+    expect(settledCanvas.recordedComposites[0]!.marks.length).toBe(
+      appended.appendedDabs,
+    );
+    expect(selectedIndexes.map(
+      (index) => settledCanvas.recordedComposites[0]!.marks[index],
+    )).toEqual(acceptedPrefixAndBoundary);
+
+    renderer.setSurface({ ...SURFACE, left: 2 });
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(settledCanvas.recordedComposites).toHaveLength(1);
+    expect(settledCanvas.recordedComposites[0]!.opacity).toBe(element.opacity);
+    expect(selectedIndexes.map(
+      (index) => settledCanvas.recordedComposites[0]!.marks[index],
+    )).toEqual(acceptedPrefixAndBoundary);
+
+    // One logical DrawEl remains one settled FIFO receipt, so Undo/release cannot leave a tail
+    // segment behind even though the material planner crossed its historical segment boundary.
+    expect(renderer.releaseSettledPrefix(1)).toBe(1);
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(settledCanvas.recordedComposites).toEqual([]);
+  }, 30_000);
 
   it("keeps the global 64-way three-tip accepted prefix authoritative across zero-alpha batches", () => {
     const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
@@ -621,7 +817,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       expect(
         selection.brushDynamics.depositPipeline,
         `${descriptor.catalogId}: authored pipeline`,
-      ).toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2);
+      ).toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
 
       const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
       const id = `stream-${descriptor.catalogId}`;
@@ -868,7 +1064,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       if (!selection) throw new Error(`missing ${catalogId} selection`);
       expect(selection.runtimeBrushId).toBe("dry-media");
       expect(selection.brushDynamics.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       );
       const pointPairs = Array.from({ length: 72 }, (_, index) => [
         6 + index * 7,

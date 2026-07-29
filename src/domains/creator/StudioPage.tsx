@@ -218,6 +218,11 @@ import {
 } from "./studio-brush-mode-width";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
+  StudioBrushR8GrainHydrator,
+  collectStudioBrushR8GrainSources,
+  projectStudioBrushR8GrainRenderElements,
+} from "./studio-brush-r8-grain-hydrator";
+import {
   materializeStudioBrushCatalogSelection,
   studioCoreBrushCatalogSelection,
   type StudioBrushCatalogSelection,
@@ -2424,6 +2429,14 @@ function StudioCuttoonEditor() {
     useState<StudioCrdtDocument | null>(null);
   // StudioPage's outer editor key rotates on both auth and work scope. This per-instance owner is
   // therefore incapable of carrying private Blob URLs or in-flight responses across identities.
+  const [studioBrushR8GrainHydrator] = useState(
+    () => new StudioBrushR8GrainHydrator()
+  );
+  const studioBrushR8GrainHydrationRevision = useSyncExternalStore(
+    studioBrushR8GrainHydrator.subscribe,
+    studioBrushR8GrainHydrator.getVersion,
+    studioBrushR8GrainHydrator.getVersion
+  );
   const [studioWorkAssetHydrator] = useState(
     () => new StudioWorkAssetHydrator(null)
   );
@@ -2444,9 +2457,14 @@ function StudioCuttoonEditor() {
     }
     studioRasterPublicationControllersRef.current.clear();
     disposeStudioDynamicCoverageCommittedCache();
+    studioBrushR8GrainHydrator.dispose();
     studioWorkAssetAdmissionCoordinator.dispose();
     studioWorkAssetHydrator.dispose();
-  }, [studioWorkAssetAdmissionCoordinator, studioWorkAssetHydrator]);
+  }, [
+    studioBrushR8GrainHydrator,
+    studioWorkAssetAdmissionCoordinator,
+    studioWorkAssetHydrator,
+  ]);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const studioLiveMutationGenerationRef = useRef(0);
   const studioLivePendingMutationRef = useRef<{
@@ -3899,6 +3917,40 @@ function StudioCuttoonEditor() {
 
   // 마스터 편집 모드에서는 편집 대상(선택·레이어 패널·속성·commit)이 문서 마스터 요소로 바뀐다(studio-master-page 규약).
   const elements = masterEditMode ? master.elements : activePage.elements;
+  useLayoutEffect(() => {
+    studioBrushR8GrainHydrator.observe(
+      authorizedWorkAssetScopeId,
+      collectStudioBrushR8GrainSources({
+        currentPages: pages,
+        history: pagesHistory,
+        historyIndex: pagesHi,
+        extraElements: master.elements,
+      })
+    );
+  }, [
+    authorizedWorkAssetScopeId,
+    master.elements,
+    pages,
+    pagesHi,
+    pagesHistory,
+    studioBrushR8GrainHydrator,
+  ]);
+  // `StudioDrawNode` is intentionally memoized by element identity. Preserve that hot-path for
+  // ordinary strokes while rotating only R8 draw references after verified hydration completes.
+  const studioBrushR8GrainRenderElements = useMemo(
+    () => projectStudioBrushR8GrainRenderElements(
+      elements,
+      studioBrushR8GrainHydrationRevision
+    ),
+    [elements, studioBrushR8GrainHydrationRevision]
+  );
+  const studioBrushR8GrainMasterRenderElements = useMemo(
+    () => projectStudioBrushR8GrainRenderElements(
+      masterRenderEls,
+      studioBrushR8GrainHydrationRevision
+    ),
+    [masterRenderEls, studioBrushR8GrainHydrationRevision]
+  );
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
@@ -34464,7 +34516,7 @@ function clearSelectionForEdit() {
           eyedropperActive={eyedropperActive}
           effScale={effScale}
           elementById={elementById}
-          elements={elements}
+          elements={studioBrushR8GrainRenderElements}
           studioFilterPageComposite={
             studioFilterSession?.target === "page-composite" &&
             studioFilterSession.pageId === activePage.id &&
@@ -34536,7 +34588,7 @@ function clearSelectionForEdit() {
           master={master}
           masterEditMode={masterEditMode}
           masterPanelOpen={masterPanelOpen}
-          masterRenderEls={masterRenderEls}
+          masterRenderEls={studioBrushR8GrainMasterRenderElements}
           mobileImmersive={mobileImmersive}
           mobileKeyboardInset={mobileKeyboardInset}
           navigate={navigate}

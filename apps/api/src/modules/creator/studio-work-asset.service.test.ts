@@ -362,6 +362,74 @@ describe("StudioWorkAssetService", () => {
     ])).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it("binds R8 CRDT references to the exact stored PNG hash, bytes, and dimensions", async () => {
+    const source = {
+      kind: "r8-texture-v1",
+      asset: {
+        assetId: manifest.assetId,
+        encodedSha256: `sha256:${manifest.sha256}`,
+        decodedSha256: `sha256:${"b".repeat(64)}`,
+        byteLength: manifest.byteSize,
+        mediaType: "image/png",
+        width: manifest.intrinsicImage!.width,
+        height: manifest.intrinsicImage!.height,
+        channel: "luminance",
+        encoding: "r8-unorm",
+      },
+    } as const;
+    repository.getManifests.mockResolvedValue([manifest]);
+
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [source, source],
+    )).resolves.toBeUndefined();
+    expect(repository.getManifests).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      [manifest.assetId],
+    );
+
+    for (const mismatched of [
+      { ...manifest, sha256: "a".repeat(64) },
+      { ...manifest, byteSize: manifest.byteSize + 1 },
+      {
+        ...manifest,
+        intrinsicImage: {
+          ...manifest.intrinsicImage!,
+          width: manifest.intrinsicImage!.width + 1,
+          decodedRgbaBytes: (manifest.intrinsicImage!.width + 1)
+            * manifest.intrinsicImage!.height
+            * 4,
+        },
+      },
+    ]) {
+      repository.getManifests.mockResolvedValueOnce([mismatched]);
+      await expect(service().assertR8GrainReferencesStored(
+        "editor",
+        "work-1",
+        [source],
+      )).rejects.toBeInstanceOf(BadRequestException);
+    }
+
+    repository.getManifests.mockClear();
+    await expect(service().assertR8GrainReferencesStored(
+      "editor",
+      "work-1",
+      [
+        source,
+        {
+          ...source,
+          asset: {
+            ...source.asset,
+            decodedSha256: `sha256:${"c".repeat(64)}`,
+          },
+        },
+      ],
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.getManifests).not.toHaveBeenCalled();
+  });
+
   it("keeps new durable work-asset references default-off without the server opt-in token", async () => {
     delete process.env.STUDIO_WORK_ASSET_ADMISSION;
     await expect(service().assertReferencesStored("editor", "work-1", [

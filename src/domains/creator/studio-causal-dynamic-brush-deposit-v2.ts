@@ -8,11 +8,16 @@
 
 import {
   applyStudioDynamicBrushMinimumDiameterRatio,
+  studioDynamicBrushDepositPipelineUsesContinuation,
   resolveStudioBrushDynamics,
   studioBrushTaperFactors,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
 } from "./studio-brush-dynamics";
-import { STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET } from "./studio-brush-render-budget";
+import {
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET,
+} from "./studio-brush-render-budget";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
@@ -20,6 +25,7 @@ import type {
 } from "./studio-brush-dynamics";
 
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION = 2 as const;
+export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION = 3 as const;
 /**
  * One persisted causal stroke ceiling shared by incremental live deposit, retained replay and
  * vector export. A lower consumer-local default used to make the accepted 1,025th live dab vanish
@@ -27,6 +33,15 @@ export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION = 2 as const;
  */
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS =
   STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET;
+/** Maximum number of deterministic continuation segments admitted for one persisted stroke. */
+export const STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_SEGMENTS =
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS;
+/**
+ * V3's complete-stroke work ceiling. The per-segment ceiling remains 65,536 so every consumer can
+ * retain bounded buffers while one logical DrawEl/CRDT identity spans up to sixteen segments.
+ */
+export const STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS =
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET;
 export const DEFAULT_STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS =
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS;
 
@@ -47,9 +62,7 @@ export interface StudioCausalDynamicBrushSampleV2 {
   readonly twist: number;
 }
 
-export interface StudioCausalDynamicBrushDepositStateV2 {
-  readonly kind: "studio-causal-dynamic-brush-deposit-state";
-  readonly version: typeof STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION;
+interface StudioCausalDynamicBrushDepositStateFields {
   readonly previousSample: StudioCausalDynamicBrushSampleV2;
   readonly totalDistance: number;
   readonly distanceSinceLastDab: number;
@@ -57,6 +70,18 @@ export interface StudioCausalDynamicBrushDepositStateV2 {
   readonly lastSpacing: number;
   readonly transitionedFromTap: boolean;
   readonly maximumDabs: number;
+}
+
+export interface StudioCausalDynamicBrushDepositStateV2
+  extends StudioCausalDynamicBrushDepositStateFields {
+  readonly kind: "studio-causal-dynamic-brush-deposit-state";
+  readonly version: typeof STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION;
+}
+
+export interface StudioCausalDynamicBrushDepositStateV3
+  extends StudioCausalDynamicBrushDepositStateFields {
+  readonly kind: "studio-causal-dynamic-brush-deposit-state";
+  readonly version: typeof STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION;
 }
 
 export type StudioCausalDynamicBrushDepositFailureReasonV2 =
@@ -91,6 +116,31 @@ export type StudioCausalDynamicBrushDepositAppendResultV2 =
       reason: StudioCausalDynamicBrushDepositFailureReasonV2;
     }>;
 
+export type StudioCausalDynamicBrushDepositBeginResultV3 =
+  | Readonly<{
+      ok: true;
+      state: StudioCausalDynamicBrushDepositStateV3;
+      dab: StudioDynamicBrushDab;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioCausalDynamicBrushDepositFailureReasonV2;
+    }>;
+
+export type StudioCausalDynamicBrushDepositAppendResultV3 =
+  | Readonly<{
+      ok: true;
+      state: StudioCausalDynamicBrushDepositStateV3;
+      dabs: readonly StudioDynamicBrushDab[];
+      replaceInitialTap: boolean;
+      /** True only after the explicit complete-stroke V3 ceiling is reached. */
+      dabCapped: boolean;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioCausalDynamicBrushDepositFailureReasonV2;
+    }>;
+
 export interface StudioCausalDynamicBrushDepositPlanInputV2 {
   readonly points: readonly number[];
   readonly pressures?: readonly number[] | null;
@@ -111,6 +161,47 @@ export type StudioCausalDynamicBrushDepositPlanResultV2 =
       sourcePointCount: number;
       /** True when the source continues beyond the immutable maximum-dab prefix. */
       dabCapped: boolean;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioCausalDynamicBrushDepositFailureReasonV2;
+    }>;
+
+export type StudioCausalDynamicBrushDepositPlanInputV3 =
+  StudioCausalDynamicBrushDepositPlanInputV2;
+
+export type StudioCausalDynamicBrushDepositPlanResultV3 =
+  | Readonly<{
+      ok: true;
+      dabs: readonly StudioDynamicBrushDab[];
+      state: StudioCausalDynamicBrushDepositStateV3;
+      sourcePointCount: number;
+      /** True only after the explicit complete-stroke V3 ceiling is reached. */
+      dabCapped: boolean;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioCausalDynamicBrushDepositFailureReasonV2;
+    }>;
+
+export interface StudioCausalDynamicBrushDepositSegmentV3 {
+  readonly kind: "studio-causal-dynamic-brush-deposit-segment";
+  readonly version: 3;
+  readonly segmentIndex: number;
+  readonly firstDabIndex: number;
+  readonly nextDabIndex: number;
+  readonly dabs: readonly StudioDynamicBrushDab[];
+}
+
+export type StudioCausalDynamicBrushDepositSegmentPlanResultV3 =
+  | Readonly<{
+      ok: true;
+      segments: readonly StudioCausalDynamicBrushDepositSegmentV3[];
+      state: StudioCausalDynamicBrushDepositStateV3;
+      sourcePointCount: number;
+      dabCount: number;
+      /** True only when the explicit sixteen-segment document ceiling was reached. */
+      continuationCapped: boolean;
     }>
   | Readonly<{
       ok: false;
@@ -158,9 +249,13 @@ function sampleIsValid(sample: StudioCausalDynamicBrushSampleV2): boolean {
     && sample.twist <= 359;
 }
 
-function stateIsValid(state: StudioCausalDynamicBrushDepositStateV2): boolean {
+function stateFieldsAreValid(
+  state:
+    | StudioCausalDynamicBrushDepositStateV2
+    | StudioCausalDynamicBrushDepositStateV3,
+  maximumAllowedDabs: number,
+): boolean {
   return state?.kind === "studio-causal-dynamic-brush-deposit-state"
-    && state.version === STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION
     && sampleIsValid(state.previousSample)
     && Number.isFinite(state.totalDistance)
     && state.totalDistance >= 0
@@ -173,7 +268,21 @@ function stateIsValid(state: StudioCausalDynamicBrushDepositStateV2): boolean {
     && typeof state.transitionedFromTap === "boolean"
     && Number.isSafeInteger(state.maximumDabs)
     && state.maximumDabs >= STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min
-    && state.maximumDabs <= STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS;
+    && state.maximumDabs <= maximumAllowedDabs;
+}
+
+function stateIsValidV2(
+  state: StudioCausalDynamicBrushDepositStateV2,
+): boolean {
+  return state?.version === STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION
+    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS);
+}
+
+function stateIsValidV3(
+  state: StudioCausalDynamicBrushDepositStateV3,
+): boolean {
+  return state?.version === STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION
+    && stateFieldsAreValid(state, STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS);
 }
 
 function frozenSample(
@@ -182,12 +291,23 @@ function frozenSample(
   return Object.freeze({ ...sample });
 }
 
-function frozenState(
-  state: Omit<StudioCausalDynamicBrushDepositStateV2, "kind" | "version">
+function frozenStateV2(
+  state: StudioCausalDynamicBrushDepositStateFields,
 ): StudioCausalDynamicBrushDepositStateV2 {
   return Object.freeze({
     kind: "studio-causal-dynamic-brush-deposit-state",
     version: STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION,
+    ...state,
+    previousSample: frozenSample(state.previousSample),
+  });
+}
+
+function frozenStateV3(
+  state: StudioCausalDynamicBrushDepositStateFields,
+): StudioCausalDynamicBrushDepositStateV3 {
+  return Object.freeze({
+    kind: "studio-causal-dynamic-brush-deposit-state",
+    version: STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V3_VERSION,
     ...state,
     previousSample: frozenSample(state.previousSample),
   });
@@ -320,7 +440,7 @@ export function beginStudioCausalDynamicBrushDepositV2(
   return Object.freeze({
     ok: true,
     dab: initial.dab,
-    state: frozenState({
+    state: frozenStateV2({
       previousSample: sample,
       totalDistance: 0,
       distanceSinceLastDab: 0,
@@ -332,14 +452,54 @@ export function beginStudioCausalDynamicBrushDepositV2(
   });
 }
 
-export function appendStudioCausalDynamicBrushDepositsV2(
-  state: StudioCausalDynamicBrushDepositStateV2,
+export function beginStudioCausalDynamicBrushDepositV3(
+  sample: StudioCausalDynamicBrushSampleV2,
+  settings: NormalizedStudioBrushDynamicsSettings,
+  maximumDabs = STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS,
+): StudioCausalDynamicBrushDepositBeginResultV3 {
+  if (
+    !studioDynamicBrushDepositPipelineUsesContinuation(settings.depositPipeline)
+    || !sampleIsValid(sample)
+    || !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min
+    || maximumDabs > STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS
+  ) return failure("invalid-input");
+  const initial = dabAt(settings, sample, 0, 0, 0, false);
+  if (!initial) return failure("numeric-overflow");
+  return Object.freeze({
+    ok: true,
+    dab: initial.dab,
+    state: frozenStateV3({
+      previousSample: sample,
+      totalDistance: 0,
+      distanceSinceLastDab: 0,
+      nextDabIndex: 1,
+      lastSpacing: initial.spacing,
+      transitionedFromTap: false,
+      maximumDabs,
+    }),
+  });
+}
+
+type StudioCausalDynamicBrushDepositAppendCoreResult =
+  | Readonly<{
+      ok: true;
+      state: StudioCausalDynamicBrushDepositStateFields;
+      dabs: readonly StudioDynamicBrushDab[];
+      replaceInitialTap: boolean;
+      dabCapped: boolean;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: StudioCausalDynamicBrushDepositFailureReasonV2;
+    }>;
+
+function appendStudioCausalDynamicBrushDepositsCore(
+  state: StudioCausalDynamicBrushDepositStateFields,
   samples: readonly StudioCausalDynamicBrushSampleV2[],
-  settings: NormalizedStudioBrushDynamicsSettings
-): StudioCausalDynamicBrushDepositAppendResultV2 {
-  if (!stateIsValid(state) || !Array.isArray(samples)) {
-    return failure("invalid-state");
-  }
+  settings: NormalizedStudioBrushDynamicsSettings,
+): StudioCausalDynamicBrushDepositAppendCoreResult {
+  if (!Array.isArray(samples)) return failure("invalid-state");
   let previousSample = state.previousSample;
   let totalDistance = state.totalDistance;
   let distanceSinceLastDab = state.distanceSinceLastDab;
@@ -386,8 +546,8 @@ export function appendStudioCausalDynamicBrushDepositsV2(
     );
     while (remainingToNext <= segmentLength - segmentOffset + POINT_EPSILON) {
       if (nextDabIndex >= state.maximumDabs) {
-        // The complete accepted prefix remains authoritative. Consume the source suffix so future
-        // calls can validate their prefix without ever clearing already-visible paint.
+        // The accepted prefix remains authoritative. V2 freezes here; V3 uses a larger explicitly
+        // versioned ceiling while retaining the same residual-spacing cursor and dab indices.
         dabCapped = true;
         segmentOffset = segmentLength;
         distanceSinceLastDab = 0;
@@ -423,7 +583,7 @@ export function appendStudioCausalDynamicBrushDepositsV2(
     dabs: Object.freeze(dabs),
     replaceInitialTap,
     dabCapped,
-    state: frozenState({
+    state: {
       previousSample,
       totalDistance,
       distanceSinceLastDab,
@@ -431,7 +591,48 @@ export function appendStudioCausalDynamicBrushDepositsV2(
       lastSpacing,
       transitionedFromTap,
       maximumDabs: state.maximumDabs,
-    }),
+    },
+  });
+}
+
+export function appendStudioCausalDynamicBrushDepositsV2(
+  state: StudioCausalDynamicBrushDepositStateV2,
+  samples: readonly StudioCausalDynamicBrushSampleV2[],
+  settings: NormalizedStudioBrushDynamicsSettings
+): StudioCausalDynamicBrushDepositAppendResultV2 {
+  if (!stateIsValidV2(state)) return failure("invalid-state");
+  const appended = appendStudioCausalDynamicBrushDepositsCore(
+    state,
+    samples,
+    settings,
+  );
+  if (!appended.ok) return appended;
+  return Object.freeze({
+    ...appended,
+    state: frozenStateV2(appended.state),
+  });
+}
+
+export function appendStudioCausalDynamicBrushDepositsV3(
+  state: StudioCausalDynamicBrushDepositStateV3,
+  samples: readonly StudioCausalDynamicBrushSampleV2[],
+  settings: NormalizedStudioBrushDynamicsSettings,
+): StudioCausalDynamicBrushDepositAppendResultV3 {
+  if (
+    !stateIsValidV3(state)
+    || !studioDynamicBrushDepositPipelineUsesContinuation(settings.depositPipeline)
+  ) {
+    return failure("invalid-state");
+  }
+  const appended = appendStudioCausalDynamicBrushDepositsCore(
+    state,
+    samples,
+    settings,
+  );
+  if (!appended.ok) return appended;
+  return Object.freeze({
+    ...appended,
+    state: frozenStateV3(appended.state),
   });
 }
 
@@ -506,5 +707,100 @@ export function planStudioCausalDynamicBrushDepositsV2(
     state: appended.state,
     sourcePointCount: input.points.length / 2,
     dabCapped: appended.dabCapped,
+  });
+}
+
+export function planStudioCausalDynamicBrushDepositsV3(
+  input: StudioCausalDynamicBrushDepositPlanInputV3,
+): StudioCausalDynamicBrushDepositPlanResultV3 {
+  if (
+    !input
+    || !studioDynamicBrushDepositPipelineUsesContinuation(
+      input.settings?.depositPipeline,
+    )
+    || !Array.isArray(input.points)
+    || input.points.length < 2
+    || input.points.length % 2 !== 0
+  ) return failure("invalid-input");
+  const first = sampleAt(input, 0);
+  if (!first) return failure("invalid-input");
+  const begun = beginStudioCausalDynamicBrushDepositV3(
+    first,
+    input.settings,
+    input.maximumDabs ?? STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS,
+  );
+  if (!begun.ok) return begun;
+  const samples: StudioCausalDynamicBrushSampleV2[] = [];
+  for (let index = 1; index < input.points.length / 2; index += 1) {
+    const sample = sampleAt(input, index);
+    if (!sample) return failure("invalid-input");
+    samples.push(sample);
+  }
+  const appended = appendStudioCausalDynamicBrushDepositsV3(
+    begun.state,
+    samples,
+    input.settings,
+  );
+  if (!appended.ok) return appended;
+  const dabs = appended.replaceInitialTap
+    ? appended.dabs
+    : [begun.dab, ...appended.dabs];
+  return Object.freeze({
+    ok: true,
+    dabs: Object.freeze(dabs),
+    state: appended.state,
+    sourcePointCount: input.points.length / 2,
+    dabCapped: appended.dabCapped,
+  });
+}
+
+/**
+ * Plans the continuation-aware V3 representation without changing V2 replay.
+ *
+ * A V2 snapshot still freezes its historical first 65,536 dabs. Only a snapshot whose persisted
+ * deposit pipeline explicitly opts into `causal-deposit-v3-segmented` reaches this function.
+ * Segment boundaries never duplicate a dab and preserve each global dab index, so joining the
+ * arrays produces the exact same causal sequence as one large planner invocation.
+ */
+export function planStudioCausalDynamicBrushDepositSegmentsV3(
+  input: StudioCausalDynamicBrushDepositPlanInputV2,
+): StudioCausalDynamicBrushDepositSegmentPlanResultV3 {
+  if (!studioDynamicBrushDepositPipelineUsesContinuation(
+    input?.settings?.depositPipeline,
+  )) {
+    return failure("invalid-input");
+  }
+  const planned = planStudioCausalDynamicBrushDepositsV3({
+    ...input,
+    maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_TOTAL_DABS,
+  });
+  if (!planned.ok) return planned;
+
+  const segments: StudioCausalDynamicBrushDepositSegmentV3[] = [];
+  for (
+    let firstDabIndex = 0, segmentIndex = 0;
+    firstDabIndex < planned.dabs.length;
+    firstDabIndex += STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS, segmentIndex += 1
+  ) {
+    const nextDabIndex = Math.min(
+      planned.dabs.length,
+      firstDabIndex + STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    segments.push(Object.freeze({
+      kind: "studio-causal-dynamic-brush-deposit-segment",
+      version: 3,
+      segmentIndex,
+      firstDabIndex,
+      nextDabIndex,
+      dabs: Object.freeze(planned.dabs.slice(firstDabIndex, nextDabIndex)),
+    }));
+  }
+  return Object.freeze({
+    ok: true,
+    segments: Object.freeze(segments),
+    state: planned.state,
+    sourcePointCount: planned.sourcePointCount,
+    dabCount: planned.dabs.length,
+    continuationCapped: planned.dabCapped,
   });
 }

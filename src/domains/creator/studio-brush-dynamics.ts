@@ -40,8 +40,32 @@ import {
 export const STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION = 1 as const;
 export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
   "causal-deposit-v2" as const;
+/**
+ * Prefix-stable causal deposits with bounded continuation segments.
+ *
+ * V2 intentionally freezes the first accepted 65,536-dab prefix. V3 preserves that exact prefix
+ * and continues the same residual-spacing cursor in additional deterministic segments, allowing
+ * live, retained, SVG and CRDT replay to keep the complete authored path without reallocating or
+ * renumbering any already accepted dab.
+ */
+export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3 =
+  "causal-deposit-v3-segmented" as const;
 export type StudioDynamicBrushDepositPipeline =
-  typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
+  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+  | typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+
+export function isStudioDynamicBrushCausalDepositPipeline(
+  value: unknown,
+): value is StudioDynamicBrushDepositPipeline {
+  return value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    || value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+}
+
+export function studioDynamicBrushDepositPipelineUsesContinuation(
+  value: unknown,
+): value is typeof STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3 {
+  return value === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3;
+}
 
 export const STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS = {
   width: { min: 0.05, max: 4096 },
@@ -485,7 +509,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "잉크 입자",
     description: "필압과 속도에 반응하는 미세 잉크 입자와 방향성 펜촉",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       seed: 101,
       taper: {
         enabled: true,
@@ -526,7 +550,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "소프트 에어브러시",
     description: "짧은 입력도 보이면서 여러 번 부드럽게 쌓이는 제어된 분사",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       seed: 202,
       taper: {
         enabled: true,
@@ -564,7 +588,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "드라이 미디어",
     description: "크레용·목탄처럼 압력과 속도에 따라 끊기고 거칠어지는 마른 획",
     settings: {
-      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       seed: 303,
       taper: {
         enabled: true,
@@ -890,8 +914,8 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
   const dualBrush = normalizeStudioBrushDualBrushSettings(source.dualBrush, tip);
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
-    ...(source.depositPipeline === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-      ? { depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 }
+    ...(isStudioDynamicBrushCausalDepositPipeline(source.depositPipeline)
+      ? { depositPipeline: source.depositPipeline }
       : {}),
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
     fallbackPressure: clamp01(finiteNumber(source.fallbackPressure, INTERNAL_DEFAULT_SETTINGS.fallbackPressure)),

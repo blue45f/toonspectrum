@@ -9,6 +9,10 @@ import {
   db,
 } from "../../../../../lib/db";
 import {
+  normalizeStudioBrushR8TextureGrainSource,
+  serializeStudioBrushR8TextureGrainSourceCanonical,
+} from "../../../../../lib/studio-brush-r8-grain-asset-contract";
+import {
   STUDIO_WORK_ASSET_CONTRACT_VERSION,
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,
@@ -170,10 +174,66 @@ export function planStudioWorkAssetOrphanCleanup(input: {
   return true;
 }
 
+function isPlainR8CleanupRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function durableDocumentReferencesR8WorkAsset(
+  document: Y.Doc,
+  assetId: string,
+): boolean {
+  if (!document.share.has("strokes")) return false;
+  let strokes: Y.Map<Y.Map<unknown>>;
+  try {
+    // Hydrated Yjs roots remain an AbstractType placeholder until materialized through getMap.
+    strokes = document.getMap<Y.Map<unknown>>("strokes");
+  } catch {
+    // Cleanup is irreversible. A malformed durable root cannot prove absence.
+    return true;
+  }
+
+  const sourceByAssetId = new Map<string, string>();
+  let referencesRequestedAsset = false;
+  for (const value of strokes.values()) {
+    if (!(value instanceof Y.Map)) return true;
+    const brushDynamics = value.get("brushDynamics");
+    if (brushDynamics == null) continue;
+    if (!isPlainR8CleanupRecord(brushDynamics)) {
+      // Schema skew or corruption may conceal a source understood by another client version.
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(brushDynamics, "grain")) continue;
+    const grain = brushDynamics.grain;
+    if (grain == null) continue;
+    if (!isPlainR8CleanupRecord(grain)) return true;
+    if (!Object.prototype.hasOwnProperty.call(grain, "source")) continue;
+    const sourceValue = grain.source;
+    if (sourceValue == null) continue;
+    const source = normalizeStudioBrushR8TextureGrainSource(sourceValue);
+    const sourceKey = source
+      ? serializeStudioBrushR8TextureGrainSourceCanonical(source)
+      : null;
+    if (!source || !sourceKey) return true;
+
+    const existingSourceKey = sourceByAssetId.get(source.asset.assetId);
+    if (existingSourceKey && existingSourceKey !== sourceKey) return true;
+    sourceByAssetId.set(source.asset.assetId, sourceKey);
+    if (source.asset.assetId === assetId) referencesRequestedAsset = true;
+  }
+  return referencesRequestedAsset;
+}
+
 /**
  * Replays the exact retained server frontier and checks for the asset's materialized scene root.
- * The check intentionally ignores the current `deleted` flag: once an identity entered the
- * durable Yjs document it is no longer eligible for upload-race compensation.
+ * Scene references and renderer-significant R8 sources intentionally ignore `deleted`: once an
+ * identity entered the durable Yjs frontier it is no longer eligible for upload compensation.
+ * Malformed/conflicting R8 state proves no safe absence and blocks every physical cleanup.
  */
 export function studioCrdtHydrationReferencesWorkAsset(
   state: StudioCrdtHydrationState,
@@ -188,9 +248,10 @@ export function studioCrdtHydrationReferencesWorkAsset(
       Y.applyUpdate(document, update.payload, "work-asset-cleanup-update");
     }
     const rootName = `scene-element:${encodeURIComponent(assetId)}`;
-    if (!document.share.has(rootName)) return false;
-    const root = document.getMap<unknown>(rootName);
-    return root.get("type") === "reference";
+    const sceneReference = document.share.has(rootName)
+      && document.getMap<unknown>(rootName).get("type") === "reference";
+    return sceneReference
+      || durableDocumentReferencesR8WorkAsset(document, assetId);
   } finally {
     document.destroy();
   }

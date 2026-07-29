@@ -35,12 +35,14 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  isStudioDynamicBrushCausalDepositPipeline,
+  studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
@@ -55,6 +57,7 @@ import {
 } from "./studio-brush-symmetry";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
@@ -144,7 +147,14 @@ import {
 import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
-import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import type {
+  NormalizedStudioBrushDynamicsSettings,
+  StudioDynamicBrushDab,
+} from "./studio-brush-dynamics";
+import type { StudioBrushSymmetryTransform } from "./studio-brush-symmetry";
+import type {
+  StudioDynamicBrushSegmentedDabVariation,
+} from "./studio-dynamic-brush-coverage-renderer";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioFxPressurePathSegment } from "./studio-fx-brush";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
@@ -174,6 +184,66 @@ function setPerfectInkDebugState(state: PerfectInkDebugState | null): void {
 const STUDIO_PENCIL_DEFAULT_JITTER_RADIUS = 0.75;
 const dynamicBrushSettingsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
 const dynamicBrushDefaultSettingsById = new Map<string, NormalizedStudioBrushDynamicsSettings>();
+
+function studioDrawNodeSegmentedDabCount(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+): number {
+  return segments.reduce((count, segment) => count + segment.length, 0);
+}
+
+/**
+ * Keeps complete immutable continuation segments and only copies the one segment that crosses the
+ * accepted-prefix boundary. This avoids flattening and then slicing a potentially million-dab
+ * pointer-up plan.
+ */
+function studioDrawNodeSegmentedDabPrefix(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  maximumDabs: number,
+): readonly (readonly StudioDynamicBrushDab[])[] {
+  const accepted: Array<readonly StudioDynamicBrushDab[]> = [];
+  let remaining = Math.max(0, Math.floor(maximumDabs));
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+    if (segment.length <= remaining) {
+      accepted.push(segment);
+      remaining -= segment.length;
+      continue;
+    }
+    accepted.push(segment.slice(0, remaining));
+    remaining = 0;
+  }
+  return accepted;
+}
+
+/**
+ * Transforms each causal continuation segment independently. Variation-major segment lists preserve
+ * the exact causal order without allocating the previous second whole-stroke `flatMap` array.
+ */
+function studioDrawNodeSegmentedDabVariations(
+  segments: readonly (readonly StudioDynamicBrushDab[])[],
+  transforms: readonly StudioBrushSymmetryTransform[],
+): readonly StudioDynamicBrushSegmentedDabVariation[] {
+  const variationSegments = transforms.map(
+    () => [] as Array<readonly StudioDynamicBrushDab[]>,
+  );
+  for (const segment of segments) {
+    const transformedSegmentVariations =
+      studioDynamicBrushDabVariationsFromTransforms(segment, transforms);
+    for (
+      let variationIndex = 0;
+      variationIndex < transformedSegmentVariations.length;
+      variationIndex += 1
+    ) {
+      variationSegments[variationIndex]!.push(
+        transformedSegmentVariations[variationIndex]!,
+      );
+    }
+  }
+  return variationSegments.map((transformedSegments) => ({
+    kind: "studio-dynamic-brush-segmented-dab-variation",
+    segments: transformedSegments,
+  }));
+}
 
 /**
  * Active drafts replace the DrawEl shell while retaining immutable settings snapshots. Normalize
@@ -430,58 +500,94 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           baseOpacity: dynamics.opacity.base,
           seed,
         };
-        const causalDepositPlan = dynamics.depositPipeline
-          === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
-          ? planStudioCausalDynamicBrushDepositsV2({
-              points: el.points,
-              pressures: el.pressures,
-              tangentialPressures: el.tangentialPressures,
-              speeds: el.speeds,
-              tiltXs: el.tiltXs,
-              tiltYs: el.tiltYs,
-              twists: el.twists,
-              settings: dynamics,
-              maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
-            })
+        const causalDepositPlan = isStudioDynamicBrushCausalDepositPipeline(
+          dynamics.depositPipeline,
+        )
+          ? studioDynamicBrushDepositPipelineUsesContinuation(
+              dynamics.depositPipeline,
+            )
+            ? planStudioCausalDynamicBrushDepositSegmentsV3({
+                points: el.points,
+                pressures: el.pressures,
+                tangentialPressures: el.tangentialPressures,
+                speeds: el.speeds,
+                tiltXs: el.tiltXs,
+                tiltYs: el.tiltYs,
+                twists: el.twists,
+                settings: dynamics,
+              })
+            : planStudioCausalDynamicBrushDepositsV2({
+                points: el.points,
+                pressures: el.pressures,
+                tangentialPressures: el.tangentialPressures,
+                speeds: el.speeds,
+                tiltXs: el.tiltXs,
+                tiltYs: el.tiltYs,
+                twists: el.twists,
+                settings: dynamics,
+                maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+              })
           : null;
         if (causalDepositPlan && !causalDepositPlan.ok) {
           dynamicBrushPlanFailed = true;
           return null;
         }
         const usesCausalDepositPlan = causalDepositPlan?.ok === true;
-        let baseDabs = usesCausalDepositPlan
-          ? [...causalDepositPlan.dabs]
-          : planNormalizedStudioDynamicBrushDabs(
-              { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
-              dynamics
-            );
+        let causalDabSegments:
+          | readonly (readonly StudioDynamicBrushDab[])[]
+          | null =
+          causalDepositPlan?.ok === true && "segments" in causalDepositPlan
+            ? causalDepositPlan.segments.map((segment) => segment.dabs)
+            : null;
+        let baseDabs = causalDabSegments
+          ? [] as readonly StudioDynamicBrushDab[]
+          : causalDepositPlan?.ok === true && "dabs" in causalDepositPlan
+            ? causalDepositPlan.dabs
+            : planNormalizedStudioDynamicBrushDabs(
+                { ...dabPlanInput, maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS },
+                dynamics
+              );
+        const baseDabCount = causalDabSegments
+          ? studioDrawNodeSegmentedDabCount(causalDabSegments)
+          : baseDabs.length;
         const symmetryTransforms = studioBrushSymmetryTransforms(el.symmetry);
         // Causal deposits deliberately freeze the live surface's material grid and work ceiling.
         // Retained redraw must not silently upgrade to a denser committed grid after pointer-up,
         // otherwise the same immutable dabs still produce different pixels during handoff.
         const markBudget = usesCausalDepositPlan
-          ? STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
+          ? studioDynamicBrushDepositPipelineUsesContinuation(
+              dynamics.depositPipeline,
+            )
+            ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
+            : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
           : activeDraft
             ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
             : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
-          dabCount: baseDabs.length,
+          dabCount: baseDabCount,
           symmetryCount: symmetryTransforms.length,
           markBudget,
         });
         if (
           usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabs.length
+          && renderBudget.maxDabsPerVariation < baseDabCount
         ) {
-          // Causal-v2 overflow is a versioned accepted-prefix receipt. Never reject the complete
+          // Causal overflow is a versioned accepted-prefix receipt. Never reject the complete
           // element here: doing so made an already-visible long stroke disappear at pointer-up.
           // The live overlay, retained Canvas and SVG all retain this exact immutable dab prefix.
-          baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+          if (causalDabSegments) {
+            causalDabSegments = studioDrawNodeSegmentedDabPrefix(
+              causalDabSegments,
+              renderBudget.maxDabsPerVariation,
+            );
+          } else {
+            baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+          }
         }
         if (
           !usesCausalDepositPlan
-          && renderBudget.maxDabsPerVariation < baseDabs.length
+          && renderBudget.maxDabsPerVariation < baseDabCount
         ) {
           // The dynamics planner's bounded pass redistributes these stations across the whole
           // stroke, retaining both endpoints instead of truncating a dense prefix.
@@ -496,10 +602,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           markBudget,
           renderBudget,
           usesCausalDepositPlan,
-          dabVariations: studioDynamicBrushDabVariationsFromTransforms(
-            baseDabs,
-            symmetryTransforms
-          ),
+          dabVariations: causalDabSegments
+            ? studioDrawNodeSegmentedDabVariations(
+                causalDabSegments,
+                symmetryTransforms,
+              )
+            : studioDynamicBrushDabVariationsFromTransforms(
+                baseDabs,
+                symmetryTransforms,
+              ),
         };
       })()
     : null;
@@ -1075,7 +1186,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     return;
                   }
                   // Only omitted/legacy paint models retain historical per-dab opacity pixels.
-                  // A malformed causal-v2 mark plan is rejected before this Shape is constructed.
+                  // A malformed causal mark plan is rejected before this Shape is constructed.
                   renderStudioDynamicBrushLegacyMarks(context, legacyMarks, opacity);
                 }}
                 globalCompositeOperation={composite}

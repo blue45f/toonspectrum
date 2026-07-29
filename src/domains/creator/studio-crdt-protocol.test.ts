@@ -15,6 +15,7 @@ import {
   parseStudioCrdtUpdateRequest,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_LOCAL_WIRE_BRAND,
+  STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
@@ -51,12 +52,13 @@ function syncResponse(bytes = new Uint8Array([1, 2, 3])) {
 }
 
 describe("studio CRDT protocol", () => {
-  it("pins renderer-significant v3 strokes to the v5 network and local-wire contract", () => {
-    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(5);
-    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v5");
+  it("pins segmented causal v4 strokes to the v6 network and local-wire contract", () => {
+    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(6);
+    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v6");
     expect(STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION).toBe(1);
     expect(STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION).toBe(2);
-    expect(STUDIO_CRDT_STROKE_PAYLOAD_VERSION).toBe(3);
+    expect(STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION).toBe(3);
+    expect(STUDIO_CRDT_STROKE_PAYLOAD_VERSION).toBe(4);
   });
 
   it("accepts only canonical bounded base64 for incremental updates", () => {
@@ -93,7 +95,7 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
-    for (const legacyVersion of [1, 2, 3, 4]) {
+    for (const legacyVersion of [1, 2, 3, 4, 5]) {
       expect(parseStudioCrdtSyncRequest({
         ...syncRequest(),
         protocolVersion: legacyVersion,
@@ -110,7 +112,7 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
-    for (const legacyVersion of [1, 2, 3, 4]) {
+    for (const legacyVersion of [1, 2, 3, 4, 5]) {
       expect(parseStudioCrdtUpdateRequest({
         ...publish,
         protocolVersion: legacyVersion,
@@ -130,6 +132,10 @@ describe("studio CRDT protocol", () => {
     )).toEqual(publish);
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 4 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 5 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();

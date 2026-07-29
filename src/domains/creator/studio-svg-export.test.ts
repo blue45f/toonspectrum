@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
@@ -7,14 +9,16 @@ import { screentoneDotsForStroke } from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSeedFromKey,
+  type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
-  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
 } from "./studio-brush-render-budget";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
@@ -23,6 +27,7 @@ import {
 } from "./studio-brush-tip-stamp";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
 import {
+  planStudioCausalDynamicBrushDepositSegmentsV3,
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
@@ -32,6 +37,7 @@ import {
 } from "./studio-dynamic-brush-coverage-renderer";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
+import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import {
   SVG_EXPORT_MIME,
   escapeXml,
@@ -105,6 +111,41 @@ function dynamicEllipseGroups(svg: string): DynamicEllipseAttributes[][] {
 
 function expectNear(actual: number, expected: number, tolerance = 0.02) {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+}
+
+function referenceCoverageNumber(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 1_000_000) / 1_000_000 + 0;
+  return rounded.toFixed(6).replace(/\.?0+$/u, "");
+}
+
+function referenceDabOpacity(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const bounded = Math.min(1, Math.max(0, value));
+  const rounded = Math.round(bounded * 1_000_000) / 1_000_000;
+  const visible = bounded > 0 && rounded === 0 ? 0.000001 : rounded;
+  return visible.toFixed(6).replace(/\.?0+$/u, "");
+}
+
+function appendReferenceEllipseCoverage(
+  hash: ReturnType<typeof createHash>,
+  mark: StudioDynamicBrushCoverageMark,
+): void {
+  const angleDegrees = mark.angleRadians * 180 / Math.PI;
+  const transform =
+    `rotate(${referenceCoverageNumber(angleDegrees)}`
+    + ` ${referenceCoverageNumber(mark.x)}`
+    + ` ${referenceCoverageNumber(mark.y)})`;
+  hash.update(
+    `<ellipse data-brush-coverage="ellipse"`
+      + ` cx="${referenceCoverageNumber(mark.x)}"`
+      + ` cy="${referenceCoverageNumber(mark.y)}"`
+      + ` rx="${referenceCoverageNumber(mark.radiusX)}"`
+      + ` ry="${referenceCoverageNumber(mark.radiusY)}"`
+      + ` fill="${escapeXml(mark.color)}"`
+      + ` opacity="${referenceDabOpacity(mark.alpha)}"`
+      + ` transform="${transform}"/>`,
+  );
 }
 
 function axisVector(angle: number): { x: number; y: number } {
@@ -457,6 +498,97 @@ describe("도형 직렬화", () => {
     expect(pointSets).toHaveLength(2);
     expect(bounds(pointSets[0]!)).toEqual({ left: 10, top: 20, right: 310, bottom: 110 });
     expect(bounds(pointSets[1]!)).toEqual({ left: 30, top: 160, right: 150, bottom: 460 });
+  });
+
+  it("Rough 도형은 Canvas와 동일 seed·geometry plan을 path 역할 순서 그대로 내보낸다", () => {
+    const sketch = {
+      enabled: true,
+      roughness: 2.1,
+      bowing: 2.5,
+      fillStyle: "cross-hatch" as const,
+    };
+    const shape = rectEl({
+      id: "rough-svg-rect",
+      kind: "rect",
+      points: [12, 18, 172, 118],
+      stroke: "#123456",
+      strokeWidth: 6,
+      fill: "#fedcba",
+      opacity: 0.73,
+      strokeStyle: {
+        dash: "dash",
+        lineCap: "square",
+        arrowStart: "none",
+        arrowEnd: "none",
+      },
+      sketch,
+    });
+    const expected = buildStudioRoughSvgParityPlan({
+      elementId: shape.id,
+      variationIndex: 0,
+      kind: "rect",
+      points: shape.points,
+      strokeWidth: shape.strokeWidth,
+      hasFill: true,
+      shapeParams: {
+        starPoints: 5,
+        starInnerRatio: 0.5,
+        polygonSides: 6,
+        cornerRadius: 3,
+      },
+      style: sketch,
+    });
+    const { svg, skipped } = exportPageToSvg(page([shape]));
+    const group = /<g data-studio-rough-shape="v1" data-rough-seed="([^"]+)" opacity="0.73">(.*?)<\/g>/u
+      .exec(svg);
+    const serializedPaths = Array.from(
+      group?.[2]?.matchAll(
+        /<path d="([^"]+)" data-rough-role="([^"]+)"/gu,
+      ) ?? [],
+      (match) => ({ data: match[1], role: match[2] }),
+    );
+
+    expect(Number(group?.[1])).toBe(expected.seed);
+    expect(serializedPaths).toEqual(
+      expected.paths.map((path) => ({ data: path.data, role: path.role })),
+    );
+    expect(svg).not.toContain('<rect x="12" y="18"');
+    expect(svg).toContain('stroke="#123456"');
+    expect(svg).toContain('stroke="#fedcba"');
+    expect(svg).toContain('stroke-dasharray="18 12"');
+    expect(svg).toContain('stroke-linecap="square"');
+    expect(skipped).toEqual([]);
+  });
+
+  it("Rough 대칭 복제본은 Canvas처럼 variation마다 id seed+index를 사용한다", () => {
+    const shape = rectEl({
+      id: "rough-svg-symmetry",
+      kind: "ellipse",
+      points: [20, 30, 100, 90],
+      fill: undefined,
+      sketch: {
+        enabled: true,
+        roughness: 1.8,
+        bowing: 1.5,
+        fillStyle: "hachure",
+      },
+      symmetry: {
+        type: "vertical",
+        centerX: 120,
+        centerY: 0,
+      },
+    });
+    const { svg } = exportPageToSvg(page([shape]));
+    const seeds = Array.from(
+      svg.matchAll(/data-studio-rough-shape="v1" data-rough-seed="([^"]+)"/gu),
+      (match) => Number(match[1]),
+    );
+
+    expect(seeds).toHaveLength(2);
+    expect(seeds[1]).toBe(seeds[0]! + 1);
+    expect((svg.match(/data-rough-role="outline"/gu) ?? []).length)
+      .toBeGreaterThanOrEqual(2);
+    expect(svg).not.toContain("<ellipse ");
   });
 
   it("선 — 화살촉(삼각형)을 stroke 색으로 채워 함께 그린다", () => {
@@ -2073,13 +2205,140 @@ describe("도형 직렬화", () => {
     expect((kaleidoscope.match(/<rect x=/g) ?? []).length).toBe(64);
   });
 
-  it("causal 텍스처가 최대 dab 예산을 넘으면 비어 있지 않은 accepted prefix를 내보낸다", () => {
+  it("66,305-dab causal-v3 SVG keeps flat-reference bytes without production flatMap", () => {
     const dynamics = normalizeStudioBrushDynamicsSettings({
       ...studioBrushDynamicsPresetSettings("ink-particle"),
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      width: { base: 2, mappings: [] },
+      opacity: { base: 1, mappings: [] },
+      flow: { base: 1, mappings: [] },
+      spacingRatio: null,
+      spacing: { base: 0.25, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+    });
+    const points = Array.from({ length: 149 }, (_, index) => [
+      index % 2 === 0 ? 8 : 120,
+      64,
+    ]).flat();
+    const pressures = Array.from({ length: points.length / 2 }, () => 0.72);
+    const dynamic = rectEl({
+      id: "causal-v3-segmented-byte-reference",
+      kind: "freehand",
+      brush: "ink-particle",
+      mode: "pen",
+      fill: undefined,
+      points,
+      pressures,
+      stroke: "#3257d6",
+      strokeWidth: 2,
+      opacity: 0.37,
+      sampleSpacing: 1,
+      paintModel: "bounded-flow-v2",
+      brushDynamics: dynamics,
+    });
+    const continuation = planStudioCausalDynamicBrushDepositSegmentsV3({
+      points,
+      pressures,
+      settings: dynamics,
+    });
+    expect(continuation.ok).toBe(true);
+    if (!continuation.ok) throw new Error(continuation.reason);
+    expect(continuation.dabCount).toBe(66_305);
+    expect(continuation.segments).toHaveLength(2);
+
+    // Build the historical flattened reference only in the test oracle. Production must preserve
+    // continuation boundaries and pass them straight to the coverage planner.
+    const flatReference = new Array<StudioDynamicBrushDab>(
+      continuation.dabCount,
+    );
+    let referenceOffset = 0;
+    for (const segment of continuation.segments) {
+      for (const plannedDab of segment.dabs) {
+        flatReference[referenceOffset] = plannedDab;
+        referenceOffset += 1;
+      }
+    }
+    expect(referenceOffset).toBe(continuation.dabCount);
+    const referenceVariations = studioDynamicBrushDabVariations(
+      flatReference,
+      dynamic.symmetry,
+    );
+    const renderBudget = planStudioDynamicBrushRenderBudget({
+      settings: dynamics,
+      dabCount: continuation.dabCount,
+      symmetryCount: referenceVariations.length,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+    expect(renderBudget.maxDabsPerVariation).toBe(continuation.dabCount);
+    const referenceCoverage =
+      planStudioDynamicBrushCoverageAndLegacyMarks({
+        dabVariations: referenceVariations,
+        dynamics,
+        dynamicSeed: studioBrushDynamicsSeedFromKey(
+          `${dynamic.id}:${dynamics.seed}`,
+        ),
+        stroke: dynamic.stroke,
+        stampGrid: renderBudget.stampGrid,
+        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+      }).coveragePlan;
+    expect(referenceCoverage.ok).toBe(true);
+    if (!referenceCoverage.ok) {
+      throw new Error(`flat reference rejected: ${referenceCoverage.reason}`);
+    }
+    expect(referenceCoverage.marks).toHaveLength(continuation.dabCount);
+
+    const input = page([dynamic], { width: 128, height: 128 });
+    const first = exportPageToSvg(input);
+    const second = exportPageToSvg(input);
+    expect(first).toEqual(second);
+    expect(first.skipped).toEqual([]);
+    expect(first.caveats).toEqual([]);
+
+    const groupPrefix =
+      `<g opacity="${referenceDabOpacity(dynamic.opacity ?? 1)}">`
+      + `<ellipse data-brush-coverage="ellipse"`;
+    const groupStart = first.svg.indexOf(groupPrefix);
+    expect(groupStart).toBeGreaterThanOrEqual(0);
+    const groupEnd = first.svg.indexOf("</g>", groupStart);
+    expect(groupEnd).toBeGreaterThan(groupStart);
+    const actualHash = createHash("sha256")
+      .update(first.svg.slice(groupStart, groupEnd + 4))
+      .digest("hex");
+    const referenceHash = createHash("sha256");
+    referenceHash.update(
+      `<g opacity="${referenceDabOpacity(dynamic.opacity ?? 1)}">`,
+    );
+    for (const plannedMark of referenceCoverage.marks) {
+      appendReferenceEllipseCoverage(referenceHash, plannedMark);
+    }
+    referenceHash.update("</g>");
+    expect(actualHash).toBe(referenceHash.digest("hex"));
+
+    const source = readFileSync(
+      new URL("./studio-svg-export.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toMatch(
+      /segments\.flatMap\(\(segment\) => segment\.dabs\)/u,
+    );
+    expect(source).toContain("svgSegmentedDynamicDabVariations");
+  }, 30_000);
+
+  it("segmented causal 텍스처가 전체 획 예산을 넘으면 비어 있지 않은 accepted prefix를 내보낸다", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
       spacing: { base: 0.5, mappings: [] },
       tip: { shape: "grain", softness: 0.2 },
     });
-    const result = exportPageToSvg(page([rectEl({
+    const dynamic = rectEl({
       id: "bounded-dynamic-svg",
       kind: "freehand",
       brush: "ink-particle",
@@ -2087,19 +2346,40 @@ describe("도형 직렬화", () => {
       strokeWidth: 12,
       brushDynamics: dynamics,
       symmetry: {
-        type: "kaleidoscope",
+        type: "radial",
         centerX: 360,
         centerY: 500,
-        radialCount: 1_000_000_000,
+        radialCount: 15,
       },
-    })]));
+    });
+    const continuation = planStudioCausalDynamicBrushDepositSegmentsV3({
+      points: dynamic.points,
+      pressures: dynamic.pressures,
+      settings: dynamics,
+    });
+    expect(continuation.ok).toBe(true);
+    if (!continuation.ok) throw new Error(continuation.reason);
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: dynamics,
+      dabCount: continuation.dabCount,
+      symmetryCount: 15,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    });
+    expect(budget.maxDabsPerVariation).toBeGreaterThan(
+      continuation.segments[0]!.nextDabIndex,
+    );
+    expect(budget.maxDabsPerVariation).toBeLessThan(continuation.dabCount);
+
+    const result = exportPageToSvg(page([dynamic]));
     const marks = (
       result.svg.match(/data-brush-coverage="(?:alpha-map|analytic-radial|ellipse)"/gu)
       ?? []
     ).length;
 
     expect(marks).toBeGreaterThan(0);
-    expect(marks).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET);
+    expect(marks).toBeLessThanOrEqual(
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+    );
     expect(result.skipped).toEqual([]);
   });
 });

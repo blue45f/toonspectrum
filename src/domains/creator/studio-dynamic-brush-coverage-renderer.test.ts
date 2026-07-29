@@ -12,6 +12,11 @@ import {
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
 import {
+  hydrateStudioBrushR8GrainAsset,
+  resetStudioBrushR8GrainRegistry,
+  studioBrushR8GrainRegistryStats,
+} from "./studio-brush-r8-grain-runtime";
+import {
   clearStudioBrushSoftFalloffStampCache,
   studioBrushSoftFalloffStampCacheStats,
 } from "./studio-brush-soft-falloff-stamp";
@@ -33,10 +38,12 @@ import {
   STUDIO_DYNAMIC_COVERAGE_ACTIVE_BYTE_BUDGET,
   STUDIO_DYNAMIC_COVERAGE_COMMITTED_CACHE_BYTE_BUDGET,
   STUDIO_DYNAMIC_COVERAGE_COMMITTED_CACHE_MOBILE_BYTE_BUDGET,
+  STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   type StudioCoverageSurface,
   type StudioCoverageSurfaceContext,
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
+import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
 
@@ -132,6 +139,40 @@ class RecordingSurfaceContext {
 
 class RecordingSurface {
   readonly context = new RecordingSurfaceContext();
+
+  constructor(
+    public width: number,
+    public height: number,
+  ) {}
+
+  getContext(): StudioCoverageSurfaceContext {
+    return this.context as unknown as StudioCoverageSurfaceContext;
+  }
+}
+
+class CountingCoverageSurfaceContext {
+  globalAlpha = 1;
+  globalCompositeOperation: GlobalCompositeOperation = "source-over";
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+  fillCount = 0;
+
+  setTransform(): void {}
+  clearRect(): void {}
+  save(): void {}
+  restore(): void {}
+  translate(): void {}
+  rotate(): void {}
+  scale(): void {}
+  beginPath(): void {}
+  arc(): void {}
+  ellipse(): void {}
+  fill(): void {
+    this.fillCount += 1;
+  }
+}
+
+class CountingCoverageSurface {
+  readonly context = new CountingCoverageSurfaceContext();
 
   constructor(
     public width: number,
@@ -312,6 +353,27 @@ function dab(overrides: Partial<StudioDynamicBrushDab> = {}): StudioDynamicBrush
     angle: 0,
     roundness: 1,
     ...overrides,
+  };
+}
+
+function r8GrainSource(
+  bytes: Uint8Array,
+  width: number,
+  height: number,
+) {
+  return {
+    kind: "r8-texture-v1",
+    asset: {
+      assetId: "paper.coverage-checker.v1",
+      encodedSha256: `sha256:${"e".repeat(64)}`,
+      decodedSha256: `sha256:${sha256HexPortable(bytes)}`,
+      byteLength: 137,
+      mediaType: "image/png",
+      width,
+      height,
+      channel: "luminance",
+      encoding: "r8-unorm",
+    },
   };
 }
 
@@ -639,6 +701,170 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       ),
       12,
     );
+  });
+
+  it("rejects a valid R8 reference explicitly until its decoded bytes are verified", () => {
+    resetStudioBrushR8GrainRegistry();
+    const bytes = new Uint8Array([
+      0, 64, 128, 255,
+      255, 128, 64, 0,
+      32, 96, 160, 224,
+      224, 160, 96, 32,
+    ]);
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "hard", softness: 0, alphaMapSize: 8 },
+      grain: {
+        amount: 0.8,
+        scale: 24,
+        contrast: 0.55,
+        seed: 17,
+        space: "canvas-fixed",
+        source: r8GrainSource(bytes, 4, 4),
+      },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[dab({ size: 24 })]],
+      dynamics,
+      dynamicSeed: 71,
+      stroke: "#335577",
+      stampGrid: 7,
+      markBudget: 8,
+    });
+
+    expect(plan).toEqual({ ok: false, reason: "r8-grain-unavailable" });
+    expect(studioBrushR8GrainRegistryStats()).toMatchObject({
+      entries: 0,
+      misses: 1,
+    });
+  });
+
+  it("gives Canvas and SVG consumers one deterministic verified R8 tip×paper mark plan", () => {
+    resetStudioBrushR8GrainRegistry();
+    const bytes = new Uint8Array([
+      0, 64, 128, 255,
+      255, 128, 64, 0,
+      32, 96, 160, 224,
+      224, 160, 96, 32,
+    ]);
+    const source = r8GrainSource(bytes, 4, 4);
+    expect(hydrateStudioBrushR8GrainAsset(source, bytes)).toMatchObject({
+      status: "ready",
+      receipt: {
+        assetId: "paper.coverage-checker.v1",
+        decodedByteLength: 16,
+      },
+    });
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "hard", softness: 0, alphaMapSize: 8 },
+      grain: {
+        amount: 0.8,
+        scale: 24,
+        contrast: 0.55,
+        seed: 17,
+        space: "canvas-fixed",
+        source,
+      },
+      taper: { enabled: false },
+    });
+    const input = {
+      dabVariations: [[dab({
+        x: 18,
+        y: 27,
+        sourceX: 18,
+        sourceY: 27,
+        size: 24,
+        roundness: 0.7,
+        angle: 23,
+      })]],
+      strokeOrigins: [{ x: 18, y: 27 }],
+      dynamics,
+      dynamicSeed: 71,
+      stroke: "#335577",
+      stampGrid: 7 as const,
+      markBudget: 8,
+    };
+    const canvasPlan = planStudioDynamicBrushCoverageMarks(input);
+    const svgPlan = planStudioDynamicBrushCoverageMarks({
+      ...input,
+      dabVariations: input.dabVariations.map((variation) => (
+        variation.map((candidate) => ({ ...candidate }))
+      )),
+    });
+
+    expect(canvasPlan.ok).toBe(true);
+    expect(svgPlan.ok).toBe(true);
+    if (!canvasPlan.ok || !svgPlan.ok) throw new Error("expected verified R8 plans");
+    expect(canvasPlan.marks).toHaveLength(1);
+    expect(svgPlan.marks).toHaveLength(1);
+    const canvasMap = canvasPlan.marks[0]!.texture?.alphaMap;
+    const svgMap = svgPlan.marks[0]!.texture?.alphaMap;
+    expect(canvasMap?.revision).toMatch(/^r8-tip-paper-v1:sha256:[0-9a-f]{64}$/u);
+    expect(svgMap?.revision).toBe(canvasMap?.revision);
+    expect([...svgMap!.alphas]).toEqual([...canvasMap!.alphas]);
+    expect(new Set([...canvasMap!.alphas].map((alpha) => alpha.toFixed(5))).size)
+      .toBeGreaterThan(4);
+    expect(canvasPlan.r8TextureAlphaMapReceipt).toEqual({
+      policy: "r8-texture-alpha-map-bytes-v1",
+      uniqueAlphaMapCount: 1,
+      alphaMapBytes: canvasMap!.alphas.byteLength,
+      alphaMapByteBudget: STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
+    });
+    expect(svgPlan.r8TextureAlphaMapReceipt).toEqual(
+      canvasPlan.r8TextureAlphaMapReceipt,
+    );
+    expect(canvasPlan.marks[0]!.alpha).toBeCloseTo(0.5 * 0.4, 12);
+    expect(svgPlan.marks[0]).toEqual(canvasPlan.marks[0]);
+  });
+
+  it("rejects R8 retained-map memory before allocating a catastrophic v3-sized plan", () => {
+    resetStudioBrushR8GrainRegistry();
+    const bytes = new Uint8Array([
+      0, 64, 128, 255,
+      255, 128, 64, 0,
+      32, 96, 160, 224,
+      224, 160, 96, 32,
+    ]);
+    const source = r8GrainSource(bytes, 4, 4);
+    expect(hydrateStudioBrushR8GrainAsset(source, bytes).status).toBe("ready");
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "hard", softness: 0, alphaMapSize: 256 },
+      grain: {
+        amount: 0.8,
+        scale: 24,
+        contrast: 0.55,
+        seed: 17,
+        space: "canvas-fixed",
+        source,
+      },
+      taper: { enabled: false },
+    });
+    const bytesPerDab = 256 * 256 * Float32Array.BYTES_PER_ELEMENT;
+    const firstRejectedDabCount = Math.floor(
+      STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET / bytesPerDab,
+    ) + 1;
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [Array.from(
+        { length: firstRejectedDabCount },
+        (_, index) => dab({
+          index,
+          x: 10 + index,
+          sourceX: 10 + index,
+          progress: index / Math.max(1, firstRejectedDabCount - 1),
+        }),
+      )],
+      dynamics,
+      dynamicSeed: 71,
+      stroke: "#335577",
+      stampGrid: 3,
+      markBudget: firstRejectedDabCount,
+    });
+
+    expect(firstRejectedDabCount).toBe(65);
+    expect(plan).toEqual({ ok: false, reason: "r8-grain-memory-budget" });
   });
 
   it("keeps a causal screen-dual wet wash as one full composed alpha-map command", () => {
@@ -1040,6 +1266,111 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(activeDestination.draws[0]?.args).toEqual(committedDestination.draws[0]?.args);
   });
 
+  it("streams committed coverage beyond 262,144 tile references with one final opacity", () => {
+    const repeatedMark = mark({
+      x: 64,
+      y: 64,
+      radiusX: 1,
+      radiusY: 1,
+      angleRadians: 0,
+      alpha: 0.03,
+    });
+    const marks = Array<StudioDynamicBrushCoverageMark>(262_145).fill(repeatedMark);
+    const activeDestination = new RecordingDestination();
+    const activeSurfaces: CountingCoverageSurface[] = [];
+    const active = renderStudioDynamicBrushCoverage(activeDestination, marks, {
+      activeDraft: true,
+      opacity: 0.5,
+      surfaceFactory: (width, height) => {
+        const surface = new CountingCoverageSurface(width, height);
+        activeSurfaces.push(surface);
+        return surface as unknown as StudioCoverageSurface;
+      },
+    });
+
+    expect(active).toMatchObject({
+      status: "fallback",
+      reason: "tile-mark-budget",
+    });
+    expect(activeDestination.draws).toHaveLength(0);
+    expect(activeSurfaces).toHaveLength(0);
+
+    const committedDestination = new RecordingDestination();
+    const committedSurfaces: CountingCoverageSurface[] = [];
+    const committed = renderStudioDynamicBrushCoverage(
+      committedDestination,
+      marks,
+      {
+        activeDraft: false,
+        opacity: 0.5,
+        surfaceFactory: (width, height) => {
+          const surface = new CountingCoverageSurface(width, height);
+          committedSurfaces.push(surface);
+          return surface as unknown as StudioCoverageSurface;
+        },
+      },
+    );
+
+    expect(committed).toMatchObject({
+      status: "rendered",
+      scale: 2,
+      tileCount: 1,
+      allocatedBytes: 260 * 260 * 4,
+      tileMarkReferences: 262_145,
+    });
+    expect(committedSurfaces).toHaveLength(1);
+    expect(committedSurfaces[0]!.context.fillCount).toBe(262_145);
+    expect(committedSurfaces[0]).toMatchObject({ width: 1, height: 1 });
+    expect(committedDestination.draws).toEqual([
+      expect.objectContaining({ alpha: 0.8 * 0.5 }),
+    ]);
+  }, 30_000);
+
+  it("streams aggregate committed coverage above 64 MiB through one reusable tile", () => {
+    clearStudioDynamicCoverageCommittedCache();
+    // At 2x, each 128-logical-pixel station occupies its own 260×260 surface tile. 249 tiles
+    // exceed the historical 64 MiB aggregate allocation ceiling (248 tiles fit).
+    const marks = Array.from({ length: 249 }, (_, tileIndex) => mark({
+      x: tileIndex * 128 + 64,
+      y: 64,
+      radiusX: 1,
+      radiusY: 1,
+      angleRadians: 0,
+      alpha: 0.4,
+    }));
+    const destination = new RecordingDestination();
+    const surfaces: CountingCoverageSurface[] = [];
+    const result = renderStudioDynamicBrushCoverage(destination, marks, {
+      activeDraft: false,
+      opacity: 0.25,
+      committedCacheKey: "streaming-above-64mib",
+      surfaceFactory: (width, height) => {
+        const surface = new CountingCoverageSurface(width, height);
+        surfaces.push(surface);
+        return surface as unknown as StudioCoverageSurface;
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "rendered",
+      scale: 2,
+      tileCount: 249,
+      allocatedBytes: 260 * 260 * 4,
+      tileMarkReferences: 249,
+    });
+    expect(surfaces).toHaveLength(1);
+    expect(surfaces[0]!.context.fillCount).toBe(249);
+    expect(surfaces[0]).toMatchObject({ width: 1, height: 1 });
+    expect(destination.draws).toHaveLength(249);
+    expect(destination.draws.every(({ alpha }) => alpha === 0.8 * 0.25)).toBe(true);
+    // Streaming plans are intentionally not retained in the multi-surface committed cache.
+    expect(studioDynamicCoverageCommittedCacheStats()).toMatchObject({
+      bytes: 0,
+      entries: 0,
+      tiles: 0,
+    });
+  });
+
   it("retains exact 4x physical quality for both live and committed coverage", () => {
     const makeDestination = () => {
       const destination = new RecordingDestination();
@@ -1089,7 +1420,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(destination.draws[0]!.alpha).toBeCloseTo(0.8 * 0.6, 12);
   });
 
-  it("reduces only coverage raster resolution when the preferred scale exceeds tile budget", () => {
+  it("preserves committed raster quality by streaming when preferred scale exceeds tile budget", () => {
     const destination = new RecordingDestination();
     destination._context.getTransform = () => ({
       a: 8,
@@ -1116,7 +1447,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       },
     );
 
-    expect(result).toMatchObject({ status: "rendered", scale: 1 });
+    expect(result).toMatchObject({ status: "rendered", scale: 4 });
     if (result.status !== "rendered") throw new Error("expected coverage");
     expect(result.allocatedBytes).toBeLessThanOrEqual(
       STUDIO_DYNAMIC_COVERAGE_ACTIVE_BYTE_BUDGET,
@@ -1235,7 +1566,13 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       taper: { enabled: false },
     });
     const plan = planStudioDynamicBrushCoverageAndLegacyMarks({
-      dabVariations: [[dab(), dab({ index: 1, x: 30, sourceX: 30 })]],
+      dabVariations: [{
+        kind: "studio-dynamic-brush-segmented-dab-variation",
+        segments: [
+          [dab()],
+          [dab({ index: 1, x: 30, sourceX: 30 })],
+        ],
+      }],
       dynamics,
       dynamicSeed: 42,
       stroke: "#123456",

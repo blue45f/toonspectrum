@@ -8,7 +8,8 @@
  */
 
 import {
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  isStudioDynamicBrushCausalDepositPipeline,
+  studioDynamicBrushDepositPipelineUsesContinuation,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import {
@@ -24,7 +25,7 @@ export const STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS = [7, 5, 3] as const;
 export type StudioDynamicBrushRenderStampGrid =
   (typeof STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS)[number];
 /**
- * Causal-v2 accepts marks append-only, so it cannot switch from a dense pointer-down lattice to a
+ * Causal deposits accept marks append-only, so they cannot switch from a dense pointer-down lattice to a
  * sparse long-stroke lattice without clearing already-visible paint. All live, retained and export
  * consumers use this one bounded lattice. Legacy snapshots keep adaptive 7/5/3 planning below.
  */
@@ -42,6 +43,12 @@ export const STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET = 4_096;
 export const STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET = 65_536;
 /** Shared causal deposit ceiling; solid one-mark nibs may use the complete range. */
 export const STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET = 65_536;
+/** Number of independently bounded causal work segments admitted by the V3 persistence contract. */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS = 16;
+/** Complete logical-stroke dab ceiling for the V3 segmented causal contract. */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET =
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET
+  * STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS;
 /**
  * Causal strokes retain one material plan across live append, pointer-up replay and SVG export.
  * Live append normally plans only the unseen suffix, so sharing the committed ceiling protects
@@ -49,6 +56,10 @@ export const STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET = 65_536;
  */
 export const STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET =
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
+/** Complete logical-stroke mark ceiling; each segment retains the historical 65,536 mark bound. */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET =
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
+  * STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_SEGMENTS;
 /** Prefer at least this many full-path stations before retaining a denser alpha-tip grid. */
 export const STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION = 32;
 /**
@@ -77,7 +88,13 @@ export interface StudioDynamicBrushAcceptedPrefixReceipt {
 
 export interface StudioDynamicBrushRenderBudgetInput {
   settings: NormalizedStudioBrushDynamicsSettings;
-  /** Actual base-dab count from the selected legacy or causal deposit plan. */
+  /**
+   * Requested base-dab count from the selected legacy or causal deposit plan.
+   *
+   * Causal callers may pass the authored count before the versioned deposit ceiling is applied.
+   * The planner never admits work beyond that ceiling, but retains this count in its overflow
+   * receipt so an upstream v2/v3 rejection cannot be mistaken for a complete render.
+   */
   dabCount: number;
   /** Number of Canvas/SVG symmetry copies that will be rendered. */
   symmetryCount: number;
@@ -133,10 +150,9 @@ export function countStudioDynamicBrushMarksPerDab(
   grid: StudioDynamicBrushRenderStampGrid
 ): number {
   if (
-    settings.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    isStudioDynamicBrushCausalDepositPipeline(settings.depositPipeline)
   ) {
-    // Causal-v2 carries each solid, analytic or full alpha-map tip as one affine command. The
+    // Causal pipelines carry each solid, analytic or full alpha-map tip as one affine command. The
     // dual tip is precomposed into the primary map; each enabled extra layer contributes one more.
     // `grid` remains serialized for legacy replay but does not reduce a causal texture to circles.
     return 1 + settings.tipLayers.filter((layer) => layer.opacity > 0).length;
@@ -187,21 +203,31 @@ function gridWorkPlans(
 export function planStudioDynamicBrushRenderBudget(
   input: StudioDynamicBrushRenderBudgetInput
 ): StudioDynamicBrushRenderBudgetPlan {
-  const causal = input.settings.depositPipeline
-    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
-  const dabCount = finiteInteger(
+  const causal = isStudioDynamicBrushCausalDepositPipeline(
+    input.settings.depositPipeline,
+  );
+  const causalDabCeiling = studioDynamicBrushDepositPipelineUsesContinuation(
+    input.settings.depositPipeline,
+  )
+    ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_DAB_BUDGET
+    : STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET;
+  const requestedDabCount = finiteInteger(
     input.dabCount,
     0,
     0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  const admittedDabCount = Math.min(
+    requestedDabCount,
     causal
-      ? STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET
+      ? causalDabCeiling
       : 4_096,
   );
   const symmetryCount = finiteInteger(input.symmetryCount, 1, 1, 64);
   const markBudget = finiteInteger(input.markBudget, 1, 1, 100_000_000);
   const candidates = gridWorkPlans(
     input.settings,
-    dabCount,
+    admittedDabCount,
     symmetryCount,
     markBudget,
     causal
@@ -209,13 +235,24 @@ export function planStudioDynamicBrushRenderBudget(
       : STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
     causal,
   );
-  const fullDabPlan = candidates.find((candidate) => candidate.maxDabs >= dabCount);
-  const minimumUsefulDabs = Math.min(dabCount, STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION);
+  const fullDabPlan = candidates.find(
+    (candidate) => candidate.maxDabs >= admittedDabCount,
+  );
+  const minimumUsefulDabs = Math.min(
+    admittedDabCount,
+    STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION,
+  );
   const selected = fullDabPlan
     ?? candidates.find((candidate) => candidate.maxDabs >= minimumUsefulDabs)
     ?? candidates.at(-1)!;
   const defaultPlan = candidates[0]!;
-  const dabCapped = selected.maxDabs < dabCount;
+  // Legacy/non-causal planning retains its historical 4,096 normalization semantics. Causal
+  // receipts, however, compare against the original authored request so both the version ceiling
+  // and a tighter symmetry/mark ceiling remain observable without admitting extra work.
+  const receiptRequestedDabCount = causal
+    ? requestedDabCount
+    : admittedDabCount;
+  const dabCapped = selected.maxDabs < receiptRequestedDabCount;
   const stampGridReduced = causal
     ? false
     : selected.grid !== STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS[0];
@@ -224,9 +261,10 @@ export function planStudioDynamicBrushRenderBudget(
         kind: "studio-dynamic-brush-accepted-prefix-receipt" as const,
         version: 1 as const,
         policy: STUDIO_DYNAMIC_BRUSH_CAUSAL_OVERFLOW_POLICY,
-        requestedDabsPerVariation: dabCount,
+        requestedDabsPerVariation: receiptRequestedDabCount,
         acceptedDabsPerVariation: selected.maxDabs,
-        rejectedDabsPerVariation: dabCount - selected.maxDabs,
+        rejectedDabsPerVariation:
+          receiptRequestedDabCount - selected.maxDabs,
         marksPerDab: selected.marksPerDab,
         symmetryCount,
         markBudget,
@@ -240,7 +278,8 @@ export function planStudioDynamicBrushRenderBudget(
     marksPerDab: selected.marksPerDab,
     symmetryCount,
     estimatedMarks: selected.estimatedMarks,
-    estimatedUnbudgetedMarks: dabCount * symmetryCount * defaultPlan.marksPerDab,
+    estimatedUnbudgetedMarks:
+      receiptRequestedDabCount * symmetryCount * defaultPlan.marksPerDab,
     dabCapped,
     stampGridReduced,
     capped: dabCapped || stampGridReduced,

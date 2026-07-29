@@ -4,7 +4,7 @@ import {
   DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS,
-  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   normalizeStudioBrushDynamicsSample,
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
@@ -315,7 +315,7 @@ describe("studio brush dynamics settings safety", () => {
     for (const preset of STUDIO_BRUSH_DYNAMICS_PRESETS) {
       expect(JSON.parse(JSON.stringify(preset.settings))).toEqual(preset.settings);
       expect(preset.settings.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
       );
       expectFiniteRecipe(resolveStudioBrushDynamics({}, studioBrushDynamicsPresetSettings(preset.id)));
     }
@@ -338,7 +338,7 @@ describe("studio brush dynamics settings safety", () => {
       const value = studioBrushDynamicsSettingsForBrushId(brushId);
       expect(value).not.toBeNull();
       expect(value?.depositPipeline).toBe(
-        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3
       );
       return value!;
     });
