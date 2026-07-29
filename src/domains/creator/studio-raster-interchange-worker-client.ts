@@ -7,15 +7,23 @@ import {
   type StudioRgbaBitmap,
 } from "./studio-raster-interchange";
 import {
+  parseStudioRasterInterchangeWorkerResponse,
   STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
   studioRasterInterchangeRequestTransfers,
   type StudioRasterInterchangeWorkerRequest,
-  type StudioRasterInterchangeWorkerResponse,
   type StudioRasterInterchangeWorkerSuccessResponse,
 } from "./studio-raster-interchange-worker-protocol";
 
 export const STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_BYTES = 4 * 1024 * 1024;
 export const STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_PIXELS = 1_048_576;
+export const STUDIO_RASTER_INTERCHANGE_WORKER_READY_TIMEOUT_DEFAULT_MS = 2_000;
+export const STUDIO_RASTER_INTERCHANGE_WORKER_READY_TIMEOUT_MAX_MS = 10_000;
+export const
+STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_DEFAULT_MS = 120_000;
+export const
+STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS = 600_000;
+
+const STUDIO_RASTER_INTERCHANGE_WORKER_TIMEOUT_MIN_MS = 100;
 
 export class StudioRasterInterchangeWorkerRequiredError extends Error {
   readonly code = "WORKER_REQUIRED" as const;
@@ -27,19 +35,23 @@ export class StudioRasterInterchangeWorkerRequiredError extends Error {
 }
 
 export interface StudioRasterInterchangeWorkerLike {
-  onmessage: ((event: MessageEvent<StudioRasterInterchangeWorkerResponse>) => void) | null;
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
   onerror: ((event: { readonly message?: string; preventDefault?(): void }) => void) | null;
+  onmessageerror: ((event: MessageEvent<unknown>) => void) | null;
   postMessage(message: StudioRasterInterchangeWorkerRequest, transfers: Transferable[]): void;
   terminate(): void;
 }
 
 export type StudioRasterInterchangeWorkerFactory = () => StudioRasterInterchangeWorkerLike | null;
 
-interface StudioRasterInterchangeAsyncOptions {
+export interface StudioRasterInterchangeAsyncOptions {
   readonly signal?: AbortSignal;
   /** `null` explicitly selects the budgeted direct fallback. */
   readonly workerFactory?: StudioRasterInterchangeWorkerFactory | null;
+  /** Legacy-compatible Worker startup/ready deadline. It never limits codec execution. */
   readonly readyTimeoutMs?: number;
+  /** Deadline applied only after ready and successful request transfer. */
+  readonly operationTimeoutMs?: number;
 }
 
 export interface StudioRasterInterchangeAsyncResult {
@@ -144,23 +156,75 @@ function createWorker(
   }
 }
 
+function boundedTimeout(
+  value: number | undefined,
+  defaultValue: number,
+  maximum: number,
+): number {
+  if (value === undefined) return defaultValue;
+  const integer = Math.trunc(value);
+  if (!Number.isFinite(integer)) return defaultValue;
+  return Math.max(
+    STUDIO_RASTER_INTERCHANGE_WORKER_TIMEOUT_MIN_MS,
+    Math.min(maximum, integer),
+  );
+}
+
+function workerFailure(message: string, name: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function workerProtocolFailure(): Error {
+  return workerFailure(
+    "래스터 Worker 응답 프로토콜이 올바르지 않습니다.",
+    "StudioRasterInterchangeWorkerError",
+  );
+}
+
 async function runStudioRasterInterchangeWorker(
   worker: StudioRasterInterchangeWorkerLike,
   request: StudioRasterInterchangeWorkerRequest,
   directFallback: () => StudioRasterInterchangeWorkerSuccessResponse,
   options: StudioRasterInterchangeAsyncOptions
 ): Promise<StudioRasterWorkerRunResult> {
-  const timeoutMs = Math.max(100, Math.min(10_000, Math.trunc(options.readyTimeoutMs ?? 2_000)));
+  const readyTimeoutMs = boundedTimeout(
+    options.readyTimeoutMs,
+    STUDIO_RASTER_INTERCHANGE_WORKER_READY_TIMEOUT_DEFAULT_MS,
+    STUDIO_RASTER_INTERCHANGE_WORKER_READY_TIMEOUT_MAX_MS,
+  );
+  const operationTimeoutMs = boundedTimeout(
+    options.operationTimeoutMs,
+    STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_DEFAULT_MS,
+    STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS,
+  );
 
   return await new Promise<StudioRasterWorkerRunResult>((resolve, reject) => {
     let settled = false;
     let posted = false;
+    let ready = false;
+    let readyTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+    let operationTimer: ReturnType<typeof globalThis.setTimeout> | null =
+      null;
     const cleanup = () => {
-      globalThis.clearTimeout(timer);
+      if (readyTimer !== null) {
+        globalThis.clearTimeout(readyTimer);
+        readyTimer = null;
+      }
+      if (operationTimer !== null) {
+        globalThis.clearTimeout(operationTimer);
+        operationTimer = null;
+      }
       options.signal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
-      worker.terminate();
+      worker.onmessageerror = null;
+      try {
+        worker.terminate();
+      } catch {
+        // A broken terminate implementation must not prevent deterministic settlement.
+      }
     };
     const finish = (callback: () => void) => {
       if (settled) return;
@@ -176,44 +240,114 @@ async function runStudioRasterInterchangeWorker(
         reject(error);
       }
     });
-    const timer = globalThis.setTimeout(() => {
-      if (!posted) {
+    readyTimer = globalThis.setTimeout(
+      fallback,
+      readyTimeoutMs,
+    );
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+    if (options.signal?.aborted) {
+      onAbort();
+      return;
+    }
+    worker.onerror = (event) => {
+      event.preventDefault?.();
+      if (!ready) {
         fallback();
         return;
       }
-      finish(() => reject(new Error("래스터 Worker 처리 시간이 초과되었습니다.")));
-    }, timeoutMs);
-    options.signal?.addEventListener("abort", onAbort, { once: true });
-    worker.onerror = (event) => {
-      event.preventDefault?.();
-      if (!posted) fallback();
-      else finish(() => reject(new Error(event.message || "래스터 Worker 실행 중 오류가 발생했습니다.")));
+      finish(() => reject(
+        workerFailure(
+          "래스터 Worker 실행을 안전하게 완료하지 못했습니다.",
+          "StudioRasterInterchangeWorkerError",
+        ),
+      ));
     };
     worker.onmessage = (event) => {
-      const response = event.data;
-      if (!response || response.version !== STUDIO_RASTER_INTERCHANGE_WORKER_VERSION) {
-        finish(() => reject(new Error("래스터 Worker가 알 수 없는 응답을 반환했습니다.")));
+      const response =
+        parseStudioRasterInterchangeWorkerResponse(event.data);
+      if (!response) {
+        finish(() => reject(workerProtocolFailure()));
         return;
       }
       if (response.type === "studio-raster-interchange/ready") {
-        if (posted) return;
+        if (ready) return;
+        ready = true;
+        if (readyTimer !== null) {
+          globalThis.clearTimeout(readyTimer);
+          readyTimer = null;
+        }
         try {
+          worker.postMessage(
+            request,
+            studioRasterInterchangeRequestTransfers(request),
+          );
           posted = true;
-          worker.postMessage(request, studioRasterInterchangeRequestTransfers(request));
+          operationTimer = globalThis.setTimeout(() => {
+            finish(() => reject(
+              workerFailure(
+                "래스터 Worker 처리 시간이 초과되었습니다.",
+                "TimeoutError",
+              ),
+            ));
+          }, operationTimeoutMs);
         } catch {
-          posted = false;
-          fallback();
+          finish(() => reject(
+            workerFailure(
+              "래스터 Worker 요청을 시작하지 못했습니다.",
+              "StudioRasterInterchangeWorkerError",
+            ),
+          ));
         }
         return;
       }
-      if (!posted || response.requestId !== request.requestId) return;
+      if (response.requestId !== request.requestId) {
+        finish(() => reject(workerProtocolFailure()));
+        return;
+      }
+      if (!posted) {
+        finish(() => reject(workerProtocolFailure()));
+        return;
+      }
       if (response.type === "studio-raster-interchange/failure") {
-        const error = new Error(response.error.message);
-        error.name = response.error.name;
-        finish(() => reject(error));
+        finish(() => reject(
+          workerFailure(
+            "래스터 Worker가 작업을 완료하지 못했습니다.",
+            "StudioRasterInterchangeWorkerError",
+          ),
+        ));
+        return;
+      }
+      if (
+        (
+          request.type === "studio-raster-interchange/encode"
+          && (
+            response.type !== "studio-raster-interchange/encode-success"
+            || response.result.extension !== `.${request.format}`
+          )
+        )
+        || (
+          request.type === "studio-raster-interchange/decode"
+          && (
+            response.type !== "studio-raster-interchange/decode-success"
+            || (
+              request.expectedFormat !== undefined
+              && response.result.format !== request.expectedFormat
+            )
+          )
+        )
+      ) {
+        finish(() => reject(workerProtocolFailure()));
         return;
       }
       finish(() => resolve({ execution: "worker", response }));
+    };
+    worker.onmessageerror = () => {
+      finish(() => reject(
+        workerFailure(
+          "래스터 Worker 응답을 복제하지 못했습니다.",
+          "StudioRasterInterchangeWorkerError",
+        ),
+      ));
     };
   });
 }

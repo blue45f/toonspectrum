@@ -7,6 +7,11 @@
  */
 
 import {
+  createStudioCodecCertificationPipelineGuard,
+  StudioCodecCertificationPipelineGuardError,
+  type StudioCodecCertificationPipelineGuard,
+} from "./studio-codec-certification-pipeline-guard";
+import {
   executeStudioCodecProvider,
   type StudioCodecDirection,
   type StudioCodecExecutionReceipt,
@@ -23,6 +28,15 @@ import {
   STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_VERSION,
   STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_FORMAT,
 } from "./studio-first-party-will-v1-document-codec-provider";
+import {
+  STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_DEFAULT_TIMEOUT_MS,
+  STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_MAX_TIMEOUT_MS,
+  STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_MIN_TIMEOUT_MS,
+  runStudioFirstPartyWillV1DocumentCodecWorker,
+  StudioFirstPartyWillV1DocumentCodecWorkerClientError,
+  type StudioFirstPartyWillV1DocumentCodecWorkerFactory,
+  type StudioFirstPartyWillV1DocumentCodecWorkerResult,
+} from "./studio-first-party-will-v1-document-codec-worker-client";
 import {
   issueStudioProductCodecCertificate,
   verifyStudioProductCodecCertificate,
@@ -41,9 +55,28 @@ export const
 STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
   "application/vnd.toonspectrum.will-v1-annex-b-document-conformance+json" as const;
 
+export const
+STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES =
+  4 * 1024 * 1024;
+
+export type StudioFirstPartyWillV1DocumentCodecExecutionPolicy =
+  | "auto"
+  | "direct"
+  | "worker";
+
 export interface ExecuteAndCertifyStudioFirstPartyWillV1DocumentCodecInput {
   readonly direction: StudioCodecDirection;
   readonly inputBytes: Uint8Array;
+  /**
+   * `auto` prefers the dedicated Worker and permits a bounded direct fallback only when execution
+   * cannot start. `worker` is fail-closed. `direct` is an explicit caller opt-in.
+   */
+  readonly execution?: StudioFirstPartyWillV1DocumentCodecExecutionPolicy;
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
+  readonly workerFactory?:
+    | StudioFirstPartyWillV1DocumentCodecWorkerFactory
+    | null;
   readonly issuedAt: string;
   readonly notBefore?: string;
   readonly expiresAt: string;
@@ -87,7 +120,12 @@ export type StudioFirstPartyWillV1DocumentCertifiedExecutionVerification =
 export class StudioFirstPartyWillV1DocumentCodecCertificationError
   extends Error {
   readonly code:
+    | "CODEC_EXECUTION_ABORTED"
     | "CODEC_EXECUTION_FAILED"
+    | "CODEC_EXECUTION_TIMEOUT"
+    | "CODEC_WORKER_REQUIRED"
+    | "INVALID_TIMEOUT"
+    | "INVALID_EXECUTION_POLICY"
     | "PROVIDER_NOT_FOUND";
 
   constructor(
@@ -98,6 +136,33 @@ export class StudioFirstPartyWillV1DocumentCodecCertificationError
     this.name = "StudioFirstPartyWillV1DocumentCodecCertificationError";
     this.code = code;
   }
+}
+
+function mapPipelineGuardError(
+  error: unknown,
+): StudioFirstPartyWillV1DocumentCodecCertificationError {
+  if (
+    error instanceof StudioCodecCertificationPipelineGuardError
+    && error.code === "timeout"
+  ) {
+    return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+      "CODEC_EXECUTION_TIMEOUT",
+      "First-party WILL v1 document codec certification pipeline timed out.",
+    );
+  }
+  if (
+    error instanceof StudioCodecCertificationPipelineGuardError
+    && error.code === "invalid-timeout"
+  ) {
+    return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+      "INVALID_TIMEOUT",
+      "First-party WILL v1 document codec certification timeout is invalid.",
+    );
+  }
+  return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+    "CODEC_EXECUTION_ABORTED",
+    "First-party WILL v1 document codec certification pipeline was aborted.",
+  );
 }
 
 export function studioFirstPartyWillV1DocumentCodecCertificationScope(
@@ -139,6 +204,209 @@ function requestFor(
     maxInputBytes: provider.manifest.maxInputBytes,
     maxOutputBytes: provider.manifest.maxOutputBytes,
   });
+}
+
+function normalizeExecutionPolicy(
+  value: unknown,
+): StudioFirstPartyWillV1DocumentCodecExecutionPolicy {
+  if (value === undefined) return "auto";
+  if (value === "auto" || value === "direct" || value === "worker") {
+    return value;
+  }
+  throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+    "INVALID_EXECUTION_POLICY",
+    "First-party WILL v1 document codec execution policy is invalid.",
+  );
+}
+
+type SuccessfulCodecExecution =
+  | StudioFirstPartyWillV1DocumentCodecWorkerResult
+  | Readonly<{
+      ok: true;
+      bytes: Uint8Array;
+      receipt: StudioCodecExecutionReceipt;
+    }>;
+
+async function executeDirect(
+  request: StudioCodecExecutionRequest,
+  inputBytes: Uint8Array,
+  provider: StudioCodecProvider,
+  signal: AbortSignal | undefined,
+): Promise<SuccessfulCodecExecution> {
+  if (signal?.aborted) {
+    throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+      "CODEC_EXECUTION_ABORTED",
+      "First-party WILL v1 document codec execution was aborted before direct execution.",
+    );
+  }
+  const execution = await executeStudioCodecProvider(
+    request,
+    inputBytes,
+    [provider],
+  );
+  if (!execution.ok) {
+    throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+      "CODEC_EXECUTION_FAILED",
+      `First-party WILL v1 Annex B document execution failed (${execution.code}).`,
+    );
+  }
+  return execution;
+}
+
+function isWorkerStartupFailure(
+  error: unknown,
+): error is StudioFirstPartyWillV1DocumentCodecWorkerClientError {
+  return (
+    error instanceof
+      StudioFirstPartyWillV1DocumentCodecWorkerClientError
+    && (
+      error.code === "worker-post-failed"
+      || error.code === "worker-unavailable"
+    )
+  );
+}
+
+function workerCertificationError(
+  error: unknown,
+): StudioFirstPartyWillV1DocumentCodecCertificationError {
+  if (
+    error instanceof
+      StudioFirstPartyWillV1DocumentCodecWorkerClientError
+  ) {
+    if (error.code === "worker-aborted") {
+      return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+        "CODEC_EXECUTION_ABORTED",
+        "First-party WILL v1 document codec Worker execution was aborted.",
+      );
+    }
+    if (error.code === "worker-timeout") {
+      return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+        "CODEC_EXECUTION_TIMEOUT",
+        "First-party WILL v1 document codec Worker execution timed out.",
+      );
+    }
+    if (error.code === "worker-unavailable") {
+      return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+        "CODEC_WORKER_REQUIRED",
+        "First-party WILL v1 document codec Worker is required but unavailable.",
+      );
+    }
+  }
+  return new StudioFirstPartyWillV1DocumentCodecCertificationError(
+    "CODEC_EXECUTION_FAILED",
+    "First-party WILL v1 document codec Worker execution failed.",
+  );
+}
+
+function executionMatchesProvider(
+  execution: SuccessfulCodecExecution,
+  request: StudioCodecExecutionRequest,
+  provider: StudioCodecProvider,
+): boolean {
+  const receipt = execution.receipt;
+  const manifest = provider.manifest;
+  return (
+    receipt.providerId === manifest.providerId
+    && receipt.mode === manifest.mode
+    && receipt.direction === request.direction
+    && receipt.format === request.format
+    && receipt.profile === request.profile
+    && receipt.version === request.version
+    && receipt.mimeType === request.mimeType
+    && receipt.extension === request.extension
+    && receipt.deterministic === true
+    && receipt.input.byteLength >= 1
+    && receipt.input.byteLength <= request.maxInputBytes
+    && receipt.output.byteLength === execution.bytes.byteLength
+    && receipt.output.byteLength <= request.maxOutputBytes
+    && receipt.licenseGrant.id === manifest.licenseGrant.id
+    && receipt.licenseGrant.expiresAt
+      === manifest.licenseGrant.expiresAt
+    && receipt.licenseGrant.scope.length
+      === manifest.licenseGrant.scope.length
+    && receipt.licenseGrant.scope.every(
+      (scope, index) =>
+        scope === manifest.licenseGrant.scope[index],
+    )
+    && receipt.officialClaims.externalAttestationAccepted === false
+    && receipt.officialClaims.officialCodec === false
+    && receipt.officialClaims.certified === false
+    && receipt.officialClaims.trademarkAuthorized === false
+  );
+}
+
+async function executeWithPolicy(
+  input: ExecuteAndCertifyStudioFirstPartyWillV1DocumentCodecInput,
+  provider: StudioCodecProvider,
+): Promise<SuccessfulCodecExecution> {
+  const policy = normalizeExecutionPolicy(input.execution);
+  const request = requestFor(provider, input.direction);
+  let execution: SuccessfulCodecExecution;
+  if (policy === "direct") {
+    if (
+      input.inputBytes.byteLength
+        > STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+    ) {
+      throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+        "CODEC_WORKER_REQUIRED",
+        "Large first-party WILL v1 document codec input requires a working Worker.",
+      );
+    }
+    execution = await executeDirect(
+      request,
+      input.inputBytes,
+      provider,
+      input.signal,
+    );
+  } else {
+    try {
+      execution =
+        await runStudioFirstPartyWillV1DocumentCodecWorker(
+          request,
+          input.inputBytes,
+          {
+            signal: input.signal,
+            timeoutMs: input.timeoutMs,
+            workerFactory: input.workerFactory,
+          },
+        );
+    } catch (error) {
+      if (
+        policy === "auto"
+        && isWorkerStartupFailure(error)
+        && input.inputBytes.byteLength
+          <=
+          STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+      ) {
+        execution = await executeDirect(
+          request,
+          input.inputBytes,
+          provider,
+          input.signal,
+        );
+      } else if (
+        policy === "auto"
+        && isWorkerStartupFailure(error)
+        && input.inputBytes.byteLength
+          >
+          STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+      ) {
+        throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+          "CODEC_WORKER_REQUIRED",
+          "Large first-party WILL v1 document input requires a working Worker.",
+        );
+      } else {
+        throw workerCertificationError(error);
+      }
+    }
+  }
+  if (!executionMatchesProvider(execution, request, provider)) {
+    throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
+      "CODEC_EXECUTION_FAILED",
+      "First-party WILL v1 document codec execution identity is invalid.",
+    );
+  }
+  return execution;
 }
 
 function sameReceipt(
@@ -200,50 +468,75 @@ export async function executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
   input: ExecuteAndCertifyStudioFirstPartyWillV1DocumentCodecInput,
   signer: StudioProductCodecCertificationSigner,
 ): Promise<StudioFirstPartyWillV1DocumentCertifiedExecution> {
-  const providers = input.providers ?? [
-    STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_PROVIDER,
-  ];
-  const provider = providerFor(providers);
-  const execution = await executeStudioCodecProvider(
-    requestFor(provider, input.direction),
-    input.inputBytes,
-    [provider],
-  );
-  if (!execution.ok) {
-    throw new StudioFirstPartyWillV1DocumentCodecCertificationError(
-      "CODEC_EXECUTION_FAILED",
-      `First-party WILL v1 Annex B document execution failed (${execution.code}).`,
-    );
+  let guard: StudioCodecCertificationPipelineGuard;
+  try {
+    guard = createStudioCodecCertificationPipelineGuard({
+      signal: input.signal,
+      timeoutMs: input.timeoutMs,
+      defaultTimeoutMs:
+        STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_DEFAULT_TIMEOUT_MS,
+      minTimeoutMs:
+        STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_MIN_TIMEOUT_MS,
+      maxTimeoutMs:
+        STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_WORKER_MAX_TIMEOUT_MS,
+    });
+  } catch (error) {
+    throw mapPipelineGuardError(error);
   }
-  const conformance =
-    await createStudioFirstPartyWillV1DocumentConformanceEvidence([provider]);
-  const scope =
-    studioFirstPartyWillV1DocumentCodecCertificationScope(input.direction);
-  const certificateBytes = await issueStudioProductCodecCertificate(
-    {
-      receipt: execution.receipt,
-      outputBytes: execution.bytes,
-      evidenceBytes: conformance.bytes,
-      evidenceMediaType:
-        STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
+  try {
+    const providers = input.providers ?? [
+      STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_PROVIDER,
+    ];
+    const provider = providerFor(providers);
+    const execution = await guard.run((signal) =>
+      executeWithPolicy({
+        ...input,
+        signal,
+        timeoutMs: guard.timeoutMs,
+      }, provider)
+    );
+    const conformance = await guard.run(() =>
+      createStudioFirstPartyWillV1DocumentConformanceEvidence([provider])
+    );
+    const scope =
+      studioFirstPartyWillV1DocumentCodecCertificationScope(
+        input.direction,
+      );
+    const certificateBytes = await guard.run(() =>
+      issueStudioProductCodecCertificate(
+        {
+          receipt: execution.receipt,
+          outputBytes: execution.bytes,
+          evidenceBytes: conformance.bytes,
+          evidenceMediaType:
+            STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
+          scope,
+          issuedAt: input.issuedAt,
+          ...(input.notBefore ? { notBefore: input.notBefore } : {}),
+          expiresAt: input.expiresAt,
+        },
+        signer,
+      )
+    );
+    return Object.freeze({
+      kind:
+        "toonspectrum-first-party-will-v1-annex-b-document-certified-execution",
+      direction: input.direction,
       scope,
-      issuedAt: input.issuedAt,
-      ...(input.notBefore ? { notBefore: input.notBefore } : {}),
-      expiresAt: input.expiresAt,
-    },
-    signer,
-  );
-  return Object.freeze({
-    kind:
-      "toonspectrum-first-party-will-v1-annex-b-document-certified-execution",
-    direction: input.direction,
-    scope,
-    bytes: execution.bytes,
-    receipt: execution.receipt,
-    conformance: conformance.evidence,
-    conformanceBytes: conformance.bytes,
-    certificateBytes,
-  });
+      bytes: execution.bytes,
+      receipt: execution.receipt,
+      conformance: conformance.evidence,
+      conformanceBytes: conformance.bytes,
+      certificateBytes,
+    });
+  } catch (error) {
+    if (error instanceof StudioCodecCertificationPipelineGuardError) {
+      throw mapPipelineGuardError(error);
+    }
+    throw error;
+  } finally {
+    guard.close();
+  }
 }
 
 export async function verifyStudioFirstPartyWillV1DocumentCertifiedExecution(

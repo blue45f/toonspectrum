@@ -7,6 +7,11 @@
  */
 
 import {
+  createStudioCodecCertificationPipelineGuard,
+  StudioCodecCertificationPipelineGuardError,
+  type StudioCodecCertificationPipelineGuard,
+} from "./studio-codec-certification-pipeline-guard";
+import {
   executeStudioCodecProvider,
   type StudioCodecDirection,
   type StudioCodecExecutionReceipt,
@@ -24,6 +29,14 @@ import {
   STUDIO_FIRST_PARTY_RASTER_CODEC_VERSION,
 } from "./studio-first-party-raster-codec-provider";
 import {
+  STUDIO_FIRST_PARTY_RASTER_CODEC_WORKER_DEFAULT_TIMEOUT_MS,
+  STUDIO_FIRST_PARTY_RASTER_CODEC_WORKER_MAX_TIMEOUT_MS,
+  runStudioFirstPartyRasterCodecWorker,
+  StudioFirstPartyRasterCodecWorkerClientError,
+  type StudioFirstPartyRasterCodecWorkerFactory,
+  type StudioFirstPartyRasterCodecWorkerResult,
+} from "./studio-first-party-raster-codec-worker-client";
+import {
   issueStudioProductCodecCertificate,
   verifyStudioProductCodecCertificate,
   type StudioProductCodecCertificate,
@@ -37,10 +50,29 @@ import type { StudioRasterInterchangeFormat } from "./studio-raster-interchange"
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
   "application/vnd.toonspectrum.raster-codec-conformance+json" as const;
 
+export const
+STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES =
+  4 * 1024 * 1024;
+
+export type StudioFirstPartyRasterCodecExecutionPolicy =
+  | "auto"
+  | "direct"
+  | "worker";
+
 export interface ExecuteAndCertifyStudioFirstPartyRasterCodecInput {
   readonly format: StudioRasterInterchangeFormat;
   readonly direction: StudioCodecDirection;
   readonly inputBytes: Uint8Array;
+  /**
+   * `auto` prefers the dedicated Worker and permits a bounded direct fallback only when Worker
+   * startup is unavailable. `worker` is fail-closed. `direct` is an explicit caller opt-in.
+   */
+  readonly execution?: StudioFirstPartyRasterCodecExecutionPolicy;
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
+  readonly workerFactory?:
+    | StudioFirstPartyRasterCodecWorkerFactory
+    | null;
   readonly issuedAt: string;
   readonly notBefore?: string;
   readonly expiresAt: string;
@@ -86,7 +118,12 @@ export type StudioFirstPartyRasterCertifiedExecutionVerification =
 
 export class StudioFirstPartyRasterCodecCertificationError extends Error {
   readonly code:
+    | "CODEC_EXECUTION_ABORTED"
     | "CODEC_EXECUTION_FAILED"
+    | "CODEC_EXECUTION_TIMEOUT"
+    | "CODEC_WORKER_REQUIRED"
+    | "INVALID_TIMEOUT"
+    | "INVALID_EXECUTION_POLICY"
     | "PROVIDER_NOT_FOUND";
 
   constructor(
@@ -97,6 +134,33 @@ export class StudioFirstPartyRasterCodecCertificationError extends Error {
     this.name = "StudioFirstPartyRasterCodecCertificationError";
     this.code = code;
   }
+}
+
+function mapPipelineGuardError(
+  error: unknown,
+): StudioFirstPartyRasterCodecCertificationError {
+  if (
+    error instanceof StudioCodecCertificationPipelineGuardError
+    && error.code === "timeout"
+  ) {
+    return new StudioFirstPartyRasterCodecCertificationError(
+      "CODEC_EXECUTION_TIMEOUT",
+      "First-party raster codec certification pipeline timed out.",
+    );
+  }
+  if (
+    error instanceof StudioCodecCertificationPipelineGuardError
+    && error.code === "invalid-timeout"
+  ) {
+    return new StudioFirstPartyRasterCodecCertificationError(
+      "INVALID_TIMEOUT",
+      "First-party raster codec certification timeout is invalid.",
+    );
+  }
+  return new StudioFirstPartyRasterCodecCertificationError(
+    "CODEC_EXECUTION_ABORTED",
+    "First-party raster codec certification pipeline was aborted.",
+  );
 }
 
 export function studioFirstPartyRasterCodecCertificationScope(
@@ -150,6 +214,186 @@ function requestFor(
     maxInputBytes: provider.manifest.maxInputBytes,
     maxOutputBytes: provider.manifest.maxOutputBytes,
   });
+}
+
+function normalizeExecutionPolicy(
+  value: unknown,
+): StudioFirstPartyRasterCodecExecutionPolicy {
+  if (value === undefined) return "auto";
+  if (value === "auto" || value === "direct" || value === "worker") {
+    return value;
+  }
+  throw new StudioFirstPartyRasterCodecCertificationError(
+    "INVALID_EXECUTION_POLICY",
+    "First-party raster codec execution policy is invalid.",
+  );
+}
+
+type SuccessfulCodecExecution =
+  | StudioFirstPartyRasterCodecWorkerResult
+  | Readonly<{
+      ok: true;
+      bytes: Uint8Array;
+      receipt: StudioCodecExecutionReceipt;
+    }>;
+
+async function executeDirect(
+  request: StudioCodecExecutionRequest,
+  inputBytes: Uint8Array,
+  provider: StudioCodecProvider,
+  signal: AbortSignal | undefined,
+): Promise<SuccessfulCodecExecution> {
+  if (signal?.aborted) {
+    throw new StudioFirstPartyRasterCodecCertificationError(
+      "CODEC_EXECUTION_ABORTED",
+      "First-party raster codec execution was aborted before direct execution.",
+    );
+  }
+  const execution = await executeStudioCodecProvider(
+    request,
+    inputBytes,
+    [provider],
+  );
+  if (!execution.ok) {
+    throw new StudioFirstPartyRasterCodecCertificationError(
+      "CODEC_EXECUTION_FAILED",
+      `First-party raster codec execution failed (${execution.code}).`,
+    );
+  }
+  return execution;
+}
+
+function isWorkerStartupFailure(
+  error: unknown,
+): error is StudioFirstPartyRasterCodecWorkerClientError {
+  return (
+    error instanceof StudioFirstPartyRasterCodecWorkerClientError
+    && (
+      error.code === "worker-post-failed"
+      || error.code === "worker-unavailable"
+    )
+  );
+}
+
+function workerCertificationError(
+  error: unknown,
+): StudioFirstPartyRasterCodecCertificationError {
+  if (error instanceof StudioFirstPartyRasterCodecWorkerClientError) {
+    if (error.code === "worker-aborted") {
+      return new StudioFirstPartyRasterCodecCertificationError(
+        "CODEC_EXECUTION_ABORTED",
+        "First-party raster codec Worker execution was aborted.",
+      );
+    }
+    if (error.code === "worker-timeout") {
+      return new StudioFirstPartyRasterCodecCertificationError(
+        "CODEC_EXECUTION_TIMEOUT",
+        "First-party raster codec Worker execution timed out.",
+      );
+    }
+    if (error.code === "worker-unavailable") {
+      return new StudioFirstPartyRasterCodecCertificationError(
+        "CODEC_WORKER_REQUIRED",
+        "First-party raster codec Worker is required but unavailable.",
+      );
+    }
+  }
+  return new StudioFirstPartyRasterCodecCertificationError(
+    "CODEC_EXECUTION_FAILED",
+    "First-party raster codec Worker execution failed.",
+  );
+}
+
+function executionMatchesProvider(
+  execution: SuccessfulCodecExecution,
+  request: StudioCodecExecutionRequest,
+  provider: StudioCodecProvider,
+): boolean {
+  const receipt = execution.receipt;
+  return (
+    receipt.providerId === provider.manifest.providerId
+    && receipt.mode === provider.manifest.mode
+    && receipt.direction === request.direction
+    && receipt.format === request.format
+    && receipt.profile === request.profile
+    && receipt.version === request.version
+    && receipt.mimeType === request.mimeType
+    && receipt.extension === request.extension
+    && receipt.output.byteLength === execution.bytes.byteLength
+  );
+}
+
+async function executeWithPolicy(
+  input: ExecuteAndCertifyStudioFirstPartyRasterCodecInput,
+  provider: StudioCodecProvider,
+): Promise<SuccessfulCodecExecution> {
+  const policy = normalizeExecutionPolicy(input.execution);
+  const request = requestFor(provider, input.direction);
+  let execution: SuccessfulCodecExecution;
+  if (policy === "direct") {
+    if (
+      input.inputBytes.byteLength
+        > STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+    ) {
+      throw new StudioFirstPartyRasterCodecCertificationError(
+        "CODEC_WORKER_REQUIRED",
+        "Large first-party raster codec input requires a working Worker.",
+      );
+    }
+    execution = await executeDirect(
+      request,
+      input.inputBytes,
+      provider,
+      input.signal,
+    );
+  } else {
+    try {
+      execution = await runStudioFirstPartyRasterCodecWorker(
+        request,
+        input.inputBytes,
+        {
+          signal: input.signal,
+          timeoutMs: input.timeoutMs,
+          workerFactory: input.workerFactory,
+        },
+      );
+    } catch (error) {
+      if (
+        policy === "auto"
+        && isWorkerStartupFailure(error)
+        && input.inputBytes.byteLength
+          <=
+          STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+      ) {
+        execution = await executeDirect(
+          request,
+          input.inputBytes,
+          provider,
+          input.signal,
+        );
+      } else if (
+        policy === "auto"
+        && isWorkerStartupFailure(error)
+        && input.inputBytes.byteLength
+          >
+          STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+      ) {
+        throw new StudioFirstPartyRasterCodecCertificationError(
+          "CODEC_WORKER_REQUIRED",
+          "Large first-party raster codec input requires a working Worker.",
+        );
+      } else {
+        throw workerCertificationError(error);
+      }
+    }
+  }
+  if (!executionMatchesProvider(execution, request, provider)) {
+    throw new StudioFirstPartyRasterCodecCertificationError(
+      "CODEC_EXECUTION_FAILED",
+      "First-party raster codec execution identity is invalid.",
+    );
+  }
+  return execution;
 }
 
 function sameReceipt(
@@ -211,54 +455,76 @@ export async function executeAndCertifyStudioFirstPartyRasterCodec(
   input: ExecuteAndCertifyStudioFirstPartyRasterCodecInput,
   signer: StudioProductCodecCertificationSigner,
 ): Promise<StudioFirstPartyRasterCertifiedExecution> {
-  const providers =
-    input.providers ?? STUDIO_FIRST_PARTY_RASTER_CODEC_PROVIDERS;
-  const provider = providerFor(input.format, providers);
-  const execution = await executeStudioCodecProvider(
-    requestFor(provider, input.direction),
-    input.inputBytes,
-    [provider],
-  );
-  if (!execution.ok) {
-    throw new StudioFirstPartyRasterCodecCertificationError(
-      "CODEC_EXECUTION_FAILED",
-      `First-party raster codec execution failed (${execution.code}).`,
-    );
+  let guard: StudioCodecCertificationPipelineGuard;
+  try {
+    guard = createStudioCodecCertificationPipelineGuard({
+      signal: input.signal,
+      timeoutMs: input.timeoutMs,
+      defaultTimeoutMs:
+        STUDIO_FIRST_PARTY_RASTER_CODEC_WORKER_DEFAULT_TIMEOUT_MS,
+      minTimeoutMs: 1,
+      maxTimeoutMs:
+        STUDIO_FIRST_PARTY_RASTER_CODEC_WORKER_MAX_TIMEOUT_MS,
+    });
+  } catch (error) {
+    throw mapPipelineGuardError(error);
   }
-  const conformance =
-    await createStudioFirstPartyRasterConformanceEvidence(
-      input.format,
-      [provider],
+  try {
+    const providers =
+      input.providers ?? STUDIO_FIRST_PARTY_RASTER_CODEC_PROVIDERS;
+    const provider = providerFor(input.format, providers);
+    const execution = await guard.run((signal) =>
+      executeWithPolicy({
+        ...input,
+        signal,
+        timeoutMs: guard.timeoutMs,
+      }, provider)
     );
-  const scope = studioFirstPartyRasterCodecCertificationScope(
-    input.format,
-    input.direction,
-  );
-  const certificateBytes = await issueStudioProductCodecCertificate(
-    {
-      receipt: execution.receipt,
-      outputBytes: execution.bytes,
-      evidenceBytes: conformance.bytes,
-      evidenceMediaType:
-        STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
+    const conformance = await guard.run(() =>
+      createStudioFirstPartyRasterConformanceEvidence(
+        input.format,
+        [provider],
+      )
+    );
+    const scope = studioFirstPartyRasterCodecCertificationScope(
+      input.format,
+      input.direction,
+    );
+    const certificateBytes = await guard.run(() =>
+      issueStudioProductCodecCertificate(
+        {
+          receipt: execution.receipt,
+          outputBytes: execution.bytes,
+          evidenceBytes: conformance.bytes,
+          evidenceMediaType:
+            STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
+          scope,
+          issuedAt: input.issuedAt,
+          ...(input.notBefore ? { notBefore: input.notBefore } : {}),
+          expiresAt: input.expiresAt,
+        },
+        signer,
+      )
+    );
+    return Object.freeze({
+      kind: "toonspectrum-first-party-raster-certified-execution",
+      format: input.format,
+      direction: input.direction,
       scope,
-      issuedAt: input.issuedAt,
-      ...(input.notBefore ? { notBefore: input.notBefore } : {}),
-      expiresAt: input.expiresAt,
-    },
-    signer,
-  );
-  return Object.freeze({
-    kind: "toonspectrum-first-party-raster-certified-execution",
-    format: input.format,
-    direction: input.direction,
-    scope,
-    bytes: execution.bytes,
-    receipt: execution.receipt,
-    conformance: conformance.evidence,
-    conformanceBytes: conformance.bytes,
-    certificateBytes,
-  });
+      bytes: execution.bytes,
+      receipt: execution.receipt,
+      conformance: conformance.evidence,
+      conformanceBytes: conformance.bytes,
+      certificateBytes,
+    });
+  } catch (error) {
+    if (error instanceof StudioCodecCertificationPipelineGuardError) {
+      throw mapPipelineGuardError(error);
+    }
+    throw error;
+  } finally {
+    guard.close();
+  }
 }
 
 export async function verifyStudioFirstPartyRasterCertifiedExecution(

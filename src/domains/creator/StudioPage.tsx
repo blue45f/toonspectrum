@@ -1457,6 +1457,7 @@ import type {
   StudioGpuLiveStrokePlanner,
 } from "./studio-webgpu-live-stroke-plan";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
+import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type {
   StudioAssetShareOptions,
   StudioAssetSortOrder,
@@ -32643,6 +32644,24 @@ function clearSelectionForEdit() {
     return exportStudioInkMl(drawElements);
   }
 
+  async function exportCurrentPageToWillV1(): Promise<StudioWillV1PageExportResult> {
+    if (!ensureSharedDocumentAvailableForExport()) {
+      throw new Error("공동 문서를 불러온 뒤 WILL v1으로 내보낼 수 있어요.");
+    }
+    const { exportStudioPageToWillV1 } = await import("./studio-will-v1-export-bridge");
+    const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
+    const drawElements = activePage.elements.filter(
+      (element): element is DrawEl =>
+        element.type === "draw" && !isEffectivelyHidden(element, pageGroups),
+    );
+    return exportStudioPageToWillV1({
+      width: CANVAS_W,
+      height: canvasH,
+      title,
+      elements: drawElements,
+    });
+  }
+
   // 현재 페이지 → 요소별 레이어를 가진 PSD. exportPagePsd 는 숨김 요소를 스스로 거르지 않으므로
   // (숨긴 요소는 렌더 시점에 Konva 노드 자체가 없어 캡처가 불가능 — 모듈 JSDoc 계약) 여기서
   // isEffectivelyHidden 기준으로 미리 걸러 넘긴다.
@@ -34071,6 +34090,7 @@ function clearSelectionForEdit() {
     exportCurrentPageToPsd,
     exportCurrentPageToRasterInterchange,
     exportCurrentPageToInkMl,
+    exportCurrentPageToWillV1,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,

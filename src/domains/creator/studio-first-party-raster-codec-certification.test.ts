@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   executeAndCertifyStudioFirstPartyRasterCodec,
+  STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES,
   studioFirstPartyRasterCodecCertificationScope,
   verifyStudioFirstPartyRasterCertifiedExecution,
 } from "./studio-first-party-raster-codec-certification";
@@ -12,9 +13,18 @@ import {
   encodeStudioCodecRgbaEnvelope,
 } from "./studio-first-party-raster-codec-provider";
 import {
+  executeStudioFirstPartyRasterCodecWorkerMessage,
+} from "./studio-first-party-raster-codec.worker";
+import {
   issueStudioProductCodecCertificate,
 } from "./studio-product-codec-certification";
 
+import type {
+  StudioFirstPartyRasterCodecWorkerLike,
+} from "./studio-first-party-raster-codec-worker-client";
+import type {
+  StudioFirstPartyRasterCodecWorkerRunMessage,
+} from "./studio-first-party-raster-codec-worker-protocol";
 import type {
   StudioProductCodecCertificationSigner,
   StudioProductCodecCertificationTrustRoot,
@@ -34,6 +44,68 @@ const INPUT = encodeStudioCodecRgbaEnvelope({
     200, 150, 100, 255,
   ),
 });
+
+type FakeWorkerMode =
+  | "hang"
+  | "post-error"
+  | "runtime-error"
+  | "success";
+
+class CertificationFakeWorker
+implements StudioFirstPartyRasterCodecWorkerLike {
+  onmessage: StudioFirstPartyRasterCodecWorkerLike["onmessage"] = null;
+  onerror: StudioFirstPartyRasterCodecWorkerLike["onerror"] = null;
+  onmessageerror:
+    StudioFirstPartyRasterCodecWorkerLike["onmessageerror"] = null;
+  readonly requests: StudioFirstPartyRasterCodecWorkerRunMessage[] = [];
+  readonly transfers: Transferable[][] = [];
+  terminateCount = 0;
+  readonly #mode: FakeWorkerMode;
+
+  constructor(mode: FakeWorkerMode = "success") {
+    this.#mode = mode;
+  }
+
+  postMessage(
+    message: StudioFirstPartyRasterCodecWorkerRunMessage,
+    transfer: Transferable[],
+  ): void {
+    if (this.#mode === "post-error") {
+      throw new DOMException("raw startup failure", "DataCloneError");
+    }
+    this.transfers.push([...transfer]);
+    const workerMessage = structuredClone(message, { transfer });
+    this.requests.push(workerMessage);
+    if (this.#mode === "runtime-error") {
+      queueMicrotask(() => {
+        this.onerror?.({
+          message: "raw provider crash",
+        } as ErrorEvent);
+      });
+    } else if (this.#mode === "success") {
+      queueMicrotask(() => {
+        void this.#respond(workerMessage);
+      });
+    }
+  }
+
+  terminate(): void {
+    this.terminateCount += 1;
+  }
+
+  async #respond(
+    message: StudioFirstPartyRasterCodecWorkerRunMessage,
+  ): Promise<void> {
+    const dispatch =
+      await executeStudioFirstPartyRasterCodecWorkerMessage(message);
+    if (!dispatch) throw new Error("Missing raster Worker dispatch.");
+    this.onmessage?.({
+      data: structuredClone(dispatch.response, {
+        transfer: [...dispatch.transfer],
+      }),
+    } as MessageEvent<unknown>);
+  }
+}
 
 async function credentials(
   scope: string,
@@ -386,5 +458,243 @@ describe("first-party raster codec product certification", () => {
       }),
     ).resolves.toMatchObject({ ok: true });
     expect(claimed.size).toBe(1);
+  });
+
+  it("prefers the dedicated Worker in auto mode and signs its exact result", async () => {
+    const scope = studioFirstPartyRasterCodecCertificationScope(
+      "qoi",
+      "encode",
+    );
+    const { signer, root } = await credentials(scope);
+    const worker = new CertificationFakeWorker();
+    const certified = await executeAndCertifyStudioFirstPartyRasterCodec(
+      {
+        format: "qoi",
+        direction: "encode",
+        inputBytes: INPUT,
+        execution: "auto",
+        workerFactory: () => worker,
+        issuedAt: ISSUED_AT,
+        expiresAt: EXPIRES_AT,
+      },
+      signer,
+    );
+
+    expect(worker.requests).toHaveLength(1);
+    expect(worker.transfers[0]).toHaveLength(1);
+    expect(worker.terminateCount).toBe(1);
+    expect(certified.receipt).toMatchObject({
+      providerId: "toonspectrum.raster.qoi.v1",
+      input: { byteLength: INPUT.byteLength },
+      output: { byteLength: certified.bytes.byteLength },
+    });
+    await expect(
+      verifyStudioFirstPartyRasterCertifiedExecution(certified, {
+        trustRoots: [root],
+        nowEpochMs: VERIFY_AT,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("allows auto direct fallback only for small Worker startup failures", async () => {
+    const scope = studioFirstPartyRasterCodecCertificationScope(
+      "qoi",
+      "encode",
+    );
+    const { signer } = await credentials(scope);
+    const unavailable =
+      await executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "auto",
+          workerFactory: null,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      );
+    expect(unavailable.receipt.providerId).toBe(
+      "toonspectrum.raster.qoi.v1",
+    );
+
+    const postFailure = new CertificationFakeWorker("post-error");
+    const recovered =
+      await executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "auto",
+          workerFactory: () => postFailure,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      );
+    expect(recovered.receipt.providerId).toBe(
+      "toonspectrum.raster.qoi.v1",
+    );
+    expect(postFailure.terminateCount).toBe(1);
+
+    const runtimeFailure = new CertificationFakeWorker("runtime-error");
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "auto",
+          workerFactory: () => runtimeFailure,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({
+      code: "CODEC_EXECUTION_FAILED",
+      message: "First-party raster codec Worker execution failed.",
+    });
+    expect(runtimeFailure.terminateCount).toBe(1);
+
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: new Uint8Array(
+            STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+              + 1,
+          ),
+          execution: "auto",
+          workerFactory: null,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({
+      code: "CODEC_WORKER_REQUIRED",
+    });
+  });
+
+  it("keeps explicit worker fail-closed and explicit direct independent", async () => {
+    const scope = studioFirstPartyRasterCodecCertificationScope(
+      "qoi",
+      "encode",
+    );
+    const { signer } = await credentials(scope);
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "worker",
+          workerFactory: null,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({
+      code: "CODEC_WORKER_REQUIRED",
+    });
+
+    const workerFactory = vi.fn(() => {
+      throw new Error("must not construct");
+    });
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "direct",
+          workerFactory,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).resolves.toMatchObject({
+      receipt: {
+        providerId: "toonspectrum.raster.qoi.v1",
+      },
+    });
+    expect(workerFactory).not.toHaveBeenCalled();
+
+    await expect(
+      executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: new Uint8Array(
+            STUDIO_FIRST_PARTY_RASTER_CODEC_DIRECT_FALLBACK_MAX_INPUT_BYTES
+              + 1,
+          ),
+          execution: "direct",
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      ),
+    ).rejects.toMatchObject({ code: "CODEC_WORKER_REQUIRED" });
+  });
+
+  it("maps AbortSignal and timeout to hard-terminated certification errors", async () => {
+    const scope = studioFirstPartyRasterCodecCertificationScope(
+      "qoi",
+      "encode",
+    );
+    const { signer } = await credentials(scope);
+    const controller = new AbortController();
+    const abortedWorker = new CertificationFakeWorker("hang");
+    const aborted = executeAndCertifyStudioFirstPartyRasterCodec(
+      {
+        format: "qoi",
+        direction: "encode",
+        inputBytes: INPUT,
+        execution: "worker",
+        workerFactory: () => abortedWorker,
+        signal: controller.signal,
+        issuedAt: ISSUED_AT,
+        expiresAt: EXPIRES_AT,
+      },
+      signer,
+    );
+    await Promise.resolve();
+    controller.abort();
+    await expect(aborted).rejects.toMatchObject({
+      code: "CODEC_EXECUTION_ABORTED",
+    });
+    expect(abortedWorker.terminateCount).toBe(1);
+
+    vi.useFakeTimers();
+    try {
+      const timeoutWorker = new CertificationFakeWorker("hang");
+      const timedOut = executeAndCertifyStudioFirstPartyRasterCodec(
+        {
+          format: "qoi",
+          direction: "encode",
+          inputBytes: INPUT,
+          execution: "worker",
+          workerFactory: () => timeoutWorker,
+          timeoutMs: 5,
+          issuedAt: ISSUED_AT,
+          expiresAt: EXPIRES_AT,
+        },
+        signer,
+      );
+      const rejection = expect(timedOut).rejects.toMatchObject({
+        code: "CODEC_EXECUTION_TIMEOUT",
+      });
+      await vi.advanceTimersByTimeAsync(5);
+      await rejection;
+      expect(timeoutWorker.terminateCount).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

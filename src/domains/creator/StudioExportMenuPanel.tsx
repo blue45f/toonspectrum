@@ -56,6 +56,7 @@ import type {
   StudioRasterInterchangeFormat,
 } from "./studio-raster-interchange";
 import type { SvgExportResult } from "./studio-svg-export";
+import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { Dispatch, SetStateAction } from "react";
 
 import { cx } from "@/lib/cx";
@@ -142,6 +143,8 @@ export interface StudioExportMenuPanelProps {
   exportCurrentPageToSvg?: () => Promise<SvgExportResult>;
   /** 현재 페이지의 보이는 펜 자유곡선을 검증된 bounded InkML로 내보냅니다. */
   exportCurrentPageToInkMl?: () => Promise<StudioInkMlExportResult>;
+  /** 보이는 펜 자유곡선을 ToonSpectrum bounded public-spec WILL v1 Annex B로 내보냅니다. */
+  exportCurrentPageToWillV1?: () => Promise<StudioWillV1PageExportResult>;
   /**
    * 현재 페이지를 요소별 레이어를 가진 PSD로 캡처 — Konva 스테이지에서 요소를 하나씩
    * 래스터화해야 하므로(여러 번의 toCanvas) SVG와 달리 비동기다. StudioPage가 stage/요소/
@@ -181,6 +184,7 @@ export function StudioExportMenuPanel({
   capturePagesForIndices,
   exportCurrentPageToSvg,
   exportCurrentPageToInkMl,
+  exportCurrentPageToWillV1,
   exportCurrentPageToPsd,
   exportCurrentPageToRasterInterchange,
 }: StudioExportMenuPanelProps) {
@@ -199,7 +203,7 @@ export function StudioExportMenuPanel({
   const [openRasterFormat, setOpenRasterFormat] = useState<StudioRasterInterchangeFormat>("qoi");
   const [openRasterBusy, setOpenRasterBusy] = useState(false);
   const [openRasterStatus, setOpenRasterStatus] = useState<ExportRunStatus | null>(null);
-  const [archiveBusy, setArchiveBusy] = useState<"cbz" | "inkml" | "ora" | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<"cbz" | "inkml" | "ora" | "will" | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<ExportRunStatus | null>(null);
   // 콘택트시트(다중 페이지 축소판을 인쇄용 한 장에 타일링) 실행 상태 — 다른 내보내기와 독립.
   const [contactColumns, setContactColumns] = useState<number>(DEFAULT_CONTACT_SHEET_COLUMNS);
@@ -507,6 +511,55 @@ export function StudioExportMenuPanel({
       setArchiveStatus({
         tone: "warn",
         text: error instanceof Error ? error.message : "InkML 파일을 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setArchiveBusy(null);
+    }
+  }
+
+  async function runWillV1Export() {
+    if (
+      !exportCurrentPageToWillV1 || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      pdfBusy || presetBusy || isExporting || contactBusy
+    ) return;
+    setArchiveBusy("will");
+    setArchiveStatus({
+      tone: "info",
+      text: "보이는 자유곡선을 bounded WILL v1 Annex B Worker로 패키징하는 중…",
+    });
+    try {
+      const result = await exportCurrentPageToWillV1();
+      if (!mountedRef.current) return;
+      const owned = Uint8Array.from(result.bytes);
+      downloadBlob(
+        new Blob([owned.buffer], { type: result.mediaType }),
+        `${safeExportBaseName(exportTitle)}${result.extension}`,
+      );
+      const quantized = result.loss.items.reduce(
+        (total, item) => total + item.changedValues,
+        0,
+      );
+      setArchiveStatus({
+        tone:
+          result.skipped.length > 0 || result.adaptations.length > 0 || quantized > 0
+            ? "warn"
+            : "good",
+        text: [
+          `WILL v1 ${result.exportedStrokeIds.length}개 획을 저장했어요.`,
+          result.skipped.length > 0
+            ? `표현할 수 없는 ${result.skipped.length}개 요소는 제외했어요.`
+            : "",
+          result.adaptations.length > 0 || quantized > 0
+            ? `bounded profile 변환 ${result.adaptations.length + quantized}건을 결과에 반영했어요.`
+            : "",
+          result.disclaimer,
+        ].filter(Boolean).join(" "),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setArchiveStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "WILL v1 파일을 만들지 못했습니다.",
       });
     } finally {
       if (mountedRef.current) setArchiveBusy(null);
@@ -1231,7 +1284,11 @@ export function StudioExportMenuPanel({
         <div
           className={cx(
             "grid gap-1.5",
-            exportCurrentPageToInkMl ? "grid-cols-3" : "grid-cols-2",
+            exportCurrentPageToWillV1
+              ? "grid-cols-2"
+              : exportCurrentPageToInkMl
+                ? "grid-cols-3"
+                : "grid-cols-2",
           )}
         >
           <button
@@ -1275,10 +1332,28 @@ export function StudioExportMenuPanel({
               {archiveBusy === "inkml" ? "검증 중" : "InkML"}
             </button>
           )}
+          {exportCurrentPageToWillV1 && (
+            <button
+              type="button"
+              onClick={() => void runWillV1Export()}
+              disabled={
+                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                isExporting || contactBusy
+              }
+              className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/35 bg-accent-soft/35 px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+              title="현재 페이지의 보이는 펜 자유곡선을 ToonSpectrum bounded WILL v1 Annex B .will 파일로 저장"
+            >
+              <FileText size={13} aria-hidden />
+              {archiveBusy === "will" ? "WILL 생성 중" : "WILL v1"}
+            </button>
+          )}
         </div>
         <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
           CBZ는 선택 범위와 ComicInfo.xml, ORA는 현재 화면의 합성을 보존합니다.
           {exportCurrentPageToInkMl ? " InkML은 펜 자유곡선의 입력 채널을 검증해 교환합니다." : null}
+          {exportCurrentPageToWillV1
+            ? " WILL v1은 ToonSpectrum bounded 공개 명세 프로필이며 Wacom 공식 SDK·인증 파일이 아닙니다."
+            : null}
         </p>
         <p
           aria-live="polite"

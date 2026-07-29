@@ -4,6 +4,8 @@ import { decodeStudioRasterInterchange, encodeStudioRasterInterchange } from "./
 import {
   STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_BYTES,
   STUDIO_RASTER_INTERCHANGE_DIRECT_MAX_PIXELS,
+  STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_DEFAULT_MS,
+  STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS,
   decodeStudioRasterInterchangeAsync,
   encodeStudioRasterInterchangeAsync,
   type StudioRasterInterchangeWorkerLike,
@@ -33,12 +35,27 @@ function oversizedQoiHeader(): Uint8Array {
 class FakeWorker implements StudioRasterInterchangeWorkerLike {
   onmessage: StudioRasterInterchangeWorkerLike["onmessage"] = null;
   onerror: StudioRasterInterchangeWorkerLike["onerror"] = null;
+  onmessageerror:
+    StudioRasterInterchangeWorkerLike["onmessageerror"] = null;
   terminate = vi.fn();
 
-  constructor(private readonly respond = true) {}
+  constructor(
+    private readonly autoRespond = true,
+    private readonly postThrows = false,
+  ) {}
 
   postMessage = vi.fn((request: StudioRasterInterchangeWorkerRequest) => {
-    if (!this.respond) return;
+    if (this.postThrows) {
+      throw new DOMException("raw transfer failure", "DataCloneError");
+    }
+    if (!this.autoRespond) return;
+    this.respond(request);
+  });
+
+  respond(
+    request = this.postMessage.mock.calls.at(-1)?.[0],
+  ): void {
+    if (!request) throw new Error("A posted raster request is required.");
     if (request.type === "studio-raster-interchange/encode") {
       const encoded = encodeStudioRasterInterchange(request.format, {
         width: request.width,
@@ -60,13 +77,24 @@ class FakeWorker implements StudioRasterInterchangeWorkerLike {
       requestId: request.requestId,
       result: decoded,
     } } as MessageEvent));
-  });
+  }
 
   ready(): void {
     this.onmessage?.({ data: {
       type: "studio-raster-interchange/ready",
       version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
     } } as MessageEvent);
+  }
+
+  runtimeError(message = "raw /private/codec.wasm panic"): void {
+    this.onerror?.({
+      message,
+      preventDefault() {},
+    });
+  }
+
+  messageError(): void {
+    this.onmessageerror?.({ data: undefined } as MessageEvent<unknown>);
   }
 }
 
@@ -84,6 +112,9 @@ describe("studio raster interchange worker client", () => {
     expect(request.data).not.toBe(bitmap.data);
     expect([...bitmap.data]).toEqual([10, 20, 30, 255]);
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(worker.onmessage).toBeNull();
+    expect(worker.onerror).toBeNull();
+    expect(worker.onmessageerror).toBeNull();
   });
 
   it("decodes in the Worker without detaching a caller-owned subarray", async () => {
@@ -172,6 +203,7 @@ describe("studio raster interchange worker client", () => {
     expect(worker.terminate).toHaveBeenCalledTimes(1);
     expect(worker.onmessage).toBeNull();
     expect(worker.onerror).toBeNull();
+    expect(worker.onmessageerror).toBeNull();
   });
 
   it("falls back for small work if a Worker never becomes ready", async () => {
@@ -190,6 +222,233 @@ describe("studio raster interchange worker client", () => {
     }
   });
 
+  it("lets large Worker work continue beyond the legacy ready timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const width = 1_025;
+      const height = 1_024;
+      const large = {
+        width,
+        height,
+        data: new Uint8ClampedArray(width * height * 4),
+      };
+      const worker = new FakeWorker(false);
+      const pending = encodeStudioRasterInterchangeAsync("qoi", large, {
+        workerFactory: () => worker,
+        readyTimeoutMs: 100,
+        operationTimeoutMs: 5_000,
+      });
+      worker.ready();
+      let settled = false;
+      void pending.finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(settled).toBe(false);
+      expect(worker.terminate).not.toHaveBeenCalled();
+      worker.respond();
+      const result = await pending;
+      expect(result.execution).toBe("worker");
+      expect(result.encoded.extension).toBe(".qoi");
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+      expect(worker.onmessage).toBeNull();
+      expect(worker.onerror).toBeNull();
+      expect(worker.onmessageerror).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds operation timeout independently up to ten minutes", async () => {
+    expect(
+      STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_DEFAULT_MS,
+    ).toBe(120_000);
+    expect(
+      STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS,
+    ).toBe(600_000);
+
+    vi.useFakeTimers();
+    try {
+      const worker = new FakeWorker(false);
+      const pending = decodeStudioRasterInterchangeAsync(
+        new Uint8Array([1]),
+        undefined,
+        {
+          workerFactory: () => worker,
+          operationTimeoutMs:
+            STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS
+            + 100_000,
+        },
+      );
+      const rejection = expect(pending).rejects.toMatchObject({
+        name: "TimeoutError",
+        message: expect.stringMatching(/시간이 초과/u),
+      });
+      worker.ready();
+
+      await vi.advanceTimersByTimeAsync(
+        STUDIO_RASTER_INTERCHANGE_WORKER_OPERATION_TIMEOUT_MAX_MS - 1,
+      );
+      expect(worker.terminate).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+
+      await rejection;
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+      expect(worker.onmessage).toBeNull();
+      expect(worker.onerror).toBeNull();
+      expect(worker.onmessageerror).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back only for runtime failure before ready and hides raw errors", async () => {
+    const starting = new FakeWorker(false);
+    const fallback = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => starting,
+    });
+    starting.runtimeError("raw /private/startup-worker.js");
+    await expect(fallback).resolves.toMatchObject({
+      execution: "direct",
+    });
+    expect(starting.terminate).toHaveBeenCalledTimes(1);
+
+    const running = new FakeWorker(false);
+    const failed = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => running,
+    });
+    running.ready();
+    running.runtimeError("raw /private/codec.wasm panic");
+    const error = await failed.catch((reason: unknown) => reason);
+    expect(error).toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+    });
+    expect(String((error as Error).message)).not.toContain("private");
+    expect(String((error as Error).message)).not.toContain("wasm");
+    expect(running.terminate).toHaveBeenCalledTimes(1);
+    expect(running.onmessageerror).toBeNull();
+  });
+
+  it("fails closed if request transfer fails after ready", async () => {
+    const worker = new FakeWorker(false, true);
+    const pending = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => worker,
+    });
+
+    worker.ready();
+
+    await expect(pending).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+      message: "래스터 Worker 요청을 시작하지 못했습니다.",
+    });
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(worker.onmessageerror).toBeNull();
+  });
+
+  it("hard-terminates on message clone failures without direct fallback", async () => {
+    const worker = new FakeWorker(false);
+    const pending = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => worker,
+    });
+    worker.ready();
+
+    worker.messageError();
+
+    await expect(pending).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+      message: "래스터 Worker 응답을 복제하지 못했습니다.",
+    });
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(worker.onmessage).toBeNull();
+    expect(worker.onerror).toBeNull();
+    expect(worker.onmessageerror).toBeNull();
+  });
+
+  it("fails fast for wrong request ids, operations and malformed pixels", async () => {
+    const wrongIdWorker = new FakeWorker(false);
+    const wrongId = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => wrongIdWorker,
+    });
+    wrongIdWorker.ready();
+    const encodeRequest = wrongIdWorker.postMessage.mock.calls[0]?.[0];
+    if (
+      !encodeRequest
+      || encodeRequest.type !== "studio-raster-interchange/encode"
+    ) {
+      throw new Error("encode request expected");
+    }
+    wrongIdWorker.onmessage?.({
+      data: {
+        type: "studio-raster-interchange/encode-success",
+        version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+        requestId: `${encodeRequest.requestId}-stale`,
+        result: encodeStudioRasterInterchange("qoi", bitmap),
+      },
+    } as MessageEvent<unknown>);
+    await expect(wrongId).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+      message: "래스터 Worker 응답 프로토콜이 올바르지 않습니다.",
+    });
+    expect(wrongIdWorker.terminate).toHaveBeenCalledTimes(1);
+
+    const wrongOperationWorker = new FakeWorker(false);
+    const wrongOperation = encodeStudioRasterInterchangeAsync("qoi", bitmap, {
+      workerFactory: () => wrongOperationWorker,
+    });
+    wrongOperationWorker.ready();
+    const wrongOperationRequest =
+      wrongOperationWorker.postMessage.mock.calls[0]?.[0];
+    if (!wrongOperationRequest) throw new Error("request expected");
+    wrongOperationWorker.onmessage?.({
+      data: {
+        type: "studio-raster-interchange/decode-success",
+        version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+        requestId: wrongOperationRequest.requestId,
+        result: {
+          bitmap,
+          format: "qoi",
+          warnings: [],
+        },
+      },
+    } as MessageEvent<unknown>);
+    await expect(wrongOperation).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+    });
+    expect(wrongOperationWorker.terminate).toHaveBeenCalledTimes(1);
+
+    const malformedWorker = new FakeWorker(false);
+    const malformed = decodeStudioRasterInterchangeAsync(
+      encodeStudioRasterInterchange("qoi", bitmap).bytes,
+      "qoi",
+      { workerFactory: () => malformedWorker },
+    );
+    malformedWorker.ready();
+    const decodeRequest = malformedWorker.postMessage.mock.calls[0]?.[0];
+    if (!decodeRequest) throw new Error("request expected");
+    malformedWorker.onmessage?.({
+      data: {
+        type: "studio-raster-interchange/decode-success",
+        version: STUDIO_RASTER_INTERCHANGE_WORKER_VERSION,
+        requestId: decodeRequest.requestId,
+        result: {
+          bitmap: {
+            width: 2,
+            height: 2,
+            data: new Uint8Array(4),
+          },
+          format: "qoi",
+          warnings: [],
+        },
+      },
+    } as MessageEvent<unknown>);
+    await expect(malformed).rejects.toMatchObject({
+      name: "StudioRasterInterchangeWorkerError",
+    });
+    expect(malformedWorker.terminate).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects over-budget fallback and a posted request timeout without sync work", async () => {
     vi.useFakeTimers();
     try {
@@ -206,12 +465,18 @@ describe("studio raster interchange worker client", () => {
       const stalledPromise = decodeStudioRasterInterchangeAsync(new Uint8Array([1]), undefined, {
         workerFactory: () => stalled,
         readyTimeoutMs: 100,
+        operationTimeoutMs: 100,
       });
       stalled.ready();
-      const stalledAssertion = expect(stalledPromise).rejects.toThrow(/시간이 초과/u);
+      const stalledAssertion = expect(stalledPromise).rejects.toMatchObject({
+        name: "TimeoutError",
+        message: expect.stringMatching(/시간이 초과/u),
+      });
       await vi.advanceTimersByTimeAsync(100);
       await stalledAssertion;
       expect(stalled.terminate).toHaveBeenCalledTimes(1);
+      expect(stalled.onmessage).toBeNull();
+      expect(stalled.onerror).toBeNull();
     } finally {
       vi.useRealTimers();
     }

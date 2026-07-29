@@ -61,6 +61,7 @@ import type { SvgExportResult } from "./studio-svg-export";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
+import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type {
   StudioWorkspaceLayout,
   StudioWorkspaceLoadResult,
@@ -169,6 +170,7 @@ export interface StudioMenubarContentHandlers {
     format: StudioRasterInterchangeFormat
   ) => Promise<StudioRasterEncoded>;
   exportCurrentPageToInkMl: () => Promise<StudioInkMlExportResult>;
+  exportCurrentPageToWillV1: () => Promise<StudioWillV1PageExportResult>;
   exportCurrentPageToSvg: () => Promise<SvgExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
@@ -362,6 +364,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToPsd,
     exportCurrentPageToRasterInterchange,
     exportCurrentPageToInkMl,
+    exportCurrentPageToWillV1,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
@@ -687,6 +690,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       capturePagesForPreset={handleCapturePagesForPreset}
                       capturePagesForIndices={handleCapturePagesForIndices}
                       exportCurrentPageToInkMl={exportCurrentPageToInkMl}
+                      exportCurrentPageToWillV1={exportCurrentPageToWillV1}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
                       exportCurrentPageToRasterInterchange={exportCurrentPageToRasterInterchange}
