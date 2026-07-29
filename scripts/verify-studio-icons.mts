@@ -175,6 +175,11 @@ async function main() {
     await page.addInitScript(({ key }) => {
       try {
         localStorage.setItem(key, "1");
+        // Icon assertions address Korean menu labels; make the harness deterministic across hosts.
+        localStorage.setItem(
+          "toonspectrum-lang",
+          JSON.stringify({ state: { lang: "ko" }, version: 0 })
+        );
         localStorage.setItem("toonspectrum-studio-ui-density:v1", JSON.stringify({ mode: "full" }));
       } catch {
         /* ignore */

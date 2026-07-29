@@ -50,6 +50,7 @@ import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ExportFormat } from "./studio-export";
+import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { PsdExportResult } from "./studio-psd-export";
 import type {
   StudioRasterEncoded,
@@ -167,6 +168,7 @@ export interface StudioMenubarContentHandlers {
   exportCurrentPageToRasterInterchange: (
     format: StudioRasterInterchangeFormat
   ) => Promise<StudioRasterEncoded>;
+  exportCurrentPageToInkMl: () => Promise<StudioInkMlExportResult>;
   exportCurrentPageToSvg: () => Promise<SvgExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
@@ -359,6 +361,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     undo,
     exportCurrentPageToPsd,
     exportCurrentPageToRasterInterchange,
+    exportCurrentPageToInkMl,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
@@ -683,6 +686,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       dialoguePages={dialoguePages}
                       capturePagesForPreset={handleCapturePagesForPreset}
                       capturePagesForIndices={handleCapturePagesForIndices}
+                      exportCurrentPageToInkMl={exportCurrentPageToInkMl}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
                       exportCurrentPageToPsd={exportCurrentPageToPsd}
                       exportCurrentPageToRasterInterchange={exportCurrentPageToRasterInterchange}

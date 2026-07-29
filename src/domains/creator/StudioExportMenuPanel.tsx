@@ -49,6 +49,7 @@ import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
+import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { PsdExportResult } from "./studio-psd-export";
 import type {
   StudioRasterEncoded,
@@ -139,6 +140,8 @@ export interface StudioExportMenuPanelProps {
    * (래스터 캡처와 달리 원본 벡터를 보존하되, 픽셀 필터·톤 등 일부는 스킵 집계로 고지.)
    */
   exportCurrentPageToSvg?: () => Promise<SvgExportResult>;
+  /** 현재 페이지의 보이는 펜 자유곡선을 검증된 bounded InkML로 내보냅니다. */
+  exportCurrentPageToInkMl?: () => Promise<StudioInkMlExportResult>;
   /**
    * 현재 페이지를 요소별 레이어를 가진 PSD로 캡처 — Konva 스테이지에서 요소를 하나씩
    * 래스터화해야 하므로(여러 번의 toCanvas) SVG와 달리 비동기다. StudioPage가 stage/요소/
@@ -177,6 +180,7 @@ export function StudioExportMenuPanel({
   capturePagesForPreset,
   capturePagesForIndices,
   exportCurrentPageToSvg,
+  exportCurrentPageToInkMl,
   exportCurrentPageToPsd,
   exportCurrentPageToRasterInterchange,
 }: StudioExportMenuPanelProps) {
@@ -195,7 +199,7 @@ export function StudioExportMenuPanel({
   const [openRasterFormat, setOpenRasterFormat] = useState<StudioRasterInterchangeFormat>("qoi");
   const [openRasterBusy, setOpenRasterBusy] = useState(false);
   const [openRasterStatus, setOpenRasterStatus] = useState<ExportRunStatus | null>(null);
-  const [archiveBusy, setArchiveBusy] = useState<"cbz" | "ora" | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<"cbz" | "inkml" | "ora" | null>(null);
   const [archiveStatus, setArchiveStatus] = useState<ExportRunStatus | null>(null);
   // 콘택트시트(다중 페이지 축소판을 인쇄용 한 장에 타일링) 실행 상태 — 다른 내보내기와 독립.
   const [contactColumns, setContactColumns] = useState<number>(DEFAULT_CONTACT_SHEET_COLUMNS);
@@ -471,6 +475,44 @@ export function StudioExportMenuPanel({
       if (mountedRef.current) setArchiveBusy(null);
     }
   }
+
+  async function runInkMlExport() {
+    if (
+      !exportCurrentPageToInkMl || archiveBusy !== null || openRasterBusy || psdBusy || svgBusy ||
+      pdfBusy || presetBusy || isExporting || contactBusy
+    ) return;
+    setArchiveBusy("inkml");
+    setArchiveStatus({
+      tone: "info",
+      text: "자유곡선 채널과 InkML 왕복 적합성을 검사하는 중…",
+    });
+    try {
+      const result = await exportCurrentPageToInkMl();
+      if (!mountedRef.current) return;
+      downloadBlob(
+        new Blob([result.xml], { type: `${result.mediaType};charset=utf-8` }),
+        `${safeExportBaseName(exportTitle)}.inkml`,
+      );
+      setArchiveStatus({
+        tone: result.skipped.length > 0 ? "warn" : "good",
+        text: [
+          `InkML ${result.exportedStrokeIds.length}개 획을 검증해 저장했어요.`,
+          result.skipped.length > 0
+            ? `숨김·지우개·도형 ${result.skipped.length}개는 의미 손실을 막기 위해 제외했어요.`
+            : "",
+        ].filter(Boolean).join(" "),
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setArchiveStatus({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "InkML 파일을 만들지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setArchiveBusy(null);
+    }
+  }
+
   const outW = Math.round(canvasWidth * exportScale);
   const outH = Math.round(canvasHeight * exportScale);
   const validation = selectedPreset
@@ -1186,7 +1228,12 @@ export function StudioExportMenuPanel({
           <Layers size={14} className="text-accent" aria-hidden />
           <span className="text-[0.68rem] font-semibold text-fg-2">문서·만화 교환</span>
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div
+          className={cx(
+            "grid gap-1.5",
+            exportCurrentPageToInkMl ? "grid-cols-3" : "grid-cols-2",
+          )}
+        >
           <button
             type="button"
             onClick={() => void runArchiveExport("cbz")}
@@ -1211,11 +1258,27 @@ export function StudioExportMenuPanel({
             title="현재 페이지를 OpenRaster 합성 1레이어 파일로 저장"
           >
             <Layers size={13} aria-hidden />
-            {archiveBusy === "ora" ? "ORA 생성 중" : "ORA · 현재"}
+            {archiveBusy === "ora" ? "ORA 중" : "ORA"}
           </button>
+          {exportCurrentPageToInkMl && (
+            <button
+              type="button"
+              onClick={() => void runInkMlExport()}
+              disabled={
+                archiveBusy !== null || openRasterBusy || pdfBusy || presetBusy || psdBusy || svgBusy ||
+                isExporting || contactBusy
+              }
+              className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-line bg-panel px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+              title="현재 페이지의 보이는 펜 자유곡선을 필압·기울기 채널이 있는 검증된 InkML로 저장"
+            >
+              <FileText size={13} aria-hidden />
+              {archiveBusy === "inkml" ? "검증 중" : "InkML"}
+            </button>
+          )}
         </div>
         <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-4">
-          CBZ는 선택한 범위({exportRangeLabel})와 ComicInfo.xml을 보존합니다. ORA는 현재 화면을 합성 1레이어로 내보냅니다.
+          CBZ는 선택 범위와 ComicInfo.xml, ORA는 현재 화면의 합성을 보존합니다.
+          {exportCurrentPageToInkMl ? " InkML은 펜 자유곡선의 입력 채널을 검증해 교환합니다." : null}
         </p>
         <p
           aria-live="polite"

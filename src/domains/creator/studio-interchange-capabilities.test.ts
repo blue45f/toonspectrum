@@ -103,6 +103,45 @@ describe("Studio interchange capability registry", () => {
     }
   });
 
+  it("벡터 PDF와 PDF/A-2b·PDF/X-4 후보를 평탄화 PDF와 분리한다", () => {
+    expect(studioInterchangeCapability("pdf")).toMatchObject({
+      label: "PDF 1.4",
+      export: "available",
+      uiWiring: { export: "wired" },
+    });
+    for (const id of ["pdf-vector", "pdf-a-2b", "pdf-x-4"]) {
+      expect(studioInterchangeCapability(id)).toMatchObject({
+        extensions: [".pdf"],
+        import: "unsupported",
+        export: "engine-ready",
+        status: "engine-ready",
+        implementation: {
+          import: "not-implemented",
+          export: "implemented",
+        },
+        uiWiring: {
+          import: "not-applicable",
+          export: "not-wired",
+        },
+        conformance: {
+          publicSpec: "tested-public-subset",
+          thirdPartyCertification: "not-claimed",
+        },
+      });
+    }
+    expect(
+      studioInterchangeCapability("pdf-a-2b")?.notes.join(" "),
+    ).toContain("veraPDF");
+    expect(
+      studioInterchangeCapability("pdf-x-4")?.notes.join(" "),
+    ).toContain("인쇄소 승인");
+    expect(
+      studioInterchangeCapabilitiesForExtension(".pdf").map((item) => item.id),
+    ).toEqual(
+      expect.arrayContaining(["pdf", "pdf-vector", "pdf-a-2b", "pdf-x-4"]),
+    );
+  });
+
   it("ORA와 CBZ import는 실제 UI 계약과 fail-closed ZIP 경계를 공개한다", () => {
     const ora = studioInterchangeCapability("ora")!;
     expect(ora).toMatchObject({
@@ -330,6 +369,45 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapabilitiesForExtension("heif").map((item) => item.id)).toEqual([
       "heic",
     ]);
+  });
+
+  it("ICC 정책 엔진과 InkML 적합성 receipt를 UI 연결 상태와 분리한다", () => {
+    expect(studioInterchangeCapability("icc-profile")).toMatchObject({
+      extensions: [".icc", ".icm"],
+      import: "engine-ready",
+      export: "engine-ready",
+      status: "engine-ready",
+      implementation: {
+        import: "implemented",
+        export: "implemented",
+      },
+      uiWiring: {
+        import: "not-wired",
+        export: "not-wired",
+      },
+      conformance: {
+        publicSpec: "tested-public-subset",
+        thirdPartyCertification: "not-claimed",
+      },
+      externalRequirements: {
+        provider: "none",
+        license: "project-implementation-only",
+      },
+    });
+    expect(studioInterchangeCapability("icc-profile")?.lossModel.join(" ")).toContain(
+      "LUT·CMYK",
+    );
+    expect(studioInterchangeCapability("icc-profile")?.notes.join(" ")).toContain(
+      "고정 SHA-256 allowlist",
+    );
+    expect(studioInterchangeCapabilitiesForExtension("icm").map((item) => item.id)).toContain(
+      "icc-profile",
+    );
+
+    const inkml = studioInterchangeCapability("inkml")!;
+    expect(inkml.runtimeRequirement.join(" ")).toContain("SHA-256 conformance receipt");
+    expect(inkml.notes.join(" ")).toContain("deterministic export");
+    expect(inkml.conformance.notes.join(" ")).toContain("Wacom WILL/UIM");
   });
 
   it("WebM container implementation과 browser codec 제공자를 별도 경계로 기록한다", () => {

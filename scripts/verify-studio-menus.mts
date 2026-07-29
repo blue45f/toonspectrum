@@ -402,6 +402,12 @@ async function main() {
     await page.addInitScript(({ key }) => {
       try {
         window.localStorage.setItem(key, "1");
+        // The assertions below intentionally use Korean product labels. Chromium's CI locale is
+        // commonly en-US, so pin the persisted app locale instead of depending on the host.
+        window.localStorage.setItem(
+          "toonspectrum-lang",
+          JSON.stringify({ state: { lang: "ko" }, version: 0 })
+        );
         // Full density so every main-menu → toolbar popover host is mounted.
         window.localStorage.setItem(
           "toonspectrum-studio-ui-density:v1",

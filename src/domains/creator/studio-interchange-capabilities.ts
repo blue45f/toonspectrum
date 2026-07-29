@@ -539,7 +539,11 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       "mm·dev 좌표, mapping·canvas transform, current context, traceGroup은 해석하지 않고 fail-closed로 거부",
       "단위 없는 basic X/Y는 제한 프로필의 응용 정의 캔버스 좌표로 가져오며 전체 InkML processor conformance를 주장하지 않음",
     ],
-    runtimeRequirement: ["W3C DOMParser", "bounded clean-room InkML profile codec"],
+    runtimeRequirement: [
+      "W3C DOMParser",
+      "bounded clean-room InkML profile codec",
+      "Web Crypto SHA-256 conformance receipt",
+    ],
     sizeBudget: {
       maxFileBytes: 32 * MiB,
       maxItems: 2_000_000,
@@ -549,9 +553,70 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     notes: [
       "상용 잉크 SDK 없이 공개 InkML 사양을 참고한 ToonSpectrum 전용 안전 부분집합을 독립 구현했습니다.",
       "DTD·외부 entity·CDATA·비정규 채널 압축은 fail-closed로 거부합니다.",
+      "import→normalize→deterministic export→reimport 채널 오차와 자원 예산을 conformance receipt로 검증합니다.",
       "px·px/ms는 ToonSpectrum v1 프로필의 명시적 응용 단위이며 공식 W3C processor 또는 Wacom .will/UIM 호환을 주장하지 않습니다.",
     ],
     recommendedBridge: ["완전한 편집 왕복에는 .toonproject.zip 사용"],
+  },
+  {
+    id: "icc-profile",
+    label: "ICC 색상 프로파일",
+    extensions: [".icc", ".icm"],
+    mime: ["application/vnd.iccprofile", "application/octet-stream"],
+    category: "publication",
+    import: "engine-ready",
+    export: "engine-ready",
+    roundTrip: "partial",
+    lossModel: [
+      "RGB matrix/TRC만 Studio 내부 색 변환에 사용하며 LUT·CMYK는 권리가 확인된 검사·원본 임베딩 경계로 제한",
+      "프로파일 파싱 결과는 라이선스·재배포·상업 사용 허가로 간주하지 않음",
+      "사용자·인쇄소 제공 프로파일은 앱 번들 allowlist로 자동 승격하지 않음",
+    ],
+    runtimeRequirement: [
+      "ICC v2/v4 bounded parser",
+      "Web Crypto SHA-256",
+      "exact provider manifest and embedding/redistribution rights policy",
+    ],
+    sizeBudget: {
+      maxFileBytes: 16 * MiB,
+      notes: "헤더·tag table·reserved 영역·profile ID·checksum·provider 권한을 적용 전에 검증",
+    },
+    status: "engine-ready",
+    notes: [
+      "제품 생성 sRGB는 고정 SHA-256 allowlist로 감사하며, 외부 프로파일은 출처·권한·identity가 일치해야 합니다.",
+      "성공 영수증은 ToonSpectrum 정책 통과이며 ICC·인쇄소·vendor의 제3자 공식 인증이 아닙니다.",
+    ],
+    technicalLayers: {
+      format: ["ICC.1 v2/v4 bounded profile"],
+      container: ["ICC profile byte stream"],
+      codec: ["matrix/TRC RGB execution", "LUT/CMYK inspect/embed boundary"],
+    },
+    implementation: {
+      import: "implemented",
+      export: "implemented",
+      notes: ["원본 검사·권한 정책과 결정적 ToonSpectrum sRGB profile builder 구현"],
+    },
+    uiWiring: {
+      import: "not-wired",
+      export: "not-wired",
+      notes: ["전문 PDF OutputIntent orchestration에서 engine API를 사용하며 독립 ICC 메뉴는 후속 연결"],
+    },
+    metadata: {
+      general: "preserved",
+      icc: "preserved",
+      notes: ["원본 bytes를 불변 복사해 identity를 검사하며 허용된 raw embedding은 동일 bytes를 사용"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["ICC v2/v4 bounded header/tag/profile-ID policy를 테스트하며 전체 CMM 인증은 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "none",
+      providers: [],
+      license: "project-implementation-only",
+      notes: ["외부 프로파일 자체의 저작권·재배포 권한은 exact provider manifest에서 별도로 검증"],
+    },
   },
   {
     id: "pdf",
@@ -568,6 +633,143 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     status: "available",
     notes: ["공유·검토·제출용 이미지 PDF이며 전문 인쇄 PDF/X writer는 아닙니다."],
   },
+  {
+    id: "pdf-vector",
+    label: "PDF 1.7 벡터",
+    extensions: [".pdf"],
+    mime: ["application/pdf"],
+    category: "publication",
+    import: "unsupported",
+    export: "engine-ready",
+    roundTrip: "none",
+    lossModel: [
+      "지원하지 않는 Studio 브러시·필터·합성 효과는 별도 래스터 자원으로 평탄화해야 함",
+      "PDF를 다시 Studio 편집 문서로 가져오는 경로는 제공하지 않음",
+    ],
+    runtimeRequirement: [
+      "deterministic classic-xref PDF writer",
+      "embedded TrueType CID font policy",
+      "bounded PDF byte scanner",
+    ],
+    sizeBudget: {
+      maxDimensionPx: 32_768,
+      notes: "문서 생성 전에 이미지·폰트·페이지 작업 예산을 별도로 적용",
+    },
+    status: "engine-ready",
+    notes: [
+      "벡터 path·텍스트·JPEG·알파·ICC OutputIntent를 쓰는 독립 PDF writer가 구현되어 있습니다.",
+      "현재 보이는 메뉴의 PDF 버튼은 기존 평탄화 PDF이며 벡터 writer는 전문 출고 UI에 아직 연결하지 않았습니다.",
+    ],
+    technicalLayers: {
+      format: ["PDF 1.7 writer subset"],
+      container: ["classic-xref PDF"],
+      codec: ["JPEG DCT image embedding", "embedded TrueType CID fonts"],
+    },
+    implementation: {
+      import: "not-implemented",
+      export: "implemented",
+      notes: ["결정적 writer와 독립 classic-xref scanner 구현"],
+    },
+    uiWiring: {
+      import: "not-applicable",
+      export: "not-wired",
+      notes: ["전문 출고 패널 연결 전 engine API로만 제공"],
+    },
+    metadata: {
+      general: "partial",
+      icc: "preserved",
+      notes: ["제목·작성자·XMP·OutputIntent를 지원하며 임의 PDF metadata 왕복은 제공하지 않음"],
+    },
+    conformance: {
+      publicSpec: "tested-public-subset",
+      thirdPartyCertification: "not-claimed",
+      notes: ["ToonSpectrum writer/scanner 부분집합을 테스트하며 범용 PDF processor 적합성을 주장하지 않음"],
+    },
+    externalRequirements: {
+      provider: "none",
+      providers: [],
+      license: "project-implementation-only",
+      notes: ["외부 PDF SDK 없이 독립 구현"],
+    },
+  },
+  ...([
+    {
+      id: "pdf-a-2b",
+      label: "PDF/A-2b 보존 후보",
+      format: "PDF/A-2b bounded candidate",
+      profileNotes: [
+        "PDF 1.7·XMP pdfaid 2/B·GTS_PDFA1·파일 ID·임베드 글꼴·금지 기능을 출력 바이트에서 다시 검사합니다.",
+        "선택적 veraPDF adapter 결과는 정확히 같은 SHA-256 문서에만 결합하며 공식 인증으로 재표시하지 않습니다.",
+      ],
+    },
+    {
+      id: "pdf-x-4",
+      label: "PDF/X-4 인쇄 후보",
+      format: "PDF/X-4 bounded candidate",
+      profileNotes: [
+        "PDF 1.6·XMP/Info PDF/X-4·Trapped·GTS_PDFX·ICC·Trim/Bleed box·device color를 출력 바이트에서 다시 검사합니다.",
+        "인쇄소 승인·ISO 인증·PDF Association 인증은 발급하지 않으며 exact-source 외부 결과 adapter만 수용합니다.",
+      ],
+    },
+  ] as const).map(
+    ({ id, label, format, profileNotes }): StudioInterchangeCapabilityDefinition => ({
+      id,
+      label,
+      extensions: [".pdf"],
+      mime: ["application/pdf"],
+      category: "publication",
+      import: "unsupported",
+      export: "engine-ready",
+      roundTrip: "none",
+      lossModel: [
+        "지원하지 않는 Studio 효과는 출고 전에 래스터화해야 함",
+        "생성 PDF를 편집 가능한 Studio 문서로 다시 가져오지 않음",
+      ],
+      runtimeRequirement: [
+        "deterministic vector PDF writer",
+        "ICC provider/rights policy",
+        "independent exact-source PDF scanner",
+        "SHA-256 conformance receipt",
+      ],
+      sizeBudget: {
+        maxDimensionPx: 32_768,
+        notes: "ICC 최대 16MiB와 문서별 이미지·폰트·페이지 사전 예산 적용",
+      },
+      status: "engine-ready",
+      notes: profileNotes,
+      technicalLayers: {
+        format: [format],
+        container: ["classic-xref PDF"],
+        codec: ["JPEG DCT image embedding", "embedded TrueType CID fonts"],
+      },
+      implementation: {
+        import: "not-implemented",
+        export: "implemented",
+        notes: ["writer→ICC audit→byte scanner→profile preflight→receipt integrity 파이프라인 구현"],
+      },
+      uiWiring: {
+        import: "not-applicable",
+        export: "not-wired",
+        notes: ["전문 출고 프로필 선택 UI는 후속 연결"],
+      },
+      metadata: {
+        general: "partial",
+        icc: "preserved",
+        notes: ["결정적 XMP·Info·OutputIntent·file ID를 기록하고 exact ICC bytes를 임베드"],
+      },
+      conformance: {
+        publicSpec: "tested-public-subset",
+        thirdPartyCertification: "not-claimed",
+        notes: ["로컬 성공은 후보 판정이며 외부 검증 결과도 exact-source 증거로만 수용"],
+      },
+      externalRequirements: {
+        provider: "none",
+        providers: [],
+        license: "project-implementation-only",
+        notes: ["로컬 후보 생성에는 외부 SDK가 필요 없고 선택적 공식 validator는 별도 adapter 경계"],
+      },
+    }),
+  ),
   {
     id: "webm",
     label: "WebM",
@@ -1280,7 +1482,10 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     conformance: {
       publicSpec: "tested-public-subset",
       thirdPartyCertification: "not-claimed",
-      notes: ["공개 InkML에서 정의한 제한 profile만 검증하며 full processor conformance는 주장하지 않음"],
+      notes: [
+        "공개 InkML에서 정의한 제한 profile만 검증하며 full processor conformance는 주장하지 않음",
+        "결정적 왕복 오차·보안 예산·SHA-256 receipt는 Wacom WILL/UIM 호환 인증이 아님",
+      ],
     },
     externalRequirements: {
       provider: "browser-runtime",

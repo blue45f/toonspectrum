@@ -187,13 +187,70 @@ describe("StudioExportMenuPanel open raster interchange", () => {
       />
     );
 
-    const oraButton = screen.getByRole("button", { name: "ORA · 현재" });
+    const oraButton = screen.getByRole("button", { name: "ORA" });
     fireEvent.click(oraButton);
 
-    await waitFor(() => expect(oraButton.textContent).toContain("ORA · 현재"));
+    await waitFor(() => expect(oraButton.textContent).toContain("ORA"));
     const oraStatus = document.querySelector('[aria-label="문서 교환 포맷"] [aria-live="polite"]');
     expect(oraStatus?.textContent).toMatch(/OpenRaster를 저장했어요/u);
     expect(capturePagesForPreset).toHaveBeenCalledWith("current");
     expect(URL.createObjectURL).toHaveBeenCalledWith(expect.objectContaining({ type: "image/openraster" }));
+  });
+
+  it("exports validated InkML and reports intentionally skipped semantics", async () => {
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:inkml") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const exportCurrentPageToInkMl = vi.fn(async () => ({
+      xml: "<ink/>",
+      mediaType: "application/inkml+xml" as const,
+      exportedStrokeIds: ["stroke-1"],
+      skipped: [{ elementId: "eraser-1", reason: "eraser-semantic-not-representable" as const }],
+      conformance: {} as never,
+    }));
+    render(
+      <StudioExportMenuPanel
+        canvasWidth={800}
+        canvasHeight={1200}
+        exportScale={1}
+        exportFormat="png"
+        exportTransparent
+        exportPresetId={null}
+        watermark={{ enabled: false, text: "", opacity: 0.2, position: "br", size: 0.028 }}
+        isExporting={false}
+        exportTitle="episode:ink"
+        pageCount={1}
+        pageLabels={["1"]}
+        setExportScale={vi.fn()}
+        setExportFormat={vi.fn()}
+        setExportTransparent={vi.fn()}
+        setExportPresetId={vi.fn()}
+        setWatermark={vi.fn()}
+        onCopyToClipboard={vi.fn()}
+        capturePagesForPreset={vi.fn(async () => [])}
+        exportCurrentPageToInkMl={exportCurrentPageToInkMl}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("region", { name: "문서 교환 포맷" })
+        .querySelector("div.grid")
+        ?.className,
+    ).toContain("grid-cols-3");
+    expect(
+      screen
+        .getByRole("spinbutton", { name: "내보내기 시작 페이지" })
+        .parentElement?.parentElement?.className,
+    ).toContain("grid-cols-2");
+
+    fireEvent.click(screen.getByRole("button", { name: "InkML" }));
+
+    await waitFor(() => expect(exportCurrentPageToInkMl).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/InkML 1개 획을 검증해 저장했어요/u)).toBeTruthy();
+    expect(screen.getByText(/숨김·지우개·도형 1개/u)).toBeTruthy();
+    expect(URL.createObjectURL).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "application/inkml+xml;charset=utf-8" }),
+    );
   });
 });

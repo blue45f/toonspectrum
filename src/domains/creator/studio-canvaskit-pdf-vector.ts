@@ -160,6 +160,23 @@ export interface StudioPdfOutputIntent {
   components: 3 | 4;
 }
 
+export type StudioPdfConformanceTarget = "pdf-a-2b" | "pdf-x-4";
+
+/**
+ * Writer가 규격 후보 파일에 넣는 결정적 식별·XMP 선언.
+ *
+ * 이 값만 있다고 적합성이 성립하는 것은 아니다. 출력 바이트를 독립 scanner와 외부 validator로
+ * 다시 검사해야 하며, writer는 그 검사가 가능하도록 필요한 선언과 fail-closed 제약만 책임진다.
+ */
+export interface StudioPdfConformanceDeclaration {
+  target: StudioPdfConformanceTarget;
+  /** PDF trailer `/ID`에 넣을 16바이트 식별자(대문자/소문자 32자리 hex). */
+  fileIdentifierHex: string;
+  /** 결정적 XMP/Info 날짜. 현재 writer는 명확한 UTC `YYYY-MM-DDTHH:mm:ssZ`만 허용한다. */
+  createdAt: string;
+  modifiedAt: string;
+}
+
 export interface StudioPdfDocument {
   pages: readonly StudioPdfPage[];
   title?: string;
@@ -179,6 +196,11 @@ export interface StudioPdfDocument {
   fontEmbeddingIntent?: StudioPdfFontDocumentIntent;
   images?: readonly StudioPdfImage[];
   outputIntent?: StudioPdfOutputIntent;
+  /**
+   * PDF/A-2b 또는 PDF/X-4 후보 선언. writer는 필수 XMP·OutputIntent·파일 ID·폰트 조건을
+   * fail-closed로 검사하지만, 제3자 인증을 주장하지 않는다.
+   */
+  conformance?: StudioPdfConformanceDeclaration;
   /** 기본 true — 스튜디오(좌상단 원점) 좌표를 그대로 받는다. */
   originTopLeft?: boolean;
 }
@@ -280,8 +302,8 @@ class PdfWriter {
     this.push(bytes);
   }
 
-  begin(): void {
-    this.text("%PDF-1.7\n");
+  begin(version: "1.6" | "1.7" = "1.7"): void {
+    this.text(`%PDF-${version}\n`);
     this.push(BINARY_MARKER);
   }
 
@@ -300,7 +322,7 @@ class PdfWriter {
   }
 
   /** xref + trailer 를 붙이고 최종 바이트를 낸다. 빠진 오브젝트가 있으면 조립을 중단한다. */
-  finish(rootNum: number, infoNum: number): Uint8Array {
+  finish(rootNum: number, infoNum: number, fileIdentifierHex?: string): Uint8Array {
     const size = this.next;
     const xrefOffset = this.offset;
     this.text(`xref\n0 ${size}\n`);
@@ -313,7 +335,13 @@ class PdfWriter {
       // 항목은 정확히 20바이트: 오프셋 10 + 공백 + 세대 5 + 공백 + 타입 1 + 공백 + 개행.
       this.text(`${String(objOffset).padStart(10, "0")} 00000 n \n`);
     }
-    this.text(`trailer\n<< /Size ${size} /Root ${rootNum} 0 R /Info ${infoNum} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+    const fileIdentifier = fileIdentifierHex
+      ? ` /ID [<${fileIdentifierHex}><${fileIdentifierHex}>]`
+      : "";
+    this.text(
+      `trailer\n<< /Size ${size} /Root ${rootNum} 0 R /Info ${infoNum} 0 R${fileIdentifier} >>\n`
+      + `startxref\n${xrefOffset}\n%%EOF`,
+    );
 
     const out = new Uint8Array(this.offset);
     let cursor = 0;
@@ -489,6 +517,160 @@ function buildContentStream(
   return lines.join("\n");
 }
 
+const PDF_CONFORMANCE_UTC_PATTERN =
+  /^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\dZ$/u;
+const PDF_FILE_IDENTIFIER_PATTERN = /^[0-9A-Fa-f]{32}$/u;
+
+interface ResolvedPdfConformanceDeclaration {
+  target: StudioPdfConformanceTarget;
+  fileIdentifierHex: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+function resolvePdfConformanceDeclaration(
+  declaration: StudioPdfConformanceDeclaration | undefined,
+): ResolvedPdfConformanceDeclaration | null {
+  if (!declaration) return null;
+  if (declaration.target !== "pdf-a-2b" && declaration.target !== "pdf-x-4") {
+    throw new Error("알 수 없는 PDF 적합성 프로필이에요.");
+  }
+  const fileIdentifierHex = declaration.fileIdentifierHex.trim().toUpperCase();
+  if (!PDF_FILE_IDENTIFIER_PATTERN.test(fileIdentifierHex)) {
+    throw new Error("PDF 적합성 파일 식별자는 16바이트(32자리 hex)여야 해요.");
+  }
+  for (const [label, value] of [
+    ["생성", declaration.createdAt],
+    ["수정", declaration.modifiedAt],
+  ] as const) {
+    if (
+      !PDF_CONFORMANCE_UTC_PATTERN.test(value)
+      || !Number.isFinite(Date.parse(value))
+      || new Date(value).toISOString().replace(".000Z", "Z") !== value
+    ) {
+      throw new Error(`PDF ${label} 날짜는 초 단위 UTC ISO-8601 형식이어야 해요.`);
+    }
+  }
+  if (Date.parse(declaration.modifiedAt) < Date.parse(declaration.createdAt)) {
+    throw new Error("PDF 수정 날짜는 생성 날짜보다 빠를 수 없어요.");
+  }
+  return {
+    target: declaration.target,
+    fileIdentifierHex,
+    createdAt: declaration.createdAt,
+    modifiedAt: declaration.modifiedAt,
+  };
+}
+
+function pdfDateFromUtc(value: string): string {
+  return `D:${value.slice(0, 4)}${value.slice(5, 7)}${value.slice(8, 10)}`
+    + `${value.slice(11, 13)}${value.slice(14, 16)}${value.slice(17, 19)}Z`;
+}
+
+function xmlText(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function buildPdfConformanceXmp(
+  document: StudioPdfDocument,
+  declaration: ResolvedPdfConformanceDeclaration,
+): Uint8Array {
+  const title = document.title?.trim();
+  const author = document.author?.trim();
+  const producer = (document.producer ?? "ToonSpectrum Studio").trim() || "ToonSpectrum Studio";
+  const profileDeclaration = declaration.target === "pdf-a-2b"
+    ? `<rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/" `
+      + `pdfaid:part="2" pdfaid:conformance="B"/>`
+    : `<rdf:Description rdf:about="" xmlns:pdfxid="http://www.npes.org/pdfx/ns/id/" `
+      + `pdfxid:GTS_PDFXVersion="PDF/X-4"/>`;
+  const titleDeclaration = title
+    ? `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmlText(title)}</rdf:li></rdf:Alt></dc:title>`
+    : "";
+  const authorDeclaration = author
+    ? `<dc:creator><rdf:Seq><rdf:li>${xmlText(author)}</rdf:li></rdf:Seq></dc:creator>`
+    : "";
+  const xmp = [
+    "<?xpacket begin=\"\uFEFF\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>",
+    "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\">",
+    "<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">",
+    profileDeclaration,
+    "<rdf:Description rdf:about=\"\"",
+    " xmlns:dc=\"http://purl.org/dc/elements/1.1/\"",
+    " xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\"",
+    " xmlns:pdf=\"http://ns.adobe.com/pdf/1.3/\">",
+    titleDeclaration,
+    authorDeclaration,
+    `<xmp:CreateDate>${declaration.createdAt}</xmp:CreateDate>`,
+    `<xmp:ModifyDate>${declaration.modifiedAt}</xmp:ModifyDate>`,
+    `<xmp:MetadataDate>${declaration.modifiedAt}</xmp:MetadataDate>`,
+    `<xmp:CreatorTool>${xmlText(producer)}</xmp:CreatorTool>`,
+    `<pdf:Producer>${xmlText(producer)}</pdf:Producer>`,
+    "</rdf:Description>",
+    "</rdf:RDF>",
+    "</x:xmpmeta>",
+    "<?xpacket end=\"w\"?>",
+  ].join("");
+  const bytes = encoder.encode(xmp);
+  if (bytes.byteLength > 1024 * 1024) {
+    throw new Error("PDF XMP 메타데이터가 1MiB 안전 예산을 초과했어요.");
+  }
+  return bytes;
+}
+
+function assertPdfConformanceIcc(intent: StudioPdfOutputIntent | undefined): asserts intent is StudioPdfOutputIntent {
+  if (!intent) {
+    throw new Error("PDF/A·PDF/X 후보에는 권리가 확인된 ICC OutputIntent가 필요해요.");
+  }
+  const bytes = intent.profileBytes;
+  if (bytes.byteLength < 132) {
+    throw new Error("PDF OutputIntent ICC 프로파일이 너무 짧아요.");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, false) !== bytes.byteLength) {
+    throw new Error("PDF OutputIntent ICC 프로파일의 선언 크기와 실제 크기가 다릅니다.");
+  }
+  const signature = String.fromCharCode(bytes[36]!, bytes[37]!, bytes[38]!, bytes[39]!);
+  if (signature !== "acsp") {
+    throw new Error("PDF OutputIntent에 유효한 ICC 프로파일 서명이 없습니다.");
+  }
+  const colorSpace = String.fromCharCode(bytes[16]!, bytes[17]!, bytes[18]!, bytes[19]!);
+  const expected = intent.components === 4 ? "CMYK" : "RGB ";
+  if (colorSpace !== expected) {
+    throw new Error("PDF OutputIntent의 ICC 색공간과 성분 수가 일치하지 않아요.");
+  }
+}
+
+function boxContains(
+  outer: readonly [number, number, number, number],
+  inner: readonly [number, number, number, number],
+): boolean {
+  return outer[0] <= inner[0] && outer[1] <= inner[1] && outer[2] >= inner[2] && outer[3] >= inner[3];
+}
+
+function assertPdfConformancePageBoxes(
+  document: StudioPdfDocument,
+  declaration: ResolvedPdfConformanceDeclaration,
+): void {
+  if (declaration.target !== "pdf-x-4") return;
+  document.pages.forEach((page, index) => {
+    if (!page.trimBox) {
+      throw new Error(`PDF/X-4 페이지 ${index + 1}에는 TrimBox가 필요해요.`);
+    }
+    const mediaBox: readonly [number, number, number, number] = [0, 0, page.widthPt, page.heightPt];
+    if (!boxContains(mediaBox, page.trimBox)) {
+      throw new Error(`PDF/X-4 페이지 ${index + 1}의 TrimBox가 MediaBox를 벗어났어요.`);
+    }
+    if (page.bleedBox && (!boxContains(mediaBox, page.bleedBox) || !boxContains(page.bleedBox, page.trimBox))) {
+      throw new Error(`PDF/X-4 페이지 ${index + 1}의 BleedBox가 TrimBox와 MediaBox를 올바르게 감싸지 않아요.`);
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 문서 조립
 // ---------------------------------------------------------------------------
@@ -504,6 +686,11 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
       throw new Error(`페이지 ${index + 1}의 크기가 올바르지 않아요.`);
     }
   });
+  const conformance = resolvePdfConformanceDeclaration(document.conformance);
+  if (conformance) {
+    assertPdfConformanceIcc(document.outputIntent);
+    assertPdfConformancePageBoxes(document, conformance);
+  }
 
   const fontList = document.fonts ?? [];
   const fontMap = new Map<string, StudioPdfFontResource>();
@@ -531,6 +718,22 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
     }
     fontMap.set(font.resourceName, font);
   }
+  if (conformance) {
+    const usedFontNames = new Set(
+      document.pages.flatMap((page) =>
+        page.ops.flatMap((op) => op.op === "text" && op.renderMode !== 3 ? [op.font] : []),
+      ),
+    );
+    for (const fontName of usedFontNames) {
+      const font = fontMap.get(fontName);
+      if (!font) {
+        throw new Error(`PDF에 없는 글꼴(${fontName})을 텍스트가 참조하고 있어요.`);
+      }
+      if (font.kind !== "truetype-cid") {
+        throw new Error("PDF/A·PDF/X 후보의 표시 텍스트는 모든 글꼴 프로그램을 임베드해야 해요.");
+      }
+    }
+  }
   const imageList = document.images ?? [];
   for (const image of imageList) {
     if (image.jpegBytes.length < 4 || image.jpegBytes[0] !== 0xff || image.jpegBytes[1] !== 0xd8) {
@@ -545,7 +748,7 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
   const gsEntries = gs.entries();
 
   const writer = new PdfWriter();
-  writer.begin();
+  writer.begin(conformance?.target === "pdf-x-4" ? "1.6" : "1.7");
 
   const catalogNum = writer.allocate();
   const pagesNum = writer.allocate();
@@ -621,15 +824,27 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
     const intent = document.outputIntent;
     const profileNum = writer.allocate();
     outputIntentNum = writer.allocate();
+    const subtype = conformance?.target === "pdf-a-2b" ? "/GTS_PDFA1" : "/GTS_PDFX";
+    const registry = conformance?.target === "pdf-x-4"
+      ? " /RegistryName (http://www.color.org)"
+      : "";
     deferred.push(() => {
       writer.stream(profileNum, `/N ${intent.components}`, intent.profileBytes);
       writer.object(
         outputIntentNum!,
-        `<< /Type /OutputIntent /S /GTS_PDFX /OutputConditionIdentifier (${escapeLiteral(intent.identifier)}) ` +
+        `<< /Type /OutputIntent /S ${subtype} /OutputConditionIdentifier (${escapeLiteral(intent.identifier)}) ` +
           `/OutputCondition (${escapeLiteral(intent.condition)}) /Info (${escapeLiteral(intent.info)}) ` +
-          `/DestOutputProfile ${profileNum} 0 R >>`,
+          `/DestOutputProfile ${profileNum} 0 R${registry} >>`,
       );
     });
+  }
+
+  // ── XMP 적합성 선언 ────────────────────────────────────────────────────
+  let metadataNum: number | null = null;
+  if (conformance) {
+    metadataNum = writer.allocate();
+    const xmp = buildPdfConformanceXmp(document, conformance);
+    deferred.push(() => writer.stream(metadataNum!, "/Type /Metadata /Subtype /XML", xmp));
   }
 
   // ── ExtGState ───────────────────────────────────────────────────────────
@@ -664,7 +879,12 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
   // 오브젝트는 번호 순서대로 파일에 쓴다 — xref 오프셋 검증이 사람 눈에도 읽히도록.
   for (const write of deferred) write();
 
-  writer.object(catalogNum, `<< /Type /Catalog /Pages ${pagesNum} 0 R${outputIntentNum ? ` /OutputIntents [${outputIntentNum} 0 R]` : ""} >>`);
+  writer.object(
+    catalogNum,
+    `<< /Type /Catalog /Pages ${pagesNum} 0 R`
+      + `${outputIntentNum ? ` /OutputIntents [${outputIntentNum} 0 R]` : ""}`
+      + `${metadataNum ? ` /Metadata ${metadataNum} 0 R` : ""} >>`,
+  );
   writer.object(
     pagesNum,
     `<< /Type /Pages /Kids [${pageNums.map((num) => `${num} 0 R`).join(" ")}] /Count ${pageNums.length} >>`,
@@ -685,11 +905,20 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
   const info: string[] = [];
   if (document.title?.trim()) info.push(`/Title ${pdfHexText(document.title.trim())}`);
   if (document.author?.trim()) info.push(`/Author ${pdfHexText(document.author.trim())}`);
-  if (document.creationDate) info.push(`/CreationDate (${escapeLiteral(document.creationDate)})`);
+  if (conformance) {
+    info.push(`/CreationDate (${pdfDateFromUtc(conformance.createdAt)})`);
+    info.push(`/ModDate (${pdfDateFromUtc(conformance.modifiedAt)})`);
+    if (conformance.target === "pdf-x-4") {
+      info.push("/GTS_PDFXVersion (PDF/X-4)");
+      info.push("/Trapped /False");
+    }
+  } else if (document.creationDate) {
+    info.push(`/CreationDate (${escapeLiteral(document.creationDate)})`);
+  }
   info.push(`/Producer (${escapeLiteral(document.producer ?? "ToonSpectrum Studio")})`);
   writer.object(infoNum, `<< ${info.join(" ")} >>`);
 
-  return writer.finish(catalogNum, infoNum);
+  return writer.finish(catalogNum, infoNum, conformance?.fileIdentifierHex);
 }
 
 /** PDF 리터럴 문자열 이스케이프 — `\`, `(`, `)` 와 개행. */
