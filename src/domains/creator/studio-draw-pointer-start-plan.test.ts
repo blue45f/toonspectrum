@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
@@ -12,6 +13,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
 } from "./studio-ink-pressure-model";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
@@ -110,6 +112,66 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.paintModel).toBe(STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1);
     expect(plan.element.sampleSpacing).toBe(0);
   });
+
+  it.each([
+    "pencil",
+    "pencil-2b",
+    "pencil-6b",
+    "soft-pencil",
+    "colored-pencil",
+    "brush",
+    "flat-brush",
+    "highlighter",
+    "chisel-highlighter",
+    "pastel-highlighter",
+    "neon",
+    "glow",
+    "soft-glow",
+  ] as const)(
+    "versions newly authored %s material pressure without upgrading legacy snapshots",
+    (brush) => {
+      const plan = planStudioDrawPointerStart(input({
+        brush,
+        pointer: {
+          pointerType: "pen",
+          pressure: 0.5,
+          timeStamp: 124,
+        },
+      }));
+
+      expect(plan.element.materialPressureModel).toBe(
+        STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      );
+      expect(plan.element.pressures).toHaveLength(1);
+      expect(plan.element.pressures?.[0]).toBeGreaterThan(0);
+      expect(plan.element.pressures?.[0]).toBeLessThan(1);
+      expect(plan.element.materialMinimumDiameterRatio).toBeTypeOf("number");
+      expect(plan.element.materialMinimumDiameterRatio).toBeGreaterThanOrEqual(0);
+      expect(plan.element.materialMinimumDiameterRatio).toBeLessThanOrEqual(1);
+    },
+  );
+
+  it.each([
+    ["pencil", 0.18],
+    ["brush", 0.08],
+    ["flat-brush", 0.08],
+    ["highlighter", 0.62],
+  ] as const)(
+    "snapshots the stricter artist/family minimum diameter for %s",
+    (brush, familyMinimum) => {
+      const familyFloor = planStudioDrawPointerStart(input({
+        brush,
+        pressureMinSize: 0,
+      }));
+      const artistFloor = planStudioDrawPointerStart(input({
+        brush,
+        pressureMinSize: 1,
+      }));
+
+      expect(familyFloor.element.materialMinimumDiameterRatio).toBe(familyMinimum);
+      expect(artistFloor.element.materialMinimumDiameterRatio).toBe(1);
+    },
+  );
 
   it("keeps eraser input immediate even when the previously selected pen has dynamics", () => {
     const plan = planStudioDrawPointerStart(input({
@@ -290,6 +352,37 @@ describe("planStudioDrawPointerStart", () => {
     expect(plan.element.twists).toEqual([90]);
     expect(plan.element.speeds).toEqual([0]);
     expect(plan.element.tangentialPressures).toEqual([1]);
+  });
+
+  it("snapshots the strictest artist, family and brush-pack dynamic diameter floor", () => {
+    const pack = materializeStudioBrushPackSelection("core-round");
+    expect(pack).not.toBeNull();
+    const familyFloor = planStudioDrawPointerStart(input({
+      brush: pack!.runtimeBrushId,
+      brushDynamics: pack!.brushDynamics,
+      pressureMinSize: 0,
+    }));
+    const artistFloor = planStudioDrawPointerStart(input({
+      brush: pack!.runtimeBrushId,
+      brushDynamics: pack!.brushDynamics,
+      pressureMinSize: 1,
+    }));
+    const packFloor = planStudioDrawPointerStart(input({
+      brush: pack!.runtimeBrushId,
+      brushDynamics: {
+        ...pack!.brushDynamics,
+        minimumDiameterRatio: 0.72,
+      },
+      pressureMinSize: 0,
+    }));
+
+    expect(familyFloor.element.brushDynamics?.minimumDiameterRatio).toBe(0.4);
+    expect(artistFloor.element.brushDynamics?.minimumDiameterRatio).toBe(1);
+    expect(packFloor.element.brushDynamics?.minimumDiameterRatio).toBe(0.72);
+    expect(packFloor.element.brushDynamics?.width.base).toBe(
+      packFloor.element.strokeWidth,
+    );
+    expect(packFloor.element.pressures).toEqual(familyFloor.element.pressures);
   });
 
   it("opts bounded dynamics symmetry into v2 only while its variation count is supported", () => {

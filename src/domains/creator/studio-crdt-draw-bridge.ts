@@ -1,5 +1,7 @@
+import { isStudioDynamicBrushMinimumDiameterRatio } from "./studio-brush-dynamics";
 import {
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
 import { normalizeStudioBrushCatalogIdentityMetadata } from "./studio-element-model";
@@ -8,6 +10,12 @@ import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+  type StudioMaterialMinimumDiameterRatio,
+  type StudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import {
   isStudioStrokePaintModel,
   isStudioStrokePaintModelCompatible,
@@ -40,6 +48,8 @@ export interface StudioCrdtCompatibleDrawElement {
   brushCatalogName?: string;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
+  materialPressureModel?: StudioMaterialPressureModel;
+  materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   sampleSpacing?: number;
   tiltXs?: number[];
   tiltYs?: number[];
@@ -119,6 +129,12 @@ function jsonObject(value: unknown): StudioCrdtJsonObject | undefined {
     : undefined;
 }
 
+function dynamicMinimumDiameterRatioOf(value: unknown): unknown {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as { minimumDiameterRatio?: unknown }).minimumDiameterRatio
+    : undefined;
+}
+
 function aligned(values: number[] | undefined, count: number, fallback: number): number[] | undefined {
   if (!values) return undefined;
   return Array.from({ length: count }, (_, index) => {
@@ -159,6 +175,21 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
   if (isStudioInkPressureModel(element.pressureModel)) {
     extensions.pressureModel = element.pressureModel;
   }
+  const materialPressureModel = element.materialPressureModel;
+  const materialMinimumDiameterRatio = element.materialMinimumDiameterRatio;
+  const hasMaterialPressureSnapshot =
+    materialPressureModel !== undefined
+    || materialMinimumDiameterRatio !== undefined;
+  if (hasMaterialPressureSnapshot) {
+    if (!isStudioMaterialPressureModel(materialPressureModel)) {
+      throw new Error("획 재질 필압 모델이 올바르지 않습니다.");
+    }
+    if (!isStudioMaterialMinimumDiameterRatio(materialMinimumDiameterRatio)) {
+      throw new Error("획 재질 최소 굵기 스냅샷이 올바르지 않습니다.");
+    }
+    extensions.materialPressureModel = materialPressureModel;
+    extensions.materialMinimumDiameterRatio = materialMinimumDiameterRatio;
+  }
   // Stroke alpha semantics are versioned just like pressure geometry. Unknown future values must
   // never enter the shared document through the generic JSON extension whitelist.
   if (isStudioStrokePaintModelCompatible(element)) {
@@ -185,12 +216,25 @@ export function studioDrawElementToCrdtStroke(
     : aligned(element.pressures, sampleCount, pressureFallback);
   const extensions = extensionsOf(element);
   const brushCatalogIdentity = normalizeStudioBrushCatalogIdentityMetadata(element);
+  const brushDynamics = jsonObject(element.brushDynamics);
+  const dynamicMinimumDiameterRatio =
+    dynamicMinimumDiameterRatioOf(element.brushDynamics);
+  if (
+    dynamicMinimumDiameterRatio !== undefined
+    && !isStudioDynamicBrushMinimumDiameterRatio(dynamicMinimumDiameterRatio)
+  ) {
+    throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
+  }
   const payload: StudioCrdtDrawStrokePayload = {
     // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
-    // renderer-significant layered paint semantics require the fail-closed v2 payload.
-    version: extensions?.paintModel === undefined
-      ? STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION
-      : STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+    // renderer-significant layered paint requires v2; material/dynamic geometry snapshots require
+    // v3 so v2 readers cannot silently ignore their meaning.
+    version: extensions?.materialPressureModel !== undefined
+      || dynamicMinimumDiameterRatio !== undefined
+      ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      : extensions?.paintModel !== undefined
+        ? STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+        : STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
     type: "draw",
     kind: element.kind ?? "freehand",
     mode: element.mode ?? "pen",
@@ -214,7 +258,7 @@ export function studioDrawElementToCrdtStroke(
   if (element.blendMode !== undefined) payload.blendMode = element.blendMode;
   payload.gradient = jsonObject(element.gradient);
   payload.pattern = jsonObject(element.pattern);
-  payload.brushDynamics = jsonObject(element.brushDynamics);
+  payload.brushDynamics = brushDynamics;
   payload.brushTip = jsonObject(element.brushTip);
   payload.strokeStyle = jsonObject(element.strokeStyle);
   payload.shapeParams = jsonObject(element.shapeParams);

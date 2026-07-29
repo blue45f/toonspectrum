@@ -1,5 +1,6 @@
 import * as Y from "yjs";
 
+import { isStudioDynamicBrushMinimumDiameterRatio } from "./studio-brush-dynamics";
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -10,6 +11,7 @@ import {
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   type StudioCrdtSyncResponse,
@@ -45,6 +47,10 @@ import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
@@ -82,6 +88,7 @@ export {
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
   STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   type StudioCrdtStrokePayloadVersion,
 } from "./studio-crdt-protocol";
@@ -786,6 +793,7 @@ function normalizedSamples(
 function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boolean): void {
   if (
     (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
       && payload.version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION)
     || payload.type !== "draw"
   ) {
@@ -826,11 +834,27 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
     const value = payload[key];
     if (value !== undefined) cloneJsonObject(value);
   }
+  const dynamicMinimumDiameterRatio =
+    payload.brushDynamics?.minimumDiameterRatio;
+  if (
+    dynamicMinimumDiameterRatio !== undefined
+    && (
+      payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || !isStudioDynamicBrushMinimumDiameterRatio(
+        dynamicMinimumDiameterRatio,
+      )
+    )
+  ) {
+    throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
+  }
   const paintModel = payload.extensions?.paintModel;
   if (
     paintModel !== undefined
     && (
-      payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      (
+        payload.version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+        && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      )
       || !isStudioStrokePaintModelCompatible({
         ...payload,
         paintModel,
@@ -841,6 +865,30 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
     )
   ) {
     throw new Error("획 페인트 모델과 브러시 합성 모드가 호환되지 않습니다.");
+  }
+  const materialPressureModel = payload.extensions?.materialPressureModel;
+  const materialMinimumDiameterRatio =
+    payload.extensions?.materialMinimumDiameterRatio;
+  const hasMaterialPressureSnapshot =
+    materialPressureModel !== undefined
+    || materialMinimumDiameterRatio !== undefined;
+  if (
+    hasMaterialPressureSnapshot
+    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("획 재질 필압 모델과 페이로드 버전이 호환되지 않습니다.");
+  }
+  if (
+    hasMaterialPressureSnapshot
+    && !isStudioMaterialPressureModel(materialPressureModel)
+  ) {
+    throw new Error("획 재질 필압 모델이 올바르지 않습니다.");
+  }
+  if (
+    hasMaterialPressureSnapshot
+    && !isStudioMaterialMinimumDiameterRatio(materialMinimumDiameterRatio)
+  ) {
+    throw new Error("획 재질 최소 굵기 스냅샷이 올바르지 않습니다.");
   }
   if (payloadMetadataByteLength(payload) > STUDIO_CRDT_METADATA_MAX_BYTES) {
     throw new Error(
@@ -970,6 +1018,7 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
   const count = pointsLength / 2;
   if (
     (version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && version !== STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
       && version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION) ||
     type !== "draw" ||
     !kind ||

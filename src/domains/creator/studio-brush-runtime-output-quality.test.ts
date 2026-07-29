@@ -2,10 +2,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   planNormalizedStudioDynamicBrushDabs,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
+  type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import { resolveNormalizedStudioBrushGrainAlphaMultiplierAt } from "./studio-brush-material-dynamics";
 import { profileStudioBrushMaterialResponse } from "./studio-brush-material-response";
+import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+import { sampleStudioBrushTipProceduralAlpha } from "./studio-brush-tip-stamp";
 import {
   buildStudioPerfectFreehandOutline,
   buildStudioPerfectFreehandPathData,
@@ -56,6 +60,94 @@ function maximumNeighborGap(outline: number[][]): number {
     );
   }
   return maximum;
+}
+
+interface SlowStrokeCoverageProfile {
+  readonly centreMeanAlpha: number;
+  readonly dabCount: number;
+  readonly maximumAlpha: number;
+  readonly meanAlpha: number;
+}
+
+/**
+ * Pixel-like deterministic probe of the real soft-tip falloff and arc-length station cadence.
+ * It models the bounded-flow contract: opacity×flow×tip×grain accumulates on the stroke-local
+ * surface, then the catalogue opacity is applied once. Sampling the whole nominal footprint
+ * catches a bright centre surrounded by an almost-white shoulder that peak-only tests miss.
+ */
+function profileSlowStrokeCoverage(
+  settings: NormalizedStudioBrushDynamicsSettings,
+  defaultWidth: number,
+  defaultOpacity: number,
+): SlowStrokeCoverageProfile {
+  const dabs = planNormalizedStudioDynamicBrushDabs({
+    baseOpacity: 1,
+    baseWidth: defaultWidth,
+    maxDabs: 4096,
+    points: [0, 0, 160, 0],
+    pressures: [0.5, 0.5],
+    seed: settings.seed,
+    speeds: [0.08, 0.08],
+  }, settings);
+  let alphaTotal = 0;
+  let centreAlphaTotal = 0;
+  let centreSampleCount = 0;
+  let maximumAlpha = 0;
+  let sampleCount = 0;
+  for (let y = -defaultWidth / 2; y <= defaultWidth / 2; y += 2) {
+    for (let x = 32; x <= 128; x += 2) {
+      let transparent = 1;
+      for (const dab of dabs) {
+        const angle = -dab.angle * Math.PI / 180;
+        const cosine = Math.cos(angle);
+        const sine = Math.sin(angle);
+        const deltaX = x - dab.x;
+        const deltaY = y - dab.y;
+        const normalizedX = (
+          cosine * deltaX - sine * deltaY
+        ) / Math.max(0.125, dab.size / 2);
+        const normalizedY = (
+          sine * deltaX + cosine * deltaY
+        ) / Math.max(0.125, dab.size * Math.max(0.01, dab.roundness) / 2);
+        const tipAlpha = sampleStudioBrushTipProceduralAlpha(
+          settings.tip.shape,
+          normalizedX,
+          normalizedY,
+          settings.tip.softness,
+        );
+        if (tipAlpha <= 0) continue;
+        const grain = resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+          x,
+          y,
+          0,
+          0,
+          settings.seed,
+          settings.grain,
+        );
+        const deposition = Math.min(
+          1,
+          Math.max(0, dab.opacity * dab.flow * tipAlpha * grain),
+        );
+        transparent *= 1 - deposition;
+      }
+      const alpha = defaultOpacity * (1 - transparent);
+      alphaTotal += alpha;
+      maximumAlpha = Math.max(maximumAlpha, alpha);
+      sampleCount += 1;
+      if (Math.abs(y) < 1) {
+        centreAlphaTotal += alpha;
+        centreSampleCount += 1;
+      }
+    }
+  }
+  return {
+    centreMeanAlpha: centreSampleCount > 0
+      ? centreAlphaTotal / centreSampleCount
+      : 0,
+    dabCount: dabs.length,
+    maximumAlpha,
+    meanAlpha: sampleCount > 0 ? alphaTotal / sampleCount : 0,
+  };
 }
 
 describe("shipped brush runtime output quality", () => {
@@ -136,6 +228,70 @@ describe("shipped brush runtime output quality", () => {
         ),
       ).toBeLessThanOrEqual(current.size * 0.18);
     }
+  });
+
+  it("keeps slow soft/spray strokes visible across their footprint without centre over-saturation", () => {
+    const grandSoft = materializeStudioBrushPackSelection("airbrush-grand-soft");
+    if (!grandSoft) throw new Error("airbrush-grand-soft pack is missing");
+    const cases = [
+      {
+        id: "airbrush",
+        settings: studioBrushDynamicsPresetSettings("airbrush"),
+        width: 32,
+        opacity: 0.7,
+        minimumMean: 0.095,
+        maximumPeak: 0.36,
+      },
+      {
+        id: "soft-brush",
+        settings: studioBrushDynamicsSettingsForBrushId("soft-brush")!,
+        width: 36,
+        opacity: 0.55,
+        minimumMean: 0.125,
+        maximumPeak: 0.39,
+      },
+      {
+        id: "spray",
+        settings: studioBrushDynamicsSettingsForBrushId("spray")!,
+        width: 40,
+        opacity: 0.55,
+        minimumMean: 0.045,
+        maximumPeak: 0.24,
+      },
+      {
+        id: grandSoft.catalogId,
+        settings: grandSoft.brushDynamics,
+        width: grandSoft.defaultWidth,
+        opacity: grandSoft.defaultOpacity,
+        minimumMean: 0.08,
+        maximumPeak: 0.3,
+      },
+    ] as const;
+    const profiles = cases.map((entry) => ({
+      ...entry,
+      profile: profileSlowStrokeCoverage(
+        entry.settings,
+        entry.width,
+        entry.opacity,
+      ),
+    }));
+
+    for (const entry of profiles) {
+      expect(entry.profile.dabCount, entry.id).toBeGreaterThan(8);
+      expect(entry.profile.meanAlpha, entry.id).toBeGreaterThanOrEqual(
+        entry.minimumMean,
+      );
+      expect(entry.profile.maximumAlpha, entry.id).toBeLessThanOrEqual(
+        entry.maximumPeak,
+      );
+      expect(
+        entry.profile.centreMeanAlpha / entry.profile.meanAlpha,
+        entry.id,
+      ).toBeLessThan(3);
+    }
+    expect(new Set(
+      profiles.map(({ profile }) => profile.meanAlpha.toFixed(2)),
+    ).size).toBe(profiles.length);
   });
 
   it("keeps a visible airbrush floor while flow accumulates below whole-stroke opacity", () => {

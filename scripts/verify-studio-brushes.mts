@@ -45,10 +45,12 @@ import {
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/studio-brush-library";
 import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "../src/domains/creator/studio-brush-selection";
+import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/studio-draw-pointer-pressure-contract";
 
 const BUILT_IN_BRUSH_PRESET_COUNT = BRUSH_PRESETS.length;
 const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
@@ -208,6 +210,31 @@ function log(message: string): void {
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+/**
+ * Catalogue dynamics describe the selected library profile; a persisted stroke additionally owns
+ * its selected width and the strictest artist/family/profile geometry floor. Keep the browser oracle
+ * on that complete replay contract so exact canonical equality still catches every stale tip,
+ * pipeline, mapping, scatter and pressure field without mistaking intentional stroke-local capture
+ * for catalogue drift.
+ */
+function expectedPersistedDynamicsForDefaultSelection(
+  selection: StudioBrushCatalogSelection,
+) {
+  if (!selection.brushDynamics) return null;
+  const captured = captureStudioDrawPointerPressureContract({
+    drawMode: "pen",
+    brush: selection.runtimeBrushId,
+    brushDynamics: selection.brushDynamics,
+    pressureMinSize: DEFAULT_STUDIO_BRUSH_SNAPSHOT.pressureMinSize,
+    strokeWidth: selection.defaultWidth,
+  }, true).brushDynamics;
+  invariant(
+    captured,
+    `${selection.catalogId}: catalogue dynamics did not produce a persisted stroke contract`,
+  );
+  return captured;
 }
 
 function assertProductBrushCatalogContract(): {
@@ -941,9 +968,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       const persistedProStroke = preset.source === "pro"
         ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)
         : null;
+      const expectedPersistedDynamics = persistedProStroke
+        ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
+        : null;
       const persistedDynamicsMatched = persistedProStroke
         ? serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)
-          === serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)
+          === serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)
         : null;
       invariant(
         persistedDynamicsMatched !== false,
@@ -1485,9 +1515,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         expectedSelection,
         preset.source === "pro",
       );
+      const expectedPersistedDynamics = preset.source === "pro"
+        ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
+        : null;
       const persistedDynamicsMatched = preset.source === "pro"
         ? serializeStudioBrushDynamicsSettingsCanonical(saved.brushDynamics)
-          === serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)
+          === serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)
         : null;
       const persistedPathDistance = persistedStrokePathDistance(saved.points);
       invariant(

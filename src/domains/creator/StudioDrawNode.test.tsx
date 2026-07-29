@@ -3,9 +3,25 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-import { STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET } from "./studio-brush-render-budget";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  studioBrushDynamicsPresetSettings,
+} from "./studio-brush-dynamics";
+import {
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
+  STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+} from "./studio-brush-render-budget";
+import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
+import {
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
+import { exportPageToSvg } from "./studio-svg-export";
 import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "./studio-element-model";
@@ -57,6 +73,13 @@ class StampSceneContext {
   arc(x: number, y: number, radius: number): void {
     this.arcs.push(`${x},${y},${radius}`);
   }
+  ellipse(
+    x: number,
+    y: number,
+    radiusX: number,
+  ): void {
+    this.arcs.push(`${x},${y},${radiusX}`);
+  }
   drawImage(
     _image: CanvasImageSource,
     ...args: [number, number, number, number, number, number, number, number]
@@ -73,6 +96,17 @@ class StampSceneContext {
 
 class AliasSceneContext {
   readonly arcs: Array<{ alpha: number; radius: number; x: number; y: number }> = [];
+  readonly fillAlphas: number[] = [];
+  readonly fillPolygons: number[][] = [];
+  readonly fillRects: Array<{
+    alpha: number;
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  }> = [];
+  readonly strokeAlphas: number[] = [];
+  readonly strokeCaps: CanvasLineCap[] = [];
   readonly strokeWidths: number[] = [];
   fillStyle: string | CanvasGradient | CanvasPattern = "";
   globalAlpha = 1;
@@ -80,16 +114,31 @@ class AliasSceneContext {
   lineJoin: CanvasLineJoin = "miter";
   lineWidth = 1;
   strokeStyle: string | CanvasGradient | CanvasPattern = "";
+  private activePolygon: number[] = [];
 
   save(): void {}
   restore(): void {}
-  beginPath(): void {}
+  beginPath(): void {
+    this.activePolygon = [];
+  }
   closePath(): void {}
-  fill(): void {}
-  moveTo(): void {}
-  lineTo(): void {}
+  fill(): void {
+    if (this.activePolygon.length >= 6) {
+      this.fillPolygons.push([...this.activePolygon]);
+      this.fillAlphas.push(this.globalAlpha);
+    }
+  }
+  moveTo(x: number, y: number): void {
+    this.activePolygon = [x, y];
+  }
+  lineTo(x: number, y: number): void {
+    this.activePolygon.push(x, y);
+  }
   quadraticCurveTo(): void {}
+  bezierCurveTo(): void {}
   stroke(): void {
+    this.strokeAlphas.push(this.globalAlpha);
+    this.strokeCaps.push(this.lineCap);
     this.strokeWidths.push(this.lineWidth);
   }
   arc(x: number, y: number, radius: number): void {
@@ -97,6 +146,9 @@ class AliasSceneContext {
   }
   createRadialGradient(): CanvasGradient {
     return { addColorStop: () => undefined } as unknown as CanvasGradient;
+  }
+  fillRect(x: number, y: number, width: number, height: number): void {
+    this.fillRects.push({ alpha: this.globalAlpha, height, width, x, y });
   }
 }
 
@@ -255,6 +307,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  clearStudioBrushTextureStampCache();
   vi.unstubAllGlobals();
 });
 
@@ -649,6 +702,66 @@ describe("StudioDrawNode orchestration", () => {
     },
   );
 
+  it.each(["brush", "flat-brush"] as const)(
+    "versions %s nib pressure while legacy retained geometry stays fixed",
+    (brush) => {
+      const renderPressure = (
+        pressures: readonly number[],
+        pressureModel = true,
+        materialMinimumDiameterRatio?: number,
+      ) => {
+        const view = render(
+          <StudioDrawNode
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [0, 0, 20, 0, 40, 0],
+              pressures: [...pressures],
+              ...(pressureModel
+                ? {
+                    materialPressureModel:
+                      STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+                    ...(materialMinimumDiameterRatio === undefined
+                      ? {}
+                      : { materialMinimumDiameterRatio }),
+                  }
+                : {}),
+              sampleSpacing: 1,
+              strokeWidth: 10,
+            })}
+          />,
+        );
+        const context = new AngledBrushSceneContext();
+        const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+          context: CanvasRenderingContext2D,
+          shape: unknown,
+        ) => void;
+        sceneFunc(
+          context as unknown as CanvasRenderingContext2D,
+          {} as never,
+        );
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return context.polygons;
+      };
+      const polygonWidth = (polygon: readonly number[]) => Math.hypot(
+        polygon[2]! - polygon[0]!,
+        polygon[3]! - polygon[1]!,
+      );
+      const light = renderPressure([0, 0, 0]);
+      const heavy = renderPressure([1, 1, 1]);
+
+      expect(polygonWidth(heavy[0]!)).toBeGreaterThan(
+        polygonWidth(light[0]!) * 2,
+      );
+      expect(renderPressure([0, 0, 0], false)).toEqual(
+        renderPressure([1, 1, 1], false),
+      );
+      expect(polygonWidth(renderPressure([0, 0, 0], true, 1)[0]!))
+        .toBeGreaterThan(polygonWidth(renderPressure([0, 0, 0], true, 0)[0]!));
+    },
+  );
+
   it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
     watercolorCapture.causalPlan.mockReturnValueOnce([
       { x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" },
@@ -696,8 +809,10 @@ describe("StudioDrawNode orchestration", () => {
         el={drawEl({ brush: "pencil", mode: "pen", points: [0, 0, 10, 0] })}
       />,
     );
-    expect(captured("Line")).toHaveLength(1);
-    expect(captured("Line")[0]!.props).toMatchObject({ opacity: 1, strokeWidth: 10 });
+    expect(captured("Shape")).toHaveLength(0);
+    expect(captured("Line").map((node) => node.props.strokeWidth)).toEqual([10]);
+    expect(captured("Line").map((node) => node.props.opacity)).toEqual([1]);
+    expect(captured("Line").map((node) => node.props.lineCap)).toEqual(["round"]);
 
     standard.unmount();
     konvaCapture.nodes.length = 0;
@@ -706,16 +821,291 @@ describe("StudioDrawNode orchestration", () => {
         el={drawEl({ brush: "soft-pencil", mode: "pen", points: [0, 0, 10, 0] })}
       />,
     );
-    expect(captured("Line")).toHaveLength(2);
-    expect(captured("Line").map(({ props }) => ({
-      opacity: props.opacity,
-      strokeWidth: props.strokeWidth,
-    }))).toEqual([
-      { opacity: 0.18, strokeWidth: 24.32 },
-      { opacity: 0.72, strokeWidth: 12.8 },
+    expect(captured("Shape")).toHaveLength(0);
+    expect(captured("Line").map((node) => node.props.strokeWidth)).toEqual([
+      24.32,
+      12.8,
     ]);
-    expect(captured("Line")[0]!.props.points).not.toEqual(captured("Line")[1]!.props.points);
+    expect(captured("Line").map((node) => node.props.opacity)).toEqual([
+      0.18,
+      0.72,
+    ]);
+    expect(captured("Line").map((node) => node.props.lineCap)).toEqual([
+      "round",
+      "round",
+    ]);
   });
+
+  it("versions pencil pressure while legacy strokes retain their fixed width and pigment", () => {
+    const renderPressure = (
+      pressures: number[],
+      activeDraft = false,
+      pressureModel = true,
+      materialMinimumDiameterRatio?: number,
+    ) => {
+      const view = render(
+        <StudioDrawNode
+          activeDraft={activeDraft}
+          el={drawEl({
+            brush: "pencil-2b",
+            mode: "pen",
+            points: [0, 0, 12, 4, 24, 0],
+            pressures,
+            ...(pressureModel
+              ? {
+                  materialPressureModel:
+                    STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+                  ...(materialMinimumDiameterRatio === undefined
+                    ? {}
+                    : { materialMinimumDiameterRatio }),
+                }
+              : {}),
+          })}
+        />,
+      );
+      const result = pressureModel
+        ? (() => {
+            const context = new AliasSceneContext();
+            const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+              context: CanvasRenderingContext2D
+            ) => void;
+            sceneFunc(context as unknown as CanvasRenderingContext2D);
+            const ribbonCells = context.fillPolygons.filter(
+              (polygon) => polygon.length === 8,
+            );
+            return {
+              arcs: context.arcs,
+              strokeAlphas: context.fillAlphas,
+              strokeCaps: context.strokeCaps,
+              strokeWidths: ribbonCells.map((polygon) => Math.max(
+                Math.hypot(
+                  polygon[0]! - polygon[6]!,
+                  polygon[1]! - polygon[7]!,
+                ),
+                Math.hypot(
+                  polygon[2]! - polygon[4]!,
+                  polygon[3]! - polygon[5]!,
+                ),
+              )),
+              terminalCapCount: context.fillPolygons.filter(
+                (polygon) => polygon.length > 8,
+              ).length,
+            };
+          })()
+        : {
+            arcs: [],
+            strokeAlphas: captured("Line").map((node) => node.props.opacity as number),
+            strokeCaps: captured("Line").map((node) => node.props.lineCap as string),
+            strokeWidths: captured("Line").map((node) => node.props.strokeWidth as number),
+            terminalCapCount: 0,
+          };
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return result;
+    };
+    const light = renderPressure([0, 0, 0]);
+    const neutral = renderPressure([0.5, 0.5, 0.5]);
+    const heavy = renderPressure([1, 1, 1]);
+    const liveHeavy = renderPressure([1, 1, 1], true);
+    const legacyLight = renderPressure([0, 0, 0], false, false);
+    const legacyHeavy = renderPressure([1, 1, 1], false, false);
+
+    expect(Math.max(...heavy.strokeWidths)).toBeGreaterThan(
+      Math.max(...neutral.strokeWidths),
+    );
+    expect(Math.max(...neutral.strokeWidths)).toBeGreaterThan(
+      Math.max(...light.strokeWidths),
+    );
+    expect(Math.max(...heavy.strokeAlphas)).toBeGreaterThan(
+      Math.max(...light.strokeAlphas),
+    );
+    expect(heavy.strokeCaps).toEqual([]);
+    expect(heavy.arcs).toEqual([]);
+    expect(heavy.terminalCapCount).toBe(2);
+    expect(liveHeavy.strokeWidths).toEqual(heavy.strokeWidths);
+    expect(liveHeavy.strokeAlphas).toEqual(heavy.strokeAlphas);
+    expect(liveHeavy.strokeCaps).toEqual(heavy.strokeCaps);
+    expect(liveHeavy.arcs).toEqual(heavy.arcs);
+    expect(legacyLight.strokeWidths).toEqual(legacyHeavy.strokeWidths);
+    expect(legacyLight.strokeAlphas).toEqual(legacyHeavy.strokeAlphas);
+    const sliderZero = renderPressure([0, 0, 0], false, true, 0);
+    const sliderFull = renderPressure([0, 0, 0], false, true, 1);
+    expect(Math.max(...sliderFull.strokeWidths)).toBeGreaterThan(
+      Math.max(...sliderZero.strokeWidths),
+    );
+    expect(sliderFull.strokeAlphas).toEqual(sliderZero.strokeAlphas);
+  });
+
+  it("shares one deterministic pressure-ribbon mesh between Canvas and SVG on a sharp S-curve", () => {
+    const element = drawEl({
+      id: "retained-ribbon-parity",
+      brush: "pencil-2b",
+      mode: "pen",
+      points: [0, 0, 18, 34, 36, -32, 54, 36, 78, 0],
+      pressures: [0.08, 0.92, 0.2, 1, 0.35],
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      materialMinimumDiameterRatio: 0.25,
+      sampleSpacing: 1,
+      strokeWidth: 14,
+      opacity: 0.64,
+    });
+    render(<StudioDrawNode el={element} />);
+    const context = new AliasSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    const exported = exportPageToSvg({
+      width: 120,
+      height: 100,
+      bg: "#ffffff",
+      elements: [element],
+    }).svg;
+    const pathCoordinates = (attribute: "data-pencil-ribbon-cell" | "data-pencil-endcap") => (
+      Array.from(
+        exported.matchAll(
+          new RegExp(`<path d="([^"]+)"[^>]*${attribute}="[^"]+"[^>]*/>`, "gu"),
+        ),
+        (match) => Array.from(
+          match[1]!.matchAll(/-?\d+(?:\.\d+)?/gu),
+          (numberMatch) => Number(numberMatch[0]),
+        ),
+      )
+    );
+    const roundCoordinates = (points: readonly number[]) => points.map(
+      (coordinate) => Math.round(coordinate * 100) / 100 + 0,
+    );
+    const canvasCells = context.fillPolygons
+      .filter((polygon) => polygon.length === 8)
+      .map(roundCoordinates);
+    const canvasCaps = context.fillPolygons
+      .filter((polygon) => polygon.length > 8)
+      .map(roundCoordinates);
+
+    expect(exported).toContain('data-brush-engine="retained-pressure-ribbon-v1"');
+    expect(pathCoordinates("data-pencil-ribbon-cell")).toEqual(canvasCells);
+    expect(pathCoordinates("data-pencil-endcap")).toEqual(canvasCaps);
+    expect(canvasCaps).toHaveLength(2);
+    expect(context.arcs).toEqual([]);
+    for (let cellIndex = 1; cellIndex < canvasCells.length; cellIndex += 1) {
+      const previous = new Set(
+        Array.from({ length: 4 }, (_, pointIndex) => (
+          `${canvasCells[cellIndex - 1]![pointIndex * 2]},${canvasCells[cellIndex - 1]![pointIndex * 2 + 1]}`
+        )),
+      );
+      const current = new Set(
+        Array.from({ length: 4 }, (_, pointIndex) => (
+          `${canvasCells[cellIndex]![pointIndex * 2]},${canvasCells[cellIndex]![pointIndex * 2 + 1]}`
+        )),
+      );
+      expect([...previous].filter((point) => current.has(point))).toHaveLength(2);
+    }
+  });
+
+  it.each(["highlighter", "neon", "glow"] as const)(
+    "keeps legacy %s on continuous Konva Lines and gates segmented Shapes to canonical-v1",
+    (brush) => {
+      const base = {
+        brush,
+        mode: "pen" as const,
+        points: [0, 0, 12, 8, 24, -2, 40, 6],
+        pressures: [0, 1, 0, 1],
+        sampleSpacing: 1,
+        strokeWidth: 12,
+      };
+      const legacy = render(<StudioDrawNode el={drawEl(base)} />);
+
+      expect(captured("Line").length).toBeGreaterThan(0);
+      expect(captured("Shape")).toHaveLength(0);
+      legacy.unmount();
+      konvaCapture.nodes.length = 0;
+
+      render(
+        <StudioDrawNode
+          el={drawEl({
+            ...base,
+            materialPressureModel:
+              STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          })}
+        />,
+      );
+      expect(captured("Shape").length).toBeGreaterThan(0);
+    },
+  );
+
+  it.each([
+    "highlighter",
+    "chisel-highlighter",
+    "pastel-highlighter",
+    "neon",
+    "glow",
+    "soft-glow",
+  ] as const)(
+    "maps %s pressure identically in active and retained rendering without round-capped interior joints",
+    (brush) => {
+      const renderPressure = (
+        pressure: number,
+        activeDraft: boolean,
+        materialMinimumDiameterRatio?: number,
+      ) => {
+        const view = render(
+          <StudioDrawNode
+            activeDraft={activeDraft}
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [0, 0, 12, 8, 24, -2, 40, 6],
+              pressures: [pressure, pressure, pressure, pressure],
+              materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+              ...(materialMinimumDiameterRatio === undefined
+                ? {}
+                : { materialMinimumDiameterRatio }),
+              sampleSpacing: 1,
+              strokeWidth: 12,
+              opacity: 0.7,
+            })}
+          />,
+        );
+        const context = new AliasSceneContext();
+        for (const shape of captured("Shape")) {
+          const sceneFunc = shape.props.sceneFunc as (
+            context: CanvasRenderingContext2D,
+          ) => void;
+          sceneFunc(context as unknown as CanvasRenderingContext2D);
+        }
+        const result = {
+          capCount: context.arcs.length + context.fillRects.length,
+          strokeAlphas: [...context.strokeAlphas],
+          strokeCaps: [...context.strokeCaps],
+          strokeWidths: [...context.strokeWidths],
+        };
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return result;
+      };
+
+      const light = renderPressure(0, false);
+      const heavy = renderPressure(1, false);
+      const liveHeavy = renderPressure(1, true);
+
+      expect(Math.max(...heavy.strokeWidths)).toBeGreaterThan(
+        Math.max(...light.strokeWidths),
+      );
+      expect(Math.max(...heavy.strokeAlphas)).toBeGreaterThan(
+        Math.max(...light.strokeAlphas),
+      );
+      expect(heavy.strokeCaps.every((cap) => cap === "butt")).toBe(true);
+      expect(heavy.capCount).toBe(
+        brush === "soft-glow" ? 8 : brush === "neon" || brush === "glow" ? 6 : 2,
+      );
+      expect(liveHeavy).toEqual(heavy);
+      const sliderZero = renderPressure(0, false, 0);
+      const sliderFull = renderPressure(0, false, 1);
+      expect(sliderFull.strokeWidths).not.toEqual(sliderZero.strokeWidths);
+      expect(sliderFull.strokeAlphas).toEqual(sliderZero.strokeAlphas);
+    },
+  );
 
   it("keeps the soft-pencil two-pass material on a one-point tap", () => {
     render(
@@ -733,6 +1123,53 @@ describe("StudioDrawNode orchestration", () => {
       { opacity: 0.72, radius: 6.4 },
     ]);
   });
+
+  it.each(["pencil-2b", "brush", "highlighter"] as const)(
+    "applies the persisted minimum diameter to a %s tap without lifting alpha",
+    (brush) => {
+      const renderTap = (materialMinimumDiameterRatio: number) => {
+        const view = render(
+          <StudioDrawNode
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [4, 7],
+              pressures: [0],
+              materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+              materialMinimumDiameterRatio,
+              strokeWidth: 12,
+              opacity: 0.7,
+            })}
+          />,
+        );
+        const nodes = [
+          ...captured("Circle"),
+          ...captured("Ellipse"),
+          ...captured("Rect"),
+        ];
+        const result = {
+          alphas: nodes.map(({ props }) => props.opacity),
+          diameters: nodes.map(({ kind, props }) => (
+            kind === "Circle"
+              ? Number(props.radius) * 2
+              : kind === "Ellipse"
+                ? Number(props.radiusX) * 2
+                : Number(props.width)
+          )),
+        };
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return result;
+      };
+      const sliderZero = renderTap(0);
+      const sliderFull = renderTap(1);
+
+      expect(Math.max(...sliderFull.diameters)).toBeGreaterThan(
+        Math.max(...sliderZero.diameters),
+      );
+      expect(sliderFull.alphas).toEqual(sliderZero.alphas);
+    },
+  );
 
   it.each([
     ["causal pen", { points: [4, 7], sampleSpacing: 1 }],
@@ -919,6 +1356,46 @@ describe("StudioDrawNode orchestration", () => {
     expect(context.drawImages.every(({ alpha }) => alpha === 0.3)).toBe(true);
   });
 
+  it("fails bounded-flow-v2 closed when its coverage surface is unavailable", () => {
+    vi.stubGlobal("OffscreenCanvas", class {
+      constructor() {
+        throw new Error("coverage unavailable");
+      }
+    });
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      tip: { shape: "round" },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 8, mappings: [] },
+      opacity: { base: 0.5, mappings: [] },
+      flow: { base: 0.5, mappings: [] },
+    });
+    render(<StudioDrawNode el={drawEl({
+      id: "bounded-flow-v2-fail-closed",
+      brush: "ink-particle",
+      mode: "pen",
+      points: [10, 20, 50, 20],
+      pressures: [0.7, 0.7],
+      stroke: "#356dcc",
+      opacity: 0.5,
+      sampleSpacing: 0.5,
+      paintModel: "bounded-flow-v2",
+      brushDynamics,
+    })} />);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    // Replaying the same .5-alpha dabs with .5 stroke opacity would produce .4375 overlap.
+    // Bounded-flow-v2 instead remains empty when it cannot preserve the .375 coverage contract.
+    expect(context.arcs).toHaveLength(0);
+    expect(context.fills).toHaveLength(0);
+    expect(context.drawImages).toHaveLength(0);
+  });
+
   it("renders custom alpha tips without a Canvas save/restore pair for every sample", () => {
     const alphaMapSize = 8;
     const alphaBytes = new Uint8Array(alphaMapSize * alphaMapSize);
@@ -956,6 +1433,223 @@ describe("StudioDrawNode orchestration", () => {
     expect(context.saveCount).toBe(1);
     expect(context.restoreCount).toBe(1);
     expect(context.fillStyleWrites).toBeLessThan(context.fills.length);
+  });
+
+  it("uses the same full causal alpha texture authority on Canvas and SVG", () => {
+    const alphaMapSize = 8;
+    const alphaBytes = new Uint8Array(alphaMapSize * alphaMapSize);
+    alphaBytes.fill(255);
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("dry-media"),
+      tip: {
+        shape: "hard",
+        softness: 0,
+        alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(alphaBytes),
+        alphaMapSize,
+      },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 8, mappings: [] },
+    });
+    const element = drawEl({
+      id: "causal-grid3-cross-layer",
+      brush: "dry-media",
+      mode: "pen",
+      points: [0, 0, 16, 0, 32, 8, 48, 4],
+      pressures: [0.25, 0.5, 0.8, 1],
+      speeds: [0.2, 0.4, 0.7, 0.3],
+      stroke: "#3257d6",
+      strokeWidth: 16,
+      opacity: 1,
+      sampleSpacing: 1,
+      brushDynamics,
+    });
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: brushDynamics,
+      dabCount: 1,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    });
+    expect(budget.stampGrid).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(budget.marksPerDab).toBe(1);
+
+    class TextureCoverageSurface {
+      width: number;
+      height: number;
+      private readonly context = {
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over" as GlobalCompositeOperation,
+        fillStyle: "",
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high" as ImageSmoothingQuality,
+        save: () => undefined,
+        restore: () => undefined,
+        setTransform: () => undefined,
+        clearRect: () => undefined,
+        translate: () => undefined,
+        rotate: () => undefined,
+        scale: () => undefined,
+        beginPath: () => undefined,
+        arc: () => undefined,
+        ellipse: () => undefined,
+        fill: () => undefined,
+        drawImage: () => undefined,
+        fillRect: () => undefined,
+        createImageData: (width: number, height: number) => ({
+          width,
+          height,
+          colorSpace: "srgb",
+          data: new Uint8ClampedArray(width * height * 4),
+        } as ImageData),
+        putImageData: () => undefined,
+      };
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext(): typeof this.context {
+        return this.context;
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", TextureCoverageSurface);
+
+    render(<StudioDrawNode el={element} />);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+    const svg = exportPageToSvg({
+      width: 128,
+      height: 96,
+      bg: "#ffffff",
+      elements: [element],
+    }).svg;
+    const svgMarks = svg.match(/data-brush-coverage="alpha-map"/gu) ?? [];
+
+    expect(context.arcs).toHaveLength(0);
+    expect(context.drawImages.length).toBeGreaterThan(0);
+    expect(svg).toContain('data-brush-tip-asset="full-alpha-map-v1"');
+    expect(svgMarks.length).toBeGreaterThan(0);
+    expect(svg).not.toContain("<circle");
+  });
+
+  it("keeps a 1,300-dab causal stroke identical and non-skipped after pointer-up and SVG export", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      width: { base: 16 },
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 1, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+    });
+    const element = drawEl({
+      id: "causal-1300-cross-surface",
+      kind: "freehand",
+      brush: "ink-particle",
+      mode: "pen",
+      points: [0, 24, 1_299, 24],
+      pressures: [0.72, 0.72],
+      stroke: "#3257d6",
+      strokeWidth: 16,
+      opacity: 1,
+      sampleSpacing: 1,
+      brushDynamics,
+    });
+    const causal = planStudioCausalDynamicBrushDepositsV2({
+      points: element.points,
+      pressures: element.pressures,
+      settings: brushDynamics,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(causal.ok).toBe(true);
+    if (!causal.ok) return;
+    expect(causal.dabs.length).toBeGreaterThan(1_024);
+    expect(causal.dabs.length).toBeLessThanOrEqual(1_500);
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: brushDynamics,
+      dabCount: causal.dabs.length,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+    });
+    expect(budget.maxDabsPerVariation).toBe(causal.dabs.length);
+
+    render(<StudioDrawNode el={element} />);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D,
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    const exported = exportPageToSvg({
+      width: 1_320,
+      height: 64,
+      bg: "#ffffff",
+      elements: [element],
+    });
+    const svgMarks = Array.from(
+      exported.svg.matchAll(
+        /<ellipse data-brush-coverage="ellipse" cx="([^"]+)" cy="([^"]+)" rx="([^"]+)"/gu,
+      ),
+      (match) => ({
+        radius: Number(match[3]),
+        x: Number(match[1]),
+        y: Number(match[2]),
+      }),
+    );
+
+    expect(context.arcs).toHaveLength(causal.dabs.length);
+    expect(svgMarks).toHaveLength(causal.dabs.length);
+    expect(exported.skipped).toEqual([]);
+    const [canvasStartX, canvasStartY, canvasStartRadius] = context.arcs[0]!
+      .split(",")
+      .map(Number);
+    const [canvasEndX, canvasEndY, canvasEndRadius] = context.arcs.at(-1)!
+      .split(",")
+      .map(Number);
+    expect(svgMarks[0]!.radius).toBeCloseTo(canvasStartRadius!, 3);
+    expect(svgMarks[0]!.x).toBeCloseTo(canvasStartX!, 3);
+    expect(svgMarks[0]!.y).toBeCloseTo(canvasStartY!, 3);
+    expect(svgMarks.at(-1)!.radius).toBeCloseTo(canvasEndRadius!, 3);
+    expect(svgMarks.at(-1)!.x).toBeCloseTo(canvasEndX!, 3);
+    expect(svgMarks.at(-1)!.y).toBeCloseTo(canvasEndY!, 3);
+  });
+
+  it("retains the bounded causal deposit prefix when the source exceeds the dab ceiling", () => {
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      taper: { enabled: false },
+      spacingRatio: null,
+      spacing: { base: 0.5, mappings: [] },
+    });
+    render(<StudioDrawNode
+      el={drawEl({
+        id: "causal-deposit-overflow",
+        kind: "freehand",
+        brush: "ink-particle",
+        mode: "pen",
+        points: [0, 0, 100_000, 0],
+        pressures: [0.7, 0.7],
+        brushDynamics,
+      })}
+    />);
+
+    expect(captured("Shape")).toHaveLength(1);
   });
 
   it("keeps pathological live multi-tip kaleidoscope work inside the shared mark budget", () => {

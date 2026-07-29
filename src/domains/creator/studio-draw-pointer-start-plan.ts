@@ -16,13 +16,13 @@ import {
   type NormalizedCalligraphyStylusInput,
 } from "./studio-brush";
 import {
-  normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
   resolveStudioStampBrushKind,
   type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
+import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
 import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "./studio-element-model";
 import {
   resolveStudioCausalInkInputPlan,
@@ -222,6 +222,7 @@ export function planStudioDrawPointerStart(
     : { x: position.x, y: position.y };
   const pressure = causalInitialSample?.pressure ?? resolvedPressure;
   const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
+  const pressureContract = captureStudioDrawPointerPressureContract(input, capturePointerDynamics);
   const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
   const brushCatalogIdentity = drawMode === "pen"
     ? normalizeStudioBrushCatalogIdentityMetadata(input)
@@ -237,14 +238,12 @@ export function planStudioDrawPointerStart(
       : drawMode === "pixel"
         ? STUDIO_PIXEL_PENCIL_RENDER_MODE
         : undefined,
+    ...pressureContract,
     ...brushCatalogIdentity,
     brushTip: drawMode === "pen" && brush === "calligraphy" ? { ...brushTip } : undefined,
     stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,
-    brushDynamics: capturePointerDynamics
-      ? normalizeStudioBrushDynamicsSettings(input.brushDynamics)
-      : undefined,
     symmetry: drawMode === "pixel" || symmetry.type === "none"
       ? undefined
       : {

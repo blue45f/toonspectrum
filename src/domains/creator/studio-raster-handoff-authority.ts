@@ -57,6 +57,8 @@ const AUTHORITY_ELEMENT_KEYS = [
   "stroke",
   "strokeWidth",
   "pressureModel",
+  "materialPressureModel",
+  "materialMinimumDiameterRatio",
   "paintModel",
   "opacity",
   "brush",

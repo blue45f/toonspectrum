@@ -50,6 +50,8 @@ function legacyPlainPromotion(
     kind: promoted.kind,
     brush: undefined,
     pressures: undefined,
+    materialPressureModel: undefined,
+    materialMinimumDiameterRatio: undefined,
     tiltXs: undefined,
     tiltYs: undefined,
     twists: undefined,

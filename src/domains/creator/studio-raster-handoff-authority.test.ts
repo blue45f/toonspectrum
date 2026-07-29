@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   createStudioRasterHandoffAuthorityKey,
@@ -132,6 +133,29 @@ describe("studio raster handoff authority", () => {
     expect(baseKey({ viewport: { ...viewport, surface: { ...viewport.surface, left: 11 } } }))
       .not.toBe(current);
     expect(baseKey({ gates: { exportActive: true } })).not.toBe(current);
+    const dynamicElement = {
+      id: "draw-dynamic",
+      type: "draw" as const,
+      kind: "freehand" as const,
+      mode: "pen" as const,
+      points: [1, 2, 3, 4],
+      pressures: [0, 0],
+      stroke: "#123456",
+      strokeWidth: 20,
+      opacity: 1,
+      brush: "airbrush",
+      panelClip: "none" as const,
+    };
+    const floorKey = (minimumDiameterRatio: number) => baseKey({
+      elements: [{
+        ...dynamicElement,
+        brushDynamics: normalizeStudioBrushDynamicsSettings({
+          minimumDiameterRatio,
+          width: { base: 20 },
+        }),
+      }],
+    });
+    expect(floorKey(0.2)).not.toBe(floorKey(0.8));
     expect(baseKey({ elements: [{
       id: "draw-a",
       type: "draw",
@@ -146,6 +170,36 @@ describe("studio raster handoff authority", () => {
       brush: "pen",
       panelClip: "none",
     }] })).not.toBe(current);
+    const materialBase = baseKey({ elements: [{
+      id: "draw-material",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0, 0],
+      stroke: "#123456",
+      strokeWidth: 4,
+      materialPressureModel: "canonical-material-v1",
+      materialMinimumDiameterRatio: 0.2,
+      opacity: 1,
+      brush: "pencil",
+      panelClip: "none",
+    }] });
+    expect(baseKey({ elements: [{
+      id: "draw-material",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0, 0],
+      stroke: "#123456",
+      strokeWidth: 4,
+      materialPressureModel: "canonical-material-v1",
+      materialMinimumDiameterRatio: 1,
+      opacity: 1,
+      brush: "pencil",
+      panelClip: "none",
+    }] })).not.toBe(materialBase);
     expect(baseKey({ elements: [{
       id: "draw-a",
       type: "draw",

@@ -91,6 +91,24 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)",
     );
     expect(harness).toContain(
+      "expectedPersistedDynamicsForDefaultSelection(expectedSelection)",
+    );
+    expect(harness).toContain(
+      "captureStudioDrawPointerPressureContract({",
+    );
+    expect(harness).toContain(
+      "pressureMinSize: DEFAULT_STUDIO_BRUSH_SNAPSHOT.pressureMinSize",
+    );
+    expect(harness).toContain(
+      "strokeWidth: selection.defaultWidth",
+    );
+    expect(harness).toContain(
+      "serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)",
+    );
+    expect(harness).not.toContain(
+      "serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)",
+    );
+    expect(harness).toContain(
       "Math.ceil(PRODUCT_BRUSH_CATALOG_COUNT / 7)",
     );
     expect(harness).not.toContain(

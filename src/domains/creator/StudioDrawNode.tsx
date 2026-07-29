@@ -41,6 +41,7 @@ import {
 } from "./studio-brush-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
 } from "./studio-brush-render-budget";
@@ -53,7 +54,10 @@ import {
   studioDynamicBrushDabVariationsFromTransforms,
 } from "./studio-brush-symmetry";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
-import { planStudioCausalDynamicBrushDepositsV2 } from "./studio-causal-dynamic-brush-deposit-v2";
+import {
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
@@ -72,16 +76,21 @@ import {
 } from "./studio-dynamic-brush-coverage-renderer";
 import {
   fxBrushSeedFromKey,
+  isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planGlowBrushPasses,
   planNeonBrushPasses,
   planOilBrushDabs,
   planPastelBrushDabs,
+  planStudioFxBrushPressurePath,
+  resolveStudioFxBrushTapPressureResponse,
+  resolveStudioFxPressurePassResponse,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
 import {
   studioInkUsesPathResidualDabSpacing,
 } from "./studio-ink-pressure-model";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -99,6 +108,12 @@ import {
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
 } from "./studio-pixel-pencil";
+import {
+  planStudioRetainedMediaPressureCurve,
+  resolveStudioRetainedMediaPressure,
+  resolveStudioRetainedMediaPressureProfileId,
+} from "./studio-retained-media-pressure";
+import { planStudioRetainedMediaRibbon } from "./studio-retained-media-ribbon";
 import {
   buildStudioRoughShapeRenderPlan,
   loadStudioRoughGenerator,
@@ -131,6 +146,7 @@ import { StudioStampDrawShape } from "./StudioStampDrawShape";
 import type { CalligraphyStylusInput } from "./studio-brush";
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
+import type { StudioFxPressurePathSegment } from "./studio-fx-brush";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
@@ -208,6 +224,67 @@ function processStudioPencilAliasPassPoints(
     const source = points[coordinateIndex];
     return source === undefined ? value : source + (value - source) * scale;
   });
+}
+
+interface StudioFxPressureTraceContext {
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  quadraticCurveTo(
+    controlX: number,
+    controlY: number,
+    endX: number,
+    endY: number,
+  ): void;
+  bezierCurveTo(
+    control1X: number,
+    control1Y: number,
+    control2X: number,
+    control2Y: number,
+    endX: number,
+    endY: number,
+  ): void;
+}
+
+function traceStudioFxPressureSegment(
+  context: StudioFxPressureTraceContext,
+  segment: StudioFxPressurePathSegment,
+): void {
+  context.moveTo(segment.moveX, segment.moveY);
+  if (segment.command === "cubic") {
+    context.bezierCurveTo(
+      segment.control1X,
+      segment.control1Y,
+      segment.control2X,
+      segment.control2Y,
+      segment.endX,
+      segment.endY,
+    );
+  } else if (segment.command === "quadratic") {
+    context.quadraticCurveTo(
+      segment.controlX,
+      segment.controlY,
+      segment.endX,
+      segment.endY,
+    );
+  } else {
+    context.lineTo(segment.endX, segment.endY);
+  }
+}
+
+function traceStudioRetainedMediaPolygon(
+  context: Pick<
+    CanvasRenderingContext2D,
+    "beginPath" | "closePath" | "lineTo" | "moveTo"
+  >,
+  points: readonly number[],
+): void {
+  if (points.length < 6) return;
+  context.beginPath();
+  context.moveTo(points[0]!, points[1]!);
+  for (let coordinateIndex = 2; coordinateIndex < points.length; coordinateIndex += 2) {
+    context.lineTo(points[coordinateIndex]!, points[coordinateIndex + 1]!);
+  }
+  context.closePath();
 }
 
 // 손그림(스케치) 도형용 rough.js generator 훅 — 스케치가 켜진 도형이 처음 보일 때만
@@ -336,6 +413,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const symmetricVariations = stampBrushKind || dynamicBrushId
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
+  let dynamicBrushPlanFailed = false;
   const dynamicBrushPlan = dynamicBrushId
     ? (() => {
         const dynamics = studioDrawNodeDynamicBrushSettings(el, dynamicBrushId);
@@ -363,9 +441,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               tiltYs: el.tiltYs,
               twists: el.twists,
               settings: dynamics,
-              maximumDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+              maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
             })
           : null;
+        if (causalDepositPlan && !causalDepositPlan.ok) {
+          dynamicBrushPlanFailed = true;
+          return null;
+        }
         const usesCausalDepositPlan = causalDepositPlan?.ok === true;
         let baseDabs = usesCausalDepositPlan
           ? [...causalDepositPlan.dabs]
@@ -378,16 +460,25 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         // Retained redraw must not silently upgrade to a denser committed grid after pointer-up,
         // otherwise the same immutable dabs still produce different pixels during handoff.
         const markBudget = usesCausalDepositPlan
-          ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
+          ? STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
           : activeDraft
             ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
             : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
-          dabCount: usesCausalDepositPlan ? 1 : baseDabs.length,
+          dabCount: baseDabs.length,
           symmetryCount: symmetryTransforms.length,
           markBudget,
         });
+        if (
+          usesCausalDepositPlan
+          && renderBudget.maxDabsPerVariation < baseDabs.length
+        ) {
+          // Causal-v2 overflow is a versioned accepted-prefix receipt. Never reject the complete
+          // element here: doing so made an already-visible long stroke disappear at pointer-up.
+          // The live overlay, retained Canvas and SVG all retain this exact immutable dab prefix.
+          baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+        }
         if (
           !usesCausalDepositPlan
           && renderBudget.maxDabsPerVariation < baseDabs.length
@@ -404,6 +495,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           seed,
           markBudget,
           renderBudget,
+          usesCausalDepositPlan,
           dabVariations: studioDynamicBrushDabVariationsFromTransforms(
             baseDabs,
             symmetryTransforms
@@ -728,6 +820,16 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             && perfectProfile === null
             && aliasPencilPasses.length > 0
           ) {
+            const sourcePressure = el.pressures?.[0] ?? 0.5;
+            const pressureProfile = resolveStudioRetainedMediaPressureProfileId(brush)
+              ?? "pencil";
+            const pressureResponse = resolveStudioRetainedMediaPressure(
+              pressureProfile,
+              el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+                ? sourcePressure
+                : undefined,
+              el.materialMinimumDiameterRatio,
+            );
             return (
               <Group key={index} opacity={opacity} listening={false}>
                 {aliasPencilPasses.map((pass) => (
@@ -735,9 +837,22 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     key={pass.role}
                     x={points[0]}
                     y={points[1]}
-                    radius={Math.max(0.35, aliasStrokeWidth * pass.widthScale / 2)}
+                    radius={Math.max(
+                      0.35,
+                      aliasStrokeWidth
+                      * pass.widthScale
+                      * pressureResponse.sizeScale
+                      / 2,
+                    )}
                     fill={stroke}
-                    opacity={pass.opacityScale}
+                    opacity={Math.min(
+                      1,
+                      pass.opacityScale
+                      * Math.sqrt(
+                        pressureResponse.opacityScale
+                        * pressureResponse.flowScale,
+                      ),
+                    )}
                     globalCompositeOperation={composite}
                     listening={false}
                   />
@@ -755,25 +870,49 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const pressure = el.mode === "eraser"
               ? sourcePressure
               : mapStudioBrushAliasPressure(brush, sourcePressure, 0.5);
+            const retainedPressureProfile =
+              resolveStudioRetainedMediaPressureProfileId(brush);
+            const retainedPressure = retainedPressureProfile
+              ? resolveStudioRetainedMediaPressure(
+                  retainedPressureProfile,
+                  el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+                    ? sourcePressure
+                    : undefined,
+                  el.materialMinimumDiameterRatio,
+                )
+              : null;
             const pressureAware = el.mode === "eraser"
               || brushFamily === "pen"
               || brushFamily === "gpen"
               || brushFamily === "calligraphy"
               || isPerfectAliasBrush
-              || brushFamily === "marker";
-            const width = pressureAware
-              ? aliasStrokeWidth * (0.3 + pressure * 1.4)
-              : aliasStrokeWidth;
+              || brushFamily === "marker"
+              || retainedPressure !== null;
+            const width = retainedPressure
+              ? aliasStrokeWidth * retainedPressure.sizeScale
+              : pressureAware
+                ? aliasStrokeWidth * (0.3 + pressure * 1.4)
+                : aliasStrokeWidth;
             if (brushFamily === "highlighter") {
+              const pressureBrush = isStudioFxPressureBrushId(brush)
+                ? brush
+                : "highlighter";
+              const pressureResponse = resolveStudioFxBrushTapPressureResponse(
+                pressureBrush,
+                sourcePressure,
+                el.materialPressureModel,
+                el.materialMinimumDiameterRatio,
+              );
+              const tapWidth = aliasStrokeWidth * pressureResponse.widthScale;
               return (
                 <Rect
                   key={index}
-                  x={points[0] - aliasStrokeWidth / 2}
-                  y={points[1] - aliasStrokeWidth / 2}
-                  width={aliasStrokeWidth}
-                  height={aliasStrokeWidth}
+                  x={points[0] - tapWidth / 2}
+                  y={points[1] - tapWidth / 2}
+                  width={tapWidth}
+                  height={tapWidth}
                   fill={stroke}
-                  opacity={opacity}
+                  opacity={opacity * Math.min(1, pressureResponse.opacityScale)}
                   globalCompositeOperation="multiply"
                   listening={false}
                 />
@@ -899,6 +1038,16 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (dynamicBrush && el.mode !== "eraser") {
+            if (
+              dynamicBrushPlanFailed
+              || !dynamicBrushPlan
+              || (
+                dynamicBrushPlan.usesCausalDepositPlan
+                && !dynamicCoverageMarkPlan?.ok
+              )
+            ) {
+              return null;
+            }
             const legacyMarks = dynamicCoverageAndLegacyMarkPlan?.legacyMarks ?? [];
             return (
               <Shape
@@ -908,7 +1057,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     dynamicCoverageMarkPlan?.ok
                     && isStudioBoundedFlowPaintModelCompatible(el)
                   ) {
-                    const coverageResult = renderStudioDynamicBrushCoverage(
+                    renderStudioDynamicBrushCoverage(
                       context,
                       dynamicCoverageMarkPlan.marks,
                       {
@@ -919,16 +1068,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                           : {}),
                       },
                     );
-                    if (
-                      coverageResult.status === "rendered"
-                      || coverageResult.status === "empty"
-                      || coverageResult.status === "partial"
-                    ) {
-                      return;
-                    }
+                    // bounded-flow-v2 owns stroke opacity as one final coverage composite. A
+                    // surface/budget failure must remain empty (or retain a partial prefix) rather
+                    // than replaying marks with opacity on every dab, which would irreversibly
+                    // darken overlaps and change the persisted paint model.
+                    return;
                   }
-                  // Omitted/legacy models and every v2 preflight failure retain historical pixels.
-                  // A malformed mark plan is empty rather than partially replayed.
+                  // Only omitted/legacy paint models retain historical per-dab opacity pixels.
+                  // A malformed causal-v2 mark plan is rejected before this Shape is constructed.
                   renderStudioDynamicBrushLegacyMarks(context, legacyMarks, opacity);
                 }}
                 globalCompositeOperation={composite}
@@ -1215,6 +1362,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
               smoothed,
               aliasStrokeWidth,
+              -Math.PI / 6,
+              el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+                ? {
+                    profileId: brush === "flat-brush" ? "flat-brush" : "brush",
+                    pressures: el.pressures,
+                    minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                  }
+                : undefined,
             );
             return (
               <Shape
@@ -1368,42 +1523,122 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.2,
             });
-            if (aliasPencilPasses.length > 0) {
+            if (
+              el.materialPressureModel
+              !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ) {
+              if (aliasPencilPasses.length > 0) {
+                return (
+                  <Group key={index} opacity={opacity} listening={false}>
+                    {aliasPencilPasses.map((pass) => (
+                      <Line
+                        key={pass.role}
+                        points={processStudioPencilAliasPassPoints(
+                          renderPath.points,
+                          pass.jitterRadius,
+                        )}
+                        stroke={stroke}
+                        strokeWidth={Math.max(
+                          0.5,
+                          aliasStrokeWidth * pass.widthScale,
+                        )}
+                        opacity={pass.opacityScale}
+                        lineCap="round"
+                        lineJoin="round"
+                        tension={renderPath.tension}
+                        globalCompositeOperation={composite}
+                        listening={false}
+                      />
+                    ))}
+                  </Group>
+                );
+              }
               return (
-                <Group key={index} opacity={opacity} listening={false}>
-                  {aliasPencilPasses.map((pass) => (
-                    <Line
-                      key={pass.role}
-                      points={processStudioPencilAliasPassPoints(
-                        renderPath.points,
-                        pass.jitterRadius,
-                      )}
-                      stroke={stroke}
-                      strokeWidth={Math.max(0.5, aliasStrokeWidth * pass.widthScale)}
-                      opacity={pass.opacityScale}
-                      lineCap="round"
-                      lineJoin="round"
-                      tension={renderPath.tension}
-                      globalCompositeOperation={composite}
-                      listening={false}
-                    />
-                  ))}
-                </Group>
+                <Line
+                  key={index}
+                  points={processPencilPoints(renderPath.points)}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  opacity={opacity}
+                  lineCap="round"
+                  lineJoin="round"
+                  tension={renderPath.tension}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
               );
             }
-            const jittered = processPencilPoints(renderPath.points);
+            const pressureProfile = resolveStudioRetainedMediaPressureProfileId(brush)
+              ?? "pencil";
+            const passes = aliasPencilPasses.length > 0
+              ? aliasPencilPasses
+              : [{
+                  role: "core" as const,
+                  widthScale: 1,
+                  opacityScale: 1,
+                  jitterRadius: 0.75,
+                }];
+            const passPlans = passes.map((pass) => {
+              const curve = planStudioRetainedMediaPressureCurve(
+                processStudioPencilAliasPassPoints(
+                  renderPath.points,
+                  pass.jitterRadius,
+                ),
+                el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+                  ? el.pressures
+                  : undefined,
+                pressureProfile,
+                {
+                  tension: renderPath.tension,
+                  minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                },
+              );
+              return {
+                pass,
+                ribbon: planStudioRetainedMediaRibbon(
+                  curve,
+                  Math.max(0.5, aliasStrokeWidth * pass.widthScale),
+                ),
+              };
+            });
             return (
-              <Line
+              <Shape
                 key={index}
-                points={jittered}
-                stroke={stroke}
-                strokeWidth={strokeWidth}
+                sceneFunc={(context) => {
+                  context.save();
+                  const inheritedAlpha = context.globalAlpha;
+                  context.fillStyle = stroke;
+                  // Every adjacent cell shares one miter/bevel cross-section. Unlike independent
+                  // butt strokes, the pressure mesh has neither an outer hole nor a darker inner
+                  // overlap; each source segment still owns its canonical pigment response.
+                  for (const { pass, ribbon } of passPlans) {
+                    for (const run of ribbon.runs) {
+                      for (const cell of run.cells) {
+                        context.globalAlpha = inheritedAlpha * Math.min(
+                          1,
+                          pass.opacityScale
+                          * Math.sqrt(cell.opacityScale * cell.flowScale),
+                        );
+                        traceStudioRetainedMediaPolygon(context, cell.points);
+                        context.fill();
+                      }
+                      for (const cap of run.caps) {
+                        context.globalAlpha = inheritedAlpha * Math.min(
+                          1,
+                          pass.opacityScale
+                          * Math.sqrt(cap.opacityScale * cap.flowScale),
+                        );
+                        traceStudioRetainedMediaPolygon(context, cap.points);
+                        context.fill();
+                      }
+                    }
+                  }
+                  context.restore();
+                }}
                 opacity={opacity}
-                lineCap="round"
-                lineJoin="round"
-                tension={renderPath.tension}
                 globalCompositeOperation={composite}
                 listening={false}
+                perfectDrawEnabled={false}
               />
             );
           }
@@ -1415,18 +1650,90 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });
+            if (
+              el.materialPressureModel
+              !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ) {
+              return (
+                <Line
+                  key={index}
+                  points={renderPath.points}
+                  stroke={stroke}
+                  strokeWidth={aliasStrokeWidth}
+                  opacity={opacity}
+                  lineCap="square"
+                  lineJoin={brush === "chisel-highlighter" ? "bevel" : "round"}
+                  tension={renderPath.tension}
+                  globalCompositeOperation="multiply"
+                  listening={false}
+                />
+              );
+            }
+            const pressureBrush = isStudioFxPressureBrushId(brush)
+              ? brush
+              : "highlighter";
+            const pressurePath = planStudioFxBrushPressurePath({
+              brushId: pressureBrush,
+              points: renderPath.points,
+              pressures: el.pressures,
+              pressureModel: el.materialPressureModel,
+              minimumDiameterRatio: el.materialMinimumDiameterRatio,
+              tension: renderPath.tension,
+            });
             return (
-              <Line
+              <Shape
                 key={index}
-                points={renderPath.points}
-                stroke={stroke}
-                strokeWidth={aliasStrokeWidth}
+                sceneFunc={(context) => {
+                  context.save();
+                  const inheritedAlpha = context.globalAlpha;
+                  context.strokeStyle = stroke;
+                  context.fillStyle = stroke;
+                  context.lineCap = "butt";
+                  context.lineJoin = brush === "chisel-highlighter"
+                    ? "bevel"
+                    : "round";
+                  for (const segment of pressurePath.segments) {
+                    context.globalAlpha = inheritedAlpha * Math.min(
+                      1,
+                      segment.opacityScale,
+                    );
+                    context.lineWidth = Math.max(
+                      0.5,
+                      aliasStrokeWidth * segment.widthScale,
+                    );
+                    context.beginPath();
+                    traceStudioFxPressureSegment(context, segment);
+                    context.stroke();
+                  }
+                  const first = pressurePath.segments[0];
+                  const last = pressurePath.segments.at(-1);
+                  for (const endpoint of first && last
+                    ? [
+                        { x: first.moveX, y: first.moveY, response: first },
+                        { x: last.endX, y: last.endY, response: last },
+                      ]
+                    : []) {
+                    const endpointWidth = Math.max(
+                      0.5,
+                      aliasStrokeWidth * endpoint.response.widthScale,
+                    );
+                    context.globalAlpha = inheritedAlpha * Math.min(
+                      1,
+                      endpoint.response.opacityScale,
+                    );
+                    context.fillRect(
+                      endpoint.x - endpointWidth / 2,
+                      endpoint.y - endpointWidth / 2,
+                      endpointWidth,
+                      endpointWidth,
+                    );
+                  }
+                  context.restore();
+                }}
                 opacity={opacity}
-                lineCap="square"
-                lineJoin={brush === "chisel-highlighter" ? "bevel" : "round"}
-                tension={renderPath.tension}
                 globalCompositeOperation="multiply"
                 listening={false}
+                perfectDrawEnabled={false}
               />
             );
           }
@@ -1439,11 +1746,77 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyTension: 0.35,
             });
             const passes = planNeonBrushPasses(strokeWidth);
+            if (
+              el.materialPressureModel
+              !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ) {
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  {passes.map((pass, passIndex) => {
+                    const passColor = pass.tone === "white-core"
+                      ? "#ffffff"
+                      : stroke;
+                    const passWidth = Math.max(
+                      0.5,
+                      strokeWidth * pass.widthScale,
+                    );
+                    return renderPath.points.length === 2 ? (
+                      <KCircle
+                        key={passIndex}
+                        x={renderPath.points[0]}
+                        y={renderPath.points[1]}
+                        radius={Math.max(0.25, passWidth / 2)}
+                        fill={passColor}
+                        opacity={pass.opacity}
+                        globalCompositeOperation="lighter"
+                        listening={false}
+                      />
+                    ) : (
+                      <Line
+                        key={passIndex}
+                        points={renderPath.points}
+                        stroke={passColor}
+                        strokeWidth={passWidth}
+                        opacity={pass.opacity}
+                        lineCap="round"
+                        lineJoin="round"
+                        tension={renderPath.tension}
+                        globalCompositeOperation="lighter"
+                        listening={false}
+                      />
+                    );
+                  })}
+                </Group>
+              );
+            }
+            const pressurePath = planStudioFxBrushPressurePath({
+              brushId: "neon",
+              points: renderPath.points,
+              pressures: el.pressures,
+              pressureModel: el.materialPressureModel,
+              minimumDiameterRatio: el.materialMinimumDiameterRatio,
+              tension: renderPath.tension,
+            });
+            const tapPressure = resolveStudioFxBrushTapPressureResponse(
+              "neon",
+              el.pressures?.[0],
+              el.materialPressureModel,
+              el.materialMinimumDiameterRatio,
+            );
             return (
               <Group key={index} opacity={opacity} listening={false}>
                 {passes.map((pass, passIndex) => {
                   const passColor = pass.tone === "white-core" ? "#ffffff" : stroke;
-                  const passWidth = Math.max(0.5, strokeWidth * pass.widthScale);
+                  const luminousCore = pass.tone === "white-core";
+                  const tapPassPressure = resolveStudioFxPressurePassResponse(
+                    tapPressure,
+                    pass.widthScale,
+                    luminousCore,
+                  );
+                  const passWidth = Math.max(
+                    0.5,
+                    strokeWidth * pass.widthScale * tapPassPressure.widthScale,
+                  );
                   return renderPath.points.length === 2 ? (
                     <KCircle
                       key={passIndex}
@@ -1451,22 +1824,79 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       y={renderPath.points[1]}
                       radius={Math.max(0.25, passWidth / 2)}
                       fill={passColor}
-                      opacity={pass.opacity}
+                      opacity={Math.min(
+                        1,
+                        pass.opacity * tapPassPressure.opacityScale,
+                      )}
                       globalCompositeOperation="lighter"
                       listening={false}
                     />
                   ) : (
-                    <Line
+                    <Shape
                       key={passIndex}
-                      points={renderPath.points}
-                      stroke={passColor}
-                      strokeWidth={passWidth}
-                      opacity={pass.opacity}
-                      lineCap="round"
-                      lineJoin="round"
-                      tension={renderPath.tension}
+                      sceneFunc={(context) => {
+                        context.save();
+                        const inheritedAlpha = context.globalAlpha;
+                        context.strokeStyle = passColor;
+                        context.fillStyle = passColor;
+                        context.lineCap = "butt";
+                        context.lineJoin = "round";
+                        for (const segment of pressurePath.segments) {
+                          const pressurePass = resolveStudioFxPressurePassResponse(
+                            segment,
+                            pass.widthScale,
+                            luminousCore,
+                          );
+                          context.globalAlpha = inheritedAlpha * Math.min(
+                            1,
+                            pass.opacity * pressurePass.opacityScale,
+                          );
+                          context.lineWidth = Math.max(
+                            0.5,
+                            strokeWidth * pass.widthScale * pressurePass.widthScale,
+                          );
+                          context.beginPath();
+                          traceStudioFxPressureSegment(context, segment);
+                          context.stroke();
+                        }
+                        const first = pressurePath.segments[0];
+                        const last = pressurePath.segments.at(-1);
+                        for (const endpoint of first && last
+                          ? [
+                              { x: first.moveX, y: first.moveY, response: first },
+                              { x: last.endX, y: last.endY, response: last },
+                            ]
+                          : []) {
+                          const pressurePass = resolveStudioFxPressurePassResponse(
+                            endpoint.response,
+                            pass.widthScale,
+                            luminousCore,
+                          );
+                          context.globalAlpha = inheritedAlpha * Math.min(
+                            1,
+                            pass.opacity * pressurePass.opacityScale,
+                          );
+                          context.beginPath();
+                          context.arc(
+                            endpoint.x,
+                            endpoint.y,
+                            Math.max(
+                              0.25,
+                              strokeWidth
+                              * pass.widthScale
+                              * pressurePass.widthScale
+                              / 2,
+                            ),
+                            0,
+                            Math.PI * 2,
+                          );
+                          context.fill();
+                        }
+                        context.restore();
+                      }}
                       globalCompositeOperation="lighter"
                       listening={false}
+                      perfectDrawEnabled={false}
                     />
                   );
                 })}
@@ -1483,35 +1913,161 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             });
             const soft = (el.brush ?? "glow") === "soft-glow";
             const passes = planGlowBrushPasses(strokeWidth, soft);
+            if (
+              el.materialPressureModel
+              !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ) {
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  {passes.map((pass, passIndex) => (
+                    renderPath.points.length === 2 ? (
+                      <KCircle
+                        key={passIndex}
+                        x={renderPath.points[0]}
+                        y={renderPath.points[1]}
+                        radius={Math.max(
+                          0.25,
+                          strokeWidth * pass.widthScale * 0.5,
+                        )}
+                        fill={stroke}
+                        opacity={pass.opacity}
+                        globalCompositeOperation="lighter"
+                        listening={false}
+                      />
+                    ) : (
+                      <Line
+                        key={passIndex}
+                        points={renderPath.points}
+                        stroke={stroke}
+                        strokeWidth={Math.max(
+                          0.5,
+                          strokeWidth * pass.widthScale,
+                        )}
+                        opacity={pass.opacity}
+                        lineCap="round"
+                        lineJoin="round"
+                        tension={renderPath.tension}
+                        globalCompositeOperation="lighter"
+                        listening={false}
+                      />
+                    )
+                  ))}
+                </Group>
+              );
+            }
+            const pressureBrush = soft ? "soft-glow" : "glow";
+            const pressurePath = planStudioFxBrushPressurePath({
+              brushId: pressureBrush,
+              points: renderPath.points,
+              pressures: el.pressures,
+              pressureModel: el.materialPressureModel,
+              minimumDiameterRatio: el.materialMinimumDiameterRatio,
+              tension: renderPath.tension,
+            });
+            const tapPressure = resolveStudioFxBrushTapPressureResponse(
+              pressureBrush,
+              el.pressures?.[0],
+              el.materialPressureModel,
+              el.materialMinimumDiameterRatio,
+            );
             return (
               <Group key={index} opacity={opacity} listening={false}>
-                {passes.map((pass, passIndex) => (
-                  renderPath.points.length === 2 ? (
+                {passes.map((pass, passIndex) => {
+                  const luminousCore = passIndex === passes.length - 1;
+                  const tapPassPressure = resolveStudioFxPressurePassResponse(
+                    tapPressure,
+                    pass.widthScale,
+                    luminousCore,
+                  );
+                  return renderPath.points.length === 2 ? (
                     <KCircle
                       key={passIndex}
                       x={renderPath.points[0]}
                       y={renderPath.points[1]}
-                      radius={Math.max(0.25, strokeWidth * pass.widthScale * 0.5)}
+                      radius={Math.max(
+                        0.25,
+                        strokeWidth
+                        * pass.widthScale
+                        * tapPassPressure.widthScale
+                        * 0.5,
+                      )}
                       fill={stroke}
-                      opacity={pass.opacity}
+                      opacity={Math.min(
+                        1,
+                        pass.opacity * tapPassPressure.opacityScale,
+                      )}
                       globalCompositeOperation="lighter"
                       listening={false}
                     />
                   ) : (
-                    <Line
+                    <Shape
                       key={passIndex}
-                      points={renderPath.points}
-                      stroke={stroke}
-                      strokeWidth={Math.max(0.5, strokeWidth * pass.widthScale)}
-                      opacity={pass.opacity}
-                      lineCap="round"
-                      lineJoin="round"
-                      tension={renderPath.tension}
+                      sceneFunc={(context) => {
+                        context.save();
+                        const inheritedAlpha = context.globalAlpha;
+                        context.strokeStyle = stroke;
+                        context.fillStyle = stroke;
+                        context.lineCap = "butt";
+                        context.lineJoin = "round";
+                        for (const segment of pressurePath.segments) {
+                          const pressurePass = resolveStudioFxPressurePassResponse(
+                            segment,
+                            pass.widthScale,
+                            luminousCore,
+                          );
+                          context.globalAlpha = inheritedAlpha * Math.min(
+                            1,
+                            pass.opacity * pressurePass.opacityScale,
+                          );
+                          context.lineWidth = Math.max(
+                            0.5,
+                            strokeWidth * pass.widthScale * pressurePass.widthScale,
+                          );
+                          context.beginPath();
+                          traceStudioFxPressureSegment(context, segment);
+                          context.stroke();
+                        }
+                        const first = pressurePath.segments[0];
+                        const last = pressurePath.segments.at(-1);
+                        for (const endpoint of first && last
+                          ? [
+                              { x: first.moveX, y: first.moveY, response: first },
+                              { x: last.endX, y: last.endY, response: last },
+                            ]
+                          : []) {
+                          const pressurePass = resolveStudioFxPressurePassResponse(
+                            endpoint.response,
+                            pass.widthScale,
+                            luminousCore,
+                          );
+                          context.globalAlpha = inheritedAlpha * Math.min(
+                            1,
+                            pass.opacity * pressurePass.opacityScale,
+                          );
+                          context.beginPath();
+                          context.arc(
+                            endpoint.x,
+                            endpoint.y,
+                            Math.max(
+                              0.25,
+                              strokeWidth
+                              * pass.widthScale
+                              * pressurePass.widthScale
+                              / 2,
+                            ),
+                            0,
+                            Math.PI * 2,
+                          );
+                          context.fill();
+                        }
+                        context.restore();
+                      }}
                       globalCompositeOperation="lighter"
                       listening={false}
+                      perfectDrawEnabled={false}
                     />
-                  )
-                ))}
+                  );
+                })}
               </Group>
             );
           }

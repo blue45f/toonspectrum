@@ -8,6 +8,10 @@
  */
 
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  type NormalizedStudioBrushDynamicsSettings,
+} from "./studio-brush-dynamics";
+import {
   composeStudioBrushDualTipAlphaMap,
   studioBrushDualTipUsesSolidEllipse,
 } from "./studio-brush-tip-composition";
@@ -16,11 +20,15 @@ import {
   type NormalizedStudioBrushTipSettings,
 } from "./studio-brush-tip-stamp";
 
-import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
-
 export const STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS = [7, 5, 3] as const;
 export type StudioDynamicBrushRenderStampGrid =
   (typeof STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS)[number];
+/**
+ * Causal-v2 accepts marks append-only, so it cannot switch from a dense pointer-down lattice to a
+ * sparse long-stroke lattice without clearing already-visible paint. All live, retained and export
+ * consumers use this one bounded lattice. Legacy snapshots keep adaptive 7/5/3 planning below.
+ */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID = 3 as const;
 
 /**
  * Keeps live pointer frames below roughly 4k Canvas arc/fill marks.
@@ -32,12 +40,44 @@ export type StudioDynamicBrushRenderStampGrid =
 export const STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET = 4_096;
 /** Retained Canvas and SVG use the same higher-fidelity deterministic ceiling. */
 export const STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET = 65_536;
+/** Shared causal deposit ceiling; solid one-mark nibs may use the complete range. */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET = 65_536;
+/**
+ * Causal strokes retain one material plan across live append, pointer-up replay and SVG export.
+ * Live append normally plans only the unseen suffix, so sharing the committed ceiling protects
+ * long textured strokes without making every pointer frame replay 65k marks.
+ */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET =
+  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
 /** Prefer at least this many full-path stations before retaining a denser alpha-tip grid. */
 export const STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION = 32;
+/**
+ * Causal overflow is deliberately a prefix receipt, not a whole-stroke redistribution.
+ *
+ * Once a live dab is visible it is immutable. Redistributing old dabs when a later pointer sample
+ * crosses the work ceiling would make the accepted live prefix jump and would no longer match
+ * replay. Versioning the policy also gives future chunked/WebGPU implementations a migration point
+ * without silently changing persisted causal-v2 pixels.
+ */
+export const STUDIO_DYNAMIC_BRUSH_CAUSAL_OVERFLOW_POLICY =
+  "accepted-prefix-v1" as const;
+
+export interface StudioDynamicBrushAcceptedPrefixReceipt {
+  readonly kind: "studio-dynamic-brush-accepted-prefix-receipt";
+  readonly version: 1;
+  readonly policy: typeof STUDIO_DYNAMIC_BRUSH_CAUSAL_OVERFLOW_POLICY;
+  readonly requestedDabsPerVariation: number;
+  readonly acceptedDabsPerVariation: number;
+  readonly rejectedDabsPerVariation: number;
+  readonly marksPerDab: number;
+  readonly symmetryCount: number;
+  readonly markBudget: number;
+  readonly acceptedMarkBudget: number;
+}
 
 export interface StudioDynamicBrushRenderBudgetInput {
   settings: NormalizedStudioBrushDynamicsSettings;
-  /** Actual base-dab count from the ordinary 1,024-dab dynamics plan. */
+  /** Actual base-dab count from the selected legacy or causal deposit plan. */
   dabCount: number;
   /** Number of Canvas/SVG symmetry copies that will be rendered. */
   symmetryCount: number;
@@ -54,6 +94,11 @@ export interface StudioDynamicBrushRenderBudgetPlan {
   dabCapped: boolean;
   stampGridReduced: boolean;
   capped: boolean;
+  /**
+   * Present only when a causal stroke exceeded the shared mark ceiling. Consumers must render this
+   * exact prefix instead of rejecting the complete stroke or redistributing already-visible dabs.
+   */
+  acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
 }
 
 interface GridWorkPlan {
@@ -87,6 +132,15 @@ export function countStudioDynamicBrushMarksPerDab(
   settings: NormalizedStudioBrushDynamicsSettings,
   grid: StudioDynamicBrushRenderStampGrid
 ): number {
+  if (
+    settings.depositPipeline
+    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+  ) {
+    // Causal-v2 carries each solid, analytic or full alpha-map tip as one affine command. The
+    // dual tip is precomposed into the primary map; each enabled extra layer contributes one more.
+    // `grid` remains serialized for legacy replay but does not reduce a causal texture to circles.
+    return 1 + settings.tipLayers.filter((layer) => layer.opacity > 0).length;
+  }
   const grainActive = settings.grain.amount > 0;
   let marks = studioBrushTipMarkCount(settings.tip, grainActive, grid, settings.dualBrush);
   for (const layer of settings.tipLayers) {
@@ -100,15 +154,20 @@ function gridWorkPlans(
   settings: NormalizedStudioBrushDynamicsSettings,
   dabCount: number,
   symmetryCount: number,
-  markBudget: number
+  markBudget: number,
+  stampGrids: readonly StudioDynamicBrushRenderStampGrid[],
+  allowEmptyAcceptedPrefix: boolean,
 ): GridWorkPlan[] {
-  return STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS.map((grid) => {
+  return stampGrids.map((grid) => {
     const marksPerDab = countStudioDynamicBrushMarksPerDab(settings, grid);
     const marksPerSymmetricDab = symmetryCount * marksPerDab;
     const affordableDabs = Math.floor(markBudget / marksPerSymmetricDab);
     const maxDabs = dabCount === 0
       ? 0
-      : Math.max(1, Math.min(dabCount, affordableDabs));
+      : Math.max(
+          allowEmptyAcceptedPrefix ? 0 : 1,
+          Math.min(dabCount, affordableDabs),
+        );
     return {
       grid,
       marksPerDab,
@@ -128,10 +187,28 @@ function gridWorkPlans(
 export function planStudioDynamicBrushRenderBudget(
   input: StudioDynamicBrushRenderBudgetInput
 ): StudioDynamicBrushRenderBudgetPlan {
-  const dabCount = finiteInteger(input.dabCount, 0, 0, 4_096);
+  const causal = input.settings.depositPipeline
+    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
+  const dabCount = finiteInteger(
+    input.dabCount,
+    0,
+    0,
+    causal
+      ? STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET
+      : 4_096,
+  );
   const symmetryCount = finiteInteger(input.symmetryCount, 1, 1, 64);
   const markBudget = finiteInteger(input.markBudget, 1, 1, 100_000_000);
-  const candidates = gridWorkPlans(input.settings, dabCount, symmetryCount, markBudget);
+  const candidates = gridWorkPlans(
+    input.settings,
+    dabCount,
+    symmetryCount,
+    markBudget,
+    causal
+      ? [STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID]
+      : STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
+    causal,
+  );
   const fullDabPlan = candidates.find((candidate) => candidate.maxDabs >= dabCount);
   const minimumUsefulDabs = Math.min(dabCount, STUDIO_DYNAMIC_BRUSH_MIN_DABS_PER_VARIATION);
   const selected = fullDabPlan
@@ -139,7 +216,23 @@ export function planStudioDynamicBrushRenderBudget(
     ?? candidates.at(-1)!;
   const defaultPlan = candidates[0]!;
   const dabCapped = selected.maxDabs < dabCount;
-  const stampGridReduced = selected.grid !== STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS[0];
+  const stampGridReduced = causal
+    ? false
+    : selected.grid !== STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS[0];
+  const acceptedPrefixReceipt = causal && dabCapped
+    ? {
+        kind: "studio-dynamic-brush-accepted-prefix-receipt" as const,
+        version: 1 as const,
+        policy: STUDIO_DYNAMIC_BRUSH_CAUSAL_OVERFLOW_POLICY,
+        requestedDabsPerVariation: dabCount,
+        acceptedDabsPerVariation: selected.maxDabs,
+        rejectedDabsPerVariation: dabCount - selected.maxDabs,
+        marksPerDab: selected.marksPerDab,
+        symmetryCount,
+        markBudget,
+        acceptedMarkBudget: selected.estimatedMarks,
+      }
+    : undefined;
 
   return {
     stampGrid: selected.grid,
@@ -151,5 +244,6 @@ export function planStudioDynamicBrushRenderBudget(
     dabCapped,
     stampGridReduced,
     capped: dabCapped || stampGridReduced,
+    ...(acceptedPrefixReceipt ? { acceptedPrefixReceipt } : {}),
   };
 }

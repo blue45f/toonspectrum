@@ -14,6 +14,7 @@ import {
 } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
+  DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
   encodeStudioBrushTipAlphaMapBase64,
   studioBrushTipAlphaMapToBase64,
 } from "./studio-brush-tip-stamp";
@@ -207,7 +208,12 @@ describe("studio brush tip composition", () => {
   it("normalizes dual settings to identity defaults and drops over-budget secondary payloads", () => {
     expect(normalizeStudioBrushDualBrushSettings()).toEqual({
       enabled: false,
-      tip: { shape: "round", softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 },
+      tip: {
+        shape: "round",
+        softness: 0.35,
+        alphaMapBase64: null,
+        alphaMapSize: DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
+      },
       blendMode: "multiply",
       sizeRatio: 1,
     });

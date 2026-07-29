@@ -18,6 +18,10 @@ import {
 } from "./studio-webgpu-committed-plan";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type {
+  StudioMaterialMinimumDiameterRatio,
+  StudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 
 import {
@@ -62,6 +66,8 @@ export interface StudioRasterOverlaySourceElement extends StudioWebGpuCommittedE
   readonly hidden?: boolean;
   readonly panelClip: StudioWebGpuCommittedElementInput["panelClip"];
   readonly sampleSpacing?: unknown;
+  readonly materialPressureModel?: StudioMaterialPressureModel;
+  readonly materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   readonly groupId?: string;
 }
 

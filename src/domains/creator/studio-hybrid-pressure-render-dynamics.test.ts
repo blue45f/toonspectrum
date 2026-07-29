@@ -96,7 +96,7 @@ describe("studio hybrid pressure render dynamics", () => {
   });
 
   it("passes unrelated brushes through neutrally and excludes G-pen authority", () => {
-    const neutral = resolveStudioHybridPressureRenderDynamics("watercolor", {
+    const neutral = resolveStudioHybridPressureRenderDynamics("screentone", {
       pointerType: "pen",
       rawPressure: 0.05,
       baseWidth: 19,

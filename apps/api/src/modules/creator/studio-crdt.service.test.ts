@@ -20,9 +20,19 @@ import {
   type StudioRasterUndoAcknowledgement,
   type StudioRasterUndoOperation,
 } from "../../../../../lib/studio-crdt-raster-ops";
+import {
+  BRUSH_PRESETS,
+  STUDIO_BRUSH_RENDER_FAMILY,
+} from "../../../../../src/domains/creator/studio-brush";
+import {
+  isStudioStrokePaintModelCompatible as hasValidBrowserStrokePaintContract,
+} from "../../../../../src/domains/creator/studio-stroke-paint-model";
 
 import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
-import { hasValidStudioCrdtRootSchema } from "./studio-crdt-root-schema";
+import {
+  hasValidStudioCrdtRootSchema,
+  hasValidStudioCrdtStrokePaintContract,
+} from "./studio-crdt-root-schema";
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   studioCrdtPayloadHash,
@@ -2439,16 +2449,96 @@ describe("StudioCrdtService", () => {
     legacy.destroy();
   });
 
-  it("admits versioned layered-flow strokes and rejects incompatible paint semantics", () => {
-    const valid = createStrokeDocument();
-    const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
-    validStroke.set("payloadVersion", 2);
-    validStroke.set("opacity", 0.6);
-    validStroke.set("brush", "marker");
-    validStroke.set("sampleSpacing", 0);
-    validStroke.set("extensions", { paintModel: "layered-flow-v1" });
-    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
-    valid.destroy();
+  it("pins the API paint mirror to every client-known brush family and dynamic alias", () => {
+    const knownBrushIds = new Set([
+      ...Object.keys(STUDIO_BRUSH_RENDER_FAMILY),
+      ...BRUSH_PRESETS.map((preset) => preset.id),
+      "future-unknown-brush",
+    ]);
+    for (const brush of knownBrushIds) {
+      for (const paintModel of ["layered-flow-v1", "bounded-flow-v2"] as const) {
+        const browserContract = {
+          paintModel,
+          kind: "freehand",
+          mode: "pen",
+          brush,
+          sampleSpacing: 0,
+          brushDynamics: paintModel === "bounded-flow-v2" ? {} : undefined,
+        };
+        const expected = hasValidBrowserStrokePaintContract(browserContract);
+        for (const payloadVersion of [2, 3]) {
+          expect(
+            hasValidStudioCrdtStrokePaintContract({
+              payloadVersion,
+              ...browserContract,
+            }),
+            `${paintModel}:${brush}:v${payloadVersion}`,
+          ).toBe(expected);
+        }
+        expect(hasValidStudioCrdtStrokePaintContract({
+          payloadVersion: 1,
+          ...browserContract,
+        })).toBe(false);
+      }
+    }
+
+    const boundedBase = {
+      paintModel: "bounded-flow-v2" as const,
+      kind: "freehand",
+      mode: "pen",
+      brush: "dry-media",
+      brushDynamics: {},
+    };
+    for (const causalGeometry of [
+      { sampleSpacing: 0 },
+      { pressureModel: "linear-full-v1" },
+      { pressureModel: "linear-residual-v2" },
+      { pressureModel: "linear-residual-path-v3" },
+      {},
+      { sampleSpacing: -0.01 },
+      { pressureModel: "linear-residual-path-v4" },
+    ]) {
+      const browserContract = { ...boundedBase, ...causalGeometry };
+      expect(hasValidStudioCrdtStrokePaintContract({
+        payloadVersion: 3,
+        ...browserContract,
+      })).toBe(hasValidBrowserStrokePaintContract(browserContract));
+    }
+    for (const symmetry of [
+      undefined,
+      { type: "none" },
+      { type: "vertical", centerX: 0, centerY: 0 },
+      { type: "horizontal", centerX: 0, centerY: 0 },
+      { type: "radial", centerX: 0, centerY: 0, radialCount: 32 },
+      { type: "kaleidoscope", centerX: 0, centerY: 0, radialCount: 1 },
+      { type: "vertical" },
+      { type: "radial", centerX: 0, centerY: 0, radialCount: 33 },
+      { type: "future", centerX: 0, centerY: 0 },
+    ]) {
+      const browserContract = {
+        ...boundedBase,
+        sampleSpacing: 0,
+        symmetry,
+      };
+      expect(hasValidStudioCrdtStrokePaintContract({
+        payloadVersion: 3,
+        ...browserContract,
+      })).toBe(hasValidBrowserStrokePaintContract(browserContract));
+    }
+  });
+
+  it("admits v2/v3 layered-flow strokes and rejects incompatible paint semantics", () => {
+    for (const payloadVersion of [2, 3]) {
+      const valid = createStrokeDocument();
+      const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      validStroke.set("payloadVersion", payloadVersion);
+      validStroke.set("opacity", 0.6);
+      validStroke.set("brush", "marker");
+      validStroke.set("sampleSpacing", 0);
+      validStroke.set("extensions", { paintModel: "layered-flow-v1" });
+      expect(hasValidStudioCrdtRootSchema(valid), `payload v${payloadVersion}`).toBe(true);
+      valid.destroy();
+    }
 
     const invalidCases: Array<(stroke: Y.Map<unknown>) => void> = [
       (stroke) => stroke.set("payloadVersion", 1),
@@ -2456,6 +2546,8 @@ describe("StudioCrdtService", () => {
       (stroke) => stroke.set("kind", "shape"),
       (stroke) => stroke.set("fill", "#ffffff"),
       (stroke) => stroke.set("brush", "watercolor"),
+      (stroke) => stroke.set("brush", "pencil-2b"),
+      (stroke) => stroke.set("brush", "flat-brush"),
       (stroke) => stroke.set("brushDynamics", { pressureSize: true }),
       (stroke) => stroke.set("symmetry", { type: "vertical" }),
       (stroke) => stroke.set("extensions", {
@@ -2487,6 +2579,391 @@ describe("StudioCrdtService", () => {
     missingGeometryStroke.set("extensions", { paintModel: "layered-flow-v1" });
     expect(hasValidStudioCrdtRootSchema(missingCausalGeometry)).toBe(false);
     missingCausalGeometry.destroy();
+  });
+
+  it("admits causal bounded-flow dynamic paint in v2/v3 and rejects partial contracts", () => {
+    const createBoundedFlowDocument = (payloadVersion: 2 | 3): Y.Doc => {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", payloadVersion);
+      stroke.set("opacity", 0.6);
+      stroke.set("brush", "dry-media");
+      stroke.set("sampleSpacing", 0);
+      stroke.set("brushDynamics", payloadVersion === 3
+        ? { pressureSize: true, minimumDiameterRatio: 0.18 }
+        : { pressureSize: true });
+      stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      return document;
+    };
+
+    for (const payloadVersion of [2, 3] as const) {
+      const valid = createBoundedFlowDocument(payloadVersion);
+      expect(
+        hasValidStudioCrdtRootSchema(valid),
+        `bounded-flow payload v${payloadVersion}`,
+      ).toBe(true);
+      valid.destroy();
+    }
+
+    const radial = createBoundedFlowDocument(3);
+    const radialStroke = radial.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    radialStroke.delete("sampleSpacing");
+    radialStroke.set("symmetry", {
+      type: "radial",
+      centerX: 100,
+      centerY: 200,
+      radialCount: 8,
+    });
+    radialStroke.set("extensions", {
+      paintModel: "bounded-flow-v2",
+      pressureModel: "linear-residual-path-v3",
+    });
+    expect(hasValidStudioCrdtRootSchema(radial)).toBe(true);
+    radial.destroy();
+
+    const invalidCases: Array<[
+      label: string,
+      mutate: (stroke: Y.Map<unknown>) => void,
+    ]> = [
+      ["payload v1", (stroke) => stroke.set("payloadVersion", 1)],
+      ["missing dynamics", (stroke) => stroke.delete("brushDynamics")],
+      ["non-dynamic brush", (stroke) => stroke.set("brush", "marker")],
+      ["pencil family", (stroke) => stroke.set("brush", "pencil-2b")],
+      ["missing causal geometry", (stroke) => stroke.delete("sampleSpacing")],
+      ["eraser mode", (stroke) => stroke.set("mode", "eraser")],
+      ["shape kind", (stroke) => stroke.set("kind", "shape")],
+      ["closed fill", (stroke) => stroke.set("fill", "#ffffff")],
+      ["stamp pipeline", (stroke) => stroke.set("extensions", {
+        paintModel: "bounded-flow-v2",
+        stampPipeline: "causal-walker-v2",
+      })],
+      ["watercolor pipeline", (stroke) => stroke.set("extensions", {
+        paintModel: "bounded-flow-v2",
+        watercolorPipeline: "causal-walker-v2",
+      })],
+      ["missing symmetry center", (stroke) => stroke.set("symmetry", {
+        type: "vertical",
+      })],
+      ["oversized radial symmetry", (stroke) => stroke.set("symmetry", {
+        type: "radial",
+        centerX: 0,
+        centerY: 0,
+        radialCount: 33,
+      })],
+      ["unknown symmetry", (stroke) => stroke.set("symmetry", {
+        type: "future",
+        centerX: 0,
+        centerY: 0,
+      })],
+      ["v2 dynamic floor", (stroke) => {
+        stroke.set("payloadVersion", 2);
+        stroke.set("brushDynamics", {
+          pressureSize: true,
+          minimumDiameterRatio: 0.18,
+        });
+      }],
+    ];
+    for (const [label, mutate] of invalidCases) {
+      const document = createBoundedFlowDocument(3);
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      mutate(stroke);
+      expect(hasValidStudioCrdtRootSchema(document), label).toBe(false);
+      document.destroy();
+    }
+  });
+
+  it("persists and rehydrates a v3 bounded-flow dynamic stroke", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createStrokeDocument();
+    const stroke = source.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    stroke.set("payloadVersion", 3);
+    stroke.set("brush", "dry-media");
+    stroke.set("sampleSpacing", 0);
+    stroke.set("brushDynamics", {
+      pressureSize: true,
+      minimumDiameterRatio: 0.18,
+    });
+    stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+
+    await expect(current.applyUpdate({
+      workId: "work-bounded-flow-v3",
+      updateId: "00000000-0000-4000-8000-000000000710",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-bounded-flow-v3"));
+    const restored = hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    expect(restored.get("payloadVersion")).toBe(3);
+    expect(restored.get("extensions")).toEqual({ paintModel: "bounded-flow-v2" });
+    expect(restored.get("brushDynamics")).toEqual({
+      pressureSize: true,
+      minimumDiameterRatio: 0.18,
+    });
+    source.destroy();
+    hydrated.destroy();
+  });
+
+  it("rejects client-incompatible paint poison before durable append", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const poisonCases: Array<[
+      label: string,
+      mutate: (stroke: Y.Map<unknown>) => void,
+    ]> = [
+      ["layered pencil family", (stroke) => {
+        stroke.set("payloadVersion", 2);
+        stroke.set("brush", "pencil-2b");
+        stroke.set("sampleSpacing", 0);
+        stroke.set("extensions", { paintModel: "layered-flow-v1" });
+      }],
+      ["bounded non-dynamic brush", (stroke) => {
+        stroke.set("payloadVersion", 3);
+        stroke.set("brush", "marker");
+        stroke.set("sampleSpacing", 0);
+        stroke.set("brushDynamics", { pressureSize: true });
+        stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      }],
+      ["bounded missing dynamics", (stroke) => {
+        stroke.set("payloadVersion", 3);
+        stroke.set("brush", "dry-media");
+        stroke.set("sampleSpacing", 0);
+        stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      }],
+      ["bounded invalid symmetry", (stroke) => {
+        stroke.set("payloadVersion", 3);
+        stroke.set("brush", "dry-media");
+        stroke.set("sampleSpacing", 0);
+        stroke.set("brushDynamics", { pressureSize: true });
+        stroke.set("symmetry", {
+          type: "radial",
+          centerX: 0,
+          centerY: 0,
+          radialCount: 0,
+        });
+        stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      }],
+    ];
+
+    for (const [index, [label, mutate]] of poisonCases.entries()) {
+      const workId = `work-paint-poison-${index}`;
+      const poison = createStrokeDocument();
+      mutate(poison.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!);
+      await expect(current.applyUpdate({
+        workId,
+        updateId: `00000000-0000-4000-8000-${(720 + index)
+          .toString()
+          .padStart(12, "0")}`,
+        actorUserId: "editor",
+        data: fromUint8Array(Y.encodeStateAsUpdate(poison)),
+      }), label).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+      expect(repository.updates.get(workId) ?? [], label).toEqual([]);
+      poison.destroy();
+    }
+    expect(repository.receipts.size).toBe(0);
+  });
+
+  it("admits only bounded, co-authored material-pressure semantics in stroke payload v3", () => {
+    const validCases: Array<[
+      label: string,
+      extensions: Record<string, unknown> | undefined,
+      brushDynamics: Record<string, unknown> | undefined,
+    ]> = [
+      [
+        "inclusive zero material floor",
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: 0,
+        },
+        undefined,
+      ],
+      [
+        "inclusive one dynamic floor",
+        undefined,
+        { pressureSize: true, minimumDiameterRatio: 1 },
+      ],
+      [
+        "independent material and dynamic floors",
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: 0.72,
+        },
+        { pressureSize: true, minimumDiameterRatio: 0.18 },
+      ],
+    ];
+    for (const [label, extensions, brushDynamics] of validCases) {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", 3);
+      if (extensions) stroke.set("extensions", extensions);
+      if (brushDynamics) stroke.set("brushDynamics", brushDynamics);
+      expect(hasValidStudioCrdtRootSchema(document), label).toBe(true);
+      document.destroy();
+    }
+
+    const invalidCases: Array<[
+      label: string,
+      payloadVersion: number,
+      extensions: Record<string, unknown> | undefined,
+      brushDynamics: Record<string, unknown> | undefined,
+    ]> = [
+      [
+        "v1 material semantics",
+        1,
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: 0.5,
+        },
+        undefined,
+      ],
+      [
+        "v2 material semantics",
+        2,
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: 0.5,
+        },
+        undefined,
+      ],
+      [
+        "v1 dynamic floor",
+        1,
+        undefined,
+        { minimumDiameterRatio: 0.5 },
+      ],
+      [
+        "v2 dynamic floor",
+        2,
+        undefined,
+        { minimumDiameterRatio: 0.5 },
+      ],
+      [
+        "unknown material pressure model",
+        3,
+        {
+          materialPressureModel: "canonical-material-v2",
+          materialMinimumDiameterRatio: 0.5,
+        },
+        undefined,
+      ],
+      [
+        "material model without floor",
+        3,
+        { materialPressureModel: "canonical-material-v1" },
+        undefined,
+      ],
+      [
+        "material floor without model",
+        3,
+        { materialMinimumDiameterRatio: 0.5 },
+        undefined,
+      ],
+      [
+        "negative material floor",
+        3,
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: -0.01,
+        },
+        undefined,
+      ],
+      [
+        "non-finite material floor",
+        3,
+        {
+          materialPressureModel: "canonical-material-v1",
+          materialMinimumDiameterRatio: Number.POSITIVE_INFINITY,
+        },
+        undefined,
+      ],
+      [
+        "oversized dynamic floor",
+        3,
+        undefined,
+        { minimumDiameterRatio: 1.01 },
+      ],
+      [
+        "non-numeric dynamic floor",
+        3,
+        undefined,
+        { minimumDiameterRatio: "0.5" },
+      ],
+    ];
+    for (const [label, payloadVersion, extensions, brushDynamics] of invalidCases) {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", payloadVersion);
+      if (extensions) stroke.set("extensions", extensions);
+      if (brushDynamics) stroke.set("brushDynamics", brushDynamics);
+      expect(hasValidStudioCrdtRootSchema(document), label).toBe(false);
+      document.destroy();
+    }
+  });
+
+  it("rejects material-pressure stroke poison updates before durable append", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const poisonCases: Array<[
+      label: string,
+      mutate: (stroke: Y.Map<unknown>) => void,
+    ]> = [
+      [
+        "v2 material fields",
+        (stroke) => {
+          stroke.set("payloadVersion", 2);
+          stroke.set("extensions", {
+            materialPressureModel: "canonical-material-v1",
+            materialMinimumDiameterRatio: 0.5,
+          });
+        },
+      ],
+      [
+        "unknown v3 material model",
+        (stroke) => {
+          stroke.set("payloadVersion", 3);
+          stroke.set("extensions", {
+            materialPressureModel: "canonical-material-v2",
+            materialMinimumDiameterRatio: 0.5,
+          });
+        },
+      ],
+      [
+        "unpaired v3 material floor",
+        (stroke) => {
+          stroke.set("payloadVersion", 3);
+          stroke.set("extensions", { materialMinimumDiameterRatio: 0.5 });
+        },
+      ],
+      [
+        "out-of-range v3 dynamic floor",
+        (stroke) => {
+          stroke.set("payloadVersion", 3);
+          stroke.set("brushDynamics", { minimumDiameterRatio: -0.01 });
+        },
+      ],
+    ];
+
+    for (const [index, [label, mutate]] of poisonCases.entries()) {
+      const workId = `work-material-poison-${index}`;
+      const poison = createStrokeDocument();
+      mutate(poison.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!);
+      await expect(
+        current.applyUpdate({
+          workId,
+          updateId: `00000000-0000-4000-8000-${(700 + index)
+            .toString()
+            .padStart(12, "0")}`,
+          actorUserId: "editor",
+          data: fromUint8Array(Y.encodeStateAsUpdate(poison)),
+        }),
+        label
+      ).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+      expect(repository.updates.get(workId) ?? [], label).toEqual([]);
+      poison.destroy();
+    }
+    expect(repository.receipts.size).toBe(0);
   });
 
   it("admits the V3 path-phase extension and stationary pressure samples", async () => {

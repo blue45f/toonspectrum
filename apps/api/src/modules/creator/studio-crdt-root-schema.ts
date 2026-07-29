@@ -66,8 +66,11 @@ const STUDIO_CRDT_STROKE_RECORD_KEYS = new Set([
 const STUDIO_CRDT_STROKE_METADATA_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_STROKE_WIDTH_MAX = 8_192;
 const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1;
-const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 2;
+const STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION = 2;
+const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 3;
 const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
+const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
+const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
 const STUDIO_CRDT_CAUSAL_PRESSURE_MODELS = new Set([
   "linear-full-v1",
   "linear-residual-v2",
@@ -77,32 +80,48 @@ const STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS = new Set([
   "pen",
   "fineliner",
   "ballpoint",
+  "technical-pen",
   "marker",
   "felt-tip",
   "marker-bold",
+  "alcohol-marker",
 ]);
 const STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS = new Set([
+  "pixel-grid-v1",
   "gpen",
   "liner",
+  "mapping-pen",
+  "kaburapen",
   "ink-brush",
   "airbrush-fine",
   "pencil-grain",
   "wash-brush",
   "calligraphy",
+  "brush-pen",
+  "perfect-ink",
+  "perfect-marker",
   "highlighter",
+  "chisel-highlighter",
+  "pastel-highlighter",
   "neon",
   "glow",
   "soft-glow",
   "glitter",
   "star-dust",
+  "sparkle-star",
   "brush",
+  "flat-brush",
   "watercolor",
   "ink-wash",
+  "gouache",
   "oil",
+  "acrylic",
   "pastel",
+  "oil-pastel",
   "ink-particle",
   "airbrush",
   "spray",
+  "splatter",
   "soft-brush",
   "dry-media",
   "crayon",
@@ -110,7 +129,22 @@ const STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS = new Set([
   "charcoal",
   "pencil",
   "soft-pencil",
+  "pencil-2b",
+  "pencil-6b",
+  "colored-pencil",
   "screentone",
+  "crosshatch",
+]);
+const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
+  "ink-particle",
+  "airbrush",
+  "dry-media",
+  "soft-brush",
+  "spray",
+  "splatter",
+  "crayon",
+  "chalk",
+  "charcoal",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
@@ -1202,6 +1236,109 @@ function validateTrackedLayerGroupRoots(doc: Y.Doc): boolean {
   return true;
 }
 
+export interface StudioCrdtStrokePaintContractInput {
+  payloadVersion: unknown;
+  paintModel: unknown;
+  kind?: unknown;
+  mode?: unknown;
+  brush?: unknown;
+  sampleSpacing?: unknown;
+  pressureModel?: unknown;
+  fill?: unknown;
+  brushDynamics?: unknown;
+  stampPipeline?: unknown;
+  watercolorPipeline?: unknown;
+  symmetry?: unknown;
+}
+
+function hasCausalStrokePaintGeometry(
+  input: StudioCrdtStrokePaintContractInput
+): boolean {
+  return (
+    typeof input.sampleSpacing === "number"
+    && Number.isFinite(input.sampleSpacing)
+    && input.sampleSpacing >= 0
+  ) || (
+    typeof input.pressureModel === "string"
+    && STUDIO_CRDT_CAUSAL_PRESSURE_MODELS.has(input.pressureModel)
+  );
+}
+
+function hasNonIdentityStrokeSymmetry(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value !== "object" || Array.isArray(value)) return true;
+  const type = (value as Record<string, unknown>).type;
+  return type !== undefined && type !== "none";
+}
+
+function isBoundedFlowStrokeSymmetryCompatible(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const source = value as Record<string, unknown>;
+  if (source.type === undefined || source.type === "none") return true;
+  if (
+    source.type !== "vertical"
+    && source.type !== "horizontal"
+    && source.type !== "radial"
+    && source.type !== "kaleidoscope"
+  ) return false;
+  if (
+    typeof source.centerX !== "number"
+    || !Number.isFinite(source.centerX)
+    || typeof source.centerY !== "number"
+    || !Number.isFinite(source.centerY)
+  ) return false;
+  if (source.type === "vertical" || source.type === "horizontal") return true;
+  return typeof source.radialCount === "number"
+    && Number.isInteger(source.radialCount)
+    && source.radialCount >= 1
+    && source.radialCount <= 32;
+}
+
+function isLayeredFlowStrokeBrushCompatible(brush: unknown): boolean {
+  if (typeof brush !== "string" || brush.length === 0) return true;
+  return STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS.has(brush)
+    || !STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush);
+}
+
+/**
+ * Server mirror of the browser's pure stroke-paint admission contract. Runtime imports stay
+ * one-way at the API boundary; the service test pins this mirror against the browser oracle.
+ */
+export function hasValidStudioCrdtStrokePaintContract(
+  input: StudioCrdtStrokePaintContractInput
+): boolean {
+  if (
+    input.payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION
+    && input.payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) return false;
+  if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") {
+    return false;
+  }
+  if (input.fill !== undefined && input.fill !== null) return false;
+  if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
+  if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
+  if (!hasCausalStrokePaintGeometry(input)) return false;
+
+  if (input.paintModel === STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL) {
+    return (
+      (input.brushDynamics === undefined || input.brushDynamics === null)
+      && !hasNonIdentityStrokeSymmetry(input.symmetry)
+      && isLayeredFlowStrokeBrushCompatible(input.brush)
+    );
+  }
+  if (input.paintModel === STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL) {
+    return (
+      typeof input.brushDynamics === "object"
+      && input.brushDynamics !== null
+      && typeof input.brush === "string"
+      && STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS.has(input.brush)
+      && isBoundedFlowStrokeSymmetryCompatible(input.symmetry)
+    );
+  }
+  return false;
+}
+
 function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   const strokeWidth = record.get("strokeWidth");
   const payloadVersion = record.get("payloadVersion");
@@ -1213,6 +1350,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     (record.get("status") !== "drawing" && record.get("status") !== "finalized") ||
     (record.has("deleted") && typeof record.get("deleted") !== "boolean") ||
     (payloadVersion !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION &&
+      payloadVersion !== STUDIO_CRDT_LAYERED_FLOW_STROKE_PAYLOAD_VERSION &&
       payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
@@ -1252,34 +1390,56 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     && !Array.isArray(extensionsValue)
     ? extensionsValue as Record<string, unknown>
     : undefined;
+  const brushDynamicsValue = record.get("brushDynamics");
+  const brushDynamics = brushDynamicsValue !== null
+    && typeof brushDynamicsValue === "object"
+    && !Array.isArray(brushDynamicsValue)
+    ? brushDynamicsValue as Record<string, unknown>
+    : undefined;
+  const hasMaterialPressureModel = extensions !== undefined
+    && Object.prototype.hasOwnProperty.call(extensions, "materialPressureModel");
+  const hasMaterialMinimumDiameterRatio = extensions !== undefined
+    && Object.prototype.hasOwnProperty.call(extensions, "materialMinimumDiameterRatio");
+  const hasDynamicMinimumDiameterRatio = brushDynamics !== undefined
+    && Object.prototype.hasOwnProperty.call(brushDynamics, "minimumDiameterRatio");
+  if (
+    payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && (
+      hasMaterialPressureModel
+      || hasMaterialMinimumDiameterRatio
+      || hasDynamicMinimumDiameterRatio
+    )
+  ) return false;
+  if (
+    payloadVersion === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && (
+      hasMaterialPressureModel !== hasMaterialMinimumDiameterRatio
+      || (hasMaterialPressureModel
+        && extensions?.materialPressureModel !== STUDIO_CRDT_MATERIAL_PRESSURE_MODEL)
+      || (hasMaterialMinimumDiameterRatio
+        && !finiteNumberInRange(extensions?.materialMinimumDiameterRatio, 0, 1))
+      || (hasDynamicMinimumDiameterRatio
+        && !finiteNumberInRange(brushDynamics?.minimumDiameterRatio, 0, 1))
+    )
+  ) return false;
   const paintModel = extensions?.paintModel;
-  if (paintModel !== undefined) {
-    const brush = record.get("brush");
-    const knownCompatibleBrush = brush === undefined ||
-      (typeof brush === "string" && STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS.has(brush));
-    const unknownBrushUsesPenFallback = typeof brush === "string" &&
-      !STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush);
-    const symmetry = record.get("symmetry");
-    const identitySymmetry = symmetry === undefined || symmetry === null ||
-      (typeof symmetry === "object" && !Array.isArray(symmetry) &&
-        ((symmetry as Record<string, unknown>).type === undefined ||
-          (symmetry as Record<string, unknown>).type === "none"));
-    const hasCausalGeometry = record.has("sampleSpacing")
-      || STUDIO_CRDT_CAUSAL_PRESSURE_MODELS.has(extensions?.pressureModel as string);
-    if (
-      payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION ||
-      paintModel !== STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL ||
-      record.get("kind") !== "freehand" ||
-      record.get("mode") !== "pen" ||
-      record.has("fill") ||
-      record.has("brushDynamics") ||
-      extensions?.stampPipeline !== undefined ||
-      extensions?.watercolorPipeline !== undefined ||
-      !hasCausalGeometry ||
-      !identitySymmetry ||
-      (!knownCompatibleBrush && !unknownBrushUsesPenFallback)
-    ) return false;
-  }
+  if (
+    paintModel !== undefined
+    && !hasValidStudioCrdtStrokePaintContract({
+      payloadVersion,
+      paintModel,
+      kind: record.get("kind"),
+      mode: record.get("mode"),
+      brush: record.get("brush"),
+      sampleSpacing: record.get("sampleSpacing"),
+      pressureModel: extensions?.pressureModel,
+      fill: record.get("fill"),
+      brushDynamics: brushDynamicsValue,
+      stampPipeline: extensions?.stampPipeline,
+      watercolorPipeline: extensions?.watercolorPipeline,
+      symmetry: record.get("symmetry"),
+    })
+  ) return false;
   const metadata: Record<string, unknown> = {
     version: payloadVersion,
     type: "draw",

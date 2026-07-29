@@ -34,6 +34,10 @@ import type {
   StudioLayerRole,
 } from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
+import type {
+  StudioMaterialMinimumDiameterRatio,
+  StudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import type { Outline } from "./studio-outline";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { PhotoFilter } from "./studio-photo-filter";
@@ -374,6 +378,16 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   pressures?: number[];
   /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
   pressureModel?: StudioInkPressureModel;
+  /**
+   * Versioned retained-media/FX pressure response. Omitted pencil/brush/highlighter/neon/glow
+   * strokes retain their historical fixed appearance even when they contain pressure samples.
+   */
+  materialPressureModel?: StudioMaterialPressureModel;
+  /**
+   * Geometry-only minimum diameter captured from the brush settings at stroke start. Omitted
+   * material strokes retain their pre-snapshot dimensions; pigment pressure is never floored.
+   */
+  materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
   sampleSpacing?: number;
   /** 손그림(rough.js) 스케치 스타일 — 미설정이면 기존 클린 프리미티브 렌더. */

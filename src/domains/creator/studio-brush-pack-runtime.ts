@@ -23,6 +23,7 @@ import {
   encodeStudioBrushTipAlphaMapBase64,
   isStudioBrushTipShapeId,
   normalizeStudioBrushTipSettings,
+  STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
   STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE,
   type NormalizedStudioBrushTipSettings,
   type StudioBrushTipSettings,
@@ -165,7 +166,12 @@ export interface StudioBrushPackDualTipR8Materialization {
 }
 
 const CUSTOM_MOTIF_SET: ReadonlySet<string> = new Set(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS);
-const CUSTOM_TIP_SIZE = 24;
+/**
+ * Bundled custom motifs use the full document-safe R8 tip resolution. This keeps the smallest
+ * authored texture texel below 3.2 CSS px even at a 200 px brush diameter, while retaining the
+ * existing collaboration/import payload boundary.
+ */
+const CUSTOM_TIP_SIZE = STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE;
 const DUAL_TIP_COMBINE_MODES: readonly StudioDualTipCombineMode[] = [
   "multiply",
   "min",
@@ -1480,15 +1486,7 @@ export function materializeStudioBrushPackDynamics(
       : 0.72 + (index % 4) * 0.055;
   const settings: StudioBrushDynamicsSettings = {
     ...base,
-    ...(
-      descriptor.catalogId === "pencil-4b-rough"
-      || descriptor.catalogId === "g-pen-flex"
-        ? {
-            depositPipeline:
-              STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
-          }
-        : {}
-    ),
+    depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
     seed,
     fallbackPressure: 0.48 + (index % 5) * 0.025,
     maxSpeed: 1.2 + (index % 7) * 0.14,

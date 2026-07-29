@@ -242,6 +242,33 @@ describe("studio stroke-local polygon coverage", () => {
     }
   });
 
+  it("maps retained brush pressure into a continuous variable-width nib", () => {
+    const points = [0, 0, 20, 0, 40, 0];
+    const lightToHeavy = planStudioAngledNibStrokeLocalCoverage(
+      points,
+      NIB_WIDTH,
+      NIB_ANGLE,
+      { profileId: "brush", pressures: [0, 0.5, 1] },
+    );
+    const heavyToLight = planStudioAngledNibStrokeLocalCoverage(
+      points,
+      NIB_WIDTH,
+      NIB_ANGLE,
+      { profileId: "brush", pressures: [1, 0.5, 0] },
+    );
+
+    expect(lightToHeavy.polygons).toHaveLength(2);
+    expect(heavyToLight.polygons).toHaveLength(2);
+    const firstWidth = (plan: typeof lightToHeavy) => Math.hypot(
+      plan.polygons[0]!.points[2]! - plan.polygons[0]!.points[0]!,
+      plan.polygons[0]!.points[3]! - plan.polygons[0]!.points[1]!,
+    );
+    expect(firstWidth(heavyToLight)).toBeGreaterThan(firstWidth(lightToHeavy) * 2);
+    expect(lightToHeavy.polygons.every((polygon) => (
+      studioStrokeLocalCoverageSignedArea(polygon.points) > 0
+    ))).toBe(true);
+  });
+
   it("keeps source-over monotonic over an existing same-colour destination", () => {
     const coverage = planStudioAngledNibStrokeLocalCoverage(
       [0, 0, 20, 0, 0, 0],

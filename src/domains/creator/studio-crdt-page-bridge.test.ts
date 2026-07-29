@@ -23,7 +23,13 @@ import {
   type StudioCrdtCompatibleDrawElement,
   type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
+import {
+  STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+} from "./studio-crdt-protocol";
 import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import { createStudioWorkAssetInitialImageDescriptor } from "./studio-work-asset-admission";
 
 function record(
@@ -97,6 +103,7 @@ function pageRecord(
 describe("phase-two brush CRDT bridge", () => {
   it("keeps colour, grain-space and multi-tip snapshots inside the existing JSON envelope", () => {
     const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      minimumDiameterRatio: 0.68,
       colorDynamics: {
         backgroundColor: "#f0b429",
         foregroundBackgroundMix: 0.25,
@@ -130,8 +137,31 @@ describe("phase-two brush CRDT bridge", () => {
       orderIndex: 0,
     });
 
+    expect(input.payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
     expect(input.payload.brushDynamics).toEqual(JSON.parse(JSON.stringify(brushDynamics)));
     expect(normalizeStudioBrushDynamicsSettings(restored.brushDynamics)).toEqual(brushDynamics);
+    expect(restored.brushDynamics).toMatchObject({ minimumDiameterRatio: 0.68 });
+    for (const legacyVersion of [
+      STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => studioCrdtStrokeToDrawElement({
+        ...input,
+        payload: { ...input.payload, version: legacyVersion },
+        status: "finalized",
+        deleted: false,
+        orderIndex: 0,
+      })).toThrow("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다");
+    }
+    expect(() => studioDrawElementToCrdtStroke("page-brush", {
+      id: "invalid-dynamic-floor",
+      type: "draw",
+      points: [1, 2],
+      stroke: "#315cdd",
+      strokeWidth: 12,
+      brush: "dry-media",
+      brushDynamics: { minimumDiameterRatio: 1.01 },
+    })).toThrow("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다");
   });
 });
 
@@ -357,7 +387,7 @@ describe("studio CRDT page bridge", () => {
 
     const encoded = studioDrawElementToCrdtStroke("page-a", element);
     expect(encoded.payload).toMatchObject({
-      version: 2,
+      version: STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
       opacity: 0.6,
       brush: "marker",
       extensions: { paintModel: "layered-flow-v1" },
@@ -372,6 +402,20 @@ describe("studio CRDT page bridge", () => {
     });
     expect(decoded.paintModel).toBe("layered-flow-v1");
     expect(decoded.stroke).toBe(element.stroke);
+
+    const decodedV3 = studioCrdtStrokeToDrawElement({
+      ...record(`${element.id}-v3`, "page-a", 1),
+      ...encoded,
+      id: `${element.id}-v3`,
+      payload: {
+        ...encoded.payload,
+        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      },
+      orderIndex: 1,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decodedV3.paintModel).toBe("layered-flow-v1");
   });
 
   it("round-trips bounded-flow-v2 only with its snapshotted dynamic brush contract", () => {
@@ -400,7 +444,7 @@ describe("studio CRDT page bridge", () => {
     const encoded = studioDrawElementToCrdtStroke("page-a", element);
     expect(studioDrawElementToCrdtStroke("page-a", element)).toEqual(encoded);
     expect(encoded.payload).toMatchObject({
-      version: 2,
+      version: STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
       brush: "airbrush",
       brushDynamics,
       extensions: { paintModel: "bounded-flow-v2" },
@@ -458,6 +502,110 @@ describe("studio CRDT page bridge", () => {
       pressures: element.pressures,
       watercolorPipeline: "causal-walker-v2",
     });
+  });
+
+  it("round-trips only complete v3 material pressure snapshots", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "neon-pressure-v1",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 12, 4],
+      pressures: [0.5, 0.9],
+      stroke: "#39ff14",
+      strokeWidth: 18,
+      brush: "neon",
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      materialMinimumDiameterRatio: 0.73,
+    };
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload.version).toBe(STUDIO_CRDT_STROKE_PAYLOAD_VERSION);
+    expect(encoded.payload.extensions?.materialPressureModel).toBe(
+      STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+    );
+    expect(encoded.payload.extensions?.materialMinimumDiameterRatio).toBe(0.73);
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded.materialPressureModel).toBe(
+      STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+    );
+    expect(decoded.materialMinimumDiameterRatio).toBe(0.73);
+
+    expect(() => studioCrdtStrokeToDrawElement(record("future-fx", "page-a", 0, {
+      payload: {
+        ...record("future-fx", "page-a", 0).payload,
+        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        brush: "neon",
+        extensions: {
+          materialPressureModel: "canonical-material-v99",
+          materialMinimumDiameterRatio: 0.73,
+        },
+      },
+    }))).toThrow("재질 필압 모델이 올바르지 않습니다");
+
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      materialMinimumDiameterRatio: 1.01,
+    })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      materialMinimumDiameterRatio: undefined,
+    })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
+    expect(() => studioDrawElementToCrdtStroke("page-a", {
+      ...element,
+      materialPressureModel: undefined,
+    })).toThrow("재질 필압 모델이 올바르지 않습니다");
+    expect(() => studioCrdtStrokeToDrawElement({
+      ...record("forged-model-only", "page-a", 0),
+      payload: {
+        ...encoded.payload,
+        extensions: {
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        },
+      },
+      status: "finalized",
+      deleted: false,
+      orderIndex: 0,
+    })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
+    expect(() => studioCrdtStrokeToDrawElement({
+      ...record("forged-minimum-only", "page-a", 0),
+      payload: {
+        ...encoded.payload,
+        extensions: { materialMinimumDiameterRatio: 0.73 },
+      },
+      status: "finalized",
+      deleted: false,
+      orderIndex: 0,
+    })).toThrow("재질 필압 모델이 올바르지 않습니다");
+    for (const legacyVersion of [
+      STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => studioCrdtStrokeToDrawElement({
+        ...record(`forged-material-v${legacyVersion}`, "page-a", 0),
+        payload: { ...encoded.payload, version: legacyVersion },
+        status: "finalized",
+        deleted: false,
+        orderIndex: 0,
+      })).toThrow("재질 필압 모델과 페이로드 버전이 호환되지 않습니다");
+    }
+    expect(() => studioCrdtStrokeToDrawElement({
+      ...record("forged-minimum", "page-a", 0),
+      payload: {
+        ...record("forged-minimum", "page-a", 0).payload,
+        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+        brush: "neon",
+        extensions: {
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          materialMinimumDiameterRatio: -0.1,
+        },
+      },
+    })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
   });
 
   it("preserves omitted legacy pressure semantics and ignores unknown pressure models", () => {

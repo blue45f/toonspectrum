@@ -6,6 +6,11 @@
  */
 
 import { hash2 } from "./studio-grain";
+import {
+  STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+  applyStudioMaterialMinimumDiameterRatio,
+  type StudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 
 // ---------------------------------------------------------------------------
 // Shared
@@ -197,6 +202,420 @@ export type FxNeonPass = FxGlowPass & {
   /** Coloured halo passes sit behind a near-white luminous core. */
   tone: "color" | "white-core";
 };
+
+export type StudioFxPressureBrushId =
+  | "highlighter"
+  | "chisel-highlighter"
+  | "pastel-highlighter"
+  | "neon"
+  | "glow"
+  | "soft-glow";
+
+export interface StudioFxBrushPressureResponse {
+  readonly pressure: number;
+  /** Selected toolbar diameter multiplier. Highlighters deliberately keep this range narrow. */
+  readonly widthScale: number;
+  /** Local pigment/light energy multiplier before whole-element opacity. */
+  readonly opacityScale: number;
+  /** Outer halo multiplier. Neutral pressure is exactly one for legacy/mouse appearance parity. */
+  readonly haloScale: number;
+}
+
+export type StudioFxPressurePathSegment =
+  | (StudioFxBrushPressureResponse & {
+      readonly command: "line";
+      readonly moveX: number;
+      readonly moveY: number;
+      readonly endX: number;
+      readonly endY: number;
+      readonly sourceSegmentIndex: number;
+    })
+  | (StudioFxBrushPressureResponse & {
+      readonly command: "quadratic";
+      readonly moveX: number;
+      readonly moveY: number;
+      readonly controlX: number;
+      readonly controlY: number;
+      readonly endX: number;
+      readonly endY: number;
+      readonly sourceSegmentIndex: number;
+    })
+  | (StudioFxBrushPressureResponse & {
+      readonly command: "cubic";
+      readonly moveX: number;
+      readonly moveY: number;
+      readonly control1X: number;
+      readonly control1Y: number;
+      readonly control2X: number;
+      readonly control2Y: number;
+      readonly endX: number;
+      readonly endY: number;
+      readonly sourceSegmentIndex: number;
+    });
+
+export interface StudioFxPressurePathPlan {
+  readonly kind: "studio-fx-pressure-path";
+  readonly brushId: StudioFxPressureBrushId;
+  readonly sourcePointCount: number;
+  readonly segments: readonly StudioFxPressurePathSegment[];
+}
+
+interface FxPressureAxis {
+  readonly light: number;
+  readonly heavy: number;
+  readonly curve: number;
+}
+
+interface FxPressureProfile {
+  readonly width: FxPressureAxis;
+  readonly opacity: FxPressureAxis;
+  readonly halo: FxPressureAxis;
+}
+
+const FX_PRESSURE_PROFILE: Readonly<
+  Record<StudioFxPressureBrushId, FxPressureProfile>
+> = {
+  highlighter: {
+    // A marker nib is physically rigid. Pressure primarily changes ink delivery, not its footprint.
+    width: { light: 0.94, heavy: 1.08, curve: 0.72 },
+    opacity: { light: 0.46, heavy: 1.08, curve: 0.84 },
+    halo: { light: 1, heavy: 1, curve: 1 },
+  },
+  "chisel-highlighter": {
+    width: { light: 0.97, heavy: 1.04, curve: 0.76 },
+    opacity: { light: 0.42, heavy: 1.1, curve: 0.86 },
+    halo: { light: 1, heavy: 1, curve: 1 },
+  },
+  "pastel-highlighter": {
+    width: { light: 0.9, heavy: 1.14, curve: 0.78 },
+    opacity: { light: 0.34, heavy: 1.14, curve: 0.92 },
+    halo: { light: 1, heavy: 1, curve: 1 },
+  },
+  neon: {
+    width: { light: 0.72, heavy: 1.24, curve: 0.82 },
+    opacity: { light: 0.42, heavy: 1.1, curve: 0.88 },
+    halo: { light: 0.82, heavy: 1.42, curve: 0.78 },
+  },
+  glow: {
+    width: { light: 0.72, heavy: 1.3, curve: 0.84 },
+    opacity: { light: 0.34, heavy: 1.14, curve: 0.92 },
+    halo: { light: 0.78, heavy: 1.54, curve: 0.76 },
+  },
+  "soft-glow": {
+    width: { light: 0.8, heavy: 1.36, curve: 0.82 },
+    opacity: { light: 0.28, heavy: 1.12, curve: 0.94 },
+    halo: { light: 0.86, heavy: 1.68, curve: 0.74 },
+  },
+};
+
+const FX_PRESSURE_LEGACY_NEUTRAL = 0.5;
+const FX_PRESSURE_CURRENT_NOMINAL = 0.8;
+
+function centeredFxPressureResponse(
+  pressure: number,
+  axis: FxPressureAxis,
+): number {
+  if (pressure <= FX_PRESSURE_CURRENT_NOMINAL) {
+    const amount = Math.pow(
+      pressure / FX_PRESSURE_CURRENT_NOMINAL,
+      axis.curve,
+    );
+    return axis.light + (1 - axis.light) * amount;
+  }
+  const amount = Math.pow(
+    (pressure - FX_PRESSURE_CURRENT_NOMINAL)
+      / (1 - FX_PRESSURE_CURRENT_NOMINAL),
+    axis.curve,
+  );
+  return 1 + (axis.heavy - 1) * amount;
+}
+
+export function isStudioFxPressureBrushId(
+  value: unknown,
+): value is StudioFxPressureBrushId {
+  return typeof value === "string"
+    && Object.prototype.hasOwnProperty.call(FX_PRESSURE_PROFILE, value);
+}
+
+/**
+ * Maps the already-canonical `DrawEl.pressures` channel to material response. No velocity
+ * inference lives here: input, replay, collaboration and export therefore receive the same value.
+ */
+export function resolveStudioFxBrushPressureResponse(
+  brushId: StudioFxPressureBrushId,
+  pressureInput: unknown,
+  minimumDiameterRatio?: unknown,
+): StudioFxBrushPressureResponse {
+  const pressure = clamp(
+    finiteNumber(pressureInput, FX_PRESSURE_CURRENT_NOMINAL),
+    0,
+    1,
+  );
+  const profile = FX_PRESSURE_PROFILE[brushId];
+  return Object.freeze({
+    pressure,
+    widthScale: applyStudioMaterialMinimumDiameterRatio(
+      centeredFxPressureResponse(pressure, profile.width),
+      minimumDiameterRatio,
+    ),
+    opacityScale: centeredFxPressureResponse(pressure, profile.opacity),
+    haloScale: centeredFxPressureResponse(pressure, profile.halo),
+  });
+}
+
+function neutralStudioFxBrushPressureResponse(
+  pressure = FX_PRESSURE_LEGACY_NEUTRAL,
+): StudioFxBrushPressureResponse {
+  return Object.freeze({
+    pressure,
+    widthScale: 1,
+    opacityScale: 1,
+    haloScale: 1,
+  });
+}
+
+/**
+ * A missing version field is a persisted legacy mark and therefore keeps the selected toolbar
+ * appearance. Canonical-v1 interprets every stored pressure, including an exact stylus 0.5.
+ */
+export function resolveStudioFxBrushTapPressureResponse(
+  brushId: StudioFxPressureBrushId,
+  pressureInput: unknown,
+  pressureModel?: StudioMaterialPressureModel,
+  minimumDiameterRatio?: unknown,
+): StudioFxBrushPressureResponse {
+  return pressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+    ? resolveStudioFxBrushPressureResponse(
+        brushId,
+        pressureInput,
+        minimumDiameterRatio,
+      )
+    : neutralStudioFxBrushPressureResponse();
+}
+
+export interface StudioFxPressurePassResponse {
+  /** Complete multiplier applied to the pass' existing width scale. */
+  readonly widthScale: number;
+  /** Complete multiplier applied to the pass' existing opacity. */
+  readonly opacityScale: number;
+}
+
+/**
+ * Outer luminous passes react more through radius, while the innermost core reacts through nib
+ * width. Both Canvas and SVG call this exact function, preventing a pressure-dependent handoff pop.
+ */
+export function resolveStudioFxPressurePassResponse(
+  pressure: StudioFxBrushPressureResponse,
+  passWidthScale: number,
+  luminousCore: boolean,
+): StudioFxPressurePassResponse {
+  const haloWeight = luminousCore
+    ? 0
+    : clamp((finiteNumber(passWidthScale, 1) - 0.8) / 3.4, 0, 1);
+  return Object.freeze({
+    widthScale:
+      pressure.widthScale
+      + (pressure.haloScale - pressure.widthScale) * haloWeight,
+    opacityScale: luminousCore
+      ? Math.sqrt(pressure.opacityScale)
+      : pressure.opacityScale,
+  });
+}
+
+interface FxPressurePoint {
+  readonly x: number;
+  readonly y: number;
+  readonly pressure: number;
+}
+
+function fixedPathPressureAt(
+  pressures: readonly number[] | null | undefined,
+  progress: number,
+): number {
+  if (!pressures || pressures.length === 0) return FX_PRESSURE_LEGACY_NEUTRAL;
+  if (pressures.length === 1) {
+    return clamp(finiteNumber(pressures[0], 0), 0, 1);
+  }
+  const position = clamp(progress, 0, 1) * (pressures.length - 1);
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.min(pressures.length - 1, Math.ceil(position));
+  const amount = position - lowerIndex;
+  const lower = clamp(
+    finiteNumber(pressures[lowerIndex], 0),
+    0,
+    1,
+  );
+  const upper = clamp(finiteNumber(pressures[upperIndex], lower), 0, 1);
+  return lower + (upper - lower) * amount;
+}
+
+function sanitizeFxPressurePathPoints(
+  points: readonly number[],
+  pressures: readonly number[] | null | undefined,
+): FxPressurePoint[] {
+  const pairCount = Math.min(1_000_000, Math.floor(points.length / 2));
+  const result: FxPressurePoint[] = [];
+  for (let pointIndex = 0; pointIndex < pairCount; pointIndex += 1) {
+    const x = safeCoord(points[pointIndex * 2]);
+    const y = safeCoord(points[pointIndex * 2 + 1]);
+    if (x === null || y === null) break;
+    const pressure = fixedPathPressureAt(
+      pressures,
+      pairCount <= 1 ? 0 : pointIndex / (pairCount - 1),
+    );
+    const previous = result.at(-1);
+    if (previous && Math.hypot(x - previous.x, y - previous.y) <= POINT_EPS) {
+      result[result.length - 1] = { x, y, pressure };
+    } else {
+      result.push({ x, y, pressure });
+    }
+  }
+  return result;
+}
+
+interface FxCardinalControl {
+  readonly beforeX: number;
+  readonly beforeY: number;
+  readonly afterX: number;
+  readonly afterY: number;
+}
+
+function cardinalFxControls(
+  points: readonly FxPressurePoint[],
+  tension: number,
+): Array<FxCardinalControl | null> {
+  const controls: Array<FxCardinalControl | null> = Array.from(
+    { length: points.length },
+    () => null,
+  );
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const next = points[index + 1]!;
+    const previousDistance = Math.hypot(
+      current.x - previous.x,
+      current.y - previous.y,
+    );
+    const nextDistance = Math.hypot(next.x - current.x, next.y - current.y);
+    const totalDistance = previousDistance + nextDistance;
+    if (totalDistance <= POINT_EPS) continue;
+    const beforeFactor = tension * previousDistance / totalDistance;
+    const afterFactor = tension * nextDistance / totalDistance;
+    controls[index] = {
+      beforeX: current.x - beforeFactor * (next.x - previous.x),
+      beforeY: current.y - beforeFactor * (next.y - previous.y),
+      afterX: current.x + afterFactor * (next.x - previous.x),
+      afterY: current.y + afterFactor * (next.y - previous.y),
+    };
+  }
+  return controls;
+}
+
+/**
+ * Pressure-bearing port of the Konva cardinal path used by the fixed-path FX brushes.
+ *
+ * Each command retains the historical Q/C geometry while carrying a midpoint pressure response.
+ * Appending a future point cannot rewrite pressure on earlier commands, and active/retained Canvas
+ * plus SVG serialize this same immutable command list.
+ */
+export function planStudioFxBrushPressurePath(input: {
+  readonly brushId: StudioFxPressureBrushId;
+  readonly points: readonly number[];
+  readonly pressures?: readonly number[] | null;
+  readonly pressureModel?: StudioMaterialPressureModel;
+  readonly minimumDiameterRatio?: unknown;
+  readonly tension?: unknown;
+}): StudioFxPressurePathPlan {
+  const points = sanitizeFxPressurePathPoints(input.points, input.pressures);
+  const canonicalPressure =
+    input.pressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1;
+  const sourcePointCount = points.length;
+  if (sourcePointCount < 2) {
+    return Object.freeze({
+      kind: "studio-fx-pressure-path",
+      brushId: input.brushId,
+      sourcePointCount,
+      segments: Object.freeze([]),
+    });
+  }
+  const tension = clamp(finiteNumber(input.tension, 0), 0, 1);
+  const controls = tension > 0 && sourcePointCount >= 3
+    ? cardinalFxControls(points, tension)
+    : [];
+  const segments: StudioFxPressurePathSegment[] = [];
+  for (
+    let sourceSegmentIndex = 0;
+    sourceSegmentIndex < sourcePointCount - 1;
+    sourceSegmentIndex += 1
+  ) {
+    const start = points[sourceSegmentIndex]!;
+    const end = points[sourceSegmentIndex + 1]!;
+    const pressure = canonicalPressure
+      ? resolveStudioFxBrushPressureResponse(
+          input.brushId,
+          (start.pressure + end.pressure) / 2,
+          input.minimumDiameterRatio,
+        )
+      : neutralStudioFxBrushPressureResponse();
+    const startControl = controls[sourceSegmentIndex];
+    const endControl = controls[sourceSegmentIndex + 1];
+    if (sourceSegmentIndex === 0 && endControl) {
+      segments.push(Object.freeze({
+        command: "quadratic",
+        moveX: start.x,
+        moveY: start.y,
+        controlX: endControl.beforeX,
+        controlY: endControl.beforeY,
+        endX: end.x,
+        endY: end.y,
+        sourceSegmentIndex,
+        ...pressure,
+      }));
+    } else if (sourceSegmentIndex === sourcePointCount - 2 && startControl) {
+      segments.push(Object.freeze({
+        command: "quadratic",
+        moveX: start.x,
+        moveY: start.y,
+        controlX: startControl.afterX,
+        controlY: startControl.afterY,
+        endX: end.x,
+        endY: end.y,
+        sourceSegmentIndex,
+        ...pressure,
+      }));
+    } else if (startControl && endControl) {
+      segments.push(Object.freeze({
+        command: "cubic",
+        moveX: start.x,
+        moveY: start.y,
+        control1X: startControl.afterX,
+        control1Y: startControl.afterY,
+        control2X: endControl.beforeX,
+        control2Y: endControl.beforeY,
+        endX: end.x,
+        endY: end.y,
+        sourceSegmentIndex,
+        ...pressure,
+      }));
+    } else {
+      segments.push(Object.freeze({
+        command: "line",
+        moveX: start.x,
+        moveY: start.y,
+        endX: end.x,
+        endY: end.y,
+        sourceSegmentIndex,
+        ...pressure,
+      }));
+    }
+  }
+  return Object.freeze({
+    kind: "studio-fx-pressure-path",
+    brushId: input.brushId,
+    sourcePointCount,
+    segments: Object.freeze(segments),
+  });
+}
 
 /**
  * Neon marker footprint: two coloured screen-blended halos plus a narrow luminous core.

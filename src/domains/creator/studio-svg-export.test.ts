@@ -1,14 +1,36 @@
+import { inflateSync } from "node:zlib";
+
 import { describe, expect, it } from "vitest";
 
+import { parsePngChunks } from "./studio-apng-encoder";
 import { screentoneDotsForStroke } from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSeedFromKey,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
-import { STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET } from "./studio-brush-render-budget";
-import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
+import {
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+} from "./studio-brush-render-budget";
+import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
+import {
+  encodeStudioBrushTipAlphaMapBase64,
+  studioBrushTipAlphaMapToBase64,
+} from "./studio-brush-tip-stamp";
 import { bubblePathData, doubleBubblePathData } from "./studio-bubble-path";
+import {
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
+import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  type StudioDynamicBrushCoverageMark,
+} from "./studio-dynamic-brush-coverage-renderer";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 import {
   SVG_EXPORT_MIME,
@@ -68,7 +90,7 @@ function dynamicEllipseGroups(svg: string): DynamicEllipseAttributes[][] {
   return Array.from(svg.matchAll(/<g>(.*?)<\/g>/g), (groupMatch) =>
     Array.from(
       groupMatch[1]!.matchAll(
-        /<ellipse cx="([^"]+)" cy="([^"]+)" rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) [^)]+\)"\/>/g
+        /<ellipse data-brush-coverage="ellipse" cx="([^"]+)" cy="([^"]+)" rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) [^)]+\)"\/>/g
       ),
       (ellipseMatch) => ({
         cx: Number(ellipseMatch[1]),
@@ -140,6 +162,138 @@ function polygonWindingAt(
     }
   }
   return winding;
+}
+
+function decodeEmbeddedRgbaPng(
+  dataUrl: string,
+): Readonly<{ width: number; height: number; pixels: Uint8Array }> {
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/u.exec(dataUrl);
+  if (!match) throw new Error("expected embedded PNG");
+  const binary = globalThis.atob(match[1]!);
+  const png = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const chunks = parsePngChunks(png);
+  const header = chunks.find((chunk) => chunk.type === "IHDR")?.data;
+  if (!header || header.byteLength !== 13) throw new Error("missing IHDR");
+  const headerView = new DataView(
+    header.buffer,
+    header.byteOffset,
+    header.byteLength,
+  );
+  const width = headerView.getUint32(0, false);
+  const height = headerView.getUint32(4, false);
+  const imageDataChunks = chunks
+    .filter((chunk) => chunk.type === "IDAT")
+    .map((chunk) => chunk.data);
+  const compressed = new Uint8Array(
+    imageDataChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0),
+  );
+  let compressedOffset = 0;
+  for (const chunk of imageDataChunks) {
+    compressed.set(chunk, compressedOffset);
+    compressedOffset += chunk.byteLength;
+  }
+  const scanlines = new Uint8Array(inflateSync(compressed));
+  const stride = width * 4 + 1;
+  if (scanlines.byteLength !== stride * height) {
+    throw new Error("unexpected PNG scanline length");
+  }
+  const pixels = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const scanlineOffset = row * stride;
+    if (scanlines[scanlineOffset] !== 0) {
+      throw new Error("unexpected PNG filter");
+    }
+    pixels.set(
+      scanlines.subarray(scanlineOffset + 1, scanlineOffset + stride),
+      row * width * 4,
+    );
+  }
+  return { width, height, pixels };
+}
+
+interface DynamicCoverageUse {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly opacity: number;
+  readonly color: string;
+  readonly angle: number;
+  readonly centerX: number;
+  readonly centerY: number;
+}
+
+function svgAttribute(tag: string, name: string): string {
+  const value = new RegExp(`\\b${name}="([^"]+)"`, "u").exec(tag)?.[1];
+  if (value === undefined) throw new Error(`missing SVG attribute: ${name}`);
+  return value;
+}
+
+function dynamicCoverageUses(svg: string): DynamicCoverageUse[] {
+  return Array.from(
+    svg.matchAll(/<use data-brush-coverage="alpha-map"[^>]*\/>/gu),
+    (match) => {
+      const tag = match[0];
+      const transform = /^rotate\(([^ ]+) ([^ ]+) ([^)]+)\)$/u.exec(
+        svgAttribute(tag, "transform"),
+      );
+      if (!transform) throw new Error("invalid dynamic coverage transform");
+      return {
+        x: Number(svgAttribute(tag, "x")),
+        y: Number(svgAttribute(tag, "y")),
+        width: Number(svgAttribute(tag, "width")),
+        height: Number(svgAttribute(tag, "height")),
+        opacity: Number(svgAttribute(tag, "opacity")),
+        color: svgAttribute(tag, "color"),
+        angle: Number(transform[1]),
+        centerX: Number(transform[2]),
+        centerY: Number(transform[3]),
+      };
+    },
+  );
+}
+
+type SvgDrawTestEl = Extract<SvgExportEl, { type: "draw" }>;
+
+function canvasCoverageMarksForSvgFixture(
+  el: SvgDrawTestEl,
+): readonly StudioDynamicBrushCoverageMark[] {
+  const dynamics = normalizeStudioBrushDynamicsSettings(el.brushDynamics);
+  const seed = studioBrushDynamicsSeedFromKey(`${el.id}:${dynamics.seed}`);
+  const causal = planStudioCausalDynamicBrushDepositsV2({
+    points: el.points,
+    pressures: el.pressures,
+    tangentialPressures: el.tangentialPressures,
+    speeds: el.speeds,
+    tiltXs: el.tiltXs,
+    tiltYs: el.tiltYs,
+    twists: el.twists,
+    settings: dynamics,
+    maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+  });
+  if (!causal.ok) throw new Error(`causal fixture rejected: ${causal.reason}`);
+  const dabVariations = studioDynamicBrushDabVariations(
+    causal.dabs,
+    el.symmetry,
+  );
+  const renderBudget = planStudioDynamicBrushRenderBudget({
+    settings: dynamics,
+    dabCount: causal.dabs.length,
+    symmetryCount: dabVariations.length,
+    markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+  });
+  const coverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+    dabVariations,
+    dynamics,
+    dynamicSeed: seed,
+    stroke: el.stroke,
+    stampGrid: renderBudget.stampGrid,
+    markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+  }).coveragePlan;
+  if (!coverage.ok) {
+    throw new Error(`coverage fixture rejected: ${coverage.reason}`);
+  }
+  return coverage.marks;
 }
 
 function textEl(over: Partial<Extract<SvgExportEl, { type: "text" }>> = {}): Extract<SvgExportEl, { type: "text" }> {
@@ -416,6 +570,46 @@ describe("도형 직렬화", () => {
     expect(softPencil).toContain('data-pencil-pass="soft-edge"');
     expect(softPencil).toContain('data-pencil-pass="core"');
     expect(softPencil).not.toBe(pencil);
+  });
+
+  it("retained 연필은 명시적 재질 모델만 필압을 적용하고 legacy 외형은 고정한다", () => {
+    const render = (pressure: number, pressureModel = true) => exportPageToSvg(page([rectEl({
+      id: `pressure-pencil-${pressure}`,
+      kind: "freehand",
+      brush: "pencil-2b",
+      points: [0, 0, 12, 4, 24, 0],
+      pressures: [pressure, pressure, pressure],
+      ...(pressureModel
+        ? {
+            materialPressureModel:
+              STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          }
+        : {}),
+      stroke: "#30241d",
+      strokeWidth: 10,
+      fill: undefined,
+      sampleSpacing: 1,
+    })])).svg;
+    const maximumAttribute = (svg: string, attribute: string) => Math.max(
+      ...Array.from(
+        svg.matchAll(new RegExp(`${attribute}="([^"]+)"`, "g")),
+        (match) => Number(match[1]),
+      ).filter(Number.isFinite),
+    );
+    const light = render(0);
+    const heavy = render(1);
+    const legacyLight = render(0, false);
+    const legacyHeavy = render(1, false);
+
+    expect(maximumAttribute(heavy, "stroke-width")).toBeGreaterThan(
+      maximumAttribute(light, "stroke-width"),
+    );
+    expect(maximumAttribute(heavy, "opacity")).toBeGreaterThan(
+      maximumAttribute(light, "opacity"),
+    );
+    expect(light).toContain('data-pencil-pass="core"');
+    expect(heavy).toContain('data-pencil-pass="core"');
+    expect(legacyLight).toBe(legacyHeavy);
   });
 
   it("새 기본 펜 — 라이브/WebGPU와 같은 causal round-dab 시퀀스로 보존한다", () => {
@@ -960,12 +1154,12 @@ describe("도형 직렬화", () => {
       brushDynamics: ellipseDynamics("airbrush"),
     })]));
 
-    // visible-tap default: opacity .65×.4, flow .48×.45, toolbar .7 = .039312.
+    // visible-tap default: opacity .65×.4, flow .50×.45, toolbar .7 = .04095.
     // 부동소수점의 마지막 반올림 방향과 무관하게 두 자리 좌표 포맷의 0이 아니라 실제
     // 저농도를 유지해야 한다.
     const serializedOpacity = Number(/<ellipse [^>]*opacity="([0-9.]+)"/.exec(svg)?.[1]);
     expect(serializedOpacity).toBeGreaterThan(0);
-    expect(serializedOpacity).toBeCloseTo(0.65 * 0.4 * 0.48 * 0.45 * 0.7, 5);
+    expect(serializedOpacity).toBeCloseTo(0.65 * 0.4 * 0.5 * 0.45 * 0.7, 5);
     expect(svg).not.toContain('opacity="0"');
   });
 
@@ -983,14 +1177,33 @@ describe("도형 직렬화", () => {
       brushDynamics: ellipseDynamics("dry-media"),
     })]));
 
-    // serializeDraw의 안전 최소 strokeWidth=1에서 dab radius는 .25, tilt roundness는 .112다.
-    // Canvas geometry: ry=.25×.112=.028(SVG 좌표 포맷 .03), 독립 clamp라면 잘못된 .25가 된다.
-    expect(svg).toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.03"[^>]*transform="rotate\((?!0 )/);
-    expect(svg).not.toMatch(/<ellipse [^>]*rx="0\.25" ry="0\.25"/);
+    const ellipse = /<ellipse data-brush-coverage="ellipse"[^>]*rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) /u
+      .exec(svg);
+    const radiusX = Number(ellipse?.[1]);
+    const radiusY = Number(ellipse?.[2]);
+    const angle = Number(ellipse?.[3]);
+
+    // Causal Canvas planner의 완성 dab 직경을 그대로 쓰며, ry만 tilt roundness로 축소한다.
+    expect(radiusX).toBeGreaterThanOrEqual(0.25);
+    expect(radiusY / radiusX).toBeCloseTo(0.112, 3);
+    expect(Math.abs(angle)).toBeGreaterThan(0);
+    expect(radiusY).toBeLessThan(radiusX);
   });
 
-  it("PNG 알파 팁 스탬프 — grain tip과 커스텀 알파 맵을 결정적 circle stamp로 내보낸다", () => {
-    const custom = studioBrushTipAlphaMapToBase64("hard", 0.2, 16);
+  it("causal PNG 알파 팁은 희소 texel 전부를 한 번의 무손실 defs 자산과 dab별 use로 보존한다", () => {
+    const alphaBytes = new Uint8Array(8 * 8);
+    alphaBytes[0] = 255;
+    alphaBytes[7] = 255;
+    alphaBytes[56] = 255;
+    alphaBytes[63] = 255;
+    alphaBytes[1] = 128;
+    alphaBytes[8] = 64;
+    alphaBytes[55] = 64;
+    alphaBytes[62] = 128;
+    const custom = {
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(alphaBytes),
+      alphaMapSize: 8,
+    };
     const stamped = rectEl({
       id: "tip-stamp-svg",
       kind: "freehand",
@@ -1001,23 +1214,261 @@ describe("도형 직렬화", () => {
       strokeWidth: 10,
       brushDynamics: normalizeStudioBrushDynamicsSettings({
         ...studioBrushDynamicsPresetSettings("dry-media"),
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
         taper: { enabled: false },
         tip: {
           shape: "grain",
-          softness: 0.35,
+          softness: 0,
           alphaMapBase64: custom.alphaMapBase64,
           alphaMapSize: custom.alphaMapSize,
         },
+        grain: { amount: 0 },
+        tipLayers: [],
+        dualBrush: { enabled: false },
+        spacingRatio: null,
         spacing: { base: 12, mappings: [] },
+        scatterRatio: null,
         scatter: { base: 0 },
       }),
     });
-    const first = exportPageToSvg(page([stamped])).svg;
-    const second = exportPageToSvg(page([stamped])).svg;
-    expect(first).toBe(second);
-    expect(first).not.toContain("<ellipse ");
-    expect((first.match(/<circle /g) ?? []).length).toBeGreaterThan(4);
-    expect(first).toContain('fill="#221100"');
+    const first = exportPageToSvg(page([stamped]));
+    const second = exportPageToSvg(page([stamped]));
+    const expectedMarks = canvasCoverageMarksForSvgFixture(stamped);
+    const uses = dynamicCoverageUses(first.svg);
+    const dataUrl = /<symbol data-brush-tip-asset="full-alpha-map-v1"[^>]*>.*?<image [^>]*href="([^"]+)"/u
+      .exec(first.svg)?.[1];
+    if (!dataUrl) throw new Error("missing embedded tip asset");
+    const decoded = decodeEmbeddedRgbaPng(dataUrl);
+    const decodedAlpha = Uint8Array.from(
+      { length: decoded.width * decoded.height },
+      (_, index) => decoded.pixels[index * 4 + 3]!,
+    );
+
+    expect(first.svg).toBe(second.svg);
+    expect(first.skipped).toEqual([]);
+    expect(decoded.width).toBe(8);
+    expect(decoded.height).toBe(8);
+    expect(decodedAlpha).toEqual(alphaBytes);
+    expect(decodedAlpha[0]).toBe(255);
+    expect(decodedAlpha[27]).toBe(0);
+    expect(decodedAlpha[63]).toBe(255);
+    expect((first.svg.match(/data-brush-tip-asset="full-alpha-map-v1"/gu) ?? []))
+      .toHaveLength(1);
+    expect(uses).toHaveLength(expectedMarks.length);
+    expect(uses.length).toBeGreaterThan(1);
+    expect(first.svg).not.toContain("<circle ");
+    expect(first.svg).not.toContain('data-brush-coverage="ellipse"');
+    expect(first.svg).toContain('color="#221100"');
+  });
+
+  it("명시적 noncausal 팁은 기존 grid circle 직렬화 바이트 경로를 유지한다", () => {
+    const legacySettings = studioBrushDynamicsPresetSettings("dry-media");
+    legacySettings.depositPipeline = undefined;
+    const custom = studioBrushTipAlphaMapToBase64("hard", 0.2, 8);
+    const legacy = rectEl({
+      id: "legacy-tip-grid-svg",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [0, 0, 16, 0],
+      pressures: [0.6, 0.6],
+      stroke: "#221100",
+      strokeWidth: 10,
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        ...legacySettings,
+        taper: { enabled: false },
+        tip: {
+          shape: "grain",
+          softness: 0.2,
+          alphaMapBase64: custom.alphaMapBase64,
+          alphaMapSize: custom.alphaMapSize,
+        },
+        grain: { amount: 0 },
+        tipLayers: [],
+        dualBrush: { enabled: false },
+        spacingRatio: null,
+        spacing: { base: 12, mappings: [] },
+        scatterRatio: null,
+        scatter: { base: 0, mappings: [] },
+      }),
+    });
+    const first = exportPageToSvg(page([legacy])).svg;
+
+    expect(first).toBe(exportPageToSvg(page([legacy])).svg);
+    expect((first.match(/<circle /gu) ?? []).length).toBeGreaterThan(1);
+    expect(first).not.toContain('data-brush-tip-asset="full-alpha-map-v1"');
+    expect(first).not.toContain('data-brush-coverage="alpha-map"');
+  });
+
+  it("causal dual tip·추가 layer·대칭·고정 grain은 Canvas coverage plan과 affine fingerprint가 같다", () => {
+    const primaryBytes = Uint8Array.from(
+      { length: 8 * 8 },
+      (_, index) => Math.max(0, 255 - (index % 8) * 32 - Math.floor(index / 8) * 8),
+    );
+    const dualBytes = Uint8Array.from(
+      { length: 8 * 8 },
+      (_, index) => Math.min(255, (index % 8) * 28 + Math.floor(index / 8) * 10),
+    );
+    const layerBytes = Uint8Array.from(
+      { length: 8 * 8 },
+      (_, index) => ((index % 8 + Math.floor(index / 8)) % 2 === 0 ? 255 : 0),
+    );
+    const tip = (bytes: Uint8Array, shape: "grain" | "star") => ({
+      shape,
+      softness: 0.2,
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(bytes),
+      alphaMapSize: 8,
+    });
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...studioBrushDynamicsPresetSettings("dry-media"),
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      taper: { enabled: false },
+      tip: tip(primaryBytes, "grain"),
+      dualBrush: {
+        enabled: true,
+        tip: tip(dualBytes, "star"),
+        blendMode: "multiply",
+        sizeRatio: 0.75,
+      },
+      tipLayers: [{
+        tip: tip(layerBytes, "star"),
+        scale: 0.55,
+        opacity: 0.62,
+        offsetX: 0.3,
+        offsetY: -0.2,
+        angle: 24,
+        roundness: 0.7,
+      }],
+      colorDynamics: {
+        hueJitter: 18,
+        saturationJitter: 0.08,
+        valueJitter: 0.06,
+      },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.68,
+        scale: 3.5,
+        contrast: 0.72,
+        seed: 57,
+      },
+      spacingRatio: null,
+      spacing: { base: 11, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+    });
+    const dynamic = rectEl({
+      id: "causal-texture-canvas-svg-parity",
+      kind: "freehand",
+      brush: "dry-media",
+      points: [18, 24, 48, 30],
+      pressures: [0.45, 0.8],
+      tiltXs: [18, 32],
+      tiltYs: [8, 16],
+      twists: [12, 42],
+      stroke: "#356dcc",
+      strokeWidth: 14,
+      brushDynamics: dynamics,
+      symmetry: { type: "vertical", centerX: 60, centerY: 50 },
+    });
+    const result = exportPageToSvg(page([dynamic]));
+    const replay = exportPageToSvg(page([dynamic]));
+    const canvasMarks = canvasCoverageMarksForSvgFixture(dynamic);
+    const uses = dynamicCoverageUses(result.svg);
+
+    expect(result.svg).toBe(replay.svg);
+    expect(result.skipped).toEqual([]);
+    expect(canvasMarks.every((mark) => mark.texture?.kind === "alpha-map"))
+      .toBe(true);
+    expect(uses).toHaveLength(canvasMarks.length);
+    expect((result.svg.match(/data-brush-tip-asset="full-alpha-map-v1"/gu) ?? []))
+      .toHaveLength(2);
+    expect(result.svg).not.toContain("<circle ");
+    uses.forEach((use, index) => {
+      const mark = canvasMarks[index]!;
+      expect(use.x).toBeCloseTo(mark.x - mark.radiusX, 5);
+      expect(use.y).toBeCloseTo(mark.y - mark.radiusY, 5);
+      expect(use.width).toBeCloseTo(mark.radiusX * 2, 5);
+      expect(use.height).toBeCloseTo(mark.radiusY * 2, 5);
+      expect(use.opacity).toBeCloseTo(mark.alpha, 6);
+      expect(use.color).toBe(mark.color);
+      expect(use.angle).toBeCloseTo(mark.angleRadians * 180 / Math.PI, 5);
+      expect(use.centerX).toBeCloseTo(mark.x, 5);
+      expect(use.centerY).toBeCloseTo(mark.y, 5);
+    });
+  });
+
+  it("exports the same non-empty 64-way three-tip accepted prefix above the causal mark ceiling", () => {
+    const tip = { shape: "round" as const, softness: 0 };
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      width: { base: 8, mappings: [] },
+      opacity: { base: 0.8, mappings: [] },
+      flow: { base: 0.7, mappings: [] },
+      spacingRatio: null,
+      spacing: { base: 1, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+      tip,
+      tipLayers: [
+        { tip, opacity: 1 },
+        { tip, opacity: 0.5 },
+      ],
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const dynamic = rectEl({
+      id: "causal-prefix-over-mark-budget-svg",
+      kind: "freehand",
+      brush: "ink-particle",
+      mode: "pen",
+      fill: undefined,
+      points: [10, 60, 370, 60],
+      pressures: [0.72, 0.72],
+      stroke: "#315f73",
+      strokeWidth: 8,
+      opacity: 0.44,
+      sampleSpacing: 1,
+      paintModel: "bounded-flow-v2",
+      brushDynamics: dynamics,
+      symmetry: {
+        type: "kaleidoscope",
+        centerX: 190,
+        centerY: 60,
+        // 32 radial sectors × mirrors = 64 complete symmetry copies.
+        radialCount: 32,
+      },
+    });
+    const causal = planStudioCausalDynamicBrushDepositsV2({
+      points: dynamic.points,
+      pressures: dynamic.pressures,
+      settings: dynamics,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+    expect(causal.ok).toBe(true);
+    if (!causal.ok) throw new Error(causal.reason);
+    const budget = planStudioDynamicBrushRenderBudget({
+      settings: dynamics,
+      dabCount: causal.dabs.length,
+      symmetryCount: 64,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+    });
+    expect(budget.acceptedPrefixReceipt).toBeDefined();
+
+    const exported = exportPageToSvg(page([dynamic], { width: 380, height: 120 }));
+    const ellipseCount = (
+      exported.svg.match(/data-brush-coverage="ellipse"/gu) ?? []
+    ).length;
+    const acceptedMarkCount =
+      budget.maxDabsPerVariation * budget.symmetryCount * budget.marksPerDab;
+
+    expect(exported.skipped).toEqual([]);
+    expect(ellipseCount).toBe(acceptedMarkCount);
+    expect(ellipseCount).toBeGreaterThan(0);
+    expect(ellipseCount).toBeLessThanOrEqual(
+      STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+    );
+    expect(exportPageToSvg(page([dynamic], { width: 380, height: 120 })).svg)
+      .toBe(exported.svg);
   });
 
   it("2차 브러시 재질 — 색상 변화·고정 그레인·멀티 팁을 같은 결정적 SVG 마크로 내보낸다", () => {
@@ -1065,21 +1516,21 @@ describe("도형 직렬화", () => {
     const replay = exportPageToSvg(page([JSON.parse(JSON.stringify(stroke))])).svg;
     const single = exportPageToSvg(page([singleTip])).svg;
     const fills = new Set(Array.from(
-      first.matchAll(/<(?:circle|ellipse) [^>]*fill="(#[0-9a-f]{6})"/g),
+      first.matchAll(/<use data-brush-coverage="alpha-map"[^>]*color="(#[0-9a-f]{6})"/g),
       (match) => match[1]
     ));
     const opacities = new Set(Array.from(
-      first.matchAll(/<(?:circle|ellipse) [^>]*opacity="([0-9.]+)"/g),
+      first.matchAll(/<use data-brush-coverage="alpha-map"[^>]*opacity="([0-9.]+)"/g),
       (match) => match[1]
     ));
 
     expect(first).toBe(replay);
-    // Grain makes even the legacy solid round primary use the world-sampled circle path.
+    // Grain makes even the solid round primary use the causal full-alpha texture path.
     expect(first).not.toContain("<ellipse ");
     expect(fills.size).toBeGreaterThan(2);
     expect(opacities.size).toBeGreaterThan(5);
-    expect((first.match(/<circle /g) ?? []).length).toBeGreaterThan(
-      (single.match(/<circle /g) ?? []).length * 1.5
+    expect((first.match(/data-brush-coverage="alpha-map"/g) ?? []).length).toBeGreaterThan(
+      (single.match(/data-brush-coverage="alpha-map"/g) ?? []).length * 1.5
     );
   });
 
@@ -1200,12 +1651,217 @@ describe("도형 직렬화", () => {
   });
 
   it("형광펜 — multiply 혼합과 사각 끝을 유지한다", () => {
-    const hl = rectEl({ id: "h1", kind: "freehand", brush: "highlighter", points: [0, 0, 10, 0, 20, 10, 30, 30] });
+    const hl = rectEl({
+      id: "h1",
+      kind: "freehand",
+      brush: "highlighter",
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      points: [0, 0, 10, 0, 20, 10, 30, 30],
+    });
     const { svg } = exportPageToSvg(page([hl]));
-    expect(svg).toContain('stroke-linecap="square"');
+    expect(svg).toContain('data-pressure-endcap="square"');
+    expect(svg).toContain('stroke-linecap="butt"');
     expect(svg).toContain('stroke-linejoin="round"');
     expect(svg).toContain("mix-blend-mode:multiply");
   });
+
+  it.each(["pencil-2b", "highlighter", "neon", "glow"] as const)(
+    "%s — legacy는 단일 round/square path를 유지하고 canonical-v1만 세그먼트화한다",
+    (brush) => {
+      const renderPressure = (
+        pressure: number,
+        pressureModel = false,
+        materialMinimumDiameterRatio?: number,
+      ) => exportPageToSvg(page([
+        rectEl({
+          id: `legacy-geometry-${brush}`,
+          kind: "freehand",
+          brush,
+          points: [0, 0, 12, 8, 24, -2, 40, 6],
+          pressures: [pressure, pressure, pressure, pressure],
+          ...(pressureModel
+            ? {
+                materialPressureModel:
+                  STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+                ...(materialMinimumDiameterRatio === undefined
+                  ? {}
+                  : { materialMinimumDiameterRatio }),
+              }
+            : {}),
+          sampleSpacing: 1,
+          stroke: "#13579b",
+          strokeWidth: 12,
+          opacity: 0.7,
+          fill: undefined,
+        }),
+      ])).svg;
+      const legacyLight = renderPressure(0);
+      const legacyHeavy = renderPressure(1);
+      const canonicalLight = renderPressure(0, true);
+      const canonicalHeavy = renderPressure(1, true);
+
+      expect(legacyLight).toBe(legacyHeavy);
+      expect(legacyLight).not.toContain('stroke-linecap="butt"');
+      expect(legacyLight).not.toMatch(/data-(?:pencil|pressure)-endcap=/u);
+      if (brush === "pencil-2b") {
+        expect(canonicalLight).toContain(
+          'data-brush-engine="retained-pressure-ribbon-v1"',
+        );
+        expect(canonicalLight).toContain("data-pencil-ribbon-cell=");
+        expect(canonicalLight).not.toContain('stroke-linecap="butt"');
+      } else {
+        expect(canonicalLight).toContain('stroke-linecap="butt"');
+      }
+      expect(canonicalLight).toMatch(/data-(?:pencil|pressure)-endcap=/u);
+      expect(canonicalLight).not.toBe(canonicalHeavy);
+      const sliderZero = renderPressure(0, true, 0);
+      const sliderFull = renderPressure(0, true, 1);
+      const widths = (svg: string) => Array.from(
+        svg.matchAll(/stroke-width="([^"]+)"/gu),
+        (match) => Number(match[1]),
+      );
+      const opacities = (svg: string) => Array.from(
+        svg.matchAll(/opacity="([^"]+)"/gu),
+        (match) => Number(match[1]),
+      );
+      expect(widths(sliderFull)).not.toEqual(widths(sliderZero));
+      expect(opacities(sliderFull)).toEqual(opacities(sliderZero));
+    },
+  );
+
+  it.each([
+    "highlighter",
+    "chisel-highlighter",
+    "pastel-highlighter",
+    "neon",
+    "glow",
+    "soft-glow",
+  ] as const)(
+    "%s — SVG도 retained와 같은 pressure path 및 단일 endpoint cap 정책을 쓴다",
+    (brush) => {
+      const exportPressure = (pressure: number) => exportPageToSvg(page([
+        rectEl({
+          id: `pressure-${brush}-${pressure}`,
+          kind: "freehand",
+          brush,
+          points: [0, 0, 12, 8, 24, -2, 40, 6],
+          pressures: [pressure, pressure, pressure, pressure],
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          sampleSpacing: 1,
+          stroke: "#13579b",
+          strokeWidth: 12,
+          opacity: 0.7,
+          fill: undefined,
+        }),
+      ])).svg;
+      const light = exportPressure(0);
+      const heavy = exportPressure(1);
+      const widths = (svg: string) => Array.from(
+        svg.matchAll(/stroke-width="([^"]+)"/gu),
+        (match) => Number(match[1]),
+      );
+      const pressureOpacities = (svg: string) => Array.from(
+        svg.matchAll(/opacity="([^"]+)"/gu),
+        (match) => Number(match[1]),
+      ).filter((value) => value !== 0.7);
+      const expectedCaps = brush === "soft-glow"
+        ? 8
+        : brush === "neon" || brush === "glow" ? 6 : 2;
+
+      expect(Math.max(...widths(heavy))).toBeGreaterThan(
+        Math.max(...widths(light)),
+      );
+      expect(Math.max(...pressureOpacities(heavy))).toBeGreaterThan(
+        Math.max(...pressureOpacities(light)),
+      );
+      expect((heavy.match(/stroke-linecap="butt"/gu) ?? []).length)
+        .toBeGreaterThan(0);
+      expect((heavy.match(/data-pressure-endcap=/gu) ?? []).length)
+        .toBe(expectedCaps);
+      expect(heavy).not.toContain('stroke-linecap="round"');
+    },
+  );
+
+  it("가변 필압 연필은 비중첩 리본 cell과 양 끝 cap만 내보낸다", () => {
+    const { svg } = exportPageToSvg(page([
+      rectEl({
+        id: "pencil-pressure-joints",
+        kind: "freehand",
+        brush: "pencil-2b",
+        points: [0, 0, 12, 8, 24, -2, 40, 6],
+        pressures: [0.15, 0.45, 0.8, 1],
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        sampleSpacing: 1,
+        stroke: "#222222",
+        strokeWidth: 12,
+        opacity: 0.7,
+        fill: undefined,
+      }),
+    ]));
+    const passCount = new Set(
+      Array.from(
+        svg.matchAll(/data-pencil-pass="([^"]+)"/gu),
+        (match) => match[1],
+      ),
+    ).size;
+
+    expect(passCount).toBeGreaterThan(0);
+    expect((svg.match(/data-pencil-pass=/gu) ?? []).length).toBeGreaterThan(
+      passCount,
+    );
+    expect((svg.match(/data-pencil-endcap=/gu) ?? [])).toHaveLength(
+      passCount * 2,
+    );
+    expect(svg).toContain('data-brush-engine="retained-pressure-ribbon-v1"');
+    expect(svg).toContain("data-pencil-ribbon-cell=");
+    expect(svg).not.toContain('stroke-linecap="butt"');
+    expect(svg).not.toContain('stroke-linecap="round"');
+  });
+
+  it.each(["pencil-2b", "brush", "highlighter"] as const)(
+    "%s 탭 — 최소 직경은 SVG geometry만 바꾸고 alpha는 그대로 둔다",
+    (brush) => {
+      const exportTap = (materialMinimumDiameterRatio: number) => (
+        exportPageToSvg(page([rectEl({
+          id: `minimum-tap-${brush}`,
+          kind: "freehand",
+          brush,
+          points: [20, 24],
+          pressures: [0],
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          materialMinimumDiameterRatio,
+          stroke: "#13579b",
+          strokeWidth: 12,
+          opacity: 0.7,
+          fill: undefined,
+        })])).svg
+      );
+      const paintedTags = (svg: string) => Array.from(
+        svg.matchAll(/<(?:circle|ellipse|rect) [^>]*fill="#13579b"[^>]*\/>/gu),
+        (match) => match[0],
+      );
+      const diameters = (svg: string) => paintedTags(svg).map((tag) => {
+        const radius = /\br="([^"]+)"/u.exec(tag)?.[1];
+        const radiusX = /\brx="([^"]+)"/u.exec(tag)?.[1];
+        const width = /\bwidth="([^"]+)"/u.exec(tag)?.[1];
+        return radius !== undefined
+          ? Number(radius) * 2
+          : radiusX !== undefined
+            ? Number(radiusX) * 2
+            : Number(width);
+      });
+      const alphas = (svg: string) => paintedTags(svg).map(
+        (tag) => Number(/\bopacity="([^"]+)"/u.exec(tag)?.[1] ?? 1),
+      );
+      const sliderZero = exportTap(0);
+      const sliderFull = exportTap(1);
+
+      expect(Math.max(...diameters(sliderFull))).toBeGreaterThan(
+        Math.max(...diameters(sliderZero)),
+      );
+      expect(alphas(sliderFull)).toEqual(alphas(sliderZero));
+    },
+  );
 
   it.each(["pencil", "highlighter", "neon", "glow"] as const)(
     "%s — modern sampleSpacing은 원본 샘플을 유지하면서 연결 곡선을 부드럽게 내보낸다",
@@ -1242,13 +1898,14 @@ describe("도형 직렬화", () => {
       kind: "freehand",
       brush: "neon",
       points: [0, 10, 20, 0, 40, 16, 60, 8],
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
       stroke: "#39ff14",
       strokeWidth: 18,
     });
     const { svg } = exportPageToSvg(page([neon]));
     expect(svg).toContain('data-brush-engine="neon-halo"');
-    expect((svg.match(/mix-blend-mode:screen/g) ?? []).length).toBe(3);
-    expect((svg.match(/stroke="#39ff14"/g) ?? []).length).toBe(2);
+    expect((svg.match(/mix-blend-mode:screen/g) ?? [])).toHaveLength(15);
+    expect((svg.match(/(?:stroke|fill)="#39ff14"/g) ?? [])).toHaveLength(10);
     expect(svg).toContain('stroke="#fff"');
   });
 
@@ -1316,6 +1973,53 @@ describe("도형 직렬화", () => {
   );
 
   it.each(["brush", "flat-brush"] as const)(
+    "%s — retained SVG nib width responds only to versioned pressure journals",
+    (brush) => {
+      const render = (
+        pressures: readonly number[],
+        pressureModel = true,
+        materialMinimumDiameterRatio?: number,
+      ) => exportPageToSvg(page([rectEl({
+        id: `${brush}-${pressures[0]}-pressure`,
+        kind: "freehand",
+        brush,
+        points: [0, 0, 20, 0, 40, 0],
+        pressures: [...pressures],
+        ...(pressureModel
+          ? {
+              materialPressureModel:
+                STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+              ...(materialMinimumDiameterRatio === undefined
+                ? {}
+                : { materialMinimumDiameterRatio }),
+            }
+          : {}),
+        sampleSpacing: 1,
+        stroke: "#111111",
+        strokeWidth: 10,
+      })])).svg;
+      const light = angledNibExportPolygons(render([0, 0, 0]));
+      const heavy = angledNibExportPolygons(render([1, 1, 1]));
+      const polygonWidth = (polygon: readonly number[]) => Math.hypot(
+        polygon[2]! - polygon[0]!,
+        polygon[3]! - polygon[1]!,
+      );
+
+      expect(polygonWidth(heavy[0]!)).toBeGreaterThan(polygonWidth(light[0]!) * 2);
+      expect(
+        angledNibExportPolygons(render([0, 0, 0], false)),
+      ).toEqual(
+        angledNibExportPolygons(render([1, 1, 1], false)),
+      );
+      expect(
+        polygonWidth(angledNibExportPolygons(render([0, 0, 0], true, 1))[0]!),
+      ).toBeGreaterThan(
+        polygonWidth(angledNibExportPolygons(render([0, 0, 0], true, 0))[0]!),
+      );
+    },
+  );
+
+  it.each(["brush", "flat-brush"] as const)(
     "%s — 자기교차 후에도 교차부의 SVG non-zero coverage를 유지한다",
     (brush) => {
       const { svg } = exportPageToSvg(page([rectEl({
@@ -1369,7 +2073,7 @@ describe("도형 직렬화", () => {
     expect((kaleidoscope.match(/<rect x=/g) ?? []).length).toBe(64);
   });
 
-  it("텍스처 동적 브러시 SVG도 대칭 복사까지 합쳐 공용 committed mark 예산을 넘지 않는다", () => {
+  it("causal 텍스처가 최대 dab 예산을 넘으면 비어 있지 않은 accepted prefix를 내보낸다", () => {
     const dynamics = normalizeStudioBrushDynamicsSettings({
       ...studioBrushDynamicsPresetSettings("ink-particle"),
       spacing: { base: 0.5, mappings: [] },
@@ -1389,10 +2093,14 @@ describe("도형 직렬화", () => {
         radialCount: 1_000_000_000,
       },
     })]));
-    const marks = (result.svg.match(/<(?:circle|ellipse) /g) ?? []).length;
+    const marks = (
+      result.svg.match(/data-brush-coverage="(?:alpha-map|analytic-radial|ellipse)"/gu)
+      ?? []
+    ).length;
 
     expect(marks).toBeGreaterThan(0);
     expect(marks).toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET);
+    expect(result.skipped).toEqual([]);
   });
 });
 

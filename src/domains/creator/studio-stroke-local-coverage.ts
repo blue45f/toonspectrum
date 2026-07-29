@@ -9,6 +9,11 @@
  * coverage, while node/stroke opacity remains a single final composition.
  */
 
+import {
+  resolveStudioRetainedMediaPressureSeries,
+  type StudioRetainedMediaPressureProfileId,
+} from "./studio-retained-media-pressure";
+
 export const STUDIO_STROKE_LOCAL_COVERAGE_VERSION = 1 as const;
 
 export interface StudioStrokeLocalCoveragePolygon {
@@ -23,6 +28,15 @@ export interface StudioAngledNibStrokeLocalCoveragePlan {
   readonly sourceSegmentCount: number;
   readonly acceptedSegmentCount: number;
   readonly polygons: readonly StudioStrokeLocalCoveragePolygon[];
+}
+
+export interface StudioAngledNibPressureInput {
+  readonly pressures?: readonly number[] | null;
+  readonly minimumDiameterRatio?: unknown;
+  readonly profileId: Extract<
+    StudioRetainedMediaPressureProfileId,
+    "brush" | "flat-brush"
+  >;
 }
 
 const MAX_COORDINATE_ABS = 1_000_000_000;
@@ -99,6 +113,7 @@ export function planStudioAngledNibStrokeLocalCoverage(
   sourcePoints: readonly number[],
   strokeWidthInput: unknown,
   angleRadiansInput: unknown = -Math.PI / 6,
+  pressureInput?: StudioAngledNibPressureInput | null,
 ): StudioAngledNibStrokeLocalCoveragePlan {
   const sourcePointCount = Math.floor(sourcePoints.length / 2);
   const sourceSegmentCount = Math.max(0, sourcePointCount - 1);
@@ -115,9 +130,22 @@ export function planStudioAngledNibStrokeLocalCoverage(
     });
   }
 
-  const radius = strokeWidth / 2;
-  const nibX = radius * Math.cos(angleRadians);
-  const nibY = radius * Math.sin(angleRadians);
+  const responses = pressureInput
+    ? resolveStudioRetainedMediaPressureSeries(
+        pressureInput.profileId,
+        pressureInput.pressures,
+        sourcePointCount,
+        pressureInput.minimumDiameterRatio,
+      )
+    : null;
+  const nibOffset = (pointIndex: number): readonly [number, number] => {
+    const scale = responses?.[pointIndex]?.sizeScale ?? 1;
+    const radius = strokeWidth * scale / 2;
+    return [
+      radius * Math.cos(angleRadians),
+      radius * Math.sin(angleRadians),
+    ];
+  };
   const polygons: StudioStrokeLocalCoveragePolygon[] = [];
   for (let segmentIndex = 0; segmentIndex < sourceSegmentCount; segmentIndex += 1) {
     const sourceOffset = segmentIndex * 2;
@@ -128,15 +156,17 @@ export function planStudioAngledNibStrokeLocalCoverage(
     if (startX === null || startY === null || endX === null || endY === null) {
       continue;
     }
+    const [startNibX, startNibY] = nibOffset(segmentIndex);
+    const [endNibX, endNibY] = nibOffset(segmentIndex + 1);
     const polygon = normalizeStudioStrokeLocalCoveragePolygon([
-      startX - nibX,
-      startY - nibY,
-      startX + nibX,
-      startY + nibY,
-      endX + nibX,
-      endY + nibY,
-      endX - nibX,
-      endY - nibY,
+      startX - startNibX,
+      startY - startNibY,
+      startX + startNibX,
+      startY + startNibY,
+      endX + endNibX,
+      endY + endNibY,
+      endX - endNibX,
+      endY - endNibY,
     ]);
     if (polygon) polygons.push(polygon);
   }

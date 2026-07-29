@@ -105,7 +105,11 @@ describe("planStudioPointerReleaseEndpoint", () => {
       pressureCurve: 2,
     });
 
-    expect(result.stroke.pressures).toEqual([0.3, 0.6, 0.0625]);
+    expect(result.stroke.pressures?.slice(0, 2)).toEqual([0.3, 0.6]);
+    expect(result.stroke.pressures?.at(-1)).toBeCloseTo(
+      Math.pow(0.25, 0.78 * 2),
+      10
+    );
     expect(result.stroke.tiltXs).toEqual([12, 999, 90]);
     expect(result.stroke.tiltYs).toEqual([0, 0, -90]);
     expect(result.stroke.twists).toEqual([10, 0, 359]);

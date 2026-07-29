@@ -7,10 +7,12 @@
  */
 
 import {
+  applyStudioDynamicBrushMinimumDiameterRatio,
   resolveStudioBrushDynamics,
   studioBrushTaperFactors,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
 } from "./studio-brush-dynamics";
+import { STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET } from "./studio-brush-render-budget";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
@@ -18,7 +20,15 @@ import type {
 } from "./studio-brush-dynamics";
 
 export const STUDIO_CAUSAL_DYNAMIC_BRUSH_DEPOSIT_V2_VERSION = 2 as const;
-export const DEFAULT_STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS = 1_024;
+/**
+ * One persisted causal stroke ceiling shared by incremental live deposit, retained replay and
+ * vector export. A lower consumer-local default used to make the accepted 1,025th live dab vanish
+ * when the same stroke crossed the pointer-up boundary.
+ */
+export const STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS =
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_DAB_BUDGET;
+export const DEFAULT_STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS =
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS;
 
 const POINT_EPSILON = 1e-6;
 const MAX_COORDINATE_ABS = 1_000_000_000;
@@ -73,6 +83,8 @@ export type StudioCausalDynamicBrushDepositAppendResultV2 =
       dabs: readonly StudioDynamicBrushDab[];
       /** The returned first dab replaces the pointer-down tap instead of appending after it. */
       replaceInitialTap: boolean;
+      /** True when this append accepted the immutable prefix and discarded later depositions. */
+      dabCapped: boolean;
     }>
   | Readonly<{
       ok: false;
@@ -97,6 +109,8 @@ export type StudioCausalDynamicBrushDepositPlanResultV2 =
       dabs: readonly StudioDynamicBrushDab[];
       state: StudioCausalDynamicBrushDepositStateV2;
       sourcePointCount: number;
+      /** True when the source continues beyond the immutable maximum-dab prefix. */
+      dabCapped: boolean;
     }>
   | Readonly<{
       ok: false;
@@ -159,7 +173,7 @@ function stateIsValid(state: StudioCausalDynamicBrushDepositStateV2): boolean {
     && typeof state.transitionedFromTap === "boolean"
     && Number.isSafeInteger(state.maximumDabs)
     && state.maximumDabs >= STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min
-    && state.maximumDabs <= STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max;
+    && state.maximumDabs <= STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS;
 }
 
 function frozenSample(
@@ -238,7 +252,15 @@ function dabAt(
   const taper = applyStartTaper
     ? startTaperFactors(settings, cumulativeDistance)
     : { size: 1, opacity: 1 };
-  const size = clamp(recipe.size * taper.size, 0.05, 4_096);
+  const size = clamp(
+    applyStudioDynamicBrushMinimumDiameterRatio(
+      recipe.size * taper.size,
+      settings.width.base,
+      settings.minimumDiameterRatio,
+    ),
+    0.05,
+    4_096,
+  );
   const opacity = clamp01(recipe.opacity * taper.opacity);
   const spacing = Math.max(0.25, recipe.spacing);
   const numeric = [
@@ -291,7 +313,7 @@ export function beginStudioCausalDynamicBrushDepositV2(
     !sampleIsValid(sample)
     || !Number.isSafeInteger(maximumDabs)
     || maximumDabs < STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.min
-    || maximumDabs > STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE.max
+    || maximumDabs > STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS
   ) return failure("invalid-input");
   const initial = dabAt(settings, sample, 0, 0, 0, false);
   if (!initial) return failure("numeric-overflow");
@@ -325,6 +347,7 @@ export function appendStudioCausalDynamicBrushDepositsV2(
   let lastSpacing = state.lastSpacing;
   let transitionedFromTap = state.transitionedFromTap;
   let replaceInitialTap = false;
+  let dabCapped = false;
   const dabs: StudioDynamicBrushDab[] = [];
 
   for (const next of samples) {
@@ -362,7 +385,14 @@ export function appendStudioCausalDynamicBrushDepositsV2(
       lastSpacing - distanceSinceLastDab,
     );
     while (remainingToNext <= segmentLength - segmentOffset + POINT_EPSILON) {
-      if (nextDabIndex >= state.maximumDabs) return failure("dab-budget");
+      if (nextDabIndex >= state.maximumDabs) {
+        // The complete accepted prefix remains authoritative. Consume the source suffix so future
+        // calls can validate their prefix without ever clearing already-visible paint.
+        dabCapped = true;
+        segmentOffset = segmentLength;
+        distanceSinceLastDab = 0;
+        break;
+      }
       segmentOffset += remainingToNext;
       const amount = clamp01(segmentOffset / segmentLength);
       const sampled = sampleBetween(start, next, amount);
@@ -392,6 +422,7 @@ export function appendStudioCausalDynamicBrushDepositsV2(
     ok: true,
     dabs: Object.freeze(dabs),
     replaceInitialTap,
+    dabCapped,
     state: frozenState({
       previousSample,
       totalDistance,
@@ -474,5 +505,6 @@ export function planStudioCausalDynamicBrushDepositsV2(
     dabs: Object.freeze(dabs),
     state: appended.state,
     sourcePointCount: input.points.length / 2,
+    dabCapped: appended.dabCapped,
   });
 }

@@ -17,7 +17,10 @@
  * contract already owns its pressure curve and must not be reinterpreted by this newer profile.
  */
 
-import { resolveBrushPressureSample } from "./studio-brush";
+import {
+  resolveBrushPressureSample,
+  studioBrushPressureWithMinSize,
+} from "./studio-brush";
 
 export const STUDIO_HYBRID_PRESSURE_PROFILE_VERSION = "hybrid-pressure-profile-v1" as const;
 
@@ -26,7 +29,12 @@ export type StudioHybridPressureProfileId =
   | "technical"
   | "pencil"
   | "marker"
-  | "brush-pen";
+  | "brush-pen"
+  | "ribbon"
+  | "dry-media"
+  | "wet-media"
+  | "airbrush"
+  | "particle";
 
 export type StudioHybridPressureSource = "hardware" | "velocity" | "nominal";
 
@@ -125,6 +133,56 @@ export const STUDIO_HYBRID_PRESSURE_PROFILES: Readonly<
     opacity: { minimum: 0.2, maximum: 1, exponent: 1.08 },
     flow: { minimum: 0.28, maximum: 1, exponent: 0.98 },
   }),
+  ribbon: profile({
+    id: "ribbon",
+    nominalPressure: 0.65,
+    minimumWidthRatio: 0.08,
+    pressureExponent: 1.02,
+    velocitySensitivity: 0.55,
+    maxVelocity: 1.5,
+    opacity: { minimum: 0.55, maximum: 1, exponent: 0.92 },
+    flow: { minimum: 0.45, maximum: 1, exponent: 0.9 },
+  }),
+  "dry-media": profile({
+    id: "dry-media",
+    nominalPressure: 0.55,
+    minimumWidthRatio: 0.1,
+    pressureExponent: 0.85,
+    velocitySensitivity: 0.45,
+    maxVelocity: 1.5,
+    opacity: { minimum: 0.18, maximum: 1, exponent: 1.05 },
+    flow: { minimum: 0.28, maximum: 1, exponent: 0.96 },
+  }),
+  "wet-media": profile({
+    id: "wet-media",
+    nominalPressure: 0.58,
+    minimumWidthRatio: 0.2,
+    pressureExponent: 0.9,
+    velocitySensitivity: 0.42,
+    maxVelocity: 1.4,
+    opacity: { minimum: 0.3, maximum: 1, exponent: 0.88 },
+    flow: { minimum: 0.24, maximum: 1, exponent: 1.04 },
+  }),
+  airbrush: profile({
+    id: "airbrush",
+    nominalPressure: 0.62,
+    minimumWidthRatio: 0.35,
+    pressureExponent: 0.78,
+    velocitySensitivity: 0.22,
+    maxVelocity: 2,
+    opacity: { minimum: 0.12, maximum: 1, exponent: 1.12 },
+    flow: { minimum: 0.18, maximum: 1, exponent: 1.06 },
+  }),
+  particle: profile({
+    id: "particle",
+    nominalPressure: 0.7,
+    minimumWidthRatio: 0.4,
+    pressureExponent: 0.7,
+    velocitySensitivity: 0.18,
+    maxVelocity: 2.4,
+    opacity: { minimum: 0.5, maximum: 1, exponent: 0.72 },
+    flow: { minimum: 0.35, maximum: 1, exponent: 0.82 },
+  }),
 };
 
 const PROFILE_ID_BY_BRUSH = new Map<string, StudioHybridPressureProfileId>([
@@ -150,6 +208,32 @@ const PROFILE_ID_BY_BRUSH = new Map<string, StudioHybridPressureProfileId>([
   ["pastel-highlighter", "marker"],
   ["calligraphy", "brush-pen"],
   ["brush-pen", "brush-pen"],
+  ["brush", "ribbon"],
+  ["flat-brush", "ribbon"],
+  ["watercolor", "wet-media"],
+  ["ink-wash", "wet-media"],
+  ["gouache", "wet-media"],
+  ["oil", "wet-media"],
+  ["acrylic", "wet-media"],
+  ["wash-brush", "wet-media"],
+  ["dry-media", "dry-media"],
+  ["crayon", "dry-media"],
+  ["chalk", "dry-media"],
+  ["charcoal", "dry-media"],
+  ["pastel", "dry-media"],
+  ["oil-pastel", "dry-media"],
+  ["airbrush", "airbrush"],
+  ["airbrush-fine", "airbrush"],
+  ["soft-brush", "airbrush"],
+  ["spray", "airbrush"],
+  ["splatter", "airbrush"],
+  ["glitter", "particle"],
+  ["star-dust", "particle"],
+  ["sparkle-star", "particle"],
+  ["ink-particle", "particle"],
+  ["neon", "marker"],
+  ["glow", "marker"],
+  ["soft-glow", "marker"],
 ]);
 
 const EXCLUDED_G_PEN_BRUSH_IDS = new Set([
@@ -263,6 +347,9 @@ export function resolveStudioHybridPressureSample(
   const velocity = !hardware && simulateVelocity;
   const artistCurve = clamp(finiteOr(input.pressureCurve, 1), 0.05, 8);
   const sensitivityScale = clamp01(finiteOr(input.velocitySensitivityScale, 1));
+  // Keep pigment pressure independent from the diameter floor. Persisting the floored width as
+  // pressure made dry/wet media retain far too much opacity at a light stylus contact and caused
+  // materially different brush families to collapse toward the same pale, round stamp.
   const pressure = resolveBrushPressureSample({
     pointerType: input.pointerType,
     rawPressure: input.rawPressure,
@@ -271,7 +358,7 @@ export function resolveStudioHybridPressureSample(
     velocityFallbackEnabled: velocity,
     velocitySensitivity: pressureProfile.velocitySensitivity * sensitivityScale,
     pressureCurve: pressureProfile.pressureExponent * artistCurve,
-    minSizeRatio: pressureProfile.minimumWidthRatio,
+    minSizeRatio: 0,
     maxVelocity: pressureProfile.maxVelocity,
     fallbackPressure: pressureProfile.nominalPressure,
   });
@@ -280,7 +367,10 @@ export function resolveStudioHybridPressureSample(
     profileId: pressureProfile.id,
     source: hardware ? "hardware" : velocity ? "velocity" : "nominal",
     pressure,
-    widthRatio: pressure,
+    widthRatio: studioBrushPressureWithMinSize(
+      pressure,
+      pressureProfile.minimumWidthRatio
+    ),
     opacityRatio: responseValue(pressure, pressureProfile.opacity),
     flowRatio: responseValue(pressure, pressureProfile.flow),
   };

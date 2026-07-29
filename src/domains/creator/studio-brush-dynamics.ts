@@ -60,6 +60,34 @@ export const STUDIO_BRUSH_DYNAMICS_RATIO_LIMITS = {
   scatter: { min: 0, max: 16 },
 } as const;
 
+export type StudioDynamicBrushMinimumDiameterRatio = number;
+
+export function isStudioDynamicBrushMinimumDiameterRatio(
+  value: unknown
+): value is StudioDynamicBrushMinimumDiameterRatio {
+  return typeof value === "number"
+    && Number.isFinite(value)
+    && value >= 0
+    && value <= 1;
+}
+
+/**
+ * Applies the persisted dynamic-brush floor to geometry only.
+ *
+ * Callers intentionally resolve pressure mappings and taper before this boundary. Returning the
+ * mapped value unchanged for an omitted/invalid ratio preserves old documents and lets the
+ * planner's existing finite-value guard fail closed on malformed geometry.
+ */
+export function applyStudioDynamicBrushMinimumDiameterRatio(
+  mappedDiameter: number,
+  baseDiameter: number,
+  minimumDiameterRatio: unknown
+): number {
+  return isStudioDynamicBrushMinimumDiameterRatio(minimumDiameterRatio)
+    ? Math.max(mappedDiameter, baseDiameter * minimumDiameterRatio)
+    : mappedDiameter;
+}
+
 /** Shared stroke-start / stroke-end taper (CSP / Procreate style tip thinning). */
 export const STUDIO_BRUSH_TAPER_LIMITS = {
   length: { min: 0, max: 0.5 },
@@ -154,6 +182,14 @@ export interface StudioBrushDynamicsSettings {
   fallbackPressure?: number;
   /** CSS px/ms at which the normalized speed source reaches 1. */
   maxSpeed?: number;
+  /**
+   * Stroke-local minimum rendered diameter as a ratio of the selected base width.
+   *
+   * This is geometry-only: canonical pressure still reaches zero so opacity, flow, grain and
+   * colour deposition retain the full stylus range. Omitted legacy snapshots keep their exact
+   * historical replay; newly authored strokes persist the stricter artist/family/pack floor.
+   */
+  minimumDiameterRatio?: number;
   /** Dab spacing as a tip-width ratio. Set null to use spacing.base as legacy absolute px. */
   spacingRatio?: number | null;
   /** Scatter radius as a tip-width ratio. Set null to use scatter.base as absolute px. */
@@ -245,6 +281,8 @@ export interface NormalizedStudioBrushDynamicsSettings {
   seed: number;
   fallbackPressure: number;
   maxSpeed: number;
+  /** Omitted for legacy snapshots; renderers interpret absence as a zero geometry floor. */
+  minimumDiameterRatio?: number;
   spacingRatio: number | null;
   scatterRatio: number | null;
   taper: NormalizedStudioBrushTaperSettings;
@@ -447,6 +485,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "잉크 입자",
     description: "필압과 속도에 반응하는 미세 잉크 입자와 방향성 펜촉",
     settings: {
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
       seed: 101,
       taper: {
         enabled: true,
@@ -487,6 +526,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "소프트 에어브러시",
     description: "짧은 입력도 보이면서 여러 번 부드럽게 쌓이는 제어된 분사",
     settings: {
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
       seed: 202,
       taper: {
         enabled: true,
@@ -496,18 +536,21 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         minOpacityRatio: 0.35,
         curve: 0.9,
       },
-      tip: { shape: "soft", softness: 0.85 },
+      // Widen the analytic shoulder instead of raising the centre valve: the previous 0.85
+      // exponent concentrated nearly all paint into a small hotspot while the footprint mean
+      // stayed almost white. The centre remains normalized to one; opacity/flow still own density.
+      tip: { shape: "soft", softness: 0.55 },
       width: {
         base: 32,
         mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
         jitter: { mode: "multiply", amount: 0.1 },
       },
-      // Mouse fallback pressure is 0.5. The soft alpha tip halves the centre sample again, so
-      // opacity/flow must be strong enough to survive a single tap. Keep the physical dab cadence
-      // independent of pointer speed: the arc-length planner should produce the same continuous
-      // material density for the same geometry, without opening gaps on a fast pointer sample run.
+      // Mouse fallback pressure is 0.5. Even with a normalized centre, the soft radial shoulder has
+      // far lower mean alpha than a solid tip, so opacity/flow must keep a single pass legible.
+      // Keep physical cadence independent of pointer speed: the same geometry must receive the
+      // same continuous material density without opening gaps on fast pointer samples.
       opacity: { base: 0.65, mappings: [{ source: "pressure", from: 0.4, to: 1 }] },
-      flow: { base: 0.48, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
+      flow: { base: 0.5, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
       spacingRatio: 0.145,
       spacing: { mappings: [] },
       scatterRatio: 0.32,
@@ -521,6 +564,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
     name: "드라이 미디어",
     description: "크레용·목탄처럼 압력과 속도에 따라 끊기고 거칠어지는 마른 획",
     settings: {
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
       seed: 303,
       taper: {
         enabled: true,
@@ -645,6 +689,9 @@ function cloneNormalizedSettings(
     seed: settings.seed,
     fallbackPressure: settings.fallbackPressure,
     maxSpeed: settings.maxSpeed,
+    ...(settings.minimumDiameterRatio !== undefined
+      ? { minimumDiameterRatio: settings.minimumDiameterRatio }
+      : {}),
     spacingRatio: settings.spacingRatio,
     scatterRatio: settings.scatterRatio,
     taper: cloneTaper(settings.taper),
@@ -849,6 +896,10 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
     fallbackPressure: clamp01(finiteNumber(source.fallbackPressure, INTERNAL_DEFAULT_SETTINGS.fallbackPressure)),
     maxSpeed: clamp(finiteNumber(source.maxSpeed, INTERNAL_DEFAULT_SETTINGS.maxSpeed), 0.01, MAX_POINTER_SPEED),
+    ...(typeof source.minimumDiameterRatio === "number"
+      && Number.isFinite(source.minimumDiameterRatio)
+      ? { minimumDiameterRatio: clamp01(source.minimumDiameterRatio) }
+      : {}),
     spacingRatio,
     scatterRatio,
     taper: normalizeTaper(source.taper),
@@ -908,7 +959,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     overrides: {
       seed: 211,
       maxSpeed: 1.4,
-      tip: { shape: "round", softness: 0.94 },
+      tip: { shape: "round", softness: 0.78 },
       width: {
         base: 36,
         mappings: [{ source: "pressure", from: 0.82, to: 1.18 }],
@@ -916,11 +967,11 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       },
       opacity: { base: 0.52, mappings: [{ source: "pressure", from: 0.55, to: 1 }] },
       flow: {
-        base: 0.36,
+        base: 0.4,
         mappings: [{ source: "pressure", from: 0.5, to: 0.9 }],
         jitter: null,
       },
-      spacingRatio: 0.105,
+      spacingRatio: 0.09,
       spacing: {
         mappings: [],
         jitter: null,
@@ -943,23 +994,23 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     overrides: {
       seed: 223,
       taper: { enabled: false },
-      tip: { shape: "flake", softness: 0.18 },
+      tip: { shape: "flake", softness: 0.12 },
       width: {
         base: 16,
         mappings: [{ source: "pressure", from: 0.85, to: 1.12 }],
         jitter: { mode: "multiply", amount: 0.45 },
       },
       opacity: {
-        base: 0.42,
+        base: 0.46,
         mappings: [{ source: "pressure", from: 0.55, to: 1 }],
         jitter: { mode: "multiply", amount: 0.22 },
       },
       flow: {
-        base: 0.24,
+        base: 0.3,
         mappings: [{ source: "pressure", from: 0.7, to: 1 }],
         jitter: { mode: "multiply", amount: 0.18 },
       },
-      spacingRatio: 0.46,
+      spacingRatio: 0.34,
       spacing: {
         mappings: [{ source: "speed", from: 0.75, to: 1.7 }],
         jitter: { mode: "multiply", amount: 0.18 },
@@ -979,6 +1030,48 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         base: 0.74,
         mappings: [],
         jitter: { mode: "multiply", amount: 0.22 },
+      },
+    },
+  },
+  splatter: {
+    presetId: "airbrush",
+    overrides: {
+      seed: 227,
+      taper: { enabled: false },
+      tip: { shape: "flake", softness: 0.08 },
+      width: {
+        base: 45,
+        mappings: [{ source: "pressure", from: 0.72, to: 1.28 }],
+        jitter: { mode: "multiply", amount: 0.58 },
+      },
+      opacity: {
+        base: 0.48,
+        mappings: [{ source: "pressure", from: 0.5, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.3 },
+      },
+      flow: {
+        base: 0.32,
+        mappings: [{ source: "pressure", from: 0.62, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.22 },
+      },
+      spacingRatio: 0.5,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.8, to: 1.45 }],
+        jitter: { mode: "multiply", amount: 0.24 },
+      },
+      // Unlike the cursor-anchored spray, splatter deliberately throws flake centres beyond the
+      // nib footprint. The explicit variant keeps causal retained/SVG replay from collapsing to
+      // the canonical soft airbrush now that those paths consume the dynamics snapshot directly.
+      scatterRatio: 1.15,
+      scatter: {
+        mappings: [{ source: "pressure", from: 1.45, to: 0.72 }],
+        jitter: { mode: "multiply", amount: 0.42 },
+      },
+      angle: { base: 0, mappings: [], jitter: { mode: "add", amount: 180 } },
+      roundness: {
+        base: 0.68,
+        mappings: [],
+        jitter: { mode: "multiply", amount: 0.28 },
       },
     },
   },
@@ -1664,8 +1757,15 @@ function planStudioDynamicBrushFromInput(
     const taper = applyStrokeTaper
       ? studioBrushTaperFactors(station.progress, settings.taper)
       : { size: 1, opacity: 1 };
+    // Width mappings and taper resolve first; the persisted minimum then constrains geometry only.
+    // Opacity/flow keep the untouched canonical pressure so a light stylus contact can remain
+    // optically delicate without becoming an unusably sub-pixel tip.
     const size = clamp(
-      recipe.size * taper.size,
+      applyStudioDynamicBrushMinimumDiameterRatio(
+        recipe.size * taper.size,
+        settings.width.base,
+        settings.minimumDiameterRatio
+      ),
       STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.min,
       STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.max
     );

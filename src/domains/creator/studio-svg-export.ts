@@ -51,6 +51,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
   resolveStudioBrushDynamicsPresetId,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
@@ -64,10 +65,16 @@ import {
 } from "./studio-brush-material-dynamics";
 import {
   planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
   type StudioDynamicBrushRenderStampGrid,
 } from "./studio-brush-render-budget";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
+import {
+  rasterizeStudioBrushSoftFalloffMaskRgba,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+} from "./studio-brush-soft-falloff-stamp";
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
@@ -82,6 +89,7 @@ import {
   studioBrushSymmetryTransforms,
   transformStudioBrushSymmetryPoint,
 } from "./studio-brush-symmetry";
+import { rasterizeStudioBrushTextureMaskRgba } from "./studio-brush-textured-stamp";
 import {
   composeStudioBrushDualTipAlphaMap,
   planNormalizedStudioBrushTipComposition,
@@ -89,8 +97,10 @@ import {
 } from "./studio-brush-tip-composition";
 import {
   buildStudioBrushTipAlphaMap,
+  encodeStudioBrushTipAlphaMapBase64,
   planStudioBrushTipStampWorldSamples,
   studioBrushTipUsesSolidEllipse,
+  type StudioBrushTipAlphaMap,
 } from "./studio-brush-tip-stamp";
 import {
   bubblePathData,
@@ -104,18 +114,32 @@ import {
   type BubbleTailSpec,
 } from "./studio-bubble-path";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
+import {
+  planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+} from "./studio-causal-dynamic-brush-deposit-v2";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
   planCausalWatercolorBrushDabs,
 } from "./studio-causal-watercolor-brush";
+import { calculateStudioCrc32 } from "./studio-crc32";
+import {
+  planStudioDynamicBrushCoverageAndLegacyMarks,
+  type StudioDynamicBrushCoverageMark,
+} from "./studio-dynamic-brush-coverage-renderer";
 import {
   fxBrushSeedFromKey,
+  isStudioFxPressureBrushId,
   planGlitterBrushParticles,
   planGlowBrushPasses,
   planNeonBrushPasses,
   planOilBrushDabs,
   planPastelBrushDabs,
+  planStudioFxBrushPressurePath,
+  resolveStudioFxBrushTapPressureResponse,
+  resolveStudioFxPressurePassResponse,
+  type StudioFxPressurePathSegment,
 } from "./studio-fx-brush";
 import {
   estimateTextGradientBBox,
@@ -135,6 +159,11 @@ import {
 } from "./studio-ink-pressure-model";
 import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
+import {
+  STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+  type StudioMaterialMinimumDiameterRatio,
+  type StudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
 import {
   buildStudioPerfectFreehandPathData,
@@ -146,6 +175,12 @@ import {
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
 } from "./studio-pixel-pencil";
+import {
+  planStudioRetainedMediaPressureCurve,
+  resolveStudioRetainedMediaPressure,
+  resolveStudioRetainedMediaPressureProfileId,
+} from "./studio-retained-media-pressure";
+import { planStudioRetainedMediaRibbon } from "./studio-retained-media-ribbon";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
@@ -324,6 +359,8 @@ export interface SvgDrawElLike extends SvgElMeta {
   brush?: string;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
+  materialPressureModel?: StudioMaterialPressureModel;
+  materialMinimumDiameterRatio?: StudioMaterialMinimumDiameterRatio;
   paintModel?: StudioStrokePaintModel;
   sampleSpacing?: number;
   stampPipeline?: "causal-walker-v2";
@@ -635,6 +672,19 @@ function tensionPathD(points: readonly number[], tension: number): string {
   return parts.join(" ");
 }
 
+function studioFxPressureSegmentPathD(
+  segment: StudioFxPressurePathSegment,
+): string {
+  const start = `M ${fmt(segment.moveX)} ${fmt(segment.moveY)}`;
+  if (segment.command === "cubic") {
+    return `${start} C ${fmt(segment.control1X)} ${fmt(segment.control1Y)} ${fmt(segment.control2X)} ${fmt(segment.control2Y)} ${fmt(segment.endX)} ${fmt(segment.endY)}`;
+  }
+  if (segment.command === "quadratic") {
+    return `${start} Q ${fmt(segment.controlX)} ${fmt(segment.controlY)} ${fmt(segment.endX)} ${fmt(segment.endY)}`;
+  }
+  return `${start} L ${fmt(segment.endX)} ${fmt(segment.endY)}`;
+}
+
 // ---------------------------------------------------------------------------
 // 내보내기 컨텍스트 — defs/스킵/글꼴 수집 + 결정적 def id 발급
 // ---------------------------------------------------------------------------
@@ -644,6 +694,13 @@ interface ExportCtx {
   skips: SvgExportSkip[];
   fonts: Set<string>;
   theme: SvgExportTheme;
+  /** Full-resolution brush-tip PNGs are content-addressed and emitted once per SVG document. */
+  brushTextureAssets: Map<string, Readonly<{ symbolId: string; size: number }>>;
+  /** Identity fast path also covers editable maps that deliberately omit a content revision. */
+  brushTextureAssetsByAlphaMap: Map<
+    StudioBrushTipAlphaMap,
+    Readonly<{ symbolId: string; size: number }>
+  >;
   /** def id 일련번호 — 입력 순서에만 의존해 결정적. */
   seq: number;
 }
@@ -651,6 +708,311 @@ interface ExportCtx {
 function nextId(ctx: ExportCtx, prefix: string): string {
   ctx.seq += 1;
   return `${prefix}${ctx.seq}`;
+}
+
+function fmtCoverageNumber(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 1_000_000) / 1_000_000 + 0;
+  return rounded.toFixed(6).replace(/\.?0+$/u, "");
+}
+
+function joinSvgPngBytes(chunks: readonly Uint8Array[]): Uint8Array {
+  const byteLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const output = new Uint8Array(byteLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+}
+
+function svgPngChunk(type: string, data: Uint8Array): Uint8Array | null {
+  if (!/^[A-Za-z]{4}$/u.test(type)) return null;
+  const output = new Uint8Array(12 + data.byteLength);
+  const view = new DataView(output.buffer);
+  view.setUint32(0, data.byteLength, false);
+  for (let index = 0; index < 4; index += 1) {
+    output[4 + index] = type.charCodeAt(index);
+  }
+  output.set(data, 8);
+  const checksumSource = output.subarray(4, 8 + data.byteLength);
+  view.setUint32(
+    8 + data.byteLength,
+    calculateStudioCrc32(checksumSource),
+    false,
+  );
+  return output;
+}
+
+function svgPngAdler32(bytes: Uint8Array): number {
+  let low = 1;
+  let high = 0;
+  for (let index = 0; index < bytes.byteLength; index += 1) {
+    low = (low + bytes[index]!) % 65_521;
+    high = (high + low) % 65_521;
+  }
+  return ((high << 16) | low) >>> 0;
+}
+
+/** Browser-safe zlib stream with deterministic uncompressed DEFLATE blocks. */
+function svgPngStoredZlib(bytes: Uint8Array): Uint8Array {
+  const blockCount = Math.max(1, Math.ceil(bytes.byteLength / 65_535));
+  const output = new Uint8Array(2 + blockCount * 5 + bytes.byteLength + 4);
+  const view = new DataView(output.buffer);
+  output.set([0x78, 0x01], 0);
+  let sourceOffset = 0;
+  let outputOffset = 2;
+  for (let blockIndex = 0; blockIndex < blockCount; blockIndex += 1) {
+    const length = Math.min(65_535, bytes.byteLength - sourceOffset);
+    output[outputOffset] = blockIndex === blockCount - 1 ? 1 : 0;
+    outputOffset += 1;
+    view.setUint16(outputOffset, length, true);
+    view.setUint16(outputOffset + 2, length ^ 0xffff, true);
+    outputOffset += 4;
+    output.set(bytes.subarray(sourceOffset, sourceOffset + length), outputOffset);
+    sourceOffset += length;
+    outputOffset += length;
+  }
+  view.setUint32(outputOffset, svgPngAdler32(bytes), false);
+  return output;
+}
+
+/**
+ * Losslessly embeds an ImageData-compatible RGBA snapshot. Filter byte zero and stored DEFLATE
+ * make the result synchronous, platform-independent and byte-deterministic.
+ */
+function encodeSvgBrushTexturePng(
+  pixels: Uint8ClampedArray,
+  size: number,
+): Uint8Array | null {
+  if (
+    !Number.isSafeInteger(size)
+    || size <= 0
+    || size > 512
+    || pixels.byteLength !== size * size * 4
+  ) return null;
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, size, false);
+  headerView.setUint32(4, size, false);
+  header.set([8, 6, 0, 0, 0], 8);
+
+  const scanlineBytes = size * 4 + 1;
+  const scanlines = new Uint8Array(scanlineBytes * size);
+  for (let row = 0; row < size; row += 1) {
+    const targetOffset = row * scanlineBytes;
+    scanlines[targetOffset] = 0;
+    scanlines.set(
+      pixels.subarray(row * size * 4, (row + 1) * size * 4),
+      targetOffset + 1,
+    );
+  }
+  const headerChunk = svgPngChunk("IHDR", header);
+  const dataChunk = svgPngChunk("IDAT", svgPngStoredZlib(scanlines));
+  const endChunk = svgPngChunk("IEND", new Uint8Array());
+  if (!headerChunk || !dataChunk || !endChunk) return null;
+  return joinSvgPngBytes([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    headerChunk,
+    dataChunk,
+    endChunk,
+  ]);
+}
+
+/**
+ * Defines one alpha-only texture carrier. A white lossless PNG is used as an SVG alpha mask, so
+ * every `<use>` can supply its own dynamic colour without duplicating the alpha asset.
+ */
+function svgBrushTextureAsset(
+  ctx: ExportCtx,
+  cacheKey: string,
+  size: number,
+  createPixels: () => Uint8ClampedArray | null,
+): Readonly<{ symbolId: string; size: number }> | null {
+  const cached = ctx.brushTextureAssets.get(cacheKey);
+  if (cached) return cached;
+  const pixels = createPixels();
+  if (!pixels) return null;
+  const png = encodeSvgBrushTexturePng(pixels, size);
+  if (!png) return null;
+  const dataUrl = `data:image/png;base64,${encodeStudioBrushTipAlphaMapBase64(png)}`;
+
+  const symbolId = nextId(ctx, "sbt");
+  const maskId = `${symbolId}m`;
+  const asset = Object.freeze({ symbolId, size });
+  ctx.brushTextureAssets.set(cacheKey, asset);
+  ctx.defs.push(
+    `<symbol data-brush-tip-asset="full-alpha-map-v1" id="${symbolId}" viewBox="0 0 ${size} ${size}" preserveAspectRatio="none">`
+      + `<mask id="${maskId}" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="0" y="0" width="${size}" height="${size}" mask-type="alpha">`
+      + `<image x="0" y="0" width="${size}" height="${size}" preserveAspectRatio="none" href="${dataUrl}"/>`
+      + `</mask><rect x="0" y="0" width="${size}" height="${size}" fill="currentColor" mask="url(#${maskId})"/>`
+      + `</symbol>`,
+  );
+  return asset;
+}
+
+function svgAlphaMapTextureAsset(
+  ctx: ExportCtx,
+  alphaMap: StudioBrushTipAlphaMap,
+): Readonly<{ symbolId: string; size: number }> | null {
+  const identityHit = ctx.brushTextureAssetsByAlphaMap.get(alphaMap);
+  if (identityHit) return identityHit;
+  const revisionKey = alphaMap.revision === undefined
+    ? null
+    : JSON.stringify([
+        "alpha-map-v1",
+        typeof alphaMap.revision,
+        alphaMap.revision,
+        alphaMap.size,
+      ]);
+  if (revisionKey) {
+    const revisionHit = ctx.brushTextureAssets.get(revisionKey);
+    if (revisionHit) {
+      ctx.brushTextureAssetsByAlphaMap.set(alphaMap, revisionHit);
+      return revisionHit;
+    }
+  }
+
+  // Renderer maps carry a revision. The content fallback is only for editable/test maps and is
+  // memoized by identity immediately, so even those encode at most once per export.
+  let pixels: Uint8ClampedArray | null = null;
+  const createPixels = (): Uint8ClampedArray | null => {
+    pixels ??= rasterizeStudioBrushTextureMaskRgba(alphaMap);
+    return pixels;
+  };
+  const fallbackKey = revisionKey ?? (() => {
+    const snapshot = createPixels();
+    if (!snapshot) return "";
+    const bytes = new Uint8Array(
+      snapshot.buffer,
+      snapshot.byteOffset,
+      snapshot.byteLength,
+    );
+    return JSON.stringify([
+      "alpha-map-external-v1",
+      alphaMap.size,
+      calculateStudioCrc32(bytes),
+      encodeStudioBrushTipAlphaMapBase64(bytes),
+    ]);
+  })();
+  if (!fallbackKey) return null;
+  const asset = svgBrushTextureAsset(
+    ctx,
+    fallbackKey,
+    alphaMap.size,
+    createPixels,
+  );
+  if (asset) ctx.brushTextureAssetsByAlphaMap.set(alphaMap, asset);
+  return asset;
+}
+
+function svgSoftFalloffTextureAsset(
+  ctx: ExportCtx,
+  exponent: number,
+): Readonly<{ symbolId: string; size: number }> | null {
+  const cacheKey = JSON.stringify([
+    "analytic-radial-v1",
+    exponent.toString(),
+    STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+    STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
+  ]);
+  const surfaceSize = STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION
+    + STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS * 2;
+  return svgBrushTextureAsset(
+    ctx,
+    cacheKey,
+    surfaceSize,
+    () => rasterizeStudioBrushSoftFalloffMaskRgba(
+      exponent,
+    )?.pixels ?? null,
+  );
+}
+
+function serializeStudioDynamicCoverageMarks(
+  ctx: ExportCtx,
+  marks: readonly StudioDynamicBrushCoverageMark[],
+  strokeOpacity: number,
+  boundedFlow: boolean,
+): string | null {
+  const initialDefsLength = ctx.defs.length;
+  const initialSequence = ctx.seq;
+  const initialAssetKeys = new Set(ctx.brushTextureAssets.keys());
+  const initialAlphaMapKeys = new Set(ctx.brushTextureAssetsByAlphaMap.keys());
+  const rollbackAssets = (): null => {
+    ctx.defs.length = initialDefsLength;
+    ctx.seq = initialSequence;
+    for (const key of ctx.brushTextureAssets.keys()) {
+      if (!initialAssetKeys.has(key)) ctx.brushTextureAssets.delete(key);
+    }
+    for (const key of ctx.brushTextureAssetsByAlphaMap.keys()) {
+      if (!initialAlphaMapKeys.has(key)) {
+        ctx.brushTextureAssetsByAlphaMap.delete(key);
+      }
+    }
+    return null;
+  };
+  const markup: string[] = [];
+
+  for (const mark of marks) {
+    const opacity = Math.min(
+      1,
+      Math.max(0, mark.alpha * (boundedFlow ? 1 : strokeOpacity)),
+    );
+    const angleDegrees = mark.angleRadians * 180 / Math.PI;
+    const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
+
+    if (mark.texture?.kind === "alpha-map") {
+      const asset = svgAlphaMapTextureAsset(
+        ctx,
+        mark.texture.alphaMap,
+      );
+      if (!asset) return rollbackAssets();
+      markup.push(
+        `<use data-brush-coverage="alpha-map" href="#${asset.symbolId}"`
+          + ` x="${fmtCoverageNumber(mark.x - mark.radiusX)}"`
+          + ` y="${fmtCoverageNumber(mark.y - mark.radiusY)}"`
+          + ` width="${fmtCoverageNumber(mark.radiusX * 2)}"`
+          + ` height="${fmtCoverageNumber(mark.radiusY * 2)}"`
+          + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
+          + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`,
+      );
+      continue;
+    }
+
+    if (mark.falloff?.kind === "analytic-radial") {
+      const asset = svgSoftFalloffTextureAsset(
+        ctx,
+        mark.falloff.exponent,
+      );
+      if (!asset) return rollbackAssets();
+      const overscan = asset.size / STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION;
+      const radiusX = mark.radiusX * overscan;
+      const radiusY = mark.radiusY * overscan;
+      markup.push(
+        `<use data-brush-coverage="analytic-radial" href="#${asset.symbolId}"`
+          + ` x="${fmtCoverageNumber(mark.x - radiusX)}"`
+          + ` y="${fmtCoverageNumber(mark.y - radiusY)}"`
+          + ` width="${fmtCoverageNumber(radiusX * 2)}"`
+          + ` height="${fmtCoverageNumber(radiusY * 2)}"`
+          + ` preserveAspectRatio="none" color="${escapeXml(mark.color)}"`
+          + ` opacity="${fmtDabOpacity(opacity)}" transform="${transform}"/>`,
+      );
+      continue;
+    }
+
+    markup.push(
+      `<ellipse data-brush-coverage="ellipse"`
+        + ` cx="${fmtCoverageNumber(mark.x)}" cy="${fmtCoverageNumber(mark.y)}"`
+        + ` rx="${fmtCoverageNumber(mark.radiusX)}" ry="${fmtCoverageNumber(mark.radiusY)}"`
+        + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"`
+        + ` transform="${transform}"/>`,
+    );
+  }
+
+  return boundedFlow
+    ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.join("")}</g>`
+    : `<g>${markup.join("")}</g>`;
 }
 
 function addSkip(ctx: ExportCtx, el: { id: string; type: string }, mode: SvgExportSkip["mode"], label: string): void {
@@ -864,6 +1226,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   const dynamicBrushId = kind === "freehand" ? resolveStudioBrushDynamicsPresetId(el.brush) : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
+  let dynamicPlanFailed = false;
   const dynamicPlan = dynamicBrushId
     ? (() => {
         const dynamics = normalizeStudioBrushDynamicsSettings(
@@ -885,30 +1248,122 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           settings: dynamics,
           seed,
         };
-        let baseDabs = planStudioDynamicBrushDabs({
-          ...dabPlanInput,
-          maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
-        });
+        const causalDepositPlan = dynamics.depositPipeline
+          === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+          ? planStudioCausalDynamicBrushDepositsV2({
+              points: el.points,
+              pressures: el.pressures,
+              tangentialPressures: el.tangentialPressures,
+              speeds: el.speeds,
+              tiltXs: el.tiltXs,
+              tiltYs: el.tiltYs,
+              twists: el.twists,
+              settings: dynamics,
+              maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+            })
+          : null;
+        if (causalDepositPlan && !causalDepositPlan.ok) {
+          dynamicPlanFailed = true;
+          return null;
+        }
+        const usesCausalDepositPlan = causalDepositPlan?.ok === true;
+        let baseDabs = usesCausalDepositPlan
+          ? [...causalDepositPlan.dabs]
+          : planStudioDynamicBrushDabs({
+              ...dabPlanInput,
+              maxDabs: DEFAULT_STUDIO_DYNAMIC_BRUSH_MAX_DABS,
+            });
+        const markBudget = usesCausalDepositPlan
+          ? STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
+          : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
         const renderBudget = planStudioDynamicBrushRenderBudget({
           settings: dynamics,
           dabCount: baseDabs.length,
           symmetryCount: variations.length,
-          markBudget: STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
+          markBudget,
         });
-        if (renderBudget.maxDabsPerVariation < baseDabs.length) {
+        if (
+          usesCausalDepositPlan
+          && renderBudget.maxDabsPerVariation < baseDabs.length
+        ) {
+          // Preserve the same accepted-prefix-v1 receipt used by the live and retained renderers.
+          // Skipping the element here would turn a bounded pathological stroke into an empty SVG.
+          baseDabs = baseDabs.slice(0, renderBudget.maxDabsPerVariation);
+        }
+        if (
+          !usesCausalDepositPlan
+          && renderBudget.maxDabsPerVariation < baseDabs.length
+        ) {
           baseDabs = planStudioDynamicBrushDabs({
             ...dabPlanInput,
             maxDabs: renderBudget.maxDabsPerVariation,
           });
         }
+        const dabVariations = studioDynamicBrushDabVariations(
+          baseDabs,
+          el.symmetry,
+        );
+        let causalCoverageMarksByVariation:
+          readonly (readonly StudioDynamicBrushCoverageMark[])[] | null = null;
+        if (usesCausalDepositPlan) {
+          const sharedCoverageInput = {
+            dynamics,
+            dynamicSeed: seed,
+            stroke,
+            stampGrid: renderBudget.stampGrid,
+            markBudget,
+          };
+          const completeCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+            ...sharedCoverageInput,
+            dabVariations,
+          }).coveragePlan;
+          if (!completeCoverage.ok) {
+            dynamicPlanFailed = true;
+            return null;
+          }
+
+          let completeOffset = 0;
+          const partitions: (readonly StudioDynamicBrushCoverageMark[])[] = [];
+          for (const dabs of dabVariations) {
+            const variationCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+              ...sharedCoverageInput,
+              dabVariations: [dabs],
+            }).coveragePlan;
+            if (!variationCoverage.ok) {
+              dynamicPlanFailed = true;
+              return null;
+            }
+            const partitionEnd = completeOffset + variationCoverage.marks.length;
+            partitions.push(completeCoverage.marks.slice(
+              completeOffset,
+              partitionEnd,
+            ));
+            completeOffset = partitionEnd;
+          }
+          if (completeOffset !== completeCoverage.marks.length) {
+            dynamicPlanFailed = true;
+            return null;
+          }
+          causalCoverageMarksByVariation = partitions;
+        }
         return {
           dynamics,
           seed,
           renderBudget,
-          dabVariations: studioDynamicBrushDabVariations(baseDabs, el.symmetry),
+          dabVariations,
+          causalCoverageMarksByVariation,
         };
       })()
     : null;
+  if (dynamicBrushId && (dynamicPlanFailed || !dynamicPlan)) {
+    addSkip(
+      ctx,
+      el,
+      "skipped",
+      "동적 브러시의 causal deposit 계획을 안전하게 생성하지 못해 SVG에서 제외했어요.",
+    );
+    return "";
+  }
   const dynamicDabVariations = dynamicPlan?.dabVariations ?? null;
   const parts: string[] = [];
   for (const [variationIndex, points] of variations.entries()) {
@@ -992,7 +1447,8 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
         dynamicDabVariations?.[variationIndex],
         dynamicPlan?.dynamics,
         dynamicPlan?.seed,
-        dynamicPlan?.renderBudget.stampGrid
+        dynamicPlan?.renderBudget.stampGrid,
+        dynamicPlan?.causalCoverageMarksByVariation?.[variationIndex],
       ));
     }
   }
@@ -1074,7 +1530,8 @@ function serializeFreehand(
   dynamicDabs?: readonly StudioDynamicBrushDab[],
   dynamics?: NormalizedStudioBrushDynamicsSettings,
   dynamicSeed?: number,
-  dynamicStampGrid: StudioDynamicBrushRenderStampGrid = 7
+  dynamicStampGrid: StudioDynamicBrushRenderStampGrid = 7,
+  causalCoverageMarks?: readonly StudioDynamicBrushCoverageMark[],
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
@@ -1109,8 +1566,17 @@ function serializeFreehand(
   ) {
     const pencilPasses = resolveStudioBrushAliasPencilPasses(brush);
     if (brushFamily === "pencil" && pencilPasses.length > 0) {
+      const pressureProfile = resolveStudioRetainedMediaPressureProfileId(brush)
+        ?? "pencil";
+      const pressureResponse = resolveStudioRetainedMediaPressure(
+        pressureProfile,
+        el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+          ? el.pressures?.[0]
+          : undefined,
+        el.materialMinimumDiameterRatio,
+      );
       const circles = pencilPasses.map((pass) => (
-        `<circle data-pencil-pass="${pass.role}" cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, aliasStrokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`
+        `<circle data-pencil-pass="${pass.role}" cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, aliasStrokeWidth * pass.widthScale * pressureResponse.sizeScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(strokeOpacity * Math.min(1, pass.opacityScale * Math.sqrt(pressureResponse.opacityScale * pressureResponse.flowScale)))}"/>`
       ));
       return `<g data-brush-alias="${escapeXml(brush)}">${circles.join("")}</g>`;
     }
@@ -1119,17 +1585,52 @@ function serializeFreehand(
       resolveStudioInkPressure(el.pressures?.[0], el.pressureModel),
       studioInkFallbackPressure(el.pressureModel)
     );
+    const retainedPressureProfile =
+      resolveStudioRetainedMediaPressureProfileId(brush);
+    const retainedPressure = retainedPressureProfile
+      ? resolveStudioRetainedMediaPressure(
+          retainedPressureProfile,
+          el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+            ? el.pressures?.[0]
+            : undefined,
+          el.materialMinimumDiameterRatio,
+        )
+      : null;
     const pressureAware = brushFamily === "pen"
       || brushFamily === "gpen"
       || brushFamily === "calligraphy"
       || brushFamily === "perfect"
-      || brushFamily === "marker";
-    const width = pressureAware
-      ? aliasStrokeWidth * (0.3 + pressure * 1.4)
-      : aliasStrokeWidth;
+      || brushFamily === "marker"
+      || retainedPressure !== null;
+    const width = retainedPressure
+      ? aliasStrokeWidth * retainedPressure.sizeScale
+      : pressureAware
+        ? aliasStrokeWidth * (0.3 + pressure * 1.4)
+        : aliasStrokeWidth;
     if (brushFamily === "highlighter") {
-      const half = aliasStrokeWidth / 2;
-      return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(aliasStrokeWidth)}" height="${fmt(aliasStrokeWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+      if (
+        el.materialPressureModel
+        !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+      ) {
+        const half = aliasStrokeWidth / 2;
+        return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(aliasStrokeWidth)}" height="${fmt(aliasStrokeWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+      }
+      const pressureBrush = isStudioFxPressureBrushId(brush)
+        ? brush
+        : "highlighter";
+      const pressureResponse = resolveStudioFxBrushTapPressureResponse(
+        pressureBrush,
+        el.pressures?.[0],
+        el.materialPressureModel,
+        el.materialMinimumDiameterRatio,
+      );
+      const tapWidth = aliasStrokeWidth * pressureResponse.widthScale;
+      const half = tapWidth / 2;
+      const tapOpacity = strokeOpacity * Math.min(
+        1,
+        pressureResponse.opacityScale,
+      );
+      return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(tapWidth)}" height="${fmt(tapWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply" opacity="${fmtDabOpacity(tapOpacity)}"/>`;
     }
     if (brushFamily === "brush" || brushFamily === "calligraphy") {
       const roundness = brushFamily === "calligraphy"
@@ -1182,6 +1683,26 @@ function serializeFreehand(
         ?? studioBrushDynamicsSettingsForBrushId(brush)
         ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
+    if (
+      normalizedDynamics.depositPipeline
+        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      && causalCoverageMarks
+    ) {
+      const exactCoverage = serializeStudioDynamicCoverageMarks(
+        ctx,
+        causalCoverageMarks,
+        strokeOpacity,
+        isStudioBoundedFlowPaintModelCompatible(el),
+      );
+      if (exactCoverage !== null) return exactCoverage;
+      addSkip(
+        ctx,
+        el,
+        "skipped",
+        "동적 브러시의 전체 해상도 팁을 SVG에 무손실로 직렬화하지 못해 제외했어요.",
+      );
+      return "";
+    }
     const strokeSeed = dynamicSeed
       ?? studioBrushDynamicsSeedFromKey(`${el.id}:${normalizedDynamics.seed}`);
     const dabs = dynamicDabs ?? [];
@@ -1417,6 +1938,14 @@ function serializeFreehand(
     const coveragePlan = planStudioAngledNibStrokeLocalCoverage(
       smoothed,
       aliasStrokeWidth,
+      -Math.PI / 6,
+      el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+        ? {
+            profileId: brush === "flat-brush" ? "flat-brush" : "brush",
+            pressures: el.pressures,
+            minimumDiameterRatio: el.materialMinimumDiameterRatio,
+          }
+        : undefined,
     );
     if (coveragePlan.polygons.length === 0) return "";
     const subpaths = coveragePlan.polygons.map((polygon) => (
@@ -1456,11 +1985,62 @@ function serializeFreehand(
     const passes = configuredPasses.length > 0
       ? configuredPasses
       : [{ role: "core" as const, widthScale: 1, opacityScale: 1, jitterRadius: 0.75 }];
-    const paths = passes.map((pass) => {
-      const jittered = scaledPencilJitterPoints(renderPath.points, pass.jitterRadius * (pass.role === "soft-edge" ? 0.6 : 1.3));
-      return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" data-pencil-pass="${pass.role}" stroke-width="${fmt(aliasStrokeWidth * pass.widthScale)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`;
+    if (
+      el.materialPressureModel
+      !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+    ) {
+      const paths = passes.map((pass) => {
+        const jittered = scaledPencilJitterPoints(
+          renderPath.points,
+          pass.jitterRadius * (pass.role === "soft-edge" ? 0.6 : 1.3),
+        );
+        return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" data-pencil-pass="${pass.role}" stroke-width="${fmt(aliasStrokeWidth * pass.widthScale)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(strokeOpacity * pass.opacityScale)}"/>`;
+      });
+      return `<g data-brush-alias="${escapeXml(brush)}">${paths.join("")}</g>`;
+    }
+    const pressureProfile = resolveStudioRetainedMediaPressureProfileId(brush)
+      ?? "pencil";
+    const paths = passes.flatMap((pass) => {
+      const jittered = scaledPencilJitterPoints(
+        renderPath.points,
+        pass.jitterRadius,
+      );
+      const pressurePlan = planStudioRetainedMediaPressureCurve(
+        jittered,
+        el.materialPressureModel === STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+          ? el.pressures
+          : undefined,
+        pressureProfile,
+        {
+          tension: renderPath.tension,
+          minimumDiameterRatio: el.materialMinimumDiameterRatio,
+        },
+      );
+      const ribbon = planStudioRetainedMediaRibbon(
+        pressurePlan,
+        Math.max(0.5, aliasStrokeWidth * pass.widthScale),
+      );
+      return ribbon.runs.flatMap((run, runIndex) => {
+        const cells = run.cells.map((cell, cellIndex) => {
+          const cellOpacity = strokeOpacity * Math.min(
+            1,
+            pass.opacityScale
+            * Math.sqrt(cell.opacityScale * cell.flowScale),
+          );
+          return `<path d="${pointsToPathD(cell.points, true)}" fill="${escapeXml(stroke)}" stroke="none" stroke-width="${fmt(cell.width)}" data-pencil-pass="${pass.role}" data-pencil-ribbon-cell="${runIndex}:${cellIndex}" opacity="${fmtDabOpacity(cellOpacity)}"/>`;
+        });
+        const caps = run.caps.map((cap) => {
+          const capOpacity = strokeOpacity * Math.min(
+            1,
+            pass.opacityScale
+            * Math.sqrt(cap.opacityScale * cap.flowScale),
+          );
+          return `<path d="${pointsToPathD(cap.points, true)}" fill="${escapeXml(stroke)}" data-pencil-endcap="${pass.role}:${cap.role}" opacity="${fmtDabOpacity(capOpacity)}"/>`;
+        });
+        return [...cells, ...caps];
+      });
     });
-    return `<g data-brush-alias="${escapeXml(brush)}">${paths.join("")}</g>`;
+    return `<g data-brush-alias="${escapeXml(brush)}" data-brush-engine="retained-pressure-ribbon-v1">${paths.join("")}</g>`;
   }
 
   if (brushFamily === "highlighter") {
@@ -1472,7 +2052,42 @@ function serializeFreehand(
       legacyTension: 0.4,
     });
     const lineJoin = brush === "chisel-highlighter" ? "bevel" : "round";
-    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="${lineJoin}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    if (
+      el.materialPressureModel
+      !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+    ) {
+      return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="${lineJoin}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    }
+    const pressureBrush = isStudioFxPressureBrushId(brush)
+      ? brush
+      : "highlighter";
+    const pressurePath = planStudioFxBrushPressurePath({
+      brushId: pressureBrush,
+      points: renderPath.points,
+      pressures: el.pressures,
+      pressureModel: el.materialPressureModel,
+      minimumDiameterRatio: el.materialMinimumDiameterRatio,
+      tension: renderPath.tension,
+    });
+    const segmentLayers = pressurePath.segments.map((segment) => (
+      `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, aliasStrokeWidth * segment.widthScale))}" stroke-linecap="butt" stroke-linejoin="${lineJoin}" opacity="${fmtDabOpacity(Math.min(1, segment.opacityScale))}" style="mix-blend-mode:multiply"/>`
+    ));
+    const first = pressurePath.segments[0];
+    const last = pressurePath.segments.at(-1);
+    const caps = first && last
+      ? [
+          { x: first.moveX, y: first.moveY, response: first },
+          { x: last.endX, y: last.endY, response: last },
+        ].map((endpoint) => {
+          const width = Math.max(
+            0.5,
+            aliasStrokeWidth * endpoint.response.widthScale,
+          );
+          return `<rect data-pressure-endcap="square" x="${fmt(endpoint.x - width / 2)}" y="${fmt(endpoint.y - width / 2)}" width="${fmt(width)}" height="${fmt(width)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, endpoint.response.opacityScale))}" style="mix-blend-mode:multiply"/>`;
+        })
+      : [];
+    const layers = [...segmentLayers, ...caps].join("");
+    return `<g data-brush-engine="highlighter-pressure-path"${opacityAttr}>${layers}</g>`;
   }
 
   if (brushFamily === "neon") {
@@ -1483,16 +2098,71 @@ function serializeFreehand(
       legacyTension: 0.35,
     });
     const passes = planNeonBrushPasses(strokeWidth);
+    if (
+      el.materialPressureModel
+      !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+    ) {
+      const layers = renderPath.points.length === 2
+        ? passes.map((pass) => (
+            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+          )).join("")
+        : (() => {
+            const pathD = tensionPathD(renderPath.points, renderPath.tension);
+            return passes.map((pass) => (
+              `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+            )).join("");
+          })();
+      return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
+    }
+    const pressurePath = planStudioFxBrushPressurePath({
+      brushId: "neon",
+      points: renderPath.points,
+      pressures: el.pressures,
+      pressureModel: el.materialPressureModel,
+      minimumDiameterRatio: el.materialMinimumDiameterRatio,
+      tension: renderPath.tension,
+    });
+    const tapPressure = resolveStudioFxBrushTapPressureResponse(
+      "neon",
+      el.pressures?.[0],
+      el.materialPressureModel,
+      el.materialMinimumDiameterRatio,
+    );
     const layers = renderPath.points.length === 2
-      ? passes.map((pass) => (
-          `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
-        )).join("")
-      : (() => {
-          const pathD = tensionPathD(renderPath.points, renderPath.tension);
-          return passes.map((pass) => (
-            `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
-          )).join("");
-        })();
+      ? passes.map((pass) => {
+          const response = resolveStudioFxPressurePassResponse(
+            tapPressure,
+            pass.widthScale,
+            pass.tone === "white-core",
+          );
+          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+        }).join("")
+      : passes.flatMap((pass) => {
+          const luminousCore = pass.tone === "white-core";
+          const segmentLayers = pressurePath.segments.map((segment) => {
+            const response = resolveStudioFxPressurePassResponse(
+              segment,
+              pass.widthScale,
+              luminousCore,
+            );
+            return `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale * response.widthScale))}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          });
+          const first = pressurePath.segments[0];
+          const last = pressurePath.segments.at(-1);
+          if (!first || !last) return segmentLayers;
+          const caps = [
+            { x: first.moveX, y: first.moveY, response: first },
+            { x: last.endX, y: last.endY, response: last },
+          ].map((endpoint) => {
+            const response = resolveStudioFxPressurePassResponse(
+              endpoint.response,
+              pass.widthScale,
+              luminousCore,
+            );
+            return `<circle data-pressure-endcap="round" cx="${fmt(endpoint.x)}" cy="${fmt(endpoint.y)}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          });
+          return [...segmentLayers, ...caps];
+        }).join("");
     return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
   }
 
@@ -1505,17 +2175,73 @@ function serializeFreehand(
     });
     const soft = (el.brush ?? "glow") === "soft-glow";
     const passes = planGlowBrushPasses(strokeWidth, soft);
+    if (
+      el.materialPressureModel
+      !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
+    ) {
+      const layers = renderPath.points.length === 2
+        ? passes.map((pass) => (
+            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+          )).join("")
+        : (() => {
+            const pathD = tensionPathD(renderPath.points, renderPath.tension);
+            return passes.map((pass) => (
+              `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
+            )).join("");
+          })();
+      return `<g${opacityAttr}>${layers}</g>`;
+    }
+    const pressureBrush = soft ? "soft-glow" : "glow";
+    const pressurePath = planStudioFxBrushPressurePath({
+      brushId: pressureBrush,
+      points: renderPath.points,
+      pressures: el.pressures,
+      pressureModel: el.materialPressureModel,
+      minimumDiameterRatio: el.materialMinimumDiameterRatio,
+      tension: renderPath.tension,
+    });
+    const tapPressure = resolveStudioFxBrushTapPressureResponse(
+      pressureBrush,
+      el.pressures?.[0],
+      el.materialPressureModel,
+      el.materialMinimumDiameterRatio,
+    );
     const layers = renderPath.points.length === 2
-      ? passes.map((pass) => (
-          `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
-        )).join("")
-      : (() => {
-          const pathD = tensionPathD(renderPath.points, renderPath.tension);
-          return passes.map((pass) => (
-            `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
-          )).join("");
-        })();
-    return `<g${opacityAttr}>${layers}</g>`;
+      ? passes.map((pass, passIndex) => {
+          const response = resolveStudioFxPressurePassResponse(
+            tapPressure,
+            pass.widthScale,
+            passIndex === passes.length - 1,
+          );
+          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+        }).join("")
+      : passes.flatMap((pass, passIndex) => {
+          const luminousCore = passIndex === passes.length - 1;
+          const segmentLayers = pressurePath.segments.map((segment) => {
+            const response = resolveStudioFxPressurePassResponse(
+              segment,
+              pass.widthScale,
+              luminousCore,
+            );
+            return `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale * response.widthScale))}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          });
+          const first = pressurePath.segments[0];
+          const last = pressurePath.segments.at(-1);
+          if (!first || !last) return segmentLayers;
+          const caps = [
+            { x: first.moveX, y: first.moveY, response: first },
+            { x: last.endX, y: last.endY, response: last },
+          ].map((endpoint) => {
+            const response = resolveStudioFxPressurePassResponse(
+              endpoint.response,
+              pass.widthScale,
+              luminousCore,
+            );
+            return `<circle data-pressure-endcap="round" cx="${fmt(endpoint.x)}" cy="${fmt(endpoint.y)}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          });
+          return [...segmentLayers, ...caps];
+        }).join("");
+    return `<g data-brush-engine="glow-pressure-halo"${opacityAttr}>${layers}</g>`;
   }
 
   if (brushFamily === "glitter") {
@@ -2285,6 +3011,8 @@ export function exportPageToSvg(input: SvgExportPageInput): SvgExportResult {
     skips: [],
     fonts: new Set<string>(),
     theme: input.theme ?? "classic",
+    brushTextureAssets: new Map(),
+    brushTextureAssetsByAlphaMap: new Map(),
     seq: 0,
   };
   const groups: LayerGroup[] = [...(input.groups ?? [])];

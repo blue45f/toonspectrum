@@ -1,16 +1,39 @@
 /**
  * Bounded stroke-local coverage renderer for versioned dynamic brushes.
  *
- * Dynamic dabs are first flattened into deterministic RGBA ellipse marks. The coverage pass bins
- * those marks into world-aligned tiles, renders every tile completely off destination, then applies
- * the element opacity once while compositing the tiles. This avoids both the historical per-dab
- * opacity darkening and a canvas-sized offscreen allocation.
+ * Dynamic dabs are flattened into deterministic ellipse, analytic-falloff or full alpha-texture
+ * primitives. The coverage pass bins those marks into world-aligned tiles, renders every tile
+ * completely off destination, then applies element opacity once while compositing the tiles. This
+ * avoids both historical per-dab opacity darkening and a canvas-sized offscreen allocation.
  */
 
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  type NormalizedStudioBrushDynamicsSettings,
+  type StudioDynamicBrushDab,
+} from "./studio-brush-dynamics";
+import {
   resolveNormalizedStudioBrushDabColor,
+  resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
   resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
 } from "./studio-brush-material-dynamics";
+import {
+  planStudioDynamicBrushRenderBudget,
+  type StudioDynamicBrushAcceptedPrefixReceipt,
+  type StudioDynamicBrushRenderStampGrid,
+} from "./studio-brush-render-budget";
+import {
+  clearStudioBrushSoftFalloffStampCache,
+  prepareStudioBrushSoftFalloffTintedStampSurface,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS,
+  STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION,
+} from "./studio-brush-soft-falloff-stamp";
+import {
+  acquireStudioBrushTextureStampSurface,
+  clearStudioBrushTextureStampCache,
+  studioBrushTextureAlphaMapIsValid,
+  type StudioBrushTextureStampSurfaceFactory,
+} from "./studio-brush-textured-stamp";
 import {
   composeNormalizedStudioBrushTipLayerDab,
   composeStudioBrushDualTipAlphaMap,
@@ -23,13 +46,8 @@ import {
   studioBrushTipUsesSolidEllipse,
   visitStudioBrushTipStampSamples,
   type NormalizedStudioBrushTipSettings,
+  type StudioBrushTipAlphaMap,
 } from "./studio-brush-tip-stamp";
-
-import type {
-  NormalizedStudioBrushDynamicsSettings,
-  StudioDynamicBrushDab,
-} from "./studio-brush-dynamics";
-import type { StudioDynamicBrushRenderStampGrid } from "./studio-brush-render-budget";
 
 export const STUDIO_DYNAMIC_COVERAGE_TILE_PIXEL_SIZE = 256;
 export const STUDIO_DYNAMIC_COVERAGE_TILE_BLEED_PIXELS = 2;
@@ -87,6 +105,15 @@ export interface StudioDynamicBrushCoverageMark {
   readonly alpha: number;
   readonly color: string;
   /**
+   * Full alpha-map stamp rendered by one affine `drawImage`. The immutable map is shared by every
+   * dab; deterministic world/stroke grain is footprint-integrated into `alpha` so Canvas and SVG
+   * share the same pulse-resistant material response.
+   */
+  readonly texture?: Readonly<{
+    readonly kind: "alpha-map";
+    readonly alphaMap: StudioBrushTipAlphaMap;
+  }>;
+  /**
    * Procedural soft tips remain one analytic mark instead of expanding into a grid of small
    * circles. Absence means the historical solid-ellipse/custom-alpha mark.
    */
@@ -117,6 +144,11 @@ export type StudioDynamicBrushCoverageMarkPlan =
   | {
       readonly ok: true;
       readonly marks: readonly StudioDynamicBrushCoverageMark[];
+      /**
+       * A causal plan that crossed the global ceiling still succeeds with this immutable complete
+       * dab-wave prefix. The receipt makes truncation explicit to live, retained and SVG callers.
+       */
+      readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
     }
   | {
       readonly ok: false;
@@ -126,8 +158,9 @@ export type StudioDynamicBrushCoverageMarkPlan =
 export interface StudioDynamicBrushCoverageAndLegacyMarkPlan {
   readonly coveragePlan: StudioDynamicBrushCoverageMarkPlan;
   /**
-   * Complete legacy replay marks. In particular, a coverage mark-budget rejection must never turn
-   * into an empty stroke at the caller's fallback boundary.
+   * Complete legacy replay marks for an explicitly legacy deposit pipeline. Causal-v2 never
+   * produces an unbounded second plan after a bounded preflight rejection: doing so could both
+   * exceed the shared work ceiling and change the accepted live deposit sequence.
    */
   readonly legacyMarks: readonly StudioDynamicBrushCoverageMark[];
 }
@@ -202,6 +235,8 @@ export interface StudioDynamicBrushLegacyDestinationContext
   translate(x: number, y: number): void;
   rotate(angle: number): void;
   scale(x: number, y: number): void;
+  imageSmoothingEnabled?: boolean;
+  imageSmoothingQuality?: ImageSmoothingQuality;
 }
 
 export interface StudioDynamicBrushCoverageRenderOptions {
@@ -233,7 +268,6 @@ export type StudioDynamicBrushCoverageRenderResult =
         | "surface-unavailable"
         | "surface-budget"
         | "tile-mark-budget"
-        | "physical-scale-unsupported"
         | "surface-render-failed";
     }
   | {
@@ -281,17 +315,6 @@ interface CommittedCoverageCacheEntry {
 }
 
 const TAU = Math.PI * 2;
-const ANALYTIC_FALLOFF_RADIAL_STOPS = Object.freeze([
-  0,
-  0.125,
-  0.25,
-  0.375,
-  0.5,
-  0.625,
-  0.75,
-  0.875,
-  1,
-] as const);
 const ANALYTIC_FALLOFF_EXPONENT_MIN = 0.125;
 const ANALYTIC_FALLOFF_EXPONENT_MAX = 8;
 const committedCoverageCache = new Map<
@@ -335,6 +358,14 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
     && typeof mark.color === "string"
     && mark.color.length > 0
     && (
+      mark.texture === undefined
+      || (
+        mark.texture.kind === "alpha-map"
+        && studioBrushTextureAlphaMapIsValid(mark.texture.alphaMap)
+      )
+    )
+    && !(mark.texture && mark.falloff)
+    && (
       mark.falloff === undefined
       || (
         mark.falloff.kind === "analytic-radial"
@@ -355,51 +386,18 @@ function proceduralSoftTipFalloffExponent(
 function tipUsesAnalyticSoftFalloff(
   tip: NormalizedStudioBrushTipSettings,
   primary: boolean,
-  dualBrush: NormalizedStudioBrushDynamicsSettings["dualBrush"]
+  dualBrush: NormalizedStudioBrushDynamicsSettings["dualBrush"],
+  fullTextureAuthority: boolean,
 ): boolean {
   const activeDual = primary && studioBrushDualBrushIsActive(dualBrush);
   return tip.shape === "soft"
     && tip.alphaMapBase64 === null
-    // A screen dual is alpha union. Rendering the smooth primary first and the secondary texture
-    // second with source-over is the same coverage equation, while avoiding a low-resolution
-    // sampled grid across the entire soft carrier. Multiply remains on the exact composed mask.
-    && (!activeDual || dualBrush?.blendMode === "screen");
-}
-
-function parseHexGradientColor(
-  color: string
-): readonly [red: number, green: number, blue: number, alpha: number] | null {
-  const match = /^#([\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.exec(color.trim());
-  if (!match) return null;
-  const source = match[1]!;
-  const expanded = source.length <= 4
-    ? [...source].map((value) => `${value}${value}`).join("")
-    : source;
-  return [
-    Number.parseInt(expanded.slice(0, 2), 16),
-    Number.parseInt(expanded.slice(2, 4), 16),
-    Number.parseInt(expanded.slice(4, 6), 16),
-    expanded.length === 8
-      ? Number.parseInt(expanded.slice(6, 8), 16) / 255
-      : 1,
-  ];
-}
-
-function analyticGradientColor(
-  color: string,
-  alpha: number
-): string {
-  const resolvedAlpha = clampAlpha(alpha);
-  const hex = parseHexGradientColor(color);
-  if (hex) {
-    const [red, green, blue, sourceAlpha] = hex;
-    return `rgba(${red}, ${green}, ${blue}, ${clampAlpha(sourceAlpha * resolvedAlpha)})`;
-  }
-  if (resolvedAlpha <= 0) return "transparent";
-  if (resolvedAlpha >= 1) return color;
-  // Dynamic brush colours are canonical hex in normal operation. This modern-CSS fallback keeps
-  // named/wide-gamut document colours hue-correct without a DOM parser or a per-mark scratch canvas.
-  return `color-mix(in srgb, ${color} ${resolvedAlpha * 100}%, transparent)`;
+    // Any enabled dual tip is a single precomposed full alpha map. Splitting a screen union into
+    // an analytic carrier plus a sampled secondary changed command count and could reveal circles.
+    && (
+      !activeDual
+      || (!fullTextureAuthority && dualBrush?.blendMode === "screen")
+    );
 }
 
 /**
@@ -409,9 +407,40 @@ function analyticGradientColor(
 export function renderStudioDynamicBrushCoverageMark(
   context: StudioDynamicBrushLegacyDestinationContext,
   mark: StudioDynamicBrushCoverageMark,
-  alphaMultiplier = 1
+  alphaMultiplier = 1,
+  textureSurfaceFactory: StudioBrushTextureStampSurfaceFactory =
+    defaultSurfaceFactory,
 ): void {
   context.globalAlpha = clampAlpha(mark.alpha * alphaMultiplier);
+  if (mark.texture) {
+    const alphaMap = mark.texture.alphaMap;
+    const surface = acquireStudioBrushTextureStampSurface(
+      alphaMap,
+      mark.color,
+      textureSurfaceFactory,
+    );
+    if (!surface) {
+      throw new Error("studio-brush-texture-stamp-unavailable");
+    }
+    context.save();
+    context.translate(mark.x, mark.y);
+    context.rotate(mark.angleRadians);
+    if ("imageSmoothingEnabled" in context) context.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in context) context.imageSmoothingQuality = "high";
+    context.drawImage(
+      surface,
+      0,
+      0,
+      alphaMap.size,
+      alphaMap.size,
+      -mark.radiusX,
+      -mark.radiusY,
+      mark.radiusX * 2,
+      mark.radiusY * 2,
+    );
+    context.restore();
+    return;
+  }
   if (!mark.falloff) {
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
     if (typeof context.ellipse === "function") {
@@ -445,19 +474,36 @@ export function renderStudioDynamicBrushCoverageMark(
     return;
   }
 
+  const surface = prepareStudioBrushSoftFalloffTintedStampSurface(
+    mark.falloff.exponent,
+    mark.color,
+    textureSurfaceFactory,
+  );
+  if (!surface) {
+    throw new Error("studio-brush-soft-falloff-stamp-unavailable");
+  }
+  const overscan = (
+    STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION
+    + STUDIO_BRUSH_SOFT_FALLOFF_STAMP_GUTTER_PIXELS * 2
+  ) / STUDIO_BRUSH_SOFT_FALLOFF_STAMP_RESOLUTION;
+  const destinationRadiusX = mark.radiusX * overscan;
+  const destinationRadiusY = mark.radiusY * overscan;
   context.save();
   context.translate(mark.x, mark.y);
   context.rotate(mark.angleRadians);
-  context.scale(1, mark.radiusY / mark.radiusX);
-  const gradient = context.createRadialGradient(0, 0, 0, 0, 0, mark.radiusX);
-  for (const offset of ANALYTIC_FALLOFF_RADIAL_STOPS) {
-    const coverage = Math.pow(1 - offset, mark.falloff.exponent);
-    gradient.addColorStop(offset, analyticGradientColor(mark.color, coverage));
-  }
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.arc(0, 0, mark.radiusX, 0, TAU);
-  context.fill();
+  if ("imageSmoothingEnabled" in context) context.imageSmoothingEnabled = true;
+  if ("imageSmoothingQuality" in context) context.imageSmoothingQuality = "high";
+  context.drawImage(
+    surface,
+    0,
+    0,
+    surface.width,
+    surface.height,
+    -destinationRadiusX,
+    -destinationRadiusY,
+    destinationRadiusX * 2,
+    destinationRadiusY * 2,
+  );
   context.restore();
 }
 
@@ -480,13 +526,38 @@ export function planStudioDynamicBrushCoverageMarks(
   const boundedMarkBudget = Number.isFinite(markBudget)
     ? Math.max(1, Math.floor(markBudget))
     : 1;
+  const causalRenderBudget = dynamics.depositPipeline
+    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    && dabVariations.length > 0
+    ? planStudioDynamicBrushRenderBudget({
+        settings: dynamics,
+        dabCount: dabVariations.reduce(
+          (maximum, variation) => Math.max(maximum, variation.length),
+          0,
+        ),
+        symmetryCount: dabVariations.length,
+        markBudget: boundedMarkBudget,
+      })
+    : null;
+  const acceptedDabsPerVariation = causalRenderBudget
+    ? causalRenderBudget.maxDabsPerVariation
+    : Number.POSITIVE_INFINITY;
+  const acceptedPrefixReceipt = causalRenderBudget?.acceptedPrefixReceipt;
+  const acceptedDabVariations = acceptedPrefixReceipt
+    ? dabVariations.map((variation) => (
+        variation.slice(0, acceptedDabsPerVariation)
+      ))
+    : dabVariations;
   const tipDefinitions = [
     dynamics.tip,
     ...dynamics.tipLayers.map((layer) => layer.tip),
   ];
   const grainActive = dynamics.grain.amount > 0;
   const dualBrush = dynamics.dualBrush;
-  const decomposedScreenDual = studioBrushDualBrushIsActive(dualBrush)
+  const fullTextureAuthority = dynamics.depositPipeline
+    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2;
+  const decomposedLegacyScreenDual = !fullTextureAuthority
+    && studioBrushDualBrushIsActive(dualBrush)
     && dualBrush?.blendMode === "screen"
     && dynamics.tip.shape === "soft"
     && dynamics.tip.alphaMapBase64 === null
@@ -497,7 +568,12 @@ export function planStudioDynamicBrushCoverageMarks(
         }
       : null;
   const tipUsesAnalyticFalloff = tipDefinitions.map((tip, tipIndex) => (
-    tipUsesAnalyticSoftFalloff(tip, tipIndex === 0, dualBrush)
+    tipUsesAnalyticSoftFalloff(
+      tip,
+      tipIndex === 0,
+      dualBrush,
+      fullTextureAuthority,
+    )
   ));
   const tipUsesEllipse = tipDefinitions.map((tip, tipIndex) => (
     !grainActive && (tipIndex === 0
@@ -521,7 +597,7 @@ export function planStudioDynamicBrushCoverageMarks(
     return true;
   };
 
-  for (const [variationIndex, dabs] of dabVariations.entries()) {
+  for (const [variationIndex, dabs] of acceptedDabVariations.entries()) {
     const suppliedOrigin = input.strokeOrigins?.[variationIndex];
     const strokeOriginX = suppliedOrigin?.x ?? dabs[0]?.sourceX ?? dabs[0]?.x ?? 0;
     const strokeOriginY = suppliedOrigin?.y ?? dabs[0]?.sourceY ?? dabs[0]?.y ?? 0;
@@ -537,6 +613,25 @@ export function planStudioDynamicBrushCoverageMarks(
             dynamics.grain
           )
         );
+    const grainAcrossFootprint = (
+      x: number,
+      y: number,
+      radiusX: number,
+      radiusY: number,
+      angleRadians: number,
+    ) => (
+      resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+        x,
+        y,
+        radiusX,
+        radiusY,
+        angleRadians,
+        strokeOriginX,
+        strokeOriginY,
+        dynamicSeed,
+        dynamics.grain,
+      )
+    );
     const appendTipDab = (
       composedDab: StudioBrushComposableDab,
       tip: NormalizedStudioBrushTipSettings,
@@ -546,19 +641,62 @@ export function planStudioDynamicBrushCoverageMarks(
       const depositionAlpha = clampAlpha(composedDab.opacity * composedDab.flow);
       if (depositionAlpha <= 0) return "ok";
       const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
+      const appendSampledTipMap = (
+        sampledDab: StudioBrushComposableDab,
+        alphaMap: StudioBrushTipAlphaMap,
+      ): "ok" | "invalid-mark" | "mark-budget" => {
+        let failure: "invalid-mark" | "mark-budget" | null = null;
+        visitStudioBrushTipStampSamples(
+          sampledDab,
+          alphaMap,
+          (dx, dy, alpha, radius) => {
+            if (failure) return;
+            const sampleX = sampledDab.x + dx;
+            const sampleY = sampledDab.y + dy;
+            const sampledMark: StudioDynamicBrushCoverageMark = {
+              x: sampleX,
+              y: sampleY,
+              radiusX: radius,
+              radiusY: radius,
+              angleRadians: 0,
+              alpha: clampAlpha(
+                depositionAlpha * alpha * grainAt(sampleX, sampleY),
+              ),
+              color: dabColor,
+            };
+            if (!markIsValid(sampledMark)) {
+              failure = "invalid-mark";
+            } else if (!appendMark(sampledMark)) {
+              failure = "mark-budget";
+            }
+          },
+          { grid: stampGrid },
+        );
+        return failure ?? "ok";
+      };
       if (
         tipUsesEllipse[tipIndex]
         || tipUsesAnalyticFalloff[tipIndex]
         || !tipAlphaMap
       ) {
         const radiusX = Math.max(0.25, composedDab.size / 2);
+        const radiusY = radiusX * composedDab.roundness;
+        const angleRadians = composedDab.angle * Math.PI / 180;
         const mark = {
           x: composedDab.x,
           y: composedDab.y,
           radiusX,
-          radiusY: radiusX * composedDab.roundness,
-          angleRadians: composedDab.angle * Math.PI / 180,
-          alpha: clampAlpha(depositionAlpha * grainAt(composedDab.x, composedDab.y)),
+          radiusY,
+          angleRadians,
+          alpha: clampAlpha(
+            depositionAlpha * grainAcrossFootprint(
+              composedDab.x,
+              composedDab.y,
+              radiusX,
+              radiusY,
+              angleRadians,
+            ),
+          ),
           color: dabColor,
           ...(tipUsesAnalyticFalloff[tipIndex]
             ? {
@@ -571,28 +709,36 @@ export function planStudioDynamicBrushCoverageMarks(
         };
         if (!markIsValid(mark)) return "invalid-mark";
         if (!appendMark(mark)) return "mark-budget";
-        if (tipIndex !== 0 || !decomposedScreenDual) return "ok";
+        if (tipIndex !== 0 || !decomposedLegacyScreenDual) return "ok";
 
         const secondaryDab: StudioBrushComposableDab = {
           ...composedDab,
           size: Math.max(
             0.05,
-            composedDab.size * decomposedScreenDual.settings.sizeRatio,
+            composedDab.size * decomposedLegacyScreenDual.settings.sizeRatio,
           ),
         };
         const secondaryRadiusX = Math.max(0.25, secondaryDab.size / 2);
-        const secondaryTip = decomposedScreenDual.tip;
+        const secondaryRadiusY = secondaryRadiusX * secondaryDab.roundness;
+        const secondaryAngleRadians = secondaryDab.angle * Math.PI / 180;
+        const secondaryTip = decomposedLegacyScreenDual.tip;
         const secondaryAnalytic = secondaryTip.shape === "soft"
           && secondaryTip.alphaMapBase64 === null;
         if (secondaryAnalytic || studioBrushTipUsesSolidEllipse(secondaryTip)) {
-          const secondaryMark = {
+          const secondaryMark: StudioDynamicBrushCoverageMark = {
             x: secondaryDab.x,
             y: secondaryDab.y,
             radiusX: secondaryRadiusX,
-            radiusY: secondaryRadiusX * secondaryDab.roundness,
-            angleRadians: secondaryDab.angle * Math.PI / 180,
+            radiusY: secondaryRadiusY,
+            angleRadians: secondaryAngleRadians,
             alpha: clampAlpha(
-              depositionAlpha * grainAt(secondaryDab.x, secondaryDab.y),
+              depositionAlpha * grainAcrossFootprint(
+                secondaryDab.x,
+                secondaryDab.y,
+                secondaryRadiusX,
+                secondaryRadiusY,
+                secondaryAngleRadians,
+              ),
             ),
             color: dabColor,
             ...(secondaryAnalytic
@@ -607,65 +753,45 @@ export function planStudioDynamicBrushCoverageMarks(
           if (!markIsValid(secondaryMark)) return "invalid-mark";
           return appendMark(secondaryMark) ? "ok" : "mark-budget";
         }
-
-        let secondaryFailure: "invalid-mark" | "mark-budget" | null = null;
-        visitStudioBrushTipStampSamples(
+        return appendSampledTipMap(
           secondaryDab,
-          decomposedScreenDual.alphaMap,
-          (dx, dy, alpha, radius) => {
-            if (secondaryFailure) return;
-            const sampleX = secondaryDab.x + dx;
-            const sampleY = secondaryDab.y + dy;
-            const secondaryMark = {
-              x: sampleX,
-              y: sampleY,
-              radiusX: radius,
-              radiusY: radius,
-              angleRadians: 0,
-              alpha: clampAlpha(
-                depositionAlpha * alpha * grainAt(sampleX, sampleY),
-              ),
-              color: dabColor,
-            };
-            if (!markIsValid(secondaryMark)) {
-              secondaryFailure = "invalid-mark";
-            } else if (!appendMark(secondaryMark)) {
-              secondaryFailure = "mark-budget";
-            }
-          },
-          { grid: stampGrid },
+          decomposedLegacyScreenDual.alphaMap,
         );
-        return secondaryFailure ?? "ok";
       }
 
-      let failure: "invalid-mark" | "mark-budget" | null = null;
-      visitStudioBrushTipStampSamples(
-        composedDab,
-        tipAlphaMap,
-        (dx, dy, alpha, radius) => {
-          if (failure) return;
-          const sampleX = composedDab.x + dx;
-          const sampleY = composedDab.y + dy;
-          const mark = {
-            x: sampleX,
-            y: sampleY,
-            radiusX: radius,
-            radiusY: radius,
-            angleRadians: 0,
-            alpha: clampAlpha(
-              depositionAlpha * alpha * grainAt(sampleX, sampleY)
-            ),
-            color: dabColor,
-          };
-          if (!markIsValid(mark)) {
-            failure = "invalid-mark";
-          } else if (!appendMark(mark)) {
-            failure = "mark-budget";
-          }
+      if (!fullTextureAuthority) {
+        return appendSampledTipMap(composedDab, tipAlphaMap);
+      }
+
+      const radiusX = Math.max(0.25, composedDab.size / 2);
+      const radiusY = radiusX * composedDab.roundness;
+      const angleRadians = composedDab.angle * Math.PI / 180;
+      const texturedMark: StudioDynamicBrushCoverageMark = {
+        x: composedDab.x,
+        y: composedDab.y,
+        radiusX,
+        radiusY,
+        angleRadians,
+        // Canvas and SVG consume the same footprint-integrated grain scalar. This removes the
+        // carrier-wide light/dark pulses caused by one centre sample while a future R8 shader
+        // evolves the same deterministic grain into per-fragment paper tooth.
+        alpha: clampAlpha(
+          depositionAlpha * grainAcrossFootprint(
+            composedDab.x,
+            composedDab.y,
+            radiusX,
+            radiusY,
+            angleRadians,
+          ),
+        ),
+        color: dabColor,
+        texture: {
+          kind: "alpha-map",
+          alphaMap: tipAlphaMap,
         },
-        { grid: stampGrid }
-      );
-      return failure ?? "ok";
+      };
+      if (!markIsValid(texturedMark)) return "invalid-mark";
+      return appendMark(texturedMark) ? "ok" : "mark-budget";
     };
 
     for (const dab of dabs) {
@@ -690,7 +816,11 @@ export function planStudioDynamicBrushCoverageMarks(
       }
     }
   }
-  return { ok: true, marks };
+  return {
+    ok: true,
+    marks,
+    ...(acceptedPrefixReceipt ? { acceptedPrefixReceipt } : {}),
+  };
 }
 
 export function planStudioDynamicBrushCoverageAndLegacyMarks(
@@ -699,6 +829,12 @@ export function planStudioDynamicBrushCoverageAndLegacyMarks(
   const coveragePlan = planStudioDynamicBrushCoverageMarks(input);
   if (coveragePlan.ok) {
     return { coveragePlan, legacyMarks: coveragePlan.marks };
+  }
+  if (
+    input.dynamics.depositPipeline
+    === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+  ) {
+    return { coveragePlan, legacyMarks: [] };
   }
   const legacyPlan = planStudioDynamicBrushCoverageMarks({
     ...input,
@@ -713,8 +849,14 @@ export function planStudioDynamicBrushCoverageAndLegacyMarks(
 function markBounds(mark: StudioDynamicBrushCoverageMark): MarkBounds {
   const cosine = Math.cos(mark.angleRadians);
   const sine = Math.sin(mark.angleRadians);
-  const halfWidth = Math.hypot(mark.radiusX * cosine, mark.radiusY * sine);
-  const halfHeight = Math.hypot(mark.radiusX * sine, mark.radiusY * cosine);
+  // Alpha maps occupy their complete square/rectangular footprint. Ellipse equations under-bound
+  // opaque corner texels after rotation and could omit the neighbouring coverage tile.
+  const halfWidth = mark.texture
+    ? Math.abs(mark.radiusX * cosine) + Math.abs(mark.radiusY * sine)
+    : Math.hypot(mark.radiusX * cosine, mark.radiusY * sine);
+  const halfHeight = mark.texture
+    ? Math.abs(mark.radiusX * sine) + Math.abs(mark.radiusY * cosine)
+    : Math.hypot(mark.radiusX * sine, mark.radiusY * cosine);
   return {
     minX: mark.x - halfWidth,
     minY: mark.y - halfHeight,
@@ -743,16 +885,26 @@ function candidateScales(
   context: StudioDynamicBrushCoverageDestinationContext,
   _activeDraft: boolean
 ): readonly number[] {
-  const maximum = 4;
+  const maximumQualityScale = 4;
   const minimum = 0.75;
   const physicalScale = destinationPhysicalScale(context);
-  if (physicalScale > maximum) return [];
   // Below 0.75x we oversample and let the destination transform downsample. This spends extra
   // pixels but never lowers output quality or changes document-space geometry.
-  const wanted = Math.max(minimum, physicalScale);
-  // Surface-budget pressure must fail closed to legacy pixels instead of silently lowering only
-  // one side of the live→committed handoff.
-  return [wanted];
+  //
+  // Above 4x, keeping a 1:1 physical backing store can multiply a stroke's tile count without
+  // bound. Cap the first attempt at the renderer's quality ceiling, then progressively lower only
+  // the *offscreen raster resolution* when the sparse-tile/reference budget cannot admit it.
+  // Geometry, dab alpha and the final stroke-local opacity composite remain unchanged at every
+  // candidate, so budget pressure cannot turn bounded-flow-v2 into legacy per-dab-opacity pixels.
+  const wanted = Math.min(
+    maximumQualityScale,
+    Math.max(minimum, physicalScale),
+  );
+  const candidates = [wanted, 2, 1, minimum];
+  return candidates.filter((scale, index) => (
+    scale <= wanted
+    && candidates.findIndex((candidate) => Math.abs(candidate - scale) < 1e-9) === index
+  ));
 }
 
 function planTilesAtScale(
@@ -885,6 +1037,15 @@ function committedCoverageMarksEqual(
   for (let index = 0; index < left.length; index += 1) {
     const leftMark = left[index]!;
     const rightMark = right[index]!;
+    const leftTextureMap = leftMark.texture?.alphaMap;
+    const rightTextureMap = rightMark.texture?.alphaMap;
+    const textureEqual = leftTextureMap === rightTextureMap
+      || (
+        leftTextureMap?.revision !== undefined
+        && rightTextureMap?.revision !== undefined
+        && Object.is(leftTextureMap.revision, rightTextureMap.revision)
+        && leftTextureMap.size === rightTextureMap.size
+      );
     if (
       leftMark.x !== rightMark.x
       || leftMark.y !== rightMark.y
@@ -895,6 +1056,8 @@ function committedCoverageMarksEqual(
       || leftMark.color !== rightMark.color
       || leftMark.falloff?.kind !== rightMark.falloff?.kind
       || leftMark.falloff?.exponent !== rightMark.falloff?.exponent
+      || leftMark.texture?.kind !== rightMark.texture?.kind
+      || !textureEqual
     ) {
       return false;
     }
@@ -963,6 +1126,8 @@ export function disposeStudioDynamicCoverageCommittedCache(): void {
   committedCoverageCacheBytes = 0;
   committedCoverageCacheClock = 0;
   for (const entry of entries) releasePreparedTiles(entry.prepared);
+  clearStudioBrushTextureStampCache();
+  clearStudioBrushSoftFalloffStampCache();
 }
 
 /** Test/debug alias retained for focused renderer isolation. */
@@ -1018,7 +1183,7 @@ function prepareTileSurfaces(
       );
       for (const markIndex of bin.markIndexes) {
         const mark = marks[markIndex]!;
-        renderStudioDynamicBrushCoverageMark(context, mark);
+        renderStudioDynamicBrushCoverageMark(context, mark, 1, factory);
       }
       prepared.push({ ...bin, surface });
     }
@@ -1094,9 +1259,6 @@ export function renderStudioDynamicBrushCoverage(
   let selectedCacheEntry: CommittedCoverageCacheEntry | null = null;
   let lastFailure: "surface-budget" | "tile-mark-budget" = "surface-budget";
   const scales = candidateScales(context, options.activeDraft);
-  if (scales.length === 0) {
-    return { status: "fallback", reason: "physical-scale-unsupported" };
-  }
   for (const scale of scales) {
     const cached = cacheKey
       ? readCommittedCoverageCache(cacheKey, marks, scale)
@@ -1165,7 +1327,9 @@ export function renderStudioDynamicBrushCoverage(
 export function renderStudioDynamicBrushLegacyMarks(
   context: StudioDynamicBrushLegacyDestinationContext,
   marks: readonly StudioDynamicBrushCoverageMark[],
-  opacity: number
+  opacity: number,
+  textureSurfaceFactory: StudioBrushTextureStampSurfaceFactory =
+    defaultSurfaceFactory,
 ): void {
   context.save();
   const inheritedAlpha = clampAlpha(context.globalAlpha);
@@ -1176,6 +1340,7 @@ export function renderStudioDynamicBrushLegacyMarks(
       context,
       mark,
       inheritedAlpha * strokeOpacity,
+      textureSurfaceFactory,
     );
   }
   context.restore();

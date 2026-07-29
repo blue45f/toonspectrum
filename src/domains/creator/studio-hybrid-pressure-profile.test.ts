@@ -18,11 +18,16 @@ describe("studio hybrid pressure profiles", () => {
     expect(resolveStudioHybridPressureProfile("marker-bold")?.id).toBe("marker");
     expect(resolveStudioHybridPressureProfile("brush-pen")?.id).toBe("brush-pen");
     expect(resolveStudioHybridPressureProfile("perfect-ink")?.id).toBe("brush-pen");
+    expect(resolveStudioHybridPressureProfile("flat-brush")?.id).toBe("ribbon");
+    expect(resolveStudioHybridPressureProfile("watercolor")?.id).toBe("wet-media");
+    expect(resolveStudioHybridPressureProfile("charcoal")?.id).toBe("dry-media");
+    expect(resolveStudioHybridPressureProfile("airbrush")?.id).toBe("airbrush");
+    expect(resolveStudioHybridPressureProfile("ink-particle")?.id).toBe("particle");
 
     for (const gpenId of ["gpen", "mapping-pen", "kaburapen", "liner"]) {
       expect(resolveStudioHybridPressureProfile(gpenId)).toBeNull();
     }
-    expect(resolveStudioHybridPressureProfile("watercolor")).toBeNull();
+    expect(resolveStudioHybridPressureProfile("screentone")).toBeNull();
     expect(resolveStudioHybridPressureProfile(null)).toBeNull();
   });
 
@@ -43,7 +48,18 @@ describe("studio hybrid pressure profiles", () => {
   });
 
   it("prioritizes real stylus pressure over velocity for every supported family", () => {
-    for (const brushId of ["pen", "technical-pen", "pencil", "marker", "brush-pen"]) {
+    for (const brushId of [
+      "pen",
+      "technical-pen",
+      "pencil",
+      "marker",
+      "brush-pen",
+      "flat-brush",
+      "charcoal",
+      "watercolor",
+      "airbrush",
+      "ink-particle",
+    ]) {
       const light = resolveStudioHybridPressureSample(brushId, {
         pointerType: "pen",
         rawPressure: 0.15,
@@ -132,6 +148,24 @@ describe("studio hybrid pressure profiles", () => {
     expect(fixed.pressure).toBe(STUDIO_HYBRID_PRESSURE_PROFILES.pencil.nominalPressure);
     expect(fixed.widthRatio).toBeGreaterThanOrEqual(
       STUDIO_HYBRID_PRESSURE_PROFILES.pencil.minimumWidthRatio
+    );
+  });
+
+  it("keeps canonical pigment pressure independent from the geometry minimum-size floor", () => {
+    const light = resolveStudioHybridPressureSample("charcoal", {
+      pointerType: "pen",
+      rawPressure: 0,
+    })!;
+
+    expect(light.pressure).toBe(0);
+    expect(light.widthRatio).toBe(
+      STUDIO_HYBRID_PRESSURE_PROFILES["dry-media"].minimumWidthRatio
+    );
+    expect(light.opacityRatio).toBe(
+      STUDIO_HYBRID_PRESSURE_PROFILES["dry-media"].opacity.minimum
+    );
+    expect(light.flowRatio).toBe(
+      STUDIO_HYBRID_PRESSURE_PROFILES["dry-media"].flow.minimum
     );
   });
 

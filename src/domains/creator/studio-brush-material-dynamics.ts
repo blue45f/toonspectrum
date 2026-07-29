@@ -92,6 +92,18 @@ const DEFAULT_GRAIN: NormalizedStudioBrushGrainSettings = {
   seed: 1,
 };
 
+const STUDIO_BRUSH_GRAIN_FOOTPRINT_SAMPLES = Object.freeze([
+  [0, 0, 4],
+  [-0.46, 0, 1],
+  [0.46, 0, 1],
+  [0, -0.46, 1],
+  [0, 0.46, 1],
+  [-0.32, -0.32, 0.75],
+  [0.32, -0.32, 0.75],
+  [-0.32, 0.32, 0.75],
+  [0.32, 0.32, 0.75],
+] as const);
+
 const MAX_UINT32 = 0xffff_ffff;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -408,4 +420,65 @@ export function resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
   const noise = valueNoise((x - anchorX) / settings.scale, (y - anchorY) / settings.scale, seed);
   const contrasted = clamp01((noise - 0.5) * (1 + settings.contrast * 4) + 0.5);
   return clamp01(1 - settings.amount * (1 - contrasted));
+}
+
+/**
+ * Integrates paper/canvas grain across one affine tip carrier instead of sampling only its centre.
+ *
+ * A centre-only scalar makes a complete charcoal/crayon stamp pulse bright/dark as it crosses a
+ * noise cell, exposing the circular dab lattice during fast strokes. This deterministic quadrature
+ * samples the centre, axial shoulders and diagonals in the rotated tip footprint. Canvas and SVG
+ * can therefore share one mark alpha while the WebGPU path later evaluates the same grain per
+ * fragment. The helper is allocation-free and preserves the exact disabled-grain identity.
+ */
+export function resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+  centerX: number,
+  centerY: number,
+  radiusX: number,
+  radiusY: number,
+  angleRadians: number,
+  strokeOriginX: number | undefined,
+  strokeOriginY: number | undefined,
+  strokeSeed: number,
+  settings: NormalizedStudioBrushGrainSettings,
+): number {
+  if (settings.amount <= 0) return 1;
+  const x = finiteNumber(centerX, 0);
+  const y = finiteNumber(centerY, 0);
+  const rx = clamp(Math.abs(finiteNumber(radiusX, 0)), 0, 1_000_000);
+  const ry = clamp(Math.abs(finiteNumber(radiusY, 0)), 0, 1_000_000);
+  const angle = finiteNumber(angleRadians, 0);
+  if (rx <= 1e-6 && ry <= 1e-6) {
+    return resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+      x,
+      y,
+      strokeOriginX,
+      strokeOriginY,
+      strokeSeed,
+      settings,
+    );
+  }
+
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  let weighted = 0;
+  let totalWeight = 0;
+  // Static affine quadrature: centre has extra weight, shoulders preserve directional paper tooth,
+  // and diagonals suppress whole-carrier pulses without washing the material into a flat opacity.
+  for (const [unitX, unitY, weight] of STUDIO_BRUSH_GRAIN_FOOTPRINT_SAMPLES) {
+    const localX = unitX * rx;
+    const localY = unitY * ry;
+    const sampleX = x + localX * cosine - localY * sine;
+    const sampleY = y + localX * sine + localY * cosine;
+    weighted += resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+      sampleX,
+      sampleY,
+      strokeOriginX,
+      strokeOriginY,
+      strokeSeed,
+      settings,
+    ) * weight;
+    totalWeight += weight;
+  }
+  return clamp01(weighted / totalWeight);
 }

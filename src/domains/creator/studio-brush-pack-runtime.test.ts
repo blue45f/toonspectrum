@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
+import {
+  planNormalizedStudioDynamicBrushDabs,
+  resolveStudioBrushDynamics,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+} from "./studio-brush-dynamics";
 import {
   STUDIO_BRUSH_PACK_EXPANSION_WAVE_IDS,
   STUDIO_BRUSH_PACK_VISIBILITY_TUNING_IDS,
@@ -21,6 +25,7 @@ import { STUDIO_BRUSH_TIP_LAYER_MAX_COUNT } from "./studio-brush-tip-composition
 import {
   buildStudioBrushTipAlphaMap,
   decodeStudioBrushTipAlphaMapBase64,
+  STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
 } from "./studio-brush-tip-stamp";
 
 function expectFiniteNumbers(value: unknown, path = "root"): void {
@@ -64,6 +69,18 @@ describe("procedural brush pack runtime", () => {
     expect(selections.map((selection) => selection.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
+    expect(selections.every(
+      ({ brushDynamics }) => brushDynamics.depositPipeline
+        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    )).toBe(true);
+    const dryMediaSelections = selections.filter(
+      ({ runtimeBrushId }) => runtimeBrushId === "dry-media"
+    );
+    expect(dryMediaSelections).toHaveLength(61);
+    expect(dryMediaSelections.every(
+      ({ brushDynamics }) => brushDynamics.depositPipeline
+        === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+    )).toBe(true);
 
     for (const [index, selection] of selections.entries()) {
       const descriptor = STUDIO_BRUSH_PACK_DESCRIPTORS[index]!;
@@ -95,6 +112,8 @@ describe("procedural brush pack runtime", () => {
       const first = materializeStudioBrushPackTipSettings(motif, index + 17, 0.12);
       const second = materializeStudioBrushPackTipSettings(motif, index + 17, 0.12);
       expect(first).toEqual(second);
+      expect(first.alphaMapSize).toBe(STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE);
+      expect(200 / first.alphaMapSize).toBeLessThanOrEqual(3.125);
       expect(first.alphaMapBase64).not.toBeNull();
       const bytes = decodeStudioBrushTipAlphaMapBase64(first.alphaMapBase64);
       expect(bytes).not.toBeNull();
@@ -108,6 +127,21 @@ describe("procedural brush pack runtime", () => {
       signatures.add(alphaSignature(firstMap.alphas));
     }
     expect(signatures.size).toBe(STUDIO_BRUSH_PACK_CUSTOM_TIP_MOTIFS.length);
+  });
+
+  it("keeps every bundled custom motif at the full document-safe R8 resolution", () => {
+    const customTips = materializeAllStudioBrushPackSelections()
+      .flatMap(({ brushDynamics }) => [
+        brushDynamics.tip,
+        ...(brushDynamics.dualBrush?.enabled ? [brushDynamics.dualBrush.tip] : []),
+        ...brushDynamics.tipLayers.map(({ tip }) => tip),
+      ])
+      .filter((tip) => tip.alphaMapBase64 !== null);
+
+    expect(customTips.length).toBeGreaterThanOrEqual(88);
+    expect(customTips.every(
+      ({ alphaMapSize }) => alphaMapSize === STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
+    )).toBe(true);
   });
 
   it("gives all 160 catalogue brushes a distinct deterministic runtime fingerprint", () => {
@@ -277,7 +311,22 @@ describe("procedural brush pack runtime", () => {
     // Technical liner ignores pressure entirely; the G-pen swells dramatically instead.
     const milli = dynamicsById("milli-pen-uniform");
     expect(milli.width.mappings).toHaveLength(0);
+    expect(milli.opacity.mappings).toHaveLength(0);
+    expect(milli.flow.mappings).toHaveLength(0);
     expect(milli.taper.enabled).toBe(false);
+    const milliLight = resolveStudioBrushDynamics(
+      { pressure: 0.1, speed: 0.5, stampIndex: 7 },
+      milli
+    );
+    const milliHeavy = resolveStudioBrushDynamics(
+      { pressure: 0.95, speed: 0.5, stampIndex: 7 },
+      milli
+    );
+    expect(milliHeavy).toMatchObject({
+      width: milliLight.width,
+      opacity: milliLight.opacity,
+      flow: milliLight.flow,
+    });
     const gPen = dynamicsById("g-pen-flex");
     expect(gPen.width.mappings[0]).toMatchObject({ source: "pressure", from: 0.12, to: 1.9 });
     expect(gPen.taper.enabled).toBe(true);
@@ -300,9 +349,9 @@ describe("procedural brush pack runtime", () => {
     expect(dynamicsById("crayon-wax-bold").grain.space).toBe("stroke-fixed");
     expect(dynamicsById("oil-impasto-heavy").spacingRatio).toBeLessThan(0.06);
     expect(dynamicsById("airbrush-grand-soft")).toMatchObject({
-      spacingRatio: 0.11,
+      spacingRatio: 0.09,
       scatterRatio: 0.025,
-      flow: { base: 0.34 },
+      flow: { base: 0.37 },
     });
 
     // Colour dynamics land on the colored pencil and the autumn leaf scatter.
@@ -322,6 +371,43 @@ describe("procedural brush pack runtime", () => {
     expect(rain.angle.base).toBeLessThan(-60);
     expect(rain.angle.mappings.some((mapping) => mapping.source === "direction")).toBe(false);
     expect(rain.width.mappings.some((mapping) => mapping.source === "speed")).toBe(true);
+    expect(rain.opacity.mappings.some((mapping) => mapping.source === "pressure")).toBe(true);
+    expect(rain.flow.mappings.some((mapping) => mapping.source === "pressure")).toBe(true);
+    const rainWithoutJitter = {
+      ...rain,
+      opacity: { ...rain.opacity, jitter: null },
+    };
+    const lightRain = resolveStudioBrushDynamics(
+      { pressure: 0.1, speed: 0.55, stampIndex: 19 },
+      rainWithoutJitter
+    );
+    const heavyRain = resolveStudioBrushDynamics(
+      { pressure: 0.95, speed: 0.55, stampIndex: 19 },
+      rainWithoutJitter
+    );
+    expect(heavyRain.width).toBe(lightRain.width);
+    expect(heavyRain.opacity).toBeGreaterThan(lightRain.opacity);
+    expect(heavyRain.flow).toBeGreaterThan(lightRain.flow);
+    const rainMist = dynamicsById("rain-mist-combo");
+    expect(rainMist.width.mappings.some((mapping) => mapping.source === "speed")).toBe(true);
+    expect(rainMist.spacing.mappings.some((mapping) => mapping.source === "speed")).toBe(true);
+    expect(rainMist.opacity.mappings.some((mapping) => mapping.source === "pressure")).toBe(true);
+    expect(rainMist.flow.mappings.some((mapping) => mapping.source === "pressure")).toBe(true);
+    const rainMistWithoutJitter = {
+      ...rainMist,
+      opacity: { ...rainMist.opacity, jitter: null },
+    };
+    const lightRainMist = resolveStudioBrushDynamics(
+      { pressure: 0.1, speed: 0.55, stampIndex: 23 },
+      rainMistWithoutJitter
+    );
+    const heavyRainMist = resolveStudioBrushDynamics(
+      { pressure: 0.95, speed: 0.55, stampIndex: 23 },
+      rainMistWithoutJitter
+    );
+    expect(heavyRainMist.width).toBe(lightRainMist.width);
+    expect(heavyRainMist.opacity).toBeGreaterThan(lightRainMist.opacity);
+    expect(heavyRainMist.flow).toBeGreaterThan(lightRainMist.flow);
     expect(dynamicsById("snow-flurry-flake").angle.jitter).toMatchObject({ amount: 180 });
 
     // Multi-tip composition still applies to the expansion's foliage and rake members.
@@ -463,14 +549,14 @@ describe("procedural brush pack runtime", () => {
     expect(visualPlans).toEqual([
       // Values intentionally pin both custom tip rasterization and the dynamic dab planner.
       // Update only after a deliberate visual QA pass.
-      { id: "bristle-fan-dry", tip: "fe8d0814", dabs: "62a0855b", count: 18 },
-      { id: "palette-knife-edge", tip: "978be8a0", dabs: "ae46755f", count: 70 },
-      { id: "watercolor-salt-bloom", tip: "fd721c85", dabs: "c11da11a", count: 7 },
-      { id: "ribbon-satin-fold", tip: "458348db", dabs: "ac5ec2b4", count: 17 },
-      { id: "smoke-wisp-layered", tip: "9db6b2bc", dabs: "5d523b4f", count: 11 },
-      { id: "flower-petal-scatter", tip: "9e485c99", dabs: "616763b3", count: 9 },
-      { id: "halftone-gradient-dot", tip: "a5d799e5", dabs: "96b49af2", count: 13 },
-      { id: "focus-ray-streak", tip: "226b1a65", dabs: "9d9ff412", count: 27 },
+      { id: "bristle-fan-dry", tip: "985d4700", dabs: "62a0855b", count: 18 },
+      { id: "palette-knife-edge", tip: "c344c2cf", dabs: "ae46755f", count: 70 },
+      { id: "watercolor-salt-bloom", tip: "206daca6", dabs: "c11da11a", count: 7 },
+      { id: "ribbon-satin-fold", tip: "30f1532a", dabs: "ac5ec2b4", count: 17 },
+      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "5d523b4f", count: 11 },
+      { id: "flower-petal-scatter", tip: "a7be40ba", dabs: "616763b3", count: 9 },
+      { id: "halftone-gradient-dot", tip: "ea3c1dbd", dabs: "96b49af2", count: 13 },
+      { id: "focus-ray-streak", tip: "194e1e56", dabs: "9d9ff412", count: 27 },
     ]);
   });
 });

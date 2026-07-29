@@ -13,8 +13,11 @@ import {
   parseStudioCrdtSyncResponse,
   parseStudioCrdtUpdateAck,
   parseStudioCrdtUpdateRequest,
+  STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_LOCAL_WIRE_BRAND,
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
+  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
 } from "./studio-crdt-protocol";
@@ -48,9 +51,12 @@ function syncResponse(bytes = new Uint8Array([1, 2, 3])) {
 }
 
 describe("studio CRDT protocol", () => {
-  it("pins advanced drawing-assist rooms to the v4 network and local-wire contract", () => {
-    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(4);
-    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v4");
+  it("pins renderer-significant v3 strokes to the v5 network and local-wire contract", () => {
+    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(5);
+    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v5");
+    expect(STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION).toBe(1);
+    expect(STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION).toBe(2);
+    expect(STUDIO_CRDT_STROKE_PAYLOAD_VERSION).toBe(3);
   });
 
   it("accepts only canonical bounded base64 for incremental updates", () => {
@@ -87,7 +93,7 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
-    for (const legacyVersion of [1, 2, 3]) {
+    for (const legacyVersion of [1, 2, 3, 4]) {
       expect(parseStudioCrdtSyncRequest({
         ...syncRequest(),
         protocolVersion: legacyVersion,
@@ -104,7 +110,7 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
-    for (const legacyVersion of [1, 2, 3]) {
+    for (const legacyVersion of [1, 2, 3, 4]) {
       expect(parseStudioCrdtUpdateRequest({
         ...publish,
         protocolVersion: legacyVersion,
@@ -120,6 +126,10 @@ describe("studio CRDT protocol", () => {
     )).toEqual(publish);
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 3 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 4 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();
@@ -169,9 +179,9 @@ describe("studio CRDT protocol", () => {
       parseStudioCrdtLocalWireMessage(
         {
           ...requestWire,
-          brand: "toonspectrum:studio-crdt:v3",
-          protocolVersion: 3,
-          payload: { ...requestWire.payload, protocolVersion: 3 },
+          brand: "toonspectrum:studio-crdt:v4",
+          protocolVersion: 4,
+          payload: { ...requestWire.payload, protocolVersion: 4 },
         },
         {
           expectedWorkId: workId,

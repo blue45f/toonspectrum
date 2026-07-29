@@ -119,6 +119,8 @@ describe("applyStudioSmartShapeBrushEffect", () => {
       tiltYs: [10, 20],
       twists: [0, 90],
       brushTip: { tiltEnabled: true, angleDeg: 20, roundness: 0.4 },
+      materialPressureModel: "canonical-material-v1",
+      materialMinimumDiameterRatio: 0.64,
     }));
 
     expect(result.status).toBe("applied");
@@ -131,6 +133,7 @@ describe("applyStudioSmartShapeBrushEffect", () => {
     expect(result.stroke.tiltXs?.[0]).toBe(-30);
     expect(result.stroke.tiltXs?.at(-1)).toBe(30);
     expect(result.stroke.brushTip).toEqual({ tiltEnabled: true, angleDeg: 20, roundness: 0.4 });
+    expect(result.stroke.materialMinimumDiameterRatio).toBe(0.64);
     expect(result.stroke.fill).toBeUndefined();
     expect(result.stroke.gradient).toBeUndefined();
     expect(result.stroke.pattern).toBeUndefined();
@@ -169,6 +172,8 @@ describe("applyStudioSmartShapeBrushEffect", () => {
       brushCatalogId: "catalog-stale",
       stampPipeline: "causal-walker-v2",
       pressures: [1, 1],
+      materialPressureModel: "canonical-material-v1",
+      materialMinimumDiameterRatio: 0.8,
     }), effect);
 
     expect(result).toMatchObject({ status: "fallback", reason });
@@ -176,6 +181,8 @@ describe("applyStudioSmartShapeBrushEffect", () => {
     expect(result.stroke.brush).toBeUndefined();
     expect(result.stroke.brushCatalogId).toBeUndefined();
     expect(result.stroke.pressures).toBeUndefined();
+    expect(result.stroke.materialPressureModel).toBeUndefined();
+    expect(result.stroke.materialMinimumDiameterRatio).toBeUndefined();
     expect(result.stroke.stampPipeline).toBeUndefined();
   });
 

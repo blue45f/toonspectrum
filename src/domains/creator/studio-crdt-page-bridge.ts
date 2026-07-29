@@ -1,4 +1,8 @@
-import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
+import { isStudioDynamicBrushMinimumDiameterRatio } from "./studio-brush-dynamics";
+import {
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+} from "./studio-crdt-protocol";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
@@ -14,6 +18,10 @@ import {
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
+import {
+  isStudioMaterialMinimumDiameterRatio,
+  isStudioMaterialPressureModel,
+} from "./studio-material-pressure-model";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 
@@ -183,10 +191,54 @@ export function studioCrdtStrokeToDrawElement(
   }
   const pressureModel = extensions.pressureModel;
   if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
+  const dynamicMinimumDiameterRatio =
+    payload.brushDynamics?.minimumDiameterRatio;
+  if (
+    dynamicMinimumDiameterRatio !== undefined
+    && (
+      payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || !isStudioDynamicBrushMinimumDiameterRatio(
+        dynamicMinimumDiameterRatio,
+      )
+    )
+  ) {
+    throw new Error("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다.");
+  }
+  const materialPressureModel = extensions.materialPressureModel;
+  const materialMinimumDiameterRatio =
+    extensions.materialMinimumDiameterRatio;
+  const hasMaterialPressureSnapshot =
+    materialPressureModel !== undefined
+    || materialMinimumDiameterRatio !== undefined;
+  if (
+    hasMaterialPressureSnapshot
+    && payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+  ) {
+    throw new Error("획 재질 필압 모델과 페이로드 버전이 호환되지 않습니다.");
+  }
+  if (
+    hasMaterialPressureSnapshot
+    && !isStudioMaterialPressureModel(materialPressureModel)
+  ) {
+    throw new Error("획 재질 필압 모델이 올바르지 않습니다.");
+  }
+  if (
+    hasMaterialPressureSnapshot
+    && !isStudioMaterialMinimumDiameterRatio(materialMinimumDiameterRatio)
+  ) {
+    throw new Error("획 재질 최소 굵기 스냅샷이 올바르지 않습니다.");
+  }
+  if (hasMaterialPressureSnapshot) {
+    result.materialPressureModel = materialPressureModel;
+    result.materialMinimumDiameterRatio = materialMinimumDiameterRatio;
+  }
   const paintModel = extensions.paintModel;
   const paintModelCandidate = { ...result, paintModel };
   if (
-    payload.version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    (
+      payload.version === STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION
+      || payload.version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    )
     && isStudioStrokePaintModelCompatible(paintModelCandidate)
   ) {
     result.paintModel = paintModelCandidate.paintModel;

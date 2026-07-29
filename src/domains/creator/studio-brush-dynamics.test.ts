@@ -4,6 +4,7 @@ import {
   DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   normalizeStudioBrushDynamicsSample,
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
@@ -21,6 +22,7 @@ import {
 } from "./studio-brush-dynamics";
 import {
   buildStudioBrushTipAlphaMap,
+  DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
   sampleStudioBrushTipProceduralAlpha,
 } from "./studio-brush-tip-stamp";
 
@@ -312,6 +314,9 @@ describe("studio brush dynamics settings safety", () => {
     expect(new Set(recipes.map((recipe) => JSON.stringify(recipe))).size).toBe(3);
     for (const preset of STUDIO_BRUSH_DYNAMICS_PRESETS) {
       expect(JSON.parse(JSON.stringify(preset.settings))).toEqual(preset.settings);
+      expect(preset.settings.depositPipeline).toBe(
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      );
       expectFiniteRecipe(resolveStudioBrushDynamics({}, studioBrushDynamicsPresetSettings(preset.id)));
     }
     const first = studioBrushDynamicsPresetSettings("ink-particle");
@@ -332,6 +337,9 @@ describe("studio brush dynamics settings safety", () => {
     const settings = brushIds.map((brushId) => {
       const value = studioBrushDynamicsSettingsForBrushId(brushId);
       expect(value).not.toBeNull();
+      expect(value?.depositPipeline).toBe(
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2
+      );
       return value!;
     });
 
@@ -405,12 +413,12 @@ describe("studio brush dynamics settings safety", () => {
     first.tip.softness = 1;
     first.flow.base = 1;
     expect(studioBrushDynamicsSettingsForBrushId("spray")).toMatchObject({
-      tip: { shape: "flake", softness: 0.18 },
-      flow: { base: 0.24 },
+      tip: { shape: "flake", softness: 0.12 },
+      flow: { base: 0.3 },
     });
     expect(studioBrushDynamicsPresetSettings("airbrush")).toMatchObject({
-      tip: { shape: "soft", softness: 0.85 },
-      flow: { base: 0.48 },
+      tip: { shape: "soft", softness: 0.55 },
+      flow: { base: 0.5 },
     });
   });
 
@@ -966,6 +974,85 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(plan.dabs[0]!.opacity).toBe(0.9);
   });
 
+  it("applies the persisted pressure floor to diameter only", () => {
+    const shared = {
+      points: [5, 5],
+      pressures: [0],
+      baseWidth: 20,
+      baseOpacity: 0.8,
+      settings: {
+        taper: { enabled: false },
+        width: {
+          mappings: [{ source: "pressure" as const, from: 0.05, to: 1 }],
+          jitter: null,
+        },
+        opacity: {
+          mappings: [{ source: "pressure" as const, from: 0.2, to: 1 }],
+          jitter: null,
+        },
+        flow: {
+          base: 0.6,
+          mappings: [{ source: "pressure" as const, from: 0.3, to: 1 }],
+          jitter: null,
+        },
+      },
+    };
+    const unbounded = planStudioDynamicBrush({
+      ...shared,
+      settings: { ...shared.settings, minimumDiameterRatio: 0 },
+    }).dabs[0]!;
+    const fullDiameterFloor = planStudioDynamicBrush({
+      ...shared,
+      settings: { ...shared.settings, minimumDiameterRatio: 1 },
+    }).dabs[0]!;
+
+    expect(unbounded.size).toBeCloseTo(1, 10);
+    expect(fullDiameterFloor.size).toBe(20);
+    expect(fullDiameterFloor.opacity).toBe(unbounded.opacity);
+    expect(fullDiameterFloor.flow).toBe(unbounded.flow);
+  });
+
+  it("keeps the optional minimum diameter legacy-safe and canonically bounded", () => {
+    const legacy = {
+      seed: 23,
+      width: { base: 14, mappings: [] },
+      taper: { enabled: false },
+    };
+    const normalizedLegacy = normalizeStudioBrushDynamicsSettings(legacy);
+    const legacyCanonical = serializeStudioBrushDynamicsSettingsCanonical(legacy);
+
+    expect(normalizedLegacy.minimumDiameterRatio).toBeUndefined();
+    expect(legacyCanonical).not.toContain("minimumDiameterRatio");
+    expect(serializeStudioBrushDynamicsSettingsCanonical({
+      ...legacy,
+      minimumDiameterRatio: "invalid",
+    })).toBe(legacyCanonical);
+    expect(normalizeStudioBrushDynamicsSettings({
+      ...legacy,
+      minimumDiameterRatio: -2,
+    }).minimumDiameterRatio).toBe(0);
+    expect(normalizeStudioBrushDynamicsSettings({
+      ...legacy,
+      minimumDiameterRatio: 4,
+    }).minimumDiameterRatio).toBe(1);
+
+    const legacyDabs = planStudioDynamicBrush({
+      points: [0, 0, 20, 0],
+      pressures: [0, 0],
+      baseWidth: 14,
+      baseOpacity: 1,
+      settings: legacy,
+    }).dabs;
+    const explicitZeroDabs = planStudioDynamicBrush({
+      points: [0, 0, 20, 0],
+      pressures: [0, 0],
+      baseWidth: 14,
+      baseOpacity: 1,
+      settings: { ...legacy, minimumDiameterRatio: 0 },
+    }).dabs;
+    expect(explicitZeroDabs).toEqual(legacyDabs);
+  });
+
   it("normalizes missing dual brush to identity defaults without disturbing legacy snapshots", () => {
     const legacy = {
       seed: 11,
@@ -993,6 +1080,27 @@ describe("studio dynamic brush arc-length dab planner", () => {
     expect(serializeStudioBrushDynamicsSettingsCanonical(normalized)).toBe(JSON.stringify(normalized));
   });
 
+  it("keeps an omitted or unknown deposit pipeline on the exact legacy replay contract", () => {
+    const legacy = {
+      seed: 17,
+      tip: { shape: "grain" as const, softness: 0.35 },
+      width: { base: 8 },
+    };
+    const normalized = normalizeStudioBrushDynamicsSettings(legacy);
+    const canonical = serializeStudioBrushDynamicsSettingsCanonical(legacy);
+
+    expect(normalized.depositPipeline).toBeUndefined();
+    expect(canonical).not.toContain("depositPipeline");
+    expect(normalizeStudioBrushDynamicsSettings({
+      ...legacy,
+      depositPipeline: "future-or-corrupt-pipeline",
+    }).depositPipeline).toBeUndefined();
+    expect(serializeStudioBrushDynamicsSettingsCanonical({
+      ...legacy,
+      depositPipeline: "future-or-corrupt-pipeline",
+    })).toBe(canonical);
+  });
+
   it("round-trips enabled dual brush fields through normalization, JSON and the planner", () => {
     const normalized = normalizeStudioBrushDynamicsSettings({
       dualBrush: {
@@ -1004,7 +1112,12 @@ describe("studio dynamic brush arc-length dab planner", () => {
     });
     expect(normalized.dualBrush).toEqual({
       enabled: true,
-      tip: { shape: "halftone", softness: 1, alphaMapBase64: null, alphaMapSize: 24 },
+      tip: {
+        shape: "halftone",
+        softness: 1,
+        alphaMapBase64: null,
+        alphaMapSize: DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
+      },
       blendMode: "screen",
       sizeRatio: 2,
     });

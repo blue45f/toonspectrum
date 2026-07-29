@@ -11,7 +11,6 @@ import {
   renderStudioBrushPackDualTipIfConfigured,
 } from "./studio-brush-pack-runtime";
 import {
-  decodeStudioBrushTipAlphaMapBase64,
   encodeStudioBrushTipAlphaMapBase64,
 } from "./studio-brush-tip-stamp";
 import {
@@ -295,8 +294,28 @@ function decodeReplayAsset(
     || typeof asset.bytesBase64 !== "string"
     || asset.bytesBase64.length > MAX_REPLAY_BASE64_CODE_UNITS
   ) return null;
-  const bytes = decodeStudioBrushTipAlphaMapBase64(asset.bytesBase64);
-  if (!bytes || bytes.byteLength !== asset.width * asset.height) return null;
+  const expectedBytes = asset.width * asset.height;
+  const expectedCodeUnits = Math.ceil(expectedBytes / 3) * 4;
+  if (
+    !Number.isSafeInteger(expectedBytes)
+    || expectedCodeUnits > MAX_REPLAY_BASE64_CODE_UNITS
+    || asset.bytesBase64.length !== expectedCodeUnits
+    || !/^[A-Za-z0-9+/]*={0,2}$/u.test(asset.bytesBase64)
+  ) return null;
+  let binary: string;
+  try {
+    binary = globalThis.atob(asset.bytesBase64);
+  } catch {
+    return null;
+  }
+  if (binary.length !== expectedBytes) return null;
+  const bytes = new Uint8Array(expectedBytes);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  // Saved replays use one canonical padded base64 spelling. This also rejects strings whose
+  // otherwise-valid final sextet contains non-zero unused bits.
+  if (encodeStudioBrushTipAlphaMapBase64(bytes) !== asset.bytesBase64) return null;
   return Object.freeze({
     assetId: asset.assetId,
     width: asset.width,

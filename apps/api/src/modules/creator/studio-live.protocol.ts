@@ -73,10 +73,10 @@ export const StudioLiveLockRequestIdSchema = z.uuid();
 export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 
-// v4 is the first room protocol that accepts drawing-assist v2 with authored advanced rulers.
-// Rejecting v1-v3 prevents stale tabs from sharing a Yjs room whose page schema they cannot
-// interpret safely.
-export const STUDIO_CRDT_PROTOCOL_VERSION = 4 as const;
+// v5 is the first room protocol that accepts stroke payload v3 material-pressure semantics.
+// Rejecting v1-v4 prevents stale tabs from sharing a Yjs room whose stroke schema they cannot
+// interpret safely. The base64-v4 label remains the name of the unchanged legacy wire format.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 5 as const;
 export const STUDIO_CRDT_BINARY_WIRE_VERSION = 1 as const;
 export const STUDIO_CRDT_BINARY_WIRE_FORMAT = "binary-v1" as const;
 export const STUDIO_CRDT_LEGACY_WIRE_FORMAT = "base64-v4" as const;

@@ -22,6 +22,7 @@ import {
   type StudioCrdtStrokeInput,
 } from "./studio-crdt-document";
 import {
+  STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
@@ -32,6 +33,7 @@ import {
   STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
   STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
 } from "./studio-element-model";
+import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 
 function payload(
   points: number[] = [10, 20],
@@ -329,11 +331,11 @@ describe("StudioCrdtDocument", () => {
     document.destroy();
   });
 
-  it("reads legacy strokes while requiring V2 and compatible fields for layered-flow paint", () => {
+  it("reads v1/v2 strokes and accepts compatible layered-flow paint in v2 or v3", () => {
     const document = new StudioCrdtDocument();
     expect(document.addStroke(stroke("legacy-stroke", "page-a")).payload.version).toBe(1);
     const layered = payload([10, 20, 14, 20], {
-      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      version: STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
       opacity: 0.6,
       brush: "marker",
       sampleSpacing: 0,
@@ -342,6 +344,13 @@ describe("StudioCrdtDocument", () => {
     expect(document.addStroke({
       ...stroke("layered-stroke", "page-a"),
       payload: layered,
+    }).payload.extensions?.paintModel).toBe("layered-flow-v1");
+    expect(document.addStroke({
+      ...stroke("layered-stroke-v3-reader", "page-a"),
+      payload: {
+        ...layered,
+        version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      },
     }).payload.extensions?.paintModel).toBe("layered-flow-v1");
 
     const invalidPayloads: StudioCrdtDrawStrokePayload[] = [
@@ -360,6 +369,126 @@ describe("StudioCrdtDocument", () => {
         ...stroke(`invalid-${index}`, "page-a"),
         payload: invalid,
       })).toThrow("페인트 모델과 브러시 합성 모드가 호환되지 않습니다");
+    }
+    document.destroy();
+  });
+
+  it("requires v3 and a complete known snapshot for renderer-significant material pressure", () => {
+    const document = new StudioCrdtDocument();
+    const versioned = payload([10, 20, 14, 24], {
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brush: "pencil-2b",
+      extensions: {
+        materialPressureModel:
+          STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio: 0.72,
+      },
+    });
+
+    expect(document.addStroke({
+      ...stroke("material-pressure-v3", "page-a"),
+      payload: versioned,
+    }).payload).toMatchObject({
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      extensions: {
+        materialPressureModel:
+          STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio: 0.72,
+      },
+    });
+    for (const legacyVersion of [
+      1,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(`forged-material-pressure-v${legacyVersion}`, "page-a"),
+        payload: { ...versioned, version: legacyVersion },
+      })).toThrow("재질 필압 모델과 페이로드 버전이 호환되지 않습니다");
+    }
+    expect(() => document.addStroke({
+      ...stroke("unknown-material-pressure-v3", "page-a"),
+      payload: {
+        ...versioned,
+        extensions: {
+          materialPressureModel: "canonical-material-v99",
+          materialMinimumDiameterRatio: 0.72,
+        },
+      },
+    })).toThrow("재질 필압 모델이 올바르지 않습니다");
+    expect(() => document.addStroke({
+      ...stroke("model-without-minimum", "page-a"),
+      payload: {
+        ...versioned,
+        extensions: {
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        },
+      },
+    })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
+    expect(() => document.addStroke({
+      ...stroke("minimum-without-model", "page-a"),
+      payload: {
+        ...versioned,
+        extensions: { materialMinimumDiameterRatio: 0.4 },
+      },
+    })).toThrow("재질 필압 모델이 올바르지 않습니다");
+    for (const [id, extensions] of [
+      ["minimum-negative", {
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio: -0.01,
+      }],
+      ["minimum-overflow", {
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio: 1.01,
+      }],
+      ["minimum-string", {
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio: "0.5",
+      }],
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(id, "page-a"),
+        payload: {
+          ...versioned,
+          extensions,
+        },
+      })).toThrow("재질 최소 굵기 스냅샷이 올바르지 않습니다");
+    }
+    document.destroy();
+  });
+
+  it("requires v3 and a bounded value for dynamic-brush minimum diameter", () => {
+    const document = new StudioCrdtDocument();
+    const versioned = payload([10, 20, 14, 24], {
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      brush: "dry-media",
+      brushDynamics: { minimumDiameterRatio: 0.64 },
+    });
+
+    expect(document.addStroke({
+      ...stroke("dynamic-minimum-v3", "page-a"),
+      payload: versioned,
+    }).payload.brushDynamics).toMatchObject({ minimumDiameterRatio: 0.64 });
+    for (const legacyVersion of [
+      1,
+      STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(`forged-dynamic-minimum-v${legacyVersion}`, "page-a"),
+        payload: { ...versioned, version: legacyVersion },
+      })).toThrow("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다");
+    }
+    for (const [id, minimumDiameterRatio] of [
+      ["dynamic-minimum-negative", -0.01],
+      ["dynamic-minimum-overflow", 1.01],
+      ["dynamic-minimum-string", "0.5"],
+    ] as const) {
+      expect(() => document.addStroke({
+        ...stroke(id, "page-a"),
+        payload: {
+          ...versioned,
+          brushDynamics: { minimumDiameterRatio },
+        },
+      })).toThrow("동적 브러시 최소 굵기 스냅샷이 올바르지 않습니다");
     }
     document.destroy();
   });

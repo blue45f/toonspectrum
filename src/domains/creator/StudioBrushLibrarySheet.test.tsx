@@ -13,6 +13,7 @@ import {
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
   STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
+import { STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE } from "./studio-brush-tip-stamp";
 import { listStudioBrushTrayItems } from "./studio-creative-ux";
 import {
   LargeBrushPreview,
@@ -375,7 +376,9 @@ describe("StudioBrushLibrarySheet", () => {
         defaultOpacity: 0.94,
         brushDynamics: expect.objectContaining({
           version: 1,
-          tip: expect.objectContaining({ alphaMapSize: 24 }),
+          tip: expect.objectContaining({
+            alphaMapSize: STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
+          }),
         }),
       })
     );

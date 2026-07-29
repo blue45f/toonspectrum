@@ -8,13 +8,19 @@
 
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
 
-export const STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE = { min: 8, max: 64 } as const;
-export const DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE = 24;
+/**
+ * Procedural renderer tips use a high-resolution R8 source so a large charcoal/crayon nib does
+ * not expose 8px-wide source texels. Imported in-document payloads retain their separate 64²
+ * boundary below; quality growth must not silently expand collaboration/document payload size.
+ */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE = { min: 8, max: 256 } as const;
+export const DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE = 128;
+export const STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE = 64;
 export const STUDIO_BRUSH_TIP_STAMP_GRID_RANGE = { min: 3, max: 17 } as const;
 export const DEFAULT_STUDIO_BRUSH_TIP_STAMP_GRID = 9;
 /** Largest decoded custom tip accepted at the document boundary (64 x 64 alpha bytes). */
 export const STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES =
-  STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.max ** 2;
+  STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE ** 2;
 /** Padded base64 character budget for the largest supported alpha map. */
 export const STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS =
   Math.ceil(STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES / 3) * 4;
@@ -24,8 +30,12 @@ export const STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS =
  */
 export const STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS =
   STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS * 2;
-/** Bounds decoded/softened tip memory while covering an active pack plus common built-ins. */
-export const STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT = 64;
+/**
+ * Covers the complete bundled catalogue plus active dual/layer variants. At the 128² procedural
+ * default this is about 16 MiB of R32 alpha data and avoids regenerating material maps while an
+ * artist switches across the library; byte-heavy destination RGBA surfaces keep a separate budget.
+ */
+export const STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT = 256;
 
 export const STUDIO_BRUSH_TIP_SHAPE_IDS = [
   "round",
@@ -717,12 +727,12 @@ export function planStudioBrushTipStampWorldSamples(
 export function studioBrushTipAlphaMapToBase64(
   shape: StudioBrushTipShapeId,
   softness = 0.35,
-  size = DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE
+  size = STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE
 ): { alphaMapBase64: string; alphaMapSize: number } {
   const safeSize = Math.trunc(clamp(
     size,
     STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.min,
-    STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.max
+    STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE
   ));
   const alphas = buildProceduralAlphaMap(shape, clamp01(softness), safeSize);
   const bytes = new Uint8Array(safeSize * safeSize);

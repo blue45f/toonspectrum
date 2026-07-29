@@ -2,8 +2,23 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+} from "./studio-brush-dynamics";
+import {
+  resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
+} from "./studio-brush-material-dynamics";
+import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
+import {
+  clearStudioBrushSoftFalloffStampCache,
+  studioBrushSoftFalloffStampCacheStats,
+} from "./studio-brush-soft-falloff-stamp";
+import {
+  clearStudioBrushTextureStampCache,
+  studioBrushTextureStampCacheStats,
+} from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import {
   clearStudioDynamicCoverageCommittedCache,
@@ -11,6 +26,7 @@ import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverage,
+  renderStudioDynamicBrushCoverageMark,
   renderStudioDynamicBrushLegacyMarks,
   resolveStudioDynamicCoverageCommittedCacheByteBudget,
   studioDynamicCoverageCommittedCacheStats,
@@ -46,7 +62,12 @@ class RecordingSurfaceContext {
   globalAlpha = 1;
   globalCompositeOperation: GlobalCompositeOperation = "source-over";
   fillStyle: string | CanvasGradient | CanvasPattern = "";
+  imageSmoothingEnabled = false;
+  imageSmoothingQuality: ImageSmoothingQuality = "low";
   readonly gradients: RecordedGradient[] = [];
+  readonly imageDraws: Array<readonly unknown[]> = [];
+  imagePixels = new Uint8ClampedArray();
+  rectFills = 0;
   readonly fills: Array<{
     alpha: number;
     color: string;
@@ -56,6 +77,23 @@ class RecordingSurfaceContext {
 
   setTransform(): void {}
   clearRect(): void {}
+  createImageData(width: number, height: number): ImageData {
+    return {
+      width,
+      height,
+      colorSpace: "srgb",
+      data: new Uint8ClampedArray(width * height * 4),
+    } as ImageData;
+  }
+  putImageData(imageData: ImageData): void {
+    this.imagePixels = new Uint8ClampedArray(imageData.data);
+  }
+  drawImage(...args: readonly unknown[]): void {
+    this.imageDraws.push(args);
+  }
+  fillRect(): void {
+    this.rectFills += 1;
+  }
   save(): void {}
   restore(): void {}
   translate(): void {}
@@ -149,6 +187,94 @@ class RecordingDestination {
   scale(): void {}
 }
 
+function sourceOverAlpha(destination: number, source: number): number {
+  return source + destination * (1 - source);
+}
+
+class AlphaOracleSurfaceContext {
+  globalAlpha = 1;
+  globalCompositeOperation: GlobalCompositeOperation = "source-over";
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+  alpha = 0;
+
+  setTransform(): void {}
+  clearRect(): void {
+    this.alpha = 0;
+  }
+  save(): void {}
+  restore(): void {}
+  beginPath(): void {}
+  arc(): void {}
+  ellipse(): void {}
+  translate(): void {}
+  rotate(): void {}
+  scale(): void {}
+  createRadialGradient(): CanvasGradient {
+    return { addColorStop: () => undefined } as CanvasGradient;
+  }
+  fill(): void {
+    this.alpha = sourceOverAlpha(this.alpha, this.globalAlpha);
+  }
+}
+
+class AlphaOracleSurface {
+  readonly context = new AlphaOracleSurfaceContext();
+
+  constructor(
+    public width: number,
+    public height: number,
+  ) {}
+
+  getContext(): StudioCoverageSurfaceContext {
+    return this.context as unknown as StudioCoverageSurfaceContext;
+  }
+}
+
+class AlphaOracleDestination {
+  globalAlpha = 1;
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+  alpha = 0;
+  private readonly alphaStack: number[] = [];
+  _context = {
+    getTransform: () => ({
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 0,
+      f: 0,
+    }) as DOMMatrix,
+  };
+
+  save(): void {
+    this.alphaStack.push(this.globalAlpha);
+  }
+  restore(): void {
+    this.globalAlpha = this.alphaStack.pop() ?? this.globalAlpha;
+  }
+  drawImage(
+    surface: CanvasImageSource,
+    ..._args: [number, number, number, number, number, number, number, number]
+  ): void {
+    const sourceAlpha = (
+      surface as unknown as AlphaOracleSurface
+    ).context.alpha * this.globalAlpha;
+    this.alpha = sourceOverAlpha(this.alpha, sourceAlpha);
+  }
+  beginPath(): void {}
+  arc(): void {}
+  ellipse(): void {}
+  translate(): void {}
+  rotate(): void {}
+  scale(): void {}
+  createRadialGradient(): CanvasGradient {
+    return { addColorStop: () => undefined } as CanvasGradient;
+  }
+  fill(): void {
+    this.alpha = sourceOverAlpha(this.alpha, this.globalAlpha);
+  }
+}
+
 function surfaceFactory(surfaces: RecordingSurface[]) {
   return (width: number, height: number): StudioCoverageSurface => {
     const surface = new RecordingSurface(width, height);
@@ -210,44 +336,60 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       angleRadians: 32 * Math.PI / 180,
       falloff: {
         kind: "analytic-radial",
-        exponent: 1.4 + 0.82 * 2.2,
+        exponent: 1.4 + dynamics.tip.softness * 2.2,
       },
     });
     expect(plan.marks[0]!.radiusY).toBeCloseTo(13.2, 12);
 
     const surfaces: RecordingSurface[] = [];
+    const factory = surfaceFactory(surfaces);
+    const committedDestination = new RecordingDestination();
     const committed = renderStudioDynamicBrushCoverage(
-      new RecordingDestination(),
+      committedDestination,
       plan.marks,
       {
         activeDraft: false,
         opacity: 0.6,
-        surfaceFactory: surfaceFactory(surfaces),
+        surfaceFactory: factory,
       },
     );
     expect(committed).toMatchObject({ status: "rendered" });
-    expect(surfaces[0]!.context.fills).toHaveLength(1);
-    expect(surfaces[0]!.context.gradients).toHaveLength(1);
-    const committedStops = surfaces[0]!.context.gradients[0]!.stops;
-    expect(committedStops).toHaveLength(9);
-    expect(committedStops[0]!.offset).toBe(0);
-    expect(committedStops[0]!.color).toMatch(/^rgba\(\d+, \d+, \d+, 1\)$/);
-    expect(committedStops.at(-1)).toEqual({
-      offset: 1,
-      color: committedStops[0]!.color.replace(/, 1\)$/, ", 0)"),
-    });
-    expect(committedStops.map(({ offset }) => offset)).toEqual(
-      [...committedStops].map(({ offset }) => offset).sort((left, right) => left - right),
+    // Two world tiles, one immutable radial mask and one reusable exact-colour tint scratch.
+    expect(surfaces).toHaveLength(4);
+    const tileSurfaces = surfaces.filter(({ context }) =>
+      context.imageDraws.length > 0 && context.rectFills === 0
     );
+    const maskSurfaces = surfaces.filter(({ context }) =>
+      context.imagePixels.length > 0
+    );
+    const tintedSurfaces = surfaces.filter(({ context }) =>
+      context.rectFills > 0
+    );
+    expect(tileSurfaces).toHaveLength(2);
+    expect(tileSurfaces.every(({ context }) =>
+      context.gradients.length === 0 && context.imageDraws.length === 1
+    )).toBe(true);
+    expect(maskSurfaces).toHaveLength(1);
+    expect(tintedSurfaces).toHaveLength(1);
+    expect(committedDestination.draws).toHaveLength(2);
 
     const legacy = new RecordingDestination();
-    renderStudioDynamicBrushLegacyMarks(legacy, plan.marks, 0.6);
-    expect(legacy.legacyFills).toHaveLength(1);
-    expect(legacy.gradients[0]!.stops).toEqual(committedStops);
-    expect(legacy.legacyFills[0]!.alpha).toBeCloseTo(
+    renderStudioDynamicBrushLegacyMarks(legacy, plan.marks, 0.6, factory);
+    expect(legacy.legacyFills).toHaveLength(0);
+    expect(legacy.gradients).toHaveLength(0);
+    expect(legacy.draws).toHaveLength(1);
+    expect(legacy.draws[0]!.alpha).toBeCloseTo(
       0.8 * 0.6 * plan.marks[0]!.alpha,
       12,
     );
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({
+      entries: 1,
+      tintedEntries: 1,
+      scratchSurfaces: 0,
+      surfaceAllocations: 2,
+      hits: 0,
+      tintedHits: 2,
+    });
   });
 
   it.each([
@@ -298,7 +440,161 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(plan.marks.every((candidate) => candidate.falloff === undefined)).toBe(true);
   });
 
-  it("keeps a grained soft medium continuous while sampling world grain once per dense dab", () => {
+  it("preserves a sparse centre-transparent custom tip as one full causal texture command", () => {
+    const alphaBytes = new Uint8Array(8 * 8);
+    alphaBytes[0] = 255;
+    alphaBytes[7] = 191;
+    alphaBytes[56] = 128;
+    alphaBytes[63] = 64;
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: {
+        shape: "hard",
+        softness: 0,
+        alphaMapSize: 8,
+        alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(alphaBytes),
+      },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[dab({ size: 48, roundness: 0.6, angle: 35 })]],
+      dynamics,
+      dynamicSeed: 42,
+      stroke: "#336699",
+      stampGrid: 3,
+      markBudget: 1,
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("expected full texture mark");
+    expect(plan.marks).toHaveLength(1);
+    const plannedMark = plan.marks[0]!;
+    expect(plannedMark).toMatchObject({
+      radiusX: 24,
+      angleRadians: 35 * Math.PI / 180,
+      texture: { kind: "alpha-map" },
+    });
+    expect(plannedMark.radiusY).toBeCloseTo(14.4, 12);
+    expect(plannedMark.falloff).toBeUndefined();
+    const alphaMap = plannedMark.texture!.alphaMap;
+    expect(alphaMap.alphas[0]).toBe(1);
+    expect(alphaMap.alphas[3 * 8 + 3]).toBe(0);
+    expect(alphaMap.alphas[4 * 8 + 4]).toBe(0);
+
+    clearStudioBrushTextureStampCache();
+    const surfaces: RecordingSurface[] = [];
+    const destination = new RecordingDestination();
+    renderStudioDynamicBrushCoverageMark(
+      destination,
+      plannedMark,
+      1,
+      surfaceFactory(surfaces),
+    );
+    expect(destination.draws).toHaveLength(1);
+    expect(destination.draws[0]!.args.slice(0, 5)).toEqual([0, 0, 8, 8, -24]);
+    expect(destination.draws[0]!.args[5]).toBeCloseTo(-14.4, 12);
+    expect(destination.draws[0]!.args[6]).toBe(48);
+    expect(destination.draws[0]!.args[7]).toBeCloseTo(28.8, 12);
+    // One immutable alpha mask plus one reusable exact-colour tint scratch.
+    expect(surfaces).toHaveLength(2);
+    expect(surfaces[0]!.context.imagePixels[3]).toBe(255);
+    expect(surfaces[0]!.context.imagePixels[(3 * 8 + 3) * 4 + 3]).toBe(0);
+  });
+
+  it("keeps causal live-prefix and retained replay texture primitives identical", () => {
+    const dynamics = materializeStudioBrushPackDynamics("pencil-4b-rough");
+    if (!dynamics) throw new Error("missing pencil-4b-rough dynamics");
+    const dabs = [
+      dab({ index: 0, x: 10, y: 20, sourceX: 10, sourceY: 20, size: 18 }),
+      dab({ index: 1, x: 22, y: 25, sourceX: 22, sourceY: 25, size: 20 }),
+    ];
+    const plan = (plannedDabs: readonly StudioDynamicBrushDab[]) =>
+      planStudioDynamicBrushCoverageMarks({
+        dabVariations: [plannedDabs],
+        strokeOrigins: [{ x: 10, y: 20 }],
+        dynamics,
+        dynamicSeed: 77,
+        stroke: "#335577",
+        stampGrid: 3,
+        markBudget: 8,
+      });
+    const livePrefix = plan(dabs.slice(0, 1));
+    const retained = plan(dabs);
+
+    expect(livePrefix.ok).toBe(true);
+    expect(retained.ok).toBe(true);
+    if (!livePrefix.ok || !retained.ok) throw new Error("expected causal texture plans");
+    expect(livePrefix.marks).toHaveLength(1);
+    expect(retained.marks).toHaveLength(2);
+    expect(retained.marks[0]).toEqual(livePrefix.marks[0]);
+    expect(retained.marks.every(({ texture }) => texture?.kind === "alpha-map")).toBe(true);
+  });
+
+  it("plans all 160 causal pack tips with bounded commands and real alpha-map shape diversity", () => {
+    const primitiveKinds = new Set<string>();
+    const alphaMapRevisions = new Set<string>();
+    const rasterShapeFingerprints = new Set<string>();
+
+    for (const catalogId of STUDIO_BRUSH_PACK_CATALOG_IDS) {
+      const dynamics = materializeStudioBrushPackDynamics(catalogId);
+      if (!dynamics) throw new Error(`missing ${catalogId} dynamics`);
+      const plan = planStudioDynamicBrushCoverageMarks({
+        dabVariations: [[dab({ size: 32, angle: 23, roundness: 0.72 })]],
+        dynamics,
+        dynamicSeed: 91,
+        stroke: "#335577",
+        stampGrid: 3,
+        markBudget: 3,
+      });
+      expect(plan.ok, catalogId).toBe(true);
+      if (!plan.ok) continue;
+      const expectedCommands = 1
+        + dynamics.tipLayers.filter((layer) => layer.opacity > 0).length;
+      expect(plan.marks, catalogId).toHaveLength(expectedCommands);
+      for (const plannedMark of plan.marks) {
+        if (plannedMark.texture) {
+          primitiveKinds.add("texture");
+          const map = plannedMark.texture.alphaMap;
+          alphaMapRevisions.add(String(map.revision));
+          let occupied = 0;
+          let edgeEnergy = 0;
+          let alphaSum = 0;
+          for (let y = 0; y < map.size; y += 1) {
+            for (let x = 0; x < map.size; x += 1) {
+              const alpha = map.alphas[y * map.size + x] ?? 0;
+              if (alpha > 0.02) occupied += 1;
+              alphaSum += alpha;
+              if (x === 0 || y === 0 || x === map.size - 1 || y === map.size - 1) {
+                edgeEnergy += alpha;
+              }
+            }
+          }
+          rasterShapeFingerprints.add([
+            map.size,
+            occupied,
+            alphaSum.toFixed(3),
+            edgeEnergy.toFixed(3),
+            (map.alphas[Math.floor(map.alphas.length / 2)] ?? 0).toFixed(3),
+          ].join(":"));
+        } else if (plannedMark.falloff) {
+          primitiveKinds.add("analytic-radial");
+        } else {
+          primitiveKinds.add("solid-ellipse");
+        }
+      }
+    }
+
+    expect(primitiveKinds).toEqual(new Set([
+      "texture",
+      "analytic-radial",
+      "solid-ellipse",
+    ]));
+    expect(alphaMapRevisions.size).toBeGreaterThan(30);
+    expect(rasterShapeFingerprints.size).toBeGreaterThan(20);
+  });
+
+  it("keeps a grained soft medium continuous with footprint-integrated world grain", () => {
     const dynamics = normalizeStudioBrushDynamicsSettings({
       tip: { shape: "soft", softness: 0.82 },
       grain: {
@@ -329,9 +625,23 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       candidate.falloff?.kind === "analytic-radial"
     )).toBe(true);
     expect(plan.marks[0]!.alpha).not.toBe(plan.marks[1]!.alpha);
+    expect(plan.marks[0]!.alpha).toBeCloseTo(
+      0.5 * 0.4 * resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+        10,
+        20,
+        24,
+        24,
+        0,
+        10,
+        20,
+        42,
+        dynamics.grain,
+      ),
+      12,
+    );
   });
 
-  it("decomposes a screen dual wet wash into a continuous carrier plus sponge texture", () => {
+  it("keeps a causal screen-dual wet wash as one full composed alpha-map command", () => {
     const dynamics = materializeStudioBrushPackDynamics("watercolor-wet-wash");
     if (!dynamics) throw new Error("missing watercolor-wet-wash dynamics");
     const plan = planStudioDynamicBrushCoverageMarks({
@@ -344,19 +654,19 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     });
 
     expect(plan.ok).toBe(true);
-    if (!plan.ok) throw new Error("expected decomposed wet-wash marks");
-    expect(plan.marks.length).toBeGreaterThan(1);
+    if (!plan.ok) throw new Error("expected textured wet-wash mark");
+    expect(plan.marks).toHaveLength(1);
     expect(plan.marks[0]).toMatchObject({
       radiusX: 28,
       radiusY: 28 * 0.78,
-      falloff: {
-        kind: "analytic-radial",
-        exponent: 1.4 + dynamics.tip.softness * 2.2,
+      texture: {
+        kind: "alpha-map",
       },
     });
-    expect(plan.marks.slice(1).some((candidate) =>
-      candidate.falloff === undefined
-    )).toBe(true);
+    expect(plan.marks[0]!.falloff).toBeUndefined();
+    expect(plan.marks[0]!.texture?.alphaMap.alphas.length).toBe(
+      plan.marks[0]!.texture!.alphaMap.size ** 2,
+    );
   });
 
   it("deposits flow locally and applies inherited × stroke opacity once at tile composite", () => {
@@ -378,6 +688,59 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(destination.draws).toHaveLength(1);
     expect(destination.draws[0]!.alpha).toBeCloseTo(0.8 * 0.4, 12);
     expect(destination.globalAlpha).toBe(0.8);
+  });
+
+  it("keeps bounded overlap alpha at 0.375 instead of legacy per-dab 0.4375", () => {
+    const marks = [
+      mark({ x: 96, y: 96, radiusX: 8, radiusY: 8, angleRadians: 0, alpha: 0.5 }),
+      mark({ x: 96, y: 96, radiusX: 8, radiusY: 8, angleRadians: 0, alpha: 0.5 }),
+    ];
+    const factory = (width: number, height: number) => (
+      new AlphaOracleSurface(width, height) as unknown as StudioCoverageSurface
+    );
+    clearStudioDynamicCoverageCommittedCache();
+    for (const physicalScale of [1, 12]) {
+      const first = new AlphaOracleDestination();
+      first._context.getTransform = () => ({
+        a: physicalScale,
+        b: 0,
+        c: 0,
+        d: physicalScale,
+        e: 0,
+        f: 0,
+      }) as DOMMatrix;
+      const firstResult = renderStudioDynamicBrushCoverage(first, marks, {
+        activeDraft: false,
+        opacity: 0.5,
+        surfaceFactory: factory,
+        committedCacheKey: `alpha-oracle:${physicalScale}`,
+      });
+      expect(firstResult).toMatchObject({
+        status: "rendered",
+        scale: physicalScale > 4 ? 4 : physicalScale,
+        tileCount: 1,
+      });
+      // Local coverage: .5 source-over .5 = .75; stroke opacity is then applied once.
+      expect(first.alpha).toBeCloseTo(0.375, 12);
+
+      const replay = new AlphaOracleDestination();
+      replay._context.getTransform = first._context.getTransform;
+      const replayResult = renderStudioDynamicBrushCoverage(replay, marks, {
+        activeDraft: false,
+        opacity: 0.5,
+        surfaceFactory: factory,
+        committedCacheKey: `alpha-oracle:${physicalScale}`,
+      });
+      expect(replayResult).toEqual(firstResult);
+      expect(replay.alpha).toBeCloseTo(0.375, 12);
+    }
+
+    const legacy = new AlphaOracleDestination();
+    renderStudioDynamicBrushLegacyMarks(legacy, marks, 0.5);
+    // Frozen legacy semantics multiply opacity into both dabs: .25 over .25 = .4375.
+    expect(legacy.alpha).toBeCloseTo(0.4375, 12);
+    expect(0.375).not.toBeCloseTo(legacy.alpha, 12);
+    clearStudioDynamicCoverageCommittedCache();
   });
 
   it("uses a lower committed-cache ceiling for coarse-pointer and low-memory devices", () => {
@@ -452,8 +815,132 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(surfaces[0]).toMatchObject({ width: 1, height: 1 });
   });
 
+  it("uses rectangular texture bounds so rotated opaque corner pixels reach adjacent tiles", () => {
+    clearStudioDynamicCoverageCommittedCache();
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "grain", softness: 0.1, alphaMapSize: 24 },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[dab({
+        x: 230,
+        y: 128,
+        sourceX: 230,
+        sourceY: 128,
+        size: 40,
+        angle: 45,
+      })]],
+      dynamics,
+      dynamicSeed: 5,
+      stroke: "#336699",
+      stampGrid: 3,
+      markBudget: 1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("expected texture mark");
+
+    const destination = new RecordingDestination();
+    destination._context.getTransform = () => ({
+      a: 1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 0,
+      f: 0,
+    }) as DOMMatrix;
+    const surfaces: RecordingSurface[] = [];
+    const result = renderStudioDynamicBrushCoverage(destination, plan.marks, {
+      activeDraft: true,
+      opacity: 1,
+      surfaceFactory: surfaceFactory(surfaces),
+    });
+
+    expect(result).toMatchObject({
+      status: "rendered",
+      scale: 1,
+      tileCount: 2,
+      tileMarkReferences: 2,
+    });
+    expect(studioBrushTextureStampCacheStats()).toMatchObject({
+      entries: 2,
+      maskEntries: 1,
+      tintEntries: 1,
+      scratchSurfaces: 1,
+      surfaceAllocations: 3,
+    });
+  });
+
+  it("reuses committed textured tiles for equal immutable alpha-map revisions", () => {
+    clearStudioDynamicCoverageCommittedCache();
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "bristle", softness: 0.25, alphaMapSize: 24 },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [[dab({ x: 100, y: 100, size: 32, angle: 17 })]],
+      dynamics,
+      dynamicSeed: 5,
+      stroke: "#336699",
+      stampGrid: 3,
+      markBudget: 1,
+    });
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("expected texture mark");
+    const firstMark = plan.marks[0]!;
+    const firstMap = firstMark.texture!.alphaMap;
+    const replayMarks: readonly StudioDynamicBrushCoverageMark[] = [{
+      ...firstMark,
+      texture: {
+        kind: "alpha-map",
+        alphaMap: {
+          ...firstMap,
+          alphas: new Float32Array(firstMap.alphas),
+        },
+      },
+    }];
+    const surfaces: RecordingSurface[] = [];
+    const factory = surfaceFactory(surfaces);
+    const first = renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      plan.marks,
+      {
+        activeDraft: false,
+        opacity: 1,
+        surfaceFactory: factory,
+        committedCacheKey: "textured-replay",
+      },
+    );
+    const replay = renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      replayMarks,
+      {
+        activeDraft: false,
+        opacity: 1,
+        surfaceFactory: factory,
+        committedCacheKey: "textured-replay",
+      },
+    );
+
+    expect(first).toMatchObject({ status: "rendered", tileCount: 1 });
+    expect(replay).toEqual(first);
+    // One tile plus an immutable alpha mask and one reusable tint scratch; replay allocates none.
+    expect(surfaces).toHaveLength(3);
+    expect(studioBrushTextureStampCacheStats()).toMatchObject({
+      entries: 1,
+      maskEntries: 1,
+      tintEntries: 0,
+      scratchSurfaces: 1,
+      surfaceAllocations: 2,
+    });
+  });
+
   it("disposes every document-owned backing surface at the Studio lifecycle boundary", () => {
     clearStudioDynamicCoverageCommittedCache();
+    clearStudioBrushSoftFalloffStampCache();
     const surfaces: RecordingSurface[] = [];
     const factory = surfaceFactory(surfaces);
     for (const committedCacheKey of ["document-a:stroke-1", "document-a:stroke-2"]) {
@@ -475,6 +962,26 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     });
     expect(surfaces.every((surface) => surface.width > 1 && surface.height > 1)).toBe(true);
 
+    const falloffMark = mark({
+      falloff: { kind: "analytic-radial", exponent: 3.2 },
+    });
+    expect(renderStudioDynamicBrushCoverage(
+      new RecordingDestination(),
+      [falloffMark],
+      {
+        activeDraft: false,
+        opacity: 1,
+        surfaceFactory: factory,
+        committedCacheKey: "document-a:soft-stroke",
+      },
+    ).status).toBe("rendered");
+    expect(studioBrushSoftFalloffStampCacheStats()).toMatchObject({
+      entries: 1,
+      tintedEntries: 1,
+      scratchSurfaces: 0,
+      surfaceAllocations: 2,
+    });
+
     disposeStudioDynamicCoverageCommittedCache();
 
     expect(studioDynamicCoverageCommittedCacheStats()).toEqual({
@@ -482,8 +989,19 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       entries: 0,
       tiles: 0,
     });
-    expect(surfaces).toHaveLength(2);
+    expect(surfaces).toHaveLength(5);
     expect(surfaces.every((surface) => surface.width === 1 && surface.height === 1)).toBe(true);
+    expect(studioBrushSoftFalloffStampCacheStats()).toEqual({
+      entries: 0,
+      tintedEntries: 0,
+      scratchSurfaces: 0,
+      bytes: 0,
+      surfaceAllocations: 0,
+      hits: 0,
+      misses: 0,
+      tintedHits: 0,
+      tintPasses: 0,
+    });
   });
 
   it("binds cache disposal to the keyed editor work/auth lifecycle", () => {
@@ -550,13 +1068,13 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     expect(committed).toMatchObject({ status: "rendered", scale: 4 });
   });
 
-  it("falls back exactly instead of raster-downscaling a transform above 4x", () => {
+  it("caps transforms above 4x without changing bounded-flow alpha semantics", () => {
     const destination = new RecordingDestination();
     destination._context.getTransform = () => ({
-      a: 4.01,
+      a: 12,
       b: 0,
       c: 0,
-      d: 4.01,
+      d: 12,
       e: 0,
       f: 0,
     }) as DOMMatrix;
@@ -566,11 +1084,45 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       surfaceFactory: surfaceFactory([]),
     });
 
-    expect(result).toEqual({
-      status: "fallback",
-      reason: "physical-scale-unsupported",
-    });
-    expect(destination.draws).toHaveLength(0);
+    expect(result).toMatchObject({ status: "rendered", scale: 4 });
+    expect(destination.draws).toHaveLength(1);
+    expect(destination.draws[0]!.alpha).toBeCloseTo(0.8 * 0.6, 12);
+  });
+
+  it("reduces only coverage raster resolution when the preferred scale exceeds tile budget", () => {
+    const destination = new RecordingDestination();
+    destination._context.getTransform = () => ({
+      a: 8,
+      b: 0,
+      c: 0,
+      d: 8,
+      e: 0,
+      f: 0,
+    }) as DOMMatrix;
+    const result = renderStudioDynamicBrushCoverage(
+      destination,
+      [mark({
+        x: 0,
+        y: 0,
+        radiusX: 1_300,
+        radiusY: 1_300,
+        angleRadians: 0,
+        alpha: 0.5,
+      })],
+      {
+        activeDraft: false,
+        opacity: 0.5,
+        surfaceFactory: surfaceFactory([]),
+      },
+    );
+
+    expect(result).toMatchObject({ status: "rendered", scale: 1 });
+    if (result.status !== "rendered") throw new Error("expected coverage");
+    expect(result.allocatedBytes).toBeLessThanOrEqual(
+      STUDIO_DYNAMIC_COVERAGE_ACTIVE_BYTE_BUDGET,
+    );
+    expect(destination.draws.length).toBeGreaterThan(0);
+    expect(destination.draws.every(({ alpha }) => alpha === 0.8 * 0.5)).toBe(true);
   });
 
   it("oversamples a sub-0.75x view without changing destination-space geometry", () => {
@@ -673,6 +1225,79 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     const destination = new RecordingDestination();
     renderStudioDynamicBrushLegacyMarks(destination, plan.legacyMarks, 0.5);
     expect(destination.legacyFills).toHaveLength(2);
+  });
+
+  it("keeps a complete causal dab-wave prefix instead of rejecting the whole stroke", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushCoverageAndLegacyMarks({
+      dabVariations: [[dab(), dab({ index: 1, x: 30, sourceX: 30 })]],
+      dynamics,
+      dynamicSeed: 42,
+      stroke: "#123456",
+      stampGrid: 3,
+      markBudget: 1,
+    });
+
+    expect(plan.coveragePlan).toMatchObject({
+      ok: true,
+      marks: [expect.objectContaining({ x: 10, y: 20 })],
+      acceptedPrefixReceipt: {
+        policy: "accepted-prefix-v1",
+        requestedDabsPerVariation: 2,
+        acceptedDabsPerVariation: 1,
+        rejectedDabsPerVariation: 1,
+        acceptedMarkBudget: 1,
+      },
+    });
+    expect(plan.legacyMarks).toEqual(
+      plan.coveragePlan.ok ? plan.coveragePlan.marks : [],
+    );
+  });
+
+  it("never splits symmetry or three-tip material layers at a causal ceiling", () => {
+    const tip = { shape: "round" as const, softness: 0 };
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      tip,
+      tipLayers: [
+        { tip, opacity: 1 },
+        { tip, opacity: 0.5 },
+      ],
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const first = dab();
+    const second = dab({ index: 1, x: 30, sourceX: 30 });
+    const mirroredFirst = dab({ x: -10, sourceX: -10 });
+    const mirroredSecond = dab({ index: 1, x: -30, sourceX: -30 });
+    const plan = planStudioDynamicBrushCoverageMarks({
+      dabVariations: [
+        [first, second],
+        [mirroredFirst, mirroredSecond],
+      ],
+      dynamics,
+      dynamicSeed: 42,
+      stroke: "#123456",
+      stampGrid: 3,
+      // One complete base-dab wave = 2 symmetry copies × 3 enabled tips.
+      markBudget: 6,
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) throw new Error("expected accepted causal prefix");
+    expect(plan.marks).toHaveLength(6);
+    expect(plan.marks.map(({ x }) => x)).toEqual([10, 10, 10, -10, -10, -10]);
+    expect(plan.acceptedPrefixReceipt).toMatchObject({
+      requestedDabsPerVariation: 2,
+      acceptedDabsPerVariation: 1,
+      rejectedDabsPerVariation: 1,
+      acceptedMarkBudget: 6,
+    });
   });
 
   it("keeps explicit full-stroke origins stable for suffix-only stroke-fixed grain plans", () => {

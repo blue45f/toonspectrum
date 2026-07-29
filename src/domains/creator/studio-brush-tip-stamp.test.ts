@@ -7,10 +7,13 @@ import {
 import {
   buildStudioBrushTipAlphaMap,
   countStudioBrushTipStampSamples,
+  DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
+  STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
   STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_MAX_CHARS,
   STUDIO_BRUSH_TIP_ALPHA_MAP_BASE64_SOURCE_MAX_CHARS,
   STUDIO_BRUSH_TIP_ALPHA_MAP_CACHE_LIMIT,
   STUDIO_BRUSH_TIP_ALPHA_MAP_MAX_BYTES,
+  STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE,
   decodeStudioBrushTipAlphaMapBase64,
   encodeStudioBrushTipAlphaMapBase64,
   normalizeStudioBrushTipSettings,
@@ -62,6 +65,53 @@ describe("studio brush tip alpha maps", () => {
     expect(map.size).toBe(size);
     expect(map.alphas[0]).toBeCloseTo(bytes[0]! / 255, 5);
     expect(map.alphas[bytes.length - 1]).toBeCloseTo(bytes[bytes.length - 1]! / 255, 5);
+  });
+
+  it("keeps the no-argument procedural-to-custom helper inside the document boundary", () => {
+    const payload = studioBrushTipAlphaMapToBase64("grain");
+    expect(payload.alphaMapSize).toBe(STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE);
+    const normalized = normalizeStudioBrushTipSettings({
+      shape: "grain",
+      ...payload,
+    });
+    expect(normalized.alphaMapBase64).toBe(payload.alphaMapBase64);
+    expect(buildStudioBrushTipAlphaMap(normalized)).toMatchObject({
+      custom: true,
+      size: STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
+    });
+  });
+
+  it("separates high-resolution procedural tips from bounded document payloads", () => {
+    const normalized = normalizeStudioBrushTipSettings({
+      shape: "grain",
+    });
+    const procedural = buildStudioBrushTipAlphaMap(normalized);
+    expect(normalized.alphaMapSize).toBe(
+      DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
+    );
+    expect(procedural.size).toBe(DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE);
+    expect(STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE_RANGE.max).toBeGreaterThanOrEqual(
+      DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE,
+    );
+    expect(DEFAULT_STUDIO_BRUSH_TIP_ALPHA_MAP_SIZE).toBeGreaterThan(
+      STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE,
+    );
+    // A 200px nib no longer magnifies one source texel into the old ~8px block.
+    expect(200 / procedural.size).toBeLessThanOrEqual(1.6);
+
+    const oversizedCustomBytes = new Uint8Array(
+      (STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE + 1) ** 2,
+    );
+    oversizedCustomBytes.fill(255);
+    const custom = normalizeStudioBrushTipSettings({
+      shape: "grain",
+      alphaMapSize: STUDIO_BRUSH_CUSTOM_TIP_ALPHA_MAP_MAX_SIZE + 1,
+      alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(
+        oversizedCustomBytes,
+      ),
+    });
+    expect(custom.alphaMapBase64).toBeNull();
+    expect(buildStudioBrushTipAlphaMap(custom).custom).toBe(false);
   });
 
   it("rejects oversized encoded alpha maps before allocating decoded output", () => {

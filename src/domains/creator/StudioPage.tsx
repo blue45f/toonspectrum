@@ -187,8 +187,6 @@ import {
   normalizeCalligraphyStylusInput,
   pressureCurvePresetId,
   pressureCurveValueForPreset,
-  resolveBrushPressureSample,
-  resolveBrushReleasePressureSample,
   strokeSampleDistanceForScale,
   type BrushPreset,
 } from "./studio-brush";
@@ -239,6 +237,11 @@ import {
   STUDIO_STAMP_BRUSH_DEFAULTS,
 } from "./studio-brush-stamp-engine";
 import { studioBrushSymmetryTransforms } from "./studio-brush-symmetry";
+import {
+  advanceStudioBrushVelocityPressure,
+  initializeStudioBrushVelocityPressure,
+  resolveStudioBrushReleasePressure,
+} from "./studio-brush-velocity-pressure";
 import { resolveAnchorTargetPoint, computeBubbleAnchorTail, type AnchorTargetBounds } from "./studio-bubble-anchor";
 import {
   bubbleShapeCanvasPointToLocal,
@@ -551,7 +554,6 @@ import {
   HISTORY_BRUSH_OPACITY_DEFAULT,
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
-import { resolveStudioHybridPressureSample } from "./studio-hybrid-pressure-profile";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -1421,6 +1423,7 @@ import type {
   StudioCompanionCommandName,
   StudioCompanionPrimaryRuntime,
 } from "./studio-tools-companion";
+import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
 import type {
   StudioGpuBackend,
   StudioGpuFrameReceipt,
@@ -9244,6 +9247,11 @@ function StudioCuttoonEditor() {
   const drawingFixedRateOwnedPointsRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
+  /**
+   * Causal low-pass velocity→pressure authority. Unlike drawingVelocityRef (speed metadata), this
+   * state owns only persisted line-width pressure and is restored after disposable predictions.
+   */
+  const drawingVelocityPressureRef = useRef<StudioVelocityPressureState | null>(null);
   // The imperative transport owns the single pointer session, DOM capture and safety listeners.
   // React retains only the drawing/CRDT/preview/commit coordinator behind its latest callback ports.
   const drawingPointerTransportRef = useRef<
@@ -24433,6 +24441,7 @@ const puppetWarpArmed =
     drawingFixedRateSampleClockRef.current = null;
     drawingLastAuthoritativePointerRef.current = null;
     drawingVelocityRef.current = null;
+    drawingVelocityPressureRef.current = null;
     drawingInputSettingsRef.current = null;
   }
   function discardDrawingPointerSession() {
@@ -25833,6 +25842,9 @@ const puppetWarpArmed =
         drawMode === "shape" || drawMode === "pixel"
           ? null
           : createStudioPointerVelocityState(pointerSample);
+      drawingVelocityPressureRef.current = initializeStudioBrushVelocityPressure(
+        drawMode, pointerSample, next, drawingInputSettingsRef.current
+      );
       drawingRef.current = next;
       // The active cursor is outline-only, so it can track the contact without darkening stable
       // pixels or becoming part of the live-ink/commit receipt.
@@ -26918,32 +26930,29 @@ const puppetWarpArmed =
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
-    const hybridPressure = typeof pressureOverride === "number" || current.brush === "pen"
-      ? null
-      : resolveStudioHybridPressureSample(current.brush, {
-          pointerType: pointerSample.pointerType,
-          rawPressure: pointerSample.pressure,
-          distance: velocitySample.distance,
-          elapsedMs: velocitySample.elapsedMs,
-          pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-          velocitySensitivityScale:
-            inputSettings?.velocitySensitivity ?? velocitySensitivity,
-          simulateVelocity:
-            inputSettings?.useVelocityPressure ?? useVelocityPressure,
-        });
+    const velocityPressure = advanceStudioBrushVelocityPressure(
+      drawingVelocityPressureRef.current,
+      {
+        x: pointerSample.clientX,
+        y: pointerSample.clientY,
+        timeMs: sampleTimeStamp,
+        pointerType: pointerSample.pointerType,
+        pressure: pointerSample.pressure,
+      },
+      {
+        brushId: current.brush,
+        pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+        pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
+        useVelocityPressure: inputSettings?.useVelocityPressure ?? useVelocityPressure,
+        velocitySensitivity:
+          inputSettings?.velocitySensitivity ?? velocitySensitivity,
+        fallbackPressure: studioInkFallbackPressure(current.pressureModel),
+      }
+    );
+    drawingVelocityPressureRef.current = velocityPressure.state;
     let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
       ? Math.min(1, Math.max(0, pressureOverride))
-      : hybridPressure?.pressure ?? resolveBrushPressureSample({
-          pointerType: pointerSample.pointerType,
-          rawPressure: pointerSample.pressure,
-          distance: velocitySample.distance,
-          elapsedMs: velocitySample.elapsedMs,
-          velocityFallbackEnabled: inputSettings?.useVelocityPressure ?? useVelocityPressure,
-          velocitySensitivity: inputSettings?.velocitySensitivity ?? velocitySensitivity,
-          minSizeRatio: inputSettings?.pressureMinSize ?? pressureMinSize,
-          pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-          fallbackPressure: current.pressureModel ? 1 : 0.5,
-        });
+      : velocityPressure.pressure;
     let targetX = pos.x;
     let targetY = pos.y;
     if (
@@ -27488,6 +27497,7 @@ const puppetWarpArmed =
         const authoritativeFixedRateFilter = drawingFixedRateFilterRef.current;
         const authoritativeStabilizer = drawingStabilizerRef.current;
         const authoritativeVelocity = drawingVelocityRef.current;
+        const authoritativeVelocityPressure = drawingVelocityPressureRef.current;
         try {
           drawingPredictionPreviewRef.current = true;
           const suffixDraftCandidate = liveDraftDirectRef.current && predictedInkTailStateRef.current
@@ -27563,6 +27573,7 @@ const puppetWarpArmed =
           drawingFixedRateFilterRef.current = authoritativeFixedRateFilter;
           drawingStabilizerRef.current = authoritativeStabilizer;
           drawingVelocityRef.current = authoritativeVelocity;
+          drawingVelocityPressureRef.current = authoritativeVelocityPressure;
         }
       }
     } finally {
@@ -27723,17 +27734,27 @@ const puppetWarpArmed =
       const contactPoint = coordinateMapper.pointFor(pointerEvent);
       if (rawState && contactPoint) {
         const settings = drawingInputSettingsRef.current;
-        const previewPressure = resolveBrushPressureSample({
-          pointerType: pointerEvent.pointerType,
-          rawPressure: pointerEvent.pressure,
-          distance: 0,
-          elapsedMs: 0,
-          velocityFallbackEnabled: false,
-          velocitySensitivity: settings?.velocitySensitivity ?? velocitySensitivity,
-          minSizeRatio: settings?.pressureMinSize ?? pressureMinSize,
-          pressureCurve: settings?.pressureCurve ?? pressureCurve,
-          fallbackPressure: drawing.pressureModel ? 1 : 0.5,
-        });
+        // Raw updates are replace-only previews. Branch from (but never publish) the latest
+        // authoritative pressure state so pencil, marker, dry-media and every other family show
+        // the same hardware-pressure curve before the processed pointer event commits it.
+        const previewPressure = advanceStudioBrushVelocityPressure(
+          drawingVelocityPressureRef.current,
+          {
+            x: pointerEvent.clientX,
+            y: pointerEvent.clientY,
+            timeMs: pointerEvent.timeStamp,
+            pointerType: pointerEvent.pointerType,
+            pressure: pointerEvent.pressure,
+          },
+          {
+            brushId: drawing.brush,
+            pressureCurve: settings?.pressureCurve ?? pressureCurve,
+            pressureMinSize: settings?.pressureMinSize ?? pressureMinSize,
+            useVelocityPressure: settings?.useVelocityPressure ?? useVelocityPressure,
+            velocitySensitivity: settings?.velocitySensitivity ?? velocitySensitivity,
+            fallbackPressure: studioInkFallbackPressure(drawing.pressureModel),
+          }
+        ).pressure;
         const rawTransition = replaceStudioRawPenInkPreview(rawState, {
           pointerId: pointerEvent.pointerId,
           generation: rawState.generation,
@@ -27983,12 +28004,13 @@ const puppetWarpArmed =
         // while width retains the last real contact pressure.
         consumeFreehandPointerBatch(stage, pointerEvent, false, {
           dispatchedPressureOverride: pointerEvent.pointerType === "pen"
-            ? resolveBrushReleasePressureSample({
+            ? resolveStudioBrushReleasePressure({
+                brushId: drawingRef.current.brush,
                 pointerType: "pen",
                 rawPressure: pointerEvent.pressure,
                 lastContactPressure: releaseLastContactPressure,
                 pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-                minSizeRatio: inputSettings?.pressureMinSize ?? pressureMinSize,
+                pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
                 fallbackPressure: releaseLastContactPressure,
               })
             : undefined,

@@ -375,6 +375,7 @@ describe("sanitizeBrushSnapshot", () => {
       maxSpeed: validSnapshot.brushDynamics.maxSpeed,
       fallbackPressure: validSnapshot.brushDynamics.fallbackPressure,
       seed: validSnapshot.brushDynamics.seed,
+      depositPipeline: validSnapshot.brushDynamics.depositPipeline,
       version: validSnapshot.brushDynamics.version,
     };
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, brushDynamics: reordered });

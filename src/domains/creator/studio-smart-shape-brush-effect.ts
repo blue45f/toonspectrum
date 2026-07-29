@@ -163,6 +163,8 @@ export function stripStudioSmartShapeBrushEffect(stroke: DrawEl): DrawEl {
     brushCatalogName: undefined,
     pressures: undefined,
     pressureModel: undefined,
+    materialPressureModel: undefined,
+    materialMinimumDiameterRatio: undefined,
     sampleSpacing: undefined,
     tiltXs: undefined,
     tiltYs: undefined,
@@ -247,6 +249,8 @@ export function applyStudioSmartShapeBrushEffect(
     brushCatalogName: sourceStroke.brushCatalogName,
     pressures: resampleChannel(sourceStroke.pressures, sampleCount, 0.5),
     pressureModel: sourceStroke.pressureModel,
+    materialPressureModel: sourceStroke.materialPressureModel,
+    materialMinimumDiameterRatio: sourceStroke.materialMinimumDiameterRatio,
     sampleSpacing: sourceStroke.sampleSpacing,
     tiltXs: calligraphy || dynamic
       ? resampleChannel(sourceStroke.tiltXs, sampleCount, 0)

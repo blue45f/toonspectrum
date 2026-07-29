@@ -2,9 +2,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   normalizeStudioBrushDynamicsSettings,
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
+import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+import {
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
+  STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+  STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
+} from "./studio-brush-render-budget";
+import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
@@ -34,6 +45,8 @@ interface RecordingCanvas extends HTMLCanvasElement {
   readonly recordedComposites: RecordedComposite[];
   readonly clearCount: () => number;
   readonly radialGradientCount: () => number;
+  textureStamp: boolean;
+  textureColor: string;
 }
 
 function rounded(value: number): number {
@@ -48,11 +61,21 @@ function recordingCanvas(): RecordingCanvas {
   let alpha = 1;
   let color = "#000000";
   let composite: GlobalCompositeOperation = "source-over";
+  let translatedX = 0;
+  let translatedY = 0;
+  let rotation = 0;
+  let scaleX = 1;
+  let scaleY = 1;
   let path: Omit<RecordedEllipse, "alpha" | "color"> | null = null;
   const stack: Array<{
     readonly alpha: number;
     readonly color: string;
     readonly composite: GlobalCompositeOperation;
+    readonly translatedX: number;
+    readonly translatedY: number;
+    readonly rotation: number;
+    readonly scaleX: number;
+    readonly scaleY: number;
   }> = [];
 
   const canvas = {
@@ -63,12 +86,23 @@ function recordingCanvas(): RecordingCanvas {
     recordedComposites,
     clearCount: () => clears,
     radialGradientCount: () => radialGradients,
+    textureStamp: false,
+    textureColor: "#000000",
     getContext: () => context,
   } as unknown as RecordingCanvas;
 
   const context = {
     save: () => {
-      stack.push({ alpha, color, composite });
+      stack.push({
+        alpha,
+        color,
+        composite,
+        translatedX,
+        translatedY,
+        rotation,
+        scaleX,
+        scaleY,
+      });
     },
     restore: () => {
       const state = stack.pop();
@@ -76,8 +110,19 @@ function recordingCanvas(): RecordingCanvas {
       alpha = state.alpha;
       color = state.color;
       composite = state.composite;
+      translatedX = state.translatedX;
+      translatedY = state.translatedY;
+      rotation = state.rotation;
+      scaleX = state.scaleX;
+      scaleY = state.scaleY;
     },
-    setTransform: () => undefined,
+    setTransform: () => {
+      translatedX = 0;
+      translatedY = 0;
+      rotation = 0;
+      scaleX = 1;
+      scaleY = 1;
+    },
     clearRect: () => {
       clears += 1;
       recordedMarks.length = 0;
@@ -120,9 +165,17 @@ function recordingCanvas(): RecordingCanvas {
         angleRadians: rounded(angleRadians),
       };
     },
-    translate: () => undefined,
-    rotate: () => undefined,
-    scale: () => undefined,
+    translate: (x: number, y: number) => {
+      translatedX += x;
+      translatedY += y;
+    },
+    rotate: (angle: number) => {
+      rotation += angle;
+    },
+    scale: (x: number, y: number) => {
+      scaleX *= x;
+      scaleY *= y;
+    },
     fill: () => {
       if (!path) return;
       recordedMarks.push({
@@ -131,8 +184,51 @@ function recordingCanvas(): RecordingCanvas {
         color,
       });
     },
-    drawImage: (source: CanvasImageSource) => {
+    createImageData: (width: number, height: number) => ({
+      width,
+      height,
+      colorSpace: "srgb",
+      data: new Uint8ClampedArray(width * height * 4),
+    } as ImageData),
+    putImageData: (imageData: ImageData) => {
+      canvas.textureStamp = true;
+      const [red = 0, green = 0, blue = 0] = imageData.data;
+      canvas.textureColor = `#${[red, green, blue]
+        .map((channel) => channel.toString(16).padStart(2, "0"))
+        .join("")}`;
+    },
+    fillRect: () => {
+      if (composite === "source-in") {
+        canvas.textureStamp = true;
+        canvas.textureColor = color;
+      }
+    },
+    drawImage: (
+      source: CanvasImageSource,
+      ...args: readonly number[]
+    ) => {
       const sourceCanvas = source as RecordingCanvas;
+      if (composite === "copy" && sourceCanvas.textureStamp) {
+        canvas.textureStamp = true;
+        canvas.textureColor = sourceCanvas.textureColor;
+        return;
+      }
+      if (sourceCanvas.textureStamp && args.length === 8) {
+        const destinationX = args[4] ?? 0;
+        const destinationY = args[5] ?? 0;
+        const destinationWidth = args[6] ?? 0;
+        const destinationHeight = args[7] ?? 0;
+        recordedMarks.push({
+          x: rounded(translatedX + (destinationX + destinationWidth / 2) * scaleX),
+          y: rounded(translatedY + (destinationY + destinationHeight / 2) * scaleY),
+          radiusX: rounded(Math.abs(destinationWidth * scaleX) / 2),
+          radiusY: rounded(Math.abs(destinationHeight * scaleY) / 2),
+          angleRadians: rounded(rotation),
+          alpha: rounded(alpha),
+          color: sourceCanvas.textureColor,
+        });
+        return;
+      }
       recordedComposites.push({
         opacity: rounded(alpha),
         marks: sourceCanvas.recordedMarks.map((mark) => ({ ...mark })),
@@ -172,8 +268,10 @@ const SURFACE: StudioLiveInkSurface = {
 };
 
 function complexDynamics() {
+  const legacyDryMedia = studioBrushDynamicsPresetSettings("dry-media");
+  delete legacyDryMedia.depositPipeline;
   return normalizeStudioBrushDynamicsSettings({
-    ...studioBrushDynamicsPresetSettings("dry-media"),
+    ...legacyDryMedia,
     seed: 821,
     tip: { shape: "grain", softness: 0.28 },
     grain: {
@@ -230,6 +328,14 @@ function drawElement(
 }
 
 function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
+  vi.stubGlobal("OffscreenCanvas", class {
+    constructor(width: number, height: number) {
+      const canvas = recordingCanvas();
+      canvas.width = width;
+      canvas.height = height;
+      return canvas;
+    }
+  });
   const activeCanvas = recordingCanvas();
   const settledCanvas = recordingCanvas();
   const renderer = new StudioLiveDynamicBrushOverlayRenderer();
@@ -238,11 +344,87 @@ function attachedRenderer(surface: StudioLiveInkSurface = SURFACE) {
   return { activeCanvas, renderer, settledCanvas };
 }
 
+function maximumLongitudinalCoverageGap(
+  marks: readonly RecordedEllipse[],
+  startX: number,
+  endX: number,
+): number {
+  const intervals = marks
+    .map((mark) => {
+      const cosine = Math.cos(mark.angleRadians);
+      const sine = Math.sin(mark.angleRadians);
+      const halfWidth = Math.hypot(
+        mark.radiusX * cosine,
+        mark.radiusY * sine,
+      );
+      return {
+        start: Math.max(startX, mark.x - halfWidth),
+        end: Math.min(endX, mark.x + halfWidth),
+      };
+    })
+    .filter(({ start, end }) => end >= startX && start <= endX)
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  let maximum = 0;
+  let coveredUntil = startX;
+  for (const interval of intervals) {
+    maximum = Math.max(maximum, interval.start - coveredUntil);
+    coveredUntil = Math.max(coveredUntil, interval.end);
+  }
+  return Math.max(maximum, endX - coveredUntil);
+}
+
 afterEach(() => {
+  clearStudioBrushTextureStampCache();
   vi.unstubAllGlobals();
 });
 
 describe("StudioLiveDynamicBrushOverlayRenderer", () => {
+  it("keeps legacy texture grids adaptive while causal-v2 starts and seals on grid3", () => {
+    const authoredDynamics = studioBrushDynamicsSettingsForBrushId("charcoal");
+    if (!authoredDynamics) throw new Error("missing charcoal dynamics");
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...authoredDynamics,
+      depositPipeline: undefined,
+    });
+    const pointerDown = planStudioDynamicBrushRenderBudget({
+      settings: dynamics,
+      dabCount: 1,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    });
+    const longStroke = planStudioDynamicBrushRenderBudget({
+      settings: dynamics,
+      dabCount: 900,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    });
+
+    expect(pointerDown.stampGrid).toBe(STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS[0]);
+    expect(pointerDown.estimatedMarks).toBeLessThanOrEqual(
+      STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    );
+    expect(longStroke.estimatedUnbudgetedMarks).toBeGreaterThan(
+      STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    );
+    expect(longStroke.stampGrid).toBeLessThan(pointerDown.stampGrid);
+    expect(longStroke.capped).toBe(true);
+
+    const causalPointerDown = planStudioDynamicBrushRenderBudget({
+      settings: authoredDynamics,
+      dabCount: 1,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    });
+    const causalLongStroke = planStudioDynamicBrushRenderBudget({
+      settings: authoredDynamics,
+      dabCount: 900,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+    });
+    expect(causalPointerDown.stampGrid).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+    expect(causalLongStroke.stampGrid).toBe(STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID);
+  });
+
   it.each(["pencil-4b-rough", "g-pen-flex"] as const)(
     "keeps causal %s marks identical through live drawing, pointer-up and retained replay",
     (catalogId) => {
@@ -285,7 +467,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
   );
 
   it("keeps a long causal G-pen on the append-only surface beyond the old 1,024-dab ceiling", () => {
-    const { activeCanvas, renderer } = attachedRenderer();
+    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
     const selection = materializeStudioBrushPackSelection("g-pen-flex");
     if (!selection) throw new Error("missing g-pen-flex selection");
     const points = Array.from({ length: 1_300 }, (_, index) => [
@@ -304,7 +486,200 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(appended.status === "fallback" ? appended.reason : appended.status)
       .toBe("appended");
     expect(activeCanvas.recordedMarks.length).toBeGreaterThan(1_024);
+    const acceptedLiveMarks = structuredClone(activeCanvas.recordedMarks);
+    const sealed = renderer.end(element);
+    expect(sealed).toMatchObject({
+      status: "settled",
+      markCount: acceptedLiveMarks.length,
+    });
+    expect(settledCanvas.recordedComposites).toEqual([{
+      opacity: element.opacity,
+      marks: acceptedLiveMarks,
+    }]);
     expect(renderer.lastFallbackReason).toBeNull();
+  });
+
+  it("keeps the global 64-way three-tip accepted prefix authoritative across zero-alpha batches", () => {
+    const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+    const tip = { shape: "round" as const, softness: 0 };
+    const brushDynamics = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      width: { base: 8, mappings: [] },
+      opacity: {
+        base: 1,
+        mappings: [{ source: "pressure", from: 0, to: 1 }],
+      },
+      flow: { base: 1, mappings: [] },
+      spacingRatio: null,
+      spacing: { base: 0.25, mappings: [] },
+      scatterRatio: null,
+      scatter: { base: 0, mappings: [] },
+      roundness: { base: 1, mappings: [] },
+      tip,
+      tipLayers: [
+        { tip, opacity: 1 },
+        { tip, opacity: 0.5 },
+      ],
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const pointPairs = Array.from({ length: 360 }, (_, index) => [
+      20 + index * 0.25,
+      80,
+    ]);
+    const pressures = pointPairs.map((_, index) => (
+      index === 0 || index >= 350 ? 1 : 0
+    ));
+    const elementAt = (count: number) => drawElement(
+      "causal-zero-alpha-prefix",
+      pointPairs.slice(0, count).flat(),
+      {
+        brush: "ink-particle",
+        brushDynamics,
+        strokeWidth: 8,
+        opacity: 0.42,
+        pressures: pressures.slice(0, count),
+        symmetry: {
+          type: "kaleidoscope",
+          centerX: 60,
+          centerY: 80,
+          // 32 radial sectors × mirrored family = 64 affine copies.
+          radialCount: 32,
+        },
+      },
+    );
+
+    const firstBatch = elementAt(200);
+    const begun = renderer.begin(firstBatch);
+    expect(begun.status === "fallback" ? begun.reason : begun.status).toBe("started");
+    if (begun.status === "fallback") return;
+    expect(begun.markCount).toBe(64 * 3);
+    expect(activeCanvas.recordedMarks).toHaveLength(64 * 3);
+    expect(renderer.appendFrom(firstBatch).status).toBe("appended");
+    const visiblePrefix = structuredClone(activeCanvas.recordedMarks);
+    expect(visiblePrefix).toHaveLength(64 * 3);
+
+    const complete = elementAt(360);
+    const appended = renderer.appendFrom(complete);
+    expect(appended.status).toBe("appended");
+    if (appended.status === "fallback") return;
+    expect(appended.acceptedPrefixReceipt).toMatchObject({
+      policy: "accepted-prefix-v1",
+      acceptedDabsPerVariation: Math.floor(
+        STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET / (64 * 3),
+      ),
+      marksPerDab: 3,
+      symmetryCount: 64,
+    });
+    // Zero-alpha dabs still own causal prefix slots. The late visible suffix cannot borrow their
+    // unused mark storage and then disappear when pointer-up replay applies the global ceiling.
+    expect(activeCanvas.recordedMarks).toEqual(visiblePrefix);
+    expect(renderer.lastFallbackReason).toBeNull();
+
+    const sealed = renderer.end(complete);
+    expect(sealed.status).toBe("settled");
+    if (sealed.status !== "settled") return;
+    expect(sealed.acceptedPrefixReceipt).toEqual(
+      appended.acceptedPrefixReceipt,
+    );
+    expect(sealed.markCount).toBe(visiblePrefix.length);
+    expect(settledCanvas.recordedComposites).toEqual([{
+      opacity: complete.opacity,
+      marks: visiblePrefix,
+    }]);
+
+    renderer.setSurface({ ...SURFACE, left: 2 });
+    expect(settledCanvas.recordedComposites).toEqual([{
+      opacity: complete.opacity,
+      marks: visiblePrefix,
+    }]);
+  });
+
+  it("streams every authored brush pack from only the prior sample plus unseen suffix", () => {
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(160);
+    let dryMediaCount = 0;
+    const prefixPointCount = 24;
+    const completePointCount = 48;
+    const completePoints = Array.from(
+      { length: completePointCount },
+      (_, index) => [8 + index * 4, 20 + Math.sin(index / 4) * 3],
+    ).flat();
+    const prefixPoints = completePoints.slice(0, prefixPointCount * 2);
+    const firstReadableCoordinate = (prefixPointCount - 1) * 2;
+    const expectedReads = Array.from(
+      {
+        length:
+          2 + (completePointCount - prefixPointCount) * 2,
+      },
+      (_, index) => firstReadableCoordinate + index,
+    );
+
+    for (const descriptor of STUDIO_BRUSH_PACK_DESCRIPTORS) {
+      if (descriptor.runtimeBrushId === "dry-media") dryMediaCount += 1;
+      const selection = materializeStudioBrushPackSelection(descriptor.catalogId);
+      if (!selection) throw new Error(`missing ${descriptor.catalogId} selection`);
+      expect(
+        selection.brushDynamics.depositPipeline,
+        `${descriptor.catalogId}: authored pipeline`,
+      ).toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2);
+
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const id = `stream-${descriptor.catalogId}`;
+      const prefix = drawElement(id, prefixPoints, {
+        brush: selection.runtimeBrushId,
+        brushDynamics: selection.brushDynamics,
+        strokeWidth: selection.defaultWidth,
+        opacity: selection.defaultOpacity,
+      });
+      expect(renderer.begin(prefix).status, `${descriptor.catalogId}: begin`)
+        .toBe("started");
+      const prefixResult = renderer.appendFrom(prefix);
+      expect(prefixResult.status, `${descriptor.catalogId}: prefix`)
+        .not.toBe("fallback");
+      const clearsAfterPrefix = activeCanvas.clearCount();
+      const numericReads: number[] = [];
+      const points = new Proxy(
+        completePoints,
+        {
+          get(target, property, receiver) {
+            if (typeof property === "string" && /^\d+$/.test(property)) {
+              numericReads.push(Number(property));
+            }
+            return Reflect.get(target, property, receiver);
+          },
+        },
+      );
+      const extended = drawElement(id, points, {
+        brush: selection.runtimeBrushId,
+        brushDynamics: selection.brushDynamics,
+        strokeWidth: selection.defaultWidth,
+        opacity: selection.defaultOpacity,
+        points,
+      });
+      numericReads.length = 0;
+
+      const result = renderer.appendFrom(extended);
+      expect(result.status, `${descriptor.catalogId}: suffix`)
+        .not.toBe("fallback");
+      expect(
+        activeCanvas.clearCount(),
+        `${descriptor.catalogId}: append-only surface`,
+      ).toBe(clearsAfterPrefix);
+      expect(
+        numericReads,
+        `${descriptor.catalogId}: O(suffix) point reads`,
+      ).toEqual(expectedReads);
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      const sealed = renderer.end(extended);
+      expect(sealed.status, `${descriptor.catalogId}: pointer-up`)
+        .toBe("settled");
+      expect(
+        settledCanvas.recordedComposites[0]?.marks,
+        `${descriptor.catalogId}: live/retained parity`,
+      ).toEqual(liveMarks);
+    }
+
+    expect(dryMediaCount).toBe(61);
   });
 
   it("uses the same one-mark analytic soft tip during live drawing, seal and replay", () => {
@@ -323,7 +698,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     const begun = renderer.begin(element);
     expect(begun.status === "fallback" ? begun.reason : begun.status).toBe("started");
     expect(renderer.appendFrom(element).status).toBe("appended");
-    expect(activeCanvas.radialGradientCount()).toBeGreaterThan(0);
+    expect(activeCanvas.radialGradientCount()).toBe(0);
+    expect(activeCanvas.recordedMarks.length).toBeGreaterThan(0);
     const sealed = renderer.end(element);
     expect(sealed.status).toBe("settled");
     if (sealed.status !== "settled") return;
@@ -333,11 +709,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       sealed.markCount,
     );
 
-    const gradientCountBeforeReplay = activeCanvas.radialGradientCount();
     renderer.setSurface({ ...SURFACE, left: 2 });
-    expect(activeCanvas.radialGradientCount()).toBeGreaterThan(
-      gradientCountBeforeReplay,
-    );
+    expect(activeCanvas.radialGradientCount()).toBe(0);
     expect(settledCanvas.recordedComposites[0]!.marks).toHaveLength(
       sealed.markCount,
     );
@@ -356,7 +729,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     })).toBe(false);
   });
 
-  it("reads only the unseen source suffix and never clears a stable live prefix", () => {
+  it("reads only the unseen source suffix while canonical legacy replay never rereads it", () => {
     const { activeCanvas, renderer } = attachedRenderer();
     const dynamics = complexDynamics();
     const prefix = drawElement("suffix", [10, 20, 22, 21, 38, 25], { brushDynamics: dynamics });
@@ -382,11 +755,239 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     numericReads.length = 0;
 
     expect(renderer.appendFrom(extended).status).toBe("appended");
-    expect(activeCanvas.clearCount()).toBe(clearsAfterPrefix);
+    // Non-causal snapshots must clear exactly once to replay taper/stations/stamp density from the
+    // same canonical plan pointer-up uses. Causal-v2 brushes retain the append-only fast path.
+    expect(activeCanvas.clearCount()).toBe(clearsAfterPrefix + 1);
     expect(Math.min(...numericReads)).toBe(4);
     numericReads.length = 0;
+    const clearsAfterExtension = activeCanvas.clearCount();
     expect(renderer.appendFrom(extended).status).toBe("noop");
     expect(numericReads).toEqual([]);
+    expect(activeCanvas.clearCount()).toBe(clearsAfterExtension);
+  });
+
+  it.each(["dry-media", "crayon", "chalk", "charcoal"] as const)(
+    "keeps fast long %s live texture marks byte-identical to pointer-up",
+    (brushId) => {
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const brushDynamics = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!brushDynamics) throw new Error(`missing ${brushId} dynamics`);
+      const pointPairs = Array.from({ length: 180 }, (_, index) => [
+        8 + index * 9,
+        72 + Math.sin(index / 7) * 5,
+      ]);
+      const points = pointPairs.flat();
+      const element = drawElement(`fast-long-${brushId}`, points, {
+        brush: brushId,
+        brushDynamics,
+        strokeWidth: brushDynamics.width.base,
+        pressures: Array.from({ length: pointPairs.length }, () => 0.72),
+        speeds: Array.from({ length: pointPairs.length }, () => 12),
+        tiltXs: Array.from({ length: pointPairs.length }, () => 18),
+        tiltYs: Array.from({ length: pointPairs.length }, () => -9),
+      });
+
+      expect(renderer.begin(element).status).toBe("started");
+      const appended = renderer.appendFrom(element);
+      expect(appended.status === "fallback" ? appended.reason : appended.status)
+        .toBe("appended");
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      expect(liveMarks.length).toBeGreaterThan(100);
+      // Start/end taper intentionally thins the terminal footprint. Audit the stable body where a
+      // fast delivery must not expose a pointer-sample-sized hole.
+      const startX = pointPairs[0]![0] + brushDynamics.width.base * 2;
+      const endX = pointPairs.at(-1)![0] - brushDynamics.width.base * 2;
+      const maximumGap = maximumLongitudinalCoverageGap(liveMarks, startX, endX);
+      // The previous independent live walker exposed sparse round alpha-map particles between
+      // widely delivered pointer samples. Canonical arc-length stations keep every tested dry
+      // medium's projected longitudinal coverage has no hole wider than 1.1 selected tips. The
+      // small allowance preserves intentional chalk tooth while rejecting pointer-sample gaps.
+      expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
+
+      const liveRoundMarks = liveMarks.filter((mark) =>
+        Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+      ).length;
+      const sealed = renderer.end(element);
+      expect(sealed.status).toBe("settled");
+      if (sealed.status !== "settled") return;
+      const retainedMarks = settledCanvas.recordedComposites[0]!.marks;
+      const retainedRoundMarks = retainedMarks.filter((mark) =>
+        Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+      ).length;
+      expect(retainedMarks).toEqual(liveMarks);
+      expect(retainedRoundMarks).toBe(liveRoundMarks);
+      expect(sealed.markCount).toBe(liveMarks.length);
+    },
+  );
+
+  it("matches the canonical pointer-up plan at every accepted charcoal prefix", () => {
+    const brushDynamics = studioBrushDynamicsSettingsForBrushId("charcoal");
+    if (!brushDynamics) throw new Error("missing charcoal dynamics");
+    const pointPairs = Array.from({ length: 96 }, (_, index) => [
+      6 + index * 8,
+      80 + Math.sin(index / 5) * 8,
+    ]);
+    const live = attachedRenderer();
+    const elementAt = (count: number) => {
+      const points = pointPairs.slice(0, count).flat();
+      return drawElement("charcoal-prefix", points, {
+        brush: "charcoal",
+        brushDynamics,
+        strokeWidth: brushDynamics.width.base,
+        pressures: Array.from({ length: count }, () => 0.68),
+        speeds: Array.from({ length: count }, () => 9),
+        tiltXs: Array.from({ length: count }, () => 12),
+        tiltYs: Array.from({ length: count }, () => -6),
+      });
+    };
+    expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+
+    for (const count of [12, 37, 68, 96]) {
+      const prefix = elementAt(count);
+      expect(live.renderer.appendFrom(prefix).status).toBe("appended");
+      const liveMarks = structuredClone(live.activeCanvas.recordedMarks);
+      const reference = attachedRenderer();
+      expect(reference.renderer.begin(prefix).status).toBe("started");
+      const sealed = reference.renderer.end(prefix);
+      expect(sealed.status).toBe("settled");
+      expect(reference.settledCanvas.recordedComposites[0]!.marks)
+        .toEqual(liveMarks);
+    }
+  });
+
+  it.each([
+    ["crayon", "crayon-wax-bold"],
+    ["chalk", "chalk-rough"],
+    ["charcoal", "velvet-charcoal"],
+    ["pastel", "pastel-paper-soft"],
+    ["oil-pastel", "oil-dry-scumble"],
+  ] as const)(
+    "keeps long %s texture stable at every live prefix and after seal",
+    (_material, catalogId) => {
+      const selection = materializeStudioBrushPackSelection(catalogId);
+      if (!selection) throw new Error(`missing ${catalogId} selection`);
+      expect(selection.runtimeBrushId).toBe("dry-media");
+      expect(selection.brushDynamics.depositPipeline).toBe(
+        STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      );
+      const pointPairs = Array.from({ length: 72 }, (_, index) => [
+        6 + index * 7,
+        78 + Math.sin(index / 5) * 7,
+      ]);
+      const live = attachedRenderer();
+      const elementAt = (count: number) => {
+        const points = pointPairs.slice(0, count).flat();
+        return drawElement(`texture-prefix-${catalogId}`, points, {
+          brush: selection.runtimeBrushId,
+          brushDynamics: selection.brushDynamics,
+          strokeWidth: selection.defaultWidth,
+          opacity: selection.defaultOpacity,
+          pressures: Array.from({ length: count }, () => 0.72),
+          speeds: Array.from({ length: count }, () => 11),
+          tiltXs: Array.from({ length: count }, () => 16),
+          tiltYs: Array.from({ length: count }, () => -8),
+        });
+      };
+      expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+
+      for (const count of [24, 48, 72]) {
+        const prefix = elementAt(count);
+        const appended = live.renderer.appendFrom(prefix);
+        expect(
+          appended.status === "fallback" ? appended.reason : appended.status,
+          `${catalogId}: live prefix ${count}`,
+        ).toBe("appended");
+        const midContactMarks = structuredClone(live.activeCanvas.recordedMarks);
+        expect(midContactMarks.length).toBeGreaterThan(0);
+        expect(midContactMarks.length).toBeLessThanOrEqual(
+          STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+        );
+        const reference = attachedRenderer();
+        expect(reference.renderer.begin(prefix).status).toBe("started");
+        const sealedPrefix = reference.renderer.end(prefix);
+        expect(sealedPrefix.status).toBe("settled");
+        expect(
+          reference.settledCanvas.recordedComposites[0]?.marks,
+          `${catalogId}: mid-contact/pointer-up parity at ${count}`,
+        ).toEqual(midContactMarks);
+      }
+
+      const complete = elementAt(72);
+      const liveMarks = structuredClone(live.activeCanvas.recordedMarks);
+      const liveRoundMarks = liveMarks.filter((mark) =>
+        Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+      ).length;
+      const sealed = live.renderer.end(complete);
+      expect(sealed.status).toBe("settled");
+      if (sealed.status !== "settled") return;
+      const retainedMarks = live.settledCanvas.recordedComposites[0]!.marks;
+      expect(retainedMarks).toEqual(liveMarks);
+      expect(retainedMarks.filter((mark) =>
+        Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+      )).toHaveLength(liveRoundMarks);
+      expect(sealed.markCount).toBeLessThanOrEqual(
+        STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+      );
+    },
+  );
+
+  it("audits every professional dry-media pack for live/pointer-up mark parity", () => {
+    const dryMediaDescriptors = STUDIO_BRUSH_PACK_DESCRIPTORS.filter(
+      ({ runtimeBrushId }) => runtimeBrushId === "dry-media",
+    );
+    expect(dryMediaDescriptors.length).toBeGreaterThan(50);
+    const pointPairs = Array.from({ length: 48 }, (_, index) => [
+      5 + index * 7,
+      76 + Math.sin(index / 4) * 6,
+    ]);
+    const points = pointPairs.flat();
+
+    for (const descriptor of dryMediaDescriptors) {
+      const selection = materializeStudioBrushPackSelection(descriptor.catalogId);
+      if (!selection) throw new Error(`missing ${descriptor.catalogId} selection`);
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const element = drawElement(`pack-${descriptor.catalogId}`, points, {
+        brush: selection.runtimeBrushId,
+        brushDynamics: selection.brushDynamics,
+        strokeWidth: selection.defaultWidth,
+        opacity: selection.defaultOpacity,
+        pressures: Array.from({ length: pointPairs.length }, () => 0.7),
+        speeds: Array.from({ length: pointPairs.length }, () => 10),
+        tiltXs: Array.from({ length: pointPairs.length }, () => 14),
+        tiltYs: Array.from({ length: pointPairs.length }, () => -7),
+      });
+
+      expect(
+        renderer.begin(element).status,
+        `${descriptor.catalogId}: begin`,
+      ).toBe("started");
+      expect(
+        renderer.appendFrom(element).status,
+        `${descriptor.catalogId}: append`,
+      ).toBe("appended");
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      expect(
+        liveMarks.length,
+        `${descriptor.catalogId}: visible live coverage`,
+      ).toBeGreaterThan(0);
+      const roundMarks = liveMarks.filter((mark) =>
+        Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+      ).length;
+      const sealed = renderer.end(element);
+      expect(sealed.status, `${descriptor.catalogId}: pointer-up`).toBe("settled");
+      if (sealed.status !== "settled") continue;
+      const retainedMarks = settledCanvas.recordedComposites[0]!.marks;
+      expect(
+        retainedMarks,
+        `${descriptor.catalogId}: live/retained geometry and material`,
+      ).toEqual(liveMarks);
+      expect(
+        retainedMarks.filter((mark) =>
+          Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
+        ).length,
+        `${descriptor.catalogId}: transient round stamp particles`,
+      ).toBe(roundMarks);
+    }
   });
 
   it("accepts canonical-equivalent dynamics clones while rejecting material mutations", () => {

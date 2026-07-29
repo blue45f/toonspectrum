@@ -27,8 +27,8 @@ export const STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 = "layered-flow-v1" as co
  * Unlike v1's single-colour compound ink path, v2 is rendered into bounded stroke-local RGBA
  * tiles. Dynamic opacity/flow, tip alpha, grain, colour dynamics and every symmetry copy build the
  * tiles first; the persisted element opacity is applied exactly once when those tiles are
- * composited. A renderer that cannot satisfy the bounded-surface contract must use the frozen
- * legacy per-dab path instead of partially applying v2.
+ * composited. A renderer that cannot satisfy the bounded-surface contract must fail closed:
+ * replaying the frozen legacy per-dab path would apply opacity repeatedly and change v2 pixels.
  */
 export const STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 = "bounded-flow-v2" as const;
 

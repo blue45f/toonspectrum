@@ -172,9 +172,12 @@ const EXPANSION_TUNING: Readonly<
     flow: { base: 0.34 },
   },
   "cotton-fiber": {
-    // Sparse fibres remain visible through the alpha map; lower grain dropout and measured flow
-    // prevent the useful strands from disappearing on white paper.
-    flow: { base: 0.38 },
+    // Preserve the cotton-soft custom hair map while a closer, less scattered carrier cadence
+    // smooths its fibrous silhouette. The measured flow lifts useful strands above white-paper
+    // contrast without crossing the preset's deliberately gradual first-contact density.
+    spacingRatio: 0.26,
+    scatterRatio: 0.28,
+    flow: { base: 0.49 },
     grain: { space: "canvas-fixed", amount: 0.28, scale: 8.25, contrast: 0.38, seed: 0xebc6_79ee },
   },
   "watercolor-flat-wash": {
@@ -390,13 +393,13 @@ const EXPANSION_TUNING: Readonly<
   },
   "airbrush-grand-soft": {
     // Grand airbrush: size stays stable; pressure only meters the paint.
-    tipSoftness: 0.82,
+    tipSoftness: 0.52,
     // The compact catalogue formula produced a 39.55%-of-diameter cadence, exposing individual
     // 64px nozzles as beads. An analytic soft falloff still needs dense stations to behave like a
     // continuous spray envelope; flow is reduced so that density builds tone instead of instantly
     // clipping to an opaque ribbon.
-    spacingRatio: 0.11,
-    flow: { base: 0.34, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.85 }] },
+    spacingRatio: 0.09,
+    flow: { base: 0.37, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.85 }] },
     width: { mappings: [{ source: "pressure", from: 0.85, to: 1.15 }], jitter: null },
     taper: { enabled: false },
     scatterRatio: 0.025,
@@ -497,17 +500,25 @@ const EXPANSION_TUNING: Readonly<
     flow: { base: 1, mappings: [] },
   },
   "rain-streak-diagonal": {
-    // Rain: streaks keep one fixed diagonal; stroke speed stretches and spreads them.
+    // Rain: streaks keep one fixed diagonal; stroke speed stretches and spreads them. Pressure is
+    // deliberately a weak pigment/deposit control rather than another width input, so a stylus can
+    // bring the rain forward without destroying the authored velocity-shaped silhouette.
     maxSpeed: 1.1,
     width: {
       mappings: [{ source: "speed", from: 0.7, to: 1.5 }],
       jitter: { mode: "multiply", amount: 0.2 },
     },
     angle: { jitter: { mode: "add", amount: 4 } },
-    opacity: { jitter: { mode: "multiply", amount: 0.3 } },
+    opacity: {
+      mappings: [{ source: "pressure", from: 0.86, to: 1, curve: 0.9 }],
+      jitter: { mode: "multiply", amount: 0.3 },
+    },
     scatter: { jitter: { mode: "add", amount: 0.5 } },
     spacing: { mappings: [{ source: "speed", from: 0.7, to: 1.7 }] },
-    flow: { base: 0.85 },
+    flow: {
+      base: 0.85,
+      mappings: [{ source: "pressure", from: 0.82, to: 1, curve: 0.88 }],
+    },
   },
   "sparkle-glint-cross": {
     // Glints: isolated cross-flare stamps with strong size variance, mostly upright.
@@ -715,7 +726,9 @@ const EXPANSION_TUNING: Readonly<
       mappings: [{ source: "pressure", from: 0.66, to: 1.55, curve: 0.9 }],
       jitter: { mode: "multiply", amount: 0.22 },
     },
-    flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
+    // Preserve the translucent backrun while keeping its first contact above the planner's
+    // 12-channel white-paper visibility floor (0.32 landed at 11.9292 after texture sampling).
+    flow: { base: 0.322, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
     opacity: { jitter: { mode: "multiply", amount: 0.16 } },
     angle: { jitter: { mode: "add", amount: 140 } },
     grain: { space: "canvas-fixed", amount: 0.24, scale: 14, contrast: 0.5, seed: 0x4b0a_2107 },
@@ -1013,11 +1026,17 @@ const EXPANSION_TUNING: Readonly<
       mappings: [{ source: "speed", from: 0.62, to: 1.58 }],
       jitter: { mode: "multiply", amount: 0.22 },
     },
-    opacity: { jitter: { mode: "multiply", amount: 0.28 } },
+    opacity: {
+      mappings: [{ source: "pressure", from: 0.84, to: 1, curve: 0.9 }],
+      jitter: { mode: "multiply", amount: 0.28 },
+    },
     spacing: { mappings: [{ source: "speed", from: 0.72, to: 1.62 }] },
     scatter: { mappings: [{ source: "speed", from: 0.64, to: 1.56 }], jitter: { mode: "add", amount: 0.42 } },
     angle: { base: -68, mappings: [], jitter: { mode: "add", amount: 5 } },
-    flow: { base: 0.54 },
+    flow: {
+      base: 0.54,
+      mappings: [{ source: "pressure", from: 0.8, to: 1, curve: 0.88 }],
+    },
     dualBrush: {
       enabled: true,
       tip: { shape: "soft", softness: 0.9 },

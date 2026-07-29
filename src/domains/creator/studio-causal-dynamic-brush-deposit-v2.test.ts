@@ -6,11 +6,16 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
 } from "./studio-brush-dynamics";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
-import { countStudioDynamicBrushMarksPerDab } from "./studio-brush-render-budget";
+import {
+  countStudioDynamicBrushMarksPerDab,
+  planStudioDynamicBrushRenderBudget,
+  STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+} from "./studio-brush-render-budget";
 import {
   appendStudioCausalDynamicBrushDepositsV2,
   beginStudioCausalDynamicBrushDepositV2,
   planStudioCausalDynamicBrushDepositsV2,
+  STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
   type StudioCausalDynamicBrushSampleV2,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 
@@ -104,6 +109,77 @@ describe("causal dynamic-brush deposit v2", () => {
     expect(countStudioDynamicBrushMarksPerDab(gPen.brushDynamics, 7)).toBe(1);
   });
 
+  it("applies the snapshotted minimum to causal geometry without flooring pigment", () => {
+    const settings = {
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+      taper: { enabled: false },
+      width: {
+        base: 20,
+        mappings: [{ source: "pressure" as const, from: 0.05, to: 1 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.8,
+        mappings: [{ source: "pressure" as const, from: 0.2, to: 1 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.6,
+        mappings: [{ source: "pressure" as const, from: 0.3, to: 1 }],
+        jitter: null,
+      },
+    };
+    const plan = (minimumDiameterRatio: number) =>
+      planStudioCausalDynamicBrushDepositsV2({
+        points: [5, 5],
+        pressures: [0],
+        settings: normalizeStudioBrushDynamicsSettings({
+          ...settings,
+          minimumDiameterRatio,
+        }),
+      });
+    const unbounded = plan(0);
+    const fullDiameterFloor = plan(1);
+
+    expect(unbounded.ok).toBe(true);
+    expect(fullDiameterFloor.ok).toBe(true);
+    if (!unbounded.ok || !fullDiameterFloor.ok) return;
+    expect(unbounded.dabs[0]!.size).toBeCloseTo(1, 10);
+    expect(fullDiameterFloor.dabs[0]!.size).toBe(20);
+    expect(fullDiameterFloor.dabs[0]!.opacity).toBe(
+      unbounded.dabs[0]!.opacity,
+    );
+    expect(fullDiameterFloor.dabs[0]!.flow).toBe(
+      unbounded.dabs[0]!.flow,
+    );
+  });
+
+  it("retains a 2,000px technical needle stroke beyond the old 4,096-dab ceiling", () => {
+    const selected = materializeStudioBrushPackSelection("technical-needle-ink");
+    if (!selected) throw new Error("missing technical-needle-ink");
+    const plan = planStudioCausalDynamicBrushDepositsV2({
+      points: [0, 0, 2_000, 0],
+      pressures: [0.8, 0.8],
+      settings: selected.brushDynamics,
+      maximumDabs: STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    });
+
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    expect(plan.dabs.length).toBeGreaterThan(4_096);
+    expect(plan.dabs.length).toBeLessThanOrEqual(
+      STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
+    );
+    const renderBudget = planStudioDynamicBrushRenderBudget({
+      settings: selected.brushDynamics,
+      dabCount: plan.dabs.length,
+      symmetryCount: 1,
+      markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET,
+    });
+    expect(renderBudget.maxDabsPerVariation).toBe(plan.dabs.length);
+    expect(renderBudget.dabCapped).toBe(false);
+  });
+
   it.each(MEDIA_IDS)(
     "produces the identical %s deposit sequence incrementally and from retained full replay",
     (id) => {
@@ -193,7 +269,7 @@ describe("causal dynamic-brush deposit v2", () => {
     },
   );
 
-  it("keeps a tap visible and fails closed on invalid samples and the explicit dab budget", () => {
+  it("keeps a tap visible, rejects invalid samples and freezes an explicit dab-budget prefix", () => {
     const input = planInput("pencil-4b-rough");
     const tap = planStudioCausalDynamicBrushDepositsV2({
       ...input,
@@ -209,9 +285,15 @@ describe("causal dynamic-brush deposit v2", () => {
       ...input,
       points: [0, 0, Number.NaN, 1],
     })).toEqual({ ok: false, reason: "invalid-input" });
-    expect(planStudioCausalDynamicBrushDepositsV2({
+    const capped = planStudioCausalDynamicBrushDepositsV2({
       ...input,
       maximumDabs: 1,
-    })).toEqual({ ok: false, reason: "dab-budget" });
+    });
+    expect(capped.ok).toBe(true);
+    if (!capped.ok) throw new Error(capped.reason);
+    expect(capped.dabs).toHaveLength(1);
+    expect(capped.dabs[0]!.index).toBe(0);
+    expect(capped.dabCapped).toBe(true);
+    expect(capped.sourcePointCount).toBe(input.points.length / 2);
   });
 });

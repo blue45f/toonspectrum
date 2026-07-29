@@ -8,9 +8,9 @@
 
 import {
   normalizeCalligraphyStylusInput,
-  resolveBrushReleasePressureSample,
 } from "./studio-brush";
 import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import { resolveStudioBrushReleasePressure } from "./studio-brush-velocity-pressure";
 import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
 
 import type { DrawEl } from "./studio-element-model";
@@ -69,13 +69,13 @@ export function planStudioPointerReleaseEndpoint(
   const fallbackPressure = studioInkFallbackPressure(stroke.pressureModel);
   const lastPressure = stroke.pressures?.at(-1) ?? fallbackPressure;
   const pressure = pointer.pointerType === "pen"
-    ? resolveBrushReleasePressureSample({
+    ? resolveStudioBrushReleasePressure({
+        brushId: stroke.brush,
         pointerType: "pen",
         rawPressure: pointer.pressure,
         lastContactPressure: lastPressure,
-        velocityFallbackEnabled: false,
         pressureCurve: input.pressureCurve,
-        minSizeRatio: input.pressureMinSize,
+        pressureMinSize: input.pressureMinSize,
         fallbackPressure: lastPressure,
       })
     : lastPressure;

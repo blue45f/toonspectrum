@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushColorDynamicsSettings,
   normalizeStudioBrushGrainSettings,
+  resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt,
   resolveNormalizedStudioBrushGrainAlphaMultiplier,
   resolveNormalizedStudioBrushGrainAlphaMultiplierAt,
   resolveStudioBrushDabColor,
@@ -144,6 +145,94 @@ describe("studio brush material dynamics", () => {
       undefined,
       Number.NaN,
       disabled
+    )).toBe(1);
+  });
+
+  it("integrates grain across a rotated carrier without whole-dab brightness pulses", () => {
+    const settings = normalizeStudioBrushGrainSettings({
+      space: "canvas-fixed",
+      amount: 0.72,
+      scale: 3.2,
+      contrast: 0.74,
+      seed: 0x4b0a_2102,
+    });
+    const centerOnly: number[] = [];
+    const footprint: number[] = [];
+    for (let index = 0; index < 160; index += 1) {
+      const x = 12 + index * 1.4;
+      const y = 31 + Math.sin(index / 11) * 4;
+      centerOnly.push(resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+        x,
+        y,
+        12,
+        31,
+        991,
+        settings,
+      ));
+      footprint.push(
+        resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+          x,
+          y,
+          13,
+          7,
+          Math.PI / 5,
+          12,
+          31,
+          991,
+          settings,
+        ),
+      );
+    }
+    const adjacentEnergy = (values: readonly number[]) => values
+      .slice(1)
+      .reduce((sum, value, index) => (
+        sum + Math.abs(value - values[index]!)
+      ), 0);
+    expect(adjacentEnergy(footprint)).toBeLessThan(
+      adjacentEnergy(centerOnly) * 0.72,
+    );
+    expect(Math.max(...footprint) - Math.min(...footprint)).toBeGreaterThan(0.04);
+    expect(footprint.every((value) => value >= 0 && value <= 1)).toBe(true);
+  });
+
+  it("preserves stroke-fixed footprint grain under translated replay", () => {
+    const settings = normalizeStudioBrushGrainSettings({
+      space: "stroke-fixed",
+      amount: 0.66,
+      scale: 5.4,
+      contrast: 0.58,
+      seed: 71,
+    });
+    const sample = (
+      x: number,
+      y: number,
+      originX: number,
+      originY: number,
+    ) => resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+      x,
+      y,
+      18,
+      6,
+      0.73,
+      originX,
+      originY,
+      1441,
+      settings,
+    );
+    expect(sample(32, 48, 10, 20)).toBeCloseTo(
+      sample(232, -52, 210, -80),
+      12,
+    );
+    expect(resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+      Number.NaN,
+      Number.NaN,
+      0,
+      0,
+      Number.NaN,
+      undefined,
+      undefined,
+      Number.NaN,
+      normalizeStudioBrushGrainSettings({ amount: 0 }),
     )).toBe(1);
   });
 });

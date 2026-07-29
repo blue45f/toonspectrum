@@ -43,6 +43,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
     expect(planner.imports).toEqual([
       "./studio-brush",
       "./studio-brush-dynamics",
+      "./studio-brush-velocity-pressure",
       "./studio-ink-pressure-model",
       "./studio-element-model",
     ]);
