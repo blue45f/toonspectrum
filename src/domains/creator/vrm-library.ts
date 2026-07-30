@@ -62,13 +62,50 @@ export type SampleVrm = {
   url: string;
 };
 
+export type BundledVrmRightsBlock = SampleVrm & {
+  status: "rights-blocked";
+  reasonCode: "redistribution-commercial-restriction";
+  notice: string;
+};
+
 type VrmThumbnailRecord = {
   id: string;
   thumbnail: string;
   updatedAt: number;
 };
 
-// 기본 번들 VRM 캐릭터. 모든 엔트리는 public/vrm/ 아래 실파일과 1:1 대응한다.
+/**
+ * 파일은 과거 번들 감사와 저장 문서 추적을 위해 남아 있지만 신규 카탈로그 제공과
+ * 런타임 로드는 차단한 모델. 원 라이선스를 임의로 재분류하지 않고 권리 제한
+ * 사실과 사유를 별도 레코드로 보존한다.
+ */
+export const BUNDLED_VRM_RIGHTS_BLOCKS: readonly BundledVrmRightsBlock[] = [
+  {
+    id: "meebit",
+    name: "미빗 (블록맨)",
+    url: "/vrm/meebit_09842.vrm",
+    status: "rights-blocked",
+    reasonCode: "redistribution-commercial-restriction",
+    notice:
+      "Meebits 보유자 이용조건은 일반 번들 재배포·상업 서비스 제공 권한으로 간주할 수 없어 카탈로그와 런타임 로드를 차단했습니다.",
+  },
+] as const;
+
+const BUNDLED_VRM_RIGHTS_BLOCK_BY_ID = new Map(
+  BUNDLED_VRM_RIGHTS_BLOCKS.map((record) => [record.id, record] as const),
+);
+
+export function bundledVrmRightsBlockById(
+  id: string,
+): BundledVrmRightsBlock | undefined {
+  return BUNDLED_VRM_RIGHTS_BLOCK_BY_ID.get(id);
+}
+
+export function isBundledVrmRightsBlocked(id: string): boolean {
+  return BUNDLED_VRM_RIGHTS_BLOCK_BY_ID.has(id);
+}
+
+// 신규 선택 가능한 기본 번들 VRM 캐릭터. 모든 엔트리는 public/vrm/ 아래 실파일과 1:1 대응한다.
 // A-C는 pixiv VRoidPreset 조건, old beta 샘플 4종은 pixiv CC0 조건을 따른다.
 // 모델별 출처 URL·라이선스 요약은 public/vrm/LICENSES.md 참고
 // (2026-06: madjin/vrm-samples VRoid 공식 샘플 + UniVRM Alicia Solid,
@@ -86,7 +123,6 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "rubin", name: "루빈", url: "/vrm/Victoria_Rubin.vrm" },
   { id: "orion", name: "오리온 (로봇)", url: "/vrm/Avatar_Orion.vrm" },
   { id: "cryptovoxel", name: "크립토 (복셀봇)", url: "/vrm/cryptovoxels.vrm" },
-  { id: "meebit", name: "미빗 (블록맨)", url: "/vrm/meebit_09842.vrm" },
   { id: "seedsan", name: "시드상 (마스코트)", url: "/vrm/Seed_san.vrm" },
   { id: "shino", name: "시노", url: "/vrm/Sendagaya_Shino.vrm" },
   { id: "fumi", name: "후미", url: "/vrm/Sakurada_Fumiriya.vrm" },
@@ -178,6 +214,15 @@ export const SAMPLE_VRM_LIBRARY_ENTRY: VrmLibraryEntry = SAMPLE_VRM_ENTRIES[0];
 
 export function sampleVrmUrl(id: string): string {
   return SAMPLE_VRMS.find((s) => s.id === id)?.url ?? SAMPLE_VRM_URL;
+}
+
+/**
+ * 카탈로그 선택에서 사용할 fail-closed URL 해석기.
+ * 권리 차단·미등록 ID를 기본 모델로 조용히 치환하지 않는다.
+ */
+export function selectableSampleVrmUrl(id: string): string | null {
+  if (isBundledVrmRightsBlocked(id)) return null;
+  return SAMPLE_VRMS.find((sample) => sample.id === id)?.url ?? null;
 }
 
 function isSampleVrmId(id: string) {

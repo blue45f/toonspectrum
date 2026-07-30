@@ -243,13 +243,13 @@ import {
 import {
   WARDROBE_SLOTS,
   WARDROBE_SLOT_LABELS,
-  WARDROBE_SETS,
+  SELECTABLE_WARDROBE_SETS,
   WARDROBE_FIT_MIN,
   WARDROBE_FIT_MAX,
   WARDROBE_HIDE_COSTUME_SLOTS,
-  wardrobeItemsBySlot,
+  selectableWardrobeItemsBySlot,
   wardrobeItemById,
-  wardrobeSetById,
+  selectableWardrobeSetById,
   applyWardrobeSet,
   createWardrobeEquip,
   buildGarmentParts,
@@ -315,7 +315,8 @@ import {
   listVrmLibraryEntries,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
-  sampleVrmUrl,
+  isBundledVrmRightsBlocked,
+  selectableSampleVrmUrl,
   saveUploadedVrm,
   saveVrmThumbnail,
   type VrmLibraryEntry,
@@ -6456,12 +6457,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   function loadModelFromLibraryEntry(entry: VrmLibraryEntry) {
-    rememberCharacterSelection(entry.id);
     if (entry.source === "sample") {
-      loadModelFromUrl(sampleVrmUrl(entry.id), entry.name, false, entry.id);
+      const sampleUrl = selectableSampleVrmUrl(entry.id);
+      if (!sampleUrl) {
+        const requestId = beginModelLoad(entry.id);
+        handleLoadFailure(
+          requestId,
+          new Error(
+            isBundledVrmRightsBlocked(entry.id)
+              ? "이 번들 VRM은 재배포·상업 이용 권리가 확인되지 않아 불러올 수 없습니다."
+              : "등록되지 않은 번들 VRM은 불러올 수 없습니다.",
+          ),
+        );
+        return;
+      }
+      rememberCharacterSelection(entry.id);
+      loadModelFromUrl(sampleUrl, entry.name, false, entry.id);
       return;
     }
 
+    rememberCharacterSelection(entry.id);
     const requestId = beginModelLoad(entry.id);
 
     void (async () => {
@@ -7315,7 +7330,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   function equipWardrobeSetById(setId: string) {
-    const set = wardrobeSetById(setId);
+    const set = selectableWardrobeSetById(setId);
     if (!set) return;
     const nextState = applyWardrobeSet(set);
     setWardrobeState(nextState);
@@ -9022,18 +9037,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
               >
                 <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Shirt size={14} className="text-accent" aria-hidden />
-                  3D 의상 실장착
-                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.68rem] font-bold text-accent">NEW</span>
+                  절차형 3D 기본 의상
+                  <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.68rem] font-bold text-accent">기본</span>
                 </h3>
                 <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                  색만 바뀌는 게 아니라 실제 3D 옷·신발이 장착됩니다. 포즈를 바꿔도 몸을 따라 움직이고, 어떤 모델이든 체형에 맞게 자동 핏돼요.
+                  빠른 콘티용 절차형 메시입니다. 포즈를 따라 움직이며 체형 측정값으로 크기를 맞춥니다. 최종 작화 전에는 관통과 실루엣을 확인해 주세요.
                 </p>
 
                 {/* 원클릭 코디 세트 */}
                 <div className="mb-3 space-y-1.5 border-b border-line/35 pb-3">
                   <p className="text-[0.65rem] font-bold text-fg-2">원클릭 코디 세트</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {WARDROBE_SETS.map((set) => (
+                    {SELECTABLE_WARDROBE_SETS.map((set) => (
                       <button
                         key={set.id}
                         type="button"
@@ -9071,7 +9086,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                           ) : null}
                         </div>
                         <div className="grid grid-cols-3 gap-1">
-                          {wardrobeItemsBySlot(slot).map((item) => {
+                          {selectableWardrobeItemsBySlot(slot).map((item) => {
                             const active = equip?.itemId === item.id;
                             return (
                               <button

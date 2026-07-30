@@ -185,9 +185,22 @@ export interface WardrobeItemDef {
   emoji: string;
   defaultColor: string;
   hint: string;
+  /**
+   * 절차형 메시의 감사 결과. 렌더·저장 호환성과 신규 카탈로그 노출 여부를
+   * 분리하기 위해 이름이나 파츠 수를 추측하지 않고 명시적으로 기록한다.
+   */
+  quality: "standard-procedural" | "low-fidelity-procedural";
+  catalogStatus: "selectable" | "legacy-only";
+  /** 신규 선택 시 제안할 같은 슬롯의 대체 아이템. */
+  replacementId: string | null;
 }
 
-export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
+type WardrobeItemBase = Omit<
+  WardrobeItemDef,
+  "quality" | "catalogStatus" | "replacementId"
+>;
+
+const WARDROBE_ITEM_BASES: readonly WardrobeItemBase[] = [
   // 겉옷
   { id: "blazer", label: "블레이저", slot: "outer", emoji: "🧥", defaultColor: "#2b3a5e", hint: "교복·오피스 컷. 색으로 학교/팀을 표현하세요." },
   { id: "hoodie", label: "후드집업", slot: "outer", emoji: "🧢", defaultColor: "#374151", hint: "캐주얼·스트릿 컷. 뒤에 후드가 달려요." },
@@ -222,12 +235,79 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = [
   { id: "clogs", label: "의료 클로그", slot: "shoes", emoji: "🩴", defaultColor: "#f1f5f9", hint: "병원·실험실 근무용으로 발등을 감싸는 가벼운 신발입니다." },
 ] as const;
 
+/**
+ * 품질 감사에서 실루엣·관통·재질 완성도가 신규 카탈로그 기준에 못 미친 항목.
+ *
+ * 키는 기존 저장 문서의 itemId와 동일하다. 항목 자체를 삭제하지 않으므로 과거
+ * 문서는 계속 파싱·렌더링할 수 있지만, 신규 선택 화면에서는 replacementId로
+ * 치환한다. 의상 이름을 통한 휴리스틱은 의도적으로 사용하지 않는다.
+ */
+export const LEGACY_WARDROBE_REPLACEMENTS: Readonly<Record<string, string>> = {
+  tank: "shirt",
+  tshirt: "shirt",
+  shorts: "jeans",
+  scrubs: "shirt",
+  sailor: "shirt",
+  dress: "sweater",
+  cardigan: "blazer",
+  pants: "jeans",
+  wide: "jeans",
+  scrubpants: "jeans",
+};
+
+export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = WARDROBE_ITEM_BASES.map(
+  (item) => {
+    const replacementId = LEGACY_WARDROBE_REPLACEMENTS[item.id] ?? null;
+    return {
+      ...item,
+      quality: replacementId
+        ? "low-fidelity-procedural"
+        : "standard-procedural",
+      catalogStatus: replacementId ? "legacy-only" : "selectable",
+      replacementId,
+    };
+  },
+);
+
 export function wardrobeItemById(id: string): WardrobeItemDef | undefined {
   return WARDROBE_ITEMS.find((item) => item.id === id);
 }
 
+/** 저장·렌더 호환성을 위한 전체 카탈로그(legacy-only 포함). */
 export function wardrobeItemsBySlot(slot: WardrobeSlot): WardrobeItemDef[] {
   return WARDROBE_ITEMS.filter((item) => item.slot === slot);
+}
+
+/** 신규 장착 화면에 노출해도 되는 감사 완료 항목만 반환한다. */
+export function selectableWardrobeItemsBySlot(
+  slot: WardrobeSlot,
+): WardrobeItemDef[] {
+  return WARDROBE_ITEMS.filter(
+    (item) => item.slot === slot && item.catalogStatus === "selectable",
+  );
+}
+
+/**
+ * 신규 선택 경계에서 legacy-only ID를 같은 슬롯의 감사 완료 대체품으로 바꾼다.
+ * 저장 문서 복원 경로(parseWardrobe)는 이 함수를 사용하지 않는다.
+ */
+export function resolveWardrobeItemForNewSelection(
+  itemId: string,
+): WardrobeItemDef | undefined {
+  const item = wardrobeItemById(itemId);
+  if (!item) return undefined;
+  if (item.catalogStatus === "selectable") return item;
+  if (!item.replacementId) return undefined;
+
+  const replacement = wardrobeItemById(item.replacementId);
+  if (
+    !replacement
+    || replacement.catalogStatus !== "selectable"
+    || replacement.slot !== item.slot
+  ) {
+    return undefined;
+  }
+  return replacement;
 }
 
 /* ── 장착 상태 + 직렬화 ──────────────────────────────────────────────── */
@@ -339,6 +419,35 @@ export const WARDROBE_SETS: readonly WardrobeSet[] = [
 
 export function wardrobeSetById(id: string): WardrobeSet | undefined {
   return WARDROBE_SETS.find((set) => set.id === id);
+}
+
+function createSelectableWardrobeSet(set: WardrobeSet): WardrobeSet | null {
+  const equips: WardrobeSet["equips"] = {};
+  for (const slot of WARDROBE_SLOTS) {
+    const pick = set.equips[slot];
+    if (!pick) continue;
+    const resolved = resolveWardrobeItemForNewSelection(pick.itemId);
+    if (!resolved || resolved.slot !== slot) return null;
+    equips[slot] = { ...pick, itemId: resolved.id };
+  }
+  return { ...set, equips };
+}
+
+/**
+ * 기존 세트 ID·색상은 유지하되 legacy-only 파츠를 감사 완료 대체품으로 바꾼
+ * 신규 선택 전용 카탈로그다. 원본 WARDROBE_SETS는 과거 문서/프리셋 호환을 위해
+ * 수정하지 않는다.
+ */
+export const SELECTABLE_WARDROBE_SETS: readonly WardrobeSet[] =
+  WARDROBE_SETS.flatMap((set) => {
+    const selectable = createSelectableWardrobeSet(set);
+    return selectable ? [selectable] : [];
+  });
+
+export function selectableWardrobeSetById(
+  id: string,
+): WardrobeSet | undefined {
+  return SELECTABLE_WARDROBE_SETS.find((set) => set.id === id);
 }
 
 /** 세트를 장착 상태로 변환한다(세트에 없는 슬롯은 비움). */

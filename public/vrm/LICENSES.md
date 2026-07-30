@@ -139,5 +139,5 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Victoria_Rubin.vrm` | 루빈 | madjin/vrm-samples | 저장소 고지 조건 |
 | `Avatar_Orion.vrm` | 오리온 (로봇) | madjin/vrm-samples | 저장소 고지 조건 |
 | `cryptovoxels.vrm` | 크립토 (복셀봇) | madjin/vrm-samples | 저장소 고지 조건 |
-| `meebit_09842.vrm` | 미빗 (블록맨) | madjin/vrm-samples | Meebits 보유자 이용조건 기반 샘플 |
+| `meebit_09842.vrm` | 미빗 (블록맨) | madjin/vrm-samples | **권리 격리:** Meebits 보유자 이용조건을 일반 번들 재배포·상업 서비스 권한으로 간주할 수 없어 신규 카탈로그 제공과 런타임 로드를 차단함 |
 | `Seed_san.vrm` | 시드상 (마스코트) | madjin/vrm-samples | VRM 프로젝트 마스코트 샘플 고지 조건 |

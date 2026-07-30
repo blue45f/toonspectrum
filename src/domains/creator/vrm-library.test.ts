@@ -3,7 +3,19 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createUploadedVrmRecord, getDeletableModelIds, SAMPLE_VRM_ENTRIES, SAMPLE_VRM_LIBRARY_ENTRY, SAMPLE_VRMS, sampleVrmUrl, withDefaultVrmEntry } from "./vrm-library";
+import {
+  BUNDLED_VRM_RIGHTS_BLOCKS,
+  bundledVrmRightsBlockById,
+  createUploadedVrmRecord,
+  getDeletableModelIds,
+  isBundledVrmRightsBlocked,
+  SAMPLE_VRM_ENTRIES,
+  SAMPLE_VRM_LIBRARY_ENTRY,
+  SAMPLE_VRMS,
+  sampleVrmUrl,
+  selectableSampleVrmUrl,
+  withDefaultVrmEntry,
+} from "./vrm-library";
 
 // 2026-06 추가된 번들 15종(헤어 전용 샘플 2종은 캐릭터가 아니라 제외·정리됨) + 2026-07 오픈소스 아바타 레지스트리(100Avatars R1~R3, CC0) 62종
 // (그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강분) — 모두 public/vrm/LICENSES.md 고지 대상.
@@ -111,8 +123,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 89 sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(89);
+  it("bundles 88 selectable sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(88);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -148,6 +160,9 @@ describe("VRM library helpers", () => {
     // 2026-07 오픈소스 아바타 레지스트리 출처와 CC0 고지가 명시되어야 한다.
     expect(licenses).toContain("github.com/ToxSam/open-source-avatars");
     expect(licenses).toContain("CC0");
+    expect(licenses).toContain("meebit_09842.vrm");
+    expect(licenses).toContain("권리 격리");
+    expect(licenses).toContain("런타임 로드를 차단");
   });
 
   // 회귀 방지: 파일 없는 "유령 엔트리"(선택 시 404)가 다시 생기지 않도록
@@ -168,6 +183,25 @@ describe("VRM library helpers", () => {
     expect(sampleVrmUrl("cool-alien")).toBe("/vrm/CoolAlien.vrm");
     expect(sampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
     expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
+  });
+
+  it("권리 제한 meebit을 별도 메타데이터로 격리하고 신규 카탈로그·엄격 로드에서 차단한다", () => {
+    expect(BUNDLED_VRM_RIGHTS_BLOCKS).toHaveLength(1);
+    expect(bundledVrmRightsBlockById("meebit")).toMatchObject({
+      id: "meebit",
+      url: "/vrm/meebit_09842.vrm",
+      status: "rights-blocked",
+      reasonCode: "redistribution-commercial-restriction",
+    });
+    expect(isBundledVrmRightsBlocked("meebit")).toBe(true);
+    expect(selectableSampleVrmUrl("meebit")).toBeNull();
+    expect(selectableSampleVrmUrl("no-such-id")).toBeNull();
+    expect(selectableSampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
+    expect(SAMPLE_VRMS.some((sample) => sample.id === "meebit")).toBe(false);
+    expect(SAMPLE_VRM_ENTRIES.some((entry) => entry.id === "meebit")).toBe(false);
+    expect(
+      existsSync(join(process.cwd(), "public", "vrm", "meebit_09842.vrm")),
+    ).toBe(false);
   });
 
   it("keeps every bundled sample before uploaded library entries", () => {

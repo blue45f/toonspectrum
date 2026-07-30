@@ -7,6 +7,8 @@ import {
   WARDROBE_FIT_MIN,
   WARDROBE_HIDE_COSTUME_SLOTS,
   WARDROBE_ITEMS,
+  LEGACY_WARDROBE_REPLACEMENTS,
+  SELECTABLE_WARDROBE_SETS,
   WARDROBE_SETS,
   WARDROBE_SLOTS,
   applyWardrobeSet,
@@ -15,9 +17,12 @@ import {
   mergeWardrobeCostumeVisibility,
   parseWardrobe,
   sanitizeWardrobeMetrics,
+  selectableWardrobeItemsBySlot,
+  selectableWardrobeSetById,
   serializeWardrobe,
   wardrobeItemById,
   wardrobeItemsBySlot,
+  resolveWardrobeItemForNewSelection,
   type GarmentPart,
   type WardrobeMetrics,
   type WardrobeState,
@@ -57,6 +62,63 @@ describe("워드로브 카탈로그", () => {
   it("wardrobeItemById는 미지의 id에 undefined를 준다", () => {
     expect(wardrobeItemById("no-such-item")).toBeUndefined();
     expect(wardrobeItemById("blazer")?.slot).toBe("outer");
+  });
+
+  it("감사에서 확인한 저품질 절차형 ID를 명시적으로 legacy-only 격리한다", () => {
+    const expectedLegacyIds = [
+      "tank",
+      "tshirt",
+      "shorts",
+      "scrubs",
+      "sailor",
+      "dress",
+      "cardigan",
+      "pants",
+      "wide",
+      "scrubpants",
+    ].sort();
+
+    expect(Object.keys(LEGACY_WARDROBE_REPLACEMENTS).sort()).toEqual(
+      expectedLegacyIds,
+    );
+    expect(
+      WARDROBE_ITEMS.filter((item) => item.catalogStatus === "legacy-only")
+        .map((item) => item.id)
+        .sort(),
+    ).toEqual(expectedLegacyIds);
+
+    for (const id of expectedLegacyIds) {
+      const legacy = wardrobeItemById(id);
+      const replacement = resolveWardrobeItemForNewSelection(id);
+      expect(legacy?.quality, id).toBe("low-fidelity-procedural");
+      expect(legacy?.replacementId, id).toBe(
+        LEGACY_WARDROBE_REPLACEMENTS[id],
+      );
+      expect(replacement?.catalogStatus, id).toBe("selectable");
+      expect(replacement?.slot, id).toBe(legacy?.slot);
+    }
+  });
+
+  it("신규 선택 목록과 세트에는 legacy-only ID가 노출되지 않는다", () => {
+    const legacyIds = new Set(Object.keys(LEGACY_WARDROBE_REPLACEMENTS));
+    for (const slot of WARDROBE_SLOTS) {
+      const selectable = selectableWardrobeItemsBySlot(slot);
+      expect(selectable.length).toBeGreaterThan(0);
+      for (const item of selectable) {
+        expect(item.catalogStatus).toBe("selectable");
+        expect(legacyIds.has(item.id), item.id).toBe(false);
+      }
+    }
+
+    expect(SELECTABLE_WARDROBE_SETS).toHaveLength(WARDROBE_SETS.length);
+    for (const set of SELECTABLE_WARDROBE_SETS) {
+      expect(selectableWardrobeSetById(set.id)).toEqual(set);
+      for (const pick of Object.values(set.equips)) {
+        expect(legacyIds.has(pick.itemId), `${set.id}.${pick.itemId}`).toBe(
+          false,
+        );
+      }
+    }
   });
 });
 
@@ -225,6 +287,27 @@ describe("장착 상태 직렬화", () => {
     expect(serialized?.version).toBe(1);
     const parsed = parseWardrobe(serialized);
     expect(parsed).toEqual(state);
+  });
+
+  it("legacy-only 의상 ID는 기존 저장 문서 복원과 렌더 호환을 유지한다", () => {
+    const parsed = parseWardrobe({
+      version: 1,
+      slots: {
+        outer: { itemId: "cardigan", color: "#112233", fit: 1.1 },
+        top: { itemId: "tshirt", color: "#445566", fit: 1 },
+        bottom: { itemId: "pants", color: "#778899", fit: 0.95 },
+      },
+    });
+
+    expect(parsed).toEqual({
+      outer: { itemId: "cardigan", color: "#112233", fit: 1.1 },
+      top: { itemId: "tshirt", color: "#445566", fit: 1 },
+      bottom: { itemId: "pants", color: "#778899", fit: 0.95 },
+    });
+    expect(buildGarmentParts("cardigan", FALLBACK_WARDROBE_METRICS)).not.toEqual(
+      [],
+    );
+    expect(serializeWardrobe(parsed)?.slots).toEqual(parsed);
   });
 
   it("빈 상태는 undefined로 직렬화된다(문서 하위호환)", () => {
