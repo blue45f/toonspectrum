@@ -58,7 +58,7 @@ export interface StudioForegroundSegmentationResult {
 }
 
 export interface StudioLocalForegroundSegmenter {
-  segment(image: HTMLImageElement): StudioForegroundSegmentationResult;
+  segment(image: TexImageSource): StudioForegroundSegmentationResult;
 }
 
 export interface StudioLocalForegroundSegmenterRuntime {
@@ -274,7 +274,9 @@ async function loadMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRun
   }
 }
 
-function getMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
+export function getStudioLocalForegroundSegmenterRuntime(): Promise<
+  StudioLocalForegroundSegmenterRuntime
+> {
   if (segmenterPromise) return segmenterPromise;
   segmenterPromise = loadMediaPipeRuntime().catch((error: unknown) => {
     segmenterPromise = null;
@@ -347,8 +349,8 @@ function closeSegmentationResources(
   }
 }
 
-function segmentDecodedImage(
-  image: HTMLImageElement,
+export function segmentStudioLocalForegroundRasterSource(
+  image: TexImageSource,
   sourceWidth: number,
   sourceHeight: number,
   runtime: StudioLocalForegroundSegmenterRuntime,
@@ -420,7 +422,7 @@ async function loadAndSegmentSource(
   });
   const [loaded, runtime] = await Promise.all([decodedImage, runtimeLoader()]);
   throwIfAborted(options.signal);
-  const mask = segmentDecodedImage(
+  const mask = segmentStudioLocalForegroundRasterSource(
     loaded.image,
     loaded.width,
     loaded.height,
@@ -443,7 +445,8 @@ export function createStudioLocalForegroundConfidenceProvider(
   options: CreateStudioLocalForegroundConfidenceProviderOptions = {},
 ): StudioLocalForegroundConfidenceProvider {
   const imageLoader = options.loadImage ?? loadImage;
-  const runtimeLoader = options.loadRuntime ?? getMediaPipeRuntime;
+  const runtimeLoader =
+    options.loadRuntime ?? getStudioLocalForegroundSegmenterRuntime;
   return Object.freeze({
     async getForegroundConfidenceMask(
       src: string,
@@ -550,7 +553,7 @@ export async function removeBackground(
     src,
     { signal: options.signal },
     loadImage,
-    getMediaPipeRuntime,
+    getStudioLocalForegroundSegmenterRuntime,
   );
   throwIfAborted(options.signal);
 

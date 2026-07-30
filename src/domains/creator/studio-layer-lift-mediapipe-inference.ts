@@ -1,0 +1,153 @@
+/**
+ * Production bridge from the strict Scene Layer Lift provider to the existing
+ * on-device MediaPipe foreground segmenter. Source pixels stay inside the
+ * browser; only the versioned model and WASM runtime are downloaded.
+ */
+import {
+  getStudioLocalForegroundSegmenterRuntime,
+  segmentStudioLocalForegroundRasterSource,
+  type StudioLocalForegroundSegmenterRuntime,
+} from "./studio-bg-remove";
+
+import type {
+  StudioLayerLiftLocalForegroundInferenceEngine,
+  StudioLayerLiftLocalForegroundInferenceInput,
+  StudioLayerLiftLocalForegroundInferenceLoader,
+} from "./studio-layer-lift-local-provider";
+
+export interface StudioLayerLiftMediaPipeRaster {
+  readonly source: TexImageSource;
+  dispose?(): void;
+}
+
+export type StudioLayerLiftMediaPipeRasterFactory = (
+  input: StudioLayerLiftLocalForegroundInferenceInput,
+) => StudioLayerLiftMediaPipeRaster;
+
+export interface CreateStudioLayerLiftMediaPipeInferenceLoaderOptions {
+  readonly loadRuntime?: () => Promise<StudioLocalForegroundSegmenterRuntime>;
+  readonly createRaster?: StudioLayerLiftMediaPipeRasterFactory;
+}
+
+function createAbortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("레이어 분석을 취소했습니다.", "AbortError");
+  }
+  const error = new Error("레이어 분석을 취소했습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw createAbortError();
+}
+
+function writeRgba(
+  context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D,
+  input: StudioLayerLiftLocalForegroundInferenceInput,
+): void {
+  const imageData = context.createImageData(input.width, input.height);
+  imageData.data.set(input.rgba);
+  context.putImageData(imageData, 0, 0);
+}
+
+function createBrowserRaster(
+  input: StudioLayerLiftLocalForegroundInferenceInput,
+): StudioLayerLiftMediaPipeRaster {
+  if (typeof globalThis.OffscreenCanvas === "function") {
+    const canvas = new OffscreenCanvas(input.width, input.height);
+    const context = canvas.getContext("2d", {
+      alpha: true,
+      colorSpace: "srgb",
+      willReadFrequently: false,
+    });
+    if (!context) {
+      throw new Error("OffscreenCanvas 2D 컨텍스트를 만들 수 없습니다.");
+    }
+    writeRgba(context, input);
+    return Object.freeze({ source: canvas });
+  }
+
+  if (typeof document === "object") {
+    const canvas = document.createElement("canvas");
+    canvas.width = input.width;
+    canvas.height = input.height;
+    const context = canvas.getContext("2d", {
+      alpha: true,
+      colorSpace: "srgb",
+      willReadFrequently: false,
+    });
+    if (!context) throw new Error("캔버스 2D 컨텍스트를 만들 수 없습니다.");
+    writeRgba(context, input);
+    return Object.freeze({ source: canvas });
+  }
+
+  throw new Error("로컬 전경 분석용 래스터 표면을 만들 수 없습니다.");
+}
+
+function modelIdentity(
+  runtime: StudioLocalForegroundSegmenterRuntime,
+): StudioLayerLiftLocalForegroundInferenceEngine["model"] {
+  return Object.freeze({
+    providerId: "mediapipe-image-segmenter",
+    providerVersion: "0.10.35",
+    modelId: "selfie-segmenter",
+    modelVersion: "float16-latest",
+    executionRoute: runtime.activeDelegate === "GPU"
+      ? "gpu"
+      : "gpu-cpu-fallback",
+  });
+}
+
+function createInferenceEngine(
+  runtime: StudioLocalForegroundSegmenterRuntime,
+  createRaster: StudioLayerLiftMediaPipeRasterFactory,
+): StudioLayerLiftLocalForegroundInferenceEngine {
+  return Object.freeze({
+    model: modelIdentity(runtime),
+    async infer(input: StudioLayerLiftLocalForegroundInferenceInput) {
+      throwIfAborted(input.signal);
+      const raster = createRaster(input);
+      try {
+        throwIfAborted(input.signal);
+        const result = segmentStudioLocalForegroundRasterSource(
+          raster.source,
+          input.width,
+          input.height,
+          runtime,
+          input.signal,
+        );
+        throwIfAborted(input.signal);
+        return Object.freeze({
+          width: result.width,
+          height: result.height,
+          confidence: result.confidence,
+        });
+      } finally {
+        raster.dispose?.();
+      }
+    },
+  });
+}
+
+/**
+ * Create a lazy production loader. MediaPipe itself owns the singleton runtime,
+ * including the bounded GPU → CPU initialization fallback.
+ */
+export function createStudioLayerLiftMediaPipeInferenceLoader(
+  options: CreateStudioLayerLiftMediaPipeInferenceLoaderOptions = {},
+): StudioLayerLiftLocalForegroundInferenceLoader {
+  const loadRuntime =
+    options.loadRuntime ?? getStudioLocalForegroundSegmenterRuntime;
+  const createRaster = options.createRaster ?? createBrowserRaster;
+
+  return async (signal) => {
+    throwIfAborted(signal);
+    const runtime = await loadRuntime();
+    throwIfAborted(signal);
+    return createInferenceEngine(runtime, createRaster);
+  };
+}
+
+export const loadStudioLayerLiftMediaPipeInference =
+  createStudioLayerLiftMediaPipeInferenceLoader();

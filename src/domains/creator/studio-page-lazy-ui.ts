@@ -112,6 +112,10 @@ const StudioFilterDialog = lazyRetry(
   () => import("./StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
   "StudioFilterDialog"
 );
+const StudioLayerLiftDialog = lazyRetry(
+  () => import("./StudioLayerLiftDialog").then((mod) => ({ default: mod.StudioLayerLiftDialog })),
+  "StudioLayerLiftDialog"
+);
 const StudioColorPalettePanel = lazyRetry(
   () => import("./StudioColorPalettePanel").then((mod) => ({ default: mod.StudioColorPalettePanel })),
   "StudioColorPalettePanel"
@@ -849,6 +853,7 @@ export {
   StudioIsometricGridOverlay,
   StudioLayerMaskPanel,
   StudioLayerMaskOverlay,
+  StudioLayerLiftDialog,
   StudioQuickMaskOverlay,
   StudioLayerNavigator,
   StudioLiquifyPanel,

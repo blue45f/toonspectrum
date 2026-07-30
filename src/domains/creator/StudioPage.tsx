@@ -604,6 +604,30 @@ import {
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
 import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
+import { inspectStudioLayerLiftAvailability } from "./studio-layer-lift-availability";
+import { StudioLayerLiftComposeWorkerClient } from "./studio-layer-lift-compose-worker-client";
+import {
+  applyStudioLayerLiftCorrectionWorkflow,
+} from "./studio-layer-lift-correction-workflow";
+import {
+  createStudioLayerLiftLocalForegroundProvider,
+} from "./studio-layer-lift-local-provider";
+import {
+  loadStudioLayerLiftMediaPipeInference,
+} from "./studio-layer-lift-mediapipe-inference";
+import {
+  StudioLayerLiftOperationRegistry,
+  type StudioLayerLiftOperationCurrentState,
+} from "./studio-layer-lift-operation-context";
+import {
+  createStudioLayerLiftReviewPreviewResource,
+  type StudioLayerLiftReviewPreviewResource,
+} from "./studio-layer-lift-review-preview";
+import {
+  analyzeStudioLayerLiftWorkflow,
+  finalizeStudioLayerLiftWorkflow,
+  type StudioLayerLiftWorkflowSession,
+} from "./studio-layer-lift-workflow";
 import {
   bakeLayerMaskStroke,
   canLayerMask,
@@ -774,6 +798,7 @@ import {
   StudioBrushStudio,
   StudioBrushCatalogPortal,
   StudioFilterDialog,
+  StudioLayerLiftDialog,
   StudioPublishContextBanner,
   StudioCommentThreadPopover,
   StudioPointCommentComposer,
@@ -1408,6 +1433,9 @@ import type {
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import type {
+  StudioLayerLiftCorrectionStroke,
+} from "./studio-layer-lift-correction";
+import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
@@ -1470,6 +1498,11 @@ import type {
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
+import type {
+  StudioLayerLiftDialogPhase,
+  StudioLayerLiftReviewOptions,
+  StudioLayerLiftReviewPreview,
+} from "./StudioLayerLiftDialog";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type {
   StudioCommentPinClickPayload,
@@ -2422,6 +2455,40 @@ function openStudioToolsCompanionForMenu(input: {
   });
 }
 
+interface StudioLayerLiftUiState {
+  readonly open: boolean;
+  readonly activeKey: string;
+  readonly sourceId: string | null;
+  readonly sourceName: string;
+  readonly sourceSrc: string;
+  readonly phase: StudioLayerLiftDialogPhase;
+  readonly progressLabel: string | null;
+  readonly error: string | null;
+  readonly session: StudioLayerLiftWorkflowSession | null;
+  readonly preview: StudioLayerLiftReviewPreview | null;
+}
+
+const STUDIO_LAYER_LIFT_DEFAULT_REVIEW_OPTIONS: StudioLayerLiftReviewOptions =
+  Object.freeze({
+    threshold: 0.5,
+    feather: 0.08,
+  });
+
+function closedStudioLayerLiftUiState(): StudioLayerLiftUiState {
+  return {
+    open: false,
+    activeKey: "studio-layer-lift:closed",
+    sourceId: null,
+    sourceName: "선택 이미지",
+    sourceSrc: "",
+    phase: "analyzing",
+    progressLabel: null,
+    error: null,
+    session: null,
+    preview: null,
+  };
+}
+
 function StudioCuttoonEditor() {
   // React Compiler는 이 컴포넌트를 구조적으로 컴파일하지 못한다(본문 dynamic import 40+,
   // try/finally 다수). 명시적으로 옵트아웃하고, 무거운 JSX 영역은 컴파일되는 memo 자식
@@ -3217,6 +3284,25 @@ function StudioCuttoonEditor() {
   });
   currentStudioDocumentScopeRef.current = { authScopeKey: studioAuthUserId, workId };
   const editorMountedRef = useRef(true);
+  const studioLayerLiftRegistryRef = useRef<StudioLayerLiftOperationRegistry | null>(
+    null
+  );
+  studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
+  const studioLayerLiftProviderRef = useRef<ReturnType<
+    typeof createStudioLayerLiftLocalForegroundProvider
+  > | null>(null);
+  studioLayerLiftProviderRef.current ??=
+    createStudioLayerLiftLocalForegroundProvider({
+      loadInference: loadStudioLayerLiftMediaPipeInference,
+    });
+  const studioLayerLiftCompositorRef =
+    useRef<StudioLayerLiftComposeWorkerClient | null>(null);
+  studioLayerLiftCompositorRef.current ??=
+    new StudioLayerLiftComposeWorkerClient();
+  const studioLayerLiftAbortRef = useRef<AbortController | null>(null);
+  const studioLayerLiftRunIdRef = useRef(0);
+  const studioLayerLiftPreviewResourceRef =
+    useRef<StudioLayerLiftReviewPreviewResource | null>(null);
   const documentSaveInFlightRef = useRef(false);
   // Monotonic snapshot token dedicated to revision review. Unlike async mutation tickets, this
   // also advances for provenance bookkeeping that changes persisted project data.
@@ -3313,6 +3399,27 @@ function StudioCuttoonEditor() {
       documentRevalidateAbortRef.current = null;
       serverRevisionAbortRef.current?.abort();
       serverRevisionAbortRef.current = null;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
+    studioLayerLiftProviderRef.current ??=
+      createStudioLayerLiftLocalForegroundProvider({
+        loadInference: loadStudioLayerLiftMediaPipeInference,
+      });
+    studioLayerLiftCompositorRef.current ??=
+      new StudioLayerLiftComposeWorkerClient();
+    return () => {
+      studioLayerLiftRunIdRef.current += 1;
+      studioLayerLiftAbortRef.current?.abort();
+      studioLayerLiftAbortRef.current = null;
+      studioLayerLiftRegistryRef.current?.invalidate();
+      studioLayerLiftRegistryRef.current = null;
+      studioLayerLiftCompositorRef.current?.dispose();
+      studioLayerLiftCompositorRef.current = null;
+      studioLayerLiftProviderRef.current = null;
+      studioLayerLiftPreviewResourceRef.current?.revoke();
+      studioLayerLiftPreviewResourceRef.current = null;
     };
   }, []);
 
@@ -5797,6 +5904,14 @@ function StudioCuttoonEditor() {
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [studioLayerLiftUi, setStudioLayerLiftUi] =
+    useState<StudioLayerLiftUiState>(closedStudioLayerLiftUiState);
+  const studioLayerLiftUiRef = useRef(studioLayerLiftUi);
+  studioLayerLiftUiRef.current = studioLayerLiftUi;
+  const [studioLayerLiftOptions, setStudioLayerLiftOptions] =
+    useState<StudioLayerLiftReviewOptions>(
+      STUDIO_LAYER_LIFT_DEFAULT_REVIEW_OPTIONS
+    );
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
   // Konva 노드의 native mouse/pointer event는 메모된 Viewport를 거쳐 stable handler로
@@ -13423,6 +13538,428 @@ function StudioCuttoonEditor() {
       (reference) => studioWorkAssetHydrator.get(reference)
     )
     : null;
+  const studioLayerLiftAvailability = inspectStudioLayerLiftAvailability({
+    elements,
+    groups,
+    selectedIds: selected?.type === "image" ? [selected.id] : [],
+  });
+  const studioLayerLiftDisabledReason = workId
+    ? "저장된 팀 원고용 에셋 트랜잭션을 연결하는 중입니다. 현재 베타는 새 로컬 원고에서 사용할 수 있어요."
+    : collaborationDocumentLocked
+      ? collaborationLockMessage()
+      : activeSurfaceReviewLocked || (pageEditLocked && !masterEditMode)
+        ? "작업면 검토 잠금을 해제한 뒤 레이어를 복원하세요."
+        : masterEditMode
+          ? "현재 베타는 페이지 이미지 레이어에서만 사용할 수 있어요. 마스터 편집을 종료해 주세요."
+          : timelinePlaying
+            ? "타임라인 재생을 멈춘 뒤 레이어를 복원하세요."
+            : timelapseCapturing
+              ? "타임랩스 캡처가 끝난 뒤 레이어를 복원하세요."
+              : saving
+                ? "저장이 끝난 뒤 레이어를 복원하세요."
+                : studioLayerLiftAvailability.available
+                  ? null
+                  : studioLayerLiftAvailability.message;
+  function currentStudioLayerLiftAvailabilityInput() {
+    return {
+      elements: activeElementsRef.current,
+      groups: activeGroupsRef.current,
+      selectedIds: currentCanvasSelectionIds(),
+    };
+  }
+  function readCurrentStudioLayerLiftOperation():
+    StudioLayerLiftOperationCurrentState {
+    const collaboration = collaborationAccessRef.current;
+    return {
+      mutationState: {
+        ...collaboration,
+        mounted: editorMountedRef.current,
+        aborted: false,
+      },
+      pageId: currentPageIdRef.current,
+      masterEditMode: masterEditModeRef.current,
+      selectedIds: currentCanvasSelectionIds(),
+      elements: activeElementsRef.current,
+      groups: activeGroupsRef.current,
+    };
+  }
+  function replaceStudioLayerLiftPreviewResource(
+    next: StudioLayerLiftReviewPreviewResource | null,
+  ) {
+    const previous = studioLayerLiftPreviewResourceRef.current;
+    if (previous === next) return;
+    studioLayerLiftPreviewResourceRef.current = next;
+    previous?.revoke();
+  }
+  function closeStudioLayerLift() {
+    studioLayerLiftRunIdRef.current += 1;
+    studioLayerLiftAbortRef.current?.abort();
+    studioLayerLiftAbortRef.current = null;
+    studioLayerLiftRegistryRef.current?.invalidate();
+    replaceStudioLayerLiftPreviewResource(null);
+    setStudioLayerLiftUi(closedStudioLayerLiftUiState());
+  }
+  async function runStudioLayerLiftAnalysis(
+    sourceId: string,
+    options: StudioLayerLiftReviewOptions,
+  ) {
+    const source = activeElementsRef.current.find(
+      (element) => element.id === sourceId,
+    );
+    if (!source || source.type !== "image") {
+      setStudioLayerLiftUi((current) => ({
+        ...current,
+        phase: "error",
+        progressLabel: null,
+        error: "분리할 이미지가 현재 페이지에 없습니다.",
+        session: null,
+        preview: null,
+      }));
+      return;
+    }
+    const registry = studioLayerLiftRegistryRef.current;
+    const provider = studioLayerLiftProviderRef.current;
+    const compositor = studioLayerLiftCompositorRef.current;
+    if (!registry || !provider || !compositor) {
+      setStudioLayerLiftUi((current) => ({
+        ...current,
+        phase: "error",
+        progressLabel: null,
+        error: "로컬 레이어 분석 엔진을 준비하지 못했습니다.",
+      }));
+      return;
+    }
+
+    studioLayerLiftRunIdRef.current += 1;
+    const runId = studioLayerLiftRunIdRef.current;
+    studioLayerLiftAbortRef.current?.abort();
+    registry.invalidate();
+    replaceStudioLayerLiftPreviewResource(null);
+    const controller = new AbortController();
+    studioLayerLiftAbortRef.current = controller;
+    const requestId = `layer-lift-${uid()}`;
+    const sourceName = source.name?.trim() || "선택 이미지";
+    const readableSource =
+      resolveStudioWorkAssetReadableImageSource(
+        source,
+        (reference) => studioWorkAssetHydrator.get(reference),
+      ) ?? source.src;
+    setStudioLayerLiftUi({
+      open: true,
+      activeKey: requestId,
+      sourceId,
+      sourceName,
+      sourceSrc: readableSource,
+      phase: "analyzing",
+      progressLabel: "원본 외형을 고정하고 로컬 인물 모델을 준비하고 있어요.",
+      error: null,
+      session: null,
+      preview: null,
+    });
+
+    const result = await analyzeStudioLayerLiftWorkflow({
+      registry,
+      mutationTicket: captureStudioMutationTicket(),
+      pageId: currentPageIdRef.current,
+      masterEditMode: masterEditModeRef.current,
+      availability: currentStudioLayerLiftAvailabilityInput(),
+      readAvailability: currentStudioLayerLiftAvailabilityInput,
+      readCurrent: readCurrentStudioLayerLiftOperation,
+      requestId,
+      backgroundOutputId: uid(),
+      foregroundOutputId: uid(),
+      provider,
+      compositor,
+      providerOptions: options,
+      compositorTimeoutMs: 45_000,
+      signal: controller.signal,
+    });
+    if (
+      controller.signal.aborted
+      || runId !== studioLayerLiftRunIdRef.current
+      || !editorMountedRef.current
+    ) {
+      return;
+    }
+    if (!result.ok) {
+      studioLayerLiftAbortRef.current = null;
+      setStudioLayerLiftUi((current) => ({
+        ...current,
+        phase: "error",
+        progressLabel: null,
+        error: result.message,
+        session: null,
+        preview: null,
+      }));
+      return;
+    }
+    setStudioLayerLiftUi((current) => ({
+      ...current,
+      phase: "analyzing",
+      progressLabel: "검증된 픽셀로 비교 미리보기를 만들고 있어요.",
+      error: null,
+      session: result.session,
+      preview: null,
+    }));
+    let previewResource: StudioLayerLiftReviewPreviewResource;
+    try {
+      previewResource = await createStudioLayerLiftReviewPreviewResource(
+        result.session,
+        { signal: controller.signal },
+      );
+    } catch (previewError) {
+      if (
+        controller.signal.aborted
+        || runId !== studioLayerLiftRunIdRef.current
+        || !editorMountedRef.current
+      ) {
+        return;
+      }
+      studioLayerLiftAbortRef.current = null;
+      registry.invalidate(result.session.ticket);
+      setStudioLayerLiftUi((current) => ({
+        ...current,
+        phase: "error",
+        progressLabel: null,
+        error: previewError instanceof Error
+          ? previewError.message
+          : "레이어 분리 비교 미리보기를 만들지 못했습니다.",
+        session: null,
+        preview: null,
+      }));
+      return;
+    }
+    if (
+      controller.signal.aborted
+      || runId !== studioLayerLiftRunIdRef.current
+      || !editorMountedRef.current
+    ) {
+      previewResource.revoke();
+      return;
+    }
+    studioLayerLiftAbortRef.current = null;
+    replaceStudioLayerLiftPreviewResource(previewResource);
+    setStudioLayerLiftUi((current) => ({
+      ...current,
+      phase: "review",
+      progressLabel: "경계와 복원 배경을 확인한 뒤 적용하세요.",
+      error: null,
+      session: result.session,
+      preview: previewResource.preview,
+    }));
+  }
+  function openStudioLayerLift() {
+    if (studioLayerLiftDisabledReason) {
+      setError(studioLayerLiftDisabledReason);
+      return;
+    }
+    const source = activeElementsRef.current.find(
+      (element) => element.id === selectedIdRef.current,
+    );
+    if (!source || source.type !== "image") {
+      setError("분리할 이미지 레이어 하나를 선택해 주세요.");
+      return;
+    }
+    void runStudioLayerLiftAnalysis(source.id, studioLayerLiftOptions);
+  }
+  async function correctStudioLayerLift(
+    stroke: StudioLayerLiftCorrectionStroke,
+  ) {
+    const current = studioLayerLiftUiRef.current;
+    const registry = studioLayerLiftRegistryRef.current;
+    const compositor = studioLayerLiftCompositorRef.current;
+    if (!current.session || !registry || !compositor) {
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: "보정할 레이어 경계가 없습니다. 다시 분석해 주세요.",
+      }));
+      return;
+    }
+    const operationState = readCurrentStudioLayerLiftOperation();
+    if (!registry.checkCurrent(current.session.ticket, operationState).ok) {
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: "원고나 선택이 바뀌어 이전 경계를 보정하지 않았습니다. 다시 분석해 주세요.",
+      }));
+      return;
+    }
+
+    studioLayerLiftRunIdRef.current += 1;
+    const runId = studioLayerLiftRunIdRef.current;
+    studioLayerLiftAbortRef.current?.abort();
+    const controller = new AbortController();
+    studioLayerLiftAbortRef.current = controller;
+    setStudioLayerLiftUi((state) => ({
+      ...state,
+      phase: "analyzing",
+      progressLabel: "작가가 고친 경계로 배경·전경을 다시 합성하고 있어요.",
+      error: null,
+    }));
+
+    const corrected = await applyStudioLayerLiftCorrectionWorkflow({
+      session: current.session,
+      stroke,
+      compositor,
+      signal: controller.signal,
+      timeoutMs: 45_000,
+    });
+    if (
+      controller.signal.aborted
+      || runId !== studioLayerLiftRunIdRef.current
+      || !editorMountedRef.current
+    ) {
+      return;
+    }
+    if (!corrected.ok) {
+      studioLayerLiftAbortRef.current = null;
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: corrected.message,
+      }));
+      return;
+    }
+    if (!registry.checkCurrent(corrected.session.ticket, readCurrentStudioLayerLiftOperation()).ok) {
+      studioLayerLiftAbortRef.current = null;
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: "재합성 중 원고나 선택이 바뀌어 보정 결과를 버렸습니다.",
+      }));
+      return;
+    }
+    if (!corrected.recomposed) {
+      studioLayerLiftAbortRef.current = null;
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "review",
+        progressLabel: "경계가 바뀌지 않아 현재 미리보기를 유지했어요.",
+        error: null,
+      }));
+      return;
+    }
+
+    let previewResource: StudioLayerLiftReviewPreviewResource;
+    try {
+      previewResource = await createStudioLayerLiftReviewPreviewResource(
+        corrected.session,
+        { signal: controller.signal },
+      );
+    } catch (previewError) {
+      if (
+        controller.signal.aborted
+        || runId !== studioLayerLiftRunIdRef.current
+        || !editorMountedRef.current
+      ) {
+        return;
+      }
+      studioLayerLiftAbortRef.current = null;
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: previewError instanceof Error
+          ? previewError.message
+          : "보정된 레이어 미리보기를 만들지 못했습니다.",
+      }));
+      return;
+    }
+    if (
+      controller.signal.aborted
+      || runId !== studioLayerLiftRunIdRef.current
+      || !editorMountedRef.current
+      || !registry.checkCurrent(
+        corrected.session.ticket,
+        readCurrentStudioLayerLiftOperation(),
+      ).ok
+    ) {
+      previewResource.revoke();
+      return;
+    }
+    studioLayerLiftAbortRef.current = null;
+    replaceStudioLayerLiftPreviewResource(previewResource);
+    setStudioLayerLiftUi((state) => ({
+      ...state,
+      phase: "review",
+      progressLabel: `${corrected.changedPixelCount.toLocaleString("ko-KR")}픽셀의 경계를 다시 합성했어요.`,
+      error: null,
+      session: corrected.session,
+      preview: previewResource.preview,
+    }));
+  }
+  async function applyStudioLayerLift() {
+    const current = studioLayerLiftUiRef.current;
+    const registry = studioLayerLiftRegistryRef.current;
+    if (!current.session || !registry) {
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: "적용할 레이어 복원 미리보기가 없습니다. 다시 분석해 주세요.",
+      }));
+      return;
+    }
+    studioLayerLiftRunIdRef.current += 1;
+    const runId = studioLayerLiftRunIdRef.current;
+    setStudioLayerLiftUi((state) => ({
+      ...state,
+      phase: "applying",
+      progressLabel: "검증된 배경·전경을 한 번의 실행 취소 단계로 묶고 있어요.",
+      error: null,
+    }));
+
+    const finalized = await finalizeStudioLayerLiftWorkflow({
+      registry,
+      session: current.session,
+      readCurrent: readCurrentStudioLayerLiftOperation,
+      groupId: uid(),
+    });
+    if (
+      runId !== studioLayerLiftRunIdRef.current
+      || !editorMountedRef.current
+    ) {
+      return;
+    }
+    if (!finalized.ok) {
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: finalized.message,
+      }));
+      return;
+    }
+    const committed = commit(
+      finalized.plan.nextElements,
+      { groups: finalized.plan.nextGroups },
+      currentPageIdRef.current,
+    );
+    if (!committed) {
+      setStudioLayerLiftUi((state) => ({
+        ...state,
+        phase: "error",
+        progressLabel: null,
+        error: "원고 상태가 바뀌어 레이어 그룹을 적용하지 못했습니다. 다시 분석해 주세요.",
+        session: null,
+      }));
+      return;
+    }
+    applyGroupSelectionState({
+      selectedId: finalized.plan.selectedId,
+      marqueeIds: [],
+      activeGroupId: null,
+    });
+    closeStudioLayerLift();
+    announceDrawingShortcut(
+      "컷 레이어 복원 완료 · 원본 백업, 분리 배경, 분리 전경 · 실행 취소 1회"
+    );
+  }
   // 요소 객체가 커밋을 넘어 reference-stable(불변 업데이트)인 점을 이용해 아이템 객체도
   // 요소별로 재사용한다 — 레이어 내비게이터 행 memo가 "새 획 1개 추가" 커밋에서 기존 행을
   // 전부 다시 그리지 않게 하는 열쇠(입력이 같으면 같은 참조를 돌려준다).
@@ -34172,6 +34709,7 @@ function clearSelectionForEdit() {
     },
     openFeatureTutorial,
     openImagePastePicker,
+    openStudioLayerLift,
     openStudioFilter,
     patchEl,
     patchPageGrade,
@@ -36532,6 +37070,7 @@ function clearSelectionForEdit() {
           savedBrushes={savedBrushes}
           saving={saving}
           studioFilterPreparationBusy={studioFilterPreparationBusy}
+          studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
           scrollPos={scrollPos}
           selected={selected}
           selectedBg3dEditSource={selectedBg3dEditSource}
@@ -37125,6 +37664,37 @@ function clearSelectionForEdit() {
               }
             }}
             onClose={closeStudioFilterDialog}
+          />
+        </Suspense>
+      ) : null}
+
+      {studioLayerLiftUi.open ? (
+        <Suspense fallback={null}>
+          <StudioLayerLiftDialog
+            open
+            activeKey={studioLayerLiftUi.activeKey}
+            sourceName={studioLayerLiftUi.sourceName}
+            sourceSrc={studioLayerLiftUi.sourceSrc}
+            phase={studioLayerLiftUi.phase}
+            progressLabel={studioLayerLiftUi.progressLabel}
+            error={studioLayerLiftUi.error}
+            preview={studioLayerLiftUi.preview}
+            options={studioLayerLiftOptions}
+            mutationLocked={studioLayerLiftDisabledReason !== null}
+            mutationLockReason={studioLayerLiftDisabledReason}
+            onOptionsChange={setStudioLayerLiftOptions}
+            onAnalyze={() => {
+              const sourceId = studioLayerLiftUiRef.current.sourceId;
+              if (sourceId) {
+                void runStudioLayerLiftAnalysis(
+                  sourceId,
+                  studioLayerLiftOptions,
+                );
+              }
+            }}
+            onCorrectionCommit={correctStudioLayerLift}
+            onApply={() => void applyStudioLayerLift()}
+            onCancel={closeStudioLayerLift}
           />
         </Suspense>
       ) : null}

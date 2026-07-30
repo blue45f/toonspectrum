@@ -188,8 +188,8 @@ const IMAGE_ACTIONS: readonly StudioInspectorAction[] = [
   {
     id: "image-quick",
     label: "이미지 빠른 수정",
-    description: "배경 제거, AI 채색, 팔레트와 기본 보정을 엽니다.",
-    keywords: ["image", "quick", "배경 제거", "ai", "채색", "팔레트", "보정"],
+    description: "레이어 복원, 배경 제거, AI 채색, 팔레트와 기본 보정을 엽니다.",
+    keywords: ["image", "quick", "레이어 복원", "분리", "배경 제거", "ai", "채색", "팔레트", "보정"],
     route: { primary: "properties", image: "quick" },
   },
   {

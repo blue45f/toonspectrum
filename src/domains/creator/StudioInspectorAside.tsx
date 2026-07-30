@@ -315,6 +315,7 @@ export interface StudioInspectorAsideHandlers {
   openBrushCatalog: (trigger: HTMLButtonElement) => void;
   openFeatureTutorial: (tutorialId?: string | null) => void;
   openImagePastePicker: () => void;
+  openStudioLayerLift: () => void;
   openStudioFilter: (kind: StudioFilterKind) => void;
   patchEl: (id: string, patch: Partial<El>) => void;
   patchPageGrade: (patch: Partial<PageGrade>) => void;
@@ -511,6 +512,7 @@ interface StudioInspectorAsideProps {
   savedBrushes: StudioSavedBrush[];
   saving: boolean;
   studioFilterPreparationBusy: boolean;
+  studioLayerLiftDisabledReason: string | null;
   scrollPos: { left: number; top: number; width: number; height: number; scrollWidth: number; scrollHeight: number; };
   selected: El | null;
   selectedBg3dEditSource: { readonly scene?: StudioBg3dSceneDocument; readonly legacyDataUrl?: string; } | null;
@@ -870,6 +872,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   savedBrushes,
   saving,
   studioFilterPreparationBusy,
+  studioLayerLiftDisabledReason,
   scrollPos,
   selected,
   selectedBg3dEditSource,
@@ -1130,6 +1133,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     openBrushCatalog,
     openFeatureTutorial,
     openImagePastePicker,
+    openStudioLayerLift,
     openStudioFilter,
     patchEl,
     patchPageGrade,
@@ -1590,9 +1594,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               );
             }}
           />
-
           <StudioInspectorDisabledReasons reasons={rightPanelDisabledReasons} />
-
           <StudioInspectorCanvasControls
             background={bg}
             canvasHeight={canvasH}
@@ -1683,7 +1685,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onPatch={patchPageGrade}
             onReset={resetPageGrade}
           />
-
           {inspectorContentMode === "selection" && selected && (
             <div
               role="tabpanel"
@@ -1734,7 +1735,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                     />
                   </div>
-
                   <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
                     선 두께
                     <span className="flex items-center gap-1.5">
@@ -1749,7 +1749,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.strokeWidth ?? 3}px</span>
                     </span>
                   </label>
-
                   <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
                     불투명도
                     <span className="flex items-center gap-1.5">
@@ -1765,7 +1764,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
                     </span>
                   </label>
-
                   {(selected.kind === "rect" ||
                     selected.kind === "ellipse" ||
                     selected.kind === "star" ||
@@ -2631,6 +2629,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                               <StudioBgRemoveButton
                                 src={selected.src}
                                 onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                                onOpenLayerLift={openStudioLayerLift}
+                                layerLiftDisabledReason={studioLayerLiftDisabledReason}
                               />
                               <StudioAiColorizePanel
                                 configured={isStudioAiConfigured(aiSettings)}
