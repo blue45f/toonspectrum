@@ -1185,7 +1185,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     : 0;
   const inspectorContentMode = resolveStudioInspectorContentMode({
     tool,
-    hasSelection: selected !== null,
+    hasSelection: selected !== null || marqueeIds.length > 0,
   });
   const inspectorDrawing = inspectorContentMode === "drawing";
   const selectedSupportsImageInspectorTabs =

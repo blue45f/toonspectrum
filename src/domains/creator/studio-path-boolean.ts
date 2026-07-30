@@ -1,10 +1,13 @@
 /**
- * Studio Path Boolean — 벡터 패스 불리언(도형 결합: 합치기/빼기/교차/제외) 순수 엔진.
+ * Studio Path Boolean — 벡터 패스 불리언(도형 결합: 합치기/빼기/교차/제외)의
+ * 문서 어댑터와 결정적 호환 엔진.
  *
- * Illustrator "패스파인더"·CSP "도형 결합"급 기능을 Paper.js 전체 엔진 대신 소형 전용
- * 라이브러리(polygon-clipping, Martinez-Rueta 알고리즘 — turf.js 의 불리언 백엔드)로 제공한다.
+ * 제품의 우선 계산 경로는 전용 Worker에서 실행되는 CanvasKit PathOps다. 이 모듈은
+ * DrawEl을 정확한 cubic SVG 입력으로 직렬화하고 CanvasKit의 portable contour 영수증을
+ * 현재 points 기반 문서 경계로 투영한다. Worker/WASM을 시작할 수 없는 환경에서는
+ * polygon-clipping(Martinez-Rueda) 기반 호환 경로도 제공한다.
  *
- * 파이프라인:
+ * 호환 파이프라인:
  *   1) studioShapeToPolygon — DrawEl 도형(rect/ellipse/star/triangle/polygon/freehand)을
  *      페이지 좌표 폴리곤 링으로 전개. 곡선(타원·둥근 모서리)은 세그먼트 근사(≥64),
  *      회전은 bbox 중심 기준으로 적용. 렌더 파이프라인(StudioDrawNode/studio-svg-export)과
@@ -32,6 +35,7 @@ import {
   starPathPoints,
 } from "./studio-stroke-shapes";
 
+import type { StudioPortablePathGeometryContour } from "./studio-canvaskit-adapter";
 import type { DrawEl, El } from "./studio-element-model";
 
 // ---------------------------------------------------------------------------
@@ -371,6 +375,368 @@ export function studioShapeToPolygon(
     return { ok: false, reason: "면적이 없는(납작한) 도형은 결합할 수 없어요." };
   }
   return { ok: true, polygon: [ring] };
+}
+
+// ---------------------------------------------------------------------------
+// 고품질 Worker 입력/출력 어댑터
+// ---------------------------------------------------------------------------
+
+type StudioSvgPathCommand =
+  | { readonly op: "M" | "L"; readonly x: number; readonly y: number }
+  | {
+      readonly op: "C";
+      readonly c1x: number;
+      readonly c1y: number;
+      readonly c2x: number;
+      readonly c2y: number;
+      readonly x: number;
+      readonly y: number;
+    }
+  | { readonly op: "Z" };
+
+export type StudioPathBooleanSvgInputResult =
+  | Readonly<{ ok: true; pathData: string }>
+  | Readonly<{ ok: false; reason: string }>;
+
+const CIRCLE_CUBIC_KAPPA = 0.552_284_749_830_793_6;
+
+function pathNumber(value: number): string {
+  const rounded = Math.round(value * 1_000) / 1_000;
+  if (Object.is(rounded, -0)) return "0";
+  return Number.isInteger(rounded)
+    ? String(rounded)
+    : rounded.toFixed(3).replace(/(?:\.0+|(\.\d+?)0+)$/u, "$1");
+}
+
+function rotatePathPoint(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  cos: number,
+  sin: number,
+): [number, number] {
+  const dx = x - cx;
+  const dy = y - cy;
+  return [
+    cx + dx * cos - dy * sin,
+    cy + dx * sin + dy * cos,
+  ];
+}
+
+function rotateSvgPathCommands(
+  commands: readonly StudioSvgPathCommand[],
+  cx: number,
+  cy: number,
+  rotationDeg: number,
+): StudioSvgPathCommand[] {
+  if (rotationDeg % 360 === 0) return [...commands];
+  const radians = rotationDeg * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return commands.map((command) => {
+    if (command.op === "Z") return command;
+    const [x, y] = rotatePathPoint(
+      command.x,
+      command.y,
+      cx,
+      cy,
+      cos,
+      sin,
+    );
+    if (command.op !== "C") return { op: command.op, x, y };
+    const [c1x, c1y] = rotatePathPoint(
+      command.c1x,
+      command.c1y,
+      cx,
+      cy,
+      cos,
+      sin,
+    );
+    const [c2x, c2y] = rotatePathPoint(
+      command.c2x,
+      command.c2y,
+      cx,
+      cy,
+      cos,
+      sin,
+    );
+    return { op: "C", c1x, c1y, c2x, c2y, x, y };
+  });
+}
+
+function svgPathData(commands: readonly StudioSvgPathCommand[]): string {
+  return commands.map((command) => {
+    if (command.op === "Z") return "Z";
+    if (command.op === "C") {
+      return [
+        "C",
+        pathNumber(command.c1x),
+        pathNumber(command.c1y),
+        pathNumber(command.c2x),
+        pathNumber(command.c2y),
+        pathNumber(command.x),
+        pathNumber(command.y),
+      ].join(" ");
+    }
+    return `${command.op} ${pathNumber(command.x)} ${pathNumber(command.y)}`;
+  }).join(" ");
+}
+
+function ringPathCommands(ring: StudioPathRing): StudioSvgPathCommand[] {
+  return ring.length === 0
+    ? []
+    : [
+        { op: "M", x: ring[0]![0], y: ring[0]![1] },
+        ...ring.slice(1).map(
+          ([x, y]): StudioSvgPathCommand => ({ op: "L", x, y }),
+        ),
+        { op: "Z" },
+      ];
+}
+
+/**
+ * Converts a current Studio shape into canonical SVG path input for CanvasKit PathOps.
+ * Ellipses and rounded rectangles remain cubic curves instead of the polygon fallback's
+ * 64–512 straight segments.
+ */
+export function studioPathBooleanShapeToSvgPathData(
+  spec: StudioPathBooleanShapeSpec,
+): StudioPathBooleanSvgInputResult {
+  const admitted = studioShapeToPolygon(spec);
+  if (!admitted.ok) return admitted;
+
+  const rotationDeg = isFiniteNumber(spec.rotationDeg) ? spec.rotationDeg : 0;
+  if (spec.kind === "freehand") {
+    const ring = admitted.polygon[0]!;
+    return {
+      ok: true,
+      pathData: svgPathData(ringPathCommands(ring)),
+    };
+  }
+
+  const [x1, y1, x2, y2] = [
+    spec.points[0]!,
+    spec.points[1]!,
+    spec.points[2]!,
+    spec.points[3]!,
+  ];
+  const x = Math.min(x1, x2);
+  const y = Math.min(y1, y2);
+  const width = Math.abs(x2 - x1);
+  const height = Math.abs(y2 - y1);
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const params = normalizeShapeParams(spec.shapeParams);
+  let commands: StudioSvgPathCommand[];
+
+  if (spec.kind === "ellipse") {
+    const rx = width / 2;
+    const ry = height / 2;
+    const kx = rx * CIRCLE_CUBIC_KAPPA;
+    const ky = ry * CIRCLE_CUBIC_KAPPA;
+    commands = [
+      { op: "M", x: cx, y },
+      {
+        op: "C",
+        c1x: cx + kx,
+        c1y: y,
+        c2x: x + width,
+        c2y: cy - ky,
+        x: x + width,
+        y: cy,
+      },
+      {
+        op: "C",
+        c1x: x + width,
+        c1y: cy + ky,
+        c2x: cx + kx,
+        c2y: y + height,
+        x: cx,
+        y: y + height,
+      },
+      {
+        op: "C",
+        c1x: cx - kx,
+        c1y: y + height,
+        c2x: x,
+        c2y: cy + ky,
+        x,
+        y: cy,
+      },
+      {
+        op: "C",
+        c1x: x,
+        c1y: cy - ky,
+        c2x: cx - kx,
+        c2y: y,
+        x: cx,
+        y,
+      },
+      { op: "Z" },
+    ];
+  } else if (spec.kind === "rect") {
+    const radius = effectiveCornerRadius(
+      width,
+      height,
+      params.cornerRadius,
+    );
+    if (radius <= 0) {
+      commands = ringPathCommands([
+        [x, y],
+        [x + width, y],
+        [x + width, y + height],
+        [x, y + height],
+      ]);
+    } else {
+      const k = radius * CIRCLE_CUBIC_KAPPA;
+      commands = [
+        { op: "M", x: x + radius, y },
+        { op: "L", x: x + width - radius, y },
+        {
+          op: "C",
+          c1x: x + width - radius + k,
+          c1y: y,
+          c2x: x + width,
+          c2y: y + radius - k,
+          x: x + width,
+          y: y + radius,
+        },
+        { op: "L", x: x + width, y: y + height - radius },
+        {
+          op: "C",
+          c1x: x + width,
+          c1y: y + height - radius + k,
+          c2x: x + width - radius + k,
+          c2y: y + height,
+          x: x + width - radius,
+          y: y + height,
+        },
+        { op: "L", x: x + radius, y: y + height },
+        {
+          op: "C",
+          c1x: x + radius - k,
+          c1y: y + height,
+          c2x: x,
+          c2y: y + height - radius + k,
+          x,
+          y: y + height - radius,
+        },
+        { op: "L", x, y: y + radius },
+        {
+          op: "C",
+          c1x: x,
+          c1y: y + radius - k,
+          c2x: x + radius - k,
+          c2y: y,
+          x: x + radius,
+          y,
+        },
+        { op: "Z" },
+      ];
+    }
+  } else {
+    // Star/triangle/polygon are already exact straight-edge shapes.
+    commands = ringPathCommands(admitted.polygon[0]!);
+    return {
+      ok: true,
+      pathData: svgPathData(commands),
+    };
+  }
+
+  commands = rotateSvgPathCommands(commands, cx, cy, rotationDeg);
+  return { ok: true, pathData: svgPathData(commands) };
+}
+
+function pointInRing(point: [number, number], ring: StudioPathRing): boolean {
+  let inside = false;
+  const [x, y] = point;
+  for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+    const [xi, yi] = ring[index]!;
+    const [xj, yj] = ring[previous]!;
+    const intersects = (yi > y) !== (yj > y)
+      && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function containmentProbe(ring: StudioPathRing): [number, number] {
+  const first = ring[0]!;
+  const center = ring.reduce(
+    (sum, point) => [sum[0] + point[0], sum[1] + point[1]] as [number, number],
+    [0, 0] as [number, number],
+  );
+  center[0] /= ring.length;
+  center[1] /= ring.length;
+  return [
+    first[0] + (center[0] - first[0]) * 0.000_001,
+    first[1] + (center[1] - first[1]) * 0.000_001,
+  ];
+}
+
+/**
+ * Rebuilds outer/hole hierarchy from CanvasKit's winding-normalized portable contours, then
+ * adapts it to the existing points-based document representation.
+ */
+export function studioPathBooleanOutputFromPortableContours(
+  contours: readonly StudioPortablePathGeometryContour[],
+  op: StudioPathBooleanOp,
+): StudioPathBooleanCombineResult {
+  const rings = contours
+    .filter((contour) => contour.closed)
+    .map((contour) => dedupeRing(roundRing(flatToRing(contour.points))))
+    .filter(
+      (ring) => ring.length >= 3
+        && Math.abs(ringSignedArea(ring)) >= MIN_RING_AREA,
+    )
+    .map((ring, inputIndex) => ({
+      ring,
+      inputIndex,
+      area: Math.abs(ringSignedArea(ring)),
+      parent: -1,
+      depth: 0,
+    }))
+    .sort((left, right) => (
+      right.area - left.area || left.inputIndex - right.inputIndex
+    ));
+
+  for (let index = 0; index < rings.length; index += 1) {
+    const child = rings[index]!;
+    const probe = containmentProbe(child.ring);
+    let parent = -1;
+    let parentArea = Infinity;
+    for (let candidateIndex = 0; candidateIndex < index; candidateIndex += 1) {
+      const candidate = rings[candidateIndex]!;
+      if (
+        candidate.area < parentArea
+        && pointInRing(probe, candidate.ring)
+      ) {
+        parent = candidateIndex;
+        parentArea = candidate.area;
+      }
+    }
+    child.parent = parent;
+    child.depth = parent < 0 ? 0 : rings[parent]!.depth + 1;
+  }
+
+  const polygons: StudioPathPolygon[] = [];
+  const polygonByRing = new Map<number, StudioPathPolygon>();
+  for (let index = 0; index < rings.length; index += 1) {
+    const entry = rings[index]!;
+    if (entry.depth % 2 === 0) {
+      const polygon: StudioPathPolygon = [entry.ring];
+      polygons.push(polygon);
+      polygonByRing.set(index, polygon);
+      continue;
+    }
+    let ancestor = entry.parent;
+    while (ancestor >= 0 && rings[ancestor]!.depth % 2 !== 0) {
+      ancestor = rings[ancestor]!.parent;
+    }
+    polygonByRing.get(ancestor)?.push(entry.ring);
+  }
+  return studioPathBooleanOutputFromPolygons(polygons, op);
 }
 
 // ---------------------------------------------------------------------------

@@ -95,8 +95,45 @@ export interface StudioStrokeToPathStyle {
   dash?: { pattern: readonly number[]; phase: number };
 }
 
+export const STUDIO_PORTABLE_PATH_GEOMETRY_VERSION = 1 as const;
+
+export interface StudioPortablePathGeometryContour {
+  /** Flattened document-space point pairs: [x0, y0, x1, y1, ...]. */
+  readonly points: readonly number[];
+  readonly closed: boolean;
+}
+
+/**
+ * Vendor-neutral, bounded geometry extracted while the CanvasKit Path is still alive.
+ *
+ * This is a settled-operation suggestion only. CanvasKit verbs, Embind objects and WASM
+ * pointers never cross the Worker boundary, and the saved document remains ToonSpectrum-owned.
+ */
+export interface StudioPortablePathGeometry {
+  readonly kind: "studio-portable-path-geometry";
+  readonly version: typeof STUDIO_PORTABLE_PATH_GEOMETRY_VERSION;
+  readonly fillRule: "nonzero";
+  readonly flatnessPx: number;
+  readonly bounds: Readonly<{
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+    readonly width: number;
+    readonly height: number;
+  }>;
+  readonly contours: readonly StudioPortablePathGeometryContour[];
+  readonly flattenedPointCount: number;
+  readonly sourceCommandValueCount: number;
+}
+
 export type StudioPathOpsResult =
-  | { ok: true; pathData: string }
+  | {
+      ok: true;
+      pathData: string;
+      /** Present for CanvasKit Worker results; optional for narrow fallback/test providers. */
+      geometry?: StudioPortablePathGeometry;
+    }
   | { ok: false; reason: string };
 
 // ---------------------------------------------------------------------------

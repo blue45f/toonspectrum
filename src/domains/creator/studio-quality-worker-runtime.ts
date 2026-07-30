@@ -1,3 +1,4 @@
+import { snapshotStudioPortablePathGeometry } from "./studio-canvaskit-portable-geometry";
 import {
   STUDIO_QUALITY_WORKER_BUDGETS,
   STUDIO_QUALITY_WORKER_PROTOCOL_REVISION,
@@ -121,7 +122,12 @@ function portableResult(
     ) {
       return "oversized";
     }
-    return { ok: true, pathData: result.pathData };
+    if (result.geometry === undefined) {
+      return { ok: true, pathData: result.pathData };
+    }
+    const geometry = snapshotStudioPortablePathGeometry(result.geometry);
+    if (geometry === null) return "invalid";
+    return { ok: true, pathData: result.pathData, geometry };
   }
   if (
     result.ok === false

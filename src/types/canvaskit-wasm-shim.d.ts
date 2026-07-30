@@ -28,10 +28,17 @@ export interface CanvasKitPath {
     join?: CanvasKitEnumValue;
     cap?: CanvasKitEnumValue;
   }): CanvasKitPath | null;
+  toCmds(): Float32Array;
   toSVGString(): string;
 }
 
 export interface CanvasKit {
+  readonly MOVE_VERB: number;
+  readonly LINE_VERB: number;
+  readonly QUAD_VERB: number;
+  readonly CONIC_VERB: number;
+  readonly CUBIC_VERB: number;
+  readonly CLOSE_VERB: number;
   readonly Path: {
     new (): CanvasKitPath;
     MakeFromSVGString(pathData: string): CanvasKitPath | null;

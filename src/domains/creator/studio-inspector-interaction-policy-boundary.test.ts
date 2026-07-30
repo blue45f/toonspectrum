@@ -25,6 +25,9 @@ describe("StudioInspectorAside interaction policy boundary", () => {
     expect(inspectorSource).not.toContain(
       'selected === null && tool === "draw"',
     );
+    expect(inspectorSource).toContain(
+      "hasSelection: selected !== null || marqueeIds.length > 0",
+    );
   });
 
   it("semantically disables selected mutations while exposing a separate escape action", () => {

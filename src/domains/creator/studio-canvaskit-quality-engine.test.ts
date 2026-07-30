@@ -44,6 +44,15 @@ describe("Studio CanvasKit quality provider", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.pathData).toMatch(/^M/u);
+    expect(result.geometry).toMatchObject({
+      kind: "studio-portable-path-geometry",
+      version: 1,
+      fillRule: "nonzero",
+    });
+    expect(result.geometry?.contours.length).toBeGreaterThan(0);
+    expect(result.geometry?.contours.every((contour) => contour.closed)).toBe(
+      true,
+    );
     expect(canvasKit.Path.MakeFromSVGString(result.pathData)).not.toBeNull();
     canvasKit.Path.MakeFromSVGString(result.pathData)?.delete();
   });

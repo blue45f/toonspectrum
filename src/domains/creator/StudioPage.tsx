@@ -278,6 +278,7 @@ import {
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
+import { combineStudioShapesWithCanvasKit } from "./studio-canvaskit-path-boolean-document-adapter";
 import {
   selectStudioCausalInkSamples,
   shouldAppendStudioCausalInkSample,
@@ -861,6 +862,7 @@ import {
   studioPathBooleanOpLabel,
   studioPathBooleanPieceToDrawElSeed,
   studioPathBooleanUnavailableReason,
+  type StudioPathBooleanCombineResult,
   type StudioPathBooleanOp,
 } from "./studio-path-boolean";
 import {
@@ -1422,6 +1424,7 @@ import type {
   StudioPublishPreflightInput,
   StudioPublishProfile,
 } from "./studio-publish-preflight";
+import type { StudioQualityWorkerClient } from "./studio-quality-worker-client";
 import type {
   StudioQuickAccessCommandMeta,
   StudioQuickAccessState,
@@ -2565,6 +2568,8 @@ function StudioCuttoonEditor() {
   const [pathBooleanBusy, setPathBooleanBusy] = useState(false);
   const pathBooleanRunIdRef = useRef(0);
   const pathBooleanActiveRef = useRef(false);
+  const pathBooleanAbortRef = useRef<AbortController | null>(null);
+  const pathBooleanClientRef = useRef<StudioQualityWorkerClient | null>(null);
   // Paper.js 경로 정리는 Worker 안의 settled suggestion만 만들며, Studio 문서 권위는 이
   // 컴포넌트가 보유한다. 페이지/Undo/선택이 바뀌면 run/epoch를 함께 전진시켜 늦은 결과를 폐기한다.
   const [paperVectorRefinementBusy, setPaperVectorRefinementBusy] = useState(false);
@@ -3607,6 +3612,8 @@ function StudioCuttoonEditor() {
     if (pathBooleanActiveRef.current) {
       pathBooleanRunIdRef.current += 1;
       pathBooleanActiveRef.current = false;
+      pathBooleanAbortRef.current?.abort();
+      pathBooleanAbortRef.current = null;
       setPathBooleanBusy(false);
     }
     if (paperVectorRefinementActiveRef.current) {
@@ -3630,6 +3637,12 @@ function StudioCuttoonEditor() {
   // edits are rejected after await by the mutation ticket and exact source identity.
   }, [activePage.id, masterEditMode, pagesHi]);
   useEffect(() => () => {
+    pathBooleanRunIdRef.current += 1;
+    pathBooleanActiveRef.current = false;
+    pathBooleanAbortRef.current?.abort();
+    pathBooleanAbortRef.current = null;
+    pathBooleanClientRef.current?.dispose();
+    pathBooleanClientRef.current = null;
     paperVectorRefinementRunIdRef.current += 1;
     paperVectorRefinementActiveRef.current = false;
     paperVectorRefinementAbortRef.current?.abort();
@@ -18457,30 +18470,68 @@ const puppetWarpArmed =
   }
 
   // 벡터 패스 불리언 결합 — 마퀴로 고른 도형 2개를 합치기/빼기/교차/제외로 치환한다.
+  // CanvasKit PathOps는 전용 module Worker에서 곡선을 계산하고 portable contour만 반환한다.
+  // Worker 자체를 시작할 수 없는 환경만 기존 polygon-clipping으로 fail-soft 처리한다.
   // 계산은 lazy geometry 청크를 기다리므로 시작 시점의 render closure를 그대로 커밋하면 안 된다.
   // 페이지/Undo/선택/원본/잠금이 하나라도 바뀐 결과는 authority 없는 suggestion으로 폐기하고,
   // 최신 ref-backed surface가 정확히 같은 때에만 단일 undo commit으로 소비한다.
   async function applyPathBooleanCombine(op: StudioPathBooleanOp) {
-    const selectionEls = marqueeIds
-      .map((id) => elements.find((el) => el.id === id))
+    if (
+      drawingRef.current
+      || requireStudioDrawingPointerTransport(
+        drawingPointerTransportRef,
+      ).getSession()
+    ) {
+      setError("현재 획을 마친 뒤 도형을 결합할 수 있어요.");
+      return;
+    }
+    if (
+      pendingStrokeCommitsRef.current
+      && !flushPendingStrokeCommitsRef.current()
+    ) {
+      setError(
+        "마지막 획을 원고에 확정하지 못해 도형 결합을 시작하지 않았어요. 잠금·동기화 상태를 확인해 주세요.",
+      );
+      return;
+    }
+    if (pathBooleanActiveRef.current) return;
+
+    const selectedIdsAtStart = currentCanvasSelectionIds();
+    const elementsAtStart = activeElementsRef.current;
+    const groupsAtStart = activeGroupsRef.current;
+    const selectionEls = selectedIdsAtStart
+      .map((id) => elementsAtStart.find((el) => el.id === id))
       .filter((el): el is El => Boolean(el));
     const gate = studioPathBooleanUnavailableReason(selectionEls);
     if (gate) {
       setError(gate);
       return;
     }
-    if (selectionEls.some((el) => isEffectivelyLocked(el, groups))) {
+    if (
+      selectionEls.some((el) => isEffectivelyLocked(el, groupsAtStart))
+    ) {
       setError("잠긴 도형은 결합할 수 없어요.");
+      return;
+    }
+    const groupIds = new Set(
+      selectionEls.map((element) => element.groupId ?? null),
+    );
+    if (groupIds.size > 1) {
+      setError(
+        "서로 다른 그룹의 도형은 바로 결합할 수 없어요. 같은 그룹 안에서 선택하거나 먼저 그룹을 해제해 주세요.",
+      );
       return;
     }
     if (pageEditLocked && !masterEditMode) {
       setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 편집해 주세요.");
       return;
     }
-    if (pathBooleanActiveRef.current) return;
+
     const runId = pathBooleanRunIdRef.current + 1;
     pathBooleanRunIdRef.current = runId;
     pathBooleanActiveRef.current = true;
+    const controller = new AbortController();
+    pathBooleanAbortRef.current = controller;
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = currentPageIdRef.current || activePage.id;
     const targetMasterEditMode = masterEditModeRef.current;
@@ -18495,13 +18546,66 @@ const puppetWarpArmed =
     setPathBooleanBusy(true);
     try {
       const indexed = selectionEls
-        .map((el) => ({ el: el as DrawEl & El, index: elements.findIndex((e) => e.id === el.id) }))
+        .map((el) => ({
+          el: el as DrawEl & El,
+          index: elementsAtStart.findIndex((element) => element.id === el.id),
+        }))
         .sort((x, y) => x.index - y.index);
       const base = indexed[0]!.el; // 아래(BACK 쪽)
       const top = indexed[1]!.el; // 위
       const baseSpec = drawElToStudioPathBooleanSpec(base)!;
       const topSpec = drawElToStudioPathBooleanSpec(top)!;
-      const result = await combineStudioShapes(baseSpec, topSpec, op); // polygon-clipping은 여기서 lazy 로드
+      let result: StudioPathBooleanCombineResult;
+      let provider: "canvaskit" | "polygon-clipping" = "canvaskit";
+      try {
+        const qualityModule = await import("./studio-quality-worker-client");
+        if (
+          controller.signal.aborted
+          || !pathBooleanActiveRef.current
+          || pathBooleanRunIdRef.current !== runId
+        ) {
+          return;
+        }
+        const client = pathBooleanClientRef.current
+          ?? new qualityModule.StudioQualityWorkerClient();
+        pathBooleanClientRef.current = client;
+        result = await combineStudioShapesWithCanvasKit(
+          client,
+          baseSpec,
+          topSpec,
+          op,
+          { signal: controller.signal },
+        );
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        const code = (
+          typeof cause === "object"
+          && cause !== null
+          && "code" in cause
+          && typeof cause.code === "string"
+        ) ? cause.code : null;
+        const fallbackAllowed = code === null || [
+          "post-failed",
+          "provider-capability-missing",
+          "provider-init-failed",
+          "protocol",
+          "unsupported-protocol",
+          "worker-failed",
+          "worker-unavailable",
+        ].includes(code);
+        if (!fallbackAllowed) throw cause;
+        pathBooleanClientRef.current?.dispose();
+        pathBooleanClientRef.current = null;
+        provider = "polygon-clipping";
+        result = await combineStudioShapes(baseSpec, topSpec, op);
+      }
+      if (
+        controller.signal.aborted
+        || !pathBooleanActiveRef.current
+        || pathBooleanRunIdRef.current !== runId
+      ) {
+        return;
+      }
       if (!result.ok) {
         setError(result.reason);
         return;
@@ -18548,6 +18652,19 @@ const puppetWarpArmed =
         ...studioPathBooleanPieceToDrawElSeed(piece, base),
         id: uid(),
         name: `도형 결합 ${studioPathBooleanOpLabel(op)}`,
+        ...(base.groupId ? { groupId: base.groupId } : {}),
+        ...(base.blendMode ? { blendMode: base.blendMode } : {}),
+        ...(base.noClip !== undefined ? { noClip: base.noClip } : {}),
+        ...(base.clipBelow !== undefined ? { clipBelow: base.clipBelow } : {}),
+        ...(base.alphaLocked !== undefined
+          ? { alphaLocked: base.alphaLocked }
+          : {}),
+        ...(base.maskSrc ? { maskSrc: base.maskSrc } : {}),
+        ...(base.maskEnabled !== undefined
+          ? { maskEnabled: base.maskEnabled }
+          : {}),
+        ...(base.layerRole ? { layerRole: base.layerRole } : {}),
+        ...(base.layerColor ? { layerColor: base.layerColor } : {}),
       }) as El);
       const latestBaseIndex = latestElements.findIndex(
         (element) => element.id === base.id
@@ -18558,21 +18675,47 @@ const puppetWarpArmed =
       const insertAt = latestElements
         .slice(0, latestBaseIndex)
         .filter((element) => element.id !== top.id).length;
+      const trackedSourceIds = selectedIds.filter((id) =>
+        hasTrack(animTimeline, id)
+      );
+      const nextTimeline = trackedSourceIds.reduce(
+        (document, id) => removeTrack(document, id),
+        animTimeline,
+      );
       const committed = commit(
         [...kept.slice(0, insertAt), ...pieceEls, ...kept.slice(insertAt)],
-        undefined,
+        trackedSourceIds.length > 0
+          ? { animTimeline: nextTimeline }
+          : undefined,
         targetPageId
       );
       if (!committed) return;
-      setSelectedId(pieceEls.length === 1 ? pieceEls[0]!.id : null);
-      setMarqueeIds(pieceEls.length > 1 ? pieceEls.map((el) => el.id) : []);
+      applyGroupSelectionState({
+        ...selectionShapeForIds(pieceEls.map((element) => element.id)),
+        activeGroupId:
+          base.groupId && activeGroupIdRef.current === base.groupId
+            ? base.groupId
+            : null,
+      });
       setError(null);
+      announceDrawingShortcut(
+        `${studioPathBooleanOpLabel(op)} 완료 · 2개 → ${pieceEls.length}개${
+          provider === "canvaskit" ? " · Skia 고품질 경로" : " · 호환 경로"
+        }`,
+      );
     } catch (err) {
-      console.error("Failed to apply path boolean combine:", err);
-      setError("도형 결합에 실패했습니다.");
+      if (!controller.signal.aborted) {
+        console.error("Failed to apply path boolean combine:", err);
+        setError(
+          err instanceof Error && err.name === "TimeoutError"
+            ? "고품질 도형 결합 시간이 초과됐어요. 도형을 단순화한 뒤 다시 시도해 주세요."
+            : "도형 결합에 실패했습니다.",
+        );
+      }
     } finally {
       if (pathBooleanRunIdRef.current === runId) {
         pathBooleanActiveRef.current = false;
+        pathBooleanAbortRef.current = null;
         setPathBooleanBusy(false);
       }
     }

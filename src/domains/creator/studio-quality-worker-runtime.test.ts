@@ -67,6 +67,31 @@ function request(
   };
 }
 
+function mutablePortableGeometry() {
+  return {
+    kind: "studio-portable-path-geometry",
+    version: 1,
+    fillRule: "nonzero",
+    flatnessPx: 0.25,
+    bounds: {
+      minX: 0,
+      minY: 0,
+      maxX: 10,
+      maxY: 10,
+      width: 10,
+      height: 10,
+    },
+    contours: [
+      {
+        points: [0, 0, 10, 0, 0, 10],
+        closed: true,
+      },
+    ],
+    flattenedPointCount: 3,
+    sourceCommandValueCount: 10,
+  };
+}
+
 async function flushMicrotasks(rounds = 8): Promise<void> {
   for (let index = 0; index < rounds; index += 1) {
     await Promise.resolve();
@@ -163,6 +188,63 @@ describe("Studio quality Worker runtime", () => {
       operationKind: "stroke-to-fill",
       result: { ok: true, pathData: "M0 0L20 0|stroke:7" },
     });
+  });
+
+  it("projects and deep-snapshots portable geometry before posting", async () => {
+    const sourceGeometry = mutablePortableGeometry();
+    const providerResult = {
+      ok: true,
+      pathData: "M0 0H10L0 10Z",
+      geometry: sourceGeometry,
+      vendorPathHandle: { delete: vi.fn() },
+    };
+    const { messages, runtime } = harness(() =>
+      fakeProvider({
+        pathOp() {
+          return providerResult as unknown as StudioPathOpsResult;
+        },
+      }),
+    );
+
+    runtime.handleMessage(initialize());
+    await flushMicrotasks();
+    runtime.handleMessage(request(1));
+    await flushMicrotasks();
+
+    const message = messages.find(
+      (candidate) => candidate.type === "studio-quality/result",
+    );
+    expect(message).toBeDefined();
+    if (message?.type !== "studio-quality/result") {
+      throw new Error("Expected a quality Worker result.");
+    }
+    expect(message.result).not.toHaveProperty("vendorPathHandle");
+    expect(message.result).toEqual({
+      ok: true,
+      pathData: "M0 0H10L0 10Z",
+      geometry: mutablePortableGeometry(),
+    });
+    if (!message.result.ok || !message.result.geometry) {
+      throw new Error("Expected a portable geometry snapshot.");
+    }
+    expect(Object.isFrozen(message.result.geometry)).toBe(true);
+    expect(Object.isFrozen(message.result.geometry.bounds)).toBe(true);
+    expect(Object.isFrozen(message.result.geometry.contours)).toBe(true);
+    expect(Object.isFrozen(message.result.geometry.contours[0])).toBe(true);
+    expect(Object.isFrozen(message.result.geometry.contours[0]?.points)).toBe(true);
+
+    providerResult.pathData = "M999 999Z";
+    sourceGeometry.bounds.maxX = 999;
+    sourceGeometry.contours[0]!.points[0] = 999;
+    sourceGeometry.contours.push({
+      points: [50, 50, 60, 50, 50, 60],
+      closed: true,
+    });
+
+    expect(message.result.pathData).toBe("M0 0H10L0 10Z");
+    expect(message.result.geometry.bounds.maxX).toBe(10);
+    expect(message.result.geometry.contours).toHaveLength(1);
+    expect(message.result.geometry.contours[0]?.points[0]).toBe(0);
   });
 
   it("snapshots mutable request style before asynchronous execution", async () => {

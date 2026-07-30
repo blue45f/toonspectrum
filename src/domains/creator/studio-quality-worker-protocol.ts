@@ -1,3 +1,5 @@
+import { snapshotStudioPortablePathGeometry } from "./studio-canvaskit-portable-geometry";
+
 import type {
   StudioPathOpsResult,
   StudioQualityPathOp,
@@ -10,7 +12,7 @@ import type {
  * CanvasKit/Skia and its Embind objects are deliberately absent from this contract. Only bounded
  * scalar data and portable SVG path strings may cross the Worker boundary.
  */
-export const STUDIO_QUALITY_WORKER_PROTOCOL_REVISION = 1 as const;
+export const STUDIO_QUALITY_WORKER_PROTOCOL_REVISION = 2 as const;
 
 export const STUDIO_QUALITY_WORKER_BUDGETS = Object.freeze({
   maxQueuedRequests: 16,
@@ -442,11 +444,18 @@ function hasResponseCorrelation(
 function isPortableResult(value: unknown): value is StudioPathOpsResult {
   if (!isRecord(value)) return false;
   if (
-    hasExactKeys(value, ["ok", "pathData"])
+    (
+      hasExactKeys(value, ["ok", "pathData"])
+      || hasExactKeys(value, ["ok", "pathData", "geometry"])
+    )
     && value.ok === true
     && isBoundedString(
       value.pathData,
       STUDIO_QUALITY_WORKER_BUDGETS.maxOutputPathCodeUnits,
+    )
+    && (
+      !Object.hasOwn(value, "geometry")
+      || snapshotStudioPortablePathGeometry(value.geometry) !== null
     )
   ) {
     return true;

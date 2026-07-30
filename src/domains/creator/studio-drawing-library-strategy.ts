@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v6" as const;
+  "studio-drawing-library-strategy-v7" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
@@ -22,6 +22,7 @@ export type StudioDrawingLibraryProductLayer =
   | "deterministic-raster-fallback"
   | "filter-worker"
   | "gpu-vector-research"
+  | "browser-runtime-benchmark"
   | "quality-benchmark"
   | "scene-model";
 
@@ -48,6 +49,7 @@ export type StudioDrawingLibraryDecision =
   | "poc-deterministic-raster-oracle"
   | "benchmark-first-filter-worker-provider"
   | "research-only-gpu-vector-provider"
+  | "native-browser-compatibility-benchmark"
   | "benchmark-oracle-only"
   | "rejected-duplicate-scene-model";
 
@@ -220,7 +222,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-worker-path-quality-provider",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "canvaskit-wasm 0.41.1 is installed behind a module Worker/WASM protocol and implements bounded Skia PathOps plus stroke-to-fill conversion. A production-source import audit finds no normal Studio caller of StudioQualityWorkerClient yet, so this remains implemented but unwired.",
+        "canvaskit-wasm 0.41.1 is installed behind a module Worker/WASM protocol. Bounded Skia PathOps is connected to the settled shape Boolean flow, while stroke-to-fill conversion remains implemented but unwired pending a canonical fill-only vector document boundary.",
       riskNotes: [
         "Only plain SVG path data and structured receipts may cross the Worker boundary; Embind objects and WASM pointers never enter the document.",
         "It has no live or committed brush-pixel authority and cannot replace the canonical stroke plan.",
@@ -292,6 +294,22 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       ],
     }),
     strategy({
+      id: "servo",
+      displayName: "Servo",
+      packageName: "servo",
+      license: "MPL-2.0",
+      productLayer: "browser-runtime-benchmark",
+      decision: "native-browser-compatibility-benchmark",
+      runtimeInstallation: "not-installed-benchmark-only",
+      maintenanceNote:
+        "Active embeddable browser-engine research candidate; regular 0.3.0, LTS 0.1.2 and main 0.4.0-dev were audited on 2026-07-30. Servo is not installed in the Vite bundle and has no Studio renderer route.",
+      riskNotes: [
+        "Servo is a browser runtime and native-shell compatibility target, not a brush, vector, filter or canonical document provider.",
+        "Current upstream compatibility evidence still includes pointerrawupdate and pen coalesced-event failures, Worker OffscreenCanvas gaps, WebGPU default-off behavior and a COEP credentialless isolation failure.",
+        "Adoption gate: keep any experiment in a separate native shell and require the production Studio browser QA corpus to pass before considering distribution.",
+      ],
+    }),
+    strategy({
       id: "signature-pad",
       displayName: "Signature Pad",
       packageName: "signature_pad",
@@ -360,7 +378,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
  * libraries, while GPL/proprietary references may be useful without being product dependencies.
  */
 export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
-  "studio-drawing-source-audit-v5" as const;
+  "studio-drawing-source-audit-v6" as const;
 
 export type StudioDrawingSourceKind =
   | "first-party"
@@ -718,6 +736,21 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     brushAuthorityOverlap: "path-renderer-overlap",
     rationale:
       "Official upstream calls Vello alpha, lists unfinished filters/artifact handling/GPU allocation/glyph caching, and says web is not a primary target with incomplete WebGPU implementations. It remains research-only until production web support plus browser parity, device-loss, memory and deterministic-export fallback gates pass.",
+  }),
+  sourceAudit({
+    id: "servo",
+    displayName: "Servo",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/servo/servo",
+    versionEvidence:
+      "regular 0.3.0 (2026-06-25), LTS 0.1.2 (2026-07-06), main 0.4.0-dev audited 2026-07-30; not installed",
+    license: "MPL-2.0",
+    activity: "active",
+    disposition: "research-only",
+    codePolicy: "research-only",
+    brushAuthorityOverlap: "none-infrastructure",
+    rationale:
+      "Servo is evaluated only as an independent embeddable browser/runtime compatibility benchmark and possible future native Studio shell. Current pointerrawupdate and pen coalesced-event failures, Worker OffscreenCanvas gaps, WebGPU default-off behavior and COEP credentialless isolation failure prohibit treating it as a product rendering provider or supported runtime today.",
   }),
   sourceAudit({
     id: "wacom-will",

@@ -15,6 +15,7 @@ import {
   type StudioQualityPathOp,
   type StudioStrokeToPathStyle,
 } from "./studio-canvaskit-adapter";
+import { flattenStudioCanvasKitPathCommands } from "./studio-canvaskit-portable-geometry";
 
 import type {
   CanvasKit,
@@ -114,13 +115,35 @@ function normalizeDash(
   return { on, off, phase: dash.phase };
 }
 
-function pathResult(path: Path | null, failureReason: string): StudioPathOpsResult {
+function pathResult(
+  canvasKit: CanvasKit,
+  path: Path | null,
+  failureReason: string,
+): StudioPathOpsResult {
   if (!path) return { ok: false, reason: failureReason };
   const pathData = path.toSVGString();
   if (!pathData || pathData.trim().length === 0) {
     return { ok: false, reason: failureReason };
   }
-  return { ok: true, pathData };
+  let commands: Float32Array;
+  try {
+    commands = path.toCmds();
+  } catch {
+    return {
+      ok: false,
+      reason: "Skia 경로 결과를 이식 가능한 지오메트리로 추출하지 못했어요.",
+    };
+  }
+  const portable = flattenStudioCanvasKitPathCommands(commands, {
+    move: canvasKit.MOVE_VERB,
+    line: canvasKit.LINE_VERB,
+    quad: canvasKit.QUAD_VERB,
+    conic: canvasKit.CONIC_VERB,
+    cubic: canvasKit.CUBIC_VERB,
+    close: canvasKit.CLOSE_VERB,
+  });
+  if (!portable.ok) return { ok: false, reason: portable.reason };
+  return { ok: true, pathData, geometry: portable.geometry };
 }
 
 /**
@@ -146,7 +169,7 @@ function windingPathResult(
     simplified = canvasKit.Path.MakeFromOp(path, empty, canvasKit.PathOp.Union);
     if (!simplified) return { ok: false, reason: failureReason };
     winding = simplified.makeAsWinding();
-    return pathResult(winding, failureReason);
+    return pathResult(canvasKit, winding, failureReason);
   } catch {
     return { ok: false, reason: failureReason };
   } finally {
@@ -266,6 +289,7 @@ export function createStudioCanvasKitQualityEngine(
           join: canvasKitStrokeJoin(canvasKit, style.join),
         });
         return pathResult(
+          canvasKit,
           stroked,
           "Skia가 이 획을 채움 경로로 변환하지 못했어요.",
         );

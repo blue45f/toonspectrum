@@ -1,8 +1,9 @@
 /**
  * Studio Path Boolean Panel
  * 도형 결합(벡터 패스 불리언) 컨트롤 — 선택한 도형 2개를 합치기/빼기/교차/제외로
- * 하나의 벡터 패스(freehand DrawEl)로 결합한다. 실제 지오메트리 연산·커밋은 StudioPage 가
- * studio-path-boolean 엔진(polygon-clipping lazy 청크)을 dynamic import 해 수행한다.
+ * 하나의 벡터 패스(freehand DrawEl)로 결합한다. 실제 지오메트리 연산은 전용 Worker의
+ * CanvasKit PathOps가 담당하고, Worker를 시작할 수 없는 환경만 polygon-clipping 호환
+ * 경로를 사용한다. 문서 권위·단일 Undo 커밋은 StudioPage가 유지한다.
  *
  * 완전히 controlled — 내부 비즈니스 상태 없음(StudioExtendedBlendPanel 과 동일 관례).
  * 무장(armed) 도구가 아니라 캔버스 제스처를 바꾸지 않는다 — disarm 연동 불필요.
@@ -35,9 +36,9 @@ export function StudioPathBooleanPanel({
 }: StudioPathBooleanPanelProps): ReactElement {
   const applyDisabled = busy || Boolean(unavailableReason);
   const statusText = busy
-    ? "도형을 결합하는 중..."
+    ? "Skia 고품질 경로로 도형을 결합하는 중..."
     : unavailableReason
-      ?? "선택한 도형 2개를 하나의 벡터 패스로 결합합니다(⌘Z로 한 번에 되돌리기). 빼기는 아래 도형에서 위 도형을 오려냅니다. 그라데이션·패턴 채우기는 결과에서 단색 채우기로 바뀝니다.";
+      ?? "선택한 도형 2개를 곡선 품질을 유지해 하나의 벡터 패스로 결합합니다(⌘Z로 한 번에 되돌리기). 빼기는 아래 도형에서 위 도형을 오려냅니다. 그라데이션·패턴 채우기는 결과에서 단색 채우기로 바뀝니다.";
 
   return (
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">

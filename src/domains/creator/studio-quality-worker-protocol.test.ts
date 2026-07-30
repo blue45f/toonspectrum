@@ -28,6 +28,31 @@ function pathRequest(
   };
 }
 
+function portableGeometry() {
+  return {
+    kind: "studio-portable-path-geometry",
+    version: 1,
+    fillRule: "nonzero",
+    flatnessPx: 0.25,
+    bounds: {
+      minX: 0,
+      minY: 0,
+      maxX: 10,
+      maxY: 10,
+      width: 10,
+      height: 10,
+    },
+    contours: [
+      {
+        points: [0, 0, 10, 0, 0, 10],
+        closed: true,
+      },
+    ],
+    flattenedPointCount: 3,
+    sourceCommandValueCount: 10,
+  };
+}
+
 describe("Studio quality Worker protocol", () => {
   it("accepts exact initialize, boolean, stroke, cancel, and dispose messages", () => {
     expect(
@@ -201,6 +226,54 @@ describe("Studio quality Worker protocol", () => {
       isStudioQualityWorkerResponseMessage({
         ...response,
         result: { ok: true, pathData: "" },
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts exact revision 2 portable geometry and rejects malformed geometry", () => {
+    expect(STUDIO_QUALITY_WORKER_PROTOCOL_REVISION).toBe(2);
+    const geometry = portableGeometry();
+    const response = {
+      type: "studio-quality/result",
+      protocolRevision: STUDIO_QUALITY_WORKER_PROTOCOL_REVISION,
+      workerEpoch: 7,
+      requestId: 1,
+      requestToken: "q:7:1:path-boolean",
+      operationKind: "path-boolean",
+      providerId: "canvaskit",
+      result: {
+        ok: true,
+        pathData: "M0 0H10L0 10Z",
+        geometry,
+      },
+    };
+
+    expect(isStudioQualityWorkerResponseMessage(response)).toBe(true);
+    expect(
+      isStudioQualityWorkerResponseMessage({
+        ...response,
+        result: {
+          ...response.result,
+          geometry: {
+            ...geometry,
+            bounds: {
+              ...geometry.bounds,
+              width: 9,
+            },
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isStudioQualityWorkerResponseMessage({
+        ...response,
+        result: {
+          ...response.result,
+          geometry: {
+            ...geometry,
+            vendorPathHandle: 42,
+          },
+        },
       }),
     ).toBe(false);
   });

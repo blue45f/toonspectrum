@@ -14,7 +14,7 @@ import {
 describe("studio drawing library strategy", () => {
   it("keeps an extensible specialist inventory without document or brush-pixel authority", () => {
     expect(STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION)
-      .toBe("studio-drawing-library-strategy-v6");
+      .toBe("studio-drawing-library-strategy-v7");
     const requiredIds = [
       "perfect-freehand",
       "lazy-brush",
@@ -29,6 +29,7 @@ describe("studio drawing library strategy", () => {
       "tiny-skia",
       "photon",
       "vello",
+      "servo",
       "signature-pad",
       "atrament",
       "croquis",
@@ -147,7 +148,12 @@ describe("studio drawing library strategy", () => {
     expect(canvasKit?.maintenanceNote).toContain("module Worker/WASM");
     expect(canvasKit?.maintenanceNote).toContain("PathOps");
     expect(canvasKit?.maintenanceNote).toContain("stroke-to-fill");
-    expect(canvasKit?.maintenanceNote).toContain("implemented but unwired");
+    expect(canvasKit?.maintenanceNote).toContain(
+      "settled shape Boolean flow",
+    );
+    expect(canvasKit?.maintenanceNote).toContain(
+      "stroke-to-fill conversion remains implemented but unwired",
+    );
     expect(canvasKit?.riskNotes).toContain(
       "Only plain SVG path data and structured receipts may cross the Worker boundary; Embind objects and WASM pointers never enter the document.",
     );
@@ -216,6 +222,21 @@ describe("studio drawing library strategy", () => {
     expect(vello?.riskNotes.join(" ")).toContain(
       "web is not a primary target",
     );
+    const servo = resolveStudioDrawingLibraryStrategy("servo");
+    expect(servo).toMatchObject({
+      packageName: "servo",
+      license: "MPL-2.0",
+      productLayer: "browser-runtime-benchmark",
+      decision: "native-browser-compatibility-benchmark",
+      runtimeInstallation: "not-installed-benchmark-only",
+      canonicalAuthority: false,
+      brushPixelAuthority: false,
+    });
+    expect(servo?.maintenanceNote).toContain("0.3.0");
+    expect(servo?.maintenanceNote).toContain("LTS 0.1.2");
+    expect(servo?.riskNotes.join(" ")).toContain("not a brush");
+    expect(servo?.riskNotes.join(" ")).toContain("pointerrawupdate");
+    expect(servo?.riskNotes.join(" ")).toContain("WebGPU default-off");
     expect(resolveStudioDrawingLibraryStrategy("fabric")).toMatchObject({
       productLayer: "scene-model",
       decision: "rejected-duplicate-scene-model",
@@ -294,6 +315,7 @@ describe("studio drawing source adoption audit", () => {
     "tiny-skia",
     "photon",
     "vello",
+    "servo",
     "wacom-will",
     "brushlib-wasm",
     "glbrush",
@@ -310,7 +332,7 @@ describe("studio drawing source adoption audit", () => {
 
   it("freezes the complete reviewed candidate set and provenance fields", () => {
     expect(STUDIO_DRAWING_SOURCE_AUDIT_VERSION)
-      .toBe("studio-drawing-source-audit-v5");
+      .toBe("studio-drawing-source-audit-v6");
     expect(STUDIO_DRAWING_SOURCE_AUDIT.map(({ id }) => id)).toEqual(
       candidateIds,
     );
@@ -365,6 +387,11 @@ describe("studio drawing source adoption audit", () => {
       disposition: "research-only",
       codePolicy: "research-only",
       brushAuthorityOverlap: "path-renderer-overlap",
+    });
+    expect(resolveStudioDrawingSourceAudit("servo")).toMatchObject({
+      disposition: "research-only",
+      codePolicy: "research-only",
+      brushAuthorityOverlap: "none-infrastructure",
     });
 
     for (const id of [
@@ -442,6 +469,19 @@ describe("studio drawing source adoption audit", () => {
       .toContain("calls Vello alpha");
     expect(resolveStudioDrawingSourceAudit("vello")?.rationale)
       .toContain("web is not a primary target");
+
+    expect(resolveStudioDrawingSourceAudit("servo")).toMatchObject({
+      officialSource: "https://github.com/servo/servo",
+      versionEvidence:
+        "regular 0.3.0 (2026-06-25), LTS 0.1.2 (2026-07-06), main 0.4.0-dev audited 2026-07-30; not installed",
+      license: "MPL-2.0",
+      activity: "active",
+      brushAuthorityOverlap: "none-infrastructure",
+    });
+    expect(resolveStudioDrawingSourceAudit("servo")?.rationale)
+      .toContain("browser/runtime compatibility benchmark");
+    expect(resolveStudioDrawingSourceAudit("servo")?.rationale)
+      .toContain("COEP credentialless isolation failure");
   });
 
   it("records the installed Hokusai settled transform without claiming a live core", () => {
