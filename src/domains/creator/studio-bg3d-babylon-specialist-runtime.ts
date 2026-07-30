@@ -52,6 +52,11 @@ export interface StudioBg3dBabylonEngineSettings {
   readonly antialias: boolean;
   readonly adaptToDeviceRatio: boolean;
   readonly deterministicLockstep: boolean;
+  /**
+   * Production capture defaults to hardware-quality fail-closed behavior. An explicit diagnostics
+   * probe may disable this so headless/software contexts can report their real backend capability.
+   */
+  readonly failIfMajorPerformanceCaveat: boolean;
   readonly lockstepMaxSteps: number;
   readonly timeStepSeconds: number;
   readonly powerPreference: "high-performance" | "low-power";
@@ -122,11 +127,13 @@ const MAX_TRANSFORM_SAMPLES = 512;
 const MAX_TRANSFORM_NODE_ID_LENGTH = 128;
 const MAX_TRANSFORM_POSITION = 1_000_000;
 const MIN_QUATERNION_LENGTH = 1e-8;
+const BABYLON_ENGINE_INIT_TIMEOUT_MS = 20_000;
 
 const DEFAULT_SETTINGS: StudioBg3dBabylonEngineSettings = Object.freeze({
   antialias: true,
   adaptToDeviceRatio: true,
   deterministicLockstep: true,
+  failIfMajorPerformanceCaveat: true,
   lockstepMaxSteps: 4,
   timeStepSeconds: 1 / 60,
   powerPreference: "high-performance",
@@ -182,6 +189,8 @@ function sanitizeSettings(
     adaptToDeviceRatio: value?.adaptToDeviceRatio ?? DEFAULT_SETTINGS.adaptToDeviceRatio,
     deterministicLockstep:
       value?.deterministicLockstep ?? DEFAULT_SETTINGS.deterministicLockstep,
+    failIfMajorPerformanceCaveat:
+      value?.failIfMajorPerformanceCaveat ?? DEFAULT_SETTINGS.failIfMajorPerformanceCaveat,
     lockstepMaxSteps: lockstepMaxSteps ?? DEFAULT_SETTINGS.lockstepMaxSteps,
     timeStepSeconds: timeStepSeconds ?? DEFAULT_SETTINGS.timeStepSeconds,
     powerPreference: value?.powerPreference ?? DEFAULT_SETTINGS.powerPreference,
@@ -420,6 +429,41 @@ function safeDispose(resource: { dispose(): void } | null): void {
   }
 }
 
+function awaitBabylonEngineInitialization(
+  operation: Promise<StudioBg3dBabylonEngineHandle>,
+  signal: AbortSignal,
+): Promise<StudioBg3dBabylonEngineHandle> {
+  return new Promise((resolve, reject) => {
+    let acceptingResult = true;
+    const finish = (callback: () => void): void => {
+      if (!acceptingResult) return;
+      acceptingResult = false;
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", onAbort);
+      callback();
+    };
+    const onAbort = () => finish(() => reject(specialistError("aborted")));
+    const timeout = setTimeout(
+      () => finish(() => reject(specialistError("engine-init-failed"))),
+      BABYLON_ENGINE_INIT_TIMEOUT_MS,
+    );
+    signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(
+      (engine) => {
+        if (!acceptingResult) {
+          safeDispose(engine);
+          return;
+        }
+        finish(() => resolve(engine));
+      },
+      (error: unknown) => {
+        if (!acceptingResult) return;
+        finish(() => reject(error));
+      },
+    );
+  });
+}
+
 function abortErrorFor(reason: ActiveAbortReason | null): StudioBg3dBabylonSpecialistError {
   return specialistError(reason ?? "aborted");
 }
@@ -529,18 +573,23 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
     return this.#bindingsPromise;
   }
 
-  async #engineForRun(): Promise<StudioBg3dBabylonEngineHandle> {
+  async #engineForRun(signal: AbortSignal): Promise<StudioBg3dBabylonEngineHandle> {
     if (this.#engineRecord) return this.#engineRecord.engine;
     this.#status = "initializing";
     const bindings = await this.#bindingsForRun();
+    if (signal.aborted) throw specialistError("aborted");
     if (this.#disposed) throw specialistError("disposed");
     if (this.#contextLost) throw specialistError("context-lost");
     let engine: StudioBg3dBabylonEngineHandle;
     try {
-      engine = this.#backend === "webgpu"
-        ? await bindings.createWebGpuEngine(this.#canvas, this.#settings)
-        : bindings.createWebGlEngine(this.#canvas, this.#settings);
+      engine = await awaitBabylonEngineInitialization(
+        Promise.resolve().then(() => this.#backend === "webgpu"
+          ? bindings.createWebGpuEngine(this.#canvas, this.#settings)
+          : bindings.createWebGlEngine(this.#canvas, this.#settings)),
+        signal,
+      );
     } catch (error) {
+      if (error instanceof StudioBg3dBabylonSpecialistError) throw error;
       throw specialistError("engine-init-failed", error);
     }
     if (this.#disposed || this.#contextLost) {
@@ -587,7 +636,7 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
 
     let scene: StudioBg3dBabylonSceneHandle | null = null;
     try {
-      const engine = await this.#engineForRun();
+      const engine = await this.#engineForRun(controller.signal);
       if (controller.signal.aborted) throw abortErrorFor(active.reason);
       const bindings = await this.#bindingsForRun();
       scene = bindings.createScene(engine);

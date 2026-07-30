@@ -90,7 +90,11 @@ describe("Studio quality-first build-size policy", () => {
       "function checkApprovedLazySpecialistBoundary(",
       "try {",
     );
-    expect(specialistBoundaryBlock).toContain("if (matching.length === 0) return");
+    expect(specialistBoundaryBlock).toContain("if (matching.length === 0) {");
+    expect(specialistBoundaryBlock).toContain(
+      "production activation is missing its approved emitted entry/runtime chunk",
+    );
+    expect(specialistBoundaryBlock).toContain("fail(");
     expect(specialistBoundaryBlock).toContain("approvedEntries.length !== 1");
     expect(specialistBoundaryBlock).toContain("approvedEntry.isDynamicEntry !== true");
     expect(specialistBoundaryBlock).toContain("runtimeChunks.length !== 1");

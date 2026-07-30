@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-function moduleImports(fileName: string) {
+interface ParsedModule {
+  readonly file: ts.SourceFile;
+  readonly source: string;
+}
+
+function parseModule(fileName: string): ParsedModule {
   const fileUrl = new URL(fileName, import.meta.url);
   const source = readFileSync(fileUrl, "utf8");
   const file = ts.createSourceFile(
@@ -13,6 +18,11 @@ function moduleImports(fileName: string) {
     true,
     fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+  return { file, source };
+}
+
+function moduleImports(fileName: string) {
+  const { file } = parseModule(fileName);
   const valueImports: string[] = [];
   const dynamicImports: string[] = [];
 
@@ -37,6 +47,59 @@ function moduleImports(fileName: string) {
 
   visit(file);
   return { dynamicImports, valueImports };
+}
+
+function functionName(node: ts.Node): string | null {
+  if (
+    (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) &&
+    node.name
+  ) {
+    return node.name.text;
+  }
+  if (
+    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+    ts.isVariableDeclaration(node.parent) &&
+    ts.isIdentifier(node.parent.name)
+  ) {
+    return node.parent.name.text;
+  }
+  if (ts.isMethodDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
+    return node.name.text;
+  }
+  return null;
+}
+
+function isFunctionLikeDeclarationNode(
+  node: ts.Node,
+): node is ts.FunctionLikeDeclaration {
+  return ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isConstructorDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node);
+}
+
+function enclosingFunction(node: ts.Node): ts.FunctionLikeDeclaration | null {
+  let current = node.parent;
+  while (current) {
+    if (isFunctionLikeDeclarationNode(current)) return current;
+    current = current.parent;
+  }
+  return null;
+}
+
+function hasAncestor(
+  node: ts.Node,
+  predicate: (candidate: ts.Node) => boolean,
+): boolean {
+  let current = node.parent;
+  while (current) {
+    if (predicate(current)) return true;
+    current = current.parent;
+  }
+  return false;
 }
 
 describe("Studio background 3D bundle boundary", () => {
@@ -84,5 +147,98 @@ describe("Studio background 3D bundle boundary", () => {
 
     expect(imports.valueImports).toEqual([]);
     expect(imports.dynamicImports).toEqual([]);
+  });
+
+  it("loads Babylon exactly once from its named explicit diagnostic loader", () => {
+    const { file, source } = parseModule("./StudioBackground3D.tsx");
+    const imports = moduleImports("./StudioBackground3D.tsx");
+    const babylonDynamicImports: ts.CallExpression[] = [];
+    const loaderCalls: ts.CallExpression[] = [];
+    const loaderFunctions: ts.FunctionLikeDeclaration[] = [];
+    const automaticActivationProps = new Set([
+      "onFocus",
+      "onMouseEnter",
+      "onPointerEnter",
+      "onTouchStart",
+    ]);
+
+    function visit(node: ts.Node) {
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        node.arguments.length === 1 &&
+        ts.isStringLiteral(node.arguments[0]) &&
+        node.arguments[0].text === "./studio-bg3d-babylon-specialist-entry"
+      ) {
+        babylonDynamicImports.push(node);
+      }
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "loadStudioBg3dBabylonSpecialistEntry"
+      ) {
+        loaderCalls.push(node);
+      }
+      if (
+        isFunctionLikeDeclarationNode(node) &&
+        functionName(node) === "loadStudioBg3dBabylonSpecialistEntry"
+      ) {
+        loaderFunctions.push(node);
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(file);
+
+    expect(
+      imports.valueImports.filter((specifier) => (
+        specifier.includes("babylon") || specifier.startsWith("@babylonjs/")
+      )),
+    ).toEqual([]);
+    expect(babylonDynamicImports).toHaveLength(1);
+    expect(loaderFunctions).toHaveLength(1);
+    expect(
+      enclosingFunction(babylonDynamicImports[0]!) === loaderFunctions[0],
+    ).toBe(true);
+    expect(loaderCalls.length).toBeGreaterThan(0);
+
+    for (const call of loaderCalls) {
+      const owner = enclosingFunction(call);
+      expect(owner, "Babylon loader call must stay behind a user action function").not.toBeNull();
+      expect(functionName(owner!), "Babylon loader call owner must be named").toMatch(
+        /(?:babylon|diagnostic)/i,
+      );
+      expect(functionName(owner!)).not.toMatch(/(?:capturebridge|mount|preload)/i);
+      expect(
+        hasAncestor(call, (candidate) => (
+          ts.isCallExpression(candidate) &&
+          ts.isIdentifier(candidate.expression) &&
+          /^(?:useEffect|useLayoutEffect|useInsertionEffect)$/u.test(candidate.expression.text)
+        )),
+        "Babylon loader must never run from a React mount/effect path",
+      ).toBe(false);
+      expect(
+        hasAncestor(call, (candidate) => (
+          ts.isJsxAttribute(candidate) &&
+          ts.isIdentifier(candidate.name) &&
+          automaticActivationProps.has(candidate.name.text)
+        )),
+        "hover, focus, and touch preload paths must not activate Babylon",
+      ).toBe(false);
+      expect(
+        hasAncestor(call, (candidate) => (
+          isFunctionLikeDeclarationNode(candidate) &&
+          functionName(candidate) === "CaptureBridge"
+        )),
+        "the automatic Three capture bridge must remain Babylon-free",
+      ).toBe(false);
+    }
+
+    const captureBridgeStart = source.indexOf("function CaptureBridge(");
+    const componentStart = source.indexOf("export function StudioBackground3D(");
+    expect(captureBridgeStart).toBeGreaterThanOrEqual(0);
+    expect(componentStart).toBeGreaterThan(captureBridgeStart);
+    expect(source.slice(captureBridgeStart, componentStart)).not.toContain(
+      "loadStudioBg3dBabylonSpecialistEntry(",
+    );
   });
 });

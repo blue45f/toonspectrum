@@ -51,6 +51,9 @@ WebGL 또는 기존 Three 캡처로 데이터 손실 없이 복귀해야 한다.
 
 - 유일하게 승인된 `studio-bg3d-babylon-specialist-entry.ts` 동적 entry와 deep ESM binding
 - WebGL/WebGPU 초기화, 작업 직렬화, abort, context/device loss, dispose lifecycle runtime
+- 3D 배경의 `보기` 패널에서 사용자가 직접 누르는 WebGL2/WebGPU 진단 버튼. 모달 열기,
+  hover/focus, render, `CaptureBridge`에서는 Babylon을 불러오지 않고, 두 backend를 자동으로
+  바꿔 실행하거나 결과를 다른 backend로 표시하지 않는다.
 - Babylon 패키지를 전용 manual chunk로 격리하고 app/Studio/BG3D 정적 그래프 유입을 막는
   manifest bundle guard
 - `StudioBg3dRuntimeCapability`의 `webtoon-scene-fx`
@@ -68,6 +71,8 @@ WebGL 또는 기존 Three 캡처로 데이터 손실 없이 복귀해야 한다.
 Material, Texture, GPUBuffer, object URL은 경계를 통과하지 않는다. 출력은 기존 runtime adapter가
 방어 복사하는 RGBA/depth DTO이며, 최종 합성은 Studio 소유 필터/레이어 경로가 수행한다.
 
+아래는 **목표 운영 경계**이며, 현재 작품 경로에는 아직 배선되지 않았다.
+
 ```text
 SceneDocument + verified GLB + bounded FX recipe
   → isolated Babylon WebGPU/WebGL job
@@ -82,18 +87,43 @@ SceneDocument + verified GLB + bounded FX recipe
 [Particle System](https://doc.babylonjs.com/typedoc/classes/BABYLON.ParticleSystem)을 한 작업 내부에서
 활용하되 Studio 문서 권위는 넘기지 않도록 한다.
 
-현재 lazy entry는 아직 프로덕션 UI·Three 장면·실제 capture executor에 연결되지 않았다.
-기본 executor는 lifecycle 확인을 위한 `runtime-metrics`만 반환하므로, 위 artifact 종류는
-**출력 계약이 구현된 상태**이지 실제 Babylon 렌더 pass가 완성된 상태가 아니다.
+현재 lazy entry의 기본 executor는 lifecycle 계측뿐 아니라 제한된 실제 offscreen capture도
+수행한다. 지원 범위는 canonical primitive와 검증된 자체 포함 core GLB의 beauty RGBA8 및
+linear normalized depth다. 외부 URI나 로컬 decoder가 준비되지 않은 Draco/meshopt/BasisU,
+직교 카메라, lens shift, 비어 있지 않은 sky preset, animation·pose·morph·constraint 상태는
+그럴듯한 오출력 대신 fail-closed한다. 이 경로는 아직 작품 결과를 만드는 프로덕션 provider가
+아니다. UI에서 연결된 기능은 사용자가 명시적으로 실행하는 격리 진단으로 한정되며,
+`runtime-metrics` 확인에 이어 64×64 canonical primitive의 beauty RGBA8와 linear normalized
+depth를 실제 캡처·검증한다. 기존 Three 장면, linked render, LT, 필터 commit, shot batch에는
+아직 연결되지 않았다.
+
+따라서 `artifact-capture-v2`의 normal, object/material ID, shadow, AO, emission, velocity는
+**검증 계약만 구현됐고 Babylon 렌더 pass는 미구현**이다. renderer-neutral 원자적 specialist
+failover와 CPU outline/depth-atmosphere/emissive-bloom compositor도 기반·단위 테스트 단계이며
+Studio의 linked render, LT, 필터 commit, shot batch에 아직 연결되지 않았다. 특히 CPU outline은
+실제 normal pass가 생기기 전에는 Babylon 결과만으로 실행할 수 없다.
+
+프로덕션 승인을 막는 검토 게이트도 남아 있다. WebGL2/WebGPU별 readback 채널 순서와 Y축,
+premultiplied 입력을 top-down straight-alpha sRGB로 바꾸는 규약, 투명 픽셀 RGB 정리,
+파싱 후 실제 Babylon scene의 mesh·material·texture·animation 예산 재검증을 브라우저 골든과
+악성/대형 GLB 테스트로 확정해야 한다. 현재의 GLB JSON 사전 예산은 필요한 1차 방어선이지
+post-parse GPU/scene 예산을 대체하지 않는다.
 
 ### 운영 capture 연결 순서
 
-1. 운영 기능 활성화 시에만 lazy entry를 import하고 runtime adapter registry에 등록한다.
-2. 동일 canonical scene으로 Three beauty/depth와 Babylon beauty/depth/normal/ID를 캡처한다.
-3. Babylon WebGPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
-4. rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를 확인한다.
-5. normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
-6. device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
+1. 완료: 사용자가 WebGL2 또는 WebGPU 진단을 명시적으로 요청할 때만 lazy entry를 import한다.
+2. 완료(제한 범위): canonical primitive와 검증된 자체 포함 core GLB의 실제 beauty/depth
+   offscreen executor 및 fail-closed 입력 경계.
+3. 다음: WebGL2/WebGPU readback·straight-alpha·post-parse budget 골든을 통과시키고, 실제
+   작품 기능의 runtime registry/linked render 경로에 명시적으로 등록한다.
+4. 다음: 동일 canonical scene으로 Three와 Babylon의 beauty/depth를 비교하고
+   Babylon normal/object/material ID pass를 추가한다.
+5. 다음: Babylon GPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
+   현재 CPU compositor 기반은 참고/저해상도 fallback이며 프로덕션 GPU executor가 아니다.
+6. 다음: rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를
+   확인한다.
+7. 다음: normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
+8. 다음: device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
    검증한다.
 
 채택 기준은 FX 미사용 시 Babylon chunk/network/GPU context가 0이고, 대표 1080p preview p95가
@@ -221,20 +251,26 @@ WebGPU-only 변형은 basic WebGL보다 initial gzip이 50,660 B 더 컸다. 이
 - WebGL/WebGPU lifecycle runtime과 runtime adapter routing
 - bounded capture v1 및 multi-artifact v2 DTO/검증
 - renderer-neutral scene/capture/linked-render 계약
+- 사용자 명시 클릭으로만 실행되는 분리 캔버스 WebGL2/WebGPU 진단
+- canonical primitive와 검증된 자체 포함 core GLB의 제한된 beauty/depth executor
+- renderer-neutral 원자적 failover와 저해상도 CPU outline/atmosphere/bloom 기반
 
-아직 남은 핵심은 canonical scene → Babylon runtime scene 변환과 실제 offscreen capture다.
+아직 남은 핵심은 지원 장면·artifact를 확대하는 것보다 먼저 WebGPU/straight-alpha/readback
+골든과 post-parse 예산을 확정하고, 이 기반을 작품 결과의 linked-render/commit 경로에
+원자적으로 연결하는 일이다. normal/ID 등 제작 pass와 GPU FX는 그 다음 단계다.
 
 ### 2단계 — 운영에 노출되지 않는 격리 실험
 
-현재 lazy foundation 위에서 다음 가설을 운영 UI에 노출하기 전에 검증한다.
+현재 lazy foundation 위에서 다음 가설을 작품 결과 생성 UI에 노출하기 전에 검증한다.
 
 - WebGPU compute/Node Material이 필요한 선화·조명 처리
 - 수천 개 반복 배경 오브젝트에서 thin instances/AssetContainer가 필요한 장면
 - `MSFT_lod` + range request를 실제로 적용한 대형 배경 스트리밍
 
 Studio/BG3D 정적 그래프에는 포함하지 않고 feature flag와 완전한 lazy boundary를 사용한다.
-barrel import 대신 deep import를 유지하며, 실제 capture executor가 골든 기준을 통과하기 전에는
-사용자 결과물 생성 경로에 연결하지 않는다.
+barrel import 대신 deep import를 유지한다. 진단 UI는 사용자의 명시적 실행에만 노출됐지만,
+실제 capture executor가 WebGL2/WebGPU·straight-alpha·post-parse budget 골든을 통과하기
+전에는 사용자 결과물 생성 경로에 연결하지 않는다.
 
 ### 3단계 — 실기기 A/B 기준
 

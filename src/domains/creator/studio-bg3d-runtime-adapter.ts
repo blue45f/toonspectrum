@@ -282,6 +282,19 @@ function snapshotRequest(
   }
 }
 
+/**
+ * Produces the exact immutable request value accepted by the runtime boundary.
+ *
+ * Multi-runtime coordinators use this once before the first attempt so every fallback receives the
+ * same transaction even when the caller still owns a mutable input object.
+ */
+export function snapshotStudioBg3dSpecialistRequest(
+  request: StudioBg3dSpecialistRequest,
+  snapshot: StudioBg3dRuntimeSnapshot,
+): StudioBg3dSpecialistRequest | null {
+  return snapshotRequest(request, snapshot);
+}
+
 function sanitizeResult(
   result: StudioBg3dSpecialistResult,
   request: StudioBg3dSpecialistRequest,

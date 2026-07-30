@@ -9,6 +9,8 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Scene } from "@babylonjs/core/scene";
 
+import { executeStudioBg3dBabylonCapture } from
+  "./studio-bg3d-babylon-artifact-capture";
 import {
   createStudioBg3dBabylonSpecialistRuntime,
   type StudioBg3dBabylonEngineHandle,
@@ -35,7 +37,7 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       audioEngine: false,
       deterministicLockstep: settings.deterministicLockstep,
       doNotHandleContextLost: false,
-      failIfMajorPerformanceCaveat: true,
+      failIfMajorPerformanceCaveat: settings.failIfMajorPerformanceCaveat,
       lockstepMaxSteps: settings.lockstepMaxSteps,
       loseContextOnDispose: true,
       powerPreference: settings.powerPreference,
@@ -84,6 +86,7 @@ export function createStudioBg3dBabylonSpecialist(
 ): StudioBg3dBabylonSpecialistRuntime {
   return createStudioBg3dBabylonSpecialistRuntime({
     ...options,
+    execute: options.execute ?? executeStudioBg3dBabylonCapture,
     loadBindings: loadStudioBg3dBabylonRuntimeBindings,
   });
 }

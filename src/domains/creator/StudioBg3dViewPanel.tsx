@@ -1,3 +1,10 @@
+import {
+  CheckCircle2,
+  Cpu,
+  Loader2,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import { useId } from "react";
 
 import {
@@ -32,6 +39,28 @@ import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-
 import type { StudioBg3dSunRigConfig } from "./studio-bg3d-sun-rig";
 
 type ViewEditorSection = "camera" | "physics";
+
+export type StudioBg3dBabylonDiagnosticBackend = "webgl2" | "webgpu";
+
+export type StudioBg3dBabylonDiagnosticState =
+  | {
+      readonly status: "idle";
+      readonly backend: null;
+    }
+  | {
+      readonly status: "loading";
+      readonly backend: StudioBg3dBabylonDiagnosticBackend;
+    }
+  | {
+      readonly status: "success";
+      readonly backend: StudioBg3dBabylonDiagnosticBackend;
+      readonly durationMs: number;
+    }
+  | {
+      readonly status: "error";
+      readonly backend: StudioBg3dBabylonDiagnosticBackend;
+      readonly message: string;
+    };
 
 interface StudioBg3dViewPanelContext {
   readonly VIEW_EDITOR_SECTIONS: readonly [{ readonly id: "camera"; readonly label: "카메라 · 환경"; }, { readonly id: "physics"; readonly label: "물리 배치"; }];
@@ -155,6 +184,10 @@ interface StudioBg3dViewPanelContext {
 export interface StudioBg3dViewPanelProps {
   readonly hidden: boolean;
   readonly context: StudioBg3dViewPanelContext;
+  readonly babylonDiagnosticState: StudioBg3dBabylonDiagnosticState;
+  readonly onRunBabylonDiagnostic: (
+    backend: StudioBg3dBabylonDiagnosticBackend,
+  ) => void;
   readonly onUseCurrentFrameAsAiReference?: () => void;
   readonly aiReferenceBusy?: boolean;
   readonly aiReferenceDisabled?: boolean;
@@ -218,9 +251,152 @@ export function StudioBg3dAiReferenceAction({
   );
 }
 
+export interface StudioBg3dBabylonDiagnosticProps {
+  readonly state: StudioBg3dBabylonDiagnosticState;
+  readonly onRun: (backend: StudioBg3dBabylonDiagnosticBackend) => void;
+}
+
+const BABYLON_DIAGNOSTIC_BACKEND_LABELS: Readonly<
+  Record<StudioBg3dBabylonDiagnosticBackend, string>
+> = Object.freeze({
+  webgl2: "WebGL2",
+  webgpu: "WebGPU",
+});
+
+export function StudioBg3dBabylonDiagnostic({
+  state,
+  onRun,
+}: StudioBg3dBabylonDiagnosticProps) {
+  const descriptionId = useId();
+  const statusId = useId();
+  const running = state.status === "loading";
+  const statusBackend =
+    state.backend === null ? null : BABYLON_DIAGNOSTIC_BACKEND_LABELS[state.backend];
+  const statusText =
+    state.status === "idle"
+      ? "진단을 실행하기 전에는 Babylon 코드와 GPU 컨텍스트를 불러오지 않습니다."
+      : state.status === "loading"
+        ? `Babylon ${statusBackend} 진단을 준비하고 있습니다.`
+        : state.status === "success"
+          ? `Babylon ${statusBackend} 진단 완료 · ${Math.max(1, Math.round(state.durationMs))}ms`
+          : state.message;
+  const statusTone =
+    state.status === "error"
+      ? "border-danger/45 bg-danger/10 text-danger"
+      : state.status === "success"
+        ? "border-accent/45 bg-accent-soft text-accent"
+        : "border-line bg-panel/70 text-fg-3";
+
+  return (
+    <section
+      aria-labelledby={descriptionId}
+      className="mt-5 border-t border-line pt-4"
+    >
+      <div className="rounded-xl border border-line bg-card/70 p-3 shadow-sm">
+        <div className="flex items-start gap-2.5">
+          <span
+            className="grid size-8 shrink-0 place-items-center rounded-lg border border-accent/30 bg-accent-soft text-accent"
+            aria-hidden
+          >
+            <Cpu size={16} />
+          </span>
+          <div className="min-w-0">
+            <h3 id={descriptionId} className="text-xs font-bold text-fg">
+              Babylon 렌더 진단
+            </h3>
+            <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-3">
+              분리된 64px 캔버스에서 엔진과 실제 컬러(beauty)·깊이(depth) 패스를 확인합니다.
+              현재 3D 편집기나 최종 렌더러를 전환하지 않으며, 선택한 백엔드가 실패해도 다른
+              백엔드를 자동 실행하지 않습니다.
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2"
+          role="group"
+          aria-label="Babylon 진단 백엔드"
+          aria-describedby={statusId}
+        >
+          {(["webgl2", "webgpu"] as const).map((backend) => {
+            const backendLabel = BABYLON_DIAGNOSTIC_BACKEND_LABELS[backend];
+            const isCurrent = state.backend === backend;
+            const isLoading = running && isCurrent;
+            const isRetry = state.status === "error" && isCurrent;
+            return (
+              <button
+                key={backend}
+                type="button"
+                data-testid={`studio-bg3d-babylon-diagnostic-${backend}`}
+                aria-label={`Babylon ${backendLabel} 진단 실행`}
+                aria-busy={isLoading}
+                disabled={running}
+                onClick={() => onRun(backend)}
+                className={cx(
+                  CONTROL_BUTTON,
+                  "min-h-11 w-full border-line bg-panel px-3 text-fg-2 hover:border-accent/50 hover:bg-raised hover:text-fg",
+                  state.status === "success" &&
+                    isCurrent &&
+                    "border-accent/45 bg-accent-soft text-accent",
+                  isRetry && "border-danger/45 bg-danger/10 text-danger",
+                )}
+              >
+                {isLoading ? (
+                  <Loader2
+                    size={14}
+                    className="animate-spin motion-reduce:animate-none"
+                    aria-hidden
+                  />
+                ) : isRetry ? (
+                  <RotateCcw size={14} aria-hidden />
+                ) : (
+                  <Cpu size={14} aria-hidden />
+                )}
+                {isLoading
+                  ? `${backendLabel} 확인 중`
+                  : isRetry
+                    ? `${backendLabel} 다시 진단`
+                    : `${backendLabel} 진단`}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          id={statusId}
+          data-testid="studio-bg3d-babylon-diagnostic-status"
+          role={state.status === "error" ? "alert" : "status"}
+          aria-live={state.status === "error" ? "assertive" : "polite"}
+          className={cx(
+            "mt-2 flex min-h-11 items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.72rem] leading-relaxed",
+            statusTone,
+          )}
+        >
+          {state.status === "success" ? (
+            <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden />
+          ) : state.status === "error" ? (
+            <TriangleAlert size={14} className="mt-0.5 shrink-0" aria-hidden />
+          ) : state.status === "loading" ? (
+            <Loader2
+              size={14}
+              className="mt-0.5 shrink-0 animate-spin motion-reduce:animate-none"
+              aria-hidden
+            />
+          ) : (
+            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-fg-3" aria-hidden />
+          )}
+          <span>{statusText}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function StudioBg3dViewPanel({
   hidden,
   context,
+  babylonDiagnosticState,
+  onRunBabylonDiagnostic,
   onUseCurrentFrameAsAiReference,
   aiReferenceBusy = false,
   aiReferenceDisabled = false,
@@ -1452,6 +1628,10 @@ export function StudioBg3dViewPanel({
                     </span>
                   </label>
                 </div>
+                <StudioBg3dBabylonDiagnostic
+                  state={babylonDiagnosticState}
+                  onRun={onRunBabylonDiagnostic}
+                />
                 </div>
               </section>
   );

@@ -37,6 +37,14 @@ const R3F_CONTEXT_LOSS_DIAGNOSTIC = "THREE.WebGLRenderer: Context Lost.";
 const SHARED_POSE_CATALOG_API_PATH = "/api/creator/assets/catalog";
 const KTX2_SMOKE_MODEL_NAME = "studio-ktx2-runtime-smoke.glb";
 const KTX2_SMOKE_MODEL_LABEL = "studio-ktx2-runtime-smoke";
+const BABYLON_DIAGNOSTIC_BUTTON_TEST_ID =
+  "studio-bg3d-babylon-diagnostic-webgl2";
+const BABYLON_DIAGNOSTIC_STATUS_TEST_ID =
+  "studio-bg3d-babylon-diagnostic-status";
+const BABYLON_RUNTIME_CHUNK_PATH_FRAGMENT =
+  "studio-bg3d-babylon-runtime";
+const BABYLON_SPECIALIST_CHUNK_PATH_PATTERN =
+  /studio-bg3d-babylon-(?:specialist-entry|runtime)/u;
 
 // Three r184's official 40x40 ETC1S KTX2 example (MIT). The verifier embeds it into a minimal
 // self-contained GLB at runtime, so the production smoke exercises admission, the pinned Basis
@@ -315,6 +323,8 @@ async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
 
 async function run(page: Page, studioUrl: string): Promise<void> {
   const issues: string[] = [];
+  const babylonSpecialistRequests: string[] = [];
+  const babylonRuntimeResponses: string[] = [];
   const sharedPoseRequests: string[] = [];
   const pngEncoderWorkers: string[] = [];
   const glbValidationWorkers: string[] = [];
@@ -357,12 +367,21 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
+    if (BABYLON_SPECIALIST_CHUNK_PATH_PATTERN.test(url.pathname)) {
+      babylonSpecialistRequests.push(request.url());
+    }
     if (url.pathname === SHARED_POSE_CATALOG_API_PATH && request.method() === "GET") {
       sharedPoseRequests.push(request.url());
     }
   });
   page.on("response", (response) => {
     const url = new URL(response.url());
+    if (
+      url.pathname.includes(BABYLON_RUNTIME_CHUNK_PATH_FRAGMENT)
+      && response.ok()
+    ) {
+      babylonRuntimeResponses.push(response.url());
+    }
     if (
       url.pathname.includes("basis_transcoder")
       && url.pathname.endsWith(".wasm")
@@ -382,6 +401,11 @@ async function run(page: Page, studioUrl: string): Promise<void> {
       { cause },
     );
   }
+  await page.waitForTimeout(500);
+  assertCondition(
+    babylonSpecialistRequests.length === 0,
+    `opening /studio eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
+  );
 
   const characterMenu = await openInsertMenu(page);
   await characterMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
@@ -447,12 +471,74 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   await closeCanvasDialog(liveLossDialog, page);
 
   const backgroundMenu = await openInsertMenu(page);
-  await backgroundMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();
+  const backgroundMenuItem = backgroundMenu.getByRole("menuitem", {
+    name: "3D 배경",
+    exact: true,
+  });
+  await backgroundMenuItem.hover();
+  await page.waitForTimeout(350);
+  await backgroundMenuItem.focus();
+  await page.waitForTimeout(350);
+  assertCondition(
+    babylonSpecialistRequests.length === 0,
+    "hover/focus BG3D preload must not request Babylon specialist code",
+  );
+  await backgroundMenuItem.click();
   const backgroundDialog = page.getByTestId("studio-bg3d-dialog");
   await backgroundDialog.waitFor({ state: "visible", timeout: 25_000 });
   await page.waitForTimeout(1_000);
+  assertCondition(
+    babylonSpecialistRequests.length === 0,
+    "opening the BG3D dialog must not request Babylon specialist code",
+  );
 
-  await backgroundDialog.getByRole("tab", { name: "모델", exact: true }).click();
+  await backgroundDialog.getByRole("tab", { name: "보기", exact: true }).click();
+  await page.waitForTimeout(300);
+  assertCondition(
+    babylonSpecialistRequests.length === 0,
+    "opening the BG3D view tools must not request Babylon specialist code",
+  );
+  const babylonDiagnosticButton = backgroundDialog.getByTestId(
+    BABYLON_DIAGNOSTIC_BUTTON_TEST_ID,
+  );
+  await babylonDiagnosticButton.waitFor({ state: "visible", timeout: 10_000 });
+  await babylonDiagnosticButton.click();
+  const babylonDiagnosticStatus = backgroundDialog.getByTestId(
+    BABYLON_DIAGNOSTIC_STATUS_TEST_ID,
+  );
+  try {
+    await babylonDiagnosticStatus
+      .filter({
+        hasText:
+          /(?:진단 완료|초기화하지 못했습니다|검증하지 못했습니다|사용할 수 없어|종료되었습니다)/u,
+      })
+      .waitFor({ state: "visible", timeout: 45_000 });
+    assertCondition(
+      (await babylonDiagnosticStatus.innerText()).includes("Babylon WebGL2 진단 완료"),
+      `Babylon WebGL2 diagnostic failed: ${await babylonDiagnosticStatus.innerText()}`,
+    );
+  } catch (cause) {
+    const diagnosticText = await babylonDiagnosticStatus.innerText()
+      .catch(() => "(status unavailable)");
+    throw new Error(
+      [
+        `Babylon WebGL2 diagnostic did not complete: ${diagnosticText}`,
+        `specialist requests: ${babylonSpecialistRequests.join(", ") || "(none)"}`,
+        `browser issues: ${issues.join("\n") || "(none)"}`,
+      ].join("\n"),
+      { cause },
+    );
+  }
+  assertCondition(
+    babylonSpecialistRequests.length > 0,
+    "the explicit Babylon diagnostic did not request its specialist entry",
+  );
+  assertCondition(
+    babylonRuntimeResponses.length > 0,
+    "the explicit Babylon diagnostic did not load a successful Babylon runtime chunk",
+  );
+
+  await backgroundDialog.getByRole("tab", { name: "에셋", exact: true }).click();
   const ktxCanvas = backgroundDialog.locator("canvas").first();
   await ktxCanvas.waitFor({ state: "visible", timeout: 5_000 });
   await ktxCanvas.evaluate(() => new Promise<void>((resolve) => {

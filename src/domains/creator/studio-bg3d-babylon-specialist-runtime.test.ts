@@ -149,12 +149,34 @@ describe("Studio Babylon isolated specialist runtime", () => {
 
     expect(loadBindings).toHaveBeenCalledOnce();
     expect(harness.webGl).toHaveBeenCalledOnce();
+    expect(harness.webGl).toHaveBeenCalledWith(
+      expect.any(FakeCanvas),
+      expect.objectContaining({ failIfMajorPerformanceCaveat: true }),
+    );
     expect(harness.webGpu).not.toHaveBeenCalled();
     expect(harness.scenes).toHaveLength(2);
     expect(harness.scenes.every((scene) => scene.dispose.mock.calls.length === 1)).toBe(true);
 
     await runtime.dispose();
     expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("allows only an explicit caller to relax the major-performance-caveat diagnostic gate", async () => {
+    const harness = bindingHarness();
+    const canvas = new FakeCanvas() as unknown as HTMLCanvasElement;
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      canvas,
+      loadBindings: async () => harness.bindings,
+      settings: { failIfMajorPerformanceCaveat: false },
+    });
+
+    await runtime.runIsolated(job("software-diagnostic"));
+
+    expect(harness.webGl).toHaveBeenCalledWith(
+      canvas,
+      expect.objectContaining({ failIfMajorPerformanceCaveat: false }),
+    );
+    await runtime.dispose();
   });
 
   it("uses the separately identified WebGPU initialization path only when explicitly requested", async () => {
@@ -172,6 +194,33 @@ describe("Studio Babylon isolated specialist runtime", () => {
     });
     expect(harness.webGpu).toHaveBeenCalledOnce();
     expect(harness.webGl).not.toHaveBeenCalled();
+    await runtime.dispose();
+  });
+
+  it("aborts a pending WebGPU initialization and disposes a late engine result", async () => {
+    const harness = bindingHarness();
+    const initialization = deferred<StudioBg3dBabylonEngineHandle>();
+    harness.webGpu.mockImplementationOnce(() => initialization.promise);
+    const controller = new AbortController();
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      loadBindings: async () => harness.bindings,
+    });
+
+    const pending = runtime.runIsolated(job(
+      "webgpu-abort",
+      { kind: "runtime-metrics" },
+      controller.signal,
+    ));
+    await vi.waitFor(() => expect(harness.webGpu).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "aborted" });
+
+    const lateEngine = new FakeEngine();
+    initialization.resolve(lateEngine);
+    await vi.waitFor(() => expect(lateEngine.dispose).toHaveBeenCalledOnce());
+    expect(runtime.getState().engineInitialized).toBe(false);
     await runtime.dispose();
   });
 

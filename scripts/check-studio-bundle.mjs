@@ -251,7 +251,12 @@ if (!fs.existsSync(manifestPath)) {
     forbiddenStaticClosures,
   }) {
     const matching = matchingManifestEntries(pattern);
-    if (matching.length === 0) return;
+    if (matching.length === 0) {
+      fail(
+        `${label} production activation is missing its approved emitted entry/runtime chunk`,
+      );
+      return;
+    }
 
     const approvedEntries = Object.entries(manifest)
       .filter(([key, entry]) => key === approvedEntrySource || entry.src === approvedEntrySource)

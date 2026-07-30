@@ -146,6 +146,12 @@ import {
   snapshotStudioBg3dLiveAnimationPlayback,
 } from "./studio-bg3d-animation-time";
 import {
+  STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+  STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+  STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  normalizeStudioBg3dArtifactCaptureResultV2,
+} from "./studio-bg3d-artifact-capture-v2";
+import {
   applyStudioBg3dProjectionAwareZoom,
   applyStudioBg3dViewportAfterTransition,
   applyStudioBg3dViewToThreeCamera,
@@ -374,6 +380,10 @@ import {
   instantiateStudioBg3dRoomBuild,
   type StudioBg3dRoomSpec,
 } from "./studio-bg3d-room-builder";
+import {
+  createStudioBg3dRuntimeSnapshot,
+  type StudioBg3dRuntimeAdapter,
+} from "./studio-bg3d-runtime-adapter";
 import { buildStudioBg3dScaleGuideParts } from "./studio-bg3d-scale-guide";
 import {
   DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
@@ -391,6 +401,7 @@ import {
   duplicateStudioBg3dShot,
   migrateStudioBg3dSceneDocument,
   moveStudioBg3dShot,
+  normalizeStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   removeStudioBg3dShot,
   serializeStudioBg3dSceneDocument,
@@ -502,7 +513,11 @@ import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioBg3dShapesPanel } from "./StudioBg3dShapesPanel";
-import { StudioBg3dViewPanel } from "./StudioBg3dViewPanel";
+import {
+  StudioBg3dViewPanel,
+  type StudioBg3dBabylonDiagnosticBackend,
+  type StudioBg3dBabylonDiagnosticState,
+} from "./StudioBg3dViewPanel";
 import {
   StudioGeneric3dModelModePanel,
   type StudioGeneric3dControlMode,
@@ -1555,6 +1570,129 @@ function loadStudioBg3dThreeWebglCaptureRuntime(): Promise<StudioBg3dThreeWebglC
   return pending;
 }
 
+interface StudioBg3dBabylonSpecialistEntry {
+  readonly createStudioBg3dBabylonSpecialist: (options: {
+    readonly canvas: HTMLCanvasElement;
+    readonly backend: StudioBg3dBabylonDiagnosticBackend;
+    readonly settings?: {
+      readonly failIfMajorPerformanceCaveat?: boolean;
+    };
+  }) => StudioBg3dRuntimeAdapter;
+}
+
+let studioBg3dBabylonSpecialistEntryPromise:
+  Promise<StudioBg3dBabylonSpecialistEntry> | null = null;
+
+/**
+ * The only Babylon production import boundary. It is deliberately invoked from the explicit
+ * diagnostic button handler, never from modal mount, render, hover/focus preload, or CaptureBridge.
+ * A rejected chunk load is evicted so the same user action can retry after a transient failure.
+ */
+function loadStudioBg3dBabylonSpecialistEntry():
+  Promise<StudioBg3dBabylonSpecialistEntry> {
+  const existing = studioBg3dBabylonSpecialistEntryPromise;
+  if (existing) return existing;
+  const pending = import("./studio-bg3d-babylon-specialist-entry").then((module) =>
+    Object.freeze({
+      createStudioBg3dBabylonSpecialist:
+        module.createStudioBg3dBabylonSpecialist,
+    }),
+  );
+  studioBg3dBabylonSpecialistEntryPromise = pending;
+  void pending.catch(() => {
+    if (studioBg3dBabylonSpecialistEntryPromise === pending) {
+      studioBg3dBabylonSpecialistEntryPromise = null;
+    }
+  });
+  return pending;
+}
+
+function createStudioBg3dBabylonDiagnosticDocument(): StudioBg3dSceneDocument {
+  return normalizeStudioBg3dSceneDocument({
+    ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    background: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+      mode: "color",
+      color: "#f8fafc",
+    },
+    nodes: [{
+      id: "babylon-diagnostic-box",
+      name: "Babylon diagnostic box",
+      kind: "primitive",
+      primitiveKind: "box",
+      color: "#4f46e5",
+      transform: {
+        position: [0, 0, 0],
+        rotation: [0.2, 0.35, 0],
+        scale: [1.6, 1.6, 1.6],
+      },
+      parentId: null,
+      visible: true,
+      locked: false,
+      castsShadow: true,
+      receivesShadow: true,
+    }],
+  });
+}
+
+function hasStudioBg3dBabylonDiagnosticBeautyVariation(
+  rgba: Uint8Array,
+): boolean {
+  let referencePixel = -1;
+  for (let pixel = 0; pixel < rgba.length / 4; pixel += 1) {
+    if (rgba[pixel * 4 + 3]! > 0) {
+      referencePixel = pixel;
+      break;
+    }
+  }
+  if (referencePixel < 0) return false;
+  const referenceOffset = referencePixel * 4;
+  for (let pixel = referencePixel + 1; pixel < rgba.length / 4; pixel += 1) {
+    const offset = pixel * 4;
+    if (rgba[offset + 3]! <= 0) continue;
+    const difference =
+      Math.abs(rgba[offset]! - rgba[referenceOffset]!) +
+      Math.abs(rgba[offset + 1]! - rgba[referenceOffset + 1]!) +
+      Math.abs(rgba[offset + 2]! - rgba[referenceOffset + 2]!);
+    if (difference >= 12) return true;
+  }
+  return false;
+}
+
+function hasStudioBg3dBabylonDiagnosticDepthVariation(
+  depth: Float32Array,
+): boolean {
+  let minimum = 1;
+  let maximum = 0;
+  for (const value of depth) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) return false;
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+  return minimum < 0.999 && maximum >= 0.999 && maximum - minimum >= 0.01;
+}
+
+function studioBg3dBabylonDiagnosticErrorMessage(
+  backend: StudioBg3dBabylonDiagnosticBackend,
+  error: unknown,
+): string {
+  const label = backend === "webgpu" ? "WebGPU" : "WebGL2";
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : null;
+  if (code === "context-lost") {
+    return `Babylon ${label} 컨텍스트가 진단 중 종료되었습니다. 다른 GPU 작업을 닫은 뒤 다시 시도해 주세요. 다른 백엔드는 자동 실행하지 않았습니다.`;
+  }
+  if (backend === "webgpu" && typeof navigator !== "undefined" && !("gpu" in navigator)) {
+    return "이 브라우저에서 WebGPU를 사용할 수 없어 Babylon WebGPU 진단을 완료하지 못했습니다. WebGL2 진단은 자동 실행하지 않았습니다.";
+  }
+  return `Babylon ${label} 엔진 또는 beauty/depth 패스를 분리 캔버스에서 검증하지 못했습니다. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
+}
+
 type StudioBg3dCameraWithView = THREE.Camera & {
   view?: {
     enabled: boolean;
@@ -2483,6 +2621,13 @@ export function StudioBackground3D({
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>("shapes");
   const [modelsPanelActivated, setModelsPanelActivated] = useState(false);
   const [viewEditorSection, setViewEditorSection] = useState<ViewEditorSection>("camera");
+  const [babylonDiagnosticState, setBabylonDiagnosticState] =
+    useState<StudioBg3dBabylonDiagnosticState>({
+      status: "idle",
+      backend: null,
+    });
+  const babylonDiagnosticAbortRef = useRef<AbortController | null>(null);
+  const babylonDiagnosticGenerationRef = useRef(0);
   const [physicsPhase, setPhysicsPhase] = useState<StudioBg3dPhysicsPhase>("idle");
   const [physicsDurationSeconds, setPhysicsDurationSeconds] = useState<2 | 4 | 8>(4);
   const [physicsGravityPreset, setPhysicsGravityPreset] =
@@ -3189,6 +3334,8 @@ export function StudioBackground3D({
     const storageIdByAttachment = storageModelIdByAttachmentIdRef.current;
     return () => {
       componentActiveRef.current = false;
+      babylonDiagnosticAbortRef.current?.abort();
+      babylonDiagnosticAbortRef.current = null;
       pending.clear();
       disposeModelCache(cache);
       attachmentByStorageId.clear();
@@ -8675,6 +8822,125 @@ export function StudioBackground3D({
     transitionPhysicsPhase("idle");
   };
 
+  const runBabylonDiagnostic = async (
+    backend: StudioBg3dBabylonDiagnosticBackend,
+  ): Promise<void> => {
+    const generation = babylonDiagnosticGenerationRef.current + 1;
+    babylonDiagnosticGenerationRef.current = generation;
+    babylonDiagnosticAbortRef.current?.abort();
+    const controller = new AbortController();
+    babylonDiagnosticAbortRef.current = controller;
+    setBabylonDiagnosticState({ status: "loading", backend });
+
+    let runtime: StudioBg3dRuntimeAdapter | null = null;
+    const startedAt = performance.now();
+    try {
+      const entry = await loadStudioBg3dBabylonSpecialistEntry();
+      if (controller.signal.aborted) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      runtime = entry.createStudioBg3dBabylonSpecialist({
+        canvas,
+        backend,
+        // Diagnostics should report software/headless support truthfully. Real capture retains the
+        // runtime's strict hardware-quality default and therefore still fails major caveats closed.
+        settings: { failIfMajorPerformanceCaveat: false },
+      });
+      const snapshot = createStudioBg3dRuntimeSnapshot(
+        createStudioBg3dBabylonDiagnosticDocument(),
+        new Map(),
+      );
+      const diagnosticId = `babylon-diagnostic-${backend}-${Date.now()}-${generation}`;
+      const metricsResult = await runtime.runIsolated({
+        id: `${diagnosticId}-metrics`,
+        snapshot,
+        request: { kind: "runtime-metrics" },
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted || generation !== babylonDiagnosticGenerationRef.current) {
+        return;
+      }
+      if (
+        metricsResult.kind !== "metrics" ||
+        metricsResult.values.backend !== backend ||
+        metricsResult.values.engine !== "babylon" ||
+        metricsResult.values.initialized !== true
+      ) {
+        throw new Error("Unexpected Babylon diagnostic receipt.");
+      }
+      const captureResult = await runtime.runIsolated({
+        id: `${diagnosticId}-beauty-depth`,
+        snapshot,
+        request: {
+          kind: "artifact-capture-v2",
+          version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+          width: 64,
+          height: 64,
+          artifacts: [
+            { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+            { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+          ],
+        },
+        signal: controller.signal,
+      });
+      const normalizedCapture = normalizeStudioBg3dArtifactCaptureResultV2(captureResult);
+      const beauty = normalizedCapture?.artifacts.find((artifact) =>
+        artifact.kind === "beauty"
+      );
+      const depth = normalizedCapture?.artifacts.find((artifact) =>
+        artifact.kind === "depth"
+      );
+      if (
+        !normalizedCapture ||
+        normalizedCapture.width !== 64 ||
+        normalizedCapture.height !== 64 ||
+        !beauty ||
+        beauty.data.byteLength !== 64 * 64 * 4 ||
+        !depth ||
+        depth.data.length !== 64 * 64 ||
+        !hasStudioBg3dBabylonDiagnosticDepthVariation(depth.data) ||
+        !hasStudioBg3dBabylonDiagnosticBeautyVariation(beauty.data)
+      ) {
+        throw new Error("Unexpected Babylon beauty/depth capture.");
+      }
+      if (
+        !componentActiveRef.current ||
+        controller.signal.aborted ||
+        generation !== babylonDiagnosticGenerationRef.current
+      ) {
+        return;
+      }
+      setBabylonDiagnosticState({
+        status: "success",
+        backend,
+        durationMs: performance.now() - startedAt,
+      });
+    } catch (diagnosticError) {
+      if (!componentActiveRef.current) return;
+      if (generation !== babylonDiagnosticGenerationRef.current) return;
+      if (controller.signal.aborted) {
+        setBabylonDiagnosticState({ status: "idle", backend: null });
+        return;
+      }
+      setBabylonDiagnosticState({
+        status: "error",
+        backend,
+        message: studioBg3dBabylonDiagnosticErrorMessage(backend, diagnosticError),
+      });
+    } finally {
+      try {
+        await runtime?.dispose();
+      } catch {
+        // The diagnostic receipt has already been decided; disposal failure must not affect Three.
+      }
+      if (babylonDiagnosticAbortRef.current === controller) {
+        babylonDiagnosticAbortRef.current = null;
+      }
+    }
+  };
+
   const pausePhysicsWhenHidden = useEffectEvent(() => pausePhysicsPreview());
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
@@ -10095,6 +10361,8 @@ export function StudioBackground3D({
 
               <StudioBg3dViewPanel
                 hidden={hideOnTab("view")}
+                babylonDiagnosticState={babylonDiagnosticState}
+                onRunBabylonDiagnostic={(backend) => void runBabylonDiagnostic(backend)}
                 aiReferenceBusy={isCapturing}
                 aiReferenceDisabled={
                   insertBlocked || (primitives.length === 0 && customModels.length === 0)
