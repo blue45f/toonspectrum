@@ -61,7 +61,7 @@ describe("Studio document interchange UI boundary", () => {
     expect(studioPage).toContain("interchangeImportInputRef.current.click()");
   });
 
-  it("connects the ORA/CBZ menu command to one format-scoped file input", () => {
+  it("connects the ORA/CBZ/WILL menu command to one format-scoped file input", () => {
     const menuItem = sourceSection(
       menuCatalogue,
       'id: "import-ora-cbz"',
@@ -77,9 +77,11 @@ describe("Studio document interchange UI boundary", () => {
     expect(menuItem).toContain("state.collaborationDocumentLocked");
     expect(menuItem).toContain("ui.requestInterchangeImport()");
     expect(studioPage).toContain("interchangeImportInputRef.current.click()");
-    expect(input).toContain('accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"');
+    expect(input).toContain(
+      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"',
+    );
     expect(input).toContain("handleImportInterchangeArchive(event)");
-    expect(input).toContain('aria-label="OpenRaster 또는 CBZ 가져오기"');
+    expect(input).toContain('aria-label="OpenRaster, CBZ 또는 WILL v1 가져오기"');
   });
 
   it("loads archive codecs and the loss adapter only after selection and makes parsing cancellable", () => {
@@ -99,6 +101,8 @@ describe("Studio document interchange UI boundary", () => {
     expect(importFlow).toContain("const controller = new AbortController()");
     expect(importFlow).toContain('import("./studio-document-interchange-commit")');
     expect(importFlow).toContain('import("./studio-document-import-device-profile")');
+    expect(importFlow).toContain('"./studio-will-v1-import-bridge"');
+    expect(importFlow).toContain("inspectStudioWillV1Import(file, file.name, {");
     expect(importFlow).toContain("inspectStudioDocumentInterchangeArchive(file, {");
     expect(interchangeCommit).toContain('import("./studio-openraster-interchange")');
     expect(interchangeCommit).toContain('import("./studio-cbz-interchange")');
@@ -172,6 +176,11 @@ describe("Studio document interchange UI boundary", () => {
     expect(dialog).toContain("<LazyStudioInterchangeLossPreviewDialog");
     expect(dialog).toContain("preview={pendingInterchangeImport.preview}");
     expect(dialog).toContain('pendingInterchangeImport.kind === "cbz"');
+    expect(dialog).toContain('pendingInterchangeImport.kind === "will-v1"');
+    expect(dialog).toContain("STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES.map");
+    expect(dialog).toContain("interchangeImportChoice");
+    expect(studioPage).toContain('label: "새 페이지에 추가"');
+    expect(studioPage).toContain('label: "현재 페이지에 추가"');
     expect(dialog).toContain(": STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES");
     expect(dialog).toContain("onConfirm={(choiceId) => void applyPendingInterchangeImport(choiceId)}");
     expect(dialog).toContain("onCancel={dismissPendingInterchangeImport}");

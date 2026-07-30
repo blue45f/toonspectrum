@@ -576,16 +576,24 @@ describe("Studio interchange capability registry", () => {
       studioInterchangeCapability("will-v1-path-stream")?.notes.join(" "),
     ).toContain("전체 .will");
     expect(studioInterchangeCapability("will-v1-document")).toMatchObject({
-      import: "engine-ready",
-      export: "engine-ready",
+      import: "available",
+      export: "available",
       roundTrip: "partial",
-      status: "engine-ready",
+      status: "partial",
       extensions: [".will"],
       mime: ["application/vnd.toonspectrum.will-v1-bounded+zip"],
       sizeBudget: {
         maxFileBytes: 40 * 1024 * 1024,
         maxFiles: 7,
-        maxItems: 100_000,
+        maxItems: 1_000_000,
+      },
+      implementation: {
+        import: "implemented",
+        export: "implemented",
+      },
+      uiWiring: {
+        import: "wired",
+        export: "wired",
       },
       conformance: {
         publicSpec: "tested-public-subset",

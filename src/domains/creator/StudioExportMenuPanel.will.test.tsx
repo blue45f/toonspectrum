@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -49,27 +50,29 @@ describe("StudioExportMenuPanel WILL v1 public-spec profile", () => {
     }));
 
     render(
-      <StudioExportMenuPanel
-        canvasWidth={800}
-        canvasHeight={1_200}
-        exportScale={1}
-        exportFormat="png"
-        exportTransparent
-        exportPresetId={null}
-        watermark={{ enabled: false, text: "", opacity: 0.2, position: "br", size: 0.028 }}
-        isExporting={false}
-        exportTitle="episode:will"
-        pageCount={1}
-        pageLabels={["1"]}
-        setExportScale={vi.fn()}
-        setExportFormat={vi.fn()}
-        setExportTransparent={vi.fn()}
-        setExportPresetId={vi.fn()}
-        setWatermark={vi.fn()}
-        onCopyToClipboard={vi.fn()}
-        capturePagesForPreset={vi.fn(async () => [])}
-        exportCurrentPageToWillV1={exportCurrentPageToWillV1}
-      />,
+      <StrictMode>
+        <StudioExportMenuPanel
+          canvasWidth={800}
+          canvasHeight={1_200}
+          exportScale={1}
+          exportFormat="png"
+          exportTransparent
+          exportPresetId={null}
+          watermark={{ enabled: false, text: "", opacity: 0.2, position: "br", size: 0.028 }}
+          isExporting={false}
+          exportTitle="episode:will"
+          pageCount={1}
+          pageLabels={["1"]}
+          setExportScale={vi.fn()}
+          setExportFormat={vi.fn()}
+          setExportTransparent={vi.fn()}
+          setExportPresetId={vi.fn()}
+          setWatermark={vi.fn()}
+          onCopyToClipboard={vi.fn()}
+          capturePagesForPreset={vi.fn(async () => [])}
+          exportCurrentPageToWillV1={exportCurrentPageToWillV1}
+        />
+      </StrictMode>,
     );
 
     const exchangeRegion = screen.getByRole("region", { name: "문서 교환 포맷" });

@@ -34,6 +34,11 @@ function groups(): StudioMainMenuGroup[] {
       items: [
         { id: "save-draft", label: "임시저장", onSelect },
         { id: "publish", label: "게시", onSelect },
+        {
+          id: "import-ora-cbz",
+          label: "ORA · CBZ · WILL 가져오기…",
+          onSelect,
+        },
       ],
     },
     {
@@ -106,6 +111,7 @@ describe("localizeStudioMainMenuGroups", () => {
         "studio.mainMenu.group.file.label": "File",
         "studio.mainMenu.item.file.save-draft.shared": "Shared save",
         "studio.mainMenu.item.file.publish.has-work": "Update publish",
+        "studio.mainMenu.item.file.import-ora-cbz": "Import ORA / CBZ…",
         "studio.mainMenu.item.view.reset-rotation": "Reset rotation ({angle}°)",
         "studio.mainMenu.item.view.page-sequence.open": "Close sequence",
         "studio.mainMenu.item.view.quick-access-palette.loading": "Opening quick access…",
@@ -119,6 +125,8 @@ describe("localizeStudioMainMenuGroups", () => {
     expect(projected[0].label).toBe("File");
     expect(item(projected, "file", "save-draft").label).toBe("Shared save");
     expect(item(projected, "file", "publish").label).toBe("Update publish");
+    expect(item(projected, "file", "import-ora-cbz").label)
+      .toBe("Import ORA / CBZ / WILL…");
     expect(item(projected, "view", "reset-rotation").label).toBe("Reset rotation (90°)");
     expect(item(projected, "view", "page-sequence").label).toBe("Close sequence");
     expect(item(projected, "view", "quick-access-palette").label).toBe("Opening quick access…");

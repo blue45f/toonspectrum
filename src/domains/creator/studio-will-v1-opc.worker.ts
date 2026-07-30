@@ -4,7 +4,11 @@ import {
   StudioWillV1OpcInterchangeError,
 } from "./studio-will-v1-opc-interchange";
 import {
-  STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
+  packStudioWillV1OpcBuildResult,
+  packStudioWillV1OpcImportResult,
+  unpackStudioWillV1OpcExportInput,
+} from "./studio-will-v1-opc-packed-codec";
+import {
   STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
   isStudioWillV1OpcWorkerRequest,
   isStudioWillV1OpcWorkerResponse,
@@ -102,12 +106,9 @@ function boundedCodecOptions(
     ...(request.options?.limits
       ? { limits: { ...request.options.limits } }
       : {}),
-    willLimits: {
-      ...request.options?.willLimits,
-      maxTotalPoints:
-        request.options?.willLimits?.maxTotalPoints
-        ?? STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
-    },
+    ...(request.options?.willLimits
+      ? { willLimits: { ...request.options.willLimits } }
+      : {}),
   };
 }
 
@@ -115,18 +116,22 @@ async function execute(request: StudioWillV1OpcWorkerRequest): Promise<void> {
   try {
     const options = boundedCodecOptions(request);
     if (request.type === "studio-will-v1-opc/encode") {
-      const result = await buildStudioWillV1OpcBytes(
-        request.input,
+      const input = unpackStudioWillV1OpcExportInput(
+        request.packedInput,
         options,
       );
+      const result = await buildStudioWillV1OpcBytes(
+        input,
+        options,
+      );
+      const archive = ownedBytes(result.bytes);
+      const packedResult = packStudioWillV1OpcBuildResult(result, options);
       post({
         type: "studio-will-v1-opc/encode-success",
         version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
         requestId: request.requestId,
-        result: {
-          ...result,
-          bytes: ownedBytes(result.bytes),
-        },
+        archive,
+        packedResult,
       });
       return;
     }
@@ -138,7 +143,7 @@ async function execute(request: StudioWillV1OpcWorkerRequest): Promise<void> {
       type: "studio-will-v1-opc/decode-success",
       version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
       requestId: request.requestId,
-      result,
+      packedResult: packStudioWillV1OpcImportResult(result, options),
     });
   } catch (cause) {
     post(

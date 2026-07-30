@@ -235,6 +235,9 @@ export function StudioExportMenuPanel({
   // 언마운트되면(다른 내보내기 형식으로 전환 등) 뒤늦게 도착한 결과가 상태를 덮어쓰지 않게 막는다.
   const mountedRef = useRef(true);
   useEffect(() => {
+    // React StrictMode는 개발 환경에서 effect를 setup → cleanup → setup 순으로 재실행한다.
+    // setup 때 다시 활성화하지 않으면 모든 비동기 내보내기 결과와 finally가 영구 폐기된다.
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };

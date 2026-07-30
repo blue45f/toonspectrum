@@ -301,7 +301,7 @@ export function buildStudioMainMenuGroups({
         },
         {
           id: "import-ora-cbz",
-          label: "ORA / CBZ 가져오기…",
+          label: "ORA · CBZ · WILL 가져오기…",
           icon: Package,
           disabled: state.interchangeImportBusy || state.collaborationDocumentLocked,
           separatorAfter: true,

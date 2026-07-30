@@ -314,9 +314,9 @@ describe("StudioMenubarContent", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "ORA / CBZ 가져오기" }));
+    fireEvent.click(screen.getByRole("button", { name: "ORA · CBZ · WILL" }));
     expect(interchangeImportInputRef.current.click).toHaveBeenCalledOnce();
-    expect(screen.queryByLabelText("OpenRaster 또는 CBZ 가져오기")).toBeNull();
+    expect(screen.queryByLabelText("OpenRaster, CBZ 또는 WILL v1 가져오기")).toBeNull();
 
     view.rerender(
       <StudioMenubarContent
@@ -342,7 +342,7 @@ describe("StudioMenubarContent", () => {
         })}
       />
     );
-    expect(screen.getByRole("button", { name: "ORA / CBZ 가져오기" }))
+    expect(screen.getByRole("button", { name: "ORA · CBZ · WILL" }))
       .toHaveProperty("disabled", true);
   });
 

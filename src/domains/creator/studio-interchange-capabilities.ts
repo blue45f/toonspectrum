@@ -626,8 +626,8 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     extensions: [".will"],
     mime: ["application/vnd.toonspectrum.will-v1-bounded+zip"],
     category: "document",
-    import: "engine-ready",
-    export: "engine-ready",
+    import: "available",
+    export: "available",
     roundTrip: "partial",
     lossModel: [
       "ToonSpectrum의 결정적 7-part OPC 프로필과 Annex A 획 스트림만 왕복함",
@@ -642,15 +642,17 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     sizeBudget: {
       maxFileBytes: 40 * MiB,
       maxFiles: 7,
-      maxItems: 100_000,
-      notes: "정확한 7개 part, XML part당 256KiB, 획 stream 32MiB 제한",
+      maxItems: 1_000_000,
+      notes:
+        "정확한 7개 part, XML part당 256KiB, 획 stream 32MiB, 문서 전체 1,000,000 source point 제한. Studio 편집 요소 변환은 별도 200,000 sample admission budget 적용",
     },
-    status: "engine-ready",
+    status: "partial",
     notes: [
       "공개 WILL v1 Annex B를 바탕으로 결정적 .will 생성과 엄격한 가져오기를 독립 구현했습니다.",
       "공개 v1 명세는 최상위 컨테이너 MIME을 정의하지 않으므로 ToonSpectrum 소유 MIME을 사용합니다.",
       "Content Types, root/section relationship, SVG r:id, CRC와 Path stream을 한 문서 경계에서 검증합니다.",
       "DTD·entity·processing instruction·외부 target·script·foreignObject·경로 순회·압축 폭탄을 fail-closed로 거부합니다.",
+      "파일 메뉴에서 전용 Worker 검사, 명시적 새 페이지/현재 페이지 선택, 손실 미리보기 후 가져오며 동일 메뉴에서 내보낼 수 있습니다.",
       "이 구현과 ToonSpectrum 제품 검증은 Wacom SDK 출처·공식 인증·상표 허가를 의미하지 않습니다.",
     ],
     recommendedBridge: [

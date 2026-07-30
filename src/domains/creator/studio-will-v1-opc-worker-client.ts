@@ -1,7 +1,6 @@
 import {
   STUDIO_WILL_V1_LIMITS,
   type StudioWillV1Limits,
-  type StudioWillV1Path,
 } from "./studio-will-v1-interchange";
 import {
   STUDIO_WILL_V1_OPC_LIMITS,
@@ -11,7 +10,13 @@ import {
   type StudioWillV1OpcLimits,
 } from "./studio-will-v1-opc-interchange";
 import {
-  STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
+  StudioWillV1OpcPackedError,
+  packStudioWillV1OpcExportInput,
+  unpackStudioWillV1OpcBuildResult,
+  unpackStudioWillV1OpcImportResultWithMetrics,
+  type StudioWillV1OpcImportMaterializationMetrics,
+} from "./studio-will-v1-opc-packed-codec";
+import {
   STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
   isStudioWillV1OpcWorkerResponse,
   studioWillV1OpcWorkerCorrelation,
@@ -76,6 +81,13 @@ export interface StudioWillV1OpcWorkerOptions {
   readonly workerFactory?: StudioWillV1OpcWorkerFactory | null;
   /** Test/host injection point. Returned IDs still pass the bounded protocol validator. */
   readonly requestIdFactory?: () => string;
+  /**
+   * Local observability hook; it is never cloned into the Worker request. A callback failure is
+   * ignored so telemetry cannot alter a validated import.
+   */
+  readonly onDecodeMaterialization?: (
+    metrics: StudioWillV1OpcImportMaterializationMetrics,
+  ) => void;
 }
 
 type StudioWillV1OpcWorkerSource = Blob | Uint8Array | ArrayBuffer;
@@ -444,7 +456,7 @@ function resolveClientBudgets(
         ),
         maxTotalPoints: resolveClientLimit(
           options.willLimits?.maxTotalPoints,
-          STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
+          STUDIO_WILL_V1_LIMITS.maxTotalPoints,
           "willLimits.maxTotalPoints"
         ),
         maxDecimalPrecision: resolveClientLimit(
@@ -605,56 +617,17 @@ function snapshotSource(
   throw clientError("SOURCE_INVALID", "지원하지 않는 WILL v1 OPC Worker 입력입니다.");
 }
 
-function pathsWithinRequestedLimits(
-  paths: readonly StudioWillV1Path[],
-  limits: StudioWillV1Limits
-): boolean {
-  if (paths.length > limits.maxPaths) return false;
-  let totalPoints = 0;
-  for (const path of paths) {
-    if (
-      path.points.length > limits.maxPointsPerPath
-      || path.decimalPrecision > limits.maxDecimalPrecision
-      || path.strokeWidths.some((width) => width > limits.maxStrokeWidth)
-      || path.points.some(
-        (point) =>
-          Math.abs(point.x) > limits.maxCoordinateMagnitude
-          || Math.abs(point.y) > limits.maxCoordinateMagnitude
-      )
-    ) {
-      return false;
-    }
-    totalPoints += path.points.length;
-    if (totalPoints > limits.maxTotalPoints) return false;
+function mapPackedError(error: unknown): never {
+  if (!(error instanceof StudioWillV1OpcPackedError)) {
+    throw protocolError("WILL v1 OPC packed transport를 처리하지 못했습니다.");
   }
-  return true;
-}
-
-function resultWithinRequestedBudgets(
-  response: StudioWillV1OpcWorkerResponse,
-  budgets: ResolvedClientBudgets
-): boolean {
-  if (response.type === "studio-will-v1-opc/failure") return true;
-  if (!pathsWithinRequestedLimits(response.result.paths, budgets.willLimits)) {
-    return false;
+  if (error.code === "RESOURCE_LIMIT") {
+    throw clientError("RESOURCE_LIMIT", error.message);
   }
-  if (response.type === "studio-will-v1-opc/encode-success") {
-    return response.result.bytes.byteLength <= budgets.limits.maxArchiveBytes;
+  if (error.code === "MODEL_INVALID") {
+    throw clientError("STROKES_INVALID", error.message);
   }
-  const metadata = [
-    response.result.title,
-    response.result.createdAt,
-    response.result.application,
-    response.result.applicationVersion,
-  ];
-  return (
-    response.result.width <= budgets.limits.maxDimension
-    && response.result.height <= budgets.limits.maxDimension
-    && metadata.every(
-      (value) => codePointLength(value) <= budgets.limits.maxMetadataCharacters
-    )
-    && codePointLength(response.result.applicationVersion) <= 64
-  );
+  throw protocolError("WILL v1 OPC packed transport가 올바르지 않습니다.");
 }
 
 export async function buildStudioWillV1OpcBytesInWorker(
@@ -665,23 +638,37 @@ export async function buildStudioWillV1OpcBytesInWorker(
   const timeoutMs = normalizeTimeout(options.timeoutMs);
   const budgets = resolveClientBudgets(options);
   preflightEncodeInput(input, budgets);
+  let packedInput: Uint8Array;
+  try {
+    packedInput = packStudioWillV1OpcExportInput(input, codecOptions(budgets));
+  } catch (error) {
+    mapPackedError(error);
+  }
   const requestId = createRequestId(options.requestIdFactory);
   const worker = createWorker(workerFactory(options));
   const request: StudioWillV1OpcWorkerRequest = {
     type: "studio-will-v1-opc/encode",
     version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
     requestId,
-    input,
+    packedInput,
     options: codecOptions(budgets),
   };
   const response = await runWorker(worker, request, "encode", timeoutMs, options.signal);
   if (response.type !== "studio-will-v1-opc/encode-success") {
     throw protocolError("WILL v1 OPC Worker 인코딩 결과가 올바르지 않습니다.");
   }
-  if (!resultWithinRequestedBudgets(response, budgets)) {
-    throw protocolError("WILL v1 OPC Worker 인코딩 결과가 요청한 안전 한도를 넘었습니다.");
+  if (response.archive.byteLength > budgets.limits.maxArchiveBytes) {
+    throw protocolError("WILL v1 OPC Worker archive가 요청한 안전 한도를 넘었습니다.");
   }
-  return response.result;
+  try {
+    return unpackStudioWillV1OpcBuildResult(
+      response.archive,
+      response.packedResult,
+      codecOptions(budgets),
+    );
+  } catch (error) {
+    mapPackedError(error);
+  }
 }
 
 export async function importStudioWillV1OpcInWorker(
@@ -706,10 +693,20 @@ export async function importStudioWillV1OpcInWorker(
   if (response.type !== "studio-will-v1-opc/decode-success") {
     throw protocolError("WILL v1 OPC Worker 디코딩 결과가 올바르지 않습니다.");
   }
-  if (!resultWithinRequestedBudgets(response, budgets)) {
-    throw protocolError("WILL v1 OPC Worker 디코딩 결과가 요청한 안전 한도를 넘었습니다.");
+  try {
+    const decoded = unpackStudioWillV1OpcImportResultWithMetrics(
+      response.packedResult,
+      codecOptions(budgets),
+    );
+    try {
+      options.onDecodeMaterialization?.(decoded.metrics);
+    } catch {
+      // Metrics are diagnostic only; imported model validity remains authoritative.
+    }
+    return decoded.result;
+  } catch (error) {
+    mapPackedError(error);
   }
-  return response.result;
 }
 
 /** Naming aliases for call sites that use the repository's `Async` Worker convention. */

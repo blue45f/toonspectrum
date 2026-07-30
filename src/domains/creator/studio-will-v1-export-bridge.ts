@@ -2,10 +2,10 @@
  * UI-facing bridge from retained Studio freehand elements to the bounded,
  * clean-room WILL v1 Annex B document Worker.
  *
- * The codec runtime stays behind a literal dynamic import so opening Studio or
- * the export panel does not load the OPC/ZIP implementation. This is a
- * ToonSpectrum-owned public-specification profile, not Wacom SDK output,
- * vendor certification, or trademark authorization.
+ * This bridge and its Worker client are part of Studio's stable module graph. Keeping the click
+ * path free of an unbounded dynamic chunk request is intentional: the expensive OPC/ZIP work still
+ * runs only inside the dedicated Worker. This is a ToonSpectrum-owned public-specification profile,
+ * not Wacom SDK output, vendor certification, or trademark authorization.
  */
 
 import {
@@ -13,23 +13,26 @@ import {
   studioInkPressureDiameter,
 } from "./studio-ink-pressure-model";
 import { parseStudioGpuColor } from "./studio-webgpu-color";
+import {
+  STUDIO_WILL_V1_OPC_EXTENSION,
+  STUDIO_WILL_V1_OPC_MEDIA_TYPE,
+} from "./studio-will-v1-opc-interchange";
+import { buildStudioWillV1OpcBytesInWorker } from "./studio-will-v1-opc-worker-client";
 
 import type { DrawEl } from "./studio-element-model";
 import type {
   StudioWillV1LossReport,
   StudioWillV1PathInput,
 } from "./studio-will-v1-interchange";
-import type {
-  StudioWillV1OpcBuildResult,
-} from "./studio-will-v1-opc-interchange";
-import type {
-  StudioWillV1OpcWorkerOptions,
-} from "./studio-will-v1-opc-worker-client";
+import type { StudioWillV1OpcBuildResult } from "./studio-will-v1-opc-interchange";
+import type { StudioWillV1OpcWorkerOptions } from "./studio-will-v1-opc-worker-client";
 
 export const STUDIO_WILL_V1_EXPORT_PROFILE_LABEL =
   "ToonSpectrum bounded WILL v1 Annex B public-spec profile" as const;
 export const STUDIO_WILL_V1_EXPORT_DISCLAIMER =
   "ToonSpectrum의 공개 명세 기반 bounded profile이며 Wacom 공식 SDK·인증 파일이 아닙니다." as const;
+/** UI export deadline. The generic codec keeps its larger host-configurable ceiling. */
+export const STUDIO_WILL_V1_EXPORT_DEFAULT_TIMEOUT_MS = 30_000;
 
 export type StudioWillV1ExportSkipReason =
   | "color-not-representable"
@@ -79,6 +82,62 @@ interface PreparedPath {
 
 const WILL_DECIMAL_PRECISION = 2;
 const WILL_MINIMUM_WIDTH = 1 / 10 ** WILL_DECIMAL_PRECISION;
+
+function willV1ExportTimeoutError(timeoutMs: number): Error {
+  const error = new Error(
+    `WILL v1 파일을 ${timeoutMs}ms 안에 만들지 못했습니다. 다시 시도해 주세요.`,
+  );
+  error.name = "TimeoutError";
+  return error;
+}
+
+function willV1ExportAbortError(): Error {
+  const error = new Error("WILL v1 내보내기를 취소했습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+function exportDeadlineMs(
+  value: number | undefined,
+): number {
+  return Number.isSafeInteger(value) && (value ?? 0) > 0
+    ? value!
+    : STUDIO_WILL_V1_EXPORT_DEFAULT_TIMEOUT_MS;
+}
+
+async function runBoundedWillV1Export<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  callerSignal?: AbortSignal,
+): Promise<T> {
+  if (callerSignal?.aborted) throw willV1ExportAbortError();
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let removeCallerAbort = () => {};
+  const guard = new Promise<never>((_, reject) => {
+    const onCallerAbort = () => {
+      // Resolve the public failure before aborting the nested Worker promise so callers receive
+      // this stable bridge-level reason even if an AbortSignal listener runs synchronously.
+      reject(willV1ExportAbortError());
+      controller.abort();
+    };
+    callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+    removeCallerAbort = () => callerSignal?.removeEventListener(
+      "abort",
+      onCallerAbort,
+    );
+    timer = globalThis.setTimeout(() => {
+      reject(willV1ExportTimeoutError(timeoutMs));
+      controller.abort();
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([operation(controller.signal), guard]);
+  } finally {
+    if (timer !== null) globalThis.clearTimeout(timer);
+    removeCallerAbort();
+  }
+}
 
 function boundedTitle(value: string): string {
   const title = Array.from(value.trim()).slice(0, 1_024).join("");
@@ -209,36 +268,39 @@ export async function exportStudioPageToWillV1(
   if (paths.length === 0) {
     throw new Error("WILL v1으로 내보낼 수 있는 보이는 펜 자유곡선이 없어요.");
   }
-
-  const [
-    { buildStudioWillV1OpcBytesInWorker },
-    {
-      STUDIO_WILL_V1_OPC_EXTENSION,
-      STUDIO_WILL_V1_OPC_MEDIA_TYPE,
+  const timeoutMs = exportDeadlineMs(input.workerOptions?.timeoutMs);
+  const result = await runBoundedWillV1Export(
+    async (signal) => {
+      const built = await buildStudioWillV1OpcBytesInWorker(
+        {
+          width: input.width,
+          height: input.height,
+          title: boundedTitle(input.title),
+          application: "ToonSpectrum",
+          applicationVersion: "1.0",
+          paths,
+        },
+        {
+          ...input.workerOptions,
+          timeoutMs: input.workerOptions?.timeoutMs
+            ?? STUDIO_WILL_V1_EXPORT_DEFAULT_TIMEOUT_MS,
+          signal,
+        },
+      );
+      return Object.freeze({
+        built,
+        extension: STUDIO_WILL_V1_OPC_EXTENSION,
+        mediaType: STUDIO_WILL_V1_OPC_MEDIA_TYPE,
+      });
     },
-  ] = await Promise.all([
-    import("./studio-will-v1-opc-worker-client"),
-    import("./studio-will-v1-opc-interchange"),
-  ]);
-  const result = await buildStudioWillV1OpcBytesInWorker(
-    {
-      width: input.width,
-      height: input.height,
-      title: boundedTitle(input.title),
-      application: "ToonSpectrum",
-      applicationVersion: "1.0",
-      paths,
-    },
-    {
-      ...input.workerOptions,
-      signal: input.signal,
-    }
+    timeoutMs,
+    input.signal,
   );
 
   return Object.freeze({
-    bytes: Uint8Array.from(result.bytes),
-    extension: STUDIO_WILL_V1_OPC_EXTENSION,
-    mediaType: STUDIO_WILL_V1_OPC_MEDIA_TYPE,
+    bytes: Uint8Array.from(result.built.bytes),
+    extension: result.extension,
+    mediaType: result.mediaType,
     profileLabel: STUDIO_WILL_V1_EXPORT_PROFILE_LABEL,
     disclaimer: STUDIO_WILL_V1_EXPORT_DISCLAIMER,
     exportedStrokeIds: Object.freeze(exportedStrokeIds),
@@ -246,7 +308,7 @@ export async function exportStudioPageToWillV1(
     adaptations: Object.freeze(
       adaptations.map((item) => Object.freeze(item))
     ),
-    loss: result.loss,
-    assurance: result.assurance,
+    loss: result.built.loss,
+    assurance: result.built.assurance,
   });
 }

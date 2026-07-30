@@ -31,6 +31,7 @@ import {
   StudioCodecCertificationAuthoritySigningRequestSchema,
   type StudioCodecCertificationAuthorityExecutionVerifier,
   type StudioCodecCertificationAuthorityExecutionVerificationResult,
+  type StudioCodecCertificationAuthoritySignature,
   type StudioCodecCertificationAuthoritySigner,
 } from "./studio-codec-certification-authority.service";
 
@@ -282,13 +283,21 @@ function verifiedExecution(
     licenseGrantId: unsigned.core.receipt.licenseGrant.id,
     licenseGrantScopes: [...unsigned.core.receipt.licenseGrant.scope],
     licenseGrantExpiresAt: unsigned.core.receipt.licenseGrant.expiresAt,
+    authorization: {
+      status: "reserved",
+      reservationId: "reservation-1",
+      attemptId: "attempt-1",
+      admissionLeaseId: "admission-lease-1",
+      expiresAt: "2026-07-30T00:06:30.000Z",
+    },
   };
 }
 
 function verifier(
-  verify = vi.fn(async () => verifiedExecution())
+  verify = vi.fn(async () => verifiedExecution()),
+  complete = vi.fn(async () => true)
 ): StudioCodecCertificationAuthorityExecutionVerifier {
-  return { verify };
+  return { verify, complete };
 }
 
 function signer(
@@ -479,6 +488,21 @@ describe("StudioCodecCertificationAuthorityService", () => {
     expect(sign).not.toHaveBeenCalled();
   });
 
+  it("rejects verified adapters that omit the mandatory completion boundary", async () => {
+    const verify = vi.fn(async () => verifiedExecution());
+    const sign = vi.fn(async () => new Uint8Array(64).fill(7));
+    const service = new StudioCodecCertificationAuthorityService(
+      signer(sign),
+      { verify } as StudioCodecCertificationAuthorityExecutionVerifier
+    );
+
+    await expect(
+      service.signProductCertificateMessage(signingFixture())
+    ).rejects.toMatchObject({ code: "EXECUTION_VERIFIER_UNAVAILABLE" });
+    expect(verify).not.toHaveBeenCalled();
+    expect(sign).not.toHaveBeenCalled();
+  });
+
   it("does not sign a forged but internally consistent certificate when independent verification rejects it", async () => {
     const verify = vi.fn(async () => ({ verified: false as const }));
     const sign = vi.fn(async () => new Uint8Array(64).fill(7));
@@ -561,41 +585,55 @@ describe("StudioCodecCertificationAuthorityService", () => {
     expect(sign).not.toHaveBeenCalled();
   });
 
-  it("retains all eight leases until abort-ignoring adapter operations actually settle", async () => {
-    const ignoresAbort = vi.fn(
-      () =>
-        new Promise<StudioCodecCertificationAuthorityExecutionVerificationResult>(
-          () => undefined
-        )
-    );
-    const sign = vi.fn(async () => new Uint8Array(64).fill(7));
-    const service = new StudioCodecCertificationAuthorityService(
-      signer(sign),
-      verifier(ignoresAbort)
-    );
-    const timedOut = Array.from({ length: 8 }, () =>
-      service.signProductCertificateMessage(signingFixture(), {
-        verificationTimeoutMs: 100,
-      })
-    );
-    const outcomes = await Promise.allSettled(timedOut);
-    expect(outcomes).toHaveLength(8);
-    expect(outcomes.every(
-      (outcome) =>
-        outcome.status === "rejected"
-        && errorCode(outcome.reason) === "EXECUTION_VERIFICATION_TIMEOUT"
-    )).toBe(true);
+  it("quarantines abort-ignoring operations without permanently poisoning capacity", async () => {
+    vi.useFakeTimers();
+    try {
+      const ignoresAbort = vi.fn(
+        () =>
+          new Promise<
+            StudioCodecCertificationAuthorityExecutionVerificationResult
+          >(() => undefined)
+      );
+      const sign = vi.fn(async () => new Uint8Array(64).fill(7));
+      const service = new StudioCodecCertificationAuthorityService(
+        signer(sign),
+        verifier(ignoresAbort)
+      );
+      const timedOut = Array.from({ length: 8 }, () =>
+        service.signProductCertificateMessage(signingFixture(), {
+          verificationTimeoutMs: 100,
+        })
+      );
+      const outcomesPromise = Promise.allSettled(timedOut);
+      await vi.advanceTimersByTimeAsync(100);
+      const outcomes = await outcomesPromise;
+      expect(outcomes).toHaveLength(8);
+      expect(outcomes.every(
+        (outcome) =>
+          outcome.status === "rejected"
+          && errorCode(outcome.reason) === "EXECUTION_VERIFICATION_TIMEOUT"
+      )).toBe(true);
 
-    await expect(
-      service.signProductCertificateMessage(signingFixture(), {
-        verificationTimeoutMs: 100,
-      })
-    ).rejects.toMatchObject({
-      code: "BUSY",
-      message: "Codec certification signing capacity is exhausted.",
-    });
-    expect(ignoresAbort).toHaveBeenCalledTimes(8);
-    expect(sign).not.toHaveBeenCalled();
+      await expect(
+        service.signProductCertificateMessage(signingFixture(), {
+          verificationTimeoutMs: 100,
+        })
+      ).rejects.toMatchObject({
+        code: "BUSY",
+        message: "Codec certification signing capacity is exhausted.",
+      });
+      ignoresAbort.mockImplementationOnce(async () => verifiedExecution());
+      await vi.advanceTimersByTimeAsync(1_001);
+      await expect(
+        service.signProductCertificateMessage(signingFixture(), {
+          verificationTimeoutMs: 100,
+        })
+      ).resolves.toMatchObject({ executionId: EXECUTION_ID });
+      expect(ignoresAbort).toHaveBeenCalledTimes(9);
+      expect(sign).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rejects digest mismatch, non-canonical JSON and forbidden vendor claims before signing", async () => {
@@ -704,6 +742,240 @@ describe("StudioCodecCertificationAuthorityService", () => {
       code: "INVALID_SIGNATURE",
       message: "Codec certification signer returned an invalid signature.",
     });
+  });
+
+  it("releases a reserved execution after transient signer failure and consumes it only after verified signing", async () => {
+    const fixture = signingFixture();
+    const complete = vi.fn(async () => true);
+    const executionVerifier: StudioCodecCertificationAuthorityExecutionVerifier = {
+      verify: vi.fn(async () => ({
+        ...verifiedExecution(fixture),
+        authorization: {
+          status: "reserved" as const,
+          reservationId: "reservation-1",
+          attemptId: "attempt-1",
+          admissionLeaseId: "admission-lease-1",
+          expiresAt: "2026-07-30T00:02:30.000Z",
+        },
+      })),
+      complete,
+    };
+    const sign = vi.fn()
+      .mockRejectedValueOnce(new Error("transient KMS timeout"))
+      .mockResolvedValueOnce(new Uint8Array(64).fill(7));
+    const service = new StudioCodecCertificationAuthorityService(
+      signer(sign),
+      executionVerifier
+    );
+
+    await expect(
+      service.signProductCertificateMessage(fixture)
+    ).rejects.toMatchObject({ code: "SIGNER_FAILED" });
+    expect(complete).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      executionId: fixture.executionId,
+      reservationId: "reservation-1",
+      outcome: "release",
+    }));
+
+    await expect(
+      service.signProductCertificateMessage(fixture)
+    ).resolves.toMatchObject({
+      executionId: fixture.executionId,
+      canonicalSha256: fixture.canonicalSha256,
+    });
+    expect(complete).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      executionId: fixture.executionId,
+      reservationId: "reservation-1",
+      outcome: "consume",
+    }));
+  });
+
+  it("releases a reservation that cannot cover downstream phase budgets plus skew", async () => {
+    const fixture = signingFixture();
+    const complete = vi.fn(async () => true);
+    const sign = vi.fn(async () => new Uint8Array(64).fill(7));
+    const service = new StudioCodecCertificationAuthorityService(
+      signer(sign),
+      verifier(vi.fn(async () => ({
+        ...verifiedExecution(fixture),
+        authorization: {
+          status: "reserved" as const,
+          reservationId: "reservation-short",
+          attemptId: "attempt-short",
+          admissionLeaseId: "admission-short",
+          expiresAt: "2026-07-30T00:01:30.000Z",
+        },
+      })), complete)
+    );
+
+    await expect(
+      service.signProductCertificateMessage(fixture)
+    ).rejects.toMatchObject({ code: "EXECUTION_FINALIZATION_FAILED" });
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "release",
+      reservationId: "reservation-short",
+    }));
+    expect(sign).not.toHaveBeenCalled();
+  });
+
+  it("never returns a signature when durable reservation consumption times out", async () => {
+    const fixture = signingFixture();
+    const complete = vi.fn(
+      ({ signal }: Parameters<
+        NonNullable<
+          StudioCodecCertificationAuthorityExecutionVerifier["complete"]
+        >
+      >[0]) =>
+        new Promise<boolean>((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new Error("private repository timeout detail")),
+            { once: true }
+          );
+        })
+    );
+    const service = new StudioCodecCertificationAuthorityService(
+      signer(),
+      {
+        verify: vi.fn(async () => ({
+          ...verifiedExecution(fixture),
+          authorization: {
+            status: "reserved" as const,
+            reservationId: "reservation-timeout",
+            attemptId: "attempt-timeout",
+            admissionLeaseId: "admission-timeout",
+            expiresAt: "2026-07-30T00:05:30.000Z",
+          },
+        })),
+        complete,
+      }
+    );
+
+    await expect(
+      service.signProductCertificateMessage(fixture, {
+        finalizationTimeoutMs: 100,
+      })
+    ).rejects.toMatchObject({
+      code: "EXECUTION_FINALIZATION_TIMEOUT",
+      message:
+        "Codec provider execution reservation finalization timed out.",
+    });
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      outcome: "consume",
+    }));
+  });
+
+  it("recovers an ambiguously committed signature without invoking the signer twice", async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = signingFixture();
+      let storedSignature:
+        StudioCodecCertificationAuthoritySignature
+        | null = null;
+      const verifyExecution = vi.fn(async () => storedSignature
+        ? {
+            ...verifiedExecution(fixture),
+            authorization: {
+              status: "completed" as const,
+              signature: storedSignature,
+            },
+          }
+        : verifiedExecution(fixture));
+      const complete = vi.fn((
+        request: Parameters<
+          StudioCodecCertificationAuthorityExecutionVerifier["complete"]
+        >[0]
+      ) => {
+        if (request.outcome !== "consume") return Promise.resolve(true);
+        storedSignature = request.signature;
+        // Simulate an atomic repository commit followed by a lost response.
+        return new Promise<boolean>(() => undefined);
+      });
+      const sign = vi.fn(async () => new Uint8Array(64).fill(7));
+      const verifySignature = vi.fn(async () => true);
+      const service = new StudioCodecCertificationAuthorityService(
+        signer(sign, verifySignature),
+        { verify: verifyExecution, complete }
+      );
+
+      const first = service.signProductCertificateMessage(fixture, {
+        finalizationTimeoutMs: 100,
+      });
+      const firstOutcome = first.then(
+        () => null,
+        (error: unknown) => error
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      await expect(firstOutcome).resolves.toMatchObject({
+        code: "EXECUTION_FINALIZATION_TIMEOUT",
+      });
+      expect(storedSignature).not.toBeNull();
+
+      const recovered = await service.signProductCertificateMessage(fixture);
+      expect(recovered).toEqual(storedSignature);
+      expect(sign).toHaveBeenCalledTimes(1);
+      expect(verifySignature).toHaveBeenCalledTimes(2);
+      expect(complete).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fences concurrent same-execution retries and recovers the completed signature", async () => {
+    const fixture = signingFixture();
+    let state: "available" | "reserved" | "completed" = "available";
+    let storedSignature: StudioCodecCertificationAuthoritySignature | null = null;
+    let releaseSigner!: () => void;
+    const signerGate = new Promise<void>((resolve) => {
+      releaseSigner = resolve;
+    });
+    const verifyExecution = vi.fn(async () => {
+      if (state === "completed" && storedSignature) {
+        return {
+          ...verifiedExecution(fixture),
+          authorization: {
+            status: "completed" as const,
+            signature: storedSignature,
+          },
+        };
+      }
+      if (state === "reserved") return { verified: false as const };
+      state = "reserved";
+      return verifiedExecution(fixture);
+    });
+    const complete = vi.fn(async (
+      request: Parameters<
+        StudioCodecCertificationAuthorityExecutionVerifier["complete"]
+      >[0]
+    ) => {
+      if (request.outcome === "consume") {
+        storedSignature = request.signature;
+        state = "completed";
+      } else if (request.outcome === "release") {
+        state = "available";
+      }
+      return true;
+    });
+    const sign = vi.fn(async () => {
+      await signerGate;
+      return new Uint8Array(64).fill(7);
+    });
+    const service = new StudioCodecCertificationAuthorityService(
+      signer(sign),
+      { verify: verifyExecution, complete }
+    );
+
+    const first = service.signProductCertificateMessage(fixture);
+    await vi.waitFor(() => expect(sign).toHaveBeenCalledOnce());
+    await expect(
+      service.signProductCertificateMessage(fixture)
+    ).rejects.toMatchObject({ code: "EXECUTION_NOT_VERIFIED" });
+    releaseSigner();
+    const signed = await first;
+    const recovered = await service.signProductCertificateMessage(fixture);
+
+    expect(recovered).toEqual(signed);
+    expect(sign).toHaveBeenCalledTimes(1);
   });
 
   it("propagates bounded cancellation and timeout without exposing abort reasons", async () => {

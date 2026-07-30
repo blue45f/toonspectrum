@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_WILL_V1_OPC_ASSURANCE } from "./studio-will-v1-opc-interchange";
+import { buildStudioWillV1OpcBytes } from "./studio-will-v1-opc-interchange";
 import {
+  packStudioWillV1OpcBuildResult,
+  packStudioWillV1OpcExportInput,
+} from "./studio-will-v1-opc-packed-codec";
+import {
+  STUDIO_WILL_V1_OPC_WORKER_MAX_PACKED_POINTS,
   STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
   STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
   isStudioWillV1OpcWorkerRequest,
@@ -9,13 +14,14 @@ import {
   studioWillV1OpcWorkerCorrelation,
   studioWillV1OpcWorkerRequestTransfers,
   studioWillV1OpcWorkerResponseTransfers,
-  type StudioWillV1OpcWorkerDecodeRequest,
+  type StudioWillV1OpcWorkerEncodeRequest,
   type StudioWillV1OpcWorkerEncodeSuccess,
 } from "./studio-will-v1-opc-worker-protocol";
 
 const SAMPLE_INPUT = {
-  width: 10,
-  height: 20,
+  width: 32,
+  height: 24,
+  title: "Packed protocol",
   paths: [
     {
       points: [
@@ -24,262 +30,133 @@ const SAMPLE_INPUT = {
         { x: 2, y: 2 },
         { x: 3, y: 3 },
       ],
-      strokeWidths: [1],
-      strokeColor: { r: 1, g: 2, b: 3, a: 255 },
+      strokeWidths: [1, 2],
+      strokeColor: { r: 10, g: 20, b: 30, a: 255 },
     },
   ],
 };
 
-const VALID_PATH = {
-  points: SAMPLE_INPUT.paths[0]!.points,
-  strokeWidths: [1],
-  strokeColor: SAMPLE_INPUT.paths[0]!.strokeColor,
-  startParameter: 0,
-  endParameter: 1,
-  decimalPrecision: 2,
-  segmentCount: 1,
-};
+function encodeRequest(): StudioWillV1OpcWorkerEncodeRequest {
+  return {
+    type: "studio-will-v1-opc/encode",
+    version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
+    requestId: "packed-encode",
+    packedInput: packStudioWillV1OpcExportInput(SAMPLE_INPUT),
+  };
+}
 
-const VALID_ENCODE_RESPONSE = {
-  type: "studio-will-v1-opc/encode-success",
-  version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-  requestId: "valid-response",
-  result: {
-    bytes: new Uint8Array(22),
-    paths: [VALID_PATH],
-    loss: {
-      status: "exact",
-      quantization: "truncate-toward-zero",
-      items: [],
-    },
-    assurance: STUDIO_WILL_V1_OPC_ASSURANCE,
-  },
-};
-
-describe("studio WILL v1 OPC Worker protocol", () => {
-  it("validates typed encode/decode requests and exposes bounded correlation", () => {
-    const encode = {
-      type: "studio-will-v1-opc/encode",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "encode-1",
-      input: SAMPLE_INPUT,
-    };
-    const decode: StudioWillV1OpcWorkerDecodeRequest = {
-      type: "studio-will-v1-opc/decode",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "decode-1",
-      source: new Uint8Array([1, 2, 3]),
-    };
-
-    expect(isStudioWillV1OpcWorkerRequest(encode)).toBe(true);
-    expect(isStudioWillV1OpcWorkerRequest(decode)).toBe(true);
-    expect(studioWillV1OpcWorkerCorrelation(encode)).toEqual({
-      requestId: "encode-1",
-      operation: "encode",
-    });
-    expect(
-      isStudioWillV1OpcWorkerRequest({ ...decode, version: 2 })
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerRequest({ ...decode, requestId: "\u0000" })
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerRequest({ ...decode, source: [1, 2, 3] })
-    ).toBe(false);
+describe("WILL v1 OPC Worker packed protocol", () => {
+  it("uses v2 packed transport and eliminates the object-clone point allowance", () => {
+    expect(STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION).toBe(2);
+    expect(STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS).toBe(0);
+    expect(STUDIO_WILL_V1_OPC_WORKER_MAX_PACKED_POINTS).toBe(1_000_000);
+    const request = encodeRequest();
+    expect(isStudioWillV1OpcWorkerRequest(request)).toBe(true);
+    expect("input" in request).toBe(false);
+    expect(request.packedInput).toBeInstanceOf(Uint8Array);
   });
 
-  it("transfers only decode request bytes and encode response bytes", () => {
-    const bytes = new Uint8Array([1, 2, 3]);
-    const decode: StudioWillV1OpcWorkerDecodeRequest = {
-      type: "studio-will-v1-opc/decode",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "decode-transfer",
-      source: bytes,
-    };
-    expect(studioWillV1OpcWorkerRequestTransfers(decode)).toEqual([bytes.buffer]);
-    expect(
-      studioWillV1OpcWorkerRequestTransfers({
-        type: "studio-will-v1-opc/encode",
-        version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-        requestId: "encode-transfer",
-        input: SAMPLE_INPUT,
-      })
-    ).toEqual([]);
+  it("accepts only exact request keys, versions, owned packets, and options", () => {
+    const request = encodeRequest();
+    expect(isStudioWillV1OpcWorkerRequest({ ...request, extra: true })).toBe(false);
+    expect(isStudioWillV1OpcWorkerRequest({ ...request, version: 1 })).toBe(false);
+    expect(isStudioWillV1OpcWorkerRequest({
+      ...request,
+      options: { willLimits: { maxTotalPoints: 1_000_001 } },
+    })).toBe(false);
 
-    const responseBytes = new Uint8Array([4, 5]);
-    const success = {
-      type: "studio-will-v1-opc/encode-success",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "encode-transfer",
-      result: {
-        bytes: responseBytes,
-        paths: [],
-        loss: { status: "exact", quantization: "truncate-toward-zero", items: [] },
-        assurance: {},
-      },
-    } as unknown as StudioWillV1OpcWorkerEncodeSuccess;
-    expect(studioWillV1OpcWorkerResponseTransfers(success)).toEqual([
-      responseBytes.buffer,
+    const backing = new Uint8Array(request.packedInput.byteLength + 2);
+    backing.set(request.packedInput, 1);
+    expect(isStudioWillV1OpcWorkerRequest({
+      ...request,
+      packedInput: backing.subarray(1, -1),
+    })).toBe(false);
+
+    const hostile = Object.defineProperty({}, "type", {
+      enumerable: true,
+      get: () => "studio-will-v1-opc/encode",
+    });
+    expect(isStudioWillV1OpcWorkerRequest(hostile)).toBe(false);
+  });
+
+  it("transfers exact dedicated buffers once and never transfers Blob input", async () => {
+    const request = encodeRequest();
+    expect(studioWillV1OpcWorkerRequestTransfers(request)).toEqual([
+      request.packedInput.buffer,
     ]);
 
-    const blobDecode: StudioWillV1OpcWorkerDecodeRequest = {
-      ...decode,
-      requestId: "blob-transfer",
-      source: new Blob([bytes]),
-    };
-    expect(isStudioWillV1OpcWorkerRequest(blobDecode)).toBe(true);
-    expect(studioWillV1OpcWorkerRequestTransfers(blobDecode)).toEqual([]);
+    const decodeBytes = new Uint8Array([1, 2, 3]);
+    expect(studioWillV1OpcWorkerRequestTransfers({
+      type: "studio-will-v1-opc/decode",
+      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
+      requestId: "decode",
+      source: decodeBytes,
+    })).toEqual([decodeBytes.buffer]);
+    expect(studioWillV1OpcWorkerRequestTransfers({
+      type: "studio-will-v1-opc/decode",
+      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
+      requestId: "blob",
+      source: new Blob([decodeBytes]),
+    })).toEqual([]);
 
-    const surrounding = new Uint8Array(32);
-    const subarraySuccess = {
-      ...success,
-      result: {
-        ...success.result,
-        bytes: surrounding.subarray(5, 27),
-      },
-    };
-    expect(studioWillV1OpcWorkerResponseTransfers(subarraySuccess)).toEqual([]);
-  });
-
-  it("fails closed on malformed correlated success/error payloads", () => {
-    const malformedSuccess = {
+    const built = await buildStudioWillV1OpcBytes(SAMPLE_INPUT);
+    const response: StudioWillV1OpcWorkerEncodeSuccess = {
       type: "studio-will-v1-opc/encode-success",
       version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "same-id",
-      result: { bytes: [1, 2, 3] },
+      requestId: "response",
+      archive: built.bytes.slice(),
+      packedResult: packStudioWillV1OpcBuildResult(built),
     };
-    const malformedFailure = {
+    expect(isStudioWillV1OpcWorkerResponse(response)).toBe(true);
+    expect(studioWillV1OpcWorkerResponseTransfers(response)).toEqual([
+      response.archive.buffer,
+      response.packedResult.buffer,
+    ]);
+
+    const shared = response.archive;
+    expect(isStudioWillV1OpcWorkerResponse({
+      ...response,
+      packedResult: shared,
+    })).toBe(false);
+    expect(studioWillV1OpcWorkerResponseTransfers({
+      ...response,
+      packedResult: shared,
+    })).toEqual([]);
+  });
+
+  it("fails closed on malformed packed responses and preserves correlation", async () => {
+    const built = await buildStudioWillV1OpcBytes(SAMPLE_INPUT);
+    const packet = packStudioWillV1OpcBuildResult(built);
+    packet[0] = 0;
+    expect(isStudioWillV1OpcWorkerResponse({
+      type: "studio-will-v1-opc/encode-success",
+      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
+      requestId: "bad",
+      archive: built.bytes.slice(),
+      packedResult: packet,
+    })).toBe(false);
+    expect(studioWillV1OpcWorkerCorrelation({
+      type: "studio-will-v1-opc/encode-success",
+      requestId: "bad",
+    })).toEqual({ requestId: "bad", operation: "encode" });
+  });
+
+  it("accepts only bounded typed failure payloads", () => {
+    const failure = {
       type: "studio-will-v1-opc/failure",
       version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "same-id",
-      operation: "encode",
-      error: { code: "NOT_A_CODE", name: "Error", message: "bad" },
-    };
-
-    expect(studioWillV1OpcWorkerCorrelation(malformedSuccess)).toEqual({
-      requestId: "same-id",
-      operation: "encode",
-    });
-    expect(isStudioWillV1OpcWorkerResponse(malformedSuccess)).toBe(false);
-    expect(isStudioWillV1OpcWorkerResponse(malformedFailure)).toBe(false);
-  });
-
-  it("rejects empty-path success and preserves exact assurance identity", () => {
-    const emptySuccess = {
-      type: "studio-will-v1-opc/encode-success",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "empty-success",
-      result: {
-        bytes: new Uint8Array(22),
-        paths: [],
-        loss: {
-          status: "exact",
-          quantization: "truncate-toward-zero",
-          items: [],
-        },
-        assurance: STUDIO_WILL_V1_OPC_ASSURANCE,
+      requestId: "failure",
+      operation: "decode",
+      error: {
+        code: "ARCHIVE_INVALID",
+        name: "StudioWillV1OpcInterchangeError",
+        message: "archive invalid",
       },
     };
-
-    expect(isStudioWillV1OpcWorkerResponse(emptySuccess)).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerResponse({
-        ...emptySuccess,
-        result: {
-          ...emptySuccess.result,
-          assurance: {
-            ...STUDIO_WILL_V1_OPC_ASSURANCE,
-            vendorCertified: true,
-          },
-        },
-      })
-    ).toBe(false);
-  });
-
-  it("rejects additional request, option, input, and path keys", () => {
-    const request = {
-      type: "studio-will-v1-opc/encode",
-      version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-      requestId: "exact-request",
-      input: SAMPLE_INPUT,
-      options: {
-        limits: { maxArchiveBytes: 1_024 },
-      },
-    };
-    expect(isStudioWillV1OpcWorkerRequest(request)).toBe(true);
-    expect(
-      isStudioWillV1OpcWorkerRequest({ ...request, extra: true }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerRequest({
-        ...request,
-        options: { ...request.options, extra: true },
-      }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerRequest({
-        ...request,
-        input: { ...request.input, extra: true },
-      }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerRequest({
-        ...request,
-        input: {
-          ...request.input,
-          paths: [{
-            ...request.input.paths[0]!,
-            extra: true,
-          }],
-        },
-      }),
-    ).toBe(false);
-  });
-
-  it("rejects additional response, result, path, and error keys", () => {
-    expect(isStudioWillV1OpcWorkerResponse(VALID_ENCODE_RESPONSE)).toBe(
-      true,
-    );
-    expect(
-      isStudioWillV1OpcWorkerResponse({
-        ...VALID_ENCODE_RESPONSE,
-        extra: true,
-      }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerResponse({
-        ...VALID_ENCODE_RESPONSE,
-        result: { ...VALID_ENCODE_RESPONSE.result, extra: true },
-      }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerResponse({
-        ...VALID_ENCODE_RESPONSE,
-        result: {
-          ...VALID_ENCODE_RESPONSE.result,
-          paths: [{ ...VALID_PATH, extra: true }],
-        },
-      }),
-    ).toBe(false);
-    expect(
-      isStudioWillV1OpcWorkerResponse({
-        type: "studio-will-v1-opc/failure",
-        version: STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION,
-        requestId: "failure-extra",
-        operation: "encode",
-        error: {
-          code: "OPERATION_FAILED",
-          name: "Error",
-          message: "작업에 실패했습니다.",
-          extra: true,
-        },
-      }),
-    ).toBe(false);
-  });
-
-  it("publishes a bounded object-clone cap below the storage limit", () => {
-    expect(
-      STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS,
-    ).toBe(100_000);
+    expect(isStudioWillV1OpcWorkerResponse(failure)).toBe(true);
+    expect(isStudioWillV1OpcWorkerResponse({
+      ...failure,
+      error: { ...failure.error, cause: "/private/path" },
+    })).toBe(false);
   });
 });

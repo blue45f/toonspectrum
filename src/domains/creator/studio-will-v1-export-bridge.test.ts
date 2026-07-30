@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,7 +12,9 @@ import {
 
 import type { DrawEl } from "./studio-element-model";
 
-const buildStudioWillV1OpcBytesInWorker = vi.fn();
+const { buildStudioWillV1OpcBytesInWorker } = vi.hoisted(() => ({
+  buildStudioWillV1OpcBytesInWorker: vi.fn(),
+}));
 
 vi.mock("./studio-will-v1-opc-worker-client", async (importOriginal) => {
   const actual = await importOriginal<
@@ -53,7 +57,21 @@ beforeEach(() => {
 });
 
 describe("Studio WILL v1 page export bridge", () => {
-  it("lazily maps visible pressure freehand into the bounded Worker profile", async () => {
+  it("keeps the Studio click path on a static bridge import instead of an unbounded chunk request", () => {
+    const studioPage = readFileSync(
+      new URL("./StudioPage.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(studioPage).toMatch(
+      /import\s*\{\s*exportStudioPageToWillV1\s*\}\s*from\s*["']\.\/studio-will-v1-export-bridge["']/,
+    );
+    expect(studioPage).not.toContain(
+      'await import("./studio-will-v1-export-bridge")',
+    );
+  });
+
+  it("maps visible pressure freehand into the bounded Worker profile", async () => {
     const result = await exportStudioPageToWillV1({
       width: 800,
       height: 1_200,
@@ -104,6 +122,67 @@ describe("Studio WILL v1 page export bridge", () => {
         vendorTrademarkAuthorized: false,
       },
     });
+    expect(buildStudioWillV1OpcBytesInWorker.mock.calls[0]![1]).toMatchObject({
+      timeoutMs: 30_000,
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it("returns an owned normal download payload before the Worker transfer buffer can change", async () => {
+    const workerBytes = Uint8Array.from([80, 75, 3, 4, 20, 24]);
+    buildStudioWillV1OpcBytesInWorker.mockResolvedValueOnce({
+      bytes: workerBytes,
+      paths: [],
+      loss: {
+        status: "exact",
+        quantization: "truncate-toward-zero",
+        items: [],
+      },
+      assurance: STUDIO_WILL_V1_OPC_ASSURANCE,
+    });
+
+    const result = await exportStudioPageToWillV1({
+      width: 100,
+      height: 100,
+      title: "Download",
+      elements: [draw()],
+    });
+    workerBytes.fill(0);
+
+    expect(result.bytes).toEqual(Uint8Array.from([80, 75, 3, 4, 20, 24]));
+    expect(result.bytes).not.toBe(workerBytes);
+    expect(result).toMatchObject({
+      extension: ".will",
+      mediaType: "application/vnd.toonspectrum.will-v1-bounded+zip",
+      exportedStrokeIds: ["stroke-1"],
+    });
+  });
+
+  it("fails closed when the export Worker promise never responds", async () => {
+    vi.useFakeTimers();
+    try {
+      buildStudioWillV1OpcBytesInWorker.mockImplementationOnce(
+        () => new Promise<never>(() => undefined),
+      );
+      const pending = exportStudioPageToWillV1({
+        width: 100,
+        height: 100,
+        title: "Never",
+        elements: [draw()],
+        workerOptions: { timeoutMs: 5 },
+      });
+      const rejection = expect(pending).rejects.toMatchObject({
+        name: "TimeoutError",
+        message: expect.stringContaining("5ms"),
+      });
+
+      await vi.advanceTimersByTimeAsync(5);
+      await rejection;
+      const workerOptions = buildStudioWillV1OpcBytesInWorker.mock.calls[0]![1];
+      expect(workerOptions.signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("pads single-point ink and explicitly reports zero-width profile adaptation", async () => {

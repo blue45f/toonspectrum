@@ -72,6 +72,17 @@ function localizeItemLabel(
   t: StudioMainMenuTranslate,
 ): string {
   const label = localizeText(t, item.label, itemLabelKey(groupId, item.id, item, state));
+  if (
+    groupId === "file"
+    && item.id === "import-ora-cbz"
+    && !/\bWILL\b/iu.test(label)
+  ) {
+    const withWill = label.replace(
+      /ORA\s*\/\s*CBZ/iu,
+      (formats) => `${formats} / WILL`,
+    );
+    return withWill === label ? `${label} · WILL` : withWill;
+  }
   if (groupId === "view" && item.id === "reset-rotation") {
     return label.replace("{angle}", String(state.canvasRotation));
   }

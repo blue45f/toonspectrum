@@ -32,6 +32,7 @@ const MAX_CONCURRENT_ADAPTER_OPERATIONS = 8;
 const DEFAULT_SIGNING_TIMEOUT_MS = 15_000;
 const MIN_SIGNING_TIMEOUT_MS = 100;
 const MAX_SIGNING_TIMEOUT_MS = 60_000;
+const ADAPTER_OPERATION_QUARANTINE_MS = 1_000;
 const MAX_SIGNER_SCOPES = 64;
 const MAX_KEY_ID_CODE_UNITS = 128;
 const MAX_VALIDITY_MILLISECONDS = 366 * 24 * 60 * 60 * 1_000;
@@ -283,6 +284,72 @@ export type StudioCodecCertificationAuthorityAlgorithm = z.infer<
   typeof AlgorithmSchema
 >;
 
+const SignatureValueSchema = z
+  .string()
+  .length(86)
+  .regex(/^[A-Za-z0-9_-]{86}$/u)
+  .refine((value) => {
+    try {
+      const bytes = Buffer.from(value, "base64url");
+      return bytes.byteLength === SIGNATURE_BYTES
+        && bytes.toString("base64url") === value;
+    } catch {
+      return false;
+    }
+  });
+
+export const StudioCodecCertificationAuthoritySignatureSchema = z
+  .object({
+    schemaVersion: z.literal(
+      STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_VERSION
+    ),
+    kind: z.literal(STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_KIND),
+    algorithm: AlgorithmSchema,
+    keyId: IdentifierSchema,
+    scope: ScopeSchema,
+    executionId: IdentifierSchema,
+    canonicalByteLength: z
+      .number()
+      .int()
+      .positive()
+      .max(STUDIO_PRODUCT_CODEC_CERTIFICATION_LIMITS.maxCertificateBytes),
+    canonicalSha256: Sha256Schema,
+    signatureValue: SignatureValueSchema,
+  })
+  .strict()
+  .superRefine((signature, context) => {
+    const bytes = Buffer.from(signature.signatureValue, "base64url");
+    if (!hasCanonicalSignatureShape(signature.algorithm, bytes)) {
+      context.addIssue({
+        code: "custom",
+        path: ["signatureValue"],
+        message: "Authority signature is not in canonical wire form.",
+      });
+    }
+  });
+
+export type StudioCodecCertificationAuthoritySignature = z.infer<
+  typeof StudioCodecCertificationAuthoritySignatureSchema
+>;
+
+const ExecutionAuthorizationSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("reserved"),
+      reservationId: IdentifierSchema,
+      attemptId: IdentifierSchema,
+      admissionLeaseId: IdentifierSchema,
+      expiresAt: CanonicalTimestampSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("completed"),
+      signature: StudioCodecCertificationAuthoritySignatureSchema,
+    })
+    .strict(),
+]);
+
 const VerifiedProviderExecutionSchema = z
   .object({
     verified: z.literal(true),
@@ -334,6 +401,7 @@ const VerifiedProviderExecutionSchema = z
       .max(STUDIO_CODEC_PROVIDER_LIMITS.maxLicenseScopes)
       .refine((value) => new Set(value).size === value.length),
     licenseGrantExpiresAt: CanonicalTimestampSchema.nullable(),
+    authorization: ExecutionAuthorizationSchema,
   })
   .strict();
 const RejectedProviderExecutionSchema = z
@@ -375,6 +443,32 @@ export interface StudioCodecCertificationAuthorityExecutionVerifier {
       signal: AbortSignal;
     }>
   ) => Promise<StudioCodecCertificationAuthorityExecutionVerificationResult>;
+  /**
+   * Mandatory two-phase one-use boundary. A successful verification either
+   * owns a fenced live reservation or carries a durable completed signature.
+   * The authority stores the independently verified signature atomically with
+   * consumption; transient signer failures release only the owning attempt.
+   */
+  readonly complete: (
+    request:
+    | Readonly<{
+      executionId: string;
+      reservationId: string;
+      attemptId: string;
+      admissionLeaseId: string;
+      outcome: "consume";
+      signature: StudioCodecCertificationAuthoritySignature;
+      signal: AbortSignal;
+    }>
+    | Readonly<{
+      executionId: string;
+      reservationId: string;
+      attemptId: string;
+      admissionLeaseId: string;
+      outcome: "reject" | "release";
+      signal: AbortSignal;
+    }>
+  ) => Promise<boolean>;
 }
 
 /**
@@ -430,23 +524,11 @@ export interface StudioCodecCertificationAuthorityClock {
 export interface StudioCodecCertificationAuthoritySignOptions {
   readonly signal?: AbortSignal;
   readonly verificationTimeoutMs?: number;
+  readonly finalizationTimeoutMs?: number;
   readonly signingTimeoutMs?: number;
   readonly signatureVerificationTimeoutMs?: number;
   /** @deprecated Use `signingTimeoutMs`; retained for the initial internal API. */
   readonly timeoutMs?: number;
-}
-
-export interface StudioCodecCertificationAuthoritySignature {
-  readonly schemaVersion:
-    typeof STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_VERSION;
-  readonly kind: typeof STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_KIND;
-  readonly algorithm: StudioCodecCertificationAuthorityAlgorithm;
-  readonly keyId: string;
-  readonly scope: string;
-  readonly executionId: string;
-  readonly canonicalByteLength: number;
-  readonly canonicalSha256: `sha256:${string}`;
-  readonly signatureValue: string;
 }
 
 export type StudioCodecCertificationAuthorityErrorCode =
@@ -455,6 +537,8 @@ export type StudioCodecCertificationAuthorityErrorCode =
   | "CERTIFICATE_TIME_INVALID"
   | "DIGEST_MISMATCH"
   | "EXECUTION_NOT_VERIFIED"
+  | "EXECUTION_FINALIZATION_FAILED"
+  | "EXECUTION_FINALIZATION_TIMEOUT"
   | "EXECUTION_VERIFICATION_FAILED"
   | "EXECUTION_VERIFICATION_MISMATCH"
   | "EXECUTION_VERIFICATION_TIMEOUT"
@@ -477,6 +561,10 @@ const STABLE_ERROR_MESSAGES = Object.freeze({
   DIGEST_MISMATCH: "Codec certification signing bytes do not match their digest.",
   EXECUTION_NOT_VERIFIED:
     "Codec provider execution was not independently verified.",
+  EXECUTION_FINALIZATION_FAILED:
+    "Codec provider execution reservation finalization failed closed.",
+  EXECUTION_FINALIZATION_TIMEOUT:
+    "Codec provider execution reservation finalization timed out.",
   EXECUTION_VERIFICATION_FAILED:
     "Codec provider execution verification failed closed.",
   EXECUTION_VERIFICATION_MISMATCH:
@@ -731,20 +819,27 @@ function constantTimeDigestEquals(left: string, right: string): boolean {
   );
 }
 
+interface AdapterOperationLease {
+  readonly running: Promise<unknown>;
+  quarantineTimer: ReturnType<typeof setTimeout> | null;
+}
+
 async function runBoundedAuthorityPhase<T>(
   operation: (signal: AbortSignal) => Promise<T>,
   options: Readonly<{
     externalSignal?: AbortSignal;
     timeoutMs: number;
     failedCode:
+      | "EXECUTION_FINALIZATION_FAILED"
       | "EXECUTION_VERIFICATION_FAILED"
       | "SIGNER_FAILED"
       | "SIGNATURE_VERIFICATION_FAILED";
     timeoutCode:
+      | "EXECUTION_FINALIZATION_TIMEOUT"
       | "EXECUTION_VERIFICATION_TIMEOUT"
       | "SIGNER_TIMEOUT"
       | "SIGNATURE_VERIFICATION_TIMEOUT";
-    leases: Set<Promise<unknown>>;
+    leases: Set<AdapterOperationLease>;
   }>
 ): Promise<T> {
   if (options.externalSignal?.aborted) fail("ABORTED");
@@ -757,6 +852,7 @@ async function runBoundedAuthorityPhase<T>(
   const operationController = new AbortController();
   let termination: "external" | "timeout" | null = null;
   let abortRaceListener: (() => void) | null = null;
+  let lease: AdapterOperationLease | null = null;
   const aborted = new Promise<never>((_resolve, reject) => {
     abortRaceListener = () => reject(new Error("terminated"));
     operationController.signal.addEventListener(
@@ -786,10 +882,22 @@ async function runBoundedAuthorityPhase<T>(
     const running = Promise.resolve().then(() =>
       operation(operationController.signal)
     );
-    options.leases.add(running);
+    lease = {
+      running,
+      quarantineTimer: null,
+    };
+    options.leases.add(lease);
+    const releaseLease = () => {
+      if (!lease) return;
+      if (lease.quarantineTimer !== null) {
+        clearTimeout(lease.quarantineTimer);
+        lease.quarantineTimer = null;
+      }
+      options.leases.delete(lease);
+    };
     void running.then(
-      () => options.leases.delete(running),
-      () => options.leases.delete(running)
+      releaseLease,
+      releaseLease
     );
     try {
       return await Promise.race([running, aborted]);
@@ -806,6 +914,22 @@ async function runBoundedAuthorityPhase<T>(
     }
   } finally {
     clearTimeout(timeout);
+    if (
+      termination !== null
+      && lease
+      && options.leases.has(lease)
+      && lease.quarantineTimer === null
+    ) {
+      // An adapter that ignores abort cannot retain process capacity forever.
+      // Keep it fenced for a finite grace interval, then half-open the circuit.
+      // Its late resolution/rejection remains observed by `releaseLease`.
+      const quarantinedLease = lease;
+      quarantinedLease.quarantineTimer = setTimeout(() => {
+        quarantinedLease.quarantineTimer = null;
+        options.leases.delete(quarantinedLease);
+      }, ADAPTER_OPERATION_QUARANTINE_MS);
+      quarantinedLease.quarantineTimer.unref?.();
+    }
     options.externalSignal?.removeEventListener("abort", abortExternally);
     if (abortRaceListener) {
       operationController.signal.removeEventListener(
@@ -888,7 +1012,7 @@ function executionVerificationMatches(
 
 @Injectable()
 export class StudioCodecCertificationAuthorityService {
-  private readonly adapterOperationLeases = new Set<Promise<unknown>>();
+  private readonly adapterOperationLeases = new Set<AdapterOperationLease>();
 
   constructor(
     @Optional()
@@ -927,6 +1051,7 @@ export class StudioCodecCertificationAuthorityService {
     if (
       !executionVerifier
       || typeof executionVerifier.verify !== "function"
+      || typeof executionVerifier.complete !== "function"
     ) {
       fail("EXECUTION_VERIFIER_UNAVAILABLE");
     }
@@ -974,6 +1099,10 @@ export class StudioCodecCertificationAuthorityService {
       options.verificationTimeoutMs,
       DEFAULT_SIGNING_TIMEOUT_MS
     );
+    const finalizationTimeoutMs = boundedTimeout(
+      options.finalizationTimeoutMs,
+      DEFAULT_SIGNING_TIMEOUT_MS
+    );
     const signingTimeoutMs = boundedTimeout(
       options.signingTimeoutMs ?? options.timeoutMs,
       DEFAULT_SIGNING_TIMEOUT_MS
@@ -1008,6 +1137,70 @@ export class StudioCodecCertificationAuthorityService {
     );
     const verification = parseExecutionVerificationResult(rawVerification);
     if (!verification.verified) fail("EXECUTION_NOT_VERIFIED");
+    const authorization = verification.authorization;
+    const completeReservation = async (
+      outcome: "consume" | "reject" | "release",
+      signature?: StudioCodecCertificationAuthoritySignature
+    ): Promise<void> => {
+      if (authorization.status !== "reserved") return;
+      if (outcome === "consume" && signature === undefined) {
+        fail("EXECUTION_FINALIZATION_FAILED");
+      }
+      const completionRequest = outcome === "consume"
+        ? {
+            executionId: verification.executionId,
+            reservationId: authorization.reservationId,
+            attemptId: authorization.attemptId,
+            admissionLeaseId: authorization.admissionLeaseId,
+            outcome,
+            signature: signature as StudioCodecCertificationAuthoritySignature,
+            signal: new AbortController().signal,
+          } as const
+        : {
+            executionId: verification.executionId,
+            reservationId: authorization.reservationId,
+            attemptId: authorization.attemptId,
+            admissionLeaseId: authorization.admissionLeaseId,
+            outcome,
+            signal: new AbortController().signal,
+          } as const;
+      const completed = await runBoundedAuthorityPhase(
+        (signal) =>
+          executionVerifier.complete({
+            ...completionRequest,
+            signal,
+          }),
+        {
+          timeoutMs: finalizationTimeoutMs,
+          failedCode: "EXECUTION_FINALIZATION_FAILED",
+          timeoutCode: "EXECUTION_FINALIZATION_TIMEOUT",
+          leases: this.adapterOperationLeases,
+        }
+      );
+      if (completed !== true) fail("EXECUTION_FINALIZATION_FAILED");
+    };
+    if (authorization.status === "reserved") {
+      let postVerificationNowEpochMs: number;
+      try {
+        postVerificationNowEpochMs = this.clock?.now() ?? Date.now();
+      } catch {
+        await completeReservation("release");
+        fail("CERTIFICATE_TIME_INVALID");
+      }
+      const minimumReservationExpiry =
+        postVerificationNowEpochMs
+        + signingTimeoutMs
+        + signatureVerificationTimeoutMs
+        + finalizationTimeoutMs
+        + MAX_CLOCK_SKEW_MILLISECONDS;
+      if (
+        !Number.isFinite(postVerificationNowEpochMs)
+        || parseEpoch(authorization.expiresAt) <= minimumReservationExpiry
+      ) {
+        await completeReservation("release");
+        fail("EXECUTION_FINALIZATION_FAILED");
+      }
+    }
     if (
       !executionVerificationMatches(
         verification,
@@ -1016,63 +1209,119 @@ export class StudioCodecCertificationAuthorityService {
         receiptByteLength
       )
     ) {
+      await completeReservation("reject");
       fail("EXECUTION_VERIFICATION_MISMATCH");
     }
 
-    const returned = await runBoundedAuthorityPhase(
-      (signal) =>
-        signer.sign({
-          algorithm: request.algorithm,
-          keyId: request.keyId,
-          scope: request.scope,
-          canonicalBytes: Uint8Array.from(ownedBytes),
-          canonicalByteLength: ownedBytes.byteLength,
-          canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
-          signal,
-        }),
-      {
-        externalSignal: options.signal,
-        timeoutMs: signingTimeoutMs,
-        failedCode: "SIGNER_FAILED",
-        timeoutCode: "SIGNER_TIMEOUT",
-        leases: this.adapterOperationLeases,
+    if (authorization.status === "completed") {
+      const recoveredSignature = authorization.signature;
+      if (
+        recoveredSignature.algorithm !== request.algorithm
+        || recoveredSignature.keyId !== request.keyId
+        || recoveredSignature.scope !== request.scope
+        || recoveredSignature.executionId !== request.executionId
+        || recoveredSignature.canonicalByteLength !== ownedBytes.byteLength
+        || !constantTimeDigestEquals(
+          recoveredSignature.canonicalSha256,
+          request.canonicalSha256
+        )
+      ) {
+        fail("EXECUTION_VERIFICATION_MISMATCH");
       }
-    );
+      const recoveredSignatureBytes = Buffer.from(
+        recoveredSignature.signatureValue,
+        "base64url"
+      );
+      if (
+        !hasCanonicalSignatureShape(
+          request.algorithm,
+          recoveredSignatureBytes
+        )
+      ) {
+        fail("INVALID_SIGNATURE");
+      }
+      const recoveredSignatureVerified = await runBoundedAuthorityPhase(
+        (signal) =>
+          signer.verify({
+            algorithm: request.algorithm,
+            keyId: request.keyId,
+            scope: request.scope,
+            canonicalBytes: Uint8Array.from(ownedBytes),
+            canonicalByteLength: ownedBytes.byteLength,
+            canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
+            signatureBytes: Uint8Array.from(recoveredSignatureBytes),
+            signal,
+          }),
+        {
+          externalSignal: options.signal,
+          timeoutMs: signatureVerificationTimeoutMs,
+          failedCode: "SIGNATURE_VERIFICATION_FAILED",
+          timeoutCode: "SIGNATURE_VERIFICATION_TIMEOUT",
+          leases: this.adapterOperationLeases,
+        }
+      );
+      if (recoveredSignatureVerified !== true) fail("INVALID_SIGNATURE");
+      return Object.freeze({ ...recoveredSignature });
+    }
+
     let signatureBytes: Uint8Array;
     try {
+      const returned = await runBoundedAuthorityPhase(
+        (signal) =>
+          signer.sign({
+            algorithm: request.algorithm,
+            keyId: request.keyId,
+            scope: request.scope,
+            canonicalBytes: Uint8Array.from(ownedBytes),
+            canonicalByteLength: ownedBytes.byteLength,
+            canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
+            signal,
+          }),
+        {
+          externalSignal: options.signal,
+          timeoutMs: signingTimeoutMs,
+          failedCode: "SIGNER_FAILED",
+          timeoutCode: "SIGNER_TIMEOUT",
+          leases: this.adapterOperationLeases,
+        }
+      );
       if (!(returned instanceof Uint8Array)) fail("INVALID_SIGNATURE");
       signatureBytes = Uint8Array.from(returned);
+      if (!hasCanonicalSignatureShape(request.algorithm, signatureBytes)) {
+        fail("INVALID_SIGNATURE");
+      }
+      const signatureVerified = await runBoundedAuthorityPhase(
+        (signal) =>
+          signer.verify({
+            algorithm: request.algorithm,
+            keyId: request.keyId,
+            scope: request.scope,
+            canonicalBytes: Uint8Array.from(ownedBytes),
+            canonicalByteLength: ownedBytes.byteLength,
+            canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
+            signatureBytes: Uint8Array.from(signatureBytes),
+            signal,
+          }),
+        {
+          externalSignal: options.signal,
+          timeoutMs: signatureVerificationTimeoutMs,
+          failedCode: "SIGNATURE_VERIFICATION_FAILED",
+          timeoutCode: "SIGNATURE_VERIFICATION_TIMEOUT",
+          leases: this.adapterOperationLeases,
+        }
+      );
+      if (signatureVerified !== true) fail("INVALID_SIGNATURE");
     } catch (error) {
+      // A KMS/HSM failure must not burn verified execution evidence. Cleanup
+      // deliberately ignores an already-aborted caller signal and uses its own
+      // bounded phase so a user cancellation can still release the reservation.
+      await completeReservation("release");
       if (error instanceof StudioCodecCertificationAuthorityError) {
         throw error;
       }
       fail("INVALID_SIGNATURE");
     }
-    if (!hasCanonicalSignatureShape(request.algorithm, signatureBytes)) {
-      fail("INVALID_SIGNATURE");
-    }
-    const signatureVerified = await runBoundedAuthorityPhase(
-      (signal) =>
-        signer.verify({
-          algorithm: request.algorithm,
-          keyId: request.keyId,
-          scope: request.scope,
-          canonicalBytes: Uint8Array.from(ownedBytes),
-          canonicalByteLength: ownedBytes.byteLength,
-          canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
-          signatureBytes: Uint8Array.from(signatureBytes),
-          signal,
-        }),
-      {
-        externalSignal: options.signal,
-        timeoutMs: signatureVerificationTimeoutMs,
-        failedCode: "SIGNATURE_VERIFICATION_FAILED",
-        timeoutCode: "SIGNATURE_VERIFICATION_TIMEOUT",
-        leases: this.adapterOperationLeases,
-      }
-    );
-    if (signatureVerified !== true) fail("INVALID_SIGNATURE");
-    return Object.freeze({
+    const signature = StudioCodecCertificationAuthoritySignatureSchema.parse({
       schemaVersion:
         STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_VERSION,
       kind: STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_KIND,
@@ -1084,5 +1333,7 @@ export class StudioCodecCertificationAuthorityService {
       canonicalSha256: request.canonicalSha256 as `sha256:${string}`,
       signatureValue: base64Url(signatureBytes),
     });
+    await completeReservation("consume", signature);
+    return Object.freeze(signature);
   }
 }

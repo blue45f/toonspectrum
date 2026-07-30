@@ -1235,6 +1235,7 @@ import {
   WET_MIX_STRENGTH_DEFAULT,
   WET_MIX_WETNESS_DEFAULT,
 } from "./studio-wet-mix";
+import { exportStudioPageToWillV1 } from "./studio-will-v1-export-bridge";
 import {
   StudioWorkAssetAdmissionCoordinator,
   replaceStudioWorkAssetSourceAcrossHistory,
@@ -1458,6 +1459,7 @@ import type {
 } from "./studio-webgpu-live-stroke-plan";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
+import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type {
   StudioAssetShareOptions,
   StudioAssetSortOrder,
@@ -1889,6 +1891,20 @@ const STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES = Object.freeze([
     id: "current-page",
     label: "현재 페이지 위에 배치",
     description: "현재 레이어를 유지한 채 가져온 레이어를 맨 위에 추가하고 필요한 경우 페이지 높이를 늘립니다.",
+  }),
+]);
+
+const STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES = Object.freeze([
+  Object.freeze({
+    id: "new-page",
+    label: "새 페이지에 추가",
+    description: "현재 원고를 건드리지 않고 검증된 선을 다음 페이지에 추가합니다.",
+    recommended: true,
+  }),
+  Object.freeze({
+    id: "current-page",
+    label: "현재 페이지에 추가",
+    description: "현재 요소를 유지한 채 검증된 선을 맨 위에 추가합니다.",
   }),
 ]);
 
@@ -7603,9 +7619,11 @@ function StudioCuttoonEditor() {
     text: string;
   } | null>(null);
   const [pendingInterchangeImport, setPendingInterchangeImport] =
-    useState<PendingStudioInterchangeImport | null>(null);
+    useState<PendingStudioInterchangeImport | PendingStudioWillV1Import | null>(null);
   const [interchangeImportChoice, setInterchangeImportChoice] =
     useState<StudioInterchangeImportChoice>("new-page");
+  const [willImportChoice, setWillImportChoice] =
+    useState<StudioInterchangeImportChoice | null>(null);
   const interchangeImportAbortRef = useRef<AbortController | null>(null);
   const documentImportEpochRef = useRef(0);
   const documentImportOperationRef = useRef<{
@@ -32110,7 +32128,7 @@ function clearSelectionForEdit() {
           },
           requestInterchangeImport: () => {
             if (!interchangeImportInputRef.current) {
-              setError("ORA/CBZ 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+              setError("ORA/CBZ/WILL 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
               return;
             }
             interchangeImportInputRef.current.click();
@@ -32648,7 +32666,6 @@ function clearSelectionForEdit() {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 WILL v1으로 내보낼 수 있어요.");
     }
-    const { exportStudioPageToWillV1 } = await import("./studio-will-v1-export-bridge");
     const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
     const drawElements = activePage.elements.filter(
       (element): element is DrawEl =>
@@ -33373,10 +33390,10 @@ function clearSelectionForEdit() {
       documentImportOperationRef.current !== null
     ) return;
     const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (extension !== ".ora" && extension !== ".cbz") {
+    if (extension !== ".ora" && extension !== ".cbz" && extension !== ".will") {
       setInterchangeImportStatus({
         tone: "bad",
-        text: "이 경로에서는 OpenRaster(.ora) 또는 Comic Book ZIP(.cbz)만 가져올 수 있어요.",
+        text: "이 경로에서는 OpenRaster(.ora), Comic Book ZIP(.cbz), bounded WILL v1(.will)만 가져올 수 있어요.",
       });
       return;
     }
@@ -33400,9 +33417,39 @@ function clearSelectionForEdit() {
       tone: "warn",
       text: extension === ".ora"
         ? "OpenRaster 구조·PNG·메모리 예산을 검사하는 중…"
-        : "CBZ 페이지 순서·이미지 header·메모리 예산을 검사하는 중…",
+        : extension === ".cbz"
+          ? "CBZ 페이지 순서·이미지 header·메모리 예산을 검사하는 중…"
+          : "전용 Worker에서 bounded WILL v1 구조·경로·메모리 예산을 검사하는 중…",
     });
     try {
+      if (extension === ".will") {
+        const { inspectStudioWillV1Import } = await import(
+          "./studio-will-v1-import-bridge"
+        );
+        const inspected = await inspectStudioWillV1Import(file, file.name, {
+          canvasWidth: CANVAS_W,
+          currentPageElementCount: activePage.elements.length,
+          canAddPage: pages.length < STUDIO_PROJECT_MAX_PAGES,
+          signal: controller.signal,
+        });
+        if (
+          controller.signal.aborted ||
+          interchangeImportAbortRef.current !== controller ||
+          documentImportEpochRef.current !== importEpoch
+        ) return;
+        setPendingInterchangeImport(inspected);
+        setWillImportChoice(null);
+        setInterchangeImportStatus({
+          tone: inspected.preview.constraints?.some(({ gate }) => gate === "blocking")
+            ? "bad"
+            : inspected.adaptations.length > 0 || inspected.skipped.length > 0
+              ? "warn"
+              : "good",
+          text: `WILL v1 경로 ${inspected.result.paths.length.toLocaleString("ko-KR")}개를 검증했어요. 적용 위치와 변환 손실을 직접 확인해 주세요.`,
+        });
+        setProjectActionsOpen(false);
+        return;
+      }
       const [
         { studioDocumentImportDeviceProfile },
         { inspectStudioDocumentInterchangeArchive },
@@ -33522,6 +33569,7 @@ function clearSelectionForEdit() {
       return;
     }
     setPendingInterchangeImport(null);
+    setWillImportChoice(null);
   }
 
   async function applyPendingInterchangeImport(selectedChoiceId?: string | null) {
@@ -33532,11 +33580,23 @@ function clearSelectionForEdit() {
       collaborationDocumentLocked ||
       documentImportOperationRef.current !== null
     ) return;
-    const applyChoice: StudioInterchangeImportChoice = selectedChoiceId === "current-page"
-      ? "current-page"
-      : selectedChoiceId === "new-page"
-        ? "new-page"
-        : interchangeImportChoice;
+    const requestedChoice: StudioInterchangeImportChoice | null =
+      selectedChoiceId === "current-page"
+        ? "current-page"
+        : selectedChoiceId === "new-page"
+          ? "new-page"
+          : pending.kind === "will-v1"
+            ? willImportChoice
+            : interchangeImportChoice;
+    if (pending.kind === "will-v1" && requestedChoice === null) {
+      setInterchangeImportStatus({
+        tone: "bad",
+        text: "WILL v1을 새 페이지 또는 현재 페이지 중 어디에 추가할지 먼저 선택해 주세요.",
+      });
+      return;
+    }
+    const applyChoice: StudioInterchangeImportChoice =
+      requestedChoice ?? interchangeImportChoice;
     const anchorPageId = activePage.id;
     if (
       pending.kind !== "cbz" &&
@@ -33593,6 +33653,51 @@ function clearSelectionForEdit() {
       return false;
     };
     try {
+      if (pending.kind === "will-v1") {
+        const { prepareStudioWillV1ImportCommit } = await import(
+          "./studio-will-v1-import-bridge"
+        );
+        const draft = prepareStudioWillV1ImportCommit(pending, {
+          destination: applyChoice,
+          currentPageElementCount: activePage.elements.length,
+          existingElementIds: new Set([
+            ...pages.flatMap((page) => page.elements.map(({ id }) => id)),
+            ...master.elements.map(({ id }) => id),
+          ]),
+        });
+        if (!canCommitImport()) return;
+        let nextPages: PageState[];
+        let selectedPageId: string | null = null;
+        if (applyChoice === "current-page") {
+          nextPages = pages.map((page) => page.id === anchorPageId
+            ? {
+                ...page,
+                canvasH: Math.max(page.canvasH, draft.pageHeight),
+                elements: [...page.elements, ...draft.elements],
+              }
+            : page);
+        } else {
+          const page = {
+            ...createBlankPage(uid, draft.pageHeight),
+            name: draft.title,
+            elements: [...draft.elements],
+          } as PageState;
+          const anchorIndex = pages.findIndex(({ id }) => id === anchorPageId);
+          if (anchorIndex < 0) {
+            throw new Error("WILL v1을 추가할 기준 페이지를 찾지 못했어요.");
+          }
+          nextPages = [...pages];
+          nextPages.splice(anchorIndex + 1, 0, page);
+          selectedPageId = page.id;
+        }
+        if (!commitImportedPages(nextPages)) return;
+        if (selectedPageId) setCurrentPageId(selectedPageId);
+        setInterchangeImportStatus(draft.status);
+        setPendingInterchangeImport(null);
+        setWillImportChoice(null);
+        setError(null);
+        return;
+      }
       const [
         { prepareStudioDocumentInterchangeCommit },
         { studioDocumentImportDeviceProfile },
@@ -34786,11 +34891,11 @@ function clearSelectionForEdit() {
       <input
         ref={interchangeImportInputRef}
         type="file"
-        accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"
+        accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"
         className="hidden"
         disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportInterchangeArchive(event)}
-        aria-label="OpenRaster 또는 CBZ 가져오기"
+        aria-label="OpenRaster, CBZ 또는 WILL v1 가져오기"
       />
     </div>
     {quickAccessPaletteOpen && quickAccessState && quickAccessIntegration ? (
@@ -34929,25 +35034,60 @@ function clearSelectionForEdit() {
           confirmLabel={
             pendingInterchangeImport.kind === "cbz"
               ? `${pendingInterchangeImport.result.pages.length}페이지 추가`
+              : pendingInterchangeImport.kind === "will-v1"
+                ? "선택한 위치에 WILL v1 추가"
               : "선택한 위치로 가져오기"
           }
           choices={
             pendingInterchangeImport.kind === "cbz"
               ? undefined
-              : STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES.map((choice) =>
-                  choice.id === "new-page" && pages.length >= STUDIO_PROJECT_MAX_PAGES
-                    ? {
-                        ...choice,
-                        disabled: true,
-                        description: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달해 현재 페이지 배치만 사용할 수 있습니다.`,
-                      }
-                    : choice
-                )
+              : pendingInterchangeImport.kind === "will-v1"
+                ? STUDIO_WILL_V1_IMPORT_PLACEMENT_CHOICES.map((choice) => {
+                    const available = choice.id === "new-page"
+                      ? pendingInterchangeImport.newPageAllowed
+                        && pages.length < STUDIO_PROJECT_MAX_PAGES
+                      : pendingInterchangeImport.currentPageAllowed;
+                    return available
+                      ? choice
+                      : {
+                          ...choice,
+                          disabled: true,
+                          description: choice.id === "new-page"
+                            ? `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지 또는 페이지당 요소 한도에 도달했습니다.`
+                            : "현재 페이지에 추가하면 페이지당 요소 저장 한도를 넘습니다.",
+                        };
+                  })
+                : STUDIO_INTERCHANGE_IMPORT_PLACEMENT_CHOICES.map((choice) =>
+                    choice.id === "new-page" && pages.length >= STUDIO_PROJECT_MAX_PAGES
+                      ? {
+                          ...choice,
+                          disabled: true,
+                          description: `프로젝트 저장 한도 ${STUDIO_PROJECT_MAX_PAGES}페이지에 도달해 현재 페이지 배치만 사용할 수 있습니다.`,
+                        }
+                      : choice
+                  )
           }
           selectedChoiceId={
-            pendingInterchangeImport.kind === "cbz" ? undefined : interchangeImportChoice
+            pendingInterchangeImport.kind === "cbz"
+              ? undefined
+              : pendingInterchangeImport.kind === "will-v1"
+                ? willImportChoice ?? undefined
+                : interchangeImportChoice
           }
           onSelectedChoiceChange={(choiceId) => {
+            if (pendingInterchangeImport.kind === "will-v1") {
+              if (
+                (choiceId === "current-page" && pendingInterchangeImport.currentPageAllowed) ||
+                (
+                  choiceId === "new-page" &&
+                  pendingInterchangeImport.newPageAllowed &&
+                  pages.length < STUDIO_PROJECT_MAX_PAGES
+                )
+              ) {
+                setWillImportChoice(choiceId);
+              }
+              return;
+            }
             if (
               choiceId === "current-page" ||
               (choiceId === "new-page" && pages.length < STUDIO_PROJECT_MAX_PAGES)

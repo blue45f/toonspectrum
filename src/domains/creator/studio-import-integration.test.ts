@@ -1262,7 +1262,9 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
       'accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"'
     );
     expect(page).toContain('accept=".psd,image/vnd.adobe.photoshop"');
-    expect(page).toContain('accept=".ora,.cbz,image/openraster,application/vnd.comicbook+zip"');
+    expect(page).toContain(
+      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"'
+    );
   });
 
   it("브러시 팁·브러시 팩·VRM 입력의 accept가 해당 디코더와 일치한다", () => {

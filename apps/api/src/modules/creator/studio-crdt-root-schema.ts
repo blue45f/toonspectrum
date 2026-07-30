@@ -170,6 +170,8 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "crayon",
   "chalk",
   "charcoal",
+  "pastel",
+  "oil-pastel",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";

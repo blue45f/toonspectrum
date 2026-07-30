@@ -26,7 +26,7 @@ function unavailableReasonForDisabledMainMenuItem(
       return "PSD 문서를 검사하는 중입니다.";
     }
     if (itemId === "import-ora-cbz" && state.interchangeImportBusy) {
-      return "OpenRaster 또는 CBZ 문서를 검사하는 중입니다.";
+      return "OpenRaster, CBZ 또는 WILL v1 문서를 검사하는 중입니다.";
     }
   }
 

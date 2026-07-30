@@ -1023,16 +1023,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               collaborationDocumentLocked
                 ? collaborationLockMessage()
                 : interchangeImportBusy
-                  ? "현재 OpenRaster/CBZ 안전 검사를 취소합니다."
+                  ? "현재 OpenRaster/CBZ/WILL v1 안전 검사를 취소합니다."
                   : psdImportBusy
                     ? "PSD 문서 검사가 끝난 뒤 사용할 수 있습니다."
-                  : "OpenRaster 레이어 또는 CBZ 페이지를 안전 검사하고 손실 미리보기 후 가져옵니다."
+                  : "OpenRaster 레이어, CBZ 페이지 또는 bounded WILL v1 선을 안전 검사하고 손실 미리보기 후 가져옵니다. WILL은 Wacom 공식 SDK·인증 파일 호환을 보증하지 않습니다."
             }
           >
             {interchangeImportBusy
               ? <X size={14} aria-hidden />
               : <Files size={14} aria-hidden />}
-            {interchangeImportBusy ? "문서 검사 취소" : "ORA / CBZ 가져오기"}
+            {interchangeImportBusy ? "문서 검사 취소" : "ORA · CBZ · WILL"}
           </button>
           {interchangeImportStatus ? (
             <span

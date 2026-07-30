@@ -1,25 +1,21 @@
 import {
   STUDIO_WILL_V1_LIMITS,
   type StudioWillV1Limits,
-  type StudioWillV1Path,
 } from "./studio-will-v1-interchange";
 import {
-  STUDIO_WILL_V1_OPC_ASSURANCE,
   STUDIO_WILL_V1_OPC_LIMITS,
-  type StudioWillV1OpcBuildResult,
   type StudioWillV1OpcErrorCode,
-  type StudioWillV1OpcExportInput,
-  type StudioWillV1OpcImportResult,
   type StudioWillV1OpcLimits,
 } from "./studio-will-v1-opc-interchange";
+import {
+  isStudioWillV1OpcPacked,
+} from "./studio-will-v1-opc-packed-codec";
 
-export const STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION = 1 as const;
-/**
- * Object-graph transport is intentionally capped below the codec's one-million-point storage
- * limit. Raising this requires a versioned packed typed-array request/response transport.
- */
-export const STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS =
-  100_000;
+export const STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION = 2 as const;
+/** Kept for diagnostics: v2 no longer sends point object graphs across the Worker boundary. */
+export const STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS = 0;
+export const STUDIO_WILL_V1_OPC_WORKER_MAX_PACKED_POINTS =
+  STUDIO_WILL_V1_LIMITS.maxTotalPoints;
 
 export interface StudioWillV1OpcWorkerCodecOptions {
   readonly limits?: Partial<StudioWillV1OpcLimits>;
@@ -34,14 +30,14 @@ interface StudioWillV1OpcWorkerRequestBase {
 export interface StudioWillV1OpcWorkerEncodeRequest
   extends StudioWillV1OpcWorkerRequestBase {
   readonly type: "studio-will-v1-opc/encode";
-  readonly input: StudioWillV1OpcExportInput;
+  readonly packedInput: Uint8Array;
   readonly options?: StudioWillV1OpcWorkerCodecOptions;
 }
 
 export interface StudioWillV1OpcWorkerDecodeRequest
   extends StudioWillV1OpcWorkerRequestBase {
   readonly type: "studio-will-v1-opc/decode";
-  /** Uint8Array snapshots are transferred; Blob inputs are structured-cloned and read in-Worker. */
+  /** Uint8Array snapshots are transferred; Blob inputs are cloned and read in-Worker. */
   readonly source: Uint8Array | Blob;
   readonly options?: StudioWillV1OpcWorkerCodecOptions;
 }
@@ -66,14 +62,15 @@ export interface StudioWillV1OpcWorkerEncodeSuccess {
   readonly type: "studio-will-v1-opc/encode-success";
   readonly version: typeof STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION;
   readonly requestId: string;
-  readonly result: StudioWillV1OpcBuildResult;
+  readonly archive: Uint8Array;
+  readonly packedResult: Uint8Array;
 }
 
 export interface StudioWillV1OpcWorkerDecodeSuccess {
   readonly type: "studio-will-v1-opc/decode-success";
   readonly version: typeof STUDIO_WILL_V1_OPC_WORKER_PROTOCOL_VERSION;
   readonly requestId: string;
-  readonly result: StudioWillV1OpcImportResult;
+  readonly packedResult: Uint8Array;
 }
 
 export interface StudioWillV1OpcWorkerFailure {
@@ -106,7 +103,6 @@ const FAILURE_CODES = new Set<StudioWillV1OpcWorkerFailureCode>([
   "OPERATION_FAILED",
 ]);
 
-const REQUEST_BASE_KEYS = ["type", "version", "requestId"] as const;
 const CODEC_OPTION_KEYS = ["limits", "willLimits"] as const;
 const OPC_LIMIT_KEYS = [
   "maxArchiveBytes",
@@ -128,58 +124,6 @@ const WILL_LIMIT_KEYS = [
   "maxCoordinateMagnitude",
   "maxStrokeWidth",
 ] as const;
-const EXPORT_INPUT_KEYS = [
-  "width",
-  "height",
-  "paths",
-  "title",
-  "createdAt",
-  "application",
-  "applicationVersion",
-] as const;
-const PATH_INPUT_KEYS = [
-  "points",
-  "strokeWidths",
-  "strokeColor",
-  "startParameter",
-  "endParameter",
-  "decimalPrecision",
-] as const;
-const PATH_KEYS = [...PATH_INPUT_KEYS, "segmentCount"] as const;
-const POINT_KEYS = ["x", "y"] as const;
-const COLOR_KEYS = ["r", "g", "b", "a"] as const;
-const ENCODE_RESULT_KEYS = ["bytes", "paths", "loss", "assurance"] as const;
-const DECODE_RESULT_KEYS = [
-  "width",
-  "height",
-  "title",
-  "createdAt",
-  "application",
-  "applicationVersion",
-  "paths",
-  "assurance",
-] as const;
-const LOSS_KEYS = ["status", "quantization", "items"] as const;
-const LOSS_ITEM_KEYS = [
-  "code",
-  "pathIndex",
-  "changedValues",
-  "maximumAbsoluteError",
-  "message",
-] as const;
-const FAILURE_KEYS = [
-  "type",
-  "version",
-  "requestId",
-  "operation",
-  "error",
-] as const;
-const LOSS_CODES = new Set([
-  "END_PARAMETER_BINARY32_QUANTIZED",
-  "POSITION_FIXED_POINT_QUANTIZED",
-  "START_PARAMETER_BINARY32_QUANTIZED",
-  "STROKE_WIDTH_FIXED_POINT_QUANTIZED",
-]);
 
 function ownDataRecord(
   value: unknown,
@@ -187,21 +131,13 @@ function ownDataRecord(
   optionalKeys: readonly string[] = [],
 ): Record<string, unknown> | null {
   try {
-    if (
-      value === null
-      || typeof value !== "object"
-      || Array.isArray(value)
-    ) {
-      return null;
-    }
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
     const prototype = Object.getPrototypeOf(value);
     if (prototype !== Object.prototype && prototype !== null) return null;
     const allowed = new Set([...requiredKeys, ...optionalKeys]);
     const ownKeys = Reflect.ownKeys(value);
     if (
-      ownKeys.some(
-        (key) => typeof key !== "string" || !allowed.has(key),
-      )
+      ownKeys.some((key) => typeof key !== "string" || !allowed.has(key))
       || requiredKeys.some((key) => !ownKeys.includes(key))
     ) {
       return null;
@@ -210,45 +146,10 @@ function ownDataRecord(
     for (const key of ownKeys) {
       if (typeof key !== "string") return null;
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (
-        !descriptor
-        || !descriptor.enumerable
-        || !("value" in descriptor)
-      ) {
-        return null;
-      }
+      if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) return null;
       record[key] = descriptor.value;
     }
     return record;
-  } catch {
-    return null;
-  }
-}
-
-function exactDenseArray(value: unknown): readonly unknown[] | null {
-  try {
-    if (!Array.isArray(value)) return null;
-    const keys = Reflect.ownKeys(value);
-    if (
-      keys.length !== value.length + 1
-      || !keys.includes("length")
-    ) {
-      return null;
-    }
-    for (let index = 0; index < value.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(
-        value,
-        String(index),
-      );
-      if (
-        !descriptor
-        || !descriptor.enumerable
-        || !("value" in descriptor)
-      ) {
-        return null;
-      }
-    }
-    return value;
   } catch {
     return null;
   }
@@ -258,9 +159,7 @@ function ownValue(value: unknown, key: string): unknown {
   try {
     if (value === null || typeof value !== "object") return undefined;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return descriptor && "value" in descriptor
-      ? descriptor.value
-      : undefined;
+    return descriptor && "value" in descriptor ? descriptor.value : undefined;
   } catch {
     return undefined;
   }
@@ -313,170 +212,50 @@ function isCodecOptions(
       willLimits?.maxTotalPoints === undefined
       || (
         typeof willLimits.maxTotalPoints === "number"
-        && willLimits.maxTotalPoints
-          <= STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS
+        && willLimits.maxTotalPoints <= STUDIO_WILL_V1_LIMITS.maxTotalPoints
       )
     )
   );
 }
 
-function isInputPath(value: unknown): boolean {
-  const path = ownDataRecord(
-    value,
-    ["points", "strokeWidths", "strokeColor"],
-    ["startParameter", "endParameter", "decimalPrecision"],
-  );
-  const points = path ? exactDenseArray(path.points) : null;
-  const strokeWidths = path
-    ? exactDenseArray(path.strokeWidths)
-    : null;
-  const color = path
-    ? ownDataRecord(path.strokeColor, COLOR_KEYS)
-    : null;
-  if (
-    !path
-    || !points
-    || !strokeWidths
-    || !color
-    || points.length < 4
-    || points.length > STUDIO_WILL_V1_LIMITS.maxPointsPerPath
-    || strokeWidths.length < 1
-    || strokeWidths.length > points.length
-  ) {
-    return false;
-  }
-  if (
-    !points.every((point) => {
-      const record = ownDataRecord(point, POINT_KEYS);
-      return (
-        record !== null
-        && finiteNumber(
-          record.x,
-          -STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-          STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-        )
-        && finiteNumber(
-          record.y,
-          -STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-          STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-        )
-      );
-    })
-    || !strokeWidths.every(
-      (width) =>
-        finiteNumber(
-          width,
-          Number.MIN_VALUE,
-          STUDIO_WILL_V1_LIMITS.maxStrokeWidth,
-        ),
-    )
-    || !COLOR_KEYS.every((channel) => {
-      const component = color[channel];
-      return (
-        Number.isInteger(component)
-        && (component as number) >= 0
-        && (component as number) <= 255
-      );
-    })
-    || (
-      path.startParameter !== undefined
-      && !finiteNumber(path.startParameter, 0, 1)
-    )
-    || (
-      path.endParameter !== undefined
-      && !finiteNumber(path.endParameter, 0, 1)
-    )
-    || (
-      path.decimalPrecision !== undefined
-      && (
-        !Number.isInteger(path.decimalPrecision)
-        || (path.decimalPrecision as number) < 0
-        || (path.decimalPrecision as number)
-          > STUDIO_WILL_V1_LIMITS.maxDecimalPrecision
-      )
-    )
-  ) {
-    return false;
-  }
-  return true;
+function packetOptions(
+  options: StudioWillV1OpcWorkerCodecOptions | undefined,
+): StudioWillV1OpcWorkerCodecOptions {
+  return {
+    ...(options?.limits ? { limits: options.limits } : {}),
+    ...(options?.willLimits ? { willLimits: options.willLimits } : {}),
+  };
 }
 
-function isEncodeInput(value: unknown): value is StudioWillV1OpcExportInput {
-  const input = ownDataRecord(
-    value,
-    ["width", "height", "paths"],
-    EXPORT_INPUT_KEYS.filter(
-      (key) => key !== "width" && key !== "height" && key !== "paths",
-    ),
-  );
-  const paths = input ? exactDenseArray(input.paths) : null;
-  if (
-    !input
-    || !paths
-    || !finiteNumber(
-      input.width,
-      Number.MIN_VALUE,
-      STUDIO_WILL_V1_OPC_LIMITS.maxDimension,
-    )
-    || !finiteNumber(
-      input.height,
-      Number.MIN_VALUE,
-      STUDIO_WILL_V1_OPC_LIMITS.maxDimension,
-    )
-    || paths.length < 1
-    || paths.length > STUDIO_WILL_V1_LIMITS.maxPaths
-  ) {
-    return false;
-  }
-  let totalPoints = 0;
-  for (const path of paths) {
-    if (!isInputPath(path)) return false;
-    const record = ownDataRecord(
-      path,
-      ["points", "strokeWidths", "strokeColor"],
-      ["startParameter", "endParameter", "decimalPrecision"],
-    );
-    const points = record ? exactDenseArray(record.points) : null;
-    if (!points) return false;
-    totalPoints += points.length;
-    if (
-      totalPoints
-      > STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS
-    ) {
-      return false;
-    }
-  }
-  return [
-    input.title,
-    input.createdAt,
-    input.application,
-    input.applicationVersion,
-  ].every(
-    (entry) =>
-      entry === undefined
-      || (
-        typeof entry === "string"
-        && entry.length >= 1
-        && Array.from(entry).length
-          <= STUDIO_WILL_V1_OPC_LIMITS.maxMetadataCharacters
-      ),
+function isOwnedBytes(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+): value is Uint8Array {
+  return (
+    value instanceof Uint8Array
+    && value.buffer instanceof ArrayBuffer
+    && value.byteOffset === 0
+    && value.byteLength === value.buffer.byteLength
+    && value.byteLength >= minimum
+    && value.byteLength <= maximum
   );
 }
 
 export function isStudioWillV1OpcWorkerRequest(
-  value: unknown
+  value: unknown,
 ): value is StudioWillV1OpcWorkerRequest {
   const type = ownValue(value, "type");
   const record = type === "studio-will-v1-opc/encode"
     ? ownDataRecord(
         value,
-        [...REQUEST_BASE_KEYS, "input"],
+        ["type", "version", "requestId", "packedInput"],
         ["options"],
       )
     : type === "studio-will-v1-opc/decode"
       ? ownDataRecord(
           value,
-          [...REQUEST_BASE_KEYS, "source"],
+          ["type", "version", "requestId", "source"],
           ["options"],
         )
       : null;
@@ -489,28 +268,36 @@ export function isStudioWillV1OpcWorkerRequest(
     return false;
   }
   if (type === "studio-will-v1-opc/encode") {
-    return isEncodeInput(record.input);
+    return isStudioWillV1OpcPacked(
+      record.packedInput,
+      "export-input",
+      packetOptions(record.options as StudioWillV1OpcWorkerCodecOptions | undefined),
+    );
   }
   return (
     type === "studio-will-v1-opc/decode"
     && (
-      record.source instanceof Uint8Array
+      isOwnedBytes(record.source, 0, STUDIO_WILL_V1_OPC_LIMITS.maxArchiveBytes)
       || (
         typeof Blob !== "undefined"
         && record.source instanceof Blob
+        && record.source.size <= STUDIO_WILL_V1_OPC_LIMITS.maxArchiveBytes
       )
     )
   );
 }
 
 export function studioWillV1OpcWorkerCorrelation(
-  value: unknown
+  value: unknown,
 ): { readonly requestId: string; readonly operation?: "decode" | "encode" } | null {
   const requestId = ownValue(value, "requestId");
   if (!isRequestId(requestId)) return null;
   const type = ownValue(value, "type");
   let operation: "decode" | "encode" | undefined;
-  if (type === "studio-will-v1-opc/encode" || type === "studio-will-v1-opc/encode-success") {
+  if (
+    type === "studio-will-v1-opc/encode"
+    || type === "studio-will-v1-opc/encode-success"
+  ) {
     operation = "encode";
   } else if (
     type === "studio-will-v1-opc/decode"
@@ -526,23 +313,15 @@ export function studioWillV1OpcWorkerCorrelation(
   ) {
     operation = ownValue(value, "operation") as "decode" | "encode";
   }
-  return operation === undefined
-    ? { requestId }
-    : { requestId, operation };
+  return operation === undefined ? { requestId } : { requestId, operation };
 }
 
 function isSerializedError(value: unknown): value is StudioWillV1OpcWorkerSerializedError {
-  const error = ownDataRecord(
-    value,
-    ["code", "name", "message"],
-    ["path"],
-  );
+  const error = ownDataRecord(value, ["code", "name", "message"], ["path"]);
   if (
     !error
     || typeof error.code !== "string"
-    || !FAILURE_CODES.has(
-      error.code as StudioWillV1OpcWorkerFailureCode,
-    )
+    || !FAILURE_CODES.has(error.code as StudioWillV1OpcWorkerFailureCode)
     || typeof error.name !== "string"
     || error.name.length < 1
     || error.name.length > 128
@@ -560,211 +339,25 @@ function isSerializedError(value: unknown): value is StudioWillV1OpcWorkerSerial
     );
 }
 
-function finiteNumber(value: unknown, minimum: number, maximum: number): value is number {
-  return (
-    typeof value === "number"
-    && Number.isFinite(value)
-    && value >= minimum
-    && value <= maximum
-  );
-}
-
-function isPath(value: unknown): value is StudioWillV1Path {
-  const path = ownDataRecord(value, PATH_KEYS);
-  const points = path ? exactDenseArray(path.points) : null;
-  const strokeWidths = path
-    ? exactDenseArray(path.strokeWidths)
-    : null;
-  const strokeColor = path
-    ? ownDataRecord(path.strokeColor, COLOR_KEYS)
-    : null;
-  if (
-    !path
-    || !points
-    || !strokeWidths
-    || !strokeColor
-    || points.length < 4
-    || points.length > STUDIO_WILL_V1_LIMITS.maxPointsPerPath
-    || strokeWidths.length < 1
-    || strokeWidths.length > points.length
-    || !finiteNumber(path.startParameter, 0, 1)
-    || !finiteNumber(path.endParameter, 0, 1)
-    || !Number.isInteger(path.decimalPrecision)
-    || (path.decimalPrecision as number) < 0
-    || (path.decimalPrecision as number)
-      > STUDIO_WILL_V1_LIMITS.maxDecimalPrecision
-    || path.segmentCount !== points.length - 3
-  ) {
-    return false;
-  }
-  for (const point of points) {
-    const record = ownDataRecord(point, POINT_KEYS);
-    if (
-      !record
-      || !finiteNumber(
-        record.x,
-        -STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-        STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude
-      )
-      || !finiteNumber(
-        record.y,
-        -STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude,
-        STUDIO_WILL_V1_LIMITS.maxCoordinateMagnitude
-      )
-    ) {
-      return false;
-    }
-  }
-  if (
-    !strokeWidths.every((width) =>
-      finiteNumber(width, Number.MIN_VALUE, STUDIO_WILL_V1_LIMITS.maxStrokeWidth)
-    )
-  ) {
-    return false;
-  }
-  return COLOR_KEYS.every((channel) => {
-    const component = strokeColor[channel];
-    return (
-      typeof component === "number"
-      && Number.isInteger(component)
-      && component >= 0
-      && component <= 255
-    );
-  });
-}
-
-function isBoundedPaths(value: unknown): value is readonly StudioWillV1Path[] {
-  const paths = exactDenseArray(value);
-  if (
-    !paths
-    || paths.length < 1
-    || paths.length > STUDIO_WILL_V1_LIMITS.maxPaths
-  ) {
-    return false;
-  }
-  let totalPoints = 0;
-  for (const path of paths) {
-    if (!isPath(path)) return false;
-    totalPoints += path.points.length;
-    if (
-      totalPoints
-      > STUDIO_WILL_V1_OPC_WORKER_MAX_STRUCTURED_CLONE_POINTS
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function isLossReport(value: unknown, pathCount: number): boolean {
-  const loss = ownDataRecord(value, LOSS_KEYS);
-  const items = loss ? exactDenseArray(loss.items) : null;
-  if (
-    !loss
-    || !items
-    || (loss.status !== "declared" && loss.status !== "exact")
-    || loss.quantization !== "truncate-toward-zero"
-    || items.length > pathCount * 4
-  ) {
-    return false;
-  }
-  return items.every((item) => {
-    const record = ownDataRecord(item, LOSS_ITEM_KEYS);
-    return (
-      record !== null
-      && typeof record.code === "string"
-      && LOSS_CODES.has(record.code)
-      && Number.isInteger(record.pathIndex)
-      && (record.pathIndex as number) >= 0
-      && (record.pathIndex as number) < pathCount
-      && Number.isInteger(record.changedValues)
-      && (record.changedValues as number) >= 1
-      && finiteNumber(
-        record.maximumAbsoluteError,
-        0,
-        Number.MAX_VALUE,
-      )
-      && typeof record.message === "string"
-      && record.message.length >= 1
-      && record.message.length <= 2_048
-    );
-  });
-}
-
-function hasExactAssurance(value: unknown): boolean {
-  const expectedEntries = Object.entries(STUDIO_WILL_V1_OPC_ASSURANCE);
-  const record = ownDataRecord(
-    value,
-    expectedEntries.map(([key]) => key),
-  );
-  if (!record) return false;
-  return expectedEntries.every(
-    ([key, expected]) => record[key] === expected,
-  );
-}
-
-function isMetadataText(value: unknown): value is string {
-  return (
-    typeof value === "string"
-    && value.length >= 1
-    && Array.from(value).length <= STUDIO_WILL_V1_OPC_LIMITS.maxMetadataCharacters
-  );
-}
-
-function isEncodeResult(value: unknown): value is StudioWillV1OpcBuildResult {
-  const result = ownDataRecord(value, ENCODE_RESULT_KEYS);
-  return (
-    result !== null
-    && result.bytes instanceof Uint8Array
-    && result.bytes.buffer instanceof ArrayBuffer
-    && result.bytes.byteOffset === 0
-    && result.bytes.byteLength === result.bytes.buffer.byteLength
-    && result.bytes.byteLength >= 22
-    && result.bytes.byteLength
-      <= STUDIO_WILL_V1_OPC_LIMITS.maxArchiveBytes
-    && isBoundedPaths(result.paths)
-    && isLossReport(
-      result.loss,
-      (result.paths as readonly StudioWillV1Path[]).length,
-    )
-    && hasExactAssurance(result.assurance)
-  );
-}
-
-function isDecodeResult(value: unknown): value is StudioWillV1OpcImportResult {
-  const result = ownDataRecord(value, DECODE_RESULT_KEYS);
-  return (
-    result !== null
-    && typeof result.width === "number"
-    && Number.isFinite(result.width)
-    && result.width > 0
-    && result.width <= STUDIO_WILL_V1_OPC_LIMITS.maxDimension
-    && typeof result.height === "number"
-    && Number.isFinite(result.height)
-    && result.height > 0
-    && result.height <= STUDIO_WILL_V1_OPC_LIMITS.maxDimension
-    && isMetadataText(result.title)
-    && isMetadataText(result.createdAt)
-    && isMetadataText(result.application)
-    && isMetadataText(result.applicationVersion)
-    && isBoundedPaths(result.paths)
-    && hasExactAssurance(result.assurance)
-  );
-}
-
 export function isStudioWillV1OpcWorkerResponse(
-  value: unknown
+  value: unknown,
 ): value is StudioWillV1OpcWorkerResponse {
   const type = ownValue(value, "type");
-  const record =
-    type === "studio-will-v1-opc/encode-success"
-    || type === "studio-will-v1-opc/decode-success"
+  const record = type === "studio-will-v1-opc/encode-success"
+    ? ownDataRecord(
+        value,
+        ["type", "version", "requestId", "archive", "packedResult"],
+      )
+    : type === "studio-will-v1-opc/decode-success"
       ? ownDataRecord(
           value,
-          ["type", "version", "requestId", "result"],
+          ["type", "version", "requestId", "packedResult"],
         )
       : type === "studio-will-v1-opc/failure"
-        ? ownDataRecord(value, FAILURE_KEYS)
+        ? ownDataRecord(
+            value,
+            ["type", "version", "requestId", "operation", "error"],
+          )
         : null;
   if (
     !record
@@ -774,41 +367,59 @@ export function isStudioWillV1OpcWorkerResponse(
     return false;
   }
   if (type === "studio-will-v1-opc/encode-success") {
-    return isEncodeResult(record.result);
+    return (
+      isOwnedBytes(record.archive, 22, STUDIO_WILL_V1_OPC_LIMITS.maxArchiveBytes)
+      && isStudioWillV1OpcPacked(record.packedResult, "build-result")
+      && (record.archive as Uint8Array).buffer
+        !== (record.packedResult as Uint8Array).buffer
+    );
   }
   if (type === "studio-will-v1-opc/decode-success") {
-    return isDecodeResult(record.result);
+    return isStudioWillV1OpcPacked(record.packedResult, "import-result");
   }
   return (
     type === "studio-will-v1-opc/failure"
-    && (
-      record.operation === "decode"
-      || record.operation === "encode"
-    )
+    && (record.operation === "decode" || record.operation === "encode")
     && isSerializedError(record.error)
   );
 }
 
+function uniqueOwnedBuffers(values: readonly unknown[]): Transferable[] {
+  const buffers: ArrayBuffer[] = [];
+  for (const value of values) {
+    if (
+      !(value instanceof Uint8Array)
+      || !(value.buffer instanceof ArrayBuffer)
+      || value.byteOffset !== 0
+      || value.byteLength !== value.buffer.byteLength
+      || buffers.includes(value.buffer)
+    ) {
+      return [];
+    }
+    buffers.push(value.buffer);
+  }
+  return buffers;
+}
+
 export function studioWillV1OpcWorkerRequestTransfers(
-  request: StudioWillV1OpcWorkerRequest
+  request: StudioWillV1OpcWorkerRequest,
 ): Transferable[] {
-  if (request.type !== "studio-will-v1-opc/decode") return [];
-  if (!(request.source instanceof Uint8Array)) return [];
-  const buffer = request.source.buffer;
-  return buffer instanceof ArrayBuffer ? [buffer] : [];
+  if (request.type === "studio-will-v1-opc/encode") {
+    return uniqueOwnedBuffers([request.packedInput]);
+  }
+  return request.source instanceof Uint8Array
+    ? uniqueOwnedBuffers([request.source])
+    : [];
 }
 
 export function studioWillV1OpcWorkerResponseTransfers(
-  response: StudioWillV1OpcWorkerResponse
+  response: StudioWillV1OpcWorkerResponse,
 ): Transferable[] {
-  if (response.type !== "studio-will-v1-opc/encode-success") return [];
-  const bytes = response.result.bytes;
-  const buffer = bytes.buffer;
-  return (
-    buffer instanceof ArrayBuffer
-    && bytes.byteOffset === 0
-    && bytes.byteLength === buffer.byteLength
-  )
-    ? [buffer]
-    : [];
+  if (response.type === "studio-will-v1-opc/encode-success") {
+    return uniqueOwnedBuffers([response.archive, response.packedResult]);
+  }
+  if (response.type === "studio-will-v1-opc/decode-success") {
+    return uniqueOwnedBuffers([response.packedResult]);
+  }
+  return [];
 }
