@@ -515,7 +515,7 @@ describe("studio brush backend availability", () => {
         status: "ready",
         liveBackend: "canvas2d-wet-ribbon",
         commitBackend: "canvas2d-wet-ribbon",
-        semanticContract: "wet-ribbon-carrier-v1",
+        semanticContract: "wet-ribbon-carrier-v2",
       });
 
     expect(resolveStudioBrushBackendQualityRoute({

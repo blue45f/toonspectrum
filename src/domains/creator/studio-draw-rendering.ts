@@ -269,11 +269,16 @@ export function isDirectLiveDraftEl(el: DrawEl): boolean {
 
 /** v2 스탬프는 raw accepted point 접미사를 자체 walker에 공급한다(대칭은 retained affine compositor가 소유). */
 export function isDirectLiveStampDraftEl(el: DrawEl): boolean {
+  const stampKind = resolveStudioStampBrushKind(el.brush);
   return (el.kind ?? "freehand") === "freehand"
     && el.mode === "pen"
     && !el.fill
     && el.stampPipeline === "causal-walker-v2"
-    && resolveStudioStampBrushKind(el.brush) !== null
+    && stampKind !== null
+    // Ink now uses one stroke-local ribbon fill. The append-only dab overlay cannot reproduce
+    // translucent retrace/figure-eight union semantics without repainting the gesture mask, so
+    // active ink intentionally stays on the exact retained Shape path.
+    && stampKind !== "ink"
     && (el.symmetry?.type ?? "none") === "none";
 }
 

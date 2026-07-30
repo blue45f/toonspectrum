@@ -67,10 +67,18 @@ import {
   planOilBrushDabs,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
+  planStudioFxLuminousRibbonPass,
   resolveStudioFxBrushTapPressureResponse,
   resolveStudioFxPressurePassResponse,
+  traceStudioFxLuminousRibbonPass,
 } from "./studio-fx-brush";
 import { konvaGradientProps } from "./studio-gradient-engine";
+import {
+  planStudioHighlighterWashRibbon,
+  planStudioHighlighterWashTap,
+  resolveStudioHighlighterWashBrushId,
+  traceStudioHighlighterWashPlan,
+} from "./studio-highlighter-wash-ribbon";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
@@ -135,7 +143,6 @@ import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
 import type { DrawEl } from "./studio-element-model";
-import type { StudioFxPressurePathSegment } from "./studio-fx-brush";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
@@ -178,51 +185,6 @@ function processStudioPencilAliasPassPoints(
     const source = points[coordinateIndex];
     return source === undefined ? value : source + (value - source) * scale;
   });
-}
-
-interface StudioFxPressureTraceContext {
-  moveTo(x: number, y: number): void;
-  lineTo(x: number, y: number): void;
-  quadraticCurveTo(
-    controlX: number,
-    controlY: number,
-    endX: number,
-    endY: number,
-  ): void;
-  bezierCurveTo(
-    control1X: number,
-    control1Y: number,
-    control2X: number,
-    control2Y: number,
-    endX: number,
-    endY: number,
-  ): void;
-}
-
-function traceStudioFxPressureSegment(
-  context: StudioFxPressureTraceContext,
-  segment: StudioFxPressurePathSegment,
-): void {
-  context.moveTo(segment.moveX, segment.moveY);
-  if (segment.command === "cubic") {
-    context.bezierCurveTo(
-      segment.control1X,
-      segment.control1Y,
-      segment.control2X,
-      segment.control2Y,
-      segment.endX,
-      segment.endY,
-    );
-  } else if (segment.command === "quadratic") {
-    context.quadraticCurveTo(
-      segment.controlX,
-      segment.controlY,
-      segment.endX,
-      segment.endY,
-    );
-  } else {
-    context.lineTo(segment.endX, segment.endY);
-  }
 }
 
 function traceStudioRetainedMediaPolygon(
@@ -919,17 +881,30 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 el.materialMinimumDiameterRatio,
               );
               const tapWidth = aliasStrokeWidth * pressureResponse.widthScale;
+              const washPlan = planStudioHighlighterWashTap({
+                brushId: resolveStudioHighlighterWashBrushId(brush),
+                x: points[0],
+                y: points[1],
+                width: tapWidth,
+                opacityScale: pressureResponse.opacityScale,
+              });
               return (
-                <Rect
+                <Shape
                   key={index}
-                  x={points[0] - tapWidth / 2}
-                  y={points[1] - tapWidth / 2}
-                  width={tapWidth}
-                  height={tapWidth}
-                  fill={stroke}
-                  opacity={opacity * Math.min(1, pressureResponse.opacityScale)}
+                  sceneFunc={(context) => {
+                    if (washPlan.runs.length === 0) return;
+                    context.save();
+                    context.globalAlpha *= washPlan.opacityScale;
+                    context.fillStyle = stroke;
+                    context.beginPath();
+                    traceStudioHighlighterWashPlan(context, washPlan);
+                    context.fill();
+                    context.restore();
+                  }}
+                  opacity={opacity}
                   globalCompositeOperation="multiply"
                   listening={false}
+                  perfectDrawEnabled={false}
                 />
               );
             }
@@ -1688,25 +1663,6 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });
-            if (
-              el.materialPressureModel
-              !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
-            ) {
-              return (
-                <Line
-                  key={index}
-                  points={renderPath.points}
-                  stroke={stroke}
-                  strokeWidth={aliasStrokeWidth}
-                  opacity={opacity}
-                  lineCap="square"
-                  lineJoin={brush === "chisel-highlighter" ? "bevel" : "round"}
-                  tension={renderPath.tension}
-                  globalCompositeOperation="multiply"
-                  listening={false}
-                />
-              );
-            }
             const pressureBrush = isStudioFxPressureBrushId(brush)
               ? brush
               : "highlighter";
@@ -1718,54 +1674,22 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               minimumDiameterRatio: el.materialMinimumDiameterRatio,
               tension: renderPath.tension,
             });
+            const washPlan = planStudioHighlighterWashRibbon({
+              brushId: resolveStudioHighlighterWashBrushId(brush),
+              pressurePath,
+              baseWidth: aliasStrokeWidth,
+            });
             return (
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  if (washPlan.runs.length === 0) return;
                   context.save();
-                  const inheritedAlpha = context.globalAlpha;
-                  context.strokeStyle = stroke;
+                  context.globalAlpha *= washPlan.opacityScale;
                   context.fillStyle = stroke;
-                  context.lineCap = "butt";
-                  context.lineJoin = brush === "chisel-highlighter"
-                    ? "bevel"
-                    : "round";
-                  for (const segment of pressurePath.segments) {
-                    context.globalAlpha = inheritedAlpha * Math.min(
-                      1,
-                      segment.opacityScale,
-                    );
-                    context.lineWidth = Math.max(
-                      0.5,
-                      aliasStrokeWidth * segment.widthScale,
-                    );
-                    context.beginPath();
-                    traceStudioFxPressureSegment(context, segment);
-                    context.stroke();
-                  }
-                  const first = pressurePath.segments[0];
-                  const last = pressurePath.segments.at(-1);
-                  for (const endpoint of first && last
-                    ? [
-                        { x: first.moveX, y: first.moveY, response: first },
-                        { x: last.endX, y: last.endY, response: last },
-                      ]
-                    : []) {
-                    const endpointWidth = Math.max(
-                      0.5,
-                      aliasStrokeWidth * endpoint.response.widthScale,
-                    );
-                    context.globalAlpha = inheritedAlpha * Math.min(
-                      1,
-                      endpoint.response.opacityScale,
-                    );
-                    context.fillRect(
-                      endpoint.x - endpointWidth / 2,
-                      endpoint.y - endpointWidth / 2,
-                      endpointWidth,
-                      endpointWidth,
-                    );
-                  }
+                  context.beginPath();
+                  traceStudioHighlighterWashPlan(context, washPlan);
+                  context.fill();
                   context.restore();
                 }}
                 opacity={opacity}
@@ -1869,74 +1793,34 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation="lighter"
                       listening={false}
                     />
-                  ) : (
-                    <Shape
-                      key={passIndex}
-                      sceneFunc={(context) => {
-                        context.save();
-                        const inheritedAlpha = context.globalAlpha;
-                        context.strokeStyle = passColor;
-                        context.fillStyle = passColor;
-                        context.lineCap = "butt";
-                        context.lineJoin = "round";
-                        for (const segment of pressurePath.segments) {
-                          const pressurePass = resolveStudioFxPressurePassResponse(
-                            segment,
-                            pass.widthScale,
-                            luminousCore,
-                          );
-                          context.globalAlpha = inheritedAlpha * Math.min(
-                            1,
-                            pass.opacity * pressurePass.opacityScale,
-                          );
-                          context.lineWidth = Math.max(
-                            0.5,
-                            strokeWidth * pass.widthScale * pressurePass.widthScale,
-                          );
+                  ) : (() => {
+                    const ribbonPlan = planStudioFxLuminousRibbonPass({
+                      brushId: "neon",
+                      pressurePath,
+                      baseWidth: strokeWidth,
+                      passWidthScale: pass.widthScale,
+                      passOpacity: pass.opacity,
+                      luminousCore,
+                    });
+                    return (
+                      <Shape
+                        key={passIndex}
+                        sceneFunc={(context) => {
+                          if (ribbonPlan.polygons.length === 0) return;
+                          context.save();
+                          context.globalAlpha *= ribbonPlan.opacity;
+                          context.fillStyle = passColor;
                           context.beginPath();
-                          traceStudioFxPressureSegment(context, segment);
-                          context.stroke();
-                        }
-                        const first = pressurePath.segments[0];
-                        const last = pressurePath.segments.at(-1);
-                        for (const endpoint of first && last
-                          ? [
-                              { x: first.moveX, y: first.moveY, response: first },
-                              { x: last.endX, y: last.endY, response: last },
-                            ]
-                          : []) {
-                          const pressurePass = resolveStudioFxPressurePassResponse(
-                            endpoint.response,
-                            pass.widthScale,
-                            luminousCore,
-                          );
-                          context.globalAlpha = inheritedAlpha * Math.min(
-                            1,
-                            pass.opacity * pressurePass.opacityScale,
-                          );
-                          context.beginPath();
-                          context.arc(
-                            endpoint.x,
-                            endpoint.y,
-                            Math.max(
-                              0.25,
-                              strokeWidth
-                              * pass.widthScale
-                              * pressurePass.widthScale
-                              / 2,
-                            ),
-                            0,
-                            Math.PI * 2,
-                          );
+                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
                           context.fill();
-                        }
-                        context.restore();
-                      }}
-                      globalCompositeOperation="lighter"
-                      listening={false}
-                      perfectDrawEnabled={false}
-                    />
-                  );
+                          context.restore();
+                        }}
+                        globalCompositeOperation={ribbonPlan.compositeOperation}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    );
+                  })();
                 })}
               </Group>
             );
@@ -2037,74 +1921,34 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       globalCompositeOperation="lighter"
                       listening={false}
                     />
-                  ) : (
-                    <Shape
-                      key={passIndex}
-                      sceneFunc={(context) => {
-                        context.save();
-                        const inheritedAlpha = context.globalAlpha;
-                        context.strokeStyle = stroke;
-                        context.fillStyle = stroke;
-                        context.lineCap = "butt";
-                        context.lineJoin = "round";
-                        for (const segment of pressurePath.segments) {
-                          const pressurePass = resolveStudioFxPressurePassResponse(
-                            segment,
-                            pass.widthScale,
-                            luminousCore,
-                          );
-                          context.globalAlpha = inheritedAlpha * Math.min(
-                            1,
-                            pass.opacity * pressurePass.opacityScale,
-                          );
-                          context.lineWidth = Math.max(
-                            0.5,
-                            strokeWidth * pass.widthScale * pressurePass.widthScale,
-                          );
+                  ) : (() => {
+                    const ribbonPlan = planStudioFxLuminousRibbonPass({
+                      brushId: pressureBrush,
+                      pressurePath,
+                      baseWidth: strokeWidth,
+                      passWidthScale: pass.widthScale,
+                      passOpacity: pass.opacity,
+                      luminousCore,
+                    });
+                    return (
+                      <Shape
+                        key={passIndex}
+                        sceneFunc={(context) => {
+                          if (ribbonPlan.polygons.length === 0) return;
+                          context.save();
+                          context.globalAlpha *= ribbonPlan.opacity;
+                          context.fillStyle = stroke;
                           context.beginPath();
-                          traceStudioFxPressureSegment(context, segment);
-                          context.stroke();
-                        }
-                        const first = pressurePath.segments[0];
-                        const last = pressurePath.segments.at(-1);
-                        for (const endpoint of first && last
-                          ? [
-                              { x: first.moveX, y: first.moveY, response: first },
-                              { x: last.endX, y: last.endY, response: last },
-                            ]
-                          : []) {
-                          const pressurePass = resolveStudioFxPressurePassResponse(
-                            endpoint.response,
-                            pass.widthScale,
-                            luminousCore,
-                          );
-                          context.globalAlpha = inheritedAlpha * Math.min(
-                            1,
-                            pass.opacity * pressurePass.opacityScale,
-                          );
-                          context.beginPath();
-                          context.arc(
-                            endpoint.x,
-                            endpoint.y,
-                            Math.max(
-                              0.25,
-                              strokeWidth
-                              * pass.widthScale
-                              * pressurePass.widthScale
-                              / 2,
-                            ),
-                            0,
-                            Math.PI * 2,
-                          );
+                          traceStudioFxLuminousRibbonPass(context, ribbonPlan);
                           context.fill();
-                        }
-                        context.restore();
-                      }}
-                      globalCompositeOperation="lighter"
-                      listening={false}
-                      perfectDrawEnabled={false}
-                    />
-                  );
+                          context.restore();
+                        }}
+                        globalCompositeOperation={ribbonPlan.compositeOperation}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    );
+                  })();
                 })}
               </Group>
             );

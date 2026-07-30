@@ -107,6 +107,14 @@ export interface StudioDynamicBrushRenderBudgetInput {
    * not halve a long stroke's affordable dab count merely because one extra mark is required.
    */
   fixedMarksPerVariation?: number;
+  /**
+   * Renderer-neutral material expansion performed after source-dab planning.
+   *
+   * An anisotropic dry-media bridge, for example, lowers one pastel dab to five physical fibres.
+   * Supplying that exact multiplier makes causal prefix admission account for the real commands
+   * before the bridge allocates them. Ordinary brushes omit it and retain the historical value 1.
+   */
+  materialMarkMultiplier?: number;
   markBudget: number;
 }
 
@@ -181,12 +189,15 @@ function gridWorkPlans(
   dabCount: number,
   symmetryCount: number,
   fixedMarksPerVariation: number,
+  materialMarkMultiplier: number,
   markBudget: number,
   stampGrids: readonly StudioDynamicBrushRenderStampGrid[],
   allowEmptyAcceptedPrefix: boolean,
 ): GridWorkPlan[] {
   return stampGrids.map((grid) => {
-    const marksPerDab = countStudioDynamicBrushMarksPerDab(settings, grid);
+    const marksPerDab =
+      countStudioDynamicBrushMarksPerDab(settings, grid)
+      * materialMarkMultiplier;
     const marksPerSymmetricDab = symmetryCount * marksPerDab;
     const fixedMarks = dabCount > 0
       ? symmetryCount * fixedMarksPerVariation
@@ -248,12 +259,19 @@ export function planStudioDynamicBrushRenderBudget(
     0,
     64,
   );
+  const materialMarkMultiplier = finiteInteger(
+    input.materialMarkMultiplier ?? 1,
+    1,
+    1,
+    64,
+  );
   const markBudget = finiteInteger(input.markBudget, 1, 1, 100_000_000);
   const candidates = gridWorkPlans(
     input.settings,
     admittedDabCount,
     symmetryCount,
     fixedMarksPerVariation,
+    materialMarkMultiplier,
     markBudget,
     causal
       ? [STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID]

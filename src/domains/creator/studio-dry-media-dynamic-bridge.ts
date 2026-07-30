@@ -162,6 +162,22 @@ const PRODUCT_LANE_COUNT = Object.freeze({
   Record<StudioDryMediaAnisotropicPresetIdV1, 3 | 5>
 >);
 
+/**
+ * Exact physical-mark expansion applied by the dry-media bridge for one authored source dab.
+ *
+ * Budget planners must charge this multiplier before admitting a causal prefix. Waiting until the
+ * bridge has materialized all lanes can exceed the shared mark ceiling and turn a valid long stroke
+ * into an all-or-nothing `mark-budget` failure.
+ */
+export function studioDryMediaDynamicBridgeMarkMultiplier(
+  materialIdentity?: StudioDynamicBrushMaterialIdentity | null,
+): 1 | 3 | 5 {
+  const presetId = materialIdentity?.dryMediaPresetId;
+  return presetId === null || presetId === undefined
+    ? 1
+    : PRODUCT_LANE_COUNT[presetId];
+}
+
 function fail(
   reason: StudioDryMediaDynamicBridgeFailureReason,
 ): StudioDryMediaDynamicBridgeResult {

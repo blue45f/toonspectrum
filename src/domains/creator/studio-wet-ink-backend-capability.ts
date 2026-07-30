@@ -27,7 +27,7 @@ export interface StudioWetInkInteractiveBackendCapability {
   readonly backendId: "worker-webgpu-wet-ink-v1";
   readonly availability: "available" | "unavailable";
   readonly mainThreadPhysicalField: false;
-  readonly fallbackRenderer: "wet-ribbon-carrier-v1";
+  readonly fallbackRenderer: "wet-ribbon-carrier-v2";
   readonly reason: "async-provider-not-installed";
 }
 
@@ -37,7 +37,7 @@ export const STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY:
     backendId: "worker-webgpu-wet-ink-v1",
     availability: "unavailable",
     mainThreadPhysicalField: false,
-    fallbackRenderer: "wet-ribbon-carrier-v1",
+    fallbackRenderer: "wet-ribbon-carrier-v2",
     reason: "async-provider-not-installed",
   });
 

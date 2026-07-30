@@ -52,8 +52,12 @@ import {
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  studioDryMediaUnionRibbonCarrierOwnsMaterial,
+} from "./studio-dry-media-union-ribbon-carrier";
 import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
@@ -216,6 +220,17 @@ interface PresentationPixelRect {
   readonly y: number;
   readonly width: number;
   readonly height: number;
+}
+
+function exactPlanUsesWholePrefixDryMediaUnion(
+  plan: ExactDynamicPlan,
+): boolean {
+  return plan.marks.length > 0
+    && plan.marks.every(
+      (mark) =>
+        mark.ribbon?.kind === "dry-media-union-ribbon-polygon"
+        && mark.ribbon.role === "stroke-union",
+    );
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -564,6 +579,9 @@ function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrush
       style.materialIdentity,
       true,
     ),
+    materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+      style.materialIdentity,
+    ),
     markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   }).stampGrid;
 }
@@ -904,6 +922,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
             active.style.materialIdentity,
             active.plannedCausalDabCount > 0,
           ),
+          materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+            active.style.materialIdentity,
+          ),
           markBudget,
         })
       : null;
@@ -1056,6 +1077,59 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.lastSpacing = planned.state.lastSpacing;
     active.transitionedFromTap = planned.state.transitionedFromTap;
 
+    if (studioDryMediaUnionRibbonCarrierOwnsMaterial(
+      active.style.materialIdentity,
+      active.style.dynamics,
+    )) {
+      const previousAcceptedDabCount = active.acceptedCausalDabCount;
+      const exact = this.exactPlan(active.style, active.source);
+      if (!exact || !exactPlanUsesWholePrefixDryMediaUnion(exact)) {
+        return this.failActive("material-plan");
+      }
+      const acceptedDabs = planned.replaceInitialTap
+        ? exact.dabCount
+        : Math.max(0, exact.dabCount - previousAcceptedDabCount);
+      if (acceptedDabs === 0) {
+        active.acceptedPrefixReceipt = exact.acceptedPrefixReceipt;
+        return {
+          status: "noop",
+          consumedSourcePoints: active.consumedSourcePoints,
+          appendedDabs: 0,
+          appendedMarks: 0,
+          ...(active.acceptedPrefixReceipt
+            ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+            : {}),
+        };
+      }
+      // A dry-media union is one whole-stroke source mask, not an appendable dab batch. Appending
+      // a suffix union would overlap the already-present prefix and make crossings darker live
+      // than after pointer-up. Replace both transient surfaces from the canonical accepted prefix
+      // so every pointer frame, retained replay and final commit consume identical geometry and
+      // the same R8/material byte receipt.
+      this.clearActiveRect();
+      active.markCount = 0;
+      active.r8AlphaMapBytes = 0;
+      active.acceptedCausalDabCount = 0;
+      active.acceptedPrefixReceipt = undefined;
+      active.stampGrid = exact.stampGrid;
+      if (!this.drawMarksToActive(exact.marks, active.style.opacity)) {
+        return this.failActive("surface-render");
+      }
+      active.markCount = exact.marks.length;
+      active.r8AlphaMapBytes = exact.r8AlphaMapBytes;
+      active.acceptedCausalDabCount = exact.dabCount;
+      active.acceptedPrefixReceipt = exact.acceptedPrefixReceipt;
+      return {
+        status: "appended",
+        consumedSourcePoints: active.consumedSourcePoints,
+        appendedDabs: acceptedDabs,
+        appendedMarks: exact.marks.length,
+        ...(active.acceptedPrefixReceipt
+          ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+          : {}),
+      };
+    }
+
     let appendedDabs = planned.dabs;
     let replacementDabs = 0;
     let replacementMarks = 0;
@@ -1193,6 +1267,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           style.materialIdentity,
           causalDabCount > 0,
         ),
+        materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+          style.materialIdentity,
+        ),
         markBudget: causalMarkBudget(style.dynamics),
       });
       const acceptedDabCount = renderBudget.acceptedPrefixReceipt
@@ -1268,6 +1345,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
         style.materialIdentity,
         dabs.some((dab) => dab.index === 0),
+      ),
+      materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+        style.materialIdentity,
       ),
       markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
     });

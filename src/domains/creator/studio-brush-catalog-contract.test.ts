@@ -37,6 +37,7 @@ const SUPPORTED_PREVIEW_KINDS = new Set([
   "calligraphy",
   "marker",
   "square-marker",
+  "wash-marker",
   "pencil",
   "texture",
   "soft-air",
@@ -121,7 +122,10 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       const runtime = resolveStudioBrushRuntimeContract(preset.id);
       const stampKind = resolveStudioStampBrushKind(preset.id);
       const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
-      const dynamicsFamily = family === "airbrush" || family === "dry-media" || family === "ink-particle";
+      const dynamicsFamily = family === "airbrush"
+        || family === "dry-media"
+        || family === "pastel"
+        || family === "ink-particle";
       const previewHtml = renderToStaticMarkup(
         createElement(LargeBrushPreview, { item: item!, active: false })
       );
@@ -144,7 +148,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
         ).not.toBeNull();
         if (runtime.distinctness === "unique") {
           expect(dynamicsId, `${preset.id}: canonical dynamics variant drift`).toBe(
-            runtime.engineVariant
+            resolveStudioBrushDynamicsPresetId(runtime.engineVariant)
           );
         }
       } else {

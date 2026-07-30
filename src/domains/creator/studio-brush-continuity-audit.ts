@@ -94,7 +94,6 @@ const CURVE_PROFILES: readonly CurveProfile[] = [
 ] as const;
 
 const INTENTIONALLY_DISCONTINUOUS_CATEGORIES = new Set([
-  "effect",
   "foliage",
   "pattern",
   "pixel",
@@ -117,6 +116,26 @@ const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
 const INTERIOR_START = 0.08;
 const INTERIOR_END = 0.92;
 const AUDIT_SEED = 0x51f1_7a3e;
+
+function candidateUsesIntentionalDiscontinuity(
+  candidate: StudioBrushContinuityAuditCandidate,
+  renderFamily: StudioBrushRenderFamily,
+): boolean {
+  return INTENTIONALLY_DISCONTINUOUS_CATEGORIES.has(candidate.category ?? "")
+    // An effect label alone does not make a carrier discrete. Smoke, cloud and cirrus presets use
+    // a soft/wavy airbrush envelope and need the same continuity gates as paint. The one wavy
+    // ink-particle effect is an authored repeated ray motif and remains intentionally separated.
+    || (
+      candidate.category === "effect"
+      && candidate.previewStyle === "wavy"
+      && candidate.runtimeBrushId === "ink-particle"
+    )
+    || INTENTIONALLY_DISCONTINUOUS_PREVIEWS.has(candidate.previewStyle ?? "")
+    || INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS.has(candidate.catalogId)
+    || renderFamily === "glitter"
+    || renderFamily === "screentone"
+    || renderFamily === "pixel";
+}
 
 function rounded(value: number, digits = 3): number {
   const multiplier = 10 ** digits;
@@ -343,13 +362,10 @@ export function auditStudioBrushContinuity(
     catalogName: candidate.catalogName,
     renderStrategy,
     renderFamily,
-    intentionalDiscontinuity:
-      INTENTIONALLY_DISCONTINUOUS_CATEGORIES.has(candidate.category ?? "")
-      || INTENTIONALLY_DISCONTINUOUS_PREVIEWS.has(candidate.previewStyle ?? "")
-      || INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS.has(candidate.catalogId)
-      || renderFamily === "glitter"
-      || renderFamily === "screentone"
-      || renderFamily === "pixel",
+    intentionalDiscontinuity: candidateUsesIntentionalDiscontinuity(
+      candidate,
+      renderFamily,
+    ),
     profiles,
   };
   return {

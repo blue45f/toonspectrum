@@ -35,6 +35,7 @@ import {
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
@@ -248,6 +249,9 @@ export function planStudioDynamicBrushRender(
     fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
       materialIdentity,
       baseDabCount > 0,
+    ),
+    materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+      materialIdentity,
     ),
     markBudget,
   });

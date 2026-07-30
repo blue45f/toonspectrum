@@ -22,6 +22,7 @@ const DEFAULT_PRESSURE = 0.55;
 const MAX_COORDINATE_ABS = 1_000_000;
 const POINT_EPSILON = 1e-6;
 const TAU = Math.PI * 2;
+const PIGMENT_NOISE_STATION_PERIOD = 12;
 
 export const STUDIO_CAUSAL_WATERCOLOR_DAB_CAP_RANGE = {
   min: 2,
@@ -108,6 +109,28 @@ function safeCoordinate(value: unknown): number | null {
   return clamp(value, -MAX_COORDINATE_ABS, MAX_COORDINATE_ABS);
 }
 
+/**
+ * Low-frequency deterministic pigment variation.
+ *
+ * Independent opacity noise at every spacing station becomes a row of transverse bars after the
+ * retained ribbon converts coverage into vector superlevels. Interpolating two deterministic
+ * anchors keeps the material alive over distance without exposing the station lattice. The value
+ * depends only on station index/seed, so appending a suffix cannot change any retained prefix.
+ */
+function causalPigmentNoise(
+  stationIndex: number,
+  salt: number,
+  seed: number,
+): number {
+  const position = stationIndex / PIGMENT_NOISE_STATION_PERIOD;
+  const leftIndex = Math.floor(position);
+  const progress = position - leftIndex;
+  const smoothProgress = progress * progress * (3 - 2 * progress);
+  const left = hash2(leftIndex, salt, seed);
+  const right = hash2(leftIndex + 1, salt, seed);
+  return left + (right - left) * smoothProgress;
+}
+
 export function normalizeStudioCausalWatercolorSettings(
   input?: Omit<StudioCausalWatercolorPlanInput, "points" | "pressures"> | null,
 ): StudioCausalWatercolorSettings {
@@ -139,7 +162,7 @@ function createStationDabs(
   }
 
   const radiusNoise = hash2(stationIndex, 11, settings.seed);
-  const opacityNoise = hash2(stationIndex, 13, settings.seed);
+  const opacityNoise = causalPigmentNoise(stationIndex, 13, settings.seed);
   const baseRadius = settings.baseWidth * 0.5;
   const pressureScale = 0.58 + pressure * 0.84;
   const radius = clamp(
@@ -148,7 +171,7 @@ function createStationDabs(
     settings.baseWidth * 1.1,
   );
   const opacity = clamp(
-    0.16 + pressure * 0.38 + (opacityNoise - 0.5) * 0.06,
+    0.16 + pressure * 0.38 + (opacityNoise - 0.5) * 0.05,
     0.08,
     0.72,
   );
@@ -167,7 +190,11 @@ function createStationDabs(
     settings.baseWidth * 1.7,
   );
   const diffuseOpacity = clamp(
-    core.opacity * (0.17 + hash2(stationIndex, 43, settings.seed) * 0.17),
+    core.opacity * (0.17 + causalPigmentNoise(
+      stationIndex,
+      43,
+      settings.seed,
+    ) * 0.17),
     0.02,
     0.3,
   );

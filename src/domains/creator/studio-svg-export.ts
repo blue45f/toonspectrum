@@ -130,6 +130,7 @@ import {
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
@@ -148,9 +149,10 @@ import {
   planOilBrushDabs,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
+  planStudioFxLuminousRibbonPass,
   resolveStudioFxBrushTapPressureResponse,
   resolveStudioFxPressurePassResponse,
-  type StudioFxPressurePathSegment,
+  type StudioFxLuminousRibbonPassPlan,
 } from "./studio-fx-brush";
 import {
   estimateTextGradientBBox,
@@ -161,6 +163,12 @@ import {
   type GradientBBox,
   type StudioGradientSpec,
 } from "./studio-gradient-engine";
+import {
+  planStudioHighlighterWashRibbon,
+  planStudioHighlighterWashTap,
+  resolveStudioHighlighterWashBrushId,
+  studioHighlighterWashPlanPathData,
+} from "./studio-highlighter-wash-ribbon";
 import {
   resolveStudioInkPressure,
   studioInkFallbackPressure,
@@ -206,6 +214,7 @@ import {
 } from "./studio-rough-shape";
 import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
+import { planStudioStampInkRibbon } from "./studio-stamp-ink-ribbon";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
@@ -710,17 +719,12 @@ function tensionPathD(points: readonly number[], tension: number): string {
   return parts.join(" ");
 }
 
-function studioFxPressureSegmentPathD(
-  segment: StudioFxPressurePathSegment,
+function studioFxLuminousRibbonPathD(
+  plan: StudioFxLuminousRibbonPassPlan,
 ): string {
-  const start = `M ${fmt(segment.moveX)} ${fmt(segment.moveY)}`;
-  if (segment.command === "cubic") {
-    return `${start} C ${fmt(segment.control1X)} ${fmt(segment.control1Y)} ${fmt(segment.control2X)} ${fmt(segment.control2Y)} ${fmt(segment.endX)} ${fmt(segment.endY)}`;
-  }
-  if (segment.command === "quadratic") {
-    return `${start} Q ${fmt(segment.controlX)} ${fmt(segment.controlY)} ${fmt(segment.endX)} ${fmt(segment.endY)}`;
-  }
-  return `${start} L ${fmt(segment.endX)} ${fmt(segment.endY)}`;
+  return plan.polygons
+    .map((polygon) => pointsToPathD(polygon.points, true))
+    .join(" ");
 }
 
 // ---------------------------------------------------------------------------
@@ -1006,6 +1010,7 @@ function serializeStudioDynamicCoverageMark(
   strokeOpacity: number,
   boundedFlow: boolean,
   retainAlphaMapIdentity = true,
+  materialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): string | null {
   const opacity = Math.min(
     1,
@@ -1013,12 +1018,19 @@ function serializeStudioDynamicCoverageMark(
   );
   const angleDegrees = mark.angleRadians * 180 / Math.PI;
   const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
+  const materialAttributes = materialIdentity?.dryMediaPresetId === "pastel"
+    ? (
+        ` data-brush-carrier="soft-pigment-fiber"`
+        + ` data-brush-material="${escapeXml(materialIdentity.brushId)}"`
+      )
+    : "";
 
   if (
     "ribbon" in mark
     && (
       mark.ribbon?.kind === "flat-nib-ribbon-polygon"
       || mark.ribbon?.kind === "paint-roller-ribbon-polygon"
+      || mark.ribbon?.kind === "dry-media-union-ribbon-polygon"
     )
   ) {
     let path = "";
@@ -1038,8 +1050,10 @@ function serializeStudioDynamicCoverageMark(
       `<path data-brush-coverage="${
         mark.ribbon.kind === "paint-roller-ribbon-polygon"
           ? "paint-roller-ribbon"
-          : "flat-nib-ribbon"
-      }" d="${path}"`
+          : mark.ribbon.kind === "dry-media-union-ribbon-polygon"
+            ? "dry-media-union-ribbon"
+            : "flat-nib-ribbon"
+      }"${materialAttributes} d="${path}"`
       + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"/>`
     );
   }
@@ -1052,7 +1066,7 @@ function serializeStudioDynamicCoverageMark(
     );
     if (!asset) return null;
     return (
-      `<use data-brush-coverage="alpha-map" href="#${asset.symbolId}"`
+      `<use data-brush-coverage="alpha-map"${materialAttributes} href="#${asset.symbolId}"`
         + ` x="${fmtCoverageNumber(mark.x - mark.radiusX)}"`
         + ` y="${fmtCoverageNumber(mark.y - mark.radiusY)}"`
         + ` width="${fmtCoverageNumber(mark.radiusX * 2)}"`
@@ -1072,7 +1086,7 @@ function serializeStudioDynamicCoverageMark(
     const radiusX = mark.radiusX * overscan;
     const radiusY = mark.radiusY * overscan;
     return (
-      `<use data-brush-coverage="analytic-radial" href="#${asset.symbolId}"`
+      `<use data-brush-coverage="analytic-radial"${materialAttributes} href="#${asset.symbolId}"`
         + ` x="${fmtCoverageNumber(mark.x - radiusX)}"`
         + ` y="${fmtCoverageNumber(mark.y - radiusY)}"`
         + ` width="${fmtCoverageNumber(radiusX * 2)}"`
@@ -1083,7 +1097,7 @@ function serializeStudioDynamicCoverageMark(
   }
 
   return (
-    `<ellipse data-brush-coverage="ellipse"`
+    `<ellipse data-brush-coverage="ellipse"${materialAttributes}`
       + ` cx="${fmtCoverageNumber(mark.x)}" cy="${fmtCoverageNumber(mark.y)}"`
       + ` rx="${fmtCoverageNumber(mark.radiusX)}" ry="${fmtCoverageNumber(mark.radiusY)}"`
       + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"`
@@ -1096,6 +1110,7 @@ function serializeStudioDynamicCoverageMarks(
   marks: readonly StudioDynamicBrushCoverageMark[],
   strokeOpacity: number,
   boundedFlow: boolean,
+  materialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): string | null {
   const initialDefsLength = ctx.defs.length;
   const initialSequence = ctx.seq;
@@ -1124,6 +1139,8 @@ function serializeStudioDynamicCoverageMarks(
       mark,
       strokeOpacity,
       boundedFlow,
+      true,
+      materialIdentity,
     );
     if (serialized === null) return rollbackAssets();
     markup.push(serialized);
@@ -1576,6 +1593,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           settings: dynamics,
           dabCount: baseDabCount,
           symmetryCount: variations.length,
+          materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+            materialIdentity,
+          ),
           markBudget,
         });
         if (
@@ -1850,6 +1870,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           dynamicPlan?.seed,
           dynamicPlan?.renderBudget.stampGrid,
           dynamicPlan?.causalCoverageMarksByVariation?.[variationIndex],
+          dynamicPlan?.materialIdentity,
         ));
     }
   }
@@ -1866,10 +1887,11 @@ function serializeStampBrushDabs(
   const color = escapeXml(style.color);
 
   if (style.kind === "ink") {
-    const circles = dabs.map((dab) => (
-      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${color}" opacity="${fmtDabOpacity(dab.alpha)}"/>`
-    )).join("");
-    return `<g data-stamp-brush="ink">${circles}</g>`;
+    const ribbon = planStudioStampInkRibbon(dabs);
+    const path = ribbon.polygons.map((polygon) => (
+      pointsToPathD(polygon.points, true)
+    )).join(" ");
+    return `<path data-stamp-brush="ink" data-stamp-ink-ribbon="${ribbon.version}" data-stamp-ink-coverage="${ribbon.coverageOperation}" data-stamp-ink-cap="${ribbon.cap}" d="${path}" fill="${color}" fill-rule="${ribbon.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbon.opacity)}"/>`;
   }
 
   if (style.kind === "pencil") {
@@ -2001,6 +2023,7 @@ function serializeFreehand(
   dynamicSeed?: number,
   dynamicStampGrid: StudioDynamicBrushRenderStampGrid = 7,
   causalCoverageMarks?: readonly StudioDynamicBrushCoverageMark[],
+  dynamicMaterialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
@@ -2102,13 +2125,6 @@ function serializeFreehand(
         ? aliasStrokeWidth * (0.3 + pressure * 1.4)
         : aliasStrokeWidth;
     if (brushFamily === "highlighter") {
-      if (
-        el.materialPressureModel
-        !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
-      ) {
-        const half = aliasStrokeWidth / 2;
-        return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(aliasStrokeWidth)}" height="${fmt(aliasStrokeWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
-      }
       const pressureBrush = isStudioFxPressureBrushId(brush)
         ? brush
         : "highlighter";
@@ -2119,12 +2135,14 @@ function serializeFreehand(
         el.materialMinimumDiameterRatio,
       );
       const tapWidth = aliasStrokeWidth * pressureResponse.widthScale;
-      const half = tapWidth / 2;
-      const tapOpacity = strokeOpacity * Math.min(
-        1,
-        pressureResponse.opacityScale,
-      );
-      return `<rect x="${fmt(points[0] - half)}" y="${fmt(points[1] - half)}" width="${fmt(tapWidth)}" height="${fmt(tapWidth)}" fill="${escapeXml(stroke)}" style="mix-blend-mode:multiply" opacity="${fmtDabOpacity(tapOpacity)}"/>`;
+      const washPlan = planStudioHighlighterWashTap({
+        brushId: resolveStudioHighlighterWashBrushId(brush),
+        x: points[0],
+        y: points[1],
+        width: tapWidth,
+        opacityScale: pressureResponse.opacityScale,
+      });
+      return `<path d="${studioHighlighterWashPlanPathData(washPlan)}" fill="${escapeXml(stroke)}" fill-rule="nonzero" data-brush-engine="${washPlan.version}" data-highlighter-cap="${washPlan.capProfile}" data-highlighter-wash="tap" style="mix-blend-mode:multiply" opacity="${fmtDabOpacity(strokeOpacity * washPlan.opacityScale)}"/>`;
     }
     if (brushFamily === "brush" || brushFamily === "calligraphy") {
       const roundness = brushFamily === "calligraphy"
@@ -2183,6 +2201,7 @@ function serializeFreehand(
         causalCoverageMarks,
         strokeOpacity,
         isStudioBoundedFlowPaintModelCompatible(el),
+        dynamicMaterialIdentity,
       );
       if (exactCoverage !== null) return exactCoverage;
       addSkip(
@@ -2347,7 +2366,7 @@ function serializeFreehand(
       const ribbonPaths = wetRibbonPlan.batches.map((batch) => (
         `<path d="${studioWetRibbonCarrierBatchPathData(batch)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(batch.opacity * strokeOpacity)}"/>`
       )).join("");
-      return `<g data-brush-engine="wet-ribbon-carrier-v1">${ribbonPaths}</g>`;
+      return `<g data-brush-engine="wet-ribbon-carrier-v2">${ribbonPaths}</g>`;
     }
 
     // Persisted watercolor without the causal marker is intentionally byte-compatible with the
@@ -2548,20 +2567,14 @@ function serializeFreehand(
   }
 
   if (brushFamily === "highlighter") {
-    // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
+    // 형광펜 — 한 gesture를 한 번만 채우는 wash 리본. 자기 교차는 농도가 겹치지 않고,
+    // 서로 다른 DrawEl만 multiply로 자연스럽게 중첩된다.
     const renderPath = resolveStudioFreehandRenderPath(points, {
       sampleSpacing: el.sampleSpacing,
       acceptedTension: 0.35,
       legacyMinDistance: renderSampleDistance,
       legacyTension: 0.4,
     });
-    const lineJoin = brush === "chisel-highlighter" ? "bevel" : "round";
-    if (
-      el.materialPressureModel
-      !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
-    ) {
-      return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(aliasStrokeWidth)}" stroke-linecap="square" stroke-linejoin="${lineJoin}" style="mix-blend-mode:multiply"${opacityAttr}/>`;
-    }
     const pressureBrush = isStudioFxPressureBrushId(brush)
       ? brush
       : "highlighter";
@@ -2573,25 +2586,13 @@ function serializeFreehand(
       minimumDiameterRatio: el.materialMinimumDiameterRatio,
       tension: renderPath.tension,
     });
-    const segmentLayers = pressurePath.segments.map((segment) => (
-      `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, aliasStrokeWidth * segment.widthScale))}" stroke-linecap="butt" stroke-linejoin="${lineJoin}" opacity="${fmtDabOpacity(Math.min(1, segment.opacityScale))}" style="mix-blend-mode:multiply"/>`
-    ));
-    const first = pressurePath.segments[0];
-    const last = pressurePath.segments.at(-1);
-    const caps = first && last
-      ? [
-          { x: first.moveX, y: first.moveY, response: first },
-          { x: last.endX, y: last.endY, response: last },
-        ].map((endpoint) => {
-          const width = Math.max(
-            0.5,
-            aliasStrokeWidth * endpoint.response.widthScale,
-          );
-          return `<rect data-pressure-endcap="square" x="${fmt(endpoint.x - width / 2)}" y="${fmt(endpoint.y - width / 2)}" width="${fmt(width)}" height="${fmt(width)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, endpoint.response.opacityScale))}" style="mix-blend-mode:multiply"/>`;
-        })
-      : [];
-    const layers = [...segmentLayers, ...caps].join("");
-    return `<g data-brush-engine="highlighter-pressure-path"${opacityAttr}>${layers}</g>`;
+    const washPlan = planStudioHighlighterWashRibbon({
+      brushId: resolveStudioHighlighterWashBrushId(brush),
+      pressurePath,
+      baseWidth: aliasStrokeWidth,
+    });
+    const pathData = studioHighlighterWashPlanPathData(washPlan);
+    return `<g data-brush-engine="${washPlan.version}" data-highlighter-cap="${washPlan.capProfile}" data-highlighter-wash="single-fill"${opacityAttr}><path d="${pathData}" fill="${escapeXml(stroke)}" fill-rule="nonzero" stroke="none" opacity="${fmtDabOpacity(washPlan.opacityScale)}" style="mix-blend-mode:multiply"/></g>`;
   }
 
   if (brushFamily === "neon") {
@@ -2641,31 +2642,17 @@ function serializeFreehand(
           );
           return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
         }).join("")
-      : passes.flatMap((pass) => {
+      : passes.map((pass) => {
           const luminousCore = pass.tone === "white-core";
-          const segmentLayers = pressurePath.segments.map((segment) => {
-            const response = resolveStudioFxPressurePassResponse(
-              segment,
-              pass.widthScale,
-              luminousCore,
-            );
-            return `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale * response.widthScale))}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          const ribbonPlan = planStudioFxLuminousRibbonPass({
+            brushId: "neon",
+            pressurePath,
+            baseWidth: strokeWidth,
+            passWidthScale: pass.widthScale,
+            passOpacity: pass.opacity,
+            luminousCore,
           });
-          const first = pressurePath.segments[0];
-          const last = pressurePath.segments.at(-1);
-          if (!first || !last) return segmentLayers;
-          const caps = [
-            { x: first.moveX, y: first.moveY, response: first },
-            { x: last.endX, y: last.endY, response: last },
-          ].map((endpoint) => {
-            const response = resolveStudioFxPressurePassResponse(
-              endpoint.response,
-              pass.widthScale,
-              luminousCore,
-            );
-            return `<circle data-pressure-endcap="round" cx="${fmt(endpoint.x)}" cy="${fmt(endpoint.y)}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
-          });
-          return [...segmentLayers, ...caps];
+          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity)}" style="mix-blend-mode:screen"/>`;
         }).join("");
     return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
   }
@@ -2719,31 +2706,17 @@ function serializeFreehand(
           );
           return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
         }).join("")
-      : passes.flatMap((pass, passIndex) => {
+      : passes.map((pass, passIndex) => {
           const luminousCore = passIndex === passes.length - 1;
-          const segmentLayers = pressurePath.segments.map((segment) => {
-            const response = resolveStudioFxPressurePassResponse(
-              segment,
-              pass.widthScale,
-              luminousCore,
-            );
-            return `<path d="${studioFxPressureSegmentPathD(segment)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale * response.widthScale))}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          const ribbonPlan = planStudioFxLuminousRibbonPass({
+            brushId: pressureBrush,
+            pressurePath,
+            baseWidth: strokeWidth,
+            passWidthScale: pass.widthScale,
+            passOpacity: pass.opacity,
+            luminousCore,
           });
-          const first = pressurePath.segments[0];
-          const last = pressurePath.segments.at(-1);
-          if (!first || !last) return segmentLayers;
-          const caps = [
-            { x: first.moveX, y: first.moveY, response: first },
-            { x: last.endX, y: last.endY, response: last },
-          ].map((endpoint) => {
-            const response = resolveStudioFxPressurePassResponse(
-              endpoint.response,
-              pass.widthScale,
-              luminousCore,
-            );
-            return `<circle data-pressure-endcap="round" cx="${fmt(endpoint.x)}" cy="${fmt(endpoint.y)}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
-          });
-          return [...segmentLayers, ...caps];
+          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity)}" style="mix-blend-mode:screen"/>`;
         }).join("");
     return `<g data-brush-engine="glow-pressure-halo"${opacityAttr}>${layers}</g>`;
   }

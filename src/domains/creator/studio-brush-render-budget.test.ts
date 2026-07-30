@@ -282,6 +282,37 @@ describe("studio dynamic brush render budget", () => {
     });
   });
 
+  it("charges a post-plan material expansion before causal prefix admission", () => {
+    const settings = normalizeStudioBrushDynamicsSettings({
+      depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+      tip: { shape: "round", softness: 0 },
+      grain: { amount: 0 },
+      taper: { enabled: false },
+    });
+    const plan = planStudioDynamicBrushRenderBudget({
+      settings,
+      dabCount: 3,
+      symmetryCount: 1,
+      materialMarkMultiplier: 5,
+      markBudget: 10,
+    });
+
+    expect(plan).toMatchObject({
+      maxDabsPerVariation: 2,
+      marksPerDab: 5,
+      estimatedMarks: 10,
+      estimatedUnbudgetedMarks: 15,
+      dabCapped: true,
+      acceptedPrefixReceipt: {
+        requestedDabsPerVariation: 3,
+        acceptedDabsPerVariation: 2,
+        rejectedDabsPerVariation: 1,
+        marksPerDab: 5,
+        acceptedMarkBudget: 10,
+      },
+    });
+  });
+
   it("combines the v3 version ceiling with a tighter symmetry mark ceiling in one receipt", () => {
     const settings = normalizeStudioBrushDynamicsSettings({
       depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,

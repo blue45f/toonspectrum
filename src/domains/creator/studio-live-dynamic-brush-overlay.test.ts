@@ -47,6 +47,11 @@ interface RecordedEllipse {
   readonly angleRadians: number;
   readonly alpha: number;
   readonly color: string;
+  readonly unionGeometry?: Readonly<{
+    readonly coordinateCount: number;
+    readonly byteLength: number;
+    readonly sha256: string;
+  }>;
 }
 
 interface RecordedComposite {
@@ -209,6 +214,7 @@ function recordingCanvas(): RecordingCanvas {
       scaleY *= y;
     },
     fill: () => {
+      let unionGeometry: RecordedEllipse["unionGeometry"];
       if (!path && polygonPath.length >= 6) {
         const xs = polygonPath.filter((_, index) => index % 2 === 0);
         const ys = polygonPath.filter((_, index) => index % 2 === 1);
@@ -223,12 +229,21 @@ function recordingCanvas(): RecordingCanvas {
           radiusY: rounded((maxY - minY) / 2),
           angleRadians: 0,
         };
+        const geometryBytes = new TextEncoder().encode(
+          polygonPath.map(rounded).join(","),
+        );
+        unionGeometry = Object.freeze({
+          coordinateCount: polygonPath.length,
+          byteLength: geometryBytes.byteLength,
+          sha256: sha256HexPortable(geometryBytes),
+        });
       }
       if (!path) return;
       recordedMarks.push({
         ...path,
         alpha: rounded(alpha),
         color,
+        ...(unionGeometry ? { unionGeometry } : {}),
       });
     },
     createImageData: (width: number, height: number) => ({
@@ -1021,7 +1036,14 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(activeCanvas.clearCount()).toBe(clearsAfterExtension);
   });
 
-  it.each(["dry-media", "crayon", "chalk", "charcoal"] as const)(
+  it.each([
+    "dry-media",
+    "crayon",
+    "chalk",
+    "charcoal",
+    "pastel",
+    "oil-pastel",
+  ] as const)(
     "keeps fast long %s live texture marks byte-identical to pointer-up",
     (brushId) => {
       const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
@@ -1047,17 +1069,34 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       expect(appended.status === "fallback" ? appended.reason : appended.status)
         .toBe("appended");
       const liveMarks = structuredClone(activeCanvas.recordedMarks);
-      expect(liveMarks.length).toBeGreaterThan(100);
-      // Start/end taper intentionally thins the terminal footprint. Audit the stable body where a
-      // fast delivery must not expose a pointer-sample-sized hole.
-      const startX = pointPairs[0]![0] + brushDynamics.width.base * 2;
-      const endX = pointPairs.at(-1)![0] - brushDynamics.width.base * 2;
-      const maximumGap = maximumLongitudinalCoverageGap(liveMarks, startX, endX);
-      // The previous independent live walker exposed sparse round alpha-map particles between
-      // widely delivered pointer samples. Canonical arc-length stations keep every tested dry
-      // medium's projected longitudinal coverage has no hole wider than 1.1 selected tips. The
-      // small allowance preserves intentional chalk tooth while rejecting pointer-sample gaps.
-      expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
+      if (brushId === "dry-media") {
+        expect(liveMarks.length).toBeGreaterThan(100);
+        // Start/end taper intentionally thins the terminal footprint. Audit the stable body where
+        // a fast delivery must not expose a pointer-sample-sized hole.
+        const startX = pointPairs[0]![0] + brushDynamics.width.base * 2;
+        const endX = pointPairs.at(-1)![0] - brushDynamics.width.base * 2;
+        const maximumGap = maximumLongitudinalCoverageGap(
+          liveMarks,
+          startX,
+          endX,
+        );
+        expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
+      } else {
+        // Core dry media now owns one non-overpainting full-prefix union. The command is compact,
+        // but its byte receipt must still contain the complete high-resolution fibre geometry.
+        expect(liveMarks).toHaveLength(1);
+        expect(liveMarks[0]?.unionGeometry).toMatchObject({
+          coordinateCount: expect.any(Number),
+          byteLength: expect.any(Number),
+          sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+        });
+        expect(
+          liveMarks[0]!.unionGeometry!.coordinateCount,
+        ).toBeGreaterThan(pointPairs.length * 2);
+        expect(
+          liveMarks[0]!.unionGeometry!.byteLength,
+        ).toBeGreaterThan(liveMarks[0]!.unionGeometry!.coordinateCount);
+      }
 
       const liveRoundMarks = liveMarks.filter((mark) =>
         Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
@@ -1070,45 +1109,116 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         Math.abs(mark.radiusX - mark.radiusY) <= 1e-9
       ).length;
       expect(retainedMarks).toEqual(liveMarks);
+      expect(retainedMarks[0]?.unionGeometry?.byteLength).toBe(
+        liveMarks[0]?.unionGeometry?.byteLength,
+      );
+      expect(retainedMarks[0]?.unionGeometry?.sha256).toBe(
+        liveMarks[0]?.unionGeometry?.sha256,
+      );
       expect(retainedRoundMarks).toBe(liveRoundMarks);
       expect(sealed.markCount).toBe(liveMarks.length);
     },
   );
 
-  it("matches the canonical pointer-up plan at every accepted charcoal prefix", () => {
-    const brushDynamics = studioBrushDynamicsSettingsForBrushId("charcoal");
-    if (!brushDynamics) throw new Error("missing charcoal dynamics");
-    const pointPairs = Array.from({ length: 96 }, (_, index) => [
-      6 + index * 8,
-      80 + Math.sin(index / 5) * 8,
-    ]);
-    const live = attachedRenderer();
-    const elementAt = (count: number) => {
-      const points = pointPairs.slice(0, count).flat();
-      return drawElement("charcoal-prefix", points, {
-        brush: "charcoal",
-        brushDynamics,
-        strokeWidth: brushDynamics.width.base,
-        pressures: Array.from({ length: count }, () => 0.68),
-        speeds: Array.from({ length: count }, () => 9),
-        tiltXs: Array.from({ length: count }, () => 12),
-        tiltYs: Array.from({ length: count }, () => -6),
+  it.each([
+    "crayon",
+    "chalk",
+    "charcoal",
+    "pastel",
+    "oil-pastel",
+  ] as const)(
+    "replaces every accepted %s crossing prefix with the canonical one-fill union",
+    (brushId) => {
+      const brushDynamics = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!brushDynamics) throw new Error(`missing ${brushId} dynamics`);
+      const anchors = [
+        [18, 30],
+        [210, 130],
+        [18, 30],
+        [210, 30],
+        [18, 130],
+      ] as const;
+      const pointPairs = anchors.slice(0, -1).flatMap((start, segmentIndex) => {
+        const end = anchors[segmentIndex + 1]!;
+        return Array.from({ length: 24 }, (_, step) => {
+          const amount = step / 24;
+          return [
+            start[0] + (end[0] - start[0]) * amount,
+            start[1] + (end[1] - start[1]) * amount,
+          ] as const;
+        });
       });
-    };
-    expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+      const live = attachedRenderer();
+      const elementAt = (count: number) => {
+        const points = pointPairs.slice(0, count).flat();
+        return drawElement(`${brushId}-union-prefix`, points, {
+          brush: brushId,
+          brushDynamics,
+          strokeWidth: brushDynamics.width.base,
+          pressures: Array.from({ length: count }, () => 0.68),
+          speeds: Array.from({ length: count }, () => 9),
+          tiltXs: Array.from({ length: count }, () => 12),
+          tiltYs: Array.from({ length: count }, () => -6),
+        });
+      };
+      expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+      let previousCoordinateCount = 0;
 
-    for (const count of [12, 37, 68, 96]) {
-      const prefix = elementAt(count);
-      expect(live.renderer.appendFrom(prefix).status).toBe("appended");
-      const liveMarks = structuredClone(live.activeCanvas.recordedMarks);
-      const reference = attachedRenderer();
-      expect(reference.renderer.begin(prefix).status).toBe("started");
-      const sealed = reference.renderer.end(prefix);
-      expect(sealed.status).toBe("settled");
-      expect(reference.settledCanvas.recordedComposites[0]!.marks)
-        .toEqual(liveMarks);
-    }
-  });
+      for (const count of [12, 37, 68, 96]) {
+        const prefix = elementAt(count);
+        const activeClearsBefore = live.activeCanvas.clearCount();
+        const presentationClearsBefore = live.presentationCanvas.clearCount();
+        const presentationCopiesBefore =
+          live.presentationCanvas.recordedCopies.length;
+        const appended = live.renderer.appendFrom(prefix);
+        expect(appended.status, `${brushId}: append ${count}`).toBe("appended");
+        if (appended.status !== "appended") continue;
+        expect(appended.appendedMarks).toBe(1);
+        expect(live.activeCanvas.clearCount()).toBe(activeClearsBefore + 1);
+        expect(live.presentationCanvas.clearCount()).toBeGreaterThan(
+          presentationClearsBefore,
+        );
+        expect(live.presentationCanvas.recordedCopies).toHaveLength(
+          presentationCopiesBefore + 1,
+        );
+        const dirtyCopy = live.presentationCanvas.recordedCopies.at(-1)!;
+        expect(dirtyCopy.sourceRect).toEqual(dirtyCopy.destinationRect);
+        expect(dirtyCopy.sourceRect[2]).toBeGreaterThan(0);
+        expect(dirtyCopy.sourceRect[3]).toBeGreaterThan(0);
+
+        const liveMarks = structuredClone(live.activeCanvas.recordedMarks);
+        expect(liveMarks).toHaveLength(1);
+        const liveGeometry = liveMarks[0]?.unionGeometry;
+        expect(liveGeometry?.sha256).toMatch(/^[0-9a-f]{64}$/);
+        expect(liveGeometry?.coordinateCount).toBeGreaterThan(
+          previousCoordinateCount,
+        );
+        previousCoordinateCount = liveGeometry?.coordinateCount ?? 0;
+
+        const reference = attachedRenderer();
+        expect(reference.renderer.begin(prefix).status).toBe("started");
+        const sealed = reference.renderer.end(prefix);
+        expect(sealed.status).toBe("settled");
+        const retainedMarks =
+          reference.settledCanvas.recordedComposites[0]!.marks;
+        expect(retainedMarks).toEqual(liveMarks);
+        expect(retainedMarks[0]?.unionGeometry?.byteLength).toBe(
+          liveGeometry?.byteLength,
+        );
+        expect(retainedMarks[0]?.unionGeometry?.sha256).toBe(
+          liveGeometry?.sha256,
+        );
+      }
+
+      const complete = elementAt(96);
+      const finalLiveMarks = structuredClone(live.activeCanvas.recordedMarks);
+      const settled = live.renderer.end(complete);
+      expect(settled.status).toBe("settled");
+      expect(live.settledCanvas.recordedComposites[0]?.marks).toEqual(
+        finalLiveMarks,
+      );
+    },
+  );
 
   it.each([
     ["crayon", "crayon-wax-bold"],

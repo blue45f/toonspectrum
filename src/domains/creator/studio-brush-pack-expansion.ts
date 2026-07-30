@@ -494,7 +494,8 @@ const EXPANSION_TUNING: Readonly<
   "cloud-billow-soft": {
     // Cumulus smoke: giant soft dabs shaped by very large canvas-pinned noise.
     tipSoftness: 0.58,
-    flow: { base: 0.28, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.75 }] },
+    // Keep the cloud airy, but make the first contact readable on a white webtoon canvas.
+    flow: { base: 0.34, mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.75 }] },
     width: {
       mappings: [{ source: "pressure", from: 0.8, to: 1.2 }],
       jitter: { mode: "multiply", amount: 0.25 },
@@ -1010,7 +1011,8 @@ const EXPANSION_TUNING: Readonly<
       ],
       jitter: { mode: "multiply", amount: 0.2 },
     },
-    flow: { base: 0.24, mappings: [{ source: "pressure", from: 0.32, to: 1 }] },
+    // A visible first touch prevents the soft dual tip from feeling broken before pressure builds.
+    flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.32, to: 1 }] },
     angle: { jitter: { mode: "add", amount: 32 } },
     grain: { space: "canvas-fixed", amount: 0.28, scale: 20, contrast: 0.4, seed: 0x4b0a_2301 },
     dualBrush: {
@@ -1162,7 +1164,8 @@ const EXPANSION_TUNING: Readonly<
       ],
       jitter: { mode: "multiply", amount: 0.16 },
     },
-    flow: { base: 0.22, mappings: [{ source: "pressure", from: 0.28, to: 1 }] },
+    // Cirrus remains lighter than opaque paint while clearing the planner's first-tap floor.
+    flow: { base: 0.34, mappings: [{ source: "pressure", from: 0.28, to: 1 }] },
     spacing: { mappings: [{ source: "speed", from: 0.78, to: 1.28 }] },
     grain: { space: "canvas-fixed", amount: 0.22, scale: 26, contrast: 0.34, seed: 0x4b0a_2308 },
     dualBrush: {

@@ -4,6 +4,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressureSamples,
 } from "./studio-brush-alias-profile";
 import {
@@ -33,6 +34,7 @@ import {
 } from "./studio-outline-stroke-contract";
 import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg } from "./studio-svg-export";
+import { planStudioWetRibbonCarrier } from "./studio-wet-ribbon-carrier";
 import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "./studio-element-model";
@@ -47,6 +49,7 @@ class StampSceneContext {
   readonly arcs: string[] = [];
   readonly drawImages: Array<{ alpha: number; args: readonly number[] }> = [];
   readonly fills: Array<{ alpha: number; color: string }> = [];
+  readonly paths: number[][] = [];
   readonly transforms: string[] = [];
   saveCount = 0;
   restoreCount = 0;
@@ -63,6 +66,7 @@ class StampSceneContext {
     }) as DOMMatrix,
   };
   private currentFillStyle: string | CanvasGradient | CanvasPattern = "";
+  private currentPath: number[] = [];
 
   get fillStyle(): string | CanvasGradient | CanvasPattern {
     return this.currentFillStyle;
@@ -77,7 +81,18 @@ class StampSceneContext {
   restore(): void {
     this.restoreCount += 1;
   }
-  beginPath(): void {}
+  beginPath(): void {
+    this.currentPath = [];
+  }
+  moveTo(x: number, y: number): void {
+    this.currentPath.push(x, y);
+  }
+  lineTo(x: number, y: number): void {
+    this.currentPath.push(x, y);
+  }
+  closePath(): void {
+    this.paths.push([...this.currentPath]);
+  }
   fill(): void {
     this.fills.push({ alpha: this.globalAlpha, color: String(this.fillStyle) });
   }
@@ -108,6 +123,7 @@ class StampSceneContext {
 class AliasSceneContext {
   readonly arcs: Array<{ alpha: number; radius: number; x: number; y: number }> = [];
   readonly fillAlphas: number[] = [];
+  readonly fillCompoundPaths: number[][] = [];
   readonly fillPolygons: number[][] = [];
   readonly fillRects: Array<{
     alpha: number;
@@ -126,24 +142,29 @@ class AliasSceneContext {
   lineWidth = 1;
   strokeStyle: string | CanvasGradient | CanvasPattern = "";
   private activePolygon: number[] = [];
+  private activeCompoundPath: number[] = [];
 
   save(): void {}
   restore(): void {}
   beginPath(): void {
     this.activePolygon = [];
+    this.activeCompoundPath = [];
   }
   closePath(): void {}
   fill(): void {
     if (this.activePolygon.length >= 6) {
       this.fillPolygons.push([...this.activePolygon]);
+      this.fillCompoundPaths.push([...this.activeCompoundPath]);
       this.fillAlphas.push(this.globalAlpha);
     }
   }
   moveTo(x: number, y: number): void {
     this.activePolygon = [x, y];
+    this.activeCompoundPath.push(x, y);
   }
   lineTo(x: number, y: number): void {
     this.activePolygon.push(x, y);
+    this.activeCompoundPath.push(x, y);
   }
   quadraticCurveTo(): void {}
   bezierCurveTo(): void {}
@@ -830,10 +851,11 @@ describe("StudioDrawNode orchestration", () => {
   );
 
   it("applies ink-wash spacing, pressure, and material scales to retained watercolor", () => {
-    watercolorCapture.causalPlan.mockReturnValueOnce([
+    const authoredDabs = [
       { x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" },
       { x: 3, y: 4, radius: 12, opacity: 0.2, role: "diffuse" },
-    ]);
+    ] as const;
+    watercolorCapture.causalPlan.mockReturnValueOnce([...authoredDabs]);
     render(
       <StudioDrawNode
         el={drawEl({
@@ -862,13 +884,17 @@ describe("StudioDrawNode orchestration", () => {
     ) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
     expect(context.arcs).toHaveLength(0);
-    expect(context.fillPolygons).toHaveLength(4);
-    expect(context.fillAlphas).toEqual([
-      0.03125,
-      0.0625,
-      0.0625,
-      0.9375,
-    ]);
+    const retainedPlan = planStudioWetRibbonCarrier(
+      applyStudioBrushAliasWatercolorMaterial("ink-wash", authoredDabs),
+    );
+    expect(retainedPlan.batches.length).toBeGreaterThan(4);
+    expect(retainedPlan.batches.length).toBeLessThanOrEqual(4 * 32);
+    expect(retainedPlan.batches.every(({ polygons }) => polygons.length > 0))
+      .toBe(true);
+    expect(context.fillPolygons).toHaveLength(retainedPlan.batches.length);
+    expect(context.fillAlphas).toEqual(
+      retainedPlan.batches.map(({ opacity }) => opacity),
+    );
     const polygonSpan = (polygon: readonly number[]) => {
       const xs = polygon.filter((_, coordinateIndex) => coordinateIndex % 2 === 0);
       const ys = polygon.filter((_, coordinateIndex) => coordinateIndex % 2 === 1);
@@ -877,8 +903,16 @@ describe("StudioDrawNode orchestration", () => {
         Math.max(...ys) - Math.min(...ys),
       );
     };
-    expect(polygonSpan(context.fillPolygons[0]!))
-      .toBeGreaterThan(polygonSpan(context.fillPolygons[3]!) * 2);
+    const diffuseOuterBatchIndex = retainedPlan.batches.findIndex(
+      ({ layer }) => layer === "diffuse-outer",
+    );
+    const coreBatchIndex = retainedPlan.batches.findIndex(
+      ({ layer }) => layer === "core",
+    );
+    expect(diffuseOuterBatchIndex).toBeGreaterThanOrEqual(0);
+    expect(coreBatchIndex).toBeGreaterThan(diffuseOuterBatchIndex);
+    expect(polygonSpan(context.fillPolygons[diffuseOuterBatchIndex]!))
+      .toBeGreaterThan(polygonSpan(context.fillPolygons[coreBatchIndex]!) * 2);
   });
 
   it("renders soft pencil as a pale wide skirt plus a rough core", () => {
@@ -1081,7 +1115,7 @@ describe("StudioDrawNode orchestration", () => {
     }
   });
 
-  it.each(["highlighter", "neon", "glow"] as const)(
+  it.each(["neon", "glow"] as const)(
     "keeps legacy %s on continuous Konva Lines and gates segmented Shapes to canonical-v1",
     (brush) => {
       const base = {
@@ -1112,15 +1146,62 @@ describe("StudioDrawNode orchestration", () => {
     },
   );
 
+  it("uses the one-wash highlighter Shape for both legacy and canonical pressure documents", () => {
+    const renderWash = (pressureModel: boolean) => {
+      const view = render(
+        <StudioDrawNode
+          el={drawEl({
+            brush: "highlighter",
+            mode: "pen",
+            points: [0, 0, 12, 8, 24, -2, 40, 6],
+            pressures: [0, 1, 0, 1],
+            sampleSpacing: 1,
+            strokeWidth: 12,
+            ...(pressureModel
+              ? {
+                  materialPressureModel:
+                    STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+                }
+              : {}),
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+        context: CanvasRenderingContext2D,
+      ) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      const result = {
+        lineCount: captured("Line").length,
+        shapeCount: captured("Shape").length,
+        fillCount: context.fillPolygons.length,
+        strokeCount: context.strokeWidths.length,
+      };
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return result;
+    };
+
+    expect(renderWash(false)).toEqual({
+      lineCount: 0,
+      shapeCount: 1,
+      fillCount: 1,
+      strokeCount: 0,
+    });
+    expect(renderWash(true)).toEqual({
+      lineCount: 0,
+      shapeCount: 1,
+      fillCount: 1,
+      strokeCount: 0,
+    });
+  });
+
   it.each([
-    "highlighter",
-    "chisel-highlighter",
-    "pastel-highlighter",
     "neon",
     "glow",
     "soft-glow",
   ] as const)(
-    "maps %s pressure identically in active and retained rendering without round-capped interior joints",
+    "maps %s pressure identically through one compound fill per pass without butt-segment seams",
     (brush) => {
       const renderPressure = (
         pressure: number,
@@ -1150,13 +1231,24 @@ describe("StudioDrawNode orchestration", () => {
           const sceneFunc = shape.props.sceneFunc as (
             context: CanvasRenderingContext2D,
           ) => void;
+          context.globalAlpha = 1;
           sceneFunc(context as unknown as CanvasRenderingContext2D);
         }
+        const geometrySpans = context.fillCompoundPaths.map((path) => {
+          const xs = path.filter((_, coordinateIndex) => coordinateIndex % 2 === 0);
+          const ys = path.filter((_, coordinateIndex) => coordinateIndex % 2 === 1);
+          return Math.max(...xs) - Math.min(...xs)
+            + Math.max(...ys) - Math.min(...ys);
+        });
         const result = {
           capCount: context.arcs.length + context.fillRects.length,
-          strokeAlphas: [...context.strokeAlphas],
-          strokeCaps: [...context.strokeCaps],
-          strokeWidths: [...context.strokeWidths],
+          fillAlphas: [...context.fillAlphas],
+          fillCount: context.fillCompoundPaths.length,
+          geometrySpans,
+          lighterShapeCount: captured("Shape").filter(
+            (shape) => shape.props.globalCompositeOperation === "lighter",
+          ).length,
+          strokeCount: context.strokeWidths.length,
         };
         view.unmount();
         konvaCapture.nodes.length = 0;
@@ -1167,23 +1259,225 @@ describe("StudioDrawNode orchestration", () => {
       const heavy = renderPressure(1, false);
       const liveHeavy = renderPressure(1, true);
 
-      expect(Math.max(...heavy.strokeWidths)).toBeGreaterThan(
-        Math.max(...light.strokeWidths),
+      expect(Math.max(...heavy.geometrySpans)).toBeGreaterThan(
+        Math.max(...light.geometrySpans),
       );
-      expect(Math.max(...heavy.strokeAlphas)).toBeGreaterThan(
-        Math.max(...light.strokeAlphas),
+      expect(Math.max(...heavy.fillAlphas)).toBeGreaterThan(
+        Math.max(...light.fillAlphas),
       );
-      expect(heavy.strokeCaps.every((cap) => cap === "butt")).toBe(true);
-      expect(heavy.capCount).toBe(
-        brush === "soft-glow" ? 8 : brush === "neon" || brush === "glow" ? 6 : 2,
-      );
+      expect(heavy.fillCount).toBe(brush === "soft-glow" ? 4 : 3);
+      expect(heavy.lighterShapeCount).toBe(heavy.fillCount);
+      expect(heavy.strokeCount).toBe(0);
+      expect(heavy.capCount).toBe(0);
       expect(liveHeavy).toEqual(heavy);
       const sliderZero = renderPressure(0, false, 0);
       const sliderFull = renderPressure(0, false, 1);
-      expect(sliderFull.strokeWidths).not.toEqual(sliderZero.strokeWidths);
-      expect(sliderFull.strokeAlphas).toEqual(sliderZero.strokeAlphas);
+      expect(sliderFull.geometrySpans).not.toEqual(sliderZero.geometrySpans);
+      expect(sliderFull.fillAlphas).toEqual(sliderZero.fillAlphas);
     },
   );
+
+  it.each([
+    "neon",
+    "glow",
+    "soft-glow",
+  ] as const)(
+    "shares the exact %s compound ribbon geometry between active, retained and SVG rendering",
+    (brush) => {
+      const element = drawEl({
+        id: `luminous-ribbon-parity-${brush}`,
+        brush,
+        mode: "pen",
+        points: [0, 0, 30, 30, 60, 0, 30, -30, 0, 0, 30, 30, 60, 0],
+        pressures: [0.8, 0.75, 0.9, 0.65, 0.8, 0.75, 0.9],
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        sampleSpacing: 1,
+        stroke: "#13579b",
+        strokeWidth: 14,
+        opacity: 0.64,
+      });
+      const roundCoordinates = (coordinates: readonly number[]) => (
+        coordinates.map((coordinate) => Math.round(coordinate * 100) / 100 + 0)
+      );
+      const renderRibbon = (activeDraft: boolean) => {
+        const view = render(
+          <StudioDrawNode activeDraft={activeDraft} el={element} />,
+        );
+        const context = new AliasSceneContext();
+        for (const shape of captured("Shape")) {
+          const sceneFunc = shape.props.sceneFunc as (
+            context: CanvasRenderingContext2D,
+          ) => void;
+          context.globalAlpha = 1;
+          sceneFunc(context as unknown as CanvasRenderingContext2D);
+        }
+        const result = {
+          alphas: context.fillAlphas.map(
+            (alpha) => Math.round(alpha * 1_000_000) / 1_000_000,
+          ),
+          paths: context.fillCompoundPaths.map(roundCoordinates),
+        };
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return result;
+      };
+      const active = renderRibbon(true);
+      const retained = renderRibbon(false);
+      const exported = exportPageToSvg({
+        width: 90,
+        height: 90,
+        bg: "#ffffff",
+        elements: [element],
+      }).svg;
+      const svgPaths = Array.from(
+        exported.matchAll(
+          /data-luminous-ribbon="single-fill"[^>]*\sd="([^"]+)"/gu,
+        ),
+        (match) => roundCoordinates(Array.from(
+          match[1]!.matchAll(/-?\d+(?:\.\d+)?/gu),
+          (coordinateMatch) => Number(coordinateMatch[0]),
+        )),
+      );
+      const svgAlphas = Array.from(
+        exported.matchAll(
+          /data-luminous-ribbon="single-fill"[^>]*opacity="([^"]+)"/gu,
+        ),
+        (match) => Number(match[1]),
+      );
+
+      expect(active).toEqual(retained);
+      expect(svgPaths).toEqual(active.paths);
+      expect(svgAlphas).toEqual(active.alphas);
+      expect(active.paths).toHaveLength(brush === "soft-glow" ? 4 : 3);
+      expect(exported).not.toContain('stroke-linecap="butt"');
+      expect(exported).not.toContain("data-pressure-endcap=");
+    },
+  );
+
+  it.each([
+    "highlighter",
+    "chisel-highlighter",
+    "pastel-highlighter",
+  ] as const)(
+    "maps %s pressure through one active/retained wash fill with embedded terminal caps",
+    (brush) => {
+      const renderPressure = (
+        pressure: number,
+        activeDraft: boolean,
+        materialMinimumDiameterRatio?: number,
+      ) => {
+        const view = render(
+          <StudioDrawNode
+            activeDraft={activeDraft}
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [0, 0, 12, 8, 24, -2, 40, 6],
+              pressures: [pressure, pressure, pressure, pressure],
+              materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+              ...(materialMinimumDiameterRatio === undefined
+                ? {}
+                : { materialMinimumDiameterRatio }),
+              sampleSpacing: 1,
+              strokeWidth: 12,
+              opacity: 0.7,
+            })}
+          />,
+        );
+        const context = new AliasSceneContext();
+        const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+          context: CanvasRenderingContext2D,
+        ) => void;
+        sceneFunc(context as unknown as CanvasRenderingContext2D);
+        const polygon = context.fillCompoundPaths[0] ?? [];
+        const xs = polygon.filter((_, index) => index % 2 === 0);
+        const ys = polygon.filter((_, index) => index % 2 === 1);
+        const result = {
+          alpha: context.fillAlphas[0],
+          boundsSpan:
+            Math.max(...xs) - Math.min(...xs)
+            + Math.max(...ys) - Math.min(...ys),
+          fillCount: context.fillPolygons.length,
+          separateCaps: context.arcs.length + context.fillRects.length,
+          strokeCount: context.strokeWidths.length,
+        };
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+        return result;
+      };
+
+      const light = renderPressure(0, false);
+      const heavy = renderPressure(1, false);
+      const liveHeavy = renderPressure(1, true);
+
+      expect(heavy.boundsSpan).toBeGreaterThan(light.boundsSpan);
+      expect(heavy.alpha).toBeGreaterThan(light.alpha);
+      expect(heavy.fillCount).toBe(1);
+      expect(heavy.separateCaps).toBe(0);
+      expect(heavy.strokeCount).toBe(0);
+      expect(liveHeavy).toEqual(heavy);
+      const sliderZero = renderPressure(0, false, 0);
+      const sliderFull = renderPressure(0, false, 1);
+      expect(sliderFull.boundsSpan).toBeGreaterThan(sliderZero.boundsSpan);
+      expect(sliderFull.alpha).toBe(sliderZero.alpha);
+    },
+  );
+
+  it("shares the exact one-wash figure-eight outline across active, retained and SVG rendering", () => {
+    const element = drawEl({
+      id: "highlighter-one-wash-parity",
+      brush: "highlighter",
+      mode: "pen",
+      points: [10, 10, 50, 50, 10, 50, 50, 10],
+      pressures: [0.15, 0.9, 0.35, 0.75],
+      materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+      sampleSpacing: 1,
+      stroke: "#13579b",
+      strokeWidth: 12,
+      opacity: 0.7,
+    });
+    const renderOutline = (activeDraft: boolean) => {
+      const view = render(
+        <StudioDrawNode activeDraft={activeDraft} el={element} />,
+      );
+      const context = new AliasSceneContext();
+      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+        context: CanvasRenderingContext2D,
+      ) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      const result = {
+        alpha: context.fillAlphas[0],
+        outline: context.fillCompoundPaths[0],
+        fillCount: context.fillPolygons.length,
+      };
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return result;
+    };
+    const active = renderOutline(true);
+    const retained = renderOutline(false);
+    const exported = exportPageToSvg({
+      width: 80,
+      height: 80,
+      bg: "#ffffff",
+      elements: [element],
+    }).svg;
+    const exportedPath = /data-highlighter-wash="single-fill"[^>]*><path d="([^"]+)"/u
+      .exec(exported)?.[1] ?? "";
+    const exportedOutline = Array.from(
+      exportedPath.matchAll(/-?\d+(?:\.\d+)?/gu),
+      (match) => Number(match[0]),
+    );
+    const exportedAlpha = Number(
+      /fill="#13579b"[^>]*opacity="([^"]+)"/u.exec(exported)?.[1] ?? 0,
+    );
+
+    expect(active).toEqual(retained);
+    expect(active.fillCount).toBe(1);
+    expect(exportedOutline).toEqual(active.outline);
+    expect(exportedAlpha).toBeCloseTo(active.alpha ?? 0, 6);
+    expect(exported).not.toContain("data-pressure-endcap=");
+  });
 
   it("keeps the soft-pencil two-pass material on a one-point tap", () => {
     render(
@@ -1202,7 +1496,7 @@ describe("StudioDrawNode orchestration", () => {
     ]);
   });
 
-  it.each(["pencil-2b", "brush", "highlighter"] as const)(
+  it.each(["pencil-2b", "brush"] as const)(
     "applies the persisted minimum diameter to a %s tap without lifting alpha",
     (brush) => {
       const renderTap = (materialMinimumDiameterRatio: number) => {
@@ -1248,6 +1542,50 @@ describe("StudioDrawNode orchestration", () => {
       expect(sliderFull.alphas).toEqual(sliderZero.alphas);
     },
   );
+
+  it("applies highlighter tap minimum diameter through one natural wash footprint", () => {
+    const renderTap = (materialMinimumDiameterRatio: number) => {
+      const view = render(
+        <StudioDrawNode
+          el={drawEl({
+            brush: "highlighter",
+            mode: "pen",
+            points: [4, 7],
+            pressures: [0],
+            materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+            materialMinimumDiameterRatio,
+            strokeWidth: 12,
+            opacity: 0.7,
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+        context: CanvasRenderingContext2D,
+      ) => void;
+      sceneFunc(context as unknown as CanvasRenderingContext2D);
+      const polygon = context.fillPolygons[0] ?? [];
+      const xs = polygon.filter((_, index) => index % 2 === 0);
+      const ys = polygon.filter((_, index) => index % 2 === 1);
+      const result = {
+        alpha: context.fillAlphas[0],
+        diameter: Math.max(
+          Math.max(...xs) - Math.min(...xs),
+          Math.max(...ys) - Math.min(...ys),
+        ),
+        fillCount: context.fillPolygons.length,
+      };
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return result;
+    };
+    const sliderZero = renderTap(0);
+    const sliderFull = renderTap(1);
+
+    expect(sliderFull.diameter).toBeGreaterThan(sliderZero.diameter);
+    expect(sliderFull.alpha).toBe(sliderZero.alpha);
+    expect(sliderFull.fillCount).toBe(1);
+  });
 
   it.each([
     ["causal pen", { points: [4, 7], sampleSpacing: 1 }],
@@ -1322,7 +1660,10 @@ describe("StudioDrawNode orchestration", () => {
     ) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
     expect(context.transforms).toEqual(["1,0,0,1,0,0"]);
-    expect(context.arcs).toHaveLength(1);
+    expect(context.arcs).toHaveLength(0);
+    expect(context.paths).toHaveLength(1);
+    expect(context.paths[0]).toHaveLength(48);
+    expect(context.fills).toHaveLength(1);
   });
 
   it("renders phase-two colour, fixed grain and multi-tip marks on the Canvas path", () => {

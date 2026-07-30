@@ -48,6 +48,8 @@ describe("studio brush catalogue selection", () => {
       "crayon",
       "chalk",
       "charcoal",
+      "pastel",
+      "oil-pastel",
       "ink-particle",
     ]);
 

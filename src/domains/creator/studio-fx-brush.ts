@@ -274,6 +274,55 @@ export interface StudioFxPressurePathPlan {
   readonly segments: readonly StudioFxPressurePathSegment[];
 }
 
+export type StudioFxLuminousBrushId = "neon" | "glow" | "soft-glow";
+
+export type StudioFxLuminousRibbonRole =
+  | "body"
+  | "join"
+  | "start-cap"
+  | "end-cap";
+
+export interface StudioFxLuminousRibbonPolygon {
+  /**
+   * Clockwise/counter-clockwise is normalised across every polygon. A non-zero compound fill
+   * therefore behaves as a geometric union even when the centreline retraces or crosses itself.
+   */
+  readonly points: readonly number[];
+  readonly role: StudioFxLuminousRibbonRole;
+}
+
+export interface StudioFxLuminousRibbonPassPlan {
+  readonly kind: "studio-fx-luminous-ribbon-pass";
+  readonly version: "studio-fx-luminous-ribbon-v1";
+  readonly brushId: StudioFxLuminousBrushId;
+  /**
+   * The renderer submits all polygons in one beginPath/fill operation. Alpha is consequently
+   * applied once per gesture/pass instead of once per source segment.
+   */
+  readonly coverageOperation: "stroke-local-single-fill";
+  /**
+   * This is applied outside the local mask. Separate DrawEls still add light naturally, while
+   * a self-crossing inside one DrawEl cannot over-brighten.
+   */
+  readonly compositeOperation: "lighter";
+  readonly fillRule: "nonzero";
+  readonly cap: "round";
+  readonly sourceSegmentCount: number;
+  readonly flattenedSegmentCount: number;
+  readonly capped: boolean;
+  readonly passWidthScale: number;
+  readonly luminousCore: boolean;
+  /** Complete pass alpha, including the pressure response. */
+  readonly opacity: number;
+  readonly polygons: readonly StudioFxLuminousRibbonPolygon[];
+}
+
+export interface StudioFxLuminousRibbonPathSink {
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  closePath(): void;
+}
+
 interface FxPressureAxis {
   readonly light: number;
   readonly heavy: number;
@@ -629,6 +678,468 @@ export function planStudioFxBrushPressurePath(input: {
     sourcePointCount,
     segments: Object.freeze(segments),
   });
+}
+
+interface FxLuminousPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+interface FxLuminousSection {
+  readonly from: FxLuminousPoint;
+  readonly to: FxLuminousPoint;
+  readonly fromRadius: number;
+  readonly toRadius: number;
+  readonly opacityScale: number;
+}
+
+interface FxLuminousSegmentResponse {
+  readonly widthScale: number;
+  readonly opacityScale: number;
+}
+
+const FX_LUMINOUS_RIBBON_VERSION =
+  "studio-fx-luminous-ribbon-v1" as const;
+const FX_LUMINOUS_MAX_FLATTENED_SEGMENTS = 262_144;
+const FX_LUMINOUS_MAX_SUBDIVISIONS = 16;
+const FX_LUMINOUS_ROUND_STEPS = 24;
+const FX_LUMINOUS_QUANTIZE_SCALE = 10_000;
+
+function quantizeFxLuminous(value: number): number {
+  const result = Math.round(value * FX_LUMINOUS_QUANTIZE_SCALE)
+    / FX_LUMINOUS_QUANTIZE_SCALE;
+  return Object.is(result, -0) ? 0 : result;
+}
+
+function fxLuminousPointAt(
+  segment: StudioFxPressurePathSegment,
+  progress: number,
+): FxLuminousPoint {
+  const amount = clamp(progress, 0, 1);
+  const inverse = 1 - amount;
+  if (segment.command === "cubic") {
+    return {
+      x: inverse ** 3 * segment.moveX
+        + 3 * inverse * inverse * amount * segment.control1X
+        + 3 * inverse * amount * amount * segment.control2X
+        + amount ** 3 * segment.endX,
+      y: inverse ** 3 * segment.moveY
+        + 3 * inverse * inverse * amount * segment.control1Y
+        + 3 * inverse * amount * amount * segment.control2Y
+        + amount ** 3 * segment.endY,
+    };
+  }
+  if (segment.command === "quadratic") {
+    return {
+      x: inverse * inverse * segment.moveX
+        + 2 * inverse * amount * segment.controlX
+        + amount * amount * segment.endX,
+      y: inverse * inverse * segment.moveY
+        + 2 * inverse * amount * segment.controlY
+        + amount * amount * segment.endY,
+    };
+  }
+  return {
+    x: segment.moveX + (segment.endX - segment.moveX) * amount,
+    y: segment.moveY + (segment.endY - segment.moveY) * amount,
+  };
+}
+
+function fxLuminousPointLineDistance(
+  point: FxLuminousPoint,
+  start: FxLuminousPoint,
+  end: FxLuminousPoint,
+): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= POINT_EPS) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  return Math.abs(
+    dy * point.x
+    - dx * point.y
+    + end.x * start.y
+    - end.y * start.x,
+  ) / length;
+}
+
+function fxLuminousSubdivisionCount(
+  segment: StudioFxPressurePathSegment,
+  passWidth: number,
+): number {
+  if (segment.command === "line") return 1;
+  const start = { x: segment.moveX, y: segment.moveY };
+  const end = { x: segment.endX, y: segment.endY };
+  const flatness = segment.command === "cubic"
+    ? Math.max(
+        fxLuminousPointLineDistance(
+          { x: segment.control1X, y: segment.control1Y },
+          start,
+          end,
+        ),
+        fxLuminousPointLineDistance(
+          { x: segment.control2X, y: segment.control2Y },
+          start,
+          end,
+        ),
+      )
+    : fxLuminousPointLineDistance(
+        { x: segment.controlX, y: segment.controlY },
+        start,
+        end,
+      );
+  const tolerance = clamp(passWidth * 0.025, 0.1, 0.55);
+  if (!Number.isFinite(flatness) || flatness <= tolerance) return 1;
+  return clamp(
+    2 ** Math.ceil(Math.log2(Math.sqrt(flatness / tolerance))),
+    1,
+    FX_LUMINOUS_MAX_SUBDIVISIONS,
+  );
+}
+
+function fxLuminousSamePoint(
+  left: FxLuminousPoint,
+  right: FxLuminousPoint,
+): boolean {
+  return Math.hypot(left.x - right.x, left.y - right.y) <= POINT_EPS;
+}
+
+function fxLuminousSegmentResponses(
+  pressurePath: StudioFxPressurePathPlan,
+  passWidthScale: number,
+  luminousCore: boolean,
+): readonly FxLuminousSegmentResponse[] {
+  return Object.freeze(pressurePath.segments.map((segment) => (
+    resolveStudioFxPressurePassResponse(
+      segment,
+      passWidthScale,
+      luminousCore,
+    )
+  )));
+}
+
+function fxLuminousInterpolatedScale(
+  responses: readonly FxLuminousSegmentResponse[],
+  segments: readonly StudioFxPressurePathSegment[],
+  segmentIndex: number,
+  edge: "from" | "to",
+  key: keyof FxLuminousSegmentResponse,
+): number {
+  const current = responses[segmentIndex]![key];
+  const adjacentIndex = edge === "from" ? segmentIndex - 1 : segmentIndex + 1;
+  const adjacent = responses[adjacentIndex];
+  const adjacentSegment = segments[adjacentIndex];
+  const segment = segments[segmentIndex]!;
+  if (!adjacent || !adjacentSegment) return current;
+  const continuous = edge === "from"
+    ? fxLuminousSamePoint(
+        { x: adjacentSegment.endX, y: adjacentSegment.endY },
+        { x: segment.moveX, y: segment.moveY },
+      )
+    : fxLuminousSamePoint(
+        { x: segment.endX, y: segment.endY },
+        { x: adjacentSegment.moveX, y: adjacentSegment.moveY },
+      );
+  return continuous ? (current + adjacent[key]) / 2 : current;
+}
+
+function flattenFxLuminousRibbon(
+  pressurePath: StudioFxPressurePathPlan,
+  baseWidth: number,
+  passWidthScale: number,
+  luminousCore: boolean,
+): {
+  readonly sections: readonly FxLuminousSection[];
+  readonly capped: boolean;
+} {
+  const sections: FxLuminousSection[] = [];
+  const responses = fxLuminousSegmentResponses(
+    pressurePath,
+    passWidthScale,
+    luminousCore,
+  );
+  const passWidth = clamp(baseWidth * passWidthScale, 0.5, 4096);
+  for (
+    let segmentIndex = 0;
+    segmentIndex < pressurePath.segments.length;
+    segmentIndex += 1
+  ) {
+    const segment = pressurePath.segments[segmentIndex]!;
+    const subdivisions = fxLuminousSubdivisionCount(segment, passWidth);
+    const fromWidthScale = fxLuminousInterpolatedScale(
+      responses,
+      pressurePath.segments,
+      segmentIndex,
+      "from",
+      "widthScale",
+    );
+    const toWidthScale = fxLuminousInterpolatedScale(
+      responses,
+      pressurePath.segments,
+      segmentIndex,
+      "to",
+      "widthScale",
+    );
+    const fromOpacityScale = fxLuminousInterpolatedScale(
+      responses,
+      pressurePath.segments,
+      segmentIndex,
+      "from",
+      "opacityScale",
+    );
+    const toOpacityScale = fxLuminousInterpolatedScale(
+      responses,
+      pressurePath.segments,
+      segmentIndex,
+      "to",
+      "opacityScale",
+    );
+    for (let subdivision = 0; subdivision < subdivisions; subdivision += 1) {
+      if (sections.length >= FX_LUMINOUS_MAX_FLATTENED_SEGMENTS) {
+        return {
+          sections: Object.freeze(sections),
+          capped: true,
+        };
+      }
+      const fromProgress = subdivision / subdivisions;
+      const toProgress = (subdivision + 1) / subdivisions;
+      const from = fxLuminousPointAt(segment, fromProgress);
+      const to = fxLuminousPointAt(segment, toProgress);
+      if (fxLuminousSamePoint(from, to)) continue;
+      const fromResponseWidth = fromWidthScale
+        + (toWidthScale - fromWidthScale) * fromProgress;
+      const toResponseWidth = fromWidthScale
+        + (toWidthScale - fromWidthScale) * toProgress;
+      const midpointProgress = (fromProgress + toProgress) / 2;
+      sections.push(Object.freeze({
+        from,
+        to,
+        fromRadius: clamp(
+          passWidth * fromResponseWidth / 2,
+          0.25,
+          2048,
+        ),
+        toRadius: clamp(
+          passWidth * toResponseWidth / 2,
+          0.25,
+          2048,
+        ),
+        opacityScale: clamp(
+          fromOpacityScale
+          + (toOpacityScale - fromOpacityScale) * midpointProgress,
+          0,
+          4,
+        ),
+      }));
+    }
+  }
+  return {
+    sections: Object.freeze(sections),
+    capped: false,
+  };
+}
+
+function fxLuminousPolygonSignedArea(points: readonly number[]): number {
+  let area = 0;
+  for (let index = 0; index + 1 < points.length; index += 2) {
+    const nextIndex = (index + 2) % points.length;
+    area += points[index]! * points[nextIndex + 1]!
+      - points[nextIndex]! * points[index + 1]!;
+  }
+  return area / 2;
+}
+
+function sameWindingFxLuminousPolygon(
+  points: readonly number[],
+): readonly number[] {
+  if (fxLuminousPolygonSignedArea(points) >= 0) {
+    return Object.freeze([...points]);
+  }
+  const reversed: number[] = [];
+  for (let index = points.length - 2; index >= 0; index -= 2) {
+    reversed.push(points[index]!, points[index + 1]!);
+  }
+  return Object.freeze(reversed);
+}
+
+function fxLuminousBodyPolygon(
+  section: FxLuminousSection,
+): readonly number[] {
+  const dx = section.to.x - section.from.x;
+  const dy = section.to.y - section.from.y;
+  const length = Math.hypot(dx, dy);
+  const normalX = -dy / length;
+  const normalY = dx / length;
+  return sameWindingFxLuminousPolygon([
+    quantizeFxLuminous(section.from.x + normalX * section.fromRadius),
+    quantizeFxLuminous(section.from.y + normalY * section.fromRadius),
+    quantizeFxLuminous(section.to.x + normalX * section.toRadius),
+    quantizeFxLuminous(section.to.y + normalY * section.toRadius),
+    quantizeFxLuminous(section.to.x - normalX * section.toRadius),
+    quantizeFxLuminous(section.to.y - normalY * section.toRadius),
+    quantizeFxLuminous(section.from.x - normalX * section.fromRadius),
+    quantizeFxLuminous(section.from.y - normalY * section.fromRadius),
+  ]);
+}
+
+function fxLuminousRoundPolygon(
+  center: FxLuminousPoint,
+  radius: number,
+): readonly number[] {
+  const points: number[] = [];
+  for (let step = 0; step < FX_LUMINOUS_ROUND_STEPS; step += 1) {
+    const angle = TAU * step / FX_LUMINOUS_ROUND_STEPS;
+    points.push(
+      quantizeFxLuminous(center.x + Math.cos(angle) * radius),
+      quantizeFxLuminous(center.y + Math.sin(angle) * radius),
+    );
+  }
+  return sameWindingFxLuminousPolygon(points);
+}
+
+function splitFxLuminousRuns(
+  sections: readonly FxLuminousSection[],
+): readonly (readonly FxLuminousSection[])[] {
+  const runs: FxLuminousSection[][] = [];
+  let active: FxLuminousSection[] = [];
+  for (const section of sections) {
+    const previous = active.at(-1);
+    if (previous && !fxLuminousSamePoint(previous.to, section.from)) {
+      runs.push(active);
+      active = [];
+    }
+    active.push(section);
+  }
+  if (active.length > 0) runs.push(active);
+  return Object.freeze(runs.map((run) => Object.freeze(run)));
+}
+
+function fxLuminousRunPolygons(
+  sections: readonly FxLuminousSection[],
+): readonly StudioFxLuminousRibbonPolygon[] {
+  const polygons: StudioFxLuminousRibbonPolygon[] = sections.map((section) => (
+    Object.freeze({
+      points: fxLuminousBodyPolygon(section),
+      role: "body" as const,
+    })
+  ));
+  for (let sectionIndex = 1; sectionIndex < sections.length; sectionIndex += 1) {
+    const previous = sections[sectionIndex - 1]!;
+    const current = sections[sectionIndex]!;
+    polygons.push(Object.freeze({
+      points: fxLuminousRoundPolygon(
+        previous.to,
+        Math.max(previous.toRadius, current.fromRadius),
+      ),
+      role: "join",
+    }));
+  }
+  const first = sections[0];
+  const last = sections.at(-1);
+  if (first && last) {
+    polygons.push(
+      Object.freeze({
+        points: fxLuminousRoundPolygon(first.from, first.fromRadius),
+        role: "start-cap",
+      }),
+      Object.freeze({
+        points: fxLuminousRoundPolygon(last.to, last.toRadius),
+        role: "end-cap",
+      }),
+    );
+  }
+  return Object.freeze(polygons);
+}
+
+function fxLuminousWeightedOpacity(
+  sections: readonly FxLuminousSection[],
+): number {
+  let weightedOpacity = 0;
+  let totalLength = 0;
+  for (const section of sections) {
+    const length = Math.hypot(
+      section.to.x - section.from.x,
+      section.to.y - section.from.y,
+    );
+    weightedOpacity += section.opacityScale * length;
+    totalLength += length;
+  }
+  return totalLength <= POINT_EPS ? 1 : weightedOpacity / totalLength;
+}
+
+/**
+ * Plans one luminous pass as a stroke-local coverage mask.
+ *
+ * The returned polygons must be appended to one compound path and filled once. Bodies, joins and
+ * round caps deliberately overlap inside that one fill; non-zero winding turns those overlaps,
+ * exact retraces and figure-eight crossings into a union instead of repeatedly applying `lighter`.
+ * Render separate DrawEls with the advertised `lighter` composite to retain normal light build-up.
+ */
+export function planStudioFxLuminousRibbonPass(input: {
+  readonly brushId: StudioFxLuminousBrushId;
+  readonly pressurePath: StudioFxPressurePathPlan;
+  readonly baseWidth: unknown;
+  readonly passWidthScale: unknown;
+  readonly passOpacity: unknown;
+  readonly luminousCore?: boolean;
+}): StudioFxLuminousRibbonPassPlan {
+  const baseWidth = clamp(finiteNumber(input.baseWidth, 0), 0, 4096);
+  const passWidthScale = clamp(
+    finiteNumber(input.passWidthScale, 1),
+    0.025,
+    16,
+  );
+  const passOpacity = clamp(finiteNumber(input.passOpacity, 0), 0, 1);
+  const luminousCore = input.luminousCore === true;
+  const flattened = baseWidth > 0
+    ? flattenFxLuminousRibbon(
+        input.pressurePath,
+        baseWidth,
+        passWidthScale,
+        luminousCore,
+      )
+    : { sections: Object.freeze([]), capped: false };
+  const polygons = splitFxLuminousRuns(flattened.sections)
+    .flatMap((run) => fxLuminousRunPolygons(run));
+  return Object.freeze({
+    kind: "studio-fx-luminous-ribbon-pass",
+    version: FX_LUMINOUS_RIBBON_VERSION,
+    brushId: input.brushId,
+    coverageOperation: "stroke-local-single-fill",
+    compositeOperation: "lighter",
+    fillRule: "nonzero",
+    cap: "round",
+    sourceSegmentCount: input.pressurePath.segments.length,
+    flattenedSegmentCount: flattened.sections.length,
+    capped: flattened.capped,
+    passWidthScale,
+    luminousCore,
+    opacity: clamp(
+      passOpacity * fxLuminousWeightedOpacity(flattened.sections),
+      0,
+      1,
+    ),
+    polygons: Object.freeze(polygons),
+  });
+}
+
+/**
+ * Appends a luminous pass to the caller's current path. Call `beginPath()` once before this helper
+ * and `fill("nonzero")` once afterwards; calling fill per polygon would reintroduce seam energy.
+ */
+export function traceStudioFxLuminousRibbonPass(
+  sink: StudioFxLuminousRibbonPathSink,
+  plan: StudioFxLuminousRibbonPassPlan,
+): void {
+  for (const polygon of plan.polygons) {
+    if (polygon.points.length < 6) continue;
+    sink.moveTo(polygon.points[0]!, polygon.points[1]!);
+    for (let index = 2; index + 1 < polygon.points.length; index += 2) {
+      sink.lineTo(polygon.points[index]!, polygon.points[index + 1]!);
+    }
+    sink.closePath();
+  }
 }
 
 /**

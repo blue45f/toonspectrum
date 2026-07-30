@@ -55,8 +55,13 @@ import {
 } from "./studio-brush-tip-stamp";
 import {
   bridgeStudioDynamicDabVariationToDryMediaV1,
+  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  planStudioDryMediaUnionRibbonCarrier,
+  type StudioDryMediaUnionRibbonPolygon,
+} from "./studio-dry-media-union-ribbon-carrier";
 import {
   planStudioFlatNibRibbonCarrier,
   type StudioFlatNibRibbonPolygon,
@@ -138,7 +143,10 @@ export interface StudioDynamicBrushCoverageMark {
    * Connected hard flat/chisel carrier. It is mutually exclusive with texture/falloff and carries
    * the exact polygon shared by live, retained Canvas and SVG export.
    */
-  readonly ribbon?: StudioFlatNibRibbonPolygon | StudioPaintRollerRibbonPolygon;
+  readonly ribbon?:
+    | StudioFlatNibRibbonPolygon
+    | StudioPaintRollerRibbonPolygon
+    | StudioDryMediaUnionRibbonPolygon;
   /**
    * Full alpha-map stamp rendered by one affine `drawImage`. The immutable map is shared by every
    * dab; deterministic world/stroke grain is footprint-integrated into `alpha` so Canvas and SVG
@@ -525,6 +533,7 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
         (
           mark.ribbon.kind === "flat-nib-ribbon-polygon"
           || mark.ribbon.kind === "paint-roller-ribbon-polygon"
+          || mark.ribbon.kind === "dry-media-union-ribbon-polygon"
         )
         && mark.ribbon.polygons.length > 0
         && mark.ribbon.polygons.every((points) => (
@@ -764,7 +773,10 @@ export function planStudioDynamicBrushCoverageMarks(
           dabVariations.some(
             (variation) =>
               studioDynamicBrushDabVariationFirst(variation)?.index === 0,
-          ),
+            ),
+        ),
+        materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
+          input.materialIdentity,
         ),
         markBudget: boundedMarkBudget,
       })
@@ -1156,6 +1168,20 @@ export function planStudioDynamicBrushCoverageMarks(
       }
     }
     const variationMarks = marks.slice(variationMarksStart);
+    const dryMediaRibbonPlan = planStudioDryMediaUnionRibbonCarrier({
+      dabs: visiblePrimaryDabs,
+      marks: variationMarks,
+      materialIdentity: input.materialIdentity,
+      dynamics,
+    });
+    if (dryMediaRibbonPlan.applied) {
+      marks.splice(
+        variationMarksStart,
+        variationMarks.length,
+        ...dryMediaRibbonPlan.marks,
+      );
+      continue;
+    }
     const ribbonPlan = planStudioFlatNibRibbonCarrier({
       dabs: visiblePrimaryDabs,
       marks: variationMarks,

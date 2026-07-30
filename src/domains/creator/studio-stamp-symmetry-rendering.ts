@@ -7,6 +7,10 @@ import {
   studioBrushSymmetryTransforms,
   transformStudioBrushSymmetryPoint,
 } from "./studio-brush-symmetry";
+import {
+  planStudioStampInkRibbon,
+  traceStudioStampInkRibbon,
+} from "./studio-stamp-ink-ribbon";
 
 import type {
   StudioStampBrushDab,
@@ -166,6 +170,9 @@ export function drawStudioStampStrokeWithSymmetry(
   symmetry: StudioBrushSymmetrySpec | undefined
 ): StudioStampSymmetryRenderPlan {
   const plan = planStudioStampSymmetryRender(style, points, pressures, symmetry);
+  const inkRibbon = style.kind === "ink"
+    ? planStudioStampInkRibbon(plan.dabs)
+    : null;
   for (const transform of plan.transforms) {
     context.save();
     context.transform(
@@ -176,7 +183,15 @@ export function drawStudioStampStrokeWithSymmetry(
       transform.e,
       transform.f
     );
-    drawStudioStampBrushDabs(context, style, plan.dabs);
+    if (inkRibbon) {
+      context.globalAlpha = inkRibbon.opacity;
+      context.fillStyle = style.color;
+      context.beginPath();
+      traceStudioStampInkRibbon(context, inkRibbon);
+      context.fill();
+    } else {
+      drawStudioStampBrushDabs(context, style, plan.dabs);
+    }
     context.restore();
   }
   return plan;

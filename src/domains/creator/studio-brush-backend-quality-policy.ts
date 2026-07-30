@@ -201,7 +201,7 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     asynchronous: false,
     defaultAvailability: "ready",
     brushPixelAuthority: true,
-    evidence: "Calligraphy, highlighter, pencil, pastel, oil and FX retain dedicated planners.",
+    evidence: "Calligraphy, highlighter, pencil, oil and FX retain dedicated planners.",
   },
   {
     id: "canvas2d-dynamic-coverage",
@@ -211,7 +211,9 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     asynchronous: false,
     defaultAvailability: "ready",
     brushPixelAuthority: true,
-    evidence: "Core dynamics and the full procedural catalogue share deterministic dab settings.",
+    evidence:
+      "Core air/dry dynamics (including anisotropic pastel and oil-pastel fibres) and the full "
+      + "procedural catalogue share deterministic causal dab settings.",
   },
   {
     id: "canvas2d-wet-field",
@@ -677,7 +679,7 @@ Readonly<Record<StudioBrushBackendRouteProfile, readonly StudioBrushBackendRoute
       {
         live: "canvas2d-wet-ribbon",
         commit: "canvas2d-wet-ribbon",
-        semanticContract: "wet-ribbon-carrier-v1",
+        semanticContract: "wet-ribbon-carrier-v2",
       },
     ),
     "wet-specialist": candidates(
@@ -834,8 +836,8 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   crayon: "dry-dynamics",
   chalk: "dry-dynamics",
   charcoal: "dry-dynamics",
-  pastel: "dry-specialist",
-  "oil-pastel": "dry-specialist",
+  pastel: "dry-dynamics",
+  "oil-pastel": "dry-dynamics",
   "ink-particle": "spray-dynamics",
   screentone: "stamp-specialist",
   crosshatch: "stamp-specialist",

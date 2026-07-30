@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyStudioBrushAliasWatercolorMaterial,
+  mapStudioBrushAliasPressureSamples,
+  resolveStudioBrushAliasWatercolorPlanSettings,
+} from "./studio-brush-alias-profile";
+import {
   planCausalWatercolorBrushDabs,
 } from "./studio-causal-watercolor-brush";
 import {
@@ -43,6 +48,65 @@ function layerOf(
   const planned = footprint.layers.find((candidate) => candidate.layer === layer);
   if (!planned) throw new Error(`missing ${layer}`);
   return planned;
+}
+
+function polygonContains(
+  points: readonly number[],
+  x: number,
+  y: number,
+): boolean {
+  let inside = false;
+  const pointCount = points.length / 2;
+  for (
+    let current = 0, previous = pointCount - 1;
+    current < pointCount;
+    previous = current, current += 1
+  ) {
+    const currentX = points[current * 2]!;
+    const currentY = points[current * 2 + 1]!;
+    const previousX = points[previous * 2]!;
+    const previousY = points[previous * 2 + 1]!;
+    const crosses = (currentY > y) !== (previousY > y)
+      && x < (
+        (previousX - currentX) * (y - currentY)
+          / (previousY - currentY)
+        + currentX
+      );
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonSignedArea(points: readonly number[]): number {
+  let twiceArea = 0;
+  const pointCount = points.length / 2;
+  for (let index = 0; index < pointCount; index += 1) {
+    const next = (index + 1) % pointCount;
+    twiceArea += points[index * 2]! * points[next * 2 + 1]!
+      - points[next * 2]! * points[index * 2 + 1]!;
+  }
+  return twiceArea / 2;
+}
+
+function compositedLayerOpacityAt(
+  plan: ReturnType<typeof planStudioWetRibbonCarrier>,
+  layer: StudioWetRibbonFootprint["layers"][number]["layer"],
+  x: number,
+  y: number,
+): number {
+  let opacity = 0;
+  for (const batch of plan.batches) {
+    if (
+      batch.layer !== layer
+      || !batch.polygons.some((candidate) => (
+        polygonContains(candidate.points, x, y)
+      ))
+    ) {
+      continue;
+    }
+    opacity = batch.opacity + opacity * (1 - batch.opacity);
+  }
+  return opacity;
 }
 
 describe("studio wet ribbon carrier geometry", () => {
@@ -123,6 +187,16 @@ describe("studio wet ribbon carrier geometry", () => {
     expect(extended.footprints.length).toBeGreaterThan(head.footprints.length);
     expect(extended.footprints.slice(0, head.footprints.length))
       .toEqual(head.footprints);
+    for (const headBatch of head.batches) {
+      const extendedBatch = extended.batches.find((candidate) => (
+        candidate.layer === headBatch.layer
+        && candidate.coverageCeiling === headBatch.coverageCeiling
+      ));
+      expect(extendedBatch).toBeDefined();
+      expect(extendedBatch?.opacity).toBe(headBatch.opacity);
+      expect(extendedBatch?.polygons.slice(0, headBatch.polygons.length))
+        .toEqual(headBatch.polygons);
+    }
   });
 
   it("shares one exact edge between neighbours without longitudinal overlap wedges", () => {
@@ -177,6 +251,73 @@ describe("studio wet ribbon carrier geometry", () => {
     }
   });
 
+  it("joins UI-like ink-wash station quads into one Canvas/SVG contour without exposing seams", () => {
+    const settings = resolveStudioBrushAliasWatercolorPlanSettings(
+      "ink-wash",
+      30,
+    )!;
+    const sourcePointCount = 81;
+    const points = Array.from(
+      { length: sourcePointCount },
+      (_, index) => [20 + index * 5, 80],
+    ).flat();
+    const pressures = mapStudioBrushAliasPressureSamples(
+      "ink-wash",
+      Array.from({ length: sourcePointCount }, () => 0.5),
+      sourcePointCount,
+      0.55,
+    );
+    const dabs = applyStudioBrushAliasWatercolorMaterial(
+      "ink-wash",
+      planCausalWatercolorBrushDabs({
+        points,
+        pressures,
+        baseWidth: settings.baseWidth,
+        spacing: settings.spacing,
+        seed: 441,
+        diffuse: true,
+        maxDabs: 8_192,
+      }, true),
+    );
+    const plan = planStudioWetRibbonCarrier(dabs, { seed: 441 });
+    const coreBulkBatch = plan.batches.find(
+      ({ coverageCeiling, layer }) => (
+        layer === "core" && coverageCeiling === 0.5
+      ),
+    )!;
+
+    // The retained causal model still owns one immutable quad per station pair.
+    expect(coreBulkBatch.polygons.length).toBeGreaterThan(60);
+
+    // The raster/export boundary removes every coincident internal edge. Before this regression,
+    // Canvas antialiased those 60+ independent subpaths at fractional zoom and produced the
+    // visible pale vertical bars in the Studio screenshot.
+    const svgPath = studioWetRibbonCarrierBatchPathData(coreBulkBatch);
+    expect(svgPath.match(/M/g)).toHaveLength(1);
+    expect(svgPath.match(/Z/g)).toHaveLength(1);
+    const canvasPath = {
+      closes: 0,
+      moves: 0,
+      lines: 0,
+    };
+    traceStudioWetRibbonCarrierBatch({
+      moveTo: () => {
+        canvasPath.moves += 1;
+      },
+      lineTo: () => {
+        canvasPath.lines += 1;
+      },
+      closePath: () => {
+        canvasPath.closes += 1;
+      },
+    }, coreBulkBatch);
+    expect(canvasPath).toEqual({
+      closes: 1,
+      moves: 1,
+      lines: coreBulkBatch.polygons.length * 2 + 1,
+    });
+  });
+
   it("preserves zero pigment opacity exactly and omits invisible render batches", () => {
     const plan = planStudioWetRibbonCarrier([
       { x: 4, y: 8, radius: 6, opacity: 0, role: "core" },
@@ -186,6 +327,77 @@ describe("studio wet ribbon carrier geometry", () => {
     expect(plan.footprints).toHaveLength(1);
     expect(plan.footprints[0]?.layers.every(({ opacity }) => opacity === 0)).toBe(true);
     expect(plan.batches).toEqual([]);
+  });
+
+  it("uses stroke-local max coverage at self-crossings while leaving inter-stroke glazing", () => {
+    const plan = planStudioWetRibbonCarrier([
+      { x: 0, y: 0, radius: 3, opacity: 0.2, role: "core" },
+      { x: 20, y: 20, radius: 3, opacity: 0.2, role: "core" },
+      { x: 0, y: 20, radius: 3, opacity: 0.8, role: "core" },
+      { x: 20, y: 0, radius: 3, opacity: 0.8, role: "core" },
+    ], { seed: 41 });
+
+    const crossing = compositedLayerOpacityAt(plan, "core", 10, 10);
+    const isolatedStrong = compositedLayerOpacityAt(plan, "core", 15, 5);
+    const isolatedLight = compositedLayerOpacityAt(plan, "core", 5, 5);
+
+    expect(crossing).toBeCloseTo(isolatedStrong, 12);
+    expect(crossing).toBeCloseTo(Math.round(0.8 * 32) / 32, 12);
+    expect(isolatedLight).toBeCloseTo(Math.round(0.2 * 32) / 32, 12);
+    expect(crossing).toBeLessThan(
+      isolatedStrong + isolatedLight * (1 - isolatedStrong),
+    );
+
+    const coreBatches = plan.batches.filter(({ layer }) => layer === "core");
+    expect(coreBatches.map(({ coverageCeiling }) => coverageCeiling))
+      .toEqual([...coreBatches].map(({ coverageCeiling }) => coverageCeiling)
+        .sort((left, right) => left - right));
+    for (const batch of coreBatches) {
+      expect(batch.polygons.length).toBeGreaterThan(0);
+      expect(batch.polygons.every((polygon) => (
+        polygonSignedArea(polygon.points) < 0
+      ))).toBe(true);
+    }
+  });
+
+  it("reconstructs every quantized local target exactly without additive crossing seams", () => {
+    const authored = [0.03125, 0.21875, 0.5, 0.78125, 1];
+    const plan = planStudioWetRibbonCarrier(
+      authored.map((opacity, index) => ({
+        x: index * 20,
+        y: 0,
+        radius: 4,
+        opacity,
+        role: "core" as const,
+      })),
+      { seed: 9 },
+    );
+
+    for (let segment = 0; segment < authored.length - 1; segment += 1) {
+      const expected = (authored[segment]! + authored[segment + 1]!) * 0.5;
+      expect(
+        compositedLayerOpacityAt(plan, "core", segment * 20 + 10, 0),
+      ).toBeCloseTo(Math.round(expected * 32) / 32, 12);
+    }
+  });
+
+  it("interpolates endpoint coverage through a segment instead of emitting a station-wide plateau", () => {
+    const plan = planStudioWetRibbonCarrier([
+      { x: 0, y: 0, radius: 4, opacity: 0.2, role: "core" },
+      { x: 20, y: 0, radius: 4, opacity: 0.8, role: "core" },
+    ], { seed: 9 });
+    const quantized = (value: number) => Math.round(value * 32) / 32;
+
+    expect(compositedLayerOpacityAt(plan, "core", 5, 0))
+      .toBeCloseTo(quantized(0.35), 12);
+    expect(compositedLayerOpacityAt(plan, "core", 10, 0))
+      .toBeCloseTo(quantized(0.5), 12);
+    expect(compositedLayerOpacityAt(plan, "core", 15, 0))
+      .toBeCloseTo(quantized(0.65), 12);
+    expect(new Set(plan.batches
+      .filter(({ layer }) => layer === "core")
+      .map(({ polygons }) => polygons[0]?.points.join(","))).size)
+      .toBeGreaterThan(2);
   });
 });
 

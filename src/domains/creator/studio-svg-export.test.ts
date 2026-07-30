@@ -961,8 +961,17 @@ describe("도형 직렬화", () => {
 
       expect(first.svg).toBe(repeated.svg);
       expect(first.svg).toContain(`data-stamp-brush="${kind}"`);
-      expect((first.svg.match(/<circle\b/g) ?? [])).toHaveLength(circles);
-      expect(first.svg).not.toContain('<path d="M 12 34');
+      if (kind === "ink") {
+        expect(first.svg).toContain(
+          'data-stamp-ink-ribbon="stamp-ink-ribbon-v1"',
+        );
+        expect(first.svg).toContain('data-stamp-ink-cap="round"');
+        expect(first.svg).toContain('data-stamp-ink-coverage="stroke-local-single-fill"');
+        expect(first.svg).not.toContain("<circle");
+      } else {
+        expect((first.svg.match(/<circle\b/g) ?? [])).toHaveLength(circles);
+        expect(first.svg).not.toContain('<path d="M 12 34');
+      }
       expect(first.skipped).toEqual([]);
       return first.svg;
     });
@@ -1144,9 +1153,19 @@ describe("도형 직렬화", () => {
       const long = exportPageToSvg(longInput).svg;
       const repeated = exportPageToSvg(longInput).svg;
 
-      expect((long.match(/<circle\b/g) ?? []).length).toBeGreaterThan(
-        (short.match(/<circle\b/g) ?? []).length
-      );
+      if (brush === "ink-brush") {
+        const inkPath = (svg: string) => (
+          /data-stamp-ink-ribbon="stamp-ink-ribbon-v1"[^>]*\sd="([^"]+)"/u
+            .exec(svg)?.[1] ?? ""
+        );
+        expect(inkPath(long).length).toBeGreaterThan(inkPath(short).length);
+        expect(long).toContain('data-stamp-ink-cap="round"');
+        expect(long).not.toContain("<circle");
+      } else {
+        expect((long.match(/<circle\b/g) ?? []).length).toBeGreaterThan(
+          (short.match(/<circle\b/g) ?? []).length
+        );
+      }
       expect(long).toBe(repeated);
     }
   });
@@ -1238,10 +1257,10 @@ describe("도형 직렬화", () => {
 
     // width 10의 causal 기본 spacing은 3.4px이다. 첫 raw 수직 구간을 보존할 때만 이 ribbon
     // 단면이 생긴다. legacy는 sampleSpacing=128로 중간점을 제거해 과거 원형 계획을 유지한다.
-    expect(causal.svg).toContain('data-brush-engine="wet-ribbon-carrier-v1"');
+    expect(causal.svg).toContain('data-brush-engine="wet-ribbon-carrier-v2"');
     expect(causal.svg).toMatch(/L-?[0-9.]+ 3\.4/);
     expect(causal.svg).not.toContain("<circle");
-    expect(legacy.svg).not.toContain('data-brush-engine="wet-ribbon-carrier-v1"');
+    expect(legacy.svg).not.toContain('data-brush-engine="wet-ribbon-carrier-v2"');
     expect(legacy.svg).toContain("<circle");
     // The continuous ribbon preserves the accepted endpoint as its terminal cross-section rather
     // than adding a centre-point triangle that would double-paint the join.
@@ -1258,8 +1277,10 @@ describe("도형 직렬화", () => {
       watercolorPipeline: "causal-walker-v2",
     }]));
     const longStrokePolygonCount = (longStroke.svg.match(/Z/g) ?? []).length;
-    expect(longStrokePolygonCount).toBeGreaterThan(512);
-    expect(longStrokePolygonCount).toBeLessThanOrEqual(8_192 * 4);
+    // Immutable station footprints are stitched into continuous render contours, so SVG does not
+    // expose one antialiased subpath seam for every 3.4px causal station.
+    expect(longStrokePolygonCount).toBeGreaterThan(4);
+    expect(longStrokePolygonCount).toBeLessThanOrEqual(4 * 32);
     expect(longStroke.svg).toMatch(/L5000 -?[0-9.]+/);
   });
 
@@ -1352,6 +1373,7 @@ describe("도형 직렬화", () => {
     ["glitter", "glitter-opacity"],
     ["oil", "oil-opacity"],
     ["pastel", "pastel-opacity"],
+    ["oil-pastel", "oil-pastel-opacity"],
   ] as const)("%s — Canvas처럼 획 투명도를 각 재료 mark에 적용한다", (brush, id) => {
     const dynamic = rectEl({
       id,
@@ -1366,7 +1388,7 @@ describe("도형 직렬화", () => {
     const full = exportPageToSvg(page([{ ...dynamic, opacity: 1 }])).svg;
     const half = exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg;
     const dabOpacities = (svg: string) => Array.from(
-      svg.matchAll(/<(?:circle|ellipse|rect|path) [^>]*opacity="([0-9.]+)"/g),
+      svg.matchAll(/<(?:circle|ellipse|rect|path|use) [^>]*opacity="([0-9.]+)"/g),
       (match) => Number(match[1])
     );
     const fullOpacities = dabOpacities(full);
@@ -1374,7 +1396,9 @@ describe("도형 직렬화", () => {
 
     expect(half).not.toMatch(/<g[^>]*opacity="0\.5"/);
     expect(halfOpacities).toHaveLength(fullOpacities.length);
-    expect(halfOpacities.length).toBeGreaterThan(2);
+    expect(halfOpacities.length).toBeGreaterThan(
+      brush === "pastel" || brush === "oil-pastel" ? 0 : 2,
+    );
     halfOpacities.forEach((value, index) => {
       expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
     });
@@ -1408,28 +1432,38 @@ describe("도형 직렬화", () => {
     })])).svg).toBe(svg);
   });
 
-  it("파스텔은 원형 스탬프 열 대신 Canvas와 같은 방향성 안료 섬유를 직렬화한다", () => {
-    const { svg } = exportPageToSvg(page([rectEl({
-      id: "pastel-anisotropic-fibres",
-      kind: "freehand",
-      brush: "pastel",
-      points: [8, 12, 40, 20, 72, 12],
-      pressures: [0.45, 0.8, 0.6],
-      stroke: "#4455aa",
-      strokeWidth: 20,
-      fill: undefined,
-    })]));
-    const fibres = Array.from(svg.matchAll(
-      /<ellipse [^>]*rx="([^"]+)" ry="([^"]+)" transform="rotate\(([^ ]+) /gu,
-    ));
+  it.each(["pastel", "oil-pastel"] as const)(
+    "%s은 원형 스탬프 열 대신 Canvas와 같은 단일 union 섬유 경로를 직렬화한다",
+    (brush) => {
+      const { svg } = exportPageToSvg(page([rectEl({
+        id: `${brush}-anisotropic-fibres`,
+        kind: "freehand",
+        brush,
+        points: [8, 12, 40, 20, 72, 12],
+        pressures: [0.45, 0.8, 0.6],
+        stroke: "#4455aa",
+        strokeWidth: 20,
+        fill: undefined,
+      })]));
+      const fibres = Array.from(svg.matchAll(
+        new RegExp(
+          `<path data-brush-coverage="dry-media-union-ribbon"`
+          + ` data-brush-carrier="soft-pigment-fiber"`
+          + ` data-brush-material="${brush}"`
+          + `[^>]* d="([^"]+)"[^>]* opacity="([^"]+)"`,
+          "gu",
+        ),
+      ));
 
-    expect(fibres.length).toBeGreaterThan(10);
-    expect(fibres.every((match) => (
-      Number(match[1]) / Number(match[2]) >= 3.19
-      && Number.isFinite(Number(match[3]))
-    ))).toBe(true);
-    expect(svg).not.toMatch(/<circle [^>]*fill="url\(#sp/u);
-  });
+      expect(fibres).toHaveLength(1);
+      expect((fibres[0]?.[1].match(/M/gu) ?? []).length).toBeGreaterThan(10);
+      expect(Number(fibres[0]?.[2])).toBeGreaterThan(0);
+      expect(Number(fibres[0]?.[2])).toBeLessThanOrEqual(1);
+      expect(svg).not.toContain('data-brush-tip-asset="full-alpha-map-v1"');
+      expect(svg).not.toMatch(/<circle [^>]*fill="url\(#sp/u);
+      expect(svg).not.toMatch(/<ellipse [^>]*data-brush-material=/u);
+    },
+  );
 
   it("기본 에어브러시 — 필압 0·툴바 투명도 70%의 저농도 dab을 0으로 반올림하지 않는다", () => {
     const { svg } = exportPageToSvg(page([rectEl({
@@ -2036,7 +2070,7 @@ describe("도형 직렬화", () => {
     expectNear(reflectedAxis.y, -originalAxis.y, 0.001);
   });
 
-  it("형광펜 — multiply 혼합과 사각 끝을 유지한다", () => {
+  it("형광펜 — 한 번의 multiply wash와 둥근 superellipse 끝을 유지한다", () => {
     const hl = rectEl({
       id: "h1",
       kind: "freehand",
@@ -2045,14 +2079,17 @@ describe("도형 직렬화", () => {
       points: [0, 0, 10, 0, 20, 10, 30, 30],
     });
     const { svg } = exportPageToSvg(page([hl]));
-    expect(svg).toContain('data-pressure-endcap="square"');
-    expect(svg).toContain('stroke-linecap="butt"');
-    expect(svg).toContain('stroke-linejoin="round"');
+    expect(svg).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
+    expect(svg).toContain('data-highlighter-cap="round-superellipse"');
+    expect(svg).toContain('data-highlighter-wash="single-fill"');
+    expect(svg).toContain('fill-rule="nonzero"');
+    expect(svg).not.toContain("data-pressure-endcap=");
+    expect(svg).not.toContain("stroke-linecap=");
     expect(svg).toContain("mix-blend-mode:multiply");
   });
 
-  it.each(["pencil-2b", "highlighter", "neon", "glow"] as const)(
-    "%s — legacy는 단일 round/square path를 유지하고 canonical-v1만 세그먼트화한다",
+  it.each(["pencil-2b", "neon", "glow"] as const)(
+    "%s — legacy geometry를 유지하고 canonical-v1만 pressure ribbon을 쓴다",
     (brush) => {
       const renderPressure = (
         pressure: number,
@@ -2095,10 +2132,15 @@ describe("도형 직렬화", () => {
         );
         expect(canonicalLight).toContain("data-pencil-ribbon-cell=");
         expect(canonicalLight).not.toContain('stroke-linecap="butt"');
+        expect(canonicalLight).toMatch(/data-pencil-endcap=/u);
       } else {
-        expect(canonicalLight).toContain('stroke-linecap="butt"');
+        expect(canonicalLight).toContain(
+          'data-luminous-ribbon="single-fill"',
+        );
+        expect(canonicalLight).toContain('data-luminous-cap="round"');
+        expect(canonicalLight).not.toContain("stroke-linecap=");
+        expect(canonicalLight).not.toContain("data-pressure-endcap=");
       }
-      expect(canonicalLight).toMatch(/data-(?:pencil|pressure)-endcap=/u);
       expect(canonicalLight).not.toBe(canonicalHeavy);
       const sliderZero = renderPressure(0, true, 0);
       const sliderFull = renderPressure(0, true, 1);
@@ -2110,20 +2152,66 @@ describe("도형 직렬화", () => {
         svg.matchAll(/opacity="([^"]+)"/gu),
         (match) => Number(match[1]),
       );
-      expect(widths(sliderFull)).not.toEqual(widths(sliderZero));
+      const luminousGeometry = (svg: string) => Array.from(
+        svg.matchAll(/data-luminous-ribbon="single-fill"[^>]*d="([^"]+)"/gu),
+        (match) => match[1],
+      );
+      if (brush === "pencil-2b") {
+        expect(widths(sliderFull)).not.toEqual(widths(sliderZero));
+      } else {
+        expect(luminousGeometry(sliderFull)).not.toEqual(
+          luminousGeometry(sliderZero),
+        );
+      }
       expect(opacities(sliderFull)).toEqual(opacities(sliderZero));
     },
   );
 
+  it("highlighter — legacy와 canonical 모두 one-wash이고 canonical만 필압 폭·농도를 보존한다", () => {
+    const renderPressure = (
+      pressure: number,
+      pressureModel = false,
+    ) => exportPageToSvg(page([
+      rectEl({
+        id: "highlighter-wash-version",
+        kind: "freehand",
+        brush: "highlighter",
+        points: [0, 0, 12, 8, 24, -2, 40, 6],
+        pressures: [pressure, pressure, pressure, pressure],
+        ...(pressureModel
+          ? {
+              materialPressureModel:
+                STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+            }
+          : {}),
+        sampleSpacing: 1,
+        stroke: "#13579b",
+        strokeWidth: 12,
+        opacity: 0.7,
+        fill: undefined,
+      }),
+    ])).svg;
+    const legacyLight = renderPressure(0);
+    const legacyHeavy = renderPressure(1);
+    const canonicalLight = renderPressure(0, true);
+    const canonicalHeavy = renderPressure(1, true);
+
+    expect(legacyLight).toBe(legacyHeavy);
+    expect(canonicalLight).not.toBe(canonicalHeavy);
+    for (const svg of [legacyLight, canonicalLight, canonicalHeavy]) {
+      expect(svg).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
+      expect(svg).toContain('data-highlighter-wash="single-fill"');
+      expect(svg).not.toContain("data-pressure-endcap=");
+      expect(svg).not.toContain("stroke-linecap=");
+    }
+  });
+
   it.each([
-    "highlighter",
-    "chisel-highlighter",
-    "pastel-highlighter",
     "neon",
     "glow",
     "soft-glow",
   ] as const)(
-    "%s — SVG도 retained와 같은 pressure path 및 단일 endpoint cap 정책을 쓴다",
+    "%s — SVG도 retained와 같은 pressure ribbon single-fill 및 round cap 정책을 쓴다",
     (brush) => {
       const exportPressure = (pressure: number) => exportPageToSvg(page([
         rectEl({
@@ -2142,29 +2230,93 @@ describe("도형 직렬화", () => {
       ])).svg;
       const light = exportPressure(0);
       const heavy = exportPressure(1);
-      const widths = (svg: string) => Array.from(
-        svg.matchAll(/stroke-width="([^"]+)"/gu),
-        (match) => Number(match[1]),
+      const geometrySpans = (svg: string) => Array.from(
+        svg.matchAll(/data-luminous-ribbon="single-fill"[^>]*d="([^"]+)"/gu),
+        (match) => {
+          const coordinates = Array.from(
+            match[1]!.matchAll(/-?\d+(?:\.\d+)?/gu),
+            (coordinateMatch) => Number(coordinateMatch[0]),
+          );
+          const xs = coordinates.filter((_, index) => index % 2 === 0);
+          const ys = coordinates.filter((_, index) => index % 2 === 1);
+          return Math.max(...xs) - Math.min(...xs)
+            + Math.max(...ys) - Math.min(...ys);
+        },
       );
       const pressureOpacities = (svg: string) => Array.from(
-        svg.matchAll(/opacity="([^"]+)"/gu),
+        svg.matchAll(
+          /data-luminous-ribbon="single-fill"[^>]*opacity="([^"]+)"/gu,
+        ),
         (match) => Number(match[1]),
-      ).filter((value) => value !== 0.7);
-      const expectedCaps = brush === "soft-glow"
-        ? 8
-        : brush === "neon" || brush === "glow" ? 6 : 2;
+      );
+      const expectedPasses = brush === "soft-glow" ? 4 : 3;
 
-      expect(Math.max(...widths(heavy))).toBeGreaterThan(
-        Math.max(...widths(light)),
+      expect(Math.max(...geometrySpans(heavy))).toBeGreaterThan(
+        Math.max(...geometrySpans(light)),
       );
       expect(Math.max(...pressureOpacities(heavy))).toBeGreaterThan(
         Math.max(...pressureOpacities(light)),
       );
-      expect((heavy.match(/stroke-linecap="butt"/gu) ?? []).length)
-        .toBeGreaterThan(0);
-      expect((heavy.match(/data-pressure-endcap=/gu) ?? []).length)
-        .toBe(expectedCaps);
-      expect(heavy).not.toContain('stroke-linecap="round"');
+      expect(heavy.match(/data-luminous-ribbon="single-fill"/gu))
+        .toHaveLength(expectedPasses);
+      expect(heavy.match(/data-luminous-cap="round"/gu))
+        .toHaveLength(expectedPasses);
+      expect(heavy).not.toContain('stroke-linecap="butt"');
+      expect(heavy).not.toContain("data-pressure-endcap=");
+      expect(heavy).not.toContain("stroke-linecap=");
+    },
+  );
+
+  it.each([
+    ["highlighter", "round-superellipse"],
+    ["chisel-highlighter", "soft-flat"],
+    ["pastel-highlighter", "pastel-natural"],
+  ] as const)(
+    "%s — SVG도 one-wash 가변폭 리본과 %s cap을 쓴다",
+    (brush, expectedCap) => {
+      const exportPressure = (pressure: number) => exportPageToSvg(page([
+        rectEl({
+          id: `pressure-${brush}-${pressure}`,
+          kind: "freehand",
+          brush,
+          points: [0, 0, 12, 8, 24, -2, 40, 6],
+          pressures: [pressure, pressure, pressure, pressure],
+          materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+          sampleSpacing: 1,
+          stroke: "#13579b",
+          strokeWidth: 12,
+          opacity: 0.7,
+          fill: undefined,
+        }),
+      ])).svg;
+      const geometry = (svg: string) => {
+        const pathData = /data-highlighter-wash="single-fill"[^>]*><path d="([^"]+)"/u
+          .exec(svg)?.[1] ?? "";
+        const coordinates = Array.from(
+          pathData.matchAll(/-?\d+(?:\.\d+)?/gu),
+          (match) => Number(match[0]),
+        );
+        const xs = coordinates.filter((_, index) => index % 2 === 0);
+        const ys = coordinates.filter((_, index) => index % 2 === 1);
+        return {
+          span:
+            Math.max(...xs) - Math.min(...xs)
+            + Math.max(...ys) - Math.min(...ys),
+          pathData,
+        };
+      };
+      const washOpacity = (svg: string) => Number(
+        /fill="#13579b"[^>]*opacity="([^"]+)"/u.exec(svg)?.[1] ?? 0,
+      );
+      const light = exportPressure(0);
+      const heavy = exportPressure(1);
+
+      expect(geometry(heavy).span).toBeGreaterThan(geometry(light).span);
+      expect(washOpacity(heavy)).toBeGreaterThan(washOpacity(light));
+      expect(heavy).toContain(`data-highlighter-cap="${expectedCap}"`);
+      expect(heavy.match(/data-highlighter-wash="single-fill"/gu)).toHaveLength(1);
+      expect(heavy).not.toContain("data-pressure-endcap=");
+      expect(heavy).not.toContain("stroke-linecap=");
     },
   );
 
@@ -2204,7 +2356,7 @@ describe("도형 직렬화", () => {
     expect(svg).not.toContain('stroke-linecap="round"');
   });
 
-  it.each(["pencil-2b", "brush", "highlighter"] as const)(
+  it.each(["pencil-2b", "brush"] as const)(
     "%s 탭 — 최소 직경은 SVG geometry만 바꾸고 alpha는 그대로 둔다",
     (brush) => {
       const exportTap = (materialMinimumDiameterRatio: number) => (
@@ -2249,7 +2401,47 @@ describe("도형 직렬화", () => {
     },
   );
 
-  it.each(["pencil", "highlighter", "neon", "glow"] as const)(
+  it("highlighter 탭 — 최소 직경은 자연스러운 단일 footprint geometry만 바꾼다", () => {
+    const exportTap = (materialMinimumDiameterRatio: number) => (
+      exportPageToSvg(page([rectEl({
+        id: "minimum-tap-highlighter",
+        kind: "freehand",
+        brush: "highlighter",
+        points: [20, 24],
+        pressures: [0],
+        materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+        materialMinimumDiameterRatio,
+        stroke: "#13579b",
+        strokeWidth: 12,
+        opacity: 0.7,
+        fill: undefined,
+      })])).svg
+    );
+    const footprint = (svg: string) => {
+      const tag = /<path d="([^"]+)" fill="#13579b"[^>]*data-highlighter-wash="tap"[^>]*opacity="([^"]+)"\/>/u
+        .exec(svg);
+      const coordinates = Array.from(
+        (tag?.[1] ?? "").matchAll(/-?\d+(?:\.\d+)?/gu),
+        (match) => Number(match[0]),
+      );
+      const xs = coordinates.filter((_, index) => index % 2 === 0);
+      const ys = coordinates.filter((_, index) => index % 2 === 1);
+      return {
+        diameter: Math.max(
+          Math.max(...xs) - Math.min(...xs),
+          Math.max(...ys) - Math.min(...ys),
+        ),
+        opacity: Number(tag?.[2] ?? 0),
+      };
+    };
+    const sliderZero = footprint(exportTap(0));
+    const sliderFull = footprint(exportTap(1));
+
+    expect(sliderFull.diameter).toBeGreaterThan(sliderZero.diameter);
+    expect(sliderFull.opacity).toBe(sliderZero.opacity);
+  });
+
+  it.each(["pencil", "neon", "glow"] as const)(
     "%s — modern sampleSpacing은 원본 샘플을 유지하면서 연결 곡선을 부드럽게 내보낸다",
     (brush) => {
       const base = rectEl({
@@ -2278,6 +2470,30 @@ describe("도형 직렬화", () => {
     }
   );
 
+  it("highlighter — modern sampleSpacing과 legacy smoothing 모두 one-wash outline으로 직렬화한다", () => {
+    const base = rectEl({
+      id: "render-path-highlighter",
+      kind: "freehand",
+      brush: "highlighter",
+      points: [0, 0, 10, 20, 20, -5, 30, 15],
+      stroke: "#13579b",
+      strokeWidth: 9,
+      fill: undefined,
+    });
+    const modern = exportPageToSvg(page([{ ...base, sampleSpacing: 1.5 }])).svg;
+    const legacy = exportPageToSvg(page([base])).svg;
+    const pathData = (svg: string) => (
+      /data-highlighter-wash="single-fill"[^>]*><path d="([^"]+)"/u.exec(svg)?.[1]
+      ?? ""
+    );
+
+    expect(pathData(modern)).toContain("L");
+    expect(pathData(legacy)).toContain("L");
+    expect(pathData(modern)).not.toBe(pathData(legacy));
+    expect(modern).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
+    expect(legacy).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
+  });
+
   it("네온 — 미리보기와 같은 2중 컬러 할로 + 흰색 코어를 내보낸다", () => {
     const neon = rectEl({
       id: "neon-1",
@@ -2290,9 +2506,11 @@ describe("도형 직렬화", () => {
     });
     const { svg } = exportPageToSvg(page([neon]));
     expect(svg).toContain('data-brush-engine="neon-halo"');
-    expect((svg.match(/mix-blend-mode:screen/g) ?? [])).toHaveLength(15);
-    expect((svg.match(/(?:stroke|fill)="#39ff14"/g) ?? [])).toHaveLength(10);
-    expect(svg).toContain('stroke="#fff"');
+    expect((svg.match(/mix-blend-mode:screen/g) ?? [])).toHaveLength(3);
+    expect((svg.match(/fill="#39ff14"/g) ?? [])).toHaveLength(2);
+    expect(svg).toContain('fill="#fff"');
+    expect(svg.match(/data-luminous-ribbon="single-fill"/g)).toHaveLength(3);
+    expect(svg).not.toContain("stroke-linecap=");
   });
 
   it("네온 탭 — 짧은 입력도 일반 원으로 축소하지 않고 3중 할로를 유지한다", () => {

@@ -247,7 +247,9 @@ export type StudioBrushDynamicsBrushId = StudioBrushDynamicsPresetId
   | "spray"
   | "crayon"
   | "chalk"
-  | "charcoal";
+  | "charcoal"
+  | "pastel"
+  | "oil-pastel";
 
 /** Runtime/type guard shared by the editor, persistence and export paths. */
 export function isStudioBrushDynamicsPresetId(value: unknown): value is StudioBrushDynamicsPresetId {
@@ -264,7 +266,13 @@ export function resolveStudioBrushDynamicsPresetId(
   if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
   if (typeof brushId !== "string") return null;
   if (brushId === "spray" || brushId === "soft-brush" || brushId === "splatter") return "airbrush";
-  if (brushId === "crayon" || brushId === "chalk" || brushId === "charcoal") return "dry-media";
+  if (
+    brushId === "crayon"
+    || brushId === "chalk"
+    || brushId === "charcoal"
+    || brushId === "pastel"
+    || brushId === "oil-pastel"
+  ) return "dry-media";
   return null;
 }
 
@@ -1270,6 +1278,126 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         base: 0.24,
         mappings: [{ source: "tilt-magnitude", from: 1, to: 0.24 }],
         jitter: { mode: "multiply", amount: 0.09 },
+      },
+    },
+  },
+  pastel: {
+    presetId: "dry-media",
+    overrides: {
+      seed: 331,
+      taper: {
+        enabled: true,
+        startLength: 0.06,
+        endLength: 0.1,
+        minSizeRatio: 0.52,
+        minOpacityRatio: 0.46,
+        curve: 0.9,
+      },
+      tip: { shape: "sponge", softness: 0.62 },
+      width: {
+        base: 20,
+        mappings: [{ source: "pressure", from: 0.62, to: 1.24 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      opacity: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.46, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      flow: {
+        base: 0.52,
+        mappings: [{ source: "pressure", from: 0.58, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.06 },
+      },
+      grain: {
+        space: "canvas-fixed",
+        amount: 0.3,
+        scale: 8.5,
+        contrast: 0.62,
+        seed: 331,
+      },
+      spacingRatio: 0.12,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.94, to: 1.08 }],
+        jitter: null,
+      },
+      scatterRatio: 0.04,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.9, to: 1.08 }],
+        jitter: null,
+      },
+      angle: {
+        base: 0,
+        mappings: [
+          { source: "direction", mode: "add", from: 0, to: 360 },
+          { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.2 },
+        ],
+        jitter: { mode: "add", amount: 4 },
+      },
+      roundness: {
+        base: 0.38,
+        mappings: [{ source: "tilt-magnitude", from: 0.9, to: 0.3 }],
+        jitter: { mode: "multiply", amount: 0.05 },
+      },
+    },
+  },
+  "oil-pastel": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 337,
+      taper: {
+        enabled: true,
+        startLength: 0.05,
+        endLength: 0.08,
+        minSizeRatio: 0.58,
+        minOpacityRatio: 0.62,
+        curve: 0.86,
+      },
+      tip: { shape: "bristle", softness: 0.38 },
+      width: {
+        base: 18,
+        mappings: [{ source: "pressure", from: 0.58, to: 1.18 }],
+        jitter: { mode: "multiply", amount: 0.06 },
+      },
+      opacity: {
+        base: 0.88,
+        mappings: [{ source: "pressure", from: 0.62, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.05 },
+      },
+      flow: {
+        base: 0.7,
+        mappings: [{ source: "pressure", from: 0.7, to: 1 }],
+        jitter: { mode: "multiply", amount: 0.04 },
+      },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.16,
+        scale: 6,
+        contrast: 0.48,
+        seed: 337,
+      },
+      spacingRatio: 0.1,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.96, to: 1.06 }],
+        jitter: null,
+      },
+      scatterRatio: 0.025,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.94, to: 1.05 }],
+        jitter: null,
+      },
+      angle: {
+        base: 0,
+        mappings: [
+          { source: "direction", mode: "add", from: 0, to: 360 },
+          { source: "tilt-azimuth", mode: "add", from: 0, to: 360, amount: 0.12 },
+        ],
+        jitter: { mode: "add", amount: 3 },
+      },
+      roundness: {
+        base: 0.46,
+        mappings: [{ source: "tilt-magnitude", from: 0.96, to: 0.4 }],
+        jitter: { mode: "multiply", amount: 0.04 },
       },
     },
   },

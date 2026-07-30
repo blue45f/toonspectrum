@@ -403,7 +403,7 @@ describe("v2 stamp symmetry render plan", () => {
   it("keeps the identity Canvas fallback byte-for-operation equivalent to direct replay", () => {
     const points = [0, 0, 8, 0, 14, 3];
     const pressures = [0.3, 0.7, 1];
-    for (const kind of ["ink", "pencil", "airbrush", "watercolor"] as const) {
+    for (const kind of ["pencil", "airbrush", "watercolor"] as const) {
       const direct = new RecordingContext();
       drawStampStroke(direct as unknown as CanvasRenderingContext2D, stampStyle(kind), points, pressures);
 
@@ -424,6 +424,20 @@ describe("v2 stamp symmetry render plan", () => {
       expect(symmetric.operations.at(-1)).toBe("restore");
       expect(symmetric.operations.slice(2, -1)).toEqual(direct.operations);
     }
+
+    const ink = new RecordingContext();
+    const inkPlan = drawStudioStampStrokeWithSymmetry(
+      ink as unknown as CanvasRenderingContext2D,
+      stampStyle("ink"),
+      points,
+      pressures,
+      undefined,
+    );
+    expect(inkPlan.transforms).toHaveLength(1);
+    expect(ink.operations.filter((operation) => operation === "fill")).toHaveLength(1);
+    expect(ink.operations.some((operation) => operation.startsWith("arc:"))).toBe(false);
+    expect(ink.operations.some((operation) => operation.startsWith("move:"))).toBe(true);
+    expect(ink.operations.some((operation) => operation === "close")).toBe(true);
   });
 });
 
@@ -569,7 +583,8 @@ describe("direct-live eligibility", () => {
   });
 
   it.each([
-    ["eligible stamp", drawEl({ mode: "pen", brush: "ink-brush", stampPipeline: "causal-walker-v2" }), true],
+    ["ink uses retained stroke-local ribbon", drawEl({ mode: "pen", brush: "ink-brush", stampPipeline: "causal-walker-v2" }), false],
+    ["eligible stamp", drawEl({ mode: "pen", brush: "airbrush-fine", stampPipeline: "causal-walker-v2" }), true],
     ["default mode is not explicit pen", drawEl({ brush: "ink-brush", stampPipeline: "causal-walker-v2" }), false],
     ["eraser", drawEl({ mode: "eraser", brush: "ink-brush", stampPipeline: "causal-walker-v2" }), false],
     ["shape", drawEl({ kind: "line", mode: "pen", brush: "ink-brush", stampPipeline: "causal-walker-v2" }), false],
@@ -578,13 +593,13 @@ describe("direct-live eligibility", () => {
     ["non-stamp brush", drawEl({ mode: "pen", brush: "fineliner", stampPipeline: "causal-walker-v2" }), false],
     ["non-identity symmetry", drawEl({
       mode: "pen",
-      brush: "ink-brush",
+      brush: "airbrush-fine",
       stampPipeline: "causal-walker-v2",
       symmetry: { type: "vertical", centerX: 0, centerY: 0 },
     }), false],
     ["identity symmetry", drawEl({
       mode: "pen",
-      brush: "ink-brush",
+      brush: "airbrush-fine",
       stampPipeline: "causal-walker-v2",
       symmetry: { type: "none", centerX: 0, centerY: 0 },
     }), true],

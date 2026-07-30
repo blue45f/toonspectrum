@@ -26,6 +26,9 @@ import {
 } from "./studio-brush-textured-stamp";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import {
+  resolveStudioDynamicBrushMaterialIdentity,
+} from "./studio-dry-media-dynamic-bridge";
+import {
   clearStudioDynamicCoverageCommittedCache,
   disposeStudioDynamicCoverageCommittedCache,
   planStudioDynamicBrushCoverageAndLegacyMarks,
@@ -1658,6 +1661,51 @@ describe("studio dynamic brush bounded coverage renderer", () => {
       acceptedMarkBudget: 6,
     });
   });
+
+  it.each(["pastel", "oil-pastel"] as const)(
+    "charges every %s fibre lane before admitting a causal prefix",
+    (brushId) => {
+      const dynamics = normalizeStudioBrushDynamicsSettings({
+        depositPipeline: STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
+        tip: { shape: "hard", softness: 0 },
+        grain: { amount: 0 },
+        taper: { enabled: false },
+      });
+      const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(brushId);
+      expect(materialIdentity?.dryMediaPresetId).toBe("pastel");
+
+      const plan = planStudioDynamicBrushCoverageMarks({
+        dabVariations: [[
+          dab(),
+          dab({ index: 1, x: 30, sourceX: 30 }),
+          dab({ index: 2, x: 50, sourceX: 50 }),
+        ]],
+        dynamics,
+        materialIdentity: materialIdentity ?? undefined,
+        dynamicSeed: 42,
+        stroke: "#765432",
+        stampGrid: 3,
+        // Two complete source dabs × five physical pastel fibres fit. The third authored dab must
+        // become a causal prefix receipt, never a late all-or-nothing bridge failure.
+        markBudget: 10,
+      });
+
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) throw new Error(`expected bounded ${brushId} prefix`);
+      expect(plan.marks).toHaveLength(10);
+      expect(plan.acceptedPrefixReceipt).toMatchObject({
+        policy: "accepted-prefix-v1",
+        requestedDabsPerVariation: 3,
+        acceptedDabsPerVariation: 2,
+        rejectedDabsPerVariation: 1,
+        marksPerDab: 5,
+        acceptedMarkBudget: 10,
+      });
+      expect(plan.marks.every(({ radiusX, radiusY }) => (
+        radiusX / radiusY >= 3 - 1e-10
+      ))).toBe(true);
+    },
+  );
 
   it("keeps explicit full-stroke origins stable for suffix-only stroke-fixed grain plans", () => {
     const dynamics = normalizeStudioBrushDynamicsSettings({

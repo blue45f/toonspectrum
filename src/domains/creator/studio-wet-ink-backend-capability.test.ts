@@ -32,7 +32,7 @@ describe("interactive wet-ink backend capability", () => {
       backendId: "worker-webgpu-wet-ink-v1",
       availability: "unavailable",
       mainThreadPhysicalField: false,
-      fallbackRenderer: "wet-ribbon-carrier-v1",
+      fallbackRenderer: "wet-ribbon-carrier-v2",
       reason: "async-provider-not-installed",
     });
     expect(studioWetInkInteractiveBackendSupportsElement(

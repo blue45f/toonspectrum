@@ -216,6 +216,46 @@ describe("causal watercolor prefix contract", () => {
       });
     },
   );
+
+  it("keeps constant-pressure ink-wash pigment variation below the visible station frequency", () => {
+    const brush = "ink-wash";
+    const settings = resolveStudioBrushAliasWatercolorPlanSettings(brush, 30)!;
+    const pointCount = 81;
+    const dabs = applyStudioBrushAliasWatercolorMaterial(
+      brush,
+      planCausalWatercolorBrushDabs({
+        ...settings,
+        seed: 441,
+        diffuse: true,
+        maxDabs: 8_192,
+        points: Array.from(
+          { length: pointCount },
+          (_, index) => [20 + index * 5, 80],
+        ).flat(),
+        pressures: Array.from({ length: pointCount }, () => 0.659479341998814),
+      }, true),
+    );
+    const coreOpacities = dabs
+      .filter(({ role }) => role === "core")
+      .map(({ opacity }) => opacity);
+    const firstDifferences = coreOpacities.slice(1).map(
+      (opacity, index) => opacity - coreOpacities[index]!,
+    );
+    const secondDifferences = firstDifferences.slice(1).map(
+      (difference, index) => difference - firstDifferences[index]!,
+    );
+
+    expect(coreOpacities.length).toBeGreaterThan(60);
+    expect(Math.max(...firstDifferences.map(Math.abs)))
+      .toBeLessThanOrEqual(0.007);
+    // Per-station hash noise previously measured above 0.06 here, producing a tonal crossbar at
+    // nearly every 5.8px carrier station. The causal low-frequency material envelope stays smooth
+    // without looking numerically flat or changing any previously emitted station.
+    expect(Math.max(...secondDifferences.map(Math.abs)))
+      .toBeLessThanOrEqual(0.002);
+    expect(new Set(coreOpacities.map((opacity) => opacity.toFixed(4))).size)
+      .toBeGreaterThan(20);
+  });
 });
 
 describe("causal watercolor safety and cap behavior", () => {

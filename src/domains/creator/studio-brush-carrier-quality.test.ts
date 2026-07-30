@@ -13,6 +13,7 @@ import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime
 import { STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET } from "./studio-brush-render-budget";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import { planStudioCausalDynamicBrushDepositSegmentsV3 } from "./studio-causal-dynamic-brush-deposit-v2";
+import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
 
 describe("continuous brush carrier quality policy", () => {
@@ -369,5 +370,121 @@ describe("continuous brush carrier quality policy", () => {
     expect(contributingMarks).toBeGreaterThan(2);
     expect(accumulatedAlpha).toBeGreaterThan(0);
     expect(accumulatedAlpha).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps representative wet, dry and soft media continuous, deterministic and non-circular", () => {
+    const cases = [
+      ["watercolor-wet-bleed", "airbrush", 0.16, 0.08],
+      ["watercolor-wet-wash", "airbrush", 0.16, 0.08],
+      ["airbrush-grand-soft", "airbrush", 0.16, 0.08],
+      ["acrylic-stiff-flat", "ink-particle", 0.18, 0.08],
+      ["pastel-paper-soft", "dry-media", 0.22, 0.12],
+      ["crayon-wax-bold", "dry-media", 0.22, 0.12],
+      ["pencil-charcoal-stick", "dry-media", 0.22, 0.12],
+      ["sumi-wash-fray", "dry-media", 0.18, 0.1],
+      ["oil-dry-scumble", "dry-media", 0.18, 0.1],
+    ] as const;
+    const points = [
+      0, 0,
+      160, 160,
+      0, 160,
+      160, 0,
+      320, 160,
+    ];
+    const pressures = [0.32, 0.62, 0.84, 0.48, 0.72];
+    const speeds = [0.25, 0.45, 0.7, 0.38, 0.55];
+    const zeroes = new Array<number>(pressures.length).fill(0);
+    const startedAt = performance.now();
+
+    for (const [
+      catalogId,
+      expectedRuntime,
+      maximumSpacingRatio,
+      maximumScatterRatio,
+    ] of cases) {
+      const selection = materializeStudioBrushPackSelection(catalogId);
+      expect(selection, catalogId).not.toBeNull();
+      if (!selection) continue;
+      expect(selection.runtimeBrushId, catalogId).toBe(expectedRuntime);
+      expect(selection.brushDynamics.spacingRatio, catalogId).not.toBeNull();
+      expect(
+        selection.brushDynamics.spacingRatio ?? Number.POSITIVE_INFINITY,
+        `${catalogId}: carrier spacing`,
+      ).toBeLessThanOrEqual(maximumSpacingRatio);
+      expect(
+        selection.brushDynamics.scatterRatio ?? Number.POSITIVE_INFINITY,
+        `${catalogId}: carrier scatter`,
+      ).toBeLessThanOrEqual(maximumScatterRatio);
+      expect(selection.brushDynamics.colorDynamics, `${catalogId}: one pigment per stroke`)
+        .toMatchObject({
+          foregroundBackgroundJitter: 0,
+          hueJitter: 0,
+          saturationJitter: 0,
+          valueJitter: 0,
+        });
+
+      const deposits = planStudioCausalDynamicBrushDepositSegmentsV3({
+        points,
+        pressures,
+        speeds,
+        tangentialPressures: zeroes,
+        tiltXs: zeroes,
+        tiltYs: zeroes,
+        twists: zeroes,
+        settings: selection.brushDynamics,
+      });
+      expect(deposits.ok, catalogId).toBe(true);
+      if (!deposits.ok) continue;
+      const segments = deposits.segments.map((segment) => segment.dabs);
+      const flatDabs = segments.flat();
+      const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
+        selection.runtimeBrushId,
+        catalogId,
+      );
+      expect(materialIdentity, catalogId).not.toBeNull();
+      if (!materialIdentity) continue;
+      const plan = (segmented: boolean) => planStudioDynamicBrushCoverageMarks({
+        dabVariations: [segmented
+          ? {
+              kind: "studio-dynamic-brush-segmented-dab-variation",
+              segments,
+            }
+          : flatDabs],
+        dynamics: selection.brushDynamics,
+        materialIdentity,
+        dynamicSeed: selection.brushDynamics.seed,
+        stroke: "#4b3628",
+        stampGrid: 3,
+        markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
+      });
+      const retained = plan(false);
+      const liveSegmented = plan(true);
+      expect(retained.ok, catalogId).toBe(true);
+      expect(liveSegmented.ok, catalogId).toBe(true);
+      if (!retained.ok || !liveSegmented.ok) continue;
+      expect(liveSegmented.marks, `${catalogId}: live/commit material parity`)
+        .toEqual(retained.marks);
+      expect(retained.marks.length, `${catalogId}: visible carrier count`)
+        .toBeGreaterThan(8);
+      expect(
+        new Set(retained.marks.map((mark) => mark.color)),
+        `${catalogId}: no lighter carrier erasure`,
+      ).toEqual(new Set(["#4b3628"]));
+      expect(retained.marks.every((mark) => (
+        Number.isFinite(mark.x)
+        && Number.isFinite(mark.y)
+        && Number.isFinite(mark.alpha)
+        && mark.alpha > 0
+        && mark.alpha <= 1
+      )), `${catalogId}: finite visible coverage`).toBe(true);
+
+      if (expectedRuntime === "dry-media") {
+        expect(retained.marks.every((mark) => (
+          mark.radiusX / mark.radiusY >= 2.3
+        )), `${catalogId}: anisotropic carrier instead of round dabs`).toBe(true);
+      }
+    }
+
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
   });
 });
