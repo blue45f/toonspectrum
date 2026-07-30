@@ -5,10 +5,15 @@ import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
   STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_EMISSION_RGBA8_PROFILE,
+  STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+  STUDIO_BG3D_NORMAL_PACKING,
   STUDIO_BG3D_NORMAL_PROFILE,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
   createStudioBg3dBabylonCaptureExecutor,
+  runStudioBg3dBabylonBoundedImport,
+  type GlbBudgetFootprint,
   type StudioBg3dBabylonCapturePlan,
 } from "./studio-bg3d-babylon-artifact-capture";
 import {
@@ -25,6 +30,8 @@ import type {
   StudioBg3dSpecialistResult,
   StudioBg3dSpecialistRequest,
 } from "./studio-bg3d-runtime-adapter";
+import type { ISceneLoaderAsyncResult } from "@babylonjs/core/Loading/sceneLoader";
+import type { Scene } from "@babylonjs/core/scene";
 
 function context(
   request: StudioBg3dSpecialistRequest,
@@ -83,6 +90,190 @@ function createGlb(root: Record<string, unknown>): Uint8Array {
   return bytes;
 }
 
+function createTriangleGlb(): Uint8Array {
+  const positions = new Float32Array([
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ]);
+  const indices = new Uint16Array([0, 1, 2]);
+  const binaryByteLength = positions.byteLength + indices.byteLength;
+  const binaryChunkLength = Math.ceil(binaryByteLength / 4) * 4;
+  const root = {
+    asset: { version: "2.0" },
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        max: [1, 1, 0],
+        min: [0, 0, 0],
+        type: "VEC3",
+      },
+      {
+        bufferView: 1,
+        componentType: 5123,
+        count: 3,
+        max: [2],
+        min: [0],
+        type: "SCALAR",
+      },
+    ],
+    buffers: [{ byteLength: binaryByteLength }],
+    bufferViews: [
+      { buffer: 0, byteLength: positions.byteLength, byteOffset: 0, target: 34962 },
+      {
+        buffer: 0,
+        byteLength: indices.byteLength,
+        byteOffset: positions.byteLength,
+        target: 34963,
+      },
+    ],
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.3, 0.4, 0.9, 1] } }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
+    nodes: [{ mesh: 0 }],
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+  };
+  const encoded = new TextEncoder().encode(JSON.stringify(root));
+  const jsonChunkLength = Math.ceil(encoded.byteLength / 4) * 4;
+  const bytes = new Uint8Array(
+    12 + 8 + jsonChunkLength + 8 + binaryChunkLength,
+  );
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, bytes.byteLength, true);
+  view.setUint32(12, jsonChunkLength, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  bytes.fill(0x20, 20, 20 + jsonChunkLength);
+  bytes.set(encoded, 20);
+  const binaryHeaderOffset = 20 + jsonChunkLength;
+  view.setUint32(binaryHeaderOffset, binaryChunkLength, true);
+  view.setUint32(binaryHeaderOffset + 4, 0x004e4942, true);
+  const binaryOffset = binaryHeaderOffset + 8;
+  bytes.set(new Uint8Array(positions.buffer), binaryOffset);
+  bytes.set(new Uint8Array(indices.buffer), binaryOffset + positions.byteLength);
+  return bytes;
+}
+
+interface GlbPrimitiveFixture {
+  readonly elementCount: number;
+  readonly mode: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}
+
+function createPrimitiveModeGlb(
+  primitiveFixtures: readonly GlbPrimitiveFixture[],
+): Uint8Array {
+  const binaryChunks: {
+    readonly bytes: Uint8Array;
+    readonly byteOffset: number;
+    readonly target: 34962 | 34963;
+  }[] = [];
+  const accessors: Record<string, unknown>[] = [];
+  const bufferViews: Record<string, unknown>[] = [];
+  const primitives: Record<string, unknown>[] = [];
+  let binaryByteLength = 0;
+
+  const appendChunk = (
+    bytes: Uint8Array,
+    target: 34962 | 34963,
+  ): number => {
+    binaryByteLength = Math.ceil(binaryByteLength / 4) * 4;
+    const byteOffset = binaryByteLength;
+    const bufferView = bufferViews.length;
+    bufferViews.push({
+      buffer: 0,
+      byteLength: bytes.byteLength,
+      byteOffset,
+      target,
+    });
+    binaryChunks.push({ bytes, byteOffset, target });
+    binaryByteLength += bytes.byteLength;
+    return bufferView;
+  };
+
+  for (const [primitiveIndex, fixture] of primitiveFixtures.entries()) {
+    const positions = new Float32Array(fixture.elementCount * 3);
+    const indices = new Uint16Array(fixture.elementCount);
+    let maxX = 0;
+    let maxY = 0;
+    for (let index = 0; index < fixture.elementCount; index += 1) {
+      const x = index % 3;
+      const y = Math.floor(index / 3);
+      positions[index * 3] = x;
+      positions[index * 3 + 1] = y;
+      indices[index] = index;
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+    const positionBufferView = appendChunk(
+      new Uint8Array(positions.buffer),
+      34962,
+    );
+    const indexBufferView = appendChunk(new Uint8Array(indices.buffer), 34963);
+    const positionAccessor = accessors.length;
+    accessors.push({
+      bufferView: positionBufferView,
+      componentType: 5126,
+      count: fixture.elementCount,
+      max: [maxX, maxY, 0],
+      min: [0, 0, 0],
+      type: "VEC3",
+    });
+    const indexAccessor = accessors.length;
+    accessors.push({
+      bufferView: indexBufferView,
+      componentType: 5123,
+      count: fixture.elementCount,
+      max: [Math.max(0, fixture.elementCount - 1)],
+      min: [0],
+      type: "SCALAR",
+    });
+    primitives.push({
+      attributes: { POSITION: positionAccessor },
+      indices: indexAccessor,
+      material: 0,
+      mode: fixture.mode,
+      name: `primitive-${primitiveIndex}`,
+    });
+  }
+
+  const binaryChunkLength = Math.ceil(binaryByteLength / 4) * 4;
+  const root = {
+    asset: { version: "2.0" },
+    accessors,
+    buffers: [{ byteLength: binaryByteLength }],
+    bufferViews,
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.3, 0.4, 0.9, 1] } }],
+    meshes: [{ primitives }],
+    nodes: [{ mesh: 0 }],
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+  };
+  const encoded = new TextEncoder().encode(JSON.stringify(root));
+  const jsonChunkLength = Math.ceil(encoded.byteLength / 4) * 4;
+  const bytes = new Uint8Array(
+    12 + 8 + jsonChunkLength + 8 + binaryChunkLength,
+  );
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, bytes.byteLength, true);
+  view.setUint32(12, jsonChunkLength, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  bytes.fill(0x20, 20, 20 + jsonChunkLength);
+  bytes.set(encoded, 20);
+  const binaryHeaderOffset = 20 + jsonChunkLength;
+  view.setUint32(binaryHeaderOffset, binaryChunkLength, true);
+  view.setUint32(binaryHeaderOffset + 4, 0x004e4942, true);
+  const binaryOffset = binaryHeaderOffset + 8;
+  for (const chunk of binaryChunks) {
+    bytes.set(chunk.bytes, binaryOffset + chunk.byteOffset);
+  }
+  return bytes;
+}
+
 function modelDocument(bytes: Uint8Array): StudioBg3dSceneDocument {
   return normalizeStudioBg3dSceneDocument({
     ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
@@ -126,7 +317,170 @@ function runtimeAsset(bytes: Uint8Array): StudioBg3dRuntimeAssetSnapshot {
   };
 }
 
-describe("Studio Babylon beauty/depth capture executor", () => {
+async function admittedFootprint(bytes: Uint8Array): Promise<GlbBudgetFootprint> {
+  let footprint: GlbBudgetFootprint | undefined;
+  const execute = createStudioBg3dBabylonCaptureExecutor(async (_context, plan) => {
+    footprint = plan.assets[0]?.footprint;
+    return { rgba: new Uint8Array(16) };
+  });
+  await execute(context(
+    artifactRequest([
+      { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+    ]),
+    {
+      assets: [runtimeAsset(bytes)],
+      document: modelDocument(bytes),
+    },
+  ));
+  if (!footprint) throw new Error("Expected one admitted GLB footprint.");
+  return footprint;
+}
+
+function deferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly reject: (error: unknown) => void;
+  readonly resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
+function fakeScene(): Scene {
+  return {
+    animationGroups: [],
+    cameras: [],
+    geometries: [],
+    lights: [],
+    materials: [],
+    meshes: [],
+    morphTargetManagers: [],
+    multiMaterials: [],
+    particleSystems: [],
+    skeletons: [],
+    spriteManagers: [],
+    textures: [],
+    transformNodes: [],
+  } as unknown as Scene;
+}
+
+function emptyImportedResult(): ISceneLoaderAsyncResult {
+  return {
+    animationGroups: [],
+    geometries: [],
+    lights: [],
+    meshes: [],
+    particleSystems: [],
+    skeletons: [],
+    spriteManagers: [],
+    transformNodes: [],
+  };
+}
+
+function preflight(
+  overrides: Partial<GlbBudgetFootprint> = {},
+): GlbBudgetFootprint {
+  return {
+    accessorElements: 0,
+    animationChannels: 0,
+    animationKeyframes: 0,
+    animationValues: 0,
+    animations: 0,
+    decodedGeometryBytes: 0,
+    drawCalls: 0,
+    joints: 0,
+    lights: 0,
+    materialSlots: overrides.materialSlots ?? overrides.materials ?? 0,
+    materials: 0,
+    morphTargets: 0,
+    nodes: 0,
+    skins: 0,
+    textures: 0,
+    triangles: 0,
+    ...overrides,
+  };
+}
+
+function disposableResource<T extends object>(properties: T): T & {
+  readonly dispose: ReturnType<typeof vi.fn>;
+} {
+  return Object.assign(properties, { dispose: vi.fn() });
+}
+
+function triangleImportFixture(subMeshCount = 1) {
+  const scene = fakeScene();
+  const positionData = new Float32Array(9);
+  const indexData = new Uint16Array([0, 1, 2]);
+  const vertexDataBuffer = { capacity: positionData.byteLength };
+  const indexDataBuffer = { capacity: indexData.byteLength };
+  const vertexBuffer = {
+    getBuffer: () => vertexDataBuffer,
+    getData: () => positionData,
+    getSize: () => 3,
+  };
+  const geometry = disposableResource({
+    getIndexBuffer: () => indexDataBuffer,
+    getIndices: () => indexData,
+    getTotalIndices: () => indexData.length,
+    getTotalVertices: () => 3,
+    getVertexBuffer: () => vertexBuffer,
+    getVerticesData: () => positionData,
+    getVerticesDataKinds: () => ["position"],
+  });
+  const material = disposableResource({
+    fillMode: 0,
+    getActiveTextures: () => [],
+    getClassName: () => "StandardMaterial",
+  });
+  const root = disposableResource({
+    geometry: null,
+    getTotalIndices: () => 0,
+    getTotalVertices: () => 0,
+    material: null,
+    morphTargetManager: null,
+    parent: null,
+    skeleton: null,
+    subMeshes: [],
+  });
+  const mesh = disposableResource({
+    _internalMetadata: {
+      gltf: {
+        pointers: ["/meshes/0/primitives/0", "/nodes/0"],
+      },
+    },
+    geometry,
+    getTotalIndices: () => indexData.length,
+    getTotalVertices: () => 3,
+    material,
+    morphTargetManager: null,
+    parent: root,
+    skeleton: null,
+    subMeshes: Array.from({ length: subMeshCount }, () => ({})),
+  });
+  const attach = () => {
+    scene.meshes.push(
+      root as unknown as Scene["meshes"][number],
+      mesh as unknown as Scene["meshes"][number],
+    );
+    scene.geometries.push(geometry as unknown as Scene["geometries"][number]);
+    scene.materials.push(material as unknown as Scene["materials"][number]);
+  };
+  const imported: ISceneLoaderAsyncResult = {
+    ...emptyImportedResult(),
+    geometries: [geometry as unknown as ISceneLoaderAsyncResult["geometries"][number]],
+    meshes: [
+      root as unknown as ISceneLoaderAsyncResult["meshes"][number],
+      mesh as unknown as ISceneLoaderAsyncResult["meshes"][number],
+    ],
+  };
+  return { attach, geometry, imported, material, mesh, root, scene };
+}
+
+describe("Studio Babylon beauty/depth/normal capture executor", () => {
   it("keeps runtime metrics cheap and does not parse or render the scene", async () => {
     const render = vi.fn();
     const execute = createStudioBg3dBabylonCaptureExecutor(render);
@@ -135,7 +489,7 @@ describe("Studio Babylon beauty/depth capture executor", () => {
       kind: "metrics",
       values: {
         backend: "webgl2",
-        capture: "beauty-depth-v1",
+        capture: "beauty-depth-normal-v2",
         engine: "babylon",
         epoch: 7,
         initialized: true,
@@ -169,6 +523,7 @@ describe("Studio Babylon beauty/depth capture executor", () => {
       width: 2,
       height: 2,
       includeDepth: true,
+      includeNormal: false,
     });
     expect(result).toMatchObject({
       kind: "studio-bg3d-artifact-capture",
@@ -195,6 +550,47 @@ describe("Studio Babylon beauty/depth capture executor", () => {
       .toBe(0);
     expect(result.kind === "studio-bg3d-artifact-capture" && result.artifacts[1]?.data[0])
       .toBe(1);
+  });
+
+  it("emits a canonical normal artifact from one renderer-owned frame", async () => {
+    const normal = Uint8Array.from([
+      128, 128,
+      255, 128,
+      128, 255,
+      0, 128,
+    ]);
+    let received: StudioBg3dBabylonCapturePlan | undefined;
+    const execute = createStudioBg3dBabylonCaptureExecutor(async (_context, plan) => {
+      received = plan;
+      return {
+        rgba: new Uint8Array(16),
+        normal,
+      };
+    });
+
+    const result = await execute(context(artifactRequest([
+      { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
+    ]))) as StudioBg3dSpecialistResult;
+
+    expect(received).toMatchObject({
+      includeDepth: false,
+      includeNormal: true,
+    });
+    expect(result).toMatchObject({
+      kind: "studio-bg3d-artifact-capture",
+      artifacts: [{
+        kind: "normal",
+        profile: STUDIO_BG3D_NORMAL_PROFILE,
+        coordinateSpace: STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+        packing: STUDIO_BG3D_NORMAL_PACKING,
+        data: normal,
+      }],
+    });
+    normal[0] = 0;
+    expect(
+      result.kind === "studio-bg3d-artifact-capture" &&
+      result.artifacts[0]?.data[0],
+    ).toBe(128);
   });
 
   it("loads only defensive copies of exact verified GLB snapshots", async () => {
@@ -236,7 +632,7 @@ describe("Studio Babylon beauty/depth capture executor", () => {
     const execute = createStudioBg3dBabylonCaptureExecutor(render);
 
     await expect(execute(context(artifactRequest([
-      { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
+      { kind: "emission", profile: STUDIO_BG3D_EMISSION_RGBA8_PROFILE },
     ])))).rejects.toMatchObject({ code: "unsupported-artifact" });
 
     const orthographic = normalizeStudioBg3dSceneDocument({
@@ -331,5 +727,329 @@ describe("Studio Babylon beauty/depth capture executor", () => {
 
     await expect(execute(executionContext)).rejects.toMatchObject({ code: "aborted" });
     expect(render).not.toHaveBeenCalled();
+  });
+});
+
+describe("Studio Babylon bounded GLB import boundary", () => {
+  it("measures and admits a real Babylon 9.19 GLB scene delta", async () => {
+    const [{ NullEngine }, { Scene: BabylonScene }] = await Promise.all([
+      import("@babylonjs/core/Engines/nullEngine"),
+      import("@babylonjs/core/scene"),
+    ]);
+    const engine = new NullEngine();
+    const scene = new BabylonScene(engine);
+    try {
+      const result = await runStudioBg3dBabylonBoundedImport({
+        bytes: createTriangleGlb(),
+        budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        name: "real-triangle.glb",
+        preflight: preflight({
+          accessorElements: 6,
+          decodedGeometryBytes: 42,
+          drawCalls: 1,
+          materials: 1,
+          nodes: 1,
+          triangles: 1,
+        }),
+        scene,
+        signal: new AbortController().signal,
+      });
+
+      expect(result.receipt).toMatchObject({
+        accessorElements: 6,
+        decodedGeometryBytes: 42,
+        drawCalls: 1,
+        geometries: 1,
+        materials: 1,
+        meshes: 1,
+        nodes: 1,
+        runtimeNodes: 2,
+        textures: 0,
+        triangles: 1,
+      });
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+
+  it("admits a real multi-primitive GLB with logical nodes and draw-mode material slots", async () => {
+    const bytes = createPrimitiveModeGlb([
+      { elementCount: 2, mode: 1 },
+      { elementCount: 5, mode: 5 },
+      { elementCount: 4, mode: 6 },
+    ]);
+    const footprint = await admittedFootprint(bytes);
+    expect(footprint).toMatchObject({
+      accessorElements: 22,
+      decodedGeometryBytes: 154,
+      drawCalls: 3,
+      materialSlots: 3,
+      materials: 1,
+      nodes: 1,
+      triangles: 5,
+    });
+
+    const [{ NullEngine }, { Scene: BabylonScene }] = await Promise.all([
+      import("@babylonjs/core/Engines/nullEngine"),
+      import("@babylonjs/core/scene"),
+    ]);
+    const engine = new NullEngine();
+    const scene = new BabylonScene(engine);
+    try {
+      const result = await runStudioBg3dBabylonBoundedImport({
+        bytes,
+        budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        name: "multi-mode.glb",
+        preflight: footprint,
+        scene,
+        signal: new AbortController().signal,
+      });
+
+      expect(result.receipt).toMatchObject({
+        accessorElements: 22,
+        drawCalls: 3,
+        geometries: 3,
+        materials: 3,
+        meshes: 3,
+        nodes: 1,
+        runtimeNodes: 5,
+        triangles: 5,
+      });
+    } finally {
+      scene.dispose();
+      engine.dispose();
+    }
+  });
+
+  it("admits an exact public scene-delta receipt within preflight and document budgets", async () => {
+    const fixture = triangleImportFixture();
+    const importMesh = vi.fn(async () => {
+      fixture.attach();
+      return fixture.imported;
+    });
+
+    const result = await runStudioBg3dBabylonBoundedImport({
+      bytes: new Uint8Array([1, 2, 3]),
+      budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+      importMesh,
+      name: "bounded.glb",
+      preflight: preflight({
+        accessorElements: 6,
+        decodedGeometryBytes: 42,
+        drawCalls: 1,
+        materials: 1,
+        nodes: 1,
+        triangles: 1,
+      }),
+      scene: fixture.scene,
+      signal: new AbortController().signal,
+    });
+
+    expect(importMesh).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      fixture.scene,
+      {
+        meshNames: null,
+        name: "bounded.glb",
+        pluginExtension: ".glb",
+        rootUrl: "",
+      },
+    );
+    expect(result.imported).toBe(fixture.imported);
+    expect(result.receipt).toMatchObject({
+      accessorElements: 6,
+      decodedGeometryBytes: 42,
+      drawCalls: 1,
+      geometries: 1,
+      materials: 1,
+      meshes: 1,
+      nodes: 1,
+      runtimeNodes: 2,
+      triangles: 1,
+    });
+    expect(fixture.root.dispose).not.toHaveBeenCalled();
+    expect(fixture.geometry.dispose).not.toHaveBeenCalled();
+  });
+
+  it("fails closed and disposes the whole import delta when Babylon amplifies draw resources", async () => {
+    const fixture = triangleImportFixture(2);
+    const importMesh = vi.fn(async () => {
+      fixture.attach();
+      return fixture.imported;
+    });
+
+    await expect(runStudioBg3dBabylonBoundedImport({
+      bytes: new Uint8Array([1, 2, 3]),
+      budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+      importMesh,
+      name: "amplified.glb",
+      preflight: preflight({
+        accessorElements: 6,
+        decodedGeometryBytes: 42,
+        drawCalls: 1,
+        materials: 1,
+        nodes: 1,
+        triangles: 1,
+      }),
+      scene: fixture.scene,
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "resource-budget-exceeded" });
+
+    expect(fixture.root.dispose).toHaveBeenCalledOnce();
+    expect(fixture.mesh.dispose).toHaveBeenCalledOnce();
+    expect(fixture.geometry.dispose).toHaveBeenCalledOnce();
+    expect(fixture.material.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("disposes every late mesh dependency exactly once when abort wins before import resolve", async () => {
+    const scene = fakeScene();
+    const pendingImport = deferred<ISceneLoaderAsyncResult>();
+    const importMesh = vi.fn(() => pendingImport.promise);
+    const controller = new AbortController();
+    const pending = runStudioBg3dBabylonBoundedImport({
+      bytes: new Uint8Array([1, 2, 3]),
+      budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+      importMesh,
+      name: "late-abort.glb",
+      preflight: preflight(),
+      scene,
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(importMesh).toHaveBeenCalledOnce());
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "aborted" });
+
+    const texture = disposableResource({});
+    const material = disposableResource({
+      getActiveTextures: () => [texture],
+      getClassName: () => "StandardMaterial",
+    });
+    const geometry = disposableResource({});
+    const skeleton = disposableResource({ bones: [] });
+    const morphTargetManager = disposableResource({});
+    const root = disposableResource({
+      geometry: null,
+      getTotalVertices: () => 0,
+      material: null,
+      morphTargetManager: null,
+      parent: null,
+      skeleton: null,
+    });
+    const mesh = disposableResource({
+      geometry,
+      getTotalVertices: () => 3,
+      material,
+      morphTargetManager,
+      parent: root,
+      skeleton,
+    });
+    const animationGroup = disposableResource({});
+    const transformNode = disposableResource({});
+    const light = disposableResource({});
+    const particleSystem = disposableResource({});
+    const spriteManager = disposableResource({});
+    scene.meshes.push(
+      root as unknown as Scene["meshes"][number],
+      mesh as unknown as Scene["meshes"][number],
+    );
+    scene.geometries.push(geometry as unknown as Scene["geometries"][number]);
+    scene.materials.push(material as unknown as Scene["materials"][number]);
+    scene.textures.push(texture as unknown as Scene["textures"][number]);
+    scene.skeletons.push(skeleton as unknown as Scene["skeletons"][number]);
+    scene.morphTargetManagers.push(
+      morphTargetManager as unknown as Scene["morphTargetManagers"][number],
+    );
+    scene.animationGroups.push(
+      animationGroup as unknown as Scene["animationGroups"][number],
+    );
+    scene.transformNodes.push(
+      transformNode as unknown as Scene["transformNodes"][number],
+    );
+    scene.lights.push(light as unknown as Scene["lights"][number]);
+    scene.particleSystems.push(
+      particleSystem as unknown as Scene["particleSystems"][number],
+    );
+    scene.spriteManagers?.push(
+      spriteManager as unknown as NonNullable<Scene["spriteManagers"]>[number],
+    );
+    pendingImport.resolve({
+      ...emptyImportedResult(),
+      animationGroups: [
+        animationGroup as unknown as ISceneLoaderAsyncResult["animationGroups"][number],
+      ],
+      geometries: [
+        geometry as unknown as ISceneLoaderAsyncResult["geometries"][number],
+      ],
+      lights: [light as unknown as ISceneLoaderAsyncResult["lights"][number]],
+      meshes: [
+        root as unknown as ISceneLoaderAsyncResult["meshes"][number],
+        mesh as unknown as ISceneLoaderAsyncResult["meshes"][number],
+      ],
+      particleSystems: [
+        particleSystem as unknown as ISceneLoaderAsyncResult["particleSystems"][number],
+      ],
+      skeletons: [
+        skeleton as unknown as ISceneLoaderAsyncResult["skeletons"][number],
+      ],
+      spriteManagers: [
+        spriteManager as unknown as ISceneLoaderAsyncResult["spriteManagers"][number],
+      ],
+      transformNodes: [
+        transformNode as unknown as ISceneLoaderAsyncResult["transformNodes"][number],
+      ],
+    });
+
+    await vi.waitFor(() => expect(mesh.dispose).toHaveBeenCalledOnce());
+    for (const resource of [
+      root,
+      mesh,
+      geometry,
+      material,
+      texture,
+      skeleton,
+      morphTargetManager,
+      animationGroup,
+      transformNode,
+      light,
+      particleSystem,
+      spriteManager,
+    ]) {
+      expect(resource.dispose).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("cleans partial scene resources on timeout and does not dispose twice after late reject", async () => {
+    vi.useFakeTimers();
+    try {
+      const scene = fakeScene();
+      const pendingImport = deferred<ISceneLoaderAsyncResult>();
+      const importMesh = vi.fn(() => pendingImport.promise);
+      const partialGeometry = disposableResource({});
+      const pending = runStudioBg3dBabylonBoundedImport({
+        bytes: new Uint8Array([1, 2, 3]),
+        budgets: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        importMesh,
+        name: "late-timeout.glb",
+        preflight: preflight(),
+        scene,
+        signal: new AbortController().signal,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(importMesh).toHaveBeenCalledOnce();
+      scene.geometries.push(
+        partialGeometry as unknown as Scene["geometries"][number],
+      );
+      const rejection = expect(pending).rejects.toMatchObject({ code: "timeout" });
+      await vi.advanceTimersByTimeAsync(60_000);
+      await rejection;
+      expect(partialGeometry.dispose).toHaveBeenCalledOnce();
+
+      pendingImport.reject(new Error("late parser rejection"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(partialGeometry.dispose).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

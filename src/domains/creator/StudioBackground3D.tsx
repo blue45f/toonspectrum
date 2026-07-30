@@ -149,6 +149,7 @@ import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
   STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_NORMAL_PROFILE,
   normalizeStudioBg3dArtifactCaptureResultV2,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
@@ -1672,6 +1673,31 @@ function hasStudioBg3dBabylonDiagnosticDepthVariation(
   return minimum < 0.999 && maximum >= 0.999 && maximum - minimum >= 0.01;
 }
 
+function hasStudioBg3dBabylonDiagnosticNormalVariation(
+  normal: Uint8Array,
+  depth: Float32Array,
+): boolean {
+  if (normal.length !== depth.length * 2) return false;
+  let minimumRed = 255;
+  let maximumRed = 0;
+  let minimumGreen = 255;
+  let maximumGreen = 0;
+  let geometryPixels = 0;
+  for (let pixel = 0; pixel < depth.length; pixel += 1) {
+    if (depth[pixel]! >= 0.999) continue;
+    geometryPixels += 1;
+    const offset = pixel * 2;
+    minimumRed = Math.min(minimumRed, normal[offset]!);
+    maximumRed = Math.max(maximumRed, normal[offset]!);
+    minimumGreen = Math.min(minimumGreen, normal[offset + 1]!);
+    maximumGreen = Math.max(maximumGreen, normal[offset + 1]!);
+  }
+  return (
+    geometryPixels > 0 &&
+    Math.max(maximumRed - minimumRed, maximumGreen - minimumGreen) >= 8
+  );
+}
+
 function studioBg3dBabylonDiagnosticErrorMessage(
   backend: StudioBg3dBabylonDiagnosticBackend,
   error: unknown,
@@ -1690,7 +1716,8 @@ function studioBg3dBabylonDiagnosticErrorMessage(
   if (backend === "webgpu" && typeof navigator !== "undefined" && !("gpu" in navigator)) {
     return "이 브라우저에서 WebGPU를 사용할 수 없어 Babylon WebGPU 진단을 완료하지 못했습니다. WebGL2 진단은 자동 실행하지 않았습니다.";
   }
-  return `Babylon ${label} 엔진 또는 beauty/depth 패스를 분리 캔버스에서 검증하지 못했습니다. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
+  const supportCode = code ? ` · 지원 코드 ${code}` : "";
+  return `Babylon ${label} 엔진 또는 beauty/depth/normal 패스를 분리 캔버스에서 검증하지 못했습니다${supportCode}. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
 }
 
 type StudioBg3dCameraWithView = THREE.Camera & {
@@ -8871,7 +8898,7 @@ export function StudioBackground3D({
         throw new Error("Unexpected Babylon diagnostic receipt.");
       }
       const captureResult = await runtime.runIsolated({
-        id: `${diagnosticId}-beauty-depth`,
+        id: `${diagnosticId}-beauty-depth-normal`,
         snapshot,
         request: {
           kind: "artifact-capture-v2",
@@ -8881,6 +8908,7 @@ export function StudioBackground3D({
           artifacts: [
             { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
             { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+            { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
           ],
         },
         signal: controller.signal,
@@ -8892,6 +8920,9 @@ export function StudioBackground3D({
       const depth = normalizedCapture?.artifacts.find((artifact) =>
         artifact.kind === "depth"
       );
+      const normal = normalizedCapture?.artifacts.find((artifact) =>
+        artifact.kind === "normal"
+      );
       if (
         !normalizedCapture ||
         normalizedCapture.width !== 64 ||
@@ -8900,10 +8931,13 @@ export function StudioBackground3D({
         beauty.data.byteLength !== 64 * 64 * 4 ||
         !depth ||
         depth.data.length !== 64 * 64 ||
+        !normal ||
+        normal.data.length !== 64 * 64 * 2 ||
         !hasStudioBg3dBabylonDiagnosticDepthVariation(depth.data) ||
+        !hasStudioBg3dBabylonDiagnosticNormalVariation(normal.data, depth.data) ||
         !hasStudioBg3dBabylonDiagnosticBeautyVariation(beauty.data)
       ) {
-        throw new Error("Unexpected Babylon beauty/depth capture.");
+        throw new Error("Unexpected Babylon beauty/depth/normal capture.");
       }
       if (
         !componentActiveRef.current ||

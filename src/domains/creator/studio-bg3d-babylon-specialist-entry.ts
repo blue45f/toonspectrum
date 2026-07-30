@@ -6,6 +6,7 @@
  */
 
 import { Engine } from "@babylonjs/core/Engines/engine";
+import "@babylonjs/core/Engines/WebGPU/Extensions/engine.multiRender";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Scene } from "@babylonjs/core/scene";
 

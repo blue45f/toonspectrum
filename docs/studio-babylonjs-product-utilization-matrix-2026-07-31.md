@@ -23,9 +23,11 @@ Babylon.js는 ToonSpectrum의 모든 2D·3D 기능을 소유하는 범용 엔진
 
 현재 가장 큰 병목은 FX 종류를 v1 union에 계속 추가하는 일이 아니다. 격리 Babylon 런타임과
 versioned artifact bundle에 더해 canonical primitive·검증된 자체 포함 core GLB의 제한된
-beauty/depth executor까지 마련됐다. 다음 핵심 작업은 WebGL2/WebGPU readback과 straight-alpha,
-파싱 후 예산을 골든으로 확정하고 이 결과를 기존 Three 장면·linked 3D→2D cache/dirty planner에
-원자적으로 연결하는 일이다.
+beauty/depth/normal executor, 파싱 후 실제 자원 receipt와 늦게 정착하는 loader 자원의 회수
+경계까지 마련됐다. 독립적인 clean local Chromium 실행에서는 WebGL2와 WebGPU 모두 64×64
+beauty/depth/normal readback을 통과했다. 다음 핵심 작업은 이 최소 증거를 브라우저·GPU별
+straight-alpha·normal packing 골든과 반복 soak로 확장하고, 그 결과를 기존 Three 장면·linked
+3D→2D cache/dirty planner에 원자적으로 연결하는 일이다.
 
 Babylon의 런타임 객체는 Studio 문서, undo/redo, CRDT, 저장 파일에 들어가지 않는다. Studio는
 계속 엔진 중립적인 장면 문서와 제한된 효과 recipe를 소유하고, Babylon은 검증된 입력을 받아
@@ -58,32 +60,48 @@ canonical SceneDocument + verified asset bytes + bounded recipe
 - bounded `webtoon-fx-capture` v1 요청과 RGBA/depth 결과 검증
 - line/depth/object-ID/normal/combined의 renderer-neutral linked-render planner
 - LT Worker, shot batch, PSD, WebCodecs, thumbnail로 이어지는 기존 소비 경계
-- canonical primitive와 검증된 자체 포함 core GLB를 Babylon scene으로 복원해 beauty RGBA8와
-  linear normalized depth를 반환하는 제한된 실제 executor
+- canonical primitive와 검증된 자체 포함 core GLB를 Babylon scene으로 복원해 beauty RGBA8,
+  linear normalized depth, view-space octahedral RG8 normal을 반환하는 제한된 실제 executor
+- GLB JSON preflight 뒤 Babylon public scene delta에서 mesh/node/geometry/draw/triangle,
+  material/texture 크기·mip 추정, animation/keyframe/value, skeleton/joint, morph와 decoded
+  geometry byte를 재계수하고 증폭을 fail-closed하는 post-parse resource receipt
+- abort·60초 timeout이 먼저 끝난 뒤 `ImportMeshAsync`가 늦게 resolve/reject해도 partial scene
+  delta와 반환 자원 그래프를 한 번만 폐기하는 late-settle cleanup
 - 한 후보가 완전히 실패한 뒤에만 다음 후보를 실행하고 partial artifact를 섞지 않는
   renderer-neutral 원자적 failover 기반
 - bounded artifact bundle을 소비하는 CPU toon-outline, depth-atmosphere, emissive-bloom 기반
 
 다만 UI에서 연결된 Babylon 호출은 사용자가 직접 누르는 격리 진단뿐이다. 이 진단은 분리
-캔버스에서 `runtime-metrics`를 확인한 다음 64×64 canonical primitive의 beauty RGBA8와 linear
-normalized depth를 실제 캡처·검증한다. 실제 executor는 작품 결과 provider나 기존 Three 장면,
-linked render, LT, 필터 commit, shot batch에 아직 연결되지 않았다. beauty/depth도 canonical
-primitive와 검증된 자체 포함 core GLB의 제한 범위만 구현됐으며,
-normal/object ID/material ID/shadow/AO/emission/velocity는 계약만 있고 실제 Babylon pass는
-없다. CPU FX와 원자적 failover도 foundation·단위 테스트 단계이지 프로덕션 배선 완료 상태가
-아니다.
+캔버스에서 `runtime-metrics`를 확인한 다음 64×64 canonical primitive의 beauty RGBA8, linear
+normalized depth, view-space octahedral RG8 normal을 요청·검증하도록 연결됐다. executor와
+normal packing/readback은 자동 테스트를 통과했고, 2026-07-31 local Chromium 150의
+cross-origin-isolated production preview에서 독립 clean 실행 기준 WebGL2와 WebGPU 모두 실제
+beauty/depth/normal 진단을 통과했다. WebGPU clean 실행 측정값은 2,739ms였다. 다만 서로 다른
+백엔드를 같은 탭에서 연속으로 반복하는 soak에서는 GPU→CPU readback이 지연돼 60초 fail-closed
+timeout에 도달하는 사례가 있어, 이 결과를 다중 브라우저·GPU 안정성 골든 완료로 확대 해석하지
+않는다. 실제 executor도 작품 결과 provider나 기존 Three 장면, linked render, LT, 필터 commit,
+shot batch에는 아직 연결되지 않았다. beauty/depth/normal은 canonical primitive와 검증된 자체
+포함 core GLB의 제한 범위만 구현됐으며, object ID/material ID/shadow/AO/emission/velocity는
+계약만 있고 실제 Babylon pass는 없다. CPU FX와 원자적 failover도 foundation·단위 테스트
+단계이지 프로덕션 배선 완료 상태가 아니다.
+
+GLB 허용 범위도 의도적으로 좁다. 현재 image/texture를 포함한 GLB와 Draco·Meshopt·BasisU 등
+외부 decoder가 필요한 GLB는 계속 preflight에서 거부한다. post-parse texture dimension·mip
+receipt가 생겼다는 이유로 이 입력 정책이 자동 완화된 것은 아니다.
 
 남은 운영 연결 과제는 다음과 같다.
 
-1. WebGL2/WebGPU의 실제 readback 형식(BGRA/RGBA, Y축, premultiplied 여부)을 브라우저별로
-   검증하고, 항상 top-down straight-alpha sRGB와 깨끗한 transparent RGB로 정규화한다.
-2. GLB JSON 사전 예산에 더해 파싱 후 Babylon scene의 실제 mesh·material·texture·animation,
-   GPU 자원 예산을 다시 검사한다. 현재 사전 계산만으로는 decoder·loader 확장 뒤의 자원 증폭을
-   완전히 통제할 수 없다.
+1. local Chromium에서 통과한 WebGL2/WebGPU 실제 readback을 Chrome·Edge·Safari Technology
+   Preview와 주요 GPU vendor matrix로 확장해 BGRA/RGBA, Y축, premultiplied 여부와 반복
+   readback 지연을 골든/soak로 고정한다. 출력은 항상 top-down straight-alpha sRGB와 깨끗한
+   transparent RGB로 정규화한다.
+2. 구현된 GLB post-parse receipt를 실제 WebGL2/WebGPU corpus에서 골든으로 고정한다. 현재
+   mesh·material·texture dimension/mip·animation·skeleton·morph·decoded geometry 증폭은
+   재검사하지만, texture/decoder GLB 자체는 아직 허용하지 않는다.
 3. 작품 기능이 요청될 때만 승인된 lazy entry를 runtime adapter registry와 linked-render
    provider에 등록한다. 현재 진단 activation을 작품 결과 activation으로 오해하면 안 된다.
-4. canonical Three 장면과 제한된 Babylon scene의 beauty/depth 골든을 확정한 다음,
-   normal/object/material ID 실제 pass를 구현한다.
+4. canonical Three 장면과 제한된 Babylon scene의 beauty/depth/normal 골든을 확정한 다음,
+   object/material ID 실제 pass를 구현한다.
 5. 한 capture의 color와 depth/normal/ID를 서로 다른 엔진에서 섞지 않는다. Babylon pass 하나라도
    실패하면 renderer-neutral atomic failover를 통해 해당 capture 전체를 다음 provider에서 다시
    만들고, 검증된 결과 하나만 commit한다.
@@ -98,8 +116,8 @@ normal/object ID/material ID/shadow/AO/emission/velocity는 계약만 있고 실
    surface 하나와 last-good baked artifact를 사용해야 한다.
 
 따라서 다음 코드 단계는 effect union을 늘리는 패치가 아니라
-**readback/straight-alpha/post-parse budget 골든 + 운영 activation + 실제 normal/ID pass +
-원자적 provider commit**이다.
+**브라우저 readback/straight-alpha/normal·post-parse receipt 골든 + 운영 activation +
+실제 object/material ID·emission pass + 원자적 provider commit**이다.
 
 ## Babylon.js 9 계열에서 특히 주목할 기능
 
@@ -442,11 +460,14 @@ Babylon은 이 planner가 요청한 pass를 생성하는 provider가 된다.
 - seed와 canonical time
 - color space, alpha, row order, normal packing
 
-### 3.4 다음 result 계약
+### 3.4 현재 result 계약과 남은 pass
 
 현재 FX v1은 RGBA와 선택적 depth를 반환하고, v2 bounded multi-artifact bundle의 형식·검증
-계약도 구현됐다. 다만 현재 Babylon executor가 실제 생성하는 v2 artifact는 beauty와 depth뿐이다.
-Magic Layer와 고급 LT에 필요한 normal/ID 등은 아래 계약에 맞는 실제 렌더 pass가 남아 있다.
+계약도 구현됐다. 현재 Babylon executor는 beauty와 depth에 더해 view-right-handed normal을
+octahedral RG8로 packing해 실제 v2 artifact로 반환한다. local Chromium의 독립 clean WebGL2와
+WebGPU 진단은 이 세 pass의 실제 readback을 확인했지만, 반복 soak·브라우저/GPU matrix와 Three
+대비 골든은 아직 남아 있다. Magic Layer에 필요한 object/material ID와 발광 레이어용 emission
+등은 아래 계약에 맞는 실제 렌더 pass가 남아 있다.
 
 | artifact | 권장 형식 | 의미 |
 | --- | --- | --- |
@@ -507,9 +528,11 @@ Physics world, collider pointer, WASM heap은 문서에 저장하지 않는다.
 
 Babylon loader는 도입 시 first-party GLB validator를 대체하지 않고 advisory 교차 검사에만
 사용한다. `@babylonjs/loaders` 패키지는 버전을 고정했고 승인 lazy entry closure 안에 core GLB
-loader만 명시적으로 등록했다. 현재 용도는 검증된 자체 포함 GLB의 제한된 beauty/depth capture다.
-아래 advisory 대조는 아직 운영 검사기에 연결되지 않았고, Draco·Meshopt·BasisU는 로컬 decoder
-byte와 예산 정책을 확정하기 전까지 fail-closed한다.
+loader만 명시적으로 등록했다. 현재 용도는 검증된 자체 포함 GLB의 제한된 beauty/depth/normal
+capture다. core JSON preflight에 더해 파싱 후 실제 Babylon scene delta receipt를 검사하며,
+abort/timeout 뒤 늦게 정착한 loader 자원도 회수한다. 아래 advisory 대조는 아직 운영 검사기에
+연결되지 않았고, image/texture GLB와 Draco·Meshopt·BasisU는 로컬 decoder byte와 예산 정책을
+확정하기 전까지 fail-closed한다.
 
 - mesh/material/texture/skeleton/morph/animation 수 대조
 - bounds와 unit scale 대조
@@ -723,10 +746,10 @@ Babylon은 WebGPU와 WebGL을 병행 지원하며 WebGPU 엔진 초기화가 비
 | --- | --- | --- |
 | FX recipe | `studio-bg3d-webtoon-fx.ts` | versioned specialist request 유지 |
 | runtime routing | `studio-bg3d-runtime-topology.ts` | Three primary + Babylon isolated specialist |
-| output boundary | `studio-bg3d-runtime-adapter.ts` | exact RGBA/depth 검증과 방어 복사 |
+| output boundary | `studio-bg3d-runtime-adapter.ts` | exact RGBA/depth/octahedral-normal 검증과 방어 복사 |
 | Babylon lazy entry | `studio-bg3d-babylon-specialist-entry.ts` | 동적 import 전용 단일 entry와 deep ESM binding; 사용자 명시 진단에서만 호출 |
 | Babylon lifecycle | `studio-bg3d-babylon-specialist-runtime.ts` | WebGL/WebGPU 초기화·직렬화·중단·손실·폐기 |
-| Babylon capture | `studio-bg3d-babylon-artifact-capture.ts` | primitive·검증된 core GLB의 beauty/depth 제한 구현; normal/ID와 프로덕션 배선은 미구현 |
+| Babylon capture | `studio-bg3d-babylon-artifact-capture.ts` | primitive·검증된 core GLB의 beauty/depth/normal, post-parse receipt, late-settle cleanup 구현; object/material ID·emission과 프로덕션 배선은 미구현 |
 | multi-artifact v2 | `studio-bg3d-artifact-capture-v2.ts` | pass별 profile·크기·예산·legend 검증 |
 | atomic failover | `studio-bg3d-atomic-specialist-failover.ts` | all-or-nothing 후보 실행 기반; 작품 commit 경로에는 미배선 |
 | artifact FX | `studio-bg3d-artifact-webtoon-fx.ts` | 저해상도 CPU outline/atmosphere/bloom 기반; Babylon GPU/프로덕션 소비 경로에는 미배선 |
@@ -775,20 +798,24 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 1. 완료: Babylon WebGPU/WebGL lazy entry와 lifecycle runtime
 2. 완료: artifact-capture-v2 계약과 전용 manual chunk/bundle guard
 3. 완료(제한 범위): 사용자 명시 진단 activation과 canonical primitive/검증된 core GLB의 실제
-   beauty/depth executor
+   beauty/depth/normal executor
 4. 기반 완료·배선 전: renderer-neutral atomic failover와 bounded CPU
    outline/depth-atmosphere/emissive-bloom
-5. 다음: WebGL2/WebGPU readback·straight-alpha·post-parse budget 골든
-6. 다음: Three/Babylon 동일 beauty/depth 비교와 normal/ID 실제 캡처
-7. 다음: Babylon GPU outline + depth fog + bloom executor
-8. 다음: 작품 결과 activation, 원자적 provider commit, device-loss 골든/soak 검증
+5. 완료(제한 범위): GLB post-parse resource receipt와 abort/timeout late-settle cleanup
+6. 완료(최소 증거)·확장 필요: local Chromium 독립 clean WebGL2/WebGPU
+   beauty/depth/normal readback. 다음은 브라우저/GPU matrix, 반복 soak, straight-alpha·normal
+   packing·post-parse receipt 골든
+7. 다음: Three/Babylon 동일 beauty/depth/normal 비교와 object/material ID 실제 캡처
+8. 다음: Babylon GPU outline + depth fog + bloom executor
+9. 다음: 작품 결과 activation, 원자적 provider commit, device-loss 골든/soak 검증
 
 ### 단계 B — Multi-artifact와 Magic Layer
 
 1. 완료: result v2 bundle과 stable legend 검증
-2. 다음: normal/object ID/material ID 실제 렌더
-3. 다음: stable legend와 click selection
-4. 다음: linked render cache/dirty planner와 pass별 commit
+2. 완료(제한 범위): view-space octahedral RG8 normal 실제 렌더와 canonical artifact 반환
+3. 다음: object ID/material ID 실제 렌더
+4. 다음: stable legend와 click selection
+5. 다음: linked render cache/dirty planner와 pass별 commit
 
 ### 단계 C — 날씨와 모션
 
@@ -799,7 +826,7 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 
 ### 단계 D — 제작 패스
 
-1. normal
+1. 완료(제한 범위): view-space octahedral RG8 normal
 2. object/material ID + stable legend
 3. shadow/emission/AO
 4. LT·선택·PSD 연결

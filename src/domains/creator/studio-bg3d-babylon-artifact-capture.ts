@@ -14,6 +14,8 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import {
   ImportMeshAsync,
   RegisterSceneLoaderPlugin,
+  type ISceneLoaderAsyncResult,
+  type ImportMeshOptions,
 } from "@babylonjs/core/Loading/sceneLoader";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { Material } from "@babylonjs/core/Materials/material";
@@ -26,6 +28,7 @@ import "@babylonjs/core/Meshes/instancedMesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { GetEnvironmentBRDFTexture } from "@babylonjs/core/Misc/brdfTextureTools";
 import "@babylonjs/core/Rendering/depthRendererSceneComponent";
 import { registerBuiltInGLTFExtensions } from "@babylonjs/loaders/glTF/2.0/Extensions/dynamic";
 import { RegisterGLTF2Loader } from "@babylonjs/loaders/glTF/2.0/glTFLoader.pure";
@@ -40,8 +43,15 @@ import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
   STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+  STUDIO_BG3D_NORMAL_PACKING,
+  STUDIO_BG3D_NORMAL_PROFILE,
   type StudioBg3dArtifactCaptureResultV2,
 } from "./studio-bg3d-artifact-capture-v2";
+import {
+  captureStudioBg3dBabylonNormals,
+  StudioBg3dBabylonNormalCaptureError,
+} from "./studio-bg3d-babylon-normal-capture";
 import {
   StudioBg3dBabylonSpecialistError,
   type StudioBg3dBabylonSpecialistExecutionContext,
@@ -59,14 +69,24 @@ import type {
   StudioBg3dMaterialOverride,
   StudioBg3dModelNode,
   StudioBg3dPrimitiveKind,
+  StudioBg3dSceneBudgets,
   StudioBg3dSceneDocument,
   StudioBg3dSceneNode,
 } from "./studio-bg3d-scene-document";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import type { Skeleton } from "@babylonjs/core/Bones/skeleton";
 import type { AbstractEngine } from "@babylonjs/core/Engines/abstractEngine";
+import type { Light } from "@babylonjs/core/Lights/light";
+import type { MultiMaterial } from "@babylonjs/core/Materials/multiMaterial";
+import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Geometry } from "@babylonjs/core/Meshes/geometry";
+import type { MorphTargetManager } from "@babylonjs/core/Morph/morphTargetManager";
 import type { Node } from "@babylonjs/core/node";
+import type { IParticleSystem } from "@babylonjs/core/Particles/IParticleSystem";
 import type { DepthRenderer } from "@babylonjs/core/Rendering/depthRenderer";
 import type { Scene } from "@babylonjs/core/scene";
+import type { ISpriteManager } from "@babylonjs/core/Sprites/spriteManager";
 
 const GLB_MAGIC = 0x46546c67;
 const GLB_VERSION = 2;
@@ -75,6 +95,10 @@ const GLB_HEADER_BYTES = 12;
 const GLB_CHUNK_HEADER_BYTES = 8;
 const MAX_GLB_JSON_BYTES = 4 * 1024 * 1024;
 const MAX_CAPTURE_WAIT_MS = 60_000;
+const MAX_POST_PARSE_DECODE_AMPLIFICATION = 4;
+const MAX_BABYLON_VERTEX_KINDS = 64;
+const MAX_BABYLON_TEXTURE_MIP_LEVELS = 32;
+const GLTF_NODE_POINTER_PATTERN = /^\/nodes\/(0|[1-9]\d*)$/;
 const CAMERA_FAR_CLIP = 200;
 const MODEL_AUTO_FIT_SIZE = 2;
 const FLOAT_TOLERANCE = 1e-5;
@@ -133,7 +157,47 @@ export class StudioBg3dBabylonCaptureError extends Error {
 interface StudioBg3dBabylonCaptureAsset {
   readonly attachmentId: string;
   readonly bytes: Uint8Array;
+  readonly footprint: GlbBudgetFootprint;
   readonly glbJson: Record<string, unknown>;
+}
+
+export type StudioBg3dBabylonMeshImporter = (
+  source: Uint8Array,
+  scene: Scene,
+  options: ImportMeshOptions,
+) => Promise<ISceneLoaderAsyncResult>;
+
+export interface StudioBg3dBabylonPostParseReceipt {
+  readonly accessorElements: number;
+  readonly animationChannels: number;
+  readonly animationKeyframes: number;
+  readonly animationValues: number;
+  readonly animations: number;
+  readonly cameras: number;
+  readonly decodedGeometryBytes: number;
+  readonly drawCalls: number;
+  readonly geometries: number;
+  readonly joints: number;
+  readonly lights: number;
+  readonly materials: number;
+  readonly meshes: number;
+  readonly morphTargets: number;
+  /** Logical glTF nodes after removing Babylon's one synthetic loader root. */
+  readonly nodes: number;
+  readonly particleSystems: number;
+  readonly runtimeNodes: number;
+  readonly skeletons: number;
+  readonly spriteManagers: number;
+  readonly textureBytes: number;
+  readonly textureMipLevels: number;
+  readonly textures: number;
+  readonly maxTextureDimension: number;
+  readonly triangles: number;
+}
+
+export interface StudioBg3dBabylonBoundedImportResult {
+  readonly imported: ISceneLoaderAsyncResult;
+  readonly receipt: StudioBg3dBabylonPostParseReceipt;
 }
 
 export interface StudioBg3dBabylonCapturePlan {
@@ -142,6 +206,7 @@ export interface StudioBg3dBabylonCapturePlan {
   readonly document: StudioBg3dSceneDocument;
   readonly height: number;
   readonly includeDepth: boolean;
+  readonly includeNormal: boolean;
   readonly width: number;
 }
 
@@ -150,6 +215,8 @@ export interface StudioBg3dBabylonCaptureFrame {
   readonly rgba: Uint8Array;
   /** Linear normalized view depth in top-down row order. */
   readonly depth?: Float32Array;
+  /** View-space right-handed octahedral RG8 in top-down row order. */
+  readonly normal?: Uint8Array;
 }
 
 export type StudioBg3dBabylonCaptureRenderer = (
@@ -162,6 +229,7 @@ interface RequestedCapture {
   readonly height: number;
   readonly includeBeauty: boolean;
   readonly includeDepth: boolean;
+  readonly includeNormal: boolean;
   readonly width: number;
 }
 
@@ -281,7 +349,7 @@ function assertOfflineCoreGlb(bytes: Uint8Array): Record<string, unknown> {
   return root;
 }
 
-interface GlbBudgetFootprint {
+export interface GlbBudgetFootprint {
   readonly accessorElements: number;
   readonly animationChannels: number;
   readonly animationKeyframes: number;
@@ -291,6 +359,8 @@ interface GlbBudgetFootprint {
   readonly drawCalls: number;
   readonly joints: number;
   readonly lights: number;
+  /** Babylon material instances keyed by the glTF material/default slot and primitive draw mode. */
+  readonly materialSlots: number;
   readonly materials: number;
   readonly morphTargets: number;
   readonly nodes: number;
@@ -374,14 +444,23 @@ function primitiveTriangleCount(
   const elementCount = "indices" in primitive
     ? accessorElementCount(accessors, primitive.indices)
     : accessorElementCount(accessors, attributes.POSITION);
-  const mode = primitive.mode === undefined ? 4 : safeNonNegativeCount(primitive.mode);
+  const mode = gltfPrimitiveMode(primitive);
   if (mode === 4) return Math.floor(elementCount / 3);
   if (mode === 5 || mode === 6) return Math.max(0, elementCount - 2);
   return 0;
 }
 
+function gltfPrimitiveMode(primitive: Record<string, unknown>): number {
+  const mode = primitive.mode === undefined ? 4 : safeNonNegativeCount(primitive.mode);
+  if (mode > 6) throw captureError("unsafe-glb");
+  return mode;
+}
+
 function glbBudgetFootprint(root: Record<string, unknown>): GlbBudgetFootprint {
   const accessors = recordArray(root.accessors);
+  const materials = recordArray(root.materials);
+  const meshes = recordArray(root.meshes);
+  const nodes = recordArray(root.nodes);
   let accessorElements = 0;
   let decodedGeometryBytes = 0;
   for (const accessor of accessors) {
@@ -403,13 +482,61 @@ function glbBudgetFootprint(root: Record<string, unknown>): GlbBudgetFootprint {
   let triangles = 0;
   let drawCalls = 0;
   let morphTargets = 0;
-  for (const mesh of recordArray(root.meshes)) {
+  const materialSlots = new Set<string>();
+  const meshDrawCalls: number[] = [];
+  const meshMorphTargets: number[] = [];
+  const meshTriangles: number[] = [];
+  for (const mesh of meshes) {
+    let currentDrawCalls = 0;
+    let currentMorphTargets = 0;
+    let currentTriangles = 0;
     for (const primitive of recordArray(mesh.primitives)) {
-      triangles = safeAdd(triangles, primitiveTriangleCount(primitive, accessors));
-      drawCalls = safeAdd(drawCalls, 1);
-      morphTargets = safeAdd(morphTargets, recordArray(primitive.targets).length);
+      const mode = gltfPrimitiveMode(primitive);
+      const materialIndex = primitive.material === undefined
+        ? "default"
+        : safeNonNegativeCount(primitive.material);
+      if (typeof materialIndex === "number" && materialIndex >= materials.length) {
+        throw captureError("unsafe-glb");
+      }
+      materialSlots.add(`${materialIndex}:${mode}`);
+      currentTriangles = safeAdd(
+        currentTriangles,
+        primitiveTriangleCount(primitive, accessors),
+      );
+      currentDrawCalls = safeAdd(currentDrawCalls, 1);
+      currentMorphTargets = safeAdd(
+        currentMorphTargets,
+        recordArray(primitive.targets).length,
+      );
     }
+    meshTriangles.push(currentTriangles);
+    meshDrawCalls.push(currentDrawCalls);
+    meshMorphTargets.push(currentMorphTargets);
+    triangles = safeAdd(triangles, currentTriangles);
+    drawCalls = safeAdd(drawCalls, currentDrawCalls);
+    morphTargets = safeAdd(morphTargets, currentMorphTargets);
   }
+
+  // A core glTF mesh may be referenced by several nodes. Babylon renders each reference, while
+  // sharing geometry through InstancedMesh where it is safe to do so. Keep the old all-mesh
+  // definition total as a conservative floor, but also bound the actual node-expanded workload.
+  let referencedTriangles = 0;
+  let referencedDrawCalls = 0;
+  let referencedMorphTargets = 0;
+  for (const node of nodes) {
+    if (node.mesh === undefined) continue;
+    const meshIndex = safeNonNegativeCount(node.mesh);
+    if (meshIndex >= meshes.length) throw captureError("unsafe-glb");
+    referencedTriangles = safeAdd(referencedTriangles, meshTriangles[meshIndex] ?? 0);
+    referencedDrawCalls = safeAdd(referencedDrawCalls, meshDrawCalls[meshIndex] ?? 0);
+    referencedMorphTargets = safeAdd(
+      referencedMorphTargets,
+      meshMorphTargets[meshIndex] ?? 0,
+    );
+  }
+  triangles = Math.max(triangles, referencedTriangles);
+  drawCalls = Math.max(drawCalls, referencedDrawCalls);
+  morphTargets = Math.max(morphTargets, referencedMorphTargets);
 
   let animationChannels = 0;
   let animationKeyframes = 0;
@@ -455,9 +582,10 @@ function glbBudgetFootprint(root: Record<string, unknown>): GlbBudgetFootprint {
     drawCalls,
     joints,
     lights: punctualLights,
-    materials: recordArray(root.materials).length,
+    materialSlots: materialSlots.size,
+    materials: materials.length,
     morphTargets,
-    nodes: recordArray(root.nodes).length,
+    nodes: nodes.length,
     skins: skins.length,
     textures: recordArray(root.textures).length,
     triangles,
@@ -479,6 +607,7 @@ function assertPreParseBudgets(
     drawCalls: 0,
     joints: 0,
     lights: 0,
+    materialSlots: 0,
     materials: 0,
     morphTargets: 0,
     nodes: 0,
@@ -486,18 +615,12 @@ function assertPreParseBudgets(
     textures: 0,
     triangles: 0,
   };
-  const footprintByAsset = new Map<string, GlbBudgetFootprint>();
   for (const node of document.nodes) {
     if (node.kind !== "model") continue;
     const asset = assetById.get(node.attachmentId);
     if (!asset) throw captureError("asset-mismatch");
-    let footprint = footprintByAsset.get(asset.attachmentId);
-    if (!footprint) {
-      footprint = glbBudgetFootprint(asset.glbJson);
-      footprintByAsset.set(asset.attachmentId, footprint);
-    }
     for (const key of Object.keys(totals) as (keyof GlbBudgetFootprint)[]) {
-      totals[key] = safeAdd(totals[key], footprint[key]);
+      totals[key] = safeAdd(totals[key], asset.footprint[key]);
     }
   }
   const complexity = document.budgets.complexity;
@@ -506,7 +629,7 @@ function assertPreParseBudgets(
     totals.nodes > complexity.maxNodes ||
     totals.triangles > complexity.maxTriangles ||
     totals.drawCalls > complexity.maxDrawCalls ||
-    totals.materials > complexity.maxMaterials ||
+    Math.max(totals.materials, totals.materialSlots) > complexity.maxMaterials ||
     totals.lights > complexity.maxLights ||
     totals.animations > complexity.maxAnimations ||
     totals.animationChannels > complexity.maxAnimationChannels ||
@@ -594,9 +717,11 @@ function admitCaptureAssets(
     }
     const ownedBytes = Uint8Array.from(bytes);
     const glbJson = assertOfflineCoreGlb(ownedBytes);
+    const footprint = glbBudgetFootprint(glbJson);
     admitted.set(asset.attachmentId, Object.freeze({
       attachmentId: asset.attachmentId,
       bytes: ownedBytes,
+      footprint,
       glbJson,
     }));
   }
@@ -635,6 +760,7 @@ function resolveCaptureRequest(
       height: request.height,
       includeBeauty: true,
       includeDepth: true,
+      includeNormal: false,
     };
   }
   if (request.kind === "webtoon-fx-capture") {
@@ -645,11 +771,16 @@ function resolveCaptureRequest(
       height: request.height,
       includeBeauty: true,
       includeDepth: request.includeDepth,
+      includeNormal: false,
     };
   }
   if (request.kind !== "artifact-capture-v2") return null;
   const kinds = request.artifacts.map((artifact) => artifact.kind);
-  if (kinds.some((kind) => kind !== "beauty" && kind !== "depth")) {
+  if (
+    kinds.some((kind) =>
+      kind !== "beauty" && kind !== "depth" && kind !== "normal"
+    )
+  ) {
     throw captureError("unsupported-artifact");
   }
   return {
@@ -658,6 +789,7 @@ function resolveCaptureRequest(
     height: request.height,
     includeBeauty: kinds.includes("beauty"),
     includeDepth: kinds.includes("depth"),
+    includeNormal: kinds.includes("normal"),
   };
 }
 
@@ -672,6 +804,8 @@ function validateFrame(
     frame.rgba.byteLength !== pixels * 4 ||
     (request.includeDepth &&
       (!(frame.depth instanceof Float32Array) || frame.depth.length !== pixels)) ||
+    (request.includeNormal &&
+      (!(frame.normal instanceof Uint8Array) || frame.normal.length !== pixels * 2)) ||
     frame.depth?.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
   ) {
     throw captureError("capture-failed");
@@ -679,6 +813,7 @@ function validateFrame(
   return {
     rgba: Uint8Array.from(frame.rgba),
     ...(frame.depth ? { depth: Float32Array.from(frame.depth) } : {}),
+    ...(frame.normal ? { normal: Uint8Array.from(frame.normal) } : {}),
   };
 }
 
@@ -700,13 +835,25 @@ function toArtifactResult(
         data: Uint8Array.from(frame.rgba),
       });
     }
-    if (!frame.depth) throw captureError("capture-failed");
+    if (artifact.kind === "depth") {
+      if (!frame.depth) throw captureError("capture-failed");
+      return Object.freeze({
+        kind: "depth" as const,
+        width: request.width,
+        height: request.height,
+        profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+        data: Float32Array.from(frame.depth),
+      });
+    }
+    if (!frame.normal) throw captureError("capture-failed");
     return Object.freeze({
-      kind: "depth" as const,
+      kind: "normal" as const,
       width: request.width,
       height: request.height,
-      profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
-      data: Float32Array.from(frame.depth),
+      profile: STUDIO_BG3D_NORMAL_PROFILE,
+      coordinateSpace: STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+      packing: STUDIO_BG3D_NORMAL_PACKING,
+      data: Uint8Array.from(frame.normal),
     });
   });
   return Object.freeze({
@@ -729,7 +876,7 @@ function metricsResult(
       engine: "babylon",
       epoch: context.epoch,
       initialized: true,
-      capture: "beauty-depth-v1",
+      capture: "beauty-depth-normal-v2",
     },
   };
 }
@@ -749,6 +896,7 @@ function createCapturePlan(
     document,
     height: request.height,
     includeDepth: request.includeDepth,
+    includeNormal: request.includeNormal,
     width: request.width,
   });
 }
@@ -778,6 +926,789 @@ function withAbortAndDeadline<T>(
       (error: unknown) => finish(() => reject(error)),
     );
   });
+}
+
+interface StudioBg3dBabylonSceneResourceSnapshot {
+  readonly animationGroups: ReadonlySet<AnimationGroup>;
+  readonly cameras: ReadonlySet<Camera>;
+  readonly geometries: ReadonlySet<Geometry>;
+  readonly lights: ReadonlySet<Light>;
+  readonly materials: ReadonlySet<Material>;
+  readonly meshes: ReadonlySet<AbstractMesh>;
+  readonly morphTargetManagers: ReadonlySet<MorphTargetManager>;
+  readonly multiMaterials: ReadonlySet<MultiMaterial>;
+  readonly particleSystems: ReadonlySet<IParticleSystem>;
+  readonly skeletons: ReadonlySet<Skeleton>;
+  readonly spriteManagers: ReadonlySet<ISpriteManager>;
+  readonly textures: ReadonlySet<BaseTexture>;
+  readonly transformNodes: ReadonlySet<TransformNode>;
+}
+
+interface StudioBg3dBabylonSceneResourceDelta {
+  readonly animationGroups: Set<AnimationGroup>;
+  readonly cameras: Set<Camera>;
+  readonly geometries: Set<Geometry>;
+  readonly lights: Set<Light>;
+  readonly materials: Set<Material>;
+  readonly meshes: Set<AbstractMesh>;
+  readonly morphTargetManagers: Set<MorphTargetManager>;
+  readonly multiMaterials: Set<MultiMaterial>;
+  readonly particleSystems: Set<IParticleSystem>;
+  readonly skeletons: Set<Skeleton>;
+  readonly spriteManagers: Set<ISpriteManager>;
+  readonly textures: Set<BaseTexture>;
+  readonly transformNodes: Set<TransformNode>;
+}
+
+export interface RunStudioBg3dBabylonBoundedImportInput {
+  readonly bytes: Uint8Array;
+  readonly budgets: StudioBg3dSceneBudgets;
+  readonly importMesh?: StudioBg3dBabylonMeshImporter;
+  readonly name: string;
+  readonly preflight: GlbBudgetFootprint;
+  readonly scene: Scene;
+  readonly signal: AbortSignal;
+}
+
+function sceneArray<T>(value: readonly T[] | null | undefined): readonly T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function snapshotStudioBg3dBabylonSceneResources(
+  scene: Scene,
+): StudioBg3dBabylonSceneResourceSnapshot {
+  return {
+    animationGroups: new Set(sceneArray(scene.animationGroups)),
+    cameras: new Set(sceneArray(scene.cameras)),
+    geometries: new Set(sceneArray(scene.geometries)),
+    lights: new Set(sceneArray(scene.lights)),
+    materials: new Set(sceneArray(scene.materials)),
+    meshes: new Set(sceneArray(scene.meshes)),
+    morphTargetManagers: new Set(sceneArray(scene.morphTargetManagers)),
+    multiMaterials: new Set(sceneArray(scene.multiMaterials)),
+    particleSystems: new Set(sceneArray(scene.particleSystems)),
+    skeletons: new Set(sceneArray(scene.skeletons)),
+    spriteManagers: new Set(sceneArray(scene.spriteManagers)),
+    textures: new Set(sceneArray(scene.textures)),
+    transformNodes: new Set(sceneArray(scene.transformNodes)),
+  };
+}
+
+function setDelta<T>(
+  current: readonly T[] | null | undefined,
+  previous: ReadonlySet<T>,
+): Set<T> {
+  const result = new Set<T>();
+  for (const resource of sceneArray(current)) {
+    if (!previous.has(resource)) result.add(resource);
+  }
+  return result;
+}
+
+function addImportedResources(
+  resources: StudioBg3dBabylonSceneResourceDelta,
+  previous: StudioBg3dBabylonSceneResourceSnapshot,
+  imported: ISceneLoaderAsyncResult | null,
+): void {
+  if (!imported) return;
+  for (const resource of sceneArray(imported.meshes)) {
+    if (!previous.meshes.has(resource)) resources.meshes.add(resource);
+  }
+  for (const resource of sceneArray(imported.transformNodes)) {
+    if (!previous.transformNodes.has(resource)) resources.transformNodes.add(resource);
+  }
+  for (const resource of sceneArray(imported.geometries)) {
+    if (!previous.geometries.has(resource)) resources.geometries.add(resource);
+  }
+  for (const resource of sceneArray(imported.animationGroups)) {
+    if (!previous.animationGroups.has(resource)) resources.animationGroups.add(resource);
+  }
+  for (const resource of sceneArray(imported.skeletons)) {
+    if (!previous.skeletons.has(resource)) resources.skeletons.add(resource);
+  }
+  for (const resource of sceneArray(imported.lights)) {
+    if (!previous.lights.has(resource)) resources.lights.add(resource);
+  }
+  for (const resource of sceneArray(imported.particleSystems)) {
+    if (!previous.particleSystems.has(resource)) resources.particleSystems.add(resource);
+  }
+  for (const resource of sceneArray(imported.spriteManagers)) {
+    if (!previous.spriteManagers.has(resource)) resources.spriteManagers.add(resource);
+  }
+}
+
+function materialClassName(material: Material): string {
+  try {
+    return material.getClassName();
+  } catch {
+    return "";
+  }
+}
+
+function collectStudioBg3dBabylonSceneResourceDelta(
+  scene: Scene,
+  previous: StudioBg3dBabylonSceneResourceSnapshot,
+  imported: ISceneLoaderAsyncResult | null = null,
+  strictTextureEnumeration = false,
+): StudioBg3dBabylonSceneResourceDelta {
+  const resources: StudioBg3dBabylonSceneResourceDelta = {
+    animationGroups: setDelta(scene.animationGroups, previous.animationGroups),
+    cameras: setDelta(scene.cameras, previous.cameras),
+    geometries: setDelta(scene.geometries, previous.geometries),
+    lights: setDelta(scene.lights, previous.lights),
+    materials: setDelta(scene.materials, previous.materials),
+    meshes: setDelta(scene.meshes, previous.meshes),
+    morphTargetManagers: setDelta(
+      scene.morphTargetManagers,
+      previous.morphTargetManagers,
+    ),
+    multiMaterials: setDelta(scene.multiMaterials, previous.multiMaterials),
+    particleSystems: setDelta(scene.particleSystems, previous.particleSystems),
+    skeletons: setDelta(scene.skeletons, previous.skeletons),
+    spriteManagers: setDelta(scene.spriteManagers, previous.spriteManagers),
+    textures: setDelta(scene.textures, previous.textures),
+    transformNodes: setDelta(scene.transformNodes, previous.transformNodes),
+  };
+  addImportedResources(resources, previous, imported);
+
+  // ImportMeshAsync does not return materials or textures. Recover those ownership edges from
+  // imported meshes so a late result remains disposable even after Scene.dispose() cleared arrays.
+  for (const mesh of resources.meshes) {
+    const material = mesh.material;
+    if (!material) continue;
+    if (
+      !previous.multiMaterials.has(material as MultiMaterial) &&
+      materialClassName(material) === "MultiMaterial"
+    ) {
+      resources.multiMaterials.add(material as MultiMaterial);
+    } else if (!previous.materials.has(material)) {
+      resources.materials.add(material);
+    }
+    try {
+      for (const texture of material.getActiveTextures()) {
+        if (!previous.textures.has(texture)) resources.textures.add(texture);
+      }
+    } catch {
+      if (strictTextureEnumeration) {
+        throw captureError("resource-budget-exceeded");
+      }
+    }
+    const geometry = mesh.geometry;
+    if (geometry && !previous.geometries.has(geometry)) resources.geometries.add(geometry);
+    const skeleton = mesh.skeleton;
+    if (skeleton && !previous.skeletons.has(skeleton)) resources.skeletons.add(skeleton);
+    const morphTargetManager = mesh.morphTargetManager;
+    if (
+      morphTargetManager &&
+      !previous.morphTargetManagers.has(morphTargetManager)
+    ) {
+      resources.morphTargetManagers.add(morphTargetManager);
+    }
+  }
+  return resources;
+}
+
+function safeDisposeBabylonResource(
+  resource: unknown,
+  disposed: Set<object>,
+  args: readonly unknown[] = [],
+): void {
+  if (
+    (typeof resource !== "object" && typeof resource !== "function") ||
+    resource === null ||
+    disposed.has(resource)
+  ) {
+    return;
+  }
+  disposed.add(resource);
+  try {
+    const dispose = Reflect.get(resource, "dispose");
+    if (typeof dispose === "function") Reflect.apply(dispose, resource, args);
+  } catch {
+    // A hostile or already-lost GPU resource must not stop disposal of the remaining import delta.
+  }
+}
+
+function disposeStudioBg3dBabylonImportDelta(
+  scene: Scene,
+  previous: StudioBg3dBabylonSceneResourceSnapshot,
+  imported: ISceneLoaderAsyncResult | null,
+  disposed: Set<object>,
+): void {
+  const resources = collectStudioBg3dBabylonSceneResourceDelta(scene, previous, imported);
+  for (const resource of resources.animationGroups) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+  for (const resource of resources.particleSystems) {
+    safeDisposeBabylonResource(resource, disposed, [false, false, false]);
+  }
+  for (const resource of resources.spriteManagers) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+  // Geometry.dispose() detaches itself from every mesh. Disposing it first prevents Mesh.dispose()
+  // from implicitly disposing the same geometry before our exactly-once guard can observe it.
+  for (const resource of resources.geometries) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+  for (const resource of resources.meshes) {
+    safeDisposeBabylonResource(resource, disposed, [true, false]);
+  }
+  for (const resource of resources.transformNodes) {
+    safeDisposeBabylonResource(resource, disposed, [true, false]);
+  }
+  for (const resource of resources.lights) {
+    safeDisposeBabylonResource(resource, disposed, [true, false]);
+  }
+  for (const resource of resources.cameras) {
+    safeDisposeBabylonResource(resource, disposed, [true, false]);
+  }
+  for (const resource of resources.skeletons) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+  for (const resource of resources.morphTargetManagers) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+  for (const resource of resources.multiMaterials) {
+    safeDisposeBabylonResource(resource, disposed, [false, false, false]);
+  }
+  for (const resource of resources.materials) {
+    safeDisposeBabylonResource(resource, disposed, [false, false, true]);
+  }
+  for (const resource of resources.textures) {
+    safeDisposeBabylonResource(resource, disposed);
+  }
+}
+
+function safePostParseCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    throw captureError("resource-budget-exceeded");
+  }
+  return value;
+}
+
+function numericDataFootprint(value: unknown): {
+  readonly byteLength: number;
+  readonly length: number;
+} {
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+    const length = Reflect.get(value, "length");
+    return {
+      byteLength: safePostParseCount(value.byteLength),
+      length: safePostParseCount(length),
+    };
+  }
+  if (Array.isArray(value)) {
+    return {
+      byteLength: safeMultiply(value.length, Float64Array.BYTES_PER_ELEMENT),
+      length: safePostParseCount(value.length),
+    };
+  }
+  throw captureError("resource-budget-exceeded");
+}
+
+function animationComponentCount(dataType: number): number {
+  switch (dataType) {
+    case 0:
+      return 1;
+    case 1:
+    case 4:
+      return 3;
+    case 2:
+    case 7:
+      return 4;
+    case 3:
+      return 16;
+    case 5:
+    case 6:
+      return 2;
+    default:
+      throw captureError("resource-budget-exceeded");
+  }
+}
+
+function loaderOwnedGltfPointers(resource: unknown): readonly string[] {
+  if (
+    (typeof resource !== "object" && typeof resource !== "function") ||
+    resource === null
+  ) {
+    return [];
+  }
+  try {
+    const internalMetadata = Reflect.get(resource, "_internalMetadata");
+    if (!isPlainRecord(internalMetadata)) return [];
+    const gltf = internalMetadata.gltf;
+    if (!isPlainRecord(gltf) || !Array.isArray(gltf.pointers)) return [];
+    if (!gltf.pointers.every((pointer) => typeof pointer === "string")) {
+      throw captureError("resource-budget-exceeded");
+    }
+    return gltf.pointers;
+  } catch (error) {
+    if (error instanceof StudioBg3dBabylonCaptureError) throw error;
+    throw captureError("resource-budget-exceeded", error);
+  }
+}
+
+function logicalGltfNodeCount(
+  resources: StudioBg3dBabylonSceneResourceDelta,
+  preflight: GlbBudgetFootprint,
+): number {
+  const nodeIndices = new Set<number>();
+  for (const resource of [...resources.meshes, ...resources.transformNodes]) {
+    for (const pointer of loaderOwnedGltfPointers(resource)) {
+      const match = GLTF_NODE_POINTER_PATTERN.exec(pointer);
+      if (!match) continue;
+      const index = Number(match[1]);
+      if (
+        !Number.isSafeInteger(index) ||
+        index < 0 ||
+        index >= preflight.nodes
+      ) {
+        throw captureError("resource-budget-exceeded");
+      }
+      nodeIndices.add(index);
+    }
+  }
+  if (preflight.nodes > 0 && nodeIndices.size < 1) {
+    throw captureError("resource-budget-exceeded");
+  }
+  return nodeIndices.size;
+}
+
+function triangleCountForBabylonDrawMode(
+  elementCount: number,
+  drawMode: number,
+): number {
+  switch (drawMode) {
+    case Material.PointListDrawMode:
+    case Material.LineListDrawMode:
+    case Material.LineLoopDrawMode:
+    case Material.LineStripDrawMode:
+      return 0;
+    case Material.TriangleFillMode:
+      return Math.floor(elementCount / 3);
+    case Material.TriangleStripDrawMode:
+    case Material.TriangleFanDrawMode:
+      return Math.max(0, elementCount - 2);
+    default:
+      throw captureError("resource-budget-exceeded");
+  }
+}
+
+function textureMipReceipt(texture: BaseTexture): {
+  readonly bytes: number;
+  readonly maxDimension: number;
+  readonly mipLevels: number;
+} {
+  const size = texture.getSize();
+  const internal = texture.getInternalTexture();
+  if (!internal) throw captureError("resource-budget-exceeded");
+  let width = safePostParseCount(size.width);
+  let height = safePostParseCount(size.height);
+  let depth = safePostParseCount(internal.depth || 1);
+  if (width < 1 || height < 1 || depth < 1) {
+    throw captureError("resource-budget-exceeded");
+  }
+  const maxDimension = Math.max(width, height, depth);
+  const computedMipLevels = internal.generateMipMaps
+    ? Math.floor(Math.log2(maxDimension)) + 1
+    : 1;
+  const mipLevels = internal.mipLevelCount > 0
+    ? safePostParseCount(internal.mipLevelCount)
+    : computedMipLevels;
+  if (mipLevels < 1 || mipLevels > MAX_BABYLON_TEXTURE_MIP_LEVELS) {
+    throw captureError("resource-budget-exceeded");
+  }
+
+  const faces = texture.isCube ? 6 : 1;
+  let texels = 0;
+  for (let level = 0; level < mipLevels; level += 1) {
+    texels = safeAdd(texels, safeMultiply(safeMultiply(width, height), depth));
+    width = Math.max(1, Math.floor(width / 2));
+    height = Math.max(1, Math.floor(height / 2));
+    if (internal.is3D) depth = Math.max(1, Math.floor(depth / 2));
+  }
+  // A conservative RGBA32F ceiling makes this receipt independent of backend texture packing.
+  return {
+    bytes: safeMultiply(safeMultiply(texels, faces), 16),
+    maxDimension,
+    mipLevels,
+  };
+}
+
+function measureStudioBg3dBabylonPostParseReceipt(
+  resources: StudioBg3dBabylonSceneResourceDelta,
+  imported: ISceneLoaderAsyncResult,
+  preflight: GlbBudgetFootprint,
+): StudioBg3dBabylonPostParseReceipt {
+  const runtimeNodes = safeAdd(resources.meshes.size, resources.transformNodes.size);
+  const logicalNodes = logicalGltfNodeCount(resources, preflight);
+  const hasSyntheticLoaderRoot = sceneArray(imported.meshes).some((mesh) => {
+    try {
+      return resources.meshes.has(mesh) && mesh.parent === null && mesh.getTotalVertices() === 0;
+    } catch {
+      return false;
+    }
+  });
+  if (!hasSyntheticLoaderRoot || runtimeNodes < 1) {
+    throw captureError("resource-budget-exceeded");
+  }
+
+  let accessorElements = 0;
+  let decodedGeometryBytes = 0;
+  let drawCalls = 0;
+  let meshes = 0;
+  let triangles = 0;
+  const measuredBuffers = new Set<object>();
+  const measuredData = new Set<object>();
+
+  const addData = (value: unknown, components: number): void => {
+    const footprint = numericDataFootprint(value);
+    if (components < 1 || footprint.length % components !== 0) {
+      throw captureError("resource-budget-exceeded");
+    }
+    if (
+      (typeof value === "object" || typeof value === "function") &&
+      value !== null &&
+      !measuredData.has(value)
+    ) {
+      measuredData.add(value);
+      decodedGeometryBytes = safeAdd(decodedGeometryBytes, footprint.byteLength);
+    }
+    accessorElements = safeAdd(accessorElements, footprint.length / components);
+  };
+  const addBufferOrData = (buffer: unknown, data: unknown, components: number): void => {
+    if (
+      (typeof buffer === "object" || typeof buffer === "function") &&
+      buffer !== null
+    ) {
+      if (!measuredBuffers.has(buffer)) {
+        measuredBuffers.add(buffer);
+        const capacity = safePostParseCount(Reflect.get(buffer, "capacity"));
+        if (capacity > 0) {
+          decodedGeometryBytes = safeAdd(decodedGeometryBytes, capacity);
+        } else {
+          addData(data, components);
+          return;
+        }
+      }
+      const footprint = numericDataFootprint(data);
+      if (components < 1 || footprint.length % components !== 0) {
+        throw captureError("resource-budget-exceeded");
+      }
+      accessorElements = safeAdd(accessorElements, footprint.length / components);
+      return;
+    }
+    addData(data, components);
+  };
+
+  for (const geometry of resources.geometries) {
+    const kinds = geometry.getVerticesDataKinds();
+    if (
+      !Array.isArray(kinds) ||
+      kinds.length > MAX_BABYLON_VERTEX_KINDS ||
+      new Set(kinds).size !== kinds.length
+    ) {
+      throw captureError("resource-budget-exceeded");
+    }
+    const totalVertices = safePostParseCount(geometry.getTotalVertices());
+    for (const kind of kinds) {
+      const vertexBuffer = geometry.getVertexBuffer(kind);
+      if (!vertexBuffer) throw captureError("resource-budget-exceeded");
+      const components = safePostParseCount(vertexBuffer.getSize());
+      // getData() exposes the whole underlying buffer and therefore cannot identify the exact
+      // accessor length for interleaved attributes. Geometry's public accessor view is exact.
+      const data = geometry.getVerticesData(kind);
+      if (!data) throw captureError("resource-budget-exceeded");
+      addBufferOrData(vertexBuffer.getBuffer(), data, components);
+      if (numericDataFootprint(data).length / components !== totalVertices) {
+        throw captureError("resource-budget-exceeded");
+      }
+    }
+    const totalIndices = safePostParseCount(geometry.getTotalIndices());
+    if (totalIndices > 0) {
+      const indices = geometry.getIndices();
+      if (!indices) throw captureError("resource-budget-exceeded");
+      addBufferOrData(geometry.getIndexBuffer(), indices, 1);
+      if (numericDataFootprint(indices).length !== totalIndices) {
+        throw captureError("resource-budget-exceeded");
+      }
+    }
+  }
+
+  for (const mesh of resources.meshes) {
+    const vertices = safePostParseCount(mesh.getTotalVertices());
+    const indices = safePostParseCount(mesh.getTotalIndices());
+    if (vertices < 1 && indices < 1) continue;
+    meshes = safeAdd(meshes, 1);
+    const subMeshes = sceneArray(mesh.subMeshes);
+    drawCalls = safeAdd(drawCalls, Math.max(1, subMeshes.length));
+    const drawMode = mesh.material?.fillMode;
+    if (typeof drawMode !== "number" || !Number.isSafeInteger(drawMode)) {
+      throw captureError("resource-budget-exceeded");
+    }
+    const elementCount = indices > 0 ? indices : vertices;
+    triangles = safeAdd(
+      triangles,
+      triangleCountForBabylonDrawMode(elementCount, drawMode),
+    );
+  }
+
+  let morphTargets = 0;
+  for (const manager of resources.morphTargetManagers) {
+    const targets = safePostParseCount(manager.numTargets);
+    morphTargets = safeAdd(morphTargets, targets);
+    for (let index = 0; index < targets; index += 1) {
+      const target = manager.getTarget(index);
+      if (!target) throw captureError("resource-budget-exceeded");
+      for (const [value, components] of [
+        [target.getPositions(), 3],
+        [target.getNormals(), 3],
+        [target.getTangents(), 3],
+        [target.getUVs(), 2],
+        [target.getUV2s(), 2],
+        [target.getColors(), 4],
+      ] as const) {
+        if (value) addData(value, components);
+      }
+    }
+  }
+
+  let animations = 0;
+  let animationChannels = 0;
+  let animationKeyframes = 0;
+  let animationValues = 0;
+  for (const group of resources.animationGroups) {
+    animations = safeAdd(animations, 1);
+    const targetedAnimations = group.targetedAnimations;
+    if (!Array.isArray(targetedAnimations)) {
+      throw captureError("resource-budget-exceeded");
+    }
+    animationChannels = safeAdd(animationChannels, targetedAnimations.length);
+    for (const targeted of targetedAnimations) {
+      const keys = targeted.animation.getKeys();
+      if (!Array.isArray(keys)) throw captureError("resource-budget-exceeded");
+      animationKeyframes = safeAdd(animationKeyframes, keys.length);
+      accessorElements = safeAdd(accessorElements, keys.length);
+      decodedGeometryBytes = safeAdd(
+        decodedGeometryBytes,
+        safeMultiply(keys.length, Float64Array.BYTES_PER_ELEMENT),
+      );
+      const components = animationComponentCount(targeted.animation.dataType);
+      let outputElements = 0;
+      for (const key of keys) {
+        const tangentElements =
+          (key.inTangent === undefined ? 0 : 1) +
+          (key.outTangent === undefined ? 0 : 1);
+        outputElements = safeAdd(outputElements, 1 + tangentElements);
+      }
+      const scalarValues = safeMultiply(outputElements, components);
+      animationValues = safeAdd(animationValues, scalarValues);
+      accessorElements = safeAdd(accessorElements, outputElements);
+      decodedGeometryBytes = safeAdd(
+        decodedGeometryBytes,
+        safeMultiply(scalarValues, Float64Array.BYTES_PER_ELEMENT),
+      );
+    }
+  }
+
+  let joints = 0;
+  for (const skeleton of resources.skeletons) {
+    if (!Array.isArray(skeleton.bones)) throw captureError("resource-budget-exceeded");
+    joints = safeAdd(joints, skeleton.bones.length);
+  }
+
+  let textureBytes = 0;
+  let textureMipLevels = 0;
+  let maxTextureDimension = 0;
+  for (const texture of resources.textures) {
+    const receipt = textureMipReceipt(texture);
+    textureBytes = safeAdd(textureBytes, receipt.bytes);
+    textureMipLevels = safeAdd(textureMipLevels, receipt.mipLevels);
+    maxTextureDimension = Math.max(maxTextureDimension, receipt.maxDimension);
+  }
+
+  return Object.freeze({
+    accessorElements,
+    animationChannels,
+    animationKeyframes,
+    animationValues,
+    animations,
+    cameras: resources.cameras.size,
+    decodedGeometryBytes,
+    drawCalls,
+    geometries: resources.geometries.size,
+    joints,
+    lights: resources.lights.size,
+    materials: resources.materials.size,
+    meshes,
+    morphTargets,
+    nodes: logicalNodes,
+    particleSystems: resources.particleSystems.size,
+    runtimeNodes,
+    skeletons: resources.skeletons.size,
+    spriteManagers: resources.spriteManagers.size,
+    textureBytes,
+    textureMipLevels,
+    textures: resources.textures.size,
+    maxTextureDimension,
+    triangles,
+  });
+}
+
+function assertStudioBg3dBabylonPostParseReceipt(
+  receipt: StudioBg3dBabylonPostParseReceipt,
+  preflight: GlbBudgetFootprint,
+  budgets: StudioBg3dSceneBudgets,
+): void {
+  const complexity = budgets.complexity;
+  const textures = budgets.textures;
+  if (
+    receipt.nodes > complexity.maxNodes ||
+    receipt.triangles > complexity.maxTriangles ||
+    receipt.drawCalls > complexity.maxDrawCalls ||
+    receipt.materials > complexity.maxMaterials ||
+    receipt.lights > complexity.maxLights ||
+    receipt.animations > complexity.maxAnimations ||
+    receipt.animationChannels > complexity.maxAnimationChannels ||
+    receipt.animationKeyframes > complexity.maxAnimationKeyframes ||
+    receipt.animationValues > complexity.maxAnimationValues ||
+    receipt.skeletons > complexity.maxSkins ||
+    receipt.joints > complexity.maxJoints ||
+    receipt.morphTargets > complexity.maxMorphTargets ||
+    receipt.accessorElements > complexity.maxAccessorElements ||
+    receipt.decodedGeometryBytes > complexity.maxDecodedGeometryBytes ||
+    receipt.textures > textures.maxTextures ||
+    receipt.textureBytes > textures.maxTotalBytes ||
+    receipt.maxTextureDimension > textures.maxDimension
+  ) {
+    throw captureError("resource-budget-exceeded");
+  }
+  if (
+    receipt.cameras > 0 ||
+    receipt.particleSystems > 0 ||
+    receipt.spriteManagers > 0
+  ) {
+    throw captureError("unsupported-scene-feature");
+  }
+
+  const runtimeNodeEnvelope = safeAdd(
+    1,
+    safeAdd(safeMultiply(preflight.nodes, 2), preflight.drawCalls),
+  );
+  const decodedByteEnvelope = safeMultiply(
+    preflight.decodedGeometryBytes,
+    MAX_POST_PARSE_DECODE_AMPLIFICATION,
+  );
+  if (
+    receipt.runtimeNodes > runtimeNodeEnvelope ||
+    receipt.nodes > preflight.nodes ||
+    receipt.triangles > preflight.triangles ||
+    receipt.drawCalls > preflight.drawCalls ||
+    receipt.geometries > preflight.drawCalls ||
+    receipt.materials > preflight.materialSlots ||
+    receipt.lights > preflight.lights ||
+    receipt.animations > preflight.animations ||
+    receipt.animationChannels > preflight.animationChannels ||
+    receipt.animationKeyframes > preflight.animationKeyframes ||
+    receipt.animationValues > preflight.animationValues ||
+    receipt.skeletons > preflight.skins ||
+    receipt.joints > preflight.joints ||
+    receipt.morphTargets > preflight.morphTargets ||
+    receipt.accessorElements > preflight.accessorElements ||
+    receipt.decodedGeometryBytes > decodedByteEnvelope ||
+    receipt.textures > preflight.textures
+  ) {
+    throw captureError("resource-budget-exceeded");
+  }
+}
+
+/**
+ * Imports one verified GLB into an isolated Babylon scene.
+ *
+ * The scene delta is the ownership boundary. If cancellation/deadline wins, the parser may still
+ * settle later; that late result and every newly attached scene resource are disposed exactly once.
+ * A timely result is admitted only after its public Babylon resources produce a bounded receipt
+ * that cannot exceed either the canonical document budgets or the GLB preflight envelope.
+ */
+export async function runStudioBg3dBabylonBoundedImport(
+  input: RunStudioBg3dBabylonBoundedImportInput,
+): Promise<StudioBg3dBabylonBoundedImportResult> {
+  throwIfAborted(input.signal);
+  // PBR materials lazily create Babylon's fixed, scene-owned BRDF LUT. Establish that public
+  // engine baseline before taking the asset ownership snapshot so a texture-free GLB cannot be
+  // rejected as if it had smuggled in one decoded texture.
+  if (typeof input.scene.getClassName === "function") {
+    GetEnvironmentBRDFTexture(input.scene);
+  }
+  const previous = snapshotStudioBg3dBabylonSceneResources(input.scene);
+  const disposed = new Set<object>();
+  let cleanupLateResult = false;
+  const importMesh = input.importMesh ?? ImportMeshAsync;
+  const operation = Promise.resolve().then(() =>
+    importMesh(input.bytes, input.scene, {
+      meshNames: null,
+      name: input.name,
+      pluginExtension: ".glb",
+      rootUrl: "",
+    })
+  );
+  const observed = operation.then(
+    (imported) => {
+      if (cleanupLateResult) {
+        disposeStudioBg3dBabylonImportDelta(
+          input.scene,
+          previous,
+          imported,
+          disposed,
+        );
+      }
+      return imported;
+    },
+    (error: unknown) => {
+      if (cleanupLateResult) {
+        disposeStudioBg3dBabylonImportDelta(
+          input.scene,
+          previous,
+          null,
+          disposed,
+        );
+      }
+      throw error;
+    },
+  );
+
+  let imported: ISceneLoaderAsyncResult | null = null;
+  try {
+    imported = await withAbortAndDeadline(observed, input.signal);
+    throwIfAborted(input.signal);
+    const resources = collectStudioBg3dBabylonSceneResourceDelta(
+      input.scene,
+      previous,
+      imported,
+      true,
+    );
+    const receipt = measureStudioBg3dBabylonPostParseReceipt(
+      resources,
+      imported,
+      input.preflight,
+    );
+    assertStudioBg3dBabylonPostParseReceipt(
+      receipt,
+      input.preflight,
+      input.budgets,
+    );
+    throwIfAborted(input.signal);
+    return Object.freeze({ imported, receipt });
+  } catch (error) {
+    cleanupLateResult = true;
+    disposeStudioBg3dBabylonImportDelta(
+      input.scene,
+      previous,
+      imported,
+      disposed,
+    );
+    throw error;
+  }
 }
 
 function rgbaRowsTopDown(
@@ -1147,15 +2078,14 @@ async function populateScene(
 
     const asset = assetByAttachmentId.get(node.attachmentId);
     if (!asset) throw captureError("asset-mismatch");
-    const imported = await withAbortAndDeadline(
-      ImportMeshAsync(asset.bytes, scene, {
-        meshNames: null,
-        name: `${asset.attachmentId}.glb`,
-        pluginExtension: ".glb",
-        rootUrl: "",
-      }),
-      context.signal,
-    );
+    const { imported } = await runStudioBg3dBabylonBoundedImport({
+      bytes: asset.bytes,
+      budgets: plan.document.budgets,
+      name: `${asset.attachmentId}.glb`,
+      preflight: asset.footprint,
+      scene,
+      signal: context.signal,
+    });
     throwIfAborted(context.signal);
     for (const group of imported.animationGroups) {
       group.stop();
@@ -1319,6 +2249,49 @@ function setupLightingAndShadows(
   }
 }
 
+async function captureStudioBg3dBabylonNormalsWithDeadline(
+  context: StudioBg3dBabylonSpecialistExecutionContext,
+  plan: StudioBg3dBabylonCapturePlan,
+  scene: Scene,
+  meshes: readonly AbstractMesh[],
+  depth: Float32Array,
+): Promise<Uint8Array> {
+  throwIfAborted(context.signal);
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromJob = () => controller.abort();
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, MAX_CAPTURE_WAIT_MS);
+  context.signal.addEventListener("abort", abortFromJob, { once: true });
+  try {
+    return await captureStudioBg3dBabylonNormals({
+      backend: plan.backend,
+      depth,
+      height: plan.height,
+      meshes,
+      scene,
+      signal: controller.signal,
+      width: plan.width,
+    });
+  } catch (error) {
+    if (context.signal.aborted) throw captureError("aborted", error);
+    if (timedOut) throw captureError("timeout", error);
+    if (error instanceof StudioBg3dBabylonNormalCaptureError) {
+      if (error.code === "aborted") throw captureError("aborted", error);
+      if (error.code === "unsupported") {
+        throw captureError("unsupported-artifact", error);
+      }
+      throw captureError("capture-failed", error);
+    }
+    throw captureError("capture-failed", error);
+  } finally {
+    clearTimeout(timeout);
+    context.signal.removeEventListener("abort", abortFromJob);
+  }
+}
+
 async function renderStudioBg3dBabylonCapture(
   context: StudioBg3dBabylonSpecialistExecutionContext,
   plan: StudioBg3dBabylonCapturePlan,
@@ -1363,9 +2336,10 @@ async function renderStudioBg3dBabylonCapture(
   const hasDepthGeometry = populated.meshes.some((mesh) =>
     mesh.getTotalVertices() > 0 && mesh.isEnabled() && mesh.isVisible
   );
+  const requiresDepth = plan.includeDepth || plan.includeNormal;
   let depthRenderer: DepthRenderer | null = null;
   try {
-    if (plan.includeDepth && hasDepthGeometry) {
+    if (requiresDepth && hasDepthGeometry) {
       depthRenderer = scene.enableDepthRenderer(
         camera,
         false,
@@ -1413,14 +2387,24 @@ async function renderStudioBg3dBabylonCapture(
         context.signal,
       ).then((pixels) => depthRowsTopDown(pixels, plan.width, plan.height, flipY))
       : Promise.resolve(
-        plan.includeDepth
+        requiresDepth
           ? new Float32Array(plan.width * plan.height).fill(1)
           : undefined,
       );
     const [rgba, depth] = await Promise.all([rgbaPromise, depthPromise]);
+    const normal = plan.includeNormal && depth
+      ? await captureStudioBg3dBabylonNormalsWithDeadline(
+        context,
+        plan,
+        scene,
+        populated.meshes,
+        depth,
+      )
+      : undefined;
     return {
       rgba,
       ...(depth ? { depth } : {}),
+      ...(normal ? { normal } : {}),
     };
   } catch (error) {
     if (

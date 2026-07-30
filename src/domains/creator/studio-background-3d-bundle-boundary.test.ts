@@ -152,6 +152,9 @@ describe("Studio background 3D bundle boundary", () => {
   it("loads Babylon exactly once from its named explicit diagnostic loader", () => {
     const { file, source } = parseModule("./StudioBackground3D.tsx");
     const imports = moduleImports("./StudioBackground3D.tsx");
+    const specialistImports = moduleImports(
+      "./studio-bg3d-babylon-specialist-entry.ts",
+    );
     const babylonDynamicImports: ts.CallExpression[] = [];
     const loaderCalls: ts.CallExpression[] = [];
     const loaderFunctions: ts.FunctionLikeDeclaration[] = [];
@@ -194,6 +197,9 @@ describe("Studio background 3D bundle boundary", () => {
         specifier.includes("babylon") || specifier.startsWith("@babylonjs/")
       )),
     ).toEqual([]);
+    expect(specialistImports.valueImports).toContain(
+      "@babylonjs/core/Engines/WebGPU/Extensions/engine.multiRender",
+    );
     expect(babylonDynamicImports).toHaveLength(1);
     expect(loaderFunctions).toHaveLength(1);
     expect(

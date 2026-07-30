@@ -119,7 +119,9 @@ describe("Studio BG3D explicit Babylon diagnostic", () => {
     expect((webGlButton as HTMLButtonElement).disabled).toBe(false);
     expect((webGpuButton as HTMLButtonElement).disabled).toBe(false);
     expect(
-      screen.getByText(/실제 컬러\(beauty\)·깊이\(depth\) 패스를 확인합니다/),
+      screen.getByText(
+        /실제 컬러\(beauty\)·깊이\(depth\)·\s*법선\(normal\) 패스를 확인합니다/,
+      ),
     ).toBeTruthy();
     expect(
       screen.getByText(
