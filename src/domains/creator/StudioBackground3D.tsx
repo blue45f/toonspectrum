@@ -575,6 +575,7 @@ export interface StudioBackground3DProps {
 }
 
 type TransformModeId = "translate" | "rotate" | "scale";
+type TransformSpace = "local" | "world";
 type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
 type ViewEditorSection = "camera" | "physics";
 type LtEditorSection = "line" | "tone";
@@ -2463,6 +2464,13 @@ export function StudioBackground3D({
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
+  /**
+   * `null` preserves the editor's established mode-aware defaults: rotation uses local axes while
+   * move/scale use world axes. Once the user chooses a space, that explicit preference stays
+   * stable while switching tools and remains view-only (it never enters scene history).
+   */
+  const [transformSpaceOverride, setTransformSpaceOverride] =
+    useState<TransformSpace | null>(null);
   const [lineArtPreview, setLineArtPreview] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
   const [isQuadView, setIsQuadView] = useState(false);
@@ -3120,6 +3128,8 @@ export function StudioBackground3D({
     (model) => !readyCloneIds.has(model.id) && !failedCloneIds.has(model.id)
   );
   const physicsInteractionLocked = isStudioBg3dPhysicsTransientPhase(physicsPhase);
+  const transformSpace =
+    transformSpaceOverride ?? (transformMode === "rotate" ? "local" : "world");
   const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
     isRestoringScene || physicsInteractionLocked || isBatchRenderingShots;
   const shotBatchBlockedReason = sceneRecoveryError
@@ -8931,7 +8941,7 @@ export function StudioBackground3D({
           <TransformControls
             object={primitiveObjectsRef.current.get(firstSelectedId)}
             mode={transformMode}
-            space={transformMode === "rotate" ? "local" : "world"}
+            space={transformSpace}
             onMouseDown={() => {
               setIsTransforming(true);
               if (!firstSelectedId) return;
@@ -9295,6 +9305,59 @@ export function StudioBackground3D({
                       );
                     })}
                   </div>
+                  <StudioToolHintTarget
+                    className="col-span-2 sm:col-span-1"
+                    hint={{
+                      id: "bg3d:transform:space",
+                      title: transformSpace === "local" ? "로컬 축" : "글로벌 축",
+                      description:
+                        transformSpace === "local"
+                          ? "선택 객체가 회전한 방향을 기준으로 기즈모 축을 표시합니다."
+                          : "장면의 고정된 X·Y·Z 방향을 기준으로 기즈모 축을 표시합니다.",
+                      preview: "object-rotate",
+                      tip: "한 번 선택한 축 기준은 이동·회전·크기 도구를 바꿔도 유지됩니다.",
+                    }}
+                    disabled={
+                      physicsInteractionLocked ||
+                      placementActive ||
+                      isCapturing ||
+                      isRestoringScene ||
+                      isBatchRenderingShots
+                    }
+                    preferredSide="right"
+                  >
+                    <button
+                      type="button"
+                      aria-label={`${transformSpace === "local" ? "로컬 축" : "글로벌 축"} · ${
+                        transformSpace === "local" ? "글로벌 축으로 전환" : "로컬 축으로 전환"
+                      }`}
+                      aria-pressed={transformSpace === "local"}
+                      data-testid="bg3d-transform-space-toggle"
+                      disabled={
+                        physicsInteractionLocked ||
+                        placementActive ||
+                        isCapturing ||
+                        isRestoringScene ||
+                        isBatchRenderingShots
+                      }
+                      className={cx(
+                        "inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-lg border border-line/70 bg-panel/80 px-2 text-[0.65rem] font-bold text-fg-2 shadow-sm backdrop-blur transition-colors",
+                        "hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                        "disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9",
+                        transformSpace === "local" &&
+                          "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
+                      )}
+                      onClick={() =>
+                        setTransformSpaceOverride((current) => {
+                          const effective =
+                            current ?? (transformMode === "rotate" ? "local" : "world");
+                          return effective === "local" ? "world" : "local";
+                        })
+                      }
+                    >
+                      {transformSpace === "local" ? "로컬 축" : "글로벌 축"}
+                    </button>
+                  </StudioToolHintTarget>
                   <StudioToolHintTarget hint={quadViewHint} preferredSide="right">
                     <button
                       type="button"
