@@ -98,8 +98,20 @@ export const STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES = {
 
 export const STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS = [
   "blurFx",
+  "lensBlur",
+  "fieldIrisBlur",
+  "tiltShiftBlur",
+  "selectiveGaussianBlur",
+  "tileableBlur",
+  "differenceOfGaussians",
+  "dustScratches",
+  "colorToAlpha",
   "curve",
   "curveCh",
+  "edgeAwareDenoise",
+  "jpegArtifactReduction",
+  "lineCleanup",
+  "screentoneRemoval",
   "smartFilters",
 ] as const;
 export type StudioWorkAssetStructuredEditKey =
@@ -129,6 +141,11 @@ const STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS = [
   "motion-blur",
   "spin-blur",
   "zoom-blur",
+  "lens-blur",
+  "field-iris-blur",
+  "tilt-shift-blur",
+  "selective-gaussian-blur",
+  "tileable-blur",
   "sharpen",
   "smart-sharpen",
   "median-despeckle",
@@ -141,6 +158,13 @@ const STUDIO_WORK_ASSET_ADJUSTMENT_ENGINE_IDS = [
   "posterize",
   "ink-threshold",
   "line-extraction",
+  "line-cleanup",
+  "screentone-removal",
+  "jpeg-artifact-reduction",
+  "edge-aware-denoise",
+  "dust-scratches",
+  "difference-of-gaussians",
+  "color-to-alpha",
   "screentone",
   "color-halftone",
   "chromatic-aberration",
@@ -191,6 +215,87 @@ export const StudioWorkAssetBlurFxSchema = z
     strength: z.number().finite().min(0).max(100),
     radius: z.number().finite().min(1).max(40),
     angle: z.number().finite().min(0).max(360),
+  })
+  .strict();
+
+/**
+ * Exact normalized option objects for the four advanced blur kernels. Keeping each option scalar
+ * explicit makes immutable descriptors and CRDT references reject partial, widened, or
+ * implementation-specific payloads at the shared boundary.
+ */
+export const StudioWorkAssetLensBlurSchema = z
+  .object({
+    radius: z.number().finite().min(0.25).max(18),
+    sampleCount: z.number().finite().int().min(5).max(64),
+    apertureBlades: z.number().finite().int().min(3).max(12),
+    apertureRotationRadians: z.number().finite().min(-Math.PI).max(Math.PI),
+  })
+  .strict();
+
+export const StudioWorkAssetFieldIrisBlurSchema = z
+  .object({
+    focusCenterX: z.number().finite().min(0).max(1),
+    focusCenterY: z.number().finite().min(0).max(1),
+    focusRadius: z.number().finite().min(0).max(Math.SQRT2),
+    feather: z.number().finite().min(0.001).max(Math.SQRT2),
+    maximumBlurRadius: z.number().finite().min(0.25).max(18),
+    sampleCount: z.number().finite().int().min(5).max(64),
+    apertureBlades: z.number().finite().int().min(3).max(12),
+  })
+  .strict();
+
+export const StudioWorkAssetTiltShiftBlurSchema = z
+  .object({
+    axisRadians: z.number().finite().min(-Math.PI).max(Math.PI),
+    focusWidth: z.number().finite().min(0).max(Math.SQRT2 * 2),
+    feather: z.number().finite().min(0.001).max(Math.SQRT2),
+    maximumBlurRadius: z.number().finite().min(0.25).max(18),
+    sampleCount: z.number().finite().int().min(5).max(64),
+  })
+  .strict();
+
+export const StudioWorkAssetSelectiveGaussianBlurSchema = z
+  .object({
+    radius: z.number().finite().int().min(1).max(10),
+    spatialSigma: z.number().finite().min(0.1).max(20),
+    edgeThreshold: z.number().finite().min(0).max(255),
+    edgeSoftness: z.number().finite().min(0).max(2),
+  })
+  .strict();
+
+export const StudioWorkAssetTileableBlurSchema = z
+  .object({
+    radius: z.number().finite().int().min(1).max(20),
+    sigma: z.number().finite().min(0.1).max(20),
+    strength: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
+export const StudioWorkAssetDifferenceOfGaussiansSchema = z
+  .object({
+    smallSigma: z.number().finite().min(0.25).max(6),
+    largeSigma: z.number().finite().min(0.35).max(12),
+    threshold: z.number().finite().min(0).max(64),
+    strength: z.number().finite().min(0).max(32),
+  })
+  .strict()
+  .refine(
+    (value) => value.largeSigma >= value.smallSigma + 0.1,
+    "대형 시그마는 미세 시그마보다 0.1 이상 커야 합니다.",
+  );
+
+export const StudioWorkAssetDustScratchesSchema = z
+  .object({
+    radius: z.number().finite().int().min(1).max(5),
+    threshold: z.number().finite().min(0).max(255),
+    strength: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
+export const StudioWorkAssetColorToAlphaSchema = z
+  .object({
+    keyColor: z.string().regex(/^#[0-9a-f]{6}$/i),
+    strength: z.number().finite().min(0).max(100),
   })
   .strict();
 
@@ -246,10 +351,57 @@ export const StudioWorkAssetCurveChannelsSchema = z
   })
   .strict();
 
+/** Bounded direct-image representation used by the line-cleanup dialog and Worker pipeline. */
+export const StudioWorkAssetLineCleanupSchema = z
+  .object({
+    threshold: z.number().finite().min(0).max(1),
+    strength: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
+export const StudioWorkAssetScreentoneRemovalSchema = z
+  .object({
+    radius: z.number().finite().int().min(1).max(3),
+    strength: z.number().finite().min(0).max(1),
+    inkLumaThreshold: z.number().finite().min(0).max(160),
+  })
+  .strict();
+
+export const StudioWorkAssetJpegArtifactReductionSchema = z
+  .object({
+    deblockStrength: z.number().finite().min(0).max(1),
+    deringStrength: z.number().finite().min(0).max(1),
+    boundaryThreshold: z.number().finite().min(1).max(64),
+    protectedEdgeThreshold: z.number().finite().min(32).max(224),
+    ringingThreshold: z.number().finite().min(1).max(96),
+    inkLumaThreshold: z.number().finite().min(0).max(160),
+  })
+  .strict();
+
+export const StudioWorkAssetEdgeAwareDenoiseSchema = z
+  .object({
+    radius: z.number().finite().int().min(1).max(3),
+    strength: z.number().finite().min(0).max(1),
+    rangeThreshold: z.number().finite().min(4).max(192),
+  })
+  .strict();
+
 export type StudioWorkAssetStructuredEditValue =
   | z.infer<typeof StudioWorkAssetBlurFxSchema>
+  | z.infer<typeof StudioWorkAssetLensBlurSchema>
+  | z.infer<typeof StudioWorkAssetFieldIrisBlurSchema>
+  | z.infer<typeof StudioWorkAssetTiltShiftBlurSchema>
+  | z.infer<typeof StudioWorkAssetSelectiveGaussianBlurSchema>
+  | z.infer<typeof StudioWorkAssetTileableBlurSchema>
+  | z.infer<typeof StudioWorkAssetDifferenceOfGaussiansSchema>
+  | z.infer<typeof StudioWorkAssetDustScratchesSchema>
+  | z.infer<typeof StudioWorkAssetColorToAlphaSchema>
   | z.infer<typeof StudioWorkAssetCurveSchema>
   | z.infer<typeof StudioWorkAssetCurveChannelsSchema>
+  | z.infer<typeof StudioWorkAssetEdgeAwareDenoiseSchema>
+  | z.infer<typeof StudioWorkAssetJpegArtifactReductionSchema>
+  | z.infer<typeof StudioWorkAssetLineCleanupSchema>
+  | z.infer<typeof StudioWorkAssetScreentoneRemovalSchema>
   | z.infer<typeof StudioWorkAssetSmartFiltersSchema>;
 
 /** Parses and clones one structured reference edit through its exact bounded wire schema. */
@@ -260,10 +412,34 @@ export function parseStudioWorkAssetStructuredEditValue(
   switch (key) {
     case "blurFx":
       return StudioWorkAssetBlurFxSchema.parse(value);
+    case "lensBlur":
+      return StudioWorkAssetLensBlurSchema.parse(value);
+    case "fieldIrisBlur":
+      return StudioWorkAssetFieldIrisBlurSchema.parse(value);
+    case "tiltShiftBlur":
+      return StudioWorkAssetTiltShiftBlurSchema.parse(value);
+    case "selectiveGaussianBlur":
+      return StudioWorkAssetSelectiveGaussianBlurSchema.parse(value);
+    case "tileableBlur":
+      return StudioWorkAssetTileableBlurSchema.parse(value);
+    case "differenceOfGaussians":
+      return StudioWorkAssetDifferenceOfGaussiansSchema.parse(value);
+    case "dustScratches":
+      return StudioWorkAssetDustScratchesSchema.parse(value);
+    case "colorToAlpha":
+      return StudioWorkAssetColorToAlphaSchema.parse(value);
     case "curve":
       return StudioWorkAssetCurveSchema.parse(value);
     case "curveCh":
       return StudioWorkAssetCurveChannelsSchema.parse(value);
+    case "edgeAwareDenoise":
+      return StudioWorkAssetEdgeAwareDenoiseSchema.parse(value);
+    case "jpegArtifactReduction":
+      return StudioWorkAssetJpegArtifactReductionSchema.parse(value);
+    case "lineCleanup":
+      return StudioWorkAssetLineCleanupSchema.parse(value);
+    case "screentoneRemoval":
+      return StudioWorkAssetScreentoneRemovalSchema.parse(value);
     case "smartFilters":
       return StudioWorkAssetSmartFiltersSchema.parse(value);
   }
@@ -307,8 +483,20 @@ export const StudioWorkAssetElementSchema = z
     lineart: z.boolean().optional(),
     invert: z.boolean().optional(),
     blurFx: StudioWorkAssetBlurFxSchema.optional(),
+    lensBlur: StudioWorkAssetLensBlurSchema.optional(),
+    fieldIrisBlur: StudioWorkAssetFieldIrisBlurSchema.optional(),
+    tiltShiftBlur: StudioWorkAssetTiltShiftBlurSchema.optional(),
+    selectiveGaussianBlur: StudioWorkAssetSelectiveGaussianBlurSchema.optional(),
+    tileableBlur: StudioWorkAssetTileableBlurSchema.optional(),
+    differenceOfGaussians: StudioWorkAssetDifferenceOfGaussiansSchema.optional(),
+    dustScratches: StudioWorkAssetDustScratchesSchema.optional(),
+    colorToAlpha: StudioWorkAssetColorToAlphaSchema.optional(),
     curve: StudioWorkAssetCurveSchema.optional(),
     curveCh: StudioWorkAssetCurveChannelsSchema.optional(),
+    edgeAwareDenoise: StudioWorkAssetEdgeAwareDenoiseSchema.optional(),
+    jpegArtifactReduction: StudioWorkAssetJpegArtifactReductionSchema.optional(),
+    lineCleanup: StudioWorkAssetLineCleanupSchema.optional(),
+    screentoneRemoval: StudioWorkAssetScreentoneRemovalSchema.optional(),
     smartFilters: StudioWorkAssetSmartFiltersSchema.optional(),
     ...StudioWorkAssetScalarFiltersSchema.shape,
   })

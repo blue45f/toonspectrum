@@ -6,6 +6,12 @@
  */
 
 import type {
+  StudioFieldIrisBlurOptions,
+  StudioLensBlurOptions,
+  StudioSelectiveGaussianBlurOptions,
+  StudioTiltShiftBlurOptions,
+} from "./studio-advanced-blur-filter-kernels";
+import type {
   StudioClouds,
   StudioConvolution,
   StudioExposureAdjustment,
@@ -15,6 +21,7 @@ import type {
 } from "./studio-advanced-pixel-filters";
 import type { ChannelMixer } from "./studio-channel-mixer";
 import type { ColorBalance } from "./studio-color-balance";
+import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Glow } from "./studio-glow";
@@ -22,9 +29,20 @@ import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
 import type { InkWash } from "./studio-ink-wash";
+import type { LineArtCleanupOptions } from "./studio-line-cleanup";
+import type {
+  StudioDifferenceOfGaussiansOptions,
+  StudioDustScratchesOptions,
+  StudioTileableBlurOptions,
+} from "./studio-professional-filter-kernels";
 import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { Stylize } from "./studio-stylize";
+import type {
+  StudioEdgeAwareDenoiseOptions,
+  StudioJpegArtifactReductionOptions,
+  StudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
 
 export const STUDIO_ADJUSTMENT_STACK_VERSION = 1 as const;
 export const STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES = 24;
@@ -44,6 +62,11 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "motion-blur",
   "spin-blur",
   "zoom-blur",
+  "lens-blur",
+  "field-iris-blur",
+  "tilt-shift-blur",
+  "selective-gaussian-blur",
+  "tileable-blur",
   "sharpen",
   "smart-sharpen",
   "median-despeckle",
@@ -56,6 +79,13 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "posterize",
   "ink-threshold",
   "line-extraction",
+  "line-cleanup",
+  "screentone-removal",
+  "jpeg-artifact-reduction",
+  "edge-aware-denoise",
+  "dust-scratches",
+  "difference-of-gaussians",
+  "color-to-alpha",
   "screentone",
   "color-halftone",
   "chromatic-aberration",
@@ -115,6 +145,30 @@ export function studioAdjustmentDefaultParams(
       return { radius: 18, strength: 85 };
     case "zoom-blur":
       return { radius: 20, strength: 85 };
+    case "lens-blur":
+      return { radius: 4, sampleCount: 21, apertureBlades: 6, apertureRotationRadians: 0 };
+    case "field-iris-blur":
+      return {
+        focusCenterX: 0.5,
+        focusCenterY: 0.5,
+        focusRadius: 0.16,
+        feather: 0.24,
+        maximumBlurRadius: 7,
+        sampleCount: 21,
+        apertureBlades: 8,
+      };
+    case "tilt-shift-blur":
+      return {
+        axisRadians: 0,
+        focusWidth: 0.2,
+        feather: 0.22,
+        maximumBlurRadius: 7,
+        sampleCount: 19,
+      };
+    case "selective-gaussian-blur":
+      return { radius: 3, spatialSigma: 2, edgeThreshold: 20, edgeSoftness: 0.35 };
+    case "tileable-blur":
+      return { radius: 5, sigma: 2.2, strength: 1 };
     case "brightness-contrast":
       return { brightness: 0.12, contrast: 10 };
     case "shadow-highlight":
@@ -138,6 +192,28 @@ export function studioAdjustmentDefaultParams(
     case "grayscale":
     case "sepia":
     case "line-extraction":
+      return {};
+    case "line-cleanup":
+      return { threshold: 0.6, strength: 0.5 };
+    case "screentone-removal":
+      return { radius: 2, strength: 0.88, inkLumaThreshold: 72 };
+    case "jpeg-artifact-reduction":
+      return {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      };
+    case "edge-aware-denoise":
+      return { radius: 1, strength: 0.78, rangeThreshold: 72 };
+    case "dust-scratches":
+      return { radius: 2, threshold: 24, strength: 1 };
+    case "difference-of-gaussians":
+      return { smallSigma: 0.8, largeSigma: 2, threshold: 1.5, strength: 12 };
+    case "color-to-alpha":
+      return { keyColor: "#ffffff", strength: 85 };
     case "screentone":
       return {};
     case "pixelate":
@@ -402,6 +478,16 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
       return "회전 블러";
     case "zoom-blur":
       return "줌 블러";
+    case "lens-blur":
+      return "렌즈 블러";
+    case "field-iris-blur":
+      return "필드 아이리스 블러";
+    case "tilt-shift-blur":
+      return "틸트 시프트 블러";
+    case "selective-gaussian-blur":
+      return "선택적 가우시안 블러";
+    case "tileable-blur":
+      return "타일러블 블러";
     case "sharpen":
       return "샤픈";
     case "smart-sharpen":
@@ -426,6 +512,20 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
       return "먹선 임계값";
     case "line-extraction":
       return "선화 추출";
+    case "line-cleanup":
+      return "스케치 선화 정리";
+    case "screentone-removal":
+      return "스크린톤 제거";
+    case "jpeg-artifact-reduction":
+      return "JPEG 아티팩트 감소";
+    case "edge-aware-denoise":
+      return "엣지 보존 노이즈 감소";
+    case "dust-scratches":
+      return "먼지와 스크래치 제거";
+    case "difference-of-gaussians":
+      return "가우시안 차분 선화";
+    case "color-to-alpha":
+      return "색상 투명화";
     case "screentone":
       return "흑백 스크린톤";
     case "color-halftone":
@@ -496,6 +596,18 @@ export type StudioAdjustmentEntryFilterFields = {
   sepia?: boolean;
   screentone?: boolean;
   lineart?: boolean;
+  lineCleanup?: LineArtCleanupOptions;
+  screentoneRemoval?: StudioScreentoneRemovalOptions;
+  jpegArtifactReduction?: StudioJpegArtifactReductionOptions;
+  edgeAwareDenoise?: StudioEdgeAwareDenoiseOptions;
+  lensBlur?: StudioLensBlurOptions;
+  fieldIrisBlur?: StudioFieldIrisBlurOptions;
+  tiltShiftBlur?: StudioTiltShiftBlurOptions;
+  selectiveGaussianBlur?: StudioSelectiveGaussianBlurOptions;
+  tileableBlur?: StudioTileableBlurOptions;
+  dustScratches?: StudioDustScratchesOptions;
+  differenceOfGaussians?: StudioDifferenceOfGaussiansOptions;
+  colorToAlpha?: ColorToAlpha;
   chromatic?: number;
   posterize?: number;
   pixelate?: number;
@@ -688,6 +800,64 @@ export function studioAdjustmentOperationToFilterFields(
         };
         break;
       }
+      case "lens-blur":
+        out.lensBlur = {
+          radius: Math.min(18, Math.max(0.25, finiteNumber(p.radius, 4))),
+          sampleCount: Math.min(64, Math.max(5, Math.round(finiteNumber(p.sampleCount, 21)))),
+          apertureBlades: Math.min(
+            12,
+            Math.max(3, Math.round(finiteNumber(p.apertureBlades, 6))),
+          ),
+          apertureRotationRadians: finiteNumber(p.apertureRotationRadians, 0),
+        };
+        break;
+      case "field-iris-blur":
+        out.fieldIrisBlur = {
+          focusCenterX: Math.min(1, Math.max(0, finiteNumber(p.focusCenterX, 0.5))),
+          focusCenterY: Math.min(1, Math.max(0, finiteNumber(p.focusCenterY, 0.5))),
+          focusRadius: Math.min(Math.SQRT2, Math.max(0, finiteNumber(p.focusRadius, 0.16))),
+          feather: Math.min(Math.SQRT2, Math.max(0.001, finiteNumber(p.feather, 0.24))),
+          maximumBlurRadius: Math.min(
+            18,
+            Math.max(0.25, finiteNumber(p.maximumBlurRadius, 7)),
+          ),
+          sampleCount: Math.min(64, Math.max(5, Math.round(finiteNumber(p.sampleCount, 21)))),
+          apertureBlades: Math.min(
+            12,
+            Math.max(3, Math.round(finiteNumber(p.apertureBlades, 8))),
+          ),
+        };
+        break;
+      case "tilt-shift-blur":
+        out.tiltShiftBlur = {
+          axisRadians: finiteNumber(p.axisRadians, 0),
+          focusWidth: Math.min(
+            Math.SQRT2 * 2,
+            Math.max(0, finiteNumber(p.focusWidth, 0.2)),
+          ),
+          feather: Math.min(Math.SQRT2, Math.max(0.001, finiteNumber(p.feather, 0.22))),
+          maximumBlurRadius: Math.min(
+            18,
+            Math.max(0.25, finiteNumber(p.maximumBlurRadius, 7)),
+          ),
+          sampleCount: Math.min(64, Math.max(5, Math.round(finiteNumber(p.sampleCount, 19)))),
+        };
+        break;
+      case "selective-gaussian-blur":
+        out.selectiveGaussianBlur = {
+          radius: Math.min(10, Math.max(1, Math.round(finiteNumber(p.radius, 3)))),
+          spatialSigma: Math.min(20, Math.max(0.1, finiteNumber(p.spatialSigma, 2))),
+          edgeThreshold: Math.min(255, Math.max(0, finiteNumber(p.edgeThreshold, 20))),
+          edgeSoftness: Math.min(2, Math.max(0, finiteNumber(p.edgeSoftness, 0.35))),
+        };
+        break;
+      case "tileable-blur":
+        out.tileableBlur = {
+          radius: Math.min(20, Math.max(1, Math.round(finiteNumber(p.radius, 5)))),
+          sigma: Math.min(20, Math.max(0.1, finiteNumber(p.sigma, 2.2))),
+          strength: Math.min(1, Math.max(0, finiteNumber(p.strength, 1))),
+        };
+        break;
       case "brightness-contrast":
         out.brightness = finiteNumber(p.brightness, 0);
         out.contrast = finiteNumber(p.contrast, 0);
@@ -760,6 +930,67 @@ export function studioAdjustmentOperationToFilterFields(
         break;
       case "line-extraction":
         out.lineart = true;
+        break;
+      case "line-cleanup":
+        out.lineCleanup = {
+          threshold: Math.min(1, Math.max(0, finiteNumber(p.threshold, 0.6))),
+          strength: Math.min(1, Math.max(0, finiteNumber(p.strength, 0.5))),
+        };
+        break;
+      case "screentone-removal":
+        out.screentoneRemoval = {
+          radius: Math.min(3, Math.max(1, Math.round(finiteNumber(p.radius, 2)))),
+          strength: Math.min(1, Math.max(0, finiteNumber(p.strength, 0.88))),
+          inkLumaThreshold: Math.min(160, Math.max(0, finiteNumber(p.inkLumaThreshold, 72))),
+        };
+        break;
+      case "jpeg-artifact-reduction":
+        out.jpegArtifactReduction = {
+          deblockStrength: Math.min(1, Math.max(0, finiteNumber(p.deblockStrength, 0.72))),
+          deringStrength: Math.min(1, Math.max(0, finiteNumber(p.deringStrength, 0.45))),
+          boundaryThreshold: Math.min(64, Math.max(1, finiteNumber(p.boundaryThreshold, 6))),
+          protectedEdgeThreshold: Math.min(
+            224,
+            Math.max(32, finiteNumber(p.protectedEdgeThreshold, 88)),
+          ),
+          ringingThreshold: Math.min(96, Math.max(1, finiteNumber(p.ringingThreshold, 18))),
+          inkLumaThreshold: Math.min(160, Math.max(0, finiteNumber(p.inkLumaThreshold, 64))),
+        };
+        break;
+      case "edge-aware-denoise":
+        out.edgeAwareDenoise = {
+          radius: Math.min(3, Math.max(1, Math.round(finiteNumber(p.radius, 1)))),
+          strength: Math.min(1, Math.max(0, finiteNumber(p.strength, 0.78))),
+          rangeThreshold: Math.min(192, Math.max(4, finiteNumber(p.rangeThreshold, 72))),
+        };
+        break;
+      case "dust-scratches":
+        out.dustScratches = {
+          radius: Math.min(5, Math.max(1, Math.round(finiteNumber(p.radius, 2)))),
+          threshold: Math.min(255, Math.max(0, finiteNumber(p.threshold, 24))),
+          strength: Math.min(1, Math.max(0, finiteNumber(p.strength, 1))),
+        };
+        break;
+      case "difference-of-gaussians": {
+        const smallSigma = Math.min(6, Math.max(0.25, finiteNumber(p.smallSigma, 0.8)));
+        out.differenceOfGaussians = {
+          smallSigma,
+          largeSigma: Math.min(
+            12,
+            Math.max(smallSigma + 0.1, finiteNumber(p.largeSigma, 2)),
+          ),
+          threshold: Math.min(64, Math.max(0, finiteNumber(p.threshold, 1.5))),
+          strength: Math.min(32, Math.max(0, finiteNumber(p.strength, 12))),
+        };
+        break;
+      }
+      case "color-to-alpha":
+        out.colorToAlpha = {
+          keyColor: typeof p.keyColor === "string" && /^#[0-9a-f]{6}$/i.test(p.keyColor)
+            ? p.keyColor
+            : "#ffffff",
+          strength: Math.min(100, Math.max(0, finiteNumber(p.strength, 85))),
+        };
         break;
       case "screentone":
         out.screentone = true;

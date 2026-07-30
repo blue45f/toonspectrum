@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+  DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+} from "./studio-advanced-blur-filter-kernels";
 import { parseStudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
@@ -207,6 +213,44 @@ describe("studio CRDT page bridge", () => {
       g: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
       b: [{ x: 0, y: 0 }, { x: 255, y: 232 }],
     };
+    const lensBlur = {
+      ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+      radius: 9.5,
+      apertureRotationRadians: Math.PI / 4,
+    };
+    const fieldIrisBlur = {
+      ...DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+      focusCenterX: 0.35,
+      focusCenterY: 0.65,
+      focusRadius: 0.22,
+      feather: 0.3,
+      maximumBlurRadius: 12,
+    };
+    const tiltShiftBlur = {
+      ...DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+      axisRadians: -Math.PI / 3,
+      focusWidth: 0.32,
+      feather: 0.38,
+      maximumBlurRadius: 10,
+    };
+    const selectiveGaussianBlur = {
+      ...DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+      radius: 6,
+      spatialSigma: 3.5,
+      edgeThreshold: 48,
+      edgeSoftness: 0.6,
+    };
+    const lineCleanup = { threshold: 0.64, strength: 0.45 };
+    const screentoneRemoval = { radius: 2, strength: 0.88, inkLumaThreshold: 72 };
+    const jpegArtifactReduction = {
+      deblockStrength: 0.72,
+      deringStrength: 0.45,
+      boundaryThreshold: 6,
+      protectedEdgeThreshold: 88,
+      ringingThreshold: 18,
+      inkLumaThreshold: 64,
+    };
+    const edgeAwareDenoise = { radius: 1, strength: 0.78, rangeThreshold: 72 };
     const descriptor = createStudioWorkAssetInitialImageDescriptor({
       id: "filter-composite-1",
       type: "image",
@@ -218,12 +262,20 @@ describe("studio CRDT page bridge", () => {
       rotation: 0,
       filterPageComposite: true,
       blurFx,
+      lensBlur,
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
       brightness: 0.8,
       contrast: -80,
       hue: 180,
       saturation: -1,
       curve,
       curveCh,
+      edgeAwareDenoise,
+      jpegArtifactReduction,
+      lineCleanup,
+      screentoneRemoval,
     });
     const encoded = studioElementToCrdtSceneElement("page-a", {
       ...descriptor.element,
@@ -237,12 +289,20 @@ describe("studio CRDT page bridge", () => {
         elementType: "image",
         filterPageComposite: true,
         blurFx,
+        lensBlur,
+        fieldIrisBlur,
+        tiltShiftBlur,
+        selectiveGaussianBlur,
         brightness: 0.8,
         contrast: -80,
         hue: 180,
         saturation: -1,
         curve,
         curveCh,
+        edgeAwareDenoise,
+        jpegArtifactReduction,
+        lineCleanup,
+        screentoneRemoval,
       },
     });
     expect(encoded.payload.props).not.toHaveProperty("src");
@@ -266,12 +326,20 @@ describe("studio CRDT page bridge", () => {
       decodedWidth: 800,
       filterPageComposite: true,
       blurFx,
+      lensBlur,
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
       brightness: 0.8,
       contrast: -80,
       hue: 180,
       saturation: -1,
       curve,
       curveCh,
+      edgeAwareDenoise,
+      jpegArtifactReduction,
+      lineCleanup,
+      screentoneRemoval,
     });
 
     const reconciled = reconcileStudioCrdtSceneGraphPages(
@@ -290,12 +358,20 @@ describe("studio CRDT page bridge", () => {
       src: canonicalSource,
       filterPageComposite: true,
       blurFx,
+      lensBlur,
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
       brightness: 0.8,
       contrast: -80,
       hue: 180,
       saturation: -1,
       curve,
       curveCh,
+      edgeAwareDenoise,
+      jpegArtifactReduction,
+      lineCleanup,
+      screentoneRemoval,
     });
   });
 

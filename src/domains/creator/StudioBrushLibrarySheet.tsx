@@ -95,6 +95,7 @@ export interface StudioBrushCatalogPortalProps {
 
 export type StudioBrushCatalogPreviewKind =
   | "ribbon"
+  | "eraser"
   | "calligraphy"
   | "marker"
   | "wash-marker"
@@ -367,6 +368,7 @@ function StudioProceduralBrushPreviewDetail({
 function studioBrushCatalogPreviewKind(
   item: StudioBrushTrayItem
 ): StudioBrushCatalogPreviewKind {
+  if (item.id === "kneaded-eraser") return "eraser";
   if (
     item.id === "highlighter"
     || item.id === "chisel-highlighter"
@@ -434,7 +436,29 @@ export function LargeBrushPreview({
   const opacity = studioBrushPreviewOpacity(item.defaultOpacity);
 
   let brushSample: ReactElement;
-  if (kind === "wash-marker") {
+  if (kind === "eraser") {
+    brushSample = (
+      <g data-studio-brush-preview-layer="eraser">
+        <path
+          d={pathD}
+          fill="none"
+          stroke={ink}
+          strokeWidth={Math.max(9, strokeW * 2.4)}
+          strokeLinecap="round"
+          opacity={Math.max(0.16, opacity * 0.72)}
+        />
+        <path
+          d={pathD}
+          fill="none"
+          stroke={active ? "currentColor" : surface.paper}
+          strokeWidth={Math.max(4.5, strokeW * 1.18)}
+          strokeLinecap="round"
+          strokeDasharray="2.5 1.4"
+          opacity="0.7"
+        />
+      </g>
+    );
+  } else if (kind === "wash-marker") {
     const chisel = item.id === "chisel-highlighter";
     const pastel = item.id === "pastel-highlighter";
     brushSample = (
@@ -593,7 +617,74 @@ export function LargeBrushPreview({
           />
         )}
         {kind === "calligraphy" ? (
-          <path d={pathD} fill="none" stroke={active ? "currentColor" : surface.paper} strokeWidth={0.75} opacity={0.62} />
+          <>
+            <path
+              d={pathD}
+              fill="none"
+              stroke={active ? "currentColor" : surface.paper}
+              strokeWidth={item.id === "school-pen" ? 0.55 : 0.75}
+              opacity={item.id === "school-pen" ? 0.46 : 0.62}
+            />
+            {item.id === "fountain-pen" ? (
+              <path
+                d={pathD}
+                fill="none"
+                stroke={ink}
+                strokeWidth={0.55}
+                strokeDasharray="7 2.2"
+                opacity={opacity * 0.74}
+                transform="translate(0 1.6)"
+                data-studio-brush-preview-detail="fountain-nib-slit"
+              />
+            ) : null}
+            {item.id === "maru-pen" ? (
+              <path
+                d={pathD}
+                fill="none"
+                stroke={ink}
+                strokeWidth={0.42}
+                strokeDasharray="10 1.1"
+                opacity={opacity * 0.82}
+                transform="translate(0 -1.1)"
+                data-studio-brush-preview-detail="maru-hairline"
+              />
+            ) : null}
+            {item.id === "parallel-pen" ? (
+              <g
+                fill="none"
+                stroke={active ? "currentColor" : surface.paper}
+                strokeLinecap="square"
+                opacity={0.72}
+                data-studio-brush-preview-detail="parallel-edge"
+              >
+                <path d={pathD} strokeWidth={0.72} transform="translate(0 -2.2)" />
+                <path d={pathD} strokeWidth={0.72} transform="translate(0 2.2)" />
+              </g>
+            ) : null}
+          </>
+        ) : null}
+        {item.id === "ruling-pen" ? (
+          <g
+            fill="none"
+            stroke={active ? "currentColor" : surface.paper}
+            strokeLinecap="round"
+            opacity={0.68}
+            data-studio-brush-preview-detail="ruling-gap"
+          >
+            <path d={pathD} strokeWidth={0.5} transform="translate(0 -1.25)" />
+            <path d={pathD} strokeWidth={0.5} transform="translate(0 1.25)" />
+          </g>
+        ) : null}
+        {item.id === "glass-pen" ? (
+          <g
+            fill={ink}
+            opacity={opacity * 0.76}
+            data-studio-brush-preview-detail="glass-flow"
+          >
+            <circle cx="27" cy="10.8" r="0.85" />
+            <circle cx="49" cy="22.7" r="1.05" />
+            <circle cx="71" cy="12.3" r="0.72" />
+          </g>
         ) : null}
       </g>
     );

@@ -65,7 +65,7 @@ const RESULTS = auditStudioBrushCatalogueContinuity(CANDIDATES);
 
 describe("full catalogue crossing and long-stroke matrix", () => {
   it("classifies every core and professional brush into an explicit live/commit family", () => {
-    expect(CANDIDATES).toHaveLength(214);
+    expect(CANDIDATES).toHaveLength(226);
     for (const candidate of CANDIDATES) {
       const classification = classifyStudioBrushBackendQuality({
         brushId: candidate.runtimeBrushId,

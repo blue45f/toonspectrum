@@ -26,7 +26,7 @@ describe("studio creative ux", () => {
 
   it("keeps the Pro pack out of the eager core tray so its full dynamics stay lazy", () => {
     expect(listStudioBrushTrayItems("pro")).toEqual([]);
-    expect(listStudioBrushTrayItems("all")).toHaveLength(54);
+    expect(listStudioBrushTrayItems("all")).toHaveLength(66);
   });
 
   it("filters Picsart-style media groups", () => {
@@ -70,10 +70,10 @@ describe("studio creative ux", () => {
       "pen",
       "marker",
       "gpen",
+      "school-pen",
+      "fountain-pen",
+      "gel-pen",
       "fineliner",
-      "pencil",
-      "ballpoint",
-      "felt-tip",
     ]);
     expect(quick.map((item) => item.quickSource)).toEqual([
       "favorite",
@@ -95,8 +95,8 @@ describe("studio creative ux", () => {
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
 
-  it("resolves Pro favorites and recent brushes from the expanded 214-item catalogue", () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(214);
+  it("resolves Pro favorites and recent brushes from the expanded 226-item catalogue", () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(226);
 
     const quick = listStudioQuickBrushTrayItems({
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,

@@ -81,6 +81,7 @@
     "verify:studio-dynamic-dual-tip-webgpu-v2": "node scripts/verify-studio-dynamic-dual-tip-webgpu-v2.mjs",
     "verify:studio-engine-tile-storage-opfs-v2": "node scripts/verify-studio-engine-tile-storage-opfs-v2.mjs",
     "verify:studio-canvaskit-quality-worker": "node scripts/verify-studio-canvaskit-quality-worker.mjs",
+    "verify:studio-vello-candidate": "tsx scripts/verify-studio-vello-candidate.mts",
     "verify:studio-gpu-filters": "tsx scripts/verify-studio-gpu-filters.mts",
     "verify:studio-bg3d-physics": "tsx scripts/verify-studio-bg3d-physics.mts",
     "verify:studio-3d-console": "tsx scripts/verify-studio-3d-console.mts",

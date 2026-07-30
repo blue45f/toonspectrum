@@ -14,7 +14,7 @@ import {
 describe("studio drawing library strategy", () => {
   it("keeps an extensible specialist inventory without document or brush-pixel authority", () => {
     expect(STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION)
-      .toBe("studio-drawing-library-strategy-v5");
+      .toBe("studio-drawing-library-strategy-v6");
     const requiredIds = [
       "perfect-freehand",
       "lazy-brush",
@@ -25,6 +25,10 @@ describe("studio drawing library strategy", () => {
       "pixi",
       "paper",
       "canvaskit",
+      "lyon",
+      "tiny-skia",
+      "photon",
+      "vello",
       "signature-pad",
       "atrament",
       "croquis",
@@ -147,6 +151,71 @@ describe("studio drawing library strategy", () => {
     expect(canvasKit?.riskNotes).toContain(
       "Only plain SVG path data and structured receipts may cross the Worker boundary; Embind objects and WASM pointers never enter the document.",
     );
+    const lyon = resolveStudioDrawingLibraryStrategy("lyon");
+    expect(lyon).toMatchObject({
+      packageName: "lyon",
+      license: "MIT OR Apache-2.0 OR MPL-2.0",
+      productLayer: "vector-tessellation",
+      decision: "poc-vector-tessellation-provider",
+      runtimeInstallation: "not-installed-poc",
+      canonicalAuthority: false,
+      brushPixelAuthority: false,
+    });
+    expect(lyon?.maintenanceNote).toContain("1.0.19");
+    expect(lyon?.riskNotes.join(" ")).toContain(
+      "no built-in antialiasing",
+    );
+    expect(lyon?.riskNotes.join(" ")).toContain("Adoption gate:");
+
+    const tinySkia = resolveStudioDrawingLibraryStrategy("tiny-skia");
+    expect(tinySkia).toMatchObject({
+      packageName: "tiny-skia",
+      license: "BSD-3-Clause",
+      productLayer: "deterministic-raster-fallback",
+      decision: "poc-deterministic-raster-oracle",
+      runtimeInstallation: "not-installed-poc",
+      canonicalAuthority: false,
+      brushPixelAuthority: false,
+    });
+    expect(tinySkia?.maintenanceNote).toContain("0.12.0");
+    expect(tinySkia?.riskNotes.join(" ")).toContain("CPU-only RGBA8888");
+    expect(tinySkia?.riskNotes.join(" ")).toContain(
+      "not by itself a cross-browser",
+    );
+
+    const photon = resolveStudioDrawingLibraryStrategy("photon");
+    expect(photon).toMatchObject({
+      packageName: "@silvia-odwyer/photon",
+      license: "Apache-2.0",
+      productLayer: "filter-worker",
+      decision: "benchmark-first-filter-worker-provider",
+      runtimeInstallation: "not-installed-poc",
+      canonicalAuthority: false,
+      brushPixelAuthority: false,
+    });
+    expect(photon?.maintenanceNote).toContain("0.3.3");
+    expect(photon?.riskNotes.join(" ")).toContain(
+      "premultiplied alpha",
+    );
+    expect(photon?.riskNotes.join(" ")).toContain(
+      "must not own filter-stack",
+    );
+
+    const vello = resolveStudioDrawingLibraryStrategy("vello");
+    expect(vello).toMatchObject({
+      packageName: "vello",
+      license: "MIT OR Apache-2.0",
+      productLayer: "gpu-vector-research",
+      decision: "research-only-gpu-vector-provider",
+      runtimeInstallation: "not-installed-research-only",
+      canonicalAuthority: false,
+      brushPixelAuthority: false,
+    });
+    expect(vello?.maintenanceNote).toContain("0.9.0");
+    expect(vello?.riskNotes.join(" ")).toContain("alpha");
+    expect(vello?.riskNotes.join(" ")).toContain(
+      "web is not a primary target",
+    );
     expect(resolveStudioDrawingLibraryStrategy("fabric")).toMatchObject({
       productLayer: "scene-model",
       decision: "rejected-duplicate-scene-model",
@@ -221,6 +290,10 @@ describe("studio drawing source adoption audit", () => {
     "pixi",
     "paper",
     "canvaskit",
+    "lyon",
+    "tiny-skia",
+    "photon",
+    "vello",
     "wacom-will",
     "brushlib-wasm",
     "glbrush",
@@ -237,7 +310,7 @@ describe("studio drawing source adoption audit", () => {
 
   it("freezes the complete reviewed candidate set and provenance fields", () => {
     expect(STUDIO_DRAWING_SOURCE_AUDIT_VERSION)
-      .toBe("studio-drawing-source-audit-v4");
+      .toBe("studio-drawing-source-audit-v5");
     expect(STUDIO_DRAWING_SOURCE_AUDIT.map(({ id }) => id)).toEqual(
       candidateIds,
     );
@@ -281,6 +354,19 @@ describe("studio drawing source adoption audit", () => {
         .toBe("adopted-opt-in");
     }
 
+    for (const id of ["lyon", "tiny-skia", "photon"]) {
+      expect(resolveStudioDrawingSourceAudit(id)?.disposition, id)
+        .toBe("candidate-poc");
+      expect(resolveStudioDrawingSourceAudit(id)?.codePolicy, id)
+        .toBe("proof-of-concept-only");
+    }
+
+    expect(resolveStudioDrawingSourceAudit("vello")).toMatchObject({
+      disposition: "research-only",
+      codePolicy: "research-only",
+      brushAuthorityOverlap: "path-renderer-overlap",
+    });
+
     for (const id of [
       "stroke-stabilizer-core",
       "wacom-will",
@@ -306,6 +392,56 @@ describe("studio drawing source adoption audit", () => {
       expect(resolveStudioDrawingSourceAudit(id)?.codePolicy, id)
         .toBe("excluded-from-product-code");
     }
+  });
+
+  it("records evidence and fail-closed gates for uninstalled vector, raster and filter candidates", () => {
+    expect(resolveStudioDrawingSourceAudit("lyon")).toMatchObject({
+      officialSource: "https://github.com/nical/lyon",
+      versionEvidence:
+        "crates.io stable lyon 1.0.19 audited 2026-07-30; not installed",
+      license: "MIT OR Apache-2.0 OR MPL-2.0",
+      brushAuthorityOverlap: "geometry-only",
+    });
+    expect(resolveStudioDrawingSourceAudit("lyon")?.rationale)
+      .toContain("not a renderer");
+    expect(resolveStudioDrawingSourceAudit("lyon")?.rationale)
+      .toContain("deterministic receipts");
+
+    expect(resolveStudioDrawingSourceAudit("tiny-skia")).toMatchObject({
+      officialSource: "https://github.com/linebender/tiny-skia",
+      versionEvidence:
+        "crates.io stable tiny-skia 0.12.0 audited 2026-07-30; not installed",
+      license: "BSD-3-Clause",
+      brushAuthorityOverlap: "path-renderer-overlap",
+    });
+    expect(resolveStudioDrawingSourceAudit("tiny-skia")?.rationale)
+      .toContain("native/WASM hash parity");
+    expect(resolveStudioDrawingSourceAudit("tiny-skia")?.rationale)
+      .toContain("cannot supply GPU");
+
+    expect(resolveStudioDrawingSourceAudit("photon")).toMatchObject({
+      officialSource: "https://github.com/silvia-odwyer/photon",
+      versionEvidence:
+        "crates.io stable photon-rs 0.3.3 audited 2026-07-30; not installed",
+      license: "Apache-2.0",
+      brushAuthorityOverlap: "filter-renderer-overlap",
+    });
+    expect(resolveStudioDrawingSourceAudit("photon")?.rationale)
+      .toContain("alpha/color correctness");
+    expect(resolveStudioDrawingSourceAudit("photon")?.rationale)
+      .toContain("existing WebGPU/OpenCV/image-js routes");
+
+    expect(resolveStudioDrawingSourceAudit("vello")).toMatchObject({
+      officialSource: "https://github.com/linebender/vello",
+      versionEvidence:
+        "crates.io stable vello 0.9.0 audited 2026-07-30; not installed",
+      license: "MIT OR Apache-2.0",
+      activity: "young-fast-moving",
+    });
+    expect(resolveStudioDrawingSourceAudit("vello")?.rationale)
+      .toContain("calls Vello alpha");
+    expect(resolveStudioDrawingSourceAudit("vello")?.rationale)
+      .toContain("web is not a primary target");
   });
 
   it("records the installed Hokusai settled transform without claiming a live core", () => {

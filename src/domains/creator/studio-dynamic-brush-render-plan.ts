@@ -35,9 +35,12 @@ import {
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
-  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  resolveStudioDynamicBrushCoverageBudgetContract,
+  type StudioDynamicBrushSegmentedDabVariation,
+} from "./studio-dynamic-brush-coverage-renderer";
 import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
@@ -46,7 +49,6 @@ import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioDynamicBrushDab,
 } from "./studio-brush-dynamics";
-import type { StudioDynamicBrushSegmentedDabVariation } from "./studio-dynamic-brush-coverage-renderer";
 import type { DrawEl } from "./studio-element-model";
 
 const dynamicsBySnapshot = new WeakMap<object, NormalizedStudioBrushDynamicsSettings>();
@@ -242,17 +244,19 @@ export function planStudioDynamicBrushRender(
     : activeDraft
       ? STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET
       : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
+  const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
+    materialIdentity,
+    dynamics,
+  );
   const renderBudget = planStudioDynamicBrushRenderBudget({
-    settings: dynamics,
+    settings: coverageBudget.settings,
     dabCount: baseDabCount,
     symmetryCount: symmetryTransforms.length,
     fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
       materialIdentity,
       baseDabCount > 0,
     ),
-    materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-      materialIdentity,
-    ),
+    materialMarkMultiplier: coverageBudget.materialMarkMultiplier,
     markBudget,
   });
 

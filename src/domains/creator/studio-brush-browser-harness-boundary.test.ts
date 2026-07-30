@@ -64,10 +64,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "coreCatalogIds.every((id) => presetById.has(id))",
     );
     expect(harness).toContain(
-      "for (const [index, preset] of STUDIO_ALL_BRUSH_CATALOG_ITEMS.entries())",
+      "for (const [index, preset] of BRUSH_MATRIX_CATALOG_ITEMS.entries())",
     );
     expect(harness).toContain(
-      "evidence.length === PRODUCT_BRUSH_CATALOG_COUNT",
+      "evidence.length === BRUSH_MATRIX_CATALOG_COUNT",
     );
     expect(harness).toContain(
       "post-redo cleanup left perceptible stroke pixels behind",
@@ -109,7 +109,7 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)",
     );
     expect(harness).toContain(
-      "Math.ceil(PRODUCT_BRUSH_CATALOG_COUNT / 7)",
+      "Math.ceil(BRUSH_MATRIX_CATALOG_COUNT / 7)",
     );
     expect(harness).not.toContain(
       "Math.ceil(BRUSH_PRESETS.length / 7)",
@@ -117,6 +117,22 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).not.toContain("BRUSH_PRESETS.length === 37");
     expect(harness).not.toContain("evidence.length === 37");
     expect(harness).not.toContain("/37 long strokes");
+  });
+
+  it("treats named erasers as destructive operations with a real paint baseline", () => {
+    expect(harness).toContain("resolveStudioBrushRuntimeContract(selection.catalogId)");
+    expect(harness).toContain('selection.drawMode === "eraser" ? "erase" : "paint"');
+    expect(harness).toContain("contractOperation === selectionOperation");
+    expect(harness).toContain("data-studio-active-draw-mode");
+    expect(harness).toContain("prepareVisibleEraserBaseline");
+    expect(harness).toContain("pointer-down gesture lost eraser operation authority");
+    expect(harness).toContain("destination-out remains release-visible by design");
+    expect(harness).toContain("waitForPersistedSelectedOperation(");
+    expect(harness).toContain('persistedErase.stroke.brush === null');
+    expect(harness).toContain("paint+erase cleanup left");
+    expect(harness).toContain("long paint+erase cleanup left");
+    expect(harness).toContain("TOONSPECTRUM_BRUSH_VERIFY_IDS");
+    expect(harness).not.toContain('preset.id === "kneaded-eraser"');
   });
 
   it("isolates every sparse long route and offers an exhaustive long-only catalogue audit", () => {

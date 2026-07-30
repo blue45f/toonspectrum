@@ -8,6 +8,7 @@
 
 import {
   applyStudioDynamicBrushMinimumDiameterRatio,
+  studioDynamicBrushContactFactor,
   studioDynamicBrushDepositPipelineUsesContinuation,
   resolveStudioBrushDynamics,
   studioBrushTaperFactors,
@@ -267,7 +268,28 @@ function segmentFrameIsValid(
     && frame.size <= 4_096
     && Number.isFinite(frame.roundness)
     && frame.roundness >= 0.01
-    && frame.roundness <= 1;
+    && frame.roundness <= 1
+    && (
+      frame.distanceFromStrokeStart === undefined
+      || (
+        Number.isFinite(frame.distanceFromStrokeStart)
+        && frame.distanceFromStrokeStart >= 0
+      )
+    )
+    && (
+      frame.contactLoadFromStrokeStart === undefined
+      || (
+        Number.isFinite(frame.contactLoadFromStrokeStart)
+        && frame.contactLoadFromStrokeStart >= 0
+      )
+    )
+    && (
+      frame.contactFactor === undefined
+      || (
+        Number.isFinite(frame.contactFactor)
+        && frame.contactFactor >= 0
+      )
+    );
 }
 
 function stateFieldsAreValid(
@@ -329,6 +351,15 @@ function segmentFrameFromDab(
     direction: dab.direction ?? dab.angle,
     size: dab.size,
     roundness: dab.roundness,
+    ...(dab.distanceFromStrokeStart === undefined
+      ? {}
+      : { distanceFromStrokeStart: dab.distanceFromStrokeStart }),
+    ...(dab.contactLoadFromStrokeStart === undefined
+      ? {}
+      : { contactLoadFromStrokeStart: dab.contactLoadFromStrokeStart }),
+    ...(dab.contactFactor === undefined
+      ? {}
+      : { contactFactor: dab.contactFactor }),
   });
 }
 
@@ -428,6 +459,22 @@ function dabAt(
   );
   const opacity = clamp01(recipe.opacity * taper.opacity);
   const spacing = Math.max(0.25, recipe.spacing);
+  const contactFactor = studioDynamicBrushContactFactor(
+    size,
+    opacity,
+    recipe.flow,
+  );
+  const boundedDistanceFromPrevious = Math.max(0, distanceFromPrevious);
+  const contactLoadFromStrokeStart = segmentStartFrame
+    ? (
+        (segmentStartFrame.contactLoadFromStrokeStart ?? 0)
+        + boundedDistanceFromPrevious
+          * (
+            (segmentStartFrame.contactFactor ?? contactFactor)
+            + contactFactor
+          ) / 2
+      )
+    : 0;
   const numeric = [
     size,
     opacity,
@@ -448,7 +495,10 @@ function dabAt(
       sourceX: sample.x,
       sourceY: sample.y,
       direction,
-      distanceFromPrevious: Math.max(0, distanceFromPrevious),
+      distanceFromPrevious: boundedDistanceFromPrevious,
+      distanceFromStrokeStart: Math.max(0, cumulativeDistance),
+      contactLoadFromStrokeStart,
+      contactFactor,
       ...(segmentStartFrame
         ? { segmentStartFrame: frozenSegmentFrame(segmentStartFrame) }
         : {}),

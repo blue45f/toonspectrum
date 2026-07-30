@@ -361,14 +361,14 @@ function allPressureProbes(): PressureProbe[] {
   return [...core, ...procedural];
 }
 
-describe("214-brush hardware-pressure catalogue planner proxy", () => {
+describe("226-brush hardware-pressure catalogue planner proxy", () => {
   beforeAll(async () => {
     perfectFreehandStroker = await loadStudioPerfectFreehandStroker();
   });
 
   it("audits every searchable identity through its materialized runtime planner", () => {
     const probes = allPressureProbes();
-    expect(probes).toHaveLength(214);
+    expect(probes).toHaveLength(226);
     expect(new Set(probes.map(({ id }) => id))).toEqual(
       new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id)),
     );
@@ -377,7 +377,7 @@ describe("214-brush hardware-pressure catalogue planner proxy", () => {
     ))).toBe(true);
   });
 
-  it("reports planner-level pressure deltas for the 211 non-fixed catalogue identities", () => {
+  it("reports planner-level pressure deltas for the 223 non-fixed catalogue identities", () => {
     const responsiveIds = allPressureProbes()
       .filter(({ low, high }) => changed(low, high))
       .map(({ id }) => id);
@@ -388,7 +388,7 @@ describe("214-brush hardware-pressure catalogue planner proxy", () => {
       ));
 
     expect(new Set(responsiveIds)).toEqual(new Set(expectedResponsiveIds));
-    expect(responsiveIds).toHaveLength(211);
+    expect(responsiveIds).toHaveLength(223);
   });
 
   it("proves the three intentional fixed-pressure exceptions rather than silently ignoring input", () => {

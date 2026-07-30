@@ -40,6 +40,8 @@ export type StudioPerfectFreehandProfileId = "perfect-ink" | "perfect-marker" | 
  */
 export type StudioPerfectFreehandBrushId =
   | StudioPerfectFreehandProfileId
+  | "school-pen"
+  | "maru-pen"
   | "mapping-pen"
   | "kaburapen"
   | "liner";
@@ -113,6 +115,8 @@ const STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH: Readonly<
   "perfect-ink": "perfect-ink",
   "perfect-marker": "perfect-marker",
   gpen: "gpen",
+  "school-pen": "gpen",
+  "maru-pen": "gpen",
   "mapping-pen": "gpen",
   kaburapen: "gpen",
   liner: "gpen",

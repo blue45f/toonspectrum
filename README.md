@@ -51,7 +51,7 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 - **내 서재** `/library` — 관심/평가/완독 관리, **취향 분석**, 맞춤 추천, 컬렉션
 - **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·표준 3D 파일/VRM·최대 64개 샷 보드와 컷별 LT Worker 합성 PNG 일괄 렌더·권한 검증형 IndexedDB 원자 복구·공개 manifest v3 Worker ZIP 패키징·
   시간대 무드 리그·가림 관계 인지 선화·의미 재질 분석·로컬 사진 포즈 스캔·시각적 관절/손목 IK·결정론적 물리 배치·분석적 IK·
-  벡터/래스터 소재·기본 G펜과 영속 즐겨찾기를 포함한 214종 브러시 카탈로그·VRM `baseColor` 표면 직접 페인팅·UV 아일랜드 Worker precompute·
+  벡터/래스터 소재·기본 G펜과 영속 즐겨찾기를 포함한 226종 브러시 카탈로그·VRM `baseColor` 표면 직접 페인팅·UV 아일랜드 Worker precompute·
   SHA-256 PNG 무결성 저장/재편집과 기기 간 portable archive·WebGPU dirty-rect 부분 업로드 준비 계층·Studio 전용 COOP/COEP 격리·
   AI 제작 보조·검토·
   복구·Publish Package와 역할 기반 팀 초대·CRC 검증 바이너리 CRDT 동시 편집·화면 공유·기본 비활성인 선택형
@@ -121,6 +121,7 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | `pixi.js` | 별도 투명 surface의 GPU scene graph, z-order, 선택·hover·custom hit-area와 transform overlay |
 | `konva` + `react-konva` | 오브젝트·텍스트·말풍선의 선택/변형/히트테스트 overlay — 문서나 브러시 픽셀 권위는 맡지 않음 |
 | `paper` + `polygon-clipping` | Bézier 교차·스무딩·단순화·부울·경로 기하 계산(화면 renderer가 아닌 동적 격리 vector geometry provider) |
+| Vello 0.9.0 격리 PoC | 공식 MMark를 Chrome WebGPU/Metal에서 실측한 차세대 벡터 후보. 1600×1600·10k 경로는 p95 13.6ms였지만 50k 경로는 p95 59.6ms였고 upstream alpha·교차 브라우저·device-loss·canonical parity 게이트가 남아 제품 권위 없이 연구 후보로 유지 |
 | `perfect-freehand` | 필압을 가진 centerline을 연속 잉크 outline으로 변환하는 실시간 geometry provider — 합성·질감·히스토리는 맡지 않음 |
 | `lazy-brush` | 정밀 모드에서만 선택하는 입력 leash/손떨림 보정 — 기본 펜 입력에는 지연을 추가하지 않으며 예측 포인트가 상태를 오염시키지 않음 |
 | `roughjs` | 문서에 저장한 seed로 결정적으로 재생하는 손그림 도형 renderer — 자유곡선 브러시 권위는 맡지 않음 |
@@ -150,7 +151,9 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 
 새 후보는 라이선스·공급망, lazy/Worker 격리, 취소·예산·복구 receipt, 실제 브라우저 품질 게이트를
 통과한 뒤 같은 provider 계약 아래 승격합니다. Vello처럼 유망하지만 웹 지원이 alpha인 엔진은
-제품 권위를 주지 않고 실험실에서 비교하며, 더 나은 결과가 확인되면 기존 provider를 교체합니다.
+제품 권위를 주지 않고 실험실에서 비교하며, 실측 근거와 한계는
+[`studio-vello-observed-poc.ts`](src/domains/creator/studio-vello-observed-poc.ts)에 고정합니다.
+더 나은 결과가 모든 hard gate에서 확인되면 기존 provider를 교체합니다.
 Signature Pad·Atrament·Croquis는 필기 품질 비교용 benchmark oracle일 뿐 런타임 의존성이 아니며,
 Fabric.js는 Konva와 장면 모델이 중복되어 제품 런타임 도입 대상에서 제외합니다.
 위 표는 provider의 계산·소유권 경계를 설명하며 곧바로 Studio UI 연결 완료를 뜻하지 않습니다.

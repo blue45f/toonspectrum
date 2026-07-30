@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+  DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+} from "./studio-advanced-blur-filter-kernels";
 import { normalizeClarity } from "./studio-clarity";
 import { normalizeColorBalance } from "./studio-color-balance";
 import { normalizeCurve } from "./studio-curves";
@@ -9,6 +15,7 @@ import { normalizeGrain } from "./studio-grain";
 import { normalizeHalftone } from "./studio-halftone";
 import { normalizeInkWash } from "./studio-ink-wash";
 import { normalizeLight } from "./studio-light";
+import { normalizeLineArtCleanup } from "./studio-line-cleanup";
 import {
   LOOK_FILTER_KEYS,
   STUDIO_LOOKS,
@@ -21,6 +28,11 @@ import { normalizePhotoFilter } from "./studio-photo-filter";
 import { normalizeShadowHighlight } from "./studio-shadow-highlight";
 import { normalizeSketch } from "./studio-sketch";
 import { normalizeStylize } from "./studio-stylize";
+import {
+  normalizeStudioEdgeAwareDenoiseOptions,
+  normalizeStudioJpegArtifactReductionOptions,
+  normalizeStudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
 import { normalizeVibrance } from "./studio-vibrance";
 
 import type { ImageFilterFields } from "./studio-konva-filters";
@@ -45,6 +57,10 @@ const OBJECT_NORMALIZERS: Partial<Record<keyof ImageFilterFields, (v: unknown) =
   sketch: (v) => normalizeSketch(v as never),
   clarity: (v) => normalizeClarity(v as never),
   shadowHighlight: (v) => normalizeShadowHighlight(v as never),
+  lineCleanup: (v) => normalizeLineArtCleanup(v as never),
+  screentoneRemoval: (v) => normalizeStudioScreentoneRemovalOptions(v),
+  jpegArtifactReduction: (v) => normalizeStudioJpegArtifactReductionOptions(v),
+  edgeAwareDenoise: (v) => normalizeStudioEdgeAwareDenoiseOptions(v),
 };
 
 // ---------------------------------------------------------------------------
@@ -193,12 +209,23 @@ describe("LOOK_FILTER_KEYS", () => {
       "grain",
       "inkWash",
       "blurFx",
+      "lensBlur",
+      "fieldIrisBlur",
+      "tiltShiftBlur",
+      "selectiveGaussianBlur",
       "distort",
       "stylize",
       "light",
       "sketch",
       "detail",
+      "lineCleanup",
+      "screentoneRemoval",
+      "jpegArtifactReduction",
+      "edgeAwareDenoise",
       "colorToAlpha",
+      "differenceOfGaussians",
+      "dustScratches",
+      "tileableBlur",
     ];
     // 순서 무관하게 같은 키 집합인지.
     expect(new Set(LOOK_FILTER_KEYS)).toEqual(new Set(expected));
@@ -251,6 +278,23 @@ describe("extractFilterFields", () => {
     const el: Partial<ImageFilterFields> = { grayscale: false, contrast: 0, brightness: 0 };
     const out = extractFilterFields(el);
     expect(out).toEqual({ grayscale: false, contrast: 0, brightness: 0 });
+  });
+
+  it("고급 블러 옵션 네 종류를 필터 복사와 전체 리셋 대상에 포함한다", () => {
+    const advancedBlurFields: Partial<ImageFilterFields> = {
+      lensBlur: { ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS },
+      fieldIrisBlur: { ...DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS },
+      tiltShiftBlur: { ...DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS },
+      selectiveGaussianBlur: { ...DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS },
+    };
+
+    expect(extractFilterFields(advancedBlurFields)).toEqual(advancedBlurFields);
+    expect(looksResetPatch()).toMatchObject({
+      lensBlur: undefined,
+      fieldIrisBlur: undefined,
+      tiltShiftBlur: undefined,
+      selectiveGaussianBlur: undefined,
+    });
   });
 
   it("입력을 변형하지 않고 새 객체를 반환한다(순수)", () => {

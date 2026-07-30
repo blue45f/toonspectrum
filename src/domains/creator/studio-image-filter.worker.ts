@@ -119,7 +119,7 @@ workerScope.onmessage = (event) => {
         width: source.imageData.width,
         height: source.imageData.height,
       };
-      const { filters, attrs } = buildImageFilters(message.el, workerFilterRegistry);
+      const { filters, attrs } = buildImageFilters(message.el, workerFilterRegistry, "worker");
       applyImageFilters(imageData, filters, attrs);
       const response: StudioImageFilterWorkerSourceSuccessMessage = {
         type: "studio-image-filter/source-success",
@@ -146,7 +146,7 @@ workerScope.onmessage = (event) => {
   try {
     const { imageData, el } = message.request;
     assertStudioImageFilterImageData(imageData);
-    const { filters, attrs } = buildImageFilters(el, workerFilterRegistry);
+    const { filters, attrs } = buildImageFilters(el, workerFilterRegistry, "worker");
     applyImageFilters(imageData, filters, attrs);
     const response: StudioImageFilterWorkerSuccessMessage = {
       type: "studio-image-filter/success",

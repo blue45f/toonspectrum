@@ -5,6 +5,7 @@ import {
   strokeRenderDistance,
 } from "./studio-brush";
 import {
+  isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
   mapStudioBrushAliasPressureSamples,
   studioBrushAliasEffectiveDiameter,
@@ -52,7 +53,7 @@ export function drawBounds(points: number[]) {
  */
 export function studioLiveBrushEffectiveDiameter(el: DrawEl): number {
   const selectedDiameter = Math.max(1, el.strokeWidth);
-  return el.mode === "eraser"
+  return el.mode === "eraser" && !isStudioBrushEraserAliasId(el.brush)
     ? selectedDiameter
     : studioBrushAliasEffectiveDiameter(el.brush, selectedDiameter);
 }
@@ -60,7 +61,9 @@ export function studioLiveBrushEffectiveDiameter(el: DrawEl): number {
 /** Maps one raw source pressure at the live boundary without changing persisted stroke samples. */
 export function studioLiveBrushPressure(el: DrawEl, pressure: unknown): number {
   return mapStudioBrushAliasPressure(
-    el.mode === "eraser" ? null : el.brush,
+    el.mode === "eraser" && !isStudioBrushEraserAliasId(el.brush)
+      ? null
+      : el.brush,
     pressure,
     studioInkFallbackPressure(el.pressureModel)
   );
@@ -76,7 +79,9 @@ export function studioLiveBrushPressureSamples(
   sourcePointCount = Math.floor(el.points.length / 2)
 ): number[] {
   return mapStudioBrushAliasPressureSamples(
-    el.mode === "eraser" ? null : el.brush,
+    el.mode === "eraser" && !isStudioBrushEraserAliasId(el.brush)
+      ? null
+      : el.brush,
     el.pressures,
     sourcePointCount,
     studioInkFallbackPressure(el.pressureModel)

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_FILTER_MENU_KINDS } from "./studio-filter-menu";
+
 const pageUrl = new URL("./StudioPage.tsx", import.meta.url);
 const viewportUrl = new URL("./StudioCanvasViewport.tsx", import.meta.url);
 const pageSource = readFileSync(pageUrl, "utf8");
@@ -128,6 +130,32 @@ function topLevelOrOperands(expression: ts.Expression): ts.Expression[] {
 }
 
 describe("StudioPage page-composite filter integration boundary", () => {
+  it("routes all cleanup filters through the same image-free page-composite session as every dialog filter", () => {
+    const open = nestedFunction("openStudioFilter").getText(pageFile);
+
+    const cleanupKinds = [
+      "line-cleanup",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
+      "tileable-blur",
+      "dust-scratches",
+      "difference-of-gaussians",
+      "color-to-alpha",
+    ] as const;
+    expect(STUDIO_FILTER_MENU_KINDS).toEqual(expect.arrayContaining([...cleanupKinds]));
+    expect(open).toContain('target: "page-composite"');
+    expect(open).toContain("kind,");
+    for (const kind of cleanupKinds) {
+      expect(open).not.toContain(`kind !== "${kind}"`);
+      expect(open).not.toContain(`kind === "${kind}"`);
+    }
+  });
+
   it("does not require an image selection to enable the filter menu", () => {
     const initializer = variableInitializer("menuFilterDisabled");
     const operands = topLevelOrOperands(initializer).map((operand) => operand.getText(pageFile));

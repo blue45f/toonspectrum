@@ -81,7 +81,14 @@ export function filterStudioBrushLibraryItems(options: {
 
   if (!query) return items;
   return items.filter((item) => {
-    const hay = `${item.name} ${item.shortName} ${item.hint} ${item.id} ${item.mediaGroup}`.toLowerCase();
+    const hay = [
+      item.name,
+      item.shortName,
+      item.hint,
+      item.id,
+      item.mediaGroup,
+      ...(item.searchAliases ?? []),
+    ].join(" ").toLowerCase();
     return hay.includes(query);
   });
 }

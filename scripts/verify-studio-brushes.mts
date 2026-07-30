@@ -18,9 +18,12 @@
  *
  * Run after `pnpm build`:
  *   pnpm verify:studio-brushes
- * Exhaustive 214-brush long-route audit without repeating the short matrix:
+ * Exhaustive 226-brush long-route audit without repeating the short matrix:
  *   TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX=1 TOONSPECTRUM_BRUSH_LONG_ONLY=1 \
  *     pnpm verify:studio-brushes
+ * Focused paint → eraser → paint browser regression (desktop short + core long routes):
+ *   TOONSPECTRUM_BRUSH_VERIFY_IDS=perfect-marker,kneaded-eraser,marker \
+ *     TOONSPECTRUM_DRAWING_ONLY=1 pnpm verify:studio-brushes
  * Screenshots/logs:
  *   TOONSPECTRUM_BRUSH_VERIFY_DIR=/tmp/my-run pnpm verify:studio-brushes
  */
@@ -50,6 +53,9 @@ import {
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
 import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "../src/domains/creator/studio-brush-library";
 import { studioBrushPackDescriptorById } from "../src/domains/creator/studio-brush-pack-index";
+import {
+  resolveStudioBrushRuntimeContract,
+} from "../src/domains/creator/studio-brush-runtime-contract";
 import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
@@ -82,11 +88,37 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
 const ALL_BRUSH_LONG_MATRIX =
   process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1";
-const LONG_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+const REQUESTED_BRUSH_VERIFY_IDS = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ?? "")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+const REQUESTED_BRUSH_VERIFY_ID_SET = new Set(REQUESTED_BRUSH_VERIFY_IDS);
+const BRUSH_MATRIX_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  REQUESTED_BRUSH_VERIFY_IDS.length > 0
+    ? STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) =>
+        REQUESTED_BRUSH_VERIFY_ID_SET.has(item.id)
+      )
+    : STUDIO_ALL_BRUSH_CATALOG_ITEMS;
+const BRUSH_MATRIX_CATALOG_COUNT = BRUSH_MATRIX_CATALOG_ITEMS.length;
+const LONG_BRUSH_CATALOG_CANDIDATES: readonly StudioBrushCatalogItem[] =
   ALL_BRUSH_LONG_MATRIX
     ? STUDIO_ALL_BRUSH_CATALOG_ITEMS
     : STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
+const LONG_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  REQUESTED_BRUSH_VERIFY_IDS.length > 0
+    ? LONG_BRUSH_CATALOG_CANDIDATES.filter((item) =>
+        REQUESTED_BRUSH_VERIFY_ID_SET.has(item.id)
+      )
+    : LONG_BRUSH_CATALOG_CANDIDATES;
 const LONG_BRUSH_CATALOG_COUNT = LONG_BRUSH_CATALOG_ITEMS.length;
+const LONG_BRUSH_MATRIX_MODE =
+  REQUESTED_BRUSH_VERIFY_IDS.length > 0
+    ? `focused-${LONG_BRUSH_CATALOG_COUNT}`
+    : ALL_BRUSH_LONG_MATRIX
+      ? "all-226"
+      : "core-only";
+
+type VerifierBrushOperation = "paint" | "erase";
 
 interface BrowserErrorCollector {
   messages: string[];
@@ -96,11 +128,14 @@ interface BrowserErrorCollector {
 interface BrushStrokeEvidence {
   id: string;
   source: StudioBrushCatalogItem["source"];
+  operation: VerifierBrushOperation;
   selected: boolean;
   visualChanged: boolean;
+  eraseLiveOperationActive: boolean | null;
   undoEnabled: boolean;
   undoRestoredPixels: boolean;
   redoRestoredStroke: boolean;
+  persistedOperationMatched: boolean;
   persistedCatalogId: string | null;
   persistedRuntimeBrushId: string | null;
   persistedDynamicsMatched: boolean | null;
@@ -109,11 +144,13 @@ interface BrushStrokeEvidence {
 interface LongBrushStrokeEvidence {
   id: string;
   source: StudioBrushCatalogItem["source"];
+  operation: VerifierBrushOperation;
   expectedRuntimeBrushId: string;
   visualChanged: boolean;
   visibleSegments: number;
   totalSegments: number;
   persistedBrushId: string | null;
+  persistedMode: "pen" | "eraser";
   persistedCatalogId: string | null;
   persistedDynamicsMatched: boolean | null;
   persistedPathDistance: number;
@@ -261,6 +298,36 @@ function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+function verifierBrushOperation(
+  selection: Pick<
+    StudioBrushCatalogSelection,
+    "catalogId" | "runtimeBrushId" | "drawMode"
+  >,
+): VerifierBrushOperation {
+  const runtimeContract =
+    resolveStudioBrushRuntimeContract(selection.catalogId)
+    ?? resolveStudioBrushRuntimeContract(selection.runtimeBrushId);
+  const selectionOperation: VerifierBrushOperation =
+    selection.drawMode === "eraser" ? "erase" : "paint";
+  const contractOperation = runtimeContract?.operation ?? "paint";
+  invariant(
+    contractOperation === selectionOperation,
+    `${selection.catalogId}: runtime operation ${contractOperation} conflicts with `
+      + `selection drawMode ${selection.drawMode ?? "pen"}`,
+  );
+  return contractOperation;
+}
+
+function verifierBaselinePaintItem(): StudioBrushCatalogItem {
+  const item = STUDIO_ALL_BRUSH_CATALOG_ITEMS.find((candidate) => {
+    if (candidate.source !== "core" || candidate.defaultOpacity < 0.95) return false;
+    const contract = resolveStudioBrushRuntimeContract(candidate.id);
+    return contract?.engine === "causal-ink" && (contract.operation ?? "paint") === "paint";
+  });
+  invariant(item, "could not resolve an opaque causal paint brush for eraser baselines");
+  return item;
+}
+
 /**
  * Catalogue dynamics describe the selected library profile; a persisted stroke additionally owns
  * its selected width and the strictest artist/family/profile geometry floor. Keep the browser oracle
@@ -334,6 +401,15 @@ function assertProductBrushCatalogContract(): {
   invariant(
     catalogIds.length === coreCatalogIds.length + proCatalogIds.length,
     "the product catalogue contains an item outside the core/pro partitions",
+  );
+  invariant(
+    new Set(REQUESTED_BRUSH_VERIFY_IDS).size === REQUESTED_BRUSH_VERIFY_IDS.length,
+    "TOONSPECTRUM_BRUSH_VERIFY_IDS contains duplicate ids",
+  );
+  invariant(
+    BRUSH_MATRIX_CATALOG_COUNT === REQUESTED_BRUSH_VERIFY_ID_SET.size
+      || REQUESTED_BRUSH_VERIFY_IDS.length === 0,
+    "TOONSPECTRUM_BRUSH_VERIFY_IDS contains an unknown product brush id",
   );
   invariant(
     JSON.stringify(catalogIds) === JSON.stringify([...coreCatalogIds, ...proCatalogIds]),
@@ -533,9 +609,25 @@ async function activateDesktopPen(page: Page): Promise<void> {
   if (await propertiesTab.getAttribute("aria-selected") !== "true") await propertiesTab.click();
 }
 
+async function ensureDesktopBrushCatalogTrigger(page: Page): Promise<Locator> {
+  const toolbar = page.locator('[data-studio-draw-options="true"]');
+  await toolbar.waitFor({ state: "visible", timeout: 8_000 });
+  let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
+  if (await pill.count() === 0) {
+    const pen = toolbar.getByRole("button", { name: "펜", exact: true });
+    await pen.click();
+    await page.waitForFunction(() =>
+      document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") === "pen"
+    );
+    pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
+    await pill.waitFor({ state: "visible" });
+  }
+  return pill;
+}
+
 async function openDesktopCatalog(page: Page): Promise<Locator> {
-  const pill = page.locator('[data-studio-brush-active-pill="true"]');
-  await pill.click();
+  await (await ensureDesktopBrushCatalogTrigger(page)).click();
   const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
   await catalog.waitFor({ state: "visible" });
   invariant(await catalog.count() === 1, "desktop opened more than one built-in catalogue session");
@@ -627,7 +719,13 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
 async function selectDesktopBrush(
   page: Page,
   preset: Pick<StudioBrushCatalogItem, "id" | "name">,
+  selection?: StudioBrushCatalogSelection,
 ): Promise<void> {
+  const expectedSelection =
+    selection ?? await materializeStudioBrushCatalogSelection(preset.id);
+  invariant(expectedSelection, `${preset.id}: catalogue selection did not materialize`);
+  const operation = verifierBrushOperation(expectedSelection);
+  const expectedDrawMode = operation === "erase" ? "eraser" : "pen";
   const catalog = await openDesktopCatalog(page);
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
   await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.id);
@@ -637,12 +735,25 @@ async function selectDesktopBrush(
   await option.click();
   await catalog.waitFor({ state: "detached" });
   await page.waitForFunction(
-    ({ expectedName }) => document
-      .querySelector('[data-studio-brush-active-pill="true"]')
-      ?.getAttribute("aria-label")
-      ?.includes(expectedName) === true,
-    { expectedName: preset.name },
+    ({ drawMode }) => document
+      .querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === drawMode,
+    { drawMode: expectedDrawMode },
   );
+  if (operation === "paint") {
+    await page.waitForFunction(
+      ({ expectedName }) => document
+        .querySelector('[data-studio-brush-active-pill="true"]')
+        ?.getAttribute("aria-label")
+        ?.includes(expectedName) === true,
+      { expectedName: preset.name },
+    );
+  } else {
+    invariant(
+      await page.locator('[data-studio-brush-active-pill="true"]').count() === 0,
+      `${preset.id}: eraser selection retained the pen-only active brush pill`,
+    );
+  }
 }
 
 async function enabledHistoryButton(page: Page, ariaLabel: "실행취소" | "다시실행"): Promise<Locator> {
@@ -673,7 +784,7 @@ function strokePoint(
   invariant(safeBottom - safeTop >= 220, "visible canvas is too short for the brush grid");
   const column = index % 7;
   const row = Math.floor(index / 7);
-  const rows = Math.max(1, Math.ceil(PRODUCT_BRUSH_CATALOG_COUNT / 7));
+  const rows = Math.max(1, Math.ceil(BRUSH_MATRIX_CATALOG_COUNT / 7));
   return {
     x: safeLeft + ((safeRight - safeLeft) * column) / 6,
     y: safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows,
@@ -909,6 +1020,61 @@ async function captureStableEvidence(
   return current;
 }
 
+interface VerifierStrokeRoute {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}
+
+async function drawVerifierStrokeRoute(
+  page: Page,
+  route: VerifierStrokeRoute,
+): Promise<void> {
+  await page.mouse.move(route.start.x, route.start.y);
+  await page.mouse.down();
+  await page.mouse.move(route.end.x, route.end.y);
+  await page.mouse.up();
+  await page.mouse.move(4, 4);
+}
+
+async function prepareVisibleEraserBaseline(
+  page: Page,
+  route: VerifierStrokeRoute,
+  clip: { x: number; y: number; width: number; height: number },
+): Promise<{
+  empty: Buffer;
+  painted: Buffer;
+}> {
+  const empty = await captureStableEvidence(page, clip);
+  const baselineItem = verifierBaselinePaintItem();
+  const baselineSelection = await materializeStudioBrushCatalogSelection(baselineItem.id);
+  invariant(baselineSelection, "eraser baseline paint selection did not materialize");
+  invariant(
+    verifierBrushOperation(baselineSelection) === "paint",
+    `${baselineItem.id}: eraser baseline resolved to a destructive operation`,
+  );
+  await selectDesktopBrush(page, baselineItem, baselineSelection);
+  await drawVerifierStrokeRoute(page, route);
+  await page.waitForTimeout(280);
+  const persisted = await waitForPersistedSelectedOperation(
+    page,
+    baselineSelection,
+    "paint",
+    1,
+    false,
+  );
+  invariant(
+    persisted.stroke.mode === "pen",
+    `${baselineItem.id}: eraser baseline did not persist as paint`,
+  );
+  const painted = await captureStableEvidence(page, clip);
+  const paintDiff = await compareScreenshotPixels(page, empty, painted);
+  invariant(
+    hasMeaningfulPixelChange(paintDiff),
+    `${baselineItem.id}: eraser baseline produced no visible paint`,
+  );
+  return { empty, painted };
+}
+
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
@@ -918,7 +1084,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     });
   }
   const errors = collectBrowserErrors(page, "desktop-brushes", studioUrl);
-  const screenshot = join(SCRATCH, `studio-brush-desktop-${PRODUCT_BRUSH_CATALOG_COUNT}.png`);
+  const screenshot = join(SCRATCH, `studio-brush-desktop-${BRUSH_MATRIX_CATALOG_COUNT}.png`);
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
 
   try {
@@ -961,14 +1127,15 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     invariant(stageBox && viewport, "could not measure the desktop canvas");
 
     const evidence: BrushStrokeEvidence[] = [];
-    for (const [index, preset] of STUDIO_ALL_BRUSH_CATALOG_ITEMS.entries()) {
+    for (const [index, preset] of BRUSH_MATRIX_CATALOG_ITEMS.entries()) {
       const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
       invariant(expectedSelection, `${preset.id}: product catalogue selection did not materialize`);
       invariant(
         preset.source === "core" || expectedSelection.brushDynamics,
         `${preset.id}: pro catalogue selection has no runtime dynamics`,
       );
-      await selectDesktopBrush(page, preset);
+      const operation = verifierBrushOperation(expectedSelection);
+      await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
       const point = strokePoint(stageBox, viewport, index);
       if (DEBUG_BRUSH_VERIFIER) {
@@ -1061,16 +1228,83 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         };
       }
       const usedClip = sanitizeEvidenceClip(strokeEvidenceClip(evidencePoint, viewport), viewport);
-      const before = await captureStableEvidence(page, usedClip);
+      const eraseBaseline = operation === "erase"
+        ? await prepareVisibleEraserBaseline(page, {
+            start: {
+              x: evidencePoint.x - 18,
+              y: evidencePoint.y - 1,
+            },
+            end: {
+              x: evidencePoint.x + evidencePoint.dx + 18,
+              y: evidencePoint.y + evidencePoint.dy + 1,
+            },
+          }, usedClip)
+        : null;
+      if (eraseBaseline) {
+        await selectDesktopBrush(page, preset, expectedSelection);
+      }
+      const emptyBefore = eraseBaseline?.empty ?? null;
+      const before = eraseBaseline?.painted
+        ?? await captureStableEvidence(page, usedClip);
+      const shortOperationRoute: VerifierStrokeRoute = operation === "erase"
+        ? {
+            start: {
+              x: evidencePoint.x - 12,
+              y: evidencePoint.y - 1,
+            },
+            end: {
+              x: evidencePoint.x + evidencePoint.dx + 12,
+              y: evidencePoint.y + evidencePoint.dy + 1,
+            },
+          }
+        : {
+            start: { x: evidencePoint.x, y: evidencePoint.y },
+            end: {
+              x: evidencePoint.x + evidencePoint.dx,
+              y: evidencePoint.y + evidencePoint.dy,
+            },
+          };
       if (DEBUG_BRUSH_VERIFIER) {
         log(`preset=${preset.id} point=${JSON.stringify(point)} evidencePoint=${JSON.stringify(evidencePoint)} clip=${JSON.stringify(usedClip)}`);
       }
 
       // No dwell between the trusted down, one short move and release: this is the regression path
       // for strokes that previously vanished when a user released earlier than the deferred commit.
-      await page.mouse.move(evidencePoint.x, evidencePoint.y);
+      await page.mouse.move(shortOperationRoute.start.x, shortOperationRoute.start.y);
       await page.mouse.down();
-      await page.mouse.move(evidencePoint.x + evidencePoint.dx, evidencePoint.y + evidencePoint.dy);
+      await page.mouse.move(
+        shortOperationRoute.end.x,
+        shortOperationRoute.end.y,
+        operation === "erase" ? { steps: 4 } : undefined,
+      );
+      let eraseLiveOperationActive: boolean | null = null;
+      if (operation === "erase") {
+        await page.waitForTimeout(80);
+        const live = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const liveDiff = await compareScreenshotPixels(page, before, live);
+        eraseLiveOperationActive = await page.evaluate(() =>
+          document.querySelector('[data-studio-draw-options="true"]')
+            ?.getAttribute("data-studio-active-draw-mode") === "eraser"
+        );
+        invariant(
+          eraseLiveOperationActive,
+          `${preset.id}: pointer-down gesture lost eraser operation authority`,
+        );
+        if (!hasMeaningfulPixelChange(liveDiff) && DEBUG_BRUSH_VERIFIER) {
+          writeFileSync(
+            join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-baseline.png`),
+            before,
+          );
+          writeFileSync(
+            join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-live.png`),
+            live,
+          );
+          log(
+            `${preset.id}: destination-out remains release-visible by design; `
+              + `pointer-down diff ${JSON.stringify(liveDiff)}`,
+          );
+        }
+      }
       await page.mouse.up();
       await page.mouse.move(4, 4);
 
@@ -1089,22 +1323,50 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           globalState.__perfectInkDebugState = null;
         });
       }
-      invariant(hasMeaningfulPixelChange(immediateDiff), `${preset.id}: fast short stroke produced no visible pixels`);
+      invariant(
+        hasMeaningfulPixelChange(immediateDiff),
+        operation === "erase"
+          ? `${preset.id}: released eraser did not visibly remove baseline paint`
+          : `${preset.id}: fast short stroke produced no visible pixels`,
+      );
       // A deferred commit is allowed, but the release preview must settle into durable pixels
       // before its 200 ms idle window elapses instead of silently disappearing.
       await page.waitForTimeout(260);
       const after = await page.screenshot({ animations: "disabled", clip: usedClip });
       const settledDiff = await compareScreenshotPixels(page, before, after);
       const visualChanged = hasMeaningfulPixelChange(settledDiff);
-      invariant(visualChanged, `${preset.id}: released stroke disappeared before becoming durable`);
+      invariant(
+        visualChanged,
+        operation === "erase"
+          ? `${preset.id}: erased baseline reappeared before commit`
+          : `${preset.id}: released stroke disappeared before becoming durable`,
+      );
       // Extended catalogue ids intentionally materialize onto three stable renderer ids. A pill
       // can therefore show the requested pro-brush name while a stale dynamics snapshot still
       // paints visible pixels through the same renderer. Verify the durable identity + exact
       // normalized dynamics before history removes the isolated stroke. Core identities receive
       // the same persistence audit in the long-route matrix below.
-      const persistedProStroke = preset.source === "pro"
+      const persistedProStroke = preset.source === "pro" && operation === "paint"
         ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)
         : null;
+      const persistedErase = operation === "erase"
+        ? await waitForPersistedSelectedOperation(
+            page,
+            expectedSelection,
+            "erase",
+            2,
+            false,
+          )
+        : null;
+      const persistedOperationMatched = operation === "erase"
+        ? persistedErase?.stroke.mode === "eraser"
+          && persistedErase.stroke.brush === null
+          && persistedErase.draws[0]?.mode === "pen"
+        : true;
+      invariant(
+        persistedOperationMatched,
+        `${preset.id}: committed eraser operation did not persist after its paint baseline`,
+      );
       const expectedPersistedDynamics = persistedProStroke
         ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
         : null;
@@ -1148,11 +1410,14 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       evidence.push({
         id: preset.id,
         source: preset.source,
+        operation,
         selected: true,
         visualChanged,
+        eraseLiveOperationActive,
         undoEnabled: true,
         undoRestoredPixels,
         redoRestoredStroke,
+        persistedOperationMatched,
         persistedCatalogId: persistedProStroke?.brushCatalogId ?? null,
         persistedRuntimeBrushId: persistedProStroke?.brush ?? null,
         persistedDynamicsMatched,
@@ -1167,9 +1432,25 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         cleanupDiff.changedPixels <= 3,
         `${preset.id}: post-redo cleanup left perceptible stroke pixels behind`,
       );
+      if (operation === "erase") {
+        invariant(emptyBefore, `${preset.id}: eraser cleanup lost its empty baseline`);
+        await page.keyboard.press("Meta+z");
+        await page.waitForTimeout(80);
+        const fullyCleaned = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const fullCleanupDiff = await compareScreenshotPixels(
+          page,
+          emptyBefore,
+          fullyCleaned,
+          20,
+        );
+        invariant(
+          fullCleanupDiff.changedPixels <= 3,
+          `${preset.id}: paint+erase cleanup left ${fullCleanupDiff.changedPixels} visible pixels`,
+        );
+      }
       log(
-        `desktop ${index + 1}/${PRODUCT_BRUSH_CATALOG_COUNT} `
-          + `${preset.id}: select/draw/undo/redo OK`,
+        `desktop ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} `
+          + `${preset.id}: select/${operation}/undo/redo OK`,
       );
     }
 
@@ -1177,14 +1458,17 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "desktop browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "desktop browser received unexpected 5xx responses");
-    const ok = evidence.length === PRODUCT_BRUSH_CATALOG_COUNT && evidence.every((entry) =>
+    const ok = evidence.length === BRUSH_MATRIX_CATALOG_COUNT && evidence.every((entry) =>
       entry.selected
       && entry.visualChanged
+      && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
       && entry.undoEnabled
       && entry.undoRestoredPixels
       && entry.redoRestoredStroke
+      && entry.persistedOperationMatched
       && (
-        entry.source === "core"
+        entry.operation === "erase"
+        || entry.source === "core"
         || (
           entry.persistedCatalogId === entry.id
           && entry.persistedRuntimeBrushId !== null
@@ -1217,6 +1501,7 @@ interface PersistedDrawElement {
   brushCatalogName: string | null;
   brushDynamics: unknown;
   kind: string | null;
+  mode: "pen" | "eraser";
   polygonSides: number | null;
   points: number[];
 }
@@ -1264,6 +1549,7 @@ async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]
           : null,
         brushDynamics: record.brushDynamics,
         kind: typeof record.kind === "string" ? record.kind : "freehand",
+        mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
         polygonSides,
         points: Array.isArray(record.points)
           ? record.points.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
@@ -1424,19 +1710,30 @@ async function waitForPersistedDrawCount(page: Page, expectedCount: number): Pro
   }, { prefix: AUTOSAVE_PREFIX, count: expectedCount }, { timeout: 5_000 });
 }
 
-async function waitForPersistedSingleLongStroke(
+async function waitForPersistedSelectedOperation(
   page: Page,
   expected: StudioBrushCatalogSelection,
+  operation: VerifierBrushOperation,
+  expectedDrawCount: number,
   requireCatalogIdentity: boolean,
-): Promise<PersistedDrawElement> {
+): Promise<{
+  stroke: PersistedDrawElement;
+  draws: PersistedDrawElement[];
+}> {
   await page.waitForFunction(({
     prefix,
     catalogId,
     catalogName,
     runtimeBrushId,
+    expectedOperation,
+    drawCount,
     requireCatalog,
   }) => {
-    let newest: { savedAt?: string; pagesList?: Array<{ elements?: unknown[] }> } | null = null;
+    let newest: {
+      savedAt?: string;
+      currentPageId?: string;
+      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
+    } | null = null;
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
       if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
@@ -1445,10 +1742,11 @@ async function waitForPersistedSingleLongStroke(
       try {
         const value = JSON.parse(raw) as {
           savedAt?: string;
-          pagesList?: Array<{ elements?: unknown[] }>;
+          currentPageId?: string;
+          pagesList?: Array<{ id?: string; elements?: unknown[] }>;
         };
         if (
-          value.pagesList
+          value?.pagesList
           && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
         ) {
           newest = value;
@@ -1457,18 +1755,27 @@ async function waitForPersistedSingleLongStroke(
         // Keep waiting for the normal debounced autosave.
       }
     }
-    const draws = (newest?.pagesList ?? [])
-      .flatMap((candidate) => candidate.elements ?? [])
-      .filter((element): element is { type: string; brush?: unknown; points?: unknown } =>
+    if (!newest?.pagesList) return false;
+    const pageRecord = newest.pagesList.find(
+      (candidate) => candidate.id === newest?.currentPageId,
+    ) ?? newest.pagesList[0];
+    const draws = (pageRecord?.elements ?? [])
+      .filter((element): element is Record<string, unknown> =>
         Boolean(element)
         && typeof element === "object"
         && (element as { type?: unknown }).type === "draw"
       );
-    const draw = draws[0] as Record<string, unknown> | undefined;
-    return draws.length === 1
-      && draw?.brush === runtimeBrushId
-      && Array.isArray(draw.points)
-      && draw.points.length >= 4
+    if (draws.length !== drawCount) return false;
+    const draw = draws.at(-1);
+    if (!draw || !Array.isArray(draw.points) || draw.points.length < 4) return false;
+    if (expectedOperation === "erase") {
+      return draw.mode === "eraser"
+        && draw.brush == null
+        && draw.brushCatalogId == null
+        && draw.brushCatalogName == null;
+    }
+    return draw.mode !== "eraser"
+      && draw.brush === runtimeBrushId
       && (
         !requireCatalog
         || (
@@ -1483,11 +1790,24 @@ async function waitForPersistedSingleLongStroke(
     catalogId: expected.catalogId,
     catalogName: expected.catalogName,
     runtimeBrushId: expected.runtimeBrushId,
+    expectedOperation: operation,
+    drawCount: expectedDrawCount,
     requireCatalog: requireCatalogIdentity,
   }, { timeout: 5_000 });
-  const [saved] = await persistedDrawElements(page);
-  invariant(saved, `${expected.catalogId}: autosave did not expose the isolated long stroke`);
-  return saved;
+  const draws = await persistedDrawElements(page);
+  invariant(
+    draws.length === expectedDrawCount,
+    `${expected.catalogId}: autosave exposed ${draws.length}/${expectedDrawCount} draw operations`,
+  );
+  const stroke = draws.at(-1);
+  invariant(stroke, `${expected.catalogId}: autosave did not expose the selected operation`);
+  invariant(
+    operation === "erase"
+      ? stroke.mode === "eraser" && stroke.brush === null
+      : stroke.mode === "pen" && stroke.brush === expected.runtimeBrushId,
+    `${expected.catalogId}: autosave persisted the wrong ${operation} operation`,
+  );
+  return { stroke, draws };
 }
 
 function persistedStrokePathDistance(points: readonly number[]): number {
@@ -1629,7 +1949,7 @@ function writeLongBrushQualityReport(input: Readonly<{
   writeFileSync(input.reportPath, `${JSON.stringify({
     schemaVersion: STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION,
     generatedAt: new Date().toISOString(),
-    mode: ALL_BRUSH_LONG_MATRIX ? "all-214" : "core-only",
+    mode: LONG_BRUSH_MATRIX_MODE,
     expectedPresetCount: LONG_BRUSH_CATALOG_COUNT,
     analyzedPresetCount: input.evidence.length,
     completed: input.completed,
@@ -1698,7 +2018,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
   const errors = collectBrowserErrors(page, "long-brushes", studioUrl);
   const qualityRunDirectory = join(
     resolve(SCRATCH),
-    `long-brush-matrix-${ALL_BRUSH_LONG_MATRIX ? "all-214" : "core"}-${Date.now()}`,
+    `long-brush-matrix-${LONG_BRUSH_MATRIX_MODE}-${Date.now()}`,
   );
   const qualityReportPath = join(qualityRunDirectory, "long-brush-quality-report.json");
   mkdirSync(qualityRunDirectory, { recursive: true });
@@ -1736,7 +2056,8 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         preset.source === "core" || expectedSelection.brushDynamics,
         `${preset.id}: long-route pro selection has no runtime dynamics`,
       );
-      await selectDesktopBrush(page, preset);
+      const operation = verifierBrushOperation(expectedSelection);
+      await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
       // Every preset gets the same clean lane. Packing all brushes into the visible 300 px height
       // made a broad preceding stroke cover a thin successor (notably pen → fineliner), so a
@@ -1763,7 +2084,18 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         start: startX - clip.x,
         end: endX - clip.x,
       };
-      const before = await captureStableEvidence(page, clip);
+      const eraseBaseline = operation === "erase"
+        ? await prepareVisibleEraserBaseline(page, {
+            start: { x: startX, y },
+            end: { x: endX, y: y + 4 },
+          }, clip)
+        : null;
+      if (eraseBaseline) {
+        await selectDesktopBrush(page, preset, expectedSelection);
+      }
+      const emptyBefore = eraseBaseline?.empty ?? null;
+      const before = eraseBaseline?.painted
+        ?? await captureStableEvidence(page, clip);
       const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
         document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
       { x: startX, y: y });
@@ -1783,6 +2115,15 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       // initialized, so the complete live ROI is compared without an endpoint exclusion.
       await page.waitForTimeout(50);
       const live = await page.screenshot({ animations: "disabled", clip });
+      if (operation === "erase") {
+        invariant(
+          await page.evaluate(() =>
+            document.querySelector('[data-studio-draw-options="true"]')
+              ?.getAttribute("data-studio-active-draw-mode") === "eraser"
+          ),
+          `${preset.id}: long pointer-down gesture lost eraser operation authority`,
+        );
+      }
       await page.mouse.up();
       const released = await page.screenshot({ animations: "disabled", clip });
       await page.mouse.move(4, 4);
@@ -1835,11 +2176,14 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         );
         log(`DEBUG ${preset.id} long-settled:${JSON.stringify(settledPerfectDebugState)}`);
       }
-      const saved = await waitForPersistedSingleLongStroke(
+      const persistedOperation = await waitForPersistedSelectedOperation(
         page,
         expectedSelection,
-        preset.source === "pro",
+        operation,
+        operation === "erase" ? 2 : 1,
+        preset.source === "pro" && operation === "paint",
       );
+      const saved = persistedOperation.stroke;
       const settled = await page.screenshot({ animations: "disabled", clip });
       const descriptor = studioBrushPackDescriptorById(preset.id);
       const dryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
@@ -1848,7 +2192,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         : descriptor
           ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
           : false;
-      const qualityPolicy = classifyStudioLongBrushQualityPolicy({
+      const classifiedQualityPolicy = classifyStudioLongBrushQualityPolicy({
         id: preset.id,
         source: preset.source,
         runtimeBrushId: expectedSelection.runtimeBrushId,
@@ -1856,6 +2200,17 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         previewStyle: preset.previewStyle,
         intentionalDiscrete,
       });
+      // A destination-out draft cannot punch through retained paint from a separate transparent
+      // preview layer. Studio therefore keeps operation authority live while its first visible
+      // pixels are the synchronous release frame. Record the pointer-down frame honestly, but do
+      // not apply paint-specific live-energy ratios to it; release/settled route coverage,
+      // persistence and history remain strict below.
+      const qualityPolicy = operation === "erase"
+        ? {
+            kind: "record-only-discrete" as const,
+            reason: "release-visible destination-out over retained paint",
+          }
+        : classifiedQualityPolicy;
       const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
       const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
         const amount = sampleIndex / Math.max(1, sampleCount - 1);
@@ -1968,7 +2323,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
        * require meaningful output above, persist the full 300 px route below, capture all four
        * frames and exercise Undo; only the continuous-coverage invariant is policy-scoped.
        */
-      if (qualityPolicy.kind !== "record-only-discrete") {
+      if (operation === "erase" || qualityPolicy.kind !== "record-only-discrete") {
         invariant(
           coverage.visibleSegments === 6,
           `${preset.id}: long stroke has missing visual segments (${coverage.visibleSegments}/6; ${coverage.segmentChangedPixels.join(",")})`,
@@ -1978,9 +2333,11 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       // still capture every remaining brush so one early scallop does not hide 213 later results.
       // Functional absence, route coverage, persistence identity and Undo remain immediate failures.
       const expectedPersistedDynamics = preset.source === "pro"
+        && operation === "paint"
         ? expectedPersistedDynamicsForDefaultSelection(expectedSelection)
         : null;
       const persistedDynamicsMatched = preset.source === "pro"
+        && operation === "paint"
         ? serializeStudioBrushDynamicsSettingsCanonical(saved.brushDynamics)
           === serializeStudioBrushDynamicsSettingsCanonical(expectedPersistedDynamics)
         : null;
@@ -1990,12 +2347,18 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         `${preset.id}: isolated long stroke persisted as ${saved.kind ?? "missing"}, not freehand`,
       );
       invariant(
-        saved.brush === expectedSelection.runtimeBrushId,
-        `${preset.id}: isolated long stroke persisted with runtime brush `
-          + `${saved.brush ?? "missing"}, expected ${expectedSelection.runtimeBrushId}`,
+        operation === "erase"
+          ? saved.mode === "eraser" && saved.brush === null
+          : saved.mode === "pen" && saved.brush === expectedSelection.runtimeBrushId,
+        operation === "erase"
+          ? `${preset.id}: isolated long eraser did not persist as destination-out geometry`
+          : `${preset.id}: isolated long stroke persisted with runtime brush `
+            + `${saved.brush ?? "missing"}, expected ${expectedSelection.runtimeBrushId}`,
       );
       invariant(
-        preset.source === "core" || saved.brushCatalogId === preset.id,
+        operation === "erase"
+          ? saved.brushCatalogId === null
+          : preset.source === "core" || saved.brushCatalogId === preset.id,
         `${preset.id}: isolated long stroke persisted with catalogue id `
           + `${saved.brushCatalogId ?? "missing"}`,
       );
@@ -2023,14 +2386,33 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         await enabledHistoryButton(page, "다시실행").then(() => true, () => false),
         `${preset.id}: isolated long-stroke Undo did not create a redo entry`,
       );
+      if (operation === "erase") {
+        invariant(emptyBefore, `${preset.id}: long eraser cleanup lost its empty baseline`);
+        await page.keyboard.press("Meta+z");
+        await page.waitForTimeout(80);
+        const fullyCleaned = await page.screenshot({ animations: "disabled", clip });
+        const fullCleanupDiff = await compareScreenshotPixels(
+          page,
+          emptyBefore,
+          fullyCleaned,
+          20,
+        );
+        invariant(
+          fullCleanupDiff.changedPixels <= 3,
+          `${preset.id}: long paint+erase cleanup left `
+            + `${fullCleanupDiff.changedPixels} visible pixels`,
+        );
+      }
       evidence.push({
         id: preset.id,
         source: preset.source,
+        operation,
         expectedRuntimeBrushId: expectedSelection.runtimeBrushId,
         visualChanged: true,
         visibleSegments: coverage.visibleSegments,
         totalSegments: 6,
         persistedBrushId: saved.brush,
+        persistedMode: saved.mode,
         persistedCatalogId: saved.brushCatalogId,
         persistedDynamicsMatched,
         persistedPathDistance,
@@ -2042,8 +2424,14 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         `long ${index + 1}/${LONG_BRUSH_CATALOG_COUNT} `
           + `${preset.id} → ${expectedSelection.runtimeBrushId}: `
           + `${coverage.visibleSegments}/6 route segments visible`
-          + `${quality.policy.kind === "record-only-discrete" ? " (discrete)" : ""} + `
-          + `${persistedPathDistance.toFixed(1)}px persisted + Undo OK`,
+          + `${
+            operation === "erase"
+              ? " (release-visible eraser)"
+              : quality.policy.kind === "record-only-discrete"
+                ? " (discrete)"
+                : ""
+          } + `
+          + `${persistedPathDistance.toFixed(1)}px ${operation} persisted + Undo OK`,
       );
     }
 
@@ -2069,12 +2457,20 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           entry.visibleSegments === entry.totalSegments
           || entry.qualityPolicy === "record-only-discrete"
         )
-        && entry.persistedBrushId === entry.expectedRuntimeBrushId
+        && (
+          entry.operation === "erase"
+            ? entry.persistedMode === "eraser"
+              && entry.persistedBrushId === null
+              && entry.persistedCatalogId === null
+            : entry.persistedMode === "pen"
+              && entry.persistedBrushId === entry.expectedRuntimeBrushId
+        )
         && entry.persistedPathDistance >= 300
         && entry.undoRestoredPixels
         && entry.qualityOk
         && (
-          entry.source === "core"
+          entry.operation === "erase"
+          || entry.source === "core"
           || (
             entry.persistedCatalogId === entry.id
             && entry.persistedDynamicsMatched === true
@@ -2674,6 +3070,15 @@ async function main(): Promise<void> {
     !(shapesOnly && longOnly),
     "TOONSPECTRUM_SHAPES_ONLY and TOONSPECTRUM_BRUSH_LONG_ONLY cannot be combined",
   );
+  invariant(
+    shapesOnly || LONG_BRUSH_CATALOG_COUNT > 0,
+    "the requested brush subset contains no brush admitted by the selected long-matrix mode",
+  );
+  if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+    log(
+      `focused brush subset: ${BRUSH_MATRIX_CATALOG_ITEMS.map((item) => item.id).join(", ")}`,
+    );
+  }
   const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   const port = externalOrigin ? null : await findFreePort();
   const origin = externalOrigin
@@ -2706,7 +3111,7 @@ async function main(): Promise<void> {
     if (desktop) {
       invariant(
         desktop.ok,
-        `desktop ${PRODUCT_BRUSH_CATALOG_COUNT}-brush matrix failed`,
+        `desktop ${BRUSH_MATRIX_CATALOG_COUNT}-brush matrix failed`,
       );
     }
     const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);
@@ -2732,9 +3137,11 @@ async function main(): Promise<void> {
     await browser.close();
     browser = null;
     log(
-      longOnly
-        ? `ALL ${LONG_BRUSH_CATALOG_COUNT} LONG-ROUTE BRUSH GATES OK`
-        : "ALL BRUSH AND SMART SHAPE BROWSER GATES OK",
+      REQUESTED_BRUSH_VERIFY_IDS.length > 0
+        ? `ALL ${BRUSH_MATRIX_CATALOG_COUNT} FOCUSED BRUSH GATES OK`
+        : longOnly
+          ? `ALL ${LONG_BRUSH_CATALOG_COUNT} LONG-ROUTE BRUSH GATES OK`
+          : "ALL BRUSH AND SMART SHAPE BROWSER GATES OK",
     );
     console.log(JSON.stringify({ scratch: SCRATCH, desktop, longBrushes, smartShapes, mobile, durability }, null, 2));
   } finally {

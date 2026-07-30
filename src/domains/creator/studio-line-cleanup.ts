@@ -31,6 +31,29 @@ export const LINE_ART_CLEANUP_RANGES = {
   strength: { min: 0, max: 1, step: 0.05 },
 } as const;
 
+function finiteUnitInterval(raw: unknown, fallback: number): number {
+  return typeof raw === "number" && Number.isFinite(raw)
+    ? Math.min(1, Math.max(0, raw))
+    : fallback;
+}
+
+/** Stored/Worker inputs are normalized once so malformed documents cannot amplify the kernels. */
+export function normalizeLineArtCleanup(
+  options?: Partial<LineArtCleanupOptions> | null,
+): LineArtCleanupOptions {
+  const source = options && typeof options === "object" ? options : {};
+  return {
+    threshold: finiteUnitInterval(
+      source.threshold,
+      DEFAULT_LINE_ART_CLEANUP.threshold,
+    ),
+    strength: finiteUnitInterval(
+      source.strength,
+      DEFAULT_LINE_ART_CLEANUP.strength,
+    ),
+  };
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -54,6 +77,44 @@ function toGrayscale(img: StudioImageDataLike): void {
 }
 
 /**
+ * Pure ImageData line-cleanup engine shared by Konva, the module Worker, page-composite filters,
+ * and the legacy one-shot image action. The operation order is intentional:
+ * grayscale → auto contrast → sharpen → optional binary threshold.
+ */
+export function applyLineArtCleanup(
+  imageData: StudioImageDataLike,
+  options?: Partial<LineArtCleanupOptions> | null,
+): void {
+  if (
+    !Number.isSafeInteger(imageData.width)
+    || !Number.isSafeInteger(imageData.height)
+    || imageData.width <= 0
+    || imageData.height <= 0
+    || imageData.data.length !== imageData.width * imageData.height * 4
+  ) {
+    return;
+  }
+  const normalized = normalizeLineArtCleanup(options);
+  toGrayscale(imageData);
+  applyAutoAdjust(imageData, { mode: "contrast", strength: 100 });
+  if (normalized.strength > 0) applySharpen(imageData, normalized.strength);
+  applyInkThreshold(imageData, normalized.threshold);
+}
+
+/** Konva/Worker adapter. Missing attrs are a fail-closed no-op, not an implicit default effect. */
+export function lineArtCleanupKonvaFilter(
+  this: { attrs?: Record<string, unknown> },
+  imageData: StudioImageDataLike,
+): void {
+  const attrs = this.attrs;
+  if (!attrs) return;
+  applyLineArtCleanup(imageData, {
+    threshold: attrs.lineCleanupThreshold as number | undefined,
+    strength: attrs.lineCleanupStrength as number | undefined,
+  });
+}
+
+/**
  * 선화 정리 — src(데이터 URL 등)의 흐릿한 스케치를 또렷한 흑백 선으로 정리한 PNG data URL 을 반환한다.
  * @param opts.threshold 잉크 임계값 0..1, 기본 0.6. 0 이면 이진화 없이 그레이 클린업만 수행.
  * @param opts.strength 언샤프 마스크 강도 0..1, 기본 0.5. 0 이면 샤픈 생략.
@@ -62,9 +123,6 @@ export async function cleanupLineArt(
   src: string,
   opts: Partial<LineArtCleanupOptions> = {},
 ): Promise<string> {
-  const threshold = opts.threshold ?? DEFAULT_LINE_ART_CLEANUP.threshold;
-  const strength = opts.strength ?? DEFAULT_LINE_ART_CLEANUP.strength;
-
   const img = await loadImage(src);
   const w = img.naturalWidth || img.width;
   const h = img.naturalHeight || img.height;
@@ -78,10 +136,7 @@ export async function cleanupLineArt(
   ctx.drawImage(img, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
 
-  toGrayscale(imageData);
-  applyAutoAdjust(imageData, { mode: "contrast", strength: 100 });
-  if (strength > 0) applySharpen(imageData, strength);
-  applyInkThreshold(imageData, threshold);
+  applyLineArtCleanup(imageData, opts);
 
   ctx.putImageData(imageData, 0, 0);
   return canvas.toDataURL("image/png");

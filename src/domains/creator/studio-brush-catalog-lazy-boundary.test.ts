@@ -28,8 +28,8 @@ describe("Studio brush catalogue lazy boundary", () => {
     expect(coreSource).not.toContain("studio-brush-pack-index");
     expect(coreSource).not.toContain("studio-draw-ux");
     expect(coreSource).not.toContain('import("./studio-brush-catalog")');
-    expect(STUDIO_CORE_BRUSH_CATALOG_ITEMS).toHaveLength(54);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 54, pro: 160, total: 214 });
+    expect(STUDIO_CORE_BRUSH_CATALOG_ITEMS).toHaveLength(66);
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 66, pro: 160, total: 226 });
   });
 
   it("keeps the quick shelf exact and useful while no pro metadata is required", () => {

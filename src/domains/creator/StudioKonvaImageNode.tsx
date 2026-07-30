@@ -22,6 +22,8 @@ import { toKonvaSkewAttrs } from "./studio-skew";
 import type { FrameEl, ImageEl } from "./studio-element-model";
 import type Konva from "konva";
 
+import { toast } from "@/lib/toast-store";
+
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
 const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;
 const IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT = 4;
@@ -89,6 +91,9 @@ export const STUDIO_DENSITY_INVARIANT_FILTER_ATTRS: ReadonlySet<string> = new Se
   // 색상 투명화 — per-pixel 키 컬러 거리 → 알파.
   "ctaColor",
   "ctaStrength",
+  // 전문 필터 실행 경계 표식 자체는 픽셀 값을 바꾸지 않는다. px 기반 전문 필터는
+  // 각자의 radius/sigma attrs 가 화이트리스트 밖이므로 계속 1×로 default-deny 된다.
+  "professionalFilterExecution",
   // 듀오톤 — 휘도 → 2색 매핑 포인트 연산.
   "duotoneShadow",
   "duotoneHighlight",
@@ -200,6 +205,17 @@ interface FilterMaskDecodedState {
   src: string;
 }
 
+function isStudioFilterWorkerRequiredError(error: unknown): boolean {
+  const code = (
+    error !== null && typeof error === "object"
+      ? (error as { code?: unknown }).code
+      : undefined
+  );
+  return code === "STUDIO_ADVANCED_BLUR_WORKER_REQUIRED"
+    || code === "STUDIO_PROFESSIONAL_FILTER_WORKER_REQUIRED"
+    || code === "STUDIO_TONE_ARTIFACT_WORKER_REQUIRED";
+}
+
 function releaseWorkerResultCanvas(canvas: HTMLCanvasElement): void {
   canvas.width = 0;
   canvas.height = 0;
@@ -296,11 +312,13 @@ export function StudioKonvaImageNode({
   const [gpuFilterModule, setGpuFilterModule] = useState<StudioGpuFilterApplyModule | null>(null);
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
+  const [workerRequiredFailureKey, setWorkerRequiredFailureKey] = useState<string>();
   const imageRef = useRef<Konva.Image | null>(null);
   const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
   const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
   const workerSourceRevisionRef = useRef(0);
   const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
+  const workerFailureNoticeRef = useRef<{ key: string } | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
   const elRef = useRef(el);
@@ -539,6 +557,9 @@ export function StudioKonvaImageNode({
     (workerDimensionsSafe ? built.filters : []) as NonNullable<Konva.NodeConfig["filters"]>;
   const filterAttrs = built.attrs;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
+  const workerRequiredForSafeExecution =
+    typeof filterWorkerClient?.studioImageFilterRequiresWorker === "function"
+    && filterWorkerClient.studioImageFilterRequiresWorker(el, workerWidth, workerHeight);
 
   // Worker 오프로드 경로 — cachePad>0(테두리 필터 활성)은 Konva의 cache({offset}) 위치 보정을
   // 정확히 복제하기 까다로워 제외하고 기존 Konva 내장 cache+filters 경로로 둔다. 애니메이션 GIF도
@@ -556,6 +577,7 @@ export function StudioKonvaImageNode({
     activeFilterMask?.src ?? null,
   ]);
   const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
+  const paddedWorkerRequiredBlocked = cachePad > 0 && workerRequiredForSafeExecution;
   const workerResultCacheLimit = el.filterPageComposite === true
     ? PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT
     : IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT;
@@ -568,6 +590,34 @@ export function StudioKonvaImageNode({
     && workerFilteredCanvas.height === workerHeight
       ? workerFilteredCanvas.canvas
       : undefined;
+  const retainedWorkerFilteredCanvas =
+    workerRequiredFailureKey === workerRequestKey
+    && workerFilteredCanvas?.src === el.src
+    && workerFilteredCanvas.source === displayImg
+    && workerFilteredCanvas.width === workerWidth
+    && workerFilteredCanvas.height === workerHeight
+      ? workerFilteredCanvas.canvas
+      : undefined;
+
+  useEffect(() => {
+    if (!paddedWorkerRequiredBlocked) return;
+    if (!workerFailureNoticeRef.current) {
+      const notice = { key: workerRequestKey };
+      workerFailureNoticeRef.current = notice;
+      toast(
+        "대형 고급 필터와 바깥 테두리를 함께 처리할 Worker 경로가 필요해 이전 화면을 유지합니다.",
+        { tone: "info", durationMs: 5_000 },
+      );
+      globalThis.setTimeout(() => {
+        if (workerFailureNoticeRef.current === notice) {
+          workerFailureNoticeRef.current = null;
+        }
+      }, 5_000);
+    }
+    console.error(
+      "[studio] blocked an oversized synchronous image-filter fallback while outline padding is active",
+    );
+  }, [paddedWorkerRequiredBlocked, workerRequestKey]);
 
   // Interactive Worker path: debounce slider bursts, keep one Worker session alive, and cache the
   // source RGBA snapshot. The resident session transfers one private source copy on revision
@@ -578,6 +628,7 @@ export function StudioKonvaImageNode({
       filterWorkerSessionRef.current = null;
       setWorkerFilteredCanvas(undefined);
       setWorkerFallbackKey(undefined);
+      if (!paddedWorkerRequiredBlocked) setWorkerRequiredFailureKey(undefined);
       workerSourcePixelsRef.current = null;
       releaseWorkerResultCache(workerResultCacheRef.current);
       workerResultCacheRef.current = null;
@@ -597,6 +648,7 @@ export function StudioKonvaImageNode({
       : undefined;
     let controller: AbortController | null = null;
     let cancelled = false;
+    setWorkerRequiredFailureKey((current) => current === requestKey ? current : undefined);
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
     // A regular image can retain several recent filter results. If the same source becomes a
     // full-page composite, enforce its stricter one-canvas budget as soon as the mode changes,
@@ -688,6 +740,7 @@ export function StudioKonvaImageNode({
           resultCache.canvases.set(filterKey, outCanvas);
           trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
           setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
+          setWorkerRequiredFailureKey((current) => current === requestKey ? undefined : current);
           setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
         } catch (error) {
           console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
@@ -730,6 +783,27 @@ export function StudioKonvaImageNode({
           })
           .catch((error) => {
             if ((error as { name?: string })?.name === "AbortError") return;
+            if (isStudioFilterWorkerRequiredError(error)) {
+              console.error(
+                "[studio] image filter Worker is required; retaining the last successful result:",
+                error,
+              );
+              setWorkerRequiredFailureKey(requestKey);
+              if (!workerFailureNoticeRef.current) {
+                const notice = { key: requestKey };
+                workerFailureNoticeRef.current = notice;
+                toast(
+                  "고급 필터 Worker를 사용할 수 없어 마지막으로 계산된 화면을 유지합니다.",
+                  { tone: "info", durationMs: 5_000 },
+                );
+                globalThis.setTimeout(() => {
+                  if (workerFailureNoticeRef.current === notice) {
+                    workerFailureNoticeRef.current = null;
+                  }
+                }, 5_000);
+              }
+              return;
+            }
             console.error("[studio] image filter worker failed, using Konva fallback:", error);
             setWorkerFallbackKey(requestKey);
           });
@@ -772,9 +846,14 @@ export function StudioKonvaImageNode({
     workerHeight,
     workerRequestKey,
     workerResultCacheLimit,
+    paddedWorkerRequiredBlocked,
   ]);
 
-  const showWorkerCanvas = workerPipelineActive && !!currentWorkerFilteredCanvas;
+  const visibleWorkerFilteredCanvas =
+    currentWorkerFilteredCanvas ?? retainedWorkerFilteredCanvas;
+  const showWorkerCanvas = workerPipelineActive && !!visibleWorkerFilteredCanvas;
+  const synchronousFallbackBlocked =
+    paddedWorkerRequiredBlocked || workerRequiredFailureKey === workerRequestKey;
 
   useEffect(() => {
     const node = imageRef.current;
@@ -789,6 +868,7 @@ export function StudioKonvaImageNode({
         && filterModule
         && !el.isAnimatedGif
         && !workerPipelineActive
+        && !synchronousFallbackBlocked
       ) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         // isAnimatedGif는 캐시를 만들지 않는다 — Konva 캐시는 "그 순간의 정적 스냅샷"이라
@@ -800,7 +880,7 @@ export function StudioKonvaImageNode({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity]);
+  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity, synchronousFallbackBlocked]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
@@ -840,7 +920,9 @@ export function StudioKonvaImageNode({
 
   // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
   // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
-  const imageSource: CanvasImageSource = showWorkerCanvas ? currentWorkerFilteredCanvas! : displayImg;
+  const imageSource: CanvasImageSource = showWorkerCanvas
+    ? visibleWorkerFilteredCanvas!
+    : displayImg;
   // Konva 폴백(cachePad>0 테두리 경로·Worker 준비/실행 실패 fail-closed)도 같은 마스크 결과를
   // 내야 한다 — 내장 필터 체인을 [원본 스냅샷, ...체인, 마스크 블렌드]로 감싼다. 캐시 캔버스는
   // 표시 반전이 구워져 있고 cachePad 만큼 패딩이 있으므로 샘플 변환으로 콘텐츠 창을 되돌린다.
@@ -857,8 +939,13 @@ export function StudioKonvaImageNode({
       ) as unknown as NonNullable<Konva.NodeConfig["filters"]>
     : filters;
   const activeFilters: Konva.NodeConfig["filters"] =
-    workerPipelineActive || !workerDimensionsSafe ? undefined : konvaFallbackFilters;
-  const activeFilterAttrs = workerPipelineActive || !workerDimensionsSafe ? {} : filterAttrs;
+    workerPipelineActive || !workerDimensionsSafe || synchronousFallbackBlocked
+      ? undefined
+      : konvaFallbackFilters;
+  const activeFilterAttrs =
+    workerPipelineActive || !workerDimensionsSafe || synchronousFallbackBlocked
+      ? {}
+      : filterAttrs;
 
   return (
     <KImage

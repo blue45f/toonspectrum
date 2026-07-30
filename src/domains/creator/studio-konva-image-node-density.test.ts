@@ -100,6 +100,59 @@ const PX_UNIT_FIXTURES: Record<string, ImageFilterFields> = {
   noise: { noise: 30 },
   screentone: { screentone: true },
   lineart: { lineart: true },
+  lineCleanup: { lineCleanup: { threshold: 0.6, strength: 0.5 } },
+  screentoneRemoval: {
+    screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+  },
+  jpegArtifactReduction: {
+    jpegArtifactReduction: {
+      deblockStrength: 0.72,
+      deringStrength: 0.45,
+      boundaryThreshold: 6,
+      protectedEdgeThreshold: 88,
+      ringingThreshold: 18,
+      inkLumaThreshold: 64,
+    },
+  },
+  edgeAwareDenoise: {
+    edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+  },
+  lensBlur: {
+    lensBlur: {
+      radius: 4,
+      sampleCount: 21,
+      apertureBlades: 6,
+      apertureRotationRadians: 0,
+    },
+  },
+  fieldIrisBlur: {
+    fieldIrisBlur: {
+      focusCenterX: 0.5,
+      focusCenterY: 0.5,
+      focusRadius: 0.16,
+      feather: 0.24,
+      maximumBlurRadius: 7,
+      sampleCount: 21,
+      apertureBlades: 8,
+    },
+  },
+  tiltShiftBlur: {
+    tiltShiftBlur: {
+      axisRadians: 0,
+      focusWidth: 0.2,
+      feather: 0.22,
+      maximumBlurRadius: 7,
+      sampleCount: 19,
+    },
+  },
+  selectiveGaussianBlur: {
+    selectiveGaussianBlur: {
+      radius: 3,
+      spatialSigma: 2,
+      edgeThreshold: 20,
+      edgeSoftness: 0.35,
+    },
+  },
   halftone: { halftone: { dotSize: 6, angle: 15, mode: "cmyk", strength: 80 } },
   grain: { grain: { type: "film", amount: 40, size: 3, seed: 7 } },
   inkWash: {

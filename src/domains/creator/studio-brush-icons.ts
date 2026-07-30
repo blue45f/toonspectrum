@@ -8,6 +8,7 @@ export type StudioBrushIconId =
   | "pen"
   | "pen-line"
   | "pen-tool"
+  | "eraser"
   | "pencil"
   | "highlighter"
   | "brush"
@@ -247,17 +248,26 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   pen: "pen",
   fineliner: "pen-line",
   ballpoint: "pen",
+  "gel-pen": "pen-line",
+  "glass-pen": "gem",
+  "ruling-pen": "direction",
   "technical-pen": "pen-line",
   gpen: "pen-line",
+  "school-pen": "pen-tool",
+  "maru-pen": "circle-dot",
   "mapping-pen": "pen-tool",
   kaburapen: "pen",
   liner: "pen-line",
   "ink-brush": "paintbrush",
   calligraphy: "a-large-small",
+  "fountain-pen": "feather",
+  "parallel-pen": "align-justify",
   "brush-pen": "brush",
   "perfect-ink": "pen-line",
   "perfect-marker": "highlighter",
+  "kneaded-eraser": "eraser",
   pencil: "pencil",
+  "erodible-pencil": "pencil",
   "pencil-2b": "pencil",
   "pencil-6b": "pencil",
   "soft-pencil": "pencil",
@@ -286,7 +296,9 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   gouache: "paintbrush",
   oil: "paintbrush",
   acrylic: "paintbrush",
+  "paint-tube": "paintbrush",
   airbrush: "wind",
+  "hard-airbrush": "wind",
   "airbrush-fine": "wind",
   "wash-brush": "droplets",
   "soft-brush": "brush",
@@ -300,6 +312,7 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   pastel: "waves",
   "oil-pastel": "waves",
   "ink-particle": "gem",
+  "tangent-normal-brush": "direction",
   screentone: "grid-3x3",
   crosshatch: "grid-3x3",
   ...STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID,

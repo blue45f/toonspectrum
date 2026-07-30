@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+  DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+} from "./studio-advanced-blur-filter-kernels";
+import {
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
@@ -36,36 +42,151 @@ describe("studio CRDT structured work-asset filters", () => {
 
   it("validates and detaches exact blur, curves, and smart-filter programs", () => {
     const curve = [{ x: 0, y: 4 }, { x: 128, y: 144 }, { x: 255, y: 250 }];
+    const lensBlur = {
+      ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+      radius: 9.5,
+      apertureRotationRadians: Math.PI / 4,
+    };
+    const fieldIrisBlur = {
+      ...DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+      focusCenterX: 0.35,
+      focusCenterY: 0.65,
+      focusRadius: 0.22,
+      feather: 0.3,
+      maximumBlurRadius: 12,
+    };
+    const tiltShiftBlur = {
+      ...DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+      axisRadians: -Math.PI / 3,
+      focusWidth: 0.32,
+      feather: 0.38,
+      maximumBlurRadius: 10,
+    };
+    const selectiveGaussianBlur = {
+      ...DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+      radius: 6,
+      spatialSigma: 3.5,
+      edgeThreshold: 48,
+      edgeSoftness: 0.6,
+    };
     const props = imageReferenceProps({
       blurFx: { type: "motion", strength: 100, radius: 40, angle: 360 },
+      lensBlur,
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
       curve,
       curveCh: {
         r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
         b: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
       },
+      lineCleanup: { threshold: 0.64, strength: 0.45 },
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+      tileableBlur: { radius: 7, sigma: 3.4, strength: 0.72 },
+      dustScratches: { radius: 3, threshold: 42, strength: 0.66 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2.1,
+        threshold: 1.5,
+        strength: 12,
+      },
+      colorToAlpha: { keyColor: "#fefefe", strength: 85 },
       smartFilters: {
         version: 1,
-        entries: [{
-          id: "tone-1",
-          engine: "brightness-contrast",
-          enabled: true,
-          params: { brightness: 0.2, contrast: -40 },
-        }],
+        entries: [
+          {
+            id: "tone-1",
+            engine: "brightness-contrast",
+            enabled: true,
+            params: { brightness: 0.2, contrast: -40 },
+          },
+          {
+            id: "tile-1",
+            engine: "tileable-blur",
+            enabled: true,
+            params: { radius: 5, sigma: 2.2, strength: 0.7 },
+          },
+          {
+            id: "dog-1",
+            engine: "difference-of-gaussians",
+            enabled: true,
+            params: { smallSigma: 0.8, largeSigma: 2, threshold: 1, strength: 9 },
+          },
+          {
+            id: "dust-1",
+            engine: "dust-scratches",
+            enabled: true,
+            params: { radius: 2, threshold: 32, strength: 0.8 },
+          },
+          {
+            id: "alpha-1",
+            engine: "color-to-alpha",
+            enabled: true,
+            params: { keyColor: "#ffffff", strength: 80 },
+          },
+        ],
       },
     });
     const validated = validateReference(props);
 
     curve[1]!.y = 1;
+    lensBlur.radius = 1;
     expect(validated.props).toMatchObject({
       blurFx: { type: "motion", strength: 100, radius: 40, angle: 360 },
+      lensBlur: {
+        ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+        radius: 9.5,
+        apertureRotationRadians: Math.PI / 4,
+      },
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
       curve: [{ x: 0, y: 4 }, { x: 128, y: 144 }, { x: 255, y: 250 }],
       curveCh: {
         r: [{ x: 0, y: 0 }, { x: 255, y: 240 }],
         b: [{ x: 0, y: 12 }, { x: 255, y: 255 }],
       },
+      lineCleanup: { threshold: 0.64, strength: 0.45 },
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+      tileableBlur: { radius: 7, sigma: 3.4, strength: 0.72 },
+      dustScratches: { radius: 3, threshold: 42, strength: 0.66 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2.1,
+        threshold: 1.5,
+        strength: 12,
+      },
+      colorToAlpha: { keyColor: "#fefefe", strength: 85 },
       smartFilters: {
         version: 1,
-        entries: [{ engine: "brightness-contrast", params: { brightness: 0.2, contrast: -40 } }],
+        entries: [
+          { engine: "brightness-contrast", params: { brightness: 0.2, contrast: -40 } },
+          { engine: "tileable-blur", params: { radius: 5, sigma: 2.2, strength: 0.7 } },
+          {
+            engine: "difference-of-gaussians",
+            params: { smallSigma: 0.8, largeSigma: 2, threshold: 1, strength: 9 },
+          },
+          { engine: "dust-scratches", params: { radius: 2, threshold: 32, strength: 0.8 } },
+          { engine: "color-to-alpha", params: { keyColor: "#ffffff", strength: 80 } },
+        ],
       },
     });
   });
@@ -88,6 +209,55 @@ describe("studio CRDT structured work-asset filters", () => {
       }),
       imageReferenceProps({
         blurFx: { type: "motion", strength: 100, radius: 41, angle: 0 },
+      }),
+      imageReferenceProps({
+        lensBlur: {
+          ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+          radius: 18.01,
+        },
+      }),
+      imageReferenceProps({
+        fieldIrisBlur: {
+          ...DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+          focusCenterY: -0.01,
+        },
+      }),
+      imageReferenceProps({
+        tiltShiftBlur: {
+          ...DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+          axisRadians: Math.PI + 0.01,
+        },
+      }),
+      imageReferenceProps({
+        selectiveGaussianBlur: {
+          ...DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+          radius: 11,
+        },
+      }),
+      imageReferenceProps({
+        lensBlur: {
+          ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+          backend: "implementation-specific",
+        },
+      }),
+      imageReferenceProps({
+        lineCleanup: { threshold: -0.01, strength: 0.5 },
+      }),
+      imageReferenceProps({
+        screentoneRemoval: { radius: 4, strength: 0.88, inkLumaThreshold: 72 },
+      }),
+      imageReferenceProps({
+        jpegArtifactReduction: {
+          deblockStrength: 0.72,
+          deringStrength: 0.45,
+          boundaryThreshold: 6,
+          protectedEdgeThreshold: 225,
+          ringingThreshold: 18,
+          inkLumaThreshold: 64,
+        },
+      }),
+      imageReferenceProps({
+        edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 193 },
       }),
       imageReferenceProps({
         smartFilters: {

@@ -70,6 +70,53 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
     { key: "radius", label: "줌 범위", min: 1, max: 40, step: 1, fallback: 20, suffix: "%" },
     { key: "strength", label: "세기", min: 0, max: 100, step: 1, fallback: 85, suffix: "%" },
   ],
+  "lens-blur": [
+    { key: "radius", label: "반경", min: 0.25, max: 18, step: 0.25, fallback: 4, suffix: "px" },
+    { key: "sampleCount", label: "품질 샘플", min: 5, max: 64, step: 1, fallback: 21 },
+    { key: "apertureBlades", label: "조리개 날", min: 3, max: 12, step: 1, fallback: 6 },
+    { key: "apertureRotationRadians", label: "조리개 회전", min: -3.14, max: 3.14, step: 0.05, fallback: 0, suffix: "rad" },
+  ],
+  "field-iris-blur": [
+    { key: "focusCenterX", label: "초점 X", min: 0, max: 1, step: 0.01, fallback: 0.5 },
+    { key: "focusCenterY", label: "초점 Y", min: 0, max: 1, step: 0.01, fallback: 0.5 },
+    { key: "focusRadius", label: "초점 반경", min: 0, max: 1.414, step: 0.01, fallback: 0.16 },
+    { key: "feather", label: "페더", min: 0.001, max: 1.414, step: 0.01, fallback: 0.24 },
+    { key: "maximumBlurRadius", label: "최대 블러", min: 0.25, max: 18, step: 0.25, fallback: 7, suffix: "px" },
+    { key: "sampleCount", label: "품질 샘플", min: 5, max: 64, step: 1, fallback: 21 },
+    { key: "apertureBlades", label: "조리개 날", min: 3, max: 12, step: 1, fallback: 8 },
+  ],
+  "tilt-shift-blur": [
+    { key: "axisRadians", label: "초점 축", min: -3.14, max: 3.14, step: 0.05, fallback: 0, suffix: "rad" },
+    { key: "focusWidth", label: "초점 폭", min: 0, max: 2.828, step: 0.01, fallback: 0.2 },
+    { key: "feather", label: "페더", min: 0.001, max: 1.414, step: 0.01, fallback: 0.22 },
+    { key: "maximumBlurRadius", label: "최대 블러", min: 0.25, max: 18, step: 0.25, fallback: 7, suffix: "px" },
+    { key: "sampleCount", label: "품질 샘플", min: 5, max: 64, step: 1, fallback: 19 },
+  ],
+  "selective-gaussian-blur": [
+    { key: "radius", label: "반경", min: 1, max: 10, step: 1, fallback: 3, suffix: "px" },
+    { key: "spatialSigma", label: "공간 시그마", min: 0.1, max: 20, step: 0.1, fallback: 2 },
+    { key: "edgeThreshold", label: "경계 임계", min: 0, max: 255, step: 1, fallback: 20 },
+    { key: "edgeSoftness", label: "경계 부드러움", min: 0, max: 2, step: 0.05, fallback: 0.35 },
+  ],
+  "tileable-blur": [
+    { key: "radius", label: "랩 반경", min: 1, max: 20, step: 1, fallback: 5, suffix: "px" },
+    { key: "sigma", label: "가우시안 시그마", min: 0.1, max: 20, step: 0.1, fallback: 2.2 },
+    { key: "strength", label: "혼합 강도", min: 0, max: 1, step: 0.02, fallback: 1 },
+  ],
+  "dust-scratches": [
+    { key: "radius", label: "결함 탐색 반경", min: 1, max: 5, step: 1, fallback: 2, suffix: "px" },
+    { key: "threshold", label: "결함 임계값", min: 0, max: 255, step: 1, fallback: 24 },
+    { key: "strength", label: "복원 강도", min: 0, max: 1, step: 0.02, fallback: 1 },
+  ],
+  "difference-of-gaussians": [
+    { key: "smallSigma", label: "미세 시그마", min: 0.25, max: 6, step: 0.25, fallback: 0.8 },
+    { key: "largeSigma", label: "대형 시그마", min: 0.35, max: 12, step: 0.05, fallback: 2 },
+    { key: "threshold", label: "경계 임계값", min: 0, max: 64, step: 0.5, fallback: 1.5 },
+    { key: "strength", label: "선 농도", min: 0, max: 32, step: 0.5, fallback: 12 },
+  ],
+  "color-to-alpha": [
+    { key: "strength", label: "투명화 강도", min: 0, max: 100, step: 1, fallback: 85, suffix: "%" },
+  ],
   "brightness-contrast": [
     { key: "brightness", label: "밝기", min: -0.8, max: 0.8, step: 0.05, fallback: 0 },
     { key: "contrast", label: "대비", min: -80, max: 80, step: 1, fallback: 0 },
@@ -114,6 +161,28 @@ const NUMERIC_CONTROLS: Partial<Record<StudioAdjustmentEngineId, readonly Numeri
   ],
   "ink-threshold": [
     { key: "level", label: "임계값", min: 0.01, max: 1, step: 0.01, fallback: 0.5 },
+  ],
+  "line-cleanup": [
+    { key: "threshold", label: "이진화 임계", min: 0, max: 1, step: 0.02, fallback: 0.6 },
+    { key: "strength", label: "선명도", min: 0, max: 1, step: 0.05, fallback: 0.5 },
+  ],
+  "screentone-removal": [
+    { key: "radius", label: "탐색 반경", min: 1, max: 3, step: 1, fallback: 2, suffix: "px" },
+    { key: "strength", label: "제거 강도", min: 0, max: 1, step: 0.02, fallback: 0.88 },
+    { key: "inkLumaThreshold", label: "먹선 보호", min: 0, max: 160, step: 1, fallback: 72 },
+  ],
+  "jpeg-artifact-reduction": [
+    { key: "deblockStrength", label: "블록 제거", min: 0, max: 1, step: 0.02, fallback: 0.72 },
+    { key: "deringStrength", label: "링잉 제거", min: 0, max: 1, step: 0.02, fallback: 0.45 },
+    { key: "boundaryThreshold", label: "블록 임계", min: 1, max: 64, step: 1, fallback: 6 },
+    { key: "protectedEdgeThreshold", label: "경계 보호", min: 32, max: 224, step: 1, fallback: 88 },
+    { key: "ringingThreshold", label: "링잉 임계", min: 1, max: 96, step: 1, fallback: 18 },
+    { key: "inkLumaThreshold", label: "먹선 보호", min: 0, max: 160, step: 1, fallback: 64 },
+  ],
+  "edge-aware-denoise": [
+    { key: "radius", label: "탐색 반경", min: 1, max: 3, step: 1, fallback: 1, suffix: "px" },
+    { key: "strength", label: "노이즈 제거", min: 0, max: 1, step: 0.02, fallback: 0.78 },
+    { key: "rangeThreshold", label: "색 경계 보호", min: 4, max: 192, step: 1, fallback: 72 },
   ],
   "color-halftone": [
     { key: "dotSize", label: "망점 크기", min: 2, max: 16, step: 1, fallback: 4, suffix: "px" },
@@ -509,6 +578,23 @@ function StudioSmartFilterControls({
       ) : null}
       {entry.engine === "custom-convolution" ? (
         <ConvolutionKernelEditor params={entry.params} onChange={onChange} />
+      ) : null}
+      {entry.engine === "color-to-alpha" ? (
+        <label className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.62rem] font-semibold text-fg-2">
+          <span>배경색</span>
+          <input
+            type="color"
+            value={
+              typeof entry.params.keyColor === "string"
+              && /^#[0-9a-f]{6}$/i.test(entry.params.keyColor)
+                ? entry.params.keyColor
+                : "#ffffff"
+            }
+            onChange={(event) => onChange({ ...entry.params, keyColor: event.target.value })}
+            className="h-10 w-full cursor-pointer rounded-lg border border-line bg-canvas p-1 pointer-coarse:min-h-11"
+            aria-label="투명화할 배경색"
+          />
+        </label>
       ) : null}
       {controls.map((spec) => (
         <NumericParameterControl

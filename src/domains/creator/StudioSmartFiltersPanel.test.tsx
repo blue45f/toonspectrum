@@ -10,7 +10,7 @@ describe("StudioSmartFiltersPanel", () => {
     );
     expect(html).toContain('type="search"');
     expect(html).toContain("필터 이름·효과 검색");
-    expect(html).toContain("사용 가능한 필터 48개");
+    expect(html).toContain("사용 가능한 필터 60개");
     expect(html).toContain("섀도우/하이라이트");
     expect(html).toContain("노출 / 감마 / 오프셋");
     expect(html).toContain("언샤프 마스크");
@@ -22,6 +22,10 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("줌 블러");
     expect(html).toContain("모자이크 / 픽셀화");
     expect(html).toContain("선화 추출");
+    expect(html).toContain("스케치 선화 정리");
+    expect(html).toContain("스크린톤 제거");
+    expect(html).toContain("JPEG 아티팩트 감소");
+    expect(html).toContain("엣지 보존 노이즈 감소");
     expect(html).toContain("컬러 하프톤");
     expect(html).toContain("미디언 잡티 제거");
     expect(html).toContain("표면 보존 블러");
@@ -29,6 +33,95 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("종이 컷아웃");
     expect(html).toContain("수채화");
     expect(html).toContain("확산 글로우");
+    expect(html).toContain("렌즈 블러");
+    expect(html).toContain("필드 아이리스 블러");
+    expect(html).toContain("틸트 시프트 블러");
+    expect(html).toContain("선택적 가우시안 블러");
+    expect(html).toContain("타일러블 블러");
+    expect(html).toContain("먼지와 스크래치 제거");
+    expect(html).toContain("가우시안 차분 선화");
+    expect(html).toContain("색상 투명화");
+  });
+
+  it("renders bounded controls for all advanced blur engines", () => {
+    const html = renderToStaticMarkup(
+      <StudioSmartFiltersPanel
+        stack={{
+          version: 1,
+          entries: [
+            {
+              id: "lens-1",
+              engine: "lens-blur",
+              enabled: true,
+              params: { radius: 6, sampleCount: 20, apertureBlades: 7, apertureRotationRadians: 0 },
+            },
+            {
+              id: "iris-1",
+              engine: "field-iris-blur",
+              enabled: true,
+              params: {
+                focusCenterX: 0.5,
+                focusCenterY: 0.5,
+                focusRadius: 0.2,
+                feather: 0.3,
+                maximumBlurRadius: 8,
+                sampleCount: 24,
+                apertureBlades: 7,
+              },
+            },
+            {
+              id: "tilt-1",
+              engine: "tilt-shift-blur",
+              enabled: true,
+              params: {
+                axisRadians: 0,
+                focusWidth: 0.25,
+                feather: 0.3,
+                maximumBlurRadius: 8,
+                sampleCount: 24,
+              },
+            },
+            {
+              id: "selective-1",
+              engine: "selective-gaussian-blur",
+              enabled: true,
+              params: { radius: 4, spatialSigma: 2.5, edgeThreshold: 28, edgeSoftness: 0.7 },
+            },
+          ],
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(html).toContain("렌즈 블러 끄기");
+    expect(html).toContain("필드 아이리스 블러 끄기");
+    expect(html).toContain("틸트 시프트 블러 끄기");
+    expect(html).toContain("선택적 가우시안 블러 끄기");
+    expect(html).toContain("조리개 날");
+    expect(html).toContain("초점 X");
+    expect(html).toContain("초점 폭");
+    expect(html).toContain("경계 임계");
+    expect(html.match(/type="range"/g)?.length).toBe(20);
+  });
+
+  it("renders editable threshold and sharpening controls for line cleanup", () => {
+    const html = renderToStaticMarkup(
+      <StudioSmartFiltersPanel
+        stack={{
+          version: 1,
+          entries: [{
+            id: "line-cleanup-1",
+            engine: "line-cleanup",
+            enabled: true,
+            params: { threshold: 0.6, strength: 0.5 },
+          }],
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(html).toContain("스케치 선화 정리 끄기");
+    expect(html).toContain("이진화 임계");
+    expect(html).toContain("선명도");
+    expect(html.match(/type="range"/g)?.length).toBe(2);
   });
 
   it("renders bounded controls and a reproducible seed for composite media filters", () => {
@@ -53,6 +146,51 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain(">시드</span>");
     expect(html).toContain('max="9999"');
     expect(html.match(/type="range"/g)?.length).toBe(5);
+  });
+
+  it("renders bounded controls for all tone and compression cleanup engines", () => {
+    const html = renderToStaticMarkup(
+      <StudioSmartFiltersPanel
+        stack={{
+          version: 1,
+          entries: [
+            {
+              id: "tone-remove-1",
+              engine: "screentone-removal",
+              enabled: true,
+              params: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+            },
+            {
+              id: "jpeg-clean-1",
+              engine: "jpeg-artifact-reduction",
+              enabled: true,
+              params: {
+                deblockStrength: 0.72,
+                deringStrength: 0.45,
+                boundaryThreshold: 6,
+                protectedEdgeThreshold: 88,
+                ringingThreshold: 18,
+                inkLumaThreshold: 64,
+              },
+            },
+            {
+              id: "edge-denoise-1",
+              engine: "edge-aware-denoise",
+              enabled: true,
+              params: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+            },
+          ],
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(html).toContain("스크린톤 제거 끄기");
+    expect(html).toContain("JPEG 아티팩트 감소 끄기");
+    expect(html).toContain("엣지 보존 노이즈 감소 끄기");
+    expect(html).toContain("블록 제거");
+    expect(html).toContain("링잉 제거");
+    expect(html).toContain("색 경계 보호");
+    expect(html.match(/type="range"/g)?.length).toBe(12);
   });
 
   it("renders editable controls and accessible stack actions for an active entry", () => {

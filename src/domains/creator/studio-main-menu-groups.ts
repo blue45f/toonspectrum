@@ -1,9 +1,11 @@
 import {
+  Aperture,
   ArrowDownToLine,
   ArrowUpToLine,
   Bookmark,
   BookOpen,
   Boxes,
+  Blend,
   ChevronDown,
   ChevronUp,
   Clapperboard,
@@ -965,7 +967,7 @@ export function buildStudioMainMenuGroups({
             editor.openStudioFilter("color-curves");
           },
         },
-        // 필터 팩 15종 — 라벨은 다이얼로그(STUDIO_FILTER_PACK_DEFS)와 동일 문구를 하드코딩한다.
+        // 자주 쓰는 필터 팩 — 라벨은 다이얼로그(STUDIO_FILTER_PACK_DEFS)와 동일 문구를 하드코딩한다.
         // (value import 시 필터 엔진 체인이 첫 청크에 딸려오므로 기존 5개 항목과 같은 방식.)
         ...([
           { id: "mosaic", label: "모자이크 / 픽셀화", icon: Grid3x3 },
@@ -981,6 +983,18 @@ export function buildStudioMainMenuGroups({
           { id: "threshold", label: "한계값 (흑백 2값)", icon: SlidersHorizontal },
           { id: "oil-paint", label: "유화", icon: Paintbrush },
           { id: "surface-blur", label: "표면 블러", icon: Droplets },
+          { id: "lens-blur", label: "렌즈 블러", icon: Aperture },
+          { id: "field-iris-blur", label: "필드 아이리스 블러", icon: Focus },
+          { id: "tilt-shift-blur", label: "틸트 시프트 블러", icon: ScanLine },
+          { id: "selective-gaussian-blur", label: "선택적 가우시안 블러", icon: Blend },
+          { id: "tileable-blur", label: "타일러블 블러", icon: Grid3x3 },
+          { id: "line-cleanup", label: "스케치 선화 정리", icon: ScanLine },
+          { id: "screentone-removal", label: "스크린톤 제거", icon: Grid2x2 },
+          { id: "jpeg-artifact-reduction", label: "JPEG 아티팩트 감소", icon: Eraser },
+          { id: "edge-aware-denoise", label: "엣지 보존 노이즈 감소", icon: Sparkles },
+          { id: "dust-scratches", label: "먼지와 스크래치 제거", icon: Eraser },
+          { id: "difference-of-gaussians", label: "가우시안 차분 선화", icon: ScanLine },
+          { id: "color-to-alpha", label: "색상 투명화", icon: Blend },
           { id: "duotone", label: "세피아 / 듀오톤", icon: Palette, separatorAfter: true },
           { id: "noise-add", label: "노이즈 추가", icon: Droplet },
         ] as const).map(({ id, label, icon, ...rest }) => ({

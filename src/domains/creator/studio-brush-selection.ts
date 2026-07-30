@@ -17,6 +17,8 @@ export interface StudioBrushCatalogSelection {
   catalogId: string;
   catalogName: string;
   runtimeBrushId: string;
+  /** Omitted legacy/pro selections paint; named eraser presets opt in explicitly. */
+  drawMode?: "pen" | "eraser";
   defaultWidth: number;
   defaultOpacity: number;
   defaultColor?: string;
@@ -61,6 +63,7 @@ export function studioCoreBrushCatalogSelection(
     catalogId: preset.id,
     catalogName: preset.name,
     runtimeBrushId: preset.id,
+    ...(preset.drawMode ? { drawMode: preset.drawMode } : {}),
     defaultWidth: preset.defaultWidth,
     defaultOpacity: preset.defaultOpacity,
     ...(preset.defaultColor ? { defaultColor: preset.defaultColor } : {}),
@@ -69,7 +72,7 @@ export function studioCoreBrushCatalogSelection(
 }
 
 /**
- * One fail-closed selector for the complete 214-brush catalogue.
+ * One fail-closed selector for the complete 226-brush catalogue.
  *
  * Core presets resolve synchronously from the canonical table. Procedural profiles keep their
  * physics chunk lazy, but both the desktop catalogue and mobile sheet receive the same durable
@@ -102,6 +105,11 @@ export function isStudioBrushCatalogSelection(
     && candidate.catalogName.length > 0
     && typeof candidate.runtimeBrushId === "string"
     && candidate.runtimeBrushId.length > 0
+    && (
+      candidate.drawMode === undefined
+      || candidate.drawMode === "pen"
+      || candidate.drawMode === "eraser"
+    )
     && typeof candidate.defaultWidth === "number"
     && Number.isFinite(candidate.defaultWidth)
     && typeof candidate.defaultOpacity === "number"

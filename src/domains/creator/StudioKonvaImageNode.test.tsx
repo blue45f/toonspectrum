@@ -88,6 +88,7 @@ vi.mock("./studio-konva-filters", () => ({
 
 vi.mock("./studio-image-filter-worker-client", () => ({
   runStudioImageFilterWorker: filterCapture.runWorker,
+  studioImageFilterRequiresWorker: () => false,
 }));
 
 const imageCapture = {

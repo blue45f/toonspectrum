@@ -3,6 +3,10 @@ import {
   normalizeStudioAdjustmentFilterOperations,
 } from "./studio-adjustment-stack";
 import {
+  StudioAdvancedBlurWorkerRequiredError,
+  studioAdvancedBlurRequiresWorker,
+} from "./studio-advanced-blur-filters";
+import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
   assertStudioImageFilterImageData,
   studioImageFilterRequestTransfers,
@@ -15,6 +19,14 @@ import {
   type StudioImageFilterWorkerRunSourceMessage,
 } from "./studio-image-filter-worker-protocol";
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
+import {
+  StudioProfessionalFilterWorkerRequiredError,
+  studioProfessionalFilterRequiresWorker,
+} from "./studio-professional-filters";
+import {
+  StudioToneArtifactWorkerRequiredError,
+  studioToneArtifactRequiresWorker,
+} from "./studio-tone-artifact-filters";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
@@ -114,6 +126,17 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
     sepia: el.sepia,
     screentone: el.screentone,
     lineart: el.lineart,
+    lineCleanup: el.lineCleanup,
+    screentoneRemoval: el.screentoneRemoval,
+    jpegArtifactReduction: el.jpegArtifactReduction,
+    edgeAwareDenoise: el.edgeAwareDenoise,
+    lensBlur: el.lensBlur,
+    fieldIrisBlur: el.fieldIrisBlur,
+    tiltShiftBlur: el.tiltShiftBlur,
+    selectiveGaussianBlur: el.selectiveGaussianBlur,
+    differenceOfGaussians: el.differenceOfGaussians,
+    dustScratches: el.dustScratches,
+    tileableBlur: el.tileableBlur,
     chromatic: finite(el.chromatic),
     posterize: finite(el.posterize),
     noise: finite(el.noise),
@@ -199,11 +222,49 @@ function cloneSafeWorkerRequest(request: StudioImageFilterWorkerRunRequest): Stu
 const directFilterRegistry: KonvaLike = { Filters: {} };
 registerStudioKonvaFilters(directFilterRegistry);
 
+/** Shared policy used by the client and the React node before considering a synchronous fallback. */
+export function studioImageFilterRequiresWorker(
+  el: ImageFilterFields,
+  width: number,
+  height: number,
+): boolean {
+  return studioAdvancedBlurRequiresWorker(el, width, height)
+    || studioProfessionalFilterRequiresWorker(el, width, height)
+    || studioToneArtifactRequiresWorker(el, width, height);
+}
+
 function runImageFilterDirect(
   request: StudioImageFilterWorkerRunRequest,
   signal: AbortSignal | undefined,
 ): StudioImageFilterWorkerClientResult {
   throwIfAborted(signal);
+  if (
+    studioAdvancedBlurRequiresWorker(
+      request.el,
+      request.imageData.width,
+      request.imageData.height,
+    )
+  ) {
+    throw new StudioAdvancedBlurWorkerRequiredError();
+  }
+  if (
+    studioProfessionalFilterRequiresWorker(
+      request.el,
+      request.imageData.width,
+      request.imageData.height,
+    )
+  ) {
+    throw new StudioProfessionalFilterWorkerRequiredError();
+  }
+  if (
+    studioToneArtifactRequiresWorker(
+      request.el,
+      request.imageData.width,
+      request.imageData.height,
+    )
+  ) {
+    throw new StudioToneArtifactWorkerRequiredError();
+  }
   const { filters, attrs } = buildImageFilters(request.el, directFilterRegistry);
   applyImageFilters(request.imageData, filters, attrs);
   return { execution: "direct", imageData: request.imageData };

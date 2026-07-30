@@ -245,11 +245,15 @@ export type StudioBrushDynamicsPresetId = "ink-particle" | "airbrush" | "dry-med
 export type StudioBrushDynamicsBrushId = StudioBrushDynamicsPresetId
   | "soft-brush"
   | "spray"
+  | "hard-airbrush"
   | "crayon"
   | "chalk"
   | "charcoal"
   | "pastel"
-  | "oil-pastel";
+  | "oil-pastel"
+  | "erodible-pencil"
+  | "paint-tube"
+  | "tangent-normal-brush";
 
 /** Runtime/type guard shared by the editor, persistence and export paths. */
 export function isStudioBrushDynamicsPresetId(value: unknown): value is StudioBrushDynamicsPresetId {
@@ -266,6 +270,16 @@ export function resolveStudioBrushDynamicsPresetId(
   if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
   if (typeof brushId !== "string") return null;
   if (brushId === "spray" || brushId === "soft-brush" || brushId === "splatter") return "airbrush";
+  if (
+    brushId === "hard-airbrush"
+    || brushId === "erodible-pencil"
+    || brushId === "paint-tube"
+    || brushId === "tangent-normal-brush"
+    || brushId === "connected-hard-envelope"
+    || brushId === "progressive-wear-ribbon"
+    || brushId === "extruded-bead-ribbon"
+    || brushId === "direction-encoded-ribbon"
+  ) return "ink-particle";
   if (
     brushId === "crayon"
     || brushId === "chalk"
@@ -422,6 +436,12 @@ export interface StudioDynamicBrushSegmentStartFrame {
   readonly direction: number;
   readonly size: number;
   readonly roundness: number;
+  /** Runtime-only causal wear receipt; absent legacy fixtures remain valid. */
+  readonly distanceFromStrokeStart?: number;
+  /** Integrated `distance × contactFactor`, independent from the selected dab spacing. */
+  readonly contactLoadFromStrokeStart?: number;
+  /** Contact factor at this station, used for trapezoidal continuation integration. */
+  readonly contactFactor?: number;
 }
 
 export interface StudioDynamicBrushDab {
@@ -437,6 +457,12 @@ export interface StudioDynamicBrushDab {
   direction?: number;
   /** Arc-length travelled from the preceding dab; zero for the initial tap. */
   distanceFromPrevious?: number;
+  /** Exact source arc length at this station. Runtime-only and regenerated from source points. */
+  distanceFromStrokeStart?: number;
+  /** Integrated physical contact receipt used by wear-aware specialist carriers. */
+  contactLoadFromStrokeStart?: number;
+  /** Current contact factor (`size × opacity × flow`) for incremental continuation. */
+  contactFactor?: number;
   /**
    * Exact previous-station frame for a non-initial segment. New canonical and causal planners
    * populate it; absence is retained only for legacy/manual dab fixtures and the initial tap.
@@ -459,6 +485,21 @@ export interface StudioDynamicBrushPlan {
   totalLength: number;
   capped: boolean;
   settings: NormalizedStudioBrushDynamicsSettings;
+}
+
+export function studioDynamicBrushContactFactor(
+  size: number,
+  opacity: number,
+  flow: number,
+): number {
+  const safeSize = Number.isFinite(size) ? Math.max(0, size) : 0;
+  const safeOpacity = Number.isFinite(opacity)
+    ? Math.min(1, Math.max(0, opacity))
+    : 0;
+  const safeFlow = Number.isFinite(flow)
+    ? Math.min(1, Math.max(0, flow))
+    : 0;
+  return safeSize * safeOpacity * safeFlow;
 }
 
 type DynamicsPropertyName = keyof typeof STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS;
@@ -1031,6 +1072,192 @@ interface StudioBrushDynamicsVariant {
  * variant catalogue or the canonical preset.
  */
 const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamicsVariant>> = {
+  "hard-airbrush": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 239,
+      fallbackPressure: 0.62,
+      maxSpeed: 2.1,
+      taper: {
+        enabled: true,
+        startLength: 0.035,
+        endLength: 0.07,
+        minSizeRatio: 0.52,
+        minOpacityRatio: 0.72,
+        curve: 0.82,
+      },
+      tip: { shape: "hard", softness: 0.015 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 28,
+        mappings: [{ source: "pressure", from: 0.46, to: 1.38, curve: 0.78 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 1,
+        mappings: [{ source: "pressure", from: 0.62, to: 1, curve: 0.72 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.64, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      spacingRatio: 0.075,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  "erodible-pencil": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 347,
+      fallbackPressure: 0.54,
+      maxSpeed: 1.45,
+      taper: {
+        enabled: true,
+        startLength: 0.04,
+        endLength: 0.1,
+        minSizeRatio: 0.34,
+        minOpacityRatio: 0.48,
+        curve: 1.16,
+      },
+      tip: { shape: "grain", softness: 0.2 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.3,
+        scale: 2.35,
+        contrast: 0.58,
+        seed: 0xe20d_1b1e,
+      },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 7,
+        mappings: [{ source: "pressure", from: 0.32, to: 1.55, curve: 1.12 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.94,
+        mappings: [{ source: "pressure", from: 0.34, to: 1, curve: 1.02 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.42, to: 1, curve: 0.94 }],
+        jitter: null,
+      },
+      spacingRatio: 0.08,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: {
+        base: 0.64,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.46, amount: 0.72 }],
+        jitter: null,
+      },
+    },
+  },
+  "paint-tube": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 353,
+      fallbackPressure: 0.68,
+      maxSpeed: 1.5,
+      taper: {
+        enabled: true,
+        startLength: 0.025,
+        endLength: 0.055,
+        minSizeRatio: 0.64,
+        minOpacityRatio: 0.88,
+        curve: 0.72,
+      },
+      tip: { shape: "hard", softness: 0.01 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 30,
+        mappings: [{ source: "pressure", from: 0.58, to: 1.42, curve: 0.76 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 1,
+        mappings: [{ source: "pressure", from: 0.82, to: 1, curve: 0.68 }],
+        jitter: null,
+      },
+      flow: { base: 0.98, mappings: [], jitter: null },
+      spacingRatio: 0.065,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: {
+        base: 0.82,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.68, amount: 0.45 }],
+        jitter: null,
+      },
+    },
+  },
+  "tangent-normal-brush": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 359,
+      fallbackPressure: 0.64,
+      maxSpeed: 1.8,
+      taper: {
+        enabled: true,
+        startLength: 0.03,
+        endLength: 0.07,
+        minSizeRatio: 0.48,
+        minOpacityRatio: 0.9,
+        curve: 0.9,
+      },
+      tip: { shape: "hard", softness: 0 },
+      grain: { amount: 0 },
+      colorDynamics: {
+        backgroundColor: null,
+        foregroundBackgroundMix: 0,
+        foregroundBackgroundJitter: 0,
+        hueJitter: 0,
+        saturationJitter: 0,
+        valueJitter: 0,
+      },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 20,
+        mappings: [{ source: "pressure", from: 0.46, to: 1.4, curve: 0.82 }],
+        jitter: null,
+      },
+      opacity: { base: 1, mappings: [], jitter: null },
+      flow: { base: 1, mappings: [], jitter: null },
+      spacingRatio: 0.075,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.9, mappings: [], jitter: null },
+    },
+  },
   "soft-brush": {
     presetId: "airbrush",
     overrides: {
@@ -1968,15 +2195,34 @@ function planStudioDynamicBrushFromInput(
       STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS.width.max
     );
     const opacity = clamp01(recipe.opacity * taper.opacity);
+    const distanceFromPrevious = index === 0
+      ? 0
+      : Math.max(0, distance - plannedStations[index - 1]!.distance);
+    const contactFactor = studioDynamicBrushContactFactor(
+      size,
+      opacity,
+      recipe.flow,
+    );
+    const contactLoadFromStrokeStart = previousSegmentFrame
+      ? (
+          (previousSegmentFrame.contactLoadFromStrokeStart ?? 0)
+          + distanceFromPrevious
+            * (
+              (previousSegmentFrame.contactFactor ?? contactFactor)
+              + contactFactor
+            ) / 2
+        )
+      : 0;
     const dab: StudioDynamicBrushDab = {
       index,
       progress: station.progress,
       sourceX: station.x,
       sourceY: station.y,
       direction: station.direction,
-      distanceFromPrevious: index === 0
-        ? 0
-        : Math.max(0, distance - plannedStations[index - 1]!.distance),
+      distanceFromPrevious,
+      distanceFromStrokeStart: distance,
+      contactLoadFromStrokeStart,
+      contactFactor,
       ...(previousSegmentFrame
         ? { segmentStartFrame: previousSegmentFrame }
         : {}),
@@ -1997,6 +2243,9 @@ function planStudioDynamicBrushFromInput(
       direction: station.direction,
       size,
       roundness: recipe.roundness,
+      distanceFromStrokeStart: distance,
+      contactLoadFromStrokeStart,
+      contactFactor,
     });
     return dab;
   });

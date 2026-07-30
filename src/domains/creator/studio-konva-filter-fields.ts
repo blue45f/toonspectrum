@@ -4,6 +4,12 @@ import type {
   StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
 import type {
+  StudioFieldIrisBlurOptions,
+  StudioLensBlurOptions,
+  StudioSelectiveGaussianBlurOptions,
+  StudioTiltShiftBlurOptions,
+} from "./studio-advanced-blur-filter-kernels";
+import type {
   StudioClouds,
   StudioConvolution,
   StudioExposureAdjustment,
@@ -29,12 +35,23 @@ import type { Halftone } from "./studio-halftone";
 import type { InkWash } from "./studio-ink-wash";
 import type { LevelsRgbChannels } from "./studio-levels";
 import type { Light } from "./studio-light";
+import type { LineArtCleanupOptions } from "./studio-line-cleanup";
 import type { Outline } from "./studio-outline";
 import type { PhotoFilter } from "./studio-photo-filter";
+import type {
+  StudioDifferenceOfGaussiansOptions,
+  StudioDustScratchesOptions,
+  StudioTileableBlurOptions,
+} from "./studio-professional-filter-kernels";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { ShadowHighlight } from "./studio-shadow-highlight";
 import type { Sketch } from "./studio-sketch";
 import type { Stylize } from "./studio-stylize";
+import type {
+  StudioEdgeAwareDenoiseOptions,
+  StudioJpegArtifactReductionOptions,
+  StudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
 import type { Vibrance } from "./studio-vibrance";
 
 // 이미지 요소의 보정 관련 필드(StudioPage의 ImageEl 부분집합).
@@ -47,6 +64,28 @@ export type ImageFilterFields = {
   sepia?: boolean;
   screentone?: boolean;
   lineart?: boolean;
+  /** Composite grayscale/contrast/sharpen/threshold pass for scanned or authored line art. */
+  lineCleanup?: LineArtCleanupOptions;
+  /** Removes periodic screentone dots while protecting authored dark ink. */
+  screentoneRemoval?: StudioScreentoneRemovalOptions;
+  /** Reduces JPEG block seams and ringing without flattening protected edges. */
+  jpegArtifactReduction?: StudioJpegArtifactReductionOptions;
+  /** Bounded edge-aware color denoise for imported and rasterized artwork. */
+  edgeAwareDenoise?: StudioEdgeAwareDenoiseOptions;
+  /** Aperture-shaped, alpha-preserving photographic blur. */
+  lensBlur?: StudioLensBlurOptions;
+  /** Radial focus field with an aperture-shaped out-of-focus region. */
+  fieldIrisBlur?: StudioFieldIrisBlurOptions;
+  /** Directional focus band with a feathered out-of-focus region. */
+  tiltShiftBlur?: StudioTiltShiftBlurOptions;
+  /** Edge-aware Gaussian blur for line-art-safe smoothing. */
+  selectiveGaussianBlur?: StudioSelectiveGaussianBlurOptions;
+  /** Two-scale Gaussian edge response rendered as clean black line art. */
+  differenceOfGaussians?: StudioDifferenceOfGaussiansOptions;
+  /** Thresholded median restoration that changes only isolated defects. */
+  dustScratches?: StudioDustScratchesOptions;
+  /** Wrap-boundary Gaussian blur for seamless texture and background tiles. */
+  tileableBlur?: StudioTileableBlurOptions;
   chromatic?: number;
   posterize?: number;
   noise?: number;
@@ -212,6 +251,18 @@ function hasActiveConvolutionCandidate(value: unknown): boolean {
   return kernelChanged || divisorChanged || biasChanged;
 }
 
+function hasActiveStrengthCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  return !!source && candidateFinite(source.strength) && source.strength > 0;
+}
+
+function hasActiveJpegArtifactCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source) return false;
+  return (candidateFinite(source.deblockStrength) && source.deblockStrength > 0)
+    || (candidateFinite(source.deringStrength) && source.deringStrength > 0);
+}
+
 const LIGHTWEIGHT_ADJUSTMENT_ENGINES = new Set<StudioAdjustmentEngineId>([
   "curves",
   "levels",
@@ -238,6 +289,14 @@ const LIGHTWEIGHT_ADJUSTMENT_ENGINES = new Set<StudioAdjustmentEngineId>([
   "posterize",
   "ink-threshold",
   "line-extraction",
+  "line-cleanup",
+  "screentone-removal",
+  "jpeg-artifact-reduction",
+  "edge-aware-denoise",
+  "lens-blur",
+  "field-iris-blur",
+  "tilt-shift-blur",
+  "selective-gaussian-blur",
   "screentone",
   "color-halftone",
   "chromatic-aberration",
@@ -356,7 +415,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveDarknessCandidate(el.vignetteFx) ||
     hasActiveSignedAmountCandidate(el.filterUnionWave) ||
     hasActiveSmartFilterProgram(el) ||
-    hasObjectFilter(el.colorToAlpha) ||
+    hasActiveStrengthCandidate(el.colorToAlpha) ||
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
@@ -367,6 +426,17 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     (el.duotoneShadow && el.duotoneHighlight) ||
     el.screentone ||
     el.lineart ||
+    hasObjectFilter(el.lineCleanup) ||
+    hasActiveStrengthCandidate(el.screentoneRemoval) ||
+    hasActiveJpegArtifactCandidate(el.jpegArtifactReduction) ||
+    hasActiveStrengthCandidate(el.edgeAwareDenoise) ||
+    hasObjectFilter(el.lensBlur) ||
+    hasObjectFilter(el.fieldIrisBlur) ||
+    hasObjectFilter(el.tiltShiftBlur) ||
+    hasObjectFilter(el.selectiveGaussianBlur) ||
+    hasActiveStrengthCandidate(el.differenceOfGaussians) ||
+    hasActiveStrengthCandidate(el.dustScratches) ||
+    hasActiveStrengthCandidate(el.tileableBlur) ||
     isActivePositiveNumber(el.chromatic) ||
     isActivePositiveNumber(el.posterize) ||
     isActivePositiveNumber(el.noise)
@@ -389,6 +459,17 @@ export function imageFilterCacheKey(el: ImageFilterFields): string {
     el.sepia ?? null,
     el.screentone ?? null,
     el.lineart ?? null,
+    el.lineCleanup ?? null,
+    el.screentoneRemoval ?? null,
+    el.jpegArtifactReduction ?? null,
+    el.edgeAwareDenoise ?? null,
+    el.lensBlur ?? null,
+    el.fieldIrisBlur ?? null,
+    el.tiltShiftBlur ?? null,
+    el.selectiveGaussianBlur ?? null,
+    el.differenceOfGaussians ?? null,
+    el.dustScratches ?? null,
+    el.tileableBlur ?? null,
     el.chromatic ?? null,
     el.posterize ?? null,
     el.noise ?? null,

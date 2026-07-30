@@ -130,11 +130,11 @@ import {
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
-  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
   planStudioDynamicBrushCoverageAndLegacyMarks,
+  resolveStudioDynamicBrushCoverageBudgetContract,
   type StudioDynamicBrushCoverageMark,
   type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
@@ -1031,8 +1031,56 @@ function serializeStudioDynamicCoverageMark(
       mark.ribbon?.kind === "flat-nib-ribbon-polygon"
       || mark.ribbon?.kind === "paint-roller-ribbon-polygon"
       || mark.ribbon?.kind === "dry-media-union-ribbon-polygon"
+      || mark.ribbon?.kind === "professional-shelf-ribbon-polygon"
+      || mark.ribbon?.kind === "competitor-specialty-ribbon-polygon"
     )
   ) {
+    if (
+      mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
+      && mark.ribbon.contourStyles
+    ) {
+      let contours = "";
+      let contourIndex = 0;
+      while (contourIndex < mark.ribbon.polygons.length) {
+        const style = mark.ribbon.contourStyles[contourIndex];
+        if (!style) return null;
+        let contourPath = "";
+        do {
+          const points = mark.ribbon.polygons[contourIndex]!;
+          const [firstX, firstY, ...remaining] = points;
+          if (firstX === undefined || firstY === undefined) return null;
+          contourPath +=
+            `M${fmtCoverageNumber(firstX)} ${fmtCoverageNumber(firstY)}`;
+          for (let index = 0; index < remaining.length; index += 2) {
+            const x = remaining[index];
+            const y = remaining[index + 1];
+            if (x === undefined || y === undefined) return null;
+            contourPath += `L${fmtCoverageNumber(x)} ${fmtCoverageNumber(y)}`;
+          }
+          contourPath += "Z";
+          contourIndex += 1;
+        } while (
+          contourIndex < mark.ribbon.polygons.length
+          && mark.ribbon.contourStyles[contourIndex]?.role === style.role
+          && mark.ribbon.contourStyles[contourIndex]?.color === style.color
+          && mark.ribbon.contourStyles[contourIndex]?.alphaMultiplier
+            === style.alphaMultiplier
+        );
+        contours += (
+          `<path data-brush-contour-role="${escapeXml(style.role)}"`
+          + ` d="${contourPath}" fill="${escapeXml(style.color)}"`
+          + ` opacity="${fmtDabOpacity(Math.min(
+            1,
+            Math.max(0, opacity * style.alphaMultiplier),
+          ))}"/>`
+        );
+      }
+      return (
+        `<g data-brush-coverage="competitor-specialty-ribbon"${materialAttributes}`
+        + ` data-brush-material-profile="${escapeXml(mark.ribbon.semanticProfile)}">`
+        + `${contours}</g>`
+      );
+    }
     let path = "";
     for (const points of mark.ribbon.polygons) {
       const [firstX, firstY, ...remaining] = points;
@@ -1052,8 +1100,17 @@ function serializeStudioDynamicCoverageMark(
           ? "paint-roller-ribbon"
           : mark.ribbon.kind === "dry-media-union-ribbon-polygon"
             ? "dry-media-union-ribbon"
-            : "flat-nib-ribbon"
-      }"${materialAttributes} d="${path}"`
+            : mark.ribbon.kind === "professional-shelf-ribbon-polygon"
+              ? "professional-shelf-ribbon"
+              : mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
+                ? "competitor-specialty-ribbon"
+              : "flat-nib-ribbon"
+      }"${materialAttributes}${
+        mark.ribbon.kind === "professional-shelf-ribbon-polygon"
+        || mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
+          ? ` data-brush-material-profile="${escapeXml(mark.ribbon.semanticProfile)}"`
+          : ""
+      } d="${path}"`
       + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"/>`
     );
   }
@@ -1589,13 +1646,15 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             ? STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET
             : STUDIO_DYNAMIC_BRUSH_CAUSAL_MARK_BUDGET
           : STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET;
+        const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
+          materialIdentity,
+          dynamics,
+        );
         const renderBudget = planStudioDynamicBrushRenderBudget({
-          settings: dynamics,
+          settings: coverageBudget.settings,
           dabCount: baseDabCount,
           symmetryCount: variations.length,
-          materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-            materialIdentity,
-          ),
+          materialMarkMultiplier: coverageBudget.materialMarkMultiplier,
           markBudget,
         });
         if (

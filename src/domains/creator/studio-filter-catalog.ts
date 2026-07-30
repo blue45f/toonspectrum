@@ -87,6 +87,41 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     keywords: ["zoom", "radial", "blur", "줌", "방사형", "돌진", "집중"],
   },
   {
+    engine: "lens-blur",
+    title: "렌즈 블러",
+    description: "다각형 조리개 샘플링으로 사진 렌즈 같은 보케와 부드러운 심도를 만듭니다.",
+    group: "blur",
+    keywords: ["lens blur", "bokeh", "aperture", "렌즈 블러", "보케", "조리개"],
+  },
+  {
+    engine: "field-iris-blur",
+    title: "필드 아이리스 블러",
+    description: "초점 중심과 반경을 유지하고 바깥 영역만 조리개 모양으로 점진적으로 흐립니다.",
+    group: "blur",
+    keywords: ["field blur", "iris blur", "focus", "필드 블러", "아이리스", "초점", "심도"],
+  },
+  {
+    engine: "tilt-shift-blur",
+    title: "틸트 시프트 블러",
+    description: "회전 가능한 초점 띠 바깥을 흐려 미니어처·원근 강조 효과를 만듭니다.",
+    group: "blur",
+    keywords: ["tilt shift", "miniature", "focus band", "틸트 시프트", "미니어처", "초점 띠"],
+  },
+  {
+    engine: "selective-gaussian-blur",
+    title: "선택적 가우시안 블러",
+    description: "색 경계를 보호하면서 평탄한 영역의 작은 요철과 노이즈만 가우시안으로 고릅니다.",
+    group: "blur",
+    keywords: ["selective gaussian", "bilateral", "edge aware", "선택적 가우시안", "경계 보호", "평활"],
+  },
+  {
+    engine: "tileable-blur",
+    title: "타일러블 블러",
+    description: "반대편 가장자리를 이어 샘플링해 배경·패턴 소재의 이음매를 부드럽게 없앱니다.",
+    group: "blur",
+    keywords: ["tileable blur", "seamless", "wrap", "타일러블 블러", "이음매", "반복 소재"],
+  },
+  {
     engine: "blur",
     title: "빠른 블러",
     description: "가벼운 박스 블러로 빠르게 흐림을 더합니다.",
@@ -192,6 +227,13 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     keywords: ["chromatic aberration", "rgb split", "색수차", "색 왜곡", "채널 분리"],
   },
   {
+    engine: "color-to-alpha",
+    title: "색상 투명화",
+    description: "흰 종이·미색 스캔·크로마키 배경을 헤일로 없이 투명하게 만들고 원래 전경색을 복원합니다.",
+    group: "color",
+    keywords: ["color to alpha", "paper removal", "색상 투명화", "배경 제거", "휘도 투명도", "스캔"],
+  },
+  {
     engine: "sharpen",
     title: "샤픈",
     description: "가벼운 고정 커널로 가장자리를 빠르게 선명하게 만듭니다.",
@@ -246,6 +288,81 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     description: "Sobel 기울기와 고정 임계값으로 명확한 흑백 윤곽선을 추출합니다.",
     group: "detail",
     keywords: ["line extraction", "sobel", "lineart", "선화 추출", "윤곽", "외곽선"],
+  },
+  {
+    engine: "line-cleanup",
+    title: "스케치 선화 정리",
+    description: "그레이스케일·자동 대비·선명화·선택적 이진화를 한 번에 적용해 흐린 스케치를 또렷한 먹선으로 정리합니다.",
+    group: "detail",
+    keywords: [
+      "line cleanup",
+      "clean lineart",
+      "scan cleanup",
+      "선화 정리",
+      "스케치 정리",
+      "먹선",
+      "스캔",
+      "이진화",
+    ],
+  },
+  {
+    engine: "screentone-removal",
+    title: "스크린톤 제거",
+    description: "주기적인 망점과 스캔 톤 자국을 억제하면서 원래 먹선과 실루엣은 보호합니다.",
+    group: "detail",
+    keywords: [
+      "screentone removal",
+      "descreen",
+      "halftone removal",
+      "스크린톤 제거",
+      "망점 제거",
+      "디스크린",
+      "스캔",
+    ],
+  },
+  {
+    engine: "jpeg-artifact-reduction",
+    title: "JPEG 아티팩트 감소",
+    description: "8px 블록 경계와 윤곽 주변 링잉을 줄이되 강한 선과 투명도는 보존합니다.",
+    group: "detail",
+    keywords: [
+      "jpeg artifact reduction",
+      "deblock",
+      "dering",
+      "jpeg 노이즈",
+      "블록 제거",
+      "링잉 제거",
+      "압축",
+    ],
+  },
+  {
+    engine: "edge-aware-denoise",
+    title: "엣지 보존 노이즈 감소",
+    description: "색상 차이를 인식하는 이웃 필터로 평탄부 노이즈를 줄이면서 선과 색 경계를 지킵니다.",
+    group: "detail",
+    keywords: [
+      "edge aware denoise",
+      "bilateral",
+      "denoise",
+      "엣지 보존",
+      "노이즈 감소",
+      "색 경계",
+      "잡티",
+    ],
+  },
+  {
+    engine: "dust-scratches",
+    title: "먼지와 스크래치 제거",
+    description: "임계값을 넘는 고립된 먼지·스크래치만 주변 중앙값으로 복원하고 원래 선은 유지합니다.",
+    group: "detail",
+    keywords: ["dust scratches", "restoration", "먼지", "스크래치", "스캔 복원", "결함 제거"],
+  },
+  {
+    engine: "difference-of-gaussians",
+    title: "가우시안 차분 선화",
+    description: "서로 다른 두 흐림 반경의 차이를 이용해 사진과 3D 렌더에서 깨끗한 검은 선을 추출합니다.",
+    group: "detail",
+    keywords: ["difference of gaussians", "dog", "edge", "가우시안 차분", "선화", "윤곽 추출"],
   },
   {
     engine: "edge-detect",
@@ -554,6 +671,15 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
   { kind: "mosaic", engine: "pixelate", preview: "mosaic" },
   { kind: "radial-blur", engine: "spin-blur", preview: "radial" },
   { kind: "zoom-blur", engine: "zoom-blur", preview: "radial" },
+  { kind: "lens-blur", engine: "lens-blur", preview: "soft-blur" },
+  { kind: "field-iris-blur", engine: "field-iris-blur", preview: "radial" },
+  { kind: "tilt-shift-blur", engine: "tilt-shift-blur", preview: "motion" },
+  {
+    kind: "selective-gaussian-blur",
+    engine: "selective-gaussian-blur",
+    preview: "soft-blur",
+  },
+  { kind: "tileable-blur", engine: "tileable-blur", preview: "soft-blur" },
   {
     kind: "chromatic-aberration",
     engine: "chromatic-aberration",
@@ -604,6 +730,21 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
   { kind: "threshold", engine: "ink-threshold", preview: "threshold" },
   { kind: "oil-paint", engine: "oil-paint", preview: "paint" },
   { kind: "surface-blur", engine: "surface-blur", preview: "soft-blur" },
+  { kind: "line-cleanup", engine: "line-cleanup", preview: "threshold" },
+  { kind: "screentone-removal", engine: "screentone-removal", preview: "dots" },
+  {
+    kind: "jpeg-artifact-reduction",
+    engine: "jpeg-artifact-reduction",
+    preview: "edges",
+  },
+  { kind: "edge-aware-denoise", engine: "edge-aware-denoise", preview: "soft-blur" },
+  { kind: "dust-scratches", engine: "dust-scratches", preview: "edges" },
+  {
+    kind: "difference-of-gaussians",
+    engine: "difference-of-gaussians",
+    preview: "edges",
+  },
+  { kind: "color-to-alpha", engine: "color-to-alpha", preview: "threshold" },
   {
     kind: "duotone",
     preview: "duotone",
@@ -635,7 +776,7 @@ const STUDIO_FILTER_DIALOG_CATALOG_SOURCES: readonly StudioFilterDialogCatalogSo
 
 /**
  * Every filter exposed by the modal has searchable metadata and an original preview family.
- * This is deliberately separate from the 64-engine smart-filter inventory: dialog aliases such
+ * This is deliberately separate from the smart-filter inventory: dialog aliases such
  * as `mosaic -> pixelate` keep their persisted document kind while reusing engine metadata.
  */
 export const STUDIO_FILTER_DIALOG_CATALOG: readonly StudioFilterDialogCatalogEntry[] =

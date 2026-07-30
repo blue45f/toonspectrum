@@ -48,6 +48,7 @@ const SUPPORTED_PREVIEW_KINDS = new Set([
   "glow",
   "particle",
   "tone",
+  "eraser",
 ]);
 
 const CORE_BRUSH_CATALOG_ITEMS = listStudioBrushTrayItems("all");
@@ -72,12 +73,12 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps all 214 identities behind one searchable quick/full catalogue source", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 54, pro: 160, total: 214 });
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(214);
+  it("keeps all 226 identities behind one searchable quick/full catalogue source", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 66, pro: 160, total: 226 });
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(226);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      214
+      226
     );
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
@@ -122,10 +123,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       const runtime = resolveStudioBrushRuntimeContract(preset.id);
       const stampKind = resolveStudioStampBrushKind(preset.id);
       const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
-      const dynamicsFamily = family === "airbrush"
-        || family === "dry-media"
-        || family === "pastel"
-        || family === "ink-particle";
+      const dynamicsFamily = runtime?.engine === "dynamic-dabs";
       const previewHtml = renderToStaticMarkup(
         createElement(LargeBrushPreview, { item: item!, active: false })
       );

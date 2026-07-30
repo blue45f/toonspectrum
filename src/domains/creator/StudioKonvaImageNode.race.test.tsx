@@ -47,6 +47,7 @@ const workerHarness = vi.hoisted(() => {
   return {
     createSession,
     disposals,
+    requiresWorker: false,
     runs,
     run: vi.fn((
       request: WorkerRun["request"],
@@ -78,6 +79,7 @@ vi.mock("./studio-image-filter-worker-client", () => ({
   createStudioImageFilterResidentWorkerSession: workerHarness.createSession,
   createStudioImageFilterWorkerSession: workerHarness.createSession,
   runStudioImageFilterWorker: workerHarness.run,
+  studioImageFilterRequiresWorker: () => workerHarness.requiresWorker,
 }));
 
 const imageHarness = {
@@ -175,6 +177,7 @@ beforeEach(() => {
   workerHarness.disposals.length = 0;
   workerHarness.runs.length = 0;
   workerHarness.run.mockClear();
+  workerHarness.requiresWorker = false;
   imageHarness.assigned.length = 0;
   canvasHarness.getImageDataCalls = 0;
   canvasHarness.getImageDataError = null;
@@ -289,6 +292,32 @@ describe("StudioKonvaImageNode async identity", () => {
 
     expect(konvaCapture.current?.image).toBe(nextImage);
     expect(workerHarness.runs).toHaveLength(1);
+  });
+
+  it("retains the last successful canvas instead of silently direct-running an oversized fallback", async () => {
+    const view = render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    const lastSuccessfulCanvas = konvaCapture.current?.image;
+    expect(lastSuccessfulCanvas).toBeInstanceOf(HTMLCanvasElement);
+
+    workerHarness.requiresWorker = true;
+    view.rerender(node(imageEl({ brightness: 0.4 })));
+    await flushWorkerDebounce();
+    const error = Object.assign(new Error("worker unavailable"), {
+      code: "STUDIO_ADVANCED_BLUR_WORKER_REQUIRED",
+      name: "StudioAdvancedBlurWorkerRequiredError",
+    });
+    await act(async () => workerHarness.runs[1]!.reject(error));
+    await flush();
+
+    expect(konvaCapture.current?.image).toBe(lastSuccessfulCanvas);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("retaining the last successful result"),
+      error,
+    );
   });
 
   it("reuses one source pixel snapshot across parameter-only slider ticks", async () => {

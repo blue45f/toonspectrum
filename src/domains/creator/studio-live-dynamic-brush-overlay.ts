@@ -51,8 +51,10 @@ import {
   type StudioCausalDynamicBrushDepositStateV3,
 } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
+  studioCompetitorSpecialtyRibbonCarrierOwnsMaterial,
+} from "./studio-competitor-specialty-ribbon-carrier";
+import {
   resolveStudioDynamicBrushMaterialIdentity,
-  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
@@ -62,6 +64,7 @@ import {
   STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET,
   planStudioDynamicBrushCoverageMarks,
   renderStudioDynamicBrushCoverageMark,
+  resolveStudioDynamicBrushCoverageBudgetContract,
   type StudioDynamicBrushCoverageMark,
   type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
@@ -70,6 +73,9 @@ import {
   resolveStudioLiveSurfaceDevicePixelRatio,
   STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
 } from "./studio-low-latency-canvas";
+import {
+  studioProfessionalShelfRibbonCarrierOwnsMaterial,
+} from "./studio-professional-shelf-ribbon-carrier";
 import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
@@ -222,14 +228,17 @@ interface PresentationPixelRect {
   readonly height: number;
 }
 
-function exactPlanUsesWholePrefixDryMediaUnion(
+function exactPlanUsesWholePrefixRibbonUnion(
   plan: ExactDynamicPlan,
 ): boolean {
   return plan.marks.length > 0
     && plan.marks.every(
-      (mark) =>
-        mark.ribbon?.kind === "dry-media-union-ribbon-polygon"
-        && mark.ribbon.role === "stroke-union",
+      (mark) => mark.ribbon?.role === "stroke-union"
+        && (
+          mark.ribbon.kind === "dry-media-union-ribbon-polygon"
+          || mark.ribbon.kind === "professional-shelf-ribbon-polygon"
+          || mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
+        ),
     );
 }
 
@@ -571,17 +580,19 @@ function initialStampGrid(style: DetachedDynamicStrokeStyle): StudioDynamicBrush
     // parity while keeping textured long strokes inside the live mark budget.
     return STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID;
   }
+  const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
+    style.materialIdentity,
+    style.dynamics,
+  );
   return planStudioDynamicBrushRenderBudget({
-    settings: style.dynamics,
+    settings: coverageBudget.settings,
     dabCount: 1,
     symmetryCount: style.transforms.length,
     fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
       style.materialIdentity,
       true,
     ),
-    materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-      style.materialIdentity,
-    ),
+    materialMarkMultiplier: coverageBudget.materialMarkMultiplier,
     markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   }).stampGrid;
 }
@@ -913,18 +924,22 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     const causal = isStudioDynamicBrushCausalDepositPipeline(
       active.style.dynamics.depositPipeline,
     );
+    const coverageBudget = causal
+      ? resolveStudioDynamicBrushCoverageBudgetContract(
+          active.style.materialIdentity,
+          active.style.dynamics,
+        )
+      : null;
     const causalBudget = causal
       ? planStudioDynamicBrushRenderBudget({
-          settings: active.style.dynamics,
+          settings: coverageBudget!.settings,
           dabCount: active.plannedCausalDabCount,
           symmetryCount: active.style.transforms.length,
           fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
             active.style.materialIdentity,
             active.plannedCausalDabCount > 0,
           ),
-          materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-            active.style.materialIdentity,
-          ),
+          materialMarkMultiplier: coverageBudget!.materialMarkMultiplier,
           markBudget,
         })
       : null;
@@ -1077,13 +1092,23 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.lastSpacing = planned.state.lastSpacing;
     active.transitionedFromTap = planned.state.transitionedFromTap;
 
-    if (studioDryMediaUnionRibbonCarrierOwnsMaterial(
-      active.style.materialIdentity,
-      active.style.dynamics,
-    )) {
+    const requiresWholePrefixRibbonReplay =
+      studioDryMediaUnionRibbonCarrierOwnsMaterial(
+        active.style.materialIdentity,
+        active.style.dynamics,
+      )
+      || studioProfessionalShelfRibbonCarrierOwnsMaterial(
+        active.style.materialIdentity,
+        active.style.dynamics,
+      )
+      || studioCompetitorSpecialtyRibbonCarrierOwnsMaterial(
+        active.style.materialIdentity,
+        active.style.dynamics,
+      );
+    if (requiresWholePrefixRibbonReplay) {
       const previousAcceptedDabCount = active.acceptedCausalDabCount;
       const exact = this.exactPlan(active.style, active.source);
-      if (!exact || !exactPlanUsesWholePrefixDryMediaUnion(exact)) {
+      if (!exact || !exactPlanUsesWholePrefixRibbonUnion(exact)) {
         return this.failActive("material-plan");
       }
       const acceptedDabs = planned.replaceInitialTap
@@ -1101,11 +1126,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
             : {}),
         };
       }
-      // A dry-media union is one whole-stroke source mask, not an appendable dab batch. Appending
-      // a suffix union would overlap the already-present prefix and make crossings darker live
-      // than after pointer-up. Replace both transient surfaces from the canonical accepted prefix
-      // so every pointer frame, retained replay and final commit consume identical geometry and
-      // the same R8/material byte receipt.
+      // Whole-stroke ribbon unions are not appendable dab batches. Appending a suffix union would
+      // overlap the already-present prefix and make crossings darker live than after pointer-up.
+      // Replace both transient surfaces from the canonical accepted prefix so every pointer frame,
+      // retained replay and final commit consume identical same-winding geometry.
       this.clearActiveRect();
       active.markCount = 0;
       active.r8AlphaMapBytes = 0;
@@ -1259,17 +1283,19 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         ? segmentedDabCount(causalSegments)
         : causalDabs!.length;
       const stampGrid = initialStampGrid(style);
+      const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
+        style.materialIdentity,
+        style.dynamics,
+      );
       const renderBudget = planStudioDynamicBrushRenderBudget({
-        settings: style.dynamics,
+        settings: coverageBudget.settings,
         dabCount: causalDabCount,
         symmetryCount: style.transforms.length,
         fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
           style.materialIdentity,
           causalDabCount > 0,
         ),
-        materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-          style.materialIdentity,
-        ),
+        materialMarkMultiplier: coverageBudget.materialMarkMultiplier,
         markBudget: causalMarkBudget(style.dynamics),
       });
       const acceptedDabCount = renderBudget.acceptedPrefixReceipt
@@ -1338,17 +1364,19 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       { ...planInput, maxDabs: MAX_LEGACY_LIVE_DABS },
       style.dynamics,
     );
+    const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
+      style.materialIdentity,
+      style.dynamics,
+    );
     const renderBudget = planStudioDynamicBrushRenderBudget({
-      settings: style.dynamics,
+      settings: coverageBudget.settings,
       dabCount: dabs.length,
       symmetryCount: style.transforms.length,
       fixedMarksPerVariation: studioSplatterOriginAnchorMarkCount(
         style.materialIdentity,
         dabs.some((dab) => dab.index === 0),
       ),
-      materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-        style.materialIdentity,
-      ),
+      materialMarkMultiplier: coverageBudget.materialMarkMultiplier,
       markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
     });
     if (renderBudget.maxDabsPerVariation < dabs.length) {

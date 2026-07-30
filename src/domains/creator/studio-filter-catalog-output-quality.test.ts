@@ -52,6 +52,7 @@ const INTENTIONAL_IDENTITY_DEFAULTS = new Set<CatalogEngineId>(["levels"]);
  */
 const SPATIAL_ALPHA_ENGINES = new Set<CatalogEngineId>([
   "blur",
+  "color-to-alpha",
   "pixelate",
   "morphology",
   "offset",
@@ -224,6 +225,18 @@ const NON_MONOTONIC_ADJUSTMENT_ENGINES = new Set<StudioAdjustmentEngineId>([
   "posterize",
   "ink-threshold",
   "line-extraction",
+  "line-cleanup",
+  "screentone-removal",
+  "jpeg-artifact-reduction",
+  "edge-aware-denoise",
+  "lens-blur",
+  "field-iris-blur",
+  "tilt-shift-blur",
+  "selective-gaussian-blur",
+  "tileable-blur",
+  "dust-scratches",
+  "difference-of-gaussians",
+  "color-to-alpha",
   "screentone",
   "chromatic-aberration",
   "morphology",
@@ -296,6 +309,19 @@ function effectiveAdjustmentParams(
 ): Record<string, number | string | boolean> {
   if (engine === "levels") {
     return { black: 32, white: 230, gamma: 0.9, outBlack: 0, outWhite: 255 };
+  }
+  // Transparent line-art fixtures intentionally carry zero hidden RGB. Use a stronger valid JPEG
+  // cleanup program so the gate measures visible deblock/dering rather than the now-forbidden
+  // influence of RGB bytes below alpha=0.
+  if (engine === "jpeg-artifact-reduction") {
+    return {
+      deblockStrength: 1,
+      deringStrength: 1,
+      boundaryThreshold: 4,
+      protectedEdgeThreshold: 96,
+      ringingThreshold: 8,
+      inkLumaThreshold: 64,
+    };
   }
   return { ...studioAdjustmentDefaultParams(engine) };
 }
@@ -385,7 +411,7 @@ class ApplyingWorker implements StudioImageFilterWorkerLike {
     const received = structuredClone(message, { transfer });
     queueMicrotask(() => {
       if (this.terminated) return;
-      const built = buildImageFilters(received.request.el, registry);
+      const built = buildImageFilters(received.request.el, registry, "worker");
       applyImageFilters(received.request.imageData, built.filters, built.attrs);
       const response: StudioImageFilterWorkerSuccessMessage = {
         type: "studio-image-filter/success",
@@ -407,14 +433,14 @@ class ApplyingWorker implements StudioImageFilterWorkerLike {
 }
 
 describe("studio filter catalog output quality", () => {
-  it("enumerates one 64-engine source-of-truth with no duplicate or unsupported entries", () => {
+  it("enumerates one 76-engine source-of-truth with no duplicate or unsupported entries", () => {
     const catalogIds = STUDIO_FILTER_CATALOG.map((entry) => entry.engine);
     const executableIds = [
       ...STUDIO_ADJUSTMENT_ENGINE_IDS,
       ...STUDIO_FILTER_UNION_WAVE_KINDS,
     ];
-    expect(catalogIds).toHaveLength(64);
-    expect(new Set(catalogIds).size).toBe(64);
+    expect(catalogIds).toHaveLength(76);
+    expect(new Set(catalogIds).size).toBe(76);
     expect([...catalogIds].sort()).toEqual([...executableIds].sort());
 
     const monotonicIds = Object.keys(MONOTONIC_ADJUSTMENT_PARAMS);
@@ -533,7 +559,7 @@ describe("studio filter catalog output quality", () => {
     },
   );
 
-  it("keeps all 64 CPU outputs byte-identical through the existing module Worker contract", async () => {
+  it("keeps all 76 CPU outputs byte-identical through the existing module Worker contract", async () => {
     for (const engine of [
       ...STUDIO_ADJUSTMENT_ENGINE_IDS,
       ...STUDIO_FILTER_UNION_WAVE_KINDS,

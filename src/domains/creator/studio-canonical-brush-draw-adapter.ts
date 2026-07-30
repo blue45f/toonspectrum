@@ -8,6 +8,7 @@
 
 import { resolveStudioBrushRenderFamily } from "./studio-brush";
 import {
+  isStudioBrushEraserAliasId,
   resolveStudioBrushAliasProfile,
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
@@ -1166,6 +1167,7 @@ function simplePressureCurve(
     );
   }
   const alias = element.mode === "eraser"
+    && !isStudioBrushEraserAliasId(element.brush)
     ? null
     : resolveStudioBrushAliasProfile(element.brush ?? "pen");
   const aliasCurve = alias?.pressure ?? { minimum: 0, maximum: 1, exponent: 1 };
@@ -1216,7 +1218,7 @@ function simpleRecipe(
       "This retained multipass/material brush must use a specialist adapter.",
     );
   }
-  const size = element.mode === "eraser"
+  const size = element.mode === "eraser" && !isStudioBrushEraserAliasId(brush)
     ? element.strokeWidth
     : studioBrushAliasEffectiveDiameter(brush, element.strokeWidth);
   const pressure = simplePressureCurve(element, size);
@@ -1270,7 +1272,9 @@ function simpleRecipe(
       : "ink";
   const recipe = versionedRecipe(element, {
     brushId: element.mode === "eraser"
-      ? "eraser"
+      ? isStudioBrushEraserAliasId(brush)
+        ? canonicalIdentifier("eraser", `eraser:${brush}`)
+        : "eraser"
       : canonicalIdentifier("brush", brush),
     engine: "dab-v1",
     material,

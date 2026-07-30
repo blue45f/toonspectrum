@@ -20,7 +20,7 @@ import {
 } from "./studio-brush-runtime-contract";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
-export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 4 as const;
+export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 5 as const;
 
 export type StudioBrushBackendQualityFamily =
   | "continuous-ink"
@@ -195,13 +195,17 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
   },
   {
     id: "canvas2d-material-specialist",
-    implementation: "StudioDrawNode material branches",
+    implementation:
+      "StudioDrawNode material branches + professional shelf connected ribbon carrier",
     connection: "active-product",
     phases: ["live", "commit"],
     asynchronous: false,
     defaultAvailability: "ready",
     brushPixelAuthority: true,
-    evidence: "Calligraphy, highlighter, pencil, oil and FX retain dedicated planners.",
+    evidence:
+      "Calligraphy, highlighter, pencil, oil and FX retain dedicated planners; audited bristle, "
+      + "filbert and palette-knife shelf presets share one causal connected-polygon plan across "
+      + "live, retained Canvas and SVG export.",
   },
   {
     id: "canvas2d-dynamic-coverage",
@@ -790,16 +794,24 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   pen: "continuous-analytic",
   fineliner: "continuous-analytic",
   ballpoint: "continuous-analytic",
+  "gel-pen": "continuous-analytic",
+  "glass-pen": "continuous-analytic",
+  "ruling-pen": "continuous-analytic",
   "technical-pen": "continuous-analytic",
   gpen: "continuous-outline",
+  "school-pen": "continuous-outline",
+  "maru-pen": "continuous-outline",
   "mapping-pen": "continuous-outline",
   kaburapen: "continuous-outline",
   liner: "continuous-outline",
   "ink-brush": "continuous-stamp",
   calligraphy: "continuous-specialist",
+  "fountain-pen": "continuous-specialist",
+  "parallel-pen": "continuous-specialist",
   "brush-pen": "continuous-specialist",
   "perfect-ink": "continuous-outline",
   "perfect-marker": "continuous-outline",
+  "kneaded-eraser": "continuous-analytic",
   marker: "continuous-analytic",
   "felt-tip": "continuous-analytic",
   "marker-bold": "continuous-analytic",
@@ -820,13 +832,16 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   gouache: "wet-specialist",
   oil: "wet-specialist",
   acrylic: "wet-specialist",
+  "paint-tube": "wet-specialist",
   airbrush: "spray-dynamics",
+  "hard-airbrush": "spray-dynamics",
   "airbrush-fine": "spray-stamp",
   "wash-brush": "wet-stamp",
   "soft-brush": "spray-dynamics",
   spray: "spray-dynamics",
   splatter: "spray-dynamics",
   pencil: "dry-specialist",
+  "erodible-pencil": "dry-dynamics",
   "pencil-2b": "dry-specialist",
   "pencil-6b": "dry-specialist",
   "soft-pencil": "dry-specialist",
@@ -839,6 +854,7 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   pastel: "dry-dynamics",
   "oil-pastel": "dry-dynamics",
   "ink-particle": "spray-dynamics",
+  "tangent-normal-brush": "continuous-catalog-dynamics",
   screentone: "stamp-specialist",
   crosshatch: "stamp-specialist",
 } as const satisfies Readonly<Record<
@@ -886,6 +902,14 @@ function proProfileForCategory(
       return "stamp-catalog-dynamics";
   }
 }
+
+const PRO_SPECIALIST_ROUTE_PROFILE_BY_ID = Object.freeze({
+  "bristle-round-loaded": "wet-specialist",
+  "bristle-fan-dry": "dry-specialist",
+  "bristle-flat-streak": "wet-specialist",
+  "oil-filbert": "wet-specialist",
+  "palette-knife-edge": "wet-specialist",
+} as const satisfies Readonly<Record<string, StudioBrushBackendRouteProfile>>);
 
 export interface StudioBrushBackendQualityIdentity {
   readonly source: "core" | "pro" | "tool";
@@ -965,7 +989,11 @@ export function classifyStudioBrushBackendQuality(
     ) {
       return { status: "rejected", reason: "identity-mismatch" };
     }
-    const routeProfile = proProfileForCategory(proDescriptor.category);
+    const routeProfile =
+      PRO_SPECIALIST_ROUTE_PROFILE_BY_ID[
+        proDescriptor.catalogId as keyof typeof PRO_SPECIALIST_ROUTE_PROFILE_BY_ID
+      ]
+      ?? proProfileForCategory(proDescriptor.category);
     const family = familyForProfile(routeProfile);
     return classified({
       source: "pro",

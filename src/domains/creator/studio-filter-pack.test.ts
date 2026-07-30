@@ -37,6 +37,12 @@ import {
   type ImageFilterFields,
   type KonvaLike,
 } from "./studio-konva-filters";
+import {
+  denoiseStudioRgba,
+  reduceStudioJpegArtifacts,
+  removeStudioScreentoneArtifacts,
+  type StudioToneArtifactAppliedResult,
+} from "./studio-tone-artifact-filter-kernels";
 
 // ---------------------------------------------------------------------------
 // 헬퍼 — 순수 가짜 ImageData(테스트는 node 환경, Konva/DOM 없음)
@@ -105,6 +111,11 @@ describe("studio filter pack 카탈로그", () => {
       "mosaic",
       "radial-blur",
       "zoom-blur",
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
+      "tileable-blur",
       "chromatic-aberration",
       "glitch",
       "scanline",
@@ -115,6 +126,13 @@ describe("studio filter pack 카탈로그", () => {
       "threshold",
       "oil-paint",
       "surface-blur",
+      "line-cleanup",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
+      "dust-scratches",
+      "difference-of-gaussians",
+      "color-to-alpha",
       "duotone",
       "noise-add",
     ];
@@ -195,6 +213,169 @@ describe("studio filter pack 드래프트", () => {
     expect(createStudioFilterDraft("threshold", { inkThreshold: 0.5 })).toEqual({
       kind: "threshold",
       values: { level: 128 },
+    });
+    expect(
+      createStudioFilterDraft("line-cleanup", {
+        lineCleanup: { threshold: 0.64, strength: 0.45 },
+      }),
+    ).toEqual({
+      kind: "line-cleanup",
+      values: { threshold: 64, strength: 45 },
+    });
+    expect(
+      createStudioFilterDraft("screentone-removal", {
+        screentoneRemoval: { radius: 3, strength: 0.76, inkLumaThreshold: 84 },
+      }),
+    ).toEqual({
+      kind: "screentone-removal",
+      values: { radius: 3, strength: 76, inkLumaThreshold: 84 },
+    });
+    expect(
+      createStudioFilterDraft("jpeg-artifact-reduction", {
+        jpegArtifactReduction: {
+          deblockStrength: 0.68,
+          deringStrength: 0.42,
+          boundaryThreshold: 7,
+          protectedEdgeThreshold: 96,
+          ringingThreshold: 20,
+          inkLumaThreshold: 60,
+        },
+      }),
+    ).toEqual({
+      kind: "jpeg-artifact-reduction",
+      values: {
+        deblockStrength: 68,
+        deringStrength: 42,
+        boundaryThreshold: 7,
+        protectedEdgeThreshold: 96,
+        ringingThreshold: 20,
+        inkLumaThreshold: 60,
+      },
+    });
+    expect(
+      createStudioFilterDraft("edge-aware-denoise", {
+        edgeAwareDenoise: { radius: 2, strength: 0.66, rangeThreshold: 80 },
+      }),
+    ).toEqual({
+      kind: "edge-aware-denoise",
+      values: { radius: 2, strength: 66, rangeThreshold: 80 },
+    });
+    expect(
+      createStudioFilterDraft("lens-blur", {
+        lensBlur: {
+          radius: 5.5,
+          sampleCount: 27,
+          apertureBlades: 9,
+          apertureRotationRadians: Math.PI / 4,
+        },
+      }),
+    ).toEqual({
+      kind: "lens-blur",
+      values: {
+        radius: 5.5,
+        sampleCount: 27,
+        apertureBlades: 9,
+        apertureRotation: 45,
+      },
+    });
+    expect(
+      createStudioFilterDraft("field-iris-blur", {
+        fieldIrisBlur: {
+          focusCenterX: 0.35,
+          focusCenterY: 0.62,
+          focusRadius: 0.2,
+          feather: 0.3,
+          maximumBlurRadius: 8,
+          sampleCount: 25,
+          apertureBlades: 7,
+        },
+      }),
+    ).toEqual({
+      kind: "field-iris-blur",
+      values: {
+        focusCenterX: 35,
+        focusCenterY: 62,
+        focusRadius: 20,
+        feather: 30,
+        maximumBlurRadius: 8,
+        sampleCount: 25,
+        apertureBlades: 7,
+      },
+    });
+    expect(
+      createStudioFilterDraft("tilt-shift-blur", {
+        tiltShiftBlur: {
+          axisRadians: -Math.PI / 2,
+          focusWidth: 0.24,
+          feather: 0.18,
+          maximumBlurRadius: 6,
+          sampleCount: 23,
+        },
+      }),
+    ).toEqual({
+      kind: "tilt-shift-blur",
+      values: {
+        axis: -90,
+        focusWidth: 24,
+        feather: 18,
+        maximumBlurRadius: 6,
+        sampleCount: 23,
+      },
+    });
+    expect(
+      createStudioFilterDraft("selective-gaussian-blur", {
+        selectiveGaussianBlur: {
+          radius: 4,
+          spatialSigma: 2.5,
+          edgeThreshold: 36,
+          edgeSoftness: 0.55,
+        },
+      }),
+    ).toEqual({
+      kind: "selective-gaussian-blur",
+      values: {
+        radius: 4,
+        spatialSigma: 2.5,
+        edgeThreshold: 36,
+        edgeSoftness: 0.55,
+      },
+    });
+    expect(
+      createStudioFilterDraft("tileable-blur", {
+        tileableBlur: { radius: 7, sigma: 3.4, strength: 0.72 },
+      }),
+    ).toEqual({
+      kind: "tileable-blur",
+      values: { radius: 7, sigma: 3.4, strength: 72 },
+    });
+    expect(
+      createStudioFilterDraft("dust-scratches", {
+        dustScratches: { radius: 3, threshold: 42, strength: 0.66 },
+      }),
+    ).toEqual({
+      kind: "dust-scratches",
+      values: { radius: 3, threshold: 42, strength: 66 },
+    });
+    expect(
+      createStudioFilterDraft("difference-of-gaussians", {
+        differenceOfGaussians: {
+          smallSigma: 1,
+          largeSigma: 2.8,
+          threshold: 3.5,
+          strength: 16,
+        },
+      }),
+    ).toEqual({
+      kind: "difference-of-gaussians",
+      values: { smallSigma: 1, largeSigma: 2.8, threshold: 3.5, strength: 16 },
+    });
+    expect(
+      createStudioFilterDraft("color-to-alpha", {
+        colorToAlpha: { keyColor: "#f2ead9", strength: 78 },
+      }),
+    ).toEqual({
+      kind: "color-to-alpha",
+      values: { keyColor: "#f2ead9", strength: 78 },
     });
     expect(
       createStudioFilterDraft("emboss", {
@@ -282,6 +463,56 @@ describe("studio filter pack 패치 매핑", () => {
         stylize: { type: "solarize", strength: 100, detail: 5 },
       }),
     ).toEqual({ kind: "solarize", values: { threshold: 108, strength: 100 } });
+  });
+
+  it("선화 정리는 정규화된 비파괴 합성 필드로 매핑된다", () => {
+    expect(
+      studioFilterDraftToPatch(
+        packDraft("line-cleanup", { threshold: 64, strength: 45 }),
+      ),
+    ).toEqual({
+      lineCleanup: { threshold: 0.64, strength: 0.45 },
+    });
+  });
+
+  it("톤·압축 노이즈 정리 3종은 정규화된 비파괴 필드로 매핑된다", () => {
+    expect(studioFilterDraftToPatch(
+      packDraft("screentone-removal", {
+        radius: 3,
+        strength: 76,
+        inkLumaThreshold: 84,
+      }),
+    )).toEqual({
+      screentoneRemoval: { radius: 3, strength: 0.76, inkLumaThreshold: 84 },
+    });
+    expect(studioFilterDraftToPatch(
+      packDraft("jpeg-artifact-reduction", {
+        deblockStrength: 68,
+        deringStrength: 42,
+        boundaryThreshold: 7,
+        protectedEdgeThreshold: 96,
+        ringingThreshold: 20,
+        inkLumaThreshold: 60,
+      }),
+    )).toEqual({
+      jpegArtifactReduction: {
+        deblockStrength: 0.68,
+        deringStrength: 0.42,
+        boundaryThreshold: 7,
+        protectedEdgeThreshold: 96,
+        ringingThreshold: 20,
+        inkLumaThreshold: 60,
+      },
+    });
+    expect(studioFilterDraftToPatch(
+      packDraft("edge-aware-denoise", {
+        radius: 2,
+        strength: 66,
+        rangeThreshold: 80,
+      }),
+    )).toEqual({
+      edgeAwareDenoise: { radius: 2, strength: 0.66, rangeThreshold: 80 },
+    });
   });
 
   it("듀오톤은 헥스 색상만 허용하고 무효 색은 기본값으로 대체한다", () => {
@@ -530,6 +761,81 @@ describe("studio filter pack 종단 간(라이브 엔진)", () => {
     expect([...out.data]).toEqual([0, 0, 0, 255, 255, 255, 255, 128]);
   });
 
+  it("선화 정리 — 페이지 합성 픽셀도 표준 필터 체인에서 이진화한다", () => {
+    const img: StudioImageDataLike = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([
+        35, 45, 55, 255,
+        160, 170, 180, 192,
+        235, 240, 245, 0,
+      ]),
+    };
+    const patch = studioFilterDraftToPatch(
+      packDraft("line-cleanup", { threshold: 60, strength: 0 }),
+    );
+    const out = pixelsAfterPatch(patch, img);
+    expect([...out.data]).toEqual([
+      0, 0, 0, 255,
+      255, 255, 255, 192,
+      255, 255, 255, 0,
+    ]);
+  });
+
+  it("톤·압축 노이즈 정리 3종은 순수 커널과 바이트 단위로 같은 페이지 합성 결과를 만든다", () => {
+    const source = patternedImage(24, 16);
+    const cases: readonly {
+      kind: (typeof STUDIO_FILTER_PACK_KINDS)[number];
+      values: Record<string, number>;
+      pure: StudioToneArtifactAppliedResult;
+    }[] = [
+      {
+        kind: "screentone-removal" as const,
+        values: { radius: 2, strength: 88, inkLumaThreshold: 72 },
+        pure: removeStudioScreentoneArtifacts(source, {
+          radius: 2,
+          strength: 0.88,
+          inkLumaThreshold: 72,
+        }),
+      },
+      {
+        kind: "jpeg-artifact-reduction" as const,
+        values: {
+          deblockStrength: 72,
+          deringStrength: 45,
+          boundaryThreshold: 6,
+          protectedEdgeThreshold: 88,
+          ringingThreshold: 18,
+          inkLumaThreshold: 64,
+        },
+        pure: reduceStudioJpegArtifacts(source, {
+          deblockStrength: 0.72,
+          deringStrength: 0.45,
+          boundaryThreshold: 6,
+          protectedEdgeThreshold: 88,
+          ringingThreshold: 18,
+          inkLumaThreshold: 64,
+        }),
+      },
+      {
+        kind: "edge-aware-denoise" as const,
+        values: { radius: 1, strength: 78, rangeThreshold: 72 },
+        pure: denoiseStudioRgba(source, {
+          radius: 1,
+          strength: 0.78,
+          rangeThreshold: 72,
+        }),
+      },
+    ];
+    for (const testCase of cases) {
+      expect(testCase.pure.status, testCase.kind).toBe("applied");
+      if (testCase.pure.status !== "applied") continue;
+      const patch = studioFilterDraftToPatch(packDraft(testCase.kind, testCase.values));
+      expect(pixelsAfterPatch(patch, source).data, testCase.kind)
+        .toEqual(testCase.pure.image.data);
+    }
+  });
+
   it("솔라라이즈 — 임계값 초과 채널만 반전된다", () => {
     const img: StudioImageDataLike = {
       width: 1,
@@ -589,17 +895,29 @@ describe("studio filter pack 종단 간(라이브 엔진)", () => {
     expect(a.data).not.toEqual(base.data);
   });
 
-  it("방사형/줌 블러·스캔라인·색수차·렌즈 플레어 패치도 라이브 필터 체인을 구성한다", () => {
+  it("고급 블러·방사형/줌 블러·스캔라인·색수차·렌즈 플레어 패치도 라이브 필터 체인을 구성한다", () => {
     const konva: KonvaLike = { Filters: {} };
     registerStudioKonvaFilters(konva);
     for (const kind of [
       "radial-blur",
       "zoom-blur",
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
+      "tileable-blur",
       "scanline",
       "chromatic-aberration",
       "lens-flare",
       "oil-paint",
       "surface-blur",
+      "line-cleanup",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
+      "dust-scratches",
+      "difference-of-gaussians",
+      "color-to-alpha",
     ] as const) {
       const patch = studioFilterPackValuesToPatch(kind, {});
       const built = buildImageFilters(patch as ImageFilterFields, konva);

@@ -40,10 +40,13 @@ describe("studio brush catalogue selection", () => {
       (preset) => resolveStudioBrushDynamicsPresetId(preset.id) !== null
     );
     expect(dynamicsPresets.map((preset) => preset.id)).toEqual([
+      "paint-tube",
       "airbrush",
+      "hard-airbrush",
       "soft-brush",
       "spray",
       "splatter",
+      "erodible-pencil",
       "dry-media",
       "crayon",
       "chalk",
@@ -51,6 +54,7 @@ describe("studio brush catalogue selection", () => {
       "pastel",
       "oil-pastel",
       "ink-particle",
+      "tangent-normal-brush",
     ]);
 
     for (const preset of dynamicsPresets) {
@@ -119,9 +123,9 @@ describe("studio brush catalogue selection", () => {
     }
   });
 
-  it("materializes all 214 catalogue ids through one fail-closed selection source", async () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(214);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 54, pro: 160, total: 214 });
+  it("materializes all 226 catalogue ids through one fail-closed selection source", async () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(226);
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 66, pro: 160, total: 226 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);

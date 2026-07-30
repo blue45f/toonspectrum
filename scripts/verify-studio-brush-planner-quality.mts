@@ -49,7 +49,7 @@ function main(): void {
     runtimeMs: performance.now() - started,
     outputRoot: OUTPUT_ROOT,
     policy: {
-      shippedPresetCount: 214,
+      shippedPresetCount: 226,
       firstTapPeakChannelDeltaFloor: 4.5,
       continuousFirstTapPeakChannelDeltaFloor: 12,
       continuousCurveGapRatioMaximum: 1,
@@ -69,8 +69,8 @@ function main(): void {
     worstOffenders: audit.rankedWorst.slice(0, 32),
     ...audit,
     ok:
-      candidates.length === 214
-      && audit.results.length === 214
+      candidates.length === 226
+      && audit.results.length === 226
       && audit.ok
       && audit.warningCount === 0
       && audit.exactFingerprintGroups.length === 0
@@ -97,7 +97,7 @@ function main(): void {
   }
   log(`report ${REPORT_PATH}`);
   invariant(report.ok, "Studio brush planner quality gate failed; inspect its JSON report");
-  log("ALL 214 SHIPPED BRUSH PLANNER QUALITY GATES OK");
+  log("ALL 226 SHIPPED BRUSH PLANNER QUALITY GATES OK");
 }
 
 try {

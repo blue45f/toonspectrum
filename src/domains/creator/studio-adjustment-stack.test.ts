@@ -166,6 +166,78 @@ describe("studio adjustment stack", () => {
     expect(project("posterize")).toMatchObject({ posterize: 5 });
     expect(project("ink-threshold")).toMatchObject({ inkThreshold: 0.5 });
     expect(project("line-extraction")).toMatchObject({ lineart: true });
+    expect(project("line-cleanup")).toMatchObject({
+      lineCleanup: { threshold: 0.6, strength: 0.5 },
+    });
+    expect(project("screentone-removal")).toMatchObject({
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+    });
+    expect(project("jpeg-artifact-reduction")).toMatchObject({
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+    });
+    expect(project("edge-aware-denoise")).toMatchObject({
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+    });
+    expect(project("lens-blur")).toMatchObject({
+      lensBlur: {
+        radius: 4,
+        sampleCount: 21,
+        apertureBlades: 6,
+        apertureRotationRadians: 0,
+      },
+    });
+    expect(project("field-iris-blur")).toMatchObject({
+      fieldIrisBlur: {
+        focusCenterX: 0.5,
+        focusCenterY: 0.5,
+        focusRadius: 0.16,
+        feather: 0.24,
+        maximumBlurRadius: 7,
+        sampleCount: 21,
+        apertureBlades: 8,
+      },
+    });
+    expect(project("tilt-shift-blur")).toMatchObject({
+      tiltShiftBlur: {
+        axisRadians: 0,
+        focusWidth: 0.2,
+        feather: 0.22,
+        maximumBlurRadius: 7,
+        sampleCount: 19,
+      },
+    });
+    expect(project("selective-gaussian-blur")).toMatchObject({
+      selectiveGaussianBlur: {
+        radius: 3,
+        spatialSigma: 2,
+        edgeThreshold: 20,
+        edgeSoftness: 0.35,
+      },
+    });
+    expect(project("tileable-blur")).toMatchObject({
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 1 },
+    });
+    expect(project("dust-scratches")).toMatchObject({
+      dustScratches: { radius: 2, threshold: 24, strength: 1 },
+    });
+    expect(project("difference-of-gaussians")).toMatchObject({
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 12,
+      },
+    });
+    expect(project("color-to-alpha")).toMatchObject({
+      colorToAlpha: { keyColor: "#ffffff", strength: 85 },
+    });
     expect(project("screentone")).toMatchObject({ screentone: true });
     expect(project("chromatic-aberration")).toMatchObject({ chromatic: 4 });
     expect(project("grayscale")).toMatchObject({ grayscale: true });
@@ -216,10 +288,22 @@ describe("studio adjustment stack", () => {
       "clouds",
       "spin-blur",
       "zoom-blur",
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
+      "tileable-blur",
       "pixelate",
       "posterize",
       "ink-threshold",
       "line-extraction",
+      "line-cleanup",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
+      "dust-scratches",
+      "difference-of-gaussians",
+      "color-to-alpha",
       "screentone",
       "color-halftone",
       "chromatic-aberration",

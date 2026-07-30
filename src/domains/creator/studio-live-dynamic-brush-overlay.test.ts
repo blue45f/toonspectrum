@@ -881,6 +881,13 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       },
       (_, index) => firstReadableCoordinate + index,
     );
+    const wholePrefixRibbonIds = new Set([
+      "bristle-round-loaded",
+      "bristle-fan-dry",
+      "bristle-flat-streak",
+      "oil-filbert",
+      "palette-knife-edge",
+    ]);
 
     for (const descriptor of STUDIO_BRUSH_PACK_DESCRIPTORS) {
       if (descriptor.runtimeBrushId === "dry-media") dryMediaCount += 1;
@@ -931,10 +938,17 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       const result = renderer.appendFrom(extended);
       expect(result.status, `${descriptor.catalogId}: suffix`)
         .not.toBe("fallback");
-      expect(
-        activeCanvas.clearCount(),
-        `${descriptor.catalogId}: append-only surface`,
-      ).toBe(clearsAfterPrefix);
+      if (wholePrefixRibbonIds.has(descriptor.catalogId)) {
+        expect(
+          activeCanvas.clearCount(),
+          `${descriptor.catalogId}: whole-prefix rebuild surface`,
+        ).toBeGreaterThan(clearsAfterPrefix);
+      } else {
+        expect(
+          activeCanvas.clearCount(),
+          `${descriptor.catalogId}: append-only surface`,
+        ).toBe(clearsAfterPrefix);
+      }
       expect(
         numericReads,
         `${descriptor.catalogId}: O(suffix) point reads`,

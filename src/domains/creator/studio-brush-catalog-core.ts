@@ -1,7 +1,7 @@
 /**
  * Launch-safe brush catalogue contract.
  *
- * Studio's 54 core brushes are small enough for the always-visible quick shelf. The 160
+ * Studio's 66 core brushes are small enough for the always-visible quick shelf. The 160
  * procedural descriptors intentionally live in `studio-brush-catalog.ts`, which is loaded only
  * when a saved pro brush needs metadata or the full library opens.
  */

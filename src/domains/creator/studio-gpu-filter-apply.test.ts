@@ -404,6 +404,114 @@ describe("studio-gpu-filter-apply: 폴백 경로", () => {
     expect(harness.requestAdapter).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["선화 정리", { lineCleanup: { threshold: 0.64, strength: 0.45 } }],
+    [
+      "스크린톤 제거",
+      { screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 } },
+    ],
+    [
+      "JPEG 아티팩트 감소",
+      {
+        jpegArtifactReduction: {
+          deblockStrength: 0.72,
+          deringStrength: 0.45,
+          boundaryThreshold: 6,
+          protectedEdgeThreshold: 88,
+          ringingThreshold: 18,
+          inkLumaThreshold: 64,
+        },
+      },
+    ],
+    [
+      "엣지 보존 노이즈 감소",
+      { edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 } },
+    ],
+    [
+      "렌즈 블러",
+      {
+        lensBlur: {
+          radius: 4,
+          sampleCount: 21,
+          apertureBlades: 6,
+          apertureRotationRadians: 0,
+        },
+      },
+    ],
+    [
+      "필드 아이리스 블러",
+      {
+        fieldIrisBlur: {
+          focusCenterX: 0.5,
+          focusCenterY: 0.5,
+          focusRadius: 0.16,
+          feather: 0.24,
+          maximumBlurRadius: 7,
+          sampleCount: 21,
+          apertureBlades: 8,
+        },
+      },
+    ],
+    [
+      "틸트 시프트 블러",
+      {
+        tiltShiftBlur: {
+          axisRadians: 0,
+          focusWidth: 0.2,
+          feather: 0.22,
+          maximumBlurRadius: 7,
+          sampleCount: 19,
+        },
+      },
+    ],
+    [
+      "선택적 가우시안 블러",
+      {
+        selectiveGaussianBlur: {
+          radius: 3,
+          spatialSigma: 2,
+          edgeThreshold: 20,
+          edgeSoftness: 0.35,
+        },
+      },
+    ],
+    [
+      "타일러블 블러",
+      { tileableBlur: { radius: 5, sigma: 2.2, strength: 0.8 } },
+    ],
+    [
+      "가우시안 차분",
+      {
+        differenceOfGaussians: {
+          smallSigma: 0.8,
+          largeSigma: 2,
+          threshold: 1.5,
+          strength: 12,
+        },
+      },
+    ],
+    [
+      "먼지·스크래치",
+      { dustScratches: { radius: 2, threshold: 24, strength: 0.9 } },
+    ],
+    [
+      "색상 투명화",
+      { colorToAlpha: { keyColor: "#ffffff", strength: 85 } },
+    ],
+  ] as const)("%s는 CPU/Worker 전용 커널이므로 WebGPU가 픽셀을 일부만 처리하지 않는다", async (
+    _label,
+    fields,
+  ) => {
+    const harness = createFakeGpu();
+    const result = await applyGpuFilterChain(
+      imageData(),
+      fields,
+      { gpu: harness.gpu },
+    );
+    expect(result).toBeNull();
+    expect(harness.requestAdapter).not.toHaveBeenCalled();
+  });
+
   it("손상된 imageData(치수·바이트 불일치)는 null", async () => {
     const harness = createFakeGpu();
     const broken = { data: new Uint8ClampedArray(8), width: 4, height: 3 };

@@ -84,7 +84,7 @@ describe("Studio exhaustive long-brush quality policy", () => {
     }).kind).toBe("record-only-discrete");
   });
 
-  it("assigns all 214 shipped brushes exactly one policy without hiding continuous dry media", () => {
+  it("assigns all 226 shipped brushes exactly one policy without hiding continuous dry media", () => {
     const policies = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => {
       const descriptor = studioBrushPackDescriptorById(item.id);
       const dryMediaClassification = classifyStudioDryMediaCatalogIdV1(item.id);
@@ -104,11 +104,11 @@ describe("Studio exhaustive long-brush quality policy", () => {
         }).kind,
       };
     });
-    expect(policies).toHaveLength(214);
-    expect(policies.filter(({ kind }) => kind === "strict-continuous")).toHaveLength(103);
-    expect(policies.filter(({ kind }) => kind === "soft-wet-continuous")).toHaveLength(35);
+    expect(policies).toHaveLength(226);
+    expect(policies.filter(({ kind }) => kind === "strict-continuous")).toHaveLength(114);
+    expect(policies.filter(({ kind }) => kind === "soft-wet-continuous")).toHaveLength(36);
     expect(policies.filter(({ kind }) => kind === "record-only-discrete")).toHaveLength(76);
-    expect(policies.filter(({ source }) => source === "core")).toHaveLength(54);
+    expect(policies.filter(({ source }) => source === "core")).toHaveLength(66);
     expect(policies.filter(({ source }) => source === "pro")).toHaveLength(160);
   });
 

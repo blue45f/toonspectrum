@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+  DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+  DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+  type StudioFieldIrisBlurOptions,
+  type StudioLensBlurOptions,
+  type StudioSelectiveGaussianBlurOptions,
+  type StudioTiltShiftBlurOptions,
+} from "../src/domains/creator/studio-advanced-blur-filter-kernels";
+
+import {
   parseStudioWorkAssetDescriptor,
   parseStudioWorkAssetSourceUri,
   isStudioWorkAssetAdmissionOptedIn,
@@ -157,8 +168,20 @@ describe("studio work asset wire contract", () => {
 
     expect(STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS).toEqual([
       "blurFx",
+      "lensBlur",
+      "fieldIrisBlur",
+      "tiltShiftBlur",
+      "selectiveGaussianBlur",
+      "tileableBlur",
+      "differenceOfGaussians",
+      "dustScratches",
+      "colorToAlpha",
       "curve",
       "curveCh",
+      "edgeAwareDenoise",
+      "jpegArtifactReduction",
+      "lineCleanup",
+      "screentoneRemoval",
       "smartFilters",
     ]);
     expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toEqual(expect.arrayContaining([
@@ -230,6 +253,10 @@ describe("studio work asset wire contract", () => {
       "posterize",
       "ink-threshold",
       "line-extraction",
+      "line-cleanup",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
       "screentone",
       "color-halftone",
       "chromatic-aberration",
@@ -242,14 +269,82 @@ describe("studio work asset wire contract", () => {
       "solarize",
       "oil-paint",
       "smart-sharpen",
+      "color-to-alpha",
+      "difference-of-gaussians",
+      "dust-scratches",
+      "tileable-blur",
+    ] as const;
+    const parsedEngines: string[] = [];
+    for (let offset = 0; offset < engines.length; offset += 12) {
+      const batch = engines.slice(offset, offset + 12);
+      const parsed = parseStudioWorkAssetDescriptor({
+        ...descriptor(),
+        element: {
+          ...descriptor().element,
+          smartFilters: {
+            version: 1,
+            entries: batch.map((engine) => ({
+              id: `filter-${engine}`,
+              engine,
+              enabled: true,
+              params: {},
+            })),
+          },
+        },
+      }, { assetId: "asset-1", elementType: "image" });
+      parsedEngines.push(
+        ...(parsed.element.smartFilters?.entries.map((entry) => entry.engine) ?? []),
+      );
+    }
+
+    expect(parsedEngines).toEqual(engines);
+  });
+
+  it("round-trips exact advanced blur options and rejects widened metadata", () => {
+    const lensBlur = {
+      ...DEFAULT_STUDIO_LENS_BLUR_OPTIONS,
+      radius: 9.5,
+      apertureRotationRadians: Math.PI,
+    } satisfies StudioLensBlurOptions;
+    const fieldIrisBlur = {
+      ...DEFAULT_STUDIO_FIELD_IRIS_BLUR_OPTIONS,
+      focusCenterX: 0.25,
+      focusCenterY: 0.75,
+      focusRadius: 0.2,
+      feather: 0.3,
+      maximumBlurRadius: 12,
+    } satisfies StudioFieldIrisBlurOptions;
+    const tiltShiftBlur = {
+      ...DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
+      axisRadians: -Math.PI / 3,
+      focusWidth: 0.28,
+      feather: 0.4,
+      maximumBlurRadius: 10,
+    } satisfies StudioTiltShiftBlurOptions;
+    const selectiveGaussianBlur = {
+      ...DEFAULT_STUDIO_SELECTIVE_GAUSSIAN_BLUR_OPTIONS,
+      radius: 6,
+      spatialSigma: 3.5,
+      edgeThreshold: 48,
+      edgeSoftness: 0.6,
+    } satisfies StudioSelectiveGaussianBlurOptions;
+    const advancedBlurEngines = [
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
     ] as const;
     const parsed = parseStudioWorkAssetDescriptor({
       ...descriptor(),
       element: {
         ...descriptor().element,
+        lensBlur,
+        fieldIrisBlur,
+        tiltShiftBlur,
+        selectiveGaussianBlur,
         smartFilters: {
           version: 1,
-          entries: engines.map((engine) => ({
+          entries: advancedBlurEngines.map((engine) => ({
             id: `filter-${engine}`,
             engine,
             enabled: true,
@@ -259,7 +354,168 @@ describe("studio work asset wire contract", () => {
       },
     }, { assetId: "asset-1", elementType: "image" });
 
-    expect(parsed.element.smartFilters?.entries.map((entry) => entry.engine)).toEqual(engines);
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toEqual(expect.arrayContaining([
+      "lensBlur",
+      "fieldIrisBlur",
+      "tiltShiftBlur",
+      "selectiveGaussianBlur",
+    ]));
+    expect(parsed.element).toMatchObject({
+      lensBlur,
+      fieldIrisBlur,
+      tiltShiftBlur,
+      selectiveGaussianBlur,
+    });
+    expect(parsed.element.lensBlur).not.toBe(lensBlur);
+    expect(parsed.element.fieldIrisBlur).not.toBe(fieldIrisBlur);
+    expect(parsed.element.tiltShiftBlur).not.toBe(tiltShiftBlur);
+    expect(parsed.element.selectiveGaussianBlur).not.toBe(selectiveGaussianBlur);
+    expect(parsed.element.smartFilters?.entries.map((entry) => entry.engine))
+      .toEqual(advancedBlurEngines);
+
+    for (const element of [
+      {
+        ...descriptor().element,
+        lensBlur: { ...lensBlur, radius: 18.01 },
+      },
+      {
+        ...descriptor().element,
+        fieldIrisBlur: { ...fieldIrisBlur, focusCenterX: 1.01 },
+      },
+      {
+        ...descriptor().element,
+        tiltShiftBlur: { ...tiltShiftBlur, axisRadians: Math.PI + 0.01 },
+      },
+      {
+        ...descriptor().element,
+        selectiveGaussianBlur: { ...selectiveGaussianBlur, radius: 1.5 },
+      },
+      {
+        ...descriptor().element,
+        lensBlur: { ...lensBlur, implementationHint: "gpu-only" },
+      },
+      {
+        ...descriptor().element,
+        lensBlur: {
+          radius: lensBlur.radius,
+          sampleCount: lensBlur.sampleCount,
+          apertureBlades: lensBlur.apertureBlades,
+        },
+      },
+      {
+        ...descriptor().element,
+        selectiveGaussianBlur: {
+          ...selectiveGaussianBlur,
+          edgeThreshold: Number.POSITIVE_INFINITY,
+        },
+      },
+    ]) {
+      expect(() => parseStudioWorkAssetDescriptor({
+        ...descriptor(),
+        element,
+      }, { assetId: "asset-1", elementType: "image" })).toThrow();
+    }
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor("asset-1", "vrm"),
+      element: {
+        ...descriptor("asset-1", "vrm").element,
+        lensBlur,
+      },
+    }, { assetId: "asset-1", elementType: "vrm" })).toThrow(/이미지/u);
+  });
+
+  it("preserves bounded direct cleanup and professional metadata on image references only", () => {
+    const lineCleanup = { threshold: 0.64, strength: 0.45 };
+    const screentoneRemoval = { radius: 2, strength: 0.88, inkLumaThreshold: 72 };
+    const jpegArtifactReduction = {
+      deblockStrength: 0.72,
+      deringStrength: 0.45,
+      boundaryThreshold: 6,
+      protectedEdgeThreshold: 88,
+      ringingThreshold: 18,
+      inkLumaThreshold: 64,
+    };
+    const edgeAwareDenoise = { radius: 1, strength: 0.78, rangeThreshold: 72 };
+    const tileableBlur = { radius: 7, sigma: 3.4, strength: 0.72 };
+    const dustScratches = { radius: 3, threshold: 42, strength: 0.66 };
+    const differenceOfGaussians = {
+      smallSigma: 0.8,
+      largeSigma: 2.1,
+      threshold: 1.5,
+      strength: 12,
+    };
+    const colorToAlpha = { keyColor: "#fefefe", strength: 85 };
+    const parsed = parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        edgeAwareDenoise,
+        jpegArtifactReduction,
+        lineCleanup,
+        screentoneRemoval,
+        tileableBlur,
+        dustScratches,
+        differenceOfGaussians,
+        colorToAlpha,
+      },
+    }, { assetId: "asset-1", elementType: "image" });
+
+    expect(STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS).toEqual(expect.arrayContaining([
+      "edgeAwareDenoise",
+      "jpegArtifactReduction",
+      "lineCleanup",
+      "screentoneRemoval",
+      "tileableBlur",
+      "dustScratches",
+      "differenceOfGaussians",
+      "colorToAlpha",
+    ]));
+    expect(parsed.element.edgeAwareDenoise).toEqual(edgeAwareDenoise);
+    expect(parsed.element.jpegArtifactReduction).toEqual(jpegArtifactReduction);
+    expect(parsed.element.lineCleanup).toEqual(lineCleanup);
+    expect(parsed.element.screentoneRemoval).toEqual(screentoneRemoval);
+    expect(parsed.element.tileableBlur).toEqual(tileableBlur);
+    expect(parsed.element.dustScratches).toEqual(dustScratches);
+    expect(parsed.element.differenceOfGaussians).toEqual(differenceOfGaussians);
+    expect(parsed.element.colorToAlpha).toEqual(colorToAlpha);
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        lineCleanup: { threshold: 1.01, strength: 0.45 },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor("asset-1", "vrm"),
+      element: {
+        ...descriptor("asset-1", "vrm").element,
+        lineCleanup,
+      },
+    }, { assetId: "asset-1", elementType: "vrm" })).toThrow(/이미지/u);
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        screentoneRemoval: { ...screentoneRemoval, radius: 4 },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        jpegArtifactReduction: {
+          ...jpegArtifactReduction,
+          protectedEdgeThreshold: 225,
+        },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
+    expect(() => parseStudioWorkAssetDescriptor({
+      ...descriptor(),
+      element: {
+        ...descriptor().element,
+        edgeAwareDenoise: { ...edgeAwareDenoise, rangeThreshold: 193 },
+      },
+    }, { assetId: "asset-1", elementType: "image" })).toThrow();
   });
 
   it("rejects MIME/type mismatches and over-limit manifests", () => {

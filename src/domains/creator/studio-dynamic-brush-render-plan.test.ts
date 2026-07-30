@@ -4,6 +4,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
+import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
 import {
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_COMMITTED_MARK_BUDGET,
@@ -140,6 +141,33 @@ describe("studio dynamic brush render plan", () => {
       brushCatalogId: "chalk-rough",
       dryMediaPresetId: "chalk",
     });
+  });
+
+  it("budgets the connected professional shelf carrier as one command per causal dab", () => {
+    const brushDynamics = materializeStudioBrushPackDynamics("bristle-fan-dry");
+    if (!brushDynamics) throw new Error("missing bristle-fan-dry dynamics");
+    const plan = requireReady(planStudioDynamicBrushRender(
+      drawElement("professional-fan-bristle", {
+        brush: "dry-media",
+        brushCatalogId: "bristle-fan-dry",
+        brushDynamics,
+      }),
+      "dry-media",
+      true,
+    ));
+
+    expect(plan.materialIdentity).toEqual({
+      brushId: "dry-media",
+      brushCatalogId: "bristle-fan-dry",
+      dryMediaPresetId: "charcoal",
+    });
+    expect(brushDynamics.tipLayers.length).toBeGreaterThan(0);
+    expect(plan.renderBudget).toMatchObject({
+      marksPerDab: 10,
+      dabCapped: false,
+    });
+    expect(plan.renderBudget.estimatedMarks)
+      .toBe(plan.renderBudget.maxDabsPerVariation * 10);
   });
 
   it("produces one exact affine dab variation per symmetry transform", () => {

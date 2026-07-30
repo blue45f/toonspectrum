@@ -54,6 +54,12 @@ import {
   type StudioBrushTipAlphaMap,
 } from "./studio-brush-tip-stamp";
 import {
+  planStudioCompetitorSpecialtyRibbonCarrier,
+  studioCompetitorSpecialtyRibbonCarrierOwnsMaterial,
+  studioCompetitorSpecialtyRibbonCarrierWorkMultiplier,
+  type StudioCompetitorSpecialtyRibbonPolygon,
+} from "./studio-competitor-specialty-ribbon-carrier";
+import {
   bridgeStudioDynamicDabVariationToDryMediaV1,
   studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
@@ -71,6 +77,12 @@ import {
   studioPaintRollerRibbonCarrierOwnsMaterial,
   type StudioPaintRollerRibbonPolygon,
 } from "./studio-paint-roller-ribbon-carrier";
+import {
+  planStudioProfessionalShelfRibbonCarrier,
+  studioProfessionalShelfRibbonCarrierOwnsMaterial,
+  studioProfessionalShelfRibbonCarrierWorkMultiplier,
+  type StudioProfessionalShelfRibbonPolygon,
+} from "./studio-professional-shelf-ribbon-carrier";
 import {
   planStudioSplatterOriginAnchorDab,
   studioSplatterOriginAnchorMarkCount,
@@ -146,7 +158,9 @@ export interface StudioDynamicBrushCoverageMark {
   readonly ribbon?:
     | StudioFlatNibRibbonPolygon
     | StudioPaintRollerRibbonPolygon
-    | StudioDryMediaUnionRibbonPolygon;
+    | StudioDryMediaUnionRibbonPolygon
+    | StudioProfessionalShelfRibbonPolygon
+    | StudioCompetitorSpecialtyRibbonPolygon;
   /**
    * Full alpha-map stamp rendered by one affine `drawImage`. The immutable map is shared by every
    * dab; deterministic world/stroke grain is footprint-integrated into `alpha` so Canvas and SVG
@@ -165,6 +179,82 @@ export interface StudioDynamicBrushCoverageMark {
     /** Alpha at normalized radius r is `(1 - r) ^ exponent`. */
     readonly exponent: number;
   }>;
+}
+
+export interface StudioDynamicBrushCoverageBudgetContract {
+  readonly settings: NormalizedStudioBrushDynamicsSettings;
+  readonly materialMarkMultiplier: number;
+  readonly specialistCarrier:
+    | "competitor-specialty-ribbon"
+    | "paint-roller-ribbon"
+    | "professional-shelf-ribbon"
+    | null;
+}
+
+/**
+ * Returns the command-count contract used by every live, retained and SVG budget caller.
+ *
+ * Professional shelf ribbons intentionally replace legacy decorative tip layers with one
+ * connected multi-contour command per canonical dab. The command budget still charges every
+ * physical contour, so a long fan brush cannot hide ten lanes behind one nominal fill. Keeping
+ * both adjustments in the shared coverage authority prevents live input from accepting a
+ * different prefix than commit/export.
+ */
+export function resolveStudioDynamicBrushCoverageBudgetContract(
+  materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
+  dynamics: NormalizedStudioBrushDynamicsSettings,
+): StudioDynamicBrushCoverageBudgetContract {
+  const competitorSpecialtyRibbon =
+    studioCompetitorSpecialtyRibbonCarrierOwnsMaterial(
+      materialIdentity,
+      dynamics,
+    );
+  const professionalShelfRibbon =
+    studioProfessionalShelfRibbonCarrierOwnsMaterial(
+      materialIdentity,
+      dynamics,
+    );
+  const paintRollerRibbon = studioPaintRollerRibbonCarrierOwnsMaterial(
+    materialIdentity,
+    dynamics,
+  );
+  const professionalContourWork =
+    studioProfessionalShelfRibbonCarrierWorkMultiplier(
+      materialIdentity,
+      dynamics,
+    );
+  const competitorContourWork =
+    studioCompetitorSpecialtyRibbonCarrierWorkMultiplier(
+      materialIdentity,
+      dynamics,
+    );
+  const settings = (
+    professionalShelfRibbon
+    || competitorSpecialtyRibbon
+  ) && dynamics.tipLayers.length > 0
+    ? Object.freeze({
+        ...dynamics,
+        tipLayers: Object.freeze([]),
+      })
+    : dynamics;
+  return Object.freeze({
+    settings,
+    materialMarkMultiplier:
+      competitorSpecialtyRibbon
+        ? competitorContourWork
+        : professionalShelfRibbon
+        ? professionalContourWork
+        : paintRollerRibbon
+          ? 1
+        : studioDryMediaDynamicBridgeMarkMultiplier(materialIdentity),
+    specialistCarrier: competitorSpecialtyRibbon
+      ? "competitor-specialty-ribbon"
+      : professionalShelfRibbon
+        ? "professional-shelf-ribbon"
+        : paintRollerRibbon
+        ? "paint-roller-ribbon"
+        : null,
+  });
 }
 
 /**
@@ -303,8 +393,10 @@ export type StudioDynamicBrushCoverageMarkPlan =
       readonly ok: false;
       readonly reason:
         | "dry-media-bridge"
+        | "competitor-specialty-carrier"
         | "invalid-mark"
         | "mark-budget"
+        | "professional-shelf-carrier"
         | "r8-grain-unavailable"
         | "r8-grain-memory-budget";
     };
@@ -534,6 +626,8 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
           mark.ribbon.kind === "flat-nib-ribbon-polygon"
           || mark.ribbon.kind === "paint-roller-ribbon-polygon"
           || mark.ribbon.kind === "dry-media-union-ribbon-polygon"
+          || mark.ribbon.kind === "professional-shelf-ribbon-polygon"
+          || mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
         )
         && mark.ribbon.polygons.length > 0
         && mark.ribbon.polygons.every((points) => (
@@ -541,6 +635,26 @@ function markIsValid(mark: StudioDynamicBrushCoverageMark): boolean {
           && points.length % 2 === 0
           && points.every(Number.isFinite)
         ))
+        && (
+          mark.ribbon.kind !== "competitor-specialty-ribbon-polygon"
+          || mark.ribbon.contourStyles === undefined
+          || (
+            mark.ribbon.contourStyles.length
+              === mark.ribbon.polygons.length
+            && mark.ribbon.contourStyles.every((style) => (
+              (
+                style.role === "body"
+                || style.role === "highlight"
+                || style.role === "shadow"
+              )
+              && typeof style.color === "string"
+              && style.color.length > 0
+              && Number.isFinite(style.alphaMultiplier)
+              && style.alphaMultiplier > 0
+              && style.alphaMultiplier <= 1
+            ))
+          )
+        )
       )
     )
     && (
@@ -600,6 +714,48 @@ export function renderStudioDynamicBrushCoverageMark(
 ): void {
   context.globalAlpha = clampAlpha(mark.alpha * alphaMultiplier);
   if (mark.ribbon) {
+    if (
+      mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
+      && mark.ribbon.contourStyles
+    ) {
+      let contourIndex = 0;
+      while (contourIndex < mark.ribbon.polygons.length) {
+        const style = mark.ribbon.contourStyles[contourIndex]!;
+        context.globalAlpha = clampAlpha(
+          mark.alpha * alphaMultiplier * style.alphaMultiplier,
+        );
+        if (context.fillStyle !== style.color) context.fillStyle = style.color;
+        context.beginPath();
+        do {
+          const points = mark.ribbon.polygons[contourIndex]!;
+          const [firstX, firstY, ...remaining] = points;
+          if (firstX !== undefined && firstY !== undefined) {
+            context.moveTo(firstX, firstY);
+            for (let index = 0; index < remaining.length; index += 2) {
+              const x = remaining[index];
+              const y = remaining[index + 1];
+              if (x === undefined || y === undefined) break;
+              context.lineTo(x, y);
+            }
+            context.closePath();
+          }
+          contourIndex += 1;
+        } while (
+          contourIndex < mark.ribbon.polygons.length
+          && mark.ribbon.contourStyles[contourIndex]?.role === style.role
+          && mark.ribbon.contourStyles[contourIndex]?.color === style.color
+          && mark.ribbon.contourStyles[contourIndex]?.alphaMultiplier
+            === style.alphaMultiplier
+        );
+        if (contourIndex > 0) {
+          // Same-winding subpaths are one non-zero union. Applying alpha once to the complete
+          // semantic layer prevents a cusp or self-crossing from becoming darker than a straight
+          // segment while keeping body/highlight/shadow as separate physical paint layers.
+          context.fill();
+        }
+      }
+      return;
+    }
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
     context.beginPath();
     for (const points of mark.ribbon.polygons) {
@@ -754,12 +910,23 @@ export function planStudioDynamicBrushCoverageMarks(
     // different pixels in different realms.
     return { ok: false, reason: "r8-grain-unavailable" };
   }
+  const coverageBudgetContract =
+    resolveStudioDynamicBrushCoverageBudgetContract(
+      input.materialIdentity,
+      dynamics,
+    );
+  const paintRollerRibbonAuthority =
+    coverageBudgetContract.specialistCarrier === "paint-roller-ribbon";
+  const competitorSpecialtyRibbonAuthority =
+    coverageBudgetContract.specialistCarrier === "competitor-specialty-ribbon";
+  const professionalShelfRibbonAuthority =
+    coverageBudgetContract.specialistCarrier === "professional-shelf-ribbon";
   const causalRenderBudget = isStudioDynamicBrushCausalDepositPipeline(
     dynamics.depositPipeline,
   )
     && dabVariations.length > 0
     ? planStudioDynamicBrushRenderBudget({
-        settings: dynamics,
+        settings: coverageBudgetContract.settings,
         dabCount: dabVariations.reduce(
           (maximum, variation) => Math.max(
             maximum,
@@ -775,9 +942,8 @@ export function planStudioDynamicBrushCoverageMarks(
               studioDynamicBrushDabVariationFirst(variation)?.index === 0,
             ),
         ),
-        materialMarkMultiplier: studioDryMediaDynamicBridgeMarkMultiplier(
-          input.materialIdentity,
-        ),
+        materialMarkMultiplier:
+          coverageBudgetContract.materialMarkMultiplier,
         markBudget: boundedMarkBudget,
       })
     : null;
@@ -794,12 +960,12 @@ export function planStudioDynamicBrushCoverageMarks(
       ))
     : dabVariations;
   let materialDabVariations = acceptedDabVariations;
-  const paintRollerRibbonAuthority =
-    studioPaintRollerRibbonCarrierOwnsMaterial(
-      input.materialIdentity,
-      dynamics,
-    );
-  if (input.materialIdentity && !paintRollerRibbonAuthority) {
+  if (
+    input.materialIdentity
+    && !paintRollerRibbonAuthority
+    && !competitorSpecialtyRibbonAuthority
+    && !professionalShelfRibbonAuthority
+  ) {
     const bridgedVariations: StudioDynamicBrushDabVariation[] = [];
     for (const variation of acceptedDabVariations) {
       const bridged = bridgeStudioDynamicDabVariationToDryMediaV1({
@@ -891,6 +1057,7 @@ export function planStudioDynamicBrushCoverageMarks(
   for (const [variationIndex, dabs] of materialDabVariations.entries()) {
     const variationMarksStart = marks.length;
     const visiblePrimaryDabs: StudioDynamicBrushDab[] = [];
+    const visiblePrimaryMarks: StudioDynamicBrushCoverageMark[] = [];
     const suppliedOrigin = input.strokeOrigins?.[variationIndex];
     const firstDab = studioDynamicBrushDabVariationFirst(dabs);
     const strokeOriginX = suppliedOrigin?.x ?? firstDab?.sourceX ?? firstDab?.x ?? 0;
@@ -1133,17 +1300,25 @@ export function planStudioDynamicBrushCoverageMarks(
       const primaryMarkStart = marks.length;
       const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
-      if (marks.length === primaryMarkStart + 1) visiblePrimaryDabs.push(dab);
-      for (const [layerIndex, layer] of dynamics.tipLayers.entries()) {
-        const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
-        if (!composedDab) continue;
-        const layerResult = appendTipDab(
-          composedDab,
-          layer.tip,
-          layerIndex + 1,
-          dabColor
-        );
-        if (layerResult !== "ok") return { ok: false, reason: layerResult };
+      if (marks.length === primaryMarkStart + 1) {
+        visiblePrimaryDabs.push(dab);
+        visiblePrimaryMarks.push(marks[primaryMarkStart]!);
+      }
+      if (
+        !professionalShelfRibbonAuthority
+        && !competitorSpecialtyRibbonAuthority
+      ) {
+        for (const [layerIndex, layer] of dynamics.tipLayers.entries()) {
+          const composedDab = composeNormalizedStudioBrushTipLayerDab(dab, layer);
+          if (!composedDab) continue;
+          const layerResult = appendTipDab(
+            composedDab,
+            layer.tip,
+            layerIndex + 1,
+            dabColor
+          );
+          if (layerResult !== "ok") return { ok: false, reason: layerResult };
+        }
       }
     }
     const originAnchor = planStudioSplatterOriginAnchorDab(
@@ -1168,6 +1343,42 @@ export function planStudioDynamicBrushCoverageMarks(
       }
     }
     const variationMarks = marks.slice(variationMarksStart);
+    const competitorSpecialtyRibbonPlan =
+      planStudioCompetitorSpecialtyRibbonCarrier({
+        dabs: visiblePrimaryDabs,
+        marks: visiblePrimaryMarks,
+        materialIdentity: input.materialIdentity,
+        dynamics,
+      });
+    if (competitorSpecialtyRibbonPlan.applied) {
+      marks.splice(
+        variationMarksStart,
+        variationMarks.length,
+        ...competitorSpecialtyRibbonPlan.marks,
+      );
+      continue;
+    }
+    if (competitorSpecialtyRibbonAuthority) {
+      return { ok: false, reason: "competitor-specialty-carrier" };
+    }
+    const professionalShelfRibbonPlan =
+      planStudioProfessionalShelfRibbonCarrier({
+        dabs: visiblePrimaryDabs,
+        marks: visiblePrimaryMarks,
+        materialIdentity: input.materialIdentity,
+        dynamics,
+      });
+    if (professionalShelfRibbonPlan.applied) {
+      marks.splice(
+        variationMarksStart,
+        variationMarks.length,
+        ...professionalShelfRibbonPlan.marks,
+      );
+      continue;
+    }
+    if (professionalShelfRibbonAuthority) {
+      return { ok: false, reason: "professional-shelf-carrier" };
+    }
     const dryMediaRibbonPlan = planStudioDryMediaUnionRibbonCarrier({
       dabs: visiblePrimaryDabs,
       marks: variationMarks,

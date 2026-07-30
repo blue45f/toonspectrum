@@ -17,6 +17,17 @@ import {
   studioAdjustmentOperationToFilterFields,
 } from "./studio-adjustment-stack";
 import {
+  fieldIrisBlurKonvaFilter,
+  lensBlurKonvaFilter,
+  normalizeStudioFieldIrisBlurOptions,
+  normalizeStudioLensBlurOptions,
+  normalizeStudioSelectiveGaussianBlurOptions,
+  normalizeStudioTiltShiftBlurOptions,
+  selectiveGaussianBlurKonvaFilter,
+  tiltShiftBlurKonvaFilter,
+  type StudioAdvancedBlurExecution,
+} from "./studio-advanced-blur-filters";
+import {
   cloudsKonvaFilter,
   convolutionKonvaFilter,
   exposureAdjustmentKonvaFilter,
@@ -41,7 +52,7 @@ import { blurFxKonvaFilter, normalizeBlurFx, isIdentityBlurFx } from "./studio-b
 import { channelMixerKonvaFilter, normalizeChannelMixer, isIdentityChannelMixer, channelMixerToFlat } from "./studio-channel-mixer";
 import { clarityKonvaFilter, normalizeClarity, isIdentityClarity } from "./studio-clarity";
 import { colorBalanceKonvaFilter, normalizeColorBalance, isIdentityColorBalance } from "./studio-color-balance";
-import { colorToAlphaKonvaFilter, normalizeColorToAlpha, isIdentityColorToAlpha } from "./studio-color-to-alpha";
+import { normalizeColorToAlpha, isIdentityColorToAlpha } from "./studio-color-to-alpha";
 import { curveKonvaFilter, normalizeCurve, normalizeCurveChannels, isIdentityCurve, isIdentityCurveChannels, curveToFlat } from "./studio-curves";
 import { detailKonvaFilter, normalizeDetail, isIdentityDetail } from "./studio-detail";
 import { distortKonvaFilter, normalizeDistort, isIdentityDistort } from "./studio-distort";
@@ -74,12 +85,40 @@ import {
 } from "./studio-konva-native-filters";
 import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "./studio-levels";
 import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
+import {
+  lineArtCleanupKonvaFilter,
+  normalizeLineArtCleanup,
+} from "./studio-line-cleanup";
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
 import { photoFilterKonvaFilter, normalizePhotoFilter, isIdentityPhotoFilter } from "./studio-photo-filter";
+import {
+  normalizeStudioDifferenceOfGaussiansOptions,
+  normalizeStudioDustScratchesOptions,
+  normalizeStudioTileableBlurOptions,
+} from "./studio-professional-filter-kernels";
+import {
+  differenceOfGaussiansKonvaFilter,
+  dustScratchesKonvaFilter,
+  professionalColorToAlphaKonvaFilter,
+  tileableBlurKonvaFilter,
+} from "./studio-professional-filters";
 import { selectiveHslKonvaFilter, normalizeSelectiveHsl, isIdentitySelectiveHsl, selectiveHslToFlat } from "./studio-selective-hsl";
 import { shadowHighlightKonvaFilter, normalizeShadowHighlight, isIdentityShadowHighlight } from "./studio-shadow-highlight";
 import { sketchKonvaFilter, normalizeSketch, isIdentitySketch } from "./studio-sketch";
 import { stylizeKonvaFilter, normalizeStylize, isIdentityStylize } from "./studio-stylize";
+import {
+  normalizeStudioEdgeAwareDenoiseOptions,
+  normalizeStudioJpegArtifactReductionOptions,
+  normalizeStudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
+import {
+  edgeAwareDenoiseKonvaFilter,
+  isIdentityStudioEdgeAwareDenoise,
+  isIdentityStudioJpegArtifactReduction,
+  isIdentityStudioScreentoneRemoval,
+  jpegArtifactReductionKonvaFilter,
+  screentoneRemovalKonvaFilter,
+} from "./studio-tone-artifact-filters";
 import { vibranceKonvaFilter, normalizeVibrance, isIdentityVibrance } from "./studio-vibrance";
 
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
@@ -156,6 +195,33 @@ function hasActiveSketch(el: ImageFilterFields): boolean {
 function hasActiveDetail(el: ImageFilterFields): boolean {
   return !!el.detail && !isIdentityDetail(normalizeDetail(el.detail));
 }
+function hasActiveLineCleanup(el: ImageFilterFields): boolean {
+  return el.lineCleanup != null;
+}
+function hasActiveScreentoneRemoval(el: ImageFilterFields): boolean {
+  return !!el.screentoneRemoval
+    && !isIdentityStudioScreentoneRemoval(el.screentoneRemoval);
+}
+function hasActiveJpegArtifactReduction(el: ImageFilterFields): boolean {
+  return !!el.jpegArtifactReduction
+    && !isIdentityStudioJpegArtifactReduction(el.jpegArtifactReduction);
+}
+function hasActiveEdgeAwareDenoise(el: ImageFilterFields): boolean {
+  return !!el.edgeAwareDenoise
+    && !isIdentityStudioEdgeAwareDenoise(el.edgeAwareDenoise);
+}
+function hasActiveLensBlur(el: ImageFilterFields): boolean {
+  return el.lensBlur != null;
+}
+function hasActiveFieldIrisBlur(el: ImageFilterFields): boolean {
+  return el.fieldIrisBlur != null;
+}
+function hasActiveTiltShiftBlur(el: ImageFilterFields): boolean {
+  return el.tiltShiftBlur != null;
+}
+function hasActiveSelectiveGaussianBlur(el: ImageFilterFields): boolean {
+  return el.selectiveGaussianBlur != null;
+}
 function hasActiveExposureAdjustment(el: ImageFilterFields): boolean {
   return !!el.exposureAdjustment && !isIdentityStudioExposureAdjustment(el.exposureAdjustment);
 }
@@ -185,6 +251,18 @@ function hasActiveSmartFilterProgram(el: ImageFilterFields): boolean {
 // 색상 투명화가 항등(strength0)이 아니면 활성.
 function hasActiveColorToAlpha(el: ImageFilterFields): boolean {
   return !!el.colorToAlpha && !isIdentityColorToAlpha(normalizeColorToAlpha(el.colorToAlpha));
+}
+function hasActiveDifferenceOfGaussians(el: ImageFilterFields): boolean {
+  return !!el.differenceOfGaussians
+    && normalizeStudioDifferenceOfGaussiansOptions(el.differenceOfGaussians).strength > 0;
+}
+function hasActiveDustScratches(el: ImageFilterFields): boolean {
+  return !!el.dustScratches
+    && normalizeStudioDustScratchesOptions(el.dustScratches).strength > 0;
+}
+function hasActiveTileableBlur(el: ImageFilterFields): boolean {
+  return !!el.tileableBlur
+    && normalizeStudioTileableBlurOptions(el.tileableBlur).strength > 0;
 }
 
 // 스티커 테두리가 항등(굵기0/불투명0)이 아니면 활성.
@@ -521,7 +599,7 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   // 포토 필터 — this.attrs.pfColor/pfDensity/pfPreserve 적용(studio-photo-filter).
   F.PhotoFilter = photoFilterKonvaFilter;
   // 색상 투명화 — this.attrs.ctaColor/ctaStrength 적용(studio-color-to-alpha).
-  F.ColorToAlpha = colorToAlphaKonvaFilter;
+  F.ColorToAlpha = professionalColorToAlphaKonvaFilter;
   // 자동 보정 — this.attrs.autoMode/autoStrength 적용(studio-auto-adjust).
   F.AutoAdjust = autoAdjustKonvaFilter;
   // 선명도/디테일 — this.attrs.clarity/dehaze 적용(studio-clarity).
@@ -558,6 +636,17 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.PixelOffset = pixelOffsetKonvaFilter;
   F.Convolution = convolutionKonvaFilter;
   F.Clouds = cloudsKonvaFilter;
+  F.LineCleanup = lineArtCleanupKonvaFilter;
+  F.ScreentoneRemoval = screentoneRemovalKonvaFilter;
+  F.JpegArtifactReduction = jpegArtifactReductionKonvaFilter;
+  F.EdgeAwareDenoise = edgeAwareDenoiseKonvaFilter;
+  F.LensBlur = lensBlurKonvaFilter;
+  F.FieldIrisBlur = fieldIrisBlurKonvaFilter;
+  F.TiltShiftBlur = tiltShiftBlurKonvaFilter;
+  F.SelectiveGaussianBlur = selectiveGaussianBlurKonvaFilter;
+  F.DifferenceOfGaussians = differenceOfGaussiansKonvaFilter;
+  F.DustScratches = dustScratchesKonvaFilter;
+  F.TileableBlur = tileableBlurKonvaFilter;
   // 필터 팩 — this.attrs.glitch*/vignette* 적용(studio-filter-pack).
   F.GlitchFx = glitchFxKonvaFilter;
   F.VignetteFx = vignetteFxKonvaFilter;
@@ -594,6 +683,17 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     hasActiveLight(el) ||
     hasActiveSketch(el) ||
     hasActiveDetail(el) ||
+    hasActiveLineCleanup(el) ||
+    hasActiveScreentoneRemoval(el) ||
+    hasActiveJpegArtifactReduction(el) ||
+    hasActiveEdgeAwareDenoise(el) ||
+    hasActiveLensBlur(el) ||
+    hasActiveFieldIrisBlur(el) ||
+    hasActiveTiltShiftBlur(el) ||
+    hasActiveSelectiveGaussianBlur(el) ||
+    hasActiveDifferenceOfGaussians(el) ||
+    hasActiveDustScratches(el) ||
+    hasActiveTileableBlur(el) ||
     hasActiveExposureAdjustment(el) ||
     hasActiveUnsharpMask(el) ||
     hasActiveMorphology(el) ||
@@ -629,6 +729,7 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
 export function buildImageFilters(
   el: ImageFilterFields,
   konva: KonvaLike,
+  execution: StudioAdvancedBlurExecution = "direct",
 ): { filters: Array<(imageData: StudioImageDataLike) => void>; attrs: Record<string, number | string | number[]>; cachePad: number } {
   // 이 시점에 읽는 필터들은 모두 등록된 함수다(Konva 내장 + registerStudioKonvaFilters로 부착).
   // unknown 인덱스 값을 필터 함수 맵으로 좁혀 읽는다.
@@ -684,6 +785,56 @@ export function buildImageFilters(
     attrs.bfRadius = bf.radius;
     attrs.bfAngle = bf.angle;
   }
+  // Advanced photographic/edge-aware blurs share one deterministic CPU oracle. The module Worker
+  // marks its execution mode so large jobs may run there; a direct Konva fallback remains bounded.
+  if (hasActiveLensBlur(el)) {
+    filters.push(F.LensBlur!);
+    const blur = normalizeStudioLensBlurOptions(el.lensBlur);
+    attrs.advancedBlurExecution = execution;
+    attrs.lensBlurRadius = blur.radius;
+    attrs.lensBlurSampleCount = blur.sampleCount;
+    attrs.lensBlurApertureBlades = blur.apertureBlades;
+    attrs.lensBlurApertureRotation = blur.apertureRotationRadians;
+  }
+  if (hasActiveFieldIrisBlur(el)) {
+    filters.push(F.FieldIrisBlur!);
+    const blur = normalizeStudioFieldIrisBlurOptions(el.fieldIrisBlur);
+    attrs.advancedBlurExecution = execution;
+    attrs.fieldIrisFocusCenterX = blur.focusCenterX;
+    attrs.fieldIrisFocusCenterY = blur.focusCenterY;
+    attrs.fieldIrisFocusRadius = blur.focusRadius;
+    attrs.fieldIrisFeather = blur.feather;
+    attrs.fieldIrisMaximumRadius = blur.maximumBlurRadius;
+    attrs.fieldIrisSampleCount = blur.sampleCount;
+    attrs.fieldIrisApertureBlades = blur.apertureBlades;
+  }
+  if (hasActiveTiltShiftBlur(el)) {
+    filters.push(F.TiltShiftBlur!);
+    const blur = normalizeStudioTiltShiftBlurOptions(el.tiltShiftBlur);
+    attrs.advancedBlurExecution = execution;
+    attrs.tiltShiftAxis = blur.axisRadians;
+    attrs.tiltShiftFocusWidth = blur.focusWidth;
+    attrs.tiltShiftFeather = blur.feather;
+    attrs.tiltShiftMaximumRadius = blur.maximumBlurRadius;
+    attrs.tiltShiftSampleCount = blur.sampleCount;
+  }
+  if (hasActiveSelectiveGaussianBlur(el)) {
+    filters.push(F.SelectiveGaussianBlur!);
+    const blur = normalizeStudioSelectiveGaussianBlurOptions(el.selectiveGaussianBlur);
+    attrs.advancedBlurExecution = execution;
+    attrs.selectiveGaussianRadius = blur.radius;
+    attrs.selectiveGaussianSpatialSigma = blur.spatialSigma;
+    attrs.selectiveGaussianEdgeThreshold = blur.edgeThreshold;
+    attrs.selectiveGaussianEdgeSoftness = blur.edgeSoftness;
+  }
+  if (hasActiveTileableBlur(el)) {
+    filters.push(F.TileableBlur!);
+    const blur = normalizeStudioTileableBlurOptions(el.tileableBlur);
+    attrs.professionalFilterExecution = execution;
+    attrs.tileableBlurRadius = blur.radius;
+    attrs.tileableBlurSigma = blur.sigma;
+    attrs.tileableBlurStrength = blur.strength;
+  }
   // 디테일(하이패스/미디언/스마트샤픈) — 색·스타일라이즈 전에 원본 질감을 다듬는 컨디셔닝.
   if (hasActiveDetail(el)) {
     filters.push(F.Detail!);
@@ -711,6 +862,61 @@ export function buildImageFilters(
     attrs.convKernel = [...convolution.kernel];
     attrs.convDivisor = convolution.divisor;
     attrs.convBias = convolution.bias;
+  }
+  // Imported-art conditioning: block/ringing cleanup first, then periodic tone removal, then
+  // edge-aware chroma denoise. These are atomic so direct, Worker and ordered smart stacks share
+  // the exact immutable kernel math and never flatten duplicate operations.
+  if (hasActiveJpegArtifactReduction(el)) {
+    filters.push(F.JpegArtifactReduction!);
+    const jpeg = normalizeStudioJpegArtifactReductionOptions(el.jpegArtifactReduction);
+    attrs.toneArtifactExecution = execution;
+    attrs.jpegDeblockStrength = jpeg.deblockStrength;
+    attrs.jpegDeringStrength = jpeg.deringStrength;
+    attrs.jpegBoundaryThreshold = jpeg.boundaryThreshold;
+    attrs.jpegProtectedEdgeThreshold = jpeg.protectedEdgeThreshold;
+    attrs.jpegRingingThreshold = jpeg.ringingThreshold;
+    attrs.jpegInkThreshold = jpeg.inkLumaThreshold;
+  }
+  if (hasActiveScreentoneRemoval(el)) {
+    filters.push(F.ScreentoneRemoval!);
+    const tone = normalizeStudioScreentoneRemovalOptions(el.screentoneRemoval);
+    attrs.toneArtifactExecution = execution;
+    attrs.toneRemovalRadius = tone.radius;
+    attrs.toneRemovalStrength = tone.strength;
+    attrs.toneRemovalInkThreshold = tone.inkLumaThreshold;
+  }
+  if (hasActiveEdgeAwareDenoise(el)) {
+    filters.push(F.EdgeAwareDenoise!);
+    const denoise = normalizeStudioEdgeAwareDenoiseOptions(el.edgeAwareDenoise);
+    attrs.toneArtifactExecution = execution;
+    attrs.edgeDenoiseRadius = denoise.radius;
+    attrs.edgeDenoiseStrength = denoise.strength;
+    attrs.edgeDenoiseRangeThreshold = denoise.rangeThreshold;
+  }
+  if (hasActiveDustScratches(el)) {
+    filters.push(F.DustScratches!);
+    const cleanup = normalizeStudioDustScratchesOptions(el.dustScratches);
+    attrs.professionalFilterExecution = execution;
+    attrs.dustScratchRadius = cleanup.radius;
+    attrs.dustScratchThreshold = cleanup.threshold;
+    attrs.dustScratchStrength = cleanup.strength;
+  }
+  if (hasActiveDifferenceOfGaussians(el)) {
+    filters.push(F.DifferenceOfGaussians!);
+    const dog = normalizeStudioDifferenceOfGaussiansOptions(el.differenceOfGaussians);
+    attrs.professionalFilterExecution = execution;
+    attrs.dogSmallSigma = dog.smallSigma;
+    attrs.dogLargeSigma = dog.largeSigma;
+    attrs.dogThreshold = dog.threshold;
+    attrs.dogStrength = dog.strength;
+  }
+  // 선화 정리는 내부 순서(그레이스케일→자동 대비→샤픈→임계)를 하나의 원자적 필터로
+  // 유지한다. 개별 필드로 펼치면 고정 카테고리 순서가 달라져 라이브/Worker 결과가 어긋난다.
+  if (hasActiveLineCleanup(el)) {
+    filters.push(F.LineCleanup!);
+    const cleanup = normalizeLineArtCleanup(el.lineCleanup);
+    attrs.lineCleanupThreshold = cleanup.threshold;
+    attrs.lineCleanupStrength = cleanup.strength;
   }
   // --- 색/톤 보정 먼저 ---
   if (hasActiveExposureAdjustment(el)) {
@@ -845,6 +1051,7 @@ export function buildImageFilters(
   if (hasActiveColorToAlpha(el)) {
     filters.push(F.ColorToAlpha!);
     const cta = normalizeColorToAlpha(el.colorToAlpha);
+    attrs.professionalFilterExecution = execution;
     attrs.ctaColor = cta.keyColor;
     attrs.ctaStrength = cta.strength;
   }
@@ -999,6 +1206,7 @@ export function buildImageFilters(
     const operationBuild = buildImageFilters(
       studioAdjustmentOperationToFilterFields(operation),
       konva,
+      execution,
     );
     const operationAttrs = operationBuild.attrs;
     for (const operationFilter of operationBuild.filters) {

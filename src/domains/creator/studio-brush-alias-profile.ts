@@ -21,17 +21,25 @@ export type StudioBrushAliasId =
   | "pen"
   | "fineliner"
   | "ballpoint"
+  | "gel-pen"
+  | "glass-pen"
+  | "ruling-pen"
   | "technical-pen"
   | "marker"
   | "felt-tip"
   | "marker-bold"
   | "alcohol-marker"
   | "gpen"
+  | "school-pen"
+  | "maru-pen"
   | "mapping-pen"
   | "kaburapen"
   | "liner"
   | "calligraphy"
+  | "fountain-pen"
+  | "parallel-pen"
   | "brush-pen"
+  | "kneaded-eraser"
   | "highlighter"
   | "chisel-highlighter"
   | "pastel-highlighter"
@@ -151,6 +159,30 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 0.68,
     pressure: { minimum: 0.34, maximum: 0.9, exponent: 1.35 },
   },
+  "gel-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "gel-pen",
+    family: "causal-ink",
+    // Dense gel ink stays opaque at light pressure but retains a small, visible swell.
+    diameterScale: 0.74,
+    pressure: { minimum: 0.78, maximum: 1.04, exponent: 0.68 },
+  },
+  "glass-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "glass-pen",
+    family: "causal-ink",
+    // A narrow glass groove retains a readable light line and swells subtly as ink loading rises.
+    diameterScale: 0.62,
+    pressure: { minimum: 0.58, maximum: 1.02, exponent: 0.92 },
+  },
+  "ruling-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "ruling-pen",
+    family: "causal-ink",
+    // The jaw gap remains controlled while pressure can still open a visibly broader technical line.
+    diameterScale: 0.86,
+    pressure: { minimum: 0.44, maximum: 1.12, exponent: 0.78 },
+  },
   "technical-pen": {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "technical-pen",
@@ -193,6 +225,22 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1,
     pressure: IDENTITY_PRESSURE,
   },
+  "school-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "school-pen",
+    family: "gpen",
+    // A school nib is steadier than a G-pen: readable hairline floor, restrained maximum.
+    diameterScale: 0.82,
+    pressure: { minimum: 0.48, maximum: 1.08, exponent: 0.88 },
+  },
+  "maru-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "maru-pen",
+    family: "gpen",
+    // A fine manga nib starts at a true hairline and opens late under deliberate pressure.
+    diameterScale: 0.58,
+    pressure: { minimum: 0.12, maximum: 1.06, exponent: 1.32 },
+  },
   "mapping-pen": {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "mapping-pen",
@@ -221,12 +269,36 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1,
     pressure: IDENTITY_PRESSURE,
   },
+  "fountain-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "fountain-pen",
+    family: "calligraphy",
+    // Firm oblique nib: narrower than the broad calligraphy tool, without becoming monoline.
+    diameterScale: 0.72,
+    pressure: { minimum: 0.38, maximum: 1.02, exponent: 1.08 },
+  },
+  "parallel-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "parallel-pen",
+    family: "calligraphy",
+    // Broad-edge lettering needs a stable parallel band rather than brush-pen elasticity.
+    diameterScale: 1.18,
+    pressure: { minimum: 0.76, maximum: 1.04, exponent: 0.62 },
+  },
   "brush-pen": {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "brush-pen",
     family: "calligraphy",
     diameterScale: 1.25,
     pressure: { minimum: 0.1, maximum: 1.3, exponent: 1.4 },
+  },
+  "kneaded-eraser": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "kneaded-eraser",
+    family: "causal-ink",
+    // The selected 26 px footprint is slightly broadened while light contact remains controllable.
+    diameterScale: 1.16,
+    pressure: { minimum: 0.24, maximum: 0.92, exponent: 0.86 },
   },
   highlighter: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
@@ -451,6 +523,13 @@ function finiteOr(value: unknown, fallback: number): number {
 export function isStudioBrushAliasId(value: unknown): value is StudioBrushAliasId {
   return typeof value === "string"
     && Object.prototype.hasOwnProperty.call(STUDIO_BRUSH_ALIAS_PROFILES, value);
+}
+
+/** Only named eraser presets may alter the generic eraser footprint and pressure response. */
+export function isStudioBrushEraserAliasId(
+  value: unknown
+): value is Extract<StudioBrushAliasId, "kneaded-eraser"> {
+  return value === "kneaded-eraser";
 }
 
 /** Unknown/future brushes intentionally return null instead of inheriting pen semantics. */

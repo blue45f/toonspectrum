@@ -28,13 +28,13 @@ const CATALOGUE_CANDIDATES = catalogueCandidates();
 const CATALOGUE_RESULTS = auditStudioBrushCatalogueContinuity(CATALOGUE_CANDIDATES);
 
 describe("studio brush continuity audit", () => {
-  it("deterministically audits all 54 core and 160 professional brushes at three speeds", () => {
+  it("deterministically audits all 66 core and 160 professional brushes at three speeds", () => {
     const replay = auditStudioBrushCatalogueContinuity(CATALOGUE_CANDIDATES);
 
-    expect(CATALOGUE_CANDIDATES).toHaveLength(214);
+    expect(CATALOGUE_CANDIDATES).toHaveLength(226);
     expect(CATALOGUE_RESULTS).toEqual(replay);
-    expect(CATALOGUE_RESULTS).toHaveLength(214);
-    expect(new Set(CATALOGUE_RESULTS.map((result) => result.catalogId)).size).toBe(214);
+    expect(CATALOGUE_RESULTS).toHaveLength(226);
+    expect(new Set(CATALOGUE_RESULTS.map((result) => result.catalogId)).size).toBe(226);
     expect(CATALOGUE_RESULTS.every((result) => result.profiles.length === 3)).toBe(true);
     expect(CATALOGUE_RESULTS.flatMap((result) => result.profiles).every((profile) => (
       profile.markCount > 0

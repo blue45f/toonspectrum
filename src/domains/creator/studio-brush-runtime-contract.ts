@@ -7,7 +7,7 @@
  * cannot silently become a duplicate of an existing one.
  *
  * Keep this table explicit rather than generating it from the family map: reviewers should be able
- * to audit all 37 promises in one place and tests can compare the declaration with the real engine
+ * to audit every core promise in one place and tests can compare the declaration with the real engine
  * resolvers used by Canvas and SVG.
  */
 
@@ -102,22 +102,32 @@ export interface StudioBrushRuntimeContract {
   texture: StudioBrushRuntimeTexture;
   dynamics: StudioBrushRuntimeDynamics;
   distinctness: StudioBrushRuntimeDistinctness;
+  /** Omitted means ordinary paint; erase is admitted only through an explicit selectable preset. */
+  operation?: "paint" | "erase";
 }
 
 export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "unique" },
   { id: "fineliner", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "ballpoint", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
+  { id: "gel-pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
+  { id: "glass-pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
+  { id: "ruling-pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "technical-pen", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "gpen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
+  { id: "school-pen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
+  { id: "maru-pen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
   { id: "mapping-pen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
   { id: "kaburapen", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
   { id: "liner", family: "gpen", engine: "perfect-outline", engineVariant: "gpen-taper", canonicalId: "gpen", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "profile-variant" },
   { id: "ink-brush", family: "stamp", engine: "stamp-dabs", engineVariant: "ink", canonicalId: "ink-brush", preview: "solid", tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "calligraphy", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "unique" },
+  { id: "fountain-pen", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "profile-variant" },
+  { id: "parallel-pen", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "profile-variant" },
   { id: "brush-pen", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "profile-variant" },
   { id: "perfect-ink", family: "perfect", engine: "perfect-outline", engineVariant: "ink-taper", canonicalId: "perfect-ink", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
   { id: "perfect-marker", family: "perfect", engine: "perfect-outline", engineVariant: "marker-flat", canonicalId: "perfect-marker", preview: "solid", tip: "round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
+  { id: "kneaded-eraser", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "kneaded-eraser", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "unique", operation: "erase" },
   { id: "marker", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "felt-tip", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "marker-bold", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
@@ -138,13 +148,16 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "gouache", family: "watercolor", engine: "watercolor-dabs", engineVariant: "diffuse", canonicalId: "watercolor", preview: "soft", tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure", distinctness: "profile-variant" },
   { id: "oil", family: "oil", engine: "oil-ribbon", engineVariant: "bristle-lanes", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "unique" },
   { id: "acrylic", family: "oil", engine: "oil-ribbon", engineVariant: "bristle-lanes", canonicalId: "oil", preview: "oil", tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure", distinctness: "profile-variant" },
+  { id: "paint-tube", family: "oil", engine: "dynamic-dabs", engineVariant: "extruded-bead-ribbon", canonicalId: "paint-tube", preview: "oil", tip: "hard", texture: "procedural-bristle", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "airbrush", family: "airbrush", engine: "dynamic-dabs", engineVariant: "airbrush", canonicalId: "airbrush", preview: "soft", tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "hard-airbrush", family: "airbrush", engine: "dynamic-dabs", engineVariant: "connected-hard-envelope", canonicalId: "hard-airbrush", preview: "solid", tip: "hard", texture: "none", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "airbrush-fine", family: "stamp", engine: "stamp-dabs", engineVariant: "airbrush", canonicalId: "airbrush-fine", preview: "soft", tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "wash-brush", family: "stamp", engine: "stamp-dabs", engineVariant: "watercolor", canonicalId: "wash-brush", preview: "soft", tip: "stamp-wet-edge", texture: "wet-edge", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "soft-brush", family: "airbrush", engine: "dynamic-dabs", engineVariant: "soft-brush", canonicalId: "airbrush", preview: "soft", tip: "round", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "spray", family: "airbrush", engine: "dynamic-dabs", engineVariant: "spray", canonicalId: "airbrush", preview: "dots", tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "splatter", family: "airbrush", engine: "dynamic-dabs", engineVariant: "splatter", canonicalId: "airbrush", preview: "dots", tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "unique" },
+  { id: "erodible-pencil", family: "pencil", engine: "dynamic-dabs", engineVariant: "progressive-wear-ribbon", canonicalId: "erodible-pencil", preview: "texture", tip: "grain", texture: "procedural-grain", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "pencil-2b", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
   { id: "pencil-6b", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
   { id: "soft-pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
@@ -157,6 +170,7 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "pastel", canonicalId: "pastel", preview: "soft", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "oil-pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "oil-pastel", canonicalId: "pastel", preview: "soft", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "ink-particle", family: "ink-particle", engine: "dynamic-dabs", engineVariant: "ink-particle", canonicalId: "ink-particle", preview: "dots", tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "tangent-normal-brush", family: "ink-particle", engine: "dynamic-dabs", engineVariant: "direction-encoded-ribbon", canonicalId: "tangent-normal-brush", preview: "calligraphy", tip: "hard", texture: "none", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "screentone", family: "screentone", engine: "screentone-dots", engineVariant: "global-grid", canonicalId: "screentone", preview: "tone", tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid", distinctness: "unique" },
   { id: "crosshatch", family: "screentone", engine: "screentone-dots", engineVariant: "global-grid", canonicalId: "screentone", preview: "tone", tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid", distinctness: "profile-variant" },
 ] as const satisfies readonly StudioBrushRuntimeContract[];
@@ -238,6 +252,10 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     pastel: { families: ["pastel"], previews: ["soft"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "oil-pastel": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "ink-particle": { families: ["ink-particle"], previews: ["dots"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "connected-hard-envelope": { families: ["airbrush"], previews: ["solid"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
+    "progressive-wear-ribbon": { families: ["pencil"], previews: ["texture"], tip: "grain", texture: "procedural-grain", dynamics: "mapped-dabs" },
+    "extruded-bead-ribbon": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "mapped-dabs" },
+    "direction-encoded-ribbon": { families: ["ink-particle"], previews: ["calligraphy"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
   },
   "pencil-path": {
     jitter: { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
@@ -260,7 +278,7 @@ export function resolveStudioBrushRuntimeContract(
 export function studioBrushRuntimeExecutionSignature(
   contract: Pick<
     StudioBrushRuntimeContract,
-    "engine" | "engineVariant" | "tip" | "texture" | "dynamics"
+    "engine" | "engineVariant" | "tip" | "texture" | "dynamics" | "operation"
   >
 ): string {
   return [
@@ -269,6 +287,7 @@ export function studioBrushRuntimeExecutionSignature(
     contract.tip,
     contract.texture,
     contract.dynamics,
+    contract.operation ?? "paint",
   ].join(":");
 }
 
@@ -349,7 +368,11 @@ export function auditStudioBrushRuntimeCatalog(
       ));
       continue;
     }
-    const compatible = capability.families.includes(contract.family)
+    const operationCompatible =
+      (contract.operation ?? "paint") === "paint"
+      || contract.engine === "causal-ink";
+    const compatible = operationCompatible
+      && capability.families.includes(contract.family)
       && capability.previews.includes(contract.preview)
       && capability.tip === contract.tip
       && capability.texture === contract.texture

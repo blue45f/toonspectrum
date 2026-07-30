@@ -188,6 +188,7 @@ import {
   normalizeCalligraphyStylusInput,
   pressureCurvePresetId,
   pressureCurveValueForPreset,
+  resolveStudioBrushPresetDrawMode,
   strokeSampleDistanceForScale,
   type BrushPreset,
 } from "./studio-brush";
@@ -6643,7 +6644,10 @@ function StudioCuttoonEditor() {
 
   function applySavedBrush(saved: StudioSavedBrush) {
     brushBaselineController.select({ kind: "saved", brush: saved });
-    activatePrimaryCanvasTool("draw", "pen");
+    activatePrimaryCanvasTool(
+      "draw",
+      resolveStudioBrushPresetDrawMode(saved.brushId),
+    );
     setBrush(saved.brushId);
     setActiveCatalogBrush({
       id: saved.sourcePresetId ?? saved.brushId,
@@ -6697,7 +6701,7 @@ function StudioCuttoonEditor() {
       color,
     });
     brushBaselineController.select({ kind: "catalog", selection });
-    activatePrimaryCanvasTool("draw", "pen");
+    activatePrimaryCanvasTool("draw", selection.drawMode ?? "pen");
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
     setActiveCatalogBrush({
@@ -6841,7 +6845,10 @@ function StudioCuttoonEditor() {
     });
     setStrokeWidth(slot.strokeWidth);
     setBrushOpacity(slot.brushOpacity);
-    activatePrimaryCanvasTool("draw", "pen");
+    activatePrimaryCanvasTool(
+      "draw",
+      resolveStudioBrushPresetDrawMode(slot.brushId),
+    );
   }
 
   function applyDynamicsPreset(

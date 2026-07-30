@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v5" as const;
+  "studio-drawing-library-strategy-v6" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
@@ -18,6 +18,10 @@ export type StudioDrawingLibraryProductLayer =
   | "object-selection-overlay"
   | "path-quality-worker"
   | "vector-geometry"
+  | "vector-tessellation"
+  | "deterministic-raster-fallback"
+  | "filter-worker"
+  | "gpu-vector-research"
   | "quality-benchmark"
   | "scene-model";
 
@@ -25,7 +29,9 @@ export type StudioDrawingLibraryRuntimeInstallation =
   | "installed-active"
   | "installed-opt-in"
   | "installed-isolated-provider"
+  | "not-installed-poc"
   | "not-installed-benchmark-only"
+  | "not-installed-research-only"
   | "not-installed-rejected";
 
 export type StudioDrawingLibraryDecision =
@@ -38,6 +44,10 @@ export type StudioDrawingLibraryDecision =
   | "isolated-gpu-scene-overlay-provider"
   | "isolated-worker-path-quality-provider"
   | "isolated-vector-geometry-provider"
+  | "poc-vector-tessellation-provider"
+  | "poc-deterministic-raster-oracle"
+  | "benchmark-first-filter-worker-provider"
+  | "research-only-gpu-vector-provider"
   | "benchmark-oracle-only"
   | "rejected-duplicate-scene-model";
 
@@ -218,6 +228,70 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       ],
     }),
     strategy({
+      id: "lyon",
+      displayName: "Lyon",
+      packageName: "lyon",
+      license: "MIT OR Apache-2.0 OR MPL-2.0",
+      productLayer: "vector-tessellation",
+      decision: "poc-vector-tessellation-provider",
+      runtimeInstallation: "not-installed-poc",
+      maintenanceNote:
+        "Candidate Rust/WASM tessellator for Illustrator-style Art Brush and Pattern Brush path geometry; upstream stable 1.0.19 is not installed and has no product route.",
+      riskNotes: [
+        "Lyon only converts SVG-compliant fills and strokes into triangles; it is not a renderer and has no built-in antialiasing.",
+        "Adoption gate: a bounded Worker PoC must beat the existing Paper.js/CanvasKit path pipeline on long-path latency, memory and deterministic geometry receipts.",
+        "Adoption gate: first-party commands must retain Art Brush stretching, pattern side/start/end/corner tile meaning, while the selected GPU renderer owns coverage antialiasing.",
+      ],
+    }),
+    strategy({
+      id: "tiny-skia",
+      displayName: "tiny-skia",
+      packageName: "tiny-skia",
+      license: "BSD-3-Clause",
+      productLayer: "deterministic-raster-fallback",
+      decision: "poc-deterministic-raster-oracle",
+      runtimeInstallation: "not-installed-poc",
+      maintenanceNote:
+        "Candidate Rust/WASM CPU fallback and golden-image oracle; upstream stable 0.12.0 is not installed and has no product route.",
+      riskNotes: [
+        "The supported surface is CPU-only RGBA8888 and excludes GPU rendering, text, ICC profiles, advanced path operations and non-PNG codecs.",
+        "Upstream's goal of matching Skia output is not by itself a cross-browser or cross-architecture determinism guarantee.",
+        "Adoption gate: native/WASM golden hashes, alpha/blend fixtures and bounded Worker benchmarks must outperform or materially simplify the current CanvasKit/Canvas2D fallback.",
+      ],
+    }),
+    strategy({
+      id: "photon",
+      displayName: "Photon",
+      packageName: "@silvia-odwyer/photon",
+      license: "Apache-2.0",
+      productLayer: "filter-worker",
+      decision: "benchmark-first-filter-worker-provider",
+      runtimeInstallation: "not-installed-poc",
+      maintenanceNote:
+        "Candidate isolated Rust/WASM filter Worker; upstream photon-rs 0.3.3 is not installed and remains benchmark-first against the current filter graph.",
+      riskNotes: [
+        "A broad function count does not prove better quality, latency or memory than ToonSpectrum's existing WebGPU, OpenCV and image-js paths.",
+        "Adoption gate: representative large-canvas color, convolution, dithering and transform benchmarks must validate premultiplied alpha, color-space behavior and transfer-memory budgets.",
+        "Adoption gate: only deterministic pixels plus a versioned receipt may cross the Worker boundary; Photon must not own filter-stack, mask or document semantics.",
+      ],
+    }),
+    strategy({
+      id: "vello",
+      displayName: "Vello",
+      packageName: "vello",
+      license: "MIT OR Apache-2.0",
+      productLayer: "gpu-vector-research",
+      decision: "research-only-gpu-vector-provider",
+      runtimeInstallation: "not-installed-research-only",
+      maintenanceNote:
+        "GPU compute vector-rendering research candidate at upstream 0.9.0; it is not installed, not a PoC dependency and has no product route.",
+      riskNotes: [
+        "Upstream explicitly describes Vello as alpha and still lists filter effects, conflation artifacts, GPU memory allocation and glyph caching as active work.",
+        "Upstream also states that web is not a primary target and browser WebGPU implementations are incomplete.",
+        "Adoption gate: reconsider only after upstream web support is production-grade and isolated-browser quality, device-loss, memory, parity and deterministic-export fallback gates pass.",
+      ],
+    }),
+    strategy({
       id: "signature-pad",
       displayName: "Signature Pad",
       packageName: "signature_pad",
@@ -286,7 +360,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
  * libraries, while GPL/proprietary references may be useful without being product dependencies.
  */
 export const STUDIO_DRAWING_SOURCE_AUDIT_VERSION =
-  "studio-drawing-source-audit-v4" as const;
+  "studio-drawing-source-audit-v5" as const;
 
 export type StudioDrawingSourceKind =
   | "first-party"
@@ -297,6 +371,8 @@ export type StudioDrawingSourceKind =
 export type StudioDrawingSourceDisposition =
   | "adopted-active"
   | "adopted-opt-in"
+  | "candidate-poc"
+  | "research-only"
   | "reference-only"
   | "excluded";
 
@@ -305,6 +381,8 @@ export type StudioDrawingSourceCodePolicy =
   | "browser-native"
   | "runtime-import"
   | "isolated-runtime"
+  | "proof-of-concept-only"
+  | "research-only"
   | "behavioral-reference-only"
   | "excluded-from-product-code";
 
@@ -325,6 +403,7 @@ export type StudioDrawingSourceBrushAuthorityOverlap =
   | "shape-style-only"
   | "brush-renderer-overlap"
   | "path-renderer-overlap"
+  | "filter-renderer-overlap"
   | "scene-model-overlap"
   | "document-and-brush-overlap";
 
@@ -579,6 +658,66 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     brushAuthorityOverlap: "path-renderer-overlap",
     rationale:
       "Bounded PathOps and stroke-to-fill run behind a module Worker; no Embind object, pointer or Skia scene enters the document.",
+  }),
+  sourceAudit({
+    id: "lyon",
+    displayName: "Lyon",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/nical/lyon",
+    versionEvidence:
+      "crates.io stable lyon 1.0.19 audited 2026-07-30; not installed",
+    license: "MIT OR Apache-2.0 OR MPL-2.0",
+    activity: "active",
+    disposition: "candidate-poc",
+    codePolicy: "proof-of-concept-only",
+    brushAuthorityOverlap: "geometry-only",
+    rationale:
+      "Official upstream defines Lyon as SVG-compliant fill/stroke tessellation into GPU-ready triangles, not a renderer, and notes that antialiasing is not built in. A Worker PoC may target Art/Pattern Brush geometry only after deterministic receipts, memory/latency benchmarks and a first-party semantic-command boundary pass.",
+  }),
+  sourceAudit({
+    id: "tiny-skia",
+    displayName: "tiny-skia",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/linebender/tiny-skia",
+    versionEvidence:
+      "crates.io stable tiny-skia 0.12.0 audited 2026-07-30; not installed",
+    license: "BSD-3-Clause",
+    activity: "active",
+    disposition: "candidate-poc",
+    codePolicy: "proof-of-concept-only",
+    brushAuthorityOverlap: "path-renderer-overlap",
+    rationale:
+      "Its official CPU-only RGBA8888 Skia subset can be evaluated as a deterministic fallback and golden oracle, but native/WASM hash parity, alpha/blend fixtures and Worker benchmarks must pass before adoption; it cannot supply GPU, text, ICC or advanced PathOps.",
+  }),
+  sourceAudit({
+    id: "photon",
+    displayName: "Photon",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/silvia-odwyer/photon",
+    versionEvidence:
+      "crates.io stable photon-rs 0.3.3 audited 2026-07-30; not installed",
+    license: "Apache-2.0",
+    activity: "active",
+    disposition: "candidate-poc",
+    codePolicy: "proof-of-concept-only",
+    brushAuthorityOverlap: "filter-renderer-overlap",
+    rationale:
+      "Official upstream provides Rust/WebAssembly image processing, but an isolated Worker benchmark must prove quality, alpha/color correctness, large-canvas latency and bounded memory against existing WebGPU/OpenCV/image-js routes before any filter provider is installed.",
+  }),
+  sourceAudit({
+    id: "vello",
+    displayName: "Vello",
+    sourceKind: "open-source",
+    officialSource: "https://github.com/linebender/vello",
+    versionEvidence:
+      "crates.io stable vello 0.9.0 audited 2026-07-30; not installed",
+    license: "MIT OR Apache-2.0",
+    activity: "young-fast-moving",
+    disposition: "research-only",
+    codePolicy: "research-only",
+    brushAuthorityOverlap: "path-renderer-overlap",
+    rationale:
+      "Official upstream calls Vello alpha, lists unfinished filters/artifact handling/GPU allocation/glyph caching, and says web is not a primary target with incomplete WebGPU implementations. It remains research-only until production web support plus browser parity, device-loss, memory and deterministic-export fallback gates pass.",
   }),
   sourceAudit({
     id: "wacom-will",

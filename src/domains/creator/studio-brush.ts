@@ -15,6 +15,10 @@ export interface BrushPreset {
   defaultOpacity: number;
   /** Catalogue preview suggestion only; switching tools preserves the artist's active color. */
   defaultColor?: string;
+  /** Locale-independent discovery terms that remain separate from the displayed product name. */
+  searchAliases?: readonly string[];
+  /** A stable preset may select the existing non-destructive eraser tool instead of paint. */
+  drawMode?: "pen" | "eraser";
 }
 
 /**
@@ -49,8 +53,13 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   pen: "pen",
   fineliner: "pen",
   ballpoint: "pen",
+  "gel-pen": "pen",
+  "glass-pen": "pen",
+  "ruling-pen": "pen",
   "technical-pen": "pen",
   gpen: "gpen",
+  "school-pen": "gpen",
+  "maru-pen": "gpen",
   liner: "gpen",
   "mapping-pen": "gpen",
   kaburapen: "gpen",
@@ -59,7 +68,10 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "pencil-grain": "stamp",
   "wash-brush": "stamp",
   calligraphy: "calligraphy",
+  "fountain-pen": "calligraphy",
+  "parallel-pen": "calligraphy",
   "brush-pen": "calligraphy",
+  "kneaded-eraser": "pen",
   // perfect-freehand(tldraw) 아웃라인 폴리곤 렌더 — studio-perfect-freehand.ts 어댑터가 그린다.
   "perfect-ink": "perfect",
   "perfect-marker": "perfect",
@@ -83,10 +95,13 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   gouache: "watercolor",
   oil: "oil",
   acrylic: "oil",
+  "paint-tube": "oil",
   pastel: "pastel",
   "oil-pastel": "pastel",
   "ink-particle": "ink-particle",
+  "tangent-normal-brush": "ink-particle",
   airbrush: "airbrush",
+  "hard-airbrush": "airbrush",
   spray: "airbrush",
   splatter: "airbrush",
   "soft-brush": "airbrush",
@@ -95,6 +110,7 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   chalk: "dry-media",
   charcoal: "dry-media",
   pencil: "pencil",
+  "erodible-pencil": "pencil",
   "soft-pencil": "pencil",
   "pencil-2b": "pencil",
   "pencil-6b": "pencil",
@@ -117,16 +133,74 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
   { id: "fineliner", name: "파인라이너", defaultWidth: 2.2, defaultOpacity: 1.0 },
   { id: "ballpoint", name: "볼펜", defaultWidth: 3.5, defaultOpacity: 0.95 },
+  {
+    id: "gel-pen",
+    name: "젤펜(선명)",
+    defaultWidth: 3.8,
+    defaultOpacity: 1,
+    searchAliases: ["젤 펜", "중성펜", "gel pen", "gel ink pen"],
+  },
+  {
+    id: "glass-pen",
+    name: "유리펜(잉크 흐름)",
+    defaultWidth: 3.1,
+    defaultOpacity: 0.92,
+    searchAliases: ["글라스 펜", "유리 딥펜", "glass pen", "glass dip pen"],
+  },
+  {
+    id: "ruling-pen",
+    name: "룰링펜(잉크 간격)",
+    defaultWidth: 4.6,
+    defaultOpacity: 0.98,
+    searchAliases: ["룰링 펜", "선긋기 펜", "ruling pen", "technical ruling pen"],
+  },
   { id: "technical-pen", name: "제도 펜", defaultWidth: 2.5, defaultOpacity: 1.0 },
   { id: "gpen", name: "G펜(필압)", defaultWidth: 7, defaultOpacity: 1.0 },
+  {
+    id: "school-pen",
+    name: "스쿨펜(안정 선화)",
+    defaultWidth: 4.2,
+    defaultOpacity: 1,
+    searchAliases: ["스쿨 펜", "학생 펜", "school pen", "school nib"],
+  },
+  {
+    id: "maru-pen",
+    name: "마루펜(세필 탄성)",
+    defaultWidth: 2.4,
+    defaultOpacity: 1,
+    searchAliases: ["마루 펜", "둥근 펜촉", "maru pen", "round manga nib"],
+  },
   { id: "mapping-pen", name: "매핑 펜(세밀원고)", defaultWidth: 3.2, defaultOpacity: 1.0 },
   { id: "kaburapen", name: "스푼 펜(스무스)", defaultWidth: 5.5, defaultOpacity: 1.0 },
   { id: "liner", name: "잉크 라이너", defaultWidth: 5, defaultOpacity: 1.0 },
   { id: "ink-brush", name: "잉크 붓(속도)", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "calligraphy", name: "캘리그래피(펜 기울기)", defaultWidth: 12, defaultOpacity: 1.0 },
+  {
+    id: "fountain-pen",
+    name: "만년필(사선 촉)",
+    defaultWidth: 6.5,
+    defaultOpacity: 1,
+    searchAliases: ["만년필 펜", "잉크 만년필", "fountain pen", "fountain nib"],
+  },
+  {
+    id: "parallel-pen",
+    name: "평행펜(넓은 촉)",
+    defaultWidth: 18,
+    defaultOpacity: 0.98,
+    searchAliases: ["패럴렐 펜", "평행 촉", "parallel pen", "parallel calligraphy nib"],
+  },
   { id: "brush-pen", name: "모필 붓펜", defaultWidth: 9, defaultOpacity: 1.0 },
   { id: "perfect-ink", name: "캘리 잉크펜(퍼펙트)", defaultWidth: 9, defaultOpacity: 1.0 },
   { id: "perfect-marker", name: "마커 펜(퍼펙트)", defaultWidth: 14, defaultOpacity: 1.0 },
+  {
+    id: "kneaded-eraser",
+    name: "떡지우개(저농도)",
+    defaultWidth: 26,
+    defaultOpacity: 0.38,
+    defaultColor: "#b7ada0",
+    searchAliases: ["말랑 지우개", "찰흙 지우개", "kneaded eraser", "putty eraser"],
+    drawMode: "eraser",
+  },
   // —— Markers (Canva Draw / Express / Picsart / CSP) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
   { id: "felt-tip", name: "펠트펜", defaultWidth: 10, defaultOpacity: 0.85 },
@@ -150,7 +224,21 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "gouache", name: "과슈 붓", defaultWidth: 24, defaultOpacity: 0.88 },
   { id: "oil", name: "유화 붓", defaultWidth: 22, defaultOpacity: 0.92 },
   { id: "acrylic", name: "아크릴 물감", defaultWidth: 20, defaultOpacity: 0.95 },
+  {
+    id: "paint-tube",
+    name: "튜브 물감(압출 릴리프)",
+    defaultWidth: 30,
+    defaultOpacity: 0.96,
+    searchAliases: ["물감 튜브", "3D 튜브", "paint tube", "3d tube brush"],
+  },
   { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
+  {
+    id: "hard-airbrush",
+    name: "하드 에어브러시",
+    defaultWidth: 28,
+    defaultOpacity: 0.76,
+    searchAliases: ["경질 에어브러시", "하드 라운드 분사", "hard airbrush", "hard round airbrush"],
+  },
   { id: "airbrush-fine", name: "정밀 에어브러시", defaultWidth: 34, defaultOpacity: 0.85 },
   { id: "wash-brush", name: "물맛 붓(웻엣지)", defaultWidth: 26, defaultOpacity: 0.8 },
   { id: "soft-brush", name: "소프트 브러시", defaultWidth: 36, defaultOpacity: 0.55 },
@@ -158,6 +246,13 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "splatter", name: "스플래터(흩뿌리기)", defaultWidth: 45, defaultOpacity: 0.65 },
   // —— Texture / dry media ——
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
+  {
+    id: "erodible-pencil",
+    name: "마모 연필(닳는 심)",
+    defaultWidth: 7,
+    defaultOpacity: 0.84,
+    searchAliases: ["닳는 연필", "마모 촉", "erodible pencil", "erodible tip"],
+  },
   { id: "pencil-2b", name: "2B 드로잉 연필", defaultWidth: 3.5, defaultOpacity: 0.88 },
   { id: "pencil-6b", name: "6B 흑연 연필", defaultWidth: 6, defaultOpacity: 0.9 },
   { id: "soft-pencil", name: "소프트 연필", defaultWidth: 5, defaultOpacity: 0.7 },
@@ -170,9 +265,27 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "pastel", name: "파스텔", defaultWidth: 20, defaultOpacity: 0.72 },
   { id: "oil-pastel", name: "오일 파스텔", defaultWidth: 18, defaultOpacity: 0.85 },
   { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
+  {
+    id: "tangent-normal-brush",
+    name: "탄젠트 노멀 브러시",
+    defaultWidth: 20,
+    defaultOpacity: 1,
+    searchAliases: ["노멀 맵 브러시", "법선 페인트", "tangent normal brush", "normal map brush"],
+  },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
   { id: "crosshatch", name: "크로스 해치(사선)", defaultWidth: 20, defaultOpacity: 0.9 },
 ];
+
+/**
+ * Rehydrates the tool operation from a persistence-safe core id. Legacy and unknown ids keep the
+ * historical paint behavior; only a preset that explicitly owns eraser semantics may switch it.
+ */
+export function resolveStudioBrushPresetDrawMode(
+  brushId: unknown
+): "pen" | "eraser" {
+  if (typeof brushId !== "string") return "pen";
+  return BRUSH_PRESETS.find((preset) => preset.id === brushId)?.drawMode ?? "pen";
+}
 
 /** Canva/PicsArt-style quick size chips (screen px brush width). */
 export const STUDIO_BRUSH_SIZE_CHIPS = [

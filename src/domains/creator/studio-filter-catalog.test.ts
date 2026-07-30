@@ -16,7 +16,7 @@ describe("studio filter catalog", () => {
   it("covers every smart-filter engine and the deterministic union wave exactly once", () => {
     const catalogIds = STUDIO_FILTER_CATALOG.map((entry) => entry.engine);
     expect(new Set(catalogIds).size).toBe(catalogIds.length);
-    expect(catalogIds.length).toBeGreaterThanOrEqual(64);
+    expect(catalogIds.length).toBeGreaterThanOrEqual(76);
     expect([...catalogIds].sort()).toEqual(
       [...STUDIO_ADJUSTMENT_ENGINE_IDS, ...STUDIO_FILTER_UNION_WAVE_KINDS].sort(),
     );
@@ -44,6 +44,28 @@ describe("studio filter catalog", () => {
       .toEqual(["color-halftone"]);
     expect(searchStudioFilterCatalog("어안").map((entry) => entry.engine)).toEqual(["fisheye"]);
     expect(searchStudioFilterCatalog("복사기 먹선").map((entry) => entry.engine)).toEqual(["photocopy"]);
+    expect(searchStudioFilterCatalog("스캔 선화 정리").map((entry) => entry.engine))
+      .toContain("line-cleanup");
+    expect(searchStudioFilterCatalog("망점 제거").map((entry) => entry.engine))
+      .toEqual(["screentone-removal"]);
+    expect(searchStudioFilterCatalog("deblock").map((entry) => entry.engine))
+      .toEqual(["jpeg-artifact-reduction"]);
+    expect(searchStudioFilterCatalog("색 경계 노이즈").map((entry) => entry.engine))
+      .toContain("edge-aware-denoise");
+    expect(searchStudioFilterCatalog("보케 조리개").map((entry) => entry.engine))
+      .toEqual(["lens-blur"]);
+    expect(searchStudioFilterCatalog("미니어처 초점 띠").map((entry) => entry.engine))
+      .toEqual(["tilt-shift-blur"]);
+    expect(searchStudioFilterCatalog("경계 보호 평활").map((entry) => entry.engine))
+      .toEqual(["selective-gaussian-blur"]);
+    expect(searchStudioFilterCatalog("반복 소재 이음매").map((entry) => entry.engine))
+      .toEqual(["tileable-blur"]);
+    expect(searchStudioFilterCatalog("스캔 복원 결함").map((entry) => entry.engine))
+      .toEqual(["dust-scratches"]);
+    expect(searchStudioFilterCatalog("dog 윤곽 추출").map((entry) => entry.engine))
+      .toEqual(["difference-of-gaussians"]);
+    expect(searchStudioFilterCatalog("paper removal").map((entry) => entry.engine))
+      .toEqual(["color-to-alpha"]);
     expect(searchStudioFilterCatalog("노멀 맵").map((entry) => entry.engine)).toEqual(["normal-map"]);
   });
 
@@ -57,7 +79,7 @@ describe("studio filter catalog", () => {
 
     expect(new Set(kinds).size).toBe(kinds.length);
     expect([...kinds].sort()).toEqual([...STUDIO_FILTER_MENU_KINDS].sort());
-    expect(kinds.length).toBeGreaterThanOrEqual(36);
+    expect(kinds.length).toBeGreaterThanOrEqual(44);
   });
 
   it("searches dialog aliases and synthetic filter metadata without a network dependency", () => {
@@ -69,6 +91,12 @@ describe("studio filter catalog", () => {
       .toEqual(["scanline"]);
     expect(searchStudioFilterDialogCatalog("투톤").map((entry) => entry.kind))
       .toEqual(["duotone"]);
+    expect(searchStudioFilterDialogCatalog("스케치 정리").map((entry) => entry.kind))
+      .toEqual(["line-cleanup"]);
+    expect(searchStudioFilterDialogCatalog("링잉 제거").map((entry) => entry.kind))
+      .toEqual(["jpeg-artifact-reduction"]);
+    expect(searchStudioFilterDialogCatalog("아이리스 초점").map((entry) => entry.kind))
+      .toEqual(["field-iris-blur"]);
   });
 
   it("builds deterministic copyright-free CSS previews for every dialog filter", () => {

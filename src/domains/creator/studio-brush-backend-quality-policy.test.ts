@@ -129,12 +129,12 @@ describe("studio brush backend integration audit", () => {
 });
 
 describe("studio brush backend quality classification", () => {
-  it("classifies all 54 core brushes exactly once and keeps dry/wet media off causal ink", () => {
+  it("classifies all 66 core brushes exactly once and keeps dry/wet media off causal ink", () => {
     const presetIds = BRUSH_PRESETS.map(({ id }) => id).sort();
     const routeIds = Object.keys(STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES).sort();
     const runtimeIds = STUDIO_BRUSH_RUNTIME_CONTRACT.map(({ id }) => id).sort();
 
-    expect(presetIds).toHaveLength(54);
+    expect(presetIds).toHaveLength(66);
     expect(routeIds).toEqual(presetIds);
     expect(runtimeIds).toEqual(presetIds);
 
@@ -186,11 +186,24 @@ describe("studio brush backend quality classification", () => {
       status: "rejected",
       reason: "identity-mismatch",
     });
+
+    for (const [catalogId, routeProfile, family] of [
+      ["bristle-round-loaded", "wet-specialist", "wet-media"],
+      ["bristle-fan-dry", "dry-specialist", "dry-media"],
+      ["bristle-flat-streak", "wet-specialist", "wet-media"],
+      ["oil-filbert", "wet-specialist", "wet-media"],
+      ["palette-knife-edge", "wet-specialist", "wet-media"],
+    ] as const) {
+      expect(classifyStudioBrushBackendQuality({ catalogId })).toMatchObject({
+        status: "classified",
+        identity: { catalogId, routeProfile, family },
+      });
+    }
   });
 
-  it("covers the complete 214-brush shelf without duplicate or unclassified ids", () => {
+  it("covers the complete 226-brush shelf without duplicate or unclassified ids", () => {
     const ids = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id);
-    expect(ids).toHaveLength(214);
+    expect(ids).toHaveLength(226);
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const { id, source } of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
@@ -287,7 +300,7 @@ describe("studio brush material backend policy", () => {
 
 describe("Hokusai .myb provider admission", () => {
   it("pins the v2 packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
-    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(4);
+    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(5);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(3);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY).toMatchObject({
       policyVersion: 3,

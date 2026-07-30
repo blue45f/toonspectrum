@@ -24,6 +24,7 @@ import {
 } from "./studio-brush";
 import {
   applyStudioBrushAliasWatercolorMaterial,
+  isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
   mapStudioBrushAliasPressureSamples,
   resolveStudioBrushAliasPencilPasses,
@@ -579,14 +580,16 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
+          const aliasProfileEnabled =
+            el.mode !== "eraser" || isStudioBrushEraserAliasId(brush);
           const isPerfectAliasBrush = brush.startsWith("perfect-");
           const pixelPencil = isStudioPixelPencilRenderMode(brush);
-          const aliasStrokeWidth = el.mode === "eraser"
-            ? strokeWidth
-            : studioBrushAliasEffectiveDiameter(brush, strokeWidth);
-          const aliasPencilPasses = el.mode === "eraser"
-            ? []
-            : resolveStudioBrushAliasPencilPasses(brush);
+          const aliasStrokeWidth = aliasProfileEnabled
+            ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
+            : strokeWidth;
+          const aliasPencilPasses = aliasProfileEnabled
+            ? resolveStudioBrushAliasPencilPasses(brush)
+            : [];
           const stampKind = stampBrushKind;
           const dynamicBrush = dynamicBrushId !== null;
           // Legacy documents predate the explicit causal-walker marker, but their four stamp
@@ -844,9 +847,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             && !isPerfectAliasBrush
           ) {
             const sourcePressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
-            const pressure = el.mode === "eraser"
-              ? sourcePressure
-              : mapStudioBrushAliasPressure(brush, sourcePressure, 0.5);
+            const pressure = aliasProfileEnabled
+              ? mapStudioBrushAliasPressure(brush, sourcePressure, 0.5)
+              : sourcePressure;
             const retainedPressureProfile =
               resolveStudioRetainedMediaPressureProfileId(brush);
             const retainedPressure = retainedPressureProfile
@@ -2159,14 +2162,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
           const smoothed = renderPath.points;
           const pressures = el.pressures;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
-            const aliasPressures = el.mode === "eraser"
-              ? pressures
-              : mapStudioBrushAliasPressureSamples(
+            const aliasPressures = aliasProfileEnabled
+              ? mapStudioBrushAliasPressureSamples(
                   brush,
                   pressures,
                   Math.floor(points.length / 2),
                   0.5,
-                );
+                )
+              : pressures;
             const sampledPressures = resampleStrokePressures(
               aliasPressures,
               Math.floor(smoothed.length / 2),

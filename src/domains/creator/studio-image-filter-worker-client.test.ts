@@ -66,7 +66,7 @@ class ApplyingWorker implements StudioImageFilterWorkerLike {
     const received = structuredClone(message, { transfer });
     queueMicrotask(() => {
       if (this.terminateCount > 0) return;
-      const { filters, attrs } = buildImageFilters(received.request.el, testRegistry);
+      const { filters, attrs } = buildImageFilters(received.request.el, testRegistry, "worker");
       applyImageFilters(received.request.imageData, filters, attrs);
       const response: StudioImageFilterWorkerSuccessMessage = {
         type: "studio-image-filter/success",
@@ -146,7 +146,7 @@ class LoadErrorWorker extends HangingWorker {
 class ImmediateApplyingWorker extends HangingWorker {
   override postMessage(message: StudioImageFilterWorkerRunMessage, transfer: Transferable[]): void {
     const received = structuredClone(message, { transfer });
-    const { filters, attrs } = buildImageFilters(received.request.el, testRegistry);
+    const { filters, attrs } = buildImageFilters(received.request.el, testRegistry, "worker");
     applyImageFilters(received.request.imageData, filters, attrs);
     this.onmessage?.({
       data: {
@@ -249,7 +249,7 @@ class ResidentApplyingWorker implements StudioImageFilterWorkerLike {
         height: source.height,
         width: source.width,
       };
-      const { filters, attrs } = buildImageFilters(received.el, testRegistry);
+      const { filters, attrs } = buildImageFilters(received.el, testRegistry, "worker");
       applyImageFilters(imageData, filters, attrs);
       const response: StudioImageFilterWorkerSourceSuccessMessage = {
         type: "studio-image-filter/source-success",
@@ -333,6 +333,77 @@ describe("runStudioImageFilterWorker", () => {
 
     expect(output.execution).toBe("direct");
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+  });
+
+  it.each([
+    ["worker unavailable", null],
+    ["worker postMessage failure", () => new ThrowingPostWorker()],
+  ] as const)("%s never surprise-blocks the main thread for an expensive advanced blur", async (
+    _label,
+    workerFactory,
+  ) => {
+    const width = 50_000;
+    const request: StudioImageFilterWorkerRunRequest = {
+      imageData: makeImageData(width, 1),
+      el: {
+        lensBlur: {
+          radius: 4,
+          sampleCount: 21,
+          apertureBlades: 6,
+          apertureRotationRadians: 0,
+        },
+      },
+    };
+
+    await expect(runStudioImageFilterWorker(request, { workerFactory }))
+      .rejects.toMatchObject({
+        name: "StudioAdvancedBlurWorkerRequiredError",
+        code: "STUDIO_ADVANCED_BLUR_WORKER_REQUIRED",
+      });
+  });
+
+  it.each([
+    ["worker unavailable", null],
+    ["worker postMessage failure", () => new ThrowingPostWorker()],
+  ] as const)("%s never surprise-blocks the main thread for an expensive professional filter", async (
+    _label,
+    workerFactory,
+  ) => {
+    const width = 120_000;
+    const request: StudioImageFilterWorkerRunRequest = {
+      imageData: makeImageData(width, 1),
+      el: {
+        dustScratches: { radius: 2, threshold: 24, strength: 1 },
+      },
+    };
+
+    await expect(runStudioImageFilterWorker(request, { workerFactory }))
+      .rejects.toMatchObject({
+        name: "StudioProfessionalFilterWorkerRequiredError",
+        code: "STUDIO_PROFESSIONAL_FILTER_WORKER_REQUIRED",
+      });
+  });
+
+  it.each([
+    ["worker unavailable", null],
+    ["worker postMessage failure", () => new ThrowingPostWorker()],
+  ] as const)("%s never surprise-blocks the main thread for expensive tone cleanup", async (
+    _label,
+    workerFactory,
+  ) => {
+    const width = 400_000;
+    const request: StudioImageFilterWorkerRunRequest = {
+      imageData: makeImageData(width, 1),
+      el: {
+        screentoneRemoval: { radius: 2, strength: 1, inkLumaThreshold: 72 },
+      },
+    };
+
+    await expect(runStudioImageFilterWorker(request, { workerFactory }))
+      .rejects.toMatchObject({
+        name: "StudioToneArtifactWorkerRequiredError",
+        code: "STUDIO_TONE_ARTIFACT_WORKER_REQUIRED",
+      });
   });
 
   it("projects an element-shaped source before direct execution and reads each filter field once", async () => {
@@ -467,6 +538,54 @@ describe("runStudioImageFilterWorker", () => {
       pixelOffset: { x: 2, y: -1, edge: "wrap" },
       convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
       clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
+      lineCleanup: { threshold: 0.6, strength: 0.5 },
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+      lensBlur: {
+        radius: 4,
+        sampleCount: 21,
+        apertureBlades: 6,
+        apertureRotationRadians: 0,
+      },
+      fieldIrisBlur: {
+        focusCenterX: 0.5,
+        focusCenterY: 0.5,
+        focusRadius: 0.16,
+        feather: 0.24,
+        maximumBlurRadius: 7,
+        sampleCount: 21,
+        apertureBlades: 8,
+      },
+      tiltShiftBlur: {
+        axisRadians: 0,
+        focusWidth: 0.2,
+        feather: 0.22,
+        maximumBlurRadius: 7,
+        sampleCount: 19,
+      },
+      selectiveGaussianBlur: {
+        radius: 3,
+        spatialSigma: 2,
+        edgeThreshold: 20,
+        edgeSoftness: 0.35,
+      },
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 0.8 },
+      dustScratches: { radius: 2, threshold: 24, strength: 0.9 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 12,
+      },
+      colorToAlpha: { keyColor: "#ffffff", strength: 85 },
       filterUnionWave: {
         kind: "wave-warp",
         amount: 42,
@@ -508,6 +627,54 @@ describe("runStudioImageFilterWorker", () => {
       pixelOffset: { x: 2, y: -1, edge: "wrap" },
       convolution: { kernel: [0, -1, 0, -1, 5, -1, 0, -1, 0], divisor: 1, bias: 0 },
       clouds: { amount: 0.2, scale: 64, seed: 42, mode: "overlay" },
+      lineCleanup: { threshold: 0.6, strength: 0.5 },
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+      lensBlur: {
+        radius: 4,
+        sampleCount: 21,
+        apertureBlades: 6,
+        apertureRotationRadians: 0,
+      },
+      fieldIrisBlur: {
+        focusCenterX: 0.5,
+        focusCenterY: 0.5,
+        focusRadius: 0.16,
+        feather: 0.24,
+        maximumBlurRadius: 7,
+        sampleCount: 21,
+        apertureBlades: 8,
+      },
+      tiltShiftBlur: {
+        axisRadians: 0,
+        focusWidth: 0.2,
+        feather: 0.22,
+        maximumBlurRadius: 7,
+        sampleCount: 19,
+      },
+      selectiveGaussianBlur: {
+        radius: 3,
+        spatialSigma: 2,
+        edgeThreshold: 20,
+        edgeSoftness: 0.35,
+      },
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 0.8 },
+      dustScratches: { radius: 2, threshold: 24, strength: 0.9 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 12,
+      },
+      colorToAlpha: { keyColor: "#ffffff", strength: 85 },
       filterUnionWave: {
         kind: "wave-warp",
         amount: 42,
@@ -528,6 +695,10 @@ describe("runStudioImageFilterWorker", () => {
         version: 1,
         entries: [
           { id: "spin", engine: "spin-blur", enabled: true, params: { radius: 12, strength: 70 } },
+          { id: "lens-a", engine: "lens-blur", enabled: true, params: { radius: 4, sampleCount: 17 } },
+          { id: "lens-b", engine: "lens-blur", enabled: true, params: { radius: 7, sampleCount: 23 } },
+          { id: "tile-a", engine: "tileable-blur", enabled: true, params: { radius: 3, sigma: 1.4, strength: 0.8 } },
+          { id: "tile-b", engine: "tileable-blur", enabled: true, params: { radius: 5, sigma: 2.2, strength: 0.6 } },
           { id: "mosaic", engine: "pixelate", enabled: true, params: { size: 6 } },
           { id: "lines", engine: "line-extraction", enabled: false, params: {} },
           { id: "halftone", engine: "color-halftone", enabled: true, params: { mode: "cmyk", dotSize: 4, strength: 80 } },
@@ -542,7 +713,15 @@ describe("runStudioImageFilterWorker", () => {
     expect(output.execution).toBe("worker");
     expect(worker.postedEl?.smartFilters).toBeUndefined();
     expect(worker.postedEl?.smartFilterOperations?.map((entry) => entry.engine))
-      .toEqual(["spin-blur", "pixelate", "color-halftone"]);
+      .toEqual([
+        "spin-blur",
+        "lens-blur",
+        "lens-blur",
+        "tileable-blur",
+        "tileable-blur",
+        "pixelate",
+        "color-halftone",
+      ]);
   });
 
   it("falls back to direct execution when postMessage throws synchronously", async () => {

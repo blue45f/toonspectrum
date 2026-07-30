@@ -77,6 +77,10 @@ const CUSTOM = [
   "PixelOffset",
   "Convolution",
   "Clouds",
+  "ColorToAlpha",
+  "DifferenceOfGaussians",
+  "DustScratches",
+  "TileableBlur",
 ] as const;
 
 describe("registerStudioKonvaFilters", () => {
@@ -420,6 +424,86 @@ describe("buildImageFilters", () => {
       .toBeLessThan(filters.indexOf(konva.Filters.Clouds as never));
   });
 
+  it("톤·압축 노이즈 정리 3종을 원자적 입력 컨디셔닝 순서와 정규화 attrs로 빌드한다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const { filters, attrs } = buildImageFilters({
+      lineCleanup: { threshold: 0.64, strength: 0.45 },
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+    }, konva);
+    expect(attrs).toMatchObject({
+      jpegDeblockStrength: 0.72,
+      jpegDeringStrength: 0.45,
+      jpegBoundaryThreshold: 6,
+      jpegProtectedEdgeThreshold: 88,
+      jpegRingingThreshold: 18,
+      jpegInkThreshold: 64,
+      toneRemovalRadius: 2,
+      toneRemovalStrength: 0.88,
+      toneRemovalInkThreshold: 72,
+      edgeDenoiseRadius: 1,
+      edgeDenoiseStrength: 0.78,
+      edgeDenoiseRangeThreshold: 72,
+      lineCleanupThreshold: 0.64,
+      lineCleanupStrength: 0.45,
+    });
+    expect(filters.indexOf(konva.Filters.JpegArtifactReduction as never))
+      .toBeLessThan(filters.indexOf(konva.Filters.ScreentoneRemoval as never));
+    expect(filters.indexOf(konva.Filters.ScreentoneRemoval as never))
+      .toBeLessThan(filters.indexOf(konva.Filters.EdgeAwareDenoise as never));
+    expect(filters.indexOf(konva.Filters.EdgeAwareDenoise as never))
+      .toBeLessThan(filters.indexOf(konva.Filters.LineCleanup as never));
+  });
+
+  it("전문 필터 4종을 보존된 순서와 Worker 실행 표식으로 빌드한다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const { filters, attrs } = buildImageFilters({
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 0.8 },
+      dustScratches: { radius: 2, threshold: 24, strength: 0.9 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 12,
+      },
+      colorToAlpha: { keyColor: "#ffffff", strength: 85 },
+    }, konva, "worker");
+
+    expect(attrs).toMatchObject({
+      professionalFilterExecution: "worker",
+      tileableBlurRadius: 5,
+      tileableBlurSigma: 2.2,
+      tileableBlurStrength: 0.8,
+      dustScratchRadius: 2,
+      dustScratchThreshold: 24,
+      dustScratchStrength: 0.9,
+      dogSmallSigma: 0.8,
+      dogLargeSigma: 2,
+      dogThreshold: 1.5,
+      dogStrength: 12,
+      ctaColor: "#ffffff",
+      ctaStrength: 85,
+    });
+    const ordered = [
+      konva.Filters.TileableBlur,
+      konva.Filters.DustScratches,
+      konva.Filters.DifferenceOfGaussians,
+      konva.Filters.ColorToAlpha,
+    ].map((filter) => filters.indexOf(filter as never));
+    expect(ordered.every((index) => index >= 0)).toBe(true);
+    expect(ordered).toEqual([...ordered].sort((left, right) => left - right));
+  });
+
   it("신규 항등 객체는 필터 모듈과 캐시를 활성화하지 않는다", () => {
     const konva = fakeKonva();
     registerStudioKonvaFilters(konva);
@@ -430,6 +514,25 @@ describe("buildImageFilters", () => {
       pixelOffset: { x: 0, y: 0, edge: "wrap" },
       convolution: { kernel: [0, 0, 0, 0, 1, 0, 0, 0, 0], divisor: 1, bias: 0 },
       clouds: { amount: 0, scale: 96, seed: 42, mode: "overlay" },
+      screentoneRemoval: { radius: 2, strength: 0, inkLumaThreshold: 72 },
+      jpegArtifactReduction: {
+        deblockStrength: 0,
+        deringStrength: 0,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+      edgeAwareDenoise: { radius: 1, strength: 0, rangeThreshold: 72 },
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 0 },
+      dustScratches: { radius: 2, threshold: 24, strength: 0 },
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 0,
+      },
+      colorToAlpha: { keyColor: "#ffffff", strength: 0 },
     };
     expect(hasActiveImageFilters(identity)).toBe(false);
     expect(hasLightweightActiveImageFilters(identity)).toBe(false);
@@ -516,6 +619,10 @@ describe("buildImageFilters", () => {
       "solarize",
       "oil-paint",
       "smart-sharpen",
+      "color-to-alpha",
+      "difference-of-gaussians",
+      "dust-scratches",
+      "tileable-blur",
     ] as const satisfies readonly StudioAdjustmentEngineId[];
     const source = patternedImage();
     const sourceRgb = Array.from(source.data).filter((_, index) => index % 4 !== 3);
@@ -541,8 +648,13 @@ describe("buildImageFilters", () => {
       applyImageFilters(image, filters, attrs);
       const rgb = Array.from(image.data).filter((_, index) => index % 4 !== 3);
       expect(rgb, engine).not.toEqual(sourceRgb);
-      expect(Array.from(image.data).filter((_, index) => index % 4 === 3), engine)
-        .toEqual(Array.from({ length: source.width * source.height }, () => 173));
+      const alpha = Array.from(image.data).filter((_, index) => index % 4 === 3);
+      if (engine === "color-to-alpha") {
+        expect(alpha.some((value) => value !== 173), engine).toBe(true);
+      } else {
+        expect(alpha, engine)
+          .toEqual(Array.from({ length: source.width * source.height }, () => 173));
+      }
       signatures.set(engine, rgb.join(","));
     }
 
@@ -593,6 +705,55 @@ describe("hasActiveImageFilters", () => {
         entries: [{ id: "invert", engine: "invert", enabled: true, params: {} }],
       },
     })).toBe(true);
+    expect(hasActiveImageFilters({
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      lensBlur: {
+        radius: 4,
+        sampleCount: 21,
+        apertureBlades: 6,
+        apertureRotationRadians: 0,
+      },
+    })).toBe(true);
+    expect(hasLightweightActiveImageFilters({
+      selectiveGaussianBlur: {
+        radius: 3,
+        spatialSigma: 2,
+        edgeThreshold: 20,
+        edgeSoftness: 0.35,
+      },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      tileableBlur: { radius: 5, sigma: 2.2, strength: 0.8 },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      dustScratches: { radius: 2, threshold: 24, strength: 0.9 },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      differenceOfGaussians: {
+        smallSigma: 0.8,
+        largeSigma: 2,
+        threshold: 1.5,
+        strength: 12,
+      },
+    })).toBe(true);
+    expect(hasActiveImageFilters({
+      colorToAlpha: { keyColor: "#ffffff", strength: 85 },
+    })).toBe(true);
   });
 
   it("보정 없음 또는 0/false면 false", () => {
@@ -635,6 +796,13 @@ describe("hasActiveImageFilters", () => {
       "posterize",
       "ink-threshold",
       "line-extraction",
+      "screentone-removal",
+      "jpeg-artifact-reduction",
+      "edge-aware-denoise",
+      "lens-blur",
+      "field-iris-blur",
+      "tilt-shift-blur",
+      "selective-gaussian-blur",
       "screentone",
       "color-halftone",
       "chromatic-aberration",
@@ -671,6 +839,34 @@ describe("imageFilterCacheKey", () => {
     expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
       ...base,
       exposureAdjustment: { exposure: 1, gamma: 1, offset: 0 },
+    }));
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
+      ...base,
+      screentoneRemoval: { radius: 2, strength: 0.88, inkLumaThreshold: 72 },
+    }));
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
+      ...base,
+      jpegArtifactReduction: {
+        deblockStrength: 0.72,
+        deringStrength: 0.45,
+        boundaryThreshold: 6,
+        protectedEdgeThreshold: 88,
+        ringingThreshold: 18,
+        inkLumaThreshold: 64,
+      },
+    }));
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
+      ...base,
+      edgeAwareDenoise: { radius: 1, strength: 0.78, rangeThreshold: 72 },
+    }));
+    expect(imageFilterCacheKey(base)).not.toBe(imageFilterCacheKey({
+      ...base,
+      lensBlur: {
+        radius: 4,
+        sampleCount: 21,
+        apertureBlades: 6,
+        apertureRotationRadians: 0,
+      },
     }));
     const firstOrder: ImageFilterFields = {
       smartFilters: {

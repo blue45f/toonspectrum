@@ -14,6 +14,13 @@
  */
 
 import {
+  normalizeStudioFieldIrisBlurOptions,
+  normalizeStudioLensBlurOptions,
+  normalizeStudioSelectiveGaussianBlurOptions,
+  normalizeStudioTiltShiftBlurOptions,
+} from "./studio-advanced-blur-filters";
+import { normalizeColorToAlpha } from "./studio-color-to-alpha";
+import {
   STUDIO_FILTER_UNION_WAVE_KINDS,
   isIdentityStudioFilterUnionWave,
   normalizeStudioFilterUnionWave,
@@ -21,6 +28,17 @@ import {
   type StudioFilterUnionWaveKind,
 } from "./studio-filter-union-wave";
 import { hash2 } from "./studio-grain";
+import { normalizeLineArtCleanup } from "./studio-line-cleanup";
+import {
+  normalizeStudioDifferenceOfGaussiansOptions,
+  normalizeStudioDustScratchesOptions,
+  normalizeStudioTileableBlurOptions,
+} from "./studio-professional-filter-kernels";
+import {
+  normalizeStudioEdgeAwareDenoiseOptions,
+  normalizeStudioJpegArtifactReductionOptions,
+  normalizeStudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
@@ -284,6 +302,11 @@ export const STUDIO_FILTER_PACK_KINDS = [
   "mosaic",
   "radial-blur",
   "zoom-blur",
+  "lens-blur",
+  "field-iris-blur",
+  "tilt-shift-blur",
+  "selective-gaussian-blur",
+  "tileable-blur",
   "chromatic-aberration",
   "glitch",
   "scanline",
@@ -294,6 +317,13 @@ export const STUDIO_FILTER_PACK_KINDS = [
   "threshold",
   "oil-paint",
   "surface-blur",
+  "line-cleanup",
+  "screentone-removal",
+  "jpeg-artifact-reduction",
+  "edge-aware-denoise",
+  "dust-scratches",
+  "difference-of-gaussians",
+  "color-to-alpha",
   "duotone",
   "noise-add",
   ...STUDIO_FILTER_UNION_WAVE_KINDS,
@@ -485,6 +515,175 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
         radius: clampToInt(values.amount, 1, 40, 16),
         angle: 0,
       },
+      }),
+  },
+  "lens-blur": {
+    kind: "lens-blur",
+    label: "렌즈 블러",
+    params: [
+      slider("radius", "반경", 0.25, 18, "px", 0.25),
+      slider("sampleCount", "품질 샘플", 5, 64),
+      slider("apertureBlades", "조리개 날", 3, 12),
+      slider("apertureRotation", "조리개 회전", -180, 180, "°"),
+    ],
+    defaults: { radius: 4, sampleCount: 21, apertureBlades: 6, apertureRotation: 0 },
+    fromImage: (image) => {
+      if (!image.lensBlur) return null;
+      const blur = normalizeStudioLensBlurOptions(image.lensBlur);
+      return {
+        radius: blur.radius,
+        sampleCount: blur.sampleCount,
+        apertureBlades: blur.apertureBlades,
+        apertureRotation: blur.apertureRotationRadians * 180 / Math.PI,
+      };
+    },
+    toPatch: (values) => ({
+      lensBlur: normalizeStudioLensBlurOptions({
+        radius: clampTo(values.radius, 0.25, 18, 4),
+        sampleCount: clampToInt(values.sampleCount, 5, 64, 21),
+        apertureBlades: clampToInt(values.apertureBlades, 3, 12, 6),
+        apertureRotationRadians:
+          clampTo(values.apertureRotation, -180, 180, 0) * Math.PI / 180,
+      }),
+    }),
+  },
+  "field-iris-blur": {
+    kind: "field-iris-blur",
+    label: "필드 아이리스 블러",
+    params: [
+      slider("focusCenterX", "초점 X", 0, 100, "%"),
+      slider("focusCenterY", "초점 Y", 0, 100, "%"),
+      slider("focusRadius", "초점 반경", 0, 141.4, "%", 0.1),
+      slider("feather", "페더", 0.1, 141.4, "%", 0.1),
+      slider("maximumBlurRadius", "최대 블러", 0.25, 18, "px", 0.25),
+      slider("sampleCount", "품질 샘플", 5, 64),
+      slider("apertureBlades", "조리개 날", 3, 12),
+    ],
+    defaults: {
+      focusCenterX: 50,
+      focusCenterY: 50,
+      focusRadius: 16,
+      feather: 24,
+      maximumBlurRadius: 7,
+      sampleCount: 21,
+      apertureBlades: 8,
+    },
+    fromImage: (image) => {
+      if (!image.fieldIrisBlur) return null;
+      const blur = normalizeStudioFieldIrisBlurOptions(image.fieldIrisBlur);
+      return {
+        focusCenterX: blur.focusCenterX * 100,
+        focusCenterY: blur.focusCenterY * 100,
+        focusRadius: blur.focusRadius * 100,
+        feather: blur.feather * 100,
+        maximumBlurRadius: blur.maximumBlurRadius,
+        sampleCount: blur.sampleCount,
+        apertureBlades: blur.apertureBlades,
+      };
+    },
+    toPatch: (values) => ({
+      fieldIrisBlur: normalizeStudioFieldIrisBlurOptions({
+        focusCenterX: clampTo(values.focusCenterX, 0, 100, 50) / 100,
+        focusCenterY: clampTo(values.focusCenterY, 0, 100, 50) / 100,
+        focusRadius: clampTo(values.focusRadius, 0, 141.4, 16) / 100,
+        feather: clampTo(values.feather, 0.1, 141.4, 24) / 100,
+        maximumBlurRadius: clampTo(values.maximumBlurRadius, 0.25, 18, 7),
+        sampleCount: clampToInt(values.sampleCount, 5, 64, 21),
+        apertureBlades: clampToInt(values.apertureBlades, 3, 12, 8),
+      }),
+    }),
+  },
+  "tilt-shift-blur": {
+    kind: "tilt-shift-blur",
+    label: "틸트 시프트 블러",
+    params: [
+      slider("axis", "초점 축", -180, 180, "°"),
+      slider("focusWidth", "초점 폭", 0, 282.8, "%", 0.1),
+      slider("feather", "페더", 0.1, 141.4, "%", 0.1),
+      slider("maximumBlurRadius", "최대 블러", 0.25, 18, "px", 0.25),
+      slider("sampleCount", "품질 샘플", 5, 64),
+    ],
+    defaults: {
+      axis: 0,
+      focusWidth: 20,
+      feather: 22,
+      maximumBlurRadius: 7,
+      sampleCount: 19,
+    },
+    fromImage: (image) => {
+      if (!image.tiltShiftBlur) return null;
+      const blur = normalizeStudioTiltShiftBlurOptions(image.tiltShiftBlur);
+      return {
+        axis: blur.axisRadians * 180 / Math.PI,
+        focusWidth: blur.focusWidth * 100,
+        feather: blur.feather * 100,
+        maximumBlurRadius: blur.maximumBlurRadius,
+        sampleCount: blur.sampleCount,
+      };
+    },
+    toPatch: (values) => ({
+      tiltShiftBlur: normalizeStudioTiltShiftBlurOptions({
+        axisRadians: clampTo(values.axis, -180, 180, 0) * Math.PI / 180,
+        focusWidth: clampTo(values.focusWidth, 0, 282.8, 20) / 100,
+        feather: clampTo(values.feather, 0.1, 141.4, 22) / 100,
+        maximumBlurRadius: clampTo(values.maximumBlurRadius, 0.25, 18, 7),
+        sampleCount: clampToInt(values.sampleCount, 5, 64, 19),
+      }),
+    }),
+  },
+  "selective-gaussian-blur": {
+    kind: "selective-gaussian-blur",
+    label: "선택적 가우시안 블러",
+    params: [
+      slider("radius", "반경", 1, 10, "px"),
+      slider("spatialSigma", "공간 시그마", 0.1, 20, undefined, 0.1),
+      slider("edgeThreshold", "경계 임계", 0, 255),
+      slider("edgeSoftness", "경계 부드러움", 0, 2, undefined, 0.05),
+    ],
+    defaults: { radius: 3, spatialSigma: 2, edgeThreshold: 20, edgeSoftness: 0.35 },
+    fromImage: (image) => {
+      if (!image.selectiveGaussianBlur) return null;
+      const blur = normalizeStudioSelectiveGaussianBlurOptions(image.selectiveGaussianBlur);
+      return {
+        radius: blur.radius,
+        spatialSigma: blur.spatialSigma,
+        edgeThreshold: blur.edgeThreshold,
+        edgeSoftness: blur.edgeSoftness,
+      };
+    },
+    toPatch: (values) => ({
+      selectiveGaussianBlur: normalizeStudioSelectiveGaussianBlurOptions({
+        radius: clampToInt(values.radius, 1, 10, 3),
+        spatialSigma: clampTo(values.spatialSigma, 0.1, 20, 2),
+        edgeThreshold: clampTo(values.edgeThreshold, 0, 255, 20),
+        edgeSoftness: clampTo(values.edgeSoftness, 0, 2, 0.35),
+      }),
+    }),
+  },
+  "tileable-blur": {
+    kind: "tileable-blur",
+    label: "타일러블 블러",
+    params: [
+      slider("radius", "랩 반경", 1, 20, "px"),
+      slider("sigma", "가우시안 시그마", 0.1, 20, undefined, 0.1),
+      slider("strength", "혼합 강도", 0, 100, "%"),
+    ],
+    defaults: { radius: 5, sigma: 2.2, strength: 100 },
+    fromImage: (image) => {
+      if (!image.tileableBlur) return null;
+      const blur = normalizeStudioTileableBlurOptions(image.tileableBlur);
+      return {
+        radius: blur.radius,
+        sigma: blur.sigma,
+        strength: blur.strength * 100,
+      };
+    },
+    toPatch: (values) => ({
+      tileableBlur: normalizeStudioTileableBlurOptions({
+        radius: clampToInt(values.radius, 1, 20, 5),
+        sigma: clampTo(values.sigma, 0.1, 20, 2.2),
+        strength: clampTo(values.strength, 0, 100, 100) / 100,
+      }),
     }),
   },
   "chromatic-aberration": {
@@ -711,6 +910,198 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
         amount: clampToInt(values.strength, 1, 100, 70),
         radius: clampToInt(values.radius, 1, 10, 3),
       },
+    }),
+  },
+  "line-cleanup": {
+    kind: "line-cleanup",
+    label: "스케치 선화 정리",
+    params: [
+      slider("threshold", "이진화 임계", 0, 100, "%"),
+      slider("strength", "선명도", 0, 100, "%"),
+    ],
+    defaults: { threshold: 60, strength: 50 },
+    fromImage: (image) => {
+      if (!image.lineCleanup) return null;
+      const cleanup = normalizeLineArtCleanup(image.lineCleanup);
+      return {
+        threshold: cleanup.threshold * 100,
+        strength: cleanup.strength * 100,
+      };
+    },
+    toPatch: (values) => ({
+      lineCleanup: normalizeLineArtCleanup({
+        threshold: clampTo(values.threshold, 0, 100, 60) / 100,
+        strength: clampTo(values.strength, 0, 100, 50) / 100,
+      }),
+    }),
+  },
+  "screentone-removal": {
+    kind: "screentone-removal",
+    label: "스크린톤 제거",
+    params: [
+      slider("radius", "탐색 반경", 1, 3, "px"),
+      slider("strength", "제거 강도", 0, 100, "%"),
+      slider("inkLumaThreshold", "먹선 보호", 0, 160),
+    ],
+    defaults: { radius: 2, strength: 88, inkLumaThreshold: 72 },
+    fromImage: (image) => {
+      if (!image.screentoneRemoval) return null;
+      const tone = normalizeStudioScreentoneRemovalOptions(image.screentoneRemoval);
+      return {
+        radius: tone.radius,
+        strength: tone.strength * 100,
+        inkLumaThreshold: tone.inkLumaThreshold,
+      };
+    },
+    toPatch: (values) => ({
+      screentoneRemoval: normalizeStudioScreentoneRemovalOptions({
+        radius: clampToInt(values.radius, 1, 3, 2),
+        strength: clampTo(values.strength, 0, 100, 88) / 100,
+        inkLumaThreshold: clampTo(values.inkLumaThreshold, 0, 160, 72),
+      }),
+    }),
+  },
+  "jpeg-artifact-reduction": {
+    kind: "jpeg-artifact-reduction",
+    label: "JPEG 아티팩트 감소",
+    params: [
+      slider("deblockStrength", "블록 제거", 0, 100, "%"),
+      slider("deringStrength", "링잉 제거", 0, 100, "%"),
+      slider("boundaryThreshold", "블록 임계", 1, 64),
+      slider("protectedEdgeThreshold", "경계 보호", 32, 224),
+      slider("ringingThreshold", "링잉 임계", 1, 96),
+      slider("inkLumaThreshold", "먹선 보호", 0, 160),
+    ],
+    defaults: {
+      deblockStrength: 72,
+      deringStrength: 45,
+      boundaryThreshold: 6,
+      protectedEdgeThreshold: 88,
+      ringingThreshold: 18,
+      inkLumaThreshold: 64,
+    },
+    fromImage: (image) => {
+      if (!image.jpegArtifactReduction) return null;
+      const jpeg = normalizeStudioJpegArtifactReductionOptions(image.jpegArtifactReduction);
+      return {
+        deblockStrength: jpeg.deblockStrength * 100,
+        deringStrength: jpeg.deringStrength * 100,
+        boundaryThreshold: jpeg.boundaryThreshold,
+        protectedEdgeThreshold: jpeg.protectedEdgeThreshold,
+        ringingThreshold: jpeg.ringingThreshold,
+        inkLumaThreshold: jpeg.inkLumaThreshold,
+      };
+    },
+    toPatch: (values) => ({
+      jpegArtifactReduction: normalizeStudioJpegArtifactReductionOptions({
+        deblockStrength: clampTo(values.deblockStrength, 0, 100, 72) / 100,
+        deringStrength: clampTo(values.deringStrength, 0, 100, 45) / 100,
+        boundaryThreshold: clampTo(values.boundaryThreshold, 1, 64, 6),
+        protectedEdgeThreshold: clampTo(values.protectedEdgeThreshold, 32, 224, 88),
+        ringingThreshold: clampTo(values.ringingThreshold, 1, 96, 18),
+        inkLumaThreshold: clampTo(values.inkLumaThreshold, 0, 160, 64),
+      }),
+    }),
+  },
+  "edge-aware-denoise": {
+    kind: "edge-aware-denoise",
+    label: "엣지 보존 노이즈 감소",
+    params: [
+      slider("radius", "탐색 반경", 1, 3, "px"),
+      slider("strength", "노이즈 제거", 0, 100, "%"),
+      slider("rangeThreshold", "색 경계 보호", 4, 192),
+    ],
+    defaults: { radius: 1, strength: 78, rangeThreshold: 72 },
+    fromImage: (image) => {
+      if (!image.edgeAwareDenoise) return null;
+      const denoise = normalizeStudioEdgeAwareDenoiseOptions(image.edgeAwareDenoise);
+      return {
+        radius: denoise.radius,
+        strength: denoise.strength * 100,
+        rangeThreshold: denoise.rangeThreshold,
+      };
+    },
+    toPatch: (values) => ({
+      edgeAwareDenoise: normalizeStudioEdgeAwareDenoiseOptions({
+        radius: clampToInt(values.radius, 1, 3, 1),
+        strength: clampTo(values.strength, 0, 100, 78) / 100,
+        rangeThreshold: clampTo(values.rangeThreshold, 4, 192, 72),
+      }),
+    }),
+  },
+  "dust-scratches": {
+    kind: "dust-scratches",
+    label: "먼지와 스크래치 제거",
+    params: [
+      slider("radius", "결함 탐색 반경", 1, 5, "px"),
+      slider("threshold", "결함 임계값", 0, 255),
+      slider("strength", "복원 강도", 0, 100, "%"),
+    ],
+    defaults: { radius: 2, threshold: 24, strength: 100 },
+    fromImage: (image) => {
+      if (!image.dustScratches) return null;
+      const cleanup = normalizeStudioDustScratchesOptions(image.dustScratches);
+      return {
+        radius: cleanup.radius,
+        threshold: cleanup.threshold,
+        strength: cleanup.strength * 100,
+      };
+    },
+    toPatch: (values) => ({
+      dustScratches: normalizeStudioDustScratchesOptions({
+        radius: clampToInt(values.radius, 1, 5, 2),
+        threshold: clampTo(values.threshold, 0, 255, 24),
+        strength: clampTo(values.strength, 0, 100, 100) / 100,
+      }),
+    }),
+  },
+  "difference-of-gaussians": {
+    kind: "difference-of-gaussians",
+    label: "가우시안 차분 선화",
+    params: [
+      slider("smallSigma", "미세 시그마", 0.25, 6, undefined, 0.25),
+      slider("largeSigma", "대형 시그마", 0.35, 12, undefined, 0.05),
+      slider("threshold", "경계 임계값", 0, 64, undefined, 0.5),
+      slider("strength", "선 농도", 0, 32, undefined, 0.5),
+    ],
+    defaults: { smallSigma: 0.8, largeSigma: 2, threshold: 1.5, strength: 12 },
+    fromImage: (image) => {
+      if (!image.differenceOfGaussians) return null;
+      const dog = normalizeStudioDifferenceOfGaussiansOptions(image.differenceOfGaussians);
+      return {
+        smallSigma: dog.smallSigma,
+        largeSigma: dog.largeSigma,
+        threshold: dog.threshold,
+        strength: dog.strength,
+      };
+    },
+    toPatch: (values) => ({
+      differenceOfGaussians: normalizeStudioDifferenceOfGaussiansOptions({
+        smallSigma: clampTo(values.smallSigma, 0.25, 6, 0.8),
+        largeSigma: clampTo(values.largeSigma, 0.35, 12, 2),
+        threshold: clampTo(values.threshold, 0, 64, 1.5),
+        strength: clampTo(values.strength, 0, 32, 12),
+      }),
+    }),
+  },
+  "color-to-alpha": {
+    kind: "color-to-alpha",
+    label: "색상 투명화",
+    params: [
+      { key: "keyColor", label: "투명화할 배경색", control: "color" },
+      slider("strength", "투명화 강도", 0, 100, "%"),
+    ],
+    defaults: { keyColor: "#ffffff", strength: 85 },
+    fromImage: (image) => {
+      if (!image.colorToAlpha) return null;
+      const value = normalizeColorToAlpha(image.colorToAlpha);
+      return { keyColor: value.keyColor, strength: value.strength };
+    },
+    toPatch: (values) => ({
+      colorToAlpha: normalizeColorToAlpha({
+        keyColor: isHexColor(values.keyColor) ? values.keyColor : "#ffffff",
+        strength: clampTo(values.strength, 0, 100, 85),
+      }),
     }),
   },
   duotone: {
@@ -942,7 +1333,10 @@ function normalizeParamValue(
   if (step <= 0) return clamped;
   // step 격자로 반올림 후 다시 클램프(148처럼 min+step*k가 max를 넘지 않게).
   const snapped = param.min + Math.round((clamped - param.min) / step) * step;
-  return Math.min(param.max, Math.max(param.min, snapped));
+  // 0.1 같은 10진 step은 IEEE-754 연산에서 30.000000000000004처럼 보일 수 있다.
+  // 다이얼로그 재열기·직렬화 값은 사람이 고른 격자값과 정확히 같도록 안정화한다.
+  const stable = Math.round(snapped * 10_000_000_000) / 10_000_000_000;
+  return Math.min(param.max, Math.max(param.min, stable));
 }
 
 /** 값 가방 전체를 스키마로 정규화 — 누락/무효 키는 기본값으로 채운다. */

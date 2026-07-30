@@ -1,4 +1,10 @@
 import type { StudioAdjustmentStack } from "./studio-adjustment-stack";
+import type {
+  StudioFieldIrisBlurOptions,
+  StudioLensBlurOptions,
+  StudioSelectiveGaussianBlurOptions,
+  StudioTiltShiftBlurOptions,
+} from "./studio-advanced-blur-filter-kernels";
 import type { StudioTextAiProvenance } from "./studio-ai-client";
 import type { BubbleVariant } from "./studio-assets";
 import type { AutoAdjust } from "./studio-auto-adjust";
@@ -34,6 +40,7 @@ import type {
   StudioLayerRole,
 } from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
+import type { LineArtCleanupOptions } from "./studio-line-cleanup";
 import type {
   StudioMaterialMinimumDiameterRatio,
   StudioMaterialPressureModel,
@@ -42,6 +49,11 @@ import type { Outline } from "./studio-outline";
 import type { StudioOutlineStrokeContractV1 } from "./studio-outline-stroke-contract";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { PhotoFilter } from "./studio-photo-filter";
+import type {
+  StudioDifferenceOfGaussiansOptions,
+  StudioDustScratchesOptions,
+  StudioTileableBlurOptions,
+} from "./studio-professional-filter-kernels";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
 import type { StudioRasterAsset } from "./studio-raster-assets";
 import type { StudioSketchStyle } from "./studio-rough-shape";
@@ -54,6 +66,11 @@ import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type { ShapeParams, StrokeStyle } from "./studio-stroke-shapes";
 import type { Stylize } from "./studio-stylize";
 import type { TextPathConfig } from "./studio-text-path";
+import type {
+  StudioEdgeAwareDenoiseOptions,
+  StudioJpegArtifactReductionOptions,
+  StudioScreentoneRemovalOptions,
+} from "./studio-tone-artifact-filter-kernels";
 import type { Vibrance } from "./studio-vibrance";
 import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
 import type { StudioInkInputContract } from "@/lib/studio-ink-input-contract";
@@ -129,6 +146,28 @@ export interface ImageEl {
   light?: Light;
   sketch?: Sketch;
   detail?: Detail;
+  /** Non-destructive scanned/authored line-art cleanup recipe. */
+  lineCleanup?: LineArtCleanupOptions;
+  /** Non-destructive periodic screentone suppression with dark-ink protection. */
+  screentoneRemoval?: StudioScreentoneRemovalOptions;
+  /** Non-destructive JPEG block/ringing cleanup with edge protection. */
+  jpegArtifactReduction?: StudioJpegArtifactReductionOptions;
+  /** Non-destructive edge-aware color denoise. */
+  edgeAwareDenoise?: StudioEdgeAwareDenoiseOptions;
+  /** Aperture-shaped photographic blur; alpha is preserved byte-for-byte. */
+  lensBlur?: StudioLensBlurOptions;
+  /** Radial focus field with an aperture-shaped out-of-focus region. */
+  fieldIrisBlur?: StudioFieldIrisBlurOptions;
+  /** Directional focus band with feathered blur outside the band. */
+  tiltShiftBlur?: StudioTiltShiftBlurOptions;
+  /** Edge-aware Gaussian smoothing that protects authored line boundaries. */
+  selectiveGaussianBlur?: StudioSelectiveGaussianBlurOptions;
+  /** Two-scale Gaussian edge response rendered as clean black line art. */
+  differenceOfGaussians?: StudioDifferenceOfGaussiansOptions;
+  /** Thresholded median restoration that changes only isolated defects. */
+  dustScratches?: StudioDustScratchesOptions;
+  /** Wrap-boundary Gaussian blur for seamless texture and background tiles. */
+  tileableBlur?: StudioTileableBlurOptions;
   // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
   skewX?: number;
   skewY?: number;
