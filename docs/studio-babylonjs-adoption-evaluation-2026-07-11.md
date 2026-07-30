@@ -5,6 +5,8 @@
 - 평가 버전: `@babylonjs/core@9.16.1`, `@babylonjs/loaders@9.16.1`, Vite `8.0.16`
 - 2026-07-31 재검토 후보: `@babylonjs/core@9.19.0`, `@babylonjs/loaders@9.19.0`
 - 범위: 3D 배경 도구, VRM 포저, 모바일 편집 성능, 번들/로더 비용
+- 제품 활용 전수 검토:
+  [studio-babylonjs-product-utilization-matrix-2026-07-31.md](./studio-babylonjs-product-utilization-matrix-2026-07-31.md)
 
 ## 결정
 
