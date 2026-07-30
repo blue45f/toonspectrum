@@ -6,6 +6,12 @@ const outputDirectory = path.resolve(process.env.STUDIO_BUNDLE_DIR ?? "dist");
 const manifestPath = path.join(outputDirectory, ".vite", "manifest.json");
 const studioEntry = "src/domains/creator/StudioPage.tsx";
 const appEntry = "index.html";
+// This is the sole production exception to the engine-lab ban. Its transitive Babylon chunks may
+// be emitted only behind this analyzable BG3D dynamic import and may not be shared by another owner.
+const approvedBabylonSpecialistEntry =
+  "src/domains/creator/studio-bg3d-babylon-specialist-entry.ts";
+const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime";
+const babylonManifestPattern = /(?:@babylonjs|babylon(?:\.js)?)/i;
 
 // Product policy (2026-07-27): bundle bytes and static request counts are
 // telemetry, not release vetoes. Quality, drawing latency and feature breadth
@@ -235,6 +241,94 @@ if (!fs.existsSync(manifestPath)) {
     return targets;
   }
 
+  function checkApprovedLazySpecialistBoundary({
+    label,
+    pattern,
+    approvedEntrySource,
+    requiredRuntimeChunkName,
+    approvedParentEntryKey,
+    approvedParentStaticKeys,
+    forbiddenStaticClosures,
+  }) {
+    const matching = matchingManifestEntries(pattern);
+    if (matching.length === 0) return;
+
+    const approvedEntries = Object.entries(manifest)
+      .filter(([key, entry]) => key === approvedEntrySource || entry.src === approvedEntrySource)
+      .map(([key]) => key);
+    if (approvedEntries.length !== 1) {
+      fail(
+        `${label} requires exactly one approved entry ${approvedEntrySource}, found ${approvedEntries.length}`,
+      );
+      return;
+    }
+
+    const approvedEntryKey = approvedEntries[0];
+    const approvedEntry = manifest[approvedEntryKey];
+    if (!matching.includes(approvedEntryKey)) {
+      fail(`${label} approved entry did not match its engine policy: ${approvedEntryKey}`);
+      return;
+    }
+    if (approvedEntry.isDynamicEntry !== true) {
+      fail(`${label} approved entry is not a dynamic manifest entry: ${approvedEntryKey}`);
+    }
+    const runtimeChunks = matching.filter((key) => {
+      const entry = manifest[key];
+      return key.includes(requiredRuntimeChunkName) ||
+        entry.file?.includes(requiredRuntimeChunkName);
+    });
+    if (runtimeChunks.length !== 1) {
+      fail(
+        `${label} requires one manifest-visible ${requiredRuntimeChunkName} chunk, found ${runtimeChunks.length}`,
+      );
+    }
+
+    const forbiddenStaticMatches = new Set();
+    for (const [closureLabel, staticKeys] of forbiddenStaticClosures) {
+      for (const key of matching) {
+        if (staticKeys.has(key)) forbiddenStaticMatches.add(`${closureLabel}: ${key}`);
+      }
+    }
+    if (forbiddenStaticMatches.size > 0) {
+      fail(
+        `${label} returned to a forbidden static graph: ${[...forbiddenStaticMatches].join(", ")}`,
+      );
+    }
+
+    const approvedClosure = staticClosure(approvedEntryKey);
+    const outsideApprovedClosure = matching.filter((key) => !approvedClosure.has(key));
+    if (outsideApprovedClosure.length > 0) {
+      fail(
+        `${label} code was emitted outside the approved specialist closure: ${outsideApprovedClosure.join(", ")}`,
+      );
+    }
+
+    const staticOwnersOutsideApprovedClosure = Object.keys(manifest).filter((key) => {
+      if (approvedClosure.has(key)) return false;
+      const closure = staticClosure(key);
+      return matching.some((matchingKey) => closure.has(matchingKey));
+    });
+    if (staticOwnersOutsideApprovedClosure.length > 0) {
+      fail(
+        `${label} code is shared by an unapproved static owner: ${staticOwnersOutsideApprovedClosure.join(", ")}`,
+      );
+    }
+
+    const directDynamicImporters = Object.entries(manifest)
+      .filter(([, entry]) => (entry.dynamicImports ?? []).includes(approvedEntryKey))
+      .map(([key]) => key);
+    if (
+      directDynamicImporters.length !== 1 ||
+      !approvedParentStaticKeys.has(directDynamicImporters[0]) ||
+      !dynamicTargetsFromStaticClosure(approvedParentEntryKey).has(approvedEntryKey)
+    ) {
+      fail(
+        `${label} must have one analyzable dynamic import from the approved parent closure; found `
+          + (directDynamicImporters.length > 0 ? directDynamicImporters.join(", ") : "none"),
+      );
+    }
+  }
+
   try {
     const studioKeys = staticClosure(studioEntry);
     const appKeys = staticClosure(appEntry);
@@ -418,12 +512,12 @@ if (!fs.existsSync(manifestPath)) {
       fail(`optional 3D runtime returned to the Studio static graph: ${eager3dRuntime.join(", ")}`);
     }
 
-    const emittedProductionEngineLabs = matchingManifestEntries(
-      /(?:studio-bg3d-(?:three-webgpu-lab|engine-benchmark-browser)|@babylonjs|babylon(?:\.js)?|playcanvas)/i,
+    const emittedUnapprovedProductionEngineLabs = matchingManifestEntries(
+      /(?:studio-bg3d-(?:three-webgpu-lab|engine-benchmark-browser)|playcanvas)/i,
     );
-    if (emittedProductionEngineLabs.length > 0) {
+    if (emittedUnapprovedProductionEngineLabs.length > 0) {
       fail(
-        `3D engine lab code was emitted into the production manifest: ${emittedProductionEngineLabs.join(", ")}`,
+        `unapproved 3D engine lab code was emitted into the production manifest: ${emittedUnapprovedProductionEngineLabs.join(", ")}`,
       );
     }
 
@@ -439,6 +533,19 @@ if (!fs.existsSync(manifestPath)) {
       fail(`expected one StudioBackground3D manifest entry, found ${background3dEntries.length}`);
     } else {
       const background3dKeys = staticClosure(background3dEntries[0]);
+      checkApprovedLazySpecialistBoundary({
+        label: "Babylon specialist",
+        pattern: babylonManifestPattern,
+        approvedEntrySource: approvedBabylonSpecialistEntry,
+        requiredRuntimeChunkName: approvedBabylonRuntimeChunkName,
+        approvedParentEntryKey: background3dEntries[0],
+        approvedParentStaticKeys: background3dKeys,
+        forbiddenStaticClosures: [
+          ["app entry", appKeys],
+          ["Studio route", studioKeys],
+          ["BG3D editor activation", background3dKeys],
+        ],
+      });
       const background3dSize = measure(background3dKeys);
       checkBudget("BG3D editor activation", background3dSize, budgets.bg3dEditor);
       observeCount(

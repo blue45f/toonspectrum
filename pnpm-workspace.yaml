@@ -3,14 +3,9 @@ packages:
   - "apps/*"
   - "packages/*"
 
-# 공급망 정책(minimumReleaseAge: 너무 최근 발행 패키지 거부)의 예외 목록.
-# pg 설치 시 따라온 transitive dep node-releases가 24h 미경과 발행이라 --frozen-lockfile에서
-# 거부됨 — caniuse/브라우저 데이터 패키지라 안전하게 제외(다른 워크스페이스와 동일 패턴).
-minimumReleaseAge: 1440
-minimumReleaseAgeExclude:
-  - node-releases
-  - '@heejun/eslint-config@4.0.0'
-  - '@heejun/deskcloud@0.1.0'
+# 제품 정책: 최신 그래픽/창작 런타임을 즉시 검증할 수 있도록 pnpm의
+# 24시간 신규 릴리스 숙성 게이트는 사용하지 않는다. 핵심 그래픽 런타임의 exact version,
+# 재현 가능한 lockfile과 아래 build allowlist, license/security audit를 공급망 경계로 유지한다.
 
 # 빌드 스크립트 실행을 명시 승인(pnpm 11 strict: 미승인 시 ERR_PNPM_IGNORED_BUILDS로 install 실패).
 # sibling(pettography) 패턴: onlyBuiltDependencies(array) + allowBuilds(map) 둘 다.
@@ -57,6 +52,7 @@ overrides:
   '@vitest/ui': '>=4.1.9'
   vite: '>=8.0.16'
   jspdf: '>=4.2.1'
+  babylonjs-gltf2interface: '9.19.0'
 
 auditConfig:
   ignoreGhsas:

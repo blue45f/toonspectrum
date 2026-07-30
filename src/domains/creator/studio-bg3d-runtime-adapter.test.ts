@@ -1,10 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_BG3D_ARTIFACT_CAPTURE_KIND,
+  STUDIO_BG3D_ARTIFACT_CAPTURE_PROFILE,
+  STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+  STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+  STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+  STUDIO_BG3D_NORMAL_PACKING,
+  STUDIO_BG3D_NORMAL_PROFILE,
+  type StudioBg3dArtifactCaptureResultV2,
+  type StudioBg3dCaptureArtifactV2,
+} from "./studio-bg3d-artifact-capture-v2";
+import {
   StudioBg3dRuntimeAdapterRegistry,
   createStudioBg3dRuntimeSnapshot,
   type StudioBg3dRuntimeAdapter,
   type StudioBg3dRuntimeAdapterJob,
+  type StudioBg3dSpecialistRequest,
 } from "./studio-bg3d-runtime-adapter";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
@@ -29,6 +42,21 @@ function metricsAdapter(): StudioBg3dRuntimeAdapter {
       };
     },
     dispose: vi.fn(),
+  };
+}
+
+function artifactCaptureResultV2(
+  artifacts: readonly StudioBg3dCaptureArtifactV2[],
+  width = 2,
+  height = 1,
+): StudioBg3dArtifactCaptureResultV2 {
+  return {
+    kind: STUDIO_BG3D_ARTIFACT_CAPTURE_KIND,
+    version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+    profile: STUDIO_BG3D_ARTIFACT_CAPTURE_PROFILE,
+    width,
+    height,
+    artifacts,
   };
 }
 
@@ -287,6 +315,237 @@ describe("Studio BG3D runtime adapter boundary", () => {
       boundedFxRequest,
     )).rejects.toMatchObject({ code: "capability-unavailable" });
     await missingCapabilityRegistry.dispose();
+  });
+
+  it("routes a frozen v2 artifact request and returns a defensive clone-safe result", async () => {
+    let received: StudioBg3dRuntimeAdapterJob["request"] | undefined;
+    const rendererBeauty = new Uint8Array(8).fill(17);
+    const rendererDepth = new Float32Array([0.25, 0.75]);
+    const requestedArtifacts = [
+      { kind: "beauty" as const, profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+      { kind: "depth" as const, profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+    ];
+    const adapter: StudioBg3dRuntimeAdapter = {
+      runtimeId: "babylon-webgpu-lab",
+      capabilities: new Set(["capture-rgba-depth", "multi-artifact-capture"]),
+      async runIsolated(job) {
+        received = job.request;
+        return artifactCaptureResultV2([
+          {
+            kind: "beauty",
+            width: 2,
+            height: 1,
+            profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+            data: rendererBeauty,
+          },
+          {
+            kind: "depth",
+            width: 2,
+            height: 1,
+            profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+            data: rendererDepth,
+          },
+        ]);
+      },
+      dispose() {},
+    };
+    const registry = new StudioBg3dRuntimeAdapterRegistry();
+    registry.register(adapter);
+    const snapshot = createStudioBg3dRuntimeSnapshot(
+      DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      new Map(),
+    );
+
+    const result = await registry.run(
+      "babylon-webgpu-lab",
+      "artifact-v2",
+      snapshot,
+      {
+        kind: "artifact-capture-v2",
+        version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+        width: 2,
+        height: 1,
+        artifacts: requestedArtifacts,
+      },
+    );
+
+    expect(received).toEqual({
+      kind: "artifact-capture-v2",
+      version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+      width: 2,
+      height: 1,
+      artifacts: requestedArtifacts,
+    });
+    expect(Object.isFrozen(received)).toBe(true);
+    expect(
+      received?.kind === "artifact-capture-v2" && Object.isFrozen(received.artifacts),
+    ).toBe(true);
+    expect(
+      received?.kind === "artifact-capture-v2" &&
+      received.artifacts.every((artifact) => Object.isFrozen(artifact)),
+    ).toBe(true);
+    expect(result.kind).toBe(STUDIO_BG3D_ARTIFACT_CAPTURE_KIND);
+    if (result.kind !== STUDIO_BG3D_ARTIFACT_CAPTURE_KIND) {
+      throw new Error("Expected an admitted v2 artifact capture.");
+    }
+    expect(result.artifacts[0].data).not.toBe(rendererBeauty);
+    expect(result.artifacts[1].data).not.toBe(rendererDepth);
+    rendererBeauty[0] = 255;
+    rendererDepth[0] = 1;
+    requestedArtifacts.pop();
+    expect(result.artifacts[0].data[0]).toBe(17);
+    expect(result.artifacts[1].data[0]).toBe(0.25);
+    expect(received?.kind === "artifact-capture-v2" && received.artifacts).toHaveLength(2);
+    expect(structuredClone(result)).toEqual(result);
+    await registry.dispose();
+  });
+
+  it("fails v2 artifact capture closed on capability, request, and result mismatches", async () => {
+    const snapshot = createStudioBg3dRuntimeSnapshot(
+      DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      new Map(),
+    );
+    const validRequest = {
+      kind: "artifact-capture-v2" as const,
+      version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+      width: 2,
+      height: 1,
+      artifacts: [
+        { kind: "beauty" as const, profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+        { kind: "depth" as const, profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+      ],
+    };
+
+    const withoutCapabilityRun = vi.fn(async () => artifactCaptureResultV2([]));
+    const withoutCapability: StudioBg3dRuntimeAdapter = {
+      runtimeId: "three-webgl",
+      capabilities: new Set(["capture-rgba-depth"]),
+      runIsolated: withoutCapabilityRun,
+      dispose() {},
+    };
+    const capabilityRegistry = new StudioBg3dRuntimeAdapterRegistry();
+    capabilityRegistry.register(withoutCapability);
+    await expect(capabilityRegistry.run(
+      "three-webgl",
+      "missing-capability",
+      snapshot,
+      validRequest,
+    )).rejects.toMatchObject({ code: "capability-unavailable" });
+    expect(withoutCapabilityRun).not.toHaveBeenCalled();
+    await capabilityRegistry.dispose();
+
+    const adapterRun = vi.fn(async (job: StudioBg3dRuntimeAdapterJob) => {
+      if (job.id === "legacy-result") {
+        return { kind: "capture" as const, width: 2, height: 1, rgba: new Uint8Array(8) };
+      }
+      if (job.id === "missing-pass") {
+        return artifactCaptureResultV2([{
+          kind: "beauty",
+          width: 2,
+          height: 1,
+          profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+          data: new Uint8Array(8),
+        }]);
+      }
+      if (job.id === "extra-pass") {
+        return artifactCaptureResultV2([
+          {
+            kind: "beauty",
+            width: 2,
+            height: 1,
+            profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+            data: new Uint8Array(8),
+          },
+          {
+            kind: "depth",
+            width: 2,
+            height: 1,
+            profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+            data: new Float32Array(2),
+          },
+          {
+            kind: "normal",
+            width: 2,
+            height: 1,
+            profile: STUDIO_BG3D_NORMAL_PROFILE,
+            coordinateSpace: STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+            packing: STUDIO_BG3D_NORMAL_PACKING,
+            data: new Uint8Array(4),
+          },
+        ]);
+      }
+      if (job.id === "wrong-size") {
+        return artifactCaptureResultV2([
+          {
+            kind: "beauty",
+            width: 1,
+            height: 2,
+            profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+            data: new Uint8Array(8),
+          },
+          {
+            kind: "depth",
+            width: 1,
+            height: 2,
+            profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+            data: new Float32Array(2),
+          },
+        ], 1, 2);
+      }
+      return artifactCaptureResultV2([
+        {
+          kind: "beauty",
+          width: 2,
+          height: 1,
+          profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+          data: new Uint8Array(8),
+        },
+        {
+          kind: "depth",
+          width: 2,
+          height: 1,
+          profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+          data: new Float32Array([0, Number.NaN]),
+        },
+      ]);
+    });
+    const registry = new StudioBg3dRuntimeAdapterRegistry();
+    registry.register({
+      runtimeId: "babylon-webgl-lab",
+      capabilities: new Set(["capture-rgba-depth", "multi-artifact-capture"]),
+      runIsolated: adapterRun,
+      dispose() {},
+    });
+
+    const malformedRequest = {
+      ...validRequest,
+      artifacts: [
+        { kind: "beauty", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+      ],
+    } as unknown as StudioBg3dSpecialistRequest;
+    await expect(registry.run(
+      "babylon-webgl-lab",
+      "malformed-request",
+      snapshot,
+      malformedRequest,
+    )).rejects.toMatchObject({ code: "invalid-request" });
+    expect(adapterRun).not.toHaveBeenCalled();
+
+    for (const id of [
+      "legacy-result",
+      "missing-pass",
+      "extra-pass",
+      "wrong-size",
+      "invalid-depth",
+    ]) {
+      await expect(registry.run(
+        "babylon-webgl-lab",
+        id,
+        snapshot,
+        validRequest,
+      )).rejects.toMatchObject({ code: "invalid-result" });
+    }
+    await registry.dispose();
   });
 
   it("snapshots an exact frozen physics DTO and rejects hostile request getters", async () => {

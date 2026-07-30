@@ -1,9 +1,9 @@
 # ADR — ToonSpectrum Studio의 Babylon.js 도입 평가
 
 - 결정일: 2026-07-11
-- 상태: **기본 3D 편집 엔진 교체 보류 / 격리 Webtoon FX specialist 계약 승인**
+- 상태: **기본 3D 편집 엔진 교체 보류 / 격리 Webtoon FX specialist 기반 구현**
 - 평가 버전: `@babylonjs/core@9.16.1`, `@babylonjs/loaders@9.16.1`, Vite `8.0.16`
-- 2026-07-31 재검토 후보: `@babylonjs/core@9.19.0`, `@babylonjs/loaders@9.19.0`
+- 2026-07-31 설치 버전: `@babylonjs/core@9.19.0`, `@babylonjs/loaders@9.19.0` exact
 - 범위: 3D 배경 도구, VRM 포저, 모바일 편집 성능, 번들/로더 비용
 - 제품 활용 전수 검토:
   [studio-babylonjs-product-utilization-matrix-2026-07-31.md](./studio-babylonjs-product-utilization-matrix-2026-07-31.md)
@@ -49,9 +49,15 @@ WebGL 또는 기존 Three 캡처로 데이터 손실 없이 복귀해야 한다.
 
 현재 제품 코드에는 다음 최소 계약을 추가했다.
 
+- 유일하게 승인된 `studio-bg3d-babylon-specialist-entry.ts` 동적 entry와 deep ESM binding
+- WebGL/WebGPU 초기화, 작업 직렬화, abort, context/device loss, dispose lifecycle runtime
+- Babylon 패키지를 전용 manual chunk로 격리하고 app/Studio/BG3D 정적 그래프 유입을 막는
+  manifest bundle guard
 - `StudioBg3dRuntimeCapability`의 `webtoon-scene-fx`
 - Babylon WebGL/WebGPU lab descriptor의 FX/capture capability
 - `StudioBg3dWebtoonFxCaptureRequest` v1: 최대 8개 pass, 결정적 time/seed, preview/final 품질
+- `artifact-capture-v2`: beauty/depth/normal/object·material ID/shadow/AO/emission/velocity의
+  profile, typed-array, 크기, 총 256 MiB 예산, stable legend를 fail-closed 검증
 - `beauty`/`lt-source` 출력 의도, 선택적 base-scene depth, 버전이 고정된 top-down RGBA8/depth profile
 - 1차 pass: toon outline, depth atmosphere, emissive bloom, depth of field,
   weather particles, speed lines
@@ -76,13 +82,18 @@ SceneDocument + verified GLB + bounded FX recipe
 [Particle System](https://doc.babylonjs.com/typedoc/classes/BABYLON.ParticleSystem)을 한 작업 내부에서
 활용하되 Studio 문서 권위는 넘기지 않도록 한다.
 
-### 프로덕션 어댑터 구현 전 PoC 순서
+현재 lazy entry는 아직 프로덕션 UI·Three 장면·실제 capture executor에 연결되지 않았다.
+기본 executor는 lifecycle 확인을 위한 `runtime-metrics`만 반환하므로, 위 artifact 종류는
+**출력 계약이 구현된 상태**이지 실제 Babylon 렌더 pass가 완성된 상태가 아니다.
 
-1. 동일 canonical scene으로 Three beauty/depth와 Babylon beauty/depth를 캡처한다.
-2. Babylon WebGPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
-3. rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를 확인한다.
-4. normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
-5. device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
+### 운영 capture 연결 순서
+
+1. 운영 기능 활성화 시에만 lazy entry를 import하고 runtime adapter registry에 등록한다.
+2. 동일 canonical scene으로 Three beauty/depth와 Babylon beauty/depth/normal/ID를 캡처한다.
+3. Babylon WebGPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
+4. rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를 확인한다.
+5. normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
+6. device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
    검증한다.
 
 채택 기준은 FX 미사용 시 Babylon chunk/network/GPU context가 0이고, 대표 1080p preview p95가
@@ -195,32 +206,35 @@ WebGPU-only 변형은 basic WebGL보다 initial gzip이 50,660 B 더 컸다. 이
 
 ### 0단계 — 현재 결정
 
-- 앱 의존성에 Babylon을 추가하지 않는다.
+- Babylon core/loaders `9.19.0`은 exact 의존성으로 설치하되 승인된 단일 lazy entry 밖에서
+  import하지 않는다.
+- 사용자의 명시적 요청으로 `minimumReleaseAge` 24시간 숙성 정책은 해제했다. exact pin,
+  lockfile, 라이선스/보안 감사는 유지한다.
 - Three/R3F/three-vrm 기능 고도화를 계속한다.
 - 당장 필요한 모바일 최적화는 엔진 교체가 아니라 모델/텍스처 예산, 선택 외 객체 freeze, DPR 동적 조절, 컨텍스트 해제 검증으로 수행한다.
 
-### 1단계 — 엔진 중립 경계만 정리
+### 1단계 — 엔진 중립 경계와 격리 기반
 
-새 엔진을 설치하지 않고 다음 계약을 인터페이스/골든 테스트로 고정한다.
+다음 기반은 현재 구현됐다.
 
-- 씬 document ↔ runtime scene 변환
-- select/move/rotate/scale/duplicate/delete command
-- 모델 library load/instantiate/dispose
-- 투명 PNG 캡처
-- PNG hash 기반 재편집 복원
-- undo/redo 한 단계의 의미
+- Babylon 단일 lazy entry와 전용 manual chunk/bundle guard
+- WebGL/WebGPU lifecycle runtime과 runtime adapter routing
+- bounded capture v1 및 multi-artifact v2 DTO/검증
+- renderer-neutral scene/capture/linked-render 계약
 
-이 작업은 Babylon 도입과 무관하게 현재 3D 코드의 테스트 가능성을 높인다.
+아직 남은 핵심은 canonical scene → Babylon runtime scene 변환과 실제 offscreen capture다.
 
-### 2단계 — 제품 밖 격리 실험
+### 2단계 — 운영에 노출되지 않는 격리 실험
 
-다음 중 하나처럼 Babylon만의 가설이 생겼을 때 `/labs` 또는 별도 실험 번들에서 실행한다.
+현재 lazy foundation 위에서 다음 가설을 운영 UI에 노출하기 전에 검증한다.
 
 - WebGPU compute/Node Material이 필요한 선화·조명 처리
 - 수천 개 반복 배경 오브젝트에서 thin instances/AssetContainer가 필요한 장면
 - `MSFT_lod` + range request를 실제로 적용한 대형 배경 스트리밍
 
-기존 Studio route에는 포함하지 않고 feature flag와 완전한 lazy boundary를 사용한다. barrel import 대신 deep import를 유지하며, 프로덕션 CDN에 실험용 전체 chunk를 배포하지 않는다.
+Studio/BG3D 정적 그래프에는 포함하지 않고 feature flag와 완전한 lazy boundary를 사용한다.
+barrel import 대신 deep import를 유지하며, 실제 capture executor가 골든 기준을 통과하기 전에는
+사용자 결과물 생성 경로에 연결하지 않는다.
 
 ### 3단계 — 실기기 A/B 기준
 
@@ -233,9 +247,11 @@ WebGPU-only 변형은 basic WebGL보다 initial gzip이 50,660 B 더 컸다. 이
 - 대체되는 Three chunk를 제거한 뒤의 **도구-open gzip 총량**이 현재보다 15% 이상 나빠지지 않는다.
 - glTF 첫 사용 시 loader 활성화 요청 수와 전송량이 목표 모바일 네트워크 예산을 통과한다.
 
-### 4단계 — 교체만 허용
+### 4단계 — 대화형 편집 엔진은 교체만 허용
 
-프로덕션 채택은 Babylon이 한 하위 시스템 전체를 대체할 때만 허용한다. 동일 기능에서 Three와 Babylon을 영구 병행하지 않는다.
+대화형 편집 장면의 프로덕션 채택은 Babylon이 한 하위 시스템 전체를 대체할 때만 허용한다.
+다만 현재 승인된 specialist는 같은 장면을 공동 소유하지 않고 bounded snapshot을 받아 portable
+artifact만 반환하므로, Three 편집 장면과 격리 job 단위로 공존할 수 있다.
 
 VRM 포저까지 이전하려면 아래 추가 조건이 필요하다.
 
@@ -255,7 +271,9 @@ VRM 포저까지 이전하려면 아래 추가 조건이 필요하다.
 
 ## 재현 명령
 
-PoC 경로는 저장소 밖 `/tmp/toonspectrum-babylon-poc`이며 앱 코드와 `package.json`은 수정하지 않았다.
+아래 수치의 원본 PoC는 저장소 밖 `/tmp/toonspectrum-babylon-poc`에서 수행했으며 당시 앱 코드와
+`package.json`은 수정하지 않았다. 이후 2026-07-31 격리 specialist 기반을 위해 저장소에는
+Babylon `9.19.0` exact 의존성을 설치했다.
 
 ```bash
 npm view @babylonjs/core version dist.unpackedSize

@@ -26,6 +26,7 @@ export type StudioBg3dRuntimeId =
 export type StudioBg3dRuntimeCapability =
   | "interactive-editing"
   | "capture-rgba-depth"
+  | "multi-artifact-capture"
   | "skinning"
   | "morph-targets"
   | "webgl"
@@ -218,6 +219,7 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
     maturity: "lab",
     capabilities: runtimeCapabilities([
       "capture-rgba-depth",
+      "multi-artifact-capture",
       "skinning",
       "morph-targets",
       "webgl",
@@ -235,6 +237,7 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
     maturity: "lab",
     capabilities: runtimeCapabilities([
       "capture-rgba-depth",
+      "multi-artifact-capture",
       "skinning",
       "morph-targets",
       "webgpu",

@@ -21,9 +21,9 @@ Babylon.js는 ToonSpectrum의 모든 2D·3D 기능을 소유하는 범용 엔진
 5. 캐릭터 애니메이션 리타게팅과 물리 기반 소품 배치 보조
 6. 자산 검사·썸네일·프리뷰·렌더 진단 specialist
 
-현재 가장 큰 병목은 FX 종류를 v1 union에 계속 추가하는 일이 아니다. 실제 Babylon adapter와
-여러 제작 패스를 한 번에 반환하는 versioned artifact bundle을 구현하고, 이미 존재하는 linked
-3D→2D cache/dirty planner에 연결하는 것이 다음 핵심 작업이다.
+현재 가장 큰 병목은 FX 종류를 v1 union에 계속 추가하는 일이 아니다. 격리 Babylon 런타임과
+versioned artifact bundle의 기반은 마련됐으므로, 실제 장면을 그리는 capture executor를 구현하고
+기존 Three 장면·linked 3D→2D cache/dirty planner에 원자적으로 연결하는 것이 다음 핵심 작업이다.
 
 Babylon의 런타임 객체는 Studio 문서, undo/redo, CRDT, 저장 파일에 들어가지 않는다. Studio는
 계속 엔진 중립적인 장면 문서와 제한된 효과 recipe를 소유하고, Babylon은 검증된 입력을 받아
@@ -40,20 +40,31 @@ canonical SceneDocument + verified asset bytes + bounded recipe
 ## 현재 구현 상태와 실제 도입 차단점
 
 이 문서는 Babylon 제품 기능을 구현 완료로 표시하는 목록이 아니다. 2026-07-31 현재 저장소에는
-`@babylonjs/*` 의존성과 프로덕션 adapter가 없고, 다음 항목만 먼저 구현돼 있다.
+다음 **격리 specialist 기반**이 구현돼 있다.
 
+- `@babylonjs/core@9.19.0`, `@babylonjs/loaders@9.19.0` exact 의존성
+- 유일하게 승인된 `studio-bg3d-babylon-specialist-entry.ts` lazy entry
+- WebGL/WebGPU 초기화, 단일 작업 직렬화, abort, context/device loss, dispose를 소유하는
+  Babylon lifecycle runtime
+- beauty/depth/normal/object ID/material ID/shadow/AO/emission/velocity를 제한된 typed-array로
+  반환하는 `artifact-capture-v2` 계약과 fail-closed 검증
+- Babylon 패키지를 전용 manual chunk로 격리하고 앱·Studio·3D 편집기 정적 그래프 유입을
+  금지하는 manifest bundle guard
 - Babylon WebGL/WebGPU specialist를 표현하는 runtime ID·capability와 topology 계약
 - bounded `webtoon-fx-capture` v1 요청과 RGBA/depth 결과 검증
 - line/depth/object-ID/normal/combined의 renderer-neutral linked-render planner
 - LT Worker, shot batch, PSD, WebCodecs, thumbnail로 이어지는 기존 소비 경계
 
-실제 adapter를 연결하기 전에 해결해야 할 차단점은 다음과 같다.
+다만 lazy entry는 아직 프로덕션 UI나 Three 장면에서 호출되지 않으며, runtime의 기본 executor는
+`runtime-metrics`만 반환한다. 따라서 Babylon으로 실제 beauty/depth/normal/ID를 생성하는 기능이
+완성됐다고 해석하면 안 된다.
 
-1. `scripts/check-studio-bundle.mjs`는 현재 프로덕션 manifest에 Babylon 문자열이 하나라도 있으면
-   실패한다. Studio 정적 그래프·초기 chunk 금지는 유지하되, 승인된 명시적 lazy specialist
-   entry만 허용하도록 가드를 세분화해야 한다.
-2. topology와 linked-render 정책은 계약·테스트 수준이며 운영 UI에서 실제 adapter job을 실행하지
-   않는다. “기능을 열 때만 import → 별도 surface/Worker → dispose” 수명주기를 연결해야 한다.
+남은 운영 연결 과제는 다음과 같다.
+
+1. 운영 기능이 요청될 때만 승인된 lazy entry를 import하고 runtime adapter registry에 등록하는
+   명시적 activation 경계를 연결한다.
+2. canonical Three 장면 snapshot을 Babylon scene으로 복원하고 실제 offscreen
+   beauty/depth/normal/ID를 만드는 executor를 구현한다.
 3. 한 capture의 color와 depth/normal/ID를 서로 다른 엔진에서 섞지 않는다. Babylon pass 하나라도
    실패하면 해당 capture 전체를 Three provider로 다시 만들고 원자적으로 commit한다.
 4. shot batch를 시작하면 engine, backend, adapter revision, output profile, recipe를 끝까지 고정한다.
@@ -67,7 +78,7 @@ canonical SceneDocument + verified asset bytes + bounded recipe
    surface 하나와 last-good baked artifact를 사용해야 한다.
 
 따라서 다음 코드 단계는 effect union을 늘리는 패치가 아니라
-**실제 lazy adapter + versioned multi-artifact result bundle + 원자적 provider fallback**이다.
+**실제 capture executor + 운영 activation + Three/Babylon 원자적 provider fallback**이다.
 
 ## Babylon.js 9 계열에서 특히 주목할 기능
 
@@ -472,7 +483,9 @@ Physics world, collider pointer, WASM heap은 문서에 저장하지 않는다.
 
 ### 5.1 교차 검증기
 
-Babylon loader는 현재 first-party GLB validator를 대체하지 않고 advisory 교차 검사에 사용한다.
+Babylon loader는 도입 시 first-party GLB validator를 대체하지 않고 advisory 교차 검사에만
+사용한다. `@babylonjs/loaders` 패키지는 버전을 고정해 설치했지만 현재 lazy entry에는 아직
+등록하지 않았으므로 아래 검사는 운영 기능이 아니라 다음 capture 단계의 구현 범위다.
 
 - mesh/material/texture/skeleton/morph/animation 수 대조
 - bounds와 unit scale 대조
@@ -687,6 +700,9 @@ Babylon은 WebGPU와 WebGL을 병행 지원하며 WebGPU 엔진 초기화가 비
 | FX recipe | `studio-bg3d-webtoon-fx.ts` | versioned specialist request 유지 |
 | runtime routing | `studio-bg3d-runtime-topology.ts` | Three primary + Babylon isolated specialist |
 | output boundary | `studio-bg3d-runtime-adapter.ts` | exact RGBA/depth 검증과 방어 복사 |
+| Babylon lazy entry | `studio-bg3d-babylon-specialist-entry.ts` | 동적 import 전용 단일 entry와 deep ESM binding; 운영 호출은 다음 단계 |
+| Babylon lifecycle | `studio-bg3d-babylon-specialist-runtime.ts` | WebGL/WebGPU 초기화·직렬화·중단·손실·폐기 |
+| multi-artifact v2 | `studio-bg3d-artifact-capture-v2.ts` | pass별 profile·크기·예산·legend 검증 |
 | 이미지 필터 commit | `StudioKonvaImageNode.tsx` | 공통 commit 앞 provider 후보 |
 | 독자용 ambient FX | `WebtoonFxPlayer.tsx` | cinematic preset에서 GPU particle provider |
 | 결정적 particle | `studio-motion-fx.ts` | preset/seed 의미 공유 |
@@ -700,11 +716,17 @@ Babylon은 WebGPU와 WebGL을 병행 지원하며 WebGPU 엔진 초기화가 비
 | physics | `studio-bg3d-physics.ts` | 요청별 Havok solve 후 transform bake |
 | panorama | `studio-bg3d-procedural-panorama.ts` | atmosphere/IBL source 후보 |
 | model thumbnail | `studio-bg3d-model-thumbnail-capture.ts` | 격리 batch thumbnail provider |
-| asset validation | `studio-bg3d-glb-validation.ts` | Babylon loader advisory 교차 검사 |
+| asset validation | `studio-bg3d-glb-validation.ts` | Babylon loader advisory 교차 검사 후보; 아직 미배선 |
 
 ## 10. 패키지 도입 전략
 
-모든 Babylon 기능을 하나의 chunk에 넣지 않는다.
+`@babylonjs/core`와 `@babylonjs/loaders`는 `9.19.0` exact 버전으로 설치했다. 사용자의 명시적
+요청에 따라 저장소의 `minimumReleaseAge` 24시간 숙성 정책은 해제했으며, 버전 고정·lockfile·
+라이선스/보안 감사는 계속 유지한다.
+
+현재 core 엔진 코드는 유일한 승인 lazy entry의 정적 closure 안에서 전용
+`studio-bg3d-babylon-runtime` manual chunk로 격리한다. 이후 기능 패키지는 아래 단위로
+사용 시점에만 추가한다.
 
 | 지연 로드 단위 | 후보 패키지 | 용도 |
 | --- | --- | --- |
@@ -723,17 +745,18 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 
 ### 단계 A — 장면 FX 골든 PoC
 
-1. Babylon WebGPU/WebGL isolated adapter
-2. Three/Babylon 동일 beauty/depth 캡처
-3. outline + depth fog + bloom
-4. device loss/abort/resize/dispose
+1. 완료: Babylon WebGPU/WebGL lazy entry와 lifecycle runtime
+2. 완료: artifact-capture-v2 계약과 전용 manual chunk/bundle guard
+3. 다음: Three/Babylon 동일 beauty/depth/normal/ID 실제 캡처
+4. 다음: outline + depth fog + bloom executor
+5. 다음: 운영 activation, 원자적 fallback, device-loss 골든/soak 검증
 
 ### 단계 B — Multi-artifact와 Magic Layer
 
-1. result v2 bundle
-2. normal/object ID/material ID
-3. stable legend와 click selection
-4. linked render cache/dirty planner와 pass별 commit
+1. 완료: result v2 bundle과 stable legend 검증
+2. 다음: normal/object ID/material ID 실제 렌더
+3. 다음: stable legend와 click selection
+4. 다음: linked render cache/dirty planner와 pass별 commit
 
 ### 단계 C — 날씨와 모션
 

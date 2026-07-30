@@ -92,6 +92,8 @@
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
+    "@babylonjs/core": "9.19.0",
+    "@babylonjs/loaders": "9.19.0",
     "@dimforge/rapier3d-deterministic-compat": "0.19.3",
     "@flatten-js/core": "^1.6.12",
     "@gltf-transform/core": "4.4.2",

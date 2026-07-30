@@ -22,6 +22,11 @@ describe("Studio BG3D runtime topology policy", () => {
     expect(Object.isFrozen(capabilities)).toBe(true);
     expect(STUDIO_BG3D_RUNTIME_CATALOG["three-webgpu-lab"].capabilities.has("webxr"))
       .toBe(false);
+    expect(capabilities.has("multi-artifact-capture")).toBe(false);
+    expect(STUDIO_BG3D_RUNTIME_CATALOG["babylon-webgl-lab"].capabilities
+      .has("multi-artifact-capture")).toBe(true);
+    expect(STUDIO_BG3D_RUNTIME_CATALOG["babylon-webgpu-lab"].capabilities
+      .has("multi-artifact-capture")).toBe(true);
   });
 
   it("keeps one production Three owner for the default editor", () => {
@@ -110,6 +115,35 @@ describe("Studio BG3D runtime topology policy", () => {
       specialists: [{
         jobId: "webtoon-fx-preview",
         runtimeId: "babylon-webgl-lab",
+        isolated: true,
+      }],
+    });
+  });
+
+  it("routes multi-artifact capture only to an isolated Babylon specialist", () => {
+    const plan = planStudioBg3dRuntimeTopology({
+      ...baseRequest,
+      availableRuntimeIds: [
+        "three-webgl",
+        "babylon-webgl-lab",
+        "babylon-webgpu-lab",
+      ],
+      allowLabRuntimes: true,
+      webgpuSupported: true,
+      maximumActivationGzipBytes: 500_000,
+      specialistJobs: [{
+        id: "multi-artifact-capture",
+        requiredCapabilities: ["capture-rgba-depth", "multi-artifact-capture"],
+      }],
+    });
+
+    expect(plan).toMatchObject({
+      ok: true,
+      primaryRuntimeId: "three-webgl",
+      totalActivationGzipBytes: 351_000,
+      specialists: [{
+        jobId: "multi-artifact-capture",
+        runtimeId: "babylon-webgpu-lab",
         isolated: true,
       }],
     });

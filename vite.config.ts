@@ -239,6 +239,15 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (
+            id.includes("/node_modules/@babylonjs/")
+            || id.includes("/node_modules/babylonjs-gltf2interface/")
+          ) {
+            // Keep every Babylon package in one manifest-visible specialist chunk. The production
+            // bundle audit can then prove that no generic shared vendor chunk leaks the engine
+            // into the app, Studio route, or BG3D editor activation graphs.
+            return "studio-bg3d-babylon-runtime";
+          }
+          if (
             id.endsWith("/src/domains/creator/studio-workspaces.ts")
             || id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")
           ) {

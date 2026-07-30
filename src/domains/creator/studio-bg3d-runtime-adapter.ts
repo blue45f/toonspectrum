@@ -1,4 +1,10 @@
 import {
+  normalizeStudioBg3dArtifactCaptureRequestV2,
+  normalizeStudioBg3dArtifactCaptureResultV2,
+  type StudioBg3dArtifactCaptureRequestV2,
+  type StudioBg3dArtifactCaptureResultV2,
+} from "./studio-bg3d-artifact-capture-v2";
+import {
   normalizeStudioBg3dPhysicsWorld,
   type StudioBg3dPhysicsWorld,
 } from "./studio-bg3d-physics";
@@ -95,6 +101,7 @@ export function createStudioBg3dRuntimeSnapshot(
 export type StudioBg3dSpecialistRequest =
   | { readonly kind: "runtime-metrics" }
   | { readonly kind: "capture"; readonly width: number; readonly height: number }
+  | StudioBg3dArtifactCaptureRequestV2
   | StudioBg3dWebtoonFxCaptureRequest
   | {
     readonly kind: "physics-preview";
@@ -127,6 +134,7 @@ export type StudioBg3dSpecialistResult =
     readonly rgba: Uint8Array;
     readonly depthFloat32?: Float32Array;
   }
+  | StudioBg3dArtifactCaptureResultV2
   | {
     readonly kind: "transforms";
     readonly samples: readonly {
@@ -189,6 +197,8 @@ function validRequest(request: unknown): request is StudioBg3dSpecialistRequest 
     case "vector-map-frame":
     case "bim-section":
       return validRasterSize(candidate.width, candidate.height);
+    case "artifact-capture-v2":
+      return normalizeStudioBg3dArtifactCaptureRequestV2(request) !== null;
     case "webtoon-fx-capture": {
       const normalized = normalizeStudioBg3dWebtoonFxCaptureRequest(request);
       return Boolean(normalized && validRasterSize(normalized.width, normalized.height));
@@ -232,6 +242,8 @@ function snapshotRequest(
       case "vector-map-frame":
       case "bim-section":
         return Object.freeze({ kind: request.kind, width: request.width, height: request.height });
+      case "artifact-capture-v2":
+        return normalizeStudioBg3dArtifactCaptureRequestV2(request);
       case "webtoon-fx-capture":
         return normalizeStudioBg3dWebtoonFxCaptureRequest(request);
       case "scientific-isosurface":
@@ -275,6 +287,26 @@ function sanitizeResult(
   request: StudioBg3dSpecialistRequest,
 ): StudioBg3dSpecialistResult {
   if (!result || typeof result !== "object") throw runtimeBoundaryError("invalid-result");
+  if (request.kind === "artifact-capture-v2") {
+    const normalized = normalizeStudioBg3dArtifactCaptureResultV2(result);
+    if (
+      !normalized ||
+      normalized.width !== request.width ||
+      normalized.height !== request.height ||
+      normalized.artifacts.length !== request.artifacts.length
+    ) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    const requestedProfiles = new Map(
+      request.artifacts.map((artifact) => [artifact.kind, artifact.profile] as const),
+    );
+    if (normalized.artifacts.some((artifact) =>
+      artifact.profile !== requestedProfiles.get(artifact.kind)
+    )) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    return normalized;
+  }
   if (request.kind === "webtoon-fx-capture" && result.kind !== "capture") {
     throw runtimeBoundaryError("invalid-result");
   }
@@ -369,6 +401,7 @@ function requiredCapabilitiesForRequest(
   switch (request.kind) {
     case "runtime-metrics": return [];
     case "capture": return ["capture-rgba-depth"];
+    case "artifact-capture-v2": return ["capture-rgba-depth", "multi-artifact-capture"];
     case "webtoon-fx-capture": return ["capture-rgba-depth", "webtoon-scene-fx"];
     case "physics-preview": return ["physics"];
     case "material-conformance": return ["material-conformance"];

@@ -10,6 +10,10 @@ const pageOrchestrationBoundarySource = readFileSync(
   new URL("./studio-page-orchestration-boundary.test.ts", import.meta.url),
   "utf8",
 );
+const viteConfigSource = readFileSync(
+  new URL("../../../vite.config.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(start: string, end: string): string {
   const startIndex = bundleCheckSource.indexOf(start);
@@ -61,6 +65,56 @@ describe("Studio quality-first build-size policy", () => {
     );
     expect(bundleCheckSource).toContain(
       "returned to the Studio static graph",
+    );
+  });
+
+  it("allows Babylon only through one exact lazy specialist boundary", () => {
+    expect(bundleCheckSource).toContain(
+      '"src/domains/creator/studio-bg3d-babylon-specialist-entry.ts"',
+    );
+    expect(bundleCheckSource).toContain(
+      "const babylonManifestPattern = /(?:@babylonjs|babylon(?:\\.js)?)/i",
+    );
+    expect(bundleCheckSource).toContain(
+      'const approvedBabylonRuntimeChunkName = "studio-bg3d-babylon-runtime"',
+    );
+    expect(viteConfigSource).toContain('id.includes("/node_modules/@babylonjs/")');
+    expect(viteConfigSource).toContain(
+      'id.includes("/node_modules/babylonjs-gltf2interface/")',
+    );
+    expect(viteConfigSource).toContain(
+      'return "studio-bg3d-babylon-runtime"',
+    );
+
+    const specialistBoundaryBlock = sourceBetween(
+      "function checkApprovedLazySpecialistBoundary(",
+      "try {",
+    );
+    expect(specialistBoundaryBlock).toContain("if (matching.length === 0) return");
+    expect(specialistBoundaryBlock).toContain("approvedEntries.length !== 1");
+    expect(specialistBoundaryBlock).toContain("approvedEntry.isDynamicEntry !== true");
+    expect(specialistBoundaryBlock).toContain("runtimeChunks.length !== 1");
+    expect(specialistBoundaryBlock).toContain("forbiddenStaticClosures");
+    expect(specialistBoundaryBlock).toContain("outsideApprovedClosure");
+    expect(specialistBoundaryBlock).toContain("staticOwnersOutsideApprovedClosure");
+    expect(specialistBoundaryBlock).toContain("directDynamicImporters.length !== 1");
+    expect(specialistBoundaryBlock).toContain(
+      "dynamicTargetsFromStaticClosure(approvedParentEntryKey).has(approvedEntryKey)",
+    );
+
+    const engineBoundaryCall = sourceBetween(
+      "const emittedUnapprovedProductionEngineLabs",
+      "const pngWorkerFiles",
+    );
+    expect(engineBoundaryCall).toContain("checkApprovedLazySpecialistBoundary({");
+    expect(engineBoundaryCall).toContain(
+      "approvedEntrySource: approvedBabylonSpecialistEntry",
+    );
+    expect(engineBoundaryCall).toContain(
+      "requiredRuntimeChunkName: approvedBabylonRuntimeChunkName",
+    );
+    expect(engineBoundaryCall).toContain(
+      '["BG3D editor activation", background3dKeys]',
     );
   });
 });
