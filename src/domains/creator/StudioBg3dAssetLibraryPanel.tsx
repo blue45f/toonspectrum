@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { Bg3dModelImportItem, Bg3dModelLibraryEntry } from "./bg3d-model-library";
 
 const ASSET_BATCH_SIZE = 12;
+const MODEL_RESULTS_ID = "bg3d-model-library-results";
 const MODEL_FILE_ACCEPT =
   ".glb,.gltf,.obj,.fbx,.dae,.stl,.ply,.3ds,.mtl,.bin,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json,model/obj,model/stl";
 
@@ -22,6 +23,8 @@ const CONTROL_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9";
 
 type AssetFilter = "all" | "usable" | "review";
+type AssetClassification = "character" | "creature" | "prop";
+type AssetClassificationFilter = "all" | AssetClassification;
 type ImportRights = NonNullable<Bg3dModelImportItem["rights"]>;
 type ImportRightsStatus = NonNullable<ImportRights["status"]>;
 type DownloadFeedback = {
@@ -34,6 +37,16 @@ const ASSET_FILTERS: ReadonlyArray<{ id: AssetFilter; label: string }> = [
   { id: "all", label: "전체" },
   { id: "usable", label: "사용 가능" },
   { id: "review", label: "확인 필요" },
+];
+
+const ASSET_CLASSIFICATION_FILTERS: ReadonlyArray<{
+  id: AssetClassificationFilter;
+  label: string;
+}> = [
+  { id: "all", label: "전체" },
+  { id: "character", label: "캐릭터" },
+  { id: "creature", label: "크리처" },
+  { id: "prop", label: "소품" },
 ];
 
 const RIGHTS_PRESETS: ReadonlyArray<{
@@ -49,6 +62,7 @@ const RIGHTS_PRESETS: ReadonlyArray<{
 
 type StudioBg3dAssetLibraryPanelProps = {
   entries: readonly Bg3dModelLibraryEntry[];
+  classificationByModelId?: ReadonlyMap<string, AssetClassification>;
   libraryStatus: "idle" | "loading" | "ready" | "error";
   deletingModelId: string | null;
   isUploading: boolean;
@@ -70,6 +84,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 export function StudioBg3dAssetLibraryPanel({
   entries,
+  classificationByModelId,
   libraryStatus,
   deletingModelId,
   isUploading,
@@ -83,6 +98,8 @@ export function StudioBg3dAssetLibraryPanel({
 }: StudioBg3dAssetLibraryPanelProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AssetFilter>("all");
+  const [classificationFilter, setClassificationFilter] =
+    useState<AssetClassificationFilter>("all");
   const [visibleCount, setVisibleCount] = useState(ASSET_BATCH_SIZE);
   const [rightsStatus, setRightsStatus] = useState<ImportRightsStatus>("unknown");
   const [commercialUse, setCommercialUse] = useState(false);
@@ -178,6 +195,10 @@ export function StudioBg3dAssetLibraryPanel({
   const filteredEntries = entries.filter((entry) => {
     if (filter === "usable" && !entry.canUse) return false;
     if (filter === "review" && entry.canUse) return false;
+    if (
+      classificationFilter !== "all" &&
+      classificationByModelId?.get(entry.id) !== classificationFilter
+    ) return false;
     if (!normalizedQuery) return true;
     return [entry.name, entry.format, entry.statusMessage].some((value) =>
       value.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
@@ -370,6 +391,7 @@ export function StudioBg3dAssetLibraryPanel({
           type="search"
           value={query}
           aria-label="3D 모델 라이브러리 검색"
+          aria-controls={MODEL_RESULTS_ID}
           placeholder="모델 이름·형식 검색…"
           spellCheck={false}
           className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -386,6 +408,7 @@ export function StudioBg3dAssetLibraryPanel({
             key={option.id}
             type="button"
             aria-pressed={filter === option.id}
+            aria-controls={MODEL_RESULTS_ID}
             className={cx(
               "min-h-11 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
               filter === option.id
@@ -402,7 +425,30 @@ export function StudioBg3dAssetLibraryPanel({
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-4 gap-1.5" role="group" aria-label="3D 모델 종류 필터">
+        {ASSET_CLASSIFICATION_FILTERS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            aria-pressed={classificationFilter === option.id}
+            aria-controls={MODEL_RESULTS_ID}
+            className={cx(
+              "min-h-11 rounded-lg border px-1.5 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9",
+              classificationFilter === option.id
+                ? "border-accent/55 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+            )}
+            onClick={() => {
+              setClassificationFilter(option.id);
+              setVisibleCount(ASSET_BATCH_SIZE);
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <div id={MODEL_RESULTS_ID} className="mt-3 grid grid-cols-2 gap-2">
         {libraryStatus === "loading" ? (
           <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
             저장된 3D 모델을 불러오는 중입니다.
@@ -416,8 +462,11 @@ export function StudioBg3dAssetLibraryPanel({
         ) : null}
 
         {entries.length > 0 && filteredEntries.length === 0 ? (
-          <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
-            검색·필터와 일치하는 3D 모델이 없습니다.
+          <div
+            className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3"
+            role="status"
+          >
+            검색·상태·종류 필터와 일치하는 3D 모델이 없습니다.
           </div>
         ) : null}
 

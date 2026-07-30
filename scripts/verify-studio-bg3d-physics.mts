@@ -284,7 +284,7 @@ async function waitForBackground3dDialog(page: Page): Promise<Locator> {
   await dialog.waitFor({ state: "visible", timeout: 25_000 });
   await waitForElementAnimations(dialog);
   const namedDialog = page.getByRole("dialog", {
-    name: "3D 배경 블록아웃 만들기",
+    name: "3D 장면 스튜디오",
     exact: true,
   });
   assertCondition(await namedDialog.count() === 1, "3D dialog lost its accessible name contract");

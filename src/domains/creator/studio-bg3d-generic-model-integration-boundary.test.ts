@@ -23,8 +23,8 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 
 describe("Studio BG3D generic model mode integration boundary", () => {
   it("owns an explicit generic 3D tab without coupling it to a VRM runtime", () => {
-    expect(source).toContain('{ id: "models", label: "범용 3D"');
-    expect(source).toContain('aria-label={tab.id === "models" ? "모델" : tab.label}');
+    expect(source).toContain('{ id: "models", label: "에셋"');
+    expect(source).toContain("aria-label={tab.label}");
     expect(source).toContain("<StudioGeneric3dModelModePanel");
     expect(source).toContain("VRM 별도");
     expect(source).toContain("VRM 아바타의 humanoid·표정·이용 조건과 섞지 않고");

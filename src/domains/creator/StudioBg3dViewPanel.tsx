@@ -15,6 +15,7 @@ import {
   roundStudioBg3dNumber as round,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
+import { StudioBg3dLightingStudio } from "./StudioBg3dLightingStudio";
 
 import type {
   StudioBg3dPhysicsGravityPreset,
@@ -23,6 +24,7 @@ import type {
 import type {
   StudioBg3dBackgroundSettings,
   StudioBg3dCameraSettings,
+  StudioBg3dLightingSettings,
   StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 import type { StudioBg3dSectionPlaneState } from "./studio-bg3d-section-plane";
@@ -117,6 +119,8 @@ interface StudioBg3dViewPanelContext {
   readonly STUDIO_BG3D_MOOD_RIGS: readonly import("./studio-bg3d-mood-rigs").StudioBg3dMoodRig[];
   readonly appliedMoodRig: import("./studio-bg3d-mood-rigs").StudioBg3dMoodRig | null;
   readonly applyMoodRig: (rigId: string) => void;
+  readonly updateLightingSettings: (patch: Partial<StudioBg3dLightingSettings>) => void;
+  readonly updateRenderExposure: (exposure: number) => void;
   readonly sunLightState: import("./studio-bg3d-sun-rig").StudioBg3dSunLightState;
   readonly STUDIO_BG3D_SUN_TIME_PRESETS: readonly import("./studio-bg3d-sun-rig").StudioBg3dSunTimePreset[];
   readonly sunRigConfig: StudioBg3dSunRigConfig;
@@ -307,6 +311,8 @@ export function StudioBg3dViewPanel({
     STUDIO_BG3D_MOOD_RIGS,
     appliedMoodRig,
     applyMoodRig,
+    updateLightingSettings,
+    updateRenderExposure,
     sunLightState,
     STUDIO_BG3D_SUN_TIME_PRESETS,
     sunRigConfig,
@@ -1063,6 +1069,17 @@ export function StudioBg3dViewPanel({
                       "현재 하늘·안개·조명·노출 값은 개별 조정된 사용자 설정입니다."}
                   </p>
                 </div>
+
+                <StudioBg3dLightingStudio
+                  lighting={sceneBaseDocument.lighting}
+                  exposure={sceneBaseDocument.render.exposure}
+                  disabled={
+                    isCapturing || isBatchRenderingShots || isRestoringScene ||
+                    physicsInteractionLocked
+                  }
+                  onUpdateLighting={updateLightingSettings}
+                  onUpdateExposure={updateRenderExposure}
+                />
 
                 <div className="mt-5 border-t border-line pt-4">
                   <div className="mb-2 flex items-center justify-between gap-3">

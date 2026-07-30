@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioBg3dAssetLibraryPanel } from "./StudioBg3dAssetLibraryPanel";
@@ -110,7 +110,7 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     fireEvent.change(screen.getByLabelText("3D 모델 라이브러리 검색"), {
       target: { value: "교실" },
     });
-    expect(screen.getByText("검색·필터와 일치하는 3D 모델이 없습니다.")).toBeTruthy();
+    expect(screen.getByText("검색·상태·종류 필터와 일치하는 3D 모델이 없습니다.")).toBeTruthy();
     expect(screen.getByText("표시 0/0개 · 데스크톱 기준")).toBeTruthy();
   });
 
@@ -138,7 +138,10 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(screen.getByRole("button", { name: "사용 가능" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByText("모델 02")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "전체" }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "3D 모델 상태 필터" }))
+        .getByRole("button", { name: "전체" }),
+    );
     fireEvent.change(screen.getByLabelText("3D 모델 라이브러리 검색"), {
       target: { value: "모델 14" },
     });
@@ -149,6 +152,97 @@ describe("StudioBg3dAssetLibraryPanel", () => {
       target: { value: "" },
     });
     expect(screen.getByText("표시 12/14개 · 데스크톱 기준")).toBeTruthy();
+  });
+
+  it("combines authoritative model types with status and search while keeping unmapped entries in all only", () => {
+    const entries = [
+      createEntry("character-usable", "주인공"),
+      createEntry("character-review", "조연", {
+        canUse: false,
+        status: "legacy-reimport-required",
+        statusMessage: "다시 가져오기가 필요합니다.",
+      }),
+      createEntry("creature", "숲의 용"),
+      createEntry("prop", "교실 책상"),
+      createEntry("unclassified", "분류 전 모델"),
+    ];
+    const classificationByModelId = new Map([
+      ["character-usable", "character"],
+      ["character-review", "character"],
+      ["creature", "creature"],
+      ["prop", "prop"],
+    ] as const);
+    renderPanel({ entries, classificationByModelId });
+
+    const statusFilters = screen.getByRole("group", { name: "3D 모델 상태 필터" });
+    const typeFilters = screen.getByRole("group", { name: "3D 모델 종류 필터" });
+    const characterFilter = within(typeFilters).getByRole("button", { name: "캐릭터" });
+
+    expect(screen.getByText("표시 5/5개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("분류 전 모델")).toBeTruthy();
+    expect(characterFilter.className).toContain("min-h-11");
+    expect(characterFilter.className).toContain("sm:min-h-9");
+    expect(characterFilter.className).toContain("focus-visible:outline");
+    expect(characterFilter.getAttribute("aria-controls")).toBe("bg3d-model-library-results");
+
+    fireEvent.click(characterFilter);
+    expect(characterFilter.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("표시 2/2개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("주인공")).toBeTruthy();
+    expect(screen.getByText("조연")).toBeTruthy();
+    expect(screen.queryByText("분류 전 모델")).toBeNull();
+    expect(screen.queryByText("숲의 용")).toBeNull();
+
+    fireEvent.click(within(statusFilters).getByRole("button", { name: "확인 필요" }));
+    expect(screen.getByText("표시 1/1개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("조연")).toBeTruthy();
+    expect(screen.queryByText("주인공")).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("3D 모델 라이브러리 검색"), {
+      target: { value: "없는 모델" },
+    });
+    expect(screen.getByRole("status").textContent)
+      .toContain("검색·상태·종류 필터와 일치하는 3D 모델이 없습니다.");
+    expect(screen.getByText("표시 0/0개 · 데스크톱 기준")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("3D 모델 라이브러리 검색"), {
+      target: { value: "" },
+    });
+    fireEvent.click(within(statusFilters).getByRole("button", { name: "전체" }));
+    fireEvent.click(within(typeFilters).getByRole("button", { name: "전체" }));
+    expect(screen.getByText("표시 5/5개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("분류 전 모델")).toBeTruthy();
+  });
+
+  it("resets increased display when a model type facet changes", () => {
+    const entries = Array.from({ length: 15 }, (_, index) =>
+      createEntry(`model-${index + 1}`, `분류 모델 ${String(index + 1).padStart(2, "0")}`),
+    );
+    const classificationByModelId = new Map(
+      entries.map((entry, index) => [
+        entry.id,
+        index < 14 ? "character" as const : "prop" as const,
+      ]),
+    );
+    renderPanel({ entries, classificationByModelId });
+
+    expect(screen.getByText("표시 12/15개 · 데스크톱 기준")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /모델 3개 더 보기/ }));
+    expect(screen.getByText("표시 15/15개 · 데스크톱 기준")).toBeTruthy();
+
+    const typeFilters = screen.getByRole("group", { name: "3D 모델 종류 필터" });
+    fireEvent.click(within(typeFilters).getByRole("button", { name: "캐릭터" }));
+    expect(screen.getByText("표시 12/14개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.queryByText("분류 모델 13")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /모델 2개 더 보기/ }));
+    expect(screen.getByText("표시 14/14개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("분류 모델 14")).toBeTruthy();
+
+    fireEvent.click(within(typeFilters).getByRole("button", { name: "소품" }));
+    expect(screen.getByText("표시 1/1개 · 데스크톱 기준")).toBeTruthy();
+    expect(screen.getByText("분류 모델 15")).toBeTruthy();
+    expect(screen.queryByText("분류 모델 14")).toBeNull();
   });
 
   it("owns the multi-format file input and switches the upload action to cancel", () => {
@@ -364,7 +458,10 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     const deleteButton = screen.getByRole("button", { name: "삭제 중 모델 삭제" }) as HTMLButtonElement;
     const unsafeDeleteButton = screen.getByRole("button", { name: "사용 불가 모델 삭제" }) as HTMLButtonElement;
     const search = screen.getByLabelText("3D 모델 라이브러리 검색");
-    const filter = screen.getByRole("button", { name: "전체" });
+    const filter = within(screen.getByRole("group", { name: "3D 모델 상태 필터" }))
+      .getByRole("button", { name: "전체" });
+    const classificationFilter = within(screen.getByRole("group", { name: "3D 모델 종류 필터" }))
+      .getByRole("button", { name: "전체" });
 
     expect(deletingAdd.disabled).toBe(true);
     expect(unsafeAdd.disabled).toBe(true);
@@ -377,6 +474,10 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(search.className).toContain("min-h-11");
     expect(search.className).toContain("focus-visible:outline");
     expect(filter.className).toContain("min-h-11");
+    expect(classificationFilter.className).toContain("min-h-11");
+    expect(classificationFilter.getAttribute("aria-pressed")).toBe("true");
+    expect(classificationFilter.getAttribute("aria-controls")).toBe("bg3d-model-library-results");
     expect(screen.getByRole("group", { name: "3D 모델 상태 필터" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "3D 모델 종류 필터" })).toBeTruthy();
   });
 });

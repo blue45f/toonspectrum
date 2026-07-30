@@ -399,6 +399,7 @@ import {
   type StudioBg3dLineOutputSettings,
   type StudioBg3dAnimationPlayback,
   type StudioBg3dConstraintLayer,
+  type StudioBg3dLightingSettings,
   type StudioBg3dMaterialOverride,
   type StudioBg3dPoseLayer,
   type StudioBg3dMorphLayer,
@@ -995,7 +996,7 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "layers", label: "레이어", icon: Layers, hint: "목록 · 선택 · 복제 · 삭제" },
   { id: "view", label: "보기", icon: Camera, hint: "카메라 프리셋 · 선화 미리보기" },
   { id: "lt", label: "LT", icon: ScanLine, hint: "컬러 · 선화 · 톤 출력 설정" },
-  { id: "models", label: "범용 3D", icon: Hexagon, hint: "GLB · glTF · OBJ/MTL 가져오기와 모델 조작" },
+  { id: "models", label: "에셋", icon: Hexagon, hint: "캐릭터 · 크리처 · 소품과 범용 3D 모델" },
 ];
 
 const TRANSFORM_MODES: Array<{
@@ -5513,6 +5514,39 @@ export function StudioBackground3D({
     setError(null);
   }
 
+  function updateLightingSettings(patch: Partial<StudioBg3dLightingSettings>) {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        lighting: {
+          ...current.lighting,
+          ...patch,
+          ...(patch.key
+            ? { key: { ...current.lighting.key, ...patch.key } }
+            : {}),
+          ...(patch.fill
+            ? { fill: { ...current.lighting.fill, ...patch.fill } }
+            : {}),
+        },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
+  function updateRenderExposure(exposure: number) {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        render: { ...current.render, exposure },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
   function applyMoodRig(rigId: string) {
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
     const applied = applyStudioBg3dMoodRig(sceneBaseDocument, rigId);
@@ -9007,8 +9041,8 @@ export function StudioBackground3D({
               <Boxes size={14} aria-hidden />
               3D 배경
             </p>
-            <h2 id="studio-bg3d-dialog-title" className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 배경 블록아웃 만들기</h2>
-            <p className="mt-1 line-clamp-1 text-xs text-fg-3">상자·모델로 구조를 잡고 컬러·선화 레이어로 추출해 패널에 추가</p>
+            <h2 id="studio-bg3d-dialog-title" className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 장면 스튜디오</h2>
+            <p className="mt-1 line-clamp-1 text-xs text-fg-3">캐릭터·배경·소품·조명을 한 장면에서 연출하고 컬러·선화로 추출</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isBatchRenderingShots ? (
@@ -9610,7 +9644,7 @@ export function StudioBackground3D({
                         <Boxes size={22} aria-hidden />
                       </div>
                       <p className="mt-4 text-sm font-bold text-fg">
-                        오른쪽 &ldquo;템플릿&rdquo; 탭에서 교실·거리 같은 완성된 공간을 통째로 추가하거나, &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩 추가하고 &ldquo;모델&rdquo; 탭에서 3D 파일을 업로드해 배경을 잡아보세요.
+                        오른쪽 &ldquo;템플릿&rdquo; 탭에서 교실·거리 같은 완성된 공간을 통째로 추가하거나, &ldquo;도형&rdquo; 탭에서 상자·원기둥·평면을 하나씩 추가하고 &ldquo;에셋&rdquo; 탭에서 캐릭터·크리처·소품과 3D 파일을 배치해 장면을 잡아보세요.
                       </p>
                     </div>
                   </div>
@@ -9635,7 +9669,7 @@ export function StudioBackground3D({
                     id={`bg3d-tab-${tab.id}`}
                     type="button"
                     role="tab"
-                    aria-label={tab.id === "models" ? "모델" : tab.label}
+                    aria-label={tab.label}
                     aria-selected={isActive}
                     aria-controls="bg3d-panel-body"
                     tabIndex={isActive ? 0 : -1}
@@ -9833,7 +9867,7 @@ export function StudioBackground3D({
                   </span>
                 </div>
                 {layerListItems.length === 0 ? (
-                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·모델이 없습니다. &ldquo;도형&rdquo;/&ldquo;모델&rdquo; 탭에서 먼저 추가해 주세요.</p>
+                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·에셋이 없습니다. &ldquo;도형&rdquo;/&ldquo;에셋&rdquo; 탭에서 먼저 추가해 주세요.</p>
                 ) : (
                   <>
                     <label className="mb-2 block">
@@ -10091,6 +10125,8 @@ export function StudioBackground3D({
                   STUDIO_BG3D_MOOD_RIGS,
                   appliedMoodRig,
                   applyMoodRig,
+                  updateLightingSettings,
+                  updateRenderExposure,
                   sunLightState,
                   STUDIO_BG3D_SUN_TIME_PRESETS,
                   sunRigConfig,
@@ -10337,6 +10373,7 @@ export function StudioBackground3D({
                   >
                     <LazyStudioBg3dAssetLibraryPanel
                       entries={modelLibrary}
+                      classificationByModelId={genericModelClassifications}
                       libraryStatus={modelLibraryStatus}
                       deletingModelId={deletingModelId}
                       isUploading={isUploadingModel}
