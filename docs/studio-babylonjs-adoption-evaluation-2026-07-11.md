@@ -1,17 +1,91 @@
 # ADR — ToonSpectrum Studio의 Babylon.js 도입 평가
 
 - 결정일: 2026-07-11
-- 상태: **프로덕션 도입 보류(Defer)**
+- 상태: **기본 3D 편집 엔진 교체 보류 / 격리 Webtoon FX specialist 계약 승인**
 - 평가 버전: `@babylonjs/core@9.16.1`, `@babylonjs/loaders@9.16.1`, Vite `8.0.16`
+- 2026-07-31 재검토 후보: `@babylonjs/core@9.19.0`, `@babylonjs/loaders@9.19.0`
 - 범위: 3D 배경 도구, VRM 포저, 모바일 편집 성능, 번들/로더 비용
 
 ## 결정
 
-현재 Three.js + React Three Fiber(R3F) + `@pixiv/three-vrm` 구현을 유지한다. Babylon.js를 기존 런타임과 함께 프로덕션에 추가하지 않는다.
+현재 Three.js + React Three Fiber(R3F) + `@pixiv/three-vrm` 구현을 대화형 편집 장면의 유일한
+소유자로 유지한다. Babylon.js를 같은 Canvas/scene graph의 두 번째 소유자로 추가하지 않는다.
 
 Babylon.js는 WebGPU, 성능 계측, AssetContainer, 다양한 로더와 대규모 씬 최적화 수단이 잘 갖춰진 엔진이다. 그러나 현재 Studio의 핵심 3D 기능은 이미 Three 생태계에 깊게 구현되어 있고, Babylon을 병행하면 **3D 배경 도구를 열 때 최소 1,278,690 B min / 305,625 B gzip의 별도 런타임**이 추가된다. glTF를 처음 활성화하면 여기에 **767,936 B min / 178,632 B gzip**이 더 필요하다. 현재 Studio 안에서 Three 기반 3D 배경 도구를 여는 증분은 **267,763 B min / 79,398 B gzip**, glTF 로더는 추가 **44,288 B min / 13,063 B gzip**이다.
 
 또한 현재 VRM 포저는 포즈, 표정, MToon, 스프링본, 의상, 소품, 웹캠 추적과 캡처/복원을 `@pixiv/three-vrm` 위에 구현한다. Babylon 공식 문서가 안내하는 VRM 경로는 코어 기능이 아니라 **community-made `babylon-vrm-loader`**이므로, 이 기능군을 동등하게 이전할 근거가 아직 부족하다. 따라서 Babylon은 특정 WebGPU 워크로드가 실제 제품 벤치마크에서 명확히 이길 때만 격리 실험으로 재검토한다.
+
+## 2026-07-31 재결정 — 웹툰 배경·멀티패스 FX specialist
+
+Babylon을 “범용 필터 엔진”으로 추가하지는 않는다. 레벨·커브·색상 행렬·일반 블러처럼 평면
+RGBA만 필요한 필터는 현재 canonical RGBA16F 타일/WebGPU·Worker 경로가 문서 저장, 마스크,
+실행 취소, 라이브/내보내기 동일성 면에서 더 직접적이다.
+
+대신 **3D 장면의 깊이·노멀·재질·오브젝트·발광·모션 정보를 함께 써야 하는 효과**는 Babylon
+격리 specialist의 승인 대상이다. Babylon은 WebGPU 엔진과 compute shader를 지원하고
+[Node Material](https://doc.babylonjs.com/typedoc/classes/BABYLON.NodeMaterial)로 WebGPU WGSL,
+post-process, depth pre-pass와 다중 렌더 타깃용 재질을 구성할 수 있다.
+[WebGPU 초기화](https://doc.babylonjs.com/setup/support/webGPU/)는 비동기이며 실패할 수 있으므로
+WebGL 또는 기존 Three 캡처로 데이터 손실 없이 복귀해야 한다.
+
+승인한 1차 효과군은 다음과 같다.
+
+| 효과군 | Babylon specialist가 맡는 계산 | Studio에 돌아오는 결과 |
+| --- | --- | --- |
+| 툰 선화 | depth/normal 불연속, 재질·오브젝트 경계, 화면 크기 독립 선 굵기 | 투명 RGBA 선화 또는 beauty 합성 |
+| 공간 분위기 | 깊이 안개·원근 대기·열 아지랑이·색 번짐 | RGBA + 정규화 depth |
+| 렌즈·조명 | emissive bloom, glow, god ray, lens flare, DOF/bokeh | RGBA + 효과 recipe/hash |
+| 날씨·입자 | 비·눈·꽃잎·먼지·불씨, 바람장, depth occlusion | 결정적 seed/time의 RGBA 프레임 |
+| 웹툰 연출 | 속도선·집중선·충격파·네온·발광 간판·물결 | 투명 FX 레이어 또는 beauty 합성 |
+| 제작 보조 pass | normal, velocity, object/material ID, shadow, emission | 검증된 typed-array 또는 lossless pass |
+
+기본 리더의 소수 Canvas2D 입자는 그대로 유지한다. Babylon은 여러 장면 pass나 depth occlusion이
+필요한 “시네마틱 FX” 프리셋을 열 때만 완전 지연 로드한다. 라이브 미리보기와 export는 동일 seed,
+고정 timestep, 동일 canonical recipe를 사용해야 하며 wall-clock time을 입력으로 쓰지 않는다.
+
+### 구현 경계
+
+현재 제품 코드에는 다음 최소 계약을 추가했다.
+
+- `StudioBg3dRuntimeCapability`의 `webtoon-scene-fx`
+- Babylon WebGL/WebGPU lab descriptor의 FX/capture capability
+- `StudioBg3dWebtoonFxCaptureRequest` v1: 최대 8개 pass, 결정적 time/seed, preview/final 품질
+- `beauty`/`lt-source` 출력 의도, 선택적 base-scene depth, 버전이 고정된 top-down RGBA8/depth profile
+- 1차 pass: toon outline, depth atmosphere, emissive bloom, depth of field,
+  weather particles, speed lines
+- preview 4Mpx, final beauty 16Mpx, LT source 8Mpx, 수치·색상·seed·effect count fail-closed 검증
+- LT source에는 depth를 강제하고 bloom·DOF·입자처럼 선화 입력을 훼손하는 pass를 거부
+
+입력은 canonical `StudioBg3dSceneDocument`와 검증된 GLB byte snapshot뿐이다. Babylon Node,
+Material, Texture, GPUBuffer, object URL은 경계를 통과하지 않는다. 출력은 기존 runtime adapter가
+방어 복사하는 RGBA/depth DTO이며, 최종 합성은 Studio 소유 필터/레이어 경로가 수행한다.
+
+```text
+SceneDocument + verified GLB + bounded FX recipe
+  → isolated Babylon WebGPU/WebGL job
+  → internal MRT / pre-pass / particle / post-process
+  → top-down RGBA + requested normalized base-scene depth
+  → Studio canonical filter/mask/layer commit
+```
+
+이 경계는 Babylon의 [Frame Graph custom post-process](https://doc.babylonjs.com/features/featuresDeepDive/frameGraph/frameGraphExamples/frameGraphExampleCustomPostProcess),
+[Geometry Buffer](https://doc.babylonjs.com/typedoc/classes/BABYLON.GeometryBufferRenderer),
+[PrePass Renderer](https://doc.babylonjs.com/typedoc/classes/BABYLON.PrePassRenderer),
+[Particle System](https://doc.babylonjs.com/typedoc/classes/BABYLON.ParticleSystem)을 한 작업 내부에서
+활용하되 Studio 문서 권위는 넘기지 않도록 한다.
+
+### 프로덕션 어댑터 구현 전 PoC 순서
+
+1. 동일 canonical scene으로 Three beauty/depth와 Babylon beauty/depth를 캡처한다.
+2. Babylon WebGPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
+3. rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를 확인한다.
+4. normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
+5. device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
+   검증한다.
+
+채택 기준은 FX 미사용 시 Babylon chunk/network/GPU context가 0이고, 대표 1080p preview p95가
+16.7ms(또는 현재 기준 대비 25% 개선), 입력·출력 byte budget 준수, 30분 soak 후 지속 heap/GPU
+증가 없음, 같은 seed/time의 라이브·export pixel diff 0, beauty/depth 골든 허용 오차 통과다.
 
 ## 현재 3D 파이프라인
 

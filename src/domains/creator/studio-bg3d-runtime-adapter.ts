@@ -12,6 +12,10 @@ import {
   serializeStudioBg3dSceneDocument,
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import {
+  normalizeStudioBg3dWebtoonFxCaptureRequest,
+  type StudioBg3dWebtoonFxCaptureRequest,
+} from "./studio-bg3d-webtoon-fx";
 
 import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
 
@@ -91,6 +95,7 @@ export function createStudioBg3dRuntimeSnapshot(
 export type StudioBg3dSpecialistRequest =
   | { readonly kind: "runtime-metrics" }
   | { readonly kind: "capture"; readonly width: number; readonly height: number }
+  | StudioBg3dWebtoonFxCaptureRequest
   | {
     readonly kind: "physics-preview";
     readonly durationSeconds: number;
@@ -184,6 +189,10 @@ function validRequest(request: unknown): request is StudioBg3dSpecialistRequest 
     case "vector-map-frame":
     case "bim-section":
       return validRasterSize(candidate.width, candidate.height);
+    case "webtoon-fx-capture": {
+      const normalized = normalizeStudioBg3dWebtoonFxCaptureRequest(request);
+      return Boolean(normalized && validRasterSize(normalized.width, normalized.height));
+    }
     case "xr-runtime-metrics":
       return true;
     case "physics-preview":
@@ -223,6 +232,8 @@ function snapshotRequest(
       case "vector-map-frame":
       case "bim-section":
         return Object.freeze({ kind: request.kind, width: request.width, height: request.height });
+      case "webtoon-fx-capture":
+        return normalizeStudioBg3dWebtoonFxCaptureRequest(request);
       case "scientific-isosurface":
         return Object.freeze({ kind: request.kind, isoValue: request.isoValue });
       case "physics-preview": {
@@ -259,8 +270,14 @@ function snapshotRequest(
   }
 }
 
-function sanitizeResult(result: StudioBg3dSpecialistResult): StudioBg3dSpecialistResult {
+function sanitizeResult(
+  result: StudioBg3dSpecialistResult,
+  request: StudioBg3dSpecialistRequest,
+): StudioBg3dSpecialistResult {
   if (!result || typeof result !== "object") throw runtimeBoundaryError("invalid-result");
+  if (request.kind === "webtoon-fx-capture" && result.kind !== "capture") {
+    throw runtimeBoundaryError("invalid-result");
+  }
   if (result.kind === "metrics") {
     const entries = Object.entries(result.values ?? {});
     if (
@@ -280,13 +297,29 @@ function sanitizeResult(result: StudioBg3dSpecialistResult): StudioBg3dSpecialis
     if (!validRasterSize(result.width, result.height)) {
       throw runtimeBoundaryError("invalid-result");
     }
+    if (
+      request.kind === "webtoon-fx-capture" &&
+      (
+        result.width !== request.width ||
+        result.height !== request.height ||
+        (request.includeDepth && !(result.depthFloat32 instanceof Float32Array))
+      )
+    ) {
+      throw runtimeBoundaryError("invalid-result");
+    }
     const pixels = result.width * result.height;
     if (!(result.rgba instanceof Uint8Array) || result.rgba.byteLength !== pixels * 4) {
       throw runtimeBoundaryError("invalid-result");
     }
     if (
       result.depthFloat32 !== undefined &&
-      (!(result.depthFloat32 instanceof Float32Array) || result.depthFloat32.length !== pixels)
+      (
+        !(result.depthFloat32 instanceof Float32Array) ||
+        result.depthFloat32.length !== pixels ||
+        result.depthFloat32.some((value) =>
+          !Number.isFinite(value) || value < 0 || value > 1
+        )
+      )
     ) {
       throw runtimeBoundaryError("invalid-result");
     }
@@ -336,6 +369,7 @@ function requiredCapabilitiesForRequest(
   switch (request.kind) {
     case "runtime-metrics": return [];
     case "capture": return ["capture-rgba-depth"];
+    case "webtoon-fx-capture": return ["capture-rgba-depth", "webtoon-scene-fx"];
     case "physics-preview": return ["physics"];
     case "material-conformance": return ["material-conformance"];
     case "splat-preview": return ["gaussian-splatting"];
@@ -413,7 +447,7 @@ export class StudioBg3dRuntimeAdapterRegistry {
         signal,
       });
       if (signal.aborted) throw runtimeBoundaryError("aborted");
-      return sanitizeResult(result);
+      return sanitizeResult(result, requestSnapshot);
     } finally {
       release?.();
     }

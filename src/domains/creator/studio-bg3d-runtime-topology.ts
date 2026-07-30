@@ -34,6 +34,7 @@ export type StudioBg3dRuntimeCapability =
   | "webxr"
   | "thin-instancing"
   | "progressive-gltf"
+  | "webtoon-scene-fx"
   | "compute"
   | "gaussian-splatting"
   | "material-conformance"
@@ -216,7 +217,6 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
     family: "babylon",
     maturity: "lab",
     capabilities: runtimeCapabilities([
-      "interactive-editing",
       "capture-rgba-depth",
       "skinning",
       "morph-targets",
@@ -225,6 +225,7 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
       "webxr",
       "thin-instancing",
       "progressive-gltf",
+      "webtoon-scene-fx",
     ]),
     activationGzipBytes: 306_000,
   }),
@@ -233,7 +234,7 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
     family: "babylon",
     maturity: "lab",
     capabilities: runtimeCapabilities([
-      "interactive-editing",
+      "capture-rgba-depth",
       "skinning",
       "morph-targets",
       "webgpu",
@@ -241,6 +242,7 @@ export const STUDIO_BG3D_RUNTIME_CATALOG: Readonly<Record<
       "webxr",
       "thin-instancing",
       "progressive-gltf",
+      "webtoon-scene-fx",
     ]),
     activationGzipBytes: 271_000,
   }),

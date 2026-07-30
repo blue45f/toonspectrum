@@ -60,6 +60,78 @@ describe("Studio BG3D runtime topology policy", () => {
     });
   });
 
+  it("routes depth-aware webtoon FX to an isolated Babylon WebGPU specialist", () => {
+    const plan = planStudioBg3dRuntimeTopology({
+      ...baseRequest,
+      availableRuntimeIds: [
+        "three-webgl",
+        "babylon-webgl-lab",
+        "babylon-webgpu-lab",
+      ],
+      allowLabRuntimes: true,
+      webgpuSupported: true,
+      maximumActivationGzipBytes: 500_000,
+      specialistJobs: [{
+        id: "webtoon-fx-preview",
+        requiredCapabilities: ["capture-rgba-depth", "webtoon-scene-fx"],
+      }],
+    });
+
+    expect(plan).toMatchObject({
+      ok: true,
+      primaryRuntimeId: "three-webgl",
+      totalActivationGzipBytes: 351_000,
+      singleInteractiveOwner: true,
+      specialists: [{
+        jobId: "webtoon-fx-preview",
+        runtimeId: "babylon-webgpu-lab",
+        isolated: true,
+      }],
+    });
+
+    const webglFallback = planStudioBg3dRuntimeTopology({
+      ...baseRequest,
+      availableRuntimeIds: [
+        "three-webgl",
+        "babylon-webgl-lab",
+        "babylon-webgpu-lab",
+      ],
+      allowLabRuntimes: true,
+      maximumActivationGzipBytes: 500_000,
+      specialistJobs: [{
+        id: "webtoon-fx-preview",
+        requiredCapabilities: ["capture-rgba-depth", "webtoon-scene-fx"],
+      }],
+    });
+    expect(webglFallback).toMatchObject({
+      ok: true,
+      primaryRuntimeId: "three-webgl",
+      totalActivationGzipBytes: 386_000,
+      specialists: [{
+        jobId: "webtoon-fx-preview",
+        runtimeId: "babylon-webgl-lab",
+        isolated: true,
+      }],
+    });
+  });
+
+  it("never promotes a Babylon FX specialist to the interactive editor owner", () => {
+    const plan = planStudioBg3dRuntimeTopology({
+      ...baseRequest,
+      availableRuntimeIds: ["babylon-webgpu-lab"],
+      allowLabRuntimes: true,
+      webgpuSupported: true,
+      primaryCapabilities: ["interactive-editing", "webgpu"],
+    });
+
+    expect(plan).toMatchObject({
+      ok: false,
+      primaryRuntimeId: null,
+      specialists: [],
+    });
+    expect(plan.diagnostics).toContain("no-primary-runtime");
+  });
+
   it("routes web-native splat/compute and domain rendering to isolated specialist adapters", () => {
     const plan = planStudioBg3dRuntimeTopology({
       ...baseRequest,

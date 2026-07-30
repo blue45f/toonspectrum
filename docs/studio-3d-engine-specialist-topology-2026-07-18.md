@@ -40,6 +40,13 @@
   morph, decoded array를 다시 측정한다.
 - 런타임 topology 정책: production/lab, WebGPU 지원, capability, 최초 활성화 gzip, specialist job을
   함께 평가하고 하나의 interactive owner만 허용한다.
+- Babylon 웹툰 FX 계약: `webtoon-scene-fx` capability와 versioned `webtoon-fx-capture` 요청을
+  추가했다. 최대 8개 pass로 툰 선화, 깊이 대기, 발광 bloom, DOF, 날씨 입자, 속도선을 기술하며
+  `beauty`/`lt-source` 출력 의도와 선택적 base-scene depth를 구분한다. preview 4Mpx,
+  final beauty 16Mpx, LT source 8Mpx 및 수치·색상·seed 예산을 통과한 recipe만 격리 adapter에
+  전달하며, LT source에서는 depth를 강제하고 bloom·DOF·입자 pass를 거부한다.
+  실제 Babylon package와 adapter는 beauty/depth 골든·device-loss·fixed-timestep replay·soak
+  게이트를 통과하기 전까지 설치하지 않는다.
 - 전문 런타임 경계: factory가 만든 canonical document + verified GLB 스냅샷만 허용하고 위조된
   구조적 복사본을 거부한다. 엔진별 작업은 직렬화하며 활성·대기 작업을 모두 비운 뒤 dispose한다.
   캡처는 16Mpx, metric/transform DTO는 길이·수치·quaternion 범위로 제한한다.
@@ -101,7 +108,7 @@
 | 후보 | 확인된 웹 강점 | ToonSpectrum에 가져올 장점 | 채택 위치 | 결론 |
 | --- | --- | --- | --- | --- |
 | **Three.js + R3F** | 현재 앱의 GLTF/OBJ, VRM, 포즈, 캡처, React UI와 직접 통합 | 가장 작은 증분 비용, 기존 VRM/선화/캡처 자산 재사용 | 기본 편집·캡처 | **프로덕션 유지** |
-| **Babylon.js** | WebGL/WebGPU, AssetContainer, thin instances, 물리/XR, instrumentation, progressive glTF | 대규모 반복 배경, 물리 sandbox, WebGPU 실기기 비교 | 완전 지연 `/labs`; 필요 시 격리 specialist | **조건부 2순위**. 일반 편집 병행은 금지 |
+| **Babylon.js** | WebGL/WebGPU, AssetContainer, thin instances, 물리/XR, instrumentation, progressive glTF, Node Material/다중 pass | 깊이·노멀 기반 선화/안개/DOF, bloom, 날씨 입자, 대규모 반복 배경 | 완전 지연 Webtoon FX·멀티패스 specialist | **FX 계약 승인**. 일반 편집 병행은 금지 |
 | **PlayCanvas Engine 2** | 공식 문서상 WebGL2 + WebGPU(beta) 자동 fallback, compute, skin/morph, batching/instancing, Gaussian Splat; GLB 권장 | Babylon보다 웹 중심인 WebGPU/compute·스플랫 비교 후보 | 스플랫/compute lab specialist | **새 PoC 우선순위 높음**. 범용 편집 교체는 A/B 후 |
 | **Spark** | Three scene 안에서 동작하는 Gaussian Splat renderer, 정렬된 splat을 instanced draw로 결합 | 두 번째 범용 엔진 없이 기존 R3F 장면에 splat 배경을 넣을 수 있음 | 격리 splat corpus 후 Three 확장 | **스플랫 1순위**. PlayCanvas와 품질·정렬·메모리 A/B |
 | **Google Filament WASM** | 모바일 지향 PBR, WebGL2 브라우저 backend, glTF/GLB·Draco·KTX2·meshopt, skin/morph animation | 재질/PBR 기준 렌더와 glTF 호환성 골든 비교 | headless/격리 material conformance viewer | **편집 엔진 아님**. 품질 검증 specialist 후보 |
