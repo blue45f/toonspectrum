@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  filterStudioBrushCatalogItems,
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
@@ -30,6 +31,13 @@ const coreCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
 const proceduralCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
   (item) => item.source === "pro"
 ).length;
+const beginnerCatalogItems = filterStudioBrushCatalogItems({
+  category: "beginner",
+  query: "",
+  favoriteIds: [],
+  recentIds: [],
+});
+const beginnerCatalogCount = beginnerCatalogItems.length;
 const sheetSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
   "utf8"
@@ -271,7 +279,8 @@ describe("StudioBrushLibrarySheet", () => {
     expect(viewGrid()?.dataset.studioBrushView).toBe("text");
     expect(viewGrid()?.className).toContain("grid-cols-1");
     expect(container.querySelector("[data-studio-brush-preview]")).toBeNull();
-    expect(container.querySelectorAll('[data-studio-brush-text-row="true"]')).toHaveLength(9);
+    expect(container.querySelectorAll('[data-studio-brush-text-row="true"]'))
+      .toHaveLength(beginnerCatalogCount);
     expect(screen.getByRole("button", { name: "펜(매끈) 선택" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "G펜(필압) 선택" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "펜(매끈) 즐겨찾기" })).toBeTruthy();
@@ -336,7 +345,9 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toMatch(/aria-label="전체 브러시 검색" aria-controls="[^"]+"/);
     expect(html).toContain('data-studio-brush-search-scope="all"');
     expect(html).toContain('role="status" aria-live="polite"');
-    expect(html).toContain("9/9개의 브러시가 표시됩니다.");
+    expect(html).toContain(
+      `${beginnerCatalogCount}/${beginnerCatalogCount}개의 브러시가 표시됩니다.`,
+    );
   });
 
   it("searches the full brush catalog regardless of the currently selected category", () => {
@@ -671,11 +682,18 @@ describe("StudioBrushLibrarySheet", () => {
       "[data-studio-brush-progressive-grid]"
     );
     const selections = screen.getAllByRole("button", { name: /선택$/ });
+    const columns = 3;
+    const lastIndex = selections.length - 1;
+    const previousRowSameColumnIndex = lastIndex - columns;
+    const missingBelowIndex = selections.length - columns;
+    expect(selections).toHaveLength(beginnerCatalogCount);
+    expect(previousRowSameColumnIndex).toBeGreaterThanOrEqual(0);
+    expect(missingBelowIndex).toBeGreaterThanOrEqual(0);
     const originalGetComputedStyle = globalThis.getComputedStyle;
     vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudoElement) => {
       if (element === grid) {
         return {
-          gridTemplateColumns: "repeat(3, minmax(0px, 1fr))",
+          gridTemplateColumns: `repeat(${columns}, minmax(0px, 1fr))`,
         } as CSSStyleDeclaration;
       }
       return originalGetComputedStyle(element, pseudoElement);
@@ -693,19 +711,19 @@ describe("StudioBrushLibrarySheet", () => {
 
     selections[0]!.focus();
     fireEvent.keyDown(selections[0]!, { key: "End" });
-    expect(document.activeElement).toBe(selections[8]);
-    fireEvent.keyDown(selections[8]!, { key: "ArrowRight" });
-    expect(document.activeElement).toBe(selections[8]);
-    fireEvent.keyDown(selections[8]!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(selections[8]);
-    fireEvent.keyDown(selections[8]!, { key: "ArrowUp" });
-    expect(document.activeElement).toBe(selections[5]);
-    fireEvent.keyDown(selections[5]!, { key: "Home" });
+    expect(document.activeElement).toBe(selections[lastIndex]);
+    fireEvent.keyDown(selections[lastIndex]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(selections[lastIndex]);
+    fireEvent.keyDown(selections[lastIndex]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[lastIndex]);
+    fireEvent.keyDown(selections[lastIndex]!, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(selections[previousRowSameColumnIndex]);
+    fireEvent.keyDown(selections[previousRowSameColumnIndex]!, { key: "Home" });
     expect(document.activeElement).toBe(selections[0]);
 
-    selections[6]!.focus();
-    fireEvent.keyDown(selections[6]!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(selections[6]);
+    selections[missingBelowIndex]!.focus();
+    fireEvent.keyDown(selections[missingBelowIndex]!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(selections[missingBelowIndex]);
   });
 
   it("keeps favorite actions out of the tab sequence and exposes F on the roving tile", () => {

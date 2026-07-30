@@ -13,7 +13,13 @@ import {
   installStudioCreatorPack,
   type StudioCreatorPackStorage,
 } from "./studio-creator-pack-runtime";
+import { STUDIO_FILTER_DIALOG_CATALOG } from "./studio-filter-catalog";
 import { StudioFilterDialog } from "./StudioFilterDialog";
+
+const filterDialogCatalogCount = STUDIO_FILTER_DIALOG_CATALOG.length;
+const transformFilterCount = STUDIO_FILTER_DIALOG_CATALOG.filter(
+  ({ group }) => group === "transform",
+).length;
 
 const filterDialogSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioFilterDialog.tsx"),
@@ -323,7 +329,9 @@ describe("StudioFilterDialog", () => {
 
     fireEvent.click(openButton);
     expect(openButton.getAttribute("aria-expanded")).toBe("true");
-    expect(within(gallery).getByText("36개 필터")).toBeTruthy();
+    expect(within(gallery).getByText(`${filterDialogCatalogCount}개 필터`)).toBeTruthy();
+    expect(within(gallery).getAllByRole("button", { name: /필터 선택$/ }))
+      .toHaveLength(filterDialogCatalogCount);
 
     fireEvent.change(within(gallery).getByRole("searchbox", { name: "필터 검색" }), {
       target: { value: "CRT" },
@@ -342,9 +350,9 @@ describe("StudioFilterDialog", () => {
     );
     fireEvent.click(within(gallery).getByRole("button", { name: "변형" }));
 
-    expect(within(gallery).getByText("7개 필터")).toBeTruthy();
-    expect(within(gallery).getAllByRole("button", { name: /필터 선택$/ }).length)
-      .toBeGreaterThan(0);
+    expect(within(gallery).getByText(`${transformFilterCount}개 필터`)).toBeTruthy();
+    expect(within(gallery).getAllByRole("button", { name: /필터 선택$/ }))
+      .toHaveLength(transformFilterCount);
     expect(filterDialogSource).toContain("min-h-11 w-full min-w-0");
     expect(filterDialogSource).toContain("grid-cols-2");
     expect(filterDialogSource).toContain("max-h-[min(44dvh,24rem)]");

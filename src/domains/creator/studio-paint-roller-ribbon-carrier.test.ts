@@ -126,6 +126,9 @@ function expectSegmentReceipts(
       direction: previous.direction ?? previous.angle,
       size: previous.size,
       roundness: previous.roundness,
+      distanceFromStrokeStart: previous.distanceFromStrokeStart,
+      contactLoadFromStrokeStart: previous.contactLoadFromStrokeStart,
+      contactFactor: previous.contactFactor,
     });
   }
 }

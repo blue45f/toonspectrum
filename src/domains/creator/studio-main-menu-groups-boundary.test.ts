@@ -21,8 +21,9 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(localization).not.toMatch(/from\s+["']react["']/u);
     expect(localization).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
     expect(localization).toContain("export function localizeStudioMainMenuGroups(");
-    // 캔버스 px 눈금자와 빠른 액세스 항목을 소유해도 카탈로그가 독립 모듈 경계를 유지한다.
-    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_090);
+    // 캔버스 px 눈금자, 빠른 액세스, 전문 필터 항목을 소유해도 카탈로그가 독립 모듈
+    // 경계를 유지한다. 기능 카탈로그 확장분만 허용하고 React/browser 경계는 위에서 엄격히 막는다.
+    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_120);
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {

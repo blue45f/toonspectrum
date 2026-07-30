@@ -196,10 +196,22 @@ describe("StudioPage tool transition boundary", () => {
   });
 
   it("routes saved, catalogue, and slot brush application through the same transition", () => {
-    for (const [startMarker, endMarker] of [
-      ["function applySavedBrush(", "function applyStudioBrushCatalogSelection("],
-      ["function applyStudioBrushCatalogSelection(", "function applyBuiltInBrushPreset("],
-      ["function applyBrushSlot(", "function applyDynamicsPreset("],
+    for (const [startMarker, endMarker, drawModeSource] of [
+      [
+        "function applySavedBrush(",
+        "function applyStudioBrushCatalogSelection(",
+        "resolveStudioBrushPresetDrawMode(saved.brushId)",
+      ],
+      [
+        "function applyStudioBrushCatalogSelection(",
+        "function applyBuiltInBrushPreset(",
+        'selection.drawMode ?? "pen"',
+      ],
+      [
+        "function applyBrushSlot(",
+        "function applyDynamicsPreset(",
+        "resolveStudioBrushPresetDrawMode(slot.brushId)",
+      ],
     ] as const) {
       const start = studioPageSource.indexOf(startMarker);
       const end = studioPageSource.indexOf(endMarker, start);
@@ -207,7 +219,9 @@ describe("StudioPage tool transition boundary", () => {
 
       expect(start, startMarker).toBeGreaterThanOrEqual(0);
       expect(end, endMarker).toBeGreaterThan(start);
-      expect(branch).toContain('activatePrimaryCanvasTool("draw", "pen");');
+      expect(branch).toContain("activatePrimaryCanvasTool(");
+      expect(branch).toContain('"draw",');
+      expect(branch).toContain(drawModeSource);
       expect(branch).not.toContain('setTool("draw");');
       expect(branch).not.toContain('setDrawMode("pen");');
     }

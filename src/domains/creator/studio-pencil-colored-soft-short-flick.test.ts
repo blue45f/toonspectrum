@@ -58,7 +58,7 @@ describe("soft coloured-pencil endpoint visibility", () => {
     expect(Math.max(...bridged.receipt.marks.map(({ alpha }) => alpha))).toBeLessThan(0.3);
   });
 
-  it("does not change the pressure-mapped grain body away from the two taper zones", () => {
+  it("keeps the pressure-mapped grain body unchanged while retaining start-taper contact history", () => {
     const selection = requireColoredPencil();
     expect(selection.brushDynamics.flow).toMatchObject({
       base: 0.58,
@@ -90,7 +90,50 @@ describe("soft coloured-pencil endpoint visibility", () => {
     const body = (dabs: typeof tapered) => dabs.filter(
       ({ progress }) => progress >= 0.2 && progress <= 0.8,
     );
-    expect(body(tapered)).not.toHaveLength(0);
-    expect(body(tapered)).toEqual(body(withoutTaper));
+    const taperedBody = body(tapered);
+    const untaperedBody = body(withoutTaper);
+    const withoutAccumulatedContactLoad = (
+      dab: (typeof tapered)[number],
+    ) => {
+      const {
+        contactLoadFromStrokeStart: _contactLoadFromStrokeStart,
+        segmentStartFrame,
+        ...renderReceipt
+      } = dab;
+      if (!segmentStartFrame) return renderReceipt;
+      const {
+        contactLoadFromStrokeStart: _segmentContactLoadFromStrokeStart,
+        ...segmentRenderReceipt
+      } = segmentStartFrame;
+      return {
+        ...renderReceipt,
+        segmentStartFrame: segmentRenderReceipt,
+      };
+    };
+
+    expect(taperedBody).not.toHaveLength(0);
+    expect(taperedBody.map(withoutAccumulatedContactLoad)).toEqual(
+      untaperedBody.map(withoutAccumulatedContactLoad),
+    );
+
+    // Contact load is an integral over the complete stroke, not a local rendering property.
+    // The smaller start-taper contact therefore remains as one stable prefix-load difference
+    // after both plans enter the identical untapered body.
+    const prefixLoadDifference = (
+      untaperedBody[0]!.contactLoadFromStrokeStart!
+      - taperedBody[0]!.contactLoadFromStrokeStart!
+    );
+    expect(prefixLoadDifference).toBeGreaterThan(0);
+    for (let index = 0; index < taperedBody.length; index += 1) {
+      const taperedDab = taperedBody[index]!;
+      const untaperedDab = untaperedBody[index]!;
+      expect(untaperedDab.contactLoadFromStrokeStart!).toBeCloseTo(
+        taperedDab.contactLoadFromStrokeStart! + prefixLoadDifference,
+      );
+      expect(untaperedDab.segmentStartFrame?.contactLoadFromStrokeStart).toBeCloseTo(
+        taperedDab.segmentStartFrame!.contactLoadFromStrokeStart!
+          + prefixLoadDifference,
+      );
+    }
   });
 });
