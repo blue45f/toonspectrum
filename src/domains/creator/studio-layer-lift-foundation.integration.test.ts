@@ -13,6 +13,7 @@ import {
   planStudioLayerLift,
 } from "./studio-layer-lift-plan";
 import { hasContiguousLayerGroups, type LayerGroup } from "./studio-layers";
+import { sha256HexPortable } from "./studio-sha256";
 
 import type { El } from "./studio-element-model";
 
@@ -46,7 +47,7 @@ function request() {
       pixelFormat: "rgba8-srgb-straight",
       channels: 4,
       byteLength: SOURCE_RGBA.byteLength,
-      sha256: `sha256:${"a".repeat(64)}`,
+      sha256: `sha256:${sha256HexPortable(SOURCE_RGBA)}`,
       bytes: new Uint8Array(SOURCE_RGBA),
     },
     requestedRoles: ["background", "foreground"],

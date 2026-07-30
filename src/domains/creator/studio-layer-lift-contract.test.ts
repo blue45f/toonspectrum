@@ -8,15 +8,26 @@ import {
   STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND,
   STUDIO_SCENE_LAYER_LIFT_RESULT_KIND,
   STUDIO_SCENE_LAYER_LIFT_SEMANTIC_LAYER_ROLES,
+  calculateStudioSceneLayerLiftProviderReceiptSha256,
+  isStudioSceneLayerLiftTrustedSuccess,
   parseStudioSceneLayerLiftLocalProviderReceipt,
   parseStudioSceneLayerLiftRequest,
   parseStudioSceneLayerLiftResult,
   parseStudioSceneLayerLiftSourceDescriptor,
 } from "./studio-layer-lift-contract";
+import { sha256HexPortable } from "./studio-sha256";
 
 const digest = (character: string) => `sha256:${character.repeat(64)}`;
+const hashBytes = (bytes: Uint8Array) =>
+  `sha256:${sha256HexPortable(bytes)}` as const;
 
 function source() {
+  const bytes = new Uint8Array([
+    10, 20, 30, 255,
+    40, 50, 60, 255,
+    70, 80, 90, 255,
+    100, 110, 120, 255,
+  ]);
   return {
     sourceId: "cut-001",
     sourceName: "episode-01-cut-001.png",
@@ -27,13 +38,8 @@ function source() {
     pixelFormat: "rgba8-srgb-straight",
     channels: 4,
     byteLength: 16,
-    sha256: digest("a"),
-    bytes: new Uint8Array([
-      10, 20, 30, 255,
-      40, 50, 60, 255,
-      70, 80, 90, 255,
-      100, 110, 120, 255,
-    ]),
+    sha256: hashBytes(bytes),
+    bytes,
   };
 }
 
@@ -44,7 +50,7 @@ function sourceBinding() {
     height: 2,
     pixelCount: 4,
     byteLength: 16,
-    sha256: digest("a"),
+    sha256: source().sha256,
   };
 }
 
@@ -59,6 +65,12 @@ function request() {
 }
 
 function rgba() {
+  const bytes = new Uint8Array([
+    10, 20, 30, 255,
+    0, 0, 0, 0,
+    70, 80, 90, 255,
+    0, 0, 0, 0,
+  ]);
   return {
     width: 2,
     height: 2,
@@ -66,17 +78,13 @@ function rgba() {
     encoding: "rgba8-srgb-straight",
     channels: 4,
     byteLength: 16,
-    sha256: digest("b"),
-    bytes: new Uint8Array([
-      10, 20, 30, 255,
-      0, 0, 0, 0,
-      70, 80, 90, 255,
-      0, 0, 0, 0,
-    ]),
+    sha256: hashBytes(bytes),
+    bytes,
   };
 }
 
 function mask() {
+  const bytes = new Uint8Array([255, 0, 255, 0]);
   return {
     width: 2,
     height: 2,
@@ -84,8 +92,8 @@ function mask() {
     encoding: "alpha8",
     channels: 1,
     byteLength: 4,
-    sha256: digest("c"),
-    bytes: new Uint8Array([255, 0, 255, 0]),
+    sha256: hashBytes(bytes),
+    bytes,
   };
 }
 
@@ -102,22 +110,26 @@ function layer(layerId = "layer-background", order = 0) {
 }
 
 function receipt(outcome: "success" | "failure" = "success") {
-  return {
+  const unsigned = {
     kind: STUDIO_SCENE_LAYER_LIFT_LOCAL_PROVIDER_RECEIPT_KIND,
     version: STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
     providerId: "local-segmentation-v1",
     providerVersion: "1.2.0",
-    execution: "local-device",
-    networkUsed: false,
+    execution: "local-device" as const,
+    networkUsed: false as const,
     requestId: "lift-001",
-    sourceSha256: digest("a"),
+    sourceSha256: source().sha256,
     inputByteLength: 16,
     outputByteLength: outcome === "success" ? 20 : 0,
     maskByteLength: outcome === "success" ? 4 : 0,
     layerCount: outcome === "success" ? 1 : 0,
     durationMilliseconds: 12.5,
     outcome,
-    receiptSha256: digest("d"),
+  };
+  return {
+    ...unsigned,
+    receiptSha256:
+      calculateStudioSceneLayerLiftProviderReceiptSha256(unsigned),
   };
 }
 
@@ -160,7 +172,10 @@ function failure() {
 }
 
 function expectRejected(
-  result: ReturnType<typeof parseStudioSceneLayerLiftResult>,
+  result: Readonly<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>,
   reason?: string,
 ) {
   expect(result.ok).toBe(false);
@@ -216,6 +231,36 @@ describe("Studio Scene Layer Lift contract", () => {
     input.requestedRoles[0] = "effect";
     expect(parsed.value.source.bytes[0]).toBe(10);
     expect(parsed.value.requestedRoles[0]).toBe("background");
+  });
+
+  it("recomputes source, layer-plane, mask, and provider-receipt authority hashes", () => {
+    const sourceTamper = source();
+    sourceTamper.bytes[0] ^= 0xff;
+    expectRejected(parseStudioSceneLayerLiftRequest({
+      ...request(),
+      source: sourceTamper,
+    }), "inconsistent-data");
+
+    const rgbaTamper = success();
+    rgbaTamper.layers[0]!.rgba.bytes[0] ^= 0xff;
+    expectRejected(
+      parseStudioSceneLayerLiftResult(rgbaTamper),
+      "inconsistent-data",
+    );
+
+    const maskTamper = success();
+    maskTamper.layers[0]!.mask.bytes[0] ^= 0xff;
+    expectRejected(
+      parseStudioSceneLayerLiftResult(maskTamper),
+      "inconsistent-data",
+    );
+
+    const receiptTamper = success();
+    receiptTamper.receipt.durationMilliseconds += 1;
+    expectRejected(
+      parseStudioSceneLayerLiftResult(receiptTamper),
+      "inconsistent-data",
+    );
   });
 
   it("parses the source descriptor independently and rejects invalid MIME, IDs, and digests", () => {
@@ -463,6 +508,32 @@ describe("Studio Scene Layer Lift contract", () => {
     expect(parsed.value.layers[0]?.rgba.bytes[0]).toBe(10);
     expect(parsed.value.layers[0]?.mask.bytes[0]).toBe(255);
     expect(parsed.value.diagnostics[0]?.message).not.toBe("mutated");
+  });
+
+  it("trusts only the exact strictly parsed success snapshot", () => {
+    const raw = success();
+    expect(isStudioSceneLayerLiftTrustedSuccess(raw)).toBe(false);
+
+    const parsed = parseStudioSceneLayerLiftResult(raw);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok || parsed.value.status !== "success") return;
+
+    expect(isStudioSceneLayerLiftTrustedSuccess(parsed.value)).toBe(true);
+    expect(isStudioSceneLayerLiftTrustedSuccess({ ...parsed.value })).toBe(
+      false,
+    );
+    expect(
+      isStudioSceneLayerLiftTrustedSuccess(structuredClone(parsed.value)),
+    ).toBe(false);
+  });
+
+  it("never identifies parsed provider failures as trusted successes", () => {
+    const parsed = parseStudioSceneLayerLiftResult(failure());
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.status).toBe("failure");
+    expect(isStudioSceneLayerLiftTrustedSuccess(parsed.value)).toBe(false);
   });
 
   it("binds receipt identity, locality, digest, byte totals, and layer count", () => {

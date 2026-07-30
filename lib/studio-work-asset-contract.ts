@@ -15,6 +15,13 @@ export function isStudioWorkAssetImageAdmissionOptedIn(value: unknown): boolean 
 }
 export const STUDIO_WORK_ASSET_TYPES = ["image", "vrm", "background3d"] as const;
 export type StudioWorkAssetType = (typeof STUDIO_WORK_ASSET_TYPES)[number];
+export const STUDIO_WORK_ASSET_LAYER_LIFT_BATCH_VERSION = 1 as const;
+export const STUDIO_WORK_ASSET_LAYER_LIFT_ROLES = [
+  "background",
+  "foreground",
+] as const;
+export type StudioWorkAssetLayerLiftRole =
+  (typeof STUDIO_WORK_ASSET_LAYER_LIFT_ROLES)[number];
 
 export const STUDIO_WORK_ASSET_MAX_DESCRIPTOR_BYTES = 2 * 1024;
 export const STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK = 250;
@@ -597,7 +604,146 @@ export const StudioWorkAssetManifestSchema = z
 
 export type StudioWorkAssetManifest = z.infer<typeof StudioWorkAssetManifestSchema>;
 
+function studioWorkAssetLayerLiftBatchEntrySchema<
+  const TRole extends StudioWorkAssetLayerLiftRole,
+>(role: TRole) {
+  return z
+    .object({
+      role: z.literal(role),
+      assetId: ExactIdentifierSchema,
+      descriptor: StudioWorkAssetDescriptorSchema,
+      expectedSha256: z.string().regex(/^[0-9a-f]{64}$/u),
+      byteSize: z.number().int().min(1).max(STUDIO_WORK_ASSET_MAX_BYTES_BY_TYPE.image),
+      width: z.number().int().positive().max(STUDIO_WORK_ASSET_MAX_IMAGE_AXIS),
+      height: z.number().int().positive().max(STUDIO_WORK_ASSET_MAX_IMAGE_AXIS),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      if (
+        value.descriptor.element.id !== value.assetId ||
+        value.descriptor.element.type !== "image"
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["descriptor"],
+          message: "레이어 분리 에셋 ID와 이미지 설명의 식별자가 일치하지 않습니다.",
+        });
+      }
+      if (value.width * value.height > STUDIO_WORK_ASSET_MAX_IMAGE_PIXELS) {
+        context.addIssue({
+          code: "custom",
+          path: ["width"],
+          message: "레이어 분리 이미지의 디코드 크기가 안전 한도를 넘었습니다.",
+        });
+      }
+    });
+}
+
+export const StudioWorkAssetLayerLiftBatchMetadataSchema = z
+  .object({
+    version: z.literal(STUDIO_WORK_ASSET_LAYER_LIFT_BATCH_VERSION),
+    batchId: z.uuid(),
+    assets: z.tuple([
+      studioWorkAssetLayerLiftBatchEntrySchema("background"),
+      studioWorkAssetLayerLiftBatchEntrySchema("foreground"),
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.assets[0].assetId === value.assets[1].assetId) {
+      context.addIssue({
+        code: "custom",
+        path: ["assets", 1, "assetId"],
+        message: "배경과 전경 에셋 ID는 서로 달라야 합니다.",
+      });
+    }
+  });
+
+export type StudioWorkAssetLayerLiftBatchMetadata = z.infer<
+  typeof StudioWorkAssetLayerLiftBatchMetadataSchema
+>;
+
+function studioWorkAssetLayerLiftBatchReceiptEntrySchema<
+  const TRole extends StudioWorkAssetLayerLiftRole,
+>(role: TRole) {
+  return z
+    .object({
+      role: z.literal(role),
+      manifest: StudioWorkAssetManifestSchema,
+    })
+    .strict();
+}
+
+export const StudioWorkAssetLayerLiftBatchReceiptSchema = z
+  .object({
+    version: z.literal(STUDIO_WORK_ASSET_LAYER_LIFT_BATCH_VERSION),
+    batchId: z.uuid(),
+    assets: z.tuple([
+      studioWorkAssetLayerLiftBatchReceiptEntrySchema("background"),
+      studioWorkAssetLayerLiftBatchReceiptEntrySchema("foreground"),
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.assets[0].manifest.assetId === value.assets[1].manifest.assetId) {
+      context.addIssue({
+        code: "custom",
+        path: ["assets", 1, "manifest", "assetId"],
+        message: "배경과 전경 receipt의 에셋 ID는 서로 달라야 합니다.",
+      });
+    }
+    for (const [index, entry] of value.assets.entries()) {
+      if (entry.manifest.elementType !== "image" || entry.manifest.mimeType !== "image/png") {
+        context.addIssue({
+          code: "custom",
+          path: ["assets", index, "manifest"],
+          message: "레이어 분리 receipt에는 정적 PNG 이미지 manifest만 사용할 수 있습니다.",
+        });
+      }
+    }
+  });
+
+export type StudioWorkAssetLayerLiftBatchReceipt = z.infer<
+  typeof StudioWorkAssetLayerLiftBatchReceiptSchema
+>;
+
 const TEXT_ENCODER = new TextEncoder();
+
+function canonicalStudioWorkAssetJson(value: unknown): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new TypeError("에셋 요소 설명에는 유한한 숫자만 사용할 수 있습니다.");
+    }
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalStudioWorkAssetJson(entry)).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const entries = Object.keys(record)
+      .filter((key) => record[key] !== undefined)
+      .sort()
+      .map((key) =>
+        `${JSON.stringify(key)}:${canonicalStudioWorkAssetJson(record[key])}`
+      );
+    return `{${entries.join(",")}}`;
+  }
+  throw new TypeError("에셋 요소 설명에 JSON으로 표현할 수 없는 값이 포함되어 있습니다.");
+}
+
+/**
+ * Produces the same descriptor identity regardless of JavaScript property order or PostgreSQL
+ * jsonb key normalization. The input has already crossed the strict descriptor schema boundary.
+ */
+export function serializeStudioWorkAssetDescriptorCanonical(
+  descriptor: StudioWorkAssetDescriptor
+): string {
+  return canonicalStudioWorkAssetJson(descriptor);
+}
 
 export function parseStudioWorkAssetDescriptor(
   value: unknown,
@@ -610,7 +756,10 @@ export function parseStudioWorkAssetDescriptor(
   ) {
     throw new Error("에셋 식별자와 요소 설명이 일치하지 않습니다.");
   }
-  if (TEXT_ENCODER.encode(JSON.stringify(descriptor)).byteLength > STUDIO_WORK_ASSET_MAX_DESCRIPTOR_BYTES) {
+  if (
+    TEXT_ENCODER.encode(serializeStudioWorkAssetDescriptorCanonical(descriptor))
+      .byteLength > STUDIO_WORK_ASSET_MAX_DESCRIPTOR_BYTES
+  ) {
     throw new Error("에셋 요소 설명이 안전 한도를 넘었습니다.");
   }
   return descriptor;

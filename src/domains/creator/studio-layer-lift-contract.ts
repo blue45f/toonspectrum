@@ -4,6 +4,7 @@
  * 이 모듈은 정규화된 RGBA 입력과 로컬 provider 결과의 신뢰 경계만 정의한다.
  * DOM, React, 모델 실행, Worker 수명주기, 네트워크 정책은 의도적으로 포함하지 않는다.
  */
+import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_SCENE_LAYER_LIFT_CONTRACT_KIND =
   "toonspectrum.scene-layer-lift" as const;
@@ -176,6 +177,37 @@ export interface StudioSceneLayerLiftLocalProviderReceipt {
   readonly receiptSha256: StudioSceneLayerLiftSha256;
 }
 
+export type StudioSceneLayerLiftLocalProviderReceiptUnsigned = Omit<
+  StudioSceneLayerLiftLocalProviderReceipt,
+  "receiptSha256"
+>;
+
+const PROVIDER_RECEIPT_TEXT_ENCODER = new TextEncoder();
+
+export function calculateStudioSceneLayerLiftProviderReceiptSha256(
+  receipt: StudioSceneLayerLiftLocalProviderReceiptUnsigned,
+): StudioSceneLayerLiftSha256 {
+  const canonical = JSON.stringify([
+    receipt.kind,
+    receipt.version,
+    receipt.providerId,
+    receipt.providerVersion,
+    receipt.execution,
+    receipt.networkUsed,
+    receipt.requestId,
+    receipt.sourceSha256,
+    receipt.inputByteLength,
+    receipt.outputByteLength,
+    receipt.maskByteLength,
+    receipt.layerCount,
+    receipt.durationMilliseconds,
+    receipt.outcome,
+  ]);
+  return `sha256:${sha256HexPortable(
+    PROVIDER_RECEIPT_TEXT_ENCODER.encode(canonical),
+  )}`;
+}
+
 export type StudioSceneLayerLiftFailureCode =
   | "invalid-request"
   | "unsupported-source"
@@ -343,6 +375,7 @@ const FAILURE_CODES = new Set<string>([
   "provider-failed",
   "aborted",
 ]);
+const TRUSTED_SUCCESS_RESULTS = new WeakSet<object>();
 
 type PlainSnapshot = Readonly<Record<string, unknown>>;
 
@@ -530,6 +563,18 @@ function sha256(value: unknown, path: string): StudioSceneLayerLiftSha256 {
   return value as StudioSceneLayerLiftSha256;
 }
 
+function verifyByteDigest(
+  bytes: Uint8Array<ArrayBuffer>,
+  declaredSha256: StudioSceneLayerLiftSha256,
+  path: string,
+): void {
+  const actualSha256 =
+    `sha256:${sha256HexPortable(bytes)}` as StudioSceneLayerLiftSha256;
+  if (actualSha256 !== declaredSha256) {
+    return reject("inconsistent-data", path);
+  }
+}
+
 function copyBytes(
   value: unknown,
   expectedByteLength: number,
@@ -629,6 +674,7 @@ function parseSourceValue(value: unknown): StudioSceneLayerLiftSourceDescriptor 
     STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumInputBytes,
     "source",
   );
+  verifyByteDigest(bytes, digest, "source.sha256");
   return Object.freeze({
     sourceId,
     sourceName,
@@ -769,6 +815,14 @@ function parseRgbaPlaneValue(
   if (byteLength !== expectedByteLength) {
     return reject("inconsistent-data", `${path}.byteLength`);
   }
+  const digest = sha256(input.sha256, `${path}.sha256`);
+  const bytes = copyBytes(
+    input.bytes,
+    byteLength,
+    STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumOutputBytes,
+    path,
+  );
+  verifyByteDigest(bytes, digest, `${path}.sha256`);
   return Object.freeze({
     width,
     height,
@@ -776,13 +830,8 @@ function parseRgbaPlaneValue(
     encoding: "rgba8-srgb-straight",
     channels: 4,
     byteLength,
-    sha256: sha256(input.sha256, `${path}.sha256`),
-    bytes: copyBytes(
-      input.bytes,
-      byteLength,
-      STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumOutputBytes,
-      path,
-    ),
+    sha256: digest,
+    bytes,
   });
 }
 
@@ -812,6 +861,14 @@ function parseMaskPlaneValue(
   if (byteLength !== pixelCount) {
     return reject("inconsistent-data", `${path}.byteLength`);
   }
+  const digest = sha256(input.sha256, `${path}.sha256`);
+  const bytes = copyBytes(
+    input.bytes,
+    byteLength,
+    STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumMaskBytes,
+    path,
+  );
+  verifyByteDigest(bytes, digest, `${path}.sha256`);
   return Object.freeze({
     width,
     height,
@@ -819,13 +876,8 @@ function parseMaskPlaneValue(
     encoding: "alpha8",
     channels: 1,
     byteLength,
-    sha256: sha256(input.sha256, `${path}.sha256`),
-    bytes: copyBytes(
-      input.bytes,
-      byteLength,
-      STUDIO_SCENE_LAYER_LIFT_BUDGETS.maximumMaskBytes,
-      path,
-    ),
+    sha256: digest,
+    bytes,
   });
 }
 
@@ -933,22 +985,36 @@ function parseReceiptValue(
   ) {
     return reject("inconsistent-data", "receipt.byteTotals");
   }
+  const unsignedReceipt: StudioSceneLayerLiftLocalProviderReceiptUnsigned =
+    Object.freeze({
+      kind: STUDIO_SCENE_LAYER_LIFT_LOCAL_PROVIDER_RECEIPT_KIND,
+      version: STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
+      providerId,
+      providerVersion,
+      execution: "local-device",
+      networkUsed: false,
+      requestId,
+      sourceSha256,
+      inputByteLength,
+      outputByteLength,
+      maskByteLength,
+      layerCount,
+      durationMilliseconds: input.durationMilliseconds,
+      outcome: input.outcome,
+    });
+  const receiptSha256 = sha256(
+    input.receiptSha256,
+    "receipt.receiptSha256",
+  );
+  if (
+    receiptSha256
+      !== calculateStudioSceneLayerLiftProviderReceiptSha256(unsignedReceipt)
+  ) {
+    return reject("inconsistent-data", "receipt.receiptSha256");
+  }
   return Object.freeze({
-    kind: STUDIO_SCENE_LAYER_LIFT_LOCAL_PROVIDER_RECEIPT_KIND,
-    version: STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION,
-    providerId,
-    providerVersion,
-    execution: "local-device",
-    networkUsed: false,
-    requestId,
-    sourceSha256,
-    inputByteLength,
-    outputByteLength,
-    maskByteLength,
-    layerCount,
-    durationMilliseconds: input.durationMilliseconds,
-    outcome: input.outcome,
-    receiptSha256: sha256(input.receiptSha256, "receipt.receiptSha256"),
+    ...unsignedReceipt,
+    receiptSha256,
   });
 }
 
@@ -1196,8 +1262,30 @@ export function parseStudioSceneLayerLiftResult(
   value: unknown,
 ): StudioSceneLayerLiftParseResult<StudioSceneLayerLiftResult> {
   try {
-    return parsed(parseResultValue(value));
+    const result = parseResultValue(value);
+    if (result.status === "success") {
+      TRUSTED_SUCCESS_RESULTS.add(result);
+    }
+    return parsed(result);
   } catch (error) {
     return parseFailure(error);
   }
+}
+
+/**
+ * Returns true only for the exact immutable success snapshot produced by
+ * `parseStudioSceneLayerLiftResult` in this module instance.
+ *
+ * Trust is deliberately identity-bound and does not survive object spreading,
+ * serialization, or structured cloning. Callers crossing such a boundary must
+ * strictly parse the received value again.
+ */
+export function isStudioSceneLayerLiftTrustedSuccess(
+  value: unknown,
+): value is StudioSceneLayerLiftSuccess {
+  return (
+    typeof value === "object"
+    && value !== null
+    && TRUSTED_SUCCESS_RESULTS.has(value)
+  );
 }

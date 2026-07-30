@@ -23,6 +23,12 @@ export const StudioWorkAssetParamsSchema = z
   })
   .strict();
 
+export const StudioWorkAssetWorkParamsSchema = z
+  .object({
+    id: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
 export const StudioWorkAssetTypeQuerySchema = z
   .object({ elementType: StudioWorkAssetTypeSchema })
   .strict();
@@ -39,6 +45,17 @@ export const UploadStudioWorkAssetSchema = z
   .strict();
 
 export class StudioWorkAssetParamsDto extends createZodDto(StudioWorkAssetParamsSchema) {}
+export class StudioWorkAssetWorkParamsDto extends createZodDto(StudioWorkAssetWorkParamsSchema) {}
 export class StudioWorkAssetTypeQueryDto extends createZodDto(StudioWorkAssetTypeQuerySchema) {}
 export class DeleteStudioWorkAssetQueryDto extends createZodDto(DeleteStudioWorkAssetQuerySchema) {}
 export class UploadStudioWorkAssetDto extends createZodDto(UploadStudioWorkAssetSchema) {}
+
+export const UploadStudioWorkAssetLayerLiftBatchSchema = z
+  .object({
+    metadata: z.string().min(2).max(12_288),
+  })
+  .strict();
+
+export class UploadStudioWorkAssetLayerLiftBatchDto extends createZodDto(
+  UploadStudioWorkAssetLayerLiftBatchSchema
+) {}

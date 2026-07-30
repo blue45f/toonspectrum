@@ -58,6 +58,7 @@ const manifest: StudioWorkAssetManifest = {
 
 const repository = {
   upsert: vi.fn(),
+  upsertBatch: vi.fn(),
   getManifest: vi.fn(),
   getManifests: vi.fn(),
   getContents: vi.fn(),
@@ -258,6 +259,7 @@ describe("StudioWorkAssetService", () => {
     process.env.STUDIO_WORK_ASSET_ADMISSION =
       STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN;
     repository.upsert.mockReset();
+    repository.upsertBatch.mockReset();
     repository.getManifest.mockReset();
     repository.getManifests.mockReset();
     repository.getContents.mockReset();
@@ -282,7 +284,14 @@ describe("StudioWorkAssetService", () => {
       JSON.stringify(manifest.descriptor),
       { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" }
     )).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      "{}",
+      undefined
+    )).rejects.toBeInstanceOf(ForbiddenException);
     expect(repository.upsert).not.toHaveBeenCalled();
+    expect(repository.upsertBatch).not.toHaveBeenCalled();
   });
 
   it("validates exact descriptor identity and never sends data URLs to the repository", async () => {
@@ -316,6 +325,233 @@ describe("StudioWorkAssetService", () => {
       { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" }
     )).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("validates both role-bound PNGs before one ordered atomic repository batch", async () => {
+    const backgroundBytes = pngBytes(2, 1);
+    const foregroundBytes = pngBytes(1, 2);
+    const batchId = "11111111-1111-4111-8111-111111111111";
+    const metadata = {
+      version: 1,
+      batchId,
+      assets: [
+        {
+          role: "background",
+          assetId: "lift-background",
+          descriptor: {
+            ...manifest.descriptor,
+            element: {
+              ...manifest.descriptor.element,
+              id: "lift-background",
+              width: 2,
+              height: 1,
+            },
+          },
+          expectedSha256: sha256(backgroundBytes),
+          byteSize: backgroundBytes.byteLength,
+          width: 2,
+          height: 1,
+        },
+        {
+          role: "foreground",
+          assetId: "lift-foreground",
+          descriptor: {
+            ...manifest.descriptor,
+            element: {
+              ...manifest.descriptor.element,
+              id: "lift-foreground",
+              width: 1,
+              height: 2,
+            },
+          },
+          expectedSha256: sha256(foregroundBytes),
+          byteSize: foregroundBytes.byteLength,
+          width: 1,
+          height: 2,
+        },
+      ],
+    };
+    const stored = metadata.assets.map((entry) => ({
+      version: 1 as const,
+      assetId: entry.assetId,
+      elementType: "image" as const,
+      mimeType: "image/png" as const,
+      byteSize: entry.byteSize,
+      sha256: entry.expectedSha256,
+      intrinsicImage: {
+        width: entry.width,
+        height: entry.height,
+        decodedRgbaBytes: entry.width * entry.height * 4,
+      },
+      descriptor: entry.descriptor,
+      updatedAt: "2026-07-16T00:00:00.000Z",
+    }));
+    repository.upsertBatch.mockResolvedValue(stored);
+    const files = {
+      background: [{
+        buffer: Buffer.from(backgroundBytes),
+        size: backgroundBytes.byteLength,
+        mimetype: "image/png",
+      }],
+      foreground: [{
+        buffer: Buffer.from(foregroundBytes),
+        size: foregroundBytes.byteLength,
+        mimetype: "image/png",
+      }],
+    };
+
+    const first = await service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      JSON.stringify(metadata),
+      files
+    );
+    const retry = await service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      JSON.stringify(metadata),
+      files
+    );
+
+    expect(first).toEqual({
+      version: 1,
+      batchId,
+      assets: [
+        { role: "background", manifest: stored[0] },
+        { role: "foreground", manifest: stored[1] },
+      ],
+    });
+    expect(retry).toEqual(first);
+    expect(repository.upsertBatch).toHaveBeenCalledTimes(2);
+    for (const call of repository.upsertBatch.mock.calls) {
+      expect(call[0]).toBe("editor");
+      expect(call[1].map((write: { assetId: string }) => write.assetId)).toEqual([
+        "lift-background",
+        "lift-foreground",
+      ]);
+    }
+
+    repository.upsertBatch.mockResolvedValueOnce([
+      stored[0]!,
+      {
+        ...stored[1]!,
+        descriptor: {
+          ...stored[1]!.descriptor,
+          element: {
+            ...stored[1]!.descriptor.element,
+            x: stored[1]!.descriptor.element.x + 1,
+          },
+        },
+      },
+    ]);
+    await expect(service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      JSON.stringify(metadata),
+      files
+    )).rejects.toThrow(/receipt identity mismatch/u);
+  });
+
+  it("never starts persistence when either layer-lift PNG fails its exact binding", async () => {
+    const backgroundBytes = pngBytes(1, 1);
+    const foregroundBytes = pngBytes(1, 1);
+    const metadata = {
+      version: 1,
+      batchId: "22222222-2222-4222-8222-222222222222",
+      assets: [
+        {
+          role: "background",
+          assetId: "lift-background",
+          descriptor: {
+            ...manifest.descriptor,
+            element: { ...manifest.descriptor.element, id: "lift-background" },
+          },
+          expectedSha256: sha256(backgroundBytes),
+          byteSize: backgroundBytes.byteLength,
+          width: 1,
+          height: 1,
+        },
+        {
+          role: "foreground",
+          assetId: "lift-foreground",
+          descriptor: {
+            ...manifest.descriptor,
+            element: { ...manifest.descriptor.element, id: "lift-foreground" },
+          },
+          expectedSha256: "f".repeat(64),
+          byteSize: foregroundBytes.byteLength,
+          width: 1,
+          height: 1,
+        },
+      ],
+    };
+    const files = {
+      background: [{
+        buffer: Buffer.from(backgroundBytes),
+        size: backgroundBytes.byteLength,
+        mimetype: "image/png",
+      }],
+      foreground: [{
+        buffer: Buffer.from(foregroundBytes),
+        size: foregroundBytes.byteLength,
+        mimetype: "image/png",
+      }],
+    };
+
+    await expect(service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      JSON.stringify(metadata),
+      files
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.upsertBatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing, extra, or non-PNG layer-lift multipart roles before persistence", async () => {
+    const bytes = pngBytes();
+    const entry = (role: "background" | "foreground", assetId: string) => ({
+      role,
+      assetId,
+      descriptor: {
+        ...manifest.descriptor,
+        element: { ...manifest.descriptor.element, id: assetId },
+      },
+      expectedSha256: sha256(bytes),
+      byteSize: bytes.byteLength,
+      width: 1,
+      height: 1,
+    });
+    const metadata = JSON.stringify({
+      version: 1,
+      batchId: "33333333-3333-4333-8333-333333333333",
+      assets: [
+        entry("background", "lift-background"),
+        entry("foreground", "lift-foreground"),
+      ],
+    });
+    const file = {
+      buffer: Buffer.from(bytes),
+      size: bytes.byteLength,
+      mimetype: "image/png",
+    };
+
+    await expect(service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      metadata,
+      { background: [file] }
+    )).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service().uploadLayerLiftBatch(
+      "editor",
+      "work-1",
+      metadata,
+      {
+        background: [file],
+        foreground: [{ ...file, mimetype: "image/jpeg" }],
+        extra: [file],
+      } as never
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.upsertBatch).not.toHaveBeenCalled();
   });
 
   it("rejects missing or inconsistent multipart files", async () => {

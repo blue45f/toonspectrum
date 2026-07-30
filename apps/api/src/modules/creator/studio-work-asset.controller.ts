@@ -13,10 +13,11 @@ import {
   Res,
   StreamableFile,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { FileFieldsInterceptor, FileInterceptor } from "@nestjs/platform-express";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
@@ -25,14 +26,20 @@ import {
   DeleteStudioWorkAssetQueryDto,
   StudioWorkAssetParamsDto,
   StudioWorkAssetTypeQueryDto,
+  StudioWorkAssetWorkParamsDto,
+  UploadStudioWorkAssetLayerLiftBatchDto,
   UploadStudioWorkAssetDto,
 } from "./studio-work-asset.dto";
 import { StudioWorkAssetService } from "./studio-work-asset.service";
 
-import type { StudioWorkAssetUploadFile } from "./studio-work-asset.service";
+import type {
+  StudioWorkAssetLayerLiftUploadFiles,
+  StudioWorkAssetUploadFile,
+} from "./studio-work-asset.service";
 import type { Response } from "express";
 
 const MAX_MULTIPART_ASSET_BYTES = 12 * 1024 * 1024;
+const MAX_MULTIPART_LAYER_LIFT_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function authenticatedUserId(userId: string | undefined): string {
   if (!userId) throw new ForbiddenException("로그인이 필요해요.");
@@ -45,6 +52,37 @@ export class StudioWorkAssetController {
     @Inject(StudioWorkAssetService)
     private readonly service: StudioWorkAssetService
   ) {}
+
+  @Put("/creator/works/:id/asset-batches/layer-lift")
+  @UseGuards(StudioWorkAssetUploadGuard)
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: "background", maxCount: 1 },
+    { name: "foreground", maxCount: 1 },
+  ], {
+    limits: {
+      fileSize: MAX_MULTIPART_LAYER_LIFT_IMAGE_BYTES,
+      files: 2,
+      fields: 1,
+      fieldNameSize: 64,
+      fieldSize: 12_288,
+      parts: 3,
+    },
+  }))
+  async uploadLayerLiftBatch(
+    @Param(new ZodValidationPipe(StudioWorkAssetWorkParamsDto))
+    params: StudioWorkAssetWorkParamsDto,
+    @Body(new ZodValidationPipe(UploadStudioWorkAssetLayerLiftBatchDto))
+    body: UploadStudioWorkAssetLayerLiftBatchDto,
+    @UploadedFiles() files: StudioWorkAssetLayerLiftUploadFiles | undefined,
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.service.uploadLayerLiftBatch(
+      authenticatedUserId(userId),
+      params.id,
+      body.metadata,
+      files
+    );
+  }
 
   @Put("/creator/works/:id/assets/:assetId")
   @UseGuards(StudioWorkAssetUploadGuard)

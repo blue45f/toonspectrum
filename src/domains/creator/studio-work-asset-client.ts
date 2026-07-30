@@ -1,7 +1,13 @@
 import { readBoundedStudioAssetResponse } from "./studio-bounded-asset-response";
+import {
+  verifyStudioLayerLiftArtifactPairReceipt,
+  type StudioLayerLiftTrustedArtifactPair,
+} from "./studio-layer-lift-artifact";
 
 import type {
   StudioWorkAssetDescriptor,
+  StudioWorkAssetLayerLiftBatchMetadata,
+  StudioWorkAssetLayerLiftBatchReceipt,
   StudioWorkAssetManifest,
   StudioWorkAssetType,
 } from "@/lib/studio-work-asset-contract";
@@ -9,7 +15,10 @@ import type {
 import {
   parseStudioWorkAssetDescriptor,
   STUDIO_WORK_ASSET_MAX_BYTES_BY_TYPE,
+  StudioWorkAssetLayerLiftBatchMetadataSchema,
+  StudioWorkAssetLayerLiftBatchReceiptSchema,
   StudioWorkAssetManifestSchema,
+  serializeStudioWorkAssetDescriptorCanonical,
 } from "@/lib/studio-work-asset-contract";
 import { api, apiPath, isHttpError, toApiError } from "@/src/infrastructure/api";
 
@@ -41,6 +50,10 @@ function assetPath(workId: string, assetId: string): string {
   return `/creator/works/${encodeURIComponent(workId)}/assets/${encodeURIComponent(assetId)}`;
 }
 
+function layerLiftBatchPath(workId: string): string {
+  return `/creator/works/${encodeURIComponent(workId)}/asset-batches/layer-lift`;
+}
+
 function exactManifest(
   value: unknown,
   expected: StudioWorkAssetReference
@@ -59,6 +72,148 @@ function exactManifest(
 async function requestError(error: unknown, fallback: string): Promise<StudioWorkAssetRequestError> {
   const status = isHttpError(error) ? error.response.status : null;
   return new StudioWorkAssetRequestError(await toApiError(error, fallback).then((value) => value.message), status, error);
+}
+
+export interface UploadStudioWorkAssetLayerLiftBatchInput {
+  readonly batchId: string;
+  readonly artifacts: StudioLayerLiftTrustedArtifactPair;
+  readonly backgroundDescriptor: StudioWorkAssetDescriptor;
+  readonly foregroundDescriptor: StudioWorkAssetDescriptor;
+}
+
+function exactLayerLiftBatchReceipt(
+  value: unknown,
+  expected: StudioWorkAssetLayerLiftBatchMetadata,
+): StudioWorkAssetLayerLiftBatchReceipt {
+  const parsed = StudioWorkAssetLayerLiftBatchReceiptSchema.safeParse(value);
+  if (!parsed.success || parsed.data.batchId !== expected.batchId) {
+    throw new StudioWorkAssetRequestError(
+      "레이어 분리 에셋 배치 응답 형식이 올바르지 않습니다.",
+      null,
+    );
+  }
+  for (const [index, expectedEntry] of expected.assets.entries()) {
+    const received = parsed.data.assets[index];
+    if (
+      received?.role !== expectedEntry.role
+      || received.manifest.assetId !== expectedEntry.assetId
+      || received.manifest.elementType !== "image"
+      || received.manifest.mimeType !== "image/png"
+      || received.manifest.sha256 !== expectedEntry.expectedSha256
+      || received.manifest.byteSize !== expectedEntry.byteSize
+      || received.manifest.intrinsicImage?.width !== expectedEntry.width
+      || received.manifest.intrinsicImage.height !== expectedEntry.height
+      || serializeStudioWorkAssetDescriptorCanonical(
+        received.manifest.descriptor,
+      ) !== serializeStudioWorkAssetDescriptorCanonical(
+        expectedEntry.descriptor,
+      )
+    ) {
+      throw new StudioWorkAssetRequestError(
+        "레이어 분리 에셋 배치 응답이 요청한 산출물과 다릅니다.",
+        null,
+      );
+    }
+  }
+  return parsed.data;
+}
+
+/**
+ * Uploads the trusted background/foreground pair through the server's one-transaction endpoint.
+ *
+ * The pair is re-hashed and its PNG envelope is revalidated immediately before FormData is built,
+ * so a mutated ArrayBuffer cannot be admitted under an older receipt. Keeping `batchId` in the
+ * caller-owned input lets a lost-response retry reuse the exact same correlation identity.
+ */
+export async function uploadStudioWorkAssetLayerLiftBatch(
+  workId: string,
+  input: UploadStudioWorkAssetLayerLiftBatchInput,
+  signal?: AbortSignal,
+): Promise<StudioWorkAssetLayerLiftBatchReceipt> {
+  try {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new DOMException("레이어 분리 에셋 업로드가 취소되었습니다.", "AbortError");
+    }
+    const artifactReceipt = input.artifacts.receipt;
+    const verified = await verifyStudioLayerLiftArtifactPairReceipt({
+      requestId: artifactReceipt.requestId,
+      sourceId: artifactReceipt.sourceId,
+      sourceWidth: artifactReceipt.sourceWidth,
+      sourceHeight: artifactReceipt.sourceHeight,
+      backgroundOutputId: artifactReceipt.background.outputId,
+      foregroundOutputId: artifactReceipt.foreground.outputId,
+      receipt: artifactReceipt,
+      backgroundBytes: input.artifacts.background.bytes,
+      foregroundBytes: input.artifacts.foreground.bytes,
+    });
+    const backgroundDescriptor = parseStudioWorkAssetDescriptor(
+      input.backgroundDescriptor,
+      {
+        assetId: verified.background.outputId,
+        elementType: "image",
+      },
+    );
+    const foregroundDescriptor = parseStudioWorkAssetDescriptor(
+      input.foregroundDescriptor,
+      {
+        assetId: verified.foreground.outputId,
+        elementType: "image",
+      },
+    );
+    const metadata = StudioWorkAssetLayerLiftBatchMetadataSchema.parse({
+      version: 1,
+      batchId: input.batchId,
+      assets: [
+        {
+          role: "background",
+          assetId: verified.background.outputId,
+          descriptor: backgroundDescriptor,
+          expectedSha256: verified.background.sha256.slice("sha256:".length),
+          byteSize: verified.background.byteLength,
+          width: verified.background.width,
+          height: verified.background.height,
+        },
+        {
+          role: "foreground",
+          assetId: verified.foreground.outputId,
+          descriptor: foregroundDescriptor,
+          expectedSha256: verified.foreground.sha256.slice("sha256:".length),
+          byteSize: verified.foreground.byteLength,
+          width: verified.foreground.width,
+          height: verified.foreground.height,
+        },
+      ],
+    });
+    const form = new FormData();
+    form.append("metadata", JSON.stringify(metadata));
+    form.append(
+      "background",
+      new Blob([verified.background.bytes], { type: "image/png" }),
+      `${verified.background.outputId}.png`,
+    );
+    form.append(
+      "foreground",
+      new Blob([verified.foreground.bytes], { type: "image/png" }),
+      `${verified.foreground.outputId}.png`,
+    );
+    const response = await api.raw.put(apiPath(layerLiftBatchPath(workId)), {
+      body: form,
+      signal,
+    });
+    return exactLayerLiftBatchReceipt(
+      await response.json<unknown>(),
+      metadata,
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof StudioWorkAssetRequestError) throw error;
+    throw await requestError(
+      error,
+      "레이어 분리 에셋 두 개를 원자적으로 업로드하지 못했습니다.",
+    );
+  }
 }
 
 export async function getStudioWorkAssetManifest(

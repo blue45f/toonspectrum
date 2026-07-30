@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { admitStudioLayerLiftArtifactPair } from "./studio-layer-lift-artifact";
 import {
   deleteUnreferencedStudioWorkAssetUpload,
   downloadStudioWorkAsset,
   readBoundedStudioWorkAssetResponse,
   StudioWorkAssetRequestError,
+  uploadStudioWorkAssetLayerLiftBatch,
   uploadStudioWorkAsset,
 } from "./studio-work-asset-client";
 
-import type { StudioWorkAssetManifest } from "@/lib/studio-work-asset-contract";
+import type {
+  StudioWorkAssetDescriptor,
+  StudioWorkAssetLayerLiftBatchReceipt,
+  StudioWorkAssetManifest,
+} from "@/lib/studio-work-asset-contract";
 
 
 const { del, get, put } = vi.hoisted(() => ({
@@ -60,6 +66,103 @@ async function manifest(bytes: Uint8Array): Promise<StudioWorkAssetManifest> {
 
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), { headers: { "Content-Type": "application/json" } });
+}
+
+const BACKGROUND_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABCAYAAAD5PA/NAAAAFElEQVR42mNggIKeBVsOnLjz4T8AGVwGNJa9xxsAAAAASUVORK5CYII=";
+const FOREGROUND_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAQAAAABCAYAAAD5PA/NAAAAE0lEQVR42mMQ0bBxCEipaGCAAgAbbQJlJs9SqgAAAABJRU5ErkJggg==";
+const LAYER_LIFT_BATCH_ID = "8fca58d7-20ad-4c38-9d57-3da0fcb70061";
+
+function base64Buffer(value: string): ArrayBuffer {
+  const decoded = atob(value);
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0)).buffer;
+}
+
+function layerLiftDescriptor(
+  assetId: string,
+  name: string,
+): StudioWorkAssetDescriptor {
+  return {
+    version: 1,
+    element: {
+      id: assetId,
+      type: "image",
+      name,
+      x: 10,
+      y: 20,
+      width: 4,
+      height: 1,
+      rotation: 0,
+    },
+  };
+}
+
+async function layerLiftUploadFixture() {
+  const artifacts = await admitStudioLayerLiftArtifactPair({
+    requestId: "layer-lift-request",
+    sourceId: "source-image",
+    sourceWidth: 4,
+    sourceHeight: 1,
+    background: {
+      outputId: "layer-lift-background",
+      bytes: base64Buffer(BACKGROUND_PNG),
+    },
+    foreground: {
+      outputId: "layer-lift-foreground",
+      bytes: base64Buffer(FOREGROUND_PNG),
+    },
+  }, {
+    decodePngDimensions: async () => ({ width: 4, height: 1 }),
+  });
+  const backgroundDescriptor = layerLiftDescriptor(
+    artifacts.background.outputId,
+    "분리 배경",
+  );
+  const foregroundDescriptor = layerLiftDescriptor(
+    artifacts.foreground.outputId,
+    "분리 전경",
+  );
+  const receipt: StudioWorkAssetLayerLiftBatchReceipt = {
+    version: 1,
+    batchId: LAYER_LIFT_BATCH_ID,
+    assets: [
+      {
+        role: "background",
+        manifest: {
+          version: 1,
+          assetId: artifacts.background.outputId,
+          elementType: "image",
+          mimeType: "image/png",
+          byteSize: artifacts.background.byteLength,
+          sha256: artifacts.background.sha256.slice("sha256:".length),
+          intrinsicImage: { width: 4, height: 1, decodedRgbaBytes: 16 },
+          descriptor: backgroundDescriptor,
+          updatedAt: "2026-07-30T00:00:00.000Z",
+        },
+      },
+      {
+        role: "foreground",
+        manifest: {
+          version: 1,
+          assetId: artifacts.foreground.outputId,
+          elementType: "image",
+          mimeType: "image/png",
+          byteSize: artifacts.foreground.byteLength,
+          sha256: artifacts.foreground.sha256.slice("sha256:".length),
+          intrinsicImage: { width: 4, height: 1, decodedRgbaBytes: 16 },
+          descriptor: foregroundDescriptor,
+          updatedAt: "2026-07-30T00:00:00.000Z",
+        },
+      },
+    ],
+  };
+  return {
+    artifacts,
+    backgroundDescriptor,
+    foregroundDescriptor,
+    receipt,
+  };
 }
 
 describe("studio work asset client", () => {
@@ -182,6 +285,76 @@ describe("studio work asset client", () => {
     expect(form.get("descriptor")).toBe(JSON.stringify(descriptor));
     expect(form.get("file")).toBeInstanceOf(Blob);
     expect(String(form.get("descriptor"))).not.toContain("data:");
+  });
+
+  it("uploads a receipt-bound layer-lift pair through one ordered multipart request", async () => {
+    const fixture = await layerLiftUploadFixture();
+    put.mockResolvedValueOnce(jsonResponse(fixture.receipt));
+
+    await expect(uploadStudioWorkAssetLayerLiftBatch("work / 1", {
+      batchId: LAYER_LIFT_BATCH_ID,
+      artifacts: fixture.artifacts,
+      backgroundDescriptor: fixture.backgroundDescriptor,
+      foregroundDescriptor: fixture.foregroundDescriptor,
+    })).resolves.toEqual(fixture.receipt);
+
+    expect(put).toHaveBeenCalledOnce();
+    expect(put.mock.calls[0]?.[0]).toBe(
+      "/api/creator/works/work%20%2F%201/asset-batches/layer-lift",
+    );
+    const options = put.mock.calls[0]?.[1] as { body?: unknown; headers?: unknown };
+    expect(options.body).toBeInstanceOf(FormData);
+    expect(options).not.toHaveProperty("headers");
+    const form = options.body as FormData;
+    const metadata = JSON.parse(String(form.get("metadata"))) as {
+      batchId: string;
+      assets: Array<{ role: string; assetId: string; expectedSha256: string }>;
+    };
+    expect(metadata).toMatchObject({
+      batchId: LAYER_LIFT_BATCH_ID,
+      assets: [
+        {
+          role: "background",
+          assetId: fixture.artifacts.background.outputId,
+          expectedSha256: fixture.artifacts.background.sha256.slice("sha256:".length),
+        },
+        {
+          role: "foreground",
+          assetId: fixture.artifacts.foreground.outputId,
+          expectedSha256: fixture.artifacts.foreground.sha256.slice("sha256:".length),
+        },
+      ],
+    });
+    expect(form.get("background")).toBeInstanceOf(Blob);
+    expect(form.get("foreground")).toBeInstanceOf(Blob);
+  });
+
+  it("rejects a swapped/tampered layer-lift batch receipt", async () => {
+    const fixture = await layerLiftUploadFixture();
+    put.mockResolvedValueOnce(jsonResponse({
+      ...fixture.receipt,
+      assets: [fixture.receipt.assets[1], fixture.receipt.assets[0]],
+    }));
+
+    await expect(uploadStudioWorkAssetLayerLiftBatch("work-1", {
+      batchId: LAYER_LIFT_BATCH_ID,
+      artifacts: fixture.artifacts,
+      backgroundDescriptor: fixture.backgroundDescriptor,
+      foregroundDescriptor: fixture.foregroundDescriptor,
+    })).rejects.toBeInstanceOf(StudioWorkAssetRequestError);
+  });
+
+  it("revalidates artifact bytes immediately before a layer-lift batch upload", async () => {
+    const fixture = await layerLiftUploadFixture();
+    new Uint8Array(fixture.artifacts.background.bytes)[0] ^= 0xff;
+
+    await expect(uploadStudioWorkAssetLayerLiftBatch("work-1", {
+      batchId: LAYER_LIFT_BATCH_ID,
+      artifacts: fixture.artifacts,
+      backgroundDescriptor: fixture.backgroundDescriptor,
+      foregroundDescriptor: fixture.foregroundDescriptor,
+    })).rejects.toBeInstanceOf(StudioWorkAssetRequestError);
+    expect(put).not.toHaveBeenCalled();
   });
 
   it("deletes only an exact receipt-bound orphan and validates the response", async () => {

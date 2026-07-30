@@ -4,11 +4,12 @@ import {
   analyzeStudioLayerLiftMask,
   applyStudioLayerLiftMaskMorphology,
   composeStudioLayerLiftForegroundAlpha,
+  estimateStudioLayerLiftMorphologyWork,
   prepareStudioLayerLiftMask,
   removeStudioLayerLiftSmallIslands,
   resampleStudioLayerLiftConfidenceMask,
   STUDIO_LAYER_LIFT_MASK_MAX_DIMENSION,
-  STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_PIXEL_VISITS,
+  STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_NEIGHBOR_VISITS,
   STUDIO_LAYER_LIFT_MASK_MAX_PIXELS,
   thresholdStudioLayerLiftConfidenceMask,
   validateStudioLayerLiftConfidenceMask,
@@ -283,8 +284,8 @@ describe("studio layer-lift binary cleanup", () => {
     const tooMuch = applyStudioLayerLiftMaskMorphology(
       binary(width, height, new Array(width * height).fill(0)),
       { operation: "close", iterations: Math.floor(
-        STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_PIXEL_VISITS
-          / (width * height * 2),
+        STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_NEIGHBOR_VISITS
+          / (width * height * 2 * 9),
       ) + 1 },
     );
     expect(tooMuch).toMatchObject({ ok: false, code: "work-budget-exceeded" });
@@ -299,6 +300,41 @@ describe("studio layer-lift binary cleanup", () => {
       binary(1, 1, [1]),
       throwingOptions as never,
     )).toMatchObject({ ok: false, code: "invalid-options" });
+  });
+
+  it("budgets actual 4/8-connected neighbor reads instead of output pixels", () => {
+    expect(estimateStudioLayerLiftMorphologyWork({
+      pixelCount: 100,
+      operation: "dilate",
+      iterations: 2,
+      connectivity: 4,
+    })).toEqual({
+      ok: true,
+      value: {
+        passCount: 2,
+        maximumNeighborsPerPixel: 5,
+        maximumNeighborVisits: 1_000,
+      },
+    });
+    expect(estimateStudioLayerLiftMorphologyWork({
+      pixelCount: 100,
+      operation: "close",
+      iterations: 2,
+      connectivity: 8,
+    })).toEqual({
+      ok: true,
+      value: {
+        passCount: 4,
+        maximumNeighborsPerPixel: 9,
+        maximumNeighborVisits: 3_600,
+      },
+    });
+    expect(estimateStudioLayerLiftMorphologyWork({
+      pixelCount: STUDIO_LAYER_LIFT_MASK_MAX_PIXELS,
+      operation: "close",
+      iterations: 2,
+      connectivity: 8,
+    })).toMatchObject({ ok: false, code: "work-budget-exceeded" });
   });
 });
 

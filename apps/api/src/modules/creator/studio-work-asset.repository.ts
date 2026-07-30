@@ -17,6 +17,7 @@ import {
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK,
+  serializeStudioWorkAssetDescriptorCanonical,
 } from "../../../../../lib/studio-work-asset-contract";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
@@ -111,6 +112,10 @@ export interface StudioWorkAssetContent {
 
 export interface StudioWorkAssetRepository {
   upsert(actorUserId: string, input: StudioWorkAssetWrite): Promise<StudioWorkAssetManifest>;
+  upsertBatch(
+    actorUserId: string,
+    inputs: readonly StudioWorkAssetWrite[]
+  ): Promise<readonly StudioWorkAssetManifest[]>;
   getManifest(
     actorUserId: string,
     workId: string,
@@ -274,8 +279,93 @@ export function isStudioWorkAssetIdempotentReplay(
 ): boolean {
   return existing.elementType === incoming.elementType &&
     existing.sha256 === incoming.sha256 &&
-    JSON.stringify(existing.descriptor) === JSON.stringify(incoming.descriptor) &&
+    serializeStudioWorkAssetDescriptorCanonical(existing.descriptor)
+      === serializeStudioWorkAssetDescriptorCanonical(incoming.descriptor) &&
     JSON.stringify(existing.intrinsicImage) === JSON.stringify(incoming.intrinsicImage);
+}
+
+export interface StudioWorkAssetBatchExisting {
+  assetId: string;
+  elementType: StudioWorkAssetType;
+  sha256: string;
+  descriptor: StudioWorkAssetDescriptor;
+  intrinsicImage: StudioWorkAssetIntrinsicImage | null;
+}
+
+/**
+ * Computes the complete missing-row set only after every member has passed immutable identity,
+ * tombstone and aggregate quota preflight. The repository performs no insert before this plan
+ * succeeds, and consumes it inside the same work-locked database transaction.
+ */
+export function planStudioWorkAssetBatchUpsert(input: {
+  writes: readonly StudioWorkAssetWrite[];
+  existing: readonly StudioWorkAssetBatchExisting[];
+  reservedAssetIds: ReadonlySet<string>;
+  assetCount: number;
+  totalBytes: number;
+}): readonly StudioWorkAssetWrite[] {
+  if (input.writes.length === 0) {
+    throw new Error("studio work asset batch must not be empty");
+  }
+  const workId = input.writes[0]!.workId;
+  const requestedIds = new Set<string>();
+  for (const write of input.writes) {
+    if (write.workId !== workId) {
+      throw new Error("studio work asset batch spans multiple works");
+    }
+    if (requestedIds.has(write.assetId)) {
+      throw new StudioWorkAssetImmutableConflictError();
+    }
+    requestedIds.add(write.assetId);
+    assertStudioWorkAssetIdNotReserved(input.reservedAssetIds.has(write.assetId));
+  }
+
+  const existingById = new Map<string, StudioWorkAssetBatchExisting>();
+  for (const existing of input.existing) {
+    if (!requestedIds.has(existing.assetId) || existingById.has(existing.assetId)) {
+      throw new Error("studio work asset batch preflight returned an unexpected row");
+    }
+    existingById.set(existing.assetId, existing);
+  }
+
+  const missing: StudioWorkAssetWrite[] = [];
+  for (const write of input.writes) {
+    const existing = existingById.get(write.assetId);
+    if (!existing) {
+      missing.push(write);
+      continue;
+    }
+    if (existing.elementType !== write.elementType) {
+      throw new StudioWorkAssetTypeConflictError();
+    }
+    if (!isStudioWorkAssetIdempotentReplay(existing, write)) {
+      throw new StudioWorkAssetImmutableConflictError();
+    }
+  }
+  if (missing.length === 0) return [];
+
+  if (!Number.isSafeInteger(input.assetCount) || input.assetCount < 0) {
+    throw new StudioWorkAssetQuotaError("count");
+  }
+  if (!Number.isSafeInteger(input.totalBytes) || input.totalBytes < 0) {
+    throw new StudioWorkAssetQuotaError("bytes");
+  }
+  if (input.assetCount + missing.length > STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK) {
+    throw new StudioWorkAssetQuotaError("count");
+  }
+  const missingBytes = missing.reduce(
+    (total, write) => total + write.payload.byteLength,
+    0
+  );
+  const nextTotalBytes = input.totalBytes + missingBytes;
+  if (
+    !Number.isSafeInteger(missingBytes) ||
+    !Number.isSafeInteger(nextTotalBytes) ||
+    nextTotalBytes > STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK
+  ) {
+    throw new StudioWorkAssetQuotaError("bytes");
+  }
+  return missing;
 }
 
 export function assertStudioWorkAssetIdNotReserved(reserved: boolean): void {
@@ -434,92 +524,104 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     actorUserId: string,
     input: StudioWorkAssetWrite
   ): Promise<StudioWorkAssetManifest> {
+    const [stored] = await this.upsertBatch(actorUserId, [input]);
+    if (!stored) throw new Error("studio work asset upsert returned no row");
+    return stored;
+  }
+
+  async upsertBatch(
+    actorUserId: string,
+    inputs: readonly StudioWorkAssetWrite[]
+  ): Promise<readonly StudioWorkAssetManifest[]> {
+    if (inputs.length === 0) throw new Error("studio work asset batch must not be empty");
+    const workId = inputs[0]!.workId;
     return db.transaction(async (transaction) => {
-      await requireAccess(transaction, actorUserId, input.workId, "edit", true);
-      const [reserved] = await transaction
+      // This one work-row lock serializes the entire pair against every participating upload,
+      // collaborator downgrade, cleanup and trusted deletion mutation for the work.
+      await requireAccess(transaction, actorUserId, workId, "edit", true);
+      const assetIds = inputs.map(({ assetId }) => assetId);
+      const reserved = await transaction
         .select({ assetId: creatorWorkAssetTombstones.assetId })
         .from(creatorWorkAssetTombstones)
         .where(
           and(
-            eq(creatorWorkAssetTombstones.workId, input.workId),
-            eq(creatorWorkAssetTombstones.assetId, input.assetId)
+            eq(creatorWorkAssetTombstones.workId, workId),
+            inArray(creatorWorkAssetTombstones.assetId, [...new Set(assetIds)])
           )
-        )
-        .limit(1);
-      assertStudioWorkAssetIdNotReserved(Boolean(reserved));
-      const [existing] = await transaction
+        );
+      const existing = await transaction
         .select()
         .from(creatorWorkAssets)
         .where(
           and(
-            eq(creatorWorkAssets.workId, input.workId),
-            eq(creatorWorkAssets.assetId, input.assetId)
+            eq(creatorWorkAssets.workId, workId),
+            inArray(creatorWorkAssets.assetId, [...new Set(assetIds)])
           )
-        )
-        .limit(1);
-      if (existing && existing.elementType !== input.elementType) {
-        throw new StudioWorkAssetTypeConflictError();
-      }
-      if (existing) {
-        if (!isStudioWorkAssetIdempotentReplay({
-          elementType: existing.elementType as StudioWorkAssetType,
-          sha256: existing.sha256,
-          descriptor: existing.descriptor,
-          intrinsicImage: existing.elementType === "image" ? {
-            width: existing.intrinsicWidth!,
-            height: existing.intrinsicHeight!,
-            decodedRgbaBytes: existing.decodedRgbaBytes!,
-          } : null,
-        }, input)) {
-          // CRDT references intentionally carry no content version. Keeping an asset ID immutable
-          // prevents already-hydrated peers from silently retaining a different body. A changed
-          // body/descriptor must be published under a fresh element/asset ID and then referenced
-          // by a normal scene operation.
-          throw new StudioWorkAssetImmutableConflictError();
-        }
-        return manifestFrom(existing);
-      }
-
+        );
       const [usage] = await transaction
         .select({
           assetCount: count(),
           totalBytes: sql<number>`coalesce(sum(${creatorWorkAssets.byteSize}), 0)`,
         })
         .from(creatorWorkAssets)
-        .where(eq(creatorWorkAssets.workId, input.workId));
-      const assetCount = Number(usage?.assetCount ?? 0);
-      const nextTotalBytes = Number(usage?.totalBytes ?? 0) + input.payload.byteLength;
-      if (assetCount >= STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK) {
-        throw new StudioWorkAssetQuotaError("count");
-      }
-      if (
-        !Number.isSafeInteger(nextTotalBytes) ||
-        nextTotalBytes > STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK
-      ) {
-        throw new StudioWorkAssetQuotaError("bytes");
+        .where(eq(creatorWorkAssets.workId, workId));
+      const existingForPlan = existing.map((row): StudioWorkAssetBatchExisting => ({
+        assetId: row.assetId,
+        elementType: row.elementType as StudioWorkAssetType,
+        sha256: row.sha256,
+        descriptor: row.descriptor,
+        intrinsicImage: row.elementType === "image" ? {
+          width: row.intrinsicWidth!,
+          height: row.intrinsicHeight!,
+          decodedRgbaBytes: row.decodedRgbaBytes!,
+        } : null,
+      }));
+      const missing = planStudioWorkAssetBatchUpsert({
+        writes: inputs,
+        existing: existingForPlan,
+        reservedAssetIds: new Set(reserved.map(({ assetId }) => assetId)),
+        assetCount: Number(usage?.assetCount ?? 0),
+        totalBytes: Number(usage?.totalBytes ?? 0),
+      });
+
+      let inserted: (typeof creatorWorkAssets.$inferSelect)[] = [];
+      if (missing.length > 0) {
+        const values = missing.map((input) => ({
+          workId: input.workId,
+          assetId: input.assetId,
+          elementType: input.elementType,
+          mimeType: input.mimeType,
+          descriptor: input.descriptor,
+          payload: copyBytes(input.payload),
+          byteSize: input.payload.byteLength,
+          sha256: input.sha256,
+          intrinsicWidth: input.intrinsicImage?.width ?? null,
+          intrinsicHeight: input.intrinsicImage?.height ?? null,
+          decodedRgbaBytes: input.intrinsicImage?.decodedRgbaBytes ?? null,
+          uploadedBy: actorUserId,
+          updatedAt: sql`now()`,
+        }));
+        inserted = await transaction
+          .insert(creatorWorkAssets)
+          .values(values)
+          .returning();
+        if (inserted.length !== missing.length) {
+          // Throwing here aborts the surrounding transaction, including every row returned above.
+          throw new Error("studio work asset batch insert returned an incomplete row set");
+        }
       }
 
-      const values = {
-        workId: input.workId,
-        assetId: input.assetId,
-        elementType: input.elementType,
-        mimeType: input.mimeType,
-        descriptor: input.descriptor,
-        payload: copyBytes(input.payload),
-        byteSize: input.payload.byteLength,
-        sha256: input.sha256,
-        intrinsicWidth: input.intrinsicImage?.width ?? null,
-        intrinsicHeight: input.intrinsicImage?.height ?? null,
-        decodedRgbaBytes: input.intrinsicImage?.decodedRgbaBytes ?? null,
-        uploadedBy: actorUserId,
-        updatedAt: sql`now()`,
-      };
-      const [stored] = await transaction
-        .insert(creatorWorkAssets)
-        .values(values)
-        .returning();
-      if (!stored) throw new Error("studio work asset upsert returned no row");
-      return manifestFrom(stored);
+      const rowById = new Map(
+        [...existing, ...inserted].map((row) => [row.assetId, row] as const)
+      );
+      return inputs.map(({ assetId }) => {
+        const row = rowById.get(assetId);
+        if (!row) {
+          // No partial receipt can escape: this throw also rolls back all missing rows.
+          throw new Error("studio work asset batch result is incomplete");
+        }
+        return manifestFrom(row);
+      });
     });
   }
 

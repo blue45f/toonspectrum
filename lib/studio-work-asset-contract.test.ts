@@ -21,7 +21,10 @@ import {
   STUDIO_WORK_ASSET_MAX_CURVE_POINTS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEYS,
+  StudioWorkAssetLayerLiftBatchMetadataSchema,
+  StudioWorkAssetLayerLiftBatchReceiptSchema,
   StudioWorkAssetManifestSchema,
+  serializeStudioWorkAssetDescriptorCanonical,
   studioWorkAssetReferenceKey,
   studioWorkAssetSourceUri,
 } from "./studio-work-asset-contract";
@@ -90,6 +93,30 @@ describe("studio work asset wire contract", () => {
       assetId: "asset-1",
       elementType: "image",
     })).toThrow();
+  });
+
+  it("canonicalizes descriptor identity independently from JSON object key order", () => {
+    const parsed = parseStudioWorkAssetDescriptor(descriptor(), {
+      assetId: "asset-1",
+      elementType: "image",
+    });
+    const reordered = {
+      element: {
+        rotation: 0,
+        height: 400,
+        width: 300,
+        y: 20,
+        x: 10,
+        type: "image" as const,
+        id: "asset-1",
+      },
+      version: 1 as const,
+    };
+
+    expect(JSON.stringify(parsed)).not.toBe(JSON.stringify(reordered));
+    expect(serializeStudioWorkAssetDescriptorCanonical(parsed)).toBe(
+      serializeStudioWorkAssetDescriptorCanonical(reordered),
+    );
   });
 
   it("accepts an ordered bounded smart-filter program on image references only", () => {
@@ -559,6 +586,103 @@ describe("studio work asset wire contract", () => {
       mimeType: "model/gltf-binary",
       descriptor: descriptor("asset-1", "vrm"),
     }).success).toBe(true);
+  });
+
+  it("binds one ordered background/foreground PNG pair to exact immutable metadata", () => {
+    const batchId = "11111111-1111-4111-8111-111111111111";
+    const metadata = {
+      version: 1,
+      batchId,
+      assets: [
+        {
+          role: "background",
+          assetId: "lift-background",
+          descriptor: descriptor("lift-background"),
+          expectedSha256: "a".repeat(64),
+          byteSize: 77,
+          width: 4,
+          height: 1,
+        },
+        {
+          role: "foreground",
+          assetId: "lift-foreground",
+          descriptor: descriptor("lift-foreground"),
+          expectedSha256: "b".repeat(64),
+          byteSize: 76,
+          width: 4,
+          height: 1,
+        },
+      ],
+    };
+
+    expect(StudioWorkAssetLayerLiftBatchMetadataSchema.parse(metadata)).toEqual(metadata);
+    expect(StudioWorkAssetLayerLiftBatchMetadataSchema.safeParse({
+      ...metadata,
+      assets: [metadata.assets[1], metadata.assets[0]],
+    }).success).toBe(false);
+    expect(StudioWorkAssetLayerLiftBatchMetadataSchema.safeParse({
+      ...metadata,
+      assets: [
+        metadata.assets[0],
+        { ...metadata.assets[1], assetId: metadata.assets[0].assetId },
+      ],
+    }).success).toBe(false);
+    expect(StudioWorkAssetLayerLiftBatchMetadataSchema.safeParse({
+      ...metadata,
+      assets: [
+        metadata.assets[0],
+        {
+          ...metadata.assets[1],
+          descriptor: descriptor("different-foreground"),
+        },
+      ],
+    }).success).toBe(false);
+    expect(StudioWorkAssetLayerLiftBatchMetadataSchema.safeParse({
+      ...metadata,
+      extra: true,
+    }).success).toBe(false);
+  });
+
+  it("returns an ordered batch receipt containing only two exact PNG manifests", () => {
+    const batchId = "22222222-2222-4222-8222-222222222222";
+    const manifestFor = (assetId: string, sha256: string) => ({
+      version: 1,
+      assetId,
+      elementType: "image",
+      mimeType: "image/png",
+      byteSize: 32,
+      sha256,
+      intrinsicImage: { width: 2, height: 4, decodedRgbaBytes: 32 },
+      descriptor: descriptor(assetId),
+      updatedAt: "2026-07-16T00:00:00.000Z",
+    });
+    const receipt = {
+      version: 1,
+      batchId,
+      assets: [
+        { role: "background", manifest: manifestFor("lift-background", "a".repeat(64)) },
+        { role: "foreground", manifest: manifestFor("lift-foreground", "b".repeat(64)) },
+      ],
+    };
+
+    expect(StudioWorkAssetLayerLiftBatchReceiptSchema.parse(receipt)).toEqual(receipt);
+    expect(StudioWorkAssetLayerLiftBatchReceiptSchema.safeParse({
+      ...receipt,
+      assets: [receipt.assets[1], receipt.assets[0]],
+    }).success).toBe(false);
+    expect(StudioWorkAssetLayerLiftBatchReceiptSchema.safeParse({
+      ...receipt,
+      assets: [
+        receipt.assets[0],
+        {
+          ...receipt.assets[1],
+          manifest: {
+            ...receipt.assets[1].manifest,
+            mimeType: "image/jpeg",
+          },
+        },
+      ],
+    }).success).toBe(false);
   });
 
   it("uses a collision-free compound reference key", () => {

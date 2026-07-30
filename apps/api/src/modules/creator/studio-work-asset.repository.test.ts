@@ -1,5 +1,5 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import {
@@ -16,6 +16,7 @@ import {
   assertStudioWorkAssetIdNotReserved,
   DrizzleStudioWorkAssetRepository,
   isStudioWorkAssetIdempotentReplay,
+  planStudioWorkAssetBatchUpsert,
   planStudioWorkAssetOrphanCleanup,
   planStudioWorkAssetDeletion,
   resolveStudioWorkAssetAccess,
@@ -26,14 +27,52 @@ import {
   StudioWorkAssetImmutableConflictError,
   StudioWorkAssetQuotaError,
   StudioWorkAssetReferencedError,
+  StudioWorkAssetTypeConflictError,
   studioWorkAssetRepositoryProvider,
 } from "./studio-work-asset.repository";
+
+import type { StudioWorkAssetWrite } from "./studio-work-asset.repository";
 
 function names(values: readonly { name?: string; config?: { name?: string } }[]): string[] {
   return values.flatMap((value) => {
     const name = value.name ?? value.config?.name;
     return name ? [name] : [];
   }).sort();
+}
+
+function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
+  const payload = Uint8Array.of(fill, fill + 1);
+  return {
+    workId: "work-1",
+    assetId,
+    elementType: "image",
+    mimeType: "image/png",
+    descriptor: {
+      version: 1,
+      element: {
+        id: assetId,
+        type: "image",
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        rotation: 0,
+      },
+    },
+    payload,
+    sha256: fill.toString(16).padStart(64, "0"),
+    intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
+  };
+}
+
+function existingFrom(write: StudioWorkAssetWrite) {
+  return {
+    assetId: write.assetId,
+    elementType: write.elementType,
+    sha256: write.sha256,
+    descriptor: write.descriptor,
+    intrinsicImage: write.intrinsicImage,
+  };
 }
 
 describe("studio work-scoped asset persistence contract", () => {
@@ -88,6 +127,7 @@ describe("studio work-scoped asset persistence contract", () => {
     );
     expect(repository).toHaveProperty("getContents");
     expect(repository).toHaveProperty("getContentsInTransaction");
+    expect(repository).toHaveProperty("upsertBatch");
   });
 
   it("keeps manifest preflight queries metadata-only", () => {
@@ -160,6 +200,21 @@ describe("studio work-scoped asset persistence contract", () => {
     expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, structuredClone(existingWithIntrinsic))).toBe(true);
     expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
       ...existingWithIntrinsic,
+      descriptor: {
+        element: {
+          rotation: 0,
+          height: 10,
+          width: 10,
+          y: 0,
+          x: 0,
+          type: "image",
+          id: "asset-1",
+        },
+        version: 1,
+      },
+    })).toBe(true);
+    expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
+      ...existingWithIntrinsic,
       sha256: "b".repeat(64),
     })).toBe(false);
     expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
@@ -176,6 +231,77 @@ describe("studio work-scoped asset persistence contract", () => {
     expect(() => assertStudioWorkAssetIdNotReserved(true))
       .toThrow(StudioWorkAssetImmutableConflictError);
     expect(() => assertStudioWorkAssetIdNotReserved(false)).not.toThrow();
+  });
+
+  it("preflights the complete pair before exposing any insertable row set", () => {
+    const background = batchWrite("lift-background", 1);
+    const foreground = batchWrite("lift-foreground", 3);
+    const insert = vi.fn();
+
+    try {
+      const missing = planStudioWorkAssetBatchUpsert({
+        writes: [background, foreground],
+        existing: [{
+          ...existingFrom(foreground),
+          sha256: "f".repeat(64),
+        }],
+        reservedAssetIds: new Set(),
+        assetCount: 10,
+        totalBytes: 100,
+      });
+      insert(missing);
+    } catch (error) {
+      expect(error).toBeInstanceOf(StudioWorkAssetImmutableConflictError);
+    }
+    expect(insert).not.toHaveBeenCalled();
+
+    expect(planStudioWorkAssetBatchUpsert({
+      writes: [background, foreground],
+      existing: [existingFrom(background)],
+      reservedAssetIds: new Set(),
+      assetCount: 10,
+      totalBytes: 100,
+    })).toEqual([foreground]);
+    expect(planStudioWorkAssetBatchUpsert({
+      writes: [background, foreground],
+      existing: [existingFrom(background), existingFrom(foreground)],
+      reservedAssetIds: new Set(),
+      assetCount: 10,
+      totalBytes: 100,
+    })).toEqual([]);
+  });
+
+  it("rejects a reserved, conflicting, duplicate, or aggregate-over-quota pair as one plan", () => {
+    const background = batchWrite("lift-background", 1);
+    const foreground = batchWrite("lift-foreground", 3);
+    const plan = (overrides: Partial<Parameters<typeof planStudioWorkAssetBatchUpsert>[0]> = {}) =>
+      planStudioWorkAssetBatchUpsert({
+        writes: [background, foreground],
+        existing: [],
+        reservedAssetIds: new Set(),
+        assetCount: 0,
+        totalBytes: 0,
+        ...overrides,
+      });
+
+    expect(() => plan({
+      reservedAssetIds: new Set([foreground.assetId]),
+    })).toThrow(StudioWorkAssetImmutableConflictError);
+    expect(() => plan({
+      existing: [{
+        ...existingFrom(foreground),
+        elementType: "vrm",
+      }],
+    })).toThrow(StudioWorkAssetTypeConflictError);
+    expect(() => plan({
+      writes: [background, { ...foreground, assetId: background.assetId }],
+    })).toThrow(StudioWorkAssetImmutableConflictError);
+    expect(() => plan({
+      assetCount: STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK - 1,
+    })).toThrow(StudioWorkAssetQuotaError);
+    expect(() => plan({
+      totalBytes: STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK - 3,
+    })).toThrow(StudioWorkAssetQuotaError);
   });
 
   it("reserves before physical deletion and fails closed at the tombstone cap", () => {

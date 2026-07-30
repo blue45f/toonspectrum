@@ -22,8 +22,12 @@ import {
   STUDIO_WORK_ASSET_MAX_IMAGE_AXIS,
   STUDIO_WORK_ASSET_MAX_IMAGE_DECODED_BYTES,
   STUDIO_WORK_ASSET_MAX_IMAGE_PIXELS,
+  STUDIO_WORK_ASSET_LAYER_LIFT_BATCH_VERSION,
+  StudioWorkAssetLayerLiftBatchMetadataSchema,
+  StudioWorkAssetLayerLiftBatchReceiptSchema,
   StudioWorkAssetManifestSchema,
   StudioWorkAssetReferenceSchema,
+  serializeStudioWorkAssetDescriptorCanonical,
 } from "../../../../../lib/studio-work-asset-contract";
 
 import {
@@ -50,6 +54,8 @@ import type {
 import type { StudioBrushR8TextureGrainSource } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import type {
   StudioWorkAssetDescriptor,
+  StudioWorkAssetLayerLiftBatchMetadata,
+  StudioWorkAssetLayerLiftBatchReceipt,
   StudioWorkAssetManifest,
   StudioWorkAssetIntrinsicImage,
   StudioWorkAssetReference,
@@ -86,6 +92,11 @@ export interface StudioWorkAssetUploadFile {
   buffer: Buffer;
   mimetype: string;
   size: number;
+}
+
+export interface StudioWorkAssetLayerLiftUploadFiles {
+  background?: StudioWorkAssetUploadFile[];
+  foreground?: StudioWorkAssetUploadFile[];
 }
 
 export interface AdmittedStudioWorkAssetPayload {
@@ -473,12 +484,150 @@ function parseDescriptorJson(
   }
 }
 
+function parseLayerLiftBatchMetadata(
+  raw: string
+): StudioWorkAssetLayerLiftBatchMetadata {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new BadRequestException("레이어 분리 에셋 metadata가 올바른 JSON이 아닙니다.");
+  }
+  const parsed = StudioWorkAssetLayerLiftBatchMetadataSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new BadRequestException("레이어 분리 에셋 metadata 형식이 올바르지 않습니다.");
+  }
+  return parsed.data;
+}
+
+function exactLayerLiftUploadFiles(
+  files: StudioWorkAssetLayerLiftUploadFiles | undefined
+): readonly [StudioWorkAssetUploadFile, StudioWorkAssetUploadFile] {
+  if (
+    !files ||
+    Object.keys(files).length !== 2 ||
+    !Array.isArray(files.background) ||
+    files.background.length !== 1 ||
+    !Array.isArray(files.foreground) ||
+    files.foreground.length !== 1
+  ) {
+    throw new BadRequestException("배경과 전경 PNG 파일이 각각 하나씩 필요합니다.");
+  }
+  return [files.background[0]!, files.foreground[0]!];
+}
+
 @Injectable()
 export class StudioWorkAssetService {
   constructor(
     @Inject(STUDIO_WORK_ASSET_REPOSITORY)
     private readonly repository: StudioWorkAssetRepository
   ) {}
+
+  async uploadLayerLiftBatch(
+    actorUserId: string,
+    workId: string,
+    metadataJson: string,
+    filesValue: StudioWorkAssetLayerLiftUploadFiles | undefined
+  ): Promise<StudioWorkAssetLayerLiftBatchReceipt> {
+    if (!isStudioWorkAssetAdmissionOptedIn(
+      process.env.STUDIO_WORK_ASSET_ADMISSION
+    )) {
+      throw new ForbiddenException(
+        "협업 에셋 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다."
+      );
+    }
+    const metadata = parseLayerLiftBatchMetadata(metadataJson);
+    const files = exactLayerLiftUploadFiles(filesValue);
+    const writes = metadata.assets.map((entry, index) => {
+      const file = files[index]!;
+      if (
+        !Buffer.isBuffer(file.buffer) ||
+        file.size !== file.buffer.byteLength ||
+        file.size !== entry.byteSize
+      ) {
+        throw new BadRequestException(
+          `${entry.role === "background" ? "배경" : "전경"} PNG 크기가 metadata와 다릅니다.`
+        );
+      }
+      if (file.mimetype !== "image/png") {
+        throw new BadRequestException("레이어 분리 결과는 PNG 파일만 업로드할 수 있습니다.");
+      }
+      const descriptor = (() => {
+        try {
+          return parseStudioWorkAssetDescriptor(entry.descriptor, {
+            assetId: entry.assetId,
+            elementType: "image",
+          });
+        } catch (error) {
+          throw new BadRequestException(
+            error instanceof Error
+              ? error.message
+              : "레이어 분리 에셋 요소 설명이 올바르지 않습니다."
+          );
+        }
+      })();
+      let admitted: AdmittedStudioWorkAssetPayload;
+      try {
+        admitted = admitStudioWorkAssetPayload("image", file.mimetype, file.buffer);
+      } catch (error) {
+        throw new BadRequestException(
+          error instanceof Error ? error.message : "레이어 분리 PNG 파일이 올바르지 않습니다."
+        );
+      }
+      if (
+        admitted.mimeType !== "image/png" ||
+        admitted.sha256 !== entry.expectedSha256 ||
+        admitted.payload.byteLength !== entry.byteSize ||
+        admitted.intrinsicImage?.width !== entry.width ||
+        admitted.intrinsicImage.height !== entry.height
+      ) {
+        throw new BadRequestException(
+          `${entry.role === "background" ? "배경" : "전경"} PNG가 요청에 바인딩된 내용과 다릅니다.`
+        );
+      }
+      return {
+        workId,
+        assetId: entry.assetId,
+        elementType: "image" as const,
+        descriptor,
+        ...admitted,
+      };
+    });
+
+    // No repository mutation begins until both role-bound files have passed every binary,
+    // descriptor, digest and dimension check. The repository then persists the pair in one
+    // work-locked transaction.
+    const stored = await this.run(() => this.repository.upsertBatch(actorUserId, writes));
+    if (stored.length !== metadata.assets.length) {
+      throw new Error("studio work asset layer-lift batch returned an incomplete receipt");
+    }
+    const manifests = stored.map((value, index) => {
+      const manifest = StudioWorkAssetManifestSchema.parse(value);
+      const expected = metadata.assets[index]!;
+      if (
+        manifest.assetId !== expected.assetId ||
+        manifest.elementType !== "image" ||
+        manifest.mimeType !== "image/png" ||
+        manifest.sha256 !== expected.expectedSha256 ||
+        manifest.byteSize !== expected.byteSize ||
+        manifest.intrinsicImage?.width !== expected.width ||
+        manifest.intrinsicImage.height !== expected.height ||
+        serializeStudioWorkAssetDescriptorCanonical(manifest.descriptor)
+          !== serializeStudioWorkAssetDescriptorCanonical(expected.descriptor)
+      ) {
+        throw new Error("studio work asset layer-lift batch receipt identity mismatch");
+      }
+      return manifest;
+    });
+    return StudioWorkAssetLayerLiftBatchReceiptSchema.parse({
+      version: STUDIO_WORK_ASSET_LAYER_LIFT_BATCH_VERSION,
+      batchId: metadata.batchId,
+      assets: [
+        { role: "background", manifest: manifests[0] },
+        { role: "foreground", manifest: manifests[1] },
+      ],
+    });
+  }
 
   async upload(
     actorUserId: string,

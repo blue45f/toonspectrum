@@ -9,8 +9,14 @@
 export const STUDIO_LAYER_LIFT_MASK_MAX_DIMENSION = 8_192;
 export const STUDIO_LAYER_LIFT_MASK_MAX_PIXELS = 16_777_216;
 export const STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_ITERATIONS = 8;
-export const STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_PIXEL_VISITS =
-  STUDIO_LAYER_LIFT_MASK_MAX_PIXELS * 8;
+/**
+ * One 8-connected 3x3 pass performs at most nine neighbour reads per output
+ * pixel. The budget admits one full-resolution open/close (two passes) while
+ * rejecting requests that previously looked cheap only because they counted
+ * output pixels instead of the actual kernel work.
+ */
+export const STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_NEIGHBOR_VISITS =
+  STUDIO_LAYER_LIFT_MASK_MAX_PIXELS * 9 * 2;
 
 export type StudioLayerLiftConnectivity = 4 | 8;
 export type StudioLayerLiftMorphologyOperation =
@@ -23,6 +29,12 @@ export interface StudioLayerLiftConfidenceMask {
   readonly width: number;
   readonly height: number;
   readonly confidence: Float32Array;
+}
+
+export interface StudioLayerLiftMorphologyWork {
+  readonly passCount: number;
+  readonly maximumNeighborsPerPixel: 5 | 9;
+  readonly maximumNeighborVisits: number;
 }
 
 export interface StudioLayerLiftAlphaMask {
@@ -176,6 +188,62 @@ function readDimensions(
   return success(Object.freeze({ width, height, area }));
 }
 
+export function estimateStudioLayerLiftMorphologyWork(input: {
+  readonly pixelCount: number;
+  readonly operation: StudioLayerLiftMorphologyOperation;
+  readonly iterations: number;
+  readonly connectivity: StudioLayerLiftConnectivity;
+}): StudioLayerLiftMaskResult<StudioLayerLiftMorphologyWork> {
+  let pixelCount: unknown;
+  let operation: unknown;
+  let iterations: unknown;
+  let connectivity: unknown;
+  try {
+    pixelCount = input?.pixelCount;
+    operation = input?.operation;
+    iterations = input?.iterations;
+    connectivity = input?.connectivity;
+  } catch {
+    return failure("invalid-options");
+  }
+  if (
+    typeof pixelCount !== "number"
+    || !Number.isSafeInteger(pixelCount)
+    || pixelCount < 1
+    || pixelCount > STUDIO_LAYER_LIFT_MASK_MAX_PIXELS
+    || (
+      operation !== "dilate"
+      && operation !== "erode"
+      && operation !== "close"
+      && operation !== "open"
+    )
+    || typeof iterations !== "number"
+    || !Number.isSafeInteger(iterations)
+    || iterations < 0
+    || iterations > STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_ITERATIONS
+    || (connectivity !== 4 && connectivity !== 8)
+  ) {
+    return failure("invalid-options");
+  }
+  const passCount = iterations
+    * (operation === "close" || operation === "open" ? 2 : 1);
+  const maximumNeighborsPerPixel = connectivity === 4 ? 5 : 9;
+  const maximumNeighborVisits =
+    pixelCount * passCount * maximumNeighborsPerPixel;
+  if (
+    !Number.isSafeInteger(maximumNeighborVisits)
+    || maximumNeighborVisits
+      > STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_NEIGHBOR_VISITS
+  ) {
+    return failure("work-budget-exceeded");
+  }
+  return success(Object.freeze({
+    passCount,
+    maximumNeighborsPerPixel,
+    maximumNeighborVisits,
+  }));
+}
+
 function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
   return value !== null && typeof value === "object";
 }
@@ -301,19 +369,24 @@ export function validateStudioLayerLiftAlphaMask(
 }
 
 /** Pixel-centre aligned bilinear resampling with edge clamping. */
-export function resampleStudioLayerLiftConfidenceMask(
-  input: unknown,
+function resampleValidatedConfidenceMask(
+  source: StudioLayerLiftConfidenceMask,
   targetWidth: number,
   targetHeight: number,
 ): StudioLayerLiftMaskResult<StudioLayerLiftConfidenceMask> {
-  const source = validateStudioLayerLiftConfidenceMask(input);
-  if (!source.ok) return source;
   const target = readDimensions(targetWidth, targetHeight);
   if (!target.ok) return target;
+  if (source.width === targetWidth && source.height === targetHeight) {
+    return success(Object.freeze({
+      width: targetWidth,
+      height: targetHeight,
+      confidence: source.confidence,
+    }));
+  }
   try {
     const output = new Float32Array(target.value.area);
-    const sourceWidth = source.value.width;
-    const sourceHeight = source.value.height;
+    const sourceWidth = source.width;
+    const sourceHeight = source.height;
     for (let y = 0; y < targetHeight; y += 1) {
       const sourceY = (y + 0.5) * sourceHeight / targetHeight - 0.5;
       const y0Unclamped = Math.floor(sourceY);
@@ -327,11 +400,11 @@ export function resampleStudioLayerLiftConfidenceMask(
         const x1 = Math.max(0, Math.min(sourceWidth - 1, x0Unclamped + 1));
         const tx = sourceX - x0Unclamped;
         const top =
-          source.value.confidence[y0 * sourceWidth + x0]! * (1 - tx)
-          + source.value.confidence[y0 * sourceWidth + x1]! * tx;
+          source.confidence[y0 * sourceWidth + x0]! * (1 - tx)
+          + source.confidence[y0 * sourceWidth + x1]! * tx;
         const bottom =
-          source.value.confidence[y1 * sourceWidth + x0]! * (1 - tx)
-          + source.value.confidence[y1 * sourceWidth + x1]! * tx;
+          source.confidence[y1 * sourceWidth + x0]! * (1 - tx)
+          + source.confidence[y1 * sourceWidth + x1]! * tx;
         output[y * targetWidth + x] = top * (1 - ty) + bottom * ty;
       }
     }
@@ -343,6 +416,21 @@ export function resampleStudioLayerLiftConfidenceMask(
   } catch {
     return failure("allocation-failed");
   }
+}
+
+/** Pixel-centre aligned bilinear resampling with edge clamping. */
+export function resampleStudioLayerLiftConfidenceMask(
+  input: unknown,
+  targetWidth: number,
+  targetHeight: number,
+): StudioLayerLiftMaskResult<StudioLayerLiftConfidenceMask> {
+  const source = validateStudioLayerLiftConfidenceMask(input);
+  if (!source.ok) return source;
+  return resampleValidatedConfidenceMask(
+    source.value,
+    targetWidth,
+    targetHeight,
+  );
 }
 
 export interface StudioLayerLiftThresholdOptions {
@@ -383,6 +471,38 @@ function readThresholdOptions(
 }
 
 /** Hard threshold, or a smoothstep transition centred on the threshold. */
+function thresholdValidatedConfidenceMask(
+  source: StudioLayerLiftConfidenceMask,
+  options: Required<StudioLayerLiftThresholdOptions>,
+): StudioLayerLiftMaskResult<StudioLayerLiftAlphaMask> {
+  try {
+    const alpha = new Float32Array(source.confidence.length);
+    const { threshold, feather } = options;
+    if (feather === 0) {
+      for (let index = 0; index < alpha.length; index += 1) {
+        alpha[index] = source.confidence[index]! >= threshold ? 1 : 0;
+      }
+    } else {
+      const lower = threshold - feather / 2;
+      for (let index = 0; index < alpha.length; index += 1) {
+        const linear = Math.max(0, Math.min(
+          1,
+          (source.confidence[index]! - lower) / feather,
+        ));
+        alpha[index] = linear * linear * (3 - 2 * linear);
+      }
+    }
+    return success(Object.freeze({
+      width: source.width,
+      height: source.height,
+      alpha,
+    }));
+  } catch {
+    return failure("allocation-failed");
+  }
+}
+
+/** Hard threshold, or a smoothstep transition centred on the threshold. */
 export function thresholdStudioLayerLiftConfidenceMask(
   input: unknown,
   options?: StudioLayerLiftThresholdOptions,
@@ -391,31 +511,7 @@ export function thresholdStudioLayerLiftConfidenceMask(
   if (!source.ok) return source;
   const admitted = readThresholdOptions(options);
   if (!admitted.ok) return admitted;
-  try {
-    const alpha = new Float32Array(source.value.confidence.length);
-    const { threshold, feather } = admitted.value;
-    if (feather === 0) {
-      for (let index = 0; index < alpha.length; index += 1) {
-        alpha[index] = source.value.confidence[index]! >= threshold ? 1 : 0;
-      }
-    } else {
-      const lower = threshold - feather / 2;
-      for (let index = 0; index < alpha.length; index += 1) {
-        const linear = Math.max(0, Math.min(
-          1,
-          (source.value.confidence[index]! - lower) / feather,
-        ));
-        alpha[index] = linear * linear * (3 - 2 * linear);
-      }
-    }
-    return success(Object.freeze({
-      width: source.value.width,
-      height: source.value.height,
-      alpha,
-    }));
-  } catch {
-    return failure("allocation-failed");
-  }
+  return thresholdValidatedConfidenceMask(source.value, admitted.value);
 }
 
 export interface StudioLayerLiftMorphologyOptions {
@@ -488,15 +584,17 @@ export function applyStudioLayerLiftMaskMorphology(
   ) {
     return failure("invalid-options");
   }
-  const passMultiplier = operation === "close" || operation === "open" ? 2 : 1;
-  if (
-    source.value.pixels.length * iterations * passMultiplier
-    > STUDIO_LAYER_LIFT_MASK_MAX_MORPHOLOGY_PIXEL_VISITS
-  ) {
-    return failure("work-budget-exceeded");
-  }
+  const work = estimateStudioLayerLiftMorphologyWork({
+    pixelCount: source.value.pixels.length,
+    operation,
+    iterations,
+    connectivity,
+  });
+  if (!work.ok) return work;
   try {
-    let pixels: Uint8Array = new Uint8Array(source.value.pixels);
+    // `copyBinaryMask` already owns a snapshot independent from the caller.
+    // Reusing it avoids another full-frame allocation before the first pass.
+    let pixels: Uint8Array = source.value.pixels;
     const first = operation === "open" || operation === "erode" ? "erode" : "dilate";
     const second = operation === "open" ? "dilate" : "erode";
     for (let index = 0; index < iterations; index += 1) {
@@ -563,7 +661,9 @@ export function removeStudioLayerLiftSmallIslands(
     return failure("invalid-options");
   }
   try {
-    const pixels = new Uint8Array(source.value.pixels);
+    // `copyBinaryMask` is the defensive-copy boundary. Cleanup can mutate its
+    // private snapshot without retaining or altering the caller's buffer.
+    const pixels = source.value.pixels;
     const visited = new Uint8Array(pixels.length);
     const queue = new Int32Array(pixels.length);
     let componentCount = 0;
@@ -707,6 +807,33 @@ export function analyzeStudioLayerLiftMask(
   ));
 }
 
+function composeValidatedForegroundAlpha(
+  source: StudioLayerLiftForegroundAlpha,
+  mask: StudioLayerLiftAlphaMask,
+): StudioLayerLiftMaskResult<StudioLayerLiftForegroundAlpha> {
+  if (
+    source.width !== mask.width
+    || source.height !== mask.height
+  ) {
+    return failure("dimension-mismatch");
+  }
+  try {
+    const alpha = new Uint8ClampedArray(source.alpha.length);
+    for (let index = 0; index < alpha.length; index += 1) {
+      alpha[index] = Math.round(
+        source.alpha[index]! * mask.alpha[index]!,
+      );
+    }
+    return success(Object.freeze({
+      width: source.width,
+      height: source.height,
+      alpha,
+    }));
+  } catch {
+    return failure("allocation-failed");
+  }
+}
+
 /** Multiply the normalized lift matte by source alpha; never replaces partial source alpha. */
 export function composeStudioLayerLiftForegroundAlpha(
   sourceAlphaInput: unknown,
@@ -716,27 +843,7 @@ export function composeStudioLayerLiftForegroundAlpha(
   if (!source.ok) return source;
   const mask = validateStudioLayerLiftAlphaMask(maskInput);
   if (!mask.ok) return mask;
-  if (
-    source.value.width !== mask.value.width
-    || source.value.height !== mask.value.height
-  ) {
-    return failure("dimension-mismatch");
-  }
-  try {
-    const alpha = new Uint8ClampedArray(source.value.alpha.length);
-    for (let index = 0; index < alpha.length; index += 1) {
-      alpha[index] = Math.round(
-        source.value.alpha[index]! * mask.value.alpha[index]!,
-      );
-    }
-    return success(Object.freeze({
-      width: source.value.width,
-      height: source.value.height,
-      alpha,
-    }));
-  } catch {
-    return failure("allocation-failed");
-  }
+  return composeValidatedForegroundAlpha(source.value, mask.value);
 }
 
 export interface StudioLayerLiftPreparationOptions
@@ -801,13 +908,18 @@ export function prepareStudioLayerLiftMask(input: {
   if (!source.ok) return preparationFailure(source);
   const thresholdOptions = readThresholdOptions(options);
   if (!thresholdOptions.ok) return preparationFailure(thresholdOptions);
-  const confidence = resampleStudioLayerLiftConfidenceMask(
-    confidenceInput,
+  const admittedConfidence =
+    validateStudioLayerLiftConfidenceMask(confidenceInput);
+  if (!admittedConfidence.ok) {
+    return preparationFailure(admittedConfidence);
+  }
+  const confidence = resampleValidatedConfidenceMask(
+    admittedConfidence.value,
     source.value.width,
     source.value.height,
   );
   if (!confidence.ok) return preparationFailure(confidence);
-  const soft = thresholdStudioLayerLiftConfidenceMask(
+  const soft = thresholdValidatedConfidenceMask(
     confidence.value,
     thresholdOptions.value,
   );
@@ -862,7 +974,7 @@ export function prepareStudioLayerLiftMask(input: {
     height: source.value.height,
     alpha: finalAlpha,
   });
-  const composed = composeStudioLayerLiftForegroundAlpha(source.value, matte);
+  const composed = composeValidatedForegroundAlpha(source.value, matte);
   if (!composed.ok) return preparationFailure(composed);
   const maskStats = maskStatistics(
     matte.width,
