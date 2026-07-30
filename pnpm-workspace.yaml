@@ -6,6 +6,7 @@ packages:
 # 제품 정책: 최신 그래픽/창작 런타임을 즉시 검증할 수 있도록 pnpm의
 # 24시간 신규 릴리스 숙성 게이트는 사용하지 않는다. 핵심 그래픽 런타임의 exact version,
 # 재현 가능한 lockfile과 아래 build allowlist, license/security audit를 공급망 경계로 유지한다.
+minimumReleaseAge: 0
 
 # 빌드 스크립트 실행을 명시 승인(pnpm 11 strict: 미승인 시 ERR_PNPM_IGNORED_BUILDS로 install 실패).
 # sibling(pettography) 패턴: onlyBuiltDependencies(array) + allowBuilds(map) 둘 다.
