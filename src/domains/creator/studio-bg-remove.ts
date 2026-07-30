@@ -1,94 +1,590 @@
-// AI 배경 제거 — 100% 브라우저(클라이언트) 실행, 서버·토큰 비용 0원.
-// 구글 MediaPipe ImageSegmenter(셀피 세그멘터)로 전경(인물/캐릭터)을 분리해 배경을 투명하게 만든다.
-// 모델·WASM 은 CDN 에서 지연 로드(최초 1회)하고 이후 브라우저 캐시를 탄다. 결과는 PNG data URL.
-//
-// 한계(정직): 셀피 세그멘터는 "사람/인물 사진" 분리에 최적화돼 있다. 실사 인물·캐릭터 사진에 잘 되고,
-// 순수 일러스트/오브젝트는 정확도가 떨어질 수 있다(향후 @imgly/background-removal 등 범용 모델로 확장 가능).
-import type { ImageSegmenter as ImageSegmenterType } from "@mediapipe/tasks-vision";
-
-const MEDIAPIPE_VISION_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
+// AI 배경 제거 — 이미지 픽셀은 브라우저 안에서만 MediaPipe에 전달한다.
+// 모델·WASM 자체는 CDN에서 지연 로드하지만, 원본 이미지를 추론 서버로 업로드하지 않는다.
+const MEDIAPIPE_VISION_CDN =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
 const SELFIE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
 
-let segmenterPromise: Promise<ImageSegmenterType> | null = null;
+export const STUDIO_BG_REMOVE_MAX_DECODED_AXIS = 8_192;
+export const STUDIO_BG_REMOVE_MAX_DECODED_PIXELS = 16_777_216;
 
-// 세그멘터를 한 번만 초기화(모델·WASM 다운로드 흡수). GPU 델리게이트 실패 시 호출부에서 처리.
-async function getSegmenter(): Promise<ImageSegmenterType> {
-  if (segmenterPromise) return segmenterPromise;
-  segmenterPromise = (async () => {
-    const { FilesetResolver, ImageSegmenter } = await import("@mediapipe/tasks-vision");
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
-    return ImageSegmenter.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: SELFIE_MODEL_URL, delegate: "GPU" },
+export type StudioLocalForegroundDelegate = "GPU" | "CPU";
+
+export interface StudioLocalForegroundModelReceipt {
+  readonly providerId: "mediapipe-image-segmenter";
+  readonly providerVersion: "0.10.35";
+  readonly model: Readonly<{
+    readonly id: "selfie-segmenter";
+    readonly format: "tflite-float16";
+    readonly revision: "latest";
+    readonly assetUrl: typeof SELFIE_MODEL_URL;
+  }>;
+  readonly execution: "local-device";
+  readonly imageUpload: false;
+  readonly preferredDelegate: "GPU";
+  readonly attemptedDelegates: readonly StudioLocalForegroundDelegate[];
+  readonly activeDelegate: StudioLocalForegroundDelegate;
+  readonly fallback: Readonly<{
+    readonly from: "GPU";
+    readonly to: "CPU";
+    readonly reason: "gpu-initialization-failed";
+  }> | null;
+}
+
+export interface StudioForegroundConfidenceMask {
+  readonly width: number;
+  readonly height: number;
+  readonly confidence: Float32Array;
+}
+
+export interface StudioLocalForegroundConfidenceMask
+  extends StudioForegroundConfidenceMask {
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly receipt: StudioLocalForegroundModelReceipt;
+}
+
+export interface StudioForegroundMaskResource {
+  readonly width: number;
+  readonly height: number;
+  getAsFloat32Array(): Float32Array;
+  close?(): void;
+}
+
+export interface StudioForegroundSegmentationResult {
+  readonly confidenceMasks?: readonly StudioForegroundMaskResource[];
+  readonly categoryMask?: StudioForegroundMaskResource;
+  close?(): void;
+}
+
+export interface StudioLocalForegroundSegmenter {
+  segment(image: HTMLImageElement): StudioForegroundSegmentationResult;
+}
+
+export interface StudioLocalForegroundSegmenterRuntime {
+  readonly segmenter: StudioLocalForegroundSegmenter;
+  readonly activeDelegate: StudioLocalForegroundDelegate;
+  /** True only when GPU creation was attempted once and CPU is the bounded fallback. */
+  readonly gpuFallback: boolean;
+}
+
+export type StudioLocalForegroundImageLoader = (
+  src: string,
+  signal?: AbortSignal,
+) => Promise<HTMLImageElement>;
+
+export type StudioLocalForegroundRuntimeLoader =
+  () => Promise<StudioLocalForegroundSegmenterRuntime>;
+
+export interface CreateStudioLocalForegroundConfidenceProviderOptions {
+  /** Dependency seam for decoded-image loading; production uses the DOM Image API. */
+  readonly loadImage?: StudioLocalForegroundImageLoader;
+  /** Dependency seam for inference; production dynamically imports MediaPipe. */
+  readonly loadRuntime?: StudioLocalForegroundRuntimeLoader;
+}
+
+export interface StudioLocalForegroundConfidenceOptions {
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioLocalForegroundConfidenceProvider {
+  getForegroundConfidenceMask(
+    src: string,
+    options?: StudioLocalForegroundConfidenceOptions,
+  ): Promise<StudioLocalForegroundConfidenceMask>;
+}
+
+export interface StudioForegroundPixelAlphaInput {
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+  readonly sourceRgba: Uint8Array | Uint8ClampedArray;
+  readonly confidenceMask: StudioForegroundConfidenceMask;
+  readonly threshold?: number;
+}
+
+export interface StudioForegroundPixelAlpha {
+  readonly width: number;
+  readonly height: number;
+  readonly alpha: Uint8ClampedArray;
+}
+
+export interface RemoveBackgroundOptions {
+  readonly threshold?: number;
+  readonly signal?: AbortSignal;
+}
+
+const SELFIE_MODEL_RECEIPT = Object.freeze({
+  id: "selfie-segmenter",
+  format: "tflite-float16",
+  revision: "latest",
+  assetUrl: SELFIE_MODEL_URL,
+} as const);
+
+let segmenterPromise: Promise<StudioLocalForegroundSegmenterRuntime> | null = null;
+
+function createAbortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("배경 분리를 취소했습니다.", "AbortError");
+  }
+  const error = new Error("배경 분리를 취소했습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw createAbortError();
+}
+
+function assertImageSource(src: unknown): asserts src is string {
+  if (typeof src !== "string" || src.length === 0) {
+    throw new TypeError("이미지 주소가 비어 있습니다.");
+  }
+}
+
+function assertThreshold(value: unknown): number {
+  const threshold = value === undefined ? 0.5 : value;
+  if (
+    typeof threshold !== "number"
+    || !Number.isFinite(threshold)
+    || threshold < 0
+    || threshold > 1
+  ) {
+    throw new RangeError("배경 분리 임계값은 0과 1 사이의 유한한 수여야 합니다.");
+  }
+  return threshold;
+}
+
+function assertRasterDimensions(
+  width: unknown,
+  height: unknown,
+  label: string,
+): number {
+  if (
+    typeof width !== "number"
+    || typeof height !== "number"
+    || !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width < 1
+    || height < 1
+  ) {
+    throw new RangeError(`${label} 크기를 확인할 수 없습니다.`);
+  }
+  if (
+    width > STUDIO_BG_REMOVE_MAX_DECODED_AXIS
+    || height > STUDIO_BG_REMOVE_MAX_DECODED_AXIS
+  ) {
+    throw new RangeError(`${label} 한 축이 안전 한도를 초과합니다.`);
+  }
+  const pixels = width * height;
+  if (
+    !Number.isSafeInteger(pixels)
+    || pixels > STUDIO_BG_REMOVE_MAX_DECODED_PIXELS
+  ) {
+    throw new RangeError(`${label} 픽셀 수가 안전 한도를 초과합니다.`);
+  }
+  return pixels;
+}
+
+function assertConfidenceBuffer(
+  confidence: unknown,
+  pixelCount: number,
+): asserts confidence is Float32Array {
+  if (!(confidence instanceof Float32Array)) {
+    throw new TypeError("전경 신뢰도 마스크 형식이 올바르지 않습니다.");
+  }
+  if (confidence.length !== pixelCount) {
+    throw new RangeError("전경 신뢰도 마스크 길이가 크기와 일치하지 않습니다.");
+  }
+  for (let index = 0; index < confidence.length; index += 1) {
+    const value = confidence[index]!;
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new RangeError("전경 신뢰도에는 0과 1 사이의 유한한 값만 사용할 수 있습니다.");
+    }
+  }
+}
+
+function modelReceipt(
+  runtime: StudioLocalForegroundSegmenterRuntime,
+): StudioLocalForegroundModelReceipt {
+  if (
+    (runtime.activeDelegate === "GPU" && runtime.gpuFallback)
+    || (runtime.activeDelegate === "CPU" && !runtime.gpuFallback)
+  ) {
+    throw new Error("전경 분리 실행 경로 영수증이 올바르지 않습니다.");
+  }
+  const cpuFallback = runtime.activeDelegate === "CPU";
+  return Object.freeze({
+    providerId: "mediapipe-image-segmenter",
+    providerVersion: "0.10.35",
+    model: SELFIE_MODEL_RECEIPT,
+    execution: "local-device",
+    imageUpload: false,
+    preferredDelegate: "GPU",
+    attemptedDelegates: Object.freeze(
+      cpuFallback ? ["GPU", "CPU"] as const : ["GPU"] as const,
+    ),
+    activeDelegate: runtime.activeDelegate,
+    fallback: cpuFallback
+      ? Object.freeze({
+          from: "GPU",
+          to: "CPU",
+          reason: "gpu-initialization-failed",
+        } as const)
+      : null,
+  });
+}
+
+async function loadMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
+  const { FilesetResolver, ImageSegmenter } =
+    await import("@mediapipe/tasks-vision");
+  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const create = (delegate: StudioLocalForegroundDelegate) =>
+    ImageSegmenter.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: SELFIE_MODEL_URL,
+        delegate,
+      },
       runningMode: "IMAGE",
       outputCategoryMask: false,
       outputConfidenceMasks: true,
     });
-  })().catch((err) => {
-    segmenterPromise = null; // 실패 시 다음 호출에서 재시도 가능하게.
-    throw err;
+
+  try {
+    const segmenter = await create("GPU");
+    return Object.freeze({
+      segmenter,
+      activeDelegate: "GPU",
+      gpuFallback: false,
+    });
+  } catch (gpuError) {
+    try {
+      const segmenter = await create("CPU");
+      return Object.freeze({
+        segmenter,
+        activeDelegate: "CPU",
+        gpuFallback: true,
+      });
+    } catch (cpuError) {
+      throw new AggregateError(
+        [gpuError, cpuError],
+        "MediaPipe GPU와 CPU 전경 분리기를 초기화하지 못했습니다.",
+        { cause: cpuError },
+      );
+    }
+  }
+}
+
+function getMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
+  if (segmenterPromise) return segmenterPromise;
+  segmenterPromise = loadMediaPipeRuntime().catch((error: unknown) => {
+    segmenterPromise = null;
+    throw error;
   });
   return segmenterPromise;
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function loadImage(
+  src: string,
+  signal?: AbortSignal,
+): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
-    img.src = src;
+    const image = new globalThis.Image();
+    let settled = false;
+
+    const cleanup = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      image.src = "";
+      reject(createAbortError());
+    };
+
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(image);
+    };
+    image.onerror = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("이미지를 불러오지 못했습니다."));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    image.src = src;
+  });
+}
+
+function closeSegmentationResources(
+  result: StudioForegroundSegmentationResult | undefined,
+  masks: readonly StudioForegroundMaskResource[],
+  categoryMask: StudioForegroundMaskResource | undefined,
+): void {
+  const uniqueMasks = new Set<StudioForegroundMaskResource>(masks);
+  if (categoryMask) uniqueMasks.add(categoryMask);
+  for (const mask of uniqueMasks) {
+    try {
+      mask.close?.();
+    } catch {
+      // Every remaining resource still gets a close attempt.
+    }
+  }
+  try {
+    result?.close?.();
+  } catch {
+    // Cleanup must not replace the inference/validation outcome.
+  }
+}
+
+function segmentDecodedImage(
+  image: HTMLImageElement,
+  sourceWidth: number,
+  sourceHeight: number,
+  runtime: StudioLocalForegroundSegmenterRuntime,
+  signal?: AbortSignal,
+): StudioLocalForegroundConfidenceMask {
+  throwIfAborted(signal);
+  let result: StudioForegroundSegmentationResult | undefined;
+  let masks: readonly StudioForegroundMaskResource[] = [];
+  let categoryMask: StudioForegroundMaskResource | undefined;
+
+  try {
+    result = runtime.segmenter.segment(image);
+    masks = Array.isArray(result.confidenceMasks)
+      ? [...result.confidenceMasks]
+      : [];
+    categoryMask = result.categoryMask;
+    throwIfAborted(signal);
+
+    if (masks.length === 0) {
+      throw new Error("배경을 분리하지 못했습니다.");
+    }
+    const foreground = masks[masks.length - 1]!;
+    const pixelCount = assertRasterDimensions(
+      foreground.width,
+      foreground.height,
+      "전경 신뢰도 마스크",
+    );
+    throwIfAborted(signal);
+    const modelConfidence = foreground.getAsFloat32Array();
+    assertConfidenceBuffer(modelConfidence, pixelCount);
+    throwIfAborted(signal);
+
+    const confidence = new Float32Array(modelConfidence);
+    throwIfAborted(signal);
+    return Object.freeze({
+      width: foreground.width,
+      height: foreground.height,
+      confidence,
+      sourceWidth,
+      sourceHeight,
+      receipt: modelReceipt(runtime),
+    });
+  } finally {
+    closeSegmentationResources(result, masks, categoryMask);
+  }
+}
+
+interface SegmentedSource {
+  readonly image: HTMLImageElement;
+  readonly width: number;
+  readonly height: number;
+  readonly mask: StudioLocalForegroundConfidenceMask;
+}
+
+async function loadAndSegmentSource(
+  src: string,
+  options: StudioLocalForegroundConfidenceOptions,
+  imageLoader: StudioLocalForegroundImageLoader,
+  runtimeLoader: StudioLocalForegroundRuntimeLoader,
+): Promise<SegmentedSource> {
+  assertImageSource(src);
+  throwIfAborted(options.signal);
+  const decodedImage = imageLoader(src, options.signal).then((image) => {
+    throwIfAborted(options.signal);
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    assertRasterDimensions(width, height, "디코드된 이미지");
+    return Object.freeze({ image, width, height });
+  });
+  const [loaded, runtime] = await Promise.all([decodedImage, runtimeLoader()]);
+  throwIfAborted(options.signal);
+  const mask = segmentDecodedImage(
+    loaded.image,
+    loaded.width,
+    loaded.height,
+    runtime,
+    options.signal,
+  );
+  return Object.freeze({
+    image: loaded.image,
+    width: loaded.width,
+    height: loaded.height,
+    mask,
   });
 }
 
 /**
- * 배경 제거 — src(데이터 URL 등)의 전경만 남기고 배경을 투명하게 한 PNG data URL 을 반환한다.
- * @param src 원본 이미지 URL(업로드 자산은 data URL 이라 CORS 문제 없음)
- * @param opts.feather 알파 경계 부드럽게(0~1, 기본 0 = 원본 신뢰도 그대로)
+ * Create a reusable local confidence provider. The injectable loaders keep the
+ * model/network out of unit tests and leave room for a future cut-layer caller.
  */
-export async function removeBackground(src: string, opts: { threshold?: number } = {}): Promise<string> {
-  const threshold = opts.threshold ?? 0.5;
-  const [segmenter, img] = await Promise.all([getSegmenter(), loadImage(src)]);
+export function createStudioLocalForegroundConfidenceProvider(
+  options: CreateStudioLocalForegroundConfidenceProviderOptions = {},
+): StudioLocalForegroundConfidenceProvider {
+  const imageLoader = options.loadImage ?? loadImage;
+  const runtimeLoader = options.loadRuntime ?? getMediaPipeRuntime;
+  return Object.freeze({
+    async getForegroundConfidenceMask(
+      src: string,
+      requestOptions: StudioLocalForegroundConfidenceOptions = {},
+    ) {
+      const segmented = await loadAndSegmentSource(
+        src,
+        requestOptions,
+        imageLoader,
+        runtimeLoader,
+      );
+      return segmented.mask;
+    },
+  });
+}
 
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
-  if (!w || !h) throw new Error("이미지 크기를 확인할 수 없습니다.");
+const defaultLocalForegroundProvider =
+  createStudioLocalForegroundConfidenceProvider();
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("캔버스를 만들 수 없습니다.");
-  ctx.drawImage(img, 0, 0, w, h);
-  const imageData = ctx.getImageData(0, 0, w, h);
+/**
+ * Decode and segment an image entirely on-device. Only model/WASM assets may be
+ * downloaded; the source pixels are never uploaded by this provider.
+ */
+export function getLocalForegroundConfidenceMask(
+  src: string,
+  options: StudioLocalForegroundConfidenceOptions = {},
+): Promise<StudioLocalForegroundConfidenceMask> {
+  return defaultLocalForegroundProvider.getForegroundConfidenceMask(src, options);
+}
 
-  const result = segmenter.segment(img);
-  const masks = result.confidenceMasks;
-  if (!masks || masks.length === 0) {
-    result.close?.();
-    throw new Error("배경을 분리하지 못했습니다.");
+/**
+ * Pure nearest-neighbour mask resampling and alpha composition.
+ * The source's existing alpha is multiplied by model confidence, never replaced.
+ */
+export function composeForegroundPixelAlpha(
+  input: StudioForegroundPixelAlphaInput,
+): StudioForegroundPixelAlpha {
+  if (input === null || typeof input !== "object") {
+    throw new TypeError("전경 알파 합성 입력이 올바르지 않습니다.");
   }
-  // 마지막 마스크 = 전경(인물) 신뢰도(1개면 그 자체, 2개면 index 1). 마스크 해상도가 이미지와
-  // 다를 수 있어 좌표를 정규화해 최근접 샘플링한다.
-  const fg = masks[masks.length - 1];
-  const mask = fg.getAsFloat32Array();
-  const mw = fg.width;
-  const mh = fg.height;
+  const threshold = assertThreshold(input.threshold);
+  const sourcePixels = assertRasterDimensions(
+    input.sourceWidth,
+    input.sourceHeight,
+    "원본 이미지",
+  );
+  const sourceRgba = input.sourceRgba;
+  if (
+    !(sourceRgba instanceof Uint8Array)
+    && !(sourceRgba instanceof Uint8ClampedArray)
+  ) {
+    throw new TypeError("원본 RGBA 버퍼 형식이 올바르지 않습니다.");
+  }
+  if (sourceRgba.length !== sourcePixels * 4) {
+    throw new RangeError("원본 RGBA 버퍼 길이가 이미지 크기와 일치하지 않습니다.");
+  }
 
-  const data = imageData.data;
-  for (let y = 0; y < h; y++) {
-    const my = Math.min(mh - 1, (y * mh / h) | 0);
-    for (let x = 0; x < w; x++) {
-      const mx = Math.min(mw - 1, (x * mw / w) | 0);
-      const conf = mask[my * mw + mx];
-      // 신뢰도를 알파로: threshold 미만은 완전 투명, 이상은 신뢰도 비례(경계 앤티앨리어싱).
-      const alpha = conf < threshold ? 0 : conf;
-      data[(y * w + x) * 4 + 3] = Math.round(alpha * 255);
+  const mask = input.confidenceMask;
+  if (mask === null || typeof mask !== "object") {
+    throw new TypeError("전경 신뢰도 마스크가 올바르지 않습니다.");
+  }
+  const maskPixels = assertRasterDimensions(
+    mask.width,
+    mask.height,
+    "전경 신뢰도 마스크",
+  );
+  assertConfidenceBuffer(mask.confidence, maskPixels);
+
+  const alpha = new Uint8ClampedArray(sourcePixels);
+  for (let y = 0; y < input.sourceHeight; y += 1) {
+    const maskY = Math.min(
+      mask.height - 1,
+      Math.floor(y * mask.height / input.sourceHeight),
+    );
+    for (let x = 0; x < input.sourceWidth; x += 1) {
+      const sourceIndex = y * input.sourceWidth + x;
+      const maskX = Math.min(
+        mask.width - 1,
+        Math.floor(x * mask.width / input.sourceWidth),
+      );
+      const confidence = mask.confidence[maskY * mask.width + maskX]!;
+      alpha[sourceIndex] = confidence < threshold
+        ? 0
+        : Math.round(sourceRgba[sourceIndex * 4 + 3]! * confidence);
     }
   }
-  result.close?.();
-  masks.forEach((m) => m.close?.());
+  return Object.freeze({
+    width: input.sourceWidth,
+    height: input.sourceHeight,
+    alpha,
+  });
+}
 
-  ctx.putImageData(imageData, 0, 0);
+/**
+ * Legacy background-removal wrapper: foreground pixels are returned as a PNG
+ * data URL. Existing `removeBackground(src, { threshold? })` calls remain valid.
+ */
+export async function removeBackground(
+  src: string,
+  options: RemoveBackgroundOptions = {},
+): Promise<string> {
+  const threshold = assertThreshold(options.threshold);
+  const segmented = await loadAndSegmentSource(
+    src,
+    { signal: options.signal },
+    loadImage,
+    getMediaPipeRuntime,
+  );
+  throwIfAborted(options.signal);
+
+  // Dimensions were admitted above, before either canvas or ImageData allocation.
+  const canvas = document.createElement("canvas");
+  canvas.width = segmented.width;
+  canvas.height = segmented.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("캔버스를 만들 수 없습니다.");
+  context.drawImage(
+    segmented.image,
+    0,
+    0,
+    segmented.width,
+    segmented.height,
+  );
+  const imageData = context.getImageData(
+    0,
+    0,
+    segmented.width,
+    segmented.height,
+  );
+  const foreground = composeForegroundPixelAlpha({
+    sourceWidth: segmented.width,
+    sourceHeight: segmented.height,
+    sourceRgba: imageData.data,
+    confidenceMask: segmented.mask,
+    threshold,
+  });
+  for (let index = 0; index < foreground.alpha.length; index += 1) {
+    imageData.data[index * 4 + 3] = foreground.alpha[index]!;
+  }
+  throwIfAborted(options.signal);
+  context.putImageData(imageData, 0, 0);
+  throwIfAborted(options.signal);
   return canvas.toDataURL("image/png");
 }
