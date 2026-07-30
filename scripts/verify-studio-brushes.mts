@@ -548,14 +548,47 @@ async function openDesktopCatalog(page: Page): Promise<Locator> {
 
 async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
   // The product UI progressively mounts large catalogues so 200+ SVG previews do not block
-  // the first open. Expand every page before checking the complete shipped catalogue.
-  for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
-    const loadMore = catalog.locator('[data-studio-brush-load-more="true"]');
-    if (await loadMore.count() === 0) return;
-    await loadMore.click();
+  // the first open. Move the actual scrollport to its observer sentinel and require one bounded
+  // batch of progress before repeating; a detached observer or stale sentinel fails closed.
+  const deadline = Date.now() + 15_000;
+  const scrollport = catalog.locator(
+    '[data-studio-brush-catalog-scrollport="true"]',
+  );
+  const selections = catalog.locator('button[aria-label$=" 선택"]');
+  let previousCount = await selections.count();
+  for (let batchIndex = 0; batchIndex < 20; batchIndex += 1) {
+    const sentinel = catalog.locator(
+      '[data-studio-brush-progressive-sentinel="true"]',
+    );
+    if (await sentinel.count() === 0) return;
+    invariant(Date.now() < deadline, "brush catalogue progressive reveal exceeded its deadline");
+    await scrollport.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const remainingTime = Math.max(250, deadline - Date.now());
+    try {
+      await selections.nth(previousCount).waitFor({
+        state: "attached",
+        timeout: remainingTime,
+      });
+    } catch {
+      const stalledCount = await selections.count();
+      invariant(
+        stalledCount > previousCount,
+        `brush catalogue made no progressive reveal progress at ${previousCount} items`,
+      );
+    }
+    const currentCount = await selections.count();
+    invariant(
+      currentCount > previousCount,
+      `brush catalogue repeated a sentinel cycle without progress at ${previousCount} items`,
+    );
+    previousCount = currentCount;
   }
   invariant(
-    await catalog.locator('[data-studio-brush-load-more="true"]').count() === 0,
+    await catalog.locator(
+      '[data-studio-brush-progressive-sentinel="true"]',
+    ).count() === 0,
     "brush catalogue still has hidden pages after the bounded expansion audit",
   );
 }

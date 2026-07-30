@@ -39,9 +39,64 @@ const selectionSource = readFileSync(
   "utf8"
 );
 
+class TestIntersectionObserver implements IntersectionObserver {
+  static readonly instances: TestIntersectionObserver[] = [];
+
+  readonly root: Element | Document | null;
+  readonly rootMargin: string;
+  readonly scrollMargin: string;
+  readonly thresholds: readonly number[];
+  readonly disconnect = vi.fn();
+  readonly unobserve = vi.fn();
+  readonly takeRecords = vi.fn((): IntersectionObserverEntry[] => []);
+  private observedTarget: Element | null = null;
+
+  constructor(
+    private readonly callback: IntersectionObserverCallback,
+    options: IntersectionObserverInit = {},
+  ) {
+    this.root = options.root ?? null;
+    this.rootMargin = options.rootMargin ?? "0px";
+    this.scrollMargin = options.scrollMargin ?? "0px";
+    this.thresholds = Array.isArray(options.threshold)
+      ? options.threshold
+      : [options.threshold ?? 0];
+    TestIntersectionObserver.instances.push(this);
+  }
+
+  readonly observe = vi.fn((target: Element) => {
+    this.observedTarget = target;
+  });
+
+  trigger(isIntersecting = true): void {
+    const target = this.observedTarget;
+    if (!target) throw new Error("IntersectionObserver target was not observed");
+    const rect = target.getBoundingClientRect();
+    this.callback([
+      {
+        time: 0,
+        target,
+        rootBounds: null,
+        boundingClientRect: rect,
+        intersectionRect: isIntersecting ? rect : new DOMRectReadOnly(),
+        isIntersecting,
+        intersectionRatio: isIntersecting ? 1 : 0,
+      },
+    ], this);
+  }
+}
+
+function installIntersectionObserver(): typeof TestIntersectionObserver.instances {
+  TestIntersectionObserver.instances.length = 0;
+  vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+  return TestIntersectionObserver.instances;
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  TestIntersectionObserver.instances.length = 0;
 });
 
 function brush(id: string): StudioBrushTrayItem {
@@ -332,7 +387,7 @@ describe("StudioBrushLibrarySheet", () => {
     expect(onClose).toHaveBeenCalledWith("selection");
   });
 
-  it("progressively opens the Pro catalog and lazily materializes a durable selection", async () => {
+  it("keeps an accessible fallback while progressively materializing a durable selection", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
     const { container } = render(
@@ -353,8 +408,11 @@ describe("StudioBrushLibrarySheet", () => {
     );
     expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(48);
     expect(screen.getAllByText("PRO")).toHaveLength(48);
-    while (container.querySelector('[data-studio-brush-load-more="true"]')) {
-      fireEvent.click(container.querySelector('[data-studio-brush-load-more="true"]')!);
+    expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
+    while (container.querySelector('[data-studio-brush-progressive-fallback="true"]')) {
+      fireEvent.click(
+        container.querySelector('[data-studio-brush-progressive-fallback="true"]')!,
+      );
     }
     expect(screen.getByRole("status").textContent).toBe(
       `${STUDIO_BRUSH_CATALOG_COUNTS.pro}/${STUDIO_BRUSH_CATALOG_COUNTS.pro}개의 브러시가 표시됩니다.`
@@ -383,6 +441,146 @@ describe("StudioBrushLibrarySheet", () => {
       })
     );
     expect(onClose).toHaveBeenCalledWith("selection");
+  });
+
+  it("reveals one batch for duplicate observer notifications and uses the scrollport root", () => {
+    const observers = installIntersectionObserver();
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("tab", {
+      name: `프로 ${STUDIO_BRUSH_CATALOG_COUNTS.pro}`,
+    }));
+    const observer = observers.at(-1);
+    const scrollport = container.querySelector(
+      "[data-studio-brush-catalog-scrollport]",
+    );
+    expect(observer?.root).toBe(scrollport);
+    expect(observer?.rootMargin).toBe("240px 0px");
+    expect(observer?.observe).toHaveBeenCalledWith(
+      container.querySelector("[data-studio-brush-progressive-sentinel]"),
+    );
+
+    act(() => {
+      observer?.trigger();
+      observer?.trigger();
+    });
+
+    expect(screen.getByRole("status").textContent).toBe(
+      `96/${STUDIO_BRUSH_CATALOG_COUNTS.pro}개의 브러시가 표시됩니다.`,
+    );
+    expect(container.querySelectorAll('[data-studio-brush-source="pro"]')).toHaveLength(96);
+    expect(observer?.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("resets the batch, scroll position, and stale observer when a filter key changes", () => {
+    const observers = installIntersectionObserver();
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("tab", {
+      name: `프로 ${STUDIO_BRUSH_CATALOG_COUNTS.pro}`,
+    }));
+    const proObserver = observers.at(-1)!;
+    act(() => proObserver.trigger());
+    expect(screen.getByRole("status").textContent).toContain("96/");
+    const scrollport = container.querySelector<HTMLElement>(
+      "[data-studio-brush-catalog-scrollport]",
+    )!;
+    scrollport.scrollTop = 720;
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: "브러시" },
+    });
+
+    expect(scrollport.scrollTop).toBe(0);
+    const resetCount = /^(\d+)\/(\d+)개의 브러시가 표시됩니다\.$/u.exec(
+      screen.getByRole("status").textContent ?? "",
+    );
+    expect(resetCount).not.toBeNull();
+    expect(Number(resetCount?.[1])).toBe(
+      Math.min(48, Number(resetCount?.[2])),
+    );
+    const countAfterReset = container.querySelectorAll(
+      "[data-studio-brush-source]",
+    ).length;
+    act(() => proObserver.trigger());
+    expect(container.querySelectorAll("[data-studio-brush-source]")).toHaveLength(
+      countAfterReset,
+    );
+    expect(proObserver.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("disconnects at the end of the catalog and removes the sentinel", () => {
+    const observers = installIntersectionObserver();
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("tab", {
+      name: `프로 ${STUDIO_BRUSH_CATALOG_COUNTS.pro}`,
+    }));
+
+    while (container.querySelector("[data-studio-brush-progressive-sentinel]")) {
+      const observer = observers.at(-1);
+      act(() => observer?.trigger());
+    }
+
+    expect(screen.getByRole("status").textContent).toBe(
+      `${STUDIO_BRUSH_CATALOG_COUNTS.pro}/${STUDIO_BRUSH_CATALOG_COUNTS.pro}개의 브러시가 표시됩니다.`,
+    );
+    expect(container.querySelector("[data-studio-brush-progressive-sentinel]")).toBeNull();
+    expect(observers.at(-1)?.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("disconnects on close and leaves a keyboard fallback when observers are unavailable", () => {
+    const { container, rerender } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("tab", {
+      name: `프로 ${STUDIO_BRUSH_CATALOG_COUNTS.pro}`,
+    }));
+
+    const fallback = screen.getByRole("button", {
+      name: `다음 브러시 48개 불러오기, ${STUDIO_BRUSH_CATALOG_COUNTS.pro - 48}개 남음`,
+    });
+    expect(fallback.className).toContain("sr-only");
+    expect(container.querySelector("[data-studio-brush-load-more]")).toBeNull();
+    fireEvent.click(fallback);
+    expect(screen.getByRole("status").textContent).toContain("96/");
+
+    const observers = installIntersectionObserver();
+    fireEvent.click(screen.getByRole("tab", { name: "전체" }));
+    const observer = observers.at(-1);
+    rerender(
+      <StudioBrushLibrarySheet
+        open={false}
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(observer?.disconnect).toHaveBeenCalledOnce();
   });
 
   it("keeps one brush-selection tab stop and moves it with arrows", () => {
@@ -644,7 +842,9 @@ describe("StudioBrushLibrarySheet", () => {
 
   it.each([
     ["gpen", "calligraphy"],
-    ["highlighter", "square-marker"],
+    ["highlighter", "wash-marker"],
+    ["chisel-highlighter", "wash-marker"],
+    ["pastel-highlighter", "wash-marker"],
     ["marker-bold", "marker"],
     ["pencil", "pencil"],
     ["charcoal", "texture"],
@@ -682,7 +882,8 @@ describe("StudioBrushLibrarySheet", () => {
       <LargeBrushPreview item={brush("pencil-grain")} active={false} />
     );
 
-    expect(highlighter).toContain('stroke-linecap="square"');
+    expect(highlighter).toContain('data-studio-brush-preview-kind="wash-marker"');
+    expect(highlighter).toContain('stroke-linecap="round"');
     expect(glow.match(/<path/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
     expect(tone.match(/<circle/g)?.length ?? 0).toBeGreaterThan(12);
     expect(texture).toContain("stroke-dasharray");

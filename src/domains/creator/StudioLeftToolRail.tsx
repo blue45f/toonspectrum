@@ -1,6 +1,7 @@
 import {
   Boxes,
   Circle,
+  CircleDashed,
   Crop,
   Droplets,
   Eraser,
@@ -26,6 +27,7 @@ import {
   Settings2,
   Shapes,
   Square,
+  SquareDashedMousePointer,
   Sun,
   Triangle,
   Type as TypeIcon,
@@ -579,7 +581,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             ) : null}
             {isRailToolVisible("marquee-rect") ? (
             <StudioRailToolButton
-              icon={Square}
+              icon={SquareDashedMousePointer}
               label="사각 선택 (M)"
               description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
               active={pixelTool === "rect" && !pixelForceCircle}
@@ -596,7 +598,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             ) : null}
             {isRailToolVisible("marquee-circle") ? (
             <StudioRailToolButton
-              icon={Circle}
+              icon={CircleDashed}
               label="원형 선택"
               description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
               active={pixelTool === "ellipse" && pixelForceCircle}

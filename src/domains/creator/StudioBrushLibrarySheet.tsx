@@ -97,7 +97,7 @@ export type StudioBrushCatalogPreviewKind =
   | "ribbon"
   | "calligraphy"
   | "marker"
-  | "square-marker"
+  | "wash-marker"
   | "pencil"
   | "texture"
   | "soft-air"
@@ -124,6 +124,9 @@ const STUDIO_BRUSH_GRID_FALLBACK_COLUMNS = {
   tile: 3,
   text: 1,
 } as const satisfies Record<StudioBrushCatalogViewMode, number>;
+const STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT = 48;
+const STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT = 48;
+const STUDIO_BRUSH_PROGRESSIVE_ROOT_MARGIN = "240px 0px";
 
 function countCssGridTracks(template: string): number | null {
   const normalizedTemplate = template.trim();
@@ -358,13 +361,17 @@ function StudioProceduralBrushPreviewDetail({
 
 /**
  * Keep preview semantics aligned with the actual renderer rather than relying only on a decorative
- * style name. Marker aliases and the square highlighter, for example, share a previewStyle in older
- * saved UI data but use different caps in the canvas renderer.
+ * style name. Marker aliases and the one-wash highlighters, for example, share a previewStyle in
+ * older saved UI data but use different cap and opacity semantics in the canvas renderer.
  */
 function studioBrushCatalogPreviewKind(
   item: StudioBrushTrayItem
 ): StudioBrushCatalogPreviewKind {
-  if (item.id === "highlighter") return "square-marker";
+  if (
+    item.id === "highlighter"
+    || item.id === "chisel-highlighter"
+    || item.id === "pastel-highlighter"
+  ) return "wash-marker";
   if (item.id === "marker" || item.id === "marker-bold" || item.id === "felt-tip") {
     return "marker";
   }
@@ -427,25 +434,29 @@ export function LargeBrushPreview({
   const opacity = studioBrushPreviewOpacity(item.defaultOpacity);
 
   let brushSample: ReactElement;
-  if (kind === "square-marker") {
+  if (kind === "wash-marker") {
+    const chisel = item.id === "chisel-highlighter";
+    const pastel = item.id === "pastel-highlighter";
     brushSample = (
-      <g data-studio-brush-preview-layer="square-marker">
+      <g data-studio-brush-preview-layer="wash-marker">
         <path
           d={pathD}
           fill="none"
           stroke={ink}
           strokeWidth={Math.max(6.8, strokeW * 1.55)}
-          strokeLinecap="square"
-          strokeLinejoin="miter"
-          opacity={opacity * 0.72}
+          strokeLinecap={chisel ? "butt" : "round"}
+          strokeLinejoin={chisel ? "bevel" : "round"}
+          strokeDasharray={pastel ? "7 0.45" : undefined}
+          opacity={opacity * 0.82}
         />
         <path
           d={pathD}
           fill="none"
           stroke={ink}
           strokeWidth={Math.max(2.2, strokeW * 0.5)}
-          strokeLinecap="square"
-          opacity={opacity * 0.32}
+          strokeLinecap={chisel ? "butt" : "round"}
+          strokeDasharray={pastel ? "1.1 1.4" : undefined}
+          opacity={opacity * (pastel ? 0.24 : 0.18)}
         />
       </g>
     );
@@ -641,12 +652,19 @@ export function StudioBrushLibrarySheet({
   const rootRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const itemGridRef = useRef<HTMLDivElement>(null);
+  const scrollportRef = useRef<HTMLDivElement>(null);
+  const progressiveSentinelRef = useRef<HTMLDivElement>(null);
+  const progressiveFilterKeyRef = useRef<string | null>(null);
+  const progressiveLoadPendingRef = useRef(false);
+  const progressiveObserverEpochRef = useRef(0);
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>("beginner");
   const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>("stroke");
-  const [visibleLimit, setVisibleLimit] = useState(48);
+  const [visibleLimit, setVisibleLimit] = useState(
+    STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
+  );
   const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
@@ -701,8 +719,6 @@ export function StudioBrushLibrarySheet({
     return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
   }, [open, onClose, triggerElement]);
 
-  if (!open) return null;
-
   const normalizedQuery = query.trim();
   const items = filterStudioBrushCatalogItems({
     category: tab,
@@ -710,8 +726,23 @@ export function StudioBrushLibrarySheet({
     favoriteIds,
     recentIds,
   });
-  const visibleItems = items.slice(0, visibleLimit);
+  const progressiveFilterKey = [
+    tab,
+    normalizedQuery,
+    tab === "favorites" ? favoriteIds.join("\u001f") : "",
+    tab === "recent" ? recentIds.join("\u001f") : "",
+  ].join("\u001e");
+  const visibleLimitForFilter =
+    progressiveFilterKeyRef.current === progressiveFilterKey
+      ? visibleLimit
+      : STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT;
+  const visibleItems = items.slice(0, visibleLimitForFilter);
   const hasMoreItems = visibleItems.length < items.length;
+  const remainingItemCount = Math.max(0, items.length - visibleItems.length);
+  const nextBatchItemCount = Math.min(
+    STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
+    remainingItemCount,
+  );
   const rovingBrushId = visibleItems.some((item) => item.id === focusedBrushId)
     ? focusedBrushId
     : visibleItems.some((item) => item.id === activeBrushId)
@@ -719,11 +750,79 @@ export function StudioBrushLibrarySheet({
       : visibleItems[0]?.id ?? null;
   const activeCatalogItem = studioBrushCatalogItemById(activeBrushId);
 
+  useLayoutEffect(() => {
+    if (progressiveFilterKeyRef.current === progressiveFilterKey) return;
+    progressiveFilterKeyRef.current = progressiveFilterKey;
+    progressiveLoadPendingRef.current = false;
+    progressiveObserverEpochRef.current += 1;
+    if (scrollportRef.current) scrollportRef.current.scrollTop = 0;
+    setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
+  }, [progressiveFilterKey]);
+
+  useEffect(() => {
+    const observerEpoch = progressiveObserverEpochRef.current + 1;
+    progressiveObserverEpochRef.current = observerEpoch;
+    progressiveLoadPendingRef.current = false;
+    const sentinel = progressiveSentinelRef.current;
+    if (
+      !open
+      || !hasMoreItems
+      || !sentinel
+      || typeof globalThis.IntersectionObserver !== "function"
+    ) {
+      return () => {
+        if (progressiveObserverEpochRef.current === observerEpoch) {
+          progressiveObserverEpochRef.current += 1;
+        }
+        progressiveLoadPendingRef.current = false;
+      };
+    }
+
+    const observer = new globalThis.IntersectionObserver(
+      (entries) => {
+        if (
+          progressiveObserverEpochRef.current !== observerEpoch
+          || progressiveLoadPendingRef.current
+          || !entries.some((entry) => entry.isIntersecting)
+        ) {
+          return;
+        }
+        progressiveLoadPendingRef.current = true;
+        setVisibleLimit((current) => Math.min(
+          items.length,
+          Math.max(current, STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT)
+            + STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
+        ));
+      },
+      {
+        root: scrollportRef.current,
+        rootMargin: STUDIO_BRUSH_PROGRESSIVE_ROOT_MARGIN,
+        threshold: 0,
+      },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+      if (progressiveObserverEpochRef.current === observerEpoch) {
+        progressiveObserverEpochRef.current += 1;
+      }
+      progressiveLoadPendingRef.current = false;
+    };
+  }, [
+    hasMoreItems,
+    items.length,
+    open,
+    progressiveFilterKey,
+    visibleItems.length,
+  ]);
+
+  if (!open) return null;
+
   function chooseTab(
     nextTab: (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"],
   ): void {
     setTab(nextTab);
-    setVisibleLimit(48);
+    setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
     setFocusedBrushId(null);
   }
 
@@ -900,7 +999,7 @@ export function StudioBrushLibrarySheet({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setVisibleLimit(48);
+              setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
               setFocusedBrushId(null);
             }}
             placeholder={`전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종 검색 (네온, 수채, G펜…)`}
@@ -1025,6 +1124,7 @@ export function StudioBrushLibrarySheet({
       </div>
 
       <div
+        ref={scrollportRef}
         id={panelId}
         role="tabpanel"
         aria-labelledby={`${tabsId}-${tab}`}
@@ -1236,19 +1336,36 @@ export function StudioBrushLibrarySheet({
             })}
           </div>
           {hasMoreItems ? (
-            <button
-              type="button"
-              onClick={() => setVisibleLimit((current) => current + 48)}
-              className={cn(
-                "mt-2 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-              )}
-              aria-label={`브러시 더 보기, ${items.length - visibleItems.length}개 남음`}
-              data-studio-brush-load-more="true"
+            <div
+              ref={progressiveSentinelRef}
+              aria-hidden="false"
+              data-studio-brush-progressive-sentinel="true"
+              data-studio-brush-progressive-remaining={remainingItemCount}
+              className="relative h-px w-full focus-within:h-auto"
             >
-              더 보기 · {visibleItems.length}/{items.length}
-            </button>
+              <button
+                type="button"
+                aria-controls={panelId}
+                aria-label={`다음 브러시 ${nextBatchItemCount}개 불러오기, ${remainingItemCount}개 남음`}
+                data-studio-brush-progressive-fallback="true"
+                onClick={() => {
+                  if (progressiveLoadPendingRef.current) return;
+                  progressiveLoadPendingRef.current = true;
+                  setVisibleLimit((current) => Math.min(
+                    items.length,
+                    Math.max(current, STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT)
+                      + STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT,
+                  ));
+                }}
+                className={cn(
+                  "sr-only focus:not-sr-only focus:mt-2 focus:flex focus:min-h-11 focus:w-full focus:items-center focus:justify-center focus:rounded-xl focus:border focus:border-line focus:bg-card focus:px-3 focus:text-[0.68rem] focus:font-bold focus:text-fg-2",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                )}
+              >
+                다음 브러시 {nextBatchItemCount}개 불러오기
+              </button>
+            </div>
           ) : null}
           </>
         )}

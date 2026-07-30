@@ -10,6 +10,7 @@ import {
   type StudioLeftToolRailHandlers,
 } from "./StudioLeftToolRail";
 
+import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 interface MockRailButtonProps {
@@ -22,6 +23,7 @@ interface MockRailButtonProps {
   readonly hintPreview?: string;
   readonly hintPreviewVariant?: string;
   readonly id?: string;
+  readonly icon?: LucideIcon;
   readonly label: string;
   readonly onClick?: () => void;
   readonly unavailableReason?: string;
@@ -39,6 +41,7 @@ vi.mock("./studio-chrome-ui", () => ({
     hintPreview,
     hintPreviewVariant,
     id,
+    icon: Icon,
     label,
     onClick,
     unavailableReason,
@@ -58,6 +61,7 @@ vi.mock("./studio-chrome-ui", () => ({
       disabled={disabled}
       onClick={onClick}
     >
+      {Icon ? <Icon aria-hidden /> : null}
       {label}
     </button>
   ),
@@ -229,6 +233,32 @@ function hiddenToolSettings(): ReturnType<typeof defaultStudioAppSettings> {
 }
 
 describe("StudioLeftToolRail", () => {
+  it("uses dashed selection silhouettes that remain distinct from solid shape tools", () => {
+    render(<StudioLeftToolRail {...createProps()} />);
+
+    const iconClass = (label: string): string => (
+      screen
+        .getByRole("button", { name: label })
+        .querySelector("svg")
+        ?.getAttribute("class")
+      ?? ""
+    );
+
+    const rectangleSelection = iconClass("사각 선택 (M)");
+    const circleSelection = iconClass("원형 선택");
+    const rectangleShape = iconClass("사각형 도형");
+    const ellipseShape = iconClass("타원 도형");
+
+    expect(rectangleSelection).toContain("lucide-square-dashed-mouse-pointer");
+    expect(circleSelection).toContain("lucide-circle-dashed");
+    expect(rectangleShape).toContain("lucide-square");
+    expect(rectangleShape).not.toContain("dashed");
+    expect(ellipseShape).toContain("lucide-circle");
+    expect(ellipseShape).not.toContain("dashed");
+    expect(rectangleSelection).not.toBe(rectangleShape);
+    expect(circleSelection).not.toBe(ellipseShape);
+  });
+
   it("wires core draw, insertion, image, and view actions to their single owners", () => {
     const props = createProps({ selected: IMAGE });
     render(<StudioLeftToolRail {...props} />);
