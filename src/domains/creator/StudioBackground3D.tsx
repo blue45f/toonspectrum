@@ -91,6 +91,10 @@ import {
   type Bg3dTemplateLibraryEntry,
 } from "./bg3d-template-library";
 import {
+  createStudioBg3dAiMethodReferenceCapture,
+  type StudioBg3dAiMethodReferenceCapture,
+} from "./studio-3d-ai-reference-handoff";
+import {
   COMPOSITE_CATEGORIES,
   COMPOSITE_CATEGORY_LABELS,
   COMPOSITE_PRESETS,
@@ -562,6 +566,9 @@ export interface StudioBackground3DProps {
   ) => Promise<boolean>;
   onClose: () => void;
   onInsert: (result: StudioBackground3DInsertResult) => boolean | void;
+  onUseAsAiMethodReference?: (
+    capture: StudioBg3dAiMethodReferenceCapture,
+  ) => boolean | void | Promise<boolean | void>;
   /** 편집 중인 문서 캔버스 크기. 주어지면 "문서 캔버스 비율" 캡처 프리셋이 목록에 추가된다. */
   documentCanvasSize?: { readonly width: number; readonly height: number };
 }
@@ -2447,6 +2454,7 @@ export function StudioBackground3D({
   validateRecoveryAccess,
   onClose,
   onInsert,
+  onUseAsAiMethodReference,
   documentCanvasSize,
 }: StudioBackground3DProps) {
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
@@ -2808,6 +2816,7 @@ export function StudioBackground3D({
     return thumbnailLease?.released ?? null;
   }, []);
   const ltInsertAbortRef = useRef<AbortController | null>(null);
+  const aiMethodReferenceAbortRef = useRef<AbortController | null>(null);
   const ltInsertSceneEpochRef = useRef(0);
   const ltInsertRestoreLineArtPreviewRef = useRef<boolean | null>(null);
   const destructiveMutationGuardRef = useRef(new StudioBg3dDestructiveMutationGuard());
@@ -2827,6 +2836,8 @@ export function StudioBackground3D({
       invalidateModelThumbnailCaptures();
       ltInsertAbortRef.current?.abort();
       ltInsertAbortRef.current = null;
+      aiMethodReferenceAbortRef.current?.abort();
+      aiMethodReferenceAbortRef.current = null;
       if (modalAssetSessionRef.current === session) modalAssetSessionRef.current = null;
       studioBg3dModalOperationCoordinator.endSession(session);
     };
@@ -2834,8 +2845,8 @@ export function StudioBackground3D({
   useLayoutEffect(() => {
     ltInsertSceneEpochRef.current += 1;
     const controller = ltInsertAbortRef.current;
-    if (!controller) return;
-    controller.abort();
+    controller?.abort();
+    aiMethodReferenceAbortRef.current?.abort();
   }, [customModels, primitives, sceneBaseDocument]);
   useLayoutEffect(() => {
     if (!surfaceSnapArmedRef.current) return;
@@ -2871,6 +2882,8 @@ export function StudioBackground3D({
     invalidateModelThumbnailCaptures();
     ltInsertAbortRef.current?.abort();
     ltInsertAbortRef.current = null;
+    aiMethodReferenceAbortRef.current?.abort();
+    aiMethodReferenceAbortRef.current = null;
     if (!modelThumbnailGpuLeaseRef.current) captureInFlightRef.current = false;
     const restoreLineArtPreview = ltInsertRestoreLineArtPreviewRef.current;
     ltInsertRestoreLineArtPreviewRef.current = null;
@@ -3071,6 +3084,8 @@ export function StudioBackground3D({
     invalidateModelThumbnailCaptures();
     ltInsertAbortRef.current?.abort();
     ltInsertAbortRef.current = null;
+    aiMethodReferenceAbortRef.current?.abort();
+    aiMethodReferenceAbortRef.current = null;
     const session = modalAssetSessionRef.current;
     if (!session) return;
     modalAssetSessionRef.current = null;
@@ -6920,6 +6935,186 @@ export function StudioBackground3D({
     }
   }
 
+  async function handleUseAsAiMethodReference() {
+    if (
+      !onUseAsAiMethodReference ||
+      captureInFlightRef.current ||
+      isCapturing ||
+      destructiveMutationGuardRef.current.blocksClose ||
+      insertBlocked
+    ) return;
+    if (!insertBackgroundIntent.ok) {
+      setError(insertBackgroundIntent.reason);
+      return;
+    }
+    const currentCapture = captureRef.current;
+    if (!currentCapture.adapter) {
+      setError("AI 구도 참조로 캡처할 3D 장면이 아직 준비되지 않았습니다.");
+      return;
+    }
+    const session = modalAssetSessionRef.current;
+    if (!session || !isModalAssetSessionCurrent(session)) return;
+
+    const backgroundSnapshot = createStudioBg3dCaptureBackgroundSnapshot({
+      background: sceneBaseDocument.background,
+      transparent: transparentInsert,
+    });
+    const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+    const currentBaseDocument: StudioBg3dSceneDocument = {
+      ...sceneBaseDocument,
+      camera: currentView,
+      background: backgroundSnapshot.background,
+      output: {
+        ...sceneBaseDocument.output,
+        transparentBackground: backgroundSnapshot.transparent,
+      },
+    };
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives,
+      customModels,
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      baseDocument: currentBaseDocument,
+    });
+    if (
+      adapted.diagnostics.length > 0 ||
+      adapted.omittedDiagnosticCount > 0 ||
+      adapted.counts.droppedPrimitives > 0 ||
+      adapted.counts.droppedCustomModels > 0 ||
+      adapted.counts.emittedPrimitives !== primitives.length ||
+      adapted.counts.emittedCustomModels !== customModels.length
+    ) {
+      setError(
+        "현재 3D 샷을 손실 없이 고정할 수 없어 AI 구도 참조 캡처를 중단했습니다. 문제가 있는 모델을 확인해 주세요.",
+      );
+      return;
+    }
+
+    aiMethodReferenceAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiMethodReferenceAbortRef.current = controller;
+    const isCaptureCurrent = () => (
+      !controller.signal.aborted &&
+      aiMethodReferenceAbortRef.current === controller &&
+      isModalAssetSessionCurrent(session)
+    );
+    const previousLineArtPreview = lineArtPreview;
+    captureInFlightRef.current = true;
+    setError(null);
+    setCaptureBackgroundSnapshot(backgroundSnapshot);
+    setLineArtPreview(false);
+    setIsCapturing(true);
+
+    try {
+      const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+        isActive: isCaptureCurrent,
+        readAdapter: () => captureRef.current.adapter,
+        waitForPaintFrame: waitForStudioBg3dPaintFrame,
+        signal: controller.signal,
+        timeoutMs: 15_000,
+      });
+      if (!captureAdapter) {
+        if (isCaptureCurrent()) {
+          setError("AI 구도 참조용 3D 시점을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        return;
+      }
+
+      const sourceSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
+      const captureFrame = resolveStudioBg3dCaptureFrame({
+        viewportWidth: sourceSize.width,
+        viewportHeight: sourceSize.height,
+        aspectRatio: adapted.document.output.exportAspectRatio ?? null,
+      });
+      if (!captureFrame) throw new Error("AI reference capture frame admission failed.");
+
+      const captureDensity = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
+      const captureSize = resolveStudioBg3dLtCaptureSize({
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height,
+        aspectRatio: captureFrame.aspectRatio,
+        requestedHeight: Math.min(
+          2_048,
+          Math.max(640, Math.round(adapted.document.output.exportHeight * captureDensity)),
+        ),
+        // A provider reference is not a final print render. Keep its worst-case RGBA footprint
+        // below the existing 12 MiB single-reference admission before PNG encoding.
+        maxPixels: Math.min(deviceQuality.maxRenderPixels, 2_000_000),
+      });
+      if (!captureSize) throw new Error("AI reference capture size admission failed.");
+
+      const releaseCaptureFrameViewOffset = applyStudioBg3dCaptureFrameViewOffset(
+        captureRef.current.adapter === captureAdapter ? captureRef.current.camera : null,
+        captureFrame,
+        sourceSize,
+      );
+      if (!releaseCaptureFrameViewOffset) {
+        throw new Error("AI reference capture frame could not be applied.");
+      }
+      const captured = await captureStudioBg3dRaster(captureAdapter, {
+        width: captureSize.width,
+        height: captureSize.height,
+        background: studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot),
+        includeDepth: false,
+      }, {
+        signal: controller.signal,
+        timeoutMs: 30_000,
+      }).finally(releaseCaptureFrameViewOffset);
+      if (
+        !isCaptureCurrent() ||
+        captureRef.current.adapter !== captureAdapter
+      ) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = captured.width;
+      canvas.height = captured.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("AI reference PNG context unavailable.");
+      const imageData = context.createImageData(captured.width, captured.height);
+      imageData.data.set(captured.rgba);
+      context.putImageData(imageData, 0, 0);
+
+      const handoff = createStudioBg3dAiMethodReferenceCapture({
+        dataUrl: canvas.toDataURL("image/png").split("#", 1)[0],
+        width: captured.width,
+        height: captured.height,
+        ...(adapted.document.activeShotId
+          ? { shotId: adapted.document.activeShotId }
+          : {}),
+        captureIdentity: {
+          backend: captureAdapter.backend,
+          engineId: captureAdapter.engineId,
+          engineVersion: captureAdapter.engineVersion,
+          implementationRevision: captureAdapter.implementationRevision,
+          graphicsApi: captureAdapter.graphicsApi,
+          profileId: captureAdapter.profileId,
+        },
+      });
+      const accepted = await onUseAsAiMethodReference(handoff);
+      if (accepted === false && isCaptureCurrent()) {
+        setError("현재 3D 샷을 AI 참조 팩에 추가하지 못했습니다. 편집 잠금과 저장소 상태를 확인해 주세요.");
+      }
+    } catch (cause) {
+      if (!controller.signal.aborted && isCaptureCurrent()) {
+        setError(
+          cause instanceof Error && cause.message.includes("크기")
+            ? cause.message
+            : "현재 3D 샷을 AI 구도 참조로 준비하지 못했습니다. 장면을 확인한 뒤 다시 시도해 주세요.",
+        );
+      }
+    } finally {
+      const ownsCapture = aiMethodReferenceAbortRef.current === controller;
+      if (ownsCapture) {
+        aiMethodReferenceAbortRef.current = null;
+        captureInFlightRef.current = false;
+      }
+      if (ownsCapture && componentActiveRef.current) {
+        setCaptureBackgroundSnapshot(null);
+        setLineArtPreview(previousLineArtPreview);
+        setIsCapturing(false);
+      }
+    }
+  }
+
   async function handleInsert() {
     if (
       captureInFlightRef.current || isCapturing ||
@@ -9803,6 +9998,13 @@ export function StudioBackground3D({
 
               <StudioBg3dViewPanel
                 hidden={hideOnTab("view")}
+                aiReferenceBusy={isCapturing}
+                aiReferenceDisabled={
+                  insertBlocked || (primitives.length === 0 && customModels.length === 0)
+                }
+                {...(onUseAsAiMethodReference
+                  ? { onUseCurrentFrameAsAiReference: () => void handleUseAsAiMethodReference() }
+                  : {})}
                 context={{
                   VIEW_EDITOR_SECTIONS,
                   viewEditorSection,

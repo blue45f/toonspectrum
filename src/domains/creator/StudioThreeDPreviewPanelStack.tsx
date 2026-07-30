@@ -35,6 +35,7 @@ type StudioThreeDPreviewPanelStackHandlers = Pick<
   | "insertMannequinResult"
   | "patchPageReview"
   | "setCurrentPageId"
+  | "useBg3dFrameAsAiMethodReference"
 >;
 
 export type StudioThreeDPreviewPanelStackProps = Pick<
@@ -262,6 +263,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
     insertMannequinResult,
     patchPageReview,
     setCurrentPageId,
+    useBg3dFrameAsAiMethodReference,
   } = stableHandlers;
   const poserInitialElement = poserInitialElementId
     ? elementById.get(poserInitialElementId) ?? null
@@ -327,6 +329,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
               setBg3dInitialElementId(undefined);
             }}
             onInsert={insertBg3dResult}
+            onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}
           />
         ) : null}
       </Suspense>

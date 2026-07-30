@@ -36,6 +36,9 @@ import {
 } from "./StudioThreeDPreviewPanelStack";
 
 import type {
+  StudioBg3dAiMethodReferenceCapture,
+} from "./studio-3d-ai-reference-handoff";
+import type {
   StudioBg3dInsertHandler,
   StudioVrmInsertHandler,
 } from "./studio-3d-insert-controller";
@@ -167,6 +170,9 @@ export interface StudioLazyPanelStackHandlers {
   importAutoActionJson: (json: string, fileName: string) => Promise<void>;
   insertBg3dResult: StudioBg3dInsertHandler;
   insertVrmResult: StudioVrmInsertHandler;
+  useBg3dFrameAsAiMethodReference: (
+    capture: StudioBg3dAiMethodReferenceCapture
+  ) => boolean | void | Promise<boolean | void>;
   insertMannequinResult: (
     result: { pngDataUrl: string; width: number; height: number; displayWidth?: number; displayHeight?: number }
   ) => boolean | void | Promise<boolean | void>;

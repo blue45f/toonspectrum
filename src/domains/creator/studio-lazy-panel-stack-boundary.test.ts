@@ -186,11 +186,16 @@ describe("Studio lazy panel stack boundary", () => {
     expect(stackUse).not.toContain("setCurrentPageId={setCurrentPageId}");
     expect(page).toContain("insertVrmResult: (result) => applyStudioVrmInsertResult({");
     expect(page).toContain("insertBg3dResult: (result) => applyStudioBg3dInsertResult({");
+    expect(stack).toContain("capture: StudioBg3dAiMethodReferenceCapture");
     expect(stack).toContain("<StudioThreeDPreviewPanelStack");
     expect(stack).toContain("validateRecoveryAccess={validateRecoveryAccess}");
     expect(stack).toContain("<StudioScrollScenarioPreviewPanelStack");
+    expect(previewStack).toContain('| "useBg3dFrameAsAiMethodReference"');
     expect(previewStack).toContain("onInsert={insertVrmResult}");
     expect(previewStack).toContain("onInsert={insertBg3dResult}");
+    expect(previewStack).toContain(
+      "onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}"
+    );
     expect(previewStack).toContain("validateRecoveryAccess={validateRecoveryAccess}");
     expect(previewStack).toContain("initialScene={poserInitialScene}");
     expect(previewStack).toContain("setPoserInitialElementId(undefined)");

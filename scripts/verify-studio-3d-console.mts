@@ -564,7 +564,13 @@ async function main(): Promise<void> {
   try {
     await waitForServer(rootUrl);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const context = await browser.newContext({ viewport: { width: 1_440, height: 1_000 } });
+    // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
+    // locale so a developer machine or CI runner whose default locale is English does not turn a
+    // healthy 3D runtime check into a menu-locator failure before either editor is opened.
+    const context = await browser.newContext({
+      locale: "ko-KR",
+      viewport: { width: 1_440, height: 1_000 },
+    });
     const page = await context.newPage();
     await run(page, studioUrl);
     await context.close();

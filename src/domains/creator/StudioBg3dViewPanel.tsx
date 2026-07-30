@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import {
   STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
   STUDIO_BG3D_CAMERA_MAX_DUTCH_ROLL_DEGREES,
@@ -149,11 +151,75 @@ interface StudioBg3dViewPanelContext {
 export interface StudioBg3dViewPanelProps {
   readonly hidden: boolean;
   readonly context: StudioBg3dViewPanelContext;
+  readonly onUseCurrentFrameAsAiReference?: () => void;
+  readonly aiReferenceBusy?: boolean;
+  readonly aiReferenceDisabled?: boolean;
+}
+
+export interface StudioBg3dAiReferenceActionProps {
+  readonly busy?: boolean;
+  readonly disabled?: boolean;
+  readonly onUseCurrentFrameAsAiReference: () => void;
+  readonly CameraIcon: typeof import("lucide-react").Camera;
+  readonly LoaderIcon: typeof import("lucide-react").Loader2;
+}
+
+export function StudioBg3dAiReferenceAction({
+  busy = false,
+  disabled = false,
+  onUseCurrentFrameAsAiReference,
+  CameraIcon,
+  LoaderIcon,
+}: StudioBg3dAiReferenceActionProps) {
+  const descriptionId = useId();
+  const locked = disabled || busy;
+  const description = busy
+    ? "현재 프레임을 구도 참조로 보내고 있습니다. 실제 AI 호출은 다음 검토 화면에서 확인을 마친 뒤에만 시작됩니다."
+    : disabled
+      ? "현재 상태에서는 프레임을 구도 참조로 보낼 수 없습니다. 실제 AI 호출은 다음 검토 화면에서 확인을 마친 뒤에만 시작됩니다."
+      : "현재 프레임을 구도 참조로 보냅니다. 실제 AI 호출은 다음 검토 화면에서 확인을 마친 뒤에만 시작됩니다.";
+
+  return (
+    <div className="mt-3 border-t border-line/70 pt-3">
+      <button
+        type="button"
+        aria-label={busy ? "현재 샷으로 AI 시안 준비 중" : "현재 샷으로 AI 시안"}
+        aria-busy={busy}
+        aria-describedby={descriptionId}
+        disabled={locked}
+        onClick={onUseCurrentFrameAsAiReference}
+        className={cx(
+          CONTROL_BUTTON,
+          "w-full border-cool/50 bg-card text-fg hover:bg-raised hover:text-cool",
+        )}
+      >
+        {busy ? (
+          <LoaderIcon
+            size={14}
+            className="animate-spin motion-reduce:animate-none"
+            aria-hidden
+          />
+        ) : (
+          <CameraIcon size={14} aria-hidden />
+        )}
+        현재 샷으로 AI 시안
+      </button>
+      <p
+        id={descriptionId}
+        className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3"
+      >
+        {description}
+      </p>
+    </div>
+  );
 }
 
 export function StudioBg3dViewPanel({
   hidden,
   context,
+  onUseCurrentFrameAsAiReference,
+  aiReferenceBusy = false,
+  aiReferenceDisabled = false,
 }: StudioBg3dViewPanelProps) {
   const {
     VIEW_EDITOR_SECTIONS,
@@ -273,6 +339,8 @@ export function StudioBg3dViewPanel({
   } = context;
   const cameraControlsDisabled =
     isCapturing || isBatchRenderingShots || isRestoringScene || physicsInteractionLocked;
+  const aiReferenceActionDisabled =
+    aiReferenceDisabled || cameraControlsDisabled;
   const currentNearClip = resolveStudioBg3dCameraNearClip(
     sceneBaseDocument.camera.nearClip,
   );
@@ -423,6 +491,15 @@ export function StudioBg3dViewPanel({
                       선택 컷 복제
                     </button>
                   </div>
+                  {onUseCurrentFrameAsAiReference ? (
+                    <StudioBg3dAiReferenceAction
+                      busy={aiReferenceBusy}
+                      disabled={aiReferenceActionDisabled}
+                      onUseCurrentFrameAsAiReference={onUseCurrentFrameAsAiReference}
+                      CameraIcon={Camera}
+                      LoaderIcon={Loader2}
+                    />
+                  ) : null}
                   <div className="mt-3 rounded-lg border border-line bg-panel/70 p-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[0.66rem] font-bold text-fg-2">

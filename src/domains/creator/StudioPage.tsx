@@ -12,6 +12,7 @@ import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { studioCreationLinkParams } from "./creator-studio-links";
+import { applyStudioBg3dAiMethodReference } from "./studio-3d-ai-reference-application";
 import {
   applyStudioBg3dInsertResult,
   applyStudioVrmInsertResult,
@@ -1366,6 +1367,7 @@ import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
 import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveOrchestration";
 import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";
 
+import type { StudioBg3dAiMethodReferenceCapture } from "./studio-3d-ai-reference-handoff";
 import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
@@ -34916,6 +34918,65 @@ function clearSelectionForEdit() {
     handleTimelapseRecordingEnd,
     handleTimelapseRecordingStart,
     importAutoActionJson,
+    useBg3dFrameAsAiMethodReference: async (
+      capture: StudioBg3dAiMethodReferenceCapture,
+    ) => {
+      const mutationTicket = bg3dMutationTicketRef.current;
+      if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
+      try {
+        const assetLibrary = await import("./studio-asset-library");
+        if (!canApplyStudioMutation(mutationTicket)) return false;
+        const saved = await assetLibrary.saveAsset({
+          name: capture.shotId ? "3D 저장 컷 · AI 구도 참조" : "3D 현재 샷 · AI 구도 참조",
+          dataUrl: capture.dataUrl,
+          width: capture.width,
+          height: capture.height,
+          kind: "bg3d-ai-method",
+        });
+        if (!canApplyStudioMutation(mutationTicket)) {
+          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          return false;
+        }
+        const application = applyStudioBg3dAiMethodReference(
+          scenarioImageReferenceDocument,
+          saved,
+          capture,
+        );
+        if (!application.ok) {
+          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          setError(
+            "구도·카메라 참조가 가득 찼어요. AI 이미지 참조 팩의 Method 항목 하나를 제거한 뒤 다시 시도해 주세요.",
+          );
+          return false;
+        }
+        setAssets((current) => [
+          saved,
+          ...current.filter(({ id }) => id !== saved.id),
+        ]);
+        setAssetsLoaded(true);
+        setScenarioImageReferenceDocument(application.document);
+        setScenarioError(null);
+        setError(null);
+        setBg3dOpen(false);
+        setBg3dInitialDataUrl(undefined);
+        setBg3dInitialScene(undefined);
+        setBg3dInitialElementId(undefined);
+        setScenarioOpen(true);
+        announceDrawingShortcut(
+          application.action === "replaced"
+            ? "현재 3D 샷으로 AI 구도 참조를 교체했어요. 프롬프트를 검토한 뒤 생성하세요."
+            : "현재 3D 샷을 AI 구도 참조에 추가했어요. 프롬프트를 검토한 뒤 생성하세요.",
+        );
+        return true;
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "현재 3D 샷을 AI 구도 참조에 저장하지 못했어요.",
+        );
+        return false;
+      }
+    },
     insertBg3dResult: (result) => applyStudioBg3dInsertResult({
       result,
       mutationTicket: bg3dMutationTicketRef.current,

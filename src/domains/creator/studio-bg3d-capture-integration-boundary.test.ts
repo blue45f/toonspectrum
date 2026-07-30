@@ -24,16 +24,22 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
 
   it("rebinds the adapter after the quad-to-single View transition, then guards that identity", () => {
     const saveStart = background3dSource.indexOf("async function handleSaveToLibrary()");
+    const aiReferenceStart = background3dSource.indexOf(
+      "async function handleUseAsAiMethodReference()",
+      saveStart,
+    );
     const insertStart = background3dSource.indexOf("async function handleInsert()");
     const handleEnd = background3dSource.indexOf("// 선택된 것이 도형", insertStart);
     const handlers = [
-      background3dSource.slice(saveStart, insertStart),
+      background3dSource.slice(saveStart, aiReferenceStart),
+      background3dSource.slice(aiReferenceStart, insertStart),
       background3dSource.slice(insertStart, handleEnd),
     ];
     const staleGuard = "captureRef.current.adapter !== captureAdapter";
 
     expect(saveStart).toBeGreaterThanOrEqual(0);
-    expect(insertStart).toBeGreaterThan(saveStart);
+    expect(aiReferenceStart).toBeGreaterThan(saveStart);
+    expect(insertStart).toBeGreaterThan(aiReferenceStart);
     expect(handleEnd).toBeGreaterThan(insertStart);
     for (const handler of handlers) {
       const transitionStart = handler.indexOf("setIsCapturing(true)");
