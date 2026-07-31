@@ -1,0 +1,49 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "toonspectrum-realtime-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_ROOMS",
+        "class_name": "RealtimeRoom"
+      }
+    ]
+  },
+
+  "exports": {
+    "RealtimeRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+
+  // Deterministic local-only test credential. Production reads the same binding
+  // from Wrangler secrets and never from a committed `vars` value.
+  "vars": {
+    "REALTIME_TICKET_SECRET": "toonspectrum-cloudflare-test-secret-32-bytes-minimum",
+    "REALTIME_TICKET_ISSUER": "toonspectrum-api",
+    "REALTIME_TICKET_AUDIENCE": "toonspectrum-realtime",
+    "REALTIME_ALLOWED_ORIGINS": "https://toonstudio.cloud",
+    "REALTIME_MAX_CONNECTIONS_PER_ROOM": "8",
+    "REALTIME_MAX_CONNECTIONS_PER_ACTOR": "4",
+    "REALTIME_MAX_BUFFERED_BYTES": "262144",
+    "REALTIME_MAX_REPLAY_EVENTS": "128",
+    "REALTIME_MAX_RECEIPT_COUNT": "512",
+    "REALTIME_MAX_RECEIPT_BYTES": "8388608",
+    "REALTIME_EVENT_RETENTION_MS": "900000",
+    "REALTIME_CLEANUP_INTERVAL_MS": "60000",
+    "REALTIME_RATE_WINDOW_MS": "10000",
+    "REALTIME_RESUME_WINDOW_MS": "10000",
+    "REALTIME_RESUME_MAX_REQUESTS_PER_WINDOW": "3",
+    "REALTIME_RESUME_MAX_BYTES_PER_WINDOW": "1048576",
+    "REALTIME_PRESENCE_MAX_EVENTS_PER_WINDOW": "120",
+    "REALTIME_PRESENCE_MAX_BYTES_PER_WINDOW": "1048576",
+    "REALTIME_COMMENTS_MAX_EVENTS_PER_WINDOW": "60",
+    "REALTIME_COMMENTS_MAX_BYTES_PER_WINDOW": "262144",
+    "REALTIME_SCREEN_MAX_EVENTS_PER_WINDOW": "120",
+    "REALTIME_SCREEN_MAX_BYTES_PER_WINDOW": "1048576"
+  }
+}

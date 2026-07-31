@@ -266,21 +266,30 @@ function activate(transport: StudioLiveSocketTransport): void {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 describe("StudioLiveSocketTransport", () => {
-  it("keeps reconnect attempts bounded for an explicitly configured server", () => {
+  it("keeps retries bounded while covering a configured free host cold start", () => {
     expect(STUDIO_LIVE_SOCKET_RETRY_POLICY).toEqual({
       reconnection: true,
-      reconnectionAttempts: 3,
+      reconnectionAttempts: 8,
       reconnectionDelay: 1_000,
-      reconnectionDelayMax: 5_000,
+      reconnectionDelayMax: 8_000,
       randomizationFactor: 0.25,
-      timeout: 10_000,
+      timeout: 15_000,
     });
   });
 
-  it("uses the local collaboration factory without constructing a socket when disabled", async () => {
+  it("returns the exact local transport even when optional purpose routing is configured", async () => {
+    vi.stubEnv(
+      "VITE_STUDIO_REALTIME_ORIGIN",
+      "https://realtime.toonstudio.cloud",
+    );
+    vi.stubEnv(
+      "VITE_STUDIO_REALTIME_PROVIDER_ID",
+      "cloudflare-realtime-v1",
+    );
     const connect = vi.fn(() => Promise.resolve());
     const close = vi.fn();
     const localTransport: StudioLiveTransport = {
@@ -300,6 +309,7 @@ describe("StudioLiveSocketTransport", () => {
     });
 
     const transport = factory(context());
+    expect(transport).toBe(localTransport);
     expect(transport.mode).toBe("local");
     expect(localFactory).toHaveBeenCalledWith(context());
     expect(socketFactory).not.toHaveBeenCalled();
@@ -347,6 +357,62 @@ describe("StudioLiveSocketTransport", () => {
     expect(
       (transport as unknown as { sessionToken: string | null }).sessionToken
     ).toBeNull();
+  });
+
+  it("fails targeted identity translation closed while a canonical client id is ambiguous", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const first = serverParticipant(
+      "connection-shared-first",
+      "shared-client-instance",
+      "첫 번째 탭",
+    );
+    const second = serverParticipant(
+      "connection-shared-second",
+      "shared-client-instance",
+      "두 번째 탭",
+    );
+    const connecting = transport.connect();
+    socket.reply(
+      "studio:join",
+      joinSuccess({ participants: [self, first, second] }),
+    );
+    await connecting;
+
+    expect(transport.canonicalSessionId(first.connectionId)).toBe(
+      first.connectionId,
+    );
+    expect(transport.canonicalSessionId(second.connectionId)).toBe(
+      second.connectionId,
+    );
+    expect(transport.transportSessionId("shared-client-instance")).toBeNull();
+
+    socket.serverEmit("studio:presence:leave", {
+      connectionId: first.connectionId,
+      reason: "disconnect",
+    });
+    expect(transport.canonicalSessionId(second.connectionId)).toBe(
+      "shared-client-instance",
+    );
+    expect(transport.transportSessionId("shared-client-instance")).toBe(
+      second.connectionId,
+    );
+
+    socket.serverEmit("studio:presence:leave", {
+      connectionId: first.connectionId,
+      reason: "stale-disconnect",
+    });
+    expect(transport.canonicalSessionId(first.connectionId)).toBe(
+      first.connectionId,
+    );
+    expect(transport.transportSessionId("shared-client-instance")).toBe(
+      second.connectionId,
+    );
+    transport.close();
   });
 
   it("delivers a valid current-work team comment invalidation after the join ACL succeeds", async () => {

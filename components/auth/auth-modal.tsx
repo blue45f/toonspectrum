@@ -1,11 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X, LogIn, UserPlus, Sparkles, ImagePlus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
 import { ToonSpectrumMark } from "../visual-marks";
+
+import { GoogleIdentityButton } from "./google-identity-button";
 
 import {
   AVATAR_PRESETS,
@@ -15,40 +17,15 @@ import {
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { signIn, signInWithGoogleIdToken } from "@/src/compat/auth-session-store";
+import { signIn } from "@/src/compat/auth-session-store";
 import { apiPath } from "@/src/infrastructure/api";
 
-
-// Google Identity Services(GIS) 클라이언트 — accounts.google.com/gsi/client 가 주입하는 전역.
-// 우리가 쓰는 표면(initialize/renderButton)만 최소 선언한다.
-declare global {
-  interface Window {
-    google?: {
-      accounts?: {
-        id?: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential?: string }) => void;
-            auto_select?: boolean;
-            cancel_on_tap_outside?: boolean;
-          }) => void;
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              theme?: "outline" | "filled_blue" | "filled_black";
-              size?: "large" | "medium" | "small";
-              text?: "signin_with" | "signup_with" | "continue_with" | "signin";
-              shape?: "rectangular" | "pill" | "circle" | "square";
-              width?: number | string;
-            }
-          ) => void;
-        };
-      };
-    };
-  }
-}
-
-type ProviderInfo = { label?: string; mode?: string; clientId?: string };
+type ProviderInfo = {
+  label?: string;
+  mode?: "oauth" | "demo" | "disabled";
+  clientId?: string;
+  reason?: "missing-client-id";
+};
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -62,77 +39,6 @@ function DemoTag({ dark }: { dark?: boolean }) {
       데모
     </span>
   );
-}
-
-// GIS(Google Identity Services) 스크립트를 1회 로드. 동시 호출은 같은 Promise 를 공유한다.
-const GIS_SRC = "https://accounts.google.com/gsi/client";
-let gisLoader: Promise<void> | null = null;
-function loadGis(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if (window.google?.accounts?.id) return Promise.resolve();
-  gisLoader ??= new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("gis load failed")));
-      if (window.google?.accounts?.id) resolve();
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = GIS_SRC;
-    s.async = true;
-    s.defer = true;
-    s.onload = () => resolve();
-    s.onerror = () => {
-      gisLoader = null; // 재시도 허용
-      reject(new Error("gis load failed"));
-    };
-    document.head.appendChild(s);
-  });
-  return gisLoader;
-}
-
-// 실연동 Google: GIS 공식 버튼을 렌더하고, credential(ID 토큰)을 서버로 보내 로그인 완료.
-function GoogleGisButton({ clientId, onSuccess, onError }: { clientId: string; onSuccess: () => void; onError: (msg: string) => void }) {
-  const holderRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadGis()
-      .then(() => {
-        if (cancelled || !holderRef.current || !window.google?.accounts?.id) return;
-        if (holderRef.current) holderRef.current.innerHTML = "";
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (resp: { credential?: string }) => {
-            if (!resp?.credential) {
-              onError("구글 로그인 응답이 비어 있어요.");
-              return;
-            }
-            void signInWithGoogleIdToken(resp.credential).then((r) => {
-              if (r.ok) {
-                onSuccess();
-              } else {
-                onError(r.error ? `구글 로그인 실패: ${r.error}` : "구글 로그인에 실패했어요. 다시 시도해 주세요.");
-              }
-            });
-          },
-        });
-        window.google.accounts.id.renderButton(holderRef.current, {
-          theme: "outline",
-          size: "large",
-          width: 320,
-          text: "continue_with",
-          shape: "rectangular",
-        });
-      })
-      .catch(() => onError("구글 로그인을 불러오지 못했어요."));
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId, onSuccess, onError]);
-
-  return <div ref={holderRef} className="flex justify-center" />;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -154,9 +60,17 @@ const authSchema = z.object({
 
 type AuthFormValues = z.infer<typeof authSchema>;
 
-export function AuthModal({ onClose }: { onClose: () => void }) {
+export function AuthModal({
+  onClose,
+  returnFocusRef,
+}: {
+  onClose: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
+}) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
+  const [providerStatus, setProviderStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [providerAttempt, setProviderAttempt] = useState(0);
   const [err, setErr] = useState("");
   const [imageErr, setImageErr] = useState("");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -186,11 +100,28 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const emailField = register("email");
 
   useEffect(() => {
-    fetch(apiPath("/auth/providers"))
-      .then((r) => r.json())
-      .then((p) => setProviders(p && typeof p === "object" ? p : {}))
-      .catch(() => {});
-  }, []);
+    const controller = new AbortController();
+    setProviderStatus("loading");
+    fetch(apiPath("/auth/providers"), { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`provider discovery failed (${response.status})`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((payload) => {
+        setProviders(
+          payload && typeof payload === "object"
+            ? (payload as Record<string, ProviderInfo>)
+            : {},
+        );
+        setProviderStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setProviders({});
+        setProviderStatus("error");
+      });
+    return () => controller.abort();
+  }, [providerAttempt]);
 
   // Escape 로 닫기 (키보드 접근성)
   useEffect(() => {
@@ -206,6 +137,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   // (autoFocus는 commit 단계라 effect보다 먼저 실행돼 트리거 대신 입력을 캡처하므로 사용하지 않음)
   useEffect(() => {
     const prevActive = document.activeElement as HTMLElement | null;
+    const explicitReturnTarget = returnFocusRef?.current;
     emailRef.current?.focus(); // 열릴 때 이메일로 포커스 이동
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !panelRef.current) return;
@@ -232,9 +164,13 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      prevActive?.focus?.();
+      if (explicitReturnTarget?.isConnected) {
+        explicitReturnTarget.focus();
+        return;
+      }
+      if (prevActive?.isConnected) prevActive.focus();
     };
-  }, []);
+  }, [returnFocusRef]);
 
   const submit = handleSubmit(async ({ email, password, name, avatar, image }) => {
     setErr("");
@@ -261,7 +197,6 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
     }
   });
 
-  const fieldError = errors.email?.message ?? errors.password?.message ?? null;
   const avatarImage = resolveSignupAvatarImage(imageValue);
 
   const onAvatarImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,6 +228,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
   const modal = (
     <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-hidden px-4 py-4 sm:pt-[12vh] sm:pb-6">
       <button
+        type="button"
         aria-label="닫기"
         tabIndex={-1}
         onClick={onClose}
@@ -306,7 +242,12 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
         className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)] sm:max-h-[calc(100dvh-7rem)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
-        <button onClick={onClose} className="absolute right-3 top-3 text-fg-3 hover:text-fg">
+        <button
+          type="button"
+          aria-label="로그인 창 닫기"
+          onClick={onClose}
+          className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+        >
           <X size={18} />
         </button>
         <div className="p-6">
@@ -322,6 +263,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             {(["login", "signup"] as const).map((m) => (
               <button
                 key={m}
+                type="button"
                 onClick={() => {
                   setMode(m);
                   setErr("");
@@ -412,7 +354,11 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                         )}
                         <span className="text-[0.68rem] text-fg-3">PNG/JPG/WebP · 180KB 이하</span>
                       </div>
-                      {imageErr && <p className="mb-3 text-xs text-bad">{imageErr}</p>}
+                      {imageErr && (
+                        <p className="mb-3 text-xs text-bad" role="alert">
+                          {imageErr}
+                        </p>
+                      )}
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         {AVATAR_PRESETS.map((preset) => {
                           const active = field.value === preset.id || field.value === preset.color;
@@ -458,16 +404,34 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
               type="email"
               placeholder="이메일"
               aria-label="이메일"
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "auth-email-error" : undefined}
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
+            {errors.email?.message && (
+              <p id="auth-email-error" className="text-xs text-bad" role="alert">
+                {errors.email.message}
+              </p>
+            )}
             <input
               {...register("password")}
               type="password"
               placeholder="비밀번호 (6자 이상)"
               aria-label="비밀번호"
+              aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "auth-password-error" : undefined}
               className="h-11 rounded-xl border border-line bg-canvas px-3.5 text-sm outline-none focus:border-accent/60"
             />
-            {(fieldError || err) && <p className="text-xs text-bad">{fieldError ?? err}</p>}
+            {errors.password?.message && (
+              <p id="auth-password-error" className="text-xs text-bad" role="alert">
+                {errors.password.message}
+              </p>
+            )}
+            {err && (
+              <p className="text-xs text-bad" role="alert">
+                {err}
+              </p>
+            )}
             <button
               type="submit"
               disabled={isSubmitting}
@@ -478,14 +442,37 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
             </button>
           </form>
 
-          {(providers.kakao || providers.google || providers.naver) && (
+          {(providerStatus !== "ready" || providers.kakao || providers.google || providers.naver) && (
             <>
               <div className="my-4 flex items-center gap-3 text-[0.7rem] text-fg-3">
                 <span className="h-px flex-1 bg-line" />또는<span className="h-px flex-1 bg-line" />
               </div>
               <div className="flex flex-col gap-2">
+                {providerStatus === "loading" && (
+                  <div
+                    className="flex h-11 animate-pulse items-center justify-center rounded-xl border border-line bg-card text-xs text-fg-3"
+                    role="status"
+                  >
+                    소셜 로그인 확인 중…
+                  </div>
+                )}
+                {providerStatus === "error" && (
+                  <div className="rounded-xl border border-line bg-card p-3 text-center">
+                    <p className="text-xs leading-relaxed text-fg-3" role="status">
+                      소셜 로그인 정보를 불러오지 못했어요. 이메일 로그인은 계속 사용할 수 있어요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setProviderAttempt((value) => value + 1)}
+                      className="mt-2 min-h-9 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    >
+                      다시 확인
+                    </button>
+                  </div>
+                )}
                 {providers.kakao && (
                   <button
+                    type="button"
                     onClick={() => signIn("kakao")}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#FEE500] text-sm font-semibold text-[#191600] transition-opacity hover:opacity-90"
                   >
@@ -496,10 +483,31 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                 {providers.google &&
                   (providers.google.mode === "oauth" && providers.google.clientId ? (
                     // 실연동 Google: GIS 공식 버튼(ID 토큰 흐름) — 리다이렉트 없이 모달에서 로그인.
-                    <GoogleGisButton clientId={providers.google.clientId} onSuccess={onClose} onError={setErr} />
+                    <GoogleIdentityButton
+                      clientId={providers.google.clientId}
+                      onSuccess={onClose}
+                      onError={setErr}
+                    />
+                  ) : providers.google.mode === "disabled" ? (
+                    <div
+                      className="rounded-xl border border-line bg-card px-3.5 py-3"
+                      role="status"
+                      aria-label="Google 로그인 설정 필요"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-fg-2">Google로 계속하기</span>
+                        <span className="rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.62rem] font-bold text-fg-3">
+                          설정 필요
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        Google 로그인 설정이 아직 완료되지 않았어요. 지금은 이메일 로그인을 이용해 주세요.
+                      </p>
+                    </div>
                   ) : (
-                    // 데모 폴백(client id 미설정): 기존 리다이렉트 흐름.
+                    // Google 데모는 제공하지 않지만, 오래된 서버 응답과의 점진 배포 호환을 유지한다.
                     <button
+                      type="button"
                       onClick={() => signIn("google")}
                       className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
                     >
@@ -509,6 +517,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   ))}
                 {providers.naver && (
                   <button
+                    type="button"
                     onClick={() => signIn("naver")}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#03C75A] text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   >
@@ -517,7 +526,7 @@ export function AuthModal({ onClose }: { onClose: () => void }) {
                   </button>
                 )}
               </div>
-              {(providers.kakao?.mode === "demo" || providers.google?.mode === "demo" || providers.naver?.mode === "demo") && (
+              {(providers.kakao?.mode === "demo" || providers.naver?.mode === "demo") && (
                 <p className="mt-2 text-center text-[0.66rem] text-fg-3">
                   데모 표시는 실제 소셜 연동이 아직 설정되지 않아 체험용 계정으로 로그인됨을 뜻해요.
                 </p>

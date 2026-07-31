@@ -11,6 +11,7 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 
+import { studioLivePrincipalFingerprint } from "../../../../../lib/server/session";
 import {
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
@@ -112,6 +113,7 @@ import type {
   StudioLiveCursorInput,
   StudioLiveFailure,
   StudioLiveInterServerRelayEvent,
+  StudioLiveIdentityClaim,
   StudioLiveJoinInput,
   StudioLiveJoinResult,
   StudioLiveLock,
@@ -189,6 +191,7 @@ export { STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS } from "./studio-live-inter-server-rel
 
 const STUDIO_LIVE_NAMESPACE = "/studio-live";
 const STUDIO_LIVE_ROOM_PREFIX = "studio-live:";
+const STUDIO_LIVE_IDENTITY_ROOM_PREFIX = "studio-live-identity:";
 const STUDIO_LIVE_CRDT_BINARY_ROOM_PREFIX = "studio-live-crdt-binary-v1:";
 const STUDIO_LIVE_ACCESS_RECHECK_MS = 15_000;
 const STUDIO_LIVE_ACCESS_CACHE_MS = 5_000;
@@ -284,8 +287,21 @@ interface StudioLiveCandidateRelayAuthorization {
   expiresAt: number;
 }
 
+type StudioLiveIdentityAdmission =
+  | {
+      status: "claimed";
+      claim: StudioLiveIdentityClaim;
+      replacedConnectionIds: string[];
+    }
+  | { status: "conflict" }
+  | { status: "unavailable" };
+
 function studioLiveRoom(workId: string): string {
   return `${STUDIO_LIVE_ROOM_PREFIX}${workId}`;
+}
+
+function studioLiveIdentityRoom(workId: string): string {
+  return `${STUDIO_LIVE_IDENTITY_ROOM_PREFIX}${workId}`;
 }
 
 function studioLiveCrdtBinaryRoom(workId: string): string {
@@ -394,6 +410,24 @@ function isStudioLiveAuthorizationLeaseCurrent(
   return (
     authorizationExpiresAt === null ||
     (Number.isFinite(authorizationExpiresAt) && authorizationExpiresAt > now)
+  );
+}
+
+function isStudioLiveIdentityClaim(
+  value: unknown,
+  socketId: string,
+  workId: string
+): value is StudioLiveIdentityClaim {
+  if (!value || typeof value !== "object") return false;
+  const claim = value as Partial<StudioLiveIdentityClaim>;
+  return (
+    claim.connectionId === socketId &&
+    claim.workId === workId &&
+    typeof claim.clientInstanceId === "string" &&
+    claim.clientInstanceId.length >= 1 &&
+    claim.clientInstanceId.length <= 80 &&
+    typeof claim.principalFingerprint === "string" &&
+    /^[A-Za-z0-9_-]{43}$/u.test(claim.principalFingerprint)
   );
 }
 
@@ -562,6 +596,7 @@ export class StudioLiveGateway
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.removeParticipant(client.id, "disconnect");
+    this.clearSocketIdentityClaims(client);
     this.rateLimits.delete(client.id);
   }
 
@@ -594,6 +629,7 @@ export class StudioLiveGateway
     if (!this.isCurrentJoinTransition(client, transitionSequence)) {
       return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
     }
+    let pendingIdentityClaim: StudioLiveIdentityClaim | null = null;
     const rejectInvalidSession = (rollbackRoom?: string): StudioLiveFailure => {
       const response = failure("unauthenticated", "로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
       reply(ack, response);
@@ -719,6 +755,51 @@ export class StudioLiveGateway
         }
         return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
       }
+
+      const identityAdmission = await this.claimClientIdentity(
+        client,
+        input,
+        principal
+      );
+      if (
+        !this.isCurrentJoinTransition(client, transitionSequence) ||
+        !this.isSocketPrincipalCurrent(client, principal, userId)
+      ) {
+        if (identityAdmission.status === "claimed") {
+          await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
+        }
+        if (joinedNewRoom) {
+          await this.roomTransitions.rollbackEnteredRoom(
+            client,
+            nextRoom,
+            () => this.disconnectRoomIsolationFailure(client)
+          );
+        }
+        return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
+      }
+      if (identityAdmission.status !== "claimed") {
+        if (joinedNewRoom) {
+          await this.roomTransitions.rollbackEnteredRoom(
+            client,
+            nextRoom,
+            () => this.disconnectRoomIsolationFailure(client)
+          );
+        }
+        return reply(
+          ack,
+          identityAdmission.status === "conflict"
+            ? failure(
+                "forbidden",
+                "같은 브라우저 작업 식별자가 다른 계정에서 사용 중입니다. 작업실을 새로 열어 주세요."
+              )
+            : failure(
+                "temporarily_unavailable",
+                "실시간 작업 식별자를 안전하게 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
+              )
+        );
+      }
+      pendingIdentityClaim = identityAdmission.claim;
+
       const existing = this.participantsBySocket.get(client.id);
       if (existing && existing.workId !== input.workId) {
         let leftPreviousRoomState = await this.roomTransitions.leavePreviousRoom({
@@ -742,14 +823,18 @@ export class StudioLiveGateway
           }
         }
         if (leftPreviousRoomState === "socket_stale") {
+          await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
+          this.clearSocketIdentityClaims(client);
           this.removeSwitchedParticipantIfCurrent(client.id, existing);
           return reply(ack, failure("not_joined", "실시간 작업실 연결이 종료되었습니다."));
         }
         if (leftPreviousRoomState === "generation_stale") {
+          await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
           this.removeSwitchedParticipantIfCurrent(client.id, existing);
           return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
         }
         if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+          await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
           return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
         }
         this.removeParticipant(client.id, "switch");
@@ -782,9 +867,11 @@ export class StudioLiveGateway
       // participant/room-index commit below. This prevents a session that expired during adapter
       // I/O from becoming a valid in-memory participant even briefly.
       if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
+        await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
         return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
       }
       if (!isStudioLiveAuthorizationLeaseCurrent(participant.authorizationExpiresAt)) {
+        await this.rollbackPendingIdentityClaim(client, identityAdmission.claim);
         if (joinedNewRoom) {
           this.roomTransitions.leaveJoinedRoomBestEffort(client, nextRoom);
         }
@@ -804,6 +891,12 @@ export class StudioLiveGateway
       roomSockets.add(client.id);
       this.socketIdsByWork.set(input.workId, roomSockets);
       const safeParticipant = this.publishParticipantToSocketData(client, participant);
+      this.commitClientIdentityClaim(client, identityAdmission.claim);
+      pendingIdentityClaim = null;
+      this.disconnectReplacedClientIdentities(
+        input.workId,
+        identityAdmission.replacedConnectionIds
+      );
       // Membership changes are emitted incrementally. Broadcasting a process-local full snapshot
       // can erase peers connected to another API instance, while per-peer updates converge even
       // when two nodes complete their adapter-wide discovery in different orders.
@@ -856,6 +949,9 @@ export class StudioLiveGateway
         },
       });
     } catch {
+      if (pendingIdentityClaim) {
+        await this.rollbackPendingIdentityClaim(client, pendingIdentityClaim);
+      }
       this.logger.warn({ workId: input.workId, socketId: client.id }, "studio live join denied");
       return reply(ack, failure("forbidden", "이 작품의 실시간 작업실에 참여할 수 없습니다."));
     }
@@ -3404,6 +3500,187 @@ export class StudioLiveGateway
     this.removeParticipant(socketId, "switch");
   }
 
+  private async claimClientIdentity(
+    client: StudioLiveSocket,
+    input: StudioLiveJoinInput,
+    principal: StudioLiveAuthPrincipal
+  ): Promise<StudioLiveIdentityAdmission> {
+    const claim: StudioLiveIdentityClaim = {
+      connectionId: client.id,
+      workId: input.workId,
+      clientInstanceId: input.clientInstanceId,
+      principalFingerprint: studioLivePrincipalFingerprint(principal.userId),
+    };
+    const previousPending = client.data.studioPendingIdentityClaim;
+    if (previousPending) {
+      await this.rollbackPendingIdentityClaim(client, previousPending);
+    }
+
+    try {
+      return await this.studioLiveLockRepository.withWorkMutation(
+        input.workId,
+        async (): Promise<StudioLiveIdentityAdmission> => {
+          await this.runIdentityAdapterOperation(
+            Promise.resolve().then(() =>
+              client.join(studioLiveIdentityRoom(input.workId))
+            ),
+            "join"
+          );
+          client.data.studioPendingIdentityClaim = claim;
+
+          let sockets;
+          try {
+            sockets = await this.runIdentityAdapterOperation(
+              this.server.in(studioLiveIdentityRoom(input.workId)).fetchSockets(),
+              "discovery"
+            );
+          } catch (error) {
+            await this.rollbackPendingIdentityClaim(client, claim);
+            throw error;
+          }
+
+          const replacedConnectionIds = new Set<string>();
+          for (const socket of sockets) {
+            if (socket.id === client.id) continue;
+            const data = socket.data as StudioLiveSocketData;
+            for (const candidate of [
+              data.studioIdentityClaim,
+              data.studioPendingIdentityClaim,
+            ]) {
+              if (
+                !isStudioLiveIdentityClaim(candidate, socket.id, input.workId) ||
+                candidate.clientInstanceId !== input.clientInstanceId
+              ) {
+                continue;
+              }
+              if (
+                candidate.principalFingerprint !== claim.principalFingerprint
+              ) {
+                await this.rollbackPendingIdentityClaim(client, claim);
+                return { status: "conflict" };
+              }
+              replacedConnectionIds.add(socket.id);
+            }
+          }
+          return {
+            status: "claimed",
+            claim,
+            replacedConnectionIds: [...replacedConnectionIds].sort(),
+          };
+        }
+      );
+    } catch (error) {
+      await this.rollbackPendingIdentityClaim(client, claim);
+      this.logger.warn(
+        {
+          workId: input.workId,
+          socketId: client.id,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio client identity admission failed closed"
+      );
+      return { status: "unavailable" };
+    }
+  }
+
+  private async runIdentityAdapterOperation<T>(
+    operation: Promise<T>,
+    label: string
+  ): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await Promise.race([
+        operation,
+        new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`studio identity adapter ${label} timed out`)),
+            STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS
+          );
+          timeout.unref?.();
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  private async rollbackPendingIdentityClaim(
+    client: StudioLiveSocket,
+    expected: StudioLiveIdentityClaim
+  ): Promise<void> {
+    const pending = client.data.studioPendingIdentityClaim;
+    if (
+      !pending ||
+      pending.connectionId !== expected.connectionId ||
+      pending.workId !== expected.workId ||
+      pending.clientInstanceId !== expected.clientInstanceId ||
+      pending.principalFingerprint !== expected.principalFingerprint
+    ) {
+      return;
+    }
+    delete client.data.studioPendingIdentityClaim;
+    if (client.data.studioIdentityClaim?.workId === expected.workId) return;
+    try {
+      await this.runIdentityAdapterOperation(
+        Promise.resolve().then(() =>
+          client.leave(studioLiveIdentityRoom(expected.workId))
+        ),
+        "rollback"
+      );
+    } catch {
+      // The comparison claim is already removed. A stale empty room membership carries no
+      // authority and disappears when this socket disconnects.
+    }
+  }
+
+  private commitClientIdentityClaim(
+    client: StudioLiveSocket,
+    claim: StudioLiveIdentityClaim
+  ): void {
+    const previous = client.data.studioIdentityClaim;
+    client.data.studioIdentityClaim = claim;
+    delete client.data.studioPendingIdentityClaim;
+    if (previous && previous.workId !== claim.workId) {
+      void Promise.resolve()
+        .then(() => client.leave(studioLiveIdentityRoom(previous.workId)))
+        .catch(() => undefined);
+    }
+  }
+
+  private disconnectReplacedClientIdentities(
+    workId: string,
+    connectionIds: readonly string[]
+  ): void {
+    for (const connectionId of connectionIds) {
+      this.server.to(connectionId).emit("studio:access:revoked", {
+        workId,
+        message: "같은 브라우저 작업 세션이 새 연결로 교체되었습니다.",
+      });
+      try {
+        this.server.in(connectionId).disconnectSockets(true);
+      } catch {
+        // The replaced socket may already have disconnected. Its adapter-visible claim disappears
+        // with the transport, while the new serialized claim remains authoritative.
+      }
+    }
+  }
+
+  private clearSocketIdentityClaims(client: StudioLiveSocket): void {
+    const workIds = new Set(
+      [
+        client.data.studioIdentityClaim?.workId,
+        client.data.studioPendingIdentityClaim?.workId,
+      ].filter((workId): workId is string => typeof workId === "string")
+    );
+    delete client.data.studioIdentityClaim;
+    delete client.data.studioPendingIdentityClaim;
+    for (const workId of workIds) {
+      void Promise.resolve()
+        .then(() => client.leave(studioLiveIdentityRoom(workId)))
+        .catch(() => undefined);
+    }
+  }
+
   private consumeRateLimit(
     socketId: string,
     action: string,
@@ -3742,6 +4019,18 @@ export class StudioLiveGateway
       ? this.activeScreenShareForSocket(socket, participant.workId)
       : null;
     if (socket) {
+      const identityClaim = socket.data.studioIdentityClaim;
+      if (
+        identityClaim?.connectionId === socketId &&
+        identityClaim.workId === participant.workId
+      ) {
+        delete socket.data.studioIdentityClaim;
+        void Promise.resolve()
+          .then(() =>
+            socket.leave(studioLiveIdentityRoom(participant.workId))
+          )
+          .catch(() => undefined);
+      }
       delete socket.data.studioParticipant;
       delete socket.data.studioWorkId;
       delete socket.data.studioScreenShare;

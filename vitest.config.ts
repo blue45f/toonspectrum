@@ -45,6 +45,12 @@ export default defineConfig({
     // .claude/worktrees/ 는 에이전트 워크플로가 격리 작업용으로 만드는 임시 git worktree(전역
     // gitignore 대상이라 커밋되진 않지만, vitest 기본 include 는 gitignore 를 안 따라가므로 이
     // 안에 있는 이 저장소의 사본까지 전부 다시 스캔해버린다) — 명시적으로 제외한다.
-    exclude: [...configDefaults.exclude, "**/.claude/worktrees/**"],
+    // Cloudflare workerd integration은 `cloudflare:test` 가상 모듈과 전용 pool이 필요하므로
+    // 루트 Node suite에 섞지 않고 `pnpm test:cloudflare-realtime`에서만 실행한다.
+    exclude: [
+      ...configDefaults.exclude,
+      "**/.claude/worktrees/**",
+      "deploy/cloudflare-realtime/integration/**",
+    ],
   },
 });

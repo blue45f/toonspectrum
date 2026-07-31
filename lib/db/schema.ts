@@ -503,11 +503,11 @@ export const creatorDraftCollaborationRooms = pgTable(
       t.draftDocumentId
     ),
     unique("creator_draft_collaboration_room_work_unique").on(t.workId),
-    unique("creator_draft_collaboration_room_owner_provision_mutation_unique").on(
+    unique("creator_draft_room_owner_provision_mutation_unique").on(
       t.ownerUserId,
       t.provisionMutationId
     ),
-    uniqueIndex("creator_draft_collaboration_room_owner_promotion_mutation_unique")
+    uniqueIndex("creator_draft_room_owner_promotion_mutation_unique")
       .on(t.ownerUserId, t.promotionMutationId)
       .where(sql`${t.promotionMutationId} is not null`),
     index("idx_creator_draft_collaboration_room_owner_created").on(

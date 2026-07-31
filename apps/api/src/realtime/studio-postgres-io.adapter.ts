@@ -15,6 +15,8 @@ import { normalizePgConnectionStringForTls } from "../../../../lib/db/pg-connect
 import {
   createLifecycleSafeStudioLivePostgresTransport,
   type StudioLivePostgresClusterTransport,
+  type StudioLivePostgresListenerLifecycleStatus,
+  type StudioLivePostgresListenerStatusProvider,
 } from "./studio-postgres-pubsub";
 
 import type { Server, ServerOptions } from "socket.io";
@@ -711,7 +713,10 @@ function acquireStudioLivePostgresPoolErrorGuard(
   return state.acquire();
 }
 
-export class StudioLivePostgresIoAdapter extends IoAdapter {
+export class StudioLivePostgresIoAdapter
+  extends IoAdapter
+  implements StudioLivePostgresListenerStatusProvider
+{
   private readonly serverClosePromises = new WeakMap<Server, Promise<void>>();
   private poolClosePromise: Promise<void> | null = null;
   private readonly poolErrorGuardLease: StudioLivePostgresPoolErrorGuardLease;
@@ -736,6 +741,10 @@ export class StudioLivePostgresIoAdapter extends IoAdapter {
     const server = super.createIOServer(port, options) as Server;
     server.adapter(this.clusterTransport.adapterConstructor);
     return server;
+  }
+
+  getStudioLivePostgresListenerStatus(): StudioLivePostgresListenerLifecycleStatus {
+    return this.clusterTransport.getStudioLivePostgresListenerStatus();
   }
 
   async disposePool(): Promise<void> {

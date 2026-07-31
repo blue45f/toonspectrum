@@ -35,6 +35,11 @@
  * 로드 의존 0. 렌더 통합(디코드·캐시 키·커밋 경로)은 StudioKonvaImageNode.tsx 가 담당한다.
  */
 
+import {
+  isStudioFilterMaskSurfaceId,
+  type StudioFilterMaskSurfaceId,
+} from "@/lib/studio-filter-mask-surface-contract";
+
 // ---------------------------------------------------------------------------
 // (A) 타입 · 술어(predicate) — studio-layer-mask.ts 의 can/has/shouldApply 3종 세트와 동일 관례.
 // ---------------------------------------------------------------------------
@@ -42,6 +47,7 @@
 /** StudioPage El의 최소 부분집합(이 모듈은 이 형태만 본다) — LayerMaskLike와 동일한 취지. */
 export type FilterMaskLike = {
   type?: string;
+  filterMaskSurfaceId?: StudioFilterMaskSurfaceId | string;
   filterMaskSrc?: string;
   filterMaskEnabled?: boolean;
 };
@@ -53,11 +59,11 @@ export function canFilterMask(el: FilterMaskLike): boolean {
 
 /** 마스크 데이터가 있는지(켜짐/꺼짐과 무관 — "삭제"와 "비활성화"를 구분하기 위한 존재 술어). */
 export function hasFilterMask(el: FilterMaskLike): boolean {
-  return !!el.filterMaskSrc;
+  return !!el.filterMaskSrc || isStudioFilterMaskSurfaceId(el.filterMaskSurfaceId);
 }
 
 /**
- * 유효 마스크 적용 여부 — image이고, filterMaskSrc가 있고, filterMaskEnabled가 명시적으로
+ * 유효 마스크 적용 여부 — image이고, inline 또는 immutable surface 마스크가 있고, enabled가
  * false가 아닐 때(undefined = 기본 켜짐). shouldApplyLayerMask와 동일한 3중 방어 패턴.
  * 미설정 문서는 항상 false → 기존 "필터 전체 적용" 동작이 바이트 단위로 동일하게 유지된다.
  */
@@ -66,13 +72,17 @@ export function shouldApplyFilterMask(el: FilterMaskLike): boolean {
 }
 
 /**
- * 필터 결과 픽셀 캐시 키에 섞을 마스크 식별자 — 적용 중이면 마스크 data URL 자체(내용이 곧
- * 정체성 — el.src 를 키에 그대로 쓰는 기존 관례와 동일), 아니면 빈 문자열(기존 키 불변).
+ * 필터 결과 픽셀 캐시 키에 섞을 마스크 식별자 — shared surface는 불변 ID, legacy/local 마스크는
+ * data URL 자체(내용이 곧 정체성 — el.src 를 키에 그대로 쓰는 기존 관례와 동일)를 사용한다.
+ * 적용하지 않으면 빈 문자열이라 기존 키가 바뀌지 않는다.
  * imageFilterCacheKey(studio-konva-filter-fields.ts)는 이 모듈이 소유하지 않으므로, 마스크
  * 무효화가 필요한 캐시는 이 키를 별도로 함께 섞는다(StudioKonvaImageNode·ClipMaskGroup ck).
  */
 export function filterMaskRenderKey(el: FilterMaskLike): string {
-  return shouldApplyFilterMask(el) ? el.filterMaskSrc! : "";
+  if (!shouldApplyFilterMask(el)) return "";
+  return isStudioFilterMaskSurfaceId(el.filterMaskSurfaceId)
+    ? el.filterMaskSurfaceId
+    : el.filterMaskSrc ?? "";
 }
 
 /** 마스크 초기 채움/브러시 방향 — studio-layer-mask.ts LayerMaskPaintMode와 구조 동일(호환).

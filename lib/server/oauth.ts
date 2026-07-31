@@ -16,6 +16,7 @@ import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } 
 // 세션은 서명 JWT(lib/server/session.ts) 로 발급되고 x-user-id 헤더로 전송된다.
 
 export type OAuthProviderId = "google" | "kakao" | "naver";
+export type OAuthProviderMode = "oauth" | "demo" | "disabled";
 
 // OAuth 제공자 프로필 JSON: 키 형태를 고정할 수 없어 unknown 값 레코드로 표현.
 // 실제 사용처에서는 asRecord()로 중첩 객체를, str()로 문자열 필드를 안전하게 좁힌다.
@@ -40,6 +41,27 @@ export interface OAuthUser {
   image: string | null;
   role: string;
   sessionVersion?: number | null;
+}
+
+export class GoogleAuthConfigurationError extends Error {
+  constructor() {
+    super("google client id not configured");
+    this.name = "GoogleAuthConfigurationError";
+  }
+}
+
+export class GoogleAuthCredentialError extends Error {
+  constructor(message = "invalid google credential") {
+    super(message);
+    this.name = "GoogleAuthCredentialError";
+  }
+}
+
+export class OAuthAccountBlockedError extends Error {
+  constructor(readonly publicMessage: string) {
+    super(publicMessage);
+    this.name = "OAuthAccountBlockedError";
+  }
 }
 
 interface ProviderConfig {
@@ -108,20 +130,22 @@ export function isOAuthProvider(value: string): value is OAuthProviderId {
   return value === "google" || value === "kakao" || value === "naver";
 }
 
-export function providerMode(id: OAuthProviderId): "oauth" | "demo" {
+export function providerMode(id: OAuthProviderId): OAuthProviderMode {
   if (DEMO_ONLY_PROVIDERS.has(id)) return "demo";
   const c = providerConfig(id);
   // Google 은 GIS(ID 토큰) 흐름이라 client id 만 있으면 실연동(클라이언트 시크릿 불필요).
-  if (id === "google") return c.clientId ? "oauth" : "demo";
+  // Google 로그인은 실제 Google 계정임을 전제로 하므로, 설정이 없을 때 데모 계정으로 가장하지 않는다.
+  if (id === "google") return c.clientId ? "oauth" : "disabled";
   if (id === "kakao") return c.clientId ? "oauth" : "demo";
   return c.clientId && c.clientSecret ? "oauth" : "demo";
 }
 
 export interface AuthProviderInfo {
   label: string;
-  mode: "oauth" | "demo";
+  mode: OAuthProviderMode;
   // GIS 버튼 렌더용 — google 실연동(oauth) 시에만 client id 를 노출(공개해도 안전한 값).
   clientId?: string;
+  reason?: "missing-client-id";
 }
 
 // providers 엔드포인트 응답 — 설정 여부에 따라 oauth/demo 모드를 함께 노출.
@@ -133,8 +157,9 @@ export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
     google: {
       label: "Google",
       mode: googleMode,
-      // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출(없으면 데모 버튼).
+      // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출한다. client secret 은 절대 노출하지 않는다.
       ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
+      ...(googleMode === "disabled" ? { reason: "missing-client-id" as const } : {}),
     },
   };
   if (opts?.kakao || kakaoMode === "oauth") out.kakao = { label: "카카오", mode: kakaoMode };
@@ -152,10 +177,29 @@ export function webAppBaseUrl(): string {
 }
 
 // ── 서명된 state (서버 저장 없이 CSRF 방지·TTL) ──
-let STATE_SECRET = env("AUTH_STATE_SECRET");
+const OAUTH_STATE_SECRET_MIN_BYTES = 32;
+let DEVELOPMENT_STATE_SECRET: string | undefined;
 function stateSecret(): string {
-  if (!STATE_SECRET) STATE_SECRET = randomBytes(32).toString("hex"); // 프로세스 수명 동안 유지
-  return STATE_SECRET;
+  const raw = process.env.AUTH_STATE_SECRET;
+  const configured = raw?.trim();
+  if (configured) {
+    if (
+      process.env.NODE_ENV === "production" &&
+      (configured !== raw ||
+        Buffer.byteLength(configured, "utf8") <
+          OAUTH_STATE_SECRET_MIN_BYTES)
+    ) {
+      throw new Error(
+        `AUTH_STATE_SECRET must be an unpadded secret of at least ${OAUTH_STATE_SECRET_MIN_BYTES} UTF-8 bytes in production`,
+      );
+    }
+    return configured;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_STATE_SECRET must be set for OAuth state in production");
+  }
+  DEVELOPMENT_STATE_SECRET ??= randomBytes(32).toString("hex");
+  return DEVELOPMENT_STATE_SECRET;
 }
 function sign(payload: string): string {
   return createHmac("sha256", stateSecret()).update(payload).digest("base64url");
@@ -211,6 +255,7 @@ export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | 
 interface NormalizedProfile {
   providerAccountId: string;
   email: string | null;
+  emailVerified?: boolean;
   name: string | null;
   image: string | null;
 }
@@ -246,9 +291,15 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
   if (!res.ok) throw new Error(`profile fetch failed (${res.status})`);
   const raw = (await res.json()) as JsonRecord;
   if (id === "google") {
+    const email = str(raw.email)?.toLowerCase() ?? null;
+    const emailVerified = raw.email_verified === true;
+    if (!email || !emailVerified) {
+      throw new GoogleAuthCredentialError("google email is missing or unverified");
+    }
     return {
       providerAccountId: String(raw.sub),
-      email: str(raw.email)?.toLowerCase() ?? null,
+      email,
+      emailVerified,
       name: str(raw.name) ?? str(raw.given_name),
       image: str(raw.picture),
     };
@@ -305,7 +356,7 @@ function avatarFor(seed: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
-// 프로필 → user/account upsert. 이메일 일치 시 기존 계정에 연결, 없으면 신규 생성.
+// 프로필 → user/account upsert. Google은 검증된 이메일만 기존 계정에 연결하고, 없으면 신규 생성.
 async function upsertOAuthUser(
   id: OAuthProviderId,
   profile: NormalizedProfile,
@@ -323,7 +374,10 @@ async function upsertOAuthUser(
 
   let userId = linked?.userId;
   if (!userId) {
-    const [byEmail] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const mayLinkByEmail = id !== "google" || profile.emailVerified === true;
+    const [byEmail] = mayLinkByEmail
+      ? await db.select().from(users).where(eq(users.email, email)).limit(1)
+      : [];
     if (byEmail) {
       userId = byEmail.id;
     } else {
@@ -352,7 +406,7 @@ async function upsertOAuthUser(
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const block = getUserAuthBlock(user);
-  if (block) throw new Error(block);
+  if (block) throw new OAuthAccountBlockedError(block);
   return {
     id: userId,
     name: user?.name ?? name,
@@ -384,6 +438,8 @@ export function googleClientId(): string | undefined {
   return providerConfig("google").clientId;
 }
 
+export const GOOGLE_ID_TOKEN_MAX_LENGTH = 16_384;
+
 // google-auth-library OAuth2Client 는 JWK(구글 공개키)를 내부 캐시한다 — 모듈 수명 동안 재사용.
 let googleVerifier: OAuth2Client | null = null;
 function getGoogleVerifier(): OAuth2Client {
@@ -394,19 +450,35 @@ function getGoogleVerifier(): OAuth2Client {
 // ID 토큰 → 정규화 프로필. 서명·만료·aud(우리 client id)·iss(accounts.google.com) 를 모두 검증한다.
 export async function verifyGoogleIdToken(idToken: string): Promise<NormalizedProfile> {
   const audience = googleClientId();
-  if (!audience) throw new Error("google client id not configured");
-  if (!idToken || typeof idToken !== "string") throw new Error("missing id_token");
+  if (!audience) throw new GoogleAuthConfigurationError();
+  const token = typeof idToken === "string" ? idToken.trim() : "";
+  if (
+    !token
+    || token.length > GOOGLE_ID_TOKEN_MAX_LENGTH
+    || token.split(".").length !== 3
+  ) {
+    throw new GoogleAuthCredentialError("invalid id_token format");
+  }
 
-  const ticket = await getGoogleVerifier().verifyIdToken({ idToken, audience });
+  let ticket;
+  try {
+    ticket = await getGoogleVerifier().verifyIdToken({ idToken: token, audience });
+  } catch {
+    throw new GoogleAuthCredentialError("google id_token verification failed");
+  }
   const payload = ticket.getPayload();
-  if (!payload?.sub) throw new Error("invalid id_token payload");
+  if (!payload?.sub) throw new GoogleAuthCredentialError("invalid id_token payload");
   // iss 는 google-auth-library 가 검증하지만 방어적으로 한 번 더 확인.
   if (payload.iss !== "accounts.google.com" && payload.iss !== "https://accounts.google.com") {
-    throw new Error("invalid issuer");
+    throw new GoogleAuthCredentialError("invalid issuer");
+  }
+  if (!payload.email || payload.email_verified !== true) {
+    throw new GoogleAuthCredentialError("google email is missing or unverified");
   }
   return {
     providerAccountId: payload.sub,
-    email: payload.email ? payload.email.toLowerCase() : null,
+    email: payload.email.toLowerCase(),
+    emailVerified: true,
     name: payload.name ?? payload.given_name ?? null,
     image: payload.picture ?? null,
   };
@@ -415,7 +487,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<NormalizedPr
 // GIS 로그인 처리: ID 토큰 검증 → user/account upsert. (kakao/naver 는 데모이므로 google 전용)
 export async function handleGoogleIdToken(idToken: string): Promise<OAuthUser> {
   const profile = await verifyGoogleIdToken(idToken);
-  return upsertOAuthUser("google", profile, { id_token: idToken });
+  // ID 토큰은 로그인 순간의 검증 증명일 뿐 장기 자격 증명이 아니다. 검증 후 원문을 저장하지 않는다.
+  return upsertOAuthUser("google", profile);
 }
 
 // 데모 폴백: 실제 제공자 연동 없이 명확히 [데모] 표시된 사용자 생성/재사용.

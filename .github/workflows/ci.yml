@@ -35,8 +35,8 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: webdex
+          POSTGRES_PASSWORD: webdex
           POSTGRES_DB: webdex
-          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -45,10 +45,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgres://webdex@localhost:5432/webdex
+      DATABASE_URL: postgres://webdex:webdex@localhost:5432/webdex
       # 같은 direct PostgreSQL에 Socket.IO adapter migration을 적용한 뒤 2-node integration을
       # 필수 실행한다. 이 값이 있으면 해당 테스트는 skip이 아니라 CI gate가 된다.
-      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex@localhost:5432/webdex
+      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex:webdex@localhost:5432/webdex
       # StudioPage.tsx 등 초대형 모듈 ESLint/tsc 힙 고갈 방지 (GitHub-hosted ~7GB 한도 내).
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -71,7 +71,35 @@ jobs:
       # 계약을 PostgreSQL에서 직접 확인해 부분 provision 상태로 테스트를 진행하지 않는다.
       - name: Provision and verify database schema
         run: |
-          pnpm exec drizzle-kit push --force
+          set -euo pipefail
+          # Fresh provision의 Marketplace trigram index DDL이 operator class를 참조하기 전에
+          # extension을 명시적으로 준비한다.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'webdex_runtime'
+            ) THEN
+              CREATE ROLE webdex_runtime
+                LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+            END IF;
+          END;
+          $$;
+          GRANT CONNECT ON DATABASE webdex TO webdex_runtime;
+          GRANT USAGE ON SCHEMA public TO webdex_runtime;
+          SQL
+          # drizzle-kit 0.31.x가 내부 PostgreSQL 오류에도 0으로 끝나는 경우가 있어 출력도 gate한다.
+          set +e
+          push_output="$(pnpm exec drizzle-kit push --force 2>&1)"
+          push_status=$?
+          set -e
+          printf '%s\n' "$push_output"
+          if [[ "$push_status" -ne 0 ]] \
+            || grep -Eiq '(^|[[:space:]])error:|severity:.*(ERROR|FATAL|PANIC)' <<< "$push_output"; then
+            echo "::error::drizzle-kit fresh schema provision failed."
+            exit 1
+          fi
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
@@ -97,18 +125,79 @@ jobs:
           END;
           $$;
           SQL
-      # 배포 migration 자체도 실제 PostgreSQL에서 실행한 뒤 integration을 수행한다.
-      # 0013은 Creator Asset 권리 보정과 제약을, 0017은 live-lock cutover 원장을,
-      # 0018은 Studio AI 분산 rate-limit/lease 경계를, 0019는 유료 호출의 durable
-      # idempotency receipt 경계를 실제 PostgreSQL에서 검증한다.
-      - name: Apply forward SQL migrations
+      # Production의 실제 무원장 baseline(0019까지 적용)을 재현한다. 이 setup은 빈 CI DB에서만
+      # historical SQL을 한 번 실행한다. runner의 adopt는 이 구조/0017 marker를 검증해 0001~0019
+      # checksum을 재실행 없이 기록하고, genuine pending인 0020~0022만 실행해야 한다.
+      - name: Reproduce reviewed historical baseline through 0019
         run: |
-          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
-          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
-          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
-          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
-          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
+          set -euo pipefail
+          while IFS= read -r migration_path; do
+            if [[ "$migration_path" == lib/db/migrations/0020_* ]]; then
+              break
+            fi
+            psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
+              -X -v ON_ERROR_STOP=1 \
+              -f "$migration_path"
+          done < scripts/production-database-migrations.manifest
+          # drizzle-kit push describes the current schema, so remove only the three post-0019
+          # relations from this fresh CI database. Adoption must recreate them through the actual
+          # 0020/0021/0022 SQL path rather than exercising CREATE IF NOT EXISTS no-ops.
+          psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
+            -X -v ON_ERROR_STOP=1 <<'SQL'
+          DROP TABLE IF EXISTS
+            "creator_marketplace_publish_gate",
+            "creator_marketplace_resource",
+            "creator_draft_collaboration_room"
+          CASCADE;
+          DROP EXTENSION IF EXISTS pg_trgm;
+          SQL
+      - name: Adopt verified history and apply genuine pending migrations
+        run: |
+          set -euo pipefail
+          adoption_output="$(
+            MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
+              node scripts/run-production-database-migrations.mjs \
+              --allow-loopback \
+              --mode adopt \
+              --runtime-database-role webdex_runtime \
+              --release-sha "$GITHUB_SHA" \
+              --confirmation ADOPT-TOONSPECTRUM-MIGRATION-HISTORY
+          )"
+          printf '%s\n' "$adoption_output"
+          grep -Fq \
+            '19 adopted, 3 applied, 20 checksum-verified skips' \
+            <<< "$adoption_output"
+      - name: Prove pending-only migration rerun
+        run: |
+          set -euo pipefail
+          rerun_output="$(
+            MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
+              node scripts/run-production-database-migrations.mjs \
+                --allow-loopback \
+                --mode apply \
+                --runtime-database-role webdex_runtime \
+                --release-sha "$GITHUB_SHA" \
+                --confirmation APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS
+          )"
+          printf '%s\n' "$rerun_output"
+          grep -Fq '0 applied, 23 checksum-verified skips' <<< "$rerun_output"
+      - name: Verify full runtime readiness and exact migration ledger
+        run: |
+          MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
+            node scripts/verify-production-database-capabilities.mjs \
+              --runtime-database-role webdex_runtime \
+              --allow-loopback
       - run: pnpm run test
+      # root Vitest suite에는 source unit만 포함된다. workerd runtime integration과 Worker
+      # 전용 tsconfig를 별도 gate하지 않으면 Durable Object/runtime 회귀가 false-green이 된다.
+      - run: pnpm run test:cloudflare-realtime
+      - run: pnpm run typecheck:cloudflare-realtime
+      - name: Verify Cloudflare realtime Worker packaging
+        run: |
+          pnpm exec wrangler deploy \
+            --dry-run \
+            --config deploy/cloudflare-realtime/wrangler.jsonc \
+            --outdir /tmp/toonspectrum-cloudflare-realtime-dry-run
       - run: pnpm run build
       - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
         run: pnpm run verify:studio-3d-console

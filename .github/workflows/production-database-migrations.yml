@@ -1,0 +1,113 @@
+# Production DDL is intentionally manual. Configure the `production-database`
+# GitHub environment with required reviewers before adding its direct-DB secret.
+name: Approved production database migrations
+run-name: Production DB migrations @ ${{ inputs.release_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: "검토·배포할 정확한 40자리 Git commit SHA"
+        required: true
+        type: string
+      confirmation:
+        description: "mode별 APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS / ADOPT-TOONSPECTRUM-MIGRATION-HISTORY / REPAIR-TOONSPECTRUM-MIGRATION-STATE 입력"
+        required: true
+        type: string
+      writer_state_confirmation:
+        description: "기존 Studio writer를 모두 drain한 뒤 NO-STUDIO-WRITERS 입력"
+        required: true
+        type: string
+      stale_lock_owner_token:
+        description: "repair에서 60분 이상 stale lock을 CAS 제거할 때만 DB 원장의 64자리 ownerToken 입력"
+        required: false
+        type: string
+      migration_mode:
+        description: "apply=대기 migration만, adopt=0019 구조 증명·과거 checksum 채택·0020~22 적용, repair=기존 중단 row만 복구"
+        required: true
+        default: apply
+        type: choice
+        options:
+          - apply
+          - adopt
+          - repair
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toonspectrum-production-database-ddl
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    environment: production-database
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      WRITER_STATE_CONFIRMATION: ${{ inputs.writer_state_confirmation }}
+      MIGRATION_MODE: ${{ inputs.migration_mode }}
+      RUNTIME_DATABASE_ROLE: ${{ vars.PRODUCTION_RUNTIME_DATABASE_ROLE }}
+    steps:
+      - name: Require an approved immutable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$WRITER_STATE_CONFIRMATION" != "NO-STUDIO-WRITERS" ]]; then
+            echo "::error::Drain every existing Studio writer before confirming NO-STUDIO-WRITERS."
+            exit 1
+          fi
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::release_sha must be a full lowercase 40-character Git commit SHA."
+            exit 1
+          fi
+          if [[ ! "$RUNTIME_DATABASE_ROLE" =~ ^[a-z_][a-z0-9_]{0,62}$ ]]; then
+            echo "::error::Set production-database variable PRODUCTION_RUNTIME_DATABASE_ROLE to the dedicated, unprivileged app role."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify protected-main release provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git show-ref --verify --quiet refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" refs/remotes/origin/main; then
+            echo "::error::release_sha must already belong to protected origin/main."
+            exit 1
+          fi
+
+      - name: Verify direct production database URL contract
+        shell: bash
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
+        run: node scripts/validate-production-database-url.mjs
+
+      - name: Apply checksum-led pending production migrations
+        shell: bash
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
+          MIGRATION_STALE_LOCK_OWNER_TOKEN: ${{ inputs.stale_lock_owner_token }}
+        run: |
+          set -euo pipefail
+          node scripts/run-production-database-migrations.mjs \
+            --mode "$MIGRATION_MODE" \
+            --runtime-database-role "$RUNTIME_DATABASE_ROLE" \
+            --release-sha "$RELEASE_SHA" \
+            --confirmation "$CONFIRMATION"
+
+      - name: Verify full runtime readiness and exact migration ledger
+        shell: bash
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_DIRECT_URL }}
+        run: |
+          node scripts/verify-production-database-capabilities.mjs \
+            --runtime-database-role "$RUNTIME_DATABASE_ROLE"

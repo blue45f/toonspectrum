@@ -417,9 +417,8 @@ export function StudioKonvaImageNode({
   // 계속 쓰거나 마스크 없이 전체 이미지에 필터를 적용하면, 새 마스크 스트로크/교체/디코드
   // 실패 순간에 사용자가 지정하지 않은 픽셀까지 비파괴 보정이 번지는 더 큰 데이터 오류가 된다.
   // 마스크가 제거되거나 명시적으로 꺼지면 요청 자체가 없으므로 기존 전체 적용 동작을 보존한다.
-  const filterMaskWantedSrc = hasFilters && shouldApplyFilterMask(el)
-    ? el.filterMaskSrc
-    : undefined;
+  const filterMaskRequested = hasFilters && shouldApplyFilterMask(el);
+  const filterMaskWantedSrc = filterMaskRequested ? el.filterMaskSrc : undefined;
   const [decodedFilterMask, setDecodedFilterMask] = useState<FilterMaskDecodedState | null>(null);
   useEffect(() => {
     if (!filterMaskWantedSrc) {
@@ -476,7 +475,11 @@ export function StudioKonvaImageNode({
     filterMaskWantedSrc && decodedFilterMask?.src === filterMaskWantedSrc
       ? decodedFilterMask
       : null;
-  const filterMaskActivationBlocked = !!filterMaskWantedSrc && !activeFilterMask;
+  // A durable surface reference is intentionally projected to a Blob URL only after exact
+  // hydration. During that gap `filterMaskSrc` is absent, but the request still exists. Blocking
+  // on the request (rather than only on the URL) prevents a whole-image filter flash while a
+  // referenced mask is loading, missing, malformed, or rejected.
+  const filterMaskActivationBlocked = filterMaskRequested && !activeFilterMask;
   // 마스크가 섞인 필터 결과는 별도 정체성으로 캐시한다 — imageFilterCacheKey(다른 소유자의
   // 파일)는 건드리지 않고, 이 노드가 소유한 모든 결과 캐시 키에 마스크 data URL을 함께 섞는다
   // (el.src를 키에 그대로 쓰는 기존 관례와 동일 — 내용이 곧 정체성).

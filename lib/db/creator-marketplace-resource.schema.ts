@@ -22,6 +22,13 @@ import type {
   CreatorMarketplaceResourceManifest,
 } from "../creator-marketplace-resource-contract";
 
+// Drizzle parameterizes primitive `${value}` interpolations as `$1`. PostgreSQL does not accept
+// parameters inside a CHECK constraint created by `drizzle-kit push`, so render this trusted,
+// compile-time integer as a literal. Never replace this with request- or environment-derived text.
+const CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES_SQL = sql.raw(
+  String(CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES)
+);
+
 /**
  * Marketplace rows deliberately store only a bounded declarative manifest. Raster/model binaries
  * remain in the existing private work-asset or static built-in pipelines, keeping public catalog
@@ -120,7 +127,7 @@ export const creatorMarketplaceResources = pgTable(
     ),
     check(
       "creator_marketplace_resource_manifest_size_check",
-      sql`${table.manifestByteSize} between 1 and ${CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES}`
+      sql`${table.manifestByteSize} between 1 and ${CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES_SQL}`
     ),
     check(
       "creator_marketplace_resource_manifest_shape_check",

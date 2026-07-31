@@ -91,6 +91,18 @@ interface FakeSocket {
     studioParticipant?: StudioLiveParticipant;
     studioWorkId?: string;
     studioVoiceMember?: { connectionId: string; callId: string; muted: boolean };
+    studioIdentityClaim?: {
+      connectionId: string;
+      workId: string;
+      clientInstanceId: string;
+      principalFingerprint: string;
+    };
+    studioPendingIdentityClaim?: {
+      connectionId: string;
+      workId: string;
+      clientInstanceId: string;
+      principalFingerprint: string;
+    };
   };
   handshake: { auth: Record<string, unknown> };
   joined: Set<string>;
@@ -371,6 +383,13 @@ function createHarness(
         async fetchSockets() {
           return [...sockets.values()].filter((candidate) => candidate.joined.has(room));
         },
+        disconnectSockets() {
+          for (const candidate of sockets.values()) {
+            if (candidate.id === room || candidate.joined.has(room)) {
+              candidate.disconnect(true);
+            }
+          }
+        },
       };
     },
     to(target: string) {
@@ -519,6 +538,12 @@ function connectFakeInterServerBus(
         return harnesses.flatMap((candidate) =>
           [...candidate.sockets.values()].filter((socket) => socket.joined.has(room))
         );
+      },
+      disconnectSockets() {
+        for (const candidate of harnesses) {
+          const socket = candidate.sockets.get(room);
+          socket?.disconnect(true);
+        }
       },
     });
     harness.namespace.serverSideEmitWithAck = async (event, payload) => {
@@ -1222,9 +1247,91 @@ describe("StudioLiveGateway", () => {
     expect(harness.service.getWorkTeam).toHaveBeenCalledWith("owner", "work-1");
     expectNoAdapterVisibleAuthentication(socket);
     expect(Object.keys(socket.data).sort()).toEqual([
+      "studioIdentityClaim",
       "studioParticipant",
       "studioWorkId",
     ]);
+  });
+
+  it("rejects the same client instance when another authenticated principal already owns it", async () => {
+    const harness = createHarness();
+    const owner = harness.socket("owner");
+    const editor = harness.socket("editor");
+    await harness.gateway.handleConnection(owner as never);
+    await harness.gateway.handleConnection(editor as never);
+
+    await expect(
+      harness.gateway.join(
+        owner as never,
+        { workId: "work-1", clientInstanceId: "shared-browser-instance" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      harness.gateway.join(
+        editor as never,
+        { workId: "work-1", clientInstanceId: "shared-browser-instance" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+
+    expect(owner.disconnected).toBe(false);
+    expect(editor.data.studioIdentityClaim).toBeUndefined();
+    expect(editor.data.studioPendingIdentityClaim).toBeUndefined();
+    expect(editor.joined).not.toContain("studio-live:work-1");
+    expect(editor.joined).not.toContain("studio-live-identity:work-1");
+    expect(JSON.stringify(owner.data)).not.toContain('"userId"');
+  });
+
+  it("serializes cross-node client identity races and lets a same-principal reconnect replace the old socket", async () => {
+    const sharedRepository = new MemoryStudioLiveLockRepository();
+    const firstNode = createHarness(
+      undefined,
+      undefined,
+      undefined,
+      sharedRepository
+    );
+    const secondNode = createHarness(
+      undefined,
+      undefined,
+      undefined,
+      sharedRepository
+    );
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    try {
+      const first = firstNode.socket("first-session", "valid:owner");
+      const replacement = secondNode.socket("replacement-session", "valid:owner");
+      await firstNode.gateway.handleConnection(first as never);
+      await secondNode.gateway.handleConnection(replacement as never);
+
+      await expect(
+        firstNode.gateway.join(
+          first as never,
+          { workId: "work-1", clientInstanceId: "stable-owner-browser" },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+      await expect(
+        secondNode.gateway.join(
+          replacement as never,
+          { workId: "work-1", clientInstanceId: "stable-owner-browser" },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+
+      expect(first.disconnected).toBe(true);
+      expect(replacement.disconnected).toBe(false);
+      expect(replacement.data.studioIdentityClaim).toMatchObject({
+        connectionId: "replacement-session",
+        workId: "work-1",
+        clientInstanceId: "stable-owner-browser",
+      });
+      expect(replacement.data.studioIdentityClaim?.principalFingerprint).not.toContain(
+        "owner"
+      );
+    } finally {
+      bus.destroy();
+    }
   });
 
   it("discovers adapter-visible participants across nodes without leaking socket-private data", async () => {
@@ -1323,10 +1430,14 @@ describe("StudioLiveGateway", () => {
 
   it("falls back only in the join ACK when adapter discovery fails and never broadcasts a partial snapshot", async () => {
     const harness = createHarness();
-    harness.namespace.in = () => ({
+    const originalDiscovery = harness.namespace.in;
+    harness.namespace.in = (room: string) => room.startsWith("studio-live-identity:")
+      ? originalDiscovery(room)
+      : ({
       async fetchSockets() {
         throw new Error("shared adapter unavailable");
       },
+      disconnectSockets() {},
     });
 
     const response = await connectAndJoin(harness, harness.socket("owner"));
@@ -1343,10 +1454,14 @@ describe("StudioLiveGateway", () => {
     vi.useFakeTimers();
     try {
       const harness = createHarness();
-      harness.namespace.in = () => ({
+      const originalDiscovery = harness.namespace.in;
+      harness.namespace.in = (room: string) => room.startsWith("studio-live-identity:")
+        ? originalDiscovery(room)
+        : ({
         async fetchSockets() {
           return new Promise<never>(() => undefined);
         },
+        disconnectSockets() {},
       });
       const joining = connectAndJoin(harness, harness.socket("owner"));
 
@@ -1660,7 +1775,10 @@ describe("StudioLiveGateway", () => {
 
     expect(superseded).toMatchObject({ ok: false, code: "not_joined" });
     expect(latest.ok).toBe(true);
-    expect([...socket.joined]).toEqual(["studio-live:work-b"]);
+    expect([...socket.joined]).toEqual([
+      "studio-live:work-b",
+      "studio-live-identity:work-b",
+    ]);
     const internals = harness.gateway as unknown as {
       participantsBySocket: Map<string, { workId: string }>;
       socketIdsByWork: Map<string, Set<string>>;
@@ -1707,7 +1825,10 @@ describe("StudioLiveGateway", () => {
       participantsBySocket: Map<string, { workId: string }>;
       socketIdsByWork: Map<string, Set<string>>;
     };
-    expect([...socket.joined]).toEqual(["studio-live:work-old"]);
+    expect([...socket.joined]).toEqual([
+      "studio-live:work-old",
+      "studio-live-identity:work-old",
+    ]);
     expect(socket.leave).toHaveBeenCalledWith("studio-live:work-old");
     expect(socket.leave).toHaveBeenCalledWith("studio-live:work-new");
     expect(internals.participantsBySocket.get(socket.id)?.workId).toBe("work-old");
@@ -1763,7 +1884,10 @@ describe("StudioLiveGateway", () => {
       participantsBySocket: Map<string, { workId: string }>;
       socketIdsByWork: Map<string, Set<string>>;
     };
-    expect([...socket.joined]).toEqual(["studio-live:work-b"]);
+    expect([...socket.joined]).toEqual([
+      "studio-live:work-b",
+      "studio-live-identity:work-b",
+    ]);
     expect(internals.participantsBySocket.get(socket.id)?.workId).toBe("work-b");
     expect([...internals.socketIdsByWork.keys()]).toEqual(["work-b"]);
     expect(harness.emissions.slice(emissionCountBeforeSwitch)).not.toContainEqual(
@@ -1948,7 +2072,10 @@ describe("StudioLiveGateway", () => {
         undefined
       )
     ).resolves.toMatchObject({ ok: true });
-    expect([...replacement.joined]).toEqual(["studio-live:work-current"]);
+    expect([...replacement.joined]).toEqual([
+      "studio-live:work-current",
+      "studio-live-identity:work-current",
+    ]);
   });
 
   it("admits the first 30 room arrivals and rejects the 31st with rate_limited", async () => {
@@ -4294,10 +4421,14 @@ describe("StudioLiveGateway", () => {
       { workId: "work-1", shareId: "share-local-fallback", label: "로컬 화면" },
       undefined
     );
-    harness.namespace.in = () => ({
+    const originalDiscovery = harness.namespace.in;
+    harness.namespace.in = (room: string) => room.startsWith("studio-live-identity:")
+      ? originalDiscovery(room)
+      : ({
       async fetchSockets() {
         throw new Error("shared adapter unavailable");
       },
+      disconnectSockets() {},
     });
 
     const observer = harness.socket("viewer");
@@ -4866,6 +4997,7 @@ describe("StudioLiveGateway", () => {
     ).resolves.toMatchObject({ ok: true });
     expectNoAdapterVisibleAuthentication(first);
     expect(Object.keys(first.data).sort()).toEqual([
+      "studioIdentityClaim",
       "studioParticipant",
       "studioVoiceMember",
       "studioWorkId",
@@ -5075,6 +5207,7 @@ describe("StudioLiveGateway", () => {
       async fetchSockets() {
         throw new Error("adapter unavailable");
       },
+      disconnectSockets() {},
     });
 
     await expect(harness.gateway.joinVoice(
@@ -5222,6 +5355,7 @@ describe("StudioLiveGateway", () => {
         async fetchSockets() {
           throw new Error("adapter discovery unavailable");
         },
+        disconnectSockets() {},
       });
 
       await expect(

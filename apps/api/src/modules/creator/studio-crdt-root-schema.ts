@@ -4,7 +4,13 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
 } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
-import { hasValidStudioCrdtRasterDocument } from "../../../../../lib/studio-crdt-raster-document-contract";
+import { readStudioCrdtRasterDocument } from "../../../../../lib/studio-crdt-raster-document-contract";
+import {
+  STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
+  isStudioFilterMaskReferenceProps,
+  isStudioFilterMaskSurfaceId,
+  isStudioFilterMaskSurfaceSpec,
+} from "../../../../../lib/studio-filter-mask-surface-contract";
 import {
   STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
   STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
@@ -295,7 +301,11 @@ const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
   ]),
   // Wire-only topology and bounded edit state for admitted image/VRM/3D bodies. Source bytes stay
   // in work-scoped private storage; this record owns placement, filters, page/layer, and tombstone.
-  reference: new Set(["elementType", ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS]),
+  reference: new Set([
+    "elementType",
+    ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+    ...STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
+  ]),
 } as const;
 
 type StudioCrdtSceneType = keyof typeof STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
@@ -715,6 +725,8 @@ function isValidStudioWorkAssetReferenceCandidate(
   }
   if (property === "rotation") return finiteNumberInRange(value, -360_000, 360_000);
   if (property === "opacity") return finiteNumberInRange(value, 0, 1);
+  if (property === "filterMaskSurfaceId") return isStudioFilterMaskSurfaceId(value);
+  if (property === "filterMaskEnabled") return typeof value === "boolean";
   if (STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET.has(property)) return typeof value === "boolean";
   if (STUDIO_WORK_ASSET_STRUCTURED_EDIT_KEY_SET.has(property)) {
     try {
@@ -744,12 +756,62 @@ function hasLegacyStudioCrdtReferenceProps(
     isValidLegacyStudioCrdtReferenceType(props.elementType);
 }
 
+function studioFilterMaskReferenceProps(
+  props: Record<string, unknown>
+): Record<string, unknown> {
+  const candidate: Record<string, unknown> = {};
+  for (const key of STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS) {
+    if (Object.hasOwn(props, key)) candidate[key] = props[key];
+  }
+  return candidate;
+}
+
+function hasStudioFilterMaskReferenceState(
+  props: Record<string, unknown>
+): boolean {
+  return STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS.some((key) => Object.hasOwn(props, key));
+}
+
+function hasImageAuxiliaryStudioCrdtReferenceProps(
+  props: Record<string, unknown>
+): boolean {
+  const keys = Object.keys(props);
+  return (
+    props.elementType === "image" &&
+    keys.length > 1 &&
+    keys.every((key) => (
+      key === "elementType" ||
+      (STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS as readonly string[]).includes(key)
+    )) &&
+    isStudioFilterMaskReferenceProps(studioFilterMaskReferenceProps(props))
+  );
+}
+
+function hasTopologyStudioCrdtReferenceProps(
+  props: Record<string, unknown>
+): boolean {
+  return hasLegacyStudioCrdtReferenceProps(props) ||
+    hasImageAuxiliaryStudioCrdtReferenceProps(props);
+}
+
 function hasValidStudioWorkAssetReferenceProps(
   id: string,
   props: Record<string, unknown>
 ): boolean {
-  if (hasLegacyStudioCrdtReferenceProps(props)) return true;
-  const { elementType, ...editProps } = props;
+  if (hasTopologyStudioCrdtReferenceProps(props)) return true;
+  const { elementType, ...referenceProps } = props;
+  const filterMaskProps = studioFilterMaskReferenceProps(props);
+  if (
+    hasStudioFilterMaskReferenceState(props) &&
+    (
+      elementType !== "image" ||
+      !isStudioFilterMaskReferenceProps(filterMaskProps)
+    )
+  ) {
+    return false;
+  }
+  const editProps: Record<string, unknown> = { ...referenceProps };
+  for (const key of STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS) delete editProps[key];
   return typeof elementType === "string" && STUDIO_WORK_ASSET_TYPE_SET.has(elementType) &&
     StudioWorkAssetElementSchema.safeParse({
       id,
@@ -883,7 +945,7 @@ export function snapshotStudioWorkAssetReferences(
     if (!isValidLegacyStudioCrdtReferenceType(elementType)) continue;
     identities.set(id, elementType);
     if (
-      hasLegacyStudioCrdtReferenceProps(props) ||
+      hasTopologyStudioCrdtReferenceProps(props) ||
       !STUDIO_WORK_ASSET_TYPE_SET.has(elementType)
     ) continue;
     const reference = {
@@ -1327,6 +1389,48 @@ function validateTrackedLayerGroupRoots(doc: Y.Doc): boolean {
       !validateLayerGroupRoot(identity, value)
     ) {
       return false;
+    }
+  }
+  return true;
+}
+
+function hasValidStudioFilterMaskSurfaceReferences(
+  doc: Y.Doc,
+  surfaces: ReadonlyMap<string, unknown>
+): boolean {
+  const index = materializeExistingMapRoot(doc, STUDIO_CRDT_SCENE_INDEX_ROOT);
+  if (index === undefined) return true;
+  if (!(index instanceof Y.Map)) return false;
+  const metadataKeys = new Set(["id", "pageId", "layerId", "payloadVersion", "type", "deleted"]);
+  for (const [id, tracked] of index) {
+    if (tracked !== true || !isBoundedStudioCrdtId(id)) return false;
+    const record = materializeExistingMapRoot(
+      doc,
+      `${STUDIO_CRDT_SCENE_ROOT_PREFIX}${encodeURIComponent(id)}`
+    );
+    if (!(record instanceof Y.Map) || record.get("type") !== "reference") continue;
+    const props = readReservedProperties(
+      record,
+      STUDIO_CRDT_SCENE_KEYS_BY_TYPE.reference,
+      metadataKeys
+    );
+    if (!props) return false;
+    const candidates = new Set<unknown>();
+    if (Object.hasOwn(props, "filterMaskSurfaceId")) {
+      candidates.add(props.filterMaskSurfaceId);
+    }
+    for (const [key, value] of record) {
+      if (
+        key === "base:filterMaskSurfaceId" ||
+        key === "prop:filterMaskSurfaceId"
+      ) {
+        candidates.add(value);
+      }
+    }
+    for (const candidate of candidates) {
+      if (!isStudioFilterMaskSurfaceId(candidate)) return false;
+      const surface = surfaces.get(candidate);
+      if (!isStudioFilterMaskSurfaceSpec(surface)) return false;
     }
   }
   return true;
@@ -1850,5 +1954,11 @@ export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
       }
     }
   }
-  return validateStudioCrdtDeletionRoots(doc) && hasValidStudioCrdtRasterDocument(doc);
+  if (!validateStudioCrdtDeletionRoots(doc)) return false;
+  try {
+    const raster = readStudioCrdtRasterDocument(doc);
+    return hasValidStudioFilterMaskSurfaceReferences(doc, raster.surfaces);
+  } catch {
+    return false;
+  }
 }

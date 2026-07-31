@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS "creator_draft_collaboration_room" (
     UNIQUE ("ownerUserId", "draftDocumentId"),
   CONSTRAINT "creator_draft_collaboration_room_work_unique"
     UNIQUE ("workId"),
-  CONSTRAINT "creator_draft_collaboration_room_owner_provision_mutation_unique"
+  CONSTRAINT "creator_draft_room_owner_provision_mutation_unique"
     UNIQUE ("ownerUserId", "provisionMutationId"),
   CONSTRAINT "creator_draft_collaboration_room_room_id_check"
     CHECK ("roomId" ~ '^draft-room_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS "creator_draft_collaboration_room" (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "creator_draft_collaboration_room_owner_promotion_mutation_unique"
+CREATE UNIQUE INDEX IF NOT EXISTS "creator_draft_room_owner_promotion_mutation_unique"
   ON "creator_draft_collaboration_room" ("ownerUserId", "promotionMutationId")
   WHERE "promotionMutationId" IS NOT NULL;
 

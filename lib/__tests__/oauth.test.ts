@@ -1,6 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { issueState, verifyState, isOAuthProvider, providerMode, listAuthProviders } from "../server/oauth";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("OAuth signed state (CSRF 방어)", () => {
   it("발급한 state는 같은 provider로 검증 통과", () => {
@@ -24,6 +28,34 @@ describe("OAuth signed state (CSRF 방어)", () => {
     const s = issueState("google");
     expect(verifyState("google", s, 0)).toBe(false); // maxAge 0 → 즉시 만료
   });
+
+  it("운영에서는 누락·약함·공백 패딩 state HMAC 비밀을 거부한다", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_STATE_SECRET", "");
+    expect(() => issueState("google")).toThrow(
+      /AUTH_STATE_SECRET must be set/u,
+    );
+
+    vi.stubEnv("AUTH_STATE_SECRET", "short");
+    expect(() => issueState("google")).toThrow(/32 UTF-8 bytes/u);
+
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      " production-state-secret-with-at-least-32-bytes ",
+    );
+    expect(() => issueState("google")).toThrow(/unpadded secret/u);
+  });
+
+  it("운영의 강한 state HMAC 비밀은 인스턴스 독립 검증 계약을 유지한다", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "production-state-secret-with-at-least-32-bytes",
+    );
+
+    const state = issueState("google");
+    expect(verifyState("google", state)).toBe(true);
+  });
 });
 
 describe("OAuth provider 유틸", () => {
@@ -34,13 +66,13 @@ describe("OAuth provider 유틸", () => {
     expect(isOAuthProvider("")).toBe(false);
   });
 
-  it("구글은 항상 노출(키 미설정 시 데모), 카카오·네이버는 기본 비노출", () => {
+  it("구글은 항상 노출하되 키 미설정 시 비활성화하고, 카카오·네이버는 기본 비노출", () => {
     // 카카오·네이버는 데모 모드지만 관리자 토글 기본 off라 목록엔 구글만.
-    expect(providerMode("google")).toBe("demo");
+    expect(providerMode("google")).toBe("disabled");
     expect(providerMode("kakao")).toBe("demo");
     expect(providerMode("naver")).toBe("demo");
     const list = listAuthProviders();
-    expect(list.google.mode).toBe("demo");
+    expect(list.google.mode).toBe("disabled");
     expect(list.kakao).toBeUndefined();
     expect(list.naver).toBeUndefined();
     // 관리자에서 켜면 노출(데모)

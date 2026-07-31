@@ -8,6 +8,7 @@ import {
   LifecycleSafePostgresPubSub,
   STUDIO_LIVE_REQUIRED_NAMESPACES,
   createLifecycleSafeStudioLivePostgresTransport,
+  type StudioLivePostgresListenerStatusProvider,
 } from "./studio-postgres-pubsub";
 
 import type { Pool, PoolClient } from "pg";
@@ -43,6 +44,8 @@ function pubSub(
     inlineBinaryPayloads?: boolean;
     queryTimeoutMs?: number;
     reconnectDelayMs?: number;
+    listenerReconnectGraceMs?: number;
+    now?: () => number;
     errorHandler?: (error: unknown, source: string) => void;
     isFromSelf?: (message: unknown) => boolean;
     onMessage?: (message: unknown) => void;
@@ -58,6 +61,9 @@ function pubSub(
       cleanupIntervalMs: 60_000,
       queryTimeoutMs: overrides.queryTimeoutMs ?? 100,
       reconnectDelayMs: overrides.reconnectDelayMs ?? 1,
+      listenerReconnectGraceMs:
+        overrides.listenerReconnectGraceMs ?? 100,
+      now: overrides.now ?? Date.now,
       errorHandler: overrides.errorHandler ?? vi.fn(),
     },
     overrides.isFromSelf ?? (() => false),
@@ -75,6 +81,15 @@ async function waitFor(predicate: () => boolean, timeoutMs = 250): Promise<void>
 }
 
 describe("Lifecycle-safe Studio PostgreSQL PubSub", () => {
+  it.each([0, 60_001, Number.NaN])(
+    "rejects an invalid listener reconnect grace: %s",
+    (listenerReconnectGraceMs) => {
+      expect(() =>
+        pubSub({} as Pool, { listenerReconnectGraceMs }),
+      ).toThrow(/reconnect grace must be between 1 and 60000 ms/u);
+    },
+  );
+
   it("provides a constructible adapter that a real Socket.IO Server can install", async () => {
     const client = clientHarness();
     const pool = {
@@ -94,10 +109,21 @@ describe("Lifecycle-safe Studio PostgreSQL PubSub", () => {
     const studioAdapter = io.of("/studio-live").adapter;
     expect(rootAdapter).toBeInstanceOf(transport.adapterConstructor);
     expect(studioAdapter).toBeInstanceOf(transport.adapterConstructor);
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "active"
+    );
+    expect(
+      (
+        studioAdapter as unknown as StudioLivePostgresListenerStatusProvider
+      ).getStudioLivePostgresListenerStatus(),
+    ).toBe("active");
 
     rootAdapter.close();
     studioAdapter.close();
     await transport.close();
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "closed"
+    );
     expect(client.release).toHaveBeenCalledOnce();
   });
 
@@ -229,6 +255,62 @@ describe("Lifecycle-safe Studio PostgreSQL PubSub", () => {
     ]);
     await transport.close();
     expect(second.release).toHaveBeenCalledWith(undefined);
+  });
+
+  it("reports active, bounded reconnect grace, stale reconnect, recovered, and closed states", async () => {
+    let now = 1_000;
+    const first = clientHarness();
+    const second = clientHarness();
+    const reconnectClient = deferred<PoolClient>();
+    const pool = {
+      connect: vi
+        .fn()
+        .mockResolvedValueOnce(first.client)
+        .mockImplementationOnce(() => reconnectClient.promise),
+      query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
+    } as unknown as Pool;
+    const transport = pubSub(pool, {
+      listenerReconnectGraceMs: 50,
+      now: () => now,
+      reconnectDelayMs: 1,
+    });
+
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "stale"
+    );
+    await transport.start(STUDIO_LIVE_REQUIRED_NAMESPACES);
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "active"
+    );
+
+    first.events.emit(
+      "error",
+      new Error("listener connection lost"),
+    );
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "reconnecting"
+    );
+    now += 50;
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "reconnecting"
+    );
+    now += 1;
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "stale"
+    );
+
+    await waitFor(() => pool.connect.mock.calls.length === 2);
+    reconnectClient.resolve(second.client);
+    await waitFor(
+      () =>
+        transport.getStudioLivePostgresListenerStatus() ===
+        "active",
+    );
+
+    await transport.close();
+    expect(transport.getStudioLivePostgresListenerStatus()).toBe(
+      "closed"
+    );
   });
 
   it("publishes attachment headers with a namespace so receiving nodes can hydrate them", async () => {

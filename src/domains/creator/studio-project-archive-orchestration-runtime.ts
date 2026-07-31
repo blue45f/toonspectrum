@@ -1,6 +1,7 @@
 import { sanitizeStudioPublishFileStem } from "./studio-publish-package";
 
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
+import type { StudioFilterMaskSurfaceArchiveDependencies } from "./studio-filter-mask-surface-archive";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { StudioProjectFile } from "./studio-project-file";
 import type { StudioProjectSnapshot } from "./studio-project-snapshot";
@@ -35,6 +36,12 @@ export interface StudioProjectArchiveOrchestrationInput {
     MutableRefObject<StudioProjectDocumentSessionProvenance | null>;
   readonly ensureSharedDocumentAvailableForExport: () => boolean;
   readonly currentStudioProjectSnapshot: () => StudioProjectSnapshot;
+  /**
+   * Work-scoped raster reader/replay boundary. It is optional only for projects without a surface
+   * ref; an archive containing one fails closed until the owning shared document supplies it.
+   */
+  readonly filterMaskSurfaceArchiveDependencies?:
+    StudioFilterMaskSurfaceArchiveDependencies;
   readonly loadStudioReleaseScheduleRuntime:
     () => Promise<StudioReleaseScheduleRuntime>;
   readonly normalizeStudioPublicationAnalyticsDeferred:
@@ -86,6 +93,7 @@ export function createStudioProjectArchiveOrchestration({
   projectDocumentSessionRef,
   ensureSharedDocumentAvailableForExport,
   currentStudioProjectSnapshot,
+  filterMaskSurfaceArchiveDependencies,
   loadStudioReleaseScheduleRuntime,
   normalizeStudioPublicationAnalyticsDeferred,
   canApplyStudioMutation,
@@ -171,8 +179,10 @@ export function createStudioProjectArchiveOrchestration({
     if (projectArchiveBusy) return;
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
+    let filterMaskArchiveController: AbortController | null = null;
     try {
-      const project = currentStudioProjectSnapshot();
+      const exportGeneration = revisionProjectGenerationRef.current;
+      const sourceProject = currentStudioProjectSnapshot();
       const [
         { buildStudioProjectArchiveWithVerifiedBg3dModels },
         { prepareStudioReferenceBoardArchiveExport },
@@ -181,14 +191,44 @@ export function createStudioProjectArchiveOrchestration({
           prepareStudioVrmTexturePaintProjectArchiveExport,
           presentStudioVrmTexturePaintProjectArchiveExport,
         },
+        {
+          hasStudioFilterMaskSurfaceArchiveReferences,
+          prepareStudioFilterMaskSurfaceArchiveExport,
+        },
         { downloadBlob },
       ] = await Promise.all([
         import("./studio-bg3d-project-library"),
         import("./studio-reference-board-archive"),
         import("./studio-vrm-project-library"),
         import("./studio-vrm-texture-paint-project-library"),
+        import("./studio-filter-mask-surface-archive"),
         import("./studio-export"),
       ]);
+      let project: unknown = sourceProject;
+      if (hasStudioFilterMaskSurfaceArchiveReferences(sourceProject)) {
+        if (!workId || !filterMaskSurfaceArchiveDependencies) {
+          throw new Error(
+            "공동 작품의 필터 마스크 원본을 확인할 수 없어 portable archive 내보내기를 중단했습니다."
+          );
+        }
+        filterMaskArchiveController = new AbortController();
+        const filterMaskArchive = await prepareStudioFilterMaskSurfaceArchiveExport({
+          project: sourceProject,
+          workId,
+          generation: exportGeneration,
+          signal: filterMaskArchiveController.signal,
+          limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+          isCurrent: ({ workId: guardedWorkId, generation }) => (
+            guardedWorkId === workId
+            && generation === exportGeneration
+            && revisionProjectGenerationRef.current === exportGeneration
+          ),
+        }, filterMaskSurfaceArchiveDependencies);
+        project = filterMaskArchive.project;
+      }
+      if (revisionProjectGenerationRef.current !== exportGeneration) {
+        throw new Error("프로젝트가 변경되어 오래된 archive 내보내기를 취소했습니다.");
+      }
       const referenceArchive = await prepareStudioReferenceBoardArchiveExport(project);
       const vrmArchive = await prepareStudioVrmProjectArchiveExport(project);
       const texturePaintAttachments =
@@ -207,6 +247,9 @@ export function createStudioProjectArchiveOrchestration({
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
+      if (revisionProjectGenerationRef.current !== exportGeneration) {
+        throw new Error("프로젝트가 변경되어 오래된 archive 다운로드를 취소했습니다.");
+      }
       const warningCount = result.diagnostics.filter(
         (item) => item.severity === "warning"
       ).length;
@@ -230,6 +273,7 @@ export function createStudioProjectArchiveOrchestration({
       setProjectArchiveStatus({ tone: "bad", text: message });
       setError(message);
     } finally {
+      filterMaskArchiveController?.abort();
       setProjectArchiveBusy(false);
     }
   }

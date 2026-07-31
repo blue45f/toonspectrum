@@ -103,7 +103,8 @@ describe("studio live collaboration protocol", () => {
     expect(parse(value)).not.toBeNull();
     expect(parse({ ...value, payload: { ...value.payload, x: -0.01 } })).toBeNull();
     expect(parse({ ...value, payload: { ...value.payload, y: 1.01 } })).toBeNull();
-    expect(parse({ ...value, payload: { ...value.payload, tool: "x".repeat(49) } })).toBeNull();
+    expect(parse({ ...value, payload: { ...value.payload, tool: "x".repeat(64) } })).not.toBeNull();
+    expect(parse({ ...value, payload: { ...value.payload, tool: "x".repeat(65) } })).toBeNull();
   });
 
   it("accepts only targeted request/SDP/ICE messages addressed to this session", () => {

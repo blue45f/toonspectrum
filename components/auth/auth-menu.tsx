@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { AuthModal } from "./auth-modal";
 
@@ -37,6 +37,7 @@ export function AuthMenu({
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(defaultOpen);
   const [isAdmin, setIsAdmin] = useState(false);
+  const loginTriggerRef = useRef<HTMLButtonElement>(null);
   const t = useT();
   const uid = session?.user?.id;
 
@@ -68,6 +69,7 @@ export function AuthMenu({
     return (
       <>
         <button
+          ref={loginTriggerRef}
           onClick={() => setModal(true)}
           aria-label={t("nav.login")}
           className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
@@ -77,7 +79,12 @@ export function AuthMenu({
             {keepInlineText(t("nav.login"))}
           </span>
         </button>
-        {modal && <AuthModal onClose={() => setModal(false)} />}
+        {modal && (
+          <AuthModal
+            onClose={() => setModal(false)}
+            returnFocusRef={loginTriggerRef}
+          />
+        )}
       </>
     );
   }

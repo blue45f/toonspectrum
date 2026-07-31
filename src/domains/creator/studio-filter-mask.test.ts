@@ -15,6 +15,9 @@ import {
   type FilterMaskLike,
 } from "./studio-filter-mask";
 
+const FILTER_MASK_SURFACE_ID =
+  "filter-mask:v1:10000000-0000-4000-8000-000000000001" as const;
+
 // ---------------------------------------------------------------------------
 // 테스트 픽스처 — RGBA 버퍼/커버리지 헬퍼(순수 모듈 자체 픽스처, 파일 간 import 없음 —
 // studio-layer-mask.test.ts와 동일 컨벤션).
@@ -73,6 +76,17 @@ describe("hasFilterMask", () => {
     expect(hasFilterMask({ type: "image" })).toBe(false);
     expect(hasFilterMask({ type: "image", filterMaskSrc: "" })).toBe(false);
   });
+
+  it("exact immutable surface ID도 마스크 존재로 판정하고 malformed ID는 거부한다", () => {
+    expect(hasFilterMask({
+      type: "image",
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+    })).toBe(true);
+    expect(hasFilterMask({
+      type: "image",
+      filterMaskSurfaceId: "data:image/png;base64,AA==",
+    })).toBe(false);
+  });
 });
 
 describe("shouldApplyFilterMask", () => {
@@ -99,6 +113,13 @@ describe("shouldApplyFilterMask", () => {
   it("필드 미설정 문서(기존 문서)는 항상 false — 현행 전체 적용과 동일", () => {
     expect(shouldApplyFilterMask({ type: "image" })).toBe(false);
   });
+
+  it("image + immutable surface ID를 적용 대상으로 판정한다", () => {
+    expect(shouldApplyFilterMask({
+      type: "image",
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+    })).toBe(true);
+  });
 });
 
 describe("filterMaskRenderKey", () => {
@@ -109,6 +130,14 @@ describe("filterMaskRenderKey", () => {
       filterMaskRenderKey({ type: "image", filterMaskSrc: "data:x", filterMaskEnabled: false })
     ).toBe("");
     expect(filterMaskRenderKey({ type: "text", filterMaskSrc: "data:x" })).toBe("");
+  });
+
+  it("immutable surface ID를 inline projection보다 우선하는 안정적인 정체성으로 사용한다", () => {
+    expect(filterMaskRenderKey({
+      type: "image",
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskSrc: "blob:https://example.test/transient",
+    })).toBe(FILTER_MASK_SURFACE_ID);
   });
 });
 

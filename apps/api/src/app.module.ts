@@ -3,6 +3,7 @@ import { APP_FILTER } from "@nestjs/core";
 import { LoggerModule } from "nestjs-pino";
 
 import { AllExceptionsFilter } from "./common/all-exceptions.filter";
+import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities/backend-capabilities.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
@@ -11,9 +12,14 @@ import { CreatorModule } from "./modules/creator/creator.module";
 import { CreatorMarketplaceModule } from "./modules/creator-marketplace/creator-marketplace.module";
 import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
+import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { MeModule } from "./modules/me/me.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
+import { createStudioRealtimeTicketDynamicModule } from "./modules/studio-realtime-ticket/studio-realtime-ticket.integration";
+
+const studioRealtimeTicketModule =
+  createStudioRealtimeTicketDynamicModule(process.env);
 
 @Module({
   imports: [
@@ -22,9 +28,15 @@ import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
         // pino-pretty 는 개발에서만 — 프로덕션은 JSON 라인(파싱/수집 친화).
         transport: process.env.NODE_ENV !== "production" ? { target: "pino-pretty" } : undefined,
         // 인증/세션 헤더는 로그에서 가린다(자격증명 유출 방지).
-        redact: ["req.headers.authorization", "req.headers.cookie"],
+        redact: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "req.headers['x-user-id']",
+          "req.headers['sec-websocket-protocol']",
+        ],
       },
     }),
+    BackendCapabilitiesModule,
     AuthModule,
     MeModule,
     CommunityModule,
@@ -33,6 +45,10 @@ import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
     FeedbackModule,
     CreatorMarketplaceModule,
     CreatorModule,
+    ...(studioRealtimeTicketModule
+      ? [studioRealtimeTicketModule]
+      : []),
+    HealthModule,
     LegalModule,
     FortuneModule,
     StudioAiModule,

@@ -8,6 +8,7 @@ import {
   createStudioLivePostgresIoAdapter,
 } from "./studio-postgres-io.adapter";
 
+import type { StudioLivePostgresListenerStatusProvider } from "./studio-postgres-pubsub";
 import type { INestApplicationContext } from "@nestjs/common";
 import type { AddressInfo } from "node:net";
 import type { Namespace, Server as SocketIoServer } from "socket.io";
@@ -154,6 +155,31 @@ describeWithDirectPostgres("Studio live PostgreSQL adapter two-node integration"
     if (adapterB && ioB) closing.push(adapterB.close(ioB));
     else if (adapterB) closing.push(adapterB.disposePool());
     await Promise.all(closing);
+    expect(adapterA?.getStudioLivePostgresListenerStatus()).toBe(
+      "closed"
+    );
+    expect(adapterB?.getStudioLivePostgresListenerStatus()).toBe(
+      "closed"
+    );
+  });
+
+  it("reports active real LISTEN clients through the IoAdapter and namespace contracts", () => {
+    expect(adapterA?.getStudioLivePostgresListenerStatus()).toBe(
+      "active"
+    );
+    expect(adapterB?.getStudioLivePostgresListenerStatus()).toBe(
+      "active"
+    );
+    expect(
+      (
+        namespaceA.adapter as unknown as StudioLivePostgresListenerStatusProvider
+      ).getStudioLivePostgresListenerStatus(),
+    ).toBe("active");
+    expect(
+      (
+        namespaceB.adapter as unknown as StudioLivePostgresListenerStatusProvider
+      ).getStudioLivePostgresListenerStatus(),
+    ).toBe("active");
   });
 
   it("broadcasts small and attachment-backed CRDT packets and supports discovery/RPC", async () => {

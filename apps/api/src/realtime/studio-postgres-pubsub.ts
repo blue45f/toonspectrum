@@ -4,6 +4,7 @@ import { PostgresAdapter } from "@socket.io/postgres-adapter";
 import type { Pool, PoolClient, QueryConfig } from "pg";
 
 export const STUDIO_LIVE_REQUIRED_NAMESPACES = ["/", "/studio-live"] as const;
+export const STUDIO_LIVE_POSTGRES_LISTENER_RECONNECT_GRACE_MS = 20_000;
 
 const POSTGRES_CHANNEL_IDENTIFIER_MAX_BYTES = 63;
 const DEFAULT_PAYLOAD_THRESHOLD_BYTES = 8_000;
@@ -44,7 +45,19 @@ interface ActiveListener {
 type SocketIoAdapterConstructor = ((namespace: unknown) => PostgresAdapter) &
   (new (namespace: unknown) => PostgresAdapter);
 
-export interface StudioLivePostgresClusterTransport {
+export type StudioLivePostgresListenerLifecycleStatus =
+  | "active"
+  | "reconnecting"
+  | "stale"
+  | "closed";
+
+export interface StudioLivePostgresListenerStatusProvider {
+  getStudioLivePostgresListenerStatus(): StudioLivePostgresListenerLifecycleStatus;
+}
+
+export interface StudioLivePostgresClusterTransport
+  extends StudioLivePostgresListenerStatusProvider
+{
   readonly adapterConstructor: SocketIoAdapterConstructor;
   close(): Promise<void>;
 }
@@ -62,6 +75,8 @@ export interface StudioLivePostgresClusterTransportOptions {
   readonly cleanupIntervalMs?: number;
   readonly queryTimeoutMs?: number;
   readonly reconnectDelayMs?: number;
+  readonly listenerReconnectGraceMs?: number;
+  readonly now?: () => number;
   readonly requiredNamespaces?: readonly string[];
 }
 
@@ -191,7 +206,9 @@ function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: strin
   });
 }
 
-export class LifecycleSafePostgresPubSub {
+export class LifecycleSafePostgresPubSub
+  implements StudioLivePostgresListenerStatusProvider
+{
   private readonly channels = new Set<string>();
   private readonly operations = new Set<Promise<unknown>>();
   private readonly pendingAcquisitions = new Set<Promise<void>>();
@@ -200,6 +217,7 @@ export class LifecycleSafePostgresPubSub {
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closePromise: Promise<void> | null = null;
+  private listenerUnavailableSinceEpochMs: number | null = null;
   private closed = false;
   private started = false;
 
@@ -215,11 +233,23 @@ export class LifecycleSafePostgresPubSub {
         | "cleanupIntervalMs"
         | "queryTimeoutMs"
         | "reconnectDelayMs"
+        | "listenerReconnectGraceMs"
+        | "now"
       >
     > & { readonly errorHandler: ErrorHandler },
     private readonly isFromSelf: (message: ClusterEnvelope) => boolean,
     private readonly onMessage: (message: ClusterEnvelope) => void
-  ) {}
+  ) {
+    if (
+      !Number.isSafeInteger(options.listenerReconnectGraceMs) ||
+      options.listenerReconnectGraceMs < 1 ||
+      options.listenerReconnectGraceMs > 60_000
+    ) {
+      throw new Error(
+        "Studio live PostgreSQL listener reconnect grace must be between 1 and 60000 ms"
+      );
+    }
+  }
 
   async start(namespaces: readonly string[]): Promise<void> {
     if (this.started) return;
@@ -265,6 +295,19 @@ export class LifecycleSafePostgresPubSub {
       throw error;
     });
     return this.track(operation);
+  }
+
+  getStudioLivePostgresListenerStatus(): StudioLivePostgresListenerLifecycleStatus {
+    if (this.closed) return "closed";
+    if (this.activeListener) return "active";
+    const unavailableSince = this.listenerUnavailableSinceEpochMs;
+    if (unavailableSince === null) return "stale";
+    const elapsedMs = this.options.now() - unavailableSince;
+    return Number.isFinite(elapsedMs) &&
+      elapsedMs >= 0 &&
+      elapsedMs <= this.options.listenerReconnectGraceMs
+      ? "reconnecting"
+      : "stale";
   }
 
   close(): Promise<void> {
@@ -344,7 +387,12 @@ export class LifecycleSafePostgresPubSub {
         if (failed) return;
         failed = true;
         if (listener) this.detach(listener);
-        if (this.activeListener === listener) this.activeListener = null;
+        if (this.activeListener === listener) {
+          this.activeListener = null;
+          // Anchor grace exactly once when a known-active listener is lost. Failed reconnect
+          // attempts must not advance this timestamp and keep a dead node ready indefinitely.
+          this.listenerUnavailableSinceEpochMs = this.options.now();
+        }
         this.release(client!, error);
         initializationFailureReject?.(error);
         if (this.started && !this.closed) this.scheduleReconnect(error);
@@ -374,6 +422,7 @@ export class LifecycleSafePostgresPubSub {
         return;
       }
       this.activeListener = listener;
+      this.listenerUnavailableSinceEpochMs = null;
     } catch (error) {
       const failure = asError(error, "PostgreSQL listener initialization failed");
       if (listener) this.detach(listener);
@@ -619,6 +668,10 @@ export async function createLifecycleSafeStudioLivePostgresTransport(
       cleanupIntervalMs: options.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS,
       queryTimeoutMs: options.queryTimeoutMs ?? DEFAULT_QUERY_TIMEOUT_MS,
       reconnectDelayMs: options.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS,
+      listenerReconnectGraceMs:
+        options.listenerReconnectGraceMs ??
+        STUDIO_LIVE_POSTGRES_LISTENER_RECONNECT_GRACE_MS,
+      now: options.now ?? Date.now,
       errorHandler,
     },
     (message) => namespaces.get(message.nsp)?.uid === message.uid,
@@ -634,7 +687,10 @@ export async function createLifecycleSafeStudioLivePostgresTransport(
   // Socket.IO installs adapters with `new (server.adapter())(namespace)`. Keep this as a real class;
   // an arrow-function factory type-checks structurally but fails at runtime because it is not
   // constructible.
-  class StudioLiveNamespacePostgresAdapter extends PostgresAdapter {
+  class StudioLiveNamespacePostgresAdapter
+    extends PostgresAdapter
+    implements StudioLivePostgresListenerStatusProvider
+  {
     constructor(namespace: unknown) {
       const runtimeNamespace = namespace as SocketIoNamespaceLike;
       super(runtimeNamespace, {}, transport as never);
@@ -649,6 +705,10 @@ export async function createLifecycleSafeStudioLivePostgresTransport(
         defaultClose();
       };
     }
+
+    getStudioLivePostgresListenerStatus(): StudioLivePostgresListenerLifecycleStatus {
+      return transport.getStudioLivePostgresListenerStatus();
+    }
   }
 
   return {
@@ -657,6 +717,8 @@ export async function createLifecycleSafeStudioLivePostgresTransport(
     // both sides of that upstream typing contract for Server#adapter.
     adapterConstructor:
       StudioLiveNamespacePostgresAdapter as unknown as SocketIoAdapterConstructor,
+    getStudioLivePostgresListenerStatus: () =>
+      transport.getStudioLivePostgresListenerStatus(),
     close: () => transport.close(),
   };
 }

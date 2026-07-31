@@ -15,6 +15,7 @@ import {
   resolveStudioLiveClusterAdapterConfig,
 } from "./studio-postgres-io.adapter";
 
+import type { StudioLivePostgresListenerLifecycleStatus } from "./studio-postgres-pubsub";
 import type { INestApplicationContext } from "@nestjs/common";
 
 const DIRECT_URL = "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonspectrum?sslmode=require";
@@ -57,13 +58,17 @@ function clientHarness(query: ReturnType<typeof vi.fn>) {
   return { client, events, query, release };
 }
 
-function inertClusterTransport(close = vi.fn(async () => undefined)) {
+function inertClusterTransport(
+  close = vi.fn(async () => undefined),
+  status: StudioLivePostgresListenerLifecycleStatus = "active",
+) {
   class FakeAdapter {
     init(): void {}
     close(): void {}
   }
   return {
     adapterConstructor: FakeAdapter as never,
+    getStudioLivePostgresListenerStatus: () => status,
     close,
   };
 }
@@ -707,6 +712,9 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
     );
 
     expect(adapter).toBeInstanceOf(StudioLivePostgresIoAdapter);
+    expect(adapter?.getStudioLivePostgresListenerStatus()).toBe(
+      "active"
+    );
     expect(createPool).toHaveBeenCalledWith(
       expect.objectContaining({
         connectionString: NORMALIZED_DIRECT_URL,
@@ -852,6 +860,8 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
     });
     const transport = {
       adapterConstructor: FakeAdapter as never,
+      getStudioLivePostgresListenerStatus: () =>
+        "active" as const,
       close: transportClose,
     };
     const adapter = new StudioLivePostgresIoAdapter(

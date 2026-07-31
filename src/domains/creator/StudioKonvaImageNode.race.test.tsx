@@ -493,6 +493,23 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(konvaCapture.current?.brightness).toBeUndefined();
   });
 
+  it("keeps a durable mask reference fail-closed before its Blob projection is ready", async () => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSurfaceId: "filter-mask:v1:123e4567-e89b-42d3-a456-426614174000",
+    })));
+    const source = assignedImage("a.png");
+    await load(source);
+    await flushWorkerDebounce();
+
+    expect(imageHarness.assigned).toHaveLength(1);
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(konvaCapture.current?.brightness).toBeUndefined();
+  });
+
   it.each([
     ["decode throws", "throw"],
     ["coverage validation fails", "coverage"],

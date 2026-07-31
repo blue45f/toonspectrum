@@ -19,12 +19,12 @@ export const STUDIO_LIVE_LOCK_MAX_LEASE_MS = 30_000;
 
 const MAX_ID_LENGTH = 160;
 export const STUDIO_LIVE_DISPLAY_NAME_MAX_LENGTH = 80;
-const MAX_TOOL_LENGTH = 48;
+const MAX_TOOL_LENGTH = 64;
 export const STUDIO_LIVE_RESOURCE_MAX_LENGTH = 200;
 const MAX_SHARE_LABEL_LENGTH = 80;
 export const STUDIO_LIVE_SDP_MAX_LENGTH = 48 * 1024;
 export const STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH = 8 * 1024;
-export const STUDIO_LIVE_SDP_MID_MAX_LENGTH = 128;
+export const STUDIO_LIVE_SDP_MID_MAX_LENGTH = 256;
 export const STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH = 256;
 export const STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH = 500;
 
@@ -533,7 +533,11 @@ function isIcePayload(value: unknown): value is StudioLiveWebRtcIcePayload {
       "usernameFragment",
     ]) &&
     exactIdentifier(value.shareId, MAX_ID_LENGTH) &&
-    exactString(value.candidate, STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH) &&
+    exactString(
+      value.candidate,
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
+      true,
+    ) &&
     studioLiveStringFitsByteContract(
       value.candidate,
       STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH

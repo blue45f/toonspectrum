@@ -9,7 +9,10 @@
 | API | NestJS serverless | Vercel Functions | `api/index.js` → `apps/api/dist/.../serverless` |
 | DB | PostgreSQL | Neon 또는 호환 Postgres | 리뷰·인증·커뮤니티·ingest 폴백 |
 
-`render.yaml`은 장시간 상시구동 API를 다시 쓰고 싶을 때의 보존된 대안입니다. 현재 `vercel.json`은 Render 프록시가 아니라 Vercel 함수로 `/api/*`를 라우팅합니다.
+`render.yaml`은 Studio Socket.IO 연결을 검증하기 위한 별도 장기 실행 호스트 Blueprint입니다.
+`API_RUNTIME_ROLE=studio-live`는 health probe와 Socket.IO만 허용하므로 일반 HTTP API의 대체
+호스트가 아닙니다. 현재 `vercel.json`은 `/api/*`를 Vercel 함수로 라우팅하며 이 경계는
+Render를 사용해도 유지합니다.
 
 ## 0. 준비물
 
@@ -95,9 +98,18 @@ Google Identity Services의 승인된 JavaScript origin에는
 - 표지 프록시(`/api/cover?u=...`)가 이미지를 반환하거나 안전하게 폴백하는지 확인.
 - 로그인/리뷰/커뮤니티 기능이 DB 연결로 동작하는지 확인.
 
-## 6. Render 대안
+## 6. Studio realtime 호스트
 
-`render.yaml`은 장시간 상시구동 Nest API를 따로 배포하기 위한 보존된 Blueprint입니다. 이 경로를 쓰려면 `vercel.json`의 `/api/:path*` rewrite를 Render API URL로 바꾸거나 `VITE_API_BASE`/프록시 전략을 별도로 정해야 합니다. 현재 기본 배포와 자동 검증은 Vercel serverless 경로를 기준으로 합니다.
+`render.yaml`의 Nest 프로세스는 전체 모듈 그래프를 재사용하지만
+`API_RUNTIME_ROLE=studio-live`가 공개 표면을 다음으로 제한합니다.
+
+- `GET /api/health/live`, `GET /api/health/ready`: 운영 probe
+- `/socket.io`: Studio 실시간 협업 연결
+- 그 밖의 `/api/*`: 일반 API로 처리하지 않음
+
+따라서 `vercel.json`의 `/api/:path*` rewrite나 `VITE_API_BASE`를 Render origin으로 바꾸면
+안 됩니다. 검색·인증·ACL·리뷰·커뮤니티 등 일반 HTTP 요청은 계속 Vercel `/api/*`를 사용하고,
+프런트에는 Socket.IO 전용 `VITE_STUDIO_LIVE_ORIGIN`만 별도로 지정합니다.
 
 ### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
 
@@ -120,13 +132,93 @@ VITE_STUDIO_RASTER_CRDT_AUTO_PUBLICATION=verified-renderer-handoff-v1
 STUDIO_RASTER_ASSET_ADMISSION=verified-renderer-handoff-v1
 ```
 
-먼저 `0009_socket_io_postgres_adapter.sql`을 적용해야 합니다. PostgreSQL 모드는 listener와
-publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler` 호스트나 PgBouncer transaction
-endpoint는 사용할 수 없습니다. 원격/운영 URL은 `sslmode=require`, `verify-ca`, `verify-full` 중
-하나를 명시해야 하며 앞의 두 레거시 값도 현재의 인증서·호스트 검증 의미를 보존하도록
-`verify-full`로 정규화합니다. URL query는
-node-postgres 해석이 authority/credential/routing을 덮어쓰지 못하도록 소문자 `sslmode`와
-`channel_binding`만 각각 한 번 허용하며, 평문 연결은 production이 아닌 loopback 개발 DB에만
+프로세스를 트래픽에 연결하기 전에 numbered SQL migration 전체를
+`scripts/production-database-migrations.manifest` 순서로 적용해야 합니다. `0023`의
+`toonspectrum_ops.deployment_migration` 원장은 각 파일의 SHA-256 checksum과 적용 상태를 보존해
+이미 적용한 과거 constraint/index migration을 다음 release에서 다시 실행하지 않습니다. 운영 DB의
+기본 경로는
+[production-database-migrations.yml](.github/workflows/production-database-migrations.yml)
+수동 실행입니다. 저장소 `production-database` Environment에 required reviewer와
+`PRODUCTION_DATABASE_DIRECT_URL` secret, `PRODUCTION_RUNTIME_DATABASE_ROLE` variable을 설정하고,
+검토한 정확한 40자리 release SHA와 확인 문구를 입력합니다. direct URL의 사용자는 DDL 전용
+migrator이고 variable은 Vercel/Render 앱이 실제 사용하는 별도 최소권한 PostgreSQL role입니다.
+두 role이 같거나 runtime role이 migrator를 상속하면 runner가 DDL 전에 거부합니다. runtime
+role은 `LOGIN`, 현재 DB `CONNECT`, `public` schema `USAGE`가 있어야 하며 superuser/CREATEROLE이면
+안 됩니다. CREATEDB/REPLICATION/BYPASSRLS 같은 elevated role flag도 허용하지 않습니다.
+
+secret은 credentialed direct endpoint여야 하며 query에는
+`sslmode=verify-full&channel_binding=require`만 허용합니다. URL parser는 protocol·authority·
+canonical effective hostname을 확인하고, pooler/pgbouncer hostname 및 `host`, `hostaddr`,
+`service`, `port`, `user`, `dbname`, `options` 같은 libpq override를 거부합니다. DB secret은
+checkout/action이 아니라 URL 검증·migration·capability 검증 step에만 주입됩니다.
+runner는 runtime role에서 `toonspectrum_ops` schema와 ledger/lock table의 모든 권한을 회수하고,
+최종 verifier는 runtime role이 해당 객체의 owner가 아니며 `USAGE`/`CREATE` 및
+`SELECT`/`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER` 권한을 갖지 않는지
+구조적으로 재확인합니다.
+
+이 검사는 ops 원장을 앱에서 격리하는 release boundary이며 product DML 권한을 자동으로
+과다 부여하지 않습니다. 인프라 준비 단계에서 runtime role에 현재 API가 사용하는 public
+relation/sequence의 필요한 `SELECT`/`INSERT`/`UPDATE`/`DELETE`만 별도 GRANT하고, 실제 runtime
+`DATABASE_URL` 세션의 `SELECT current_user`가 `PRODUCTION_RUNTIME_DATABASE_ROLE`과 exact
+match하는지 required reviewer가 먼저 확인해야 합니다. dummy role 이름으로 ops ACL gate를
+대리 통과시키면 안 됩니다. 이어서 같은 runtime 연결로 `/api/health/ready`, 로그인, 저장, 협업,
+댓글, Marketplace publish canary를 통과시켜야 합니다. 이 identity+DML canary가 끝나지 않으면
+migration이 성공해도 runtime release는 승인하지 않습니다.
+
+workflow mode는 다음처럼 분리됩니다.
+
+- `adopt` + `ADOPT-TOONSPECTRUM-MIGRATION-HISTORY`: 기존 무원장 DB가 reviewed production
+  baseline인 0019까지 실제 도달했는지 relation·constraint/index·0017 cutover marker로 먼저
+  증명합니다. 증명된 0001~0019는 SQL을 재실행하지 않고 exact checksum과 `adopted` provenance를
+  기록하며, 0020~0022만 genuine pending으로 실행하고 0023 bootstrap을 기록합니다.
+- `apply` + `APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS`: 원장 이후 새 pending migration만
+  실행합니다. 과거 migration은 checksum만 확인하고 건너뜁니다.
+- `repair` + `REPAIR-TOONSPECTRUM-MIGRATION-STATE`: 원인을 확인한 운영자가 중단된
+  `applying`/`failed` 상태와 stale runner lock을 명시적으로 복구할 때만 사용합니다. 원장이
+  없거나 누락된 history/pending row에는 사용할 수 없으므로 adoption/apply의 우회 경로가
+  아닙니다. durable lock이 있으면 DB 원장에서 확인한 exact 64자리 `ownerToken`을
+  `stale_lock_owner_token` input으로 함께 전달해야 하며, DB 획득 시각이 60분 이상 지난 lock만
+  같은 token을 조건으로 원자적 compare-and-delete합니다. 신선한 lock이나 token 불일치는
+  fail-closed입니다.
+
+workflow는 production DDL concurrency를 1로 고정하고 manifest가 모든 numbered migration과
+정확히 일치하는지 확인합니다. 끝에서는 현재 API health-readiness가 요구하는 relation 전체,
+comment reanchor, Marketplace generated search/GIN opclass, `pg_trgm`, `0017` cutover marker,
+manifest checksum 원장과 runner-lock 해제를 구조적으로 검증합니다. 이미 provision된 운영 DB
+upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 production DB bootstrap은 별도
+승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
+`drizzle-kit push`를 실행하지 않습니다.
+
+운영 migration release 순서는 다음과 같습니다.
+
+1. reviewed release commit SHA를 확정합니다. Render는 `autoDeployTrigger: off`를 유지합니다.
+   Vercel production build는 `scripts/vercel-production-release-gate.mjs`가
+   `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 `VERCEL_GIT_COMMIT_SHA`의 exact match 없이는
+   취소합니다.
+2. 기존 DB upgrade라면 현재 Studio writer를 모두 drain하고 이전 binary가 새 mutation을 받지
+   않는지 확인합니다. 특히 `0017` 최초 cutover와 최초 `adopt`에는 이 단계가 필수입니다.
+3. workflow에서 exact release SHA가 `origin/main`의 ancestor인지 확인하고
+   `NO-STUDIO-WRITERS`를 입력합니다. 최초 원장 채택은 `adopt`, 이후는 `apply`를 선택합니다.
+   base schema가 완전히 provision되지 않은 DB는 거부되며 이 workflow를 새 DB bootstrap 수단으로
+   사용하지 않습니다.
+4. migration과 full capability verification이 성공한 뒤 Cloudflare Worker·Render realtime canary를
+   같은 SHA 기준으로 완료합니다.
+5. Vercel production 환경의 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`를 exact SHA로 설정하고 같은
+   commit을 수동 production redeploy합니다. 환경변수 변경은 새 deployment에만 반영되므로 기존
+   deployment 재사용으로 끝내면 안 됩니다.
+6. 다음 commit은 approved SHA와 달라 production build gate에서 다시 취소됩니다. 새 release마다
+   DB/realtime canary 후 승인 SHA를 회전하며 wildcard나 빈 값으로 gate를 우회하지 않습니다.
+
+`vercel.json`의 repository gate와 Render의 수동 release 설정을 제거하면 Vercel Git Integration이
+database workflow 완료를 기다리지 않고 새 runtime을 먼저 띄울 수 있습니다. 따라서 gate 환경변수
+미설정/불일치가 build 진행으로 해석되거나 dashboard의 Ignored Build Step을 우회하도록 바꾸는 것은
+릴리스 차단 사유입니다.
+
+PostgreSQL adapter는 listener와 publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler`
+호스트나 PgBouncer transaction endpoint는 사용할 수 없습니다. 원격/운영 URL은
+`sslmode=verify-full`과 `channel_binding=require`를 각각 정확히 한 번 명시해야 합니다. URL
+query는 node-postgres/libpq 해석이 authority·credential·routing을 덮어쓰지 못하도록 이 두 키
+외에는 허용하지 않으며, 평문 연결은 production이 아닌 명시적 loopback 테스트 모드에만
 허용됩니다. 부팅
 사전검사는 별도 세션의 nonce `pg_notify`가 실제 listener에
 도착하는지, attachment 임시 행의 `INSERT → SELECT(bytea) → DELETE` 권한과 롤백 정리를 확인한 뒤에만
@@ -143,3 +235,39 @@ PubSub listener를 닫은 다음 pool을 닫습니다. 장기 실행 서버에�
 자동 타일 게시가 실행되지 않으며 기존 Yjs 벡터 원본이 계속 화면·내보내기의 권위가 됩니다. 활성화한
 배포에서는 먼저 실제 PostgreSQL migration과 래스터 에셋 업로드 권한을 확인하고, 두 브라우저에서
 동일 획의 `append → broadcast → replay → handoff`와 스크롤·내보내기 즉시 벡터 복구를 점검하세요.
+
+### Render 무료 Blueprint와 운영 승격 게이트
+
+현재 `render.yaml`의 `plan: free`는 미리보기·저비용 검증 전용입니다. Render 무료 web service는
+production 용도가 아니며 다음 제약이 Studio realtime authority와 맞지 않습니다
+([Render Free 공식 문서](https://render.com/docs/free)).
+
+- inbound HTTP 요청이나 기존 WebSocket의 메시지가 15분 동안 없으면 spin down하고, 다음 요청의
+  cold start는 약 1분 걸릴 수 있습니다.
+- workspace 전체에서 월 750 free instance-hours를 소진하면 다음 달까지 무료 서비스가
+  suspend될 수 있습니다.
+- 단일 인스턴스만 허용되어 수평 확장과 다중 인스턴스 장애 검증을 할 수 없습니다.
+- 무료 web service에는 `preDeployCommand`를 설정할 수 없습니다.
+
+그러므로 무료 Render origin을 production realtime 권위 서버나 SLA 경로로 승격하지 않습니다.
+production 출시 전에는 유료 always-on Render web service 또는 동등한 상시 구동·WebSocket 지원
+호스트를 확보하고, direct PostgreSQL 연결·health probe·재시작 정책·교차 노드 integration을 다시
+검증해야 합니다. 이 인프라 승격이 끝나지 않으면 realtime 기능의 production release gate는
+통과하지 않은 것입니다.
+
+Render의 [pre-deploy command](https://render.com/docs/deploys#pre-deploy-command)는 유료 web
+service에서 build 이후, 새 버전 시작 이전에 별도
+인스턴스로 실행되며 실패하면 새 배포를 중단하고 마지막 성공 버전을 유지하므로 migration 경계로
+사용할 수 있습니다. 다만 운영에서는 아래 두 DDL writer 중 **정확히 하나만** 선택합니다.
+
+1. 기본: GitHub의 승인형
+   [production-database-migrations.yml](.github/workflows/production-database-migrations.yml)을
+   먼저 실행하고 구조 검증 성공 후 Render release를 승인합니다.
+2. 유료 Render 대안: 동일한 checksum-led runner의 `apply`와 full capability verifier를
+   `preDeployCommand`에서 실행하고 GitHub migration 실행 경로는 사용하지 않습니다. 해당 Render
+   service만 sole writer여야 하며 자동 `drizzle-kit push`, start-command migration, 다른 호스트의
+   pre-deploy를 모두 금지합니다. 최초 `adopt`나 `repair`는 pre-deploy 자동 경로에서 실행하지
+   않습니다.
+
+현재 무료 Blueprint에는 지원되지 않는 `preDeployCommand`를 일부러 넣지 않았습니다. 유료 플랜
+전환과 DDL writer 변경은 비용·운영 경계를 바꾸므로 별도 리뷰에서 함께 승인해야 합니다.

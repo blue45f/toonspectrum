@@ -68,6 +68,13 @@ export type StudioLiveTransportControlEvent =
 export interface StudioLiveTransport {
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
+  /**
+   * Optional identity bridge for transports whose wire connection id differs from Studio's stable
+   * client-instance session id. Hybrid transports use it before merging independently sequenced
+   * provider and primary events.
+   */
+  canonicalSessionId?(transportSessionId: string): string;
+  transportSessionId?(canonicalSessionId: string): string | null;
   connect(): Promise<void>;
   send(envelope: StudioLiveEnvelope): boolean;
   subscribe(listener: (value: unknown) => void): () => void;

@@ -8,12 +8,17 @@ import {
 } from "./studio-advanced-blur-filter-kernels";
 import {
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+  isStudioCrdtImageAuxiliaryReferencePayload,
+  isStudioCrdtTopologyReferencePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
 } from "./studio-crdt-scene-schema";
 import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
 
 import { STUDIO_WORK_ASSET_MAX_CURVE_POINTS } from "@/lib/studio-work-asset-contract";
+
+const FILTER_MASK_SURFACE_ID =
+  "filter-mask:v1:10000000-0000-4000-8000-000000000001";
 
 function imageReferenceProps(overrides: StudioCrdtJsonObject = {}): StudioCrdtJsonObject {
   return {
@@ -275,6 +280,60 @@ describe("studio CRDT structured work-asset filters", () => {
 
     for (const props of invalidProps) {
       expect(() => validateReference(props)).toThrow(/구조화 필터/u);
+    }
+  });
+});
+
+describe("studio CRDT immutable filter-mask surface references", () => {
+  it("admits a topology-preserving image auxiliary and an admitted image edit", () => {
+    const auxiliary = validateReference({
+      elementType: "image",
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: true,
+    });
+    expect(isStudioCrdtImageAuxiliaryReferencePayload(auxiliary)).toBe(true);
+    expect(isStudioCrdtTopologyReferencePayload(auxiliary)).toBe(true);
+
+    const admitted = validateReference(imageReferenceProps({
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: false,
+    }));
+    expect(isStudioCrdtImageAuxiliaryReferencePayload(admitted)).toBe(false);
+    expect(isStudioCrdtTopologyReferencePayload(admitted)).toBe(false);
+    expect(admitted.props).toMatchObject({
+      elementType: "image",
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: false,
+    });
+  });
+
+  it("rejects malformed, inline, orphan-enabled, and non-image mask reference state", () => {
+    const invalidProps: StudioCrdtJsonObject[] = [
+      {
+        elementType: "image",
+        filterMaskSurfaceId: "data:image/png;base64,AA==",
+      },
+      {
+        elementType: "image",
+        filterMaskEnabled: true,
+      },
+      {
+        ...imageReferenceProps(),
+        filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+        filterMaskEnabled: "yes",
+      },
+      {
+        ...imageReferenceProps(),
+        elementType: "vrm",
+        filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      },
+      {
+        ...imageReferenceProps(),
+        filterMaskSrc: "data:image/png;base64,AA==",
+      },
+    ];
+    for (const props of invalidProps) {
+      expect(() => validateReference(props)).toThrow();
     }
   });
 });

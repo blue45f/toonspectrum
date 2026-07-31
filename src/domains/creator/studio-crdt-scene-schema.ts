@@ -2,6 +2,10 @@ import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from 
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
 import {
+  STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
+  isStudioFilterMaskReferenceProps,
+} from "@/lib/studio-filter-mask-surface-contract";
+import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
   STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
@@ -144,7 +148,11 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "noise", "rotation",
   ]),
-  reference: new Set(["elementType", ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS]),
+  reference: new Set([
+    "elementType",
+    ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+    ...STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
+  ]),
 };
 
 export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
@@ -199,6 +207,45 @@ export function isStudioCrdtLegacyReferencePayload(
   return payload.type === "reference" &&
     Object.keys(payload.props).length === 1 &&
     isLegacyStudioCrdtReferenceType(payload.props.elementType);
+}
+
+function studioFilterMaskReferenceProps(
+  props: StudioCrdtJsonObject
+): StudioCrdtJsonObject {
+  const candidate: StudioCrdtJsonObject = {};
+  for (const key of STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS) {
+    if (Object.hasOwn(props, key)) candidate[key] = props[key]!;
+  }
+  return candidate;
+}
+
+/** Topology-preserving image reference carrying only an immutable filter-mask surface binding. */
+export function isStudioCrdtImageAuxiliaryReferencePayload(
+  payload: Pick<StudioCrdtSceneElementPayload, "type" | "props">
+): boolean {
+  if (payload.type !== "reference" || payload.props.elementType !== "image") return false;
+  const keys = Object.keys(payload.props);
+  if (
+    keys.length <= 1 ||
+    keys.some((key) => (
+      key !== "elementType" &&
+      !(STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS as readonly string[]).includes(key)
+    ))
+  ) {
+    return false;
+  }
+  return isStudioFilterMaskReferenceProps(studioFilterMaskReferenceProps(payload.props));
+}
+
+/**
+ * References in this class must preserve their locally/project-hydrated source body. Admitted work
+ * assets are deliberately excluded because their source is replaced by the stable work-asset URI.
+ */
+export function isStudioCrdtTopologyReferencePayload(
+  payload: Pick<StudioCrdtSceneElementPayload, "type" | "props">
+): boolean {
+  return isStudioCrdtLegacyReferencePayload(payload) ||
+    isStudioCrdtImageAuxiliaryReferencePayload(payload);
 }
 
 function cloneJson(
@@ -284,7 +331,7 @@ export function validateStudioCrdtSceneElementPayload(
   for (const key of STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS[payload.type]) {
     if (!(key in props)) throw new Error(`${payload.type} 요소의 ${key} 속성이 필요합니다.`);
   }
-  const legacyReference = isStudioCrdtLegacyReferencePayload({
+  const topologyReference = isStudioCrdtTopologyReferencePayload({
     type: payload.type,
     props,
   });
@@ -292,7 +339,19 @@ export function validateStudioCrdtSceneElementPayload(
     if (!isLegacyStudioCrdtReferenceType(props.elementType)) {
       throw new Error("참조 요소의 원본 타입이 올바르지 않습니다.");
     }
-    if (!legacyReference) {
+    const hasFilterMaskReferenceState = STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS.some(
+      (key) => Object.hasOwn(props, key)
+    );
+    if (
+      hasFilterMaskReferenceState &&
+      (
+        props.elementType !== "image" ||
+        !isStudioFilterMaskReferenceProps(studioFilterMaskReferenceProps(props))
+      )
+    ) {
+      throw new Error("참조 요소의 필터 마스크 surface 상태가 올바르지 않습니다.");
+    }
+    if (!topologyReference) {
       if (!STUDIO_WORK_ASSET_TYPE_SET.has(props.elementType as string)) {
         throw new Error("승인된 참조 요소 타입이 올바르지 않습니다.");
       }
@@ -307,7 +366,7 @@ export function validateStudioCrdtSceneElementPayload(
   for (const key of ["width", "height", "fontSize", "strokeWidth"] as const) {
     if (key in props) finiteRange(props[key], 0, MAX_COORDINATE, key);
   }
-  if (payload.type === "reference" && !legacyReference) {
+  if (payload.type === "reference" && !topologyReference) {
     finiteRange(props.width, Number.MIN_VALUE, MAX_COORDINATE, "width");
     finiteRange(props.height, Number.MIN_VALUE, MAX_COORDINATE, "height");
   }
@@ -320,13 +379,13 @@ export function validateStudioCrdtSceneElementPayload(
     if (key in props) finiteRange(props[key], -MAX_COORDINATE, MAX_COORDINATE, key);
   }
   if ("rotation" in props) finiteRange(props.rotation, -1_000_000, 1_000_000, "rotation");
-  if (payload.type === "reference" && !legacyReference) {
+  if (payload.type === "reference" && !topologyReference) {
     finiteRange(props.rotation, -360_000, 360_000, "rotation");
   }
   if ("opacity" in props) finiteRange(props.opacity, 0, 1, "opacity");
   for (const key of [
     "hidden", "locked", "noClip", "lockAspect", "clipBelow", "alphaLocked", "maskEnabled",
-    "vertical", "autoShrinkText", ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
+    "vertical", "autoShrinkText", "filterMaskEnabled", ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   ] as const) {
     if (key in props && typeof props[key] !== "boolean") {
       throw new Error(`장면 요소의 ${key} 값이 올바르지 않습니다.`);

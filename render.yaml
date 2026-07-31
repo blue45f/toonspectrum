@@ -1,80 +1,71 @@
-# Render Blueprint — ToonSpectrum NestJS API optional long-running host.
-# 기본 배포는 Vercel serverless + 정적 카탈로그다. 이 파일은 API를 상시구동 호스트로 분리하고
-# 싶을 때의 보존된 대안이다. 사용 시 vercel.json의 /api 라우팅도 함께 조정해야 한다.
+# Render Blueprint — ToonSpectrum Studio realtime preview/low-cost validation.
+# 일반 HTTP/API는 Vercel serverless가 계속 담당하고, 이 호스트는 Socket.IO CRDT·잠금처럼
+# 연결 수명이 필요한 기능만 맡는다. free 플랜을 production 권위 서버/SLA 경로로 사용하지 않는다.
 services:
   - type: web
-    name: webdex-api
+    name: toonspectrum-studio-live
     runtime: node
     region: singapore
-    # free 플랜은 15분 무요청 시 슬립 → 재기동 시 카탈로그 재적재로 첫 응답이 느리다.
-    # 상용은 starter 이상(상시구동) 권장.
+    # free: 15분 동안 inbound HTTP/WebSocket 메시지가 없으면 spin down하며 cold start가 생긴다.
+    # workspace 월 750시간 한도·단일 인스턴스 제약도 있어 미리보기 전용이다.
+    # production realtime release 전에는 유료 always-on 또는 동등한 호스트를 별도 승인한다.
     plan: free
     rootDir: .
+    # free web service는 preDeployCommand를 지원하지 않는다. 운영 DDL의 기본 single writer는
+    # production-database GitHub Environment 승인형 workflow이며 build/start에서 DDL을 금지한다.
+    # 유료 전환 후 Render pre-deploy를 택하려면 GitHub 경로와 동시에 쓰지 말고 별도 리뷰한다.
     # API는 apps/api/dist/ 로 컴파일된다(tsconfig outDir=dist, rootDir=../.. → dist/apps/api/src/main.js).
     # repo 루트의 dist/ 는 프론트 빌드 산출물이므로 혼동 금지.
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @webtoon-nest/api build
     startCommand: node apps/api/dist/apps/api/src/main.js
-    healthCheckPath: /api/auth/providers
-    autoDeploy: true
+    healthCheckPath: /api/health/ready
+    # migration 검증보다 새 runtime이 먼저 뜨는 race를 막기 위해 preview도 수동 release한다.
+    autoDeployTrigger: "off"
     envVars:
       - key: NODE_ENV
         value: production
+      # 전체 Nest 그래프는 정본 ACL/CRDT/잠금 구현을 재사용하지만, 공개 HTTP 표면은
+      # health와 Socket.IO로 제한해 일반 API의 중복 호스트가 되지 않게 한다.
+      - key: API_RUNTIME_ROLE
+        value: studio-live
       - key: TZ
         value: Asia/Seoul
       # 기본은 번들 catalog.json.gz를 먼저 로드하고, 필요 시 DB catalog_snapshot으로 폴백한다.
       # 자동 크롤은 끄고(off) 별도 cron/운영 절차에서 수동 트리거하는 것을 권장한다.
       - key: CATALOG_INGEST_MODE
         value: "off"
-      # Neon 연결 문자열(sslmode=verify-full). 시크릿이라 대시보드에서 입력.
+      # Socket handshake ACL/CRDT 상태 조회용 Neon 연결 문자열. 일반 HTTP API는 이 호스트가 받지 않는다.
+      # 시크릿이라 대시보드에서 입력하되 full API 계정을 재사용하지 않고 Studio가 조회·변경하는
+      # relation만 GRANT한 전용 DB role을 사용한다.
       - key: DATABASE_URL
         sync: false
-      # OAuth state 서명 키 — Render가 자동 생성.
-      - key: AUTH_STATE_SECRET
-        generateValue: true
-      # 세션 JWT(HS256) 서명 키 — Render가 자동 생성. 미설정 시 AUTH_STATE_SECRET 폴백.
-      # (운영에서 둘 다 없으면 토큰 발급이 거부되어 약한 폴백 비밀로의 세션 위조를 차단한다.)
+      # 여러 Socket.IO 인스턴스가 방·잠금·CRDT fanout을 공유하도록 direct PostgreSQL endpoint를
+      # 사용한다. `-pooler`/transaction PgBouncer 주소는 LISTEN을 유지할 수 없어 사용할 수 없다.
+      # 이 direct URL도 migration owner가 아니라 LISTEN/NOTIFY와 Studio relation 최소 권한 role이다.
+      - key: STUDIO_LIVE_CLUSTER_ADAPTER
+        value: postgres
+      - key: STUDIO_LIVE_POSTGRES_URL
+        sync: false
+      - key: STUDIO_LIVE_POSTGRES_POOL_MAX
+        value: "2"
+      - key: STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED
+        value: "false"
+      # Cloudflare 입장권은 인증 HTTP/ACL 정본인 Vercel API만 발급한다. 장기 연결 전용 Render에는
+      # HMAC 비밀을 복제하지 않고 route도 등록하지 않아 목적별 권한과 비밀 노출 범위를 분리한다.
+      - key: STUDIO_REALTIME_TICKET_ENABLED
+        value: "false"
+      # Vercel에서 로그인한 세션을 Socket.IO가 검증하므로 세션 서명키만 정확히 공유한다.
+      # OAuth HTTP route는 runtime role guard가 막으므로 state·provider credential은 복제하지 않는다.
       - key: AUTH_SESSION_SECRET
-        generateValue: true
-      # Studio 음성은 production에서 실제 TURN을 필수로 사용한다. Render API는 단기 자격증명만
-      # 발급하며 미디어 릴레이는 공인 IP를 가진 별도 coturn/관리형 TURN이 담당한다.
-      - key: STUDIO_VOICE_STUN_URLS
         sync: false
-      - key: STUDIO_VOICE_TURN_URLS
-        sync: false
-      - key: STUDIO_VOICE_TURN_SHARED_SECRET
-        sync: false
-      - key: STUDIO_VOICE_TURN_REQUIRED
-        value: "true"
-      - key: STUDIO_VOICE_TURN_TTL_SECONDS
-        value: "900"
-      # 수동 크롤 트리거 토큰 — Render가 자동 생성(GitHub cron 시크릿과 동일 값으로 맞출 것).
-      - key: CATALOG_INGEST_TRIGGER_TOKEN
-        generateValue: true
+      # 비용이 큰 음성/TURN은 제품 기본 범위에서 제외한다. 화면 공유 미디어는 WebRTC P2P이고,
+      # Cloudflare/Nest는 SDP·ICE 같은 작은 신호만 전달하므로 이 스위치와 무관하다.
+      - key: STUDIO_LIVE_VOICE_ENABLED
+        value: "false"
       # 공개 웹 앱은 www를 정본으로 사용한다. apex는 308 리다이렉트되지만 리다이렉트 전
       # preflight/Socket.IO upgrade를 위해 exact allowlist에 함께 둔다.
       - key: API_CORS_ALLOWED_ORIGINS
         value: https://www.toonstudio.cloud,https://toonstudio.cloud
-      - key: CANONICAL_HOST
-        value: www.toonstudio.cloud
-      - key: OAUTH_REDIRECT_BASE_URL
-        value: https://www.toonstudio.cloud
-      - key: WEB_APP_BASE_URL
-        value: https://www.toonstudio.cloud
-      # Google 실연동: GIS(ID 토큰) 흐름이라 CLIENT ID 만 있으면 동작(시크릿 불필요).
-      - key: GOOGLE_OAUTH_CLIENT_ID
-        sync: false
-      # (선택) 레거시 인가-코드 redirect 폴백에서만 사용.
-      - key: GOOGLE_OAUTH_CLIENT_SECRET
-        sync: false
-      # 카카오·네이버는 외부 앱키 발급 전까지 데모 고정(키를 채워도 DEMO_ONLY_PROVIDERS 제거 전엔 데모).
-      - key: KAKAO_REST_API_KEY
-        sync: false
-      - key: KAKAO_CLIENT_SECRET
-        sync: false
-      - key: NAVER_OAUTH_CLIENT_ID
-        sync: false
-      - key: NAVER_OAUTH_CLIENT_SECRET
-        sync: false
-      # 관리자 이메일 화이트리스트(선택).
-      - key: ADMIN_EMAILS
-        sync: false
+      # 이 호스트는 브라우저의 Socket.IO 연결만 직접 받는다. Vercel 프런트 빌드에는 배포 후
+      # Render의 정확한 HTTPS origin을 VITE_STUDIO_LIVE_ORIGIN으로 별도 설정한다.
+      # VITE_API_BASE나 Vercel의 일반 /api rewrite를 이 origin으로 바꾸지 않는다.

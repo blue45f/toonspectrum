@@ -8,6 +8,7 @@ import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
+import { createApiRuntimeRoleGuard } from "./config/runtime-role";
 import {
   createStudioLivePostgresIoAdapter,
   type StudioLivePostgresIoAdapter,
@@ -23,6 +24,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(예외 필터의 5xx 로깅도 이걸 사용)
   app.enableShutdownHooks();
   configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
+  app.use(createApiRuntimeRoleGuard(process.env));
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use((req: Request, _res: Response, next: NextFunction) => {

@@ -211,7 +211,7 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 
 ### DB 준비 (PostgreSQL / Neon)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 수동 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 스키마를 push한 뒤 forward SQL migration을 적용하고 카탈로그를 적재하세요. Creator Asset API는 `0013`의 권리 보정·제약이, Studio AI API는 `0018`의 분산 rate-limit·lease 및 `0019`의 유료 호출 멱등성 receipt 경계가 누락되면 요청 중 DDL을 실행하지 않고 부팅 단계에서 즉시 실패합니다.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
 
 **A. 로컬 docker Postgres**
 
@@ -219,16 +219,8 @@ DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(�
 docker run -d --name wd-pg \
   -e POSTGRES_USER=webdex -e POSTGRES_PASSWORD=webdex -e POSTGRES_DB=webdex \
   -p 55432:5432 postgres:16-alpine
-export DATABASE_URL='postgres://webdex:webdex@127.0.0.1:55432/webdex'
+export DATABASE_URL='postgresql://webdex:webdex@127.0.0.1:55432/webdex'
 export STUDIO_LIVE_POSTGRES_URL="$DATABASE_URL"
-pnpm exec drizzle-kit push --force
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
-pnpm ingest                       # 전 소스 크롤 후 catalog.json.gz 갱신(DB 무관) → API가 폴링으로 자동 반영
-pnpm dev:all
 ```
 
 **B. 원격 Neon** — `.env.local`에 연결 문자열만 넣으면 크롤·ingest·API가 모두 원격을 사용합니다.
@@ -238,18 +230,123 @@ pnpm dev:all
 echo 'DATABASE_URL="postgresql://<user>:<pw>@<host>-pooler.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 echo 'STUDIO_LIVE_POSTGRES_URL="postgresql://<user>:<pw>@<direct-host>.<region>.aws.neon.tech/<db>?sslmode=verify-full"' >> .env.local
 set -a; source .env.local; set +a
-pnpm exec drizzle-kit push --force
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0013_creator_asset_marketplace.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0017_creator_work_live_lock_revision.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0018_studio_ai_request_gate.sql
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
-pnpm ingest                       # catalog.json.gz 갱신(Neon 전송 0)
-pnpm dev:all                      # apps/api가 부팅 시 .env.local을 먼저 로드 → 자동으로 Neon 연결
 ```
 
-기존 운영 DB는 API writer를 먼저 drain해야 합니다. live-lock revision cutover, 검증, retry,
-emergency rollback 절차는 [`docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
+**C. 선택한 완전한 빈 로컬 DB 최초 provision** — 아래 `drizzle-kit push`는 public table이 없는
+DB에 처음 한 번만 실행합니다. Drizzle 0.31.x의 반복 push는 FK/unique 재정렬 오류가 있으므로 이미
+provision된 DB의 upgrade나 운영 rolling migration에 사용하지 않습니다. migration runner는
+`scripts/production-database-migrations.manifest`가 모든 numbered SQL 파일을 정확히 한 번씩
+0001부터 번호 누락 없이 정렬해 포함하는지 검사합니다. 최초 `adopt`는 0019까지의 relation,
+constraint/index, comment re-anchor, AI gate/receipt, 0017 cutover marker를 먼저 증명한 뒤 해당
+checksum을 `adopted`로 기록하며 과거 migration을 재실행하지 않습니다.
+
+```bash
+set -euo pipefail
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
+  -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
+psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'webdex_runtime'
+  ) THEN
+    CREATE ROLE webdex_runtime
+      LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+  END IF;
+END;
+$$;
+SELECT format(
+  'GRANT CONNECT ON DATABASE %I TO webdex_runtime',
+  current_database()
+)
+\gexec
+GRANT USAGE ON SCHEMA public TO webdex_runtime;
+SQL
+set +e
+push_output="$(
+  DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" pnpm exec drizzle-kit push --force 2>&1
+)"
+push_status=$?
+set -e
+printf '%s\n' "$push_output"
+if test "$push_status" -ne 0 \
+  || grep -Eiq '(^|[[:space:]])error:|severity:.*(ERROR|FATAL|PANIC)' <<< "$push_output"; then
+  echo 'drizzle-kit fresh schema provision 실패' >&2
+  exit 1
+fi
+
+# 빈 로컬 DB에서만 reviewed historical baseline을 한 번 구성합니다.
+# macOS 기본 Bash 3.2에서도 동작하도록 배열의 음수 인덱스를 사용하지 않습니다.
+while IFS= read -r migration_path; do
+  case "$migration_path" in
+    lib/db/migrations/0020_*) break ;;
+  esac
+  psql "$STUDIO_LIVE_POSTGRES_URL" -X -v ON_ERROR_STOP=1 \
+    -f "$migration_path"
+done < scripts/production-database-migrations.manifest
+
+# Drizzle push는 현재 최종 모델을 만들므로 빈 로컬 DB에서만 post-0019 객체를 제거해
+# genuine pending 0020~0022 경로를 검증합니다.
+psql "$STUDIO_LIVE_POSTGRES_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+DROP TABLE IF EXISTS
+  "creator_marketplace_publish_gate",
+  "creator_marketplace_resource",
+  "creator_draft_collaboration_room"
+CASCADE;
+DROP EXTENSION IF EXISTS pg_trgm;
+SQL
+
+release_sha="$(git rev-parse HEAD)"
+MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
+  node scripts/run-production-database-migrations.mjs \
+    --allow-loopback \
+    --mode adopt \
+    --runtime-database-role webdex_runtime \
+    --release-sha "$release_sha" \
+    --confirmation ADOPT-TOONSPECTRUM-MIGRATION-HISTORY
+MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
+  node scripts/verify-production-database-capabilities.mjs \
+    --runtime-database-role webdex_runtime \
+    --allow-loopback
+pnpm ingest
+pnpm dev:all
+```
+
+기존 운영 DB upgrade에는 `drizzle-kit push`를 사용하지 않고, 앱 시작 시에는 어떤 DDL도 실행하지
+않습니다.
+[production-database-migrations.yml](.github/workflows/production-database-migrations.yml)을
+정확한 release commit SHA로 수동 실행하고,
+`production-database` GitHub Environment의 required reviewer 승인과
+`PRODUCTION_DATABASE_DIRECT_URL` secret, `PRODUCTION_RUNTIME_DATABASE_ROLE` variable을 사용합니다.
+direct URL은 runtime 앱 role과 별개인 전용 DDL migrator role이어야 하며 runtime role은 migrator
+role을 상속하거나 `toonspectrum_ops` schema/원장 table을 소유·사용·변경할 수 없습니다. runtime
+role의 public relation/sequence 최소 DML GRANT와 실제 `DATABASE_URL` canary는
+[`DEPLOY.md`](DEPLOY.md)의 운영 전제대로 별도 완료해야 합니다. URL은
+구조 파싱 후 `postgresql:`/`postgres:`
+protocol, credentialed authority, direct hostname을 확인하고, query는
+`sslmode=verify-full&channel_binding=require`만 정확히 한 번씩 허용합니다. `host`, `hostaddr`,
+`service`, `port`, `user`, `dbname`, `options`를 포함한 libpq override와 pooler hostname은
+거부합니다. DB secret은 URL 검증·migration·capability 검증 step에만 전달됩니다.
+
+최초 원장 도입은 `migration_mode=adopt`와
+`ADOPT-TOONSPECTRUM-MIGRATION-HISTORY`, 이후 일반 배포는 `migration_mode=apply`와
+`APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS`를 사용합니다. 중단되어 `applying`/`failed`가 남으면
+일반 실행은 거부되며, 원인을 확인한 뒤에만 `migration_mode=repair`와
+`REPAIR-TOONSPECTRUM-MIGRATION-STATE`를 사용합니다. `repair`는 checksum이 일치하는 기존
+`applying`/`failed` row만 재개하며, 원장이 없거나 누락된 history/pending migration을 생성하는
+우회 경로로 사용할 수 없습니다. durable lock이 남아 있으면 DB에서 확인한 exact 64자리
+`ownerToken`을 workflow의 `stale_lock_owner_token`에 입력해야 하고, 획득 후 60분이 지나지 않은
+lock은 token이 일치해도 active runner로 간주해 탈취하지 않습니다. 모든 mode는
+`NO-STUDIO-WRITERS` 확인과 Environment reviewer 승인을 요구합니다. workflow는 exact checksum
+원장, 현재 runtime health relation 전체, comment reanchor, Marketplace generated search/GIN
+opclass, `pg_trgm`, `0017` cutover marker를 함께 검증합니다.
+
+이 workflow는 이미 provision된 운영 DB upgrade 전용이며 `user`, `creator_work`,
+`creator_work_live_lock` base relation이 없으면 DDL 전에 실패합니다. 새 production DB bootstrap은
+별도의 승인·검증 작업으로 먼저 완료해야 합니다. `0017` 최초 cutover와 최초 adoption 전에 모든
+Studio writer를 drain해야 합니다. Render pre-deploy 등 다른 migration writer와 동시에 활성화하면
+안 됩니다. API writer drain, live-lock revision cutover, retry, emergency rollback 절차는
+[`docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](docs/STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
 
 > 데이터 갱신: 정적 운영에서는 `pnpm catalog:gen`으로 `public/data/*.json`을 재생성하고 재배포합니다. API는 gz 파일 mtime/size 폴링(`CATALOG_REFRESH_POLL_SECONDS`, 기본 60s — DB 왕복 없음)으로 새 카탈로그를 **무중단 핫 리로드**하거나, `POST /api/catalog/refresh`로 즉시 반영합니다. 전체 흐름은 [`docs/data-pipeline.md`](docs/data-pipeline.md) 참고.
 

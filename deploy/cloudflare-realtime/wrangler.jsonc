@@ -1,0 +1,54 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "toonspectrum-realtime",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_ROOMS",
+        "class_name": "RealtimeRoom"
+      }
+    ]
+  },
+
+  // Current Wrangler declarative lifecycle. This creates SQLite-backed room
+  // objects; do not change it to KV-backed `new_classes`.
+  "exports": {
+    "RealtimeRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+
+  // Provision with `wrangler secret put REALTIME_TICKET_SECRET`; ticket
+  // credentials must never be committed as plaintext production vars.
+  "secrets": {
+    "required": ["REALTIME_TICKET_SECRET"]
+  },
+
+  "vars": {
+    "REALTIME_TICKET_ISSUER": "toonspectrum-api",
+    "REALTIME_TICKET_AUDIENCE": "toonspectrum-realtime",
+    "REALTIME_ALLOWED_ORIGINS": "https://toonstudio.cloud,https://www.toonstudio.cloud",
+    "REALTIME_MAX_CONNECTIONS_PER_ROOM": "64",
+    "REALTIME_MAX_CONNECTIONS_PER_ACTOR": "4",
+    "REALTIME_MAX_BUFFERED_BYTES": "262144",
+    "REALTIME_MAX_REPLAY_EVENTS": "2048",
+    "REALTIME_MAX_RECEIPT_COUNT": "4096",
+    "REALTIME_MAX_RECEIPT_BYTES": "33554432",
+    "REALTIME_EVENT_RETENTION_MS": "900000",
+    "REALTIME_CLEANUP_INTERVAL_MS": "60000",
+    "REALTIME_RATE_WINDOW_MS": "10000",
+    "REALTIME_RESUME_WINDOW_MS": "10000",
+    "REALTIME_RESUME_MAX_REQUESTS_PER_WINDOW": "64",
+    "REALTIME_RESUME_MAX_BYTES_PER_WINDOW": "8388608",
+    "REALTIME_PRESENCE_MAX_EVENTS_PER_WINDOW": "1200",
+    "REALTIME_PRESENCE_MAX_BYTES_PER_WINDOW": "4194304",
+    "REALTIME_COMMENTS_MAX_EVENTS_PER_WINDOW": "60",
+    "REALTIME_COMMENTS_MAX_BYTES_PER_WINDOW": "262144",
+    "REALTIME_SCREEN_MAX_EVENTS_PER_WINDOW": "400",
+    "REALTIME_SCREEN_MAX_BYTES_PER_WINDOW": "4194304"
+  }
+}

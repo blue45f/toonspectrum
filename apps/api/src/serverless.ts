@@ -8,6 +8,10 @@ import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
+import {
+  createApiRuntimeRoleGuard,
+  resolveApiRuntimeRole,
+} from "./config/runtime-role";
 import { sessionAuth } from "./session-middleware";
 
 // Vercel 서버리스용 — 콜드 컨테이너당 1회 부팅 후 캐시(웜 인스턴스 재사용).
@@ -15,7 +19,27 @@ import { sessionAuth } from "./session-middleware";
 // (수동 ExpressAdapter 구성은 NestJS11 registerParserMiddleware 에서 깨진다.)
 let appPromise: Promise<Express> | null = null;
 
+type ServerlessRuntimeEnvironment = Partial<
+  Record<"API_RUNTIME_ROLE", string | undefined>
+>;
+
+/**
+ * Vercel cannot own the long-lived Socket.IO lifecycle. A role typo or an accidentally shared
+ * deployment environment must reject the cold start instead of publishing a misleading,
+ * health-only serverless surface.
+ */
+export function assertVercelServerlessRuntimeRole(
+  environment: ServerlessRuntimeEnvironment = process.env,
+): void {
+  if (resolveApiRuntimeRole(environment) !== "full") {
+    throw new Error(
+      "Vercel serverless bootstrap requires API_RUNTIME_ROLE=full",
+    );
+  }
+}
+
 async function create(): Promise<Express> {
+  assertVercelServerlessRuntimeRole(process.env);
   // env 검증(NON-FATAL) — 콜드 부팅당 1회. 실패해도 throw 하지 않고 경고만(main.ts와 동일).
   validateEnv();
   // 기본 본문 파서(100kb) 대신 직접 등록(main.ts와 동일) — 스튜디오/커뮤니티 첨부가 data-URL
@@ -23,6 +47,7 @@ async function create(): Promise<Express> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true, bodyParser: false });
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(main.ts와 동일)
   configureCors(app); // Vercel OPTIONS를 Nest가 204로 끝내고 Origin별 허용 헤더를 반환
+  app.use(createApiRuntimeRoleGuard(process.env));
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use((req: Request, _res: Response, next: NextFunction) => {

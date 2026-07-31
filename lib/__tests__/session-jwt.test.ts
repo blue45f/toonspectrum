@@ -1,8 +1,19 @@
 import { createHmac } from "node:crypto";
 
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
-import { SESSION_TOKEN_TTL_MS, signSession, verifySession, verifySessionToken } from "../server/session";
+import {
+  SESSION_HMAC_SECRET_MIN_BYTES,
+  SESSION_TOKEN_TTL_MS,
+  signSession,
+  studioLivePrincipalFingerprint,
+  verifySession,
+  verifySessionToken,
+} from "../server/session";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const DEV_FALLBACK_SECRET = "toonspectrum-insecure-dev-session-secret";
 function sessionSecret(): string {
@@ -69,6 +80,14 @@ describe("세션 JWT(HS256) 발급/검증", () => {
     expect(verifySession(undefined)).toBeNull();
     expect(verifySession("")).toBeNull();
   });
+
+  it("실시간 어댑터에는 사용자 ID 대신 도메인 분리된 불투명 지문만 제공한다", () => {
+    const first = studioLivePrincipalFingerprint("user-123");
+    expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+    expect(first).not.toContain("user-123");
+    expect(studioLivePrincipalFingerprint("user-123")).toBe(first);
+    expect(studioLivePrincipalFingerprint("user-456")).not.toBe(first);
+  });
 });
 
 describe("레거시 v2 HMAC 토큰 투명 흡수(락아웃 방지)", () => {
@@ -99,5 +118,41 @@ describe("레거시 v2 HMAC 토큰 투명 흡수(락아웃 방지)", () => {
     const now = 1_700_000_000_000;
     const token = makeV2("legacy-tamper", 1, now + 60_000);
     expect(verifySessionToken(`${token.slice(0, -2)}xy`, now)).toBeNull();
+  });
+});
+
+describe("운영 세션 HMAC 비밀 경계", () => {
+  it("운영에서는 누락·공백 패딩·32바이트 미만 비밀을 거부한다", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_SESSION_SECRET", "");
+    vi.stubEnv("AUTH_STATE_SECRET", "");
+    expect(() => signSession("missing-secret")).toThrow(
+      /must be set in production/u,
+    );
+
+    vi.stubEnv("AUTH_SESSION_SECRET", "short-secret");
+    expect(() => signSession("weak-secret")).toThrow(
+      new RegExp(`${SESSION_HMAC_SECRET_MIN_BYTES} UTF-8 bytes`, "u"),
+    );
+
+    vi.stubEnv(
+      "AUTH_SESSION_SECRET",
+      " production-session-secret-with-at-least-32-bytes ",
+    );
+    expect(() => signSession("padded-secret")).toThrow(
+      /unpadded secret/u,
+    );
+  });
+
+  it("운영의 공백 없는 32바이트 이상 비밀은 발급·검증한다", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv(
+      "AUTH_SESSION_SECRET",
+      "production-session-secret-with-at-least-32-bytes",
+    );
+    vi.stubEnv("AUTH_STATE_SECRET", "");
+
+    const token = signSession("production-user");
+    expect(verifySession(token)).toBe("production-user");
   });
 });

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const verifyIdToken = vi.fn();
 const getPayload = vi.fn();
+const VALID_ID_TOKEN = "header.payload.signature";
 
 vi.mock("google-auth-library", () => ({
   OAuth2Client: class {
@@ -37,54 +38,89 @@ describe("Google GIS ID 토큰 검증(verifyGoogleIdToken)", () => {
       name: "테스트 사용자",
       picture: "https://img/avatar.png",
       iss: "https://accounts.google.com",
+      email_verified: true,
     });
     const { verifyGoogleIdToken } = await freshModule();
 
-    const profile = await verifyGoogleIdToken("dummy.id.token");
+    const profile = await verifyGoogleIdToken(VALID_ID_TOKEN);
 
     expect(verifyIdToken).toHaveBeenCalledWith({
-      idToken: "dummy.id.token",
+      idToken: VALID_ID_TOKEN,
       audience: "test-client-id.apps.googleusercontent.com",
     });
     expect(profile).toEqual({
       providerAccountId: "google-sub-1",
       email: "user@example.com", // 소문자 정규화
+      emailVerified: true,
       name: "테스트 사용자",
       image: "https://img/avatar.png",
     });
   });
 
   it("이름이 없으면 given_name 으로, 둘 다 없으면 null 로 폴백한다", async () => {
-    getPayload.mockReturnValue({ sub: "google-sub-2", given_name: "Given", iss: "accounts.google.com" });
+    getPayload.mockReturnValue({
+      sub: "google-sub-2",
+      email: "given@example.com",
+      email_verified: true,
+      given_name: "Given",
+      iss: "accounts.google.com",
+    });
     const { verifyGoogleIdToken } = await freshModule();
-    const profile = await verifyGoogleIdToken("t");
+    const profile = await verifyGoogleIdToken(VALID_ID_TOKEN);
     expect(profile.name).toBe("Given");
-    expect(profile.email).toBeNull();
+    expect(profile.email).toBe("given@example.com");
     expect(profile.image).toBeNull();
   });
 
   it("issuer 가 구글이 아니면 거부한다(방어적 iss 확인)", async () => {
-    getPayload.mockReturnValue({ sub: "google-sub-3", iss: "https://evil.example.com" });
+    getPayload.mockReturnValue({
+      sub: "google-sub-3",
+      email: "artist@example.com",
+      email_verified: true,
+      iss: "https://evil.example.com",
+    });
     const { verifyGoogleIdToken } = await freshModule();
-    await expect(verifyGoogleIdToken("t")).rejects.toThrow(/issuer/);
+    await expect(verifyGoogleIdToken(VALID_ID_TOKEN)).rejects.toThrow(/issuer/);
   });
 
   it("payload 에 sub 가 없으면 거부한다", async () => {
     getPayload.mockReturnValue({ iss: "https://accounts.google.com" });
     const { verifyGoogleIdToken } = await freshModule();
-    await expect(verifyGoogleIdToken("t")).rejects.toThrow(/invalid id_token/);
+    await expect(verifyGoogleIdToken(VALID_ID_TOKEN)).rejects.toThrow(/invalid id_token/);
   });
 
   it("client id 미설정이면 검증을 거부한다(외부 키 의존 명시)", async () => {
     delete process.env.GOOGLE_OAUTH_CLIENT_ID;
     const { verifyGoogleIdToken } = await freshModule();
-    await expect(verifyGoogleIdToken("t")).rejects.toThrow(/client id/);
+    await expect(verifyGoogleIdToken(VALID_ID_TOKEN)).rejects.toThrow(/client id/);
     expect(verifyIdToken).not.toHaveBeenCalled();
   });
 
   it("빈 ID 토큰은 거부한다", async () => {
     const { verifyGoogleIdToken } = await freshModule();
     await expect(verifyGoogleIdToken("")).rejects.toThrow(/id_token/);
+  });
+
+  it("검증된 이메일이 없는 Google 계정은 기존 이메일 계정 연결 전에 거부한다", async () => {
+    getPayload.mockReturnValue({
+      sub: "google-sub-unverified",
+      email: "artist@example.com",
+      email_verified: false,
+      iss: "https://accounts.google.com",
+    });
+    const { verifyGoogleIdToken } = await freshModule();
+
+    await expect(verifyGoogleIdToken(VALID_ID_TOKEN)).rejects.toThrow(/unverified/);
+  });
+
+  it("JWT 형태가 아니거나 비정상적으로 큰 토큰은 Google 검증기로 보내지 않는다", async () => {
+    const { GOOGLE_ID_TOKEN_MAX_LENGTH, verifyGoogleIdToken } = await freshModule();
+
+    await expect(verifyGoogleIdToken("not-a-jwt")).rejects.toThrow(/format/);
+    await expect(
+      verifyGoogleIdToken(`a.${"b".repeat(GOOGLE_ID_TOKEN_MAX_LENGTH)}.c`),
+    ).rejects.toThrow(/format/);
+    expect(verifyIdToken).not.toHaveBeenCalled();
   });
 });
 
@@ -104,11 +140,12 @@ describe("Google providerMode/clientId 노출(GIS는 client secret 불필요)", 
     expect(list.google.clientId).toBe("cid.apps.googleusercontent.com");
   });
 
-  it("client id 미설정이면 google 은 demo 모드이고 client id 를 노출하지 않는다", async () => {
+  it("client id 미설정이면 google 은 안전하게 비활성화되고 client id 를 노출하지 않는다", async () => {
     const { providerMode, listAuthProviders } = await freshModule();
-    expect(providerMode("google")).toBe("demo");
+    expect(providerMode("google")).toBe("disabled");
     const list = listAuthProviders();
-    expect(list.google.mode).toBe("demo");
+    expect(list.google.mode).toBe("disabled");
+    expect(list.google.reason).toBe("missing-client-id");
     expect(list.google.clientId).toBeUndefined();
   });
 });

@@ -12,8 +12,8 @@ import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
-  isStudioCrdtLegacyReferencePayload,
   isStudioCrdtPayloadSceneElementType,
+  isStudioCrdtTopologyReferencePayload,
   studioCrdtLayerGroupKey,
   validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtPagePayload,
@@ -41,6 +41,11 @@ import type {
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
+import {
+  STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
+  isStudioFilterMaskReferenceProps,
+  isStudioFilterMaskSurfaceId,
+} from "@/lib/studio-filter-mask-surface-contract";
 import { normalizeStudioInkInputContract } from "@/lib/studio-ink-input-contract";
 import {
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -365,11 +370,31 @@ export function studioElementToCrdtSceneElement(
     );
   }
   const props: StudioCrdtJsonObject = { elementType: element.type };
+  const source = element as StudioCrdtCompatibleElement & Record<string, unknown>;
   if (isStudioCrdtAdmittedWorkAssetElement(element)) {
-    const source = element as StudioCrdtCompatibleElement & Record<string, unknown>;
     for (const key of STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS) {
       const normalized = jsonValue(source[key]);
       if (normalized !== undefined) props[key] = normalized;
+    }
+  }
+  if (source.filterMaskSurfaceId !== undefined && element.type !== "image") {
+    throw new Error("필터 마스크 surface는 이미지 참조에만 연결할 수 있습니다.");
+  }
+  if (element.type === "image" && source.filterMaskSurfaceId !== undefined) {
+    if (!isStudioFilterMaskSurfaceId(source.filterMaskSurfaceId)) {
+      throw new Error("필터 마스크 surface ID가 올바르지 않습니다.");
+    }
+    const filterMaskProps: StudioCrdtJsonObject = {
+      filterMaskSurfaceId: source.filterMaskSurfaceId,
+    };
+    if (source.filterMaskEnabled !== undefined) {
+      filterMaskProps.filterMaskEnabled = jsonValue(source.filterMaskEnabled)!;
+    }
+    if (!isStudioFilterMaskReferenceProps(filterMaskProps)) {
+      throw new Error("필터 마스크 surface 상태가 올바르지 않습니다.");
+    }
+    for (const key of STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS) {
+      if (Object.hasOwn(filterMaskProps, key)) props[key] = filterMaskProps[key]!;
     }
   }
   return {
@@ -400,13 +425,13 @@ export function studioCrdtElementToSceneElement<
     }
     const referenceProps = { ...record.payload.props };
     delete referenceProps.elementType;
-    const legacyReference = isStudioCrdtLegacyReferencePayload(record.payload);
+    const topologyReference = isStudioCrdtTopologyReferencePayload(record.payload);
     const element = {
       ...referenceSource,
       ...referenceProps,
       id: record.id,
       type: elementType,
-      ...(!legacyReference ? {
+      ...(!topologyReference ? {
         src: studioWorkAssetSourceUri({
           assetId: record.id,
           elementType: elementType as (typeof STUDIO_WORK_ASSET_TYPES)[number],
@@ -750,18 +775,18 @@ export function reconcileStudioCrdtSceneGraphPages<
       typeof record.payload.props.elementType === "string"
         ? record.payload.props.elementType
         : null;
-    const legacyReference = record.payload.type === "reference" &&
-      isStudioCrdtLegacyReferencePayload(record.payload);
+    const topologyReference = record.payload.type === "reference" &&
+      isStudioCrdtTopologyReferencePayload(record.payload);
     const canonicalLocalSource =
       expectedReferenceType &&
       localSource?.element.id === record.id && localSource.element.type === expectedReferenceType &&
-      (legacyReference || (
+      (topologyReference || (
         STUDIO_WORK_ASSET_TYPE_SET.has(expectedReferenceType) &&
         isStudioCrdtAdmittedWorkAssetElement(localSource.element)
       ))
         ? localSource
         : undefined;
-    const hydratedSource = authoritative && expectedReferenceType && !legacyReference
+    const hydratedSource = authoritative && expectedReferenceType && !topologyReference
       ? referenceSources?.get(record.id)
       : undefined;
     const exactHydratedSource =

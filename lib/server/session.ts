@@ -18,6 +18,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 //   - exp/iat/iss/aud 를 모두 검증.
 
 const FALLBACK_SECRET = "toonspectrum-insecure-dev-session-secret";
+export const SESSION_HMAC_SECRET_MIN_BYTES = 32;
 export const SESSION_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const JWT_ISSUER = "toonspectrum";
@@ -33,10 +34,36 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+function configuredSessionSecret(): {
+  readonly key: "AUTH_SESSION_SECRET" | "AUTH_STATE_SECRET";
+  readonly raw: string;
+  readonly value: string;
+} | null {
+  for (const key of ["AUTH_SESSION_SECRET", "AUTH_STATE_SECRET"] as const) {
+    const raw = process.env[key];
+    if (typeof raw !== "string") continue;
+    const value = raw.trim();
+    if (value) return { key, raw, value };
+  }
+  return null;
+}
+
 function secret(): string {
   // 운영에선 AUTH_SESSION_SECRET(없으면 기존 AUTH_STATE_SECRET) 사용. 로컬 개발용 폴백만 별도.
-  const configured = process.env.AUTH_SESSION_SECRET || process.env.AUTH_STATE_SECRET;
-  if (configured && configured.trim()) return configured.trim();
+  const configured = configuredSessionSecret();
+  if (configured) {
+    if (
+      isProduction() &&
+      (configured.raw !== configured.value ||
+        Buffer.byteLength(configured.value, "utf8") <
+          SESSION_HMAC_SECRET_MIN_BYTES)
+    ) {
+      throw new Error(
+        `${configured.key} must be an unpadded secret of at least ${SESSION_HMAC_SECRET_MIN_BYTES} UTF-8 bytes in production`,
+      );
+    }
+    return configured.value;
+  }
   // 운영에서 비밀이 없으면 약한 폴백으로 토큰을 발급/검증하지 않는다(위조·세션 탈취 차단).
   if (isProduction()) {
     throw new Error("AUTH_SESSION_SECRET (or AUTH_STATE_SECRET) must be set in production");
@@ -56,6 +83,16 @@ function b64url(input: string | Buffer): string {
 
 function hmac(payload: string): string {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+/**
+ * Adapter-visible collaboration metadata may need to compare two authenticated principals across
+ * API nodes, but must never expose a database user id through Socket.IO's `fetchSockets()` surface.
+ * This stable, domain-separated HMAC is intentionally opaque and cannot be used as a session
+ * credential.
+ */
+export function studioLivePrincipalFingerprint(userId: string): string {
+  return hmac(`studio-live-principal:v1:${userId}`);
 }
 
 // 두 base64url 서명을 상수 시간으로 비교(길이 불일치도 안전 처리).

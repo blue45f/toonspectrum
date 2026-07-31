@@ -68,6 +68,15 @@ describe("StudioPage user-action orchestration boundary", () => {
     expect(projectArchiveSource).toContain(
       'import("./studio-vrm-texture-paint-project-library")',
     );
+    expect(studioPageSource).toContain(
+      'await import("./studio-raster-asset-client")',
+    );
+    expect(studioPageSource).toContain(
+      "filterMaskSurfaceArchiveDependencies,",
+    );
+    expect(studioPageSource).not.toMatch(
+      /import\s+[^;]*from\s+["']\.\/studio-raster-asset-client["']/u,
+    );
     expect(projectArchiveSource).not.toMatch(
       /import\s+[^;]*from\s+["']\.\/studio-project-archive["']/u,
     );

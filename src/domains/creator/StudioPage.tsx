@@ -507,6 +507,16 @@ import {
   FILTER_MASK_BRUSH_STRENGTH_DEFAULT,
   type FilterMaskPaintMode,
 } from "./studio-filter-mask";
+import { attachStudioFilterMaskSurfaceAcrossHistory } from "./studio-filter-mask-surface-admission";
+import { StudioFilterMaskSurfaceHydrator } from "./studio-filter-mask-surface-hydrator";
+import {
+  applyStudioInlineFilterMaskMutation,
+  collectStudioFilterMaskSurfaceIds,
+  projectStudioFilterMaskElementsForServerSave,
+  projectStudioFilterMaskPagesForServerSave,
+  projectStudioFilterMaskSurfacesForRender,
+  type StudioInlineFilterMaskMutationPatch,
+} from "./studio-filter-mask-surface-projection";
 import { hexToRgb } from "./studio-filters";
 import {
   createFixedRateStrokeFilter,
@@ -1371,7 +1381,10 @@ import { useStudioProjectArchiveOrchestration } from "./useStudioProjectArchiveO
 import { useStudioRasterExportOrchestration } from "./useStudioRasterExportOrchestration";
 
 import type { StudioBg3dAiMethodReferenceCapture } from "./studio-3d-ai-reference-handoff";
-import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
+import type {
+  StudioBackground3DInsertResult,
+  StudioBackground3DMagicFilterMask,
+} from "./studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type { StudioAsset } from "./studio-asset-library";
@@ -2560,6 +2573,8 @@ function StudioCuttoonEditor() {
   // tiles are still uploading. Each controller is also an account/work teardown boundary.
   const studioRasterPublicationTailRef = useRef<Promise<void>>(Promise.resolve());
   const studioRasterPublicationControllersRef = useRef(new Set<AbortController>());
+  const studioFilterMaskPublicationClockRef = useRef(0);
+  const studioFilterMaskPublicationGenerationRef = useRef(new Map<string, number>());
   const [studioCrdtDocument, setStudioCrdtDocument] = useState<StudioCrdtDocument | null>(null);
   const [studioCrdtReconciledDocument, setStudioCrdtReconciledDocument] =
     useState<StudioCrdtDocument | null>(null);
@@ -2576,6 +2591,9 @@ function StudioCuttoonEditor() {
   const [studioWorkAssetHydrator] = useState(
     () => new StudioWorkAssetHydrator(null)
   );
+  const [studioFilterMaskSurfaceHydrator] = useState(
+    () => new StudioFilterMaskSurfaceHydrator()
+  );
   const [studioWorkAssetAdmissionCoordinator] = useState(
     () => new StudioWorkAssetAdmissionCoordinator()
   );
@@ -2584,20 +2602,29 @@ function StudioCuttoonEditor() {
     studioWorkAssetHydrator.getVersion,
     studioWorkAssetHydrator.getVersion
   );
+  const studioFilterMaskHydrationRevision = useSyncExternalStore(
+    studioFilterMaskSurfaceHydrator.subscribe,
+    studioFilterMaskSurfaceHydrator.getVersion,
+    studioFilterMaskSurfaceHydrator.getVersion
+  );
   const [studioWorkAssetReferences, setStudioWorkAssetReferences] =
     useState<StudioWorkAssetSceneReference[]>([]);
   const [studioWorkAssetLimitExceeded, setStudioWorkAssetLimitExceeded] = useState(false);
   useLayoutEffect(() => () => {
+    studioFilterMaskPublicationClockRef.current += 1;
+    studioFilterMaskPublicationGenerationRef.current.clear();
     for (const controller of studioRasterPublicationControllersRef.current) {
       controller.abort(new DOMException("래스터 편집 세션이 종료되었습니다.", "AbortError"));
     }
     studioRasterPublicationControllersRef.current.clear();
     disposeStudioDynamicCoverageCommittedCache();
     studioBrushR8GrainHydrator.dispose();
+    studioFilterMaskSurfaceHydrator.dispose();
     studioWorkAssetAdmissionCoordinator.dispose();
     studioWorkAssetHydrator.dispose();
   }, [
     studioBrushR8GrainHydrator,
+    studioFilterMaskSurfaceHydrator,
     studioWorkAssetAdmissionCoordinator,
     studioWorkAssetHydrator,
   ]);
@@ -4168,15 +4195,70 @@ function StudioCuttoonEditor() {
     hydrationRevision: studioWorkAssetHydrationRevision,
     resolveState: (reference) => studioWorkAssetHydrator.get(reference),
   });
+  useLayoutEffect(() => {
+    studioFilterMaskSurfaceHydrator.setScope(
+      authorizedWorkAssetScopeId,
+      studioCrdtDocument
+    );
+    const allSurfaceIds = collectStudioFilterMaskSurfaceIds([
+      ...pages.flatMap((page) => page.elements),
+      ...master.elements,
+    ]);
+    const prioritySurfaceIds = collectStudioFilterMaskSurfaceIds(activePage.elements);
+    studioFilterMaskSurfaceHydrator.observe(allSurfaceIds, {
+      prioritySurfaceIds,
+    });
+  }, [
+    activePage.elements,
+    authorizedWorkAssetScopeId,
+    master.elements,
+    pages,
+    studioCrdtDocument,
+    studioFilterMaskSurfaceHydrator,
+  ]);
+  const studioFilterMaskRenderProjection =
+    projectStudioFilterMaskSurfacesForRender<El>({
+      elements: studioWorkAssetRenderProjection.elements,
+      hydrationRevision: studioFilterMaskHydrationRevision,
+      resolveState: (surfaceId) => studioFilterMaskSurfaceHydrator.get(surfaceId),
+    });
+  const studioCanvasWorkAssetRenderProjection =
+    studioFilterMaskRenderProjection.elements === studioWorkAssetRenderProjection.elements
+      ? studioWorkAssetRenderProjection
+      : {
+          ...studioWorkAssetRenderProjection,
+          elements: studioFilterMaskRenderProjection.elements,
+        };
+  const studioFilterMaskMasterRenderElements =
+    projectStudioFilterMaskSurfacesForRender<El>({
+      elements: studioBrushR8GrainMasterRenderElements,
+      hydrationRevision: studioFilterMaskHydrationRevision,
+      resolveState: (surfaceId) => studioFilterMaskSurfaceHydrator.get(surfaceId),
+    }).elements;
   // useCallback: 페이지 목록/패널 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
   const composeWorkAssetPreviewPage = useCallback(
-    (page: PageState): PageState =>
-      projectStudioWorkAssetPageForReadOnlyPreview({
+    (page: PageState): PageState => {
+      const projectedPage = projectStudioWorkAssetPageForReadOnlyPreview({
         page: composeThumbPage(master, page),
         hydrationRevision: studioWorkAssetHydrationRevision,
         resolveState: (reference) => studioWorkAssetHydrator.get(reference),
-      }),
-    [master, studioWorkAssetHydrationRevision, studioWorkAssetHydrator]
+      });
+      const maskProjection = projectStudioFilterMaskSurfacesForRender<El>({
+        elements: projectedPage.elements,
+        hydrationRevision: studioFilterMaskHydrationRevision,
+        resolveState: (surfaceId) => studioFilterMaskSurfaceHydrator.get(surfaceId),
+      });
+      return maskProjection.elements === projectedPage.elements
+        ? projectedPage
+        : { ...projectedPage, elements: maskProjection.elements };
+    },
+    [
+      master,
+      studioFilterMaskHydrationRevision,
+      studioFilterMaskSurfaceHydrator,
+      studioWorkAssetHydrationRevision,
+      studioWorkAssetHydrator,
+    ]
   );
   const studioWorkAssetRenderPlaceholders: StudioWorkAssetRenderPlaceholder[] = useMemo(() =>
     studioWorkAssetLimitExceeded
@@ -17702,11 +17784,28 @@ const puppetWarpArmed =
       setError(workAssetReason);
       return false;
     }
-    const changed = Object.entries(patch).some(([key, value]) =>
+    // `filterMaskSurfaceId` names one immutable historical bitmap. Any patch that owns
+    // `filterMaskSrc` is a new inline authority (paint/add/delete/invert/replace), so atomically
+    // remove the durable reference in the same undo/CRDT transition. Keeping it would allow the
+    // hydrator to project the old surface over the new PNG; assigning `undefined` is insufficient
+    // because the portable archive deliberately detects own-properties fail-closed.
+    const replacesInlineFilterMask =
+      target.type === "image" && Object.hasOwn(patch, "filterMaskSrc");
+    const changed = (
+      replacesInlineFilterMask && Object.hasOwn(target, "filterMaskSurfaceId")
+    ) || Object.entries(patch).some(([key, value]) =>
       !studioPatchValuesEqual((target as unknown as Record<string, unknown>)[key], value)
     );
     if (!changed) return true;
-    const committed = commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+    const committed = commit(elements.map((e) => {
+      if (e.id !== id) return e;
+      return replacesInlineFilterMask && e.type === "image"
+        ? applyStudioInlineFilterMaskMutation(
+            e,
+            patch as unknown as StudioInlineFilterMaskMutationPatch
+          )
+        : ({ ...e, ...patch } as El);
+    }));
     if (!committed) return false;
     maybeRecordMacroFromPatch(patch);
     return true;
@@ -19739,6 +19838,44 @@ const puppetWarpArmed =
       groups: plan.nextGroups,
       ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
     })) return false;
+    const magicMask = result.magicFilterMask;
+    const magicTarget = magicAttachment.applied
+      ? nextElements.find((element) => element.id === magicAttachment.targetElementId)
+      : null;
+    const rasterWorkId = authorizedWorkAssetScopeId;
+    const rasterActorId = studioAuthUserId;
+    const rasterDocument = studioCrdtDocumentRef.current;
+    const rasterRuntime = studioCrdtSceneRuntimeRef.current;
+    if (
+      magicAttachment.applied
+      && magicMask
+      && magicTarget?.type === "image"
+      && rasterWorkId
+      && rasterActorId
+      && rasterDocument
+      && rasterRuntime
+      && studioCrdtOperationSyncReady
+      && !collaborationDocumentLocked
+    ) {
+      const publicationGeneration = studioFilterMaskPublicationClockRef.current + 1;
+      studioFilterMaskPublicationClockRef.current = publicationGeneration;
+      studioFilterMaskPublicationGenerationRef.current.set(
+        magicAttachment.targetElementId,
+        publicationGeneration
+      );
+      queueStudioBg3dMagicFilterMaskPublication({
+        pageId: activePage.id,
+        layerId: magicTarget.groupId ?? "page-root",
+        targetElementId: magicAttachment.targetElementId,
+        mask: magicMask,
+        workId: rasterWorkId,
+        actorId: rasterActorId,
+        document: rasterDocument,
+        runtime: rasterRuntime,
+        accessGeneration: collaborationAccessRef.current.accessGeneration,
+        publicationGeneration,
+      });
+    }
     if (nextDrawingAssist) {
       setDrawingAssistPreview(null);
     }
@@ -29644,6 +29781,212 @@ const puppetWarpArmed =
     },
   });
 
+  function queueStudioBg3dMagicFilterMaskPublication(input: {
+    readonly pageId: string;
+    readonly layerId: string;
+    readonly targetElementId: string;
+    readonly mask: StudioBackground3DMagicFilterMask;
+    readonly workId: string;
+    readonly actorId: string;
+    readonly document: StudioCrdtDocument;
+    readonly runtime: StudioCrdtSceneGraphRuntime;
+    readonly accessGeneration: number;
+    readonly publicationGeneration: number;
+  }): void {
+    const controller = new AbortController();
+    studioRasterPublicationControllersRef.current.add(controller);
+    const scopeIsCurrent = () => {
+      const access = collaborationAccessRef.current;
+      return (
+        editorMountedRef.current
+        && !documentSaveInFlightRef.current
+        && !access.locked
+        && access.authScopeKey === input.actorId
+        && access.workId === input.workId
+        && access.accessGeneration === input.accessGeneration
+        && (
+          studioFilterMaskPublicationGenerationRef.current.get(input.targetElementId)
+          === input.publicationGeneration
+        )
+        && studioCrdtDocumentRef.current === input.document
+        && studioCrdtSceneRuntimeRef.current === input.runtime
+      );
+    };
+    const currentTarget = (): ImageEl | null => {
+      const history = pagesHistoryRef.current;
+      const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
+      const page = history[currentIndex]?.find(({ id }) => id === input.pageId) ?? null;
+      const target = page?.elements.find(({ id }) => id === input.targetElementId) ?? null;
+      if (
+        !page
+        || target?.type !== "image"
+        || target.filterMaskSrc !== input.mask.pngDataUrl
+        || target.filterMaskSurfaceId !== undefined
+        || (target.groupId ?? "page-root") !== input.layerId
+        || isEffectivelyLocked(target, page.groups ?? [])
+      ) {
+        return null;
+      }
+      return target;
+    };
+    const abortForStaleScope = (): never => {
+      throw new DOMException(
+        "3D Magic Layer 또는 공동 편집 권한이 변경되었습니다.",
+        "AbortError"
+      );
+    };
+
+    const run = async () => {
+      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
+      const [
+        publicationModule,
+        rasterPublisherModule,
+        assetClientModule,
+        maskImage,
+      ] = await Promise.all([
+        import("./studio-filter-mask-surface-publisher"),
+        import("./studio-crdt-raster-patch-publisher"),
+        import("./studio-raster-asset-client"),
+        loadStudioPixelEditImage(input.mask.pngDataUrl, controller.signal),
+      ]);
+      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
+      const width = maskImage.naturalWidth || maskImage.width;
+      const height = maskImage.naturalHeight || maskImage.height;
+      if (width !== input.mask.width || height !== input.mask.height) {
+        throw new Error("3D Magic Layer 마스크의 디코드 크기가 캡처 계약과 다릅니다.");
+      }
+      const made = createStudioPixelEditCanvas(width, height);
+      if (!made) throw new Error("3D Magic Layer 게시용 픽셀 표면을 만들 수 없습니다.");
+      made.ctx.clearRect(0, 0, width, height);
+      made.ctx.drawImage(maskImage, 0, 0);
+      const pixels = made.ctx.getImageData(0, 0, width, height).data;
+      const sourceIdentity = await input.runtime.sha256RasterSemanticParameters(
+        input.mask.pngDataUrl,
+        controller.signal
+      );
+      if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
+      const encoder = rasterPublisherModule.createStudioRasterBrowserPngEncoder();
+
+      await publicationModule.publishStudioFilterMaskSurface({
+        workId: input.workId,
+        actorId: input.actorId,
+        pageId: input.pageId,
+        layerId: input.layerId,
+        targetElementId: input.targetElementId,
+        sourceIdentity,
+        selectedObjectStableId: input.mask.selectedObjectStableId,
+        generation: input.publicationGeneration,
+        width,
+        height,
+        pixels,
+        signal: controller.signal,
+      }, {
+        encode: encoder,
+        upload: (workId, { reference, bytes, signal }) => {
+          if (workId !== input.workId) abortForStaleScope();
+          return assetClientModule.uploadStudioRasterAsset(
+            workId,
+            reference,
+            bytes,
+            signal
+          );
+        },
+        append: (log) => {
+          if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
+          input.document.mergeRasterOperationLog(log);
+        },
+        compensate: (workId, { reference, signal }) => {
+          if (workId !== input.workId) return Promise.resolve(false);
+          return assetClientModule.deleteUnreferencedStudioRasterAssetUpload(
+            workId,
+            reference,
+            signal
+          );
+        },
+        canWriteLayer: (guardInput) => (
+          guardInput.actorId === input.actorId
+          && guardInput.pageId === input.pageId
+          && guardInput.layerId === input.layerId
+          && guardInput.intent === "paint"
+          && scopeIsCurrent()
+          && currentTarget() !== null
+        ),
+        isCurrent: () => scopeIsCurrent() && currentTarget() !== null,
+        nextLogicalClock: () =>
+          input.runtime.nextRasterLogicalClock(input.document.getRasterOperationLogs()),
+        sha256SemanticParameters: (canonicalParameters, signal) =>
+          input.runtime.sha256RasterSemanticParameters(canonicalParameters, signal),
+        waitForAuthoritativeAck: async ({ signal }) => {
+          const barrier = studioCrdtAuthoritativeSaveBarrierRef.current;
+          if (!barrier) {
+            throw new DOMException(
+              "3D Magic Layer 서버 승인 경계가 준비되지 않았습니다.",
+              "AbortError"
+            );
+          }
+          if (!scopeIsCurrent() || signal.aborted) abortForStaleScope();
+          return barrier(10_000);
+        },
+        attachSceneReference: ({ filterMaskSurfaceId }) => {
+          if (!scopeIsCurrent() || !currentTarget()) abortForStaleScope();
+          const history = pagesHistoryRef.current;
+          const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
+          const admitted = attachStudioFilterMaskSurfaceAcrossHistory<El, PageState>({
+            history,
+            currentIndex,
+            targetElementId: input.targetElementId,
+            expectedInlineSource: input.mask.pngDataUrl,
+            surfaceId: filterMaskSurfaceId,
+          });
+          if (!admitted.changed || !markStudioDocumentChanged()) abortForStaleScope();
+          if (!publishStudioCrdtSceneTransitionRef.current(
+            admitted.previousCurrentPages,
+            admitted.nextCurrentPages
+          )) {
+            throw new Error("승인된 3D Magic Layer 참조를 팀 문서에 반영하지 못했습니다.");
+          }
+          pagesHistoryRef.current = admitted.history;
+          rebaseStudioHistoryJournal(
+            admitted.nextCurrentPages,
+            currentIndex,
+            "Magic filter-mask surface admission"
+          );
+          setPagesHistoryState(admitted.history);
+        },
+      });
+    };
+
+    const task = studioRasterPublicationTailRef.current
+      .catch(() => undefined)
+      .then(run);
+    studioRasterPublicationTailRef.current = task.then(
+      () => undefined,
+      () => undefined
+    );
+    void task.catch((cause: unknown) => {
+      if (
+        controller.signal.aborted
+        || (cause instanceof DOMException && cause.name === "AbortError")
+        || !scopeIsCurrent()
+      ) {
+        return;
+      }
+      setError(
+        cause instanceof Error
+          ? `3D Magic Layer 공유 표면 게시: ${cause.message} 인라인 마스크는 안전하게 유지됩니다.`
+          : "3D Magic Layer 공유 표면을 게시하지 못해 인라인 마스크를 유지했습니다."
+      );
+    }).finally(() => {
+      studioRasterPublicationControllersRef.current.delete(controller);
+      if (
+        studioFilterMaskPublicationGenerationRef.current.get(input.targetElementId)
+        === input.publicationGeneration
+      ) {
+        studioFilterMaskPublicationGenerationRef.current.delete(input.targetElementId);
+      }
+    });
+  }
+
   function queueStudioRasterDrawPromotion(input: {
     plan: NonNullable<ReturnType<StudioCrdtSceneGraphRuntime["planRasterDrawPromotion"]>>;
     pageId: string;
@@ -31494,6 +31837,25 @@ const puppetWarpArmed =
         }
         setSharedDocumentNotice(null);
       }
+      // Render-only Blob URLs never cross the canonical save boundary. Once a referenced
+      // immutable mask is present in the exact CRDT raster registry (and, for shared documents,
+      // the authoritative barrier above has acknowledged the registry), its inline data-URL
+      // fallback is redundant and deliberately omitted. Local/unpublished masks retain the
+      // fallback so an unsaved document remains portable.
+      const crdtDocumentAtSave = studioCrdtDocumentRef.current;
+      const isDurableFilterMaskSurface = (surfaceId: string) =>
+        (crdtDocumentAtSave?.getRasterOperationLog(surfaceId) ?? null) !== null;
+      const serverSavePages = projectStudioFilterMaskPagesForServerSave(
+        savePages,
+        isDurableFilterMaskSurface
+      );
+      const serverSaveMaster: DocumentMaster<El> = {
+        ...master,
+        elements: projectStudioFilterMaskElementsForServerSave(
+          master.elements,
+          isDurableFilterMaskSurface
+        ),
+      };
       const pageImages: string[] = [];
 
       for (const page of savePages) {
@@ -31528,9 +31890,9 @@ const puppetWarpArmed =
           // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오 소유 키만 덮어쓴다.
           extensionBase: sharedDocument?.document.doc ?? loadedWork?.doc,
           width: CANVAS_W,
-          pagesList: savePages,
+          pagesList: serverSavePages,
           // 비어 있는 마스터는 undefined여서 JSON 직렬화 시 키가 떨어진다(하위호환).
-          master: serializeDocumentMaster(master),
+          master: serializeDocumentMaster(serverSaveMaster),
           characterBible,
           writerRoom,
           aiProvenance,
@@ -34059,6 +34421,26 @@ function clearSelectionForEdit() {
 
   // 스튜디오 프로젝트 내보내기 (.json). 새 파일은 버전·문서 식별자·revision을 명시한
   // canonical envelope이고, 불러오기는 과거 raw v1/v2 JSON도 계속 지원한다.
+  const filterMaskSurfaceArchiveDependencies = (
+    workId
+    && authorizedWorkAssetScopeId === workId
+    && studioCrdtDocument
+    && studioCrdtDocumentReady
+  )
+    ? {
+        document: studioCrdtDocument,
+        download: async (
+          reference: Parameters<
+            typeof import("./studio-raster-asset-client").downloadStudioRasterAsset
+          >[1],
+          signal?: AbortSignal,
+        ) => {
+          const { downloadStudioRasterAsset } = await import("./studio-raster-asset-client");
+          const downloaded = await downloadStudioRasterAsset(workId, reference, signal);
+          return downloaded.bytes;
+        },
+      }
+    : undefined;
   const projectArchiveOrchestration = useStudioProjectArchiveOrchestration({
     workId,
     remixId,
@@ -34072,6 +34454,7 @@ function clearSelectionForEdit() {
     projectDocumentSessionRef: studioProjectDocumentSessionRef,
     ensureSharedDocumentAvailableForExport,
     currentStudioProjectSnapshot,
+    filterMaskSurfaceArchiveDependencies,
     loadStudioReleaseScheduleRuntime,
     normalizeStudioPublicationAnalyticsDeferred,
     captureStudioMutationTicket,
@@ -36715,7 +37098,7 @@ function clearSelectionForEdit() {
           master={master}
           masterEditMode={masterEditMode}
           masterPanelOpen={masterPanelOpen}
-          masterRenderEls={studioBrushR8GrainMasterRenderElements}
+          masterRenderEls={studioFilterMaskMasterRenderElements}
           mobileImmersive={mobileImmersive}
           mobileKeyboardInset={mobileKeyboardInset}
           navigate={navigate}
@@ -36838,7 +37221,7 @@ function clearSelectionForEdit() {
           studioRasterOverlayElements={studioRasterOverlayElements}
           studioRasterVisibleDocumentRect={studioRasterVisibleDocumentRect}
           studioWorkAssetRenderPlaceholders={studioWorkAssetRenderPlaceholders}
-          studioWorkAssetRenderProjection={studioWorkAssetRenderProjection}
+          studioWorkAssetRenderProjection={studioCanvasWorkAssetRenderProjection}
           symmetryCenterX={symmetryCenterX}
           symmetryCenterY={symmetryCenterY}
           symmetryRadialCount={symmetryRadialCount}

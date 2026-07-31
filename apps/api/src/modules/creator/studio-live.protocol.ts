@@ -881,16 +881,29 @@ export interface StudioLiveJoinResult {
   screenShares: StudioLiveActiveScreenShare[];
 }
 
+export interface StudioLiveIdentityClaim {
+  connectionId: string;
+  workId: string;
+  clientInstanceId: string;
+  /**
+   * Domain-separated HMAC of the authenticated database principal. It is comparison-only,
+   * adapter-visible metadata and never a session credential or raw user identifier.
+   */
+  principalFingerprint: string;
+}
+
 export interface StudioLiveSocketData {
   /**
-   * Adapter-visible, public-only presence record. Shared Socket.IO adapters expose `socket.data`
-   * through `fetchSockets()`, so this is the cluster-safe discovery surface. Never place the
-   * internal user id, work authorization timestamps, or session principal in this record.
+   * Shared Socket.IO adapters expose `socket.data` through `fetchSockets()`, so this discovery
+   * surface contains only public presence plus a comparison-only HMAC identity claim. Never place
+   * the internal user id, work authorization timestamps, session principal, or credential here.
    */
   studioParticipant?: StudioLiveParticipant;
   studioWorkId?: string;
   studioVoiceMember?: StudioLiveVoiceMember;
   studioScreenShare?: StudioLiveActiveScreenShare;
+  studioIdentityClaim?: StudioLiveIdentityClaim;
+  studioPendingIdentityClaim?: StudioLiveIdentityClaim;
 }
 
 export interface StudioLiveClientToServerEvents {

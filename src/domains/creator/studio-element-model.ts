@@ -73,6 +73,7 @@ import type {
 } from "./studio-tone-artifact-filter-kernels";
 import type { Vibrance } from "./studio-vibrance";
 import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import type { StudioFilterMaskSurfaceId } from "@/lib/studio-filter-mask-surface-contract";
 import type { StudioInkInputContract } from "@/lib/studio-ink-input-contract";
 
 export interface ImageEl {
@@ -177,6 +178,9 @@ export interface ImageEl {
   // 요소-로컬 그레이스케일 마스크(el.src 자연 해상도 기준, maskSrc와 동일 좌표 규약).
   // 흰색/불투명=필터 결과, 검정/투명=원본, 회색=선형 블렌드. 미설정=기존 전체 적용과 동일.
   // 가시성을 자르는 maskSrc(레이어 마스크)와는 독립 축 — studio-filter-mask.ts 참고.
+  /** Shared-work canonical identity; binary mask bytes live in immutable raster CRDT assets. */
+  filterMaskSurfaceId?: StudioFilterMaskSurfaceId;
+  /** Legacy/local/offline materialization. Shared canonical documents prefer filterMaskSurfaceId. */
   filterMaskSrc?: string;
   filterMaskEnabled?: boolean;
   // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.

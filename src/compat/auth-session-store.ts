@@ -40,20 +40,54 @@ export function useSession(): SessionContextValue {
 
 // GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을
 // 서버에서 검증해 세션을 확정한다. 리다이렉트 없이 모달에서 바로 로그인 완료.
-export async function signInWithGoogleIdToken(idToken: string) {
-  const response = await api.raw(apiPath("/auth/oauth/google/id-token"), {
-    method: "POST",
-    throwHttpErrors: false,
-    json: { idToken },
-  });
-  const payload = (await response.json().catch(() => null)) as
-    | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
-    | null;
-  if (!response.ok || !payload?.user) {
-    return { ok: false, error: payload?.error ?? "auth-failed", status: response.status };
+export type GoogleIdTokenSignInResult =
+  | { ok: true; error: null; status: number }
+  | { ok: false; error: string; status: number };
+
+const GOOGLE_ID_TOKEN_MAX_LENGTH = 16_384;
+
+export async function signInWithGoogleIdToken(
+  idToken: string,
+  options?: { signal?: AbortSignal },
+): Promise<GoogleIdTokenSignInResult> {
+  const token = typeof idToken === "string" ? idToken.trim() : "";
+  if (
+    !token
+    || token.length > GOOGLE_ID_TOKEN_MAX_LENGTH
+    || token.split(".").length !== 3
+  ) {
+    return { ok: false, error: "Google 로그인 응답 형식이 올바르지 않아요.", status: 400 };
   }
-  persistSession({ user: payload.user, token: payload.token ?? null });
-  return { ok: true, error: null, status: response.status };
+
+  try {
+    const response = await api.raw(apiPath("/auth/oauth/google/id-token"), {
+      method: "POST",
+      throwHttpErrors: false,
+      json: { idToken: token },
+      signal: options?.signal,
+    });
+    const payload = (await response.json().catch(() => null)) as
+      | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
+      | null;
+    if (!response.ok || !payload?.user) {
+      return {
+        ok: false,
+        error: payload?.error ?? "Google 로그인에 실패했어요. 다시 시도해 주세요.",
+        status: response.status,
+      };
+    }
+    persistSession({ user: payload.user, token: payload.token ?? null });
+    return { ok: true, error: null, status: response.status };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { ok: false, error: "Google 로그인 요청이 취소되었어요.", status: 0 };
+    }
+    return {
+      ok: false,
+      error: "로그인 서버에 연결하지 못했어요. 네트워크를 확인해 주세요.",
+      status: 0,
+    };
+  }
 }
 
 export async function signIn(provider?: string, options?: Record<string, unknown>) {

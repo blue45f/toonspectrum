@@ -12,6 +12,9 @@ import {
 } from "./studio-crdt-page-bridge";
 import { publishStudioCrdtSceneGraphDiff } from "./studio-crdt-scene-publisher";
 
+const FILTER_MASK_SURFACE_ID =
+  "filter-mask:v1:10000000-0000-4000-8000-000000000001";
+
 interface TestElement {
   id: string;
   type: string;
@@ -211,6 +214,70 @@ describe("studio CRDT universal reference topology", () => {
     expect(result[0]!.elements[1]!.src).toBe("work-asset://image/image-a");
     expect(JSON.stringify(result)).not.toContain("base64");
     document.destroy();
+  });
+
+  it("syncs an immutable mask binding without admitting or leaking a local image body", () => {
+    const localImage = {
+      ...asset(
+        "masked-image",
+        "image",
+        "data:image/png;base64,local-image",
+      ),
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: true,
+      filterMaskSrc: "data:image/png;base64,legacy-local-mask",
+    };
+    const encoded = studioElementToCrdtSceneElement("page-a", localImage);
+
+    expect(encoded.payload).toEqual({
+      version: 1,
+      type: "reference",
+      props: {
+        elementType: "image",
+        filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+        filterMaskEnabled: true,
+      },
+    });
+    expect(JSON.stringify(encoded)).not.toContain("local-image");
+    expect(JSON.stringify(encoded)).not.toContain("legacy-local-mask");
+    expect(studioCrdtElementToSceneElement({
+      ...encoded,
+      deleted: false,
+      orderIndex: 0,
+    }, localImage)).toMatchObject({
+      id: localImage.id,
+      src: localImage.src,
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: true,
+    });
+
+    const admittedImage = {
+      ...localImage,
+      src: "work-asset://image/masked-image",
+    };
+    expect(studioElementToCrdtSceneElement("page-a", admittedImage).payload.props).toMatchObject({
+      elementType: "image",
+      x: 10,
+      y: 20,
+      width: 300,
+      height: 400,
+      rotation: 5,
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+      filterMaskEnabled: true,
+    });
+
+    const malformedMaskImage: TestElement = {
+      ...localImage,
+      filterMaskSurfaceId: "data:image/png;base64,AA==",
+    };
+    const maskedModel: TestElement = {
+      ...asset("model", "vrm", "data:model/gltf-binary;base64,AA=="),
+      filterMaskSurfaceId: FILTER_MASK_SURFACE_ID,
+    };
+    expect(() => studioElementToCrdtSceneElement("page-a", malformedMaskImage))
+      .toThrow("surface ID");
+    expect(() => studioElementToCrdtSceneElement("page-a", maskedModel))
+      .toThrow("이미지 참조");
   });
 
   it("converges an image page move with a peer z-order edit and resolves same-named groups by page", () => {

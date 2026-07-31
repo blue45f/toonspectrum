@@ -65,6 +65,9 @@ import {
   type StudioLiveTransportFactory,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import {
+  createStudioCloudflarePurposeRoutedLiveTransportFactory,
+} from "./studio-live-purpose-routed-transport";
 import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
 import {
   isRecord,
@@ -88,13 +91,16 @@ import {
   type ServerParticipant,
   type ServerVoiceMember,
 } from "./studio-live-socket-wire";
+import {
+  resolveStudioCloudflareRealtimeOrigin,
+} from "./studio-realtime-provider-cloudflare-adapter";
 import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
 import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
 const SOCKET_PATH = "/socket.io";
-const CONNECT_TIMEOUT_MS = 10_000;
+const CONNECT_TIMEOUT_MS = 15_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
 const CRDT_WIRE_SELECT_ACK_TIMEOUT_MS = 8_000;
 const LOCK_ACK_TIMEOUT_MS = 10_000;
@@ -108,17 +114,25 @@ const MAX_PENDING_LOCK_DELTAS = 512;
 const MAX_PENDING_VOICE_SIGNALS = 256;
 const MAX_ABANDONED_LOCK_ACQUISITIONS = 512;
 const MAX_LOCK_REVISION_WATERMARKS = 1_024;
+const MAX_CANONICAL_SESSION_TOMBSTONES = 2_048;
 const ABANDONED_LOCK_ACQUISITION_TTL_MS = 90_000;
 const JOIN_RESYNC_RETRY_BASE_MS = 500;
 const JOIN_RESYNC_RETRY_MAX_MS = 10_000;
 const JOIN_RATE_LIMIT_RETRY_MS = 60_000;
+const DEFAULT_STUDIO_REALTIME_PROVIDER_ID = "cloudflare-realtime-v1";
+const STUDIO_REALTIME_PROVIDER_ID =
+  /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,159}$/u;
 
-/** Bounded reconnects prevent an unavailable configured server from logging forever. */
+/**
+ * Bounded retries still cover a free container's cold start. Production never constructs this
+ * socket without an explicit long-running origin, so the larger window cannot revive the old
+ * Vercel-serverless reconnect loop.
+ */
 export const STUDIO_LIVE_SOCKET_RETRY_POLICY = Object.freeze({
   reconnection: true,
-  reconnectionAttempts: 3,
+  reconnectionAttempts: 8,
   reconnectionDelay: 1_000,
-  reconnectionDelayMax: 5_000,
+  reconnectionDelayMax: 8_000,
   randomizationFactor: 0.25,
   timeout: CONNECT_TIMEOUT_MS,
 });
@@ -248,6 +262,48 @@ function runtimeSocketEndpoint(): string | null {
   });
 }
 
+export interface StudioRealtimePurposeRoutingEnvironment {
+  readonly realtimeOrigin?: string;
+  readonly providerId?: string;
+}
+
+function resolveStudioRealtimeProviderId(
+  value: string | null | undefined,
+): string | null {
+  const providerId = value?.trim() || DEFAULT_STUDIO_REALTIME_PROVIDER_ID;
+  return STUDIO_REALTIME_PROVIDER_ID.test(providerId) ? providerId : null;
+}
+
+/**
+ * Activates the purpose-specific Cloudflare data plane only for an exact HTTPS origin. Missing or
+ * malformed browser configuration leaves the proven primary transport untouched. The ticket
+ * endpoint intentionally remains the same trusted API base instead of accepting another VITE URL
+ * that could receive the signed session header.
+ */
+export function applyStudioRealtimePurposeRouting(
+  primaryFactory: StudioLiveTransportFactory,
+  sessionToken: string,
+  environment: StudioRealtimePurposeRoutingEnvironment,
+): StudioLiveTransportFactory {
+  const realtimeOrigin = resolveStudioCloudflareRealtimeOrigin(
+    environment.realtimeOrigin,
+  );
+  const providerId = resolveStudioRealtimeProviderId(environment.providerId);
+  if (!realtimeOrigin || !providerId) return primaryFactory;
+  return (context) => {
+    const primary = primaryFactory(context);
+    // A browser-local BroadcastChannel cannot provide remote CRDT/locks/chat authority. Wrapping
+    // it with remote presence would advertise collaborators the document path can never reach.
+    if (primary.mode !== "server") return primary;
+    return createStudioCloudflarePurposeRoutedLiveTransportFactory({
+      primaryFactory: () => primary,
+      sessionToken,
+      realtimeOrigin,
+      providerId,
+    })(context);
+  };
+}
+
 function createSocketAtEndpoint(
   endpoint: string,
   auth: { sessionToken: string },
@@ -371,6 +427,17 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly abandonedLockAcquisitions = new Map<string, AbandonedLockAcquisition>();
   private readonly abandonedLockRequestIdsByResource = new Map<string, Set<string>>();
   private readonly participants = new Map<string, ServerParticipant>();
+  /**
+   * Socket connection ids are intentionally short-lived, while Studio room identity is the
+   * authenticated client-instance id. Keep a bounded bridge (including recent leave tombstones)
+   * so a hybrid provider can merge Socket.IO and purpose-provider events without rendering one
+   * person twice or losing a final leave event after the participant map is pruned.
+   */
+  private readonly canonicalSessionByConnection = new Map<string, string>();
+  private readonly activeConnectionsByCanonicalSession = new Map<
+    string,
+    Set<string>
+  >();
   private readonly sequenceByConnection = new Map<string, number>();
   private readonly activeScreenShareByConnection = new Map<
     string,
@@ -470,6 +537,46 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.selectedCrdtWireFormat !== null &&
       this.socket.connected
     );
+  }
+
+  canonicalSessionId(transportSessionId: string): string {
+    if (transportSessionId === this.context.participant.sessionId) {
+      return transportSessionId;
+    }
+    if (transportSessionId === this.selfConnectionId) {
+      return this.context.participant.sessionId;
+    }
+    const participant = this.participants.get(transportSessionId);
+    if (participant) {
+      this.rememberCanonicalSession(
+        participant.connectionId,
+        participant.clientInstanceId,
+      );
+      const active = this.activeConnectionsByCanonicalSession.get(
+        participant.clientInstanceId,
+      );
+      return active?.size === 1 && active.has(participant.connectionId)
+        ? participant.clientInstanceId
+        : transportSessionId;
+    }
+    const canonical =
+      this.canonicalSessionByConnection.get(transportSessionId);
+    if (!canonical) return transportSessionId;
+    const active = this.activeConnectionsByCanonicalSession.get(canonical);
+    // A tombstoned connection may be canonicalized only after the last active connection for
+    // that identity has left. Otherwise an older tab's leave could remove a newer active tab.
+    return active && active.size > 0 ? transportSessionId : canonical;
+  }
+
+  transportSessionId(canonicalSessionId: string): string | null {
+    if (canonicalSessionId === this.context.participant.sessionId) {
+      return this.selfConnectionId;
+    }
+    if (this.participants.has(canonicalSessionId)) return canonicalSessionId;
+    const active =
+      this.activeConnectionsByCanonicalSession.get(canonicalSessionId);
+    if (!active || active.size !== 1) return null;
+    return active.values().next().value ?? null;
   }
 
   connect(): Promise<void> {
@@ -1276,6 +1383,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingCrdtPublishes.clear();
     this.seenCrdtUpdateIds.clear();
     this.participants.clear();
+    this.canonicalSessionByConnection.clear();
+    this.activeConnectionsByCanonicalSession.clear();
     this.sequenceByConnection.clear();
     this.activeScreenShareByConnection.clear();
     this.shareIdByConnection.clear();
@@ -1478,6 +1587,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const participant = this.participants.get(connectionId);
     const voice = this.voiceMemberByConnection.get(connectionId);
     const pendingVoice = this.pendingVoiceByConnection.get(connectionId);
+    if (participant) {
+      this.rememberCanonicalSession(
+        participant.connectionId,
+        participant.clientInstanceId,
+      );
+    }
+    this.unindexActiveParticipant(participant);
     this.participants.delete(connectionId);
     this.activeScreenShareByConnection.delete(connectionId);
     this.shareIdByConnection.delete(connectionId);
@@ -1496,11 +1612,12 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private applyPresenceUpdate(participant: ServerParticipant): void {
     const previous = this.participants.get(participant.connectionId);
     if (previous && Date.parse(previous.updatedAt) > Date.parse(participant.updatedAt)) return;
-    this.participants.set(participant.connectionId, participant);
+    this.setActiveParticipant(participant);
     if (participant.connectionId === this.selfConnectionId) return;
     this.deliver(participant, "presence:heartbeat", {
       visibility: participant.state === "active" ? "active" : "idle",
       pageId: participant.pageId,
+      tool: participant.tool,
     });
     this.replayPendingVoiceForParticipant(participant);
   }
@@ -1610,6 +1727,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private stagePresenceDelta(delta: PendingPresenceDelta): void {
     if (delta.kind === "leave") {
+      this.unindexActiveParticipant(
+        this.participants.get(delta.connectionId),
+      );
       this.participants.delete(delta.connectionId);
       this.activeScreenShareByConnection.delete(delta.connectionId);
       this.shareIdByConnection.delete(delta.connectionId);
@@ -1617,7 +1737,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
     const previous = this.participants.get(delta.participant.connectionId);
     if (!previous || Date.parse(previous.updatedAt) <= Date.parse(delta.participant.updatedAt)) {
-      this.participants.set(delta.participant.connectionId, delta.participant);
+      this.setActiveParticipant(delta.participant);
     }
   }
 
@@ -2509,12 +2629,16 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.lockProtocolVersion = reconciledSnapshot.lockProtocolVersion;
     this.lockRevisionVersion = reconciledSnapshot.lockRevisionVersion;
     this.selfConnectionId = reconciledSnapshot.self.connectionId;
+    this.rememberCanonicalSession(
+      reconciledSnapshot.self.connectionId,
+      this.context.participant.sessionId,
+    );
     this.joined = true;
     this.pendingInitialSnapshot = reconciledSnapshot;
     // Stage the authoritative identity map immediately so an update arriving between join ACK and
     // the room's first heartbeat can still resolve lock owners and targeted connection ids.
     for (const participant of reconciledSnapshot.participants) {
-      this.participants.set(participant.connectionId, participant);
+      this.setActiveParticipant(participant);
     }
     if (reconciledSnapshot.crdtWireAdvertisement) {
       this.selectCrdtBinaryWire(
@@ -2857,6 +2981,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const next = new Map(nextParticipants.map((participant) => [participant.connectionId, participant]));
     for (const previous of this.participants.values()) {
       if (previous.connectionId === this.selfConnectionId || next.has(previous.connectionId)) continue;
+      this.unindexActiveParticipant(previous);
       const voice = this.voiceMemberByConnection.get(previous.connectionId);
       if (voice) this.deliver(previous, "voice:leave", { callId: voice.callId });
       this.deliver(previous, "presence:leave", {});
@@ -2866,12 +2991,14 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.pendingVoiceByConnection.delete(previous.connectionId);
     }
     this.participants.clear();
-    for (const participant of next.values()) this.participants.set(participant.connectionId, participant);
+    this.activeConnectionsByCanonicalSession.clear();
+    for (const participant of next.values()) this.setActiveParticipant(participant);
     for (const participant of next.values()) {
       if (participant.connectionId === this.selfConnectionId) continue;
       this.deliver(participant, "presence:heartbeat", {
         visibility: participant.state === "active" ? "active" : "idle",
         pageId: participant.pageId,
+        tool: participant.tool,
       });
       this.replayPendingVoiceForParticipant(participant);
     }
@@ -3126,6 +3253,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     targetSessionId: string | null = null
   ): void {
     if (!this.ready || sender.connectionId === this.selfConnectionId) return;
+    this.rememberCanonicalSession(sender.connectionId, sender.clientInstanceId);
     const previous = this.sequenceByConnection.get(sender.connectionId) ?? 0;
     if (previous >= Number.MAX_SAFE_INTEGER) return;
     const sequence = previous + 1;
@@ -3147,6 +3275,64 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message: "팀 서버에서 받은 공동작업 신호를 안전하게 처리하지 못했습니다.",
         recoverable: true,
       });
+    }
+  }
+
+  private rememberCanonicalSession(
+    connectionId: string,
+    canonicalSessionId: string,
+  ): void {
+    this.canonicalSessionByConnection.delete(connectionId);
+    this.canonicalSessionByConnection.set(connectionId, canonicalSessionId);
+    if (
+      this.canonicalSessionByConnection.size <=
+      MAX_CANONICAL_SESSION_TOMBSTONES
+    ) {
+      return;
+    }
+    const oldest = this.canonicalSessionByConnection.keys().next().value;
+    if (typeof oldest === "string") {
+      this.canonicalSessionByConnection.delete(oldest);
+    }
+  }
+
+  private setActiveParticipant(participant: ServerParticipant): void {
+    const previous = this.participants.get(participant.connectionId);
+    if (
+      previous &&
+      previous.clientInstanceId !== participant.clientInstanceId
+    ) {
+      this.unindexActiveParticipant(previous);
+    }
+    this.participants.set(participant.connectionId, participant);
+    this.rememberCanonicalSession(
+      participant.connectionId,
+      participant.clientInstanceId,
+    );
+    const active =
+      this.activeConnectionsByCanonicalSession.get(
+        participant.clientInstanceId,
+      ) ?? new Set<string>();
+    active.add(participant.connectionId);
+    this.activeConnectionsByCanonicalSession.set(
+      participant.clientInstanceId,
+      active,
+    );
+  }
+
+  private unindexActiveParticipant(
+    participant: ServerParticipant | undefined,
+  ): void {
+    if (!participant) return;
+    const active = this.activeConnectionsByCanonicalSession.get(
+      participant.clientInstanceId,
+    );
+    if (!active) return;
+    active.delete(participant.connectionId);
+    if (active.size === 0) {
+      this.activeConnectionsByCanonicalSession.delete(
+        participant.clientInstanceId,
+      );
     }
   }
 
@@ -4323,13 +4509,25 @@ export function createStudioServerLiveTransportFactory(
     ...transportDependencies
   } = dependencies;
 
-  if (!endpoint) return localTransportFactory;
-  const serverDependencies: StudioLiveSocketTransportDependencies = {
-    ...transportDependencies,
-    createSocket:
-      dependencies.createSocket
-      ?? ((auth) => createSocketAtEndpoint(endpoint, auth)),
-  };
-  return (context) =>
-    new StudioLiveSocketTransport(context, sessionToken, serverDependencies);
+  const primaryFactory: StudioLiveTransportFactory = endpoint
+    ? (() => {
+        const serverDependencies: StudioLiveSocketTransportDependencies = {
+          ...transportDependencies,
+          createSocket:
+            dependencies.createSocket
+            ?? ((auth) => createSocketAtEndpoint(endpoint, auth)),
+        };
+        return (context) =>
+          new StudioLiveSocketTransport(
+            context,
+            sessionToken,
+            serverDependencies,
+          );
+      })()
+    : localTransportFactory;
+
+  return applyStudioRealtimePurposeRouting(primaryFactory, sessionToken, {
+    realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
+    providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
+  });
 }

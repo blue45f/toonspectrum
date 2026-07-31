@@ -26,6 +26,13 @@ const creatorModuleSource = readFileSync(
   "utf8"
 );
 const ciSource = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const productionMigrationManifestSource = readFileSync(
+  new URL(
+    "../scripts/production-database-migrations.manifest",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 describe("creator asset marketplace persistence boundary", () => {
   it("quarantines legacy rows and makes explicit rights a database invariant for publication", () => {
@@ -73,7 +80,11 @@ describe("creator asset marketplace persistence boundary", () => {
     expect(creatorModuleSource).toContain("creatorAssetSchemaPreflightProvider");
     expect(preflightSource).toContain("to_regclass('public.creator_asset')");
     expect(preflightSource).toContain("to_regclass('public.creator_asset_report')");
-    expect(ciSource).toContain("lib/db/migrations/0013_creator_asset_marketplace.sql");
+    expect(productionMigrationManifestSource).toContain(
+      "lib/db/migrations/0013_creator_asset_marketplace.sql"
+    );
+    expect(ciSource).toContain("scripts/production-database-migrations.manifest");
+    expect(ciSource).toContain("run-production-database-migrations.mjs");
   });
 
   it("repairs every owned index to its canonical table, key, direction, and predicate", () => {

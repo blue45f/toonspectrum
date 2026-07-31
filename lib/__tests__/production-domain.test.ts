@@ -52,7 +52,7 @@ describe("toonstudio.cloud production domain", () => {
     }
   });
 
-  it("documents exact production API, OAuth and web origins without secrets", () => {
+  it("keeps full API origins canonical while Render stays a least-privilege realtime host", () => {
     const deployment = read("deploy/oci/.env.example");
     const production = read(".env.production.example");
     const render = read("render.yaml");
@@ -76,13 +76,16 @@ describe("toonstudio.cloud production domain", () => {
       /key: API_CORS_ALLOWED_ORIGINS\s+value: https:\/\/www\.toonstudio\.cloud,https:\/\/toonstudio\.cloud/u
     );
     expect(render).toMatch(
-      /key: OAUTH_REDIRECT_BASE_URL\s+value: https:\/\/www\.toonstudio\.cloud/u
+      /key: API_RUNTIME_ROLE\s+value: studio-live/u
     );
     expect(render).toMatch(
-      /key: WEB_APP_BASE_URL\s+value: https:\/\/www\.toonstudio\.cloud/u
+      /key: AUTH_SESSION_SECRET\s+sync: false/u
     );
     expect(render).toMatch(
-      /key: CANONICAL_HOST\s+value: www\.toonstudio\.cloud/u
+      /key: STUDIO_REALTIME_TICKET_ENABLED\s+value: "false"/u
+    );
+    expect(render).not.toMatch(
+      /key: (?:AUTH_STATE_SECRET|OAUTH_REDIRECT_BASE_URL|WEB_APP_BASE_URL|CANONICAL_HOST|GOOGLE_OAUTH_CLIENT_ID|GOOGLE_OAUTH_CLIENT_SECRET)/u
     );
   });
 });

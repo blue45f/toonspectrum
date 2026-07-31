@@ -56,6 +56,7 @@ describe("Studio CRDT root schema ownership boundary", () => {
       "yjs",
       "../../../../../lib/studio-brush-r8-grain-asset-contract",
       "../../../../../lib/studio-crdt-raster-document-contract",
+      "../../../../../lib/studio-filter-mask-surface-contract",
       "../../../../../lib/studio-ink-input-contract",
       "../../../../../lib/studio-work-asset-contract",
     ]);

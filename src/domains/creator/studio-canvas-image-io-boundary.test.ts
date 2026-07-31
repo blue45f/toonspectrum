@@ -111,8 +111,10 @@ describe("Studio canvas image I/O module boundary", () => {
     // 의도적 변경(2026-07-24): 선택 픽셀 → 새 레이어 복사/오려내기 추가 —
     // loadStudioPixelEditImage 22 → 23, createStudioPixelEditCanvas 23 → 26(마스크·추출·삭제).
     // 의도적 변경(2026-07-24): 선택 → 레이어 마스크 만들기 추가 — 24 / 28.
-    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(24);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(28);
+    // 의도적 변경(2026-07-31): 3D Magic Layer의 공동 편집 필터 마스크 표면 게시가
+    // 캡처된 PNG를 검증 가능한 픽셀 표면으로 변환한다 — 25 / 29.
+    expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(25);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(29);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });

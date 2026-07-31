@@ -17,7 +17,7 @@ function sourceBetween(start: string, end: string): string {
 }
 
 describe("pending stroke lifecycle source contract", () => {
-  it("서버 저장 잠금 전에 대기 획을 flush하고 같은 savePages로 이미지와 doc을 만든다", () => {
+  it("서버 저장 잠금 전에 대기 획을 flush하고 같은 savePages로 이미지와 서버 doc 투영을 만든다", () => {
     const handleSave = sourceBetween(
       "async function handleSave(status:",
       "// 터치 기기(작은 폰)에서는"
@@ -28,8 +28,11 @@ describe("pending stroke lifecycle source contract", () => {
     expect(flushIndex).toBeGreaterThanOrEqual(0);
     expect(lockIndex).toBeGreaterThan(flushIndex);
     expect(handleSave).toContain("const savePages = saveHistory[saveHistoryIndex] ?? pages");
+    expect(handleSave).toMatch(
+      /const serverSavePages = projectStudioFilterMaskPagesForServerSave\(\s+savePages,/u
+    );
     expect(handleSave).toContain("for (const page of savePages)");
-    expect(handleSave).toContain("pagesList: savePages");
+    expect(handleSave).toContain("pagesList: serverSavePages");
     expect(handleSave).not.toContain("for (const page of pages)");
   });
 

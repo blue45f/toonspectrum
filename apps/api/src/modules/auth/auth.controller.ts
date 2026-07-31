@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Headers,
   HttpException,
@@ -11,6 +12,8 @@ import {
   Query,
   Req,
   Res,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 
@@ -25,12 +28,15 @@ import {
   buildAuthorizeUrl,
   consumeHandoff,
   createDemoUser,
+  GoogleAuthConfigurationError,
+  GoogleAuthCredentialError,
   handleGoogleIdToken,
   handleOAuthCallback,
   isOAuthProvider,
   issueHandoff,
   issueState,
   listAuthProviders,
+  OAuthAccountBlockedError,
   providerMode,
   verifyState,
   webAppBaseUrl,
@@ -42,6 +48,10 @@ import {
   normalizeSessionVersion,
   revokeUserSessions,
 } from "../../../../../lib/server/user-lifecycle";
+import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+
+import { isAllowedAuthRequestOrigin } from "./auth-origin";
+import { GoogleIdTokenDto } from "./auth.dto";
 
 import type { Request, Response } from "express";
 
@@ -69,14 +79,19 @@ export class AuthController {
     });
   }
 
-  // 실제 OAuth 시작 — 인가 URL로 리다이렉트(설정된 제공자만). 미설정이면 데모 폴백 안내.
+  // 실제 OAuth 시작 — 인가 URL로 리다이렉트(설정된 제공자만).
   @Get("oauth/:provider/start")
   oauthStart(@Param("provider") provider: string, @Res() res: Response) {
     if (!isOAuthProvider(provider))
       throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
     const url = buildAuthorizeUrl(provider, issueState(provider));
     if (!url) {
-      // client id/secret 미설정 → 데모 모드. 프론트가 데모 엔드포인트를 호출하도록 콜백으로 안내.
+      if (providerMode(provider) !== "demo") {
+        throw new ServiceUnavailableException({
+          error: "이 로그인 제공자의 서버 설정이 완료되지 않았어요.",
+        });
+      }
+      // 카카오·네이버의 명시적 데모 제공자만 체험 흐름으로 보낸다.
       return res.redirect(`${webAppBaseUrl()}/auth/callback#demo=${provider}`);
     }
     return res.redirect(url);
@@ -113,27 +128,38 @@ export class AuthController {
   // 인가-코드/리다이렉트 없이 직접 세션을 발급한다(서명·aud·iss·exp 는 google-auth-library 가 검증).
   @Post("oauth/google/id-token")
   async oauthGoogleIdToken(
-    @Body() body: { idToken?: unknown; credential?: unknown },
+    @Body(new ZodValidationPipe(GoogleIdTokenDto)) body: GoogleIdTokenDto,
+    @Headers("origin") origin: string | undefined,
     @Req() req: Request,
   ) {
-    // GIS 콜백은 필드명이 credential — idToken 도 함께 허용한다.
-    const idToken =
-      typeof body?.idToken === "string"
-        ? body.idToken
-        : typeof body?.credential === "string"
-          ? body.credential
-          : "";
-    if (!idToken)
-      throw new BadRequestException({ error: "ID 토큰이 필요해요." });
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 로그인 요청이에요.",
+      });
+    }
     enforceRateLimit(`oauth-google-idtoken:${clientIp(req)}`, 30, 10 * 60_000);
     let user;
     try {
-      user = await handleGoogleIdToken(idToken);
+      user = await handleGoogleIdToken(body.idToken);
     } catch (err: unknown) {
       if (err instanceof HttpException) throw err;
-      const msg =
-        err instanceof Error ? err.message : "구글 로그인 검증에 실패했어요.";
-      throw new HttpException({ error: msg }, HttpStatus.UNAUTHORIZED);
+      if (err instanceof GoogleAuthConfigurationError) {
+        throw new ServiceUnavailableException({
+          error: "Google 로그인이 아직 설정되지 않았어요.",
+        });
+      }
+      if (err instanceof GoogleAuthCredentialError) {
+        throw new UnauthorizedException({
+          error: "Google 로그인 정보가 만료되었거나 올바르지 않아요. 다시 시도해 주세요.",
+        });
+      }
+      if (err instanceof OAuthAccountBlockedError) {
+        throw new ForbiddenException({ error: err.publicMessage });
+      }
+      // DB·외부 라이브러리의 내부 오류 메시지나 자격 증명 세부정보는 응답에 노출하지 않는다.
+      throw new ServiceUnavailableException({
+        error: "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      });
     }
     return {
       ok: true,
@@ -165,8 +191,13 @@ export class AuthController {
   async oauthDemo(@Param("provider") provider: string, @Req() req: Request) {
     if (!isOAuthProvider(provider))
       throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
-    const codeFlowUrl = buildAuthorizeUrl(provider, "check");
-    if (providerMode(provider) !== "demo" && codeFlowUrl !== null) {
+    const mode = providerMode(provider);
+    if (mode === "disabled") {
+      throw new ServiceUnavailableException({
+        error: "이 로그인 제공자의 설정이 완료되지 않았어요.",
+      });
+    }
+    if (mode !== "demo") {
       throw new HttpException(
         { error: "이 제공자는 실제 OAuth가 설정되어 데모를 쓸 수 없어요." },
         HttpStatus.CONFLICT,
