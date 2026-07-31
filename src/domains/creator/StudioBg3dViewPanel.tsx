@@ -306,8 +306,9 @@ export function StudioBg3dBabylonDiagnostic({
             </h3>
             <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-3">
               분리된 64px 캔버스에서 엔진과 실제 컬러(beauty)·깊이(depth)·
-              법선(normal) 패스를 확인합니다. 현재 3D 편집기나 최종 렌더러를 전환하지
-              않으며, 선택한 백엔드가 실패해도 다른 백엔드를 자동 실행하지 않습니다.
+              법선(normal)·객체 ID·재질 ID 패스를 확인합니다. 현재 3D 편집기나 최종
+              렌더러를 전환하지 않으며, 선택한 백엔드가 실패해도 다른 백엔드를 자동
+              실행하지 않습니다.
             </p>
           </div>
         </div>

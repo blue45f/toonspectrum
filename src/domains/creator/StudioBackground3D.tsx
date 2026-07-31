@@ -150,6 +150,7 @@ import {
   STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
   STUDIO_BG3D_NORMAL_PROFILE,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
   normalizeStudioBg3dArtifactCaptureResultV2,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
@@ -1698,6 +1699,38 @@ function hasStudioBg3dBabylonDiagnosticNormalVariation(
   );
 }
 
+function hasStudioBg3dBabylonDiagnosticStableIds(
+  data: Uint32Array,
+  legend: readonly {
+    readonly id: number;
+    readonly label: string;
+    readonly stableId: string;
+  }[],
+  expectedStableId: string,
+  expectedLabel: string,
+): boolean {
+  if (
+    legend.length !== 1 ||
+    legend[0]?.id !== 1 ||
+    legend[0].stableId !== expectedStableId ||
+    legend[0].label !== expectedLabel
+  ) {
+    return false;
+  }
+  let hasBackground = false;
+  let hasGeometry = false;
+  for (const id of data) {
+    if (id === 0) {
+      hasBackground = true;
+    } else if (id === 1) {
+      hasGeometry = true;
+    } else {
+      return false;
+    }
+  }
+  return hasBackground && hasGeometry;
+}
+
 function studioBg3dBabylonDiagnosticErrorMessage(
   backend: StudioBg3dBabylonDiagnosticBackend,
   error: unknown,
@@ -1717,7 +1750,7 @@ function studioBg3dBabylonDiagnosticErrorMessage(
     return "이 브라우저에서 WebGPU를 사용할 수 없어 Babylon WebGPU 진단을 완료하지 못했습니다. WebGL2 진단은 자동 실행하지 않았습니다.";
   }
   const supportCode = code ? ` · 지원 코드 ${code}` : "";
-  return `Babylon ${label} 엔진 또는 beauty/depth/normal 패스를 분리 캔버스에서 검증하지 못했습니다${supportCode}. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
+  return `Babylon ${label} 엔진 또는 beauty/depth/normal/object ID/material ID 패스를 분리 캔버스에서 검증하지 못했습니다${supportCode}. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
 }
 
 type StudioBg3dCameraWithView = THREE.Camera & {
@@ -8898,7 +8931,7 @@ export function StudioBackground3D({
         throw new Error("Unexpected Babylon diagnostic receipt.");
       }
       const captureResult = await runtime.runIsolated({
-        id: `${diagnosticId}-beauty-depth-normal`,
+        id: `${diagnosticId}-beauty-depth-normal-stable-id`,
         snapshot,
         request: {
           kind: "artifact-capture-v2",
@@ -8909,6 +8942,8 @@ export function StudioBackground3D({
             { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
             { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
             { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
+            { kind: "object-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+            { kind: "material-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
           ],
         },
         signal: controller.signal,
@@ -8923,6 +8958,12 @@ export function StudioBackground3D({
       const normal = normalizedCapture?.artifacts.find((artifact) =>
         artifact.kind === "normal"
       );
+      const objectId = normalizedCapture?.artifacts.find((artifact) =>
+        artifact.kind === "object-id"
+      );
+      const materialId = normalizedCapture?.artifacts.find((artifact) =>
+        artifact.kind === "material-id"
+      );
       if (
         !normalizedCapture ||
         normalizedCapture.width !== 64 ||
@@ -8933,11 +8974,29 @@ export function StudioBackground3D({
         depth.data.length !== 64 * 64 ||
         !normal ||
         normal.data.length !== 64 * 64 * 2 ||
+        !objectId ||
+        objectId.data.length !== 64 * 64 ||
+        !materialId ||
+        materialId.data.length !== 64 * 64 ||
         !hasStudioBg3dBabylonDiagnosticDepthVariation(depth.data) ||
         !hasStudioBg3dBabylonDiagnosticNormalVariation(normal.data, depth.data) ||
-        !hasStudioBg3dBabylonDiagnosticBeautyVariation(beauty.data)
+        !hasStudioBg3dBabylonDiagnosticBeautyVariation(beauty.data) ||
+        !hasStudioBg3dBabylonDiagnosticStableIds(
+          objectId.data,
+          objectId.legend,
+          "obj/babylon-diagnostic-box",
+          "Babylon diagnostic box",
+        ) ||
+        !hasStudioBg3dBabylonDiagnosticStableIds(
+          materialId.data,
+          materialId.legend,
+          "mat/babylon-diagnostic-box/primitive",
+          "Babylon diagnostic box · 기본 재질",
+        )
       ) {
-        throw new Error("Unexpected Babylon beauty/depth/normal capture.");
+        throw new Error(
+          "Unexpected Babylon beauty/depth/normal/object/material capture.",
+        );
       }
       if (
         !componentActiveRef.current ||

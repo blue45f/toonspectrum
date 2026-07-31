@@ -34,6 +34,22 @@ function capture(
   };
 }
 
+it("admits SceneDocument-compatible tilde stable IDs", () => {
+  const result = normalizeStudioBg3dArtifactCaptureResultV2(capture([{
+    kind: "object-id",
+    width: 1,
+    height: 1,
+    profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+    legend: [{ id: 1, stableId: "obj/node~variant", label: "Node variant" }],
+    data: Uint32Array.from([1]),
+  }], 1, 1));
+
+  expect(result?.artifacts[0]).toMatchObject({
+    kind: "object-id",
+    legend: [{ id: 1, stableId: "obj/node~variant", label: "Node variant" }],
+  });
+});
+
 function beauty(
   data: unknown = new Uint8Array(8),
   width = 2,

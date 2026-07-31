@@ -18,6 +18,18 @@ import { pathToFileURL } from "node:url";
 
 import { chromium, type Locator, type Page } from "playwright";
 
+import {
+  STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+  STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_NORMAL_PROFILE,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
+} from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
+import {
+  DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  normalizeStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+} from "../src/domains/creator/studio-bg3d-scene-document";
+
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
@@ -45,6 +57,10 @@ const BABYLON_RUNTIME_CHUNK_PATH_FRAGMENT =
   "studio-bg3d-babylon-runtime";
 const BABYLON_SPECIALIST_CHUNK_PATH_PATTERN =
   /studio-bg3d-babylon-(?:specialist-entry|runtime)/u;
+const BABYLON_SPECIALIST_ENTRY_FILE_PATTERN =
+  /^studio-bg3d-babylon-specialist-entry-[A-Za-z0-9_-]+\.js$/u;
+const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
+const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 
 // Three r184's official 40x40 ETC1S KTX2 example (MIT). The verifier embeds it into a minimal
 // self-contained GLB at runtime, so the production smoke exercises admission, the pinned Basis
@@ -144,6 +160,67 @@ function createKtx2SmokeGlb(): Buffer {
   glb.writeUInt32LE(0x004e4942, binaryHeaderOffset + 4);
   binary.copy(glb, binaryHeaderOffset + 8);
   return glb;
+}
+
+function createBabylonStableIdProofDocumentJson(): string {
+  const document = normalizeStudioBg3dSceneDocument({
+    ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    background: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+      mode: "color",
+      color: "#f8fafc",
+    },
+    nodes: [
+      {
+        id: "babylon-diagnostic-lower",
+        name: "Babylon diagnostic lower box",
+        kind: "primitive",
+        primitiveKind: "box",
+        color: "#4f46e5",
+        transform: {
+          position: [-0.8, -0.9, 0],
+          rotation: [0.2, 0.35, 0],
+          scale: [0.9, 0.9, 0.9],
+        },
+        parentId: null,
+        visible: true,
+        locked: false,
+        castsShadow: true,
+        receivesShadow: true,
+      },
+      {
+        id: "babylon-diagnostic-upper",
+        name: "Babylon diagnostic upper box",
+        kind: "primitive",
+        primitiveKind: "box",
+        color: "#0ea5e9",
+        transform: {
+          position: [0.8, 1.8, 0],
+          rotation: [-0.15, -0.25, 0.1],
+          scale: [0.9, 0.9, 0.9],
+        },
+        parentId: null,
+        visible: true,
+        locked: false,
+        castsShadow: true,
+        receivesShadow: true,
+      },
+    ],
+  });
+  const serialized = serializeStudioBg3dSceneDocument(document);
+  assertCondition(serialized, "could not serialize the Babylon stable-ID proof document");
+  return serialized;
+}
+
+function findBabylonSpecialistEntryFile(): string {
+  const assetsDirectory = join(process.cwd(), "dist", "assets");
+  const entries = readdirSync(assetsDirectory)
+    .filter((name) => BABYLON_SPECIALIST_ENTRY_FILE_PATTERN.test(name));
+  assertCondition(
+    entries.length === 1,
+    `expected one Babylon specialist entry, found ${entries.length}`,
+  );
+  return entries[0]!;
 }
 
 function assertCondition(condition: unknown, message: string): asserts condition {
@@ -625,6 +702,619 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   assertCondition(issues.length === 0, `unexpected 3D browser diagnostics:\n${issues.join("\n")}`);
 }
 
+/**
+ * Runs the actual minified production specialist on WebGPU and WebGL2 at intentionally
+ * row-unaligned widths. Both backends must return compact canonical top-down object/material ID
+ * planes with exact pixel parity, and the upper proof object must remain above the lower one.
+ */
+async function runBabylonStableIdOrientationParityProof(
+  page: Page,
+  rootUrl: string,
+): Promise<void> {
+  await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  const graphicsSupport = await page.evaluate(() => ({
+    gpu: "gpu" in navigator && Boolean(navigator.gpu),
+    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
+  }));
+  assertCondition(graphicsSupport.gpu, "WebGPU is unavailable for the stable-ID alignment proof");
+  assertCondition(graphicsSupport.webgl2, "WebGL2 is unavailable beside the WebGPU proof");
+
+  const entryUrl = new URL(
+    `assets/${findBabylonSpecialistEntryFile()}`,
+    rootUrl,
+  ).href;
+  const canonicalDocumentJson = createBabylonStableIdProofDocumentJson();
+  const result = await page.evaluate(async ({
+    canonicalDocumentJson: documentJson,
+    entryUrl: specialistEntryUrl,
+    height,
+    profiles,
+    widths,
+  }) => {
+    const entry = await import(specialistEntryUrl) as {
+      readonly createStudioBg3dBabylonSpecialist?: (options: {
+        readonly backend: "webgl2" | "webgpu";
+        readonly canvas: HTMLCanvasElement;
+        readonly settings: {
+          readonly failIfMajorPerformanceCaveat: boolean;
+        };
+      }) => {
+        readonly dispose: () => void | Promise<void>;
+        readonly runIsolated: (job: {
+          readonly id: string;
+          readonly request: {
+            readonly artifacts: readonly {
+              readonly kind: string;
+              readonly profile: string;
+            }[];
+            readonly height: number;
+            readonly kind: "artifact-capture-v2";
+            readonly width: number;
+          };
+          readonly signal: AbortSignal;
+          readonly snapshot: {
+            readonly assets: readonly [];
+            readonly canonicalDocumentJson: string;
+            readonly totalAssetBytes: 0;
+          };
+        }) => Promise<unknown>;
+      };
+    };
+    if (typeof entry.createStudioBg3dBabylonSpecialist !== "function") {
+      throw new Error("production Babylon specialist entry is malformed");
+    }
+
+    const emptyAssets = Object.freeze([]) as readonly [];
+    const snapshot = Object.freeze({
+      assets: emptyAssets,
+      canonicalDocumentJson: documentJson,
+      totalAssetBytes: 0 as const,
+    });
+
+    type CapturedStableIdArtifact = {
+      readonly byteLength: number;
+      readonly data: Uint32Array;
+      readonly height: unknown;
+      readonly kind: unknown;
+      readonly legend: unknown;
+      readonly profile: unknown;
+      readonly width: unknown;
+    };
+    type CapturedRasterArtifact = {
+      readonly byteLength: number;
+      readonly dataLength: number;
+      readonly height: unknown;
+      readonly kind: unknown;
+      readonly profile: unknown;
+      readonly variation: boolean;
+      readonly width: unknown;
+    };
+    type CapturedBundle = {
+      readonly artifacts: readonly CapturedStableIdArtifact[];
+      readonly height: unknown;
+      readonly profile: unknown;
+      readonly rasterArtifacts: readonly CapturedRasterArtifact[];
+      readonly width: unknown;
+    };
+    const capturesByBackend: CapturedBundle[][] = [];
+    for (const backend of ["webgpu", "webgl2"] as const) {
+      const canvas = document.createElement("canvas");
+      // Keep both engines at the visible diagnostic's square aspect. Only their offscreen targets
+      // use the intentionally row-unaligned 63/65px widths.
+      canvas.width = 64;
+      canvas.height = 64;
+      canvas.style.cssText =
+        "position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;pointer-events:none";
+      document.body.append(canvas);
+      const runtime = entry.createStudioBg3dBabylonSpecialist!({
+        backend,
+        canvas,
+        // This is a conformance proof, not a production quality-policy admission check. Keep the
+        // same software/headless allowance as the visible diagnostic so CI can exercise packing.
+        settings: { failIfMajorPerformanceCaveat: false },
+      });
+      const summaries = [];
+      try {
+        for (const width of widths) {
+          const controller = new AbortController();
+          let raw: unknown;
+          try {
+            raw = await runtime.runIsolated({
+              id: `${backend}-stable-id-orientation-parity-${width}x${height}`,
+              request: {
+                artifacts: [
+                  { kind: "beauty", profile: profiles.beauty },
+                  { kind: "depth", profile: profiles.depth },
+                  { kind: "normal", profile: profiles.normal },
+                  { kind: "object-id", profile: profiles.stableId },
+                  { kind: "material-id", profile: profiles.stableId },
+                ],
+                height,
+                kind: "artifact-capture-v2",
+                width,
+              },
+              signal: controller.signal,
+              snapshot,
+            });
+          } catch (cause) {
+            throw new Error(
+              `${backend} ${width}x${height} stable-ID parity capture failed`,
+              { cause },
+            );
+          }
+          if (
+            typeof raw !== "object" ||
+            raw === null ||
+            (raw as { readonly kind?: unknown }).kind !==
+              "studio-bg3d-artifact-capture" ||
+            !Array.isArray((raw as { readonly artifacts?: unknown }).artifacts)
+          ) {
+            throw new Error(`unexpected ${backend} ${width}x${height} stable-ID envelope`);
+          }
+          const capture = raw as {
+            readonly artifacts: readonly {
+              readonly data: unknown;
+              readonly height: unknown;
+              readonly kind: unknown;
+              readonly legend: unknown;
+              readonly profile: unknown;
+              readonly width: unknown;
+            }[];
+            readonly height: unknown;
+            readonly profile: unknown;
+            readonly width: unknown;
+          };
+          const idArtifacts = capture.artifacts.filter((artifact) =>
+            artifact.kind === "object-id" || artifact.kind === "material-id"
+          );
+          const beauty = capture.artifacts.find((artifact) => artifact.kind === "beauty");
+          const depth = capture.artifacts.find((artifact) => artifact.kind === "depth");
+          const normal = capture.artifacts.find((artifact) => artifact.kind === "normal");
+          if (
+            !(beauty?.data instanceof Uint8Array) ||
+            !(depth?.data instanceof Float32Array) ||
+            !(normal?.data instanceof Uint8Array)
+          ) {
+            throw new Error(
+              `unexpected ${backend} ${width}x${height} beauty/depth/normal data`,
+            );
+          }
+          let beautyReferencePixel = -1;
+          let beautyVariation = false;
+          for (let pixel = 0; pixel < beauty.data.length / 4; pixel += 1) {
+            if (beauty.data[pixel * 4 + 3]! > 0) {
+              beautyReferencePixel = pixel;
+              break;
+            }
+          }
+          if (beautyReferencePixel >= 0) {
+            const referenceOffset = beautyReferencePixel * 4;
+            for (
+              let pixel = beautyReferencePixel + 1;
+              pixel < beauty.data.length / 4;
+              pixel += 1
+            ) {
+              const offset = pixel * 4;
+              if (beauty.data[offset + 3]! <= 0) continue;
+              const difference =
+                Math.abs(beauty.data[offset]! - beauty.data[referenceOffset]!) +
+                Math.abs(beauty.data[offset + 1]! - beauty.data[referenceOffset + 1]!) +
+                Math.abs(beauty.data[offset + 2]! - beauty.data[referenceOffset + 2]!);
+              if (difference >= 12) {
+                beautyVariation = true;
+                break;
+              }
+            }
+          }
+          let minimumDepth = 1;
+          let maximumDepth = 0;
+          let depthValuesValid = true;
+          for (const value of depth.data) {
+            if (!Number.isFinite(value) || value < 0 || value > 1) {
+              depthValuesValid = false;
+              break;
+            }
+            minimumDepth = Math.min(minimumDepth, value);
+            maximumDepth = Math.max(maximumDepth, value);
+          }
+          const depthVariation =
+            depthValuesValid &&
+            minimumDepth < 0.999 &&
+            maximumDepth >= 0.999 &&
+            maximumDepth - minimumDepth >= 0.01;
+          let minimumNormalRed = 255;
+          let maximumNormalRed = 0;
+          let minimumNormalGreen = 255;
+          let maximumNormalGreen = 0;
+          let normalGeometryPixels = 0;
+          if (normal.data.length === depth.data.length * 2) {
+            for (let pixel = 0; pixel < depth.data.length; pixel += 1) {
+              if (depth.data[pixel]! >= 0.999) continue;
+              normalGeometryPixels += 1;
+              const offset = pixel * 2;
+              minimumNormalRed = Math.min(minimumNormalRed, normal.data[offset]!);
+              maximumNormalRed = Math.max(maximumNormalRed, normal.data[offset]!);
+              minimumNormalGreen = Math.min(
+                minimumNormalGreen,
+                normal.data[offset + 1]!,
+              );
+              maximumNormalGreen = Math.max(
+                maximumNormalGreen,
+                normal.data[offset + 1]!,
+              );
+            }
+          }
+          const normalVariation =
+            normalGeometryPixels > 0 &&
+            Math.max(
+              maximumNormalRed - minimumNormalRed,
+              maximumNormalGreen - minimumNormalGreen,
+            ) >= 8;
+          summaries.push({
+            artifacts: idArtifacts.map((artifact) => {
+              if (!(artifact.data instanceof Uint32Array)) {
+                throw new Error(
+                  `unexpected ${backend} ${width}x${height} stable-ID data`,
+                );
+              }
+              return {
+                byteLength: artifact.data.byteLength,
+                data: Uint32Array.from(artifact.data),
+                height: artifact.height,
+                kind: artifact.kind,
+                legend: artifact.legend,
+                profile: artifact.profile,
+                width: artifact.width,
+              };
+            }),
+            height: capture.height,
+            profile: capture.profile,
+            rasterArtifacts: [
+              {
+                byteLength: beauty.data.byteLength,
+                dataLength: beauty.data.length,
+                height: beauty.height,
+                kind: beauty.kind,
+                profile: beauty.profile,
+                variation: beautyVariation,
+                width: beauty.width,
+              },
+              {
+                byteLength: depth.data.byteLength,
+                dataLength: depth.data.length,
+                height: depth.height,
+                kind: depth.kind,
+                profile: depth.profile,
+                variation: depthVariation,
+                width: depth.width,
+              },
+              {
+                byteLength: normal.data.byteLength,
+                dataLength: normal.data.length,
+                height: normal.height,
+                kind: normal.kind,
+                profile: normal.profile,
+                variation: normalVariation,
+                width: normal.width,
+              },
+            ],
+            width: capture.width,
+          });
+        }
+      } finally {
+        await runtime.dispose();
+        canvas.remove();
+      }
+      capturesByBackend.push(summaries);
+    }
+
+    const webGpuCaptures = capturesByBackend[0]!;
+    const webGlCaptures = capturesByBackend[1]!;
+    return webGpuCaptures.map((capture, captureIndex) => {
+      const webGlCapture = webGlCaptures[captureIndex];
+      if (!webGlCapture || webGlCapture.artifacts.length !== capture.artifacts.length) {
+        throw new Error(`missing WebGL2 oracle for ${String(capture.width)}px capture`);
+      }
+      if (webGlCapture.rasterArtifacts.length !== capture.rasterArtifacts.length) {
+        throw new Error(
+          `missing WebGL2 beauty/depth/normal oracle for ${String(capture.width)}px capture`,
+        );
+      }
+      if (capture.artifacts.length !== 2) {
+        throw new Error(`missing WebGPU stable-ID artifacts for ${String(capture.width)}px`);
+      }
+      const objectData = capture.artifacts[0]!.data;
+      const materialData = capture.artifacts[1]!.data;
+      if (
+        objectData.length !== materialData.length ||
+        objectData.some((value, index) => value !== materialData[index])
+      ) {
+        throw new Error(
+          `WebGPU object/material masks diverged for ${String(capture.width)}px`,
+        );
+      }
+
+      return {
+        artifacts: capture.artifacts.map((artifact, artifactIndex) => {
+          const oracle = webGlCapture.artifacts[artifactIndex];
+          if (
+            !oracle ||
+            oracle.kind !== artifact.kind ||
+            oracle.data.length !== artifact.data.length
+          ) {
+            throw new Error(
+              `invalid WebGL2 ${String(artifact.kind)} oracle for ` +
+                `${String(capture.width)}px`,
+            );
+          }
+          let parityDifferencePixels = 0;
+          let flipXDifferencePixels = 0;
+          let flipYDifferencePixels = 0;
+          let rotate180DifferencePixels = 0;
+          const rasterWidth = widths[captureIndex]!;
+          for (let y = 0; y < height; y += 1) {
+            for (let x = 0; x < rasterWidth; x += 1) {
+              const pixel = y * rasterWidth + x;
+              const flipXPixel = y * rasterWidth + (rasterWidth - x - 1);
+              const flipYPixel = (height - y - 1) * rasterWidth + x;
+              const rotate180Pixel =
+                (height - y - 1) * rasterWidth + (rasterWidth - x - 1);
+              if (artifact.data[pixel] !== oracle.data[pixel]) {
+                parityDifferencePixels += 1;
+              }
+              if (artifact.data[pixel] !== oracle.data[flipXPixel]) {
+                flipXDifferencePixels += 1;
+              }
+              if (artifact.data[pixel] !== oracle.data[flipYPixel]) {
+                flipYDifferencePixels += 1;
+              }
+              if (artifact.data[pixel] !== oracle.data[rotate180Pixel]) {
+                rotate180DifferencePixels += 1;
+              }
+            }
+          }
+          if (parityDifferencePixels !== 0) {
+            throw new Error(
+              `WebGPU/WebGL2 ${String(artifact.kind)} spatial parity failed for ` +
+                `${String(capture.width)}px: direct=${parityDifferencePixels}, ` +
+                `flipX=${flipXDifferencePixels}, flipY=${flipYDifferencePixels}, ` +
+              `rotate180=${rotate180DifferencePixels}`,
+            );
+          }
+          const foregroundStats = [...new Set(artifact.data)]
+            .filter((id) => id > 0)
+            .sort((left, right) => left - right)
+            .map((id) => {
+              let count = 0;
+              let minX: number = rasterWidth;
+              let maxX: number = -1;
+              let minY: number = height;
+              let maxY: number = -1;
+              let sumY = 0;
+              for (let y = 0; y < height; y += 1) {
+                for (let x = 0; x < rasterWidth; x += 1) {
+                  if (artifact.data[y * rasterWidth + x] !== id) continue;
+                  count += 1;
+                  minX = Math.min(minX, x);
+                  maxX = Math.max(maxX, x);
+                  minY = Math.min(minY, y);
+                  maxY = Math.max(maxY, y);
+                  sumY += y;
+                }
+              }
+              if (count === 0) {
+                throw new Error(
+                  `empty ${String(artifact.kind)} foreground ID ${id} for ` +
+                    `${String(capture.width)}px`,
+                );
+              }
+              return {
+                centroidY: sumY / count,
+                count,
+                id,
+                maxX,
+                maxY,
+                minX,
+                minY,
+              };
+            });
+          return {
+            byteLength: artifact.byteLength,
+            dataLength: artifact.data.length,
+            foregroundStats,
+            height: artifact.height,
+            kind: artifact.kind,
+            legend: artifact.legend,
+            parityDifferencePixels,
+            profile: artifact.profile,
+            uniqueIds: [...new Set(artifact.data)].sort((a, b) => a - b),
+            width: artifact.width,
+          };
+        }),
+        height: capture.height,
+        profile: capture.profile,
+        rasterArtifacts: capture.rasterArtifacts.map((artifact, artifactIndex) => {
+          const oracle = webGlCapture.rasterArtifacts[artifactIndex];
+          if (!oracle || oracle.kind !== artifact.kind) {
+            throw new Error(
+              `invalid WebGL2 ${String(artifact.kind)} oracle for ` +
+                `${String(capture.width)}px`,
+            );
+          }
+          return {
+            ...artifact,
+            webGlVariation: oracle.variation,
+          };
+        }),
+        width: capture.width,
+      };
+    });
+  }, {
+    canonicalDocumentJson,
+    entryUrl,
+    height: BABYLON_STABLE_ID_PARITY_HEIGHT,
+    profiles: {
+      beauty: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+      depth: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+      normal: STUDIO_BG3D_NORMAL_PROFILE,
+      stableId: STUDIO_BG3D_STABLE_ID_PROFILE,
+    },
+    widths: BABYLON_STABLE_ID_PARITY_WIDTHS,
+  });
+
+  for (const [index, width] of BABYLON_STABLE_ID_PARITY_WIDTHS.entries()) {
+    const capture = result[index];
+    assertCondition(
+      capture,
+      `missing ${width}px WebGPU/WebGL2 canonical stable-ID parity proof`,
+    );
+    assertCondition(capture.width === width, `unexpected ${width}px capture width`);
+    assertCondition(
+      capture.height === BABYLON_STABLE_ID_PARITY_HEIGHT,
+      `unexpected ${width}px capture height`,
+    );
+    assertCondition(
+      capture.profile === "studio-bg3d-multi-artifact-v2",
+      `unexpected ${width}px artifact bundle profile`,
+    );
+    assertCondition(
+      capture.rasterArtifacts.length === 3,
+      `missing ${width}px beauty/depth/normal artifacts`,
+    );
+    const expectedRasterArtifacts = [
+      {
+        bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
+        channels: 4,
+        kind: "beauty",
+        profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+      },
+      {
+        bytesPerElement: Float32Array.BYTES_PER_ELEMENT,
+        channels: 1,
+        kind: "depth",
+        profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+      },
+      {
+        bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
+        channels: 2,
+        kind: "normal",
+        profile: STUDIO_BG3D_NORMAL_PROFILE,
+      },
+    ] as const;
+    for (const [artifactIndex, expectedArtifact] of expectedRasterArtifacts.entries()) {
+      const artifact = capture.rasterArtifacts[artifactIndex];
+      const expectedValues =
+        width * BABYLON_STABLE_ID_PARITY_HEIGHT * expectedArtifact.channels;
+      assertCondition(
+        artifact?.kind === expectedArtifact.kind &&
+          artifact.profile === expectedArtifact.profile,
+        `unexpected ${width}px ${expectedArtifact.kind} artifact`,
+      );
+      assertCondition(
+        artifact.width === width &&
+          artifact.height === BABYLON_STABLE_ID_PARITY_HEIGHT,
+        `unexpected ${width}px ${expectedArtifact.kind} dimensions`,
+      );
+      assertCondition(
+        artifact.dataLength === expectedValues &&
+          artifact.byteLength === expectedValues * expectedArtifact.bytesPerElement,
+        `unexpected ${width}px ${expectedArtifact.kind} compact readback length`,
+      );
+      assertCondition(
+        artifact.variation && artifact.webGlVariation,
+        `missing ${width}px ${expectedArtifact.kind} variation on WebGPU or WebGL2`,
+      );
+    }
+    assertCondition(capture.artifacts.length === 2, `missing ${width}px stable-ID artifacts`);
+
+    const expected = [
+      {
+        kind: "object-id",
+        legend: [
+          {
+            label: "Babylon diagnostic lower box",
+            stableId: "obj/babylon-diagnostic-lower",
+          },
+          {
+            label: "Babylon diagnostic upper box",
+            stableId: "obj/babylon-diagnostic-upper",
+          },
+        ],
+      },
+      {
+        kind: "material-id",
+        legend: [
+          {
+            label: "Babylon diagnostic lower box · 기본 재질",
+            stableId: "mat/babylon-diagnostic-lower/primitive",
+          },
+          {
+            label: "Babylon diagnostic upper box · 기본 재질",
+            stableId: "mat/babylon-diagnostic-upper/primitive",
+          },
+        ],
+      },
+    ] as const;
+    for (const [artifactIndex, expectedArtifact] of expected.entries()) {
+      const artifact = capture.artifacts[artifactIndex];
+      assertCondition(
+        artifact?.kind === expectedArtifact.kind,
+        `unexpected ${width}px artifact order`,
+      );
+      assertCondition(
+        artifact.profile === STUDIO_BG3D_STABLE_ID_PROFILE,
+        `unexpected ${width}px ${expectedArtifact.kind} profile`,
+      );
+      assertCondition(
+        artifact.width === width &&
+          artifact.height === BABYLON_STABLE_ID_PARITY_HEIGHT,
+        `unexpected ${width}px ${expectedArtifact.kind} dimensions`,
+      );
+      const expectedPixels = width * BABYLON_STABLE_ID_PARITY_HEIGHT;
+      assertCondition(
+        artifact.dataLength === expectedPixels &&
+          artifact.byteLength === expectedPixels * Uint32Array.BYTES_PER_ELEMENT,
+        `unexpected ${width}px ${expectedArtifact.kind} compact readback length`,
+      );
+      assertCondition(
+        artifact.uniqueIds.length === 3 &&
+          artifact.uniqueIds[0] === 0 &&
+          artifact.uniqueIds[1] === 1 &&
+          artifact.uniqueIds[2] === 2,
+        `unexpected ${width}px ${expectedArtifact.kind} IDs: ` +
+          JSON.stringify(artifact.uniqueIds),
+      );
+      const legend = artifact.legend;
+      assertCondition(
+        Array.isArray(legend),
+        `unexpected ${width}px ${expectedArtifact.kind} legend type`,
+      );
+      assertCondition(
+        legend.length === expectedArtifact.legend.length &&
+          expectedArtifact.legend.every((entry, legendIndex) =>
+            legend[legendIndex]?.id === legendIndex + 1 &&
+            legend[legendIndex]?.stableId === entry.stableId &&
+            legend[legendIndex]?.label === entry.label
+          ),
+        `unexpected ${width}px ${expectedArtifact.kind} legend`,
+      );
+      const lower = artifact.foregroundStats.find((entry) => entry.id === 1);
+      const upper = artifact.foregroundStats.find((entry) => entry.id === 2);
+      assertCondition(
+        lower && upper && upper.centroidY < lower.centroidY,
+        `non-canonical ${width}px ${expectedArtifact.kind} row orientation: ` +
+          JSON.stringify(artifact.foregroundStats),
+      );
+    }
+  }
+
+  console.log(
+    `[verify-studio-3d-console] Babylon WebGPU/WebGL2 canonical top-down ` +
+      `stable-ID parity PASS ${BABYLON_STABLE_ID_PARITY_WIDTHS.join("/")}x` +
+      `${BABYLON_STABLE_ID_PARITY_HEIGHT}`,
+  );
+}
+
 async function main(): Promise<void> {
   verifyPatchedThreeRuntime();
   assertCondition(
@@ -650,6 +1340,27 @@ async function main(): Promise<void> {
   try {
     await waitForServer(rootUrl);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. SwiftShader
+    // makes the WebGPU conformance gate reproducible on GPU-less Linux CI and local headless runs.
+    const webGpuBrowser = await chromium.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--enable-unsafe-webgpu",
+        "--use-angle=swiftshader",
+      ],
+    });
+    try {
+      const webGpuContext = await webGpuBrowser.newContext({
+        locale: "ko-KR",
+        viewport: { width: 1_440, height: 1_000 },
+      });
+      const webGpuPage = await webGpuContext.newPage();
+      await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+      await webGpuContext.close();
+    } finally {
+      await webGpuBrowser.close();
+    }
     // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
     // locale so a developer machine or CI runner whose default locale is English does not turn a
     // healthy 3D runtime check into a menu-locator failure before either editor is opened.

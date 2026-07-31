@@ -31,7 +31,7 @@ export class StudioBg3dStableIdPackingError extends Error {
 
 const MAX_PIXELS = 16_777_216;
 const MAX_LABEL_LENGTH = 160;
-const STABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+const STABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~:/-]{0,127}$/u;
 const CONTROL_CHARACTER_PATTERN = /[\p{Cc}\p{Cf}]/u;
 const UTF8_ENCODER = new TextEncoder();
 

@@ -61,6 +61,8 @@ jobs:
           node-version: 24
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm run validate:architecture
       - run: pnpm run lint
       - run: pnpm run typecheck
@@ -108,5 +110,7 @@ jobs:
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0019_studio_ai_request_receipt.sql
       - run: pnpm run test
       - run: pnpm run build
+      - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
+        run: pnpm run verify:studio-3d-console
       - run: pnpm run check:studio-bundle
       - run: pnpm run build:all

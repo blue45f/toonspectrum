@@ -190,7 +190,7 @@ const ARTIFACT_KINDS = new Set<StudioBg3dArtifactKind>([
   "velocity",
 ]);
 const MAX_VELOCITY_PIXELS_PER_SECOND = 1_000_000;
-const STABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/u;
+const STABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~:/-]{0,127}$/u;
 const LEGEND_CONTROL_CHARACTER_PATTERN = /[\p{Cc}\p{Cf}]/u;
 const LEGEND_LABEL_MAX_LENGTH = 160;
 const UTF8_ENCODER = new TextEncoder();

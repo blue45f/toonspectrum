@@ -23,11 +23,20 @@ Babylon.js는 ToonSpectrum의 모든 2D·3D 기능을 소유하는 범용 엔진
 
 현재 가장 큰 병목은 FX 종류를 v1 union에 계속 추가하는 일이 아니다. 격리 Babylon 런타임과
 versioned artifact bundle에 더해 canonical primitive·검증된 자체 포함 core GLB의 제한된
-beauty/depth/normal executor, 파싱 후 실제 자원 receipt와 늦게 정착하는 loader 자원의 회수
-경계까지 마련됐다. 독립적인 clean local Chromium 실행에서는 WebGL2와 WebGPU 모두 64×64
-beauty/depth/normal readback을 통과했다. 다음 핵심 작업은 이 최소 증거를 브라우저·GPU별
-straight-alpha·normal packing 골든과 반복 soak로 확장하고, 그 결과를 기존 Three 장면·linked
-3D→2D cache/dirty planner에 원자적으로 연결하는 일이다.
+beauty/depth/normal/object ID/material ID executor, 파싱 후 실제 자원 receipt와 늦게 정착하는
+loader 자원의 회수 경계까지 마련됐다. fresh production preview의 독립 clean Chromium
+실행에서는 WebGL2와 WebGPU 모두 64×64 beauty/depth/normal/object ID/material ID 5-pass
+readback을 통과했다. 각 object/material ID 결과에서 배경과 대상에 해당하는 decoded ID 집합
+`{0, 1}`과 nonzero ID `1`의 stable legend를 확인했다. WebGPU는 UI 진단 269ms, 동일 executor
+직접 capture 254ms로 측정됐다. 후속 fresh UI 계측은 WebGPU 299ms, WebGL2 645ms였다. 실제
+minified production specialist의 비정렬 WebGPU raw readback은 63×2에서 padded 512→compact
+504 bytes, 65×2에서 1,024→520 bytes로 정규화됐다. production executor는 Babylon offscreen
+render target의 WebGPU와 WebGL2 raw object/material ID rows를 모두 canonical compact top-down
+plane으로 반환한다. `scripts/verify-studio-3d-console.mts`의 영구 63/65×64 proof는 위·아래에
+분리한 두 오브젝트로 절대 방향을 확인하고, 두 backend object/material ID의 exact spatial
+parity, 차이 픽셀 0, ID `[0, 1, 2]`, exact legend와 오류 없음을 검증한다. 다음 핵심 작업은 이
+단일 브라우저·GPU 환경의 최소 증거를 브라우저·GPU matrix와 장시간 반복 soak로 확장하고, 그
+결과를 기존 Three 장면·linked 3D→2D cache/dirty planner에 원자적으로 연결하는 일이다.
 
 Babylon의 런타임 객체는 Studio 문서, undo/redo, CRDT, 저장 파일에 들어가지 않는다. Studio는
 계속 엔진 중립적인 장면 문서와 제한된 효과 recipe를 소유하고, Babylon은 검증된 입력을 받아
@@ -61,7 +70,11 @@ canonical SceneDocument + verified asset bytes + bounded recipe
 - line/depth/object-ID/normal/combined의 renderer-neutral linked-render planner
 - LT Worker, shot batch, PSD, WebCodecs, thumbnail로 이어지는 기존 소비 경계
 - canonical primitive와 검증된 자체 포함 core GLB를 Babylon scene으로 복원해 beauty RGBA8,
-  linear normalized depth, view-space octahedral RG8 normal을 반환하는 제한된 실제 executor
+  linear normalized depth, view-space octahedral RG8 normal, object/material ID를 반환하는
+  제한된 실제 executor
+- 별도 RGBA8 render target과 비혼합 shader readback으로 만든 exact object/material ID pass.
+  object ID는 Studio 배치 logical node, material ID는 배치별 primitive 기본 재질 또는 검증된
+  glTF material index/default에 대응하며, canonical `Uint32Array`와 stable legend를 함께 반환
 - GLB JSON preflight 뒤 Babylon public scene delta에서 mesh/node/geometry/draw/triangle,
   material/texture 크기·mip 추정, animation/keyframe/value, skeleton/joint, morph와 decoded
   geometry byte를 재계수하고 증폭을 fail-closed하는 post-parse resource receipt
@@ -73,17 +86,23 @@ canonical SceneDocument + verified asset bytes + bounded recipe
 
 다만 UI에서 연결된 Babylon 호출은 사용자가 직접 누르는 격리 진단뿐이다. 이 진단은 분리
 캔버스에서 `runtime-metrics`를 확인한 다음 64×64 canonical primitive의 beauty RGBA8, linear
-normalized depth, view-space octahedral RG8 normal을 요청·검증하도록 연결됐다. executor와
-normal packing/readback은 자동 테스트를 통과했고, 2026-07-31 local Chromium 150의
-cross-origin-isolated production preview에서 독립 clean 실행 기준 WebGL2와 WebGPU 모두 실제
-beauty/depth/normal 진단을 통과했다. WebGPU clean 실행 측정값은 2,739ms였다. 다만 서로 다른
-백엔드를 같은 탭에서 연속으로 반복하는 soak에서는 GPU→CPU readback이 지연돼 60초 fail-closed
-timeout에 도달하는 사례가 있어, 이 결과를 다중 브라우저·GPU 안정성 골든 완료로 확대 해석하지
-않는다. 실제 executor도 작품 결과 provider나 기존 Three 장면, linked render, LT, 필터 commit,
-shot batch에는 아직 연결되지 않았다. beauty/depth/normal은 canonical primitive와 검증된 자체
-포함 core GLB의 제한 범위만 구현됐으며, object ID/material ID/shadow/AO/emission/velocity는
-계약만 있고 실제 Babylon pass는 없다. CPU FX와 원자적 failover도 foundation·단위 테스트
-단계이지 프로덕션 배선 완료 상태가 아니다.
+normalized depth, view-space octahedral RG8 normal, object/material ID를 요청·검증하도록
+확장됐다. 자동 테스트에 이어 2026-07-31 fresh cross-origin-isolated production preview의 독립
+clean Chromium 실행에서 WebGL2와 WebGPU 모두 실제 5-pass 진단을 통과했다. object/material
+결과는 각각 decoded ID 집합 `{0, 1}`과 nonzero ID `1`의 stable legend를 반환했다. WebGPU
+측정값은 UI 진단 269ms, 동일 executor 직접 capture 254ms다. readback 정규화는 WebGL의
+tight destination 동일 view와 WebGPU의 caller-owned padded allocation 위 zero-offset
+tight-length prefix view만 허용하고, WebGPU가 요구하는 256-byte row padding을 compact rows로
+제거한다. Babylon
+offscreen render target의 WebGPU와 WebGL2 raw object/material ID readback은 모두 canonical
+top-down `Uint32Array`로 정규화되며, production-preview verifier는 비대칭 63/65×64 장면에서
+절대 top-down 방향, 두 backend의 exact spatial parity와 동일 stable legend를 영구 검증한다.
+이 결과는 한 production-preview Chromium 환경의 최소 증거이며 브라우저·GPU matrix나 장시간
+반복 soak 완료를 뜻하지 않는다. 실제 executor는 작품 결과 provider나 기존 Three 장면,
+linked render, LT, Magic Layer, 필터 commit, shot batch, 저장 경로에 아직 연결되지 않았다.
+현재 실제 pass 범위는 beauty/depth/normal/object ID/material ID이며
+shadow/AO/emission/velocity는 계약만 있고 Babylon pass는 없다. CPU FX와 원자적 failover도
+foundation·단위 테스트 단계이지 프로덕션 배선 완료 상태가 아니다.
 
 GLB 허용 범위도 의도적으로 좁다. 현재 image/texture를 포함한 GLB와 Draco·Meshopt·BasisU 등
 외부 decoder가 필요한 GLB는 계속 preflight에서 거부한다. post-parse texture dimension·mip
@@ -91,17 +110,19 @@ receipt가 생겼다는 이유로 이 입력 정책이 자동 완화된 것은 �
 
 남은 운영 연결 과제는 다음과 같다.
 
-1. local Chromium에서 통과한 WebGL2/WebGPU 실제 readback을 Chrome·Edge·Safari Technology
-   Preview와 주요 GPU vendor matrix로 확장해 BGRA/RGBA, Y축, premultiplied 여부와 반복
-   readback 지연을 골든/soak로 고정한다. 출력은 항상 top-down straight-alpha sRGB와 깨끗한
-   transparent RGB로 정규화한다.
+1. local Chromium에서 고정한 WebGPU/WebGL2 canonical top-down 계약과 63/65×64 stable-ID
+   absolute orientation·exact spatial parity를 Chrome·Edge·Safari Technology Preview 및 주요
+   GPU vendor matrix에서 재현한다. BGRA/RGBA 채널, premultiplied 여부, 투명 픽셀 RGB, 반복
+   readback 지연을 골든/soak로 고정하며 출력은 항상 top-down straight-alpha sRGB와 깨끗한
+   transparent RGB로 유지한다.
 2. 구현된 GLB post-parse receipt를 실제 WebGL2/WebGPU corpus에서 골든으로 고정한다. 현재
    mesh·material·texture dimension/mip·animation·skeleton·morph·decoded geometry 증폭은
    재검사하지만, texture/decoder GLB 자체는 아직 허용하지 않는다.
 3. 작품 기능이 요청될 때만 승인된 lazy entry를 runtime adapter registry와 linked-render
    provider에 등록한다. 현재 진단 activation을 작품 결과 activation으로 오해하면 안 된다.
-4. canonical Three 장면과 제한된 Babylon scene의 beauty/depth/normal 골든을 확정한 다음,
-   object/material ID 실제 pass를 구현한다.
+4. 현재 64×64 진단과 63/65×64 object/material ID의 canonical top-down absolute
+   orientation·exact spatial parity·stable legend 증거를 복합 GLB와 더 다양한 해상도로
+   확장하고, canonical Three 장면과 제한된 Babylon scene의 beauty/depth/normal 골든을 확정한다.
 5. 한 capture의 color와 depth/normal/ID를 서로 다른 엔진에서 섞지 않는다. Babylon pass 하나라도
    실패하면 renderer-neutral atomic failover를 통해 해당 capture 전체를 다음 provider에서 다시
    만들고, 검증된 결과 하나만 commit한다.
@@ -116,8 +137,8 @@ receipt가 생겼다는 이유로 이 입력 정책이 자동 완화된 것은 �
    surface 하나와 last-good baked artifact를 사용해야 한다.
 
 따라서 다음 코드 단계는 effect union을 늘리는 패치가 아니라
-**브라우저 readback/straight-alpha/normal·post-parse receipt 골든 + 운영 activation +
-실제 object/material ID·emission pass + 원자적 provider commit**이다.
+**다중 브라우저·GPU readback/straight-alpha/normal·ID·post-parse receipt 골든과 장시간 soak +
+운영 activation + 실제 emission pass + 원자적 provider·Magic Layer·저장 commit**이다.
 
 ## Babylon.js 9 계열에서 특히 주목할 기능
 
@@ -431,8 +452,9 @@ glow·reveal animation·instance를 지원한다. 다음 기능에 적합하다.
 - object ID를 2D 선택 마스크로 전환
 
 Babylon의 GeometryBuffer/PrePass 결과가 자동으로 stable object/material ID를 보장하지는 않는다.
-ID 패스는 canonical logical node ID와 material slot을 고유 색상으로 렌더하는 별도 pass로 만들고,
-동일 ID와 색상 사이 legend를 함께 저장해야 한다.
+현재 실제 ID pass는 Studio 배치 logical node와 검증된 glTF material index/default를 별도 exact
+RGBA8 색상으로 렌더하고, 이를 canonical `Uint32Array`와 stable legend로 반환한다. 이 결과를
+Magic Layer의 클릭 선택·마스크·저장 경로가 소비하는 제품 배선은 아직 남아 있다.
 [GeometryBufferRenderer](https://doc.babylonjs.com/typedoc/classes/BABYLON.GeometryBufferRenderer),
 [PrePassRenderer](https://doc.babylonjs.com/typedoc/classes/BABYLON.PrePassRenderer)
 
@@ -463,19 +485,27 @@ Babylon은 이 planner가 요청한 pass를 생성하는 provider가 된다.
 ### 3.4 현재 result 계약과 남은 pass
 
 현재 FX v1은 RGBA와 선택적 depth를 반환하고, v2 bounded multi-artifact bundle의 형식·검증
-계약도 구현됐다. 현재 Babylon executor는 beauty와 depth에 더해 view-right-handed normal을
-octahedral RG8로 packing해 실제 v2 artifact로 반환한다. local Chromium의 독립 clean WebGL2와
-WebGPU 진단은 이 세 pass의 실제 readback을 확인했지만, 반복 soak·브라우저/GPU matrix와 Three
-대비 골든은 아직 남아 있다. Magic Layer에 필요한 object/material ID와 발광 레이어용 emission
-등은 아래 계약에 맞는 실제 렌더 pass가 남아 있다.
+계약도 구현됐다. 현재 Babylon executor는 beauty와 depth, view-right-handed octahedral RG8
+normal에 더해 object/material ID를 실제 v2 artifact로 반환한다. ID pass는 별도 non-blended
+RGBA8 render target의 정확한 bytes를 top-down `Uint32Array`로 decode하며 stable legend를
+동반한다. object ID는 Studio의 배치 logical node를, material ID는 각 배치의 primitive 기본
+재질 또는 사전 검증한 glTF material index/default를 가리킨다. 기존 local Chromium 독립 clean
+WebGL2/WebGPU 진단은 새 ID를 포함한 5-pass 실제 readback까지 확인했다. object/material 결과의
+decoded ID 집합은 각각 `{0, 1}`이고 nonzero ID `1`은 stable legend에 대응했다. 이는 fresh
+production-preview Chromium의 최소 증거이며 장시간 반복 soak·브라우저/GPU matrix·Three 대비
+골든은 아직 남아 있다. WebGPU와 WebGL2 offscreen raw ID rows는 backend의 row padding을 제거한
+뒤 동일한 canonical compact top-down plane으로 정규화하며, 영구 production-preview verifier는
+비대칭 63/65×64 object/material ID에서 절대 위·아래 방향과 두 backend의 direct pixel diff
+0을 확인한다. 발광 레이어용 emission과 shadow/AO/velocity는 아래 계약에 맞는 실제 렌더 pass가
+남아 있다.
 
 | artifact | 권장 형식 | 의미 |
 | --- | --- | --- |
 | beauty | top-down straight-sRGB RGBA8 | 화면과 최종 합성 |
 | depth | normalized Float32 | FX 이전 base scene depth |
 | normal | versioned packed 또는 Float texture | 좌표계가 명시된 view/world normal |
-| object ID | Uint32 또는 lossless packed ID | canonical node legend 참조 |
-| material ID | Uint32 또는 lossless packed ID | canonical material legend 참조 |
+| object ID | Uint32 (현재 actual) 또는 lossless packed ID | Studio placement logical node legend 참조 |
+| material ID | Uint32 (현재 actual) 또는 lossless packed ID | 배치별 glTF material index/default legend 참조 |
 | shadow/AO | linear R8/R16F | 그림자·접촉 음영 레이어 |
 | emission | straight RGBA8/RGBA16F | 네온·발광 합성 |
 | velocity | versioned 2-channel float | camera/object motion과 단위 명시 |
@@ -528,8 +558,9 @@ Physics world, collider pointer, WASM heap은 문서에 저장하지 않는다.
 
 Babylon loader는 도입 시 first-party GLB validator를 대체하지 않고 advisory 교차 검사에만
 사용한다. `@babylonjs/loaders` 패키지는 버전을 고정했고 승인 lazy entry closure 안에 core GLB
-loader만 명시적으로 등록했다. 현재 용도는 검증된 자체 포함 GLB의 제한된 beauty/depth/normal
-capture다. core JSON preflight에 더해 파싱 후 실제 Babylon scene delta receipt를 검사하며,
+loader만 명시적으로 등록했다. 현재 용도는 검증된 texture-free 자체 포함 GLB의 제한된
+beauty/depth/normal/object ID/material ID capture다. core JSON preflight에 더해 파싱 후 실제
+Babylon scene delta receipt를 검사하며,
 abort/timeout 뒤 늦게 정착한 loader 자원도 회수한다. 아래 advisory 대조는 아직 운영 검사기에
 연결되지 않았고, image/texture GLB와 Draco·Meshopt·BasisU는 로컬 decoder byte와 예산 정책을
 확정하기 전까지 fail-closed한다.
@@ -749,7 +780,7 @@ Babylon은 WebGPU와 WebGL을 병행 지원하며 WebGPU 엔진 초기화가 비
 | output boundary | `studio-bg3d-runtime-adapter.ts` | exact RGBA/depth/octahedral-normal 검증과 방어 복사 |
 | Babylon lazy entry | `studio-bg3d-babylon-specialist-entry.ts` | 동적 import 전용 단일 entry와 deep ESM binding; 사용자 명시 진단에서만 호출 |
 | Babylon lifecycle | `studio-bg3d-babylon-specialist-runtime.ts` | WebGL/WebGPU 초기화·직렬화·중단·손실·폐기 |
-| Babylon capture | `studio-bg3d-babylon-artifact-capture.ts` | primitive·검증된 core GLB의 beauty/depth/normal, post-parse receipt, late-settle cleanup 구현; object/material ID·emission과 프로덕션 배선은 미구현 |
+| Babylon capture | `studio-bg3d-babylon-artifact-capture.ts`, `studio-bg3d-babylon-stable-id-capture.ts` | primitive·검증된 texture-free core GLB의 beauty/depth/normal/object ID/material ID, stable legend, exact RGBA8 ID readback, post-parse receipt, late-settle cleanup 구현; emission과 프로덕션 배선은 미구현 |
 | multi-artifact v2 | `studio-bg3d-artifact-capture-v2.ts` | pass별 profile·크기·예산·legend 검증 |
 | atomic failover | `studio-bg3d-atomic-specialist-failover.ts` | all-or-nothing 후보 실행 기반; 작품 commit 경로에는 미배선 |
 | artifact FX | `studio-bg3d-artifact-webtoon-fx.ts` | 저해상도 CPU outline/atmosphere/bloom 기반; Babylon GPU/프로덕션 소비 경로에는 미배선 |
@@ -798,14 +829,17 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 1. 완료: Babylon WebGPU/WebGL lazy entry와 lifecycle runtime
 2. 완료: artifact-capture-v2 계약과 전용 manual chunk/bundle guard
 3. 완료(제한 범위): 사용자 명시 진단 activation과 canonical primitive/검증된 core GLB의 실제
-   beauty/depth/normal executor
+   beauty/depth/normal/object ID/material ID executor
 4. 기반 완료·배선 전: renderer-neutral atomic failover와 bounded CPU
    outline/depth-atmosphere/emissive-bloom
 5. 완료(제한 범위): GLB post-parse resource receipt와 abort/timeout late-settle cleanup
-6. 완료(최소 증거)·확장 필요: local Chromium 독립 clean WebGL2/WebGPU
-   beauty/depth/normal readback. 다음은 브라우저/GPU matrix, 반복 soak, straight-alpha·normal
-   packing·post-parse receipt 골든
-7. 다음: Three/Babylon 동일 beauty/depth/normal 비교와 object/material ID 실제 캡처
+6. 완료(단일 환경 최소 증거)·확장 필요: fresh production-preview Chromium 독립 clean
+   WebGL2/WebGPU 5-pass readback. object/material ID의 `{0, 1}` decoded IDs와 stable legend,
+   caller-owned tight-length prefix alias, WebGPU 256-byte row compaction을 확인했다. 별도 비대칭 63/65×64
+   proof는 두 backend object/material ID의 canonical top-down absolute orientation과 exact
+   spatial parity를 고정한다. 다음은 브라우저/GPU matrix, 장시간 반복 soak,
+   straight-alpha·normal·ID packing·post-parse receipt 확장 골든
+7. 다음: Three/Babylon 동일 beauty/depth/normal 비교와 복합 GLB·다중 해상도 ID 골든
 8. 다음: Babylon GPU outline + depth fog + bloom executor
 9. 다음: 작품 결과 activation, 원자적 provider commit, device-loss 골든/soak 검증
 
@@ -813,8 +847,10 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 
 1. 완료: result v2 bundle과 stable legend 검증
 2. 완료(제한 범위): view-space octahedral RG8 normal 실제 렌더와 canonical artifact 반환
-3. 다음: object ID/material ID 실제 렌더
-4. 다음: stable legend와 click selection
+3. 완료(제한 범위): object ID/material ID 실제 렌더, exact RGBA8 readback, stable legend 반환
+4. 완료(단일 환경 최소 증거): WebGL2/WebGPU 5-pass 브라우저 proof와 63/65×64 object/material
+   ID의 canonical top-down absolute orientation·exact spatial parity proof. 다음은 Magic Layer
+   click selection과 브라우저/GPU matrix
 5. 다음: linked render cache/dirty planner와 pass별 commit
 
 ### 단계 C — 날씨와 모션
@@ -827,7 +863,7 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 ### 단계 D — 제작 패스
 
 1. 완료(제한 범위): view-space octahedral RG8 normal
-2. object/material ID + stable legend
+2. 완료(제한 범위): object/material ID + stable legend
 3. shadow/emission/AO
 4. LT·선택·PSD 연결
 
@@ -881,7 +917,9 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 - 동일 기기·동일 backend·동일 adapter revision에서는 scene/recipe/seed/time 반복 결과 exact 일치 목표
 - 다른 GPU 또는 WebGPU/WebGL 사이에는 채널·depth·perceptual golden 허용 오차 적용
 - 저장된 작품 외형은 마지막 검증 baked artifact bytes/hash가 권위
-- top-down row order와 straight-alpha 규약 준수
+- WebGPU/WebGL2 raw readback을 동일한 canonical top-down row order로 정규화하며, stable-ID
+  plane은 비정렬 폭에서도 절대 방향과 cross-backend exact spatial parity를 유지
+- straight-alpha 규약 준수
 - 투명 픽셀 RGB 오염 없음
 - depth는 같은 카메라의 FX 이전 base scene depth
 - object/material ID는 경계 1px을 제외하고 정확

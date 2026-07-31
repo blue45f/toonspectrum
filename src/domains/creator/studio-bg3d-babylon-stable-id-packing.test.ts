@@ -27,6 +27,27 @@ describe("studio-bg3d-babylon-stable-id-packing", () => {
     expect(Object.isFrozen(plan.idByStableId)).toBe(true);
   });
 
+  it("keeps SceneDocument-compatible tilde IDs valid through readback", () => {
+    const plan = createStudioBg3dStableIdPackingPlan([
+      { stableId: "obj/node~variant", label: "Node variant" },
+    ]);
+    const color = encodeStudioBg3dStableIdRgba(1);
+
+    expect(plan.legend).toEqual([{
+      id: 1,
+      stableId: "obj/node~variant",
+      label: "Node variant",
+    }]);
+    expect(decodeStudioBg3dStableIdReadback({
+      data: Uint8Array.from(color),
+      width: 1,
+      height: 1,
+      flipY: false,
+      swapRedBlue: false,
+      plan,
+    })).toEqual(Uint32Array.from([1]));
+  });
+
   it("encodes and decodes exact RGBA palette values with row/channel normalization", () => {
     const plan = createStudioBg3dStableIdPackingPlan([
       { stableId: "node:a", label: "A" },

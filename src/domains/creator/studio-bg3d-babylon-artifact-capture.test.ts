@@ -9,6 +9,7 @@ import {
   STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
   STUDIO_BG3D_NORMAL_PACKING,
   STUDIO_BG3D_NORMAL_PROFILE,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
   createStudioBg3dBabylonCaptureExecutor,
@@ -489,7 +490,7 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       kind: "metrics",
       values: {
         backend: "webgl2",
-        capture: "beauty-depth-normal-v2",
+        capture: "beauty-depth-normal-stable-id-v2",
         engine: "babylon",
         epoch: 7,
         initialized: true,
@@ -523,7 +524,9 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       width: 2,
       height: 2,
       includeDepth: true,
+      includeMaterialId: false,
       includeNormal: false,
+      includeObjectId: false,
     });
     expect(result).toMatchObject({
       kind: "studio-bg3d-artifact-capture",
@@ -591,6 +594,66 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       result.kind === "studio-bg3d-artifact-capture" &&
       result.artifacts[0]?.data[0],
     ).toBe(128);
+  });
+
+  it("emits canonical object and material IDs with independent stable legends", async () => {
+    const objectData = Uint32Array.from([0, 1, 1, 0]);
+    const materialData = Uint32Array.from([0, 2, 1, 0]);
+    const objectLegend = Object.freeze([
+      Object.freeze({ id: 1, stableId: "obj/node~a", label: "Object A" }),
+    ]);
+    const materialLegend = Object.freeze([
+      Object.freeze({ id: 1, stableId: "mat/node~a/primitive", label: "Material A" }),
+      Object.freeze({ id: 2, stableId: "mat/node~b/primitive", label: "Material B" }),
+    ]);
+    let received: StudioBg3dBabylonCapturePlan | undefined;
+    const execute = createStudioBg3dBabylonCaptureExecutor(async (_context, plan) => {
+      received = plan;
+      return {
+        rgba: new Uint8Array(16),
+        objectId: { data: objectData, legend: objectLegend },
+        materialId: { data: materialData, legend: materialLegend },
+      };
+    });
+
+    const result = await execute(context(artifactRequest([
+      { kind: "material-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+      { kind: "object-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+    ]))) as StudioBg3dSpecialistResult;
+
+    expect(received).toMatchObject({
+      includeMaterialId: true,
+      includeObjectId: true,
+      includeDepth: false,
+      includeNormal: false,
+    });
+    expect(result).toMatchObject({
+      kind: "studio-bg3d-artifact-capture",
+      artifacts: [
+        {
+          kind: "material-id",
+          profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+          data: materialData,
+          legend: materialLegend,
+        },
+        {
+          kind: "object-id",
+          profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+          data: objectData,
+          legend: objectLegend,
+        },
+      ],
+    });
+    objectData[1] = 99;
+    materialData[1] = 99;
+    expect(
+      result.kind === "studio-bg3d-artifact-capture" &&
+      result.artifacts[0]?.data[1],
+    ).toBe(2);
+    expect(
+      result.kind === "studio-bg3d-artifact-capture" &&
+      result.artifacts[1]?.data[1],
+    ).toBe(1);
   });
 
   it("loads only defensive copies of exact verified GLB snapshots", async () => {

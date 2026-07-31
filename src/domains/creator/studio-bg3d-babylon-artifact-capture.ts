@@ -46,7 +46,9 @@ import {
   STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
   STUDIO_BG3D_NORMAL_PACKING,
   STUDIO_BG3D_NORMAL_PROFILE,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
   type StudioBg3dArtifactCaptureResultV2,
+  type StudioBg3dStableIdLegendEntry,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
   captureStudioBg3dBabylonNormals,
@@ -57,10 +59,17 @@ import {
   type StudioBg3dBabylonSpecialistExecutionContext,
   type StudioBg3dBabylonSpecialistExecutor,
 } from "./studio-bg3d-babylon-specialist-runtime";
+import {
+  captureStudioBg3dBabylonStableIds,
+  StudioBg3dBabylonStableIdCaptureError,
+  type StudioBg3dBabylonStableIdRenderable,
+} from "./studio-bg3d-babylon-stable-id-capture";
 import { resolveStudioBg3dCameraNearClip, resolveStudioBg3dCameraUpVector } from
   "./studio-bg3d-camera-orientation";
 import { parseStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 
+import type { StudioBg3dStableIdDescriptor } from
+  "./studio-bg3d-babylon-stable-id-packing";
 import type {
   StudioBg3dRuntimeAdapterJob,
   StudioBg3dSpecialistResult,
@@ -99,9 +108,13 @@ const MAX_POST_PARSE_DECODE_AMPLIFICATION = 4;
 const MAX_BABYLON_VERTEX_KINDS = 64;
 const MAX_BABYLON_TEXTURE_MIP_LEVELS = 32;
 const GLTF_NODE_POINTER_PATTERN = /^\/nodes\/(0|[1-9]\d*)$/;
+const GLTF_PRIMITIVE_POINTER_PATTERN =
+  /^\/meshes\/(0|[1-9]\d*)\/primitives\/(0|[1-9]\d*)$/;
+const GLTF_MATERIAL_POINTER_PATTERN = /^\/materials\/(0|[1-9]\d*)$/;
 const CAMERA_FAR_CLIP = 200;
 const MODEL_AUTO_FIT_SIZE = 2;
 const FLOAT_TOLERANCE = 1e-5;
+const STABLE_ID_LEGEND_LABEL_MAX_LENGTH = 160;
 
 const UNSUPPORTED_DECODER_EXTENSIONS = new Set([
   "EXT_meshopt_compression",
@@ -206,8 +219,15 @@ export interface StudioBg3dBabylonCapturePlan {
   readonly document: StudioBg3dSceneDocument;
   readonly height: number;
   readonly includeDepth: boolean;
+  readonly includeMaterialId: boolean;
   readonly includeNormal: boolean;
+  readonly includeObjectId: boolean;
   readonly width: number;
+}
+
+export interface StudioBg3dBabylonStableIdFrame {
+  readonly data: Uint32Array;
+  readonly legend: readonly StudioBg3dStableIdLegendEntry[];
 }
 
 export interface StudioBg3dBabylonCaptureFrame {
@@ -215,8 +235,12 @@ export interface StudioBg3dBabylonCaptureFrame {
   readonly rgba: Uint8Array;
   /** Linear normalized view depth in top-down row order. */
   readonly depth?: Float32Array;
+  /** Stable logical material IDs in top-down row order; zero is background. */
+  readonly materialId?: StudioBg3dBabylonStableIdFrame;
   /** View-space right-handed octahedral RG8 in top-down row order. */
   readonly normal?: Uint8Array;
+  /** Stable logical object IDs in top-down row order; zero is background. */
+  readonly objectId?: StudioBg3dBabylonStableIdFrame;
 }
 
 export type StudioBg3dBabylonCaptureRenderer = (
@@ -229,7 +253,9 @@ interface RequestedCapture {
   readonly height: number;
   readonly includeBeauty: boolean;
   readonly includeDepth: boolean;
+  readonly includeMaterialId: boolean;
   readonly includeNormal: boolean;
+  readonly includeObjectId: boolean;
   readonly width: number;
 }
 
@@ -760,7 +786,9 @@ function resolveCaptureRequest(
       height: request.height,
       includeBeauty: true,
       includeDepth: true,
+      includeMaterialId: false,
       includeNormal: false,
+      includeObjectId: false,
     };
   }
   if (request.kind === "webtoon-fx-capture") {
@@ -771,14 +799,20 @@ function resolveCaptureRequest(
       height: request.height,
       includeBeauty: true,
       includeDepth: request.includeDepth,
+      includeMaterialId: false,
       includeNormal: false,
+      includeObjectId: false,
     };
   }
   if (request.kind !== "artifact-capture-v2") return null;
   const kinds = request.artifacts.map((artifact) => artifact.kind);
   if (
     kinds.some((kind) =>
-      kind !== "beauty" && kind !== "depth" && kind !== "normal"
+      kind !== "beauty" &&
+      kind !== "depth" &&
+      kind !== "normal" &&
+      kind !== "object-id" &&
+      kind !== "material-id"
     )
   ) {
     throw captureError("unsupported-artifact");
@@ -789,7 +823,9 @@ function resolveCaptureRequest(
     height: request.height,
     includeBeauty: kinds.includes("beauty"),
     includeDepth: kinds.includes("depth"),
+    includeMaterialId: kinds.includes("material-id"),
     includeNormal: kinds.includes("normal"),
+    includeObjectId: kinds.includes("object-id"),
   };
 }
 
@@ -806,6 +842,18 @@ function validateFrame(
       (!(frame.depth instanceof Float32Array) || frame.depth.length !== pixels)) ||
     (request.includeNormal &&
       (!(frame.normal instanceof Uint8Array) || frame.normal.length !== pixels * 2)) ||
+    (request.includeObjectId &&
+      (
+        !(frame.objectId?.data instanceof Uint32Array) ||
+        frame.objectId.data.length !== pixels ||
+        !Array.isArray(frame.objectId.legend)
+      )) ||
+    (request.includeMaterialId &&
+      (
+        !(frame.materialId?.data instanceof Uint32Array) ||
+        frame.materialId.data.length !== pixels ||
+        !Array.isArray(frame.materialId.legend)
+      )) ||
     frame.depth?.some((value) => !Number.isFinite(value) || value < 0 || value > 1)
   ) {
     throw captureError("capture-failed");
@@ -813,7 +861,27 @@ function validateFrame(
   return {
     rgba: Uint8Array.from(frame.rgba),
     ...(frame.depth ? { depth: Float32Array.from(frame.depth) } : {}),
+    ...(frame.materialId
+      ? {
+        materialId: {
+          data: Uint32Array.from(frame.materialId.data),
+          legend: Object.freeze(frame.materialId.legend.map((entry) =>
+            Object.freeze({ ...entry })
+          )),
+        },
+      }
+      : {}),
     ...(frame.normal ? { normal: Uint8Array.from(frame.normal) } : {}),
+    ...(frame.objectId
+      ? {
+        objectId: {
+          data: Uint32Array.from(frame.objectId.data),
+          legend: Object.freeze(frame.objectId.legend.map((entry) =>
+            Object.freeze({ ...entry })
+          )),
+        },
+      }
+      : {}),
   };
 }
 
@@ -845,16 +913,45 @@ function toArtifactResult(
         data: Float32Array.from(frame.depth),
       });
     }
-    if (!frame.normal) throw captureError("capture-failed");
-    return Object.freeze({
-      kind: "normal" as const,
-      width: request.width,
-      height: request.height,
-      profile: STUDIO_BG3D_NORMAL_PROFILE,
-      coordinateSpace: STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
-      packing: STUDIO_BG3D_NORMAL_PACKING,
-      data: Uint8Array.from(frame.normal),
-    });
+    if (artifact.kind === "normal") {
+      if (!frame.normal) throw captureError("capture-failed");
+      return Object.freeze({
+        kind: "normal" as const,
+        width: request.width,
+        height: request.height,
+        profile: STUDIO_BG3D_NORMAL_PROFILE,
+        coordinateSpace: STUDIO_BG3D_NORMAL_COORDINATE_SPACE,
+        packing: STUDIO_BG3D_NORMAL_PACKING,
+        data: Uint8Array.from(frame.normal),
+      });
+    }
+    if (artifact.kind === "object-id") {
+      if (!frame.objectId) throw captureError("capture-failed");
+      return Object.freeze({
+        kind: "object-id" as const,
+        width: request.width,
+        height: request.height,
+        profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+        legend: Object.freeze(frame.objectId.legend.map((entry) =>
+          Object.freeze({ ...entry })
+        )),
+        data: Uint32Array.from(frame.objectId.data),
+      });
+    }
+    if (artifact.kind === "material-id") {
+      if (!frame.materialId) throw captureError("capture-failed");
+      return Object.freeze({
+        kind: "material-id" as const,
+        width: request.width,
+        height: request.height,
+        profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+        legend: Object.freeze(frame.materialId.legend.map((entry) =>
+          Object.freeze({ ...entry })
+        )),
+        data: Uint32Array.from(frame.materialId.data),
+      });
+    }
+    throw captureError("unsupported-artifact");
   });
   return Object.freeze({
     kind: STUDIO_BG3D_ARTIFACT_CAPTURE_KIND,
@@ -876,7 +973,7 @@ function metricsResult(
       engine: "babylon",
       epoch: context.epoch,
       initialized: true,
-      capture: "beauty-depth-normal-v2",
+      capture: "beauty-depth-normal-stable-id-v2",
     },
   };
 }
@@ -896,7 +993,9 @@ function createCapturePlan(
     document,
     height: request.height,
     includeDepth: request.includeDepth,
+    includeMaterialId: request.includeMaterialId,
     includeNormal: request.includeNormal,
+    includeObjectId: request.includeObjectId,
     width: request.width,
   });
 }
@@ -1246,6 +1345,140 @@ function loaderOwnedGltfPointers(resource: unknown): readonly string[] {
     if (error instanceof StudioBg3dBabylonCaptureError) throw error;
     throw captureError("resource-budget-exceeded", error);
   }
+}
+
+function boundedStableIdLabel(
+  base: string,
+  suffix: string,
+  fallback: string,
+): string {
+  const normalizedBase = base
+    .normalize("NFKC")
+    .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
+    .trim()
+    .replace(/\s+/gu, " ");
+  const normalizedSuffix = suffix
+    .normalize("NFKC")
+    .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
+    .trim()
+    .replace(/\s+/gu, " ");
+  const safeBase = normalizedBase || fallback;
+  const separator = normalizedSuffix ? " · " : "";
+  const reservedLength = separator.length + normalizedSuffix.length;
+  const maximumBaseLength = Math.max(
+    1,
+    STABLE_ID_LEGEND_LABEL_MAX_LENGTH - reservedLength,
+  );
+  let boundedBase = "";
+  for (const character of safeBase) {
+    if (boundedBase.length + character.length > maximumBaseLength) break;
+    boundedBase += character;
+  }
+  const result = `${boundedBase || fallback}${separator}${normalizedSuffix}`;
+  if (result.length <= STABLE_ID_LEGEND_LABEL_MAX_LENGTH) return result;
+  let bounded = "";
+  for (const character of result) {
+    if (bounded.length + character.length > STABLE_ID_LEGEND_LABEL_MAX_LENGTH) break;
+    bounded += character;
+  }
+  return bounded || fallback;
+}
+
+function stableObjectDescriptor(
+  node: StudioBg3dSceneNode,
+): StudioBg3dStableIdDescriptor {
+  return {
+    stableId: `obj/${node.id}`,
+    label: boundedStableIdLabel(node.name, "", "3D object"),
+  };
+}
+
+function primitiveMaterialDescriptor(
+  node: StudioBg3dSceneNode,
+): StudioBg3dStableIdDescriptor {
+  return {
+    stableId: `mat/${node.id}/primitive`,
+    label: boundedStableIdLabel(node.name, "기본 재질", "3D material"),
+  };
+}
+
+function uniqueGltfIndexPointer(
+  resource: unknown,
+  pattern: RegExp,
+): readonly number[] | null {
+  const matches = new Map<string, readonly number[]>();
+  for (const pointer of loaderOwnedGltfPointers(resource)) {
+    const match = pattern.exec(pointer);
+    if (!match) continue;
+    const indices = match.slice(1).map(Number);
+    if (indices.some((value) => !Number.isSafeInteger(value) || value < 0)) {
+      throw captureError("unsupported-artifact");
+    }
+    matches.set(pointer, Object.freeze(indices));
+  }
+  if (matches.size !== 1) return null;
+  return matches.values().next().value ?? null;
+}
+
+/**
+ * Adapter boundary for Babylon's loader-owned glTF source pointers.
+ *
+ * Babylon does not expose primitive/material source indices through a public runtime property.
+ * This exact pointer is therefore validated against the already-admitted canonical GLB JSON,
+ * never supplemented with runtime names, unique IDs, or scene array order.
+ */
+function modelMaterialDescriptor(
+  asset: StudioBg3dBabylonCaptureAsset,
+  mesh: AbstractMesh,
+  node: StudioBg3dModelNode,
+): StudioBg3dStableIdDescriptor {
+  const indices = uniqueGltfIndexPointer(mesh, GLTF_PRIMITIVE_POINTER_PATTERN);
+  if (!indices || indices.length !== 2) {
+    throw captureError("unsupported-artifact");
+  }
+  const [meshIndex, primitiveIndex] = indices;
+  const gltfMeshes = recordArray(asset.glbJson.meshes);
+  const sourceMesh = gltfMeshes[meshIndex!];
+  const primitive = sourceMesh
+    ? recordArray(sourceMesh.primitives)[primitiveIndex!]
+    : undefined;
+  if (!primitive) throw captureError("unsupported-artifact");
+
+  const materials = recordArray(asset.glbJson.materials);
+  const materialIndex = primitive.material === undefined
+    ? null
+    : safeNonNegativeCount(primitive.material);
+  if (materialIndex !== null && materialIndex >= materials.length) {
+    throw captureError("unsupported-artifact");
+  }
+
+  const runtimeMaterialIndex = mesh.material
+    ? uniqueGltfIndexPointer(mesh.material, GLTF_MATERIAL_POINTER_PATTERN)
+    : null;
+  if (
+    runtimeMaterialIndex &&
+    (
+      runtimeMaterialIndex.length !== 1 ||
+      materialIndex === null ||
+      runtimeMaterialIndex[0] !== materialIndex
+    )
+  ) {
+    throw captureError("unsupported-artifact");
+  }
+
+  return materialIndex === null
+    ? {
+      stableId: `mat/${node.id}/gltf-default`,
+      label: boundedStableIdLabel(node.name, "기본 재질", "3D material"),
+    }
+    : {
+      stableId: `mat/${node.id}/gltf-material/${materialIndex}`,
+      label: boundedStableIdLabel(
+        node.name,
+        `재질 ${materialIndex + 1}`,
+        "3D material",
+      ),
+    };
 }
 
 function logicalGltfNodeCount(
@@ -2050,7 +2283,9 @@ async function populateScene(
   plan: StudioBg3dBabylonCapturePlan,
   scene: Scene,
 ): Promise<{
+  readonly materialIdRenderables: readonly StudioBg3dBabylonStableIdRenderable[];
   readonly meshes: readonly AbstractMesh[];
+  readonly objectIdRenderables: readonly StudioBg3dBabylonStableIdRenderable[];
   readonly shadowCasters: readonly AbstractMesh[];
 }> {
   const rootById = createNodeRoots(plan.document, scene);
@@ -2058,6 +2293,8 @@ async function populateScene(
     plan.assets.map((asset) => [asset.attachmentId, asset]),
   );
   const renderMeshes: AbstractMesh[] = [];
+  const objectIdRenderables: StudioBg3dBabylonStableIdRenderable[] = [];
+  const materialIdRenderables: StudioBg3dBabylonStableIdRenderable[] = [];
   const shadowCasters: AbstractMesh[] = [];
 
   for (const node of plan.document.nodes) {
@@ -2072,6 +2309,18 @@ async function populateScene(
       mesh.material = material;
       mesh.receiveShadows = node.receivesShadow;
       renderMeshes.push(mesh);
+      if (plan.includeObjectId) {
+        objectIdRenderables.push({
+          descriptor: stableObjectDescriptor(node),
+          mesh,
+        });
+      }
+      if (plan.includeMaterialId) {
+        materialIdRenderables.push({
+          descriptor: primitiveMaterialDescriptor(node),
+          mesh,
+        });
+      }
       if (node.castsShadow) shadowCasters.push(mesh);
       continue;
     }
@@ -2118,11 +2367,25 @@ async function populateScene(
         overriddenMaterials.add(mesh.material);
       }
       renderMeshes.push(mesh);
+      if (plan.includeObjectId) {
+        objectIdRenderables.push({
+          descriptor: stableObjectDescriptor(node),
+          mesh,
+        });
+      }
+      if (plan.includeMaterialId) {
+        materialIdRenderables.push({
+          descriptor: modelMaterialDescriptor(asset, mesh, node),
+          mesh,
+        });
+      }
       if (node.castsShadow) shadowCasters.push(mesh);
     }
   }
   return Object.freeze({
+    materialIdRenderables: Object.freeze(materialIdRenderables),
     meshes: Object.freeze(renderMeshes),
+    objectIdRenderables: Object.freeze(objectIdRenderables),
     shadowCasters: Object.freeze(shadowCasters),
   });
 }
@@ -2292,6 +2555,47 @@ async function captureStudioBg3dBabylonNormalsWithDeadline(
   }
 }
 
+async function captureStudioBg3dBabylonStableIdsWithDeadline(
+  context: StudioBg3dBabylonSpecialistExecutionContext,
+  plan: StudioBg3dBabylonCapturePlan,
+  scene: Scene,
+  renderables: readonly StudioBg3dBabylonStableIdRenderable[],
+): Promise<StudioBg3dBabylonStableIdFrame> {
+  throwIfAborted(context.signal);
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromJob = () => controller.abort();
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, MAX_CAPTURE_WAIT_MS);
+  context.signal.addEventListener("abort", abortFromJob, { once: true });
+  try {
+    return await captureStudioBg3dBabylonStableIds({
+      backend: plan.backend,
+      height: plan.height,
+      renderables,
+      scene,
+      signal: controller.signal,
+      width: plan.width,
+    });
+  } catch (error) {
+    if (context.signal.aborted) throw captureError("aborted", error);
+    if (timedOut) throw captureError("timeout", error);
+    if (error instanceof StudioBg3dBabylonStableIdCaptureError) {
+      if (error.code === "aborted") throw captureError("aborted", error);
+      if (error.code === "unsupported") {
+        throw captureError("unsupported-artifact", error);
+      }
+      throw captureError("capture-failed", error);
+    }
+    throw captureError("capture-failed", error);
+  } finally {
+    clearTimeout(timeout);
+    context.signal.removeEventListener("abort", abortFromJob);
+  }
+}
+
 async function renderStudioBg3dBabylonCapture(
   context: StudioBg3dBabylonSpecialistExecutionContext,
   plan: StudioBg3dBabylonCapturePlan,
@@ -2401,10 +2705,28 @@ async function renderStudioBg3dBabylonCapture(
         depth,
       )
       : undefined;
+    const objectId = plan.includeObjectId
+      ? await captureStudioBg3dBabylonStableIdsWithDeadline(
+        context,
+        plan,
+        scene,
+        populated.objectIdRenderables,
+      )
+      : undefined;
+    const materialId = plan.includeMaterialId
+      ? await captureStudioBg3dBabylonStableIdsWithDeadline(
+        context,
+        plan,
+        scene,
+        populated.materialIdRenderables,
+      )
+      : undefined;
     return {
       rgba,
       ...(depth ? { depth } : {}),
+      ...(materialId ? { materialId } : {}),
       ...(normal ? { normal } : {}),
+      ...(objectId ? { objectId } : {}),
     };
   } catch (error) {
     if (

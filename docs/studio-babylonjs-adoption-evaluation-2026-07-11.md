@@ -69,7 +69,8 @@ WebGL 또는 기존 Three 캡처로 데이터 손실 없이 복귀해야 한다.
 
 입력은 canonical `StudioBg3dSceneDocument`와 검증된 GLB byte snapshot뿐이다. Babylon Node,
 Material, Texture, GPUBuffer, object URL은 경계를 통과하지 않는다. 출력은 기존 runtime adapter가
-방어 복사하는 RGBA/depth DTO이며, 최종 합성은 Studio 소유 필터/레이어 경로가 수행한다.
+방어 복사하는 RGBA/depth/normal/ID DTO이며, 최종 합성은 Studio 소유 필터/레이어 경로가
+수행한다.
 
 아래는 **목표 운영 경계**이며, 현재 작품 경로에는 아직 배선되지 않았다.
 
@@ -88,41 +89,68 @@ SceneDocument + verified GLB + bounded FX recipe
 활용하되 Studio 문서 권위는 넘기지 않도록 한다.
 
 현재 lazy entry의 기본 executor는 lifecycle 계측뿐 아니라 제한된 실제 offscreen capture도
-수행한다. 지원 범위는 canonical primitive와 검증된 자체 포함 core GLB의 beauty RGBA8 및
-linear normalized depth다. 외부 URI나 로컬 decoder가 준비되지 않은 Draco/meshopt/BasisU,
+수행한다. 지원 범위는 canonical primitive와 검증된 texture-free 자체 포함 core GLB의 beauty
+RGBA8, linear normalized depth, view-space octahedral RG8 normal, object/material ID다.
+object ID는 Studio 배치 logical node, material ID는 배치별 primitive 기본 재질 또는 사전
+검증된 glTF material index/default를 가리킨다. ID는 별도 non-blended RGBA8 render target에서
+정확하게 readback한 뒤 canonical top-down `Uint32Array`와 stable legend로 반환한다. 외부 URI나
+로컬 decoder가 준비되지 않은 Draco/meshopt/BasisU,
 직교 카메라, lens shift, 비어 있지 않은 sky preset, animation·pose·morph·constraint 상태는
 그럴듯한 오출력 대신 fail-closed한다. 이 경로는 아직 작품 결과를 만드는 프로덕션 provider가
 아니다. UI에서 연결된 기능은 사용자가 명시적으로 실행하는 격리 진단으로 한정되며,
-`runtime-metrics` 확인에 이어 64×64 canonical primitive의 beauty RGBA8와 linear normalized
-depth를 실제 캡처·검증한다. 기존 Three 장면, linked render, LT, 필터 commit, shot batch에는
+`runtime-metrics` 확인에 이어 64×64 canonical primitive의 5개 artifact를 요청·검증하도록
+확장됐다. fresh production preview의 독립 clean Chromium 실행에서 WebGL2와 WebGPU 모두
+beauty/depth/normal/object ID/material ID 5-pass proof를 통과했다. object/material 결과는 각각
+decoded ID 집합 `{0, 1}`과 nonzero ID `1`의 stable legend를 반환했고, WebGPU는 UI 진단 269ms,
+동일 executor 직접 capture 254ms로 측정됐다. 후속 fresh UI 계측은 WebGPU 299ms, WebGL2
+645ms였다. 이전 minified production specialist의 비정렬 WebGPU raw readback은 63×2에서
+padded 512→compact 504 bytes, 65×2에서 1,024→520 bytes로 정규화됐고 object/material ID
+`[0, 1]`, exact legend, 오류 없음이 확인됐다. 현재 production executor는 Babylon offscreen
+render target의 WebGPU와 WebGL2 raw object/material ID rows를 모두 canonical compact top-down
+`Uint32Array`로 정규화한다. `scripts/verify-studio-3d-console.mts`의 영구 63/65×64 proof는
+위·아래에 분리한 두 오브젝트로 절대 top-down 방향을 확인하고, 두 backend object/material ID의
+exact spatial parity, 차이 픽셀 0, ID `[0, 1, 2]`, exact legend를 검증한다. 이 결과는 단일
+브라우저·GPU 환경의 최소 증거이므로 cross-browser/GPU matrix나 장시간 soak 완료로 확대하지
+않는다. 기존 Three 장면, linked render, LT, Magic Layer, 필터 commit, shot batch, 저장 경로에는
 아직 연결되지 않았다.
 
-따라서 `artifact-capture-v2`의 normal, object/material ID, shadow, AO, emission, velocity는
-**검증 계약만 구현됐고 Babylon 렌더 pass는 미구현**이다. renderer-neutral 원자적 specialist
-failover와 CPU outline/depth-atmosphere/emissive-bloom compositor도 기반·단위 테스트 단계이며
-Studio의 linked render, LT, 필터 commit, shot batch에 아직 연결되지 않았다. 특히 CPU outline은
-실제 normal pass가 생기기 전에는 Babylon 결과만으로 실행할 수 없다.
+따라서 `artifact-capture-v2`의 beauty/depth/normal/object/material ID는 제한된 실제 Babylon
+렌더 pass까지 구현됐고, shadow, AO, emission, velocity는 아직 검증 계약만 있다.
+renderer-neutral 원자적 specialist failover와 CPU outline/depth-atmosphere/emissive-bloom
+compositor도 기반·단위 테스트 단계이며 Studio의 linked render, LT, Magic Layer, 필터 commit,
+shot batch, 저장 경로에는 아직 연결되지 않았다.
 
-프로덕션 승인을 막는 검토 게이트도 남아 있다. WebGL2/WebGPU별 readback 채널 순서와 Y축,
-premultiplied 입력을 top-down straight-alpha sRGB로 바꾸는 규약, 투명 픽셀 RGB 정리,
-파싱 후 실제 Babylon scene의 mesh·material·texture·animation 예산 재검증을 브라우저 골든과
-악성/대형 GLB 테스트로 확정해야 한다. 현재의 GLB JSON 사전 예산은 필요한 1차 방어선이지
-post-parse GPU/scene 예산을 대체하지 않는다.
+프로덕션 승인을 막는 검토 게이트도 남아 있다. 현재 readback 경계는 Babylon의
+WebGL의 caller-owned tight destination 동일 view와 WebGPU의 padded allocation 위 zero-offset
+tight-length prefix alias를 검증하고 WebGPU의 256-byte row padding을
+compact rows로 제거한다. Babylon offscreen render target에서 나온 WebGPU와 WebGL2의 bottom-up
+raw ID rows는 모두 canonical top-down으로 뒤집으며, 63/65×64 비대칭 장면의 절대 방향과
+cross-backend exact spatial parity를 production-preview verifier에 고정했다. 다만 이 증거는
+단일 Chromium 환경에 한정되므로 BGRA/RGBA 채널, premultiplied 입력의 straight-alpha sRGB
+변환, 투명 픽셀 RGB와 동일 orientation 계약을 cross-browser/GPU matrix와 장시간 soak에서
+재확인해야 한다. 파싱 후 실제 Babylon scene의 mesh·material·texture·animation 예산 재검증도
+브라우저 골든과 악성/대형 GLB 테스트가 필요하다. 현재의 GLB JSON 사전 예산은 필요한 1차
+방어선이지 post-parse GPU/scene 예산을 대체하지 않는다.
 
 ### 운영 capture 연결 순서
 
 1. 완료: 사용자가 WebGL2 또는 WebGPU 진단을 명시적으로 요청할 때만 lazy entry를 import한다.
 2. 완료(제한 범위): canonical primitive와 검증된 자체 포함 core GLB의 실제 beauty/depth
    offscreen executor 및 fail-closed 입력 경계.
-3. 다음: WebGL2/WebGPU readback·straight-alpha·post-parse budget 골든을 통과시키고, 실제
-   작품 기능의 runtime registry/linked render 경로에 명시적으로 등록한다.
-4. 다음: 동일 canonical scene으로 Three와 Babylon의 beauty/depth를 비교하고
-   Babylon normal/object/material ID pass를 추가한다.
+3. 완료(단일 환경 최소 증거): object/material ID를 포함한 fresh production-preview Chromium
+   WebGL2/WebGPU 5-pass proof와 63/65×64 stable-ID absolute top-down·exact spatial parity proof.
+   다음은 같은 계약을 cross-browser/GPU matrix·straight-alpha·post-parse budget 골든과 장시간
+   soak로 확장한 뒤 실제 작품 기능의 runtime registry/linked render 경로에 등록하는 일이다.
+4. 완료(제한 범위): Babylon normal/object/material ID pass, 64×64 진단, 63/65×64
+   object/material ID의 canonical top-down cross-backend exact parity proof를 추가했다. 다음은
+   동일 canonical scene으로 Three와 Babylon의 beauty/depth/normal을 비교하고 복합 GLB·다중
+   해상도에서 ID exactness를 고정하는 일이다.
 5. 다음: Babylon GPU에서 outline + depth atmosphere + bloom을 하나의 대표 장면에 구현한다.
    현재 CPU compositor 기반은 참고/저해상도 fallback이며 프로덕션 GPU executor가 아니다.
 6. 다음: rain/snow/petals를 seed + fixed timestep으로 300프레임 반복해 byte-identical replay를
    확인한다.
-7. 다음: normal/object/material ID pass를 LT 선화, 마스크 선택, 레이어 분리에 소비한다.
+7. 다음: 구현된 normal/object/material ID pass를 LT 선화, Magic Layer 마스크 선택, 레이어
+   분리와 저장 경로에 소비한다.
 8. 다음: device loss, WebGPU 초기화 실패, abort, resize, dispose 뒤 Three 편집 장면이 손실 없이 유지되는지
    검증한다.
 
@@ -252,12 +280,14 @@ WebGPU-only 변형은 basic WebGL보다 initial gzip이 50,660 B 더 컸다. 이
 - bounded capture v1 및 multi-artifact v2 DTO/검증
 - renderer-neutral scene/capture/linked-render 계약
 - 사용자 명시 클릭으로만 실행되는 분리 캔버스 WebGL2/WebGPU 진단
-- canonical primitive와 검증된 자체 포함 core GLB의 제한된 beauty/depth executor
+- canonical primitive와 검증된 texture-free 자체 포함 core GLB의 제한된
+  beauty/depth/normal/object ID/material ID executor
 - renderer-neutral 원자적 failover와 저해상도 CPU outline/atmosphere/bloom 기반
 
-아직 남은 핵심은 지원 장면·artifact를 확대하는 것보다 먼저 WebGPU/straight-alpha/readback
-골든과 post-parse 예산을 확정하고, 이 기반을 작품 결과의 linked-render/commit 경로에
-원자적으로 연결하는 일이다. normal/ID 등 제작 pass와 GPU FX는 그 다음 단계다.
+아직 남은 핵심은 지원 장면·artifact를 확대하는 것보다 먼저 현재 단일 Chromium 5-pass 증거를
+cross-browser/GPU matrix·장시간 soak·straight-alpha/readback 골든과 post-parse 예산으로
+확장하고, 이 기반을 작품 결과의 linked-render/Magic Layer/save commit 경로에 원자적으로
+연결하는 일이다. emission 등 나머지 제작 pass와 GPU FX는 그 다음 단계다.
 
 ### 2단계 — 운영에 노출되지 않는 격리 실험
 
