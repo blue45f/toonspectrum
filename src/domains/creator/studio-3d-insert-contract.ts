@@ -21,6 +21,14 @@ export interface StudioBackground3DLtLayer {
   readonly height: number;
 }
 
+/** Full-frame LT selection mask with engine-neutral `obj/<scene-node-id>` identity. */
+export interface StudioBackground3DMagicFilterMask {
+  readonly pngDataUrl: string;
+  readonly width: number;
+  readonly height: number;
+  readonly selectedObjectStableId: string;
+}
+
 export interface StudioBackground3DInsertResult {
   readonly kind: "separated";
   readonly width: number;
@@ -35,6 +43,8 @@ export interface StudioBackground3DInsertResult {
     readonly x: number;
     readonly y: number;
   }[];
+  /** Optional single-object Magic Layer mask captured in the same frame as every LT raster. */
+  readonly magicFilterMask?: StudioBackground3DMagicFilterMask;
   readonly bg3dScene: StudioBg3dSceneDocument;
 }
 

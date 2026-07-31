@@ -1,0 +1,227 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  STUDIO_BG3D_ARTIFACT_CAPTURE_KIND,
+  STUDIO_BG3D_ARTIFACT_CAPTURE_PROFILE,
+  STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
+} from "./studio-bg3d-artifact-capture-v2";
+import {
+  captureStudioBg3dMagicObjectIds,
+  StudioBg3dMagicObjectIdCaptureError,
+  type StudioBg3dMagicBabylonBackend,
+} from "./studio-bg3d-magic-object-id-capture";
+import {
+  createStudioBg3dRuntimeSnapshot,
+  type StudioBg3dRuntimeAdapter,
+  type StudioBg3dRuntimeAdapterJob,
+  type StudioBg3dSpecialistResult,
+} from "./studio-bg3d-runtime-adapter";
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
+
+const snapshot = createStudioBg3dRuntimeSnapshot(
+  DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  new Map(),
+);
+
+function successResult(width: number, height: number): StudioBg3dSpecialistResult {
+  const objectIds = new Uint32Array(width * height);
+  objectIds[Math.floor(objectIds.length / 2)] = 1;
+  return {
+    kind: STUDIO_BG3D_ARTIFACT_CAPTURE_KIND,
+    version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+    profile: STUDIO_BG3D_ARTIFACT_CAPTURE_PROFILE,
+    width,
+    height,
+    artifacts: [{
+      kind: "object-id",
+      width,
+      height,
+      profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+      data: objectIds,
+      legend: [{
+        id: 1,
+        stableId: "obj/selected",
+        label: "Selected",
+      }],
+    }],
+  };
+}
+
+function adapter(
+  backend: StudioBg3dMagicBabylonBackend,
+  run: (job: StudioBg3dRuntimeAdapterJob) => Promise<StudioBg3dSpecialistResult>,
+  dispose = vi.fn(),
+): StudioBg3dRuntimeAdapter {
+  return {
+    runtimeId: backend === "webgpu" ? "babylon-webgpu-lab" : "babylon-webgl-lab",
+    capabilities: new Set([
+      "capture-rgba-depth",
+      "multi-artifact-capture",
+      backend === "webgpu" ? "webgpu" : "webgl",
+    ]),
+    runIsolated: run,
+    dispose,
+  };
+}
+
+function input(
+  createRuntime: (
+    backend: StudioBg3dMagicBabylonBackend,
+  ) => StudioBg3dRuntimeAdapter,
+  backends: readonly StudioBg3dMagicBabylonBackend[] = ["webgpu", "webgl2"],
+) {
+  return {
+    snapshot,
+    width: 3,
+    height: 2,
+    jobId: "magic-object-id",
+    backends,
+    createCanvas: vi.fn(() => ({ width: 0, height: 0 })),
+    createRuntime: vi.fn(({ backend }: { backend: StudioBg3dMagicBabylonBackend }) =>
+      createRuntime(backend)
+    ),
+  };
+}
+
+describe("captureStudioBg3dMagicObjectIds", () => {
+  it("returns a defensive canonical object-ID receipt from the preferred backend", async () => {
+    const webGpuResult = successResult(3, 2);
+    const disposeWebGpu = vi.fn();
+    const disposeWebGl = vi.fn();
+    const request = input((backend) =>
+      adapter(
+        backend,
+        async () => backend === "webgpu" ? webGpuResult : successResult(3, 2),
+        backend === "webgpu" ? disposeWebGpu : disposeWebGl,
+      )
+    );
+
+    const result = await captureStudioBg3dMagicObjectIds(request);
+
+    expect(result).toMatchObject({
+      width: 3,
+      height: 2,
+      backend: "webgpu",
+      fallbackUsed: false,
+      legend: [{ id: 1, stableId: "obj/selected", label: "Selected" }],
+      attempts: [{ runtimeId: "babylon-webgpu-lab", outcome: "succeeded" }],
+    });
+    expect([...result.objectIds]).toEqual([0, 0, 0, 1, 0, 0]);
+    const source = webGpuResult.kind === STUDIO_BG3D_ARTIFACT_CAPTURE_KIND
+      ? webGpuResult.artifacts[0]
+      : null;
+    if (source?.kind !== "object-id") throw new Error("invalid fixture");
+    source.data.fill(9);
+    expect([...result.objectIds]).toEqual([0, 0, 0, 1, 0, 0]);
+    expect(disposeWebGpu).toHaveBeenCalledOnce();
+    expect(disposeWebGl).toHaveBeenCalledOnce();
+  });
+
+  it("falls back atomically to WebGL2 only for an eligible WebGPU failure", async () => {
+    const request = input((backend) =>
+      adapter(backend, async () => {
+        if (backend === "webgpu") {
+          throw Object.assign(new Error("device unavailable"), {
+            code: "engine-init-failed",
+          });
+        }
+        return successResult(3, 2);
+      })
+    );
+
+    const result = await captureStudioBg3dMagicObjectIds(request);
+
+    expect(result.backend).toBe("webgl2");
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.attempts).toEqual([
+      {
+        runtimeId: "babylon-webgpu-lab",
+        outcome: "failed",
+        errorCode: "engine-init-failed",
+      },
+      { runtimeId: "babylon-webgl-lab", outcome: "succeeded" },
+    ]);
+  });
+
+  it("keeps unknown failures terminal instead of hiding them behind fallback", async () => {
+    const webGlRun = vi.fn(async () => successResult(3, 2));
+    const request = input((backend) =>
+      adapter(
+        backend,
+        backend === "webgpu"
+          ? async () => {
+            throw new Error("programming defect");
+          }
+          : webGlRun,
+      )
+    );
+
+    await expect(captureStudioBg3dMagicObjectIds(request)).rejects.toMatchObject({
+      code: "capture-failed",
+    });
+    expect(webGlRun).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on malformed dimensions, backend order, or returned artifact", async () => {
+    const valid = input((backend) => adapter(backend, async () => successResult(3, 2)));
+    await expect(captureStudioBg3dMagicObjectIds({
+      ...valid,
+      width: 0,
+    })).rejects.toBeInstanceOf(StudioBg3dMagicObjectIdCaptureError);
+    await expect(captureStudioBg3dMagicObjectIds({
+      ...valid,
+      backends: ["webgl2", "webgl2"],
+    })).rejects.toMatchObject({ code: "invalid-input" });
+
+    const malformed = input((backend) =>
+      adapter(backend, async () => ({
+        ...successResult(3, 2),
+        width: 4,
+      } as StudioBg3dSpecialistResult)),
+      ["webgl2"],
+    );
+    await expect(captureStudioBg3dMagicObjectIds(malformed)).rejects.toMatchObject({
+      code: "capture-failed",
+    });
+  });
+
+  it("propagates abort and still disposes every registered runtime", async () => {
+    const controller = new AbortController();
+    const disposers = [vi.fn(), vi.fn()];
+    const request = input((backend) =>
+      adapter(backend, async (job) => {
+        controller.abort();
+        if (!job.signal.aborted) throw new Error("expected shared abort signal");
+        throw Object.assign(new Error("aborted"), { code: "aborted" });
+      }, disposers[backend === "webgpu" ? 0 : 1])
+    );
+
+    await expect(captureStudioBg3dMagicObjectIds({
+      ...request,
+      signal: controller.signal,
+    })).rejects.toMatchObject({ code: "aborted", name: "AbortError" });
+    expect(disposers[0]).toHaveBeenCalledOnce();
+    expect(disposers[1]).toHaveBeenCalledOnce();
+  });
+
+  it("sizes every caller-owned canvas before constructing its runtime", async () => {
+    const canvasRecords: { width: number; height: number }[] = [];
+    const request = input((backend) =>
+      adapter(backend, async () => successResult(3, 2))
+    );
+    request.createCanvas.mockImplementation(() => {
+      const canvas = { width: 0, height: 0 };
+      canvasRecords.push(canvas);
+      return canvas;
+    });
+
+    await captureStudioBg3dMagicObjectIds(request);
+
+    expect(canvasRecords).toHaveLength(2);
+    expect(canvasRecords).toEqual([
+      { width: 3, height: 2 },
+      { width: 3, height: 2 },
+    ]);
+  });
+});

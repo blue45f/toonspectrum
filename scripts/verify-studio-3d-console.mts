@@ -25,6 +25,12 @@ import {
   STUDIO_BG3D_STABLE_ID_PROFILE,
 } from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
 import {
+  resolveStudioBg3dCaptureFrame,
+  resolveStudioBg3dCaptureFrameCameraSettings,
+} from "../src/domains/creator/studio-bg3d-capture-frame-geometry";
+import { STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION } from
+  "../src/domains/creator/studio-bg3d-lt-render-worker-protocol";
+import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   normalizeStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -59,8 +65,20 @@ const BABYLON_SPECIALIST_CHUNK_PATH_PATTERN =
   /studio-bg3d-babylon-(?:specialist-entry|runtime)/u;
 const BABYLON_SPECIALIST_ENTRY_FILE_PATTERN =
   /^studio-bg3d-babylon-specialist-entry-[A-Za-z0-9_-]+\.js$/u;
+const THREE_MODULE_FILE_PATTERN =
+  /^three\.module-[A-Za-z0-9_-]+\.js$/u;
+const THREE_WEBGL_CAPTURE_FILE_PATTERN =
+  /^studio-bg3d-three-webgl-capture-[A-Za-z0-9_-]+\.js$/u;
+const STUDIO_BG3D_MAGIC_PROOF_ENTRY_FILE_PATTERN =
+  /^studio-bg3d-magic-production-proof-[A-Za-z0-9_-]+\.js$/u;
+const STUDIO_BG3D_LT_RENDER_WORKER_FILE_PATTERN =
+  /^studio-bg3d-lt-render\.worker-[A-Za-z0-9_-]+\.js$/u;
 const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
+const MAGIC_ALIGNMENT_VIEWPORT = Object.freeze({ width: 320, height: 180 });
+const MAGIC_ALIGNMENT_SELECTED_NODE_ID = "magic-alignment-asymmetric-box";
+const MAGIC_ALIGNMENT_SELECTED_STABLE_ID =
+  `obj/${MAGIC_ALIGNMENT_SELECTED_NODE_ID}`;
 
 // Three r184's official 40x40 ETC1S KTX2 example (MIT). The verifier embeds it into a minimal
 // self-contained GLB at runtime, so the production smoke exercises admission, the pinned Basis
@@ -212,15 +230,120 @@ function createBabylonStableIdProofDocumentJson(): string {
   return serialized;
 }
 
-function findBabylonSpecialistEntryFile(): string {
+interface MagicLayerAlignmentProofScenario {
+  readonly babylonCanonicalDocumentJson: string;
+  readonly fit: "exact" | "letterbox" | "pillarbox";
+  readonly frame: NonNullable<ReturnType<typeof resolveStudioBg3dCaptureFrame>>;
+  readonly height: number;
+  readonly id: "exact" | "letterbox" | "pillarbox";
+  readonly threeCanonicalDocumentJson: string;
+  readonly width: number;
+}
+
+function createMagicLayerAlignmentProofScenarios():
+  readonly MagicLayerAlignmentProofScenario[] {
+  const baseDocument = normalizeStudioBg3dSceneDocument({
+    ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    background: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+      mode: "transparent",
+      color: "#ffffff",
+      skyPresetId: "blank",
+    },
+    render: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.render,
+      shadows: false,
+    },
+    nodes: [{
+      id: MAGIC_ALIGNMENT_SELECTED_NODE_ID,
+      name: "Magic alignment asymmetric box",
+      kind: "primitive",
+      primitiveKind: "box",
+      color: "#f97316",
+      transform: {
+        // An off-centre, non-uniform, three-axis rotation makes X/Y mirroring and crop drift
+        // visible in both the silhouette centroid and its projected bounding box.
+        position: [0.72, 1.12, -0.32],
+        rotation: [0.43, -0.61, 0.29],
+        scale: [1.74, 0.68, 1.06],
+      },
+      parentId: null,
+      visible: true,
+      locked: false,
+      castsShadow: false,
+      receivesShadow: false,
+    }],
+  });
+  const definitions = [
+    { id: "exact", aspectRatio: MAGIC_ALIGNMENT_VIEWPORT.width /
+      MAGIC_ALIGNMENT_VIEWPORT.height, expectedFit: "exact" },
+    { id: "pillarbox", aspectRatio: 1, expectedFit: "pillarbox" },
+    { id: "letterbox", aspectRatio: 4, expectedFit: "letterbox" },
+  ] as const;
+
+  return Object.freeze(definitions.map(({ aspectRatio, expectedFit, id }) => {
+    const frame = resolveStudioBg3dCaptureFrame({
+      viewportWidth: MAGIC_ALIGNMENT_VIEWPORT.width,
+      viewportHeight: MAGIC_ALIGNMENT_VIEWPORT.height,
+      aspectRatio,
+    });
+    assertCondition(frame, `could not resolve the ${id} Magic alignment frame`);
+    assertCondition(
+      frame.fit === expectedFit,
+      `unexpected ${id} Magic alignment frame fit: ${frame.fit}`,
+    );
+    const width = Math.round(frame.width);
+    const height = Math.round(frame.height);
+    assertCondition(
+      Math.abs(width / height - frame.aspectRatio) <= 1e-9,
+      `the ${id} Magic alignment frame is not integer-exact`,
+    );
+    const threeDocument = normalizeStudioBg3dSceneDocument({
+      ...baseDocument,
+      output: {
+        ...baseDocument.output,
+        exportAspectRatio: aspectRatio,
+      },
+    });
+    const babylonDocument = normalizeStudioBg3dSceneDocument({
+      ...threeDocument,
+      camera: resolveStudioBg3dCaptureFrameCameraSettings(
+        threeDocument.camera,
+        frame,
+      ),
+    });
+    const threeCanonicalDocumentJson =
+      serializeStudioBg3dSceneDocument(threeDocument);
+    const babylonCanonicalDocumentJson =
+      serializeStudioBg3dSceneDocument(babylonDocument);
+    assertCondition(
+      threeCanonicalDocumentJson && babylonCanonicalDocumentJson,
+      `could not serialize the ${id} Magic alignment documents`,
+    );
+    return Object.freeze({
+      babylonCanonicalDocumentJson,
+      fit: frame.fit,
+      frame,
+      height,
+      id,
+      threeCanonicalDocumentJson,
+      width,
+    });
+  }));
+}
+
+function findProductionAssetFile(pattern: RegExp, label: string): string {
   const assetsDirectory = join(process.cwd(), "dist", "assets");
-  const entries = readdirSync(assetsDirectory)
-    .filter((name) => BABYLON_SPECIALIST_ENTRY_FILE_PATTERN.test(name));
-  assertCondition(
-    entries.length === 1,
-    `expected one Babylon specialist entry, found ${entries.length}`,
-  );
+  const entries = readdirSync(assetsDirectory).filter((name) => pattern.test(name));
+  assertCondition(entries.length === 1, `expected one ${label}, found ${entries.length}`);
   return entries[0]!;
+}
+
+function findBabylonSpecialistEntryFile(): string {
+  return findProductionAssetFile(
+    BABYLON_SPECIALIST_ENTRY_FILE_PATTERN,
+    "Babylon specialist entry",
+  );
 }
 
 function assertCondition(condition: unknown, message: string): asserts condition {
@@ -1315,6 +1438,930 @@ async function runBabylonStableIdOrientationParityProof(
   );
 }
 
+/**
+ * Exercises the first Magic Layer production boundary end to end. The live Three camera starts at
+ * the unadjusted 320x180 viewport state and the shipped capture-frame wrapper applies the crop.
+ * Its RGBA result then crosses the shipped LT Worker and exact shipped DOM PNG encoder before the
+ * decoded silhouette is compared with Babylon's adjusted-camera object-ID mask.
+ */
+async function runMagicLayerProductionAlignmentProof(
+  page: Page,
+  rootUrl: string,
+): Promise<void> {
+  const graphicsSupport = await page.evaluate(() => ({
+    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
+  }));
+  assertCondition(
+    graphicsSupport.webgl2,
+    "WebGL2 is unavailable for the Magic Layer production alignment proof",
+  );
+  const assetUrl = (file: string) => new URL(`assets/${file}`, rootUrl).href;
+  // `tsx` preserves local helper names with esbuild's `__name` shim, while Playwright serializes
+  // only this callback. Install the same verifier-only no-op used by the other browser harnesses.
+  await page.evaluate("globalThis.__name ??= (target) => target");
+  const result = await page.evaluate(async ({
+    babylonEntryUrl,
+    beautyProfile,
+    expectedStableId,
+    ltWorkerProtocolVersion,
+    ltWorkerUrl,
+    productionProofEntryUrl,
+    scenarios,
+    stableIdProfile,
+    threeCaptureUrl,
+    threeModuleUrl,
+    viewport,
+  }) => {
+    type ThreeConstructor = new (...args: never[]) => {
+      readonly type?: unknown;
+      dispose?: () => void;
+    };
+    type AlignmentStats = {
+      readonly bbox: {
+        readonly maxX: number;
+        readonly maxY: number;
+        readonly minX: number;
+        readonly minY: number;
+      };
+      readonly centroidX: number;
+      readonly centroidY: number;
+      readonly count: number;
+      readonly directionX: number;
+      readonly directionY: number;
+    };
+    type BinaryTransform = "direct" | "flip-x" | "flip-y" | "rotate-180";
+    type ProductionLtColorLayer = {
+      readonly data: Uint8ClampedArray;
+      readonly height: number;
+      readonly role: "color";
+      readonly width: number;
+    };
+    type ProductionProofEntry = {
+      readonly applyStudioBg3dCaptureFrameViewOffset?: (
+        camera: import("three").Camera,
+        frame: MagicLayerAlignmentProofScenario["frame"],
+        sourceViewport: { readonly height: number; readonly width: number },
+      ) => (() => void) | null;
+      readonly encodeStudioBg3dLtLayers?: (
+        layers: readonly ProductionLtColorLayer[],
+      ) => {
+        readonly compositePngDataUrl: string;
+        readonly layers: readonly {
+          readonly height: number;
+          readonly pngDataUrl: string;
+          readonly role: string;
+          readonly width: number;
+        }[];
+      };
+    };
+
+    const threeModule = await import(threeModuleUrl) as Record<string, unknown>;
+    const threeCaptureModule = await import(threeCaptureUrl) as Pick<
+      typeof import("../src/domains/creator/studio-bg3d-three-webgl-capture"),
+      "createStudioBg3dThreeWebglCaptureAdapter"
+    >;
+    const productionProofEntry =
+      await import(productionProofEntryUrl) as ProductionProofEntry;
+    const babylonEntry = await import(babylonEntryUrl) as {
+      readonly createStudioBg3dBabylonSpecialist?: (options: {
+        readonly backend: "webgl2";
+        readonly canvas: HTMLCanvasElement;
+        readonly settings: {
+          readonly failIfMajorPerformanceCaveat: boolean;
+        };
+      }) => {
+        readonly dispose: () => void | Promise<void>;
+          readonly runIsolated: (job: {
+          readonly id: string;
+          readonly request: {
+            readonly artifacts: readonly [
+              {
+                readonly kind: "beauty";
+                readonly profile: string;
+              },
+              {
+                readonly kind: "object-id";
+                readonly profile: string;
+              },
+            ];
+            readonly height: number;
+            readonly kind: "artifact-capture-v2";
+            readonly width: number;
+          };
+          readonly signal: AbortSignal;
+          readonly snapshot: {
+            readonly assets: readonly [];
+            readonly canonicalDocumentJson: string;
+            readonly totalAssetBytes: 0;
+          };
+        }) => Promise<unknown>;
+      };
+    };
+    if (
+      typeof threeCaptureModule.createStudioBg3dThreeWebglCaptureAdapter !== "function" ||
+      typeof productionProofEntry.applyStudioBg3dCaptureFrameViewOffset !== "function" ||
+      typeof productionProofEntry.encodeStudioBg3dLtLayers !== "function" ||
+      typeof babylonEntry.createStudioBg3dBabylonSpecialist !== "function"
+    ) {
+      throw new Error("Magic alignment production entries are malformed");
+    }
+
+    function functionSource(value: unknown): string {
+      return typeof value === "function"
+        ? Function.prototype.toString.call(value)
+        : "";
+    }
+    const rendererCandidate = Object.values(threeModule).find((value) =>
+      functionSource(value).includes("this.isWebGLRenderer")
+    );
+    if (typeof rendererCandidate !== "function") {
+      throw new Error("could not identify the production Three WebGLRenderer");
+    }
+    function findThreeConstructor(type: string): ThreeConstructor {
+      for (const value of Object.values(threeModule)) {
+        if (
+          typeof value !== "function" ||
+          functionSource(value).includes("this.isWebGLRenderer")
+        ) {
+          continue;
+        }
+        let instance: InstanceType<ThreeConstructor> | null = null;
+        try {
+          instance = Reflect.construct(value, []) as InstanceType<ThreeConstructor>;
+          if (instance.type === type) {
+            instance.dispose?.();
+            return value as ThreeConstructor;
+          }
+        } catch {
+          // Most Three exports are functions rather than zero-argument constructors.
+        }
+        instance?.dispose?.();
+      }
+      throw new Error(`could not identify the production Three ${type} constructor`);
+    }
+
+    const WebGLRenderer = rendererCandidate as typeof import("three").WebGLRenderer;
+    const Scene = findThreeConstructor("Scene") as typeof import("three").Scene;
+    const PerspectiveCamera =
+      findThreeConstructor("PerspectiveCamera") as typeof import("three").PerspectiveCamera;
+    const BoxGeometry =
+      findThreeConstructor("BoxGeometry") as typeof import("three").BoxGeometry;
+    const MeshBasicMaterial =
+      findThreeConstructor("MeshBasicMaterial") as typeof import("three").MeshBasicMaterial;
+    const Mesh = findThreeConstructor("Mesh") as typeof import("three").Mesh;
+
+    function statsForMask(
+      mask: Uint8Array,
+      width: number,
+      height: number,
+      label: string,
+    ): AlignmentStats {
+      let count = 0;
+      let minX = width;
+      let minY = height;
+      let maxX = -1;
+      let maxY = -1;
+      let sumX = 0;
+      let sumY = 0;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          if (mask[y * width + x] === 0) continue;
+          count += 1;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          sumX += x;
+          sumY += y;
+        }
+      }
+      if (count === 0) throw new Error(`${label} produced an empty silhouette`);
+      const centroidX = sumX / count;
+      const centroidY = sumY / count;
+      return {
+        bbox: { maxX, maxY, minX, minY },
+        centroidX,
+        centroidY,
+        count,
+        directionX: centroidX - (width - 1) / 2,
+        directionY: centroidY - (height - 1) / 2,
+      };
+    }
+    function transformedIndex(
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+      transform: BinaryTransform,
+    ): number {
+      switch (transform) {
+        case "direct":
+          return y * width + x;
+        case "flip-x":
+          return y * width + (width - x - 1);
+        case "flip-y":
+          return (height - y - 1) * width + x;
+        case "rotate-180":
+          return (height - y - 1) * width + (width - x - 1);
+      }
+    }
+    function intersectionOverUnion(
+      left: Uint8Array,
+      right: Uint8Array,
+      width: number,
+      height: number,
+      transform: BinaryTransform,
+    ): number {
+      let intersection = 0;
+      let union = 0;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const leftSet = left[y * width + x] !== 0;
+          const rightSet =
+            right[transformedIndex(x, y, width, height, transform)] !== 0;
+          if (leftSet && rightSet) intersection += 1;
+          if (leftSet || rightSet) union += 1;
+        }
+      }
+      return union > 0 ? intersection / union : 0;
+    }
+    function renderLtColorInProductionWorker(
+      rgba: Uint8Array | Uint8ClampedArray,
+      width: number,
+      height: number,
+      requestId: number,
+    ): Promise<ProductionLtColorLayer> {
+      return new Promise((resolve, reject) => {
+        const worker = new Worker(ltWorkerUrl, {
+          name: `magic-lt-production-${requestId}`,
+          type: "module",
+        });
+        let settled = false;
+        let timeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+        const finish = (callback: () => void) => {
+          if (settled) return;
+          settled = true;
+          if (timeout !== null) globalThis.clearTimeout(timeout);
+          worker.terminate();
+          callback();
+        };
+        timeout = globalThis.setTimeout(() => {
+          finish(() => reject(new Error("the production LT Worker timed out")));
+        }, 30_000);
+        worker.addEventListener("error", (event) => {
+          finish(() => reject(new Error(
+            `the production LT Worker failed: ${event.message || "unknown error"}`,
+          )));
+        });
+        worker.addEventListener("messageerror", () => {
+          finish(() => reject(new Error(
+            "the production LT Worker response could not be cloned",
+          )));
+        });
+        worker.addEventListener("message", (event: MessageEvent<unknown>) => {
+          const message = event.data;
+          if (
+            typeof message !== "object" ||
+            message === null ||
+            Reflect.get(message, "version") !== ltWorkerProtocolVersion ||
+            Reflect.get(message, "requestId") !== requestId
+          ) {
+            finish(() => reject(new Error(
+              "the production LT Worker returned a foreign envelope",
+            )));
+            return;
+          }
+          if (Reflect.get(message, "kind") === "error") {
+            finish(() => reject(new Error(
+              `the production LT Worker rejected the request: ${String(
+                Reflect.get(message, "code"),
+              )}`,
+            )));
+            return;
+          }
+          const layers = Reflect.get(message, "layers");
+          if (
+            Reflect.get(message, "kind") !== "result" ||
+            Reflect.get(message, "width") !== width ||
+            Reflect.get(message, "height") !== height ||
+            !Array.isArray(layers) ||
+            layers.length !== 1
+          ) {
+            finish(() => reject(new Error(
+              "the production LT Worker result is malformed",
+            )));
+            return;
+          }
+          const layer = layers[0] as Record<string, unknown>;
+          const dataBuffer = layer?.dataBuffer;
+          if (
+            layer?.role !== "color" ||
+            layer?.width !== width ||
+            layer?.height !== height ||
+            !(dataBuffer instanceof ArrayBuffer) ||
+            dataBuffer.byteLength !== width * height * 4
+          ) {
+            finish(() => reject(new Error(
+              "the production LT Worker did not return one exact color layer",
+            )));
+            return;
+          }
+          finish(() => resolve({
+            data: new Uint8ClampedArray(dataBuffer),
+            height,
+            role: "color",
+            width,
+          }));
+        });
+
+        const transferredRgba = new Uint8Array(rgba.byteLength);
+        transferredRgba.set(rgba);
+        const rgbaBuffer = transferredRgba.buffer;
+        worker.postMessage({
+          version: ltWorkerProtocolVersion,
+          kind: "render",
+          requestId,
+          input: {
+            width,
+            height,
+            rgbaBuffer,
+          },
+          settings: {
+            line: {
+              enabled: false,
+              layerType: "raster",
+              color: "#000000",
+              widthPx: 1,
+              strength: 0,
+              accuracy: 0.5,
+              scaleAwareAccuracy: true,
+              exteriorOutlineStrength: 1,
+              depthEnabled: false,
+              depthStrength: 0,
+              depthOutlineOnly: false,
+              smoothing: 0,
+              textureLineEnabled: false,
+              textureLineStrength: 0,
+              creaseAngleDegrees: 45,
+              hiddenLineRemoval: true,
+            },
+            tone: {
+              mode: "flat",
+              type: "color",
+              pattern: "dot",
+              levels: 4,
+              opacity: 1,
+              frequency: 60,
+              angleDegrees: 45,
+            },
+          },
+        }, [rgbaBuffer]);
+      });
+    }
+    async function decodePngDataUrl(
+      dataUrl: string,
+      width: number,
+      height: number,
+      label: string,
+    ): Promise<Uint8ClampedArray> {
+      if (!dataUrl.startsWith("data:image/png;base64,")) {
+        throw new Error(`${label} is not a PNG data URL`);
+      }
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener(
+          "error",
+          () => reject(new Error(`${label} could not be decoded`)),
+          { once: true },
+        );
+        image.src = dataUrl;
+      });
+      if (image.naturalWidth !== width || image.naturalHeight !== height) {
+        throw new Error(
+          `${label} decoded as ${image.naturalWidth}x${image.naturalHeight}, ` +
+            `expected ${width}x${height}`,
+        );
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error(`${label} has no 2D decode context`);
+      context.drawImage(image, 0, 0);
+      return new Uint8ClampedArray(
+        context.getImageData(0, 0, width, height).data,
+      );
+    }
+    function countAlphaDifferences(
+      left: Uint8Array | Uint8ClampedArray,
+      right: Uint8Array | Uint8ClampedArray,
+    ): number {
+      if (left.length !== right.length) return Number.POSITIVE_INFINITY;
+      let differences = 0;
+      for (let index = 3; index < left.length; index += 4) {
+        if (left[index] !== right[index]) differences += 1;
+      }
+      return differences;
+    }
+
+    const summaries = [];
+    for (const [scenarioIndex, scenario] of scenarios.entries()) {
+        const parsed = JSON.parse(scenario.threeCanonicalDocumentJson) as {
+          readonly camera: {
+            readonly fovDegrees: number;
+            readonly nearClip: number;
+            readonly position: readonly [number, number, number];
+            readonly target: readonly [number, number, number];
+            readonly up: readonly [number, number, number];
+            readonly zoom: number;
+          };
+          readonly nodes: readonly [{
+            readonly color: string;
+            readonly id: string;
+            readonly transform: {
+              readonly position: readonly [number, number, number];
+              readonly rotation: readonly [number, number, number];
+              readonly scale: readonly [number, number, number];
+            };
+          }];
+        };
+        const node = parsed.nodes[0];
+        if (!node || node.id !== expectedStableId.slice(4)) {
+          throw new Error(`[${scenario.id}] canonical asymmetric node is missing`);
+        }
+
+        const threeCanvas = document.createElement("canvas");
+        threeCanvas.width = viewport.width;
+        threeCanvas.height = viewport.height;
+        threeCanvas.style.cssText =
+          "position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;pointer-events:none";
+        document.body.append(threeCanvas);
+        const renderer = new WebGLRenderer({
+          alpha: true,
+          antialias: true,
+          canvas: threeCanvas,
+          failIfMajorPerformanceCaveat: false,
+          powerPreference: "high-performance",
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+        });
+        renderer.setPixelRatio(1);
+        renderer.setSize(viewport.width, viewport.height, false);
+        const scene = new Scene();
+        const camera = new PerspectiveCamera(
+          parsed.camera.fovDegrees,
+          viewport.width / viewport.height,
+          parsed.camera.nearClip,
+          200,
+        );
+        camera.position.set(...parsed.camera.position);
+        camera.up.set(...parsed.camera.up);
+        camera.zoom = parsed.camera.zoom;
+        camera.lookAt(...parsed.camera.target);
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld(true);
+        const geometry = new BoxGeometry(1, 1, 1);
+        const material = new MeshBasicMaterial({ color: node.color });
+        const mesh = new Mesh(geometry, material);
+        mesh.position.set(...node.transform.position);
+        mesh.rotation.set(...node.transform.rotation);
+        mesh.scale.set(...node.transform.scale);
+        scene.add(mesh);
+        scene.updateMatrixWorld(true);
+
+        let threeRgba: Uint8Array | Uint8ClampedArray;
+        let releaseCaptureFrameViewOffset: (() => void) | null = null;
+        let viewOffsetApplied: boolean;
+        try {
+          const adapter =
+            threeCaptureModule.createStudioBg3dThreeWebglCaptureAdapter({
+              camera,
+              renderer,
+              scene,
+            });
+          const sourceSize = adapter.getSourceSize();
+          if (
+            sourceSize.width !== viewport.width ||
+            sourceSize.height !== viewport.height
+          ) {
+            throw new Error(
+              `[${scenario.id}] Three source viewport changed: ` +
+                `${sourceSize.width}x${sourceSize.height}`,
+            );
+          }
+          releaseCaptureFrameViewOffset =
+            productionProofEntry.applyStudioBg3dCaptureFrameViewOffset(
+              camera,
+              scenario.frame,
+              viewport,
+            );
+          if (!releaseCaptureFrameViewOffset) {
+            throw new Error(`[${scenario.id}] shipped capture-frame wrapper rejected the crop`);
+          }
+          viewOffsetApplied = Boolean(camera.view?.enabled);
+          if (
+            (scenario.fit === "exact" && viewOffsetApplied) ||
+            (scenario.fit !== "exact" && !viewOffsetApplied)
+          ) {
+            throw new Error(
+              `[${scenario.id}] shipped capture-frame wrapper took the wrong path`,
+            );
+          }
+          const capture = await adapter.capture({
+            width: scenario.width,
+            height: scenario.height,
+            background: { alpha: 0, color: "#ffffff" },
+            includeDepth: false,
+          });
+          threeRgba = capture.rgba;
+        } finally {
+          try {
+            releaseCaptureFrameViewOffset?.();
+          } finally {
+            scene.remove(mesh);
+            geometry.dispose();
+            material.dispose();
+            renderer.dispose();
+            threeCanvas.remove();
+          }
+        }
+        if (camera.view?.enabled) {
+          throw new Error(`[${scenario.id}] shipped capture-frame wrapper did not restore view`);
+        }
+
+        const ltColorLayer = await renderLtColorInProductionWorker(
+          threeRgba,
+          scenario.width,
+          scenario.height,
+          scenarioIndex + 1,
+        );
+        const encoded = productionProofEntry.encodeStudioBg3dLtLayers([
+          ltColorLayer,
+        ]);
+        const encodedColorLayer = encoded.layers.find((layer) => layer.role === "color");
+        if (
+          !encodedColorLayer ||
+          encoded.layers.length !== 1 ||
+          encodedColorLayer.width !== scenario.width ||
+          encodedColorLayer.height !== scenario.height
+        ) {
+          throw new Error(`[${scenario.id}] shipped LT PNG encoder returned malformed layers`);
+        }
+        const [decodedColorRgba, decodedCompositeRgba] = await Promise.all([
+          decodePngDataUrl(
+            encodedColorLayer.pngDataUrl,
+            scenario.width,
+            scenario.height,
+            `[${scenario.id}] encoded LT color layer`,
+          ),
+          decodePngDataUrl(
+            encoded.compositePngDataUrl,
+            scenario.width,
+            scenario.height,
+            `[${scenario.id}] encoded LT composite`,
+          ),
+        ]);
+        const workerToPngAlphaDifferences =
+          countAlphaDifferences(ltColorLayer.data, decodedColorRgba);
+        const layerToCompositeAlphaDifferences =
+          countAlphaDifferences(decodedColorRgba, decodedCompositeRgba);
+        if (
+          workerToPngAlphaDifferences !== 0 ||
+          layerToCompositeAlphaDifferences !== 0
+        ) {
+          throw new Error(
+            `[${scenario.id}] shipped LT Worker/PNG alpha changed: ` +
+              `worker-to-layer=${workerToPngAlphaDifferences}, ` +
+              `layer-to-composite=${layerToCompositeAlphaDifferences}`,
+          );
+        }
+        let visibleColorPixels = 0;
+        const threeMask = new Uint8Array(scenario.width * scenario.height);
+        for (let pixel = 0; pixel < threeMask.length; pixel += 1) {
+          const byteIndex = pixel * 4;
+          const alpha = decodedColorRgba[byteIndex + 3]!;
+          // Compare the decoded shipped PNG, not adapter readback. Row flip, crop, Worker and
+          // encoder regressions consequently change the mask being admitted below.
+          threeMask[pixel] = alpha >= 32 ? 1 : 0;
+          if (
+            alpha >= 32 &&
+            (
+              decodedColorRgba[byteIndex]! > 8 ||
+              decodedColorRgba[byteIndex + 1]! > 8 ||
+              decodedColorRgba[byteIndex + 2]! > 8
+            )
+          ) {
+            visibleColorPixels += 1;
+          }
+        }
+        if (visibleColorPixels === 0) {
+          throw new Error(`[${scenario.id}] decoded LT color PNG has no visible RGB`);
+        }
+
+        const controller = new AbortController();
+        // `captureStudioBg3dMagicObjectIds` owns a fresh exact-size canvas/runtime for every
+        // backend attempt. Reusing the exact-scenario engine here would retain Babylon projection
+        // cache state and would not exercise the product lifetime.
+        const babylonCanvas = document.createElement("canvas");
+        babylonCanvas.width = scenario.width;
+        babylonCanvas.height = scenario.height;
+        const babylonRuntime = babylonEntry.createStudioBg3dBabylonSpecialist({
+          backend: "webgl2",
+          canvas: babylonCanvas,
+          settings: { failIfMajorPerformanceCaveat: false },
+        });
+        let raw: unknown;
+        try {
+          raw = await babylonRuntime.runIsolated({
+            id: `magic-production-alignment-${scenario.id}`,
+            request: {
+              artifacts: [
+                {
+                  kind: "beauty",
+                  profile: beautyProfile,
+                },
+                {
+                  kind: "object-id",
+                  profile: stableIdProfile,
+                },
+              ],
+              height: scenario.height,
+              kind: "artifact-capture-v2",
+              width: scenario.width,
+            },
+            signal: controller.signal,
+            snapshot: Object.freeze({
+              assets: Object.freeze([]) as readonly [],
+              canonicalDocumentJson: scenario.babylonCanonicalDocumentJson,
+              totalAssetBytes: 0 as const,
+            }),
+          });
+        } catch (cause) {
+          throw new Error(`[${scenario.id}] Babylon object-ID capture failed`, { cause });
+        } finally {
+          await babylonRuntime.dispose();
+          babylonCanvas.remove();
+        }
+        if (
+          typeof raw !== "object" ||
+          raw === null ||
+          (raw as { readonly kind?: unknown }).kind !== "studio-bg3d-artifact-capture"
+        ) {
+          throw new Error(`[${scenario.id}] unexpected Babylon object-ID envelope`);
+        }
+        const artifacts = (raw as {
+          readonly artifacts?: readonly {
+            readonly data?: unknown;
+            readonly kind?: unknown;
+            readonly legend?: unknown;
+          }[];
+        }).artifacts;
+        const beautyArtifact = artifacts?.find((artifact) => artifact.kind === "beauty");
+        const objectArtifact = artifacts?.find((artifact) => artifact.kind === "object-id");
+        if (
+          !(beautyArtifact?.data instanceof Uint8Array) ||
+          beautyArtifact.data.length !== scenario.width * scenario.height * 4 ||
+          !(objectArtifact?.data instanceof Uint32Array) ||
+          !Array.isArray(objectArtifact.legend) ||
+          objectArtifact.data.length !== scenario.width * scenario.height
+        ) {
+          throw new Error(`[${scenario.id}] malformed Babylon object-ID artifact`);
+        }
+        const legendEntry = (objectArtifact.legend as readonly {
+          readonly id?: unknown;
+          readonly stableId?: unknown;
+        }[]).find((entry) => entry.stableId === expectedStableId);
+        if (!legendEntry || !Number.isSafeInteger(legendEntry.id)) {
+          throw new Error(
+            `[${scenario.id}] selected stable ID is absent from the Babylon legend`,
+          );
+        }
+        const selectedObjectId = legendEntry.id as number;
+        const babylonMask = Uint8Array.from(
+          objectArtifact.data,
+          (value) => value === selectedObjectId ? 1 : 0,
+        );
+        const babylonBeautyMask = new Uint8Array(
+          scenario.width * scenario.height,
+        );
+        for (let pixel = 0; pixel < babylonBeautyMask.length; pixel += 1) {
+          babylonBeautyMask[pixel] =
+            beautyArtifact.data[pixel * 4 + 3]! >= 32 ? 1 : 0;
+        }
+        const three = statsForMask(
+          threeMask,
+          scenario.width,
+          scenario.height,
+          `[${scenario.id}] Three LT color`,
+        );
+        const babylon = statsForMask(
+          babylonMask,
+          scenario.width,
+          scenario.height,
+          `[${scenario.id}] Babylon object-ID`,
+        );
+        const babylonBeauty = statsForMask(
+          babylonBeautyMask,
+          scenario.width,
+          scenario.height,
+          `[${scenario.id}] Babylon beauty alpha`,
+        );
+        const babylonBeautyIdIou = intersectionOverUnion(
+          babylonBeautyMask,
+          babylonMask,
+          scenario.width,
+          scenario.height,
+          "direct",
+        );
+        const iou = {
+          direct: intersectionOverUnion(
+            threeMask,
+            babylonMask,
+            scenario.width,
+            scenario.height,
+            "direct",
+          ),
+          flipX: intersectionOverUnion(
+            threeMask,
+            babylonMask,
+            scenario.width,
+            scenario.height,
+            "flip-x",
+          ),
+          flipY: intersectionOverUnion(
+            threeMask,
+            babylonMask,
+            scenario.width,
+            scenario.height,
+            "flip-y",
+          ),
+          rotate180: intersectionOverUnion(
+            threeMask,
+            babylonMask,
+            scenario.width,
+            scenario.height,
+            "rotate-180",
+          ),
+        };
+        const edgeTolerance = Math.max(
+          3,
+          Math.ceil(Math.max(scenario.width, scenario.height) * 0.0125),
+        );
+        const centroidTolerance = edgeTolerance;
+        const bboxDelta = {
+          maxX: Math.abs(three.bbox.maxX - babylon.bbox.maxX),
+          maxY: Math.abs(three.bbox.maxY - babylon.bbox.maxY),
+          minX: Math.abs(three.bbox.minX - babylon.bbox.minX),
+          minY: Math.abs(three.bbox.minY - babylon.bbox.minY),
+        };
+        const centroidDelta = {
+          x: Math.abs(three.centroidX - babylon.centroidX),
+          y: Math.abs(three.centroidY - babylon.centroidY),
+        };
+        const directionTolerance = Math.max(2, edgeTolerance / 2);
+        const directionMatches =
+          (
+            Math.abs(three.directionX) <= directionTolerance ||
+            Math.abs(babylon.directionX) <= directionTolerance ||
+            Math.sign(three.directionX) === Math.sign(babylon.directionX)
+          ) &&
+          (
+            Math.abs(three.directionY) <= directionTolerance ||
+            Math.abs(babylon.directionY) <= directionTolerance ||
+            Math.sign(three.directionY) === Math.sign(babylon.directionY)
+          );
+        const areaRatio = three.count / babylon.count;
+        const pixelCount = scenario.width * scenario.height;
+        const coverage = {
+          babylon: babylon.count / pixelCount,
+          three: three.count / pixelCount,
+        };
+        const bestMirroredIou = Math.max(iou.flipX, iou.flipY, iou.rotate180);
+        const bboxMatches = Object.values(bboxDelta)
+          .every((delta) => delta <= edgeTolerance);
+        const centroidMatches =
+          centroidDelta.x <= centroidTolerance &&
+          centroidDelta.y <= centroidTolerance;
+        const silhouetteMatches =
+          iou.direct >= 0.88 &&
+          areaRatio >= 0.85 &&
+          areaRatio <= 1.15;
+        const nonTrivialSilhouettes =
+          coverage.three >= 0.0025 &&
+          coverage.three <= 0.8 &&
+          coverage.babylon >= 0.0025 &&
+          coverage.babylon <= 0.8 &&
+          Math.hypot(three.directionX, three.directionY) >= 1 &&
+          Math.hypot(babylon.directionX, babylon.directionY) >= 1;
+        const orientationIsDiscriminating =
+          iou.direct >= bestMirroredIou + 0.01;
+        const diagnostics = {
+          areaRatio,
+          babylon,
+          babylonBeauty,
+          babylonBeautyIdIou,
+          bestMirroredIou,
+          bboxDelta,
+          centroidDelta,
+          coverage,
+          edgeTolerance,
+          iou,
+          three,
+          viewOffsetApplied,
+          workerToPngAlphaDifferences,
+        };
+        const passed =
+          bboxMatches &&
+          centroidMatches &&
+          directionMatches &&
+          silhouetteMatches &&
+          nonTrivialSilhouettes &&
+          orientationIsDiscriminating;
+        summaries.push({
+          areaRatio,
+          bboxDelta,
+          centroidDelta,
+          coverage,
+          diagnostics,
+          fit: scenario.fit,
+          height: scenario.height,
+          id: scenario.id,
+          iou,
+          passed,
+          pngBase64Length: encodedColorLayer.pngDataUrl.length,
+          viewOffsetApplied,
+          width: scenario.width,
+          workerToPngAlphaDifferences,
+        });
+    }
+    return summaries;
+  }, {
+    babylonEntryUrl: assetUrl(findBabylonSpecialistEntryFile()),
+    beautyProfile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+    expectedStableId: MAGIC_ALIGNMENT_SELECTED_STABLE_ID,
+    ltWorkerProtocolVersion: STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION,
+    ltWorkerUrl: assetUrl(findProductionAssetFile(
+      STUDIO_BG3D_LT_RENDER_WORKER_FILE_PATTERN,
+      "Studio LT render Worker",
+    )),
+    productionProofEntryUrl: assetUrl(findProductionAssetFile(
+      STUDIO_BG3D_MAGIC_PROOF_ENTRY_FILE_PATTERN,
+      "Studio Magic production proof entry",
+    )),
+    scenarios: createMagicLayerAlignmentProofScenarios(),
+    stableIdProfile: STUDIO_BG3D_STABLE_ID_PROFILE,
+    threeCaptureUrl: assetUrl(findProductionAssetFile(
+      THREE_WEBGL_CAPTURE_FILE_PATTERN,
+      "Three WebGL capture entry",
+    )),
+    threeModuleUrl: assetUrl(findProductionAssetFile(
+      THREE_MODULE_FILE_PATTERN,
+      "Three production module",
+    )),
+    viewport: MAGIC_ALIGNMENT_VIEWPORT,
+  });
+
+  const expectedScenarios = createMagicLayerAlignmentProofScenarios();
+  assertCondition(
+    result.length === expectedScenarios.length,
+    `Magic alignment returned ${result.length}/${expectedScenarios.length} scenarios`,
+  );
+  for (const [index, expected] of expectedScenarios.entries()) {
+    const actual = result[index];
+    assertCondition(
+      actual &&
+        actual.id === expected.id &&
+        actual.fit === expected.fit &&
+        actual.width === expected.width &&
+        actual.height === expected.height,
+      `Magic alignment scenario order/dimensions changed at ${expected.id}`,
+    );
+    console.log(
+      `[verify-studio-3d-console] Magic alignment ${actual.id}/${actual.fit} ` +
+        `${actual.width}x${actual.height} ${actual.passed ? "PASS" : "FAIL"} ` +
+        `IoU=${actual.iou.direct.toFixed(4)} area=${actual.areaRatio.toFixed(4)} ` +
+        `coverage=${actual.coverage.three.toFixed(4)}/` +
+        `${actual.coverage.babylon.toFixed(4)} ` +
+        `bbox=${JSON.stringify(actual.diagnostics.three.bbox)}/` +
+        `${JSON.stringify(actual.diagnostics.babylon.bbox)} ` +
+        `bboxΔ=${JSON.stringify(actual.bboxDelta)} ` +
+        `centroidΔ=(${actual.centroidDelta.x.toFixed(2)},` +
+        `${actual.centroidDelta.y.toFixed(2)}) ` +
+        `viewOffset=${actual.viewOffsetApplied ? "applied" : "exact/no-op"} ` +
+        `worker-to-png-alpha-delta=${actual.workerToPngAlphaDifferences} ` +
+        `png=${actual.pngBase64Length}chars`,
+    );
+  }
+  const failed = result.find((scenario) => !scenario.passed);
+  assertCondition(
+    !failed,
+    `[${failed?.id} ${failed?.fit} ${failed?.width}x${failed?.height}] ` +
+      `Three LT/Babylon Magic silhouette alignment failed: ` +
+      JSON.stringify(failed?.diagnostics),
+  );
+}
+
 async function main(): Promise<void> {
   verifyPatchedThreeRuntime();
   assertCondition(
@@ -1357,6 +2404,7 @@ async function main(): Promise<void> {
       });
       const webGpuPage = await webGpuContext.newPage();
       await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+      await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
       await webGpuContext.close();
     } finally {
       await webGpuBrowser.close();

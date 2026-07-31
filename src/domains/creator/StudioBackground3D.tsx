@@ -50,6 +50,7 @@ import {
   Undo2,
   Unlock,
   Upload,
+  WandSparkles,
   X,
   ZoomIn,
   ZoomOut,
@@ -189,9 +190,8 @@ import {
   normalizeStudioBg3dCaptureAspectRatio,
   resolveStudioBg3dCaptureFrame,
   resolveStudioBg3dCaptureFrameCameraSettings,
-  resolveStudioBg3dCaptureViewOffset,
-  type StudioBg3dCaptureFrame,
 } from "./studio-bg3d-capture-frame-geometry";
+import { applyStudioBg3dCaptureFrameViewOffset } from "./studio-bg3d-capture-frame-view-offset";
 import {
   BgAnimationPlayhead,
   LtRangeControl,
@@ -235,6 +235,7 @@ import {
 } from "./studio-bg3d-lens";
 import { projectStudioBg3dLodDiameterCssPx } from "./studio-bg3d-lod-selection";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
+import { encodeStudioBg3dLtLayers } from "./studio-bg3d-lt-layer-encoder";
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
   createStudioBg3dLtUserPreset,
@@ -262,13 +263,26 @@ import {
 import {
   renderStudioBg3dLtLayers,
   STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
-  type StudioBg3dLtRasterLayer,
   type StudioBg3dLtRenderSettings,
 } from "./studio-bg3d-lt-render";
 import {
   renderStudioBg3dLtLayersInWorker,
   StudioBg3dLtRenderWorkerError,
 } from "./studio-bg3d-lt-render-worker-client";
+import {
+  buildStudioBg3dMagicFilterMask,
+} from "./studio-bg3d-magic-filter-mask";
+import {
+  encodeStudioBg3dMagicMaskPngDataUrl,
+} from "./studio-bg3d-magic-mask-png";
+import {
+  captureStudioBg3dMagicObjectIds,
+  type StudioBg3dMagicBabylonBackend,
+} from "./studio-bg3d-magic-object-id-capture";
+import {
+  resolveStudioBg3dMagicSelection,
+  type StudioBg3dMagicSelectionSnapshot,
+} from "./studio-bg3d-magic-selection";
 import {
   STUDIO_BG3D_MEASUREMENT_MAX_REFERENCES,
   classifyStudioBg3dMeasurementInference,
@@ -529,7 +543,6 @@ import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type {
   StudioBackground3DInsertResult,
-  StudioBackground3DLtLayer,
 } from "./studio-3d-insert-contract";
 import type {
   StudioBg3dCaptureAdapter,
@@ -875,59 +888,30 @@ function waitForStudioBg3dPaintFrame(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+function studioBg3dMagicCaptureCompatibilityMessage(
+  document: StudioBg3dSceneDocument,
+): string | null {
+  const lensShift = document.camera.lensShift;
+  if (document.camera.projection === "orthographic") {
+    return "첫 단계의 매직 마스크는 원근 카메라에서만 지원해요.";
+  }
+  if (lensShift && (lensShift[0] !== 0 || lensShift[1] !== 0)) {
+    return "렌즈 시프트를 0으로 되돌린 뒤 매직 마스크를 다시 만들어 주세요.";
+  }
+  if (
+    document.background.mode === "sky-preset" &&
+    document.background.skyPresetId !== "blank"
+  ) {
+    return "첫 단계에서는 단색·투명·빈 하늘 배경에서만 매직 마스크를 만들 수 있어요.";
+  }
+  if (document.output.tone.mode === "none" || document.output.tone.opacity <= 0) {
+    return "매직 마스크를 붙일 컬러 또는 톤 베이스 출력을 먼저 켜 주세요.";
+  }
+  return null;
+}
+
 const STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS = 1_048_576;
 const STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS = 120_000;
-
-/**
- * Interactive insert compatibility encoder. LT detection runs in a Worker, while this bounded
- * DOM-canvas PNG boundary intentionally remains on the main thread until the insert contract can
- * accept Blob-backed work assets. Keeping it named and isolated makes that ownership testable.
- */
-function encodeStudioBg3dLtLayers(
-  layers: readonly StudioBg3dLtRasterLayer[]
-): { readonly layers: readonly StudioBackground3DLtLayer[]; readonly compositePngDataUrl: string } {
-  if (layers.length === 0) throw new Error("LT layers are empty.");
-  const width = layers[0]?.width ?? 0;
-  const height = layers[0]?.height ?? 0;
-  if (width < 1 || height < 1 || layers.some((layer) => layer.width !== width || layer.height !== height)) {
-    throw new Error("LT layer dimensions do not match.");
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("2D PNG context unavailable.");
-  const compositeCanvas = document.createElement("canvas");
-  compositeCanvas.width = width;
-  compositeCanvas.height = height;
-  const compositeContext = compositeCanvas.getContext("2d");
-  if (!compositeContext) throw new Error("2D composite context unavailable.");
-  const encodedLayers = layers.map((layer) => {
-    const imageData = context.createImageData(width, height);
-    imageData.data.set(layer.data);
-    context.clearRect(0, 0, width, height);
-    context.putImageData(imageData, 0, 0);
-    compositeContext.drawImage(canvas, 0, 0);
-    const pngDataUrl = canvas.toDataURL("image/png").split("#", 1)[0];
-    if (!pngDataUrl.startsWith("data:image/png;base64,")) {
-      throw new Error("LT layer PNG encoding failed.");
-    }
-    return Object.freeze({
-      role: layer.role,
-      pngDataUrl,
-      width,
-      height,
-    });
-  });
-  const compositePngDataUrl = compositeCanvas.toDataURL("image/png").split("#", 1)[0];
-  if (!compositePngDataUrl.startsWith("data:image/png;base64,")) {
-    throw new Error("LT composite PNG encoding failed.");
-  }
-  return Object.freeze({
-    layers: Object.freeze(encodedLayers),
-    compositePngDataUrl,
-  });
-}
 
 function ltOutputFingerprint(
   line: StudioBg3dLineOutputSettings,
@@ -1587,8 +1571,9 @@ let studioBg3dBabylonSpecialistEntryPromise:
 
 /**
  * The only Babylon production import boundary. It is deliberately invoked from the explicit
- * diagnostic button handler, never from modal mount, render, hover/focus preload, or CaptureBridge.
- * A rejected chunk load is evicted so the same user action can retry after a transient failure.
+ * diagnostic action or an explicitly enabled Magic Layer insertion, never from modal mount,
+ * render, hover/focus preload, or CaptureBridge. A rejected chunk load is evicted so the same user
+ * action can retry after a transient failure.
  */
 function loadStudioBg3dBabylonSpecialistEntry():
   Promise<StudioBg3dBabylonSpecialistEntry> {
@@ -1751,87 +1736,6 @@ function studioBg3dBabylonDiagnosticErrorMessage(
   }
   const supportCode = code ? ` · 지원 코드 ${code}` : "";
   return `Babylon ${label} 엔진 또는 beauty/depth/normal/object ID/material ID 패스를 분리 캔버스에서 검증하지 못했습니다${supportCode}. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
-}
-
-type StudioBg3dCameraWithView = THREE.Camera & {
-  view?: {
-    enabled: boolean;
-    fullWidth: number;
-    fullHeight: number;
-    offsetX: number;
-    offsetY: number;
-    width: number;
-    height: number;
-  } | null;
-  setViewOffset?: (
-    fullWidth: number,
-    fullHeight: number,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ) => void;
-  clearViewOffset?: () => void;
-};
-
-/**
- * 캡처 프레임을 Three 카메라의 view 창으로 잡고, 되돌리는 함수를 돌려준다. 크롭을 적용할 수 없으면
- * null을 돌려준다 — 호출자는 늘어난 래스터를 삽입하는 대신 트랜잭션을 실패시켜야 한다.
- *
- * 뷰포트와 같은 프레임(자동/일치)이면 카메라를 전혀 건드리지 않는다. 크롭이 있을 때만 이전 view를
- * 스냅샷해 두었다가 정확히 같은 상태로 복원하므로, 렌즈 시프트 같은 기존 설정이 살아남는다.
- */
-function applyStudioBg3dCaptureFrameViewOffset(
-  camera: THREE.Camera | null,
-  frame: StudioBg3dCaptureFrame,
-  viewport: { readonly width: number; readonly height: number },
-): (() => void) | null {
-  if (frame.fit === "exact") return () => {};
-  const target = camera as StudioBg3dCameraWithView | null;
-  if (
-    !target ||
-    typeof target.setViewOffset !== "function" ||
-    typeof target.clearViewOffset !== "function"
-  ) {
-    return null;
-  }
-  const previous = target.view && target.view.enabled ? { ...target.view } : null;
-  const offset = resolveStudioBg3dCaptureViewOffset({
-    frame,
-    viewportWidth: viewport.width,
-    viewportHeight: viewport.height,
-    baseWindow: previous && previous.fullWidth > 0 && previous.fullHeight > 0
-      ? {
-          offsetX: previous.offsetX / previous.fullWidth,
-          offsetY: previous.offsetY / previous.fullHeight,
-          width: previous.width / previous.fullWidth,
-          height: previous.height / previous.fullHeight,
-        }
-      : null,
-  });
-  if (!offset) return null;
-  target.setViewOffset(
-    offset.fullWidth,
-    offset.fullHeight,
-    offset.offsetX,
-    offset.offsetY,
-    offset.width,
-    offset.height,
-  );
-  return () => {
-    if (previous) {
-      target.setViewOffset?.(
-        previous.fullWidth,
-        previous.fullHeight,
-        previous.offsetX,
-        previous.offsetY,
-        previous.width,
-        previous.height,
-      );
-      return;
-    }
-    target.clearViewOffset?.();
-  };
 }
 
 /* ── R3F Canvas 내부에서 렌더러/씬/카메라를 꺼내 캡처용 ref에 흘려보내는 다리.
@@ -2670,6 +2574,7 @@ export function StudioBackground3D({
   const [transformSpaceOverride, setTransformSpaceOverride] =
     useState<TransformSpace | null>(null);
   const [lineArtPreview, setLineArtPreview] = useState(false);
+  const [magicLayerEnabled, setMagicLayerEnabled] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
   const [isQuadView, setIsQuadView] = useState(false);
   const viewTopRef = useRef<HTMLDivElement>(null);
@@ -3032,6 +2937,8 @@ export function StudioBackground3D({
   const ltInsertAbortRef = useRef<AbortController | null>(null);
   const aiMethodReferenceAbortRef = useRef<AbortController | null>(null);
   const ltInsertSceneEpochRef = useRef(0);
+  const ltMagicSelectionEpochRef = useRef(0);
+  const ltMagicCaptureGenerationRef = useRef(0);
   const ltInsertRestoreLineArtPreviewRef = useRef<boolean | null>(null);
   const destructiveMutationGuardRef = useRef(new StudioBg3dDestructiveMutationGuard());
   const shotBatchAbortRef = useRef<AbortController | null>(null);
@@ -3062,6 +2969,12 @@ export function StudioBackground3D({
     controller?.abort();
     aiMethodReferenceAbortRef.current?.abort();
   }, [customModels, primitives, sceneBaseDocument]);
+  useLayoutEffect(() => {
+    ltMagicSelectionEpochRef.current += 1;
+    if (magicLayerEnabled && captureInFlightRef.current) {
+      ltInsertAbortRef.current?.abort();
+    }
+  }, [magicLayerEnabled, selectedIds]);
   useLayoutEffect(() => {
     if (!surfaceSnapArmedRef.current) return;
     cancelSurfaceSnap("장면이 변경되어 표면 붙이기 대상을 다시 선택해야 합니다.");
@@ -3337,6 +3250,34 @@ export function StudioBackground3D({
     transformSpaceOverride ?? (transformMode === "rotate" ? "local" : "world");
   const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
     isRestoringScene || physicsInteractionLocked || isBatchRenderingShots;
+  const magicLayerEffectivelyVisibleIds =
+    collectStudioBg3dEffectivelyVisibleEntityIds([...primitives, ...customModels]);
+  const magicLayerSelectedPrimitive = selectedIds.size === 1
+    ? primitives.find((primitive) => selectedIds.has(primitive.id)) ?? null
+    : null;
+  const magicLayerLensShift = sceneBaseDocument.camera.lensShift;
+  const magicLayerUnavailableReason = initialScene || initialDataUrl
+    ? "첫 단계에서는 새 3D 배경을 추가할 때만 매직 마스크를 만들 수 있어요."
+    : customModels.length > 0
+      ? "첫 단계에서는 외부 모델이 없는 프리미티브 장면만 정확하게 분리할 수 있어요."
+      : selectedIds.size !== 1
+        ? "보이는 프리미티브 한 개를 선택하면 사용할 수 있어요."
+        : !magicLayerSelectedPrimitive
+          ? "현재 선택은 프리미티브가 아니어서 매직 마스크를 만들 수 없어요."
+          : !magicLayerEffectivelyVisibleIds.has(magicLayerSelectedPrimitive.id)
+            ? "숨겨진 프리미티브나 숨겨진 그룹의 자식은 마스크에 나타나지 않아요. 먼저 표시해 주세요."
+            : sceneBaseDocument.camera.projection === "orthographic"
+              ? "첫 단계의 매직 마스크는 원근 카메라에서만 지원해요."
+              : magicLayerLensShift &&
+                  (magicLayerLensShift[0] !== 0 || magicLayerLensShift[1] !== 0)
+                ? "렌즈 시프트를 0으로 되돌리면 매직 마스크를 만들 수 있어요."
+                : sceneBaseDocument.background.mode === "sky-preset" &&
+                    sceneBaseDocument.background.skyPresetId !== "blank"
+                  ? "첫 단계에서는 단색·투명·빈 하늘 배경에서만 매직 마스크를 만들 수 있어요."
+                  : sceneBaseDocument.output.tone.mode === "none" ||
+                      sceneBaseDocument.output.tone.opacity <= 0
+                    ? "매직 마스크를 붙일 컬러 또는 톤 베이스 출력을 먼저 켜 주세요."
+                    : null;
   const shotBatchBlockedReason = sceneRecoveryError
     ? "3D 장면 복원 오류를 해결하기 전에는 누락 가능성이 있는 컷을 배치 출력할 수 없습니다."
     : hasCloneFailure
@@ -6952,7 +6893,7 @@ export function StudioBackground3D({
   const undoRef = useRef(doUndo);
   const redoRef = useRef(doRedo);
   const deleteSelectedRef = useRef(deleteSelectedEntity);
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectedIdsRef.current = selectedIds;
     undoRef.current = doUndo;
     redoRef.current = doRedo;
@@ -7422,6 +7363,26 @@ export function StudioBackground3D({
       return;
     }
 
+    let magicSelectionSnapshot: StudioBg3dMagicSelectionSnapshot | null = null;
+    if (magicLayerEnabled) {
+      const compatibilityMessage =
+        studioBg3dMagicCaptureCompatibilityMessage(adapted.document);
+      if (compatibilityMessage) {
+        setError(compatibilityMessage);
+        return;
+      }
+      const magicSelection = resolveStudioBg3dMagicSelection({
+        operation: initialScene || initialDataUrl ? "update" : "insert",
+        document: adapted.document,
+        selectedIds: Object.freeze([...selectedIds]),
+      });
+      if (!magicSelection.ok) {
+        setError(magicSelection.message);
+        return;
+      }
+      magicSelectionSnapshot = magicSelection.snapshot;
+    }
+
     const ltSettingsSnapshot: StudioBg3dLtRenderSettings = Object.freeze({
       line: Object.freeze({ ...adapted.document.output.line }),
       tone: Object.freeze({ ...adapted.document.output.tone }),
@@ -7430,10 +7391,19 @@ export function StudioBackground3D({
     const insertController = new AbortController();
     ltInsertAbortRef.current = insertController;
     const insertSceneEpoch = ltInsertSceneEpochRef.current;
+    const magicSelectionEpoch = ltMagicSelectionEpochRef.current;
     const isInsertCurrent = () => (
       !insertController.signal.aborted &&
       ltInsertAbortRef.current === insertController &&
       ltInsertSceneEpochRef.current === insertSceneEpoch &&
+      (
+        magicSelectionSnapshot === null ||
+        (
+          ltMagicSelectionEpochRef.current === magicSelectionEpoch &&
+          selectedIdsRef.current.size === 1 &&
+          selectedIdsRef.current.has(magicSelectionSnapshot.selectedId)
+        )
+      ) &&
       isModalAssetSessionCurrent(session)
     );
 
@@ -7445,6 +7415,12 @@ export function StudioBackground3D({
     setCaptureBackgroundSnapshot(backgroundSnapshot);
     setLineArtPreview(false);
     setIsCapturing(true);
+    let insertPhase:
+      | "lt"
+      | "magic-object-id"
+      | "magic-png"
+      | "lt-encode"
+      | "commit" = "lt";
     try {
       // React/R3F가 캡처 전용 visibility와 셰이딩 상태를 반영할 시간을 보장한다.
       const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
@@ -7463,6 +7439,7 @@ export function StudioBackground3D({
       const captureAdapterIsStale = () => captureRef.current.adapter !== captureAdapter;
 
       const sourceSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
+      if (!isInsertCurrent() || captureAdapterIsStale()) return;
       // 캡처 비율은 뷰포트 캔버스 크기가 아니라 문서가 소유한 값에서 나온다. 값이 없는(레거시)
       // 문서만 예전처럼 뷰포트 비율을 그대로 따르고, 그때 프레임은 뷰포트 전체와 정확히 같다.
       const captureFrame = resolveStudioBg3dCaptureFrame({
@@ -7490,6 +7467,11 @@ export function StudioBackground3D({
       if (!captureSize) {
         throw new Error("LT capture size admission failed.");
       }
+      const captureFrameCameraSettings =
+        resolveStudioBg3dCaptureFrameCameraSettings(
+          adapted.document.camera,
+          captureFrame,
+        );
       // 프레임이 뷰포트와 다를 때만 카메라 view 창을 잡는다(렌즈 시프트와 선형 합성). 크롭 없는
       // 자동 경로에서는 카메라를 아예 건드리지 않아 예전 결과와 완전히 동일하다. 크롭이 필요한데
       // 카메라를 못 잡으면 늘어난 그림을 삽입하는 대신 실패한다(fail-closed).
@@ -7539,12 +7521,93 @@ export function StudioBackground3D({
         setError("현재 LT 설정에서는 보이는 선화나 톤이 만들어지지 않습니다. 선화 또는 톤을 켜 주세요.");
         return;
       }
+      if (
+        magicSelectionSnapshot &&
+        !rendered.layers.some((layer) => layer.role === "color" || layer.role === "tone")
+      ) {
+        setError("매직 마스크를 붙일 컬러 또는 톤 베이스 레이어가 만들어지지 않았어요. 베이스 출력을 켜고 다시 시도해 주세요.");
+        return;
+      }
+
+      let magicFilterMask: StudioBackground3DInsertResult["magicFilterMask"];
+      if (magicSelectionSnapshot) {
+        insertPhase = "magic-object-id";
+        const magicCaptureDocument = normalizeStudioBg3dSceneDocument({
+          ...adapted.document,
+          camera: captureFrameCameraSettings,
+        });
+        const magicCompatibilityMessage =
+          studioBg3dMagicCaptureCompatibilityMessage(magicCaptureDocument);
+        if (magicCompatibilityMessage) {
+          setError(magicCompatibilityMessage);
+          return;
+        }
+        const magicRuntimeSnapshot = createStudioBg3dRuntimeSnapshot(
+          magicCaptureDocument,
+          new Map(),
+        );
+        const babylonEntry = await loadStudioBg3dBabylonSpecialistEntry();
+        if (!isInsertCurrent() || captureAdapterIsStale()) return;
+        const magicBackends: readonly StudioBg3dMagicBabylonBackend[] =
+          typeof navigator !== "undefined" && "gpu" in navigator
+            ? ["webgpu", "webgl2"]
+            : ["webgl2"];
+        ltMagicCaptureGenerationRef.current += 1;
+        const objectIdCapture = await captureStudioBg3dMagicObjectIds({
+          snapshot: magicRuntimeSnapshot,
+          width: rendered.width,
+          height: rendered.height,
+          jobId: `magic-${insertSceneEpoch}-${ltMagicCaptureGenerationRef.current}`,
+          backends: magicBackends,
+          createCanvas: () => document.createElement("canvas"),
+          createRuntime: ({ backend, canvas, settings }) => {
+            if (!(canvas instanceof HTMLCanvasElement)) {
+              throw new Error("Magic Layer canvas owner is unavailable.");
+            }
+            return babylonEntry.createStudioBg3dBabylonSpecialist({
+              canvas,
+              backend,
+              settings,
+            });
+          },
+          signal: insertController.signal,
+        });
+        if (!isInsertCurrent() || captureAdapterIsStale()) return;
+        const magicMask = buildStudioBg3dMagicFilterMask({
+          width: objectIdCapture.width,
+          height: objectIdCapture.height,
+          objectIds: objectIdCapture.objectIds,
+          legend: objectIdCapture.legend,
+          selectedId: magicSelectionSnapshot.selectedId,
+        });
+        if (magicMask.selectedStableId !== magicSelectionSnapshot.stableId) {
+          throw new Error("Magic Layer stable object identity changed.");
+        }
+        insertPhase = "magic-png";
+        const magicMaskPngDataUrl = await encodeStudioBg3dMagicMaskPngDataUrl({
+          width: magicMask.width,
+          height: magicMask.height,
+          data: magicMask.data,
+        }, {
+          signal: insertController.signal,
+          timeoutMs: STUDIO_BG3D_LT_INSERT_WORKER_TIMEOUT_MS,
+        });
+        if (!isInsertCurrent() || captureAdapterIsStale()) return;
+        magicFilterMask = Object.freeze({
+          pngDataUrl: magicMaskPngDataUrl,
+          width: magicMask.width,
+          height: magicMask.height,
+          selectedObjectStableId: magicMask.selectedStableId,
+        });
+      }
+
+      insertPhase = "lt-encode";
       const encoded = encodeStudioBg3dLtLayers(rendered.layers);
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
       // 소실점도 캡처 프레임 기준이어야 한다. 중앙 크롭은 NDC 선형 확대라 카메라 설정을 프레임
       // 배율로 환산하면 잘린 래스터 좌표계에서 렌더러와 정확히 같은 위치가 나온다.
       const perspectiveGuides = deriveStudioBg3dVanishingPoints(
-        resolveStudioBg3dCaptureFrameCameraSettings(adapted.document.camera, captureFrame),
+        captureFrameCameraSettings,
         rendered.width,
         rendered.height,
       ).map((point) => ({
@@ -7552,6 +7615,8 @@ export function StudioBackground3D({
         x: point.x / rendered.width,
         y: point.y / rendered.height,
       }));
+      if (!isInsertCurrent() || captureAdapterIsStale()) return;
+      insertPhase = "commit";
       setSceneBaseDocument(adapted.document);
       const accepted = onInsert({
         kind: "separated",
@@ -7560,6 +7625,7 @@ export function StudioBackground3D({
         layers: encoded.layers,
         compositePngDataUrl: encoded.compositePngDataUrl,
         perspectiveGuides,
+        ...(magicFilterMask ? { magicFilterMask } : {}),
         bg3dScene: adapted.document,
       });
       if (accepted === false) {
@@ -7589,12 +7655,20 @@ export function StudioBackground3D({
         const supersededByNewInsert = ltInsertAbortRef.current !== null &&
           ltInsertAbortRef.current !== insertController;
         if (!supersededByNewInsert && isModalAssetSessionCurrent(session)) {
-          setError("장면 또는 출력 설정이 변경되어 LT 변환을 취소했습니다. 최신 장면에서 다시 추가해 주세요.");
+          setError("장면·선택 또는 출력 설정이 변경되어 LT 변환을 취소했습니다. 최신 상태에서 다시 추가해 주세요.");
         }
         return;
       }
       if (!isInsertCurrent()) return;
-      if (insertFailure instanceof StudioBg3dLtRenderWorkerError) {
+      if (insertPhase === "magic-object-id") {
+        setError(
+          "선택 객체를 같은 프레임에서 안전하게 분리하지 못했습니다. 원근 카메라·단색 배경·선택 상태를 확인하고 다시 시도해 주세요.",
+        );
+      } else if (insertPhase === "magic-png") {
+        setError(
+          "선택 객체 마스크를 안전한 PNG로 만들지 못했습니다. 출력 해상도를 낮추거나 브라우저 그래픽 상태를 확인해 주세요.",
+        );
+      } else if (insertFailure instanceof StudioBg3dLtRenderWorkerError) {
         setError(
           insertFailure.code === "worker-unavailable"
             ? "이 브라우저에서 LT 백그라운드 작업을 시작할 수 없고 현재 출력은 안전한 즉시 변환 한도를 넘습니다. 출력 해상도를 낮춰 다시 시도해 주세요."
@@ -10602,6 +10676,15 @@ export function StudioBackground3D({
                 hidden={hideOnTab("lt")}
                 context={{
                   ScanLine,
+                  WandSparkles,
+                  magicLayerEnabled,
+                  setMagicLayerEnabled,
+                  magicLayerUnavailableReason,
+                  magicLayerSelectionName: magicLayerSelectedPrimitive?.name
+                    ?? (magicLayerSelectedPrimitive
+                      ? PRIMITIVE_DEFS[magicLayerSelectedPrimitive.kind].label
+                      : null),
+                  magicLayerBusy: isCapturing,
                   appliedLtPresetId,
                   applyLtPreset,
                   STUDIO_BG3D_LT_BUILT_IN_PRESETS,

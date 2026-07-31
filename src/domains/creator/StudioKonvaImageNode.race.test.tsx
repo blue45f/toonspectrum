@@ -110,6 +110,7 @@ class ControlledImage {
 const canvasHarness = {
   getImageDataCalls: 0,
   getImageDataError: null as Error | null,
+  invalidMaskCoverage: false,
 };
 
 function imageEl(overrides: Partial<ImageEl> = {}): ImageEl {
@@ -162,6 +163,12 @@ async function load(image: ControlledImage): Promise<void> {
   await flush();
 }
 
+function assignedImage(src: string): ControlledImage {
+  const image = imageHarness.assigned.findLast((candidate) => candidate.src === src);
+  if (!image) throw new Error(`Image loader was not created for ${src}`);
+  return image;
+}
+
 function resolveRun(run: WorkerRun): void {
   const { width, height } = run.request.imageData;
   run.resolve({
@@ -181,6 +188,7 @@ beforeEach(() => {
   imageHarness.assigned.length = 0;
   canvasHarness.getImageDataCalls = 0;
   canvasHarness.getImageDataError = null;
+  canvasHarness.invalidMaskCoverage = false;
   vi.stubGlobal("Image", ControlledImage);
   vi.stubGlobal("ImageData", class {
     constructor(
@@ -197,6 +205,13 @@ beforeEach(() => {
         getImageData: vi.fn(() => {
           canvasHarness.getImageDataCalls += 1;
           if (canvasHarness.getImageDataError) throw canvasHarness.getImageDataError;
+          if (canvasHarness.invalidMaskCoverage && this.width === 64 && this.height === 32) {
+            return {
+              data: new Uint8ClampedArray(0),
+              height: this.height,
+              width: this.width,
+            } as ImageData;
+          }
           return {
             data: new Uint8ClampedArray(this.width * this.height * 4),
             height: this.height,
@@ -457,5 +472,193 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(workerHarness.runs).toHaveLength(0);
     expect(canvasHarness.getImageDataCalls).toBe(0);
     expect(konvaCapture.current?.filters).toBeUndefined();
+  });
+
+  it("keeps a requested mask fail-closed while its exact coverage is pending", async () => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    const mask = assignedImage("mask-a.png");
+
+    await load(source);
+    await flushWorkerDebounce();
+
+    expect(mask.handlersBeforeSrc).toBe(true);
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(konvaCapture.current?.brightness).toBeUndefined();
+  });
+
+  it.each([
+    ["decode throws", "throw"],
+    ["coverage validation fails", "coverage"],
+  ] as const)("keeps a requested mask fail-closed when %s", async (_label, failure) => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    const mask = assignedImage("mask-a.png");
+    await load(source);
+
+    if (failure === "throw") {
+      canvasHarness.getImageDataError = new DOMException("tainted mask", "SecurityError");
+    } else {
+      canvasHarness.invalidMaskCoverage = true;
+    }
+    await load(mask);
+    await flushWorkerDebounce();
+
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(konvaCapture.current?.brightness).toBeUndefined();
+  });
+
+  it("keeps a requested mask fail-closed when the image decoder rejects it", async () => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    const mask = assignedImage("mask-a.png");
+    await load(source);
+    await act(async () => mask.onerror?.(new Event("error")));
+    await flushWorkerDebounce();
+
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(konvaCapture.current?.brightness).toBeUndefined();
+  });
+
+  it("activates filtering only after coverage for the exact wanted mask is ready", async () => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    const mask = assignedImage("mask-a.png");
+    await load(source);
+
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(0);
+
+    await load(mask);
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+  });
+
+  it("rejects a stale decoded mask immediately when filterMaskSrc is replaced", async () => {
+    const view = render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    await load(source);
+    await load(assignedImage("mask-a.png"));
+    await flushWorkerDebounce();
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+
+    view.rerender(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-b.png",
+    })));
+
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+    expect(konvaCapture.current?.brightness).toBeUndefined();
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await load(assignedImage("mask-b.png"));
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(2);
+  });
+
+  it("ignores a stale mask load after replacement and waits for the current src", async () => {
+    const view = render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    const staleMask = assignedImage("mask-a.png");
+    const staleLoad = staleMask.onload;
+    await load(source);
+
+    view.rerender(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-b.png",
+    })));
+    await act(async () => staleLoad?.(new Event("load")));
+    await flushWorkerDebounce();
+
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+
+    await load(assignedImage("mask-b.png"));
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(1);
+  });
+
+  it("aborts and ignores an in-flight result owned by a replaced mask src", async () => {
+    const view = render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-a.png",
+    })));
+    const source = assignedImage("a.png");
+    await load(source);
+    await load(assignedImage("mask-a.png"));
+    await flushWorkerDebounce();
+    const staleRun = workerHarness.runs[0]!;
+
+    view.rerender(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: true,
+      filterMaskSrc: "mask-b.png",
+    })));
+    expect(staleRun.signal?.aborted).toBe(true);
+    expect(konvaCapture.current?.image).toBe(source);
+    expect(konvaCapture.current?.filters).toBeUndefined();
+
+    await act(async () => resolveRun(staleRun));
+    expect(konvaCapture.current?.image).toBe(source);
+
+    await load(assignedImage("mask-b.png"));
+    await flushWorkerDebounce();
+    expect(workerHarness.runs).toHaveLength(2);
+    await act(async () => resolveRun(workerHarness.runs[1]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+  });
+
+  it("preserves full-image filtering when a mask is absent or explicitly disabled", async () => {
+    render(node(imageEl({
+      brightness: 0.2,
+      filterMaskEnabled: false,
+      filterMaskSrc: "disabled-mask.png",
+    })));
+    await load(assignedImage("a.png"));
+    await flushWorkerDebounce();
+
+    expect(imageHarness.assigned.some((image) => image.src === "disabled-mask.png")).toBe(false);
+    expect(workerHarness.runs).toHaveLength(1);
   });
 });

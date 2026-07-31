@@ -110,7 +110,7 @@ describe("Studio 3D insert controller boundary", () => {
     expect(contract.source.split("\n").length).toBeLessThanOrEqual(70);
 
     expect(background.source).toContain(
-      'import type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "./studio-3d-insert-contract";'
+      'import type {\n  StudioBackground3DInsertResult,\n} from "./studio-3d-insert-contract";'
     );
     expect(background.source).toContain(
       'export type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "./studio-3d-insert-contract";'
@@ -210,21 +210,32 @@ describe("Studio 3D insert controller boundary", () => {
     expect(backgroundInsert).toContain("if (!patchEl(targetElementId, {");
     expect(backgroundInsert).toContain("if (!addEl({");
     expect(backgroundInsert).toContain(
-      "if (!commit(plan.nextElements, {"
+      "if (targetElementId && result.magicFilterMask) {"
+    );
+    expect(backgroundInsert.indexOf(
+      "if (targetElementId && result.magicFilterMask) {"
+    )).toBeLessThan(backgroundInsert.indexOf(
+      "const plan = planStudioBg3dLtLayers"
+    ));
+    expect(backgroundInsert).toContain(
+      "const magicAttachment = attachStudioBg3dMagicFilterMaskToLtPlan({"
+    );
+    expect(backgroundInsert).toContain(
+      "if (!commit(nextElements, {"
     );
     expect(backgroundInsert.indexOf("setSelectedId(plan.anchorElementId);")).toBeGreaterThan(
       backgroundInsert.indexOf(
-        "if (!commit(plan.nextElements, {"
+        "if (!commit(nextElements, {"
       )
     );
     expect(backgroundInsert).toContain("drawingAssist: nextDrawingAssist");
     expect(backgroundInsert).toContain("mapStudioBg3dPerspectiveGuidesToAnchor(");
     expect(backgroundInsert).toContain(
-      "const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);"
+      "const anchor = nextElements.find((element) => element.id === plan.anchorElementId);"
     );
     expect(backgroundInsert).not.toContain("commitStudioDrawingAssistDocument(");
     expect(backgroundInsert.indexOf("setTool(\"select\");")).toBeGreaterThan(
-      backgroundInsert.indexOf("if (!commit(plan.nextElements, {")
+      backgroundInsert.indexOf("if (!commit(nextElements, {")
     );
     expect(backgroundInsert.lastIndexOf("return true;")).toBeGreaterThan(
       backgroundInsert.indexOf("commitStudioDrawingAssistDocument(")

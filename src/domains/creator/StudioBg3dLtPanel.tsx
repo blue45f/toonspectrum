@@ -25,6 +25,12 @@ type LtEditorSection = "line" | "tone";
 
 interface StudioBg3dLtPanelContext {
   readonly ScanLine: typeof import("lucide-react").ScanLine;
+  readonly WandSparkles: typeof import("lucide-react").WandSparkles;
+  readonly magicLayerEnabled: boolean;
+  readonly setMagicLayerEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  readonly magicLayerUnavailableReason: string | null;
+  readonly magicLayerSelectionName: string | null;
+  readonly magicLayerBusy: boolean;
   readonly appliedLtPresetId: string;
   readonly applyLtPreset: (presetId: string) => void;
   readonly STUDIO_BG3D_LT_BUILT_IN_PRESETS: readonly StudioBg3dLtPreset[];
@@ -74,6 +80,125 @@ interface StudioBg3dLtPanelContext {
   readonly LT_TONE_PATTERN_LABELS: Record<import("./studio-bg3d-scene-document").StudioBg3dTonePattern, string>;
 }
 
+interface StudioBg3dMagicLayerControlProps {
+  readonly WandSparkles: typeof import("lucide-react").WandSparkles;
+  readonly enabled: boolean;
+  readonly unavailableReason: string | null;
+  readonly selectionName: string | null;
+  readonly busy: boolean;
+  readonly onToggle: () => void;
+}
+
+export function StudioBg3dMagicLayerControl({
+  WandSparkles,
+  enabled,
+  unavailableReason,
+  selectionName,
+  busy,
+  onToggle,
+}: StudioBg3dMagicLayerControlProps) {
+  const unavailable = unavailableReason !== null;
+  const disabled = busy || (!enabled && unavailable);
+  const visualState = busy
+    ? "busy"
+    : enabled
+      ? unavailable
+        ? "needs-attention"
+        : "enabled"
+      : unavailable
+        ? "unavailable"
+        : "available";
+  const status = busy
+    ? "3D 배경을 처리하는 동안에는 이 설정을 바꿀 수 없어요. 작업이 끝나면 다시 변경할 수 있습니다."
+    : unavailableReason
+      ? enabled
+        ? `${unavailableReason} 이 옵션을 끄거나 선택을 바로잡아 주세요.`
+        : unavailableReason
+      : enabled
+        ? `“${selectionName ?? "선택 객체"}”를 동일 프레임에서 정밀 분리합니다.`
+        : "한 객체에만 색보정·블러·톤 효과를 걸고 싶을 때 켜세요.";
+
+  return (
+    <div
+      data-state={visualState}
+      className={cx(
+        "mt-3 rounded-xl border p-3 transition-colors motion-reduce:transition-none",
+        enabled
+          ? "border-accent/45 bg-accent-soft"
+          : unavailable || busy
+            ? "border-line bg-card/55"
+            : "border-accent/25 bg-accent/5",
+      )}
+    >
+      <button
+        id="bg3d-magic-layer"
+        type="button"
+        role="switch"
+        aria-busy={busy}
+        aria-checked={enabled}
+        aria-labelledby="bg3d-magic-layer-label"
+        aria-describedby="bg3d-magic-layer-description bg3d-magic-layer-status"
+        disabled={disabled}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed"
+        onClick={onToggle}
+      >
+        <span className="min-w-0">
+          <span
+            id="bg3d-magic-layer-label"
+            className={cx(
+              "flex items-center gap-1.5 text-xs font-bold",
+              enabled || (!unavailable && !busy) ? "text-fg" : "text-fg-2",
+            )}
+          >
+            <WandSparkles
+              size={14}
+              className={cx(
+                "shrink-0",
+                enabled || (!unavailable && !busy) ? "text-accent" : "text-fg-3",
+              )}
+              aria-hidden
+            />
+            선택 객체 매직 마스크
+          </span>
+          <span
+            id="bg3d-magic-layer-description"
+            className="mt-0.5 block text-xs leading-relaxed text-fg-3"
+          >
+            컬러 레이어에 편집 가능한 필터 범위를 함께 만듭니다.
+          </span>
+        </span>
+        <span
+          aria-hidden
+          className={cx(
+            "flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors motion-reduce:transition-none",
+            enabled
+              ? "border-accent bg-accent"
+              : "border-line bg-panel",
+          )}
+        >
+          <span
+            className={cx(
+              "size-3.5 rounded-full bg-fg shadow-sm transition-transform motion-reduce:transition-none",
+              enabled ? "translate-x-3.5" : "translate-x-0",
+            )}
+          />
+        </span>
+      </button>
+      <p
+        id="bg3d-magic-layer-status"
+        aria-live="polite"
+        aria-atomic="true"
+        className={cx(
+          "mt-1.5 text-xs leading-relaxed",
+          enabled && unavailable ? "text-warn" : "text-fg-2",
+        )}
+      >
+        {status}
+      </p>
+    </div>
+  );
+}
+
 export interface StudioBg3dLtPanelProps {
   readonly hidden: boolean;
   readonly context: StudioBg3dLtPanelContext;
@@ -85,6 +210,12 @@ export function StudioBg3dLtPanel({
 }: StudioBg3dLtPanelProps) {
   const {
     ScanLine,
+    WandSparkles,
+    magicLayerEnabled,
+    setMagicLayerEnabled,
+    magicLayerUnavailableReason,
+    magicLayerSelectionName,
+    magicLayerBusy,
     appliedLtPresetId,
     applyLtPreset,
     STUDIO_BG3D_LT_BUILT_IN_PRESETS,
@@ -148,6 +279,15 @@ export function StudioBg3dLtPanel({
                 <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
                   3D 배경의 컬러·선화·톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 조정하세요.
                 </p>
+
+                <StudioBg3dMagicLayerControl
+                  WandSparkles={WandSparkles}
+                  enabled={magicLayerEnabled}
+                  unavailableReason={magicLayerUnavailableReason}
+                  selectionName={magicLayerSelectionName}
+                  busy={magicLayerBusy}
+                  onToggle={() => setMagicLayerEnabled((enabled) => !enabled)}
+                />
 
                 <label htmlFor="bg3d-lt-preset" className="mt-3 block text-xs font-semibold text-fg-2">
                   변환 프리셋

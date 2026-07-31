@@ -6,6 +6,10 @@ const editorSource = readFileSync(
   new URL("./StudioBackground3D.tsx", import.meta.url),
   "utf8",
 );
+const encoderSource = readFileSync(
+  new URL("./studio-bg3d-lt-layer-encoder.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(startMarker: string, endMarker: string): string {
   const start = editorSource.indexOf(startMarker);
@@ -46,7 +50,7 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     );
     const fallback = sourceBetween(
       "const STUDIO_BG3D_LT_INSERT_SYNC_FALLBACK_MAX_PIXELS",
-      "function encodeStudioBg3dLtLayers(",
+      "function ltOutputFingerprint(",
     );
 
     expect(fallback).toContain("1_048_576");
@@ -90,7 +94,8 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     expect(insert).toContain(
       "const captureAdapterIsStale = () => captureRef.current.adapter !== captureAdapter;",
     );
-    expect(insert.match(/captureAdapterIsStale\(\)/gu)).toHaveLength(3);
+    expect(insert.match(/captureAdapterIsStale\(\)/gu)?.length ?? 0)
+      .toBeGreaterThanOrEqual(7);
     expect(afterCaptureFence).toBeGreaterThan(capture);
     expect(afterCaptureFence).toBeLessThan(worker);
     expect(afterWorkerFence).toBeGreaterThan(worker);
@@ -108,18 +113,66 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     expect(sessionLifecycle).toContain("setIsCapturing(false)");
     expect(sessionLifecycle).toContain("setLineArtPreview(restoreLineArtPreview)");
     expect(invalidation).toContain("ltInsertAbortRef.current?.abort()");
-    expect(insert).toContain("장면 또는 출력 설정이 변경되어 LT 변환을 취소했습니다.");
+    expect(insert).toContain("장면·선택 또는 출력 설정이 변경되어 LT 변환을 취소했습니다.");
+  });
+
+  it("keeps optional Magic Layer capture in the same frame and the same atomic insert", () => {
+    const insert = sourceBetween(
+      "async function handleInsert()",
+      "// 선택된 것이 도형(primitives)인지",
+    );
+    const resolveSelection = insert.indexOf("resolveStudioBg3dMagicSelection({");
+    const captureFrameCamera = insert.indexOf(
+      "const captureFrameCameraSettings =",
+    );
+    const ltWorker = insert.indexOf("await renderStudioBg3dLtLayersInWorker(");
+    const objectIds = insert.indexOf("await captureStudioBg3dMagicObjectIds({");
+    const buildMask = insert.indexOf("buildStudioBg3dMagicFilterMask({");
+    const encodeMask = insert.indexOf(
+      "await encodeStudioBg3dMagicMaskPngDataUrl({",
+    );
+    const encodeLt = insert.indexOf("const encoded = encodeStudioBg3dLtLayers(rendered.layers)");
+    const publish = insert.indexOf("const accepted = onInsert({");
+
+    expect(resolveSelection).toBeGreaterThanOrEqual(0);
+    expect(captureFrameCamera).toBeGreaterThan(resolveSelection);
+    expect(ltWorker).toBeGreaterThan(captureFrameCamera);
+    expect(objectIds).toBeGreaterThan(ltWorker);
+    expect(buildMask).toBeGreaterThan(objectIds);
+    expect(encodeMask).toBeGreaterThan(buildMask);
+    expect(encodeLt).toBeGreaterThan(encodeMask);
+    expect(publish).toBeGreaterThan(encodeLt);
+    expect(insert).toContain("const magicSelectionEpoch = ltMagicSelectionEpochRef.current");
+    expect(insert).toContain(
+      "ltMagicSelectionEpochRef.current === magicSelectionEpoch",
+    );
+    expect(insert).toContain(
+      "selectedIdsRef.current.has(magicSelectionSnapshot.selectedId)",
+    );
+    expect(insert).toContain("camera: captureFrameCameraSettings");
+    expect(insert).toContain("width: rendered.width");
+    expect(insert).toContain("height: rendered.height");
+    expect(insert).toContain("bg3dScene: adapted.document");
+    expect(insert).toContain("...(magicFilterMask ? { magicFilterMask } : {})");
+    expect(insert).toContain(
+      'layer.role === "color" || layer.role === "tone"',
+    );
+    expect(insert).toContain(
+      'operation: initialScene || initialDataUrl ? "update" : "insert"',
+    );
   });
 
   it("keeps PNG data-URL encoding as an explicit main-thread compatibility boundary", () => {
-    const encoder = sourceBetween(
-      "Interactive insert compatibility encoder.",
-      "function ltOutputFingerprint(",
+    expect(editorSource).toContain(
+      'import { encodeStudioBg3dLtLayers } from "./studio-bg3d-lt-layer-encoder";',
     );
-
-    expect(encoder).toContain("intentionally remains on the main thread");
-    expect(encoder).toContain('document.createElement("canvas")');
-    expect(encoder).toContain('canvas.toDataURL("image/png")');
-    expect(encoder).not.toContain("TODO");
+    expect(editorSource).toContain(
+      "const encoded = encodeStudioBg3dLtLayers(rendered.layers)",
+    );
+    expect(editorSource).not.toContain("function encodeStudioBg3dLtLayers(");
+    expect(encoderSource).toContain("intentionally remains on the main thread");
+    expect(encoderSource).toContain('document.createElement("canvas")');
+    expect(encoderSource).toContain('canvas.toDataURL("image/png")');
+    expect(encoderSource).not.toContain("TODO");
   });
 });

@@ -210,9 +210,10 @@ describe("Studio background 3D bundle boundary", () => {
     for (const call of loaderCalls) {
       const owner = enclosingFunction(call);
       expect(owner, "Babylon loader call must stay behind a user action function").not.toBeNull();
-      expect(functionName(owner!), "Babylon loader call owner must be named").toMatch(
-        /(?:babylon|diagnostic)/i,
-      );
+      expect(
+        ["handleInsert", "runBabylonDiagnostic"],
+        "Babylon loader calls are limited to explicit diagnostic and opt-in Magic insertion actions",
+      ).toContain(functionName(owner!));
       expect(functionName(owner!)).not.toMatch(/(?:capturebridge|mount|preload)/i);
       expect(
         hasAncestor(call, (candidate) => (

@@ -3,6 +3,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import type {
   StudioBackground3DInsertResult,
   StudioBackground3DLtLayer,
+  StudioBackground3DMagicFilterMask,
   StudioBg3dLtRasterLayerRole,
   StudioVrmPoserInsertResult,
 } from "./studio-3d-insert-contract";
@@ -25,6 +26,13 @@ const layers = layerRoles.map((role, index) => ({
   height: 600,
 })) satisfies StudioBackground3DLtLayer[];
 
+const magicFilterMask = {
+  pngDataUrl: "data:image/png;base64,bWFzaw==",
+  width: 800,
+  height: 600,
+  selectedObjectStableId: "obj/hero",
+} satisfies StudioBackground3DMagicFilterMask;
+
 const backgroundResult = {
   kind: "separated",
   width: 800,
@@ -36,6 +44,7 @@ const backgroundResult = {
     { axis: "world-y", x: 0.5, y: 0.25 },
     { axis: "world-z", x: 0.75, y: 0.5 },
   ],
+  magicFilterMask,
   bg3dScene: {} as StudioBg3dSceneDocument,
 } satisfies StudioBackground3DInsertResult;
 
@@ -65,6 +74,12 @@ describe("Studio 3D insert contract", () => {
       "world-y",
       "world-z",
     ]);
+    expect(backgroundResult.magicFilterMask).toEqual({
+      pngDataUrl: "data:image/png;base64,bWFzaw==",
+      width: 800,
+      height: 600,
+      selectedObjectStableId: "obj/hero",
+    });
   });
 
   it("keeps the VRM capture paired with its editable scene document", () => {

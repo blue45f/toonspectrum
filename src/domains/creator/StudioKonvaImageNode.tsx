@@ -412,11 +412,11 @@ export function StudioKonvaImageNode({
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
 
-  // ── 필터 마스크(비파괴 필터 부분 적용) — 디코드된 커버리지 맵. 새 마스크(스트로크)가
-  // 디코드되는 동안에도 직전 커버리지로 계속 블렌드해 "전체 필터 ↔ 부분 필터" 깜빡임을 없앤다
-  // (마스크 페인팅은 스트로크마다 filterMaskSrc data URL이 통째로 갱신된다). 마스크가 제거되면
-  // 즉시 null로 돌아가 기존 전체 적용과 동일해진다. 디코드/커버리지 실패는 fail-open(마스크
-  // 없이 기존 필터 룩 유지 — 마스크는 보정 범위 축이라 가시성 손실이 없다).
+  // ── 필터 마스크(비파괴 필터 부분 적용) — 디코드된 커버리지 맵. 마스크가 요청된 동안에는
+  // 그 정확한 src의 커버리지가 준비되기 전까지 필터 전체를 fail-closed 한다. 직전 마스크를
+  // 계속 쓰거나 마스크 없이 전체 이미지에 필터를 적용하면, 새 마스크 스트로크/교체/디코드
+  // 실패 순간에 사용자가 지정하지 않은 픽셀까지 비파괴 보정이 번지는 더 큰 데이터 오류가 된다.
+  // 마스크가 제거되거나 명시적으로 꺼지면 요청 자체가 없으므로 기존 전체 적용 동작을 보존한다.
   const filterMaskWantedSrc = hasFilters && shouldApplyFilterMask(el)
     ? el.filterMaskSrc
     : undefined;
@@ -429,6 +429,10 @@ export function StudioKonvaImageNode({
     const src = filterMaskWantedSrc;
     const im = new globalThis.Image();
     let active = true;
+    const clearCurrentDecodedMask = () => {
+      if (!active) return;
+      setDecodedFilterMask((current) => current?.src === src ? null : current);
+    };
     im.onload = () => {
       if (!active) return;
       try {
@@ -438,18 +442,25 @@ export function StudioKonvaImageNode({
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+          clearCurrentDecodedMask();
+          return;
+        }
         ctx.drawImage(im, 0, 0);
         const pixels = ctx.getImageData(0, 0, w, h);
         const coverage = computeFilterMaskCoverage(pixels.data, w, h);
-        if (coverage && active) setDecodedFilterMask({ coverage, src });
+        if (!coverage) {
+          clearCurrentDecodedMask();
+          return;
+        }
+        if (active) setDecodedFilterMask({ coverage, src });
       } catch (error) {
-        console.error("[studio] filter mask decode failed, applying filters unmasked:", error);
+        clearCurrentDecodedMask();
+        console.error("[studio] filter mask decode failed, preserving the unfiltered source:", error);
       }
     };
     im.onerror = () => {
-      // 현재 마스크의 재디코드까지 실패했다면 이전 커버리지를 남기지 않는다(전체 적용 폴백).
-      if (active) setDecodedFilterMask((current) => current?.src === src ? null : current);
+      clearCurrentDecodedMask();
     };
     // 캐시된 data URL은 대입과 같은 tick에 완료될 수 있으므로 handler를 먼저 연결한다.
     im.src = src;
@@ -459,12 +470,18 @@ export function StudioKonvaImageNode({
       im.onerror = null;
     };
   }, [filterMaskWantedSrc]);
-  const activeFilterMask = filterMaskWantedSrc ? decodedFilterMask : null;
+  // 비동기 effect 정리보다 렌더가 먼저 일어나도 오래된 src의 coverage가 단 한 프레임도
+  // 활성화되지 않도록 렌더 경계에서 정체성을 다시 대조한다.
+  const activeFilterMask =
+    filterMaskWantedSrc && decodedFilterMask?.src === filterMaskWantedSrc
+      ? decodedFilterMask
+      : null;
+  const filterMaskActivationBlocked = !!filterMaskWantedSrc && !activeFilterMask;
   // 마스크가 섞인 필터 결과는 별도 정체성으로 캐시한다 — imageFilterCacheKey(다른 소유자의
   // 파일)는 건드리지 않고, 이 노드가 소유한 모든 결과 캐시 키에 마스크 data URL을 함께 섞는다
   // (el.src를 키에 그대로 쓰는 기존 관례와 동일 — 내용이 곧 정체성).
-  const maskedFilterKey = activeFilterMask
-    ? JSON.stringify([filterCacheKey, activeFilterMask.src])
+  const maskedFilterKey = filterMaskWantedSrc
+    ? JSON.stringify([filterCacheKey, filterMaskWantedSrc])
     : filterCacheKey;
   useEffect(() => {
     if (!hasFilters || filterModule) return;
@@ -566,7 +583,12 @@ export function StudioKonvaImageNode({
   // 기존과 동일하게 필터 미적용(아래 cache effect의 조건과 일치, 새 동작 아님).
   const useWorkerFilterPath =
     workerDimensionsSafe
-    && hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
+    && hasFilters
+    && !!filterModule
+    && !!filterWorkerClient
+    && cachePad === 0
+    && !el.isAnimatedGif
+    && !filterMaskActivationBlocked;
   const workerRequestKey = JSON.stringify([
     el.src,
     filterCacheKey,
@@ -574,7 +596,7 @@ export function StudioKonvaImageNode({
     workerHeight,
     // 필터 마스크 정체성 — 마스크가 바뀌면(스트로크/반전/삭제) 결과 픽셀이 달라지므로 같은
     // 요청으로 취급하면 안 된다(fail-closed 폴백 키와 결과 상태 매칭이 함께 이 키를 쓴다).
-    activeFilterMask?.src ?? null,
+    filterMaskWantedSrc ?? null,
   ]);
   const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
   const paddedWorkerRequiredBlocked = cachePad > 0 && workerRequiredForSafeExecution;
@@ -853,7 +875,9 @@ export function StudioKonvaImageNode({
     currentWorkerFilteredCanvas ?? retainedWorkerFilteredCanvas;
   const showWorkerCanvas = workerPipelineActive && !!visibleWorkerFilteredCanvas;
   const synchronousFallbackBlocked =
-    paddedWorkerRequiredBlocked || workerRequiredFailureKey === workerRequestKey;
+    filterMaskActivationBlocked
+    || paddedWorkerRequiredBlocked
+    || workerRequiredFailureKey === workerRequestKey;
 
   useEffect(() => {
     const node = imageRef.current;

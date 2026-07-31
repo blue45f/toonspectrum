@@ -181,6 +181,9 @@ import {
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
 } from "./studio-bg3d-lt-layer-plan";
 import {
+  attachStudioBg3dMagicFilterMaskToLtPlan,
+} from "./studio-bg3d-magic-layer-attach";
+import {
   StudioBg3dRecoveryAccessGate,
 } from "./studio-bg3d-recovery-access-lease";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
@@ -19615,6 +19618,12 @@ const puppetWarpArmed =
     // 문서 마스터는 의도적으로 그룹을 지원하지 않는다. 이 표면에서는 분리 레이어를 거짓으로
     // 그룹화하지 않고 같은 LT 결과의 투명 합성 PNG를 사용하며, 장면 원본은 계속 재편집 가능하다.
     if (masterEditMode) {
+      if (result.magicFilterMask) {
+        setError(
+          "매직 레이어 마스크는 일반 페이지의 분리된 컬러·톤 레이어에서만 안전하게 만들 수 있어요. 문서 마스터를 닫고 새 3D 배경으로 추가해 주세요.",
+        );
+        return false;
+      }
       if (targetElementId) {
         const target = elementById.get(targetElementId);
         if (!target || target.type !== "image") {
@@ -19652,6 +19661,13 @@ const puppetWarpArmed =
       return true;
     }
 
+    if (targetElementId && result.magicFilterMask) {
+      setError(
+        "매직 레이어 마스크는 기존 3D 배경 업데이트에 합성하지 않아요. 새 3D 배경으로 추가해 주세요.",
+      );
+      return false;
+    }
+
     const template = createCanvasImageElement({
       id: uid(),
       src: anchorLayer.pngDataUrl,
@@ -19682,7 +19698,16 @@ const puppetWarpArmed =
       setError(plan.message);
       return false;
     }
-    const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);
+    const magicAttachment = attachStudioBg3dMagicFilterMaskToLtPlan({
+      plan,
+      insertResult: result,
+    });
+    if (!magicAttachment.ok) {
+      setError(magicAttachment.message);
+      return false;
+    }
+    const nextElements = magicAttachment.nextElements;
+    const anchor = nextElements.find((element) => element.id === plan.anchorElementId);
     const mappedGuides = anchor?.type === "image"
       ? mapStudioBg3dPerspectiveGuidesToAnchor(result.perspectiveGuides, anchor)
       : [];
@@ -19708,8 +19733,9 @@ const puppetWarpArmed =
         })
       : undefined;
     // LT layers, their editable group, and the camera-derived perspective ruler are one document
-    // transition. Undo can never leave only half of a 3D insertion behind.
-    if (!commit(plan.nextElements, {
+    // transition. The optional Magic Layer mask is attached to that same next-elements snapshot,
+    // so undo can never leave only half of either a 3D insertion or its object selection behind.
+    if (!commit(nextElements, {
       groups: plan.nextGroups,
       ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
     })) return false;
