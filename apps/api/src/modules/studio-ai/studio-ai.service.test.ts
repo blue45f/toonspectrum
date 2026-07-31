@@ -1,6 +1,8 @@
 import { HttpException, ServiceUnavailableException } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { type BackendCapabilityGatewayDispatchResult } from "../../infrastructure/backend-capabilities/backend-capability-gateway-dispatcher";
+
 import { StudioAiService } from "./studio-ai.service";
 
 import type { StudioAiAdmissionGate } from "./studio-ai-admission";
@@ -18,6 +20,10 @@ const compositionInput = {
 const IDEMPOTENCY_KEY = "studio-ai-operation-0000000000000001";
 const RECEIPT_KEY_HASH = new Uint8Array(32).fill(0x11);
 const RECEIPT_REQUEST_HASH = new Uint8Array(32).fill(0x22);
+
+type CapabilityDispatchMock = {
+  dispatch: ReturnType<typeof vi.fn>;
+};
 
 function complete(
   service: StudioAiService,
@@ -64,6 +70,8 @@ function createService(input?: {
   markAmbiguousError?: Error;
   abandonBeforeSendResult?: boolean;
   abandonSafeRejectionResult?: boolean;
+  dispatchResult?: BackendCapabilityGatewayDispatchResult;
+  dispatchError?: Error;
 }) {
   const reserve = input?.reserveError
     ? vi.fn().mockRejectedValue(input.reserveError)
@@ -112,6 +120,11 @@ function createService(input?: {
   const abandonSafeRejection = vi.fn().mockResolvedValue(
     input?.abandonSafeRejectionResult ?? true
   );
+  const dispatch = input?.dispatchResult
+    ? vi.fn().mockResolvedValue(input.dispatchResult)
+    : input?.dispatchError
+      ? vi.fn().mockRejectedValue(input.dispatchError)
+      : undefined;
   const admissionGate = {
     acquire,
     renew,
@@ -123,7 +136,11 @@ function createService(input?: {
     abandonSafeRejection,
   } as unknown as StudioAiAdmissionGate;
   return {
-    service: new StudioAiService(store, admissionGate),
+    service: new StudioAiService(
+      store,
+      admissionGate,
+      dispatch ? ({ dispatch } as unknown as CapabilityDispatchMock) : null
+    ),
     reserve,
     finalize,
     acquire,
@@ -134,6 +151,7 @@ function createService(input?: {
     markAmbiguous,
     abandonBeforeSend,
     abandonSafeRejection,
+    dispatch,
   };
 }
 
@@ -179,6 +197,126 @@ describe("StudioAiService", () => {
       explicitPreferenceFallback: true,
     });
     expect(JSON.stringify(status)).not.toContain("test-server-key");
+  });
+
+  it("분산 경계로 즉시 완료된 응답은 직접 프로바이더 호출 없이 성공한다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { service, dispatch, reserve, markSent, markSucceeded } = createService({
+      dispatchResult: {
+        ok: true,
+        coordinationMode: "distributed",
+        providerId: "cloudflare",
+        placementRole: "edge-short",
+        selectionReason: "workload-affinity",
+        outcome: "completed",
+        result: {
+          content: "분산 응답",
+          provider: "deepseek",
+          model: "deepseek-distributed",
+          requestId: "studio-distributed-req",
+          usage: {
+            promptTokens: 12,
+            completionTokens: 3,
+            totalTokens: 15,
+          },
+        },
+        attempts: [],
+      },
+    });
+
+    await expect(complete(service, "studio-user-distributed")).resolves.toMatchObject({
+      content: "분산 응답",
+      provider: "deepseek",
+      model: "deepseek-distributed",
+      requestId: "studio-distributed-req",
+      usage: { totalTokens: 15 },
+    });
+
+    expect(dispatch).toHaveBeenCalledOnce();
+    const [command] = dispatch.mock.calls[0] as [
+      {
+        tenantId: string;
+        capability: string;
+        workload: string;
+        payload: {
+          operation: string;
+          task: string;
+        };
+        idempotencyKey: string;
+      }
+    ];
+    expect(command).toMatchObject({
+      capability: "async-job",
+      workload: "webhook",
+      idempotencyKey: IDEMPOTENCY_KEY,
+      tenantId: expect.stringMatching(/^[0-9a-f]{64}$/),
+      payload: expect.objectContaining({
+        operation: "studio-ai-chat",
+        task: "composition",
+      }),
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(markSent).toHaveBeenCalledOnce();
+    expect(markSucceeded).toHaveBeenCalledOnce();
+    expect(reserve).toHaveBeenCalledOnce();
+  });
+
+  it("분산 경계가 안전한 실패를 반환하면 프로바이더 직접 호출로 폴백한다", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          model: "deepseek-v4-flash",
+          choices: [{ finish_reason: "stop", message: { content: "직접 호출 완료" } }],
+          usage: { prompt_tokens: 4, completion_tokens: 2, total_tokens: 6 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal(
+      "fetch",
+      fetchMock
+    );
+    const { service, dispatch } = createService({
+      dispatchResult: {
+        ok: false,
+        coordinationMode: "distributed",
+        reason: "coordination-deferred",
+        attempts: [],
+      },
+    });
+
+    await expect(complete(service, "studio-user-distributed-fallback")).resolves.toMatchObject({
+      content: "직접 호출 완료",
+      provider: "deepseek",
+    });
+
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("분산 경계가 비안전 실패면 재시도 없이 실패한다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      fetchMock
+    );
+    const { service, dispatch } = createService({
+      dispatchResult: {
+        ok: false,
+        coordinationMode: "distributed",
+        reason: "delivery-unknown",
+        attempts: [],
+      },
+    });
+
+    const error = await captureHttpException(
+      complete(service, "studio-user-distributed-unsafefail")
+    );
+
+    expect(error.getStatus()).toBe(503);
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each([undefined, "short-key", " studio-ai-operation-0000000000000001"])(

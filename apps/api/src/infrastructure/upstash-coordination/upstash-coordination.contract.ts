@@ -171,6 +171,22 @@ export type ConsumeProviderBudget = z.infer<
   typeof ConsumeProviderBudgetSchema
 >;
 
+/**
+ * A deliberately narrow, privacy-preserving cross-host limiter. `subjectFingerprint` is a
+ * caller-created SHA-256 digest, never an IP address, email, token, or arbitrary user content.
+ * The Redis client HMACs the complete key again before it leaves the API process.
+ */
+export const ConsumeRateLimitSchema = z
+  .object({
+    scope: z.enum(["auth"]),
+    subjectFingerprint: Sha256FingerprintSchema,
+    maximumRequests: z.number().int().min(1).max(100_000),
+    windowMs: z.number().int().min(1_000).max(24 * 60 * 60 * 1_000),
+  })
+  .strict();
+
+export type ConsumeRateLimit = z.infer<typeof ConsumeRateLimitSchema>;
+
 export const AcquireCoordinationLeaseResultSchema = z
   .object({
     acquired: z.boolean(),
@@ -245,4 +261,16 @@ export const ConsumeProviderBudgetResultSchema = z
 
 export type ConsumeProviderBudgetResult = z.infer<
   typeof ConsumeProviderBudgetResultSchema
+>;
+
+export const ConsumeRateLimitResultSchema = z
+  .object({
+    accepted: z.boolean(),
+    requestCount: z.number().int().min(0),
+    remainingTtlMs: z.number().int().min(0),
+  })
+  .strict();
+
+export type ConsumeRateLimitResult = z.infer<
+  typeof ConsumeRateLimitResultSchema
 >;

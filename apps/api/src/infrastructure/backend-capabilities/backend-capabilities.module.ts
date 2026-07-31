@@ -9,11 +9,13 @@ import {
   BACKEND_CAPABILITY_COORDINATION_RUNTIME,
   BackendCapabilityCoordinationGate,
 } from "./backend-capability-coordination-gate";
+import { BackendCapabilityGatewayController } from "./backend-capability-gateway-controller";
 import {
   BACKEND_CAPABILITY_GATEWAY_RUNTIME,
   BackendCapabilityGatewayDispatcher,
   type BackendCapabilityGatewayRuntime,
 } from "./backend-capability-gateway-dispatcher";
+import { BackendCapabilityGatewayExecutor } from "./backend-capability-gateway-executor";
 import { resolveBackendCapabilityPolicy } from "./backend-capability-policy";
 import {
   BACKEND_CAPABILITY_POLICY,
@@ -36,6 +38,7 @@ const optionalInfrastructureExports = [
 
 @Module({
   imports: optionalInfrastructureModules,
+  controllers: [BackendCapabilityGatewayController],
   providers: [
     {
       provide: BACKEND_CAPABILITY_POLICY,
@@ -56,11 +59,13 @@ const optionalInfrastructureExports = [
     BackendCapabilityRouter,
     BackendCapabilityCoordinationGate,
     BackendCapabilityGatewayDispatcher,
+    BackendCapabilityGatewayExecutor,
   ],
   exports: [
     BackendCapabilityRouter,
     BackendCapabilityCoordinationGate,
     BackendCapabilityGatewayDispatcher,
+    BackendCapabilityGatewayExecutor,
     ...optionalInfrastructureExports,
   ],
 })

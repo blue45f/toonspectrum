@@ -1,0 +1,3 @@
+export const AUTH_CLIENT_IP_POLICY = Symbol("AUTH_CLIENT_IP_POLICY");
+export const AUTH_RATE_LIMIT_CONFIG = Symbol("AUTH_RATE_LIMIT_CONFIG");
+

@@ -8,6 +8,8 @@ import {
   AcquireCoordinationLeaseSchema,
   CompleteIdempotencyReceiptResultSchema,
   CompleteIdempotencyReceiptSchema,
+  ConsumeRateLimitResultSchema,
+  ConsumeRateLimitSchema,
   ConsumeProviderBudgetResultSchema,
   ConsumeProviderBudgetSchema,
   MutateCoordinationLeaseResultSchema,
@@ -22,6 +24,8 @@ import {
   type AcquireCoordinationLeaseResult,
   type CompleteIdempotencyReceipt,
   type CompleteIdempotencyReceiptResult,
+  type ConsumeRateLimit,
+  type ConsumeRateLimitResult,
   type ConsumeProviderBudget,
   type ConsumeProviderBudgetResult,
   type MutateCoordinationLease,
@@ -103,6 +107,11 @@ const BudgetResultTupleSchema = z.tuple([
   z.union([z.literal(0), z.literal(1)]),
   z.number().int().min(0),
   z.number().int().min(0),
+  z.number().int().min(0),
+  z.number().int().min(0),
+]);
+const RateLimitResultTupleSchema = z.tuple([
+  z.union([z.literal(0), z.literal(1)]),
   z.number().int().min(0),
   z.number().int().min(0),
 ]);
@@ -308,6 +317,32 @@ end
 redis.call("HSET", KEYS[1], operationField, tostring(accepted) .. ":" .. tostring(requests) .. ":" .. tostring(costs))
 redis.call("PEXPIRE", KEYS[1], remainingTtlMs)
 return {1, accepted, requests, costs, utcDay, remainingTtlMs}
+`.trim();
+
+/*
+ * Fixed-window auth limiter. Rejected attempts do not increment the counter, so a hostile caller
+ * cannot turn one bounded key into an unbounded receipt/hash. The key itself is HMAC-derived by
+ * `singleKey`, and the input contract permits only a SHA-256 subject fingerprint.
+ */
+const CONSUME_RATE_LIMIT_SCRIPT = `
+local currentRaw = redis.call("GET", KEYS[1])
+if not currentRaw then
+  redis.call("SET", KEYS[1], "1", "PX", ARGV[2])
+  return {1, 1, tonumber(ARGV[2])}
+end
+if not string.match(currentRaw, "^%d+$") then
+  return redis.error_reply("COORDINATION_RATE_LIMIT_VALUE_INVALID")
+end
+local ttl = redis.call("PTTL", KEYS[1])
+if ttl <= 0 then
+  return redis.error_reply("COORDINATION_RATE_LIMIT_TTL_INVALID")
+end
+local current = tonumber(currentRaw)
+if current >= tonumber(ARGV[1]) then
+  return {0, current, ttl}
+end
+current = redis.call("INCR", KEYS[1])
+return {1, current, ttl}
 `.trim();
 
 function byteLength(value: string): number {
@@ -699,6 +734,25 @@ export class UpstashRestCoordinationPort implements UpstashCoordinationPort {
       costUnits: result[3],
       windowId: `utc-day:${result[4]}`,
       remainingTtlMs: result[5],
+    });
+  }
+
+  async consumeRateLimit(
+    input: ConsumeRateLimit,
+    options: UpstashCoordinationCallOptions = {}
+  ): Promise<ConsumeRateLimitResult> {
+    const value = this.parseInput(ConsumeRateLimitSchema, input);
+    const result = await this.eval(
+      CONSUME_RATE_LIMIT_SCRIPT,
+      [this.singleKey("rate-limit", [value.scope, value.subjectFingerprint])],
+      [value.maximumRequests, value.windowMs],
+      RateLimitResultTupleSchema,
+      options
+    );
+    return ConsumeRateLimitResultSchema.parse({
+      accepted: result[0] === 1,
+      requestCount: result[1],
+      remainingTtlMs: result[2],
     });
   }
 

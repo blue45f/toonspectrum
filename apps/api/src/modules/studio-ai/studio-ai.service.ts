@@ -5,11 +5,17 @@ import {
   BadGatewayException,
   GatewayTimeoutException,
   HttpException,
+  Optional,
   HttpStatus,
   Inject,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
+
+import {
+  BackendCapabilityGatewayDispatcher,
+  type BackendCapabilityGatewayDispatchResult,
+} from "../../infrastructure/backend-capabilities/backend-capability-gateway-dispatcher";
 
 import {
   STUDIO_AI_ADMISSION_GATE,
@@ -55,6 +61,8 @@ import type { StudioAiChatDto } from "./studio-ai.dto";
 
 const CLIENT_CLOSED_REQUEST_STATUS = 499;
 const MAX_RECORDED_TOKEN_COUNT = 2_147_483_647;
+const STUDIO_AI_GATEWAY_WORKLOAD = "webhook" as const;
+const STUDIO_AI_GATEWAY_CAPABILITY = "async-job" as const;
 
 const CREATOR_SCOPE =
   "당신은 ToonSpectrum의 한국 웹툰 창작 보조 AI입니다. 웹툰의 기획, 연출, 장면 구성, 대사, 번역, " +
@@ -95,6 +103,126 @@ function recordedTokenCount(value: unknown): number | undefined {
     value <= MAX_RECORDED_TOKEN_COUNT
     ? value
     : undefined;
+}
+
+function toGatewayTenantId(userKeyHash: Uint8Array): string {
+  return Buffer.from(userKeyHash).toString("hex");
+}
+
+function fallbackSafeGatewayDispatch(
+  dispatchResult: BackendCapabilityGatewayDispatchResult
+): boolean {
+  if (dispatchResult.ok) {
+    return dispatchResult.outcome !== "completed" && dispatchResult.outcome !== "duplicate";
+  }
+  if (dispatchResult.reason === "aborted" || dispatchResult.reason === "delivery-unknown") {
+    return false;
+  }
+  if (
+    dispatchResult.attempts.length > 0 &&
+    dispatchResult.attempts.some((attempt) => attempt.outcome !== "request-rejected")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizeGatewayUsage(usage: unknown): StudioAiTokenUsage {
+  if (!usage || typeof usage !== "object") {
+    return {};
+  }
+  const value = usage as Record<string, unknown>;
+  const promptTokens = recordedTokenCount(value.promptTokens);
+  const completionTokens = recordedTokenCount(value.completionTokens);
+  const totalTokens = recordedTokenCount(value.totalTokens);
+  if (
+    promptTokens !== undefined ||
+    completionTokens !== undefined ||
+    totalTokens !== undefined
+  ) {
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens,
+    };
+  }
+  const legacyPromptTokens = recordedTokenCount(value.prompt_tokens);
+  const legacyCompletionTokens = recordedTokenCount(value.completion_tokens);
+  const legacyTotalTokens = recordedTokenCount(value.total_tokens);
+  return {
+    ...(legacyPromptTokens !== undefined ? { promptTokens: legacyPromptTokens } : {}),
+    ...(legacyCompletionTokens !== undefined
+      ? { completionTokens: legacyCompletionTokens }
+      : {}),
+    ...(legacyTotalTokens !== undefined ? { totalTokens: legacyTotalTokens } : {}),
+  };
+}
+
+function normalizeGatewayResult(
+  payload: unknown,
+  fallbackProvider: StudioAiProviderConfig
+): StudioAiCompletionResult | null {
+  if (!payload || typeof payload !== "object") return null;
+  const object = payload as Record<string, unknown>;
+  const content = typeof object.content === "string" && object.content.trim().length > 0
+    ? object.content.trim()
+    : "";
+  if (!content) return null;
+  const providerValue = typeof object.provider === "string" ? object.provider : undefined;
+  const modelValue = typeof object.model === "string" ? object.model : "";
+  const requestId = typeof object.requestId === "string" && object.requestId.trim()
+    ? object.requestId.trim().slice(0, 240)
+    : typeof object.request_id === "string" && object.request_id.trim()
+      ? object.request_id.trim().slice(0, 240)
+      : undefined;
+  const rawFailover = object.failover;
+  const failover = isStudioAiDistributedFailover(rawFailover)
+    ? {
+        attemptedProvider: rawFailover.attemptedProvider,
+        attemptedModel: rawFailover.attemptedModel,
+        actualProvider: rawFailover.actualProvider,
+        actualModel: rawFailover.actualModel,
+        reason: STUDIO_AI_BILLING_FAILOVER_REASON,
+      }
+    : undefined;
+  const normalizedProvider: StudioAiProviderId = isStudioAiProviderId(providerValue)
+    ? providerValue
+    : fallbackProvider.id;
+  const model = modelValue || fallbackProvider.model;
+  return {
+    content,
+    provider: normalizedProvider,
+    model: model.slice(0, 200),
+    ...(requestId ? { requestId } : {}),
+    usage: normalizeGatewayUsage(object.usage),
+    ...(failover ? { failover } : {}),
+  };
+}
+
+function isStudioAiDistributedFailover(
+  value: unknown
+): value is {
+  attemptedProvider: StudioAiProviderId;
+  attemptedModel: string;
+  actualProvider: StudioAiProviderId;
+  actualModel: string;
+  reason: string;
+} {
+  if (!value || typeof value !== "object") return false;
+  const raw = value as Record<string, unknown>;
+  return (
+    typeof raw.attemptedProvider === "string" &&
+    isStudioAiProviderId(raw.attemptedProvider) &&
+    typeof raw.attemptedModel === "string" &&
+    typeof raw.actualProvider === "string" &&
+    isStudioAiProviderId(raw.actualProvider) &&
+    typeof raw.actualModel === "string" &&
+    typeof raw.reason === "string"
+  );
+}
+
+function isStudioAiProviderId(value: string | undefined): value is StudioAiProviderId {
+  return value === "zai" || value === "deepseek";
 }
 
 const TASK_SPECS = {
@@ -267,7 +395,10 @@ export class StudioAiService {
     @Inject(STUDIO_AI_USAGE_STORE)
     private readonly usageStore: StudioAiUsageStore,
     @Inject(STUDIO_AI_ADMISSION_GATE)
-    private readonly admissionGate: StudioAiAdmissionGate
+    private readonly admissionGate: StudioAiAdmissionGate,
+    @Optional()
+    @Inject(BackendCapabilityGatewayDispatcher)
+    private readonly capabilityDispatcher: BackendCapabilityGatewayDispatcher | null = null
   ) {}
 
   status() {
@@ -352,6 +483,7 @@ export class StudioAiService {
     try {
       result = await this.completeAdmitted(
         userId,
+        idempotencyKey,
         input,
         providers,
         admission.lease,
@@ -380,8 +512,89 @@ export class StudioAiService {
     return result;
   }
 
+  private async completeViaCapabilityBoundary(
+    input: StudioAiChatDto,
+    provider: StudioAiProviderConfig,
+    reservedTokens: number,
+    spec: {
+      temperature: number;
+      maxTokens: number;
+      responseFormat: "json" | "text";
+    },
+    anonymousUserId: string | undefined,
+    idempotencyKey: string,
+    tenantId: string,
+    providerTimeoutMs: number,
+    clientSignal?: AbortSignal
+  ): Promise<StudioAiCompletionResult | null> {
+    if (!this.capabilityDispatcher) return null;
+
+    const payload = {
+      operation: "studio-ai-chat",
+      capability: "studio-ai-chat",
+      tenant: tenantId,
+      provider: provider.id,
+      modelHint: provider.model,
+      temperature: spec.temperature,
+      maxTokens: spec.maxTokens,
+      responseFormat: spec.responseFormat,
+      task: input.task,
+      system: input.system,
+      user: input.user,
+      anonymousUserId: anonymousUserId ?? null,
+      requestKey: idempotencyKey,
+    };
+    const dispatchResult = await this.capabilityDispatcher.dispatch(
+      {
+        tenantId,
+        capability: STUDIO_AI_GATEWAY_CAPABILITY,
+        workload: STUDIO_AI_GATEWAY_WORKLOAD,
+        estimatedCostUnits: Math.max(1, reservedTokens),
+        estimatedDurationMs: providerTimeoutMs,
+        durability: "best-effort",
+        idempotencyKey,
+        idempotent: true,
+        payload,
+      },
+      { signal: clientSignal }
+    );
+    if (dispatchResult.ok) {
+      if (
+        dispatchResult.outcome !== "completed" &&
+        dispatchResult.outcome !== "duplicate"
+      ) {
+        throw new ServiceUnavailableException(
+          "AI 분산 호출이 즉시 완료 응답을 반환하지 않았어요. 잠시 후 다시 시도해 주세요."
+        );
+      }
+      if (dispatchResult.result === null) {
+        throw new BadGatewayException("AI 분산 경로 응답을 해석할 수 없었어요.");
+      }
+      const result = normalizeGatewayResult(dispatchResult.result, provider);
+      if (!result) {
+        throw new BadGatewayException("AI 분산 경로 응답을 해석할 수 없었어요.");
+      }
+      return result;
+    }
+
+    if (fallbackSafeGatewayDispatch(dispatchResult)) return null;
+
+    if (dispatchResult.reason === "delivery-unknown") {
+      throw new ServiceUnavailableException(
+        "AI 분산 경로에서 처리 불일치가 발생했어요. 잠시 후 다시 시도해 주세요."
+      );
+    }
+    if (dispatchResult.reason === "aborted") {
+      throw clientClosedRequestException();
+    }
+    throw new ServiceUnavailableException(
+      "AI 분산 경로 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."
+    );
+  }
+
   private async completeAdmitted(
     userId: string,
+    idempotencyKey: string,
     input: StudioAiChatDto,
     providers: readonly StudioAiProviderConfig[],
     admissionLease: StudioAiAdmissionLease,
@@ -528,6 +741,45 @@ export class StudioAiService {
         if (!sent) throw admissionUnavailableException();
         // From this exact point onward, any non-definitive outcome may already have been billed.
         receiptOutcome = "ambiguous";
+
+        const tenantId = toGatewayTenantId(admissionReceipt.userKeyHash);
+        let distributedResult: StudioAiCompletionResult | null | undefined;
+        try {
+          distributedResult = await this.completeViaCapabilityBoundary(
+            input,
+            provider,
+            reservedTokens,
+            spec,
+            anonymousUserId,
+            idempotencyKey,
+            tenantId,
+            providerTimeoutMs,
+            clientSignal
+          );
+        } catch (error) {
+          outcomeStatus = error instanceof HttpException
+            ? error.getStatus() === CLIENT_CLOSED_REQUEST_STATUS
+              ? "client_aborted"
+              : error.getStatus() === 502
+                ? "network_error"
+                : "provider_error"
+            : "provider_error";
+          throw error;
+        }
+        if (distributedResult) {
+          receiptOutcome = "succeeded";
+          outcomeStatus = "success";
+          usage = distributedResult.usage ?? {};
+          result = {
+            content: distributedResult.content,
+            provider: distributedResult.provider,
+            model: distributedResult.model,
+            ...(distributedResult.requestId ? { requestId: distributedResult.requestId } : {}),
+            usage: distributedResult.usage ?? {},
+            ...(distributedResult.failover ? { failover: distributedResult.failover } : {}),
+          };
+          break;
+        }
 
         let response: Response;
         try {

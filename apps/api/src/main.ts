@@ -1,7 +1,14 @@
 import "./load-env"; // 반드시 첫 import — lib/db가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
+import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { json, urlencoded, type Request, type Response, type NextFunction } from "express";
+import {
+  json,
+  urlencoded,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
@@ -9,6 +16,8 @@ import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { createApiRuntimeRoleGuard } from "./config/runtime-role";
+import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
+import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import {
   createStudioLivePostgresIoAdapter,
   type StudioLivePostgresIoAdapter,
@@ -20,12 +29,28 @@ async function bootstrap() {
   validateEnv();
   // 기본 본문 파서(100kb) 대신 직접 등록 — 창작 스튜디오가 data-URL 이미지(페이지/문서)를 전송하므로 한도를 키운다.
   // bufferLogs: nestjs-pino 로거가 준비되기 전 로그를 버퍼링했다가 useLogger 이후 flush 한다.
+  const gatewayContentType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
   const app = await NestFactory.create(AppModule, { bodyParser: false, bufferLogs: true });
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(예외 필터의 5xx 로깅도 이걸 사용)
   app.enableShutdownHooks();
+  app.use(createApiSecurityHeadersMiddleware(process.env));
   configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   app.use(createApiRuntimeRoleGuard(process.env));
-  app.use(json({ limit: "16mb" }));
+  app.use(
+    json({
+      limit: "16mb",
+      type: (request) => {
+        const contentType = String(request.headers["content-type"] ?? "")
+          .toLowerCase()
+          .split(";")[0]
+          .trim();
+        return contentType === "application/json" || contentType === gatewayContentType;
+      },
+    })
+  );
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.query && typeof req.query === "object" && "path" in req.query) {
@@ -34,7 +59,9 @@ async function bootstrap() {
     next();
   });
   app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
-  app.setGlobalPrefix("api");
+  app.setGlobalPrefix("api", {
+    exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
+  });
   // 표준 Zod 검증 파이프. createZodDto DTO 만 검증하고 그 외(@Body() body: unknown)는 통과.
   app.useGlobalPipes(new ZodValidationPipe());
 

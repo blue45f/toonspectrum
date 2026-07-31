@@ -7,6 +7,7 @@ import {
 import {
   AcquireCoordinationLeaseSchema,
   CompleteIdempotencyReceiptSchema,
+  ConsumeRateLimitSchema,
   ConsumeProviderBudgetSchema,
   ProviderCircuitFailureSchema,
   ReserveIdempotencyReceiptSchema,
@@ -124,6 +125,26 @@ describe("Upstash coordination contracts", () => {
         ...budget,
         userContent: "not allowed",
       }).success
+    ).toBe(false);
+
+    const rateLimit = {
+      scope: "auth",
+      subjectFingerprint: `sha256:${"c".repeat(64)}`,
+      maximumRequests: 10,
+      windowMs: 10 * 60_000,
+    } as const;
+    expect(ConsumeRateLimitSchema.safeParse(rateLimit).success).toBe(true);
+    expect(
+      ConsumeRateLimitSchema.safeParse({
+        ...rateLimit,
+        subjectFingerprint: "198.51.100.7",
+      }).success,
+    ).toBe(false);
+    expect(
+      ConsumeRateLimitSchema.safeParse({
+        ...rateLimit,
+        userContent: "forbidden",
+      }).success,
     ).toBe(false);
   });
 });

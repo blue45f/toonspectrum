@@ -66,6 +66,13 @@ const budgetInput = {
   expiryGraceMs: 3_600_000,
 } as const;
 
+const rateLimitInput = {
+  scope: "auth",
+  subjectFingerprint: `sha256:${"d".repeat(64)}`,
+  maximumRequests: 10,
+  windowMs: 10 * 60_000,
+} as const;
+
 describe("Upstash REST coordination port", () => {
   it("proves authenticated Redis reachability without touching coordination state", async () => {
     const { client, fetchMock } = createClient(async () => response("PONG"));
@@ -326,6 +333,38 @@ describe("Upstash REST coordination port", () => {
         client.consumeProviderBudget(budgetInput)
       ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
     }
+  });
+
+  it("consumes a bounded auth rate-limit window without exposing its subject", async () => {
+    const results = [response([1, 1, 600_000]), response([0, 10, 598_000])];
+    const { client, fetchMock } = createClient(async () => {
+      const next = results.shift();
+      if (!next) throw new Error("Unexpected request.");
+      return next;
+    });
+
+    await expect(client.consumeRateLimit(rateLimitInput)).resolves.toEqual({
+      accepted: true,
+      requestCount: 1,
+      remainingTtlMs: 600_000,
+    });
+    await expect(client.consumeRateLimit(rateLimitInput)).resolves.toEqual({
+      accepted: false,
+      requestCount: 10,
+      remainingTtlMs: 598_000,
+    });
+
+    const command = commandFromCall(fetchMock);
+    expect(command[0]).toBe("EVAL");
+    expect(String(command[1])).toContain('redis.call("SET", KEYS[1], "1", "PX", ARGV[2])');
+    expect(String(command[1])).toContain("current >= tonumber(ARGV[1])");
+    expect(JSON.stringify(command)).not.toContain(rateLimitInput.subjectFingerprint);
+    expect(command[3]).toBe(commandFromCall(fetchMock, 1)[3]);
+
+    const malformed = createClient(async () => response([1, 1]));
+    await expect(malformed.client.consumeRateLimit(rateLimitInput)).rejects.toMatchObject({
+      code: "INVALID_RESPONSE",
+    });
   });
 
   it("rejects creator payload fields before any remote request", async () => {

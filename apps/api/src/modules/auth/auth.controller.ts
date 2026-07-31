@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   BadRequestException,
   Body,
@@ -7,6 +9,8 @@ import {
   Headers,
   HttpException,
   HttpStatus,
+  Inject,
+  Optional,
   Param,
   Post,
   Query,
@@ -49,10 +53,22 @@ import {
   revokeUserSessions,
 } from "../../../../../lib/server/user-lifecycle";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import {
+  UPSTASH_COORDINATION_PORT,
+  type UpstashCoordinationPort,
+} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import {
+  AUTH_SESSION_COOKIE_NAME,
+  resolveSessionCookieClearOptions,
+  resolveSessionCookieOptions,
+} from "../../session-cookie";
 
+import { AuthClientIpPolicy, resolveAuthClientIp } from "./auth-client-ip";
 import { isAllowedAuthRequestOrigin } from "./auth-origin";
 import { GoogleIdTokenDto } from "./auth.dto";
+import { AUTH_CLIENT_IP_POLICY, AUTH_RATE_LIMIT_CONFIG } from "./auth.tokens";
 
+import type { AuthRateLimitConfig } from "./auth-rate-limit.config";
 import type { Request, Response } from "express";
 
 interface AuthPayload {
@@ -64,12 +80,51 @@ interface AuthPayload {
 }
 
 type AuthRole = "admin" | "creator" | "operator" | "user";
+type AuthRateLimitAction =
+  | "oauth-google-idtoken"
+  | "oauth-demo"
+  | "signup"
+  | "login";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const AuthRateLimitStore: Record<string, number[]> = {};
+const AUTH_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
+const AUTH_RATE_LIMIT_DISTRIBUTED_EXPIRY_GRACE_MS = 120_000;
+const AUTH_RATE_LIMIT_MAX_COST = 1_000_000;
+const UNKNOWN_AUTH_CLIENT_IP = "unknown";
+
+const AUTH_RATE_LIMIT_POLICIES: Record<
+  AuthRateLimitAction,
+  { readonly limit: number; readonly costUnits: number }
+> = {
+  "oauth-google-idtoken": { limit: 30, costUnits: 0 },
+  "oauth-demo": { limit: 20, costUnits: 0 },
+  signup: { limit: 5, costUnits: 0 },
+  login: { limit: 10, costUnits: 0 },
+};
+
+const AUTH_RATE_LIMIT_LOCAL_STORE: Record<string, number[]> = {};
+const AUTH_RATE_LIMIT_OPERATION_NONCE: { value: number } = { value: 0 };
 
 @Controller("auth")
 export class AuthController {
+  private readonly rateLimitDistributed: boolean;
+  private readonly clientIpPolicy: AuthClientIpPolicy;
+  private readonly coordination: UpstashCoordinationPort | null;
+
+  constructor(
+    @Inject(AUTH_RATE_LIMIT_CONFIG)
+    rateLimitConfig: AuthRateLimitConfig,
+    @Inject(AUTH_CLIENT_IP_POLICY)
+    clientIpPolicy: AuthClientIpPolicy,
+    @Optional()
+    @Inject(UPSTASH_COORDINATION_PORT)
+    coordination?: UpstashCoordinationPort | null,
+  ) {
+    this.rateLimitDistributed = rateLimitConfig.distributed;
+    this.clientIpPolicy = clientIpPolicy;
+    this.coordination = coordination ?? null;
+  }
+
   @Get("providers")
   async getProviders() {
     const config = await getAppConfig();
@@ -131,13 +186,14 @@ export class AuthController {
     @Body(new ZodValidationPipe(GoogleIdTokenDto)) body: GoogleIdTokenDto,
     @Headers("origin") origin: string | undefined,
     @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
   ) {
     if (!isAllowedAuthRequestOrigin(origin)) {
       throw new ForbiddenException({
         error: "허용되지 않은 사이트에서 보낸 로그인 요청이에요.",
       });
     }
-    enforceRateLimit(`oauth-google-idtoken:${clientIp(req)}`, 30, 10 * 60_000);
+    await this.enforceRateLimit("oauth-google-idtoken", req);
     let user;
     try {
       user = await handleGoogleIdToken(body.idToken);
@@ -161,16 +217,21 @@ export class AuthController {
         error: "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
       });
     }
+    const token = signSession(user.id, normalizeSessionVersion(user.sessionVersion));
+    applyAuthSessionCookie(response, token);
     return {
       ok: true,
       user,
-      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
+      token,
     };
   }
 
   // 핸드오프 토큰 → 사용자 객체(프론트가 세션 저장). 1회용.
   @Post("oauth/exchange")
-  oauthExchange(@Body() body: { token?: unknown }) {
+  oauthExchange(
+    @Body() body: { token?: unknown },
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const user = consumeHandoff(
       typeof body?.token === "string" ? body.token : undefined,
     );
@@ -179,16 +240,22 @@ export class AuthController {
         { error: "만료되었거나 잘못된 로그인 토큰이에요." },
         HttpStatus.UNAUTHORIZED,
       );
+    const token = signSession(user.id, normalizeSessionVersion(user.sessionVersion));
+    applyAuthSessionCookie(response, token);
     return {
       ok: true,
       user,
-      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
+      token,
     };
   }
 
   // 데모 폴백 로그인 — 실제 제공자 미설정 시에만 허용. 명확히 [데모] 사용자.
   @Post("oauth/:provider/demo")
-  async oauthDemo(@Param("provider") provider: string, @Req() req: Request) {
+  async oauthDemo(
+    @Param("provider") provider: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     if (!isOAuthProvider(provider))
       throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
     const mode = providerMode(provider);
@@ -203,19 +270,24 @@ export class AuthController {
         HttpStatus.CONFLICT,
       );
     }
-    enforceRateLimit(`oauth-demo:${clientIp(req)}`, 20, 10 * 60_000);
+    await this.enforceRateLimit("oauth-demo", req);
     const user = await createDemoUser(provider);
+    const token = signSession(user.id, normalizeSessionVersion(user.sessionVersion));
+    applyAuthSessionCookie(response, token);
     return {
       ok: true,
       user,
       demo: true,
-      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
+      token,
     };
   }
 
   @Post("signup")
-  async signup(@Body() body: AuthPayload, @Req() req: Request) {
-    enforceRateLimit(`signup:${clientIp(req)}`, 5, 10 * 60_000);
+  async signup(
+    @Body() body: AuthPayload,
+    @Req() req: Request,
+  ) {
+    await this.enforceRateLimit("signup", req);
     await ensureUserLifecycleSchema();
 
     const email = normalizeEmail(body.email);
@@ -260,14 +332,10 @@ export class AuthController {
   @Post("login")
   async login(
     @Body() body: AuthPayload,
-    @Headers("x-forwarded-for") forwardedFor: string | undefined,
     @Req() req: Request,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    enforceRateLimit(
-      `login:${forwardedFor?.split(",")[0]?.trim() || clientIp(req)}`,
-      10,
-      10 * 60_000,
-    );
+    await this.enforceRateLimit("login", req);
     await ensureUserLifecycleSchema();
 
     const email = normalizeEmail(body.email);
@@ -291,6 +359,9 @@ export class AuthController {
     const block = getUserAuthBlock(user);
     if (block) throw new HttpException({ error: block }, HttpStatus.FORBIDDEN);
 
+    const token = signSession(user.id, normalizeSessionVersion(user.sessionVersion));
+    applyAuthSessionCookie(response, token);
+
     return {
       ok: true,
       user: {
@@ -300,14 +371,52 @@ export class AuthController {
         image: user.image,
         role: normalizeRole(user.role),
       },
-      token: signSession(user.id, normalizeSessionVersion(user.sessionVersion)),
+      token,
     };
   }
 
   @Post("logout")
-  async logout(@Headers("x-user-id") userId?: string) {
+  async logout(
+    @Headers("x-user-id") userId: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     if (userId) await revokeUserSessions(userId);
+    clearAuthSessionCookie(response);
     return { ok: true };
+  }
+
+  private async enforceRateLimit(
+    action: AuthRateLimitAction,
+    req: Request,
+  ): Promise<void> {
+    const policy = AUTH_RATE_LIMIT_POLICIES[action];
+    const sourceIp = resolveAuthClientIp(req, this.clientIpPolicy);
+    const identity = `${action}:${sourceIp}`;
+
+    if (!this.rateLimitDistributed) {
+      await enforceLocalRateLimit(identity, policy.limit, AUTH_RATE_LIMIT_WINDOW_MS);
+      return;
+    }
+
+    if (!this.coordination) {
+      throw new ServiceUnavailableException({
+        error: "인증 요청 한도 검증 인프라가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    }
+
+    try {
+      await enforceDistributedRateLimit(
+        this.coordination,
+        action,
+        sourceIp,
+        policy,
+      );
+    } catch (error: unknown) {
+      if (error instanceof HttpException) throw error;
+      throw new ServiceUnavailableException({
+        error: "인증 요청 한도 검증 인프라가 일시적으로 응답하지 않습니다.",
+      });
+    }
   }
 }
 
@@ -317,6 +426,21 @@ function normalizeEmail(value: unknown) {
     .trim();
 }
 
+function applyAuthSessionCookie(response: Response, token: string): void {
+  response.cookie(
+    AUTH_SESSION_COOKIE_NAME,
+    token,
+    resolveSessionCookieOptions(),
+  );
+}
+
+function clearAuthSessionCookie(response: Response): void {
+  response.clearCookie(
+    AUTH_SESSION_COOKIE_NAME,
+    resolveSessionCookieClearOptions(),
+  );
+}
+
 function normalizeRole(value: string | null | undefined): AuthRole {
   const role = String(value ?? "").toLowerCase();
   if (role === "admin" || role === "creator" || role === "operator")
@@ -324,26 +448,67 @@ function normalizeRole(value: string | null | undefined): AuthRole {
   return "user";
 }
 
-function clientIp(req: Request) {
-  const xff = req.headers["x-forwarded-for"];
-  if (typeof xff === "string" && xff.trim()) return xff.split(",")[0].trim();
-  const real = req.headers["x-real-ip"];
-  if (typeof real === "string" && real.trim()) return real.trim();
-  return req.socket?.remoteAddress ?? "unknown";
+function createAuthRateLimitProviderId(
+  action: AuthRateLimitAction,
+  sourceIp: string,
+  nowMs: number,
+): string {
+  const bucketId = Math.floor(nowMs / AUTH_RATE_LIMIT_WINDOW_MS);
+  const safeIp = sourceIp === UNKNOWN_AUTH_CLIENT_IP ? "unknown" : sourceIp;
+  const ipDigest = createHash("sha256")
+    .update(safeIp)
+    .digest("hex")
+    .slice(0, 8);
+  return `auth-${action}-${bucketId}-${ipDigest}`;
 }
 
-function enforceRateLimit(key: string, limit: number, windowMs: number) {
+function nextAuthRateLimitOperationId(action: AuthRateLimitAction): string {
+  AUTH_RATE_LIMIT_OPERATION_NONCE.value += 1;
+  return `${action}-${Date.now().toString(36)}-${AUTH_RATE_LIMIT_OPERATION_NONCE.value.toString(36)}`;
+}
+
+async function enforceLocalRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<void> {
   const now = Date.now();
-  const recent = (AuthRateLimitStore[key] ?? []).filter(
+  const recent = (AUTH_RATE_LIMIT_LOCAL_STORE[key] ?? []).filter(
     (timestamp) => now - timestamp < windowMs,
   );
   if (recent.length >= limit) {
-    AuthRateLimitStore[key] = recent;
+    AUTH_RATE_LIMIT_LOCAL_STORE[key] = recent;
     throw new HttpException(
       { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
       HttpStatus.TOO_MANY_REQUESTS,
     );
   }
   recent.push(now);
-  AuthRateLimitStore[key] = recent;
+  AUTH_RATE_LIMIT_LOCAL_STORE[key] = recent;
+}
+
+async function enforceDistributedRateLimit(
+  coordination: UpstashCoordinationPort,
+  action: AuthRateLimitAction,
+  sourceIp: string,
+  policy: { readonly limit: number; readonly costUnits: number },
+): Promise<void> {
+  const nowMs = Date.now();
+  const providerId = createAuthRateLimitProviderId(action, sourceIp, nowMs);
+
+  const budget = await coordination.consumeProviderBudget({
+    providerId,
+    operationId: nextAuthRateLimitOperationId(action),
+    requestUnits: 1,
+    costUnits: policy.costUnits,
+    maximumRequestUnits: policy.limit,
+    maximumCostUnits: Math.max(policy.limit, AUTH_RATE_LIMIT_MAX_COST),
+    expiryGraceMs: AUTH_RATE_LIMIT_DISTRIBUTED_EXPIRY_GRACE_MS,
+  });
+  if (!budget.accepted) {
+    throw new HttpException(
+      { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
 }

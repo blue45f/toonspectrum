@@ -3,6 +3,8 @@ import type {
   AcquireCoordinationLeaseResult,
   CompleteIdempotencyReceipt,
   CompleteIdempotencyReceiptResult,
+  ConsumeRateLimit,
+  ConsumeRateLimitResult,
   ConsumeProviderBudget,
   ConsumeProviderBudgetResult,
   MutateCoordinationLease,
@@ -68,4 +70,12 @@ export interface UpstashCoordinationPort {
     input: ConsumeProviderBudget,
     options?: UpstashCoordinationCallOptions
   ): Promise<ConsumeProviderBudgetResult>;
+  /**
+   * Bounded fixed-window counter for authentication abuse controls. The contract deliberately
+   * accepts only a pre-hashed subject fingerprint and never general caller data.
+   */
+  consumeRateLimit(
+    input: ConsumeRateLimit,
+    options?: UpstashCoordinationCallOptions
+  ): Promise<ConsumeRateLimitResult>;
 }
