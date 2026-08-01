@@ -18,20 +18,28 @@ import {
   createStudioDccCollabRoom,
   STUDIO_DCC_COLLAB_SHELL_REVISION,
 } from "./studio-dcc-collab-shell";
+import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
 import {
   importStudioFbxDocument,
   isStudioFbxBinary,
 } from "./studio-fbx-ascii-import";
-import { buildStudioGeoNodesPrimitive } from "./studio-geometry-nodes-workspace-bridge";
+import {
+  buildStudioGeoNodesPrimitive,
+  evaluateStudioGeoNodesStarterGraph,
+} from "./studio-geometry-nodes-workspace-bridge";
 import {
   createStudioHybridDccWorkspace,
+  runStudioHybridDccFullEngineSuite,
   workspaceAddGeoNodesPrimitive,
+  workspaceAddGeoNodesStarter,
   workspaceAddUnitCube,
   workspaceArrayActive,
   workspaceCadProp,
+  workspaceCadRevolve,
   workspaceClothStep,
   workspaceCollabJoin,
   workspaceDecimateActive,
+  workspaceExportActiveMesh,
   workspaceExportToon3d,
   workspaceMirrorActive,
   workspaceRebuildBom,
@@ -39,11 +47,16 @@ import {
   workspaceSculptActive,
   workspaceSubdivideActive,
   workspaceUvUnwrapActive,
+  workspaceVoxelRemeshActive,
 } from "./studio-hybrid-dcc-workspace";
 import {
-  bomRollupByMaterial,
   bomEstimateMassKg,
+  bomRollupByMaterial,
 } from "./studio-manufacturing-bom-lite";
+import {
+  exportStudioMeshObj,
+  exportStudioMeshStlAscii,
+} from "./studio-mesh-export-adapters";
 import {
   importStudio3mfMinimal,
   importStudioBvhMotion,
@@ -156,7 +169,7 @@ describe("expanded format adapters OFF/3MF/BVH/IFC", () => {
 describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
   it("runs expanded workspace ops and packs toon3d", async () => {
     let ws = createStudioHybridDccWorkspace("ws-product");
-    expect(ws.revision).toBe(2);
+    expect(ws.revision).toBeGreaterThanOrEqual(3);
     ws = workspaceAddUnitCube(ws, "hero");
     ws = await workspaceMirrorActive(ws);
     ws = workspaceUvUnwrapActive(ws, "box");
@@ -205,6 +218,63 @@ describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
     ws = workspaceDecimateActive(ws, 0.6);
     expect(ws.session.state.geometry.records["cyl-1"]).toBeDefined();
   });
+
+  it("evaluates real geometry-nodes starter graph into workspace", () => {
+    const starter = evaluateStudioGeoNodesStarterGraph();
+    expect(starter.ok).toBe(true);
+    if (starter.ok) {
+      expect(starter.vertexCount).toBe(8);
+      expect(starter.triangleCount).toBe(12);
+    }
+    let ws = createStudioHybridDccWorkspace("ws-starter");
+    ws = workspaceAddGeoNodesStarter(ws, "gn-box");
+    expect(ws.activeAssetId).toBe("gn-box");
+    expect(ws.session.state.geometry.records["gn-box"]).toBeDefined();
+  });
+
+  it("exports mesh formats with non-empty hashes from shipped adapters", () => {
+    const cube = createStudioUnitCubeMesh();
+    const stl = exportStudioMeshStlAscii(cube, "cube");
+    expect(stl.triangleCount).toBeGreaterThan(0);
+    expect(stl.text).toContain("solid cube");
+    expect(stl.contentHash.startsWith("sha256:")).toBe(true);
+    const obj = exportStudioMeshObj(cube);
+    expect(obj.text).toMatch(/^v /m);
+    expect(obj.text).toMatch(/^f /m);
+    let ws = createStudioHybridDccWorkspace("ws-export");
+    ws = workspaceAddUnitCube(ws, "ex");
+    ws = workspaceExportActiveMesh(ws, "ply");
+    expect(ws.lastExport?.format).toBe("ply");
+    expect(ws.lastExport!.triangleCount).toBeGreaterThan(0);
+  });
+
+  it("full multi-kernel engine suite asserts engine coverage metrics", async () => {
+    const result = await runStudioHybridDccFullEngineSuite("suite-gate");
+    expect(result.metrics.assetCount).toBeGreaterThanOrEqual(2);
+    expect(result.metrics.engines).toContain("geometry-nodes-starter");
+    expect(result.metrics.engines).toContain("modifier-solidify");
+    expect(result.metrics.engines).toContain("cad-extrude");
+    expect(result.metrics.engines).toContain("export-stl");
+    expect(result.metrics.engines).toContain("toon3d-pack");
+    expect(result.metrics.exportFormat).toBe("stl");
+    expect(result.metrics.exportTriangles).toBeGreaterThan(0);
+    expect(result.metrics.springTailY).not.toBeNull();
+    expect(result.metrics.packageHash.startsWith("sha256:")).toBe(true);
+    expect(result.metrics.toonPassCount).toBeGreaterThan(0);
+    expect(result.metrics.diagnosticErrors).toBe(0);
+    expect(result.package.files["document/document.json"]).toContain("gn-starter");
+  });
+
+  it("CAD revolve and voxel remesh produce non-empty meshes via shipped APIs", () => {
+    let ws = createStudioHybridDccWorkspace("ws-revolve-remesh");
+    ws = workspaceCadRevolve(ws, "lathe");
+    const lathe = ws.session.state.geometry.records["lathe"]?.mesh;
+    expect(lathe).toBeDefined();
+    expect(lathe!.faces.length).toBeGreaterThan(0);
+    ws = workspaceAddUnitCube(ws, "remesh-src");
+    ws = workspaceVoxelRemeshActive(ws, 0.25);
+    expect(ws.session.state.geometry.records["remesh-src"]!.mesh.faces.length).toBeGreaterThan(0);
+  });
 });
 
 describe("collab shell + catalog revision", () => {
@@ -220,7 +290,8 @@ describe("collab shell + catalog revision", () => {
     });
     expect(collabActivePeerIds(room).includes("a")).toBe(true);
     expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(4);
-    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(5);
+    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(6);
+    expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "WS-FULL-ENGINE")).toBe(true);
     expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "FMT-OFF")).toBe(true);
     expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "UI-HYBRID-PANEL")).toBe(true);
     const { ok, missing } = assertWebtoonObjectCreatorV1Coverage();

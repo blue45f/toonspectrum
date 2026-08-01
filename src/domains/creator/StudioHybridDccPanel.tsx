@@ -7,17 +7,21 @@ import { useRef, useState } from "react";
 
 import {
   createStudioHybridDccWorkspace,
+  runStudioHybridDccFullEngineSuite,
   workspaceAddArtistInk,
   workspaceAddGeoNodesPrimitive,
+  workspaceAddGeoNodesStarter,
   workspaceAddUnitCube,
   workspaceArrayActive,
   workspaceBooleanDifference,
   workspaceCadProp,
+  workspaceCadRevolve,
   workspaceClothStep,
   workspaceCollabJoin,
   workspaceDecimateActive,
   workspaceDiagnostics,
   workspaceEnsureShots,
+  workspaceExportActiveMesh,
   workspaceExportToon3d,
   workspaceExtrudeActive,
   workspaceImportBytes,
@@ -26,6 +30,7 @@ import {
   workspaceMirrorActive,
   workspaceRebuildBom,
   workspaceSculptActive,
+  workspaceSolidifyActive,
   workspaceSubdivideActive,
   workspaceUndo,
   workspaceUvUnwrapActive,
@@ -102,6 +107,54 @@ export function StudioHybridDccPanel() {
           onClick={() => run("Geo sphere", () => workspaceAddGeoNodesPrimitive(ws, "sphere"))}
         >
           Geo sphere
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("Geo starter", () => workspaceAddGeoNodesStarter(ws))}
+        >
+          Geo starter
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Solidify", () => workspaceSolidifyActive(ws))}
+        >
+          Solidify
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("CAD revolve", () => workspaceCadRevolve(ws))}
+        >
+          CAD revolve
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Export OBJ", () => workspaceExportActiveMesh(ws, "obj"))}
+        >
+          Export OBJ
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() =>
+            run("Full engine suite", async () => {
+              const result = await runStudioHybridDccFullEngineSuite("ui-suite");
+              setLog(
+                `Suite engines=${result.metrics.engines.length} export=${result.metrics.exportFormat} hash=${result.metrics.packageHash.slice(0, 18)}…`,
+              );
+              return result.workspace;
+            })
+          }
+        >
+          Full engines
         </button>
         <button
           type="button"

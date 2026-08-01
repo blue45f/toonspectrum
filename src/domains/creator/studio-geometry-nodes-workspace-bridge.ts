@@ -1,6 +1,6 @@
 /**
  * Geometry Nodes → Hybrid DCC workspace bridge (MOD procedural path).
- * Builds a simple procedural mesh via the existing geometry-nodes primitives
+ * Builds procedural meshes via geometry-nodes primitives + starter graph evaluator
  * and converts to editable half-edge for document authority.
  */
 
@@ -9,16 +9,18 @@ import {
   type StudioEditableMesh,
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
+import { createStudioGeometryNodesEvaluator } from "./studio-geometry-nodes-eval";
 import {
   studioGeometryCube,
   studioGeometryCylinder,
   studioGeometryGrid,
   studioGeometrySphere,
 } from "./studio-geometry-nodes-primitives";
+import { createStudioGeometryNodesStarterGraph } from "./studio-geometry-nodes-serialization";
 
 import type { StudioGeometryMesh } from "./studio-geometry-nodes-mesh";
 
-export const STUDIO_GEOMETRY_NODES_WORKSPACE_BRIDGE_REVISION = 1 as const;
+export const STUDIO_GEOMETRY_NODES_WORKSPACE_BRIDGE_REVISION = 2 as const;
 
 export type StudioGeoNodesPrimitiveKind = "cube" | "sphere" | "cylinder" | "grid";
 
@@ -92,6 +94,37 @@ export function buildStudioGeoNodesPrimitive(
     return {
       ok: false,
       detail: error instanceof Error ? error.message : "geo nodes convert failed",
+    };
+  }
+}
+
+/**
+ * Evaluate the shipped starter graph (grid → extrude → output) into an editable mesh.
+ * Drives the real geometry-nodes evaluator — not a reimplementation.
+ */
+export function evaluateStudioGeoNodesStarterGraph(): StudioGeoNodesBridgeResult {
+  try {
+    const evaluator = createStudioGeometryNodesEvaluator();
+    const result = evaluator.evaluate(createStudioGeometryNodesStarterGraph());
+    if (!result.ok) {
+      return { ok: false, detail: result.detail };
+    }
+    const geometry = result.outputs.geometry;
+    if (!geometry || geometry.kind !== "geometry") {
+      return { ok: false, detail: "starter graph produced no geometry output" };
+    }
+    const mesh = meshFromGeometryMesh(geometry.mesh);
+    return {
+      ok: true,
+      kind: "cube",
+      mesh,
+      vertexCount: geometry.mesh.positions.length / 3,
+      triangleCount: geometry.mesh.indices.length / 3,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : "starter graph eval failed",
     };
   }
 }

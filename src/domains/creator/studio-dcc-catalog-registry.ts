@@ -3,7 +3,7 @@
  * Used by gating tests to assert every §12.1 / P0–P1 ID has a concrete API.
  */
 
-export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 5 as const;
+export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 6 as const;
 
 export type StudioCatalogStatus =
   | "shipped"
@@ -191,6 +191,14 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "SCP-001", priority: "P3", status: "shipped", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke", "workspaceSculptActive"] },
   { id: "GAR-005", priority: "P3", status: "shipped", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd", "workspaceClothStep"] },
   { id: "WS-WAVE-LOOP", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["runStudioHybridDccWaveProductLoop"] },
+  { id: "WS-FULL-ENGINE", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["runStudioHybridDccFullEngineSuite"] },
+  { id: "MOD-GEONODES-EVAL", priority: "P2", status: "shipped", module: "studio-geometry-nodes-workspace-bridge.ts", apis: ["evaluateStudioGeoNodesStarterGraph"] },
+  { id: "FMT-EXPORT-STL", priority: "P1", status: "shipped", module: "studio-mesh-export-adapters.ts", apis: ["exportStudioMeshStlAscii", "exportStudioMeshObj", "exportStudioMeshPlyAscii"] },
+  { id: "MOD-SOLIDIFY-WS", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceSolidifyActive", "workspaceBevelActive"] },
+  { id: "MOD-DEFORM-WS", priority: "P2", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceBendActive", "workspaceRepairActive", "workspaceShrinkwrapActive"] },
+  { id: "SCP-REMESH-WS", priority: "P3", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceVoxelRemeshActive"] },
+  { id: "CAD-REVOLVE-WS", priority: "P3", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceCadRevolve"] },
+  { id: "CHR-SPRING-WS", priority: "P2", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceStepSpring", "workspaceSampleIdleClip"] },
 ];
 
 export function studioCatalogByPriority(

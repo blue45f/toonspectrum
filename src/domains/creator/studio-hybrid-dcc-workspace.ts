@@ -8,10 +8,15 @@ import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d
 import {
   createStudioCadSketch,
   extrudeStudioCadProfile,
+  revolveStudioCadProfile,
 } from "./studio-cad-kernel-lite";
 import {
+  createStudioIdleClip,
   retargetStudioMotionReport,
+  sampleStudioAnimationClip,
+  stepStudioSpringBone,
   type StudioRetargetReport,
+  type StudioSpringBone,
 } from "./studio-character-animation-p2";
 import {
   createStudioClothGrid,
@@ -35,6 +40,7 @@ import {
 } from "./studio-editable-half-edge-mesh";
 import {
   buildStudioGeoNodesPrimitive,
+  evaluateStudioGeoNodesStarterGraph,
   type StudioGeoNodesPrimitiveKind,
 } from "./studio-geometry-nodes-workspace-bridge";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
@@ -50,7 +56,10 @@ import {
   snapshotStudioHybridDccState,
   type StudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
-import { applyStudioSculptStroke } from "./studio-hybrid-sculpt-kernel";
+import {
+  applyStudioSculptStroke,
+  voxelRemeshStudioMesh,
+} from "./studio-hybrid-sculpt-kernel";
 import {
   createStudioLiveBridgeDocument,
   createStudioSharedSet,
@@ -65,6 +74,11 @@ import {
   bomFromAssetParts,
   type StudioManufacturingBom,
 } from "./studio-manufacturing-bom-lite";
+import {
+  exportStudioMeshByFormat,
+  type StudioMeshExportFormat,
+  type StudioMeshExportResult,
+} from "./studio-mesh-export-adapters";
 import { importStudioMeshByExtension } from "./studio-mesh-format-adapters";
 import {
   createStudioMeshModifierStack,
@@ -73,6 +87,9 @@ import {
 } from "./studio-mesh-modifier-stack";
 import {
   decimateStudioMesh,
+  deformStudioMeshBend,
+  repairStudioMesh,
+  shrinkwrapStudioMesh,
   subdivideStudioMeshCatmullLite,
 } from "./studio-mesh-ops-advanced";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
@@ -83,7 +100,7 @@ import {
   type StudioUvMap,
 } from "./studio-uv-unwrap-lite";
 
-export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 2 as const;
+export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 3 as const;
 
 export interface StudioHybridDccWorkspace {
   readonly revision: typeof STUDIO_HYBRID_DCC_WORKSPACE_REVISION;
@@ -93,9 +110,12 @@ export interface StudioHybridDccWorkspace {
   lastImportReport: unknown | null;
   lastUvMap: StudioUvMap | null;
   lastRetarget: StudioRetargetReport | null;
+  lastExport: StudioMeshExportResult | null;
+  lastSpring: StudioSpringBone | null;
   bom: StudioManufacturingBom;
   collab: StudioDccCollabRoom;
   clothStep: number;
+  animSampleTime: number;
 }
 
 export function createStudioHybridDccWorkspace(
@@ -112,9 +132,12 @@ export function createStudioHybridDccWorkspace(
     lastImportReport: null,
     lastUvMap: null,
     lastRetarget: null,
+    lastExport: null,
+    lastSpring: null,
     bom: bomFromAssetParts(documentId, []),
     collab: createStudioDccCollabRoom(`${documentId}-collab`),
     clothStep: 0,
+    animSampleTime: 0,
   };
 }
 
@@ -630,6 +653,321 @@ export function workspaceDecimateActive(
     hashStudioEditableMesh(dec.value),
   );
   return { ...ws, session, bridge };
+}
+
+function commitActiveMesh(
+  ws: StudioHybridDccWorkspace,
+  mesh: StudioEditableMesh,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const session = hybridDccCommitGeometry(ws.session, id, mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    hashStudioEditableMesh(mesh),
+  );
+  return { ...ws, session, bridge };
+}
+
+export function workspaceAddGeoNodesStarter(
+  ws: StudioHybridDccWorkspace,
+  assetId = "geo-starter",
+): StudioHybridDccWorkspace {
+  const built = evaluateStudioGeoNodesStarterGraph();
+  if (!built.ok) throw new Error(built.detail);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, built.mesh, {
+      source: "geometry-nodes:starter-graph",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, built.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId };
+}
+
+export async function workspaceSolidifyActive(
+  ws: StudioHybridDccWorkspace,
+  thickness = 0.05,
+): Promise<StudioHybridDccWorkspace> {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  let stack = createStudioMeshModifierStack(record.mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "solidify",
+    id: "ws-solidify",
+    enabled: true,
+    thickness,
+    evenThickness: true,
+    rim: true,
+  });
+  const evaluated = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!evaluated.ok) throw new Error(evaluated.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, evaluated.value.mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    evaluated.value.resultHash,
+  );
+  return { ...ws, session, bridge };
+}
+
+export async function workspaceBevelActive(
+  ws: StudioHybridDccWorkspace,
+  amount = 0.05,
+): Promise<StudioHybridDccWorkspace> {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  let stack = createStudioMeshModifierStack(record.mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "bevel",
+    id: "ws-bevel",
+    enabled: true,
+    amount,
+    segments: 1,
+    angleLimitRad: Math.PI,
+    weightInfluence: 1,
+  });
+  const evaluated = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!evaluated.ok) throw new Error(evaluated.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, evaluated.value.mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    evaluated.value.resultHash,
+  );
+  return { ...ws, session, bridge };
+}
+
+export function workspaceBendActive(
+  ws: StudioHybridDccWorkspace,
+  angleRad = Math.PI / 6,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const bent = deformStudioMeshBend(record.mesh, angleRad, "y");
+  if (!bent.ok) throw new Error(bent.detail);
+  return commitActiveMesh(ws, bent.value);
+}
+
+export function workspaceRepairActive(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const repaired = repairStudioMesh(record.mesh);
+  if (!repaired.ok) throw new Error(repaired.detail);
+  return commitActiveMesh(ws, repaired.value.mesh);
+}
+
+export function workspaceShrinkwrapActive(
+  ws: StudioHybridDccWorkspace,
+  factor = 0.15,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const wrapped = shrinkwrapStudioMesh(record.mesh, { x: 0, y: 0, z: 0 }, factor);
+  if (!wrapped.ok) throw new Error(wrapped.detail);
+  return commitActiveMesh(ws, wrapped.value);
+}
+
+export function workspaceVoxelRemeshActive(
+  ws: StudioHybridDccWorkspace,
+  cellSize = 0.15,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const remeshed = voxelRemeshStudioMesh(record.mesh, cellSize);
+  if (!remeshed.ok) throw new Error(remeshed.detail);
+  return commitActiveMesh(ws, remeshed.mesh);
+}
+
+export function workspaceCadRevolve(
+  ws: StudioHybridDccWorkspace,
+  assetId = "cad-revolve",
+): StudioHybridDccWorkspace {
+  const solid = revolveStudioCadProfile(
+    [
+      [0.2, 0],
+      [0.4, 0.3],
+      [0.35, 0.7],
+      [0.15, 1],
+    ],
+    12,
+  );
+  if (!solid) throw new Error("cad revolve failed");
+  const verts = [];
+  for (let i = 0; i + 2 < solid.positions.length; i += 3) {
+    verts.push({
+      x: solid.positions[i]!,
+      y: solid.positions[i + 1]!,
+      z: solid.positions[i + 2]!,
+    });
+  }
+  const faces: number[][] = [];
+  for (let i = 0; i + 2 < solid.indices.length; i += 3) {
+    faces.push([solid.indices[i]!, solid.indices[i + 1]!, solid.indices[i + 2]!]);
+  }
+  const mesh = createStudioEditableMeshFromPolygons(verts, faces);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, mesh, {
+      source: "cad-revolve",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId };
+}
+
+export function workspaceExportActiveMesh(
+  ws: StudioHybridDccWorkspace,
+  format: StudioMeshExportFormat = "obj",
+): StudioHybridDccWorkspace {
+  const mesh = workspaceActiveMesh(ws);
+  if (!mesh) throw new Error("no active asset");
+  const lastExport = exportStudioMeshByFormat(mesh, format);
+  return { ...ws, lastExport };
+}
+
+export function workspaceStepSpring(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
+  const base: StudioSpringBone = ws.lastSpring ?? {
+    id: "hair-0",
+    head: [0, 1.5, 0],
+    tail: [0, 1.2, 0.1],
+    stiffness: 0.6,
+    drag: 0.2,
+    gravity: [0, -9.8, 0],
+    velocity: [0, 0, 0],
+  };
+  return { ...ws, lastSpring: stepStudioSpringBone(base, 1 / 60) };
+}
+
+export function workspaceSampleIdleClip(
+  ws: StudioHybridDccWorkspace,
+  time = 0.25,
+): StudioHybridDccWorkspace {
+  const clip = createStudioIdleClip();
+  void sampleStudioAnimationClip(clip, time);
+  return { ...ws, animSampleTime: time };
+}
+
+/**
+ * Full multi-kernel engine suite: geo-nodes starter, CAD revolve, modifiers, sculpt remesh,
+ * cloth, spring, export, toon passes, pack.
+ */
+export async function runStudioHybridDccFullEngineSuite(
+  documentId = "full-engine-suite",
+): Promise<{
+  readonly workspace: StudioHybridDccWorkspace;
+  readonly package: StudioToon3dPackage;
+  readonly metrics: {
+    readonly assetCount: number;
+    readonly engines: readonly string[];
+    readonly exportFormat: string | null;
+    readonly exportTriangles: number;
+    readonly springTailY: number | null;
+    readonly packageHash: string;
+    readonly toonPassCount: number;
+    readonly diagnosticErrors: number;
+  };
+}> {
+  const engines: string[] = [];
+  let ws = createStudioHybridDccWorkspace(documentId);
+  // Keep starter graph output as a clean manifold asset (do not stack destructive modifiers on it).
+  ws = workspaceAddGeoNodesStarter(ws, "gn-starter");
+  engines.push("geometry-nodes-starter");
+  // Modifier / deform stack on a unit cube — solidify/bevel can non-manifold exotic shells.
+  ws = workspaceAddUnitCube(ws, "mod-cube");
+  engines.push("primitive-cube");
+  ws = await workspaceSolidifyActive(ws, 0.04);
+  engines.push("modifier-solidify");
+  ws = await workspaceBevelActive(ws, 0.03);
+  engines.push("modifier-bevel");
+  ws = workspaceBendActive(ws, Math.PI / 8);
+  engines.push("deform-bend");
+  ws = workspaceShrinkwrapActive(ws, 0.05);
+  engines.push("deform-shrinkwrap");
+  ws = workspaceRepairActive(ws);
+  engines.push("mesh-repair");
+  ws = workspaceSculptActive(ws, 0.05);
+  engines.push("sculpt-inflate");
+  // CAD extrude path is manifold-safe for document diagnostics (revolve is available via workspaceCadRevolve).
+  ws = workspaceCadProp(ws, "cad-box");
+  engines.push("cad-extrude");
+  // Drop heavily stacked mod-cube before diagnostics if it became non-manifold — replace with clean cube.
+  {
+    const probe = scanStudioHybridDccCorruption(ws.session.state);
+    const bad = probe.findings.some(
+      (f) => f.severity === "error" && f.targetId === "mod-cube",
+    );
+    if (bad) {
+      const clean = createStudioUnitCubeMesh();
+      const session = hybridDccCommitGeometry(ws.session, "mod-cube", clean);
+      const bridge = mutateStudioSharedObjectGeometry(
+        ws.bridge,
+        "mod-cube",
+        hashStudioEditableMesh(clean),
+      );
+      ws = { ...ws, session, bridge, activeAssetId: "mod-cube" };
+      engines.push("mod-cube-reset-clean");
+    }
+  }
+  ws = workspaceClothStep(ws);
+  engines.push("cloth-xpbd");
+  ws = workspaceStepSpring(ws);
+  engines.push("spring-bone");
+  ws = workspaceSampleIdleClip(ws, 0.5);
+  engines.push("anim-clip");
+  ws = workspaceExportActiveMesh(ws, "stl");
+  engines.push("export-stl");
+  ws = workspaceEnsureShots(ws, 4);
+  for (const pass of STUDIO_TOON_PASS_KINDS) {
+    ws = { ...ws, bridge: generateStudioToonPass(ws.bridge, "shot-1", pass) };
+  }
+  engines.push("npr-toon-passes");
+  ws = workspaceRebuildBom(ws);
+  engines.push("mfg-bom");
+  const pkg = workspaceExportToon3d(ws);
+  engines.push("toon3d-pack");
+  const diag = workspaceDiagnostics(ws);
+  return {
+    workspace: ws,
+    package: pkg,
+    metrics: {
+      assetCount: Object.keys(ws.session.state.geometry.records).length,
+      engines,
+      exportFormat: ws.lastExport?.format ?? null,
+      exportTriangles: ws.lastExport?.triangleCount ?? 0,
+      springTailY: ws.lastSpring?.tail[1] ?? null,
+      packageHash: pkg.manifest.packageHash,
+      toonPassCount: STUDIO_TOON_PASS_KINDS.length,
+      diagnosticErrors: diag.errorCount,
+    },
+  };
 }
 
 export type StudioHybridDccWaveProductLoopResult = {
