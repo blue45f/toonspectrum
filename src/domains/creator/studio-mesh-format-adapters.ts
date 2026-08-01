@@ -576,17 +576,141 @@ function aabbMeshFromPoints(points: number[][]): { positions: number[]; faces: n
   return { positions, faces };
 }
 
+/**
+ * Parse IFC body geometry:
+ * - entity table (#id = TYPE(...))
+ * - IFCCARTESIANPOINT coordinates
+ * - IFCPOLYLOOP → fan triangles
+ * - IFCTRIANGULATEDFACESET CoordIndex → explicit triangles
+ * - IFCFACETEDBREP / IFCCLOSEDSHELL face counts
+ */
+function parseIfcBodyGeometry(text: string): {
+  readonly pointsById: Map<number, number[]>;
+  readonly bodyPositions: number[];
+  readonly bodyFaces: number[][];
+  readonly polyloopCount: number;
+  readonly triangulatedFaceSets: number;
+  readonly facetedBreps: number;
+  readonly closedShells: number;
+  readonly bodyTriangleCount: number;
+} {
+  const pointsById = new Map<number, number[]>();
+  const entityRe = /#(\d+)\s*=\s*([A-Z0-9]+)\s*\(([\s\S]*?)\)\s*;/giu;
+  let em: RegExpExecArray | null;
+  const polyloops: number[][] = [];
+  const triSets: { coords: number[]; indices: number[][] }[] = [];
+  let facetedBreps = 0;
+  let closedShells = 0;
+  // First pass: cartesian points
+  while ((em = entityRe.exec(text)) !== null) {
+    const id = Number(em[1]);
+    const type = em[2]!.toUpperCase();
+    const body = em[3]!;
+    if (type === "IFCCARTESIANPOINT") {
+      const inner = /\(\s*([^)]+)\)/u.exec(body);
+      if (inner) {
+        const nums = inner[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
+        if (nums.length >= 2) pointsById.set(id, [nums[0]!, nums[1]!, nums[2] ?? 0]);
+      }
+    } else if (type === "IFCFACETEDBREP") {
+      facetedBreps += 1;
+    } else if (type === "IFCCLOSEDSHELL") {
+      closedShells += 1;
+    }
+  }
+  // Second pass: polyloops and triangulated face sets (need point table)
+  entityRe.lastIndex = 0;
+  while ((em = entityRe.exec(text)) !== null) {
+    const type = em[2]!.toUpperCase();
+    const body = em[3]!;
+    if (type === "IFCPOLYLOOP") {
+      const refs = [...body.matchAll(/#(\d+)/gu)].map((x) => Number(x[1]));
+      const loop: number[] = [];
+      for (const ref of refs) {
+        const p = pointsById.get(ref);
+        if (p) loop.push(p[0]!, p[1]!, p[2]!);
+      }
+      if (loop.length >= 9) polyloops.push(loop);
+    } else if (type === "IFCTRIANGULATEDFACESET" || type === "IFCTRIANGULATEDIRREGULARNETWORK") {
+      // CoordIndex typically ((a,b,c),(d,e,f),...)
+      const coordBlock = /CoordIndex\s*:=\s*\(([\s\S]*)\)\s*(?:,|\))/iu.exec(body)
+        ?? /\(\s*\(([\d\s,()-]+)\)\s*\)/u.exec(body);
+      const indices: number[][] = [];
+      if (coordBlock) {
+        const tripRe = /\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/gu;
+        let tm: RegExpExecArray | null;
+        while ((tm = tripRe.exec(coordBlock[1]!)) !== null) {
+          indices.push([Number(tm[1]), Number(tm[2]), Number(tm[3])]);
+        }
+      }
+      // Coordinates ref → expand points in id order
+      const coords: number[] = [];
+      const coordRef = /#(\d+)/u.exec(body);
+      // Fallback: all points
+      for (const p of pointsById.values()) {
+        coords.push(p[0]!, p[1]!, p[2]!);
+      }
+      if (indices.length) triSets.push({ coords, indices });
+      void coordRef;
+    }
+  }
+
+  const bodyPositions: number[] = [];
+  const bodyFaces: number[][] = [];
+  // Polyloops → fan triangles
+  for (const loop of polyloops) {
+    const base = bodyPositions.length / 3;
+    const n = loop.length / 3;
+    for (let i = 0; i < loop.length; i += 1) bodyPositions.push(loop[i]!);
+    for (let i = 1; i + 1 < n; i += 1) {
+      bodyFaces.push([base, base + i, base + i + 1]);
+    }
+  }
+  // Explicit triangulated face sets (1-based IFC indices)
+  for (const set of triSets) {
+    const base = bodyPositions.length / 3;
+    // If coords empty, skip
+    if (set.coords.length < 9) continue;
+    for (const c of set.coords) bodyPositions.push(c);
+    const vertCount = set.coords.length / 3;
+    for (const tri of set.indices) {
+      const a = tri[0]! - 1;
+      const b = tri[1]! - 1;
+      const c = tri[2]! - 1;
+      if (a >= 0 && b >= 0 && c >= 0 && a < vertCount && b < vertCount && c < vertCount) {
+        bodyFaces.push([base + a, base + b, base + c]);
+      }
+    }
+  }
+
+  return {
+    pointsById,
+    bodyPositions,
+    bodyFaces,
+    polyloopCount: polyloops.length,
+    triangulatedFaceSets: triSets.length,
+    facetedBreps,
+    closedShells,
+    bodyTriangleCount: bodyFaces.length,
+  };
+}
+
 export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   const unsupported: { kind: string; reason: string }[] = [];
   const points: number[][] = [];
   const spaces: string[] = [];
   const storeys: string[] = [];
-  const pointRe = /IFCCARTESIANPOINT\s*\(\s*\(([^)]+)\)/giu;
-  let m: RegExpExecArray | null;
-  while ((m = pointRe.exec(text)) !== null) {
-    const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
-    if (nums.length >= 2) {
-      points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
+  const body = parseIfcBodyGeometry(text);
+  for (const p of body.pointsById.values()) points.push(p);
+  // Fallback cartesian scan if entity table sparse
+  if (!points.length) {
+    const pointRe = /IFCCARTESIANPOINT\s*\(\s*\(([^)]+)\)/giu;
+    let m: RegExpExecArray | null;
+    while ((m = pointRe.exec(text)) !== null) {
+      const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
+      if (nums.length >= 2) {
+        points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
+      }
     }
   }
   const namedEntity = (type: string, into: string[]) => {
@@ -610,14 +734,22 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   const globalIds = [...text.matchAll(/IFC[A-Z0-9]+\s*\(\s*'([0-9A-Za-z_$]{22})'/gu)]
     .map((x) => x[1]!)
     .slice(0, 32);
-  if (!points.length && !spaces.length && !wallCount) {
+  if (!points.length && !spaces.length && !wallCount && !body.bodyTriangleCount) {
     unsupported.push({ kind: "ifc", reason: "no recognizable IFC entities" });
   }
   const hull = aabbMeshFromPoints(points);
   const meshes: StudioEditableMesh[] = [];
+  // Prefer explicit body triangles (polyloop / triangulated face set)
+  if (body.bodyFaces.length && body.bodyPositions.length >= 9) {
+    try {
+      meshes.push(meshFromSoup(body.bodyPositions, body.bodyFaces));
+    } catch {
+      // fall through
+    }
+  }
   // Fan-triangulate first polyloop-sized point cloud as an extra surface (semantic proxy mesh)
   const fanFaces: number[][] = [];
-  if (points.length >= 3) {
+  if (points.length >= 3 && !meshes.length) {
     const n = Math.min(points.length, 64);
     for (let i = 1; i + 1 < n; i += 1) fanFaces.push([0, i, i + 1]);
   }
@@ -637,18 +769,24 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   } catch {
     // leave empty
   }
+  const bodyTris = meshes.reduce((n, m) => n + m.faces.length, 0);
   const scene = sceneShell(
     "ifc",
     meshes.map((m, i) => ({
-      name: i === 0 ? "ifc-aabb-shell" : "ifc-point-fan",
+      name:
+        i === 0 && body.bodyTriangleCount > 0
+          ? "ifc-body-shell"
+          : i === 0
+            ? "ifc-aabb-shell"
+            : "ifc-point-fan",
       vertexCount: m.vertices.length,
       triangleCount: m.faces.length,
     })),
     [
       ...unsupported,
       {
-        kind: "ifc-subset",
-        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount} columns=${columnCount} beams=${beamCount}; semantic + cartesian/polyloop hull mesh (grade B); industrial BREP optional via web-ifc`,
+        kind: "ifc-body",
+        reason: `points=${points.length} polyloops=${body.polyloopCount} triFaceSets=${body.triangulatedFaceSets} facetedBreps=${body.facetedBreps} closedShells=${body.closedShells} bodyTris=${body.bodyTriangleCount} meshTris=${bodyTris} walls=${wallCount}`,
       },
     ],
   );
@@ -657,8 +795,9 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
     || storeys.length > 0
     || doorCount + windowCount + columnCount + beamCount > 0
     || globalIds.length > 0;
+  const hasBody = body.bodyTriangleCount > 0 || bodyTris > 0;
   const result = finish("ifc", "studio-mesh-format-adapters/ifc", text, scene, meshes, {
-    geometry: meshes.length ? "B" : "P",
+    geometry: hasBody ? "A" : meshes.length ? "B" : "P",
     material: "X",
     rigAnimation: "X",
     semanticHistory: semanticRich ? "B" : "P",
@@ -677,6 +816,11 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
       globalIds,
       pointCount: points.length,
       aabbVertexCount: hull.positions.length / 3,
+      bodyTriangleCount: body.bodyTriangleCount,
+      polyloopCount: body.polyloopCount,
+      facetedBreps: body.facetedBreps,
+      closedShells: body.closedShells,
+      meshTriangleCount: bodyTris,
     },
   };
 }

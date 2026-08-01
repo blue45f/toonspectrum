@@ -20,6 +20,7 @@ import {
   workspaceCollabJoin,
   workspaceDecimateActive,
   workspaceDiagnostics,
+  workspaceDynatopoActive,
   workspaceEnsureShots,
   workspaceExportActiveMesh,
   workspaceExportToon3d,
@@ -28,7 +29,10 @@ import {
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
   workspaceMirrorActive,
+  workspaceOcctBooleanCut,
+  workspaceOcctBox,
   workspaceRebuildBom,
+  workspaceRetopoActive,
   workspaceSculptActive,
   workspaceSolidifyActive,
   workspaceSubdivideActive,
@@ -54,7 +58,7 @@ export function StudioHybridDccPanel() {
       const next = await fn();
       setWs(next);
       setLog(
-        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep} bom=${next.bom.lines.length}`,
+        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep} bom=${next.bom.lines.length} occt=${next.lastOcct ? `${next.lastOcct.operation}:${next.lastOcct.triangleCount}t` : "—"} dynatopo=${next.lastDynatopo ? `${next.lastDynatopo.mode}:${next.lastDynatopo.facesAfter}f b=${next.lastDynatopo.boundaryEdges}` : "—"} retopo=${next.lastRetopo ? `${next.lastRetopo.facesAfter}/${next.lastRetopo.targetFaces}` : "—"}`,
       );
     } catch (error) {
       setLog(`${label} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -78,7 +82,7 @@ export function StudioHybridDccPanel() {
       <input
         ref={fileRef}
         type="file"
-        accept=".stl,.ply,.dae,.dxf,.off,.3mf,.bvh,.ifc,.obj,.glb,.gltf,.vrm,.fbx"
+        accept=".stl,.ply,.dae,.dxf,.off,.3mf,.bvh,.ifc,.obj,.glb,.gltf,.vrm,.fbx,.3dm,.step,.stp"
         className="sr-only"
         data-studio-hybrid-dcc-import="true"
         onChange={(event) => {
@@ -131,6 +135,42 @@ export function StudioHybridDccPanel() {
           onClick={() => run("CAD revolve", () => workspaceCadRevolve(ws))}
         >
           CAD revolve
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-box"
+          onClick={() => run("OCCT box", () => workspaceOcctBox(ws))}
+        >
+          OCCT box
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-cut"
+          onClick={() => run("OCCT cut", () => workspaceOcctBooleanCut(ws))}
+        >
+          OCCT boolean
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          data-studio-hybrid-dcc-action="dynatopo"
+          onClick={() => run("Dynatopo", () => workspaceDynatopoActive(ws, "refine"))}
+        >
+          Dynatopo
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          data-studio-hybrid-dcc-action="retopo"
+          onClick={() => run("Retopo", () => workspaceRetopoActive(ws, 8))}
+        >
+          Retopo
         </button>
         <button
           type="button"
@@ -317,9 +357,18 @@ export function StudioHybridDccPanel() {
       <p className="text-xs" data-studio-hybrid-dcc-log="true">
         {log}
       </p>
-      <p className="text-muted-foreground text-xs">
+      <p
+        className="text-muted-foreground text-xs"
+        data-studio-hybrid-dcc-stats="true"
+        data-assets={Object.keys(ws.session.state.geometry.records).length}
+        data-active={ws.activeAssetId ?? "none"}
+        data-occt-tris={ws.lastOcct?.triangleCount ?? 0}
+        data-dynatopo-faces={ws.lastDynatopo?.facesAfter ?? 0}
+        data-retopo-faces={ws.lastRetopo?.facesAfter ?? 0}
+      >
         Diagnostics: errors={diag.errorCount} warnings={diag.warningCount} active=
-        {ws.activeAssetId ?? "none"}
+        {ws.activeAssetId ?? "none"} assets=
+        {Object.keys(ws.session.state.geometry.records).length}
       </p>
     </section>
   );

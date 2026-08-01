@@ -80,7 +80,7 @@ import {
   scaleStudioBodyProportion,
   sectionPlaneCutawayStudioMeshVerts,
   applyStudioSculptSymmetryRadial,
-} from "./studio-dcc-section6-lite-ops";
+} from "./studio-dcc-domain-ops";
 import {
   createStudioUnitCubeMesh,
   createStudioEditableMeshFromPolygons,
@@ -642,9 +642,15 @@ export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
   }
   const curvePoints = parsed.doc.curves.reduce((s, c) => s + c.pointCount, 0);
   const meshVerts = parsed.doc.meshes.reduce((s, m) => s + m.vertexCount, 0);
-  // Geometry evidence: at least one recovered curve point triple or layer string from binary
-  if (curvePoints < 2 && parsed.doc.layers.length < 1) {
-    throw new Error("binary 3dm produced no layers/curves");
+  const bodyMeshes = parsed.doc.bodyMeshes ?? [];
+  const bodyVerts = bodyMeshes.reduce((s, m) => s + m.vertexCount, 0);
+  const bodyFaces = bodyMeshes.reduce((s, m) => s + m.faceCount, 0);
+  const bodyIndexCount = bodyMeshes.reduce((s, m) => s + m.indices.length, 0);
+  // Industrial bar: body mesh buffers with non-zero positions/indices
+  if (bodyVerts < 3 || bodyFaces < 1 || bodyIndexCount < 3) {
+    throw new Error(
+      `binary 3dm missing body geometry: verts=${bodyVerts} faces=${bodyFaces} indices=${bodyIndexCount}`,
+    );
   }
   return ok("CAD-016", {
     layers: parsed.doc.layers.length,
@@ -653,6 +659,10 @@ export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
     objects: parsed.doc.objects.length,
     curvePoints,
     meshVerts,
+    bodyMeshes: bodyMeshes.length,
+    bodyVerts,
+    bodyFaces,
+    bodyIndexCount,
     chunkCount: parsed.doc.chunkCount,
     version: parsed.doc.version ?? 0,
     losses: parsed.losses.length,
@@ -689,21 +699,49 @@ export function runCad017DxfPlanImportExport(): StudioDccKernelResult {
 }
 
 export function runCad018IfcPropertySpaceWall(): StudioDccKernelResult {
+  // Body geometry: closed polyloop square + wall/space semantics
   const ifc = importStudioIfcShell(
     [
       "ISO-10303-21;",
+      "HEADER;",
+      "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
+      "FILE_NAME('body.ifc','2026-08-02',('toonspectrum'),('ts'),'IFC2X3','','');",
+      "FILE_SCHEMA(('IFC2X3'));",
+      "ENDSEC;",
       "DATA;",
       "#1=IFCCARTESIANPOINT((0.,0.,0.));",
-      "#2=IFCCARTESIANPOINT((2.,0.,1.));",
-      "#3=IFCSPACE('0abcdefghij0123456789A','Room','',$,$,$,$,$,.ELEMENT.,$,$);",
-      "#4=IFCWALL('0abcdefghij0123456789B','W',$,$,$,$,$,$,$);",
+      "#2=IFCCARTESIANPOINT((2.,0.,0.));",
+      "#3=IFCCARTESIANPOINT((2.,2.,0.));",
+      "#4=IFCCARTESIANPOINT((0.,2.,0.));",
+      "#5=IFCCARTESIANPOINT((0.,0.,1.));",
+      "#6=IFCCARTESIANPOINT((2.,0.,1.));",
+      "#7=IFCCARTESIANPOINT((2.,2.,1.));",
+      "#8=IFCCARTESIANPOINT((0.,2.,1.));",
+      "#10=IFCPOLYLOOP((#1,#2,#3,#4));",
+      "#11=IFCPOLYLOOP((#5,#6,#7,#8));",
+      "#12=IFCPOLYLOOP((#1,#2,#6,#5));",
+      "#20=IFCFACETEDBREP($);",
+      "#21=IFCCLOSEDSHELL($);",
+      "#30=IFCSPACE('0abcdefghij0123456789A',$,'Room',$,$,$,$,$,.ELEMENT.,$,$);",
+      "#31=IFCWALL('0abcdefghij0123456789B',$,'W',$,$,$,$,$,$);",
       "ENDSEC;",
+      "END-ISO-10303-21;",
     ].join("\n"),
   );
+  const bodyTris = Number(ifc.extras?.bodyTriangleCount ?? 0);
+  const meshTris = Number(ifc.extras?.meshTriangleCount ?? 0);
+  if (bodyTris < 1 && meshTris < 1) {
+    throw new Error("IFC body parse produced no triangles");
+  }
   return ok("CAD-018", {
     wallCount: Number(ifc.extras?.wallCount ?? 0),
     pointCount: Number(ifc.extras?.pointCount ?? 0),
     meshes: ifc.meshes.length,
+    bodyTriangleCount: bodyTris,
+    meshTriangleCount: meshTris,
+    polyloopCount: Number(ifc.extras?.polyloopCount ?? 0),
+    facetedBreps: Number(ifc.extras?.facetedBreps ?? 0),
+    closedShells: Number(ifc.extras?.closedShells ?? 0),
   });
 }
 

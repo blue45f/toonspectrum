@@ -114,6 +114,10 @@ describe("§6 full catalog SSOT", () => {
       resolve(__dirname, "studio-dcc-section6-lite-ops.ts"),
       "utf8",
     );
+    const domainOpsSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-domain-ops.ts"),
+      "utf8",
+    );
     const dispatchSrc = readFileSync(
       resolve(__dirname, "studio-dcc-catalog-feature-dispatch.ts"),
       "utf8",
@@ -126,9 +130,11 @@ describe("§6 full catalog SSOT", () => {
     );
     const rhinoSrc = readFileSync(resolve(__dirname, "studio-rhino3dm-lite.ts"), "utf8");
     const bimSrc = readFileSync(resolve(__dirname, "studio-bim-room-builder-map.ts"), "utf8");
+    const occtSrc = readFileSync(resolve(__dirname, "studio-occt-wasm-facade.ts"), "utf8");
     const combined = [
       coreSrc,
       domainSrc,
+      domainOpsSrc,
       liteSrc,
       dispatchSrc,
       cadSrc,
@@ -136,6 +142,7 @@ describe("§6 full catalog SSOT", () => {
       matSrc,
       rhinoSrc,
       bimSrc,
+      occtSrc,
     ].join("\n");
     // Structural ban on presence-only theater
     expect(combined).not.toMatch(/typeof\s+\w+\s*===\s*["']function["']/u);
@@ -157,7 +164,25 @@ describe("§6 full catalog SSOT", () => {
       "CAD-010": ["originX", "originY", "originZ", "orthogonal", "frameHash"],
       "CAD-012": ["mateCount", "locked", "kinds"],
       "CAD-015": ["exportBytes", "importMeshes", "importPoints", "exportPoints"],
-      "CAD-016": ["layers", "curves", "curvePoints", "binaryBytes", "format", "chunkCount"],
+      "CAD-016": [
+        "layers",
+        "curves",
+        "curvePoints",
+        "binaryBytes",
+        "format",
+        "chunkCount",
+        "bodyMeshes",
+        "bodyVerts",
+        "bodyFaces",
+      ],
+      "CAD-018": [
+        "wallCount",
+        "pointCount",
+        "meshes",
+        "bodyTriangleCount",
+        "meshTriangleCount",
+        "polyloopCount",
+      ],
       "CAD-019": [
         "parts",
         "walls",
@@ -195,10 +220,13 @@ describe("§6 full catalog SSOT", () => {
       "DRW-007": ["parseOk", "width", "height", "exportBytes", "parseLosses", "exportLosses"],
     };
 
-    // Structural ban: lite-ops must not contain pure hardcoded return bodies for CAD-010
-    expect(liteSrc).not.toMatch(
+    // Domain-ops (former lite-ops) must not contain pure hardcoded return bodies for CAD-010
+    expect(domainOpsSrc).not.toMatch(
       /createStudioCadDatumPlaneAxisCsys[\s\S]{0,200}planeNormalY:\s*1,\s*axisDirY:\s*1,\s*datums:\s*2/u,
     );
+    // lite-ops must only re-export — no function bodies for domain ops
+    expect(liteSrc).toMatch(/from\s+["']\.\/studio-dcc-domain-ops["']/u);
+    expect(liteSrc).not.toMatch(/export function mergeStudioBinaryLockBranch/u);
     // CAD-008 must not hardcode thickness*2 >= 1 unit check
     expect(cadSrc).not.toMatch(/thickness\s*\*\s*2\s*>=\s*1/u);
     // SCP-006 coarsen must not drop every other triangle
@@ -206,6 +234,9 @@ describe("§6 full catalog SSOT", () => {
     // SCP-006 refine must implement red-green promotion (not naive near-only 1→4)
     expect(meshOpsSrc).toMatch(/splitEdges/u);
     expect(meshOpsSrc).toMatch(/n\s*>=\s*2/u);
+    // Industrial OCCT facade must load real WASM MakeBox
+    expect(occtSrc).toMatch(/BRepPrimAPI_MakeBox_1/u);
+    expect(occtSrc).toMatch(/opencascade\.wasm/u);
 
     const missingExportCall: string[] = [];
     const missingNumeric: string[] = [];
@@ -215,12 +246,20 @@ describe("§6 full catalog SSOT", () => {
       const primary = entry.apis[0]!;
       // Primary export must appear as a call site in sealed runner sources
       const callRe = new RegExp(`\\b${primary}\\s*\\(`, "u");
-      if (!callRe.test(combined) && !liteSrc.includes(`function ${primary}`)) {
+      if (
+        !callRe.test(combined)
+        && !domainOpsSrc.includes(`function ${primary}`)
+        && !liteSrc.includes(`function ${primary}`)
+      ) {
         missingExportCall.push(`${entry.id}:${primary}`);
       }
-      // Lite-ops definitions count as sealed real APIs when SSOT points at them
-      if (entry.module.includes("lite-ops") && !liteSrc.includes(`function ${primary}`)) {
-        missingExportCall.push(`${entry.id}:missing-lite-def:${primary}`);
+      // Domain-ops definitions count as sealed real APIs when SSOT points at them
+      if (
+        (entry.module.includes("domain-ops") || entry.module.includes("lite-ops"))
+        && !domainOpsSrc.includes(`function ${primary}`)
+        && !domainOpsSrc.includes(`export function ${primary}`)
+      ) {
+        missingExportCall.push(`${entry.id}:missing-domain-def:${primary}`);
       }
       // Runtime evidence must include a non-constant-looking numeric domain metric
       const r = await exerciseStudioDccCatalogFeature(entry.id);
@@ -230,19 +269,19 @@ describe("§6 full catalog SSOT", () => {
       if (numericKeys.length === 0) {
         missingNumeric.push(entry.id);
       }
-      // Lite-ops rows must produce ≥2 numeric fields AND at least one string hash/id field
+      // Domain-ops rows must produce ≥2 numeric fields AND at least one string hash/id field
       // (blocks pure count-echo of a single input number).
-      if (entry.module.includes("lite-ops")) {
+      if (entry.module.includes("domain-ops") || entry.module.includes("lite-ops")) {
         const stringKeys = Object.entries(r.evidence).filter(
           ([, v]) => typeof v === "string" && v.length > 0,
         );
         if (numericKeys.length < 2) {
-          countEchoFails.push(`${entry.id}:lite-ops-need-2-numeric`);
+          countEchoFails.push(`${entry.id}:domain-ops-need-2-numeric`);
         }
         if (stringKeys.length < 1 && !("conflict" in r.evidence) && !("orthogonal" in r.evidence)) {
           // allow boolean-only if also ≥3 numerics (geometry)
           if (numericKeys.length < 3) {
-            countEchoFails.push(`${entry.id}:lite-ops-need-hash-or-bool-structure`);
+            countEchoFails.push(`${entry.id}:domain-ops-need-hash-or-bool-structure`);
           }
         }
       }
@@ -292,6 +331,14 @@ describe("§6 full catalog SSOT", () => {
           expect(r.evidence.format).toBe("3dm-binary");
           expect(Number(r.evidence.binaryBytes)).toBeGreaterThan(32);
           expect(Number(r.evidence.curvePoints) + Number(r.evidence.layers)).toBeGreaterThan(1);
+          expect(Number(r.evidence.bodyMeshes)).toBeGreaterThan(0);
+          expect(Number(r.evidence.bodyVerts)).toBeGreaterThanOrEqual(3);
+          expect(Number(r.evidence.bodyFaces)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CAD-018") {
+          expect(Number(r.evidence.meshTriangleCount) + Number(r.evidence.bodyTriangleCount)).toBeGreaterThan(0);
+          expect(Number(r.evidence.pointCount)).toBeGreaterThan(2);
+          expect(Number(r.evidence.polyloopCount)).toBeGreaterThan(0);
         }
         if (entry.id === "CAD-019") {
           expect(Number(r.evidence.totalWallLength)).toBeGreaterThan(1);

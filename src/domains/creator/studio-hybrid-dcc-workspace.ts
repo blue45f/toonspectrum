@@ -86,8 +86,10 @@ import {
   withStudioMeshModifier,
 } from "./studio-mesh-modifier-stack";
 import {
+  autoRetopoStudioMeshBasic,
   decimateStudioMesh,
   deformStudioMeshBend,
+  dynatopoStudioMeshBrushLocal,
   repairStudioMesh,
   shrinkwrapStudioMesh,
   subdivideStudioMeshCatmullLite,
@@ -99,6 +101,18 @@ import {
   unwrapStudioMeshPlanar,
   type StudioUvMap,
 } from "./studio-uv-unwrap-lite";
+
+/** OCCT result shape (lazy-loaded; avoid static node:fs in browser harness). */
+export type StudioOcctSolidResult = {
+  readonly ok: true;
+  readonly mesh: StudioEditableMesh;
+  readonly faceCount: number;
+  readonly triangleCount: number;
+  readonly vertexCount: number;
+  readonly volumeApprox: number;
+  readonly backend: "opencascade-wasm";
+  readonly operation: string;
+};
 
 export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 3 as const;
 
@@ -112,6 +126,19 @@ export interface StudioHybridDccWorkspace {
   lastRetarget: StudioRetargetReport | null;
   lastExport: StudioMeshExportResult | null;
   lastSpring: StudioSpringBone | null;
+  lastOcct: StudioOcctSolidResult | null;
+  lastDynatopo: {
+    readonly facesBefore: number;
+    readonly facesAfter: number;
+    readonly boundaryEdges: number;
+    readonly mode: string;
+  } | null;
+  lastRetopo: {
+    readonly facesBefore: number;
+    readonly facesAfter: number;
+    readonly targetFaces: number;
+    readonly meanError: number;
+  } | null;
   bom: StudioManufacturingBom;
   collab: StudioDccCollabRoom;
   clothStep: number;
@@ -134,6 +161,9 @@ export function createStudioHybridDccWorkspace(
     lastRetarget: null,
     lastExport: null,
     lastSpring: null,
+    lastOcct: null,
+    lastDynatopo: null,
+    lastRetopo: null,
     bom: bomFromAssetParts(documentId, []),
     collab: createStudioDccCollabRoom(`${documentId}-collab`),
     clothStep: 0,
@@ -851,6 +881,103 @@ export function workspaceExportActiveMesh(
   if (!mesh) throw new Error("no active asset");
   const lastExport = exportStudioMeshByFormat(mesh, format);
   return { ...ws, lastExport };
+}
+
+/** Industrial OCCT WASM box solid → workspace asset. */
+export async function workspaceOcctBox(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-box",
+  size: readonly [number, number, number] = [1, 1, 1],
+): Promise<StudioHybridDccWorkspace> {
+  const { occtMakeBoxSolid } = await import("./studio-occt-wasm-facade");
+  const result = await occtMakeBoxSolid(size[0], size[1], size[2]);
+  if (!result.ok) throw new Error(`OCCT box failed: ${result.detail}`);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, result.mesh, {
+      source: "occt-wasm",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, result.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId, lastOcct: result };
+}
+
+/** Industrial OCCT boolean cut of two boxes. */
+export async function workspaceOcctBooleanCut(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-cut",
+): Promise<StudioHybridDccWorkspace> {
+  const { occtBooleanCutBoxes } = await import("./studio-occt-wasm-facade");
+  const result = await occtBooleanCutBoxes(
+    { dx: 2, dy: 2, dz: 2 },
+    { dx: 1, dy: 1, dz: 1, ox: 0.4, oy: 0.4, oz: 0.4 },
+  );
+  if (!result.ok) throw new Error(`OCCT cut failed: ${result.detail}`);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, result.mesh, {
+      source: "occt-wasm-boolean",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, result.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId, lastOcct: result };
+}
+
+/** SCP-006 dynatopo refine/coarsen on active mesh. */
+export function workspaceDynatopoActive(
+  ws: StudioHybridDccWorkspace,
+  mode: "refine" | "coarsen" = "refine",
+  radius = 0.75,
+): StudioHybridDccWorkspace {
+  const mesh = workspaceActiveMesh(ws);
+  if (!mesh) throw new Error("no active asset");
+  const result = dynatopoStudioMeshBrushLocal(
+    mesh,
+    { center: { x: 0.5, y: 0.5, z: 0.5 }, radius },
+    mode,
+  );
+  if (!result.ok) throw new Error(result.detail);
+  const next = commitActiveMesh(ws, result.value.mesh);
+  return {
+    ...next,
+    lastDynatopo: {
+      facesBefore: result.value.facesBefore,
+      facesAfter: result.value.facesAfter,
+      boundaryEdges: result.value.boundaryEdges,
+      mode,
+    },
+  };
+}
+
+/** SCP-011 auto-retopo on active mesh. */
+export function workspaceRetopoActive(
+  ws: StudioHybridDccWorkspace,
+  targetFaces = 8,
+): StudioHybridDccWorkspace {
+  const mesh = workspaceActiveMesh(ws);
+  if (!mesh) throw new Error("no active asset");
+  const result = autoRetopoStudioMeshBasic(mesh, { targetFaces, symmetryX: true });
+  if (!result.ok) throw new Error(result.detail);
+  const next = commitActiveMesh(ws, result.value.mesh);
+  return {
+    ...next,
+    lastRetopo: {
+      facesBefore: result.value.facesBefore,
+      facesAfter: result.value.facesAfter,
+      targetFaces: result.value.targetFaces,
+      meanError: result.value.meanError,
+    },
+  };
 }
 
 export function workspaceStepSpring(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {

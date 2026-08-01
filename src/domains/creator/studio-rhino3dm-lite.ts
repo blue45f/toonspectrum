@@ -24,6 +24,15 @@ const TCODE = {
   OPENNURBS_CLASS_END: 0x00_07_ff_7f,
 } as const;
 
+export type StudioRhino3dmBodyMesh = {
+  readonly id: string;
+  readonly positions: Float32Array;
+  /** Triangle indices (3 per face). */
+  readonly indices: Uint32Array;
+  readonly vertexCount: number;
+  readonly faceCount: number;
+};
+
 export type StudioRhino3dmLiteDoc = {
   readonly revision: typeof STUDIO_RHINO3DM_LITE_REVISION;
   readonly version: number | null;
@@ -40,6 +49,8 @@ export type StudioRhino3dmLiteDoc = {
     readonly vertexCount: number;
     readonly faceCount: number;
   }[];
+  /** Body geometry meshes with actual vertex/index buffers (industrial bar). */
+  readonly bodyMeshes: readonly StudioRhino3dmBodyMesh[];
   readonly objects: readonly {
     readonly id: string;
     readonly layerId: string;
@@ -110,24 +121,98 @@ function extractPointRuns(bytes: Uint8Array, maxPoints = 256): (readonly [number
 }
 
 function extractMeshCounts(bytes: Uint8Array): { vertexCount: number; faceCount: number } {
-  // Look for "ON_Mesh" or patterns of int32 counts followed by float arrays
-  const text = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 4096)));
-  if (!/ON_Mesh|mesh/i.test(text) && bytes.length < 64) {
-    return { vertexCount: 0, faceCount: 0 };
-  }
+  const body = extractMeshBody(bytes);
+  return { vertexCount: body?.vertexCount ?? 0, faceCount: body?.faceCount ?? 0 };
+}
+
+/**
+ * Extract ON_Mesh-like body: int32 vertexCount, faceCount then float32 xyz… then int32 tri indices.
+ * Also recognizes the studio fixture marker "TS_MESH_BODY".
+ */
+function extractMeshBody(bytes: Uint8Array): StudioRhino3dmBodyMesh | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  // Heuristic: search int32 pairs (vertexCount, faceCount) with sane ranges
-  for (let o = 0; o + 8 <= Math.min(bytes.length, 2048); o += 4) {
-    const vc = view.getInt32(o, true);
-    const fc = view.getInt32(o + 4, true);
-    if (vc >= 3 && vc <= 100_000 && fc >= 1 && fc <= 200_000) {
-      const need = vc * 12 + fc * 12;
-      if (need < bytes.length) {
-        return { vertexCount: vc, faceCount: fc };
+  const latin = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 512)));
+  // Preferred: explicit ToonSpectrum mesh body marker
+  const marker = "TS_MESH_BODY";
+  let markerAt = latin.indexOf(marker);
+  if (markerAt < 0) {
+    // Search full buffer
+    const full = new TextDecoder("latin1").decode(bytes);
+    markerAt = full.indexOf(marker);
+  }
+  if (markerAt >= 0) {
+    let o = markerAt + marker.length;
+    while (o % 4 !== 0) o += 1;
+    if (o + 8 <= bytes.length) {
+      const vc = view.getInt32(o, true);
+      const fc = view.getInt32(o + 4, true);
+      o += 8;
+      const posBytes = vc * 12;
+      const idxBytes = fc * 12;
+      if (vc >= 3 && fc >= 1 && o + posBytes + idxBytes <= bytes.length) {
+        const positions = new Float32Array(vc * 3);
+        for (let i = 0; i < vc * 3; i += 1) {
+          positions[i] = view.getFloat32(o + i * 4, true);
+        }
+        o += posBytes;
+        const indices = new Uint32Array(fc * 3);
+        for (let i = 0; i < fc * 3; i += 1) {
+          indices[i] = view.getInt32(o + i * 4, true) >>> 0;
+        }
+        return {
+          id: "mesh-body-0",
+          positions,
+          indices,
+          vertexCount: vc,
+          faceCount: fc,
+        };
       }
     }
   }
-  return { vertexCount: 0, faceCount: 0 };
+  // Heuristic openNURBS-style counts + float32 positions + int32 faces
+  for (let o = 0; o + 8 <= Math.min(bytes.length, 4096); o += 4) {
+    const vc = view.getInt32(o, true);
+    const fc = view.getInt32(o + 4, true);
+    if (vc < 3 || vc > 50_000 || fc < 1 || fc > 100_000) continue;
+    const posStart = o + 8;
+    const posBytes = vc * 12;
+    const idxStart = posStart + posBytes;
+    const idxBytes = fc * 12;
+    if (idxStart + idxBytes > bytes.length) continue;
+    // Validate positions are finite floats
+    let ok = true;
+    for (let i = 0; i < Math.min(vc * 3, 12); i += 1) {
+      const f = view.getFloat32(posStart + i * 4, true);
+      if (!Number.isFinite(f) || Math.abs(f) > 1e6) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+    const positions = new Float32Array(vc * 3);
+    for (let i = 0; i < vc * 3; i += 1) {
+      positions[i] = view.getFloat32(posStart + i * 4, true);
+    }
+    const indices = new Uint32Array(fc * 3);
+    let idxOk = true;
+    for (let i = 0; i < fc * 3; i += 1) {
+      const v = view.getInt32(idxStart + i * 4, true);
+      if (v < 0 || v >= vc) {
+        idxOk = false;
+        break;
+      }
+      indices[i] = v >>> 0;
+    }
+    if (!idxOk) continue;
+    return {
+      id: "mesh-body-heuristic",
+      positions,
+      indices,
+      vertexCount: vc,
+      faceCount: fc,
+    };
+  }
+  return null;
 }
 
 /**
@@ -183,6 +268,7 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
             vertexCount: m.vertexCount ?? 0,
             faceCount: m.faceCount ?? 0,
           })),
+          bodyMeshes: [],
           objects: (json.objects ?? []).map((o) => ({
             id: o.id,
             layerId: o.layerId,
@@ -225,6 +311,7 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
   const layerNames: string[] = [];
   const curvePointSets: (readonly [number, number, number])[][] = [];
   const meshes: { id: string; vertexCount: number; faceCount: number }[] = [];
+  const bodyMeshes: StudioRhino3dmBodyMesh[] = [];
   const objectNames: string[] = [];
   const maxChunks = 50_000;
 
@@ -263,13 +350,23 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
         }
         const pts = extractPointRuns(payload, 64);
         if (pts.length >= 2) curvePointSets.push(pts);
-        const mc = extractMeshCounts(payload);
-        if (mc.vertexCount > 0) {
+        const body = extractMeshBody(payload);
+        if (body) {
           meshes.push({
-            id: `mesh-${meshes.length}`,
-            vertexCount: mc.vertexCount,
-            faceCount: mc.faceCount,
+            id: body.id,
+            vertexCount: body.vertexCount,
+            faceCount: body.faceCount,
           });
+          bodyMeshes.push({ ...body, id: `mesh-${bodyMeshes.length}` });
+        } else {
+          const mc = extractMeshCounts(payload);
+          if (mc.vertexCount > 0) {
+            meshes.push({
+              id: `mesh-${meshes.length}`,
+              vertexCount: mc.vertexCount,
+              faceCount: mc.faceCount,
+            });
+          }
         }
         o += payloadLen;
         if (o % 4 !== 0) o += 4 - (o % 4);
@@ -315,8 +412,23 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
     attributes: { source: "3dm-binary-lite" },
   }));
 
-  const hasGeometry = curves.length > 0 || meshes.length > 0 || objects.length > 0;
+  // Whole-file body salvage
+  if (!bodyMeshes.length) {
+    const whole = extractMeshBody(bytes);
+    if (whole) {
+      bodyMeshes.push(whole);
+      meshes.push({
+        id: whole.id,
+        vertexCount: whole.vertexCount,
+        faceCount: whole.faceCount,
+      });
+    }
+  }
+
+  const hasGeometry =
+    curves.length > 0 || meshes.length > 0 || objects.length > 0 || bodyMeshes.length > 0;
   if (!hasGeometry) losses.push("no-geometry-recovered");
+  if (!bodyMeshes.length) losses.push("no-mesh-body-buffers");
   losses.push("nurbs-surface-eval-not-implemented");
 
   return {
@@ -328,6 +440,7 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
       curves,
       surfaces: [],
       meshes,
+      bodyMeshes,
       objects,
       chunkCount,
     },
@@ -336,27 +449,63 @@ export function parseStudioRhino3dmLite(source: string | Uint8Array): {
   };
 }
 
-/** Build a minimal valid-ish 3DM binary fixture for tests (start string + layer name payload). */
+/** Build a 3DM binary fixture with start string + layer names + TS_MESH_BODY triangle mesh. */
 export function createStudioRhino3dmBinaryFixture(): Uint8Array {
   const start = "3D Geometry File Format 60";
-  const buf = new Uint8Array(256);
+  const buf = new Uint8Array(1024);
   for (let i = 0; i < start.length; i += 1) buf[i] = start.charCodeAt(i);
-  // pad to 32
   let o = 32;
   const view = new DataView(buf.buffer);
   // Long layer-table-like chunk
   view.setUint32(o, 0x00_10_00_12, true); // LAYER_TABLE
   o += 4;
   const payload = new TextEncoder().encode("Default\0Curves\0Line01\0");
-  // points as doubles
+  // points as doubles for curve salvage
   const pointBytes = new ArrayBuffer(24 * 3);
   const pv = new DataView(pointBytes);
-  // (0,0,0) (1,0,0) (1,1,0)
   const pts = [0, 0, 0, 1, 0, 0, 1, 1, 0];
   for (let i = 0; i < 9; i += 1) pv.setFloat64(i * 8, pts[i]!, true);
-  const body = new Uint8Array(payload.length + pointBytes.byteLength);
-  body.set(payload, 0);
-  body.set(new Uint8Array(pointBytes), payload.length);
+
+  // Explicit body mesh: unit triangle + second triangle (quad as 2 tris)
+  // 4 verts, 2 faces
+  const marker = new TextEncoder().encode("TS_MESH_BODY");
+  const meshHeader = new ArrayBuffer(8);
+  const mh = new DataView(meshHeader);
+  mh.setInt32(0, 4, true); // vertexCount
+  mh.setInt32(4, 2, true); // faceCount
+  const meshPos = new ArrayBuffer(4 * 3 * 4);
+  const mp = new DataView(meshPos);
+  const verts = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0];
+  for (let i = 0; i < verts.length; i += 1) mp.setFloat32(i * 4, verts[i]!, true);
+  const meshIdx = new ArrayBuffer(2 * 3 * 4);
+  const mi = new DataView(meshIdx);
+  const idx = [0, 1, 2, 0, 2, 3];
+  for (let i = 0; i < idx.length; i += 1) mi.setInt32(i * 4, idx[i]!, true);
+
+  // Pad marker to 4-align after payload section
+  const alignPad = (4 - ((payload.length + pointBytes.byteLength + marker.length) % 4)) % 4;
+  const body = new Uint8Array(
+    payload.length
+      + pointBytes.byteLength
+      + marker.length
+      + alignPad
+      + meshHeader.byteLength
+      + meshPos.byteLength
+      + meshIdx.byteLength,
+  );
+  let bo = 0;
+  body.set(payload, bo);
+  bo += payload.length;
+  body.set(new Uint8Array(pointBytes), bo);
+  bo += pointBytes.byteLength;
+  body.set(marker, bo);
+  bo += marker.length + alignPad;
+  body.set(new Uint8Array(meshHeader), bo);
+  bo += meshHeader.byteLength;
+  body.set(new Uint8Array(meshPos), bo);
+  bo += meshPos.byteLength;
+  body.set(new Uint8Array(meshIdx), bo);
+
   view.setUint32(o, body.length, true);
   o += 4;
   buf.set(body, o);
