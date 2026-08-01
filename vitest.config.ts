@@ -51,6 +51,8 @@ export default defineConfig({
       ...configDefaults.exclude,
       "**/.claude/worktrees/**",
       "deploy/cloudflare-realtime/integration/**",
+      // Playwright browser E2E (run via `pnpm exec playwright test`, not Vitest).
+      "e2e/**",
     ],
   },
 });

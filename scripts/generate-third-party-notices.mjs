@@ -42,6 +42,7 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "CC0-1.0",
   "ISC",
   "LGPL-2.1",
+  "LGPL-2.1-only",
   "LGPL-3.0-or-later",
   "MIT",
   "MIT OR Apache-2.0",
