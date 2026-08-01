@@ -32,7 +32,10 @@ describe("Studio mobile top browser harness boundary", () => {
     expect(harness).toContain(
       '"Connection closed before receiving a handshake response"',
     );
-    expect(harness).toContain("message === expectedMessage");
+    expect(harness).toContain(
+      '"Error during WebSocket handshake: Unexpected response code: 400"',
+    );
+    expect(harness).toContain("expectedMessages.includes");
     expect(harness).toContain("sourceUrl.origin === previewUrl.origin");
     expect(harness).toContain(
       "/^\\/assets\\/[A-Za-z0-9._-]+\\.js$/u.test(sourceUrl.pathname)",
