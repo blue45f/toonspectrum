@@ -81,15 +81,24 @@ describe("§6 full catalog SSOT", () => {
     }
   });
 
-  it("exercises every catalog ID through shipped dispatch on real entry", () => {
-    const all = exerciseAllStudioDccCatalogFeatures();
+  it("exercises every catalog ID through real domain/core kernels", async () => {
+    const all = await exerciseAllStudioDccCatalogFeatures();
     expect(all.failures).toEqual([]);
     expect(all.ok).toBe(true);
     expect(all.exercised).toBe(STUDIO_DCC_SECTION6_IDS.length);
-    const drw = exerciseStudioDccCatalogFeature("DRW-001");
-    expect(drw.evidence.drawKernel).toBe(true);
-    const pub = exerciseStudioDccCatalogFeature("PUB-001");
-    expect(pub.evidence.publishArtifact).toBe(true);
+    const drw = await exerciseStudioDccCatalogFeature("DRW-001");
+    expect(drw.evidence.sampleCount).toBeGreaterThan(0);
+    expect(drw.evidence.pathLength).toBeGreaterThan(0);
+    const pub = await exerciseStudioDccCatalogFeature("PUB-001");
+    expect(pub.evidence.fileCount).toBeGreaterThan(0);
+    const mod = await exerciseStudioDccCatalogFeature("MOD-018");
+    expect(mod.evidence.facesAfter).toBeDefined();
+    const cad = await exerciseStudioDccCatalogFeature("CAD-005");
+    expect(Number(cad.evidence.extrudeTris)).toBeGreaterThan(0);
+  });
+
+  it("rejects unknown IDs instead of inventing hash evidence", async () => {
+    await expect(exerciseStudioDccCatalogFeature("ZZZ-999")).rejects.toThrow(/unknown catalog id/);
   });
 });
 
