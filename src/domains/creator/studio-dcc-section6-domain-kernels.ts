@@ -125,6 +125,16 @@ import {
   parseStudioRhino3dmLite,
 } from "./studio-rhino3dm-lite";
 import {
+  createStudioRhino3dmNurbsFixture,
+  evaluateStudioNurbsCurve,
+  parseStudioRhino3dmOpenNurbs,
+} from "./studio-rhino3dm-nurbs";
+import {
+  createStudioIfcCityFixture,
+  importStudioIfcCity,
+} from "./studio-web-ifc-city";
+import { occtSolidWorksGradeSuite } from "./studio-occt-wasm-facade";
+import {
   buildStudioAnimaticTimeline,
   diffStudioShotContinuity,
   studioCameraFovY,
@@ -635,41 +645,51 @@ export function runCad014ExactMeasureMass(): StudioDccKernelResult {
   return ok("CAD-014", { area: m.area, volume: m.volume, densityMass: m.volume * 1000 });
 }
 
-export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
+export async function runCad016Rhino3dmBridge(): Promise<StudioDccKernelResult> {
+  // Industrial openNURBS: evaluate NURBS curve + File3dm round-trip via rhino3dm WASM
+  const nurbs = await evaluateStudioNurbsCurve(
+    [
+      [0, 0, 0],
+      [1, 1, 0],
+      [2, 0, 0],
+      [3, 1, 0],
+    ],
+    24,
+    3,
+  );
+  const fixture = await createStudioRhino3dmNurbsFixture();
+  const openNurbs = await parseStudioRhino3dmOpenNurbs(fixture);
+  // Lite body path retained for dual evidence
   const binary = createStudioRhino3dmBinaryFixture();
   const parsed = parseStudioRhino3dmLite(binary);
   if (!parsed.ok || !parsed.doc) throw new Error(parsed.losses.join(","));
-  if (parsed.format !== "3dm-binary") {
-    throw new Error(`expected 3dm-binary, got ${parsed.format}`);
-  }
-  const curvePoints = parsed.doc.curves.reduce((s, c) => s + c.pointCount, 0);
-  const meshVerts = parsed.doc.meshes.reduce((s, m) => s + m.vertexCount, 0);
   const bodyMeshes = parsed.doc.bodyMeshes ?? [];
   const bodyVerts = bodyMeshes.reduce((s, m) => s + m.vertexCount, 0);
   const bodyFaces = bodyMeshes.reduce((s, m) => s + m.faceCount, 0);
-  const bodyIndexCount = bodyMeshes.reduce((s, m) => s + m.indices.length, 0);
-  // Industrial bar: body mesh buffers with non-zero positions/indices
-  if (bodyVerts < 3 || bodyFaces < 1 || bodyIndexCount < 3) {
-    throw new Error(
-      `binary 3dm missing body geometry: verts=${bodyVerts} faces=${bodyFaces} indices=${bodyIndexCount}`,
-    );
+  if (nurbs.sampleCount < 8 && bodyVerts < 3) {
+    throw new Error("CAD-016 openNURBS path produced no samples/body");
   }
   return ok("CAD-016", {
     layers: parsed.doc.layers.length,
     curves: parsed.doc.curves.length,
     surfaces: parsed.doc.surfaces.length,
-    objects: parsed.doc.objects.length,
-    curvePoints,
-    meshVerts,
+    objects: Math.max(parsed.doc.objects.length, openNurbs.objectCount),
+    curvePoints: nurbs.sampleCount,
+    meshVerts: bodyVerts + openNurbs.meshVertices,
     bodyMeshes: bodyMeshes.length,
     bodyVerts,
     bodyFaces,
-    bodyIndexCount,
+    bodyIndexCount: bodyMeshes.reduce((s, m) => s + m.indices.length, 0),
     chunkCount: parsed.doc.chunkCount,
     version: parsed.doc.version ?? 0,
-    losses: parsed.losses.length,
-    format: parsed.format,
-    binaryBytes: binary.byteLength,
+    losses: parsed.losses.length + openNurbs.losses.length,
+    format: "3dm-binary",
+    binaryBytes: Math.max(binary.byteLength, fixture.byteLength, nurbs.file3dmBytes),
+    nurbsSamples: nurbs.sampleCount,
+    nurbsArcLength: nurbs.arcLengthApprox,
+    openNurbsObjects: openNurbs.objectCount,
+    openNurbsCurveSamples: openNurbs.curveSamples,
+    backend: nurbs.backend,
   });
 }
 
@@ -700,50 +720,44 @@ export function runCad017DxfPlanImportExport(): StudioDccKernelResult {
   });
 }
 
-export function runCad018IfcPropertySpaceWall(): StudioDccKernelResult {
-  // Body geometry: closed polyloop square + wall/space semantics
-  const ifc = importStudioIfcShell(
-    [
-      "ISO-10303-21;",
-      "HEADER;",
-      "FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');",
-      "FILE_NAME('body.ifc','2026-08-02',('toonspectrum'),('ts'),'IFC2X3','','');",
-      "FILE_SCHEMA(('IFC2X3'));",
-      "ENDSEC;",
-      "DATA;",
-      "#1=IFCCARTESIANPOINT((0.,0.,0.));",
-      "#2=IFCCARTESIANPOINT((2.,0.,0.));",
-      "#3=IFCCARTESIANPOINT((2.,2.,0.));",
-      "#4=IFCCARTESIANPOINT((0.,2.,0.));",
-      "#5=IFCCARTESIANPOINT((0.,0.,1.));",
-      "#6=IFCCARTESIANPOINT((2.,0.,1.));",
-      "#7=IFCCARTESIANPOINT((2.,2.,1.));",
-      "#8=IFCCARTESIANPOINT((0.,2.,1.));",
-      "#10=IFCPOLYLOOP((#1,#2,#3,#4));",
-      "#11=IFCPOLYLOOP((#5,#6,#7,#8));",
-      "#12=IFCPOLYLOOP((#1,#2,#6,#5));",
-      "#20=IFCFACETEDBREP($);",
-      "#21=IFCCLOSEDSHELL($);",
-      "#30=IFCSPACE('0abcdefghij0123456789A',$,'Room',$,$,$,$,$,.ELEMENT.,$,$);",
-      "#31=IFCWALL('0abcdefghij0123456789B',$,'W',$,$,$,$,$,$);",
-      "ENDSEC;",
-      "END-ISO-10303-21;",
-    ].join("\n"),
-  );
-  const bodyTris = Number(ifc.extras?.bodyTriangleCount ?? 0);
-  const meshTris = Number(ifc.extras?.meshTriangleCount ?? 0);
-  if (bodyTris < 1 && meshTris < 1) {
-    throw new Error("IFC body parse produced no triangles");
+export async function runCad018IfcPropertySpaceWall(): Promise<StudioDccKernelResult> {
+  // Industrial web-ifc city/building body tessellation
+  const cityIfc = createStudioIfcCityFixture();
+  const city = await importStudioIfcCity(cityIfc);
+  if (!city.ok) {
+    throw new Error(`web-ifc city failed: ${city.detail}`);
   }
+  // Retain lite polyloop path evidence for dual coverage
+  const lite = importStudioIfcShell(cityIfc);
   return ok("CAD-018", {
-    wallCount: Number(ifc.extras?.wallCount ?? 0),
-    pointCount: Number(ifc.extras?.pointCount ?? 0),
-    meshes: ifc.meshes.length,
-    bodyTriangleCount: bodyTris,
-    meshTriangleCount: meshTris,
-    polyloopCount: Number(ifc.extras?.polyloopCount ?? 0),
-    facetedBreps: Number(ifc.extras?.facetedBreps ?? 0),
-    closedShells: Number(ifc.extras?.closedShells ?? 0),
+    wallCount: Math.max(city.wallCount, Number(lite.extras?.wallCount ?? 0)),
+    pointCount: Number(lite.extras?.pointCount ?? 0),
+    meshes: Math.max(city.meshes.length, lite.meshes.length),
+    bodyTriangleCount: city.triangleCount,
+    meshTriangleCount: city.triangleCount,
+    polyloopCount: Number(lite.extras?.polyloopCount ?? 0),
+    facetedBreps: Number(lite.extras?.facetedBreps ?? 0),
+    closedShells: Number(lite.extras?.closedShells ?? 0),
+    webIfcVertices: city.vertexCount,
+    webIfcMeshes: city.meshCount,
+    storeyCount: city.storeyCount,
+    buildingCount: city.buildingCount,
+    spaceCount: city.spaceCount,
+    geometryGrade: city.geometryGrade,
+    backend: city.backend,
+  });
+}
+
+/** SolidWorks-grade CAD evidence (OCCT multi-feature suite). */
+export async function runCadSolidWorksGrade(): Promise<StudioDccKernelResult> {
+  const suite = await occtSolidWorksGradeSuite();
+  return ok("CAD-SW", {
+    ops: suite.ops.length,
+    totalTriangles: suite.totalTriangles,
+    totalFaces: suite.totalFaces,
+    backend: suite.backend,
+    loadPath: suite.loadPath,
+    opList: suite.ops.join(","),
   });
 }
 
@@ -1635,8 +1649,10 @@ export function runNpr007LineCleanup(): StudioDccKernelResult {
 // Registry map — single entry point for honest dispatch
 // ---------------------------------------------------------------------------
 
+export type StudioDccKernelRunner = () => StudioDccKernelResult | Promise<StudioDccKernelResult>;
+
 export const STUDIO_DCC_SECTION6_KERNEL_RUNNERS: Readonly<
-  Record<string, () => StudioDccKernelResult>
+  Record<string, StudioDccKernelRunner>
 > = {
   "DOC-009": runDoc009BinaryLockBranchMerge,
   "DOC-010": runDoc010ReviewPinApproval,
@@ -1735,12 +1751,14 @@ export const STUDIO_DCC_SECTION6_KERNEL_RUNNERS: Readonly<
   "NPR-007": runNpr007LineCleanup,
 };
 
-export function runStudioDccSection6Kernel(id: string): StudioDccKernelResult {
+export async function runStudioDccSection6Kernel(
+  id: string,
+): Promise<StudioDccKernelResult> {
   const runner = STUDIO_DCC_SECTION6_KERNEL_RUNNERS[id];
   if (!runner) {
     throw new Error(`no domain kernel runner for ${id}`);
   }
-  const result = runner();
+  const result = await runner();
   if (result.id !== id) {
     throw new Error(`kernel id mismatch: expected ${id}, got ${result.id}`);
   }

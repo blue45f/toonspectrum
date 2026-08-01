@@ -216,6 +216,9 @@ importers:
       react-router-dom:
         specifier: 7.18.2
         version: 7.18.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      rhino3dm:
+        specifier: 8.32.1
+        version: 8.32.1
       roughjs:
         specifier: ^4.6.6
         version: 4.6.6
@@ -234,6 +237,9 @@ importers:
       three-mesh-bvh:
         specifier: 0.9.13
         version: 0.9.13(three@0.184.0)
+      web-ifc:
+        specifier: 0.0.77
+        version: 0.0.77
       xatlasjs:
         specifier: 0.2.0
         version: 0.2.0
@@ -5904,6 +5910,9 @@ packages:
   rfdc@1.4.1:
     resolution: {integrity: sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==}
 
+  rhino3dm@8.32.1:
+    resolution: {integrity: sha512-Opb+WAEh41j+YoUQOhG7C8egfG1ZVIW6/pbTuOHoJULFCSTAQgIzOibHCCbRKtQfAuTOPbjm0bCiST3rK2k2sw==}
+
   robust-orientation@1.2.1:
     resolution: {integrity: sha512-FuTptgKwY6iNuU15nrIJDLjXzCChWB+T4AvksRtwPS/WZ3HuP1CElCm1t+OBfgQKfWbtZIawip+61k7+buRKAg==}
 
@@ -6570,6 +6579,9 @@ packages:
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
+
+  web-ifc@0.0.77:
+    resolution: {integrity: sha512-VzQ0W/Iiqbidxn1ECUvz6qJ6p2sXBVNcOsUOBCETzy77psAH6yFLKQm74aXabkx3JH4OvFVHe8k1qS6+Z2zl1w==}
 
   web-streams-polyfill@3.3.3:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
@@ -12169,6 +12181,8 @@ snapshots:
 
   rfdc@1.4.1: {}
 
+  rhino3dm@8.32.1: {}
+
   robust-orientation@1.2.1:
     dependencies:
       robust-scale: 1.0.2
@@ -12949,6 +12963,8 @@ snapshots:
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
+
+  web-ifc@0.0.77: {}
 
   web-streams-polyfill@3.3.3: {}
 

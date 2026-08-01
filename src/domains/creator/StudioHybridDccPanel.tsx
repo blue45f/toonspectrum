@@ -29,8 +29,10 @@ import {
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
   workspaceMirrorActive,
+  workspaceImportIfcCity,
   workspaceOcctBooleanCut,
   workspaceOcctBox,
+  workspaceOpenNurbsSphere,
   workspaceRebuildBom,
   workspaceRetopoActive,
   workspaceSculptActive,
@@ -135,6 +137,24 @@ export function StudioHybridDccPanel() {
           onClick={() => run("CAD revolve", () => workspaceCadRevolve(ws))}
         >
           CAD revolve
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="opennurbs-sphere"
+          onClick={() => run("openNURBS sphere", () => workspaceOpenNurbsSphere(ws))}
+        >
+          openNURBS sphere
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="ifc-city"
+          onClick={() => run("IFC city", () => workspaceImportIfcCity(ws))}
+        >
+          IFC city
         </button>
         <button
           type="button"

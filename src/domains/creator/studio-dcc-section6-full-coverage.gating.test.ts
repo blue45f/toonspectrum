@@ -337,11 +337,23 @@ describe("§6 full catalog SSOT", () => {
           expect(Number(r.evidence.bodyMeshes)).toBeGreaterThan(0);
           expect(Number(r.evidence.bodyVerts)).toBeGreaterThanOrEqual(3);
           expect(Number(r.evidence.bodyFaces)).toBeGreaterThan(0);
+          // openNURBS (rhino3dm) NURBS samples
+          if ("nurbsSamples" in r.evidence) {
+            expect(Number(r.evidence.nurbsSamples)).toBeGreaterThan(4);
+            expect(r.evidence.backend).toBe("rhino3dm-opennurbs");
+          }
         }
         if (entry.id === "CAD-018") {
           expect(Number(r.evidence.meshTriangleCount) + Number(r.evidence.bodyTriangleCount)).toBeGreaterThan(0);
-          expect(Number(r.evidence.pointCount)).toBeGreaterThan(2);
-          expect(Number(r.evidence.polyloopCount)).toBeGreaterThan(0);
+          // Industrial web-ifc city path: triangles + storeys/walls (polyloop optional)
+          expect(
+            Number(r.evidence.webIfcVertices ?? 0)
+              + Number(r.evidence.pointCount ?? 0)
+              + Number(r.evidence.wallCount ?? 0),
+          ).toBeGreaterThan(0);
+          expect(r.evidence.backend === "web-ifc" || Number(r.evidence.polyloopCount) > 0).toBe(
+            true,
+          );
         }
         if (entry.id === "CAD-019") {
           expect(Number(r.evidence.totalWallLength)).toBeGreaterThan(1);

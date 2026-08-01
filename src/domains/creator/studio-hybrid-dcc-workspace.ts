@@ -884,6 +884,57 @@ export function workspaceExportActiveMesh(
   return { ...ws, lastExport };
 }
 
+/** Industrial openNURBS sphere mesh via rhino3dm. */
+export async function workspaceOpenNurbsSphere(
+  ws: StudioHybridDccWorkspace,
+  assetId = "opennurbs-sphere",
+  radius = 1,
+): Promise<StudioHybridDccWorkspace> {
+  const { evaluateStudioNurbsSurfaceSphere } = await import("./studio-rhino3dm-nurbs");
+  const surf = await evaluateStudioNurbsSurfaceSphere(radius, 16, 12);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, surf.mesh, {
+      source: "rhino3dm-opennurbs",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, surf.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId };
+}
+
+/** Industrial web-ifc city import → workspace meshes. */
+export async function workspaceImportIfcCity(
+  ws: StudioHybridDccWorkspace,
+  ifcText?: string,
+): Promise<StudioHybridDccWorkspace> {
+  const { createStudioIfcCityFixture, importStudioIfcCity } = await import("./studio-web-ifc-city");
+  const city = await importStudioIfcCity(ifcText ?? createStudioIfcCityFixture());
+  if (!city.ok) throw new Error(`IFC city: ${city.detail}`);
+  let session = ws.session;
+  let active: string | null = ws.activeAssetId;
+  city.meshes.forEach((mesh, i) => {
+    const id = `ifc-city-${i}`;
+    if (!session.state.geometry.records[id]) {
+      session = hybridDccRegisterAsset(session, id, mesh, {
+        source: "web-ifc-city",
+        creator: "studio",
+        license: "CC0-1.0",
+        useScope: "commercial",
+        derivative: "original",
+      });
+    } else {
+      session = hybridDccCommitGeometry(session, id, mesh);
+    }
+    active = id;
+  });
+  return { ...ws, session, activeAssetId: active };
+}
+
 /** Industrial OCCT WASM box solid → workspace asset. */
 export async function workspaceOcctBox(
   ws: StudioHybridDccWorkspace,
