@@ -514,7 +514,9 @@ export function autoRetopoStudioMeshBasic(
 }
 
 /**
- * SCP-014: bake normal / AO / curvature / ID maps into UV-space buffers with padding.
+ * SCP-014: bake normal / AO / curvature / object-ID from high-res mesh into UV atlas.
+ * Uses box-unwrap UVs, per-texel nearest-triangle sample, cage offset, padding dilate,
+ * and linear→sRGB encoding flag for color management of AO.
  */
 export function bakeStudioMeshMaps(
   mesh: StudioEditableMesh,
@@ -522,6 +524,9 @@ export function bakeStudioMeshMaps(
     readonly resolution: number;
     readonly paddingPx?: number;
     readonly cageScale?: number;
+    /** Optional high-res mesh (defaults to mesh). Normals/AO sample this surface. */
+    readonly highRes?: StudioEditableMesh;
+    readonly workingSpace?: "linear" | "srgb";
   },
 ): {
   readonly resolution: number;
@@ -532,43 +537,265 @@ export function bakeStudioMeshMaps(
   readonly curvature: Float32Array;
   readonly objectId: Uint32Array;
   readonly texelCount: number;
+  readonly coveredTexels: number;
+  readonly workingSpace: "linear" | "srgb";
+  readonly meanNormalLength: number;
+  readonly meanAoLinear: number;
+  readonly meanCurvature: number;
 } {
   const res = Math.max(4, Math.min(512, Math.trunc(options.resolution)));
   const pad = Math.max(0, Math.trunc(options.paddingPx ?? 2));
   const cage = options.cageScale ?? 1.02;
+  const workingSpace = options.workingSpace ?? "linear";
   const n = res * res;
   const normal = new Float32Array(n * 3);
   const ao = new Float32Array(n);
   const curvature = new Float32Array(n);
   const objectId = new Uint32Array(n);
-  const soup = studioEditableMeshToTriangleSoup(mesh);
-  // Average face normal as base
-  let nx = 0, ny = 0, nz = 0;
-  for (let t = 0; t < soup.indices.length; t += 3) {
-    const ia = soup.indices[t]!, ib = soup.indices[t + 1]!, ic = soup.indices[t + 2]!;
-    const ax = soup.positions[ia * 3]!, ay = soup.positions[ia * 3 + 1]!, az = soup.positions[ia * 3 + 2]!;
-    const bx = soup.positions[ib * 3]! - ax, by = soup.positions[ib * 3 + 1]! - ay, bz = soup.positions[ib * 3 + 2]! - az;
-    const cx = soup.positions[ic * 3]! - ax, cy = soup.positions[ic * 3 + 1]! - ay, cz = soup.positions[ic * 3 + 2]! - az;
-    nx += by * cz - bz * cy;
-    ny += bz * cx - bx * cz;
-    nz += bx * cy - by * cx;
+  const covered = new Uint8Array(n);
+
+  const high = options.highRes ?? mesh;
+  const soup = studioEditableMeshToTriangleSoup(high);
+  const triCount = soup.indices.length / 3;
+
+  // Per-face normals + area + UV (box projection per vertex, same as unwrapStudioMeshBox)
+  const faceNx = new Float32Array(triCount);
+  const faceNy = new Float32Array(triCount);
+  const faceNz = new Float32Array(triCount);
+  const faceCx = new Float32Array(triCount);
+  const faceCy = new Float32Array(triCount);
+  const faceCz = new Float32Array(triCount);
+  const faceU0 = new Float32Array(triCount);
+  const faceV0 = new Float32Array(triCount);
+  const faceU1 = new Float32Array(triCount);
+  const faceV1 = new Float32Array(triCount);
+  const faceU2 = new Float32Array(triCount);
+  const faceV2 = new Float32Array(triCount);
+
+  // Vertex UVs via box unwrap
+  const vCount = soup.positions.length / 3;
+  const vU = new Float32Array(vCount);
+  const vV = new Float32Array(vCount);
+  for (let i = 0; i < vCount; i += 1) {
+    const x = soup.positions[i * 3]!;
+    const y = soup.positions[i * 3 + 1]!;
+    const z = soup.positions[i * 3 + 2]!;
+    const ax = Math.abs(x);
+    const ay = Math.abs(y);
+    const az = Math.abs(z);
+    if (ax >= ay && ax >= az) {
+      vU[i] = z;
+      vV[i] = y;
+    } else if (ay >= ax && ay >= az) {
+      vU[i] = x;
+      vV[i] = z;
+    } else {
+      vU[i] = x;
+      vV[i] = y;
+    }
   }
-  const nl = Math.hypot(nx, ny, nz) || 1;
-  nx /= nl; ny /= nl; nz /= nl;
+  let minU = Infinity, minV = Infinity, maxU = -Infinity, maxV = -Infinity;
+  for (let i = 0; i < vCount; i += 1) {
+    minU = Math.min(minU, vU[i]!);
+    minV = Math.min(minV, vV[i]!);
+    maxU = Math.max(maxU, vU[i]!);
+    maxV = Math.max(maxV, vV[i]!);
+  }
+  const du = Math.max(1e-8, maxU - minU);
+  const dv = Math.max(1e-8, maxV - minV);
+  for (let i = 0; i < vCount; i += 1) {
+    vU[i] = (vU[i]! - minU) / du;
+    vV[i] = (vV[i]! - minV) / dv;
+  }
+
+  // Vertex normals (accumulate face normals)
+  const vNx = new Float32Array(vCount);
+  const vNy = new Float32Array(vCount);
+  const vNz = new Float32Array(vCount);
+
+  for (let t = 0; t < triCount; t += 1) {
+    const ia = soup.indices[t * 3]!;
+    const ib = soup.indices[t * 3 + 1]!;
+    const ic = soup.indices[t * 3 + 2]!;
+    const ax = soup.positions[ia * 3]!, ay = soup.positions[ia * 3 + 1]!, az = soup.positions[ia * 3 + 2]!;
+    const bx = soup.positions[ib * 3]!, by = soup.positions[ib * 3 + 1]!, bz = soup.positions[ib * 3 + 2]!;
+    const cx = soup.positions[ic * 3]!, cy = soup.positions[ic * 3 + 1]!, cz = soup.positions[ic * 3 + 2]!;
+    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
+    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    let nx = e1y * e2z - e1z * e2y;
+    let ny = e1z * e2x - e1x * e2z;
+    let nz = e1x * e2y - e1y * e2x;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl; ny /= nl; nz /= nl;
+    faceNx[t] = nx; faceNy[t] = ny; faceNz[t] = nz;
+    faceCx[t] = (ax + bx + cx) / 3;
+    faceCy[t] = (ay + by + cy) / 3;
+    faceCz[t] = (az + bz + cz) / 3;
+    faceU0[t] = vU[ia]!; faceV0[t] = vV[ia]!;
+    faceU1[t] = vU[ib]!; faceV1[t] = vV[ib]!;
+    faceU2[t] = vU[ic]!; faceV2[t] = vV[ic]!;
+    vNx[ia]! += nx; vNy[ia]! += ny; vNz[ia]! += nz;
+    vNx[ib]! += nx; vNy[ib]! += ny; vNz[ib]! += nz;
+    vNx[ic]! += nx; vNy[ic]! += ny; vNz[ic]! += nz;
+  }
+  for (let i = 0; i < vCount; i += 1) {
+    const l = Math.hypot(vNx[i]!, vNy[i]!, vNz[i]!) || 1;
+    vNx[i]! /= l; vNy[i]! /= l; vNz[i]! /= l;
+  }
+
+  // Curvature proxy at vertices: variance of adjacent face normals
+  const vCurv = new Float32Array(vCount);
+  const vAdj: number[][] = Array.from({ length: vCount }, () => []);
+  for (let t = 0; t < triCount; t += 1) {
+    for (let k = 0; k < 3; k += 1) {
+      vAdj[soup.indices[t * 3 + k]!]!.push(t);
+    }
+  }
+  for (let i = 0; i < vCount; i += 1) {
+    const adj = vAdj[i]!;
+    if (adj.length < 2) {
+      vCurv[i] = 0;
+      continue;
+    }
+    let mx = 0, my = 0, mz = 0;
+    for (const t of adj) {
+      mx += faceNx[t]!; my += faceNy[t]!; mz += faceNz[t]!;
+    }
+    mx /= adj.length; my /= adj.length; mz /= adj.length;
+    let varn = 0;
+    for (const t of adj) {
+      varn += Math.hypot(faceNx[t]! - mx, faceNy[t]! - my, faceNz[t]! - mz);
+    }
+    vCurv[i] = varn / adj.length;
+  }
+
+  const barycentric = (
+    u: number,
+    v: number,
+    u0: number,
+    v0: number,
+    u1: number,
+    v1: number,
+    u2: number,
+    v2: number,
+  ): { w0: number; w1: number; w2: number; inside: boolean } => {
+    const den = (v1 - v2) * (u0 - u2) + (u2 - u1) * (v0 - v2);
+    if (Math.abs(den) < 1e-12) return { w0: 0, w1: 0, w2: 0, inside: false };
+    const w0 = ((v1 - v2) * (u - u2) + (u2 - u1) * (v - v2)) / den;
+    const w1 = ((v2 - v0) * (u - u2) + (u0 - u2) * (v - v2)) / den;
+    const w2 = 1 - w0 - w1;
+    const inside = w0 >= -1e-4 && w1 >= -1e-4 && w2 >= -1e-4;
+    return { w0, w1, w2, inside };
+  };
+
+  // Sample each texel from UV triangles
   for (let y = 0; y < res; y += 1) {
     for (let x = 0; x < res; x += 1) {
       const i = y * res + x;
-      const border = x < pad || y < pad || x >= res - pad || y >= res - pad;
-      const u = x / (res - 1);
-      const v = y / (res - 1);
-      normal[i * 3] = nx * cage;
-      normal[i * 3 + 1] = ny * cage;
-      normal[i * 3 + 2] = nz * cage;
-      ao[i] = border ? 0.15 : 0.5 + 0.5 * Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
-      curvature[i] = border ? 0 : Math.abs(Math.sin(u * 6) * Math.cos(v * 6));
-      objectId[i] = border ? 0 : 1;
+      const u = (x + 0.5) / res;
+      const v = (y + 0.5) / res;
+      let bestD = Infinity;
+      let bestT = -1;
+      let bw0 = 0, bw1 = 0, bw2 = 0;
+      for (let t = 0; t < triCount; t += 1) {
+        const b = barycentric(
+          u,
+          v,
+          faceU0[t]!,
+          faceV0[t]!,
+          faceU1[t]!,
+          faceV1[t]!,
+          faceU2[t]!,
+          faceV2[t]!,
+        );
+        if (b.inside) {
+          bestT = t;
+          bw0 = b.w0; bw1 = b.w1; bw2 = b.w2;
+          bestD = 0;
+          break;
+        }
+        // distance to triangle centroid in UV for padding fill later
+        const cu = (faceU0[t]! + faceU1[t]! + faceU2[t]!) / 3;
+        const cv = (faceV0[t]! + faceV1[t]! + faceV2[t]!) / 3;
+        const d = (u - cu) ** 2 + (v - cv) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          bestT = t;
+          bw0 = 1 / 3; bw1 = 1 / 3; bw2 = 1 / 3;
+        }
+      }
+      if (bestT < 0) continue;
+      const ia = soup.indices[bestT * 3]!;
+      const ib = soup.indices[bestT * 3 + 1]!;
+      const ic = soup.indices[bestT * 3 + 2]!;
+      // Interpolated normal
+      let nx = vNx[ia]! * bw0 + vNx[ib]! * bw1 + vNx[ic]! * bw2;
+      let ny = vNy[ia]! * bw0 + vNy[ib]! * bw1 + vNy[ic]! * bw2;
+      let nz = vNz[ia]! * bw0 + vNz[ib]! * bw1 + vNz[ic]! * bw2;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nx = (nx / nl) * cage;
+      ny = (ny / nl) * cage;
+      nz = (nz / nl) * cage;
+      normal[i * 3] = nx;
+      normal[i * 3 + 1] = ny;
+      normal[i * 3 + 2] = nz;
+      // AO: bent-normal proxy — 0.5 + 0.5 * up-dot (not UV sin formula)
+      const aoLin = Math.max(0, Math.min(1, 0.35 + 0.65 * Math.max(0, ny / cage)));
+      ao[i] = workingSpace === "srgb" ? Math.pow(aoLin, 1 / 2.2) : aoLin;
+      curvature[i] = vCurv[ia]! * bw0 + vCurv[ib]! * bw1 + vCurv[ic]! * bw2;
+      objectId[i] = bestT + 1; // face id
+      covered[i] = bestD === 0 ? 1 : 0;
     }
   }
+
+  // Padding dilate: for border empty texels near covered, copy neighbor
+  if (pad > 0) {
+    for (let iter = 0; iter < pad; iter += 1) {
+      const next = covered.slice();
+      for (let y = 0; y < res; y += 1) {
+        for (let x = 0; x < res; x += 1) {
+          const i = y * res + x;
+          if (covered[i]) continue;
+          let found = false;
+          for (let dy = -1; dy <= 1 && !found; dy += 1) {
+            for (let dx = -1; dx <= 1 && !found; dx += 1) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= res || ny >= res) continue;
+              const j = ny * res + nx;
+              if (!covered[j]) continue;
+              normal[i * 3] = normal[j * 3]!;
+              normal[i * 3 + 1] = normal[j * 3 + 1]!;
+              normal[i * 3 + 2] = normal[j * 3 + 2]!;
+              ao[i] = ao[j]!;
+              curvature[i] = curvature[j]!;
+              objectId[i] = objectId[j]!;
+              next[i] = 1;
+              found = true;
+            }
+          }
+        }
+      }
+      covered.set(next);
+    }
+  }
+
+  let coveredTexels = 0;
+  let meanNormalLength = 0;
+  let meanAoLinear = 0;
+  let meanCurvature = 0;
+  for (let i = 0; i < n; i += 1) {
+    if (objectId[i]! > 0) coveredTexels += 1;
+    meanNormalLength += Math.hypot(normal[i * 3]!, normal[i * 3 + 1]!, normal[i * 3 + 2]!);
+    const aoLin =
+      workingSpace === "srgb" ? Math.pow(Math.max(0, ao[i]!), 2.2) : ao[i]!;
+    meanAoLinear += aoLin;
+    meanCurvature += curvature[i]!;
+  }
+  meanNormalLength /= n;
+  meanAoLinear /= n;
+  meanCurvature /= n;
+
   return {
     resolution: res,
     paddingPx: pad,
@@ -578,5 +805,10 @@ export function bakeStudioMeshMaps(
     curvature,
     objectId,
     texelCount: n,
+    coveredTexels,
+    workingSpace,
+    meanNormalLength,
+    meanAoLinear,
+    meanCurvature,
   };
 }

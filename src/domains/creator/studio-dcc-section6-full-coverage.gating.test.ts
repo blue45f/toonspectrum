@@ -148,11 +148,29 @@ describe("§6 full catalog SSOT", () => {
       "CAD-008": ["shellVolume", "thickness", "draftDeg", "failureFaces"],
       "CAD-012": ["mateCount", "locked", "kinds"],
       "CAD-015": ["exportBytes", "importMeshes", "importPoints", "exportPoints"],
-      "CAD-016": ["layers", "curves", "surfaces", "objects", "curvePoints"],
-      "CAD-019": ["parts", "walls", "doors", "windows", "spaces"],
+      "CAD-016": ["layers", "curves", "curvePoints", "binaryBytes", "format", "chunkCount"],
+      "CAD-019": [
+        "parts",
+        "walls",
+        "totalWallLength",
+        "openingArea",
+        "wallPartsWithPose",
+        "wallVolume",
+        "roomWidth",
+        "roomDepth",
+      ],
       "SCP-006": ["facesBefore", "facesAfterRefine", "affectedRefine"],
       "SCP-011": ["targetFaces", "guideSamples", "meanError", "errorMapLen", "symmetryX"],
-      "SCP-014": ["resolution", "paddingPx", "texelCount", "cageScale"],
+      "SCP-014": [
+        "resolution",
+        "paddingPx",
+        "texelCount",
+        "coveredTexels",
+        "meanNormalLength",
+        "meanAoLinear",
+        "meanCurvature",
+        "distinctFaceIds",
+      ],
       "DRW-007": ["parseOk", "width", "height", "exportBytes", "parseLosses", "exportLosses"],
     };
 
@@ -203,6 +221,25 @@ describe("§6 full catalog SSOT", () => {
           expect(Number(r.evidence.facesAfterRefine)).toBeGreaterThan(
             Number(r.evidence.facesBefore),
           );
+        }
+        if (entry.id === "CAD-016") {
+          expect(r.evidence.format).toBe("3dm-binary");
+          expect(Number(r.evidence.binaryBytes)).toBeGreaterThan(32);
+          expect(Number(r.evidence.curvePoints) + Number(r.evidence.layers)).toBeGreaterThan(1);
+        }
+        if (entry.id === "CAD-019") {
+          expect(Number(r.evidence.totalWallLength)).toBeGreaterThan(1);
+          expect(Number(r.evidence.wallPartsWithPose)).toBeGreaterThan(0);
+          expect(Number(r.evidence.wallVolume)).toBeGreaterThan(0);
+          expect(Number(r.evidence.roomWidth)).toBeGreaterThan(0);
+        }
+        if (entry.id === "SCP-014") {
+          expect(Number(r.evidence.coveredTexels)).toBeGreaterThan(4);
+          expect(Number(r.evidence.meanNormalLength)).toBeGreaterThan(0.5);
+          expect(Number(r.evidence.distinctFaceIds)).toBeGreaterThan(1);
+          // Ban constant AO theater: linear mean must be in (0,1) from bent-normal
+          expect(Number(r.evidence.meanAoLinear)).toBeGreaterThan(0.2);
+          expect(Number(r.evidence.meanAoLinear)).toBeLessThan(0.95);
         }
       }
     }

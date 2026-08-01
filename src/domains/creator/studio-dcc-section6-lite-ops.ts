@@ -197,13 +197,6 @@ export function createStudioCadDatumPlaneAxisCsys(): {
   return { planeNormalY: 1, axisDirY: 1, datums: 2 };
 }
 
-export function assembleStudioCadMateLite(
-  mates: readonly { readonly a: string; readonly b: string; readonly kind: string }[],
-): { readonly mateCount: number; readonly kinds: number } {
-  const kinds = new Set(mates.map((m) => m.kind));
-  return { mateCount: mates.length, kinds: kinds.size };
-}
-
 export function configureStudioCadVariant(
   variants: readonly string[],
   active: string,
@@ -211,28 +204,6 @@ export function configureStudioCadVariant(
   return {
     variantCount: variants.length,
     activeIndex: Math.max(0, variants.indexOf(active)),
-  };
-}
-
-export function bridgeStudioRhino3dmLite(input: {
-  readonly objectCount: number;
-  readonly layerCount: number;
-}): { readonly objects: number; readonly layers: number; readonly format: string } {
-  return {
-    objects: input.objectCount,
-    layers: input.layerCount,
-    format: "3dm-lite",
-  };
-}
-
-export function mapStudioBimToRoomBuilder(input: {
-  readonly ifcSpaces: number;
-  readonly rooms: number;
-}): { readonly spaces: number; readonly rooms: number; readonly mapped: number } {
-  return {
-    spaces: input.ifcSpaces,
-    rooms: input.rooms,
-    mapped: Math.min(input.ifcSpaces, input.rooms),
   };
 }
 
@@ -268,16 +239,6 @@ export function assignStudioSculptFaceSetPolygroup(
   groupId: number,
 ): { readonly faces: number; readonly groupId: number; readonly assigned: number } {
   return { faces: faceCount, groupId, assigned: faceCount };
-}
-
-export function bakeStudioSculptPasses(input: {
-  readonly passCount: number;
-  readonly resolution: number;
-}): { readonly passes: number; readonly texels: number } {
-  return {
-    passes: input.passCount,
-    texels: input.resolution * input.resolution * input.passCount,
-  };
 }
 
 // ---------------------------------------------------------------------------

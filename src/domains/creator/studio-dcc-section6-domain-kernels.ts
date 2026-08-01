@@ -120,7 +120,10 @@ import {
   arrayStudioAlongCurve,
   scatterStudioInstances,
 } from "./studio-procedural-scatter";
-import { parseStudioRhino3dmLite } from "./studio-rhino3dm-lite";
+import {
+  createStudioRhino3dmBinaryFixture,
+  parseStudioRhino3dmLite,
+} from "./studio-rhino3dm-lite";
 import {
   buildStudioAnimaticTimeline,
   diffStudioShotContinuity,
@@ -552,29 +555,30 @@ export function runCad014ExactMeasureMass(): StudioDccKernelResult {
 }
 
 export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
-  const src = JSON.stringify({
-    layers: [
-      { id: "L0", name: "Default", color: "#fff" },
-      { id: "L1", name: "Curves", color: "#0af" },
-    ],
-    curves: [
-      { id: "C1", layerId: "L1", points: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] },
-    ],
-    surfaces: [{ id: "S1", layerId: "L0", uCount: 4, vCount: 4 }],
-    objects: [
-      { id: "O1", layerId: "L0", name: "Box", attributes: { material: "plastic" } },
-    ],
-  });
-  const parsed = parseStudioRhino3dmLite(src);
+  const binary = createStudioRhino3dmBinaryFixture();
+  const parsed = parseStudioRhino3dmLite(binary);
   if (!parsed.ok || !parsed.doc) throw new Error(parsed.losses.join(","));
+  if (parsed.format !== "3dm-binary") {
+    throw new Error(`expected 3dm-binary, got ${parsed.format}`);
+  }
+  const curvePoints = parsed.doc.curves.reduce((s, c) => s + c.pointCount, 0);
+  const meshVerts = parsed.doc.meshes.reduce((s, m) => s + m.vertexCount, 0);
+  // Geometry evidence: at least one recovered curve point triple or layer string from binary
+  if (curvePoints < 2 && parsed.doc.layers.length < 1) {
+    throw new Error("binary 3dm produced no layers/curves");
+  }
   return ok("CAD-016", {
     layers: parsed.doc.layers.length,
     curves: parsed.doc.curves.length,
     surfaces: parsed.doc.surfaces.length,
     objects: parsed.doc.objects.length,
-    curvePoints: parsed.doc.curves[0]?.pointCount ?? 0,
+    curvePoints,
+    meshVerts,
+    chunkCount: parsed.doc.chunkCount,
+    version: parsed.doc.version ?? 0,
     losses: parsed.losses.length,
     format: parsed.format,
+    binaryBytes: binary.byteLength,
   });
 }
 
@@ -641,6 +645,15 @@ export function runCad019BimToRoomBuilder(): StudioDccKernelResult {
     "ENDSEC;",
   ].join("\n");
   const mapped = mapStudioBimIfcToRoomBuilder(ifc);
+  const wallParts = mapped.parts.filter((p) => p.kind === "wall");
+  const withOpenings = wallParts.filter((p) => p.openings.length > 0).length;
+  const totalSize = wallParts.reduce(
+    (s, p) => s + p.size[0] * p.size[1] * p.size[2],
+    0,
+  );
+  if (mapped.totalWallLength <= 0 || wallParts.length === 0) {
+    throw new Error("BIM map produced no wall geometry");
+  }
   return ok("CAD-019", {
     parts: mapped.parts.length,
     spaces: mapped.spaces,
@@ -650,6 +663,14 @@ export function runCad019BimToRoomBuilder(): StudioDccKernelResult {
     windows: mapped.windows,
     meshCount: mapped.meshCount,
     pointCount: mapped.pointCount,
+    totalWallLength: mapped.totalWallLength,
+    openingArea: mapped.openingArea,
+    wallPartsWithPose: wallParts.length,
+    wallsWithOpenings: withOpenings,
+    wallVolume: totalSize,
+    roomWidth: mapped.roomSpec.width,
+    roomDepth: mapped.roomSpec.depth,
+    roomOpenings: mapped.roomSpec.openings.length,
   });
 }
 
@@ -850,23 +871,35 @@ export function runScp013UvUnwrapPack(): StudioDccKernelResult {
 }
 
 export function runScp014BakePasses(): StudioDccKernelResult {
-  const bake = bakeStudioMeshMaps(cube(), {
+  const low = cube();
+  const high = subdivideStudioMeshCatmullLite(low, 1);
+  if (!high.ok) throw new Error(high.detail);
+  const bake = bakeStudioMeshMaps(low, {
     resolution: 32,
     paddingPx: 2,
     cageScale: 1.05,
+    highRes: high.value,
+    workingSpace: "linear",
   });
-  let normalSum = 0;
-  for (let i = 0; i < bake.normal.length; i += 1) normalSum += bake.normal[i]!;
-  let aoSum = 0;
-  for (let i = 0; i < bake.ao.length; i += 1) aoSum += bake.ao[i]!;
+  // Variance of object IDs proves per-face projection (not constant fill)
+  const idSet = new Set<number>();
+  for (let i = 0; i < bake.objectId.length; i += 1) {
+    if (bake.objectId[i]! > 0) idSet.add(bake.objectId[i]!);
+  }
+  if (bake.coveredTexels < 4) throw new Error("bake covered almost no UV texels");
+  if (bake.meanNormalLength < 0.5) throw new Error("normals not projected");
   return ok("SCP-014", {
     resolution: bake.resolution,
     paddingPx: bake.paddingPx,
     cageScale: bake.cageScale,
     texelCount: bake.texelCount,
-    normalSum,
-    aoMean: aoSum / bake.ao.length,
-    idNonZero: bake.objectId.reduce((s, v) => s + (v > 0 ? 1 : 0), 0),
+    coveredTexels: bake.coveredTexels,
+    meanNormalLength: bake.meanNormalLength,
+    meanAoLinear: bake.meanAoLinear,
+    meanCurvature: bake.meanCurvature,
+    distinctFaceIds: idSet.size,
+    workingSpace: bake.workingSpace,
+    highFaces: high.value.faces.length,
   });
 }
 
