@@ -3,7 +3,7 @@
  * Not a full Yjs CRDT; pure session ops for offline tests and workspace UI.
  */
 
-export const STUDIO_DCC_COLLAB_SHELL_REVISION = 3 as const;
+export const STUDIO_DCC_COLLAB_SHELL_REVISION = 4 as const;
 
 export type StudioDccCollabPresence = {
   readonly peerId: string;
@@ -152,6 +152,56 @@ export function collabActivePeerIds(
   return room.peers
     .filter((p) => now - p.lastSeenAt <= ttlMs)
     .map((p) => p.peerId);
+}
+
+/** True when asset is unlocked or the peer holds the exclusive lock. */
+export function collabCanEdit(
+  room: StudioDccCollabRoom,
+  peerId: string,
+  assetId: string,
+): boolean {
+  const holder = room.locks[assetId];
+  return holder === undefined || holder === peerId;
+}
+
+/**
+ * Drop locks held by peers whose lastSeenAt is older than ttlMs (stale presence).
+ * Pure session hygiene — not a CRDT tombstone.
+ */
+export function collabExpireStaleLocks(
+  room: StudioDccCollabRoom,
+  now = Date.now(),
+  ttlMs = 60_000,
+): StudioDccCollabRoom {
+  const active = new Set(collabActivePeerIds(room, now, ttlMs));
+  const locks: Record<string, string> = {};
+  let changed = false;
+  for (const [assetId, holder] of Object.entries(room.locks)) {
+    if (active.has(holder)) {
+      locks[assetId] = holder;
+    } else {
+      changed = true;
+    }
+  }
+  if (!changed) return room;
+  return { ...room, locks, epoch: room.epoch + 1 };
+}
+
+/** Deterministic room fingerprint for tests / workspace diagnostics (not crypto-secure). */
+export function collabRoomDigest(room: StudioDccCollabRoom): string {
+  const peers = [...room.peers]
+    .map((p) => `${p.peerId}:${p.lastSeenAt}:${p.selection.join(",")}`)
+    .sort()
+    .join("|");
+  const locks = Object.entries(room.locks)
+    .map(([k, v]) => `${k}=${v}`)
+    .sort()
+    .join("|");
+  const opTail = room.ops
+    .slice(-8)
+    .map((op) => `${op.kind}:${op.peerId}:${op.at}`)
+    .join("|");
+  return `e${room.epoch};p${room.peers.length};o${room.ops.length};L[${locks}];P[${peers}];T[${opTail}]`;
 }
 
 /** Latest geometry-hint hash per asset (last write wins by op timestamp). */

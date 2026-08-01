@@ -30,12 +30,14 @@ export type StudioFbxImportResult =
       readonly report: StudioImportCompatibilityReport;
       readonly commit: ReturnType<typeof commitStudioImportToDocument>;
       readonly meshes: readonly StudioEditableMesh[];
+      readonly header: StudioFbxAsciiHeader;
     }
   | {
       readonly ok: false;
       readonly detail: string;
       readonly report?: StudioImportCompatibilityReport;
       readonly binary?: StudioFbxBinarySniff;
+      readonly header?: StudioFbxAsciiHeader;
     };
 
 /** Read Kaydara binary header version field (uint32 LE at offset 23) when magic matches. */
@@ -65,6 +67,35 @@ function parseNumberList(body: string): number[] {
   return values;
 }
 
+export type StudioFbxAsciiHeader = {
+  readonly fbxVersion: number | null;
+  readonly headerVersion: number | null;
+  readonly creator: string | null;
+  readonly geometryMeshCount: number;
+  readonly modelCount: number;
+  readonly hasLayerElementUV: boolean;
+  readonly hasDeformer: boolean;
+};
+
+/** Pure header/stats scan for ASCII FBX (no mesh rebuild). */
+export function parseStudioFbxAsciiHeader(text: string): StudioFbxAsciiHeader {
+  const fbxVersion = /FBXVersion:\s*(\d+)/u.exec(text);
+  const headerVersion = /FBXHeaderVersion:\s*(\d+)/u.exec(text);
+  const creator = /Creator:\s*"([^"]*)"/u.exec(text) ?? /Creator:\s*([^\n\r]+)/u.exec(text);
+  const geometryMeshCount = (text.match(/Geometry:\s*\d+,\s*"Geometry::[^"]+",\s*"Mesh"/gu) ?? []).length
+    || (text.match(/Geometry:\s*\d+,\s*"[^"]*",\s*"Mesh"/gu) ?? []).length;
+  const modelCount = (text.match(/Model:\s*\d+,\s*"Model::/gu) ?? []).length;
+  return {
+    fbxVersion: fbxVersion ? Number(fbxVersion[1]) : null,
+    headerVersion: headerVersion ? Number(headerVersion[1]) : null,
+    creator: creator?.[1]?.trim() ?? null,
+    geometryMeshCount,
+    modelCount,
+    hasLayerElementUV: /LayerElementUV\b/u.test(text),
+    hasDeformer: /Deformer\b/u.test(text) || /AnimationStack\b/u.test(text),
+  };
+}
+
 /**
  * Parse ASCII FBX text into triangle meshes (subset of FBX 7.x Geometry Mesh).
  */
@@ -72,9 +103,11 @@ export function parseStudioFbxAscii(text: string): {
   readonly positions: number[];
   readonly polygons: number[][];
   readonly modelNames: string[];
+  readonly header: StudioFbxAsciiHeader;
   readonly unsupported: readonly { kind: string; reason: string }[];
 } {
   const unsupported: { kind: string; reason: string }[] = [];
+  const header = parseStudioFbxAsciiHeader(text);
   if (!text.includes("FBX") && !text.includes("Vertices:")) {
     unsupported.push({ kind: "format", reason: "not ASCII FBX mesh text" });
   }
@@ -122,7 +155,7 @@ export function parseStudioFbxAscii(text: string): {
     modelNames.push(m[1]!);
   }
 
-  if (text.includes("Deformer") || text.includes("AnimationStack")) {
+  if (header.hasDeformer) {
     unsupported.push({
       kind: "animation-or-skin",
       reason: "ASCII FBX skin/animation not imported in lite path",
@@ -134,8 +167,20 @@ export function parseStudioFbxAscii(text: string): {
       reason: "FBX materials partially mapped — appearance may differ",
     });
   }
+  if (header.geometryMeshCount > 1) {
+    unsupported.push({
+      kind: "multi-geometry",
+      reason: `ASCII lite imports first Vertices/PolygonVertexIndex only (${header.geometryMeshCount} Geometry::Mesh declared)`,
+    });
+  }
+  if (header.hasLayerElementUV) {
+    unsupported.push({
+      kind: "uv",
+      reason: "LayerElementUV present but not bound on lite path",
+    });
+  }
 
-  return { positions, polygons, modelNames, unsupported };
+  return { positions, polygons, modelNames, header, unsupported };
 }
 
 /** Detect Kaydara FBX binary magic (Kaydara FBX Binary  \x00). */
@@ -216,6 +261,7 @@ export function importStudioFbxAsciiDocument(
     return {
       ok: false,
       detail: "ASCII FBX contained no importable mesh polygons",
+      header: parsed.header,
     };
   }
 
@@ -295,12 +341,13 @@ export function importStudioFbxAsciiDocument(
     warnings: [
       ...report.warnings,
       "FBX ASCII lite path (grade B). Binary FBX: convertStudioBg3dModelFilesToGlb / Three FBXLoader.",
+      `ASCII header fbxVersion=${parsed.header.fbxVersion ?? "?"} geometryMeshCount=${parsed.header.geometryMeshCount} modelCount=${parsed.header.modelCount}`,
     ],
     fidelity: {
       ...report.fidelity,
       geometry: "B",
       material: "P",
-      rigAnimation: "X",
+      rigAnimation: parsed.header.hasDeformer ? "X" : "P",
       semanticHistory: "P",
     },
   };
@@ -311,6 +358,7 @@ export function importStudioFbxAsciiDocument(
     report: reportFbx,
     commit: commitStudioImportToDocument(reportFbx, { ...scene, format: "unknown" }),
     meshes,
+    header: parsed.header,
   };
 }
 

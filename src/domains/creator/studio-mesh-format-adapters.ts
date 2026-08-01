@@ -605,6 +605,11 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   const slabCount = (text.match(/IFCSLAB\b/giu) ?? []).length;
   const doorCount = (text.match(/IFCDOOR\b/giu) ?? []).length;
   const windowCount = (text.match(/IFCWINDOW\b/giu) ?? []).length;
+  const columnCount = (text.match(/IFCCOLUMN\b/giu) ?? []).length;
+  const beamCount = (text.match(/IFCBEAM\b/giu) ?? []).length;
+  const globalIds = [...text.matchAll(/IFC[A-Z0-9]+\s*\(\s*'([0-9A-Za-z_$]{22})'/gu)]
+    .map((x) => x[1]!)
+    .slice(0, 32);
   if (!points.length && !spaces.length && !wallCount) {
     unsupported.push({ kind: "ifc", reason: "no recognizable IFC entities" });
   }
@@ -626,11 +631,15 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
       ...unsupported,
       {
         kind: "ifc-subset",
-        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount}; full BREP tessellation deferred to web-ifc WASM path`,
+        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount} columns=${columnCount} beams=${beamCount}; full BREP tessellation deferred to web-ifc WASM path`,
       },
     ],
   );
-  const semanticRich = spaces.length > 0 || storeys.length > 0 || doorCount + windowCount > 0;
+  const semanticRich =
+    spaces.length > 0
+    || storeys.length > 0
+    || doorCount + windowCount + columnCount + beamCount > 0
+    || globalIds.length > 0;
   const result = finish("ifc", "studio-mesh-format-adapters/ifc", text, scene, meshes, {
     geometry: meshes.length ? "B" : "P",
     material: "X",
@@ -646,6 +655,9 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
       slabCount,
       doorCount,
       windowCount,
+      columnCount,
+      beamCount,
+      globalIds,
       pointCount: points.length,
       aabbVertexCount: hull.positions.length / 3,
     },
@@ -676,6 +688,10 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
   const closedShells = (text.match(/CLOSED_SHELL\b/giu) ?? []).length;
   const openShells = (text.match(/OPEN_SHELL\b/giu) ?? []).length;
   const directions = (text.match(/DIRECTION\s*\(/giu) ?? []).length;
+  const manifoldSolidBreps = (text.match(/MANIFOLD_SOLID_BREP\b/giu) ?? []).length;
+  const axis2Placements = (text.match(/AXIS2_PLACEMENT_3D\b/giu) ?? []).length;
+  const siMetre = /\.SI_UNIT\s*\(\s*\.\s*,\s*\.METRE\s*\.\)/iu.test(text)
+    || /SI_UNIT\s*\([^)]*METRE/iu.test(text);
   if (!points.length && !products.length && !advancedFaces) {
     unsupported.push({
       kind: "step",
@@ -700,7 +716,7 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
       ...unsupported,
       {
         kind: "step-subset",
-        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces} closedShells=${closedShells} openShells=${openShells} directions=${directions}; B-Rep tessellation needs OCCT`,
+        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces} closedShells=${closedShells} openShells=${openShells} directions=${directions} manifoldSolidBreps=${manifoldSolidBreps} axis2Placements=${axis2Placements} siMetre=${siMetre}; B-Rep tessellation needs OCCT`,
       },
     ],
   );
@@ -708,7 +724,7 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
     geometry: meshes.length ? "B" : "P",
     material: "X",
     rigAnimation: "X",
-    semanticHistory: products.length || closedShells > 0 ? "B" : "P",
+    semanticHistory: products.length || closedShells > 0 || manifoldSolidBreps > 0 ? "B" : "P",
   });
   return {
     ...result,
@@ -718,6 +734,9 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
       closedShells,
       openShells,
       directions,
+      manifoldSolidBreps,
+      axis2Placements,
+      siMetre,
       pointCount: points.length,
       isIges,
       aabbVertexCount: hull.positions.length / 3,

@@ -3,7 +3,7 @@
  * Used by gating tests to assert every §12.1 / P0–P1 ID has a concrete API.
  */
 
-export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 4 as const;
+export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 5 as const;
 
 export type StudioCatalogStatus =
   | "shipped"
@@ -20,7 +20,23 @@ export interface StudioCatalogEntry {
   readonly status: StudioCatalogStatus;
   readonly apis: readonly string[];
   readonly module: string;
+  /** When status is partial/bridge-only: pure-TS ceiling note (further depth needs WASM/native). */
+  readonly ceilingNote?: string;
 }
+
+/** Partial IDs that still accept pure-TS increments vs sealed ceilings. */
+export const STUDIO_DCC_PARTIAL_PURE_TS_POLICY = {
+  "DOC-008":
+    "presence/ops/locks/canEdit/expire/digest pure TS; full Yjs multi-user CRDT is intentional ceiling",
+  "FMT-FBX":
+    "ASCII mesh + header stats + binary sniff pure TS; full binary skin/anim needs ufbx/Assimp bridge",
+  "FMT-IFC":
+    "entity/AABB shell pure TS; BREP tessellation needs web-ifc WASM",
+  "FMT-STEP":
+    "cartesian/product/AABB shell pure TS; solid tessellation needs OCCT",
+  "CAD-001":
+    "sketch constraints + rectangle recipe pure TS; full variational solver / OCCT is ceiling",
+} as const;
 
 export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   // DOC
@@ -33,7 +49,24 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "DOC-007", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccSelectiveUndo"] },
   { id: "DOC-012", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccRegisterAsset"] },
   { id: "DOC-015", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-diagnostics.ts", apis: ["scanStudioHybridDccCorruption"] },
-  { id: "DOC-008", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabAppendOp", "collabConflictReport", "collabMergeOpLogs", "collabLatestGeometryHints"] },
+  {
+    id: "DOC-008",
+    priority: "P2",
+    status: "partial",
+    module: "studio-dcc-collab-shell.ts",
+    apis: [
+      "createStudioDccCollabRoom",
+      "collabJoin",
+      "collabAppendOp",
+      "collabConflictReport",
+      "collabMergeOpLogs",
+      "collabLatestGeometryHints",
+      "collabCanEdit",
+      "collabExpireStaleLocks",
+      "collabRoomDigest",
+    ],
+    ceilingNote: STUDIO_DCC_PARTIAL_PURE_TS_POLICY["DOC-008"],
+  },
   // MOD
   { id: "MOD-001", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
   { id: "MOD-002", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
@@ -92,7 +125,20 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-GLB", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-VRM", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-OBJ", priority: "P0", status: "shipped", module: "studio-import-compatibility-report.ts", apis: ["parseStudioObjToSceneIR"] },
-  { id: "FMT-FBX", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxAsciiDocument", "importStudioFbxDocument", "isStudioFbxBinary", "sniffStudioFbxBinaryHeader"] },
+  {
+    id: "FMT-FBX",
+    priority: "P1",
+    status: "partial",
+    module: "studio-fbx-ascii-import.ts",
+    apis: [
+      "importStudioFbxAsciiDocument",
+      "importStudioFbxDocument",
+      "isStudioFbxBinary",
+      "sniffStudioFbxBinaryHeader",
+      "parseStudioFbxAsciiHeader",
+    ],
+    ceilingNote: STUDIO_DCC_PARTIAL_PURE_TS_POLICY["FMT-FBX"],
+  },
   { id: "FMT-STL", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStl"] },
   { id: "FMT-PLY", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioPlyAscii"] },
   { id: "FMT-DAE", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioDaeMinimal"] },
@@ -100,8 +146,22 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-OFF", priority: "P3", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioOff"] },
   { id: "FMT-3MF", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudio3mfMinimal"] },
   { id: "FMT-BVH", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioBvhMotion"] },
-  { id: "FMT-IFC", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioIfcShell"] },
-  { id: "FMT-STEP", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStepShell"] },
+  {
+    id: "FMT-IFC",
+    priority: "P3",
+    status: "partial",
+    module: "studio-mesh-format-adapters.ts",
+    apis: ["importStudioIfcShell"],
+    ceilingNote: STUDIO_DCC_PARTIAL_PURE_TS_POLICY["FMT-IFC"],
+  },
+  {
+    id: "FMT-STEP",
+    priority: "P3",
+    status: "partial",
+    module: "studio-mesh-format-adapters.ts",
+    apis: ["importStudioStepShell"],
+    ceilingNote: STUDIO_DCC_PARTIAL_PURE_TS_POLICY["FMT-STEP"],
+  },
   { id: "FMT-TOON3D", priority: "P0", status: "shipped", module: "studio-toon3d-package.ts", apis: ["packStudioToon3dPackage"] },
   { id: "MAT-004", priority: "P2", status: "shipped", module: "studio-uv-unwrap-lite.ts", apis: ["unwrapStudioMeshBox", "unwrapStudioMeshPlanar"] },
   { id: "CHR-RETARGET", priority: "P2", status: "shipped", module: "studio-character-animation-p2.ts", apis: ["retargetStudioMotionReport", "workspaceRetargetFromBvhExtras"] },
@@ -114,7 +174,19 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "WS-API", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["createStudioHybridDccWorkspace"] },
   { id: "UI-HYBRID-PANEL", priority: "P1", status: "shipped", module: "StudioHybridDccPanel.tsx", apis: ["StudioHybridDccPanel", "StudioHybridDccDialog"] },
   // CAD / sculpt / cloth promoted from deferred lite kernels
-  { id: "CAD-001", priority: "P3", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["createStudioCadSketch", "diagnoseStudioCadConstraints", "snapStudioCadSketchAxes"] },
+  {
+    id: "CAD-001",
+    priority: "P3",
+    status: "partial",
+    module: "studio-cad-kernel-lite.ts",
+    apis: [
+      "createStudioCadSketch",
+      "diagnoseStudioCadConstraints",
+      "snapStudioCadSketchAxes",
+      "buildStudioCadRectangleSketch",
+    ],
+    ceilingNote: STUDIO_DCC_PARTIAL_PURE_TS_POLICY["CAD-001"],
+  },
   { id: "CAD-015", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["extrudeStudioCadProfile", "workspaceCadProp"] },
   { id: "SCP-001", priority: "P3", status: "shipped", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke", "workspaceSculptActive"] },
   { id: "GAR-005", priority: "P3", status: "shipped", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd", "workspaceClothStep"] },
@@ -152,5 +224,16 @@ export function assertWebtoonObjectCreatorV1Coverage(): {
     const e = byId.get(id);
     return !e || (e.status !== "shipped" && e.status !== "partial");
   });
+  return { missing, ok: missing.length === 0 };
+}
+
+/** Every registry partial must declare a pure-TS ceiling note (sealed audit). */
+export function assertPartialCeilingNotes(): {
+  readonly missing: readonly string[];
+  readonly ok: boolean;
+} {
+  const missing = STUDIO_DCC_CATALOG_REGISTRY
+    .filter((e) => e.status === "partial" && !e.ceilingNote)
+    .map((e) => e.id);
   return { missing, ok: missing.length === 0 };
 }

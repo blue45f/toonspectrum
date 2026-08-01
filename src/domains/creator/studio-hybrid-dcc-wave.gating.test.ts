@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildStudioCadRectangleSketch,
   createStudioCadSketch,
   diagnoseStudioCadConstraints,
   snapStudioCadSketchAxes,
@@ -11,19 +12,26 @@ import {
 import {
   STUDIO_DCC_CATALOG_REGISTRY,
   STUDIO_DCC_CATALOG_REGISTRY_REVISION,
+  assertPartialCeilingNotes,
   assertWebtoonObjectCreatorV1Coverage,
 } from "./studio-dcc-catalog-registry";
 import {
   collabAppendOp,
+  collabCanEdit,
   collabConflictReport,
+  collabExpireStaleLocks,
   collabJoin,
   collabLatestGeometryHints,
   collabMergeOpLogs,
+  collabRoomDigest,
   createStudioDccCollabRoom,
   STUDIO_DCC_COLLAB_SHELL_REVISION,
 } from "./studio-dcc-collab-shell";
 import {
+  createStudioAsciiFbxTriangleFixture,
+  importStudioFbxAsciiDocument,
   importStudioFbxDocument,
+  parseStudioFbxAsciiHeader,
   sniffStudioFbxBinaryHeader,
 } from "./studio-fbx-ascii-import";
 import {
@@ -37,7 +45,7 @@ import { unpackStudioToon3dPackage } from "./studio-toon3d-package";
 
 describe("collab shell deepenings", () => {
   it("locks, merges op logs, and reports concurrent geometry-hint conflicts", () => {
-    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(3);
+    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(4);
     let a = createStudioDccCollabRoom("room-wave");
     a = collabJoin(a, { peerId: "p1", displayName: "One", color: "#111" }, 1000);
     a = collabJoin(a, { peerId: "p2", displayName: "Two", color: "#222" }, 1000);
@@ -173,6 +181,35 @@ describe("collab shell deepenings", () => {
     // Replay from empty locks — single lock application, not double
     expect(Object.keys(merged.locks)).toEqual(["mesh-d"]);
   });
+
+  it("canEdit, expire stale locks, and room digest are pure-TS collab hygiene", () => {
+    let room = createStudioDccCollabRoom("room-hygiene");
+    room = collabJoin(room, { peerId: "ghost", displayName: "G", color: "#666" }, 1000);
+    room = collabAppendOp(room, {
+      kind: "lock",
+      peerId: "ghost",
+      assetId: "mesh-stale",
+      at: 1100,
+    });
+    room = collabJoin(room, { peerId: "alive", displayName: "A", color: "#0f0" }, 100_000);
+    room = collabAppendOp(room, {
+      kind: "lock",
+      peerId: "alive",
+      assetId: "mesh-live",
+      at: 100_100,
+    });
+    expect(collabCanEdit(room, "alive", "mesh-live")).toBe(true);
+    expect(collabCanEdit(room, "alive", "mesh-stale")).toBe(false);
+    expect(collabCanEdit(room, "ghost", "mesh-stale")).toBe(true);
+    // ghost lastSeenAt=1100 is outside TTL; alive lastSeenAt=100100 stays
+    const expired = collabExpireStaleLocks(room, 100_100 + 5_000, 60_000);
+    expect(expired.locks["mesh-stale"]).toBeUndefined();
+    expect(expired.locks["mesh-live"]).toBe("alive");
+    const digest = collabRoomDigest(expired);
+    expect(digest).toContain("e");
+    expect(digest).toContain("mesh-live=alive");
+    expect(collabRoomDigest(expired)).toBe(digest);
+  });
 });
 
 describe("FBX binary honesty", () => {
@@ -198,6 +235,23 @@ describe("FBX binary honesty", () => {
       expect(result.report?.sourceHash.startsWith("sha256:")).toBe(true);
     }
   });
+
+  it("parses ASCII FBX header stats on the shipped import path", () => {
+    const fixture = createStudioAsciiFbxTriangleFixture();
+    const header = parseStudioFbxAsciiHeader(fixture);
+    expect(header.fbxVersion).toBe(7400);
+    expect(header.headerVersion).toBe(1003);
+    expect(header.geometryMeshCount).toBeGreaterThanOrEqual(1);
+    expect(header.modelCount).toBeGreaterThanOrEqual(1);
+    const imported = importStudioFbxAsciiDocument(fixture);
+    expect(imported.ok).toBe(true);
+    if (imported.ok) {
+      expect(imported.header.fbxVersion).toBe(7400);
+      expect(imported.meshes.length).toBe(1);
+      expect(imported.report.fidelity.geometry).toBe("B");
+      expect(imported.report.warnings.some((w) => w.includes("geometryMeshCount="))).toBe(true);
+    }
+  });
 });
 
 describe("IFC/STEP AABB shell fidelity", () => {
@@ -208,11 +262,13 @@ describe("IFC/STEP AABB shell fidelity", () => {
         "DATA;",
         "#1=IFCCARTESIANPOINT((0.,0.,0.));",
         "#2=IFCCARTESIANPOINT((2.,1.,3.));",
-        "#3=IFCSPACE('1','Hall','',$,$,$,$,$,.ELEMENT.,$,$);",
-        "#4=IFCBUILDINGSTOREY('2','L1','',$,$,$,$,$,.ELEMENT.,$);",
-        "#5=IFCWALL('3','W',$,$,$,$,$,$,$);",
-        "#6=IFCDOOR('4','D',$,$,$,$,$,$,$);",
-        "#7=IFCWINDOW('5','Win',$,$,$,$,$,$,$);",
+        "#3=IFCSPACE('0$1','Hall','',$,$,$,$,$,.ELEMENT.,$,$);",
+        "#4=IFCBUILDINGSTOREY('0$2','L1','',$,$,$,$,$,.ELEMENT.,$);",
+        "#5=IFCWALL('0abcdefghij0123456789A','W',$,$,$,$,$,$,$);",
+        "#6=IFCDOOR('0abcdefghij0123456789B','D',$,$,$,$,$,$,$);",
+        "#7=IFCWINDOW('0abcdefghij0123456789C','Win',$,$,$,$,$,$,$);",
+        "#8=IFCCOLUMN('0abcdefghij0123456789D','C1',$,$,$,$,$,$,$);",
+        "#9=IFCBEAM('0abcdefghij0123456789E','B1',$,$,$,$,$,$,$);",
         "ENDSEC;",
       ].join("\n"),
     );
@@ -220,6 +276,9 @@ describe("IFC/STEP AABB shell fidelity", () => {
     expect(ifc.report.fidelity.geometry).toBe("B");
     expect(ifc.extras?.doorCount).toBe(1);
     expect(ifc.extras?.windowCount).toBe(1);
+    expect(ifc.extras?.columnCount).toBe(1);
+    expect(ifc.extras?.beamCount).toBe(1);
+    expect((ifc.extras?.globalIds as string[]).length).toBeGreaterThan(0);
     expect((ifc.extras?.storeys as string[])?.includes("L1")).toBe(true);
     expect(ifc.extras?.aabbVertexCount).toBe(8);
   });
@@ -233,12 +292,18 @@ describe("IFC/STEP AABB shell fidelity", () => {
         "#50=ADVANCED_FACE('',(#60),#70,.T.);",
         "#80=CLOSED_SHELL('',(#50));",
         "#90=DIRECTION('',(0.,1.,0.));",
+        "#100=MANIFOLD_SOLID_BREP('',#80);",
+        "#110=AXIS2_PLACEMENT_3D('',#10,#90,#90);",
+        "#120=SI_UNIT(*,.METRE.);",
       ].join("\n"),
     );
     expect(step.meshes.length).toBe(1);
     expect(step.report.fidelity.geometry).toBe("B");
     expect(step.extras?.closedShells).toBe(1);
     expect(step.extras?.directions).toBe(1);
+    expect(step.extras?.manifoldSolidBreps).toBe(1);
+    expect(step.extras?.axis2Placements).toBe(1);
+    expect(step.extras?.siMetre).toBe(true);
     expect((step.extras?.products as string[])?.includes("Bracket")).toBe(true);
     expect(step.extras?.aabbVertexCount).toBe(8);
   });
@@ -277,6 +342,14 @@ describe("CAD constraint diagnostics deepenings", () => {
     const badReport = diagnoseStudioCadConstraints(bad);
     expect(badReport.conflicts.some((c) => c.includes("coincident"))).toBe(true);
   });
+
+  it("rectangle recipe satisfies angle constraints on the shipped diagnose API", () => {
+    const rect = buildStudioCadRectangleSketch(2, 1);
+    const report = diagnoseStudioCadConstraints(rect);
+    expect(report.conflicts).toHaveLength(0);
+    expect(report.satisfied.length).toBe(rect.constraints.length);
+    expect(report.state === "fully-constrained" || report.degreesOfFreedom === 0).toBe(true);
+  });
 });
 
 describe("wave multi-step product loop", () => {
@@ -302,13 +375,18 @@ describe("wave multi-step product loop", () => {
 });
 
 describe("catalog SSOT wave revision", () => {
-  it("keeps §12.1 coverage and registers wave loop + collab deepenings", () => {
-    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(4);
+  it("keeps §12.1 coverage and seals pure-TS ceiling notes on partials", () => {
+    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(5);
     expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "WS-WAVE-LOOP")).toBe(true);
     const doc008 = STUDIO_DCC_CATALOG_REGISTRY.find((e) => e.id === "DOC-008");
     expect(doc008?.apis).toContain("collabConflictReport");
+    expect(doc008?.apis).toContain("collabCanEdit");
+    expect(doc008?.ceilingNote).toMatch(/Yjs|CRDT/i);
     const { ok, missing } = assertWebtoonObjectCreatorV1Coverage();
     expect(missing).toEqual([]);
     expect(ok).toBe(true);
+    const ceiling = assertPartialCeilingNotes();
+    expect(ceiling.missing).toEqual([]);
+    expect(ceiling.ok).toBe(true);
   });
 });

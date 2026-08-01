@@ -3,7 +3,7 @@
  * Pure geometry — not OCCT; provides constraint diagnostics + extrude/revolve solids for webtoon props.
  */
 
-export const STUDIO_CAD_KERNEL_REVISION = 1 as const;
+export const STUDIO_CAD_KERNEL_REVISION = 2 as const;
 
 export type StudioCadVec2 = readonly [number, number];
 export type StudioCadVec3 = readonly [number, number, number];
@@ -22,7 +22,8 @@ export type StudioCadConstraint =
   | { readonly kind: "coincident"; readonly a: number; readonly b: number; readonly endA: "a" | "b"; readonly endB: "a" | "b" }
   | { readonly kind: "distance"; readonly a: number; readonly b: number; readonly value: number }
   | { readonly kind: "radius"; readonly curveIndex: number; readonly value: number }
-  | { readonly kind: "equal"; readonly a: number; readonly b: number };
+  | { readonly kind: "equal"; readonly a: number; readonly b: number }
+  | { readonly kind: "angle"; readonly a: number; readonly b: number; readonly valueRad: number };
 
 export interface StudioCadSketch {
   readonly revision: typeof STUDIO_CAD_KERNEL_REVISION;
@@ -170,6 +171,25 @@ export function diagnoseStudioCadConstraints(
       } else {
         conflicts.push(`constraint ${i}: coincident gap ${d.toFixed(4)}`);
       }
+    } else if (c.kind === "angle") {
+      const a = sketch.curves[c.a];
+      const b = sketch.curves[c.b];
+      const da = a ? lineDir(a) : null;
+      const db = b ? lineDir(b) : null;
+      if (!da || !db) {
+        conflicts.push(`constraint ${i}: angle needs two lines`);
+        return;
+      }
+      const dot = Math.max(-1, Math.min(1, da[0] * db[0] + da[1] * db[1]));
+      const ang = Math.acos(dot);
+      if (Math.abs(ang - c.valueRad) < 1e-2 || Math.abs(Math.PI - ang - c.valueRad) < 1e-2) {
+        satisfied.push(i);
+        locked += 1;
+      } else {
+        conflicts.push(
+          `constraint ${i}: angle ${ang.toFixed(4)}≠${c.valueRad.toFixed(4)}`,
+        );
+      }
     }
   });
   // DOF approx: 2 per unconstrained line endpoint pair minus locks
@@ -201,6 +221,42 @@ export function snapStudioCadSketchAxes(sketch: StudioCadSketch, eps = 1e-3): St
     return curve;
   });
   return { ...sketch, curves };
+}
+
+/**
+ * Axis-aligned rectangle with horizontal/vertical/coincident/equal/angle(π/2) constraints.
+ * Intended for fully-constrained prop profiles after snap.
+ */
+export function buildStudioCadRectangleSketch(
+  width: number,
+  height: number,
+  units: StudioCadSketch["units"] = "m",
+): StudioCadSketch {
+  const w = Math.max(1e-6, width);
+  const h = Math.max(1e-6, height);
+  return createStudioCadSketch(
+    [
+      { kind: "line", a: [0, 0], b: [w, 0] },
+      { kind: "line", a: [w, 0], b: [w, h] },
+      { kind: "line", a: [w, h], b: [0, h] },
+      { kind: "line", a: [0, h], b: [0, 0] },
+    ],
+    [
+      { kind: "horizontal", curveIndex: 0 },
+      { kind: "vertical", curveIndex: 1 },
+      { kind: "horizontal", curveIndex: 2 },
+      { kind: "vertical", curveIndex: 3 },
+      { kind: "coincident", a: 0, b: 1, endA: "b", endB: "a" },
+      { kind: "coincident", a: 1, b: 2, endA: "b", endB: "a" },
+      { kind: "coincident", a: 2, b: 3, endA: "b", endB: "a" },
+      { kind: "coincident", a: 3, b: 0, endA: "b", endB: "a" },
+      { kind: "equal", a: 0, b: 2 },
+      { kind: "equal", a: 1, b: 3 },
+      { kind: "angle", a: 0, b: 1, valueRad: Math.PI / 2 },
+      { kind: "angle", a: 1, b: 2, valueRad: Math.PI / 2 },
+    ],
+    units,
+  );
 }
 
 export interface StudioCadSolidMesh {
