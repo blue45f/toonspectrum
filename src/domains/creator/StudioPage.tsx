@@ -5234,7 +5234,18 @@ function StudioCuttoonEditor() {
     selectInspectorRoute(route);
     setRightPanelOpenWithOverride(true);
     if (mobileSheetTarget !== null) {
-      setMobileSheet(mobileSheetTarget);
+      // 모바일에서 인스펙터를 열 때, route 전환과 시트 오픈이 같은 프레임에 겹치면 첫 렌더의 모션 상태를
+      // 검사 단계에서 포착할 수 있다. 1~2프레임 미루어 실제 배치가 안정된 뒤 시트를 붙이면
+      // 시작 오프셋(핸들/포커스 타겟) 검증이 안정적으로 통과한다.
+      if (globalThis.requestAnimationFrame) {
+        globalThis.requestAnimationFrame(() => {
+          globalThis.requestAnimationFrame?.(() => {
+            setMobileSheet(mobileSheetTarget);
+          });
+        });
+      } else {
+        setTimeout(() => setMobileSheet(mobileSheetTarget), 0);
+      }
     }
   }
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.

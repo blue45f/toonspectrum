@@ -860,6 +860,29 @@ async function verifyTabTrap(page: Page, dialog: Locator): Promise<boolean> {
   return wrappedForward && wrappedBackward;
 }
 
+async function awaitSheetOpenSettle(page: Page, sheetId: string): Promise<void> {
+  await page.waitForFunction((selector) => {
+    const sheet = document.querySelector(selector);
+    if (!sheet) return false;
+    if (
+      sheet.getAttribute("aria-modal") !== "true" ||
+      sheet.getAttribute("data-studio-mobile-sheet") !== "true"
+    ) {
+      return false;
+    }
+    const transform = getComputedStyle(sheet).transform;
+    const match2d = /matrix\([^,]+, [^,]+, [^,]+, [^,]+, [^,]+, ([^)]+)\)/.exec(transform);
+    const match3d = /matrix3d\([^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, [^,]+, ([^)]+)\)/.exec(transform);
+    const y = match2d
+      ? Number.parseFloat(match2d[1])
+      : match3d
+        ? Number.parseFloat(match3d[13])
+        : NaN;
+    if (Number.isNaN(y)) return true;
+    return Math.abs(y) <= 1;
+  }, `[data-studio-sheet-id="${sheetId}"]`, { timeout: 5000 });
+}
+
 async function dragSheetHandle(
   page: Page,
   handle: Locator,
@@ -901,11 +924,23 @@ async function verifyMobileModalSheet({
 }: VerifyMobileModalSheetOptions): Promise<MobileSheetContractResult> {
   await open();
   await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await page.waitForFunction((sheetId) => {
+    const element = document.querySelector<HTMLElement>(
+      `[data-studio-sheet-id="${sheetId}"]`,
+    );
+    if (!element) return false;
+    return (
+      element.getAttribute("aria-modal") === "true" &&
+      element.getAttribute("data-studio-mobile-sheet") === "true"
+    );
+  }, id, { timeout: 3000 });
   await awaitElementAnimations(dialog);
 
   const opened =
     await dialog.getAttribute("aria-modal") === "true" &&
     await dialog.getAttribute("data-studio-mobile-sheet") === "true";
+  await awaitSheetOpenSettle(page, id);
+  await awaitElementAnimations(dialog);
   const initialFocusReady = await initialFocus.evaluate(
     (control) => document.activeElement === control,
   );
