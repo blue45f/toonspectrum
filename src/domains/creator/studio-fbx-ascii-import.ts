@@ -1,6 +1,6 @@
 /**
- * ASCII FBX mesh import (grade B) — pure parser for Geometry::Mesh Vertices + PolygonVertexIndex.
- * Produces SceneIR + CompatibilityLoss report. Binary FBX remains bridge/ufbx path.
+ * FBX mesh import (grade B) — ASCII Geometry::Mesh + binary uncompressed Vertices/PolygonVertexIndex.
+ * Produces SceneIR + CompatibilityLoss report. Full skin/anim optional via ufbx WASM (not required for shipped bar).
  */
 
 import {
@@ -194,7 +194,200 @@ export function isStudioFbxBinary(bytes: Uint8Array): boolean {
 }
 
 /**
- * Unified FBX entry: ASCII mesh path, or binary → report-only bridge (no silent fake mesh).
+ * Pure-TS binary FBX mesh lite (Geometry Vertices + PolygonVertexIndex).
+ * Skin/animation still deferred (grade B/C subset) — not a full ufbx clone.
+ */
+export function parseStudioFbxBinaryMeshLite(bytes: Uint8Array): {
+  readonly positions: number[];
+  readonly polygons: number[][];
+  readonly version: number | null;
+  readonly nodeCount: number;
+  readonly unsupported: readonly { kind: string; reason: string }[];
+} {
+  const unsupported: { kind: string; reason: string }[] = [];
+  if (!isStudioFbxBinary(bytes)) {
+    return { positions: [], polygons: [], version: null, nodeCount: 0, unsupported: [{ kind: "format", reason: "not binary FBX" }] };
+  }
+  const sniff = sniffStudioFbxBinaryHeader(bytes);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // After 23-byte magic + 2 nulls + version(4) ≈ offset 27; some files pad to 27.
+  let offset = 27;
+  if (bytes.length > 26 && bytes[23] === 0x1a && bytes[24] === 0x00) {
+    offset = 27;
+  }
+  let nodeCount = 0;
+  let positions: number[] = [];
+  let polygons: number[][] = [];
+
+  /** FBX property type codes (common): Y/C/I/F/D/L/f/d/l/i/b/S/R */
+  const readProperty = (o: number): { value: unknown; next: number } | null => {
+    if (o >= bytes.length) return null;
+    const type = String.fromCharCode(bytes[o]!);
+    let p = o + 1;
+    try {
+      switch (type) {
+        case "Y": // int16
+          return { value: view.getInt16(p, true), next: p + 2 };
+        case "C": // bool
+          return { value: bytes[p] === 1, next: p + 1 };
+        case "I": // int32
+          return { value: view.getInt32(p, true), next: p + 4 };
+        case "F": // float32
+          return { value: view.getFloat32(p, true), next: p + 4 };
+        case "D": // float64
+          return { value: view.getFloat64(p, true), next: p + 8 };
+        case "L": // int64
+          return { value: Number(view.getBigInt64(p, true)), next: p + 8 };
+        case "S":
+        case "R": {
+          const len = view.getUint32(p, true);
+          p += 4;
+          const raw = bytes.subarray(p, p + len);
+          const value = type === "S" ? new TextDecoder().decode(raw) : raw;
+          return { value, next: p + len };
+        }
+        case "f":
+        case "d":
+        case "l":
+        case "i":
+        case "b": {
+          // array: length(u32), encoding(u32), compressedLen(u32), data
+          const arrayLen = view.getUint32(p, true);
+          const encoding = view.getUint32(p + 4, true);
+          const compLen = view.getUint32(p + 8, true);
+          p += 12;
+          const elemSize = type === "f" || type === "i" ? 4 : type === "d" || type === "l" ? 8 : 1;
+          const data = bytes.subarray(p, p + (encoding === 0 ? arrayLen * elemSize : compLen));
+          p += encoding === 0 ? arrayLen * elemSize : compLen;
+          if (encoding !== 0) {
+            // zlib compressed arrays — leave as unsupported for lite path unless we inflate
+            unsupported.push({
+              kind: "fbx-binary-zlib",
+              reason: `compressed ${type} array len=${arrayLen} (need inflate for full mesh)`,
+            });
+            return { value: [], next: p };
+          }
+          const out: number[] = [];
+          const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          for (let i = 0; i < arrayLen; i += 1) {
+            if (type === "f") out.push(dv.getFloat32(i * 4, true));
+            else if (type === "d") out.push(dv.getFloat64(i * 8, true));
+            else if (type === "i") out.push(dv.getInt32(i * 4, true));
+            else if (type === "l") out.push(Number(dv.getBigInt64(i * 8, true)));
+            else out.push(data[i]!);
+          }
+          return { value: out, next: p };
+        }
+        default:
+          return null;
+      }
+    } catch {
+      return null;
+    }
+  };
+
+  const parseNode = (o: number, depth: number): number => {
+    if (o + 13 > bytes.length || depth > 64) return bytes.length;
+    // FBX 7500+ uses 64-bit offsets; older 32-bit. Heuristic: version >= 7500 → 25-byte header.
+    const version = sniff.version ?? 0;
+    const large = version >= 7500;
+    let endOffset: number;
+    let numProps: number;
+    let propListLen: number;
+    let nameLen: number;
+    let p: number;
+    if (large) {
+      if (o + 25 > bytes.length) return bytes.length;
+      endOffset = Number(view.getBigUint64(o, true));
+      numProps = Number(view.getBigUint64(o + 8, true));
+      propListLen = Number(view.getBigUint64(o + 16, true));
+      nameLen = bytes[o + 24]!;
+      p = o + 25;
+    } else {
+      endOffset = view.getUint32(o, true);
+      numProps = view.getUint32(o + 4, true);
+      propListLen = view.getUint32(o + 8, true);
+      nameLen = bytes[o + 12]!;
+      p = o + 13;
+    }
+    // Null record terminator
+    if (endOffset === 0) return o + (large ? 25 : 13);
+    if (endOffset <= o || endOffset > bytes.length) return bytes.length;
+    const name = new TextDecoder().decode(bytes.subarray(p, p + nameLen));
+    p += nameLen;
+    nodeCount += 1;
+    const props: unknown[] = [];
+    const propEnd = p + propListLen;
+    for (let i = 0; i < numProps && p < propEnd; i += 1) {
+      const pr = readProperty(p);
+      if (!pr) break;
+      props.push(pr.value);
+      p = pr.next;
+    }
+    // Children until endOffset
+    while (p + (large ? 25 : 13) < endOffset) {
+      const before = p;
+      p = parseNode(p, depth + 1);
+      if (p <= before) break;
+    }
+
+    // Capture mesh arrays by property name conventions in nested Properties70 / direct Vertices nodes
+    if (name === "Vertices" && Array.isArray(props[0])) {
+      positions = props[0] as number[];
+    }
+    if ((name === "PolygonVertexIndex" || name === "Edges") && Array.isArray(props[0]) && name === "PolygonVertexIndex") {
+      const idx = props[0] as number[];
+      const poly: number[] = [];
+      const polys: number[][] = [];
+      for (const raw of idx) {
+        if (raw < 0) {
+          poly.push(~raw);
+          if (poly.length >= 3) polys.push([...poly]);
+          poly.length = 0;
+        } else {
+          poly.push(raw);
+        }
+      }
+      if (polys.length) polygons = polys;
+    }
+    // Some exporters nest name as first string prop of a node named Geometry
+    return endOffset;
+  };
+
+  // Walk top-level nodes
+  while (offset + 13 < bytes.length) {
+    const before = offset;
+    offset = parseNode(offset, 0);
+    if (offset <= before) break;
+    // safety
+    if (nodeCount > 50_000) break;
+  }
+
+  if (!positions.length || !polygons.length) {
+    unsupported.push({
+      kind: "fbx-binary-mesh",
+      reason: `nodes=${nodeCount} verts=${positions.length / 3} polys=${polygons.length}; uncompressed Vertices/PolygonVertexIndex not found (zlib or exotic layout)`,
+    });
+  }
+  if (bytes.length > 100) {
+    // Always note skin/anim ceiling as grade note, not hard fail when mesh found
+    unsupported.push({
+      kind: "fbx-skin-anim",
+      reason: "binary FBX skin/animation not imported in pure-TS lite (mesh path only)",
+    });
+  }
+
+  return {
+    positions,
+    polygons,
+    version: sniff.version,
+    nodeCount,
+    unsupported,
+  };
+}
+
+/**
+ * Unified FBX entry: ASCII mesh path, or binary mesh lite (uncompressed Vertices).
  */
 export function importStudioFbxDocument(
   source: string | Uint8Array,
@@ -202,8 +395,80 @@ export function importStudioFbxDocument(
 ): StudioFbxImportResult {
   if (typeof source !== "string" && isStudioFbxBinary(source)) {
     const sniff = sniffStudioFbxBinaryHeader(source);
+    const parsed = parseStudioFbxBinaryMeshLite(source);
+    if (parsed.positions.length >= 9 && parsed.polygons.length > 0) {
+      const verts: StudioMeshVec3[] = [];
+      for (let i = 0; i + 2 < parsed.positions.length; i += 3) {
+        verts.push({
+          x: parsed.positions[i]!,
+          y: parsed.positions[i + 1]!,
+          z: parsed.positions[i + 2]!,
+        });
+      }
+      try {
+        const mesh = createStudioEditableMeshFromPolygons(verts, parsed.polygons);
+        const scene: StudioImportSceneIR = {
+          format: "unknown",
+          units: "cm",
+          axis: "y-up",
+          meshes: [
+            {
+              name: "fbx-binary-mesh",
+              vertexCount: mesh.vertices.length,
+              triangleCount: mesh.faces.length,
+            },
+          ],
+          materials: [],
+          textures: [],
+          nodes: [{ name: "RootNode" }, { name: "fbx-binary-mesh", parent: "RootNode" }],
+          bones: [],
+          animations: [],
+          morphTargets: [],
+          unsupported: [...parsed.unsupported],
+        };
+        const report = buildStudioImportCompatibilityReport({
+          parser: options.parser ?? "studio-fbx-binary-mesh-lite",
+          sourceBytes: source,
+          scene,
+          committed: true,
+        });
+        const reportFbx: StudioImportCompatibilityReport = {
+          ...report,
+          fidelity: {
+            ...report.fidelity,
+            geometry: "B",
+            material: "X",
+            rigAnimation: "X",
+            semanticHistory: "P",
+          },
+          warnings: [
+            ...report.warnings,
+            `Binary FBX v${sniff.version ?? "?"} mesh lite; skin/anim not imported`,
+          ],
+        };
+        const header: StudioFbxAsciiHeader = {
+          fbxVersion: sniff.version,
+          headerVersion: null,
+          creator: "binary-mesh-lite",
+          geometryMeshCount: 1,
+          modelCount: 1,
+          hasLayerElementUV: false,
+          hasDeformer: false,
+        };
+        return {
+          ok: true,
+          scene,
+          report: reportFbx,
+          commit: commitStudioImportToDocument(reportFbx, scene),
+          meshes: [mesh],
+          header,
+        };
+      } catch {
+        // fall through to report-only failure path
+      }
+    }
     const report = buildStudioImportCompatibilityReport({
-      parser: options.parser ?? "studio-fbx-binary-sniff",
+      parser: options.parser ?? "studio-fbx-binary-mesh-lite",
       sourceBytes: source,
       scene: {
         format: "unknown",
@@ -217,28 +482,28 @@ export function importStudioFbxDocument(
         animations: [],
         morphTargets: [],
         unsupported: [
+          ...parsed.unsupported,
           {
             kind: "fbx-binary",
-            reason: `Binary FBX v${sniff.version ?? "?"} (${sniff.byteLength} bytes); use ufbx WASM / Assimp bridge — not parsed in browser pure core`,
+            reason: `Binary FBX v${sniff.version ?? "?"} nodes=${parsed.nodeCount}; mesh arrays missing or zlib-only`,
           },
         ],
       },
       committed: false,
     });
-    const fidelityReport: StudioImportCompatibilityReport = {
-      ...report,
-      fidelity: {
-        ...report.fidelity,
-        geometry: "X",
-        material: "X",
-        rigAnimation: "X",
-        semanticHistory: "P",
-      },
-    };
     return {
       ok: false,
-      detail: `binary-fbx:${fidelityReport.sourceHash}`,
-      report: fidelityReport,
+      detail: `binary-fbx:${report.sourceHash}`,
+      report: {
+        ...report,
+        fidelity: {
+          ...report.fidelity,
+          geometry: "P",
+          material: "X",
+          rigAnimation: "X",
+          semanticHistory: "P",
+        },
+      },
       binary: sniff,
     };
   }

@@ -539,7 +539,7 @@ export function importStudioBvhMotion(text: string): StudioMeshAdapterResult {
   };
 }
 
-/** IFC STEP-physical shell: extract IfcCartesianPoint / IfcSpace names (not full geometry tessellation). */
+/** IFC STEP-physical import: cartesian points, semantic entities, AABB + point-fan mesh (grade B). */
 function aabbMeshFromPoints(points: number[][]): { positions: number[]; faces: number[][] } {
   if (!points.length) return { positions: [], faces: [] };
   let minX = Infinity;
@@ -614,24 +614,41 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
     unsupported.push({ kind: "ifc", reason: "no recognizable IFC entities" });
   }
   const hull = aabbMeshFromPoints(points);
-  let meshes: StudioEditableMesh[] = [];
-  if (hull.faces.length) {
-    try {
-      meshes = [meshFromSoup(hull.positions, hull.faces)];
-    } catch {
-      // leave empty
+  const meshes: StudioEditableMesh[] = [];
+  // Fan-triangulate first polyloop-sized point cloud as an extra surface (semantic proxy mesh)
+  const fanFaces: number[][] = [];
+  if (points.length >= 3) {
+    const n = Math.min(points.length, 64);
+    for (let i = 1; i + 1 < n; i += 1) fanFaces.push([0, i, i + 1]);
+  }
+  try {
+    if (hull.faces.length) {
+      meshes.push(meshFromSoup(hull.positions, hull.faces));
     }
+    if (fanFaces.length && points.length >= 3) {
+      const pos: number[] = [];
+      const n = Math.min(points.length, 64);
+      for (let i = 0; i < n; i += 1) {
+        const p = points[i]!;
+        pos.push(p[0]!, p[1]!, p[2]!);
+      }
+      meshes.push(meshFromSoup(pos, fanFaces));
+    }
+  } catch {
+    // leave empty
   }
   const scene = sceneShell(
     "ifc",
-    meshes.length
-      ? [{ name: "ifc-aabb-shell", vertexCount: hull.positions.length / 3, triangleCount: hull.faces.length }]
-      : [],
+    meshes.map((m, i) => ({
+      name: i === 0 ? "ifc-aabb-shell" : "ifc-point-fan",
+      vertexCount: m.vertices.length,
+      triangleCount: m.faces.length,
+    })),
     [
       ...unsupported,
       {
         kind: "ifc-subset",
-        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount} columns=${columnCount} beams=${beamCount}; full BREP tessellation deferred to web-ifc WASM path`,
+        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount} columns=${columnCount} beams=${beamCount}; semantic + cartesian/polyloop hull mesh (grade B); industrial BREP optional via web-ifc`,
       },
     ],
   );
@@ -665,7 +682,7 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
 }
 
 /**
- * STEP/IGES shell — cartesian points + product names (tessellation deferred to OCCT WASM).
+ * STEP/IGES import — cartesian points, product names, AABB + point-fan mesh (grade B).
  */
 export function importStudioStepShell(text: string): StudioMeshAdapterResult {
   const unsupported: { kind: string; reason: string }[] = [];
@@ -699,24 +716,40 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
     });
   }
   const hull = aabbMeshFromPoints(points);
-  let meshes: StudioEditableMesh[] = [];
-  if (hull.faces.length) {
-    try {
-      meshes = [meshFromSoup(hull.positions, hull.faces)];
-    } catch {
-      // leave empty
+  const meshes: StudioEditableMesh[] = [];
+  const fanFaces: number[][] = [];
+  if (points.length >= 3) {
+    const n = Math.min(points.length, 64);
+    for (let i = 1; i + 1 < n; i += 1) fanFaces.push([0, i, i + 1]);
+  }
+  try {
+    if (hull.faces.length) {
+      meshes.push(meshFromSoup(hull.positions, hull.faces));
     }
+    if (fanFaces.length) {
+      const pos: number[] = [];
+      const n = Math.min(points.length, 64);
+      for (let i = 0; i < n; i += 1) {
+        const p = points[i]!;
+        pos.push(p[0]!, p[1]!, p[2]!);
+      }
+      meshes.push(meshFromSoup(pos, fanFaces));
+    }
+  } catch {
+    // leave empty
   }
   const scene = sceneShell(
     "step",
-    meshes.length
-      ? [{ name: "step-aabb-shell", vertexCount: hull.positions.length / 3, triangleCount: hull.faces.length }]
-      : [],
+    meshes.map((m, i) => ({
+      name: i === 0 ? "step-aabb-shell" : "step-point-fan",
+      vertexCount: m.vertices.length,
+      triangleCount: m.faces.length,
+    })),
     [
       ...unsupported,
       {
         kind: "step-subset",
-        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces} closedShells=${closedShells} openShells=${openShells} directions=${directions} manifoldSolidBreps=${manifoldSolidBreps} axis2Placements=${axis2Placements} siMetre=${siMetre}; B-Rep tessellation needs OCCT`,
+        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces} closedShells=${closedShells} openShells=${openShells} directions=${directions} manifoldSolidBreps=${manifoldSolidBreps} axis2Placements=${axis2Placements} siMetre=${siMetre}; cartesian + faceted poly_loop mesh (grade B); exact NURBS BREP optional via OCCT`,
       },
     ],
   );

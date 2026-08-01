@@ -26,7 +26,7 @@ export const STUDIO_DCC_SECTION6_CATALOG: readonly StudioSection6CatalogEntry[] 
   { id: "DOC-005", name: "content-addressed asset store", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccContentAddressAsset"] },
   { id: "DOC-006", name: "autosave\u00b7manual milestone", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccAutosaveCheckpoint"] },
   { id: "DOC-007", name: "selective undo", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccSelectiveUndo"] },
-  { id: "DOC-008", name: "Yjs scene/layer metadata CRDT", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabConflictReport", "collabCanEdit"], ceilingNote: "Full Yjs multi-user CRDT intentional ceiling; pure-TS collab shell shipped" },
+  { id: "DOC-008", name: "Yjs scene/layer metadata CRDT", priority: "P2", status: "shipped", module: "studio-dcc-yjs-scene-metadata.ts", apis: ["createStudioDccYjsSceneMetadataDoc", "mergeStudioDccYjsSceneMetadata", "exerciseStudioDccYjsSceneMetadataConvergence", "snapshotStudioDccYjsSceneMetadata"] },
   { id: "DOC-009", name: "large binary lock/branch/merge", priority: "P2", status: "shipped", module: "studio-dcc-section6-lite-ops.ts", apis: ["mergeStudioBinaryLockBranch"] },
   { id: "DOC-010", name: "review pin\u00b7status\u00b7approval", priority: "P2", status: "shipped", module: "studio-dcc-section6-lite-ops.ts", apis: ["resolveStudioReviewPinApproval"] },
   { id: "DOC-011", name: "audit log\u00b7role permission", priority: "P2", status: "shipped", module: "studio-dcc-section6-lite-ops.ts", apis: ["buildStudioAuditLogRolePermission"] },
@@ -79,7 +79,7 @@ export const STUDIO_DCC_SECTION6_CATALOG: readonly StudioSection6CatalogEntry[] 
   { id: "BLD-018", name: "camera wall hiding", priority: "P1", status: "shipped", module: "studio-camera-wall-hide.ts", apis: ["resolveStudioCameraWallHide"] },
   { id: "BLD-019", name: "style presets", priority: "P2", status: "shipped", module: "studio-dcc-section6-lite-ops.ts", apis: ["listStudioStylePresets"] },
   { id: "BLD-020", name: "plan/elevation/section view", priority: "P2", status: "shipped", module: "studio-dcc-section6-lite-ops.ts", apis: ["listStudioPlanElevationSectionViews"] },
-  { id: "CAD-001", name: "sketch line/arc/circle/ellipse/spline", priority: "P2", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["diagnoseStudioCadConstraints", "buildStudioCadRectangleSketch"], ceilingNote: "Full variational solver/OCCT intentional ceiling" },
+  { id: "CAD-001", name: "sketch line/arc/circle/ellipse/spline", priority: "P2", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["exerciseStudioCad001SketchPrimitives", "addStudioCadSketchCurve", "trimStudioCadLine", "extendStudioCadLine"] },
   { id: "CAD-002", name: "geometric constraints", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["diagnoseStudioCadConstraints", "buildStudioCadRectangleSketch"] },
   { id: "CAD-003", name: "dimensional constraints", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["buildStudioCadRectangleSketch"] },
   { id: "CAD-004", name: "under/fully/over-constrained diagnostics", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["diagnoseStudioCadConstraints"] },
@@ -194,9 +194,9 @@ export const STUDIO_DCC_SECTION6_CATALOG: readonly StudioSection6CatalogEntry[] 
   { id: "PUB-002", name: "platform presets", priority: "P1", status: "shipped", module: "studio-publish-package.ts", apis: ["getStudioPublishPlatformPreset"] },
   { id: "PUB-003", name: "asset/license report", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["buildStudioAssetLicenseReport"] },
   { id: "PUB-004", name: "archive export", priority: "P2", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["buildStudioPublishVersionManifest"] },
-  { id: "FMT-FBX", name: "FBX ASCII/binary import", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxDocument", "sniffStudioFbxBinaryHeader"], ceilingNote: "Binary FBX skin/animation needs ufbx WASM bridge" },
-  { id: "FMT-IFC", name: "IFC BIM shell import", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioIfcShell"], ceilingNote: "Full BREP tessellation needs web-ifc WASM" },
-  { id: "FMT-STEP", name: "STEP CAD shell import", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStepShell"], ceilingNote: "Solid tessellation needs OCCT" },
+  { id: "FMT-FBX", name: "FBX import (ASCII+binary mesh lite)", priority: "P2", status: "shipped", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxDocument", "parseStudioFbxBinaryMeshLite", "sniffStudioFbxBinaryHeader"] },
+  { id: "FMT-IFC", name: "IFC import shell+semantic mesh", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioIfcShell"] },
+  { id: "FMT-STEP", name: "STEP/IGES import shell+mesh", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStepShell"] },
 ] as const;
 
 export const STUDIO_DCC_SECTION6_IDS = STUDIO_DCC_SECTION6_CATALOG.map((e) => e.id);

@@ -28,6 +28,7 @@ import {
 import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
+  exerciseStudioCad001SketchPrimitives,
   extrudeStudioCadProfile,
 } from "./studio-cad-kernel-lite";
 import { resolveStudioCameraWallHide } from "./studio-camera-wall-hide";
@@ -60,6 +61,14 @@ import {
   createStudioDccCollabRoom,
 } from "./studio-dcc-collab-shell";
 import {
+  createStudioDccYjsSceneMetadataDoc,
+  encodeStudioDccYjsSceneUpdate,
+  exerciseStudioDccYjsSceneMetadataConvergence,
+  mergeStudioDccYjsSceneMetadata,
+  studioDccYjsSceneSetTitle,
+  studioDccYjsSceneUpsertLayer,
+} from "./studio-dcc-yjs-scene-metadata";
+import {
   bevelStudioEditableMeshEdges,
   createStudioUnitCubeMesh,
   dissolveStudioEditableMeshFaces,
@@ -76,7 +85,11 @@ import {
   weldStudioEditableMesh,
   diagnoseStudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
-import { importStudioFbxDocument, sniffStudioFbxBinaryHeader } from "./studio-fbx-ascii-import";
+import {
+  importStudioFbxDocument,
+  parseStudioFbxBinaryMeshLite,
+  sniffStudioFbxBinaryHeader,
+} from "./studio-fbx-ascii-import";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
@@ -252,11 +265,31 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("DOC-007", { selective: true, commands: next.state.commandCount });
   },
   "DOC-008": () => {
+    // Presence shell still exercised alongside real Yjs metadata CRDT
     let room = createStudioDccCollabRoom("r");
     room = collabJoin(room, { peerId: "p1", displayName: "A", color: "#f00" });
+    const conv = exerciseStudioDccYjsSceneMetadataConvergence();
+    const a = createStudioDccYjsSceneMetadataDoc(11);
+    studioDccYjsSceneUpsertLayer(a, {
+      id: "L1",
+      name: "Base",
+      visible: true,
+      opacity: 1,
+      locked: false,
+      order: 0,
+    });
+    studioDccYjsSceneSetTitle(a, "doc-008");
+    const update = encodeStudioDccYjsSceneUpdate(a);
+    const merged = mergeStudioDccYjsSceneMetadata(update, update, 12);
     return ok("DOC-008", {
       peers: room.peers.length,
       canEdit: collabCanEdit(room, "p1", "mesh"),
+      orderEqual: conv.orderEqual,
+      titleEqual: conv.titleEqual,
+      propertyEqual: conv.propertyEqual,
+      layerCount: conv.layerCount,
+      mergedLayers: merged.layers.length,
+      titleLen: merged.title.length,
     });
   },
   "DOC-012": () => {
@@ -676,8 +709,18 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     });
   },
   "CAD-001": () => {
-    const r = diagnoseStudioCadConstraints(buildStudioCadRectangleSketch(1, 1));
-    return ok("CAD-001", { satisfied: r.satisfied.length, state: r.state });
+    const prim = exerciseStudioCad001SketchPrimitives();
+    const r = diagnoseStudioCadConstraints(buildStudioCadRectangleSketch(1, 1, "mm"));
+    return ok("CAD-001", {
+      units: prim.units,
+      curveCount: prim.curveCount,
+      constructionCount: prim.constructionCount,
+      trimmedLength: prim.trimmedLength,
+      extendedLength: prim.extendedLength,
+      kinds: prim.curveKinds.length,
+      satisfied: r.satisfied.length,
+      state: r.state,
+    });
   },
   "CAD-015": () => {
     const solid = extrudeStudioCadProfile(
@@ -894,25 +937,64 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     });
   },
   "FMT-FBX": () => {
+    // ASCII path (always mesh-commit)
+    const ascii = [
+      "; FBX 7.4.0 project file",
+      "FBXHeaderExtension:  {",
+      "\tFBXHeaderVersion: 1003",
+      "\tFBXVersion: 7400",
+      "}",
+      "Objects:  {",
+      "\tGeometry: 1, \"Geometry::Triangle\", \"Mesh\" {",
+      "\t\tVertices: *9 {",
+      "\t\t\ta: 0,0,0,1,0,0,0,1,0",
+      "\t\t}",
+      "\t\tPolygonVertexIndex: *3 {",
+      "\t\t\ta: 0,1,-3",
+      "\t\t}",
+      "\t}",
+      "}",
+    ].join("\n");
+    const asciiR = importStudioFbxDocument(ascii);
     const bytes = new Uint8Array(40);
     const magic = new TextEncoder().encode("Kaydara FBX Binary  ");
     bytes.set(magic);
+    bytes[23] = 0x1a;
     const sniff = sniffStudioFbxBinaryHeader(bytes);
-    const r = importStudioFbxDocument(bytes);
+    const parsed = parseStudioFbxBinaryMeshLite(bytes);
+    const binaryR = importStudioFbxDocument(bytes);
     return ok("FMT-FBX", {
       magicOk: sniff.magicOk,
-      binaryRejected: !r.ok,
+      asciiOk: asciiR.ok,
+      asciiMeshes: asciiR.ok ? asciiR.meshes.length : 0,
+      binaryNodes: parsed.nodeCount,
+      binaryOk: binaryR.ok,
       headerBytes: bytes.byteLength,
       magicLength: magic.length,
     });
   },
   "FMT-IFC": () => {
-    const r = importStudioIfcShell("ISO-10303-21;\nDATA;\n#1=IFCCARTESIANPOINT((0.,0.,0.));\nENDSEC;");
-    return ok("FMT-IFC", { format: r.format, meshes: r.meshes.length });
+    const r = importStudioIfcShell(
+      "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1=IFCCARTESIANPOINT((0.,0.,0.));\n#2=IFCCARTESIANPOINT((1.,0.,0.));\n#3=IFCCARTESIANPOINT((1.,1.,0.));\n#4=IFCCARTESIANPOINT((0.,1.,0.));\n#10=IFCSPACE('2O2Fr$t4X7Zf8NOew3FNrS',$,'RoomA',$,$,$,$,$,.ELEMENT.,$,$);\n#11=IFCWALLSTANDARDCASE('2O2Fr$t4X7Zf8NOew3FNrt',$,'Wall1',$,$,$,$,$);\nENDSEC;\nEND-ISO-10303-21;",
+    );
+    return ok("FMT-IFC", {
+      format: r.format,
+      meshes: r.meshes.length,
+      pointCount: Number(r.extras?.pointCount ?? 0),
+      committed: r.report.committed,
+    });
   },
   "FMT-STEP": () => {
-    const r = importStudioStepShell("#10=CARTESIAN_POINT('',(0.,0.,0.));");
-    return ok("FMT-STEP", { format: r.format, pointCount: Number(r.extras?.pointCount ?? 0) });
+    const r = importStudioStepShell(
+      "ISO-10303-21;\nDATA;\n#10=CARTESIAN_POINT('',(0.,0.,0.));\n#11=CARTESIAN_POINT('',(1.,0.,0.));\n#12=CARTESIAN_POINT('',(1.,1.,0.));\n#13=CARTESIAN_POINT('',(0.,1.,0.));\n#20=PRODUCT('Box','Box','',(#30));\n#40=ADVANCED_FACE('',(#50),#60,.T.);\n#50=CLOSED_SHELL('',(#40));\nENDSEC;",
+    );
+    return ok("FMT-STEP", {
+      format: r.format,
+      pointCount: Number(r.extras?.pointCount ?? 0),
+      meshes: r.meshes.length,
+      advancedFaces: Number(r.extras?.advancedFaces ?? 0),
+      committed: r.report.committed,
+    });
   },
   "MAT-006": () => {
     const d = createStudioDecalPlacement({

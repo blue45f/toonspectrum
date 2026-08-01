@@ -1,18 +1,48 @@
 /**
  * CAD / sketch / B-Rep-lite kernel (CAD-001–011, 014 subset).
- * Pure geometry — not OCCT; provides constraint diagnostics + extrude/revolve solids for webtoon props.
+ * Pure geometry for webtoon props — variational OCCT is not required for CAD-001 shipped bar
+ * (units · construction geometry · trim/extend · line/arc/circle/ellipse/spline).
  */
 
-export const STUDIO_CAD_KERNEL_REVISION = 2 as const;
+export const STUDIO_CAD_KERNEL_REVISION = 3 as const;
 
 export type StudioCadVec2 = readonly [number, number];
 export type StudioCadVec3 = readonly [number, number, number];
 
 export type StudioCadCurve =
-  | { readonly kind: "line"; readonly a: StudioCadVec2; readonly b: StudioCadVec2 }
-  | { readonly kind: "circle"; readonly center: StudioCadVec2; readonly radius: number }
-  | { readonly kind: "arc"; readonly center: StudioCadVec2; readonly radius: number; readonly startRad: number; readonly endRad: number }
-  | { readonly kind: "spline"; readonly points: readonly StudioCadVec2[] };
+  | {
+      readonly kind: "line";
+      readonly a: StudioCadVec2;
+      readonly b: StudioCadVec2;
+      readonly construction?: boolean;
+    }
+  | {
+      readonly kind: "circle";
+      readonly center: StudioCadVec2;
+      readonly radius: number;
+      readonly construction?: boolean;
+    }
+  | {
+      readonly kind: "arc";
+      readonly center: StudioCadVec2;
+      readonly radius: number;
+      readonly startRad: number;
+      readonly endRad: number;
+      readonly construction?: boolean;
+    }
+  | {
+      readonly kind: "ellipse";
+      readonly center: StudioCadVec2;
+      readonly radiusX: number;
+      readonly radiusY: number;
+      readonly rotationRad?: number;
+      readonly construction?: boolean;
+    }
+  | {
+      readonly kind: "spline";
+      readonly points: readonly StudioCadVec2[];
+      readonly construction?: boolean;
+    };
 
 export type StudioCadConstraint =
   | { readonly kind: "horizontal"; readonly curveIndex: number }
@@ -201,6 +231,163 @@ export function diagnoseStudioCadConstraints(
     state = "fully-constrained";
   } else if (conflicts.length > 0) state = "over-constrained";
   return { state, degreesOfFreedom: dof, conflicts, satisfied };
+}
+
+/** CAD-001: append a curve (line/arc/circle/ellipse/spline) with optional construction flag. */
+export function addStudioCadSketchCurve(
+  sketch: StudioCadSketch,
+  curve: StudioCadCurve,
+): StudioCadSketch {
+  return { ...sketch, curves: [...sketch.curves, curve] };
+}
+
+/** CAD-001: set units on the sketch. */
+export function setStudioCadSketchUnits(
+  sketch: StudioCadSketch,
+  units: StudioCadSketch["units"],
+): StudioCadSketch {
+  return { ...sketch, units };
+}
+
+/** CAD-001: mark curve as construction geometry (guide only). */
+export function setStudioCadCurveConstruction(
+  sketch: StudioCadSketch,
+  curveIndex: number,
+  construction: boolean,
+): StudioCadSketch {
+  const curves = sketch.curves.map((c, i) =>
+    i === curveIndex ? { ...c, construction } : c,
+  );
+  return { ...sketch, curves };
+}
+
+/**
+ * CAD-001: trim a line to segment [t0,t1] in parametric 0..1 range (endpoint projection).
+ * Non-line curves: returns sketch unchanged with no throw (caller can inspect result).
+ */
+export function trimStudioCadLine(
+  sketch: StudioCadSketch,
+  curveIndex: number,
+  t0: number,
+  t1: number,
+): StudioCadSketch {
+  const curve = sketch.curves[curveIndex];
+  if (!curve || curve.kind !== "line") return sketch;
+  const a0 = Math.max(0, Math.min(1, Math.min(t0, t1)));
+  const a1 = Math.max(0, Math.min(1, Math.max(t0, t1)));
+  if (a1 - a0 < 1e-9) return sketch;
+  const lerp = (t: number): StudioCadVec2 => [
+    curve.a[0] + (curve.b[0] - curve.a[0]) * t,
+    curve.a[1] + (curve.b[1] - curve.a[1]) * t,
+  ];
+  const next: StudioCadCurve = {
+    kind: "line",
+    a: lerp(a0),
+    b: lerp(a1),
+    construction: curve.construction,
+  };
+  const curves = sketch.curves.map((c, i) => (i === curveIndex ? next : c));
+  return { ...sketch, curves };
+}
+
+/** CAD-001: extend a line by distance beyond endpoint "a" or "b". */
+export function extendStudioCadLine(
+  sketch: StudioCadSketch,
+  curveIndex: number,
+  end: "a" | "b",
+  distance: number,
+): StudioCadSketch {
+  const curve = sketch.curves[curveIndex];
+  if (!curve || curve.kind !== "line" || !Number.isFinite(distance) || distance === 0) {
+    return sketch;
+  }
+  const dx = curve.b[0] - curve.a[0];
+  const dy = curve.b[1] - curve.a[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const next: StudioCadCurve =
+    end === "b"
+      ? {
+          kind: "line",
+          a: curve.a,
+          b: [curve.b[0] + ux * distance, curve.b[1] + uy * distance],
+          construction: curve.construction,
+        }
+      : {
+          kind: "line",
+          a: [curve.a[0] - ux * distance, curve.a[1] - uy * distance],
+          b: curve.b,
+          construction: curve.construction,
+        };
+  const curves = sketch.curves.map((c, i) => (i === curveIndex ? next : c));
+  return { ...sketch, curves };
+}
+
+/**
+ * CAD-001 exercise: line/arc/circle/ellipse/spline with units, construction, trim, extend.
+ * Returns measurable counts for gating (not OCCT variational solve).
+ */
+export function exerciseStudioCad001SketchPrimitives(): {
+  readonly units: StudioCadSketch["units"];
+  readonly curveKinds: readonly string[];
+  readonly constructionCount: number;
+  readonly trimmedLength: number;
+  readonly extendedLength: number;
+  readonly curveCount: number;
+} {
+  let sketch = createStudioCadSketch([], [], "mm");
+  sketch = addStudioCadSketchCurve(sketch, { kind: "line", a: [0, 0], b: [10, 0] });
+  sketch = addStudioCadSketchCurve(sketch, {
+    kind: "circle",
+    center: [5, 5],
+    radius: 2,
+  });
+  sketch = addStudioCadSketchCurve(sketch, {
+    kind: "arc",
+    center: [0, 5],
+    radius: 3,
+    startRad: 0,
+    endRad: Math.PI / 2,
+  });
+  sketch = addStudioCadSketchCurve(sketch, {
+    kind: "ellipse",
+    center: [8, 8],
+    radiusX: 4,
+    radiusY: 2,
+    rotationRad: 0.2,
+  });
+  sketch = addStudioCadSketchCurve(sketch, {
+    kind: "spline",
+    points: [
+      [0, 0],
+      [2, 3],
+      [5, 1],
+      [8, 4],
+    ],
+  });
+  sketch = setStudioCadCurveConstruction(sketch, 4, true);
+  sketch = setStudioCadSketchUnits(sketch, "mm");
+  sketch = trimStudioCadLine(sketch, 0, 0.1, 0.9);
+  const trimmed = sketch.curves[0] as Extract<StudioCadCurve, { kind: "line" }>;
+  const trimmedLength = Math.hypot(
+    trimmed.b[0] - trimmed.a[0],
+    trimmed.b[1] - trimmed.a[1],
+  );
+  sketch = extendStudioCadLine(sketch, 0, "b", 2);
+  const extended = sketch.curves[0] as Extract<StudioCadCurve, { kind: "line" }>;
+  const extendedLength = Math.hypot(
+    extended.b[0] - extended.a[0],
+    extended.b[1] - extended.a[1],
+  );
+  return {
+    units: sketch.units,
+    curveKinds: sketch.curves.map((c) => c.kind),
+    constructionCount: sketch.curves.filter((c) => c.construction).length,
+    trimmedLength,
+    extendedLength,
+    curveCount: sketch.curves.length,
+  };
 }
 
 /**
