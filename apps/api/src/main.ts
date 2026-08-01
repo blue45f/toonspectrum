@@ -53,7 +53,35 @@ async function bootstrap() {
   );
   app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    if (req.query && typeof req.query === "object" && "path" in req.query) {
+    const pathValue =
+      req.query && typeof req.query === "object" ? req.query.path : undefined;
+    const extractedPath = Array.isArray(pathValue)
+      ? pathValue
+          .filter((value): value is string => typeof value === "string")
+          .join("/")
+      : typeof pathValue === "string"
+        ? pathValue
+        : undefined;
+    if (typeof extractedPath === "string") {
+      const nextPath = extractedPath.startsWith("/")
+        ? extractedPath
+        : `/${extractedPath}`;
+      const safeNormalizedPath = (() => {
+        try {
+          return decodeURIComponent(nextPath);
+        } catch {
+          return nextPath;
+        }
+      })();
+      const normalizedPath = safeNormalizedPath.startsWith("/")
+        ? safeNormalizedPath.startsWith("/api")
+          ? safeNormalizedPath
+          : `/api${safeNormalizedPath}`
+        : `/api/${safeNormalizedPath}`;
+      const rewriteUrl = new URL(req.url, "https://example.local");
+      rewriteUrl.pathname = normalizedPath;
+      rewriteUrl.searchParams.delete("path");
+      req.url = `${rewriteUrl.pathname}${rewriteUrl.search}`;
       delete (req.query as Record<string, unknown>).path;
     }
     next();
