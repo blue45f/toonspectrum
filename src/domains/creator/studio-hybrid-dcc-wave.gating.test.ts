@@ -37,7 +37,7 @@ import { unpackStudioToon3dPackage } from "./studio-toon3d-package";
 
 describe("collab shell deepenings", () => {
   it("locks, merges op logs, and reports concurrent geometry-hint conflicts", () => {
-    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBe(2);
+    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(3);
     let a = createStudioDccCollabRoom("room-wave");
     a = collabJoin(a, { peerId: "p1", displayName: "One", color: "#111" }, 1000);
     a = collabJoin(a, { peerId: "p2", displayName: "Two", color: "#222" }, 1000);
@@ -79,7 +79,99 @@ describe("collab shell deepenings", () => {
     const merged = collabMergeOpLogs(a, b);
     expect(merged.peers.length).toBeGreaterThanOrEqual(3);
     expect(merged.ops.some((op) => op.kind === "chat")).toBe(true);
-    expect(merged.epoch).toBeGreaterThan(a.epoch);
+    // Rebuild from empty locks: epoch tracks appends only (not pre-seeded join epochs).
+    expect(merged.ops.length).toBeGreaterThanOrEqual(a.ops.length);
+    expect(merged.epoch).toBe(merged.ops.length);
+    expect(merged.locks["mesh-a"]).toBe("p1");
+  });
+
+  it("select-before-lock is not contention; select-after-lock is", () => {
+    let room = createStudioDccCollabRoom("room-lock-timing");
+    room = collabJoin(room, { peerId: "holder", displayName: "H", color: "#0a0" }, 1000);
+    room = collabJoin(room, { peerId: "other", displayName: "O", color: "#a00" }, 1000);
+    // Historical select before any lock must not count as contention
+    room = collabAppendOp(room, {
+      kind: "select",
+      peerId: "other",
+      assetIds: ["mesh-x"],
+      at: 1100,
+    });
+    room = collabAppendOp(room, {
+      kind: "lock",
+      peerId: "holder",
+      assetId: "mesh-x",
+      at: 2000,
+    });
+    expect(room.locks["mesh-x"]).toBe("holder");
+    const beforeOnly = collabConflictReport(room);
+    expect(beforeOnly.some((c) => c.reason === "lock-contention" && c.assetId === "mesh-x")).toBe(
+      false,
+    );
+
+    // Select after lock by non-holder is contention
+    room = collabAppendOp(room, {
+      kind: "select",
+      peerId: "other",
+      assetIds: ["mesh-x"],
+      at: 2100,
+    });
+    const afterSelect = collabConflictReport(room);
+    const lockConflict = afterSelect.find(
+      (c) => c.reason === "lock-contention" && c.assetId === "mesh-x",
+    );
+    expect(lockConflict).toBeDefined();
+    expect(lockConflict!.peerIds).toContain("holder");
+    expect(lockConflict!.peerIds).toContain("other");
+  });
+
+  it("merge of related rooms does not duplicate shared ops", () => {
+    const sharedChat = {
+      kind: "chat" as const,
+      peerId: "p1",
+      text: "shared",
+      at: 1500,
+    };
+    let left = createStudioDccCollabRoom("room-dedupe");
+    left = collabJoin(left, { peerId: "p1", displayName: "One", color: "#111" }, 1000);
+    left = collabAppendOp(left, {
+      kind: "lock",
+      peerId: "p1",
+      assetId: "mesh-d",
+      at: 1200,
+    });
+    left = collabAppendOp(left, sharedChat);
+
+    let right = createStudioDccCollabRoom("room-dedupe");
+    right = collabJoin(right, { peerId: "p1", displayName: "One", color: "#111" }, 1000);
+    right = collabJoin(right, { peerId: "p2", displayName: "Two", color: "#222" }, 1100);
+    // Same shared history + one unique op on right
+    right = collabAppendOp(right, {
+      kind: "lock",
+      peerId: "p1",
+      assetId: "mesh-d",
+      at: 1200,
+    });
+    right = collabAppendOp(right, sharedChat);
+    right = collabAppendOp(right, {
+      kind: "chat",
+      peerId: "p2",
+      text: "only-right",
+      at: 1600,
+    });
+
+    const merged = collabMergeOpLogs(left, right);
+    const sharedCount = merged.ops.filter(
+      (op) => op.kind === "chat" && op.peerId === "p1" && op.text === "shared" && op.at === 1500,
+    ).length;
+    expect(sharedCount).toBe(1);
+    const lockCount = merged.ops.filter(
+      (op) => op.kind === "lock" && op.assetId === "mesh-d" && op.peerId === "p1" && op.at === 1200,
+    ).length;
+    expect(lockCount).toBe(1);
+    expect(merged.locks["mesh-d"]).toBe("p1");
+    expect(merged.ops.some((op) => op.kind === "chat" && op.text === "only-right")).toBe(true);
+    // Replay from empty locks — single lock application, not double
+    expect(Object.keys(merged.locks)).toEqual(["mesh-d"]);
   });
 });
 

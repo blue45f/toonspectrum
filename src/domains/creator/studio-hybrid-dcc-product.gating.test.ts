@@ -219,7 +219,7 @@ describe("collab shell + catalog revision", () => {
       at: Date.now(),
     });
     expect(collabActivePeerIds(room).includes("a")).toBe(true);
-    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(2);
+    expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(3);
     expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(4);
     expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "FMT-OFF")).toBe(true);
     expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "UI-HYBRID-PANEL")).toBe(true);
