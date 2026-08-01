@@ -234,9 +234,12 @@ describe("§6 full catalog SSOT", () => {
     // SCP-006 refine must implement red-green promotion (not naive near-only 1→4)
     expect(meshOpsSrc).toMatch(/splitEdges/u);
     expect(meshOpsSrc).toMatch(/n\s*>=\s*2/u);
-    // Industrial OCCT facade must load real WASM MakeBox
+    // Industrial OCCT facade must load real WASM MakeBox in browser + node paths
     expect(occtSrc).toMatch(/BRepPrimAPI_MakeBox_1/u);
     expect(occtSrc).toMatch(/opencascade\.wasm/u);
+    expect(occtSrc).toMatch(/loadBrowserOcctFactory|isBrowserEnvironment/u);
+    expect(occtSrc).not.toMatch(/^import\s+fs\s+from\s+["']node:fs["']/mu);
+    expect(occtSrc).not.toMatch(/^import\s+\{\s*createRequire/mu);
 
     const missingExportCall: string[] = [];
     const missingNumeric: string[] = [];

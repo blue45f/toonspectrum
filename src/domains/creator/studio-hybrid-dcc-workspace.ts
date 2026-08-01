@@ -102,7 +102,7 @@ import {
   type StudioUvMap,
 } from "./studio-uv-unwrap-lite";
 
-/** OCCT result shape (lazy-loaded; avoid static node:fs in browser harness). */
+/** OCCT result shape (lazy-loaded; browser fetch or Node loader). */
 export type StudioOcctSolidResult = {
   readonly ok: true;
   readonly mesh: StudioEditableMesh;
@@ -112,6 +112,7 @@ export type StudioOcctSolidResult = {
   readonly volumeApprox: number;
   readonly backend: "opencascade-wasm";
   readonly operation: string;
+  readonly loadPath?: "browser" | "node";
 };
 
 export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 3 as const;

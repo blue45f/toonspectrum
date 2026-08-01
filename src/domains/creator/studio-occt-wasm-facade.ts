@@ -2,14 +2,12 @@
  * Industrial CAD path: real OpenCascade Technology via WASM (opencascade.js).
  * Lazy-loaded; never eagerly pulled into the Studio shell bundle.
  *
+ * Browser: fetch/locateFile + Embind factory (no node:* builtins).
+ * Node/Vitest: dynamic node:fs + vm sandbox (same real WASM binary).
+ *
  * License: opencascade.js redistributes OCCT under LGPL-2.1 — loaded dynamically
  * as a separate WASM module (not statically linked into the main app chunk).
  */
-
-import fs from "node:fs";
-import { createRequire } from "node:module";
-import path from "node:path";
-import { createContext, runInContext } from "node:vm";
 
 import {
   createStudioEditableMeshFromPolygons,
@@ -17,12 +15,13 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 1 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 2 as const;
 
 export type StudioOcctRuntime = {
   readonly backend: "opencascade-wasm";
   readonly occtVersionHint: string;
   readonly module: StudioOcctModule;
+  readonly loadPath: "browser" | "node";
 };
 
 /** Minimal surface of the Embind module we use. */
@@ -40,6 +39,7 @@ export type StudioOcctSolidResult = {
   readonly volumeApprox: number;
   readonly backend: "opencascade-wasm";
   readonly operation: string;
+  readonly loadPath: "browser" | "node";
 };
 
 export type StudioOcctFail = {
@@ -55,12 +55,34 @@ type StudioOcctTriangulation = {
   Triangle(index: number): { Value(vertex: number): number };
 };
 
+type OcctFactory = (cfg: {
+  wasmBinary?: ArrayBuffer | Uint8Array;
+  locateFile?: (path: string, prefix?: string) => string;
+}) => Promise<StudioOcctModule>;
+
 let cachedRuntime: StudioOcctRuntime | null = null;
 let cachedPromise: Promise<StudioOcctRuntime> | null = null;
 
 function isCallable(value: unknown): boolean {
   return Object.prototype.toString.call(value) === "[object Function]"
     || Object.prototype.toString.call(value) === "[object AsyncFunction]";
+}
+
+function isBrowserEnvironment(): boolean {
+  // Product browser path: DOM + fetch, and NOT a Node host (Vitest/jsdom still polyfills window).
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  if (!isCallable(globalThis.fetch)) return false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeVersion = (globalThis as any).process?.versions?.node;
+    if (typeof nodeVersion === "string" && nodeVersion.length > 0) {
+      // Running under Node (Vitest/jsdom/CI). Use node-loader for the same real WASM binary.
+      return false;
+    }
+  } catch {
+    // ignore
+  }
+  return true;
 }
 
 function resolveStudioOcctTriangulation(candidate: unknown): StudioOcctTriangulation | null {
@@ -90,8 +112,50 @@ function resolveStudioOcctTriangulation(candidate: unknown): StudioOcctTriangula
   return null;
 }
 
+async function resolveBrowserWasmUrl(): Promise<string> {
+  // Vite asset URL (preferred in browser harness / app)
+  try {
+    const mod = await import(
+      /* @vite-ignore */ "opencascade.js/dist/opencascade.wasm.wasm?url"
+    );
+    const url = (mod as { default?: string }).default;
+    if (url && Object.prototype.toString.call(url) === "[object String]") return url;
+  } catch {
+    // fall through
+  }
+  // Dev server / absolute package path
+  return "/node_modules/opencascade.js/dist/opencascade.wasm.wasm";
+}
+
+async function loadBrowserOcctFactory(): Promise<{
+  factory: OcctFactory;
+  wasmUrl: string;
+  wasmBinary: Uint8Array;
+}> {
+  const wasmUrl = await resolveBrowserWasmUrl();
+  const wasmResponse = await fetch(wasmUrl);
+  if (!wasmResponse.ok) {
+    throw new Error(`OCCT wasm fetch failed: ${wasmResponse.status} ${wasmUrl}`);
+  }
+  const wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
+  if (wasmBinary.byteLength < 1_000_000) {
+    throw new Error(`OCCT wasm too small (${wasmBinary.byteLength} bytes) at ${wasmUrl}`);
+  }
+
+  // Embind factory — ESM default export from opencascade.wasm.js
+  const factoryMod = await import(
+    /* @vite-ignore */ "opencascade.js/dist/opencascade.wasm.js"
+  );
+  const factory = ((factoryMod as { default?: OcctFactory }).default
+    ?? factoryMod) as OcctFactory;
+  if (!isCallable(factory)) {
+    throw new Error("opencascade browser factory missing");
+  }
+  return { factory, wasmUrl, wasmBinary };
+}
+
 /**
- * Load OpenCascade WASM (Node/Vitest).
+ * Load OpenCascade WASM in browser (fetch) or Node (separate node-loader).
  * Honest failure if the package or WASM binary is missing.
  */
 export async function loadStudioOcctRuntime(): Promise<StudioOcctRuntime> {
@@ -99,55 +163,33 @@ export async function loadStudioOcctRuntime(): Promise<StudioOcctRuntime> {
   if (cachedPromise) return cachedPromise;
   cachedPromise = (async () => {
     try {
-      const require = createRequire(import.meta.url);
-      const wasmPath = require.resolve("opencascade.js/dist/opencascade.wasm.wasm");
-      const jsPath = require.resolve("opencascade.js/dist/opencascade.wasm.js");
-      const wasmBinary = fs.readFileSync(wasmPath);
-      const code = fs
-        .readFileSync(jsPath, "utf8")
-        .replace(/export\s+default\s+opencascade\s*;?\s*$/mu, "module.exports = opencascade;");
-      const moduleBag = { exports: {} as { default?: (cfg: object) => Promise<StudioOcctModule> } };
-      const dirname = path.dirname(jsPath);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sandbox: Record<string, any> = {
-        module: moduleBag,
-        exports: moduleBag.exports,
-        require,
-        __dirname: dirname,
-        __filename: jsPath,
-        console,
-        process,
-        Buffer,
-        WebAssembly,
-        TextDecoder,
-        TextEncoder,
-        setTimeout,
-        clearTimeout,
-        setInterval,
-        clearInterval,
-      };
-      sandbox.self = sandbox;
-      sandbox.global = sandbox;
-      sandbox.globalThis = sandbox;
-      createContext(sandbox);
-      runInContext(code, sandbox, { filename: jsPath });
-      const factory =
-        (moduleBag.exports as { default?: (cfg: object) => Promise<StudioOcctModule> }).default
-        ?? (moduleBag.exports as unknown as (cfg: object) => Promise<StudioOcctModule>);
-      if (!isCallable(factory)) {
-        throw new Error("opencascade factory missing");
+      if (isBrowserEnvironment()) {
+        const { factory, wasmUrl, wasmBinary } = await loadBrowserOcctFactory();
+        const oc = await factory({
+          wasmBinary,
+          locateFile: (p: string) => (p.endsWith(".wasm") ? wasmUrl : p),
+        });
+        if (!oc?.BRepPrimAPI_MakeBox_1) {
+          throw new Error("opencascade module missing BRepPrimAPI_MakeBox_1");
+        }
+        const runtime: StudioOcctRuntime = {
+          backend: "opencascade-wasm",
+          occtVersionHint: "OCCT-7.4 via opencascade.js@1.1.1",
+          module: oc,
+          loadPath: "browser",
+        };
+        cachedRuntime = runtime;
+        return runtime;
       }
-      const oc = await factory({
-        wasmBinary,
-        locateFile: (p: string) => (p.endsWith(".wasm") ? wasmPath : p),
-      });
-      if (!oc?.BRepPrimAPI_MakeBox_1) {
-        throw new Error("opencascade module missing BRepPrimAPI_MakeBox_1");
-      }
+
+      // Node/Vitest only — dynamic import keeps node:* out of the browser graph.
+      const { loadStudioOcctModuleFromNode } = await import("./studio-occt-wasm-node-loader");
+      const loaded = await loadStudioOcctModuleFromNode();
       const runtime: StudioOcctRuntime = {
         backend: "opencascade-wasm",
         occtVersionHint: "OCCT-7.4 via opencascade.js@1.1.1",
-        module: oc,
+        module: loaded.module,
+        loadPath: "node",
       };
       cachedRuntime = runtime;
       return runtime;
@@ -189,17 +231,17 @@ export function tessellateStudioOcctShape(
     faceCount += 1;
     const face = oc.TopoDS.Face_1(exp.Current());
     const loc = new oc.TopLoc_Location_1();
-    let raw: unknown;
-    try {
-      raw = oc.BRep_Tool.Triangulation_1(face, loc);
-    } catch {
+    const tri = (() => {
       try {
-        raw = oc.BRep_Tool.Triangulation(face, loc);
+        return resolveStudioOcctTriangulation(oc.BRep_Tool.Triangulation_1(face, loc));
       } catch {
-        raw = null;
+        try {
+          return resolveStudioOcctTriangulation(oc.BRep_Tool.Triangulation(face, loc));
+        } catch {
+          return null;
+        }
       }
-    }
-    const tri = resolveStudioOcctTriangulation(raw);
+    })();
     if (!tri) {
       exp.Next();
       continue;
@@ -247,6 +289,7 @@ function packResult(
   faceCount: number,
   triangleCount: number,
   volumeApprox: number,
+  loadPath: "browser" | "node",
 ): StudioOcctSolidResult {
   return {
     ok: true,
@@ -257,6 +300,7 @@ function packResult(
     volumeApprox,
     backend: "opencascade-wasm",
     operation,
+    loadPath,
   };
 }
 
@@ -267,7 +311,8 @@ export async function occtMakeBoxSolid(
   dz: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
   try {
-    const { module: oc } = await loadStudioOcctRuntime();
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
     const shape = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
     const tess = tessellateStudioOcctShape(oc, shape);
     if (tess.triangleCount < 1) {
@@ -279,6 +324,7 @@ export async function occtMakeBoxSolid(
       tess.faceCount,
       tess.triangleCount,
       approxVolumeBox(dx, dy, dz),
+      runtime.loadPath,
     );
   } catch (error) {
     return {
@@ -295,7 +341,8 @@ export async function occtMakeCylinderSolid(
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
   try {
-    const { module: oc } = await loadStudioOcctRuntime();
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
     let shape: unknown = null;
     for (const key of [
       "BRepPrimAPI_MakeCylinder_1",
@@ -328,6 +375,7 @@ export async function occtMakeCylinderSolid(
       tess.faceCount,
       tess.triangleCount,
       Math.PI * radius * radius * height,
+      runtime.loadPath,
     );
   } catch (error) {
     return {
@@ -353,7 +401,8 @@ export async function occtBooleanCutBoxes(
   },
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
   try {
-    const { module: oc } = await loadStudioOcctRuntime();
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
     const shapeA = new oc.BRepPrimAPI_MakeBox_1(a.dx, a.dy, a.dz).Shape();
     let shapeB: unknown;
     if (b.ox || b.oy || b.oz) {
@@ -407,6 +456,7 @@ export async function occtBooleanCutBoxes(
       tess.faceCount,
       tess.triangleCount,
       Math.max(0, approxVolumeBox(a.dx, a.dy, a.dz) - approxVolumeBox(b.dx, b.dy, b.dz) * 0.5),
+      runtime.loadPath,
     );
   } catch (error) {
     return {

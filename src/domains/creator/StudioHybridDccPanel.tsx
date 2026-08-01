@@ -58,7 +58,7 @@ export function StudioHybridDccPanel() {
       const next = await fn();
       setWs(next);
       setLog(
-        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep} bom=${next.bom.lines.length} occt=${next.lastOcct ? `${next.lastOcct.operation}:${next.lastOcct.triangleCount}t` : "—"} dynatopo=${next.lastDynatopo ? `${next.lastDynatopo.mode}:${next.lastDynatopo.facesAfter}f b=${next.lastDynatopo.boundaryEdges}` : "—"} retopo=${next.lastRetopo ? `${next.lastRetopo.facesAfter}/${next.lastRetopo.targetFaces}` : "—"}`,
+        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep} bom=${next.bom.lines.length} occt=${next.lastOcct ? `${next.lastOcct.operation}:${next.lastOcct.triangleCount}t:${next.lastOcct.loadPath ?? "wasm"}` : "—"} dynatopo=${next.lastDynatopo ? `${next.lastDynatopo.mode}:${next.lastDynatopo.facesAfter}f b=${next.lastDynatopo.boundaryEdges}` : "—"} retopo=${next.lastRetopo ? `${next.lastRetopo.facesAfter}/${next.lastRetopo.targetFaces}` : "—"}`,
       );
     } catch (error) {
       setLog(`${label} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -363,6 +363,8 @@ export function StudioHybridDccPanel() {
         data-assets={Object.keys(ws.session.state.geometry.records).length}
         data-active={ws.activeAssetId ?? "none"}
         data-occt-tris={ws.lastOcct?.triangleCount ?? 0}
+        data-occt-path={ws.lastOcct?.loadPath ?? ""}
+        data-occt-op={ws.lastOcct?.operation ?? ""}
         data-dynatopo-faces={ws.lastDynatopo?.facesAfter ?? 0}
         data-retopo-faces={ws.lastRetopo?.facesAfter ?? 0}
       >

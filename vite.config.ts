@@ -226,6 +226,11 @@ export default defineConfig(({ mode }) => ({
       "@": fileURLToPath(new URL("./", import.meta.url)),
     },
   },
+  // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
+  assetsInclude: ["**/*.wasm"],
+  optimizeDeps: {
+    exclude: ["opencascade.js"],
+  },
   build: {
     // CI reads this graph to enforce the mobile Studio's initial-JS budgets and lazy-only engines.
     manifest: true,

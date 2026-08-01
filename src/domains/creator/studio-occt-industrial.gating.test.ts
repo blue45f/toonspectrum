@@ -15,6 +15,7 @@ describe("industrial OCCT WASM CAD", () => {
     const rt = await loadStudioOcctRuntime();
     expect(rt.backend).toBe("opencascade-wasm");
     expect(rt.occtVersionHint).toMatch(/OCCT/i);
+    expect(rt.loadPath).toBe("node");
     expect(rt.module.BRepPrimAPI_MakeBox_1).toBeTypeOf("function");
   }, 120_000);
 
