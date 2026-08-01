@@ -32,6 +32,10 @@ import {
   studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
+import {
+  buildStudioGeoNodesPrimitive,
+  type StudioGeoNodesPrimitiveKind,
+} from "./studio-geometry-nodes-workspace-bridge";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
@@ -66,7 +70,10 @@ import {
   evaluateStudioMeshModifierStack,
   withStudioMeshModifier,
 } from "./studio-mesh-modifier-stack";
-import { subdivideStudioMeshCatmullLite } from "./studio-mesh-ops-advanced";
+import {
+  decimateStudioMesh,
+  subdivideStudioMeshCatmullLite,
+} from "./studio-mesh-ops-advanced";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 import { packStudioToon3dPackage, type StudioToon3dPackage } from "./studio-toon3d-package";
 import {
@@ -576,4 +583,46 @@ export function workspaceRebuildBom(ws: StudioHybridDccWorkspace): StudioHybridD
     volumeM3: Math.max(0.001, rec.mesh.faces.length * 0.0001),
   }));
   return { ...ws, bom: bomFromAssetParts(ws.session.state.documentId, parts) };
+}
+
+export function workspaceAddGeoNodesPrimitive(
+  ws: StudioHybridDccWorkspace,
+  kind: StudioGeoNodesPrimitiveKind = "sphere",
+  assetId = `geo-${kind}`,
+  segments = 6,
+): StudioHybridDccWorkspace {
+  const built = buildStudioGeoNodesPrimitive(kind, segments);
+  if (!built.ok) throw new Error(built.detail);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, built.mesh, {
+      source: `geometry-nodes:${kind}`,
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, built.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId };
+}
+
+export function workspaceDecimateActive(
+  ws: StudioHybridDccWorkspace,
+  ratio = 0.5,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const dec = decimateStudioMesh(record.mesh, ratio);
+  if (!dec.ok) throw new Error(dec.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, dec.value);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    hashStudioEditableMesh(dec.value),
+  );
+  return { ...ws, session, bridge };
 }

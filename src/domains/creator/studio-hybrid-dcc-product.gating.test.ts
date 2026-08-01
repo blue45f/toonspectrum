@@ -21,13 +21,16 @@ import {
   importStudioFbxDocument,
   isStudioFbxBinary,
 } from "./studio-fbx-ascii-import";
+import { buildStudioGeoNodesPrimitive } from "./studio-geometry-nodes-workspace-bridge";
 import {
   createStudioHybridDccWorkspace,
+  workspaceAddGeoNodesPrimitive,
   workspaceAddUnitCube,
   workspaceArrayActive,
   workspaceCadProp,
   workspaceClothStep,
   workspaceCollabJoin,
+  workspaceDecimateActive,
   workspaceExportToon3d,
   workspaceMirrorActive,
   workspaceRebuildBom,
@@ -187,6 +190,19 @@ describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
     const result = importStudioFbxDocument(bytes);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.detail.startsWith("binary-fbx:")).toBe(true);
+  });
+
+  it("geometry-nodes primitives and decimate land in workspace", () => {
+    const sphere = buildStudioGeoNodesPrimitive("sphere", 6);
+    expect(sphere.ok).toBe(true);
+    if (sphere.ok) {
+      expect(sphere.triangleCount).toBeGreaterThan(0);
+    }
+    let ws = createStudioHybridDccWorkspace("ws-geonodes");
+    ws = workspaceAddGeoNodesPrimitive(ws, "cylinder", "cyl-1", 6);
+    expect(ws.activeAssetId).toBe("cyl-1");
+    ws = workspaceDecimateActive(ws, 0.6);
+    expect(ws.session.state.geometry.records["cyl-1"]).toBeDefined();
   });
 });
 

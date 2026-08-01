@@ -107,6 +107,8 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "CHR-RETARGET", priority: "P2", status: "shipped", module: "studio-character-animation-p2.ts", apis: ["retargetStudioMotionReport", "workspaceRetargetFromBvhExtras"] },
   { id: "CAD-BOM", priority: "P4", status: "shipped", module: "studio-manufacturing-bom-lite.ts", apis: ["bomFromAssetParts", "bomRollupByMaterial", "workspaceRebuildBom"] },
   { id: "MOD-ARRAY-WS", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceArrayActive", "workspaceSubdivideActive"] },
+  { id: "MOD-GEONODES", priority: "P2", status: "shipped", module: "studio-geometry-nodes-workspace-bridge.ts", apis: ["buildStudioGeoNodesPrimitive", "workspaceAddGeoNodesPrimitive"] },
+  { id: "MOD-DECIMATE-WS", priority: "P2", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceDecimateActive"] },
   // Workspace vertical
   { id: "V1-VERTICAL", priority: "P1", status: "shipped", module: "studio-webtoon-object-creator-v1-demo.ts", apis: ["runStudioWebtoonObjectCreatorV1Demo"] },
   { id: "WS-API", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["createStudioHybridDccWorkspace"] },

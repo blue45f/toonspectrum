@@ -8,12 +8,14 @@ import { useRef, useState } from "react";
 import {
   createStudioHybridDccWorkspace,
   workspaceAddArtistInk,
+  workspaceAddGeoNodesPrimitive,
   workspaceAddUnitCube,
   workspaceArrayActive,
   workspaceBooleanDifference,
   workspaceCadProp,
   workspaceClothStep,
   workspaceCollabJoin,
+  workspaceDecimateActive,
   workspaceDiagnostics,
   workspaceEnsureShots,
   workspaceExportToon3d,
@@ -92,6 +94,22 @@ export function StudioHybridDccPanel() {
           onClick={() => run("Add cube", () => workspaceAddUnitCube(ws))}
         >
           Add cube
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("Geo sphere", () => workspaceAddGeoNodesPrimitive(ws, "sphere"))}
+        >
+          Geo sphere
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Decimate", () => workspaceDecimateActive(ws, 0.5))}
+        >
+          Decimate
         </button>
         <button
           type="button"
