@@ -15,11 +15,23 @@ import {
   type StudioImportCompatibilityReport,
   type StudioImportSceneIR,
 } from "./studio-import-compatibility-report";
+import { importStudioMeshByExtension } from "./studio-mesh-format-adapters";
 import { sha256HexPortable } from "./studio-sha256";
 
-export const STUDIO_GRADE_A_IMPORT_REVISION = 1 as const;
+export const STUDIO_GRADE_A_IMPORT_REVISION = 2 as const;
 
-export type StudioGradeAFormat = "glb" | "gltf" | "vrm" | "obj" | "fbx" | "png" | "psd";
+export type StudioGradeAFormat =
+  | "glb"
+  | "gltf"
+  | "vrm"
+  | "obj"
+  | "fbx"
+  | "png"
+  | "psd"
+  | "stl"
+  | "ply"
+  | "dae"
+  | "dxf";
 
 export interface StudioGradeAImportResult {
   readonly format: StudioGradeAFormat;
@@ -41,6 +53,10 @@ function detectFormat(
   if (lower.endsWith(".fbx")) return "fbx";
   if (lower.endsWith(".png")) return "png";
   if (lower.endsWith(".psd") || lower.endsWith(".psb")) return "psd";
+  if (lower.endsWith(".stl")) return "stl";
+  if (lower.endsWith(".ply")) return "ply";
+  if (lower.endsWith(".dae")) return "dae";
+  if (lower.endsWith(".dxf")) return "dxf";
   // magic
   if (
     bytes.length >= 4
@@ -100,6 +116,28 @@ export function importStudioGradeAAsset(input: {
   readonly format?: StudioGradeAFormat;
 }): StudioGradeAImportResult {
   const format = input.format ?? detectFormat(input.fileName, input.bytes);
+  if (
+    format === "stl"
+    || format === "ply"
+    || format === "dae"
+    || format === "dxf"
+  ) {
+    const adapted = importStudioMeshByExtension(
+      input.fileName.endsWith(`.${format}`)
+        ? input.fileName
+        : `${input.fileName}.${format}`,
+      input.bytes,
+    );
+    if (adapted) {
+      return {
+        format,
+        report: adapted.report,
+        scene: adapted.scene,
+        commitHash: adapted.commitHash,
+        committed: adapted.meshes.length > 0,
+      };
+    }
+  }
   if (!format) {
     const empty: StudioImportSceneIR = {
       format: "unknown",
@@ -121,6 +159,45 @@ export function importStudioGradeAAsset(input: {
       scene: empty,
       commitHash: report.sourceHash,
       committed: false,
+    };
+  }
+
+  if (
+    format === "stl"
+    || format === "ply"
+    || format === "dae"
+    || format === "dxf"
+  ) {
+    const adapted = importStudioMeshByExtension(input.fileName, input.bytes);
+    if (!adapted) {
+      const empty: StudioImportSceneIR = {
+        format: "unknown",
+        meshes: [],
+        materials: [],
+        textures: [],
+        nodes: [],
+        unsupported: [{ kind: "format", reason: format }],
+      };
+      const report = buildStudioImportCompatibilityReport({
+        parser: "studio-grade-a-import-pipeline/mesh-adapter",
+        sourceBytes: input.bytes,
+        scene: empty,
+        committed: false,
+      });
+      return {
+        format,
+        report,
+        scene: empty,
+        commitHash: report.sourceHash,
+        committed: false,
+      };
+    }
+    return {
+      format,
+      report: adapted.report,
+      scene: adapted.scene,
+      commitHash: adapted.commitHash,
+      committed: adapted.meshes.length > 0,
     };
   }
 
