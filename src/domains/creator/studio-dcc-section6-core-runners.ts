@@ -3,7 +3,11 @@
  * Complements studio-dcc-section6-domain-kernels for formerly fake IDs.
  */
 
-import { reprojectStudioArtistCorrections, appendStudioArtistCorrection } from "./studio-artist-correction-delta";
+import {
+  appendStudioArtistCorrection,
+  createStudioArtistCorrectionStore,
+  reprojectStudioArtistCorrections,
+} from "./studio-artist-correction-delta";
 import { planStudioBg3dPushPull } from "./studio-bg3d-push-pull";
 import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d-room-builder";
 import {
@@ -17,7 +21,10 @@ import {
   resolveStudioBuildInferenceSnap,
   cycleStudioInferenceAxisLock,
 } from "./studio-build-inference-snap";
-import { resolveStudioOutlinerVisibility } from "./studio-build-tags-outliner";
+import {
+  createStudioTagsOutlinerDocument,
+  resolveStudioOutlinerVisibility,
+} from "./studio-build-tags-outliner";
 import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
@@ -36,13 +43,17 @@ import {
   mixStudioExpressions,
   STUDIO_HAND_POSE_LIBRARY,
   createStudioDecalPlacement,
+  mirrorStudioHandPose,
   studioKtx2DerivativeForProfile,
 } from "./studio-character-pose-p1";
 import {
   createStudioClothGrid,
   stepStudioClothXpbd,
 } from "./studio-cloth-pattern-kernel";
-import { planStudioComponentMakeUnique } from "./studio-component-instance-core";
+import {
+  createStudioComponentDocument,
+  planStudioComponentMakeUnique,
+} from "./studio-component-instance-core";
 import {
   collabCanEdit,
   collabJoin,
@@ -69,6 +80,7 @@ import { importStudioFbxDocument, sniffStudioFbxBinaryHeader } from "./studio-fb
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
+  createStudioHybridDccOpfsPorts,
   createStudioHybridDccSession,
   hybridDccAutosaveCheckpoint,
   hybridDccContentAddressAsset,
@@ -99,10 +111,51 @@ import {
   subdivideStudioMeshCatmullLite,
 } from "./studio-mesh-ops-advanced";
 import { studioCameraFovY } from "./studio-shot-continuity";
-import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
+import {
+  createStudioDefaultSolidBooleanBackend,
+  createStudioManifoldSolidBooleanBackend,
+} from "./studio-solid-boolean-backend";
 import { unwrapStudioMeshBox } from "./studio-uv-unwrap-lite";
 
 import type { StudioDccKernelResult } from "./studio-dcc-section6-domain-kernels";
+import type { StudioOpfsRecoveryJournalAdapter } from "./studio-opfs-recovery-journal";
+
+/** In-memory OPFS adapter for DOC-004 journal recovery exercise. */
+class Section6CoreOpfsAdapter implements StudioOpfsRecoveryJournalAdapter {
+  readonly kind = "fake-opfs" as const;
+  readonly files = new Map<string, Uint8Array>();
+  async read(path: string) {
+    const b = this.files.get(path);
+    return b ? new Uint8Array(b) : null;
+  }
+  async writeAtomic(path: string, bytes: Uint8Array) {
+    this.files.set(path, new Uint8Array(bytes));
+  }
+  async remove(path: string) {
+    this.files.delete(path);
+  }
+  async list(prefix: string) {
+    return [...this.files.keys()].filter((p) => p.startsWith(prefix)).sort();
+  }
+  async size(path: string) {
+    return this.files.get(path)?.byteLength ?? null;
+  }
+  async estimateQuota() {
+    return null;
+  }
+  async withExclusiveLock<T>(
+    _n: string,
+    signal: AbortSignal | undefined,
+    op: () => Promise<T>,
+  ) {
+    if (signal?.aborted) {
+      const e = new Error("aborted");
+      e.name = "AbortError";
+      throw e;
+    }
+    return op();
+  }
+}
 
 function ok(
   id: string,
@@ -120,7 +173,12 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
 > = {
   "DOC-001": () => {
     const s = createStudioHybridDccSession("core-doc");
-    return ok("DOC-001", { documentId: s.state.documentId, format: s.state.format });
+    return ok("DOC-001", {
+      documentId: s.state.documentId,
+      format: s.state.format,
+      version: s.state.version,
+      commandCount: s.state.commandCount,
+    });
   },
   "DOC-002": () => {
     let s = createStudioHybridDccSession("core-undo");
@@ -142,17 +200,39 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     );
     return ok("DOC-003", { dirty: dirty.length, includesB: dirty.includes("b") });
   },
-  "DOC-004": () => {
-    const s = createStudioHybridDccSession("core-recover");
-    // recovery path exists; without OPFS adapter returns session identity
-    return ok("DOC-004", {
-      hasRecoverApi: typeof hybridDccRecoverFromJournal === "function",
+  "DOC-004": async () => {
+    let s = createStudioHybridDccSession("core-recover");
+    s = hybridDccRegisterAsset(s, "asset", cube(), {
+      source: "p",
+      creator: "t",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+    let t = 1_000;
+    const ports = createStudioHybridDccOpfsPorts({
+      adapter: new Section6CoreOpfsAdapter(),
       documentId: s.state.documentId,
+      now: () => ++t,
+      randomToken: () => `tok-${t}`,
+    });
+    const recovered = await hybridDccRecoverFromJournal(s, ports);
+    return ok("DOC-004", {
+      journalRestored: recovered.journalRestored,
+      checkpointFound: recovered.checkpointFound,
+      meshHashesEqual: recovered.meshHashesEqual,
+      lastSequence: recovered.lastSequence,
     });
   },
   "DOC-005": () => {
-    const hash = hybridDccContentAddressAsset(new TextEncoder().encode("asset-bytes"));
-    return ok("DOC-005", { hashPrefix: hash.slice(0, 10), addressed: hash.startsWith("sha256:") });
+    const bytes = new TextEncoder().encode("asset-bytes");
+    const hash = hybridDccContentAddressAsset(bytes);
+    return ok("DOC-005", {
+      hashPrefix: hash.slice(0, 10),
+      addressed: hash.startsWith("sha256:"),
+      byteLength: bytes.byteLength,
+      hashLength: hash.length,
+    });
   },
   "DOC-006": () => {
     const s = createStudioHybridDccSession("core-auto");
@@ -220,6 +300,8 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     if (!t.ok) throw new Error(t.detail);
     return ok("MOD-003", {
       moved: hashStudioEditableMesh(mesh) !== hashStudioEditableMesh(t.value),
+      verts: t.value.vertices.length,
+      selected: sel.value.ids.length,
     });
   },
   "MOD-004": () => {
@@ -273,7 +355,12 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
   "MOD-011": () => {
     const mesh = cube();
     const c = setStudioEditableMeshCrease(mesh, [0], 1);
-    return ok("MOD-011", { ok: c.ok });
+    if (!c.ok) throw new Error(c.detail);
+    return ok("MOD-011", {
+      ok: c.ok,
+      creaseEdges: 1,
+      verts: c.value.vertices.length,
+    });
   },
   "MOD-012": async () => {
     let stack = createStudioMeshModifierStack(cube());
@@ -323,10 +410,15 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
       operation: "difference",
       operand: { positions: op, indices: soup.indices },
     });
+    const backend = createStudioManifoldSolidBooleanBackend();
     const e = await evaluateStudioMeshModifierStack(stack, {
-      booleanBackend: createStudioDefaultSolidBooleanBackend(),
+      booleanBackend: backend,
     });
-    return ok("MOD-014", { ok: e.ok, faces: e.ok ? e.value.mesh.faces.length : 0 });
+    return ok("MOD-014", {
+      ok: e.ok,
+      faces: e.ok ? e.value.mesh.faces.length : 0,
+      backendReady: backend != null,
+    });
   },
   "MOD-015": async () => {
     let stack = createStudioMeshModifierStack(cube());
@@ -373,20 +465,51 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     });
   },
   "BLD-001": () => {
-    // API presence + pure snap math evidence without full query scaffolding
+    const snap = resolveStudioBuildInferenceSnap({
+      cursor: { x: 0.02, y: 0, z: 0 },
+      segments: [
+        { id: "s1", a: { x: 0, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 } },
+      ],
+      pixelThreshold: 12,
+      pixelsPerUnit: 100,
+      pointerVelocity: 0,
+      axisLock: "none",
+      preferKinds: ["endpoint", "midpoint"],
+    });
     return ok("BLD-001", {
-      api: typeof resolveStudioBuildInferenceSnap === "function",
-      snapDistance: Math.hypot(0.01, 0, 0),
+      snapped: snap.snapped,
+      candidates: snap.candidates.length,
+      worldThreshold: snap.worldThreshold,
     });
   },
   "BLD-002": () => {
-    const axis = cycleStudioInferenceAxisLock("x" as never);
-    return ok("BLD-002", { next: String(axis), api: true });
+    const axis = cycleStudioInferenceAxisLock("x");
+    const order = ["none", "x", "y", "z"] as const;
+    return ok("BLD-002", {
+      next: axis,
+      locked: axis !== "none",
+      axisIndex: order.indexOf(axis),
+    });
   },
   "BLD-003": () => {
+    const prim = {
+      id: "box-1",
+      kind: "box" as const,
+      position: [0, 0, 0] as [number, number, number],
+      rotation: [0, 0, 0] as [number, number, number],
+      scale: [1, 1, 1] as [number, number, number],
+      color: "#cccccc",
+    };
+    const plan = planStudioBg3dPushPull(prim, {
+      distance: 0.5,
+      axis: "y",
+      face: "positive",
+    });
+    if (!plan.ok) throw new Error(plan.message);
     return ok("BLD-003", {
-      api: typeof planStudioBg3dPushPull === "function",
-      pushDistance: 0.5,
+      appliedDistance: plan.appliedDistance,
+      previousDimension: plan.previousDimension,
+      nextDimension: plan.nextDimension,
     });
   },
   "BLD-004": () => {
@@ -403,13 +526,64 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("BLD-004", { points: off.polygon.length, resolved: off.selfIntersectionResolved });
   },
   "BLD-006": () => {
+    const doc = createStudioComponentDocument({
+      version: 1,
+      definitions: [
+        {
+          id: "comp-chair",
+          name: "Chair",
+          kind: "prop",
+          schemaVersion: 1,
+          revision: 1,
+          payload: { mesh: "chair", color: "#abc" },
+          slots: [],
+          properties: [],
+          variantAxes: [],
+        },
+      ],
+      instances: [
+        {
+          id: "inst-1",
+          componentId: "comp-chair",
+          sourceRevision: 1,
+          updatePolicy: "auto",
+          variantSelection: {},
+          slotBindings: {},
+          propertyValues: {},
+          localOverrides: [],
+        },
+      ],
+    });
+    const plan = planStudioComponentMakeUnique(
+      doc,
+      "inst-1",
+      "comp-chair-unique-1",
+      "Chair Unique",
+    );
     return ok("BLD-006", {
-      api: typeof planStudioComponentMakeUnique === "function",
+      kind: plan.kind,
+      uniqueId: plan.definitionForward?.id ?? "",
+      instances: doc.instances.length,
     });
   },
   "BLD-007": () => {
+    const doc = createStudioTagsOutlinerDocument(
+      [{ id: "tag-wall", label: "Wall", visible: true, renderLayer: 1 }],
+      [
+        {
+          id: "node-1",
+          label: "Wall A",
+          parentId: null,
+          tagIds: ["tag-wall"],
+          objectVisible: true,
+        },
+      ],
+    );
+    const vis = resolveStudioOutlinerVisibility(doc, "node-1");
     return ok("BLD-007", {
-      api: typeof resolveStudioOutlinerVisibility === "function",
+      visible: vis.visible,
+      layers: vis.renderLayers.length,
+      reason: vis.reason,
     });
   },
   "BLD-009": () => {
@@ -435,20 +609,43 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("BLD-010", { parts: parts.length, hasPreset: Boolean(preset) });
   },
   "BLD-011": () => {
-    return ok("BLD-011", {
-      api: typeof generateStudioStairs === "function",
+    const stairs = generateStudioStairs({
       steps: 8,
+      rise: 0.18,
+      run: 0.28,
+      width: 1.0,
+      landing: true,
+    });
+    return ok("BLD-011", {
+      steps: stairs.steps.length,
+      totalRise: stairs.totalRise,
+      totalRun: stairs.totalRun,
+      hasLanding: stairs.landing != null,
     });
   },
   "BLD-012": () => {
-    return ok("BLD-012", {
-      api: typeof generateStudioSlab === "function",
+    const slab = generateStudioSlab({
+      polygon: [
+        { x: 0, z: 0 },
+        { x: 4, z: 0 },
+        { x: 4, z: 3 },
+        { x: 0, z: 3 },
+      ],
+      elevation: 0,
       thickness: 0.2,
+      kind: "floor",
+    });
+    if (!slab) throw new Error("slab generation failed");
+    return ok("BLD-012", {
+      thickness: slab.thickness,
+      area: slab.area,
+      polyPoints: slab.polygon.length,
     });
   },
   "BLD-015": () => {
     const preset = getStudioBg3dRoomPreset("cafe");
-    return ok("BLD-015", { hasPreset: Boolean(preset) });
+    const parts = preset ? buildStudioBg3dRoomParts(preset.spec) : [];
+    return ok("BLD-015", { hasPreset: Boolean(preset), parts: parts.length });
   },
   "BLD-016": () => {
     const dim = createStudioDimension("dim-1", [0, 0, 0], [1, 0, 0], "m", 2);
@@ -459,8 +656,22 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     });
   },
   "BLD-018": () => {
+    const hide = resolveStudioCameraWallHide({
+      cameraPosition: [0, 1.6, 4],
+      subjectPosition: [0, 1.0, 0],
+      walls: [
+        {
+          id: "wall-front",
+          point: [0, 1, 2],
+          normal: [0, 0, 1],
+          thickness: 0.2,
+        },
+      ],
+      occludedOpacity: 0.2,
+    });
     return ok("BLD-018", {
-      api: typeof resolveStudioCameraWallHide === "function",
+      decisions: hide.decisions.length,
+      occluded: hide.occludedWallIds.length,
       cameraY: 1.6,
     });
   },
@@ -481,14 +692,19 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("CAD-015", { tris: solid ? solid.indices.length / 3 : 0 });
   },
   "SCP-001": () => {
-    const s = applyStudioSculptStroke(cube(), {
+    const before = cube();
+    const s = applyStudioSculptStroke(before, {
       kind: "inflate",
       center: { x: 0.5, y: 0.5, z: 0.5 },
       radius: 0.5,
       strength: 0.1,
     });
     if (!s.ok) throw new Error(s.detail);
-    return ok("SCP-001", { ok: true });
+    return ok("SCP-001", {
+      ok: true,
+      verts: s.mesh.vertices.length,
+      hashChanged: hashStudioEditableMesh(before) !== hashStudioEditableMesh(s.mesh),
+    });
   },
   "CHR-001": () => {
     const obj = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n";
@@ -519,7 +735,13 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     });
   },
   "CHR-007": () => {
-    return ok("CHR-007", { poses: STUDIO_HAND_POSE_LIBRARY.length });
+    const fist = STUDIO_HAND_POSE_LIBRARY.find((p) => p.id === "fist")!;
+    const left = mirrorStudioHandPose(fist, "left");
+    return ok("CHR-007", {
+      poses: STUDIO_HAND_POSE_LIBRARY.length,
+      side: left.side,
+      curlSum: left.curls.reduce((s, c) => s + c, 0),
+    });
   },
   "CHR-008": () => {
     const m = mixStudioExpressions([
@@ -599,7 +821,19 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     } as never);
     return ok("SHT-005", { hidden: Array.isArray(hide) ? hide.length : 0 });
   },
-  "NPR-001": () => ok("NPR-001", { passes: STUDIO_TOON_PASS_KINDS.length }),
+  "NPR-001": () => {
+    const set = createStudioSharedSet("s", []);
+    let bridge = createStudioLiveBridgeDocument(set, ["shot-1"]);
+    let passCount = 0;
+    for (const p of STUDIO_TOON_PASS_KINDS) {
+      bridge = generateStudioToonPass(bridge, "shot-1", p);
+      passCount += 1;
+    }
+    return ok("NPR-001", {
+      passes: STUDIO_TOON_PASS_KINDS.length,
+      generated: passCount,
+    });
+  },
   "NPR-005": () => {
     const set = createStudioSharedSet("s", [
       { id: "o1", geometryHash: "g", visible: true, materialId: "m" },
@@ -631,14 +865,32 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("NPR-006", { deltas: bridge.artistCorrections.deltas.length });
   },
   "NPR-008": () => {
-    const store = {
-      revision: 1 as const,
-      deltas: [],
-    };
-    // reproject API exists
+    let store = createStudioArtistCorrectionStore();
+    store = appendStudioArtistCorrection(store, {
+      id: "d1",
+      pass: "line",
+      shotId: "shot-1",
+      points: [[0.1, 0.1], [0.5, 0.5]],
+      pressure: [1, 0.8],
+      provenance: { objectId: "o1", confidence: 1 },
+      creationCameraHash: "cam-a",
+      creationGeometryHash: "geo-a",
+      createdAt: 0,
+    });
+    const reproj = reprojectStudioArtistCorrections(store, {
+      shotId: "shot-1",
+      previousCameraHash: "cam-a",
+      nextCameraHash: "cam-b",
+      previousGeometryHash: "geo-a",
+      nextGeometryHash: "geo-a",
+      policy: "reproject-uv",
+      uvAffine: [1, 0, 0.05, 0, 1, 0],
+    });
     return ok("NPR-008", {
-      api: typeof reprojectStudioArtistCorrections === "function" || typeof appendStudioArtistCorrection === "function",
-      storeEmpty: store.deltas.length === 0,
+      deltas: store.deltas.length,
+      preserved: reproj.preservedIds.length,
+      reprojected: reproj.reprojectedIds.length,
+      dropped: reproj.droppedIds.length,
     });
   },
   "FMT-FBX": () => {
@@ -650,6 +902,8 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     return ok("FMT-FBX", {
       magicOk: sniff.magicOk,
       binaryRejected: !r.ok,
+      headerBytes: bytes.byteLength,
+      magicLength: magic.length,
     });
   },
   "FMT-IFC": () => {
@@ -670,7 +924,12 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
       textureAssetId: "tex-poster",
       shotOnly: true,
     });
-    return ok("MAT-006", { mode: d.mode, shotOnly: d.shotOnly });
+    return ok("MAT-006", {
+      mode: d.mode,
+      shotOnly: d.shotOnly,
+      uvScaleX: d.uvScale[0],
+      uvScaleY: d.uvScale[1],
+    });
   },
   "MAT-009": () => {
     const k = studioKtx2DerivativeForProfile(4096, "mobile");

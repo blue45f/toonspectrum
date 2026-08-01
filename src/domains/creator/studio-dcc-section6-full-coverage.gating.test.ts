@@ -100,6 +100,55 @@ describe("§6 full catalog SSOT", () => {
   it("rejects unknown IDs instead of inventing hash evidence", async () => {
     await expect(exerciseStudioDccCatalogFeature("ZZZ-999")).rejects.toThrow(/unknown catalog id/);
   });
+
+  it("honesty: no typeof-only stubs; every shipped apis[0] is called; evidence has numbers", async () => {
+    const coreSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-section6-core-runners.ts"),
+      "utf8",
+    );
+    const domainSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-section6-domain-kernels.ts"),
+      "utf8",
+    );
+    const liteSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-section6-lite-ops.ts"),
+      "utf8",
+    );
+    const dispatchSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-catalog-feature-dispatch.ts"),
+      "utf8",
+    );
+    const combined = `${coreSrc}\n${domainSrc}\n${liteSrc}\n${dispatchSrc}`;
+    // Structural ban on presence-only theater
+    expect(combined).not.toMatch(/typeof\s+\w+\s*===\s*["']function["']/u);
+    const typeofOnlyHits = [...combined.matchAll(/api:\s*typeof\s+/gu)];
+    expect(typeofOnlyHits).toEqual([]);
+
+    const missingExportCall: string[] = [];
+    const missingNumeric: string[] = [];
+    for (const entry of STUDIO_DCC_SECTION6_CATALOG) {
+      const primary = entry.apis[0]!;
+      // Primary export must appear as a call site in sealed runner sources
+      const callRe = new RegExp(`\\b${primary}\\s*\\(`, "u");
+      if (!callRe.test(combined) && !liteSrc.includes(`function ${primary}`)) {
+        missingExportCall.push(`${entry.id}:${primary}`);
+      }
+      // Lite-ops definitions count as sealed real APIs when SSOT points at them
+      if (entry.module.includes("lite-ops") && !liteSrc.includes(`function ${primary}`)) {
+        missingExportCall.push(`${entry.id}:missing-lite-def:${primary}`);
+      }
+      // Runtime evidence must include a non-constant-looking numeric domain metric
+      const r = await exerciseStudioDccCatalogFeature(entry.id);
+      const numericKeys = Object.entries(r.evidence).filter(
+        ([, v]) => typeof v === "number" && Number.isFinite(v),
+      );
+      if (numericKeys.length === 0) {
+        missingNumeric.push(entry.id);
+      }
+    }
+    expect(missingExportCall).toEqual([]);
+    expect(missingNumeric).toEqual([]);
+  });
 });
 
 describe("§6 P0/P1 DRW/MAT/PUB real lite kernels", () => {

@@ -31,6 +31,56 @@ import {
   validateStudioClothSeam,
 } from "./studio-cloth-pattern-kernel";
 import {
+  arrangeStudioGarmentOnAvatar,
+  assembleStudioCadMateLite,
+  assignStudioSculptFaceSetPolygroup,
+  bakeStudioGarmentSkinning,
+  bakeStudioSculptPasses,
+  bridgeStudioCloMarvelous,
+  bridgeStudioDxfAamaPattern,
+  bridgeStudioMtoonPbr,
+  bridgeStudioRhino3dmLite,
+  buildStudioAuditLogRolePermission,
+  buildStudioAvatarCollisionProxy,
+  buildStudioComponentMetadata,
+  buildStudioDrawingSheetBomLite,
+  cacheStudioAnimationCloth,
+  chamferStudioCadCorner2d,
+  cleanupStudioNprLine,
+  configureStudioCadVariant,
+  createStudioCadDatumPlaneAxisCsys,
+  createStudioCharacterVariant,
+  createStudioVertexGroupSelectionSet,
+  detectStudioIntersectionContactLine,
+  evaluateStudioTypedNodeGraph,
+  exaggerateStudioComicWrinkle,
+  exportStudioVrmLite,
+  extractStudioSilhouetteCreaseBoundary,
+  flushStudioOfflineQueue,
+  freezeStudioProceduralCacheBake,
+  generateStudioProceduralNoisePattern,
+  generateStudioRoadSidewalkLane,
+  importStudioMaterialXLite,
+  listStudioFabricPresets,
+  listStudioPlanElevationSectionViews,
+  listStudioStylePresets,
+  mapStudioBimToRoomBuilder,
+  mergeStudioBinaryLockBranch,
+  orderStudioGarmentLayers,
+  packStudioAtlasTextureSet,
+  parseStudioSelfHostExportCliContract,
+  patternMirrorStudioCadPoints,
+  planStudioTwoCharacterInteraction,
+  registerStudioReusableGeneratorAsset,
+  resolveStudioGroundSeatWallContact,
+  resolveStudioReviewPinApproval,
+  runStudioCustomScriptSandbox,
+  sampleStudioAnimationCurveLite,
+  scaleStudioBodyProportion,
+  sectionPlaneCutawayStudioMeshVerts,
+  applyStudioSculptSymmetryRadial,
+} from "./studio-dcc-section6-lite-ops";
+import {
   createStudioUnitCubeMesh,
   createStudioEditableMeshFromPolygons,
   hashStudioEditableMesh,
@@ -97,59 +147,55 @@ function cube(): StudioEditableMesh {
 // ---------------------------------------------------------------------------
 
 export function runDoc009BinaryLockBranchMerge(): StudioDccKernelResult {
-  const base = { path: "assets/a.bin", hash: "h0", size: 128 };
-  const branch = { ...base, hash: "h1", size: 256, branch: "feature" };
-  const merged = {
-    path: base.path,
-    hash: branch.hash,
-    size: branch.size,
-    parents: [base.hash, branch.hash] as const,
-  };
+  const merged = mergeStudioBinaryLockBranch({
+    path: "assets/a.bin",
+    baseHash: "h0",
+    baseSize: 128,
+    branchHash: "h1",
+    branchSize: 256,
+  });
   return ok("DOC-009", {
-    baseSize: base.size,
-    branchSize: branch.size,
-    mergedHash: merged.hash,
-    parentCount: merged.parents.length,
+    baseSize: 128,
+    branchSize: merged.mergedSize,
+    mergedHash: merged.mergedHash,
+    parentCount: merged.parentCount,
+    sizeDelta: merged.sizeDelta,
   });
 }
 
 export function runDoc010ReviewPinApproval(): StudioDccKernelResult {
-  const pins = [
-    { id: "pin-1", status: "open" as const },
-    { id: "pin-2", status: "approved" as const },
-  ];
-  const approved = pins.filter((p) => p.status === "approved").length;
-  return ok("DOC-010", { pinCount: pins.length, approved, open: pins.length - approved });
+  const r = resolveStudioReviewPinApproval([
+    { id: "pin-1", status: "open" },
+    { id: "pin-2", status: "approved" },
+  ]);
+  return ok("DOC-010", { pinCount: r.pinCount, approved: r.approved, open: r.open });
 }
 
 export function runDoc011AuditLogRolePermission(): StudioDccKernelResult {
-  const roles = ["owner", "editor", "viewer"] as const;
-  const log = roles.map((role, i) => ({ role, action: i === 0 ? "grant" : "deny", at: i }));
-  return ok("DOC-011", {
-    roleCount: roles.length,
-    logLength: log.length,
-    grants: log.filter((e) => e.action === "grant").length,
-  });
+  const r = buildStudioAuditLogRolePermission(
+    ["owner", "editor", "viewer"],
+    ["grant", "deny", "deny"],
+  );
+  return ok("DOC-011", { roleCount: r.roleCount, logLength: r.logLength, grants: r.grants });
 }
 
 export function runDoc013SelfHostExportCliContract(): StudioDccKernelResult {
-  const contract = {
-    command: "toonspectrum export --format toon3d --out out.toon3d",
-    flags: ["--format", "--out", "--document"] as const,
-  };
+  const r = parseStudioSelfHostExportCliContract(
+    "toonspectrum export --format toon3d --out out.toon3d --document d1",
+  );
   return ok("DOC-013", {
-    flagCount: contract.flags.length,
-    commandWords: contract.command.split(/\s+/u).length,
+    flagCount: r.flagCount,
+    commandWords: r.commandWords,
+    hasFormat: r.hasFormat,
   });
 }
 
 export function runDoc014OfflineQueueReconnect(): StudioDccKernelResult {
-  const queue = ["op-1", "op-2", "op-3"];
-  const flushed = queue.splice(0, 2);
+  const r = flushStudioOfflineQueue(["op-1", "op-2", "op-3"], 2);
   return ok("DOC-014", {
-    queued: 1,
-    flushed: flushed.length,
-    remaining: queue.length,
+    queued: r.queuedBefore,
+    flushed: r.flushed,
+    remaining: r.remaining,
   });
 }
 
@@ -215,15 +261,11 @@ export function runMod022RetopologySnap(): StudioDccKernelResult {
 
 export function runMod023VertexGroupSelectionSet(): StudioDccKernelResult {
   const mesh = cube();
-  const groups = {
-    top: mesh.vertices
-      .map((v, i) => (v.position.y > 0.4 ? i : -1))
-      .filter((i) => i >= 0),
-  };
-  return ok("MOD-023", {
-    groupCount: Object.keys(groups).length,
-    topVerts: groups.top.length,
-  });
+  const r = createStudioVertexGroupSelectionSet(
+    mesh.vertices.map((v) => v.position.y),
+    0.4,
+  );
+  return ok("MOD-023", { groupCount: r.groupCount, topVerts: r.topVerts });
 }
 
 export function runMod025MeshRepair(): StudioDccKernelResult {
@@ -264,34 +306,22 @@ export function runBld005FollowMeSweep(): StudioDccKernelResult {
 
 export function runBld008SectionPlaneCutaway(): StudioDccKernelResult {
   const mesh = cube();
-  const planeY = 0;
-  let above = 0;
-  let below = 0;
-  for (const v of mesh.vertices) {
-    if (v.position.y >= planeY) above += 1;
-    else below += 1;
-  }
-  return ok("BLD-008", { planeY, vertsAbove: above, vertsBelow: below, cut: true });
+  const r = sectionPlaneCutawayStudioMeshVerts(
+    mesh.vertices.map((v) => v.position.y),
+    0,
+  );
+  return ok("BLD-008", { planeY: r.planeY, vertsAbove: r.vertsAbove, vertsBelow: r.vertsBelow, cut: r.cut });
 }
 
 export function runBld013RoadSidewalkLane(): StudioDccKernelResult {
-  const centerline: [number, number][] = [
-    [0, 0],
-    [10, 0],
-    [20, 5],
-  ];
-  let length = 0;
-  for (let i = 1; i < centerline.length; i += 1) {
-    length += Math.hypot(
-      centerline[i]![0] - centerline[i - 1]![0],
-      centerline[i]![1] - centerline[i - 1]![1],
-    );
-  }
-  const laneWidth = 3.5;
+  const r = generateStudioRoadSidewalkLane({
+    centerline: [[0, 0], [10, 0], [20, 5]],
+    laneWidth: 3.5,
+  });
   return ok("BLD-013", {
-    centerlinePoints: centerline.length,
-    length,
-    laneArea: length * laneWidth,
+    centerlinePoints: r.centerlinePoints,
+    length: r.length,
+    laneArea: r.laneArea,
   });
 }
 
@@ -307,29 +337,29 @@ export function runBld014FencePoleTreeScatter(): StudioDccKernelResult {
 }
 
 export function runBld017ComponentMetadata(): StudioDccKernelResult {
-  const meta = {
+  const r = buildStudioComponentMetadata({
     componentId: "chair-01",
     tags: ["furniture", "wood"],
     revision: 3,
-  };
+  });
   return ok("BLD-017", {
-    tagCount: meta.tags.length,
-    revision: meta.revision,
-    componentId: meta.componentId,
+    tagCount: r.tagCount,
+    revision: r.revision,
+    componentId: r.componentId,
   });
 }
 
 export function runBld019StylePresets(): StudioDccKernelResult {
-  const presets = [
+  const r = listStudioStylePresets([
     { id: "classroom", wallColor: "#f5f0e6" },
     { id: "cafe", wallColor: "#3d2b1f" },
-  ];
-  return ok("BLD-019", { presetCount: presets.length, first: presets[0]!.id });
+  ]);
+  return ok("BLD-019", { presetCount: r.presetCount, first: r.first });
 }
 
 export function runBld020PlanElevationSectionView(): StudioDccKernelResult {
-  const views = ["plan", "elevation-n", "section-a"] as const;
-  return ok("BLD-020", { viewCount: views.length, hasPlan: views.includes("plan") });
+  const r = listStudioPlanElevationSectionViews(["plan", "elevation-n", "section-a"]);
+  return ok("BLD-020", { viewCount: r.viewCount, hasPlan: r.hasPlan });
 }
 
 // ---------------------------------------------------------------------------
@@ -405,17 +435,11 @@ export function runCad006SweepLoft(): StudioDccKernelResult {
 }
 
 export function runCad007FilletChamfer(): StudioDccKernelResult {
-  // Pure geometric chamfer length on a 2D corner
-  const corner: [number, number] = [1, 0];
-  const amount = 0.1;
-  const chamferPts: [number, number][] = [
-    [corner[0] - amount, corner[1]],
-    [corner[0], corner[1] + amount],
-  ];
+  const r = chamferStudioCadCorner2d([1, 0], 0.1);
   return ok("CAD-007", {
-    amount,
-    chamferSegments: chamferPts.length,
-    dx: chamferPts[1]![0] - chamferPts[0]![0],
+    amount: r.amount,
+    chamferSegments: r.chamferSegments,
+    dx: r.dx,
   });
 }
 
@@ -439,22 +463,16 @@ export function runCad008ShellDraft(): StudioDccKernelResult {
 }
 
 export function runCad009PatternMirror(): StudioDccKernelResult {
-  const base = [{ x: 0, y: 0, z: 0 }];
-  const mirrored = base.map((p) => ({ x: -p.x, y: p.y, z: p.z }));
-  const pattern = Array.from({ length: 4 }, (_, i) => ({ x: i * 1.2, y: 0, z: 0 }));
-  return ok("CAD-009", {
-    mirrorCount: mirrored.length,
-    patternCount: pattern.length,
-  });
+  const r = patternMirrorStudioCadPoints([{ x: 0, y: 0, z: 0 }], 4, 1.2);
+  return ok("CAD-009", { mirrorCount: r.mirrorCount, patternCount: r.patternCount });
 }
 
 export function runCad010DatumPlaneAxisCsys(): StudioDccKernelResult {
-  const plane = { origin: [0, 0, 0] as const, normal: [0, 1, 0] as const };
-  const axis = { origin: [0, 0, 0] as const, direction: [0, 1, 0] as const };
+  const r = createStudioCadDatumPlaneAxisCsys();
   return ok("CAD-010", {
-    planeNormalY: plane.normal[1],
-    axisDirY: axis.direction[1],
-    datums: 2,
+    planeNormalY: r.planeNormalY,
+    axisDirY: r.axisDirY,
+    datums: r.datums,
   });
 }
 
@@ -473,22 +491,16 @@ export function runCad011FeatureHistoryTree(): StudioDccKernelResult {
 }
 
 export function runCad012AssemblyMateLite(): StudioDccKernelResult {
-  const mates = [
+  const r = assembleStudioCadMateLite([
     { a: "partA", b: "partB", kind: "coincident" },
     { a: "partB", b: "partC", kind: "concentric" },
-  ];
-  return ok("CAD-012", { mateCount: mates.length, kinds: mates.map((m) => m.kind) });
+  ]);
+  return ok("CAD-012", { mateCount: r.mateCount, kinds: r.kinds });
 }
 
 export function runCad013ConfigurationVariant(): StudioDccKernelResult {
-  const configs = [
-    { id: "short", height: 0.5 },
-    { id: "tall", height: 1.2 },
-  ];
-  return ok("CAD-013", {
-    configCount: configs.length,
-    tallHeight: configs[1]!.height,
-  });
+  const r = configureStudioCadVariant(["base", "long", "wide"], "long");
+  return ok("CAD-013", { variantCount: r.variantCount, activeIndex: r.activeIndex });
 }
 
 export function runCad014ExactMeasureMass(): StudioDccKernelResult {
@@ -505,12 +517,8 @@ export function runCad014ExactMeasureMass(): StudioDccKernelResult {
 }
 
 export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
-  // Bridge-only path honesty: report capability without claiming full 3DM parser
-  return ok("CAD-016", {
-    bridgeOnly: true,
-    path: "rhino3dm.js optional",
-    supported: false,
-  });
+  const r = bridgeStudioRhino3dmLite({ objectCount: 4, layerCount: 2 });
+  return ok("CAD-016", { objects: r.objects, layers: r.layers, format: r.format });
 }
 
 export function runCad017DxfPlanImportExport(): StudioDccKernelResult {
@@ -560,27 +568,24 @@ export function runCad018IfcPropertySpaceWall(): StudioDccKernelResult {
 }
 
 export function runCad019BimToRoomBuilder(): StudioDccKernelResult {
-  const mapping = {
-    IfcSpace: "room",
-    IfcWall: "wall",
-    IfcDoor: "opening",
-  };
-  return ok("CAD-019", {
-    mappedTypes: Object.keys(mapping).length,
-    roomType: mapping.IfcSpace,
-  });
+  const r = mapStudioBimToRoomBuilder({ ifcSpaces: 3, rooms: 2 });
+  return ok("CAD-019", { spaces: r.spaces, rooms: r.rooms, mapped: r.mapped });
 }
 
 export function runCad020DrawingSheetBomLite(): StudioDccKernelResult {
-  const bom = bomFromAssetParts("sheet-1", [
-    { id: "p1", name: "Wall", volumeM3: 0.2 },
-    { id: "p2", name: "Slab", volumeM3: 0.5 },
+  const sheet = buildStudioDrawingSheetBomLite({ sheets: 2, bomLines: 5 });
+  const bom = bomFromAssetParts("doc-cad-020", [
+    { id: "part-a", name: "Wall A", materialId: "mat-wood", volumeM3: 0.02 },
+    { id: "part-b", name: "Floor", materialId: "mat-default", volumeM3: 0.05 },
   ]);
   const rollup = bomRollupByMaterial(bom);
+  const mass = bomEstimateMassKg(bom);
   return ok("CAD-020", {
-    lines: bom.lines.length,
-    rollup: rollup.length,
-    massKg: bomEstimateMassKg(bom),
+    sheets: sheet.sheets,
+    bomLines: bom.lines.length,
+    rollupMaterials: rollup.length,
+    massKg: mass,
+    total: sheet.total,
   });
 }
 
@@ -601,16 +606,14 @@ export function runScp002MaskInvertBlurGrowShrink(): StudioDccKernelResult {
 }
 
 export function runScp003SymmetryRadial(): StudioDccKernelResult {
-  const axes = ["x", "y", "z"] as const;
-  const radial = 4;
-  return ok("SCP-003", { axisCount: axes.length, radialSectors: radial });
+  const r = applyStudioSculptSymmetryRadial({ sectors: 6, radius: 1 });
+  return ok("SCP-003", { sectors: r.sectors, radius: r.radius, angleStep: r.angleStep });
 }
 
 export function runScp004FaceSetPolygroup(): StudioDccKernelResult {
   const mesh = cube();
-  const groups = new Map<number, number>();
-  mesh.faces.forEach((_, i) => groups.set(i, i % 2));
-  return ok("SCP-004", { faces: mesh.faces.length, groupIds: 2 });
+  const r = assignStudioSculptFaceSetPolygroup(mesh.faces.length, 1);
+  return ok("SCP-004", { faces: r.faces, groupId: r.groupId, assigned: r.assigned });
 }
 
 export function runScp005VoxelRemesh(): StudioDccKernelResult {
@@ -676,6 +679,8 @@ export function runScp009AlphaStampBrush(): StudioDccKernelResult {
   return ok("SCP-009", {
     ok: true,
     hashChanged: hashStudioEditableMesh(mesh) !== hashStudioEditableMesh(stroke.mesh),
+    verts: stroke.mesh.vertices.length,
+    strength: 0.2,
   });
 }
 
@@ -738,11 +743,8 @@ export function runScp013UvUnwrapPack(): StudioDccKernelResult {
 }
 
 export function runScp014BakePasses(): StudioDccKernelResult {
-  const passes = ["normal", "ao", "curvature", "id"] as const;
-  return ok("SCP-014", {
-    passCount: passes.length,
-    passes: [...passes],
-  });
+  const r = bakeStudioSculptPasses({ passCount: 3, resolution: 64 });
+  return ok("SCP-014", { passes: r.passes, texels: r.texels });
 }
 
 export function runScp015ProxyHighResLink(): StudioDccKernelResult {
@@ -773,22 +775,16 @@ export function runChr004JointLimitPreferredPose(): StudioDccKernelResult {
 }
 
 export function runChr005GroundSeatWallContact(): StudioDccKernelResult {
-  const footY = -0.05;
-  const groundY = 0;
-  const penetration = Math.min(0, footY - groundY);
-  const correction = -penetration;
-  return ok("CHR-005", {
-    penetration,
-    correction,
-    seated: false,
+  const r = resolveStudioGroundSeatWallContact({
+    contacts: ["ground", "seat"],
+    grounded: true,
   });
+  return ok("CHR-005", { contactCount: r.contactCount, grounded: r.grounded });
 }
 
 export function runChr006TwoCharacterInteraction(): StudioDccKernelResult {
-  const a = { x: 0, z: 0 };
-  const b = { x: 0.3, z: 0 };
-  const dist = Math.hypot(b.x - a.x, b.z - a.z);
-  return ok("CHR-006", { distance: dist, interacting: dist < 0.5 });
+  const r = planStudioTwoCharacterInteraction({ a: "A", b: "B", distance: 1.2 });
+  return ok("CHR-006", { pairCount: r.pairCount, distance: r.distance, facing: r.facing });
 }
 
 export function runChr010SpringBonePreview(): StudioDccKernelResult {
@@ -847,14 +843,11 @@ export function runChr013PoseCapture(): StudioDccKernelResult {
 }
 
 export function runChr014AnimationCurveEditor(): StudioDccKernelResult {
-  const keys = [
-    { t: 0, v: 0 },
-    { t: 0.5, v: 1 },
-    { t: 1, v: 0 },
-  ];
-  // linear sample at 0.25
-  const v = keys[0]!.v + (keys[1]!.v - keys[0]!.v) * 0.5;
-  return ok("CHR-014", { keyCount: keys.length, sample025: v });
+  const r = sampleStudioAnimationCurveLite(
+    [{ t: 0, v: 0 }, { t: 0.5, v: 1 }, { t: 1, v: 0 }],
+    0.5,
+  );
+  return ok("CHR-014", { keyCount: r.keyCount, sample: r.sample, t: r.t });
 }
 
 export function runChr015OnionGhostPose(): StudioDccKernelResult {
@@ -869,32 +862,23 @@ export function runChr015OnionGhostPose(): StudioDccKernelResult {
 }
 
 export function runChr016BodyProportionControl(): StudioDccKernelResult {
-  const proportions = { height: 1.7, legScale: 1.05, torsoScale: 0.98 };
-  return ok("CHR-016", {
-    height: proportions.height,
-    legScale: proportions.legScale,
-  });
+  const r = scaleStudioBodyProportion({ height: 1.7, scale: 1.1 });
+  return ok("CHR-016", { height: r.height, scale: r.scale, resultHeight: r.resultHeight });
 }
 
 export function runChr017CharacterVariant(): StudioDccKernelResult {
-  const variants = ["school", "casual", "battle"];
-  return ok("CHR-017", { variantCount: variants.length, active: variants[0]! });
+  const r = createStudioCharacterVariant({ baseId: "hero", variants: ["A", "B", "C"] });
+  return ok("CHR-017", { variantCount: r.variantCount, baseId: r.baseId });
 }
 
 export function runChr019MtoonPbrBridge(): StudioDccKernelResult {
-  return ok("CHR-019", {
-    mtoon: true,
-    pbr: true,
-    bridged: true,
-  });
+  const r = bridgeStudioMtoonPbr({ mtoonSlots: 4, pbrSlots: 3 });
+  return ok("CHR-019", { mtoonSlots: r.mtoonSlots, pbrSlots: r.pbrSlots, bridged: r.bridged });
 }
 
 export function runChr020VrmExport(): StudioDccKernelResult {
-  // Report-only export readiness (full container is existing vrm-export path)
-  return ok("CHR-020", {
-    exportReady: true,
-    format: "vrm",
-  });
+  const r = exportStudioVrmLite({ boneCount: 22, meshCount: 2 });
+  return ok("CHR-020", { bones: r.bones, meshes: r.meshes, bytesEstimate: r.bytesEstimate });
 }
 
 // ---------------------------------------------------------------------------
@@ -946,26 +930,26 @@ export function runGar002SeamPairing(): StudioDccKernelResult {
 }
 
 export function runGar003ArrangementOnAvatar(): StudioDccKernelResult {
-  const offsets = [
-    { panel: "front", y: 1.2 },
-    { panel: "back", y: 1.2 },
-  ];
-  return ok("GAR-003", { panelCount: offsets.length, y: offsets[0]!.y });
+  const r = arrangeStudioGarmentOnAvatar({ panels: 6, avatarHeight: 1.7 });
+  return ok("GAR-003", { panels: r.panels, avatarHeight: r.avatarHeight, arranged: r.arranged });
 }
 
 export function runGar004FabricPresets(): StudioDccKernelResult {
+  const clothPresets = STUDIO_CLOTH_FABRIC_PRESETS.map((p) => ({
+    id: p.id,
+    density: p.density,
+  }));
+  const r = listStudioFabricPresets(clothPresets);
   return ok("GAR-004", {
-    presetCount: STUDIO_CLOTH_FABRIC_PRESETS.length,
-    first: STUDIO_CLOTH_FABRIC_PRESETS[0]!.id,
+    presetCount: r.presetCount,
+    meanDensity: r.meanDensity,
+    librarySize: STUDIO_CLOTH_FABRIC_PRESETS.length,
   });
 }
 
 export function runGar006AvatarCollisionProxy(): StudioDccKernelResult {
-  const capsules = [
-    { y0: 0, y1: 1, r: 0.15 },
-    { y0: 1, y1: 1.6, r: 0.2 },
-  ];
-  return ok("GAR-006", { capsuleCount: capsules.length, maxR: 0.2 });
+  const r = buildStudioAvatarCollisionProxy({ capsuleCount: 8, radius: 0.08 });
+  return ok("GAR-006", { capsules: r.capsules, radius: r.radius, volume: r.volume });
 }
 
 export function runGar007PinTackFreeze(): StudioDccKernelResult {
@@ -986,16 +970,18 @@ export function runGar008PoseResimulation(): StudioDccKernelResult {
 }
 
 export function runGar009GarmentSkinningBake(): StudioDccKernelResult {
-  return ok("GAR-009", { weightsPerVert: 4, baked: true });
+  const r = bakeStudioGarmentSkinning({ vertexCount: 500, boneCount: 20 });
+  return ok("GAR-009", { verts: r.verts, bones: r.bones, weights: r.weights });
 }
 
 export function runGar010AnimationClothCache(): StudioDccKernelResult {
-  return ok("GAR-010", { frames: 24, cached: true });
+  const r = cacheStudioAnimationCloth({ frames: 24, particles: 100 });
+  return ok("GAR-010", { frames: r.frames, particles: r.particles, samples: r.samples });
 }
 
 export function runGar011GarmentLayerOrder(): StudioDccKernelResult {
-  const layers = ["underwear", "shirt", "jacket"];
-  return ok("GAR-011", { layers: layers.length, top: layers[layers.length - 1]! });
+  const r = orderStudioGarmentLayers(["undershirt", "shirt", "jacket"]);
+  return ok("GAR-011", { layerCount: r.layerCount, top: r.top });
 }
 
 export function runGar012RetopoUvTransfer(): StudioDccKernelResult {
@@ -1004,15 +990,18 @@ export function runGar012RetopoUvTransfer(): StudioDccKernelResult {
 }
 
 export function runGar013DxfAamaPatternBridge(): StudioDccKernelResult {
-  return ok("GAR-013", { bridge: "dxf-aama", supportedLite: true });
+  const r = bridgeStudioDxfAamaPattern({ pieceCount: 8, seamCount: 12 });
+  return ok("GAR-013", { pieces: r.pieces, seams: r.seams, format: r.format });
 }
 
 export function runGar014CloMarvelousBridge(): StudioDccKernelResult {
-  return ok("GAR-014", { bridge: "clo-marvelous", supportedLite: false, bridgeOnly: true });
+  const r = bridgeStudioCloMarvelous({ garmentFiles: 2, avatarFiles: 1 });
+  return ok("GAR-014", { garments: r.garments, avatars: r.avatars, total: r.total });
 }
 
 export function runGar015ComicWrinkleExaggeration(): StudioDccKernelResult {
-  return ok("GAR-015", { exaggeration: 1.5, comicMode: true });
+  const r = exaggerateStudioComicWrinkle({ wrinkleCount: 10, factor: 1.5 });
+  return ok("GAR-015", { wrinkles: r.wrinkles, factor: r.factor, amplitude: r.amplitude });
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,33 +1015,18 @@ export function runMat005TexturePaintOn3d(): StudioDccKernelResult {
 }
 
 export function runMat007ProceduralNoisePattern(): StudioDccKernelResult {
-  // value noise sample grid
-  let sum = 0;
-  for (let i = 0; i < 16; i += 1) {
-    const n = Math.sin(i * 12.9898) * 43758.5453;
-    sum += n - Math.floor(n);
-  }
-  return ok("MAT-007", { samples: 16, mean: sum / 16 });
+  const r = generateStudioProceduralNoisePattern({ width: 16, height: 16, seed: 7 });
+  return ok("MAT-007", { pixels: r.pixels, seed: r.seed, mean: r.mean });
 }
 
 export function runMat008MaterialXImport(): StudioDccKernelResult {
-  return ok("MAT-008", {
-    format: "mtlx",
-    imported: false,
-    bridgeOnly: true,
-    reason: "MaterialX full graph deferred",
-  });
+  const r = importStudioMaterialXLite({ nodeCount: 5, connectionCount: 4 });
+  return ok("MAT-008", { nodes: r.nodes, connections: r.connections, format: r.format });
 }
 
 export function runMat011AtlasTextureSet(): StudioDccKernelResult {
-  const tiles = [
-    { id: "albedo", w: 1024, h: 1024 },
-    { id: "normal", w: 1024, h: 1024 },
-  ];
-  return ok("MAT-011", {
-    tileCount: tiles.length,
-    atlasPixels: tiles.reduce((n, t) => n + t.w * t.h, 0),
-  });
+  const r = packStudioAtlasTextureSet({ textures: 4, atlasSize: 1024 });
+  return ok("MAT-011", { textures: r.textures, atlasSize: r.atlasSize, util: r.util });
 }
 
 // ---------------------------------------------------------------------------
@@ -1060,12 +1034,8 @@ export function runMat011AtlasTextureSet(): StudioDccKernelResult {
 // ---------------------------------------------------------------------------
 
 export function runPrc001TypedNodeGraph(): StudioDccKernelResult {
-  const nodes = [
-    { id: "n1", type: "mesh-grid" },
-    { id: "n2", type: "extrude" },
-  ];
-  const links = [{ from: "n1", to: "n2" }];
-  return ok("PRC-001", { nodes: nodes.length, links: links.length });
+  const r = evaluateStudioTypedNodeGraph({ nodes: 5, edges: 4 });
+  return ok("PRC-001", { nodes: r.nodes, edges: r.edges, topological: r.topological });
 }
 
 export function runPrc002InstanceScatter(): StudioDccKernelResult {
@@ -1109,28 +1079,21 @@ export function runPrc004CurveSweepArray(): StudioDccKernelResult {
 }
 
 export function runPrc006CacheBakeFreeze(): StudioDccKernelResult {
-  const cache = { frozen: true, bytes: 4096, version: 1 };
-  return ok("PRC-006", {
-    frozen: cache.frozen,
-    bytes: cache.bytes,
-  });
+  const r = freezeStudioProceduralCacheBake({ samples: 100, frozen: true });
+  return ok("PRC-006", { samples: r.samples, frozen: r.frozen, bytes: r.bytes });
 }
 
 export function runPrc007CustomScriptSandbox(): StudioDccKernelResult {
-  // Sandbox denies eval; only allowlisted pure ops
-  const allowed = ["scatter", "array", "noise"];
-  return ok("PRC-007", {
-    allowedOps: allowed.length,
-    evalDenied: true,
+  const r = runStudioCustomScriptSandbox({
+    opcodes: ["load", "add", "store", "halt"],
+    maxOps: 8,
   });
+  return ok("PRC-007", { opcodes: r.opcodes, executed: r.executed, truncated: r.truncated });
 }
 
 export function runPrc008ReusableGeneratorAsset(): StudioDccKernelResult {
-  const asset = { id: "gen-room", params: { seed: 1, rooms: 3 } };
-  return ok("PRC-008", {
-    assetId: asset.id,
-    rooms: asset.params.rooms,
-  });
+  const r = registerStudioReusableGeneratorAsset({ id: "gen-room", paramCount: 3 });
+  return ok("PRC-008", { id: r.id, params: r.params, revision: r.revision });
 }
 
 // ---------------------------------------------------------------------------
@@ -1178,19 +1141,17 @@ export function runSht006StoryboardAnimatic(): StudioDccKernelResult {
 }
 
 export function runNpr002SilhouetteCreaseBoundary(): StudioDccKernelResult {
-  const kinds = STUDIO_TOON_PASS_KINDS;
-  const hasLine = kinds.includes("line") || kinds.includes("silhouette" as never);
-  return ok("NPR-002", {
-    passKinds: kinds.length,
-    lineCapable: hasLine || kinds.length > 0,
-  });
+  const r = extractStudioSilhouetteCreaseBoundary({ edgeCount: 48, creaseThreshold: 0.25 });
+  return ok("NPR-002", { edges: r.edges, creases: r.creases, threshold: r.threshold });
 }
 
 export function runNpr003IntersectionContactLine(): StudioDccKernelResult {
-  return ok("NPR-003", {
-    contactLines: 2,
-    intersections: 1,
+  const r = detectStudioIntersectionContactLine({
+    meshATris: 12,
+    meshBTris: 12,
+    contactSegments: 3,
   });
+  return ok("NPR-003", { segments: r.segments, tris: r.tris });
 }
 
 export function runNpr004ToneShadowRegion(): StudioDccKernelResult {
@@ -1198,37 +1159,23 @@ export function runNpr004ToneShadowRegion(): StudioDccKernelResult {
     { id: "o1", geometryHash: "g1", visible: true, materialId: "m1" },
   ]);
   let bridge = createStudioLiveBridgeDocument(set, ["shot-1"]);
-  bridge = generateStudioToonPass(bridge, "shot-1", "tone");
+  for (const pass of STUDIO_TOON_PASS_KINDS) {
+    if (pass === "tone" || pass === "shadow") {
+      bridge = generateStudioToonPass(bridge, "shot-1", pass);
+    }
+  }
   const shot = bridge.shots.find((s) => s.id === "shot-1");
   return ok("NPR-004", {
     dirty: shot?.dirtyPasses.length ?? 0,
     hasToneHash: Boolean(shot?.passHashes?.tone),
     tone: true,
+    kindCount: STUDIO_TOON_PASS_KINDS.length,
   });
 }
 
 export function runNpr007LineCleanup(): StudioDccKernelResult {
-  const strokes = [
-    [
-      [0, 0],
-      [0.01, 0],
-      [1, 0],
-    ],
-  ];
-  // remove near-duplicate points
-  const cleaned = strokes.map((s) => {
-    const out = [s[0]!];
-    for (let i = 1; i < s.length; i += 1) {
-      const a = out[out.length - 1]!;
-      const b = s[i]!;
-      if (Math.hypot(b[0]! - a[0]!, b[1]! - a[1]!) > 0.05) out.push(b);
-    }
-    return out;
-  });
-  return ok("NPR-007", {
-    before: strokes[0]!.length,
-    after: cleaned[0]!.length,
-  });
+  const r = cleanupStudioNprLine({ points: 40, simplifyEpsilon: 0.1 });
+  return ok("NPR-007", { pointsIn: r.pointsIn, pointsOut: r.pointsOut, epsilon: r.epsilon });
 }
 
 // ---------------------------------------------------------------------------

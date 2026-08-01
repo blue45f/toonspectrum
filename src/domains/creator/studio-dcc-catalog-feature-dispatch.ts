@@ -19,6 +19,7 @@ import {
   measureStudioBrushLatencyBudget,
   planStudioPressureBrushStroke,
   reportStudioPsdPsbCompatibility,
+  overrideStudioMaterialByShot,
   resolveStudioColorManagementProfile,
   snapStudioRulerGuide,
   transformStudioLayer,
@@ -165,15 +166,32 @@ function runDrawMatPubKernel(id: string): StudioDccKernelResult {
       return { id, ok: true, evidence: { model: m.model, toony: m.shadingToony } };
     }
     case "MAT-003": {
-      const base = createStudioPbrMaterialLite("base");
-      return { id, ok: true, evidence: { baseId: base.id, shotOverride: true } };
+      const overridden = overrideStudioMaterialByShot("base", "shot-1", {
+        metallic: 0.8,
+        roughness: 0.1,
+      });
+      return {
+        id,
+        ok: true,
+        evidence: {
+          baseId: overridden.baseMaterialId,
+          shotOverride: true,
+          metallic: overridden.effective.metallic,
+          roughness: overridden.effective.roughness,
+        },
+      };
     }
     case "MAT-010": {
       const cm = resolveStudioColorManagementProfile({ linear: true, exr: true });
       return {
         id,
         ok: true,
-        evidence: { workingSpace: cm.workingSpace, exrPass: cm.exrPass },
+        evidence: {
+          workingSpace: cm.workingSpace,
+          exrPass: cm.exrPass,
+          linear: cm.workingSpace === "linear-sRGB" ? 1 : 0,
+          icc: cm.iccEmbedded ? 1 : 0,
+        },
       };
     }
     case "MAT-012": {
@@ -193,7 +211,12 @@ function runDrawMatPubKernel(id: string): StudioDccKernelResult {
       return {
         id,
         ok: true,
-        evidence: { destination: preset.id, revision: preset.revision },
+        evidence: {
+          destination: preset.id,
+          revision: preset.revision,
+          episodeMaxHeight: preset.episode.maxHeight ?? 0,
+          thumbnailSlots: preset.thumbnails.length,
+        },
       };
     }
     case "PUB-003": {
@@ -212,7 +235,16 @@ function runDrawMatPubKernel(id: string): StudioDccKernelResult {
         version: "1",
         packageHash: "sha256:x",
       });
-      return { id, ok: true, evidence: { kind: man.kind, version: man.version } };
+      return {
+        id,
+        ok: true,
+        evidence: {
+          kind: man.kind,
+          version: man.version,
+          versionLength: man.version.length,
+          hashLength: man.packageHash.length,
+        },
+      };
     }
     default:
       throw new Error(`no draw/mat/pub kernel for ${id}`);
