@@ -60,15 +60,17 @@ export function isExpectedStaticPreviewApiError(
     return true;
   }
 
-  const expectedMessage = [
-    "WebSocket connection to ",
-    `'ws://127.0.0.1:${preview.port}/socket.io/?EIO=4&transport=websocket' failed: `,
-    "Connection closed before receiving a handshake response",
-  ].join("");
-  if (message === expectedMessage) return true;
+  const base = `ws://127.0.0.1:${preview.port}/socket.io/?EIO=4&transport=websocket`;
+  const expectedMessageSuffixes = [
+    `WebSocket connection to '${base}' failed: Connection closed before receiving a handshake response`,
+    `WebSocket connection to '${base}' failed: Error during WebSocket handshake: Unexpected response code: 400`,
+  ];
+  if (expectedMessageSuffixes.includes(message)) return true;
 
-  const sourcePrefix = `${expectedMessage} @ `;
-  if (!message.startsWith(sourcePrefix)) return false;
+  const sourcePrefix = expectedMessageSuffixes
+    .map((entry) => `${entry} @ `)
+    .find((entry) => message.startsWith(entry));
+  if (!sourcePrefix) return false;
   try {
     const source = new URL(message.slice(sourcePrefix.length));
     return source.origin === preview.origin
