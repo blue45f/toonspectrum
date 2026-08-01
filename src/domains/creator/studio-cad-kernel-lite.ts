@@ -732,15 +732,15 @@ export function shellDraftStudioCadExtrusion(
   if (profile.length < 3) {
     return { ok: false, reason: "profile needs ≥3 points", failureFaces: ["profile"] };
   }
-  if (!(thickness > 0) || thickness * 2 >= 1) {
+  if (!(thickness > 0) || !Number.isFinite(thickness) || !Number.isFinite(height) || height <= 0) {
     return {
       ok: false,
-      reason: "thickness invalid or exceeds half-extent",
+      reason: "thickness/height invalid",
       failureFaces: ["inner-offset"],
     };
   }
   const outer = measureStudioCadExtrusion(profile, height);
-  // Shrink profile by thickness (uniform inset on AABB of profile)
+  // Shrink profile by thickness (uniform inset on AABB of profile) — compare to measured extents only
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of profile) {
     minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);

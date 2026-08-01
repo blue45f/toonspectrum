@@ -144,8 +144,17 @@ describe("§6 full catalog SSOT", () => {
 
     /** Doc 구현·완료 기준 → required evidence keys (skeptic residual set). */
     const DOC_CRITERIA_EVIDENCE: Readonly<Record<string, readonly string[]>> = {
+      "DOC-009": ["mergedHash", "parentCount", "mergeStrategy", "mergeRev", "conflict"],
       "CAD-006": ["sweepTris", "loftTris", "pathSamples", "failedSections"],
-      "CAD-008": ["shellVolume", "thickness", "draftDeg", "failureFaces"],
+      "CAD-008": [
+        "shellVolume",
+        "thickness",
+        "draftDeg",
+        "failureFaces",
+        "largeShellVolume",
+        "largeThickness",
+      ],
+      "CAD-010": ["originX", "originY", "originZ", "orthogonal", "frameHash"],
       "CAD-012": ["mateCount", "locked", "kinds"],
       "CAD-015": ["exportBytes", "importMeshes", "importPoints", "exportPoints"],
       "CAD-016": ["layers", "curves", "curvePoints", "binaryBytes", "format", "chunkCount"],
@@ -159,7 +168,14 @@ describe("§6 full catalog SSOT", () => {
         "roomWidth",
         "roomDepth",
       ],
-      "SCP-006": ["facesBefore", "facesAfterRefine", "affectedRefine"],
+      "SCP-006": [
+        "facesBefore",
+        "facesAfterRefine",
+        "affectedRefine",
+        "boundaryAfterRefine",
+        "boundaryAfterCoarsen",
+        "facesAfterCoarsen",
+      ],
       "SCP-011": ["targetFaces", "guideSamples", "meanError", "errorMapLen", "symmetryX"],
       "SCP-014": [
         "resolution",
@@ -171,12 +187,26 @@ describe("§6 full catalog SSOT", () => {
         "meanCurvature",
         "distinctFaceIds",
       ],
+      "CHR-020": ["jsonBytes", "humanoidMapped", "documentHash", "hasAsset"],
+      "GAR-009": ["weights", "weightSumError", "influencesPerVert", "skinHash"],
+      "NPR-002": ["edges", "creases", "silhouettes", "boundaries", "edgeHash"],
+      "NPR-003": ["segments", "overlapPairs", "contactLength", "contactHash"],
       "DRW-007": ["parseOk", "width", "height", "exportBytes", "parseLosses", "exportLosses"],
     };
+
+    // Structural ban: lite-ops must not contain pure hardcoded return bodies for CAD-010
+    expect(liteSrc).not.toMatch(
+      /createStudioCadDatumPlaneAxisCsys[\s\S]{0,200}planeNormalY:\s*1,\s*axisDirY:\s*1,\s*datums:\s*2/u,
+    );
+    // CAD-008 must not hardcode thickness*2 >= 1 unit check
+    expect(cadSrc).not.toMatch(/thickness\s*\*\s*2\s*>=\s*1/u);
+    // SCP-006 coarsen must not drop every other triangle
+    expect(meshOpsSrc).not.toMatch(/triNear\(t\)\s*&&\s*t\s*%\s*2\s*===\s*1/u);
 
     const missingExportCall: string[] = [];
     const missingNumeric: string[] = [];
     const missingCriteria: string[] = [];
+    const countEchoFails: string[] = [];
     for (const entry of STUDIO_DCC_SECTION6_CATALOG) {
       const primary = entry.apis[0]!;
       // Primary export must appear as a call site in sealed runner sources
@@ -196,6 +226,22 @@ describe("§6 full catalog SSOT", () => {
       if (numericKeys.length === 0) {
         missingNumeric.push(entry.id);
       }
+      // Lite-ops rows must produce ≥2 numeric fields AND at least one string hash/id field
+      // (blocks pure count-echo of a single input number).
+      if (entry.module.includes("lite-ops")) {
+        const stringKeys = Object.entries(r.evidence).filter(
+          ([, v]) => typeof v === "string" && v.length > 0,
+        );
+        if (numericKeys.length < 2) {
+          countEchoFails.push(`${entry.id}:lite-ops-need-2-numeric`);
+        }
+        if (stringKeys.length < 1 && !("conflict" in r.evidence) && !("orthogonal" in r.evidence)) {
+          // allow boolean-only if also ≥3 numerics (geometry)
+          if (numericKeys.length < 3) {
+            countEchoFails.push(`${entry.id}:lite-ops-need-hash-or-bool-structure`);
+          }
+        }
+      }
       const required = DOC_CRITERIA_EVIDENCE[entry.id];
       if (required) {
         for (const key of required) {
@@ -207,6 +253,10 @@ describe("§6 full catalog SSOT", () => {
         if (entry.id === "CAD-006") {
           expect(Number(r.evidence.pathSamples)).toBeGreaterThan(2);
           expect(Number(r.evidence.sweepTris)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CAD-008") {
+          expect(Number(r.evidence.largeShellVolume)).toBeGreaterThan(0);
+          expect(Number(r.evidence.largeThickness)).toBe(0.6);
         }
         if (entry.id === "CAD-015") {
           expect(Number(r.evidence.exportBytes)).toBeGreaterThan(50);
@@ -220,6 +270,13 @@ describe("§6 full catalog SSOT", () => {
         if (entry.id === "SCP-006") {
           expect(Number(r.evidence.facesAfterRefine)).toBeGreaterThan(
             Number(r.evidence.facesBefore),
+          );
+          // Crack-free coarsen: boundary edges must not explode vs refine
+          expect(Number(r.evidence.boundaryAfterCoarsen)).toBeLessThanOrEqual(
+            Number(r.evidence.boundaryAfterRefine) + 2,
+          );
+          expect(Number(r.evidence.facesAfterCoarsen)).toBeLessThan(
+            Number(r.evidence.facesAfterRefine),
           );
         }
         if (entry.id === "CAD-016") {
@@ -241,11 +298,39 @@ describe("§6 full catalog SSOT", () => {
           expect(Number(r.evidence.meanAoLinear)).toBeGreaterThan(0.2);
           expect(Number(r.evidence.meanAoLinear)).toBeLessThan(0.95);
         }
+        if (entry.id === "DOC-009") {
+          expect(r.evidence.mergeStrategy === "lww-branch" || r.evidence.conflict === true).toBe(
+            true,
+          );
+          expect(String(r.evidence.mergedHash).length).toBeGreaterThan(4);
+        }
+        if (entry.id === "NPR-002") {
+          expect(Number(r.evidence.edges)).toBeGreaterThan(0);
+          expect(String(r.evidence.edgeHash)).not.toBe("h00000000");
+        }
+        if (entry.id === "NPR-003") {
+          expect(Number(r.evidence.overlapPairs)).toBeGreaterThan(0);
+          expect(Number(r.evidence.contactLength)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CHR-020") {
+          expect(r.evidence.hasAsset).toBe(true);
+          expect(Number(r.evidence.jsonBytes)).toBeGreaterThan(50);
+        }
+        if (entry.id === "GAR-009") {
+          expect(Number(r.evidence.weightSumError)).toBeLessThan(1e-5);
+          expect(Number(r.evidence.influencesPerVert)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CAD-010") {
+          expect(r.evidence.orthogonal).toBe(true);
+          expect(Number(r.evidence.originX)).toBe(1);
+          expect(String(r.evidence.frameHash).length).toBeGreaterThan(4);
+        }
       }
     }
     expect(missingExportCall).toEqual([]);
     expect(missingNumeric).toEqual([]);
     expect(missingCriteria).toEqual([]);
+    expect(countEchoFails).toEqual([]);
   });
 });
 

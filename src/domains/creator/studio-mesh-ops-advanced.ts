@@ -345,8 +345,8 @@ export function retopoSnapStudioMeshToPlane(
 // ---------------------------------------------------------------------------
 
 /**
- * SCP-006: brush-local refine — mid-split edges of triangles near brush center.
- * Coarsen path merges by dropping distant detail (ratio). Crack-free: only whole-triangle ops.
+ * SCP-006: brush-local refine (1→4 mid-split) and crack-free coarsen via edge collapse.
+ * Coarsen collapses the shortest internal edge among near triangles (manifold-preserving).
  */
 export function dynatopoStudioMeshBrushLocal(
   mesh: StudioEditableMesh,
@@ -357,17 +357,18 @@ export function dynatopoStudioMeshBrushLocal(
   readonly affectedTris: number;
   readonly facesBefore: number;
   readonly facesAfter: number;
+  readonly boundaryEdges: number;
 }> {
   const soup = studioEditableMeshToTriangleSoup(mesh);
   const facesBefore = soup.indices.length / 3;
   const r2 = brush.radius * brush.radius;
-  const triNear = (t: number) => {
+  const triCentroidNear = (t: number, positions: ArrayLike<number>, indices: ArrayLike<number>) => {
     let cx = 0, cy = 0, cz = 0;
     for (let k = 0; k < 3; k += 1) {
-      const vi = soup.indices[t * 3 + k]!;
-      cx += soup.positions[vi * 3]!;
-      cy += soup.positions[vi * 3 + 1]!;
-      cz += soup.positions[vi * 3 + 2]!;
+      const vi = indices[t * 3 + k]!;
+      cx += positions[vi * 3]!;
+      cy += positions[vi * 3 + 1]!;
+      cz += positions[vi * 3 + 2]!;
     }
     cx /= 3; cy /= 3; cz /= 3;
     const dx = cx - brush.center.x;
@@ -376,31 +377,90 @@ export function dynatopoStudioMeshBrushLocal(
     return dx * dx + dy * dy + dz * dz <= r2;
   };
 
+  const countBoundaryEdges = (indices: ArrayLike<number>, triCount: number): number => {
+    const edgeUse = new Map<string, number>();
+    const key = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+    for (let t = 0; t < triCount; t += 1) {
+      const i0 = indices[t * 3]!;
+      const i1 = indices[t * 3 + 1]!;
+      const i2 = indices[t * 3 + 2]!;
+      for (const [a, b] of [[i0, i1], [i1, i2], [i2, i0]] as const) {
+        const k = key(a, b);
+        edgeUse.set(k, (edgeUse.get(k) ?? 0) + 1);
+      }
+    }
+    let boundary = 0;
+    for (const c of edgeUse.values()) if (c === 1) boundary += 1;
+    return boundary;
+  };
+
   if (mode === "coarsen") {
-    const indices: number[] = [];
+    // Edge-collapse coarsen: collapse shortest internal edge whose midpoint is near brush.
+    type EdgeRec = { a: number; b: number; len: number; faces: number[] };
+    const edgeMap = new Map<string, EdgeRec>();
+    const ekey = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+    for (let t = 0; t < facesBefore; t += 1) {
+      const ids = [soup.indices[t * 3]!, soup.indices[t * 3 + 1]!, soup.indices[t * 3 + 2]!];
+      for (let e = 0; e < 3; e += 1) {
+        const a = ids[e]!;
+        const b = ids[(e + 1) % 3]!;
+        const k = ekey(a, b);
+        let rec = edgeMap.get(k);
+        if (!rec) {
+          const dx = soup.positions[a * 3]! - soup.positions[b * 3]!;
+          const dy = soup.positions[a * 3 + 1]! - soup.positions[b * 3 + 1]!;
+          const dz = soup.positions[a * 3 + 2]! - soup.positions[b * 3 + 2]!;
+          rec = { a: Math.min(a, b), b: Math.max(a, b), len: Math.hypot(dx, dy, dz), faces: [] };
+          edgeMap.set(k, rec);
+        }
+        rec.faces.push(t);
+      }
+    }
+    let best: EdgeRec | null = null;
+    for (const rec of edgeMap.values()) {
+      if (rec.faces.length !== 2) continue; // only internal edges (manifold collapse)
+      if (!rec.faces.every((t) => triCentroidNear(t, soup.positions, soup.indices))) continue;
+      if (!best || rec.len < best.len) best = rec;
+    }
+    if (!best) {
+      // No safe collapse — return mesh unchanged (crack-free no-op)
+      return ok({
+        mesh,
+        affectedTris: 0,
+        facesBefore,
+        facesAfter: facesBefore,
+        boundaryEdges: countBoundaryEdges(soup.indices, facesBefore),
+      });
+    }
+    // Collapse b → a: drop the two faces using the edge; remap remaining b → a
+    const drop = new Set(best.faces);
+    const remap = (v: number) => (v === best!.b ? best!.a : v);
+    const newIndices: number[] = [];
     let affected = 0;
     for (let t = 0; t < facesBefore; t += 1) {
-      if (triNear(t) && t % 2 === 1) {
+      if (drop.has(t)) {
         affected += 1;
-        continue; // drop every other near tri (deterministic coarsen)
+        continue;
       }
-      indices.push(
-        soup.indices[t * 3]!,
-        soup.indices[t * 3 + 1]!,
-        soup.indices[t * 3 + 2]!,
-      );
+      const i0 = remap(soup.indices[t * 3]!);
+      const i1 = remap(soup.indices[t * 3 + 1]!);
+      const i2 = remap(soup.indices[t * 3 + 2]!);
+      if (i0 === i1 || i1 === i2 || i2 === i0) continue; // degenerate after collapse
+      newIndices.push(i0, i1, i2);
     }
-    if (indices.length < 3) return fail("empty", "dynatopo coarsen removed all");
-    const out = soupToMesh(soup.positions, new Uint32Array(indices));
+    if (newIndices.length < 3) return fail("empty", "dynatopo coarsen removed all");
+    const out = soupToMesh(soup.positions, new Uint32Array(newIndices));
+    const facesAfter = newIndices.length / 3;
     return ok({
       mesh: out,
       affectedTris: affected,
       facesBefore,
-      facesAfter: indices.length / 3,
+      facesAfter,
+      boundaryEdges: countBoundaryEdges(newIndices, facesAfter),
     });
   }
 
-  // refine: 1-to-4 split for near triangles
+  // refine: 1-to-4 split for near triangles (shared mids keep manifold)
   const positions = [...soup.positions];
   const midCache = new Map<string, number>();
   const mid = (a: number, b: number) => {
@@ -424,7 +484,7 @@ export function dynatopoStudioMeshBrushLocal(
     const i0 = soup.indices[t * 3]!;
     const i1 = soup.indices[t * 3 + 1]!;
     const i2 = soup.indices[t * 3 + 2]!;
-    if (!triNear(t)) {
+    if (!triCentroidNear(t, soup.positions, soup.indices)) {
       indices.push(i0, i1, i2);
       continue;
     }
@@ -435,11 +495,13 @@ export function dynatopoStudioMeshBrushLocal(
     indices.push(i0, m01, m20, i1, m12, m01, i2, m20, m12, m01, m12, m20);
   }
   const out = soupToMesh(new Float32Array(positions), new Uint32Array(indices));
+  const facesAfter = indices.length / 3;
   return ok({
     mesh: out,
     affectedTris: affected,
     facesBefore,
-    facesAfter: indices.length / 3,
+    facesAfter,
+    boundaryEdges: countBoundaryEdges(indices, facesAfter),
   });
 }
 
