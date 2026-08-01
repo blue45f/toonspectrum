@@ -394,6 +394,8 @@ export function runBld019StylePresets(): StudioDccKernelResult {
     presetCount: r.presetCount,
     first: r.first,
     colorSet: r.colorSet,
+    idCharCount: r.idCharCount,
+    colorChannelSum: r.colorChannelSum,
     catalogHash: r.catalogHash,
   });
 }

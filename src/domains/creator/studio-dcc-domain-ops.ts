@@ -257,15 +257,37 @@ export function listStudioStylePresets(
   readonly presetCount: number;
   readonly first: string;
   readonly colorSet: number;
+  readonly idCharCount: number;
+  readonly colorChannelSum: number;
   readonly catalogHash: string;
 } {
   const ids = presets.map((p) => p.id).sort();
   const colors = new Set(presets.map((p) => p.wallColor));
+  let idCharCount = 0;
+  for (const id of ids) idCharCount += id.length;
+  // Parse #rrggbb (or short) into channel sum for non-echo geometry-ish metric
+  let colorChannelSum = 0;
+  for (const c of colors) {
+    const hex = c.replace(/^#/u, "");
+    if (/^[0-9a-fA-F]{6}$/u.test(hex)) {
+      colorChannelSum +=
+        Number.parseInt(hex.slice(0, 2), 16)
+        + Number.parseInt(hex.slice(2, 4), 16)
+        + Number.parseInt(hex.slice(4, 6), 16);
+    } else if (/^[0-9a-fA-F]{3}$/u.test(hex)) {
+      colorChannelSum +=
+        Number.parseInt(hex[0]! + hex[0]!, 16)
+        + Number.parseInt(hex[1]! + hex[1]!, 16)
+        + Number.parseInt(hex[2]! + hex[2]!, 16);
+    }
+  }
   return {
     presetCount: presets.length,
     first: presets[0]?.id ?? "",
     colorSet: colors.size,
-    catalogHash: fnv1a(ids),
+    idCharCount,
+    colorChannelSum,
+    catalogHash: fnv1a([...ids, ...colors, idCharCount, colorChannelSum]),
   };
 }
 

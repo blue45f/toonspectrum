@@ -97,4 +97,62 @@ describe("StudioHybridDccPanel industrial wiring", () => {
       );
     });
   });
+
+  it("build/document domains: room, BOM, collab, UV, boolean, export toon3d", async () => {
+    render(<StudioHybridDccPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Room" }));
+    await waitFor(() => {
+      expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
+        /Room OK/u,
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "BOM" }));
+    await waitFor(() => {
+      const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";
+      expect(log).toMatch(/BOM OK/u);
+      expect(log).toMatch(/bom=\d+/u);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Collab" }));
+    await waitFor(() => {
+      expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
+        /Collab OK|collab=\d+/u,
+      );
+    });
+    // Need active mesh for UV/boolean
+    fireEvent.click(screen.getByRole("button", { name: "Add cube" }));
+    await waitFor(() => {
+      expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
+        /Add cube OK/u,
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "UV unwrap" }));
+    await waitFor(() => {
+      const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";
+      expect(log).toMatch(/UV OK|uv=/u);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Subdiv" }));
+    await waitFor(() => {
+      expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
+        /Subdiv OK/u,
+      );
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Export .toon3d" }));
+    await waitFor(() => {
+      expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
+        /\.toon3d packed|hash=/u,
+      );
+    });
+    // Industrial OCCT boolean (not Manifold pure path) on dedicated asset
+    fireEvent.click(screen.getByRole("button", { name: "OCCT boolean" }));
+    await waitFor(
+      () => {
+        const log = document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent ?? "";
+        expect(log).toMatch(/OCCT cut OK/u);
+        expect(log).toMatch(/BRepAlgoAPI_Cut/u);
+        const stats = document.querySelector("[data-studio-hybrid-dcc-stats]");
+        expect(Number(stats?.getAttribute("data-occt-tris") ?? 0)).toBeGreaterThan(0);
+      },
+      { timeout: 120_000 },
+    );
+  }, 180_000);
 });
