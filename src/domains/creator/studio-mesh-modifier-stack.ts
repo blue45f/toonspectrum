@@ -7,6 +7,7 @@
  */
 
 import {
+  bevelStudioEditableMeshEdges,
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   hashStudioEditableMesh,
@@ -14,6 +15,7 @@ import {
   type StudioEditableMesh,
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
+import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 
 export const STUDIO_MESH_MODIFIER_STACK_REVISION = 1 as const;
 
@@ -334,32 +336,30 @@ function applyBevel(
   mesh: StudioEditableMesh,
   mod: StudioMeshBevelModifier,
 ): StudioEditableMesh {
-  // Non-destructive bevel approx: push vertices with high dihedral slightly inward.
+  // Non-destructive stack bevel: topology-changing edge bevel (MOD-016 → MOD-006 kernel).
   const amount = Math.max(0, Math.min(0.45, mod.amount));
   if (amount === 0) return mesh;
-  const soup = studioEditableMeshToTriangleSoup(mesh);
-  let cx = 0;
-  let cy = 0;
-  let cz = 0;
-  const n = soup.positions.length / 3;
-  for (let i = 0; i < n; i += 1) {
-    cx += soup.positions[i * 3]!;
-    cy += soup.positions[i * 3 + 1]!;
-    cz += soup.positions[i * 3 + 2]!;
+  // Unique undirected half-edges (prefer lower id)
+  const edgeIds: number[] = [];
+  for (const he of mesh.halfEdges) {
+    if (he.twin < 0 || he.id < he.twin) edgeIds.push(he.id);
   }
-  cx /= n;
-  cy /= n;
-  cz /= n;
-  const positions = new Float32Array(soup.positions.length);
-  for (let i = 0; i < n; i += 1) {
-    const x = soup.positions[i * 3]!;
-    const y = soup.positions[i * 3 + 1]!;
-    const z = soup.positions[i * 3 + 2]!;
-    positions[i * 3] = x + (cx - x) * amount * (1 + mod.weightInfluence * 0);
-    positions[i * 3 + 1] = y + (cy - y) * amount;
-    positions[i * 3 + 2] = z + (cz - z) * amount;
+  // Apply sequential edge bevels; each call inserts verts + chamfer faces.
+  let current = mesh;
+  const limit = Math.max(1, Math.min(edgeIds.length, Math.trunc(mod.segments) * 12 || edgeIds.length));
+  for (let i = 0; i < limit; i += 1) {
+    const heId = edgeIds[i];
+    if (heId === undefined) break;
+    // Re-find a valid half-edge after previous rebuilds: use first boundary-or-manifold he
+    const seed =
+      current.halfEdges.find((h) => h.twin < 0 || h.id < h.twin)?.id
+      ?? current.halfEdges[0]?.id;
+    if (seed === undefined) break;
+    const next = bevelStudioEditableMeshEdges(current, [seed], amount);
+    if (!next.ok) break;
+    current = next.value;
   }
-  return soupToMesh(positions, soup.indices);
+  return current;
 }
 
 /**
@@ -474,7 +474,8 @@ export async function evaluateStudioMeshModifierStack(
   readonly resultHash: string;
 }>> {
   let current = stack.source;
-  const backend = options.booleanBackend ?? createStudioAabbSolidBooleanBackend();
+  // MOD-014: commit path defaults to Manifold solid CSG (with pure convex fallback).
+  const backend = options.booleanBackend ?? createStudioDefaultSolidBooleanBackend();
   for (const mod of stack.modifiers) {
     if (!mod.enabled) continue;
     try {

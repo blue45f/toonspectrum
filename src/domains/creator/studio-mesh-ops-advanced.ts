@@ -43,6 +43,8 @@ function soupToMesh(
   return createStudioEditableMeshFromPolygons(verts, faces);
 }
 
+export { knifeStudioEditableMesh } from "./studio-editable-half-edge-mesh";
+
 /** MOD-008: bisect mesh by plane (ax+by+cz+d=0), keep positive side. */
 export function bisectStudioEditableMesh(
   mesh: StudioEditableMesh,

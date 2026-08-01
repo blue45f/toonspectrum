@@ -1,0 +1,295 @@
+/**
+ * Solid boolean backends for MOD-014.
+ * Default commit path uses Manifold WASM (manifold-3d). Pure convex CSG is a fallback.
+ */
+
+import {
+  createStudioManifoldMeshProvider,
+  createStudioManifoldRuntime,
+  loadStudioManifoldRuntime,
+  type StudioManifoldRuntime,
+} from "./studio-manifold-mesh-provider";
+
+import type {
+  StudioMeshBooleanOp,
+  StudioSolidBooleanBackend,
+} from "./studio-mesh-modifier-stack";
+
+export type StudioSolidBooleanResult = {
+  readonly positions: Float32Array;
+  readonly indices: Uint32Array;
+  readonly diagnostic?: string;
+};
+
+let cachedRuntime: StudioManifoldRuntime | null = null;
+let cachedRuntimePromise: Promise<StudioManifoldRuntime> | null = null;
+
+async function loadManifoldRuntimeForHost(): Promise<StudioManifoldRuntime> {
+  if (cachedRuntime) return cachedRuntime;
+  if (cachedRuntimePromise) return cachedRuntimePromise;
+  cachedRuntimePromise = (async () => {
+    // Prefer explicit node_modules resolve (Vitest/Node). Vite app uses loadStudioManifoldRuntime.
+    try {
+      const { createRequire } = await import("node:module");
+      const require = createRequire(import.meta.url);
+      const wasmPath = require.resolve("manifold-3d/manifold.wasm");
+      const factory = await import("manifold-3d");
+      const module = await factory.default({ locateFile: () => wasmPath });
+      module.setup();
+      const runtime = createStudioManifoldRuntime(module);
+      cachedRuntime = runtime;
+      return runtime;
+    } catch {
+      const runtime = await loadStudioManifoldRuntime();
+      cachedRuntime = runtime;
+      return runtime;
+    }
+  })();
+  return cachedRuntimePromise;
+}
+
+/** Production / default: Manifold triangle solid CSG. */
+export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBackend {
+  return {
+    async boolean(input) {
+      const runtime = await loadManifoldRuntimeForHost();
+      const provider = createStudioManifoldMeshProvider({
+        epoch: 0,
+        runtimeLoader: () => runtime,
+      });
+      try {
+        const receipt = await provider.boolean({
+          left: {
+            positions: input.left.positions,
+            triangleIndices: input.left.indices,
+          },
+          right: {
+            positions: input.right.positions,
+            triangleIndices: input.right.indices,
+          },
+          operation: input.operation,
+          epoch: 0,
+        });
+        return {
+          positions: receipt.output.mesh.positions,
+          indices: receipt.output.mesh.triangleIndices,
+          diagnostic: `manifold:${receipt.runtimeVersion}:${receipt.operation}`,
+        };
+      } finally {
+        await provider.destroy();
+      }
+    },
+  };
+}
+
+/**
+ * Pure convex solid CSG (plane-clip). Changes topology on non-AABB meshes (e.g. tetrahedra).
+ * Used as unit-testable fallback and for environments without WASM.
+ */
+export function createStudioPureConvexSolidBooleanBackend(): StudioSolidBooleanBackend {
+  return {
+    async boolean(input) {
+      return pureConvexMeshBoolean(
+        input.left.positions,
+        input.left.indices,
+        input.right.positions,
+        input.right.indices,
+        input.operation,
+      );
+    },
+  };
+}
+
+function pureConvexMeshBoolean(
+  leftPos: Float32Array,
+  leftIdx: Uint32Array,
+  rightPos: Float32Array,
+  rightIdx: Uint32Array,
+  operation: StudioMeshBooleanOp,
+): StudioSolidBooleanResult {
+  const leftTris = trianglesOf(leftPos, leftIdx);
+  const rightTris = trianglesOf(rightPos, rightIdx);
+  const rightPlanes = planesOf(rightTris);
+  const leftPlanes = planesOf(leftTris);
+
+  if (operation === "union") {
+    // Outside left of right + outside right of left + boundary clips
+    const a = clipMeshOutsideSolid(leftTris, rightPlanes);
+    const b = clipMeshOutsideSolid(rightTris, leftPlanes);
+    return meshFromTriangles([...a, ...b], `pure-convex:union`);
+  }
+  if (operation === "intersection") {
+    const a = clipMeshInsideSolid(leftTris, rightPlanes);
+    return meshFromTriangles(a, `pure-convex:intersection`);
+  }
+  // difference = left outside right + inverted right faces inside left
+  const a = clipMeshOutsideSolid(leftTris, rightPlanes);
+  const b = clipMeshInsideSolid(rightTris, leftPlanes).map(flipTri);
+  return meshFromTriangles([...a, ...b], `pure-convex:difference`);
+}
+
+type Tri = readonly [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+type Plane = { readonly n: readonly [number, number, number]; readonly d: number };
+
+function trianglesOf(pos: Float32Array, idx: Uint32Array): Tri[] {
+  const out: Tri[] = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    const ia = idx[t]!;
+    const ib = idx[t + 1]!;
+    const ic = idx[t + 2]!;
+    out.push([
+      [pos[ia * 3]!, pos[ia * 3 + 1]!, pos[ia * 3 + 2]!],
+      [pos[ib * 3]!, pos[ib * 3 + 1]!, pos[ib * 3 + 2]!],
+      [pos[ic * 3]!, pos[ic * 3 + 1]!, pos[ic * 3 + 2]!],
+    ]);
+  }
+  return out;
+}
+
+function planesOf(tris: readonly Tri[]): Plane[] {
+  return tris.map((tri) => {
+    const [a, b, c] = tri;
+    const ab: [number, number, number] = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac: [number, number, number] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n: [number, number, number] = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    const len = Math.hypot(n[0], n[1], n[2]) || 1;
+    const nn: [number, number, number] = [n[0] / len, n[1] / len, n[2] / len];
+    return { n: nn, d: -(nn[0] * a[0] + nn[1] * a[1] + nn[2] * a[2]) };
+  });
+}
+
+function side(p: readonly [number, number, number], plane: Plane): number {
+  return plane.n[0] * p[0] + plane.n[1] * p[1] + plane.n[2] * p[2] + plane.d;
+}
+
+function lerp(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  t: number,
+): [number, number, number] {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+/** Clip polygon to keep points where plane side >= 0 (outside / positive half-space). */
+function clipPolyToPlane(
+  poly: readonly (readonly [number, number, number])[],
+  plane: Plane,
+  keepPositive: boolean,
+): (readonly [number, number, number])[] {
+  if (poly.length === 0) return [];
+  const out: (readonly [number, number, number])[] = [];
+  for (let i = 0; i < poly.length; i += 1) {
+    const cur = poly[i]!;
+    const prev = poly[(i + poly.length - 1) % poly.length]!;
+    const sc = side(cur, plane);
+    const sp = side(prev, plane);
+    const curIn = keepPositive ? sc >= -1e-9 : sc <= 1e-9;
+    const prevIn = keepPositive ? sp >= -1e-9 : sp <= 1e-9;
+    if (curIn) {
+      if (!prevIn) {
+        const t = sp / (sp - sc);
+        out.push(lerp(prev, cur, t));
+      }
+      out.push(cur);
+    } else if (prevIn) {
+      const t = sp / (sp - sc);
+      out.push(lerp(prev, cur, t));
+    }
+  }
+  return out;
+}
+
+function clipMeshOutsideSolid(tris: readonly Tri[], solidPlanes: readonly Plane[]): Tri[] {
+  return clipMesh(tris, solidPlanes, true);
+}
+
+function clipMeshInsideSolid(tris: readonly Tri[], solidPlanes: readonly Plane[]): Tri[] {
+  // Inside convex solid = against all planes (side <= 0 if outward normals)
+  return clipMesh(tris, solidPlanes, false);
+}
+
+function clipMesh(
+  tris: readonly Tri[],
+  solidPlanes: readonly Plane[],
+  keepOutside: boolean,
+): Tri[] {
+  const result: Tri[] = [];
+  for (const tri of tris) {
+    let poly: (readonly [number, number, number])[] = [tri[0], tri[1], tri[2]];
+    for (const plane of solidPlanes) {
+      // Outside = positive side of outward plane
+      poly = clipPolyToPlane(poly, plane, keepOutside);
+      if (poly.length < 3) break;
+    }
+    for (let i = 1; i + 1 < poly.length; i += 1) {
+      result.push([poly[0]!, poly[i]!, poly[i + 1]!]);
+    }
+  }
+  return result;
+}
+
+function flipTri(tri: Tri): Tri {
+  return [tri[0], tri[2], tri[1]];
+}
+
+function meshFromTriangles(
+  tris: readonly Tri[],
+  diagnostic: string,
+): StudioSolidBooleanResult {
+  if (tris.length === 0) {
+    throw new Error(`${diagnostic}: empty boolean result`);
+  }
+  const key = (p: readonly [number, number, number]) =>
+    `${p[0].toFixed(6)}|${p[1].toFixed(6)}|${p[2].toFixed(6)}`;
+  const map = new Map<string, number>();
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const ensure = (p: readonly [number, number, number]) => {
+    const k = key(p);
+    let i = map.get(k);
+    if (i !== undefined) return i;
+    i = positions.length / 3;
+    map.set(k, i);
+    positions.push(p[0], p[1], p[2]);
+    return i;
+  };
+  for (const tri of tris) {
+    const a = ensure(tri[0]);
+    const b = ensure(tri[1]);
+    const c = ensure(tri[2]);
+    if (a !== b && b !== c && a !== c) indices.push(a, b, c);
+  }
+  if (indices.length === 0) throw new Error(`${diagnostic}: no triangles after weld`);
+  return {
+    positions: new Float32Array(positions),
+    indices: new Uint32Array(indices),
+    diagnostic,
+  };
+}
+
+/** Default commit backend: Manifold first, pure convex CSG fallback. */
+export function createStudioDefaultSolidBooleanBackend(): StudioSolidBooleanBackend {
+  const manifold = createStudioManifoldSolidBooleanBackend();
+  const pure = createStudioPureConvexSolidBooleanBackend();
+  return {
+    async boolean(input) {
+      try {
+        return await manifold.boolean(input);
+      } catch (error) {
+        try {
+          const fallback = await pure.boolean(input);
+          return {
+            ...fallback,
+            diagnostic: `${fallback.diagnostic};manifold-fallback:${error instanceof Error ? error.message : "failed"}`,
+          };
+        } catch {
+          throw error;
+        }
+      }
+    },
+  };
+}

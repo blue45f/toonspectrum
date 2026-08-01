@@ -1089,6 +1089,101 @@ export function setStudioEditableMeshFaceSmooth(
   return ok({ ...mesh, faces });
 }
 
+/**
+ * MOD-008 knife / plane cut through mesh: split faces crossed by plane, keep both sides.
+ * Returns mesh with inserted verts along cut and split faces (topology change).
+ */
+export function knifeStudioEditableMesh(
+  mesh: StudioEditableMesh,
+  plane: {
+    readonly point: StudioMeshVec3;
+    readonly normal: StudioMeshVec3;
+  },
+): StudioEditableMeshResult<StudioEditableMesh> {
+  const n = normalize(plane.normal);
+  if (length(n) < 1e-12) return fail("invalid-parameter", "knife plane normal");
+  const d = -(n.x * plane.point.x + n.y * plane.point.y + n.z * plane.point.z);
+  const sideOf = (p: StudioMeshVec3) => n.x * p.x + n.y * p.y + n.z * p.z + d;
+
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  const positions: number[] = [...soup.positions];
+  const edgeCut = new Map<string, number>();
+  const cutOnEdge = (a: number, b: number): number | null => {
+    const sa = sideOf({
+      x: soup.positions[a * 3]!,
+      y: soup.positions[a * 3 + 1]!,
+      z: soup.positions[a * 3 + 2]!,
+    });
+    const sb = sideOf({
+      x: soup.positions[b * 3]!,
+      y: soup.positions[b * 3 + 1]!,
+      z: soup.positions[b * 3 + 2]!,
+    });
+    if (sa * sb >= 0) return null;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    const existing = edgeCut.get(key);
+    if (existing !== undefined) return existing;
+    const t = sa / (sa - sb);
+    const idx = positions.length / 3;
+    positions.push(
+      soup.positions[a * 3]! + (soup.positions[b * 3]! - soup.positions[a * 3]!) * t,
+      soup.positions[a * 3 + 1]!
+        + (soup.positions[b * 3 + 1]! - soup.positions[a * 3 + 1]!) * t,
+      soup.positions[a * 3 + 2]!
+        + (soup.positions[b * 3 + 2]! - soup.positions[a * 3 + 2]!) * t,
+    );
+    edgeCut.set(key, idx);
+    return idx;
+  };
+
+  const faces: number[][] = [];
+  for (let t = 0; t < soup.indices.length; t += 3) {
+    const i0 = soup.indices[t]!;
+    const i1 = soup.indices[t + 1]!;
+    const i2 = soup.indices[t + 2]!;
+    const c01 = cutOnEdge(i0, i1);
+    const c12 = cutOnEdge(i1, i2);
+    const c20 = cutOnEdge(i2, i0);
+    const cuts = [c01, c12, c20].filter((c): c is number => c !== null);
+    if (cuts.length === 0) {
+      faces.push([i0, i1, i2]);
+      continue;
+    }
+    if (cuts.length === 2) {
+      // Split into triangle + quad → 3 tris
+      if (c01 !== null && c12 !== null) {
+        faces.push([i0, c01, i2], [c01, i1, c12], [c01, c12, i2]);
+      } else if (c12 !== null && c20 !== null) {
+        faces.push([i0, i1, c12], [i0, c12, c20], [c20, c12, i2]);
+      } else if (c20 !== null && c01 !== null) {
+        faces.push([i0, c01, c20], [c01, i1, i2], [c20, c01, i2]);
+      }
+    } else {
+      faces.push([i0, i1, i2]);
+    }
+  }
+
+  try {
+    const verts = [];
+    for (let i = 0; i < positions.length; i += 3) {
+      verts.push(vec(positions[i]!, positions[i + 1]!, positions[i + 2]!));
+    }
+    const next = createStudioEditableMeshFromPolygons(verts, faces);
+    const before = studioEditableMeshStats(mesh);
+    const after = studioEditableMeshStats(next);
+    if (after.vertexCount <= before.vertexCount) {
+      // Plane missed mesh — still valid knife with no cut
+      return ok(mesh);
+    }
+    return ok(next);
+  } catch (error) {
+    return fail(
+      "topology-failed",
+      error instanceof Error ? error.message : "knife failed",
+    );
+  }
+}
+
 /** Export triangle positions/indices for render cache or Manifold (derived only). */
 export function studioEditableMeshToTriangleSoup(mesh: StudioEditableMesh): {
   readonly positions: Float32Array;
