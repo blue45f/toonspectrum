@@ -112,11 +112,64 @@ export function diagnoseStudioCadConstraints(
         locked += 1;
       } else conflicts.push(`constraint ${i}: ${c.kind} violated`);
     } else if (c.kind === "distance") {
-      locked += 0.5;
-      satisfied.push(i);
-    } else if (c.kind === "equal" || c.kind === "coincident") {
-      locked += 1;
-      satisfied.push(i);
+      const a = sketch.curves[c.a];
+      const b = sketch.curves[c.b];
+      if (!a || !b || a.kind !== "line" || b.kind !== "line") {
+        conflicts.push(`constraint ${i}: distance needs two lines`);
+        return;
+      }
+      // Approximate distance between line midpoints projected on 2D.
+      const midA: StudioCadVec2 = [(a.a[0] + a.b[0]) / 2, (a.a[1] + a.b[1]) / 2];
+      const midB: StudioCadVec2 = [(b.a[0] + b.b[0]) / 2, (b.a[1] + b.b[1]) / 2];
+      const d = Math.hypot(midA[0] - midB[0], midA[1] - midB[1]);
+      if (Math.abs(d - c.value) < 1e-3) {
+        satisfied.push(i);
+        locked += 1;
+      } else {
+        conflicts.push(`constraint ${i}: distance ${d.toFixed(4)}≠${c.value}`);
+      }
+    } else if (c.kind === "equal") {
+      const a = sketch.curves[c.a];
+      const b = sketch.curves[c.b];
+      if (!a || !b) {
+        conflicts.push(`constraint ${i}: equal missing curves`);
+        return;
+      }
+      const len = (curve: StudioCadCurve): number | null => {
+        if (curve.kind === "line") {
+          return Math.hypot(curve.b[0] - curve.a[0], curve.b[1] - curve.a[1]);
+        }
+        if (curve.kind === "circle" || curve.kind === "arc") return curve.radius;
+        return null;
+      };
+      const la = len(a);
+      const lb = len(b);
+      if (la === null || lb === null) {
+        conflicts.push(`constraint ${i}: equal unsupported curve kinds`);
+        return;
+      }
+      if (Math.abs(la - lb) < 1e-3) {
+        satisfied.push(i);
+        locked += 1;
+      } else {
+        conflicts.push(`constraint ${i}: equal lengths ${la}≠${lb}`);
+      }
+    } else if (c.kind === "coincident") {
+      const a = sketch.curves[c.a];
+      const b = sketch.curves[c.b];
+      if (!a || !b || a.kind !== "line" || b.kind !== "line") {
+        conflicts.push(`constraint ${i}: coincident needs two lines`);
+        return;
+      }
+      const pa = c.endA === "a" ? a.a : a.b;
+      const pb = c.endB === "a" ? b.a : b.b;
+      const d = Math.hypot(pa[0] - pb[0], pa[1] - pb[1]);
+      if (d < 1e-3) {
+        satisfied.push(i);
+        locked += 1;
+      } else {
+        conflicts.push(`constraint ${i}: coincident gap ${d.toFixed(4)}`);
+      }
     }
   });
   // DOF approx: 2 per unconstrained line endpoint pair minus locks
@@ -128,6 +181,26 @@ export function diagnoseStudioCadConstraints(
     state = "fully-constrained";
   } else if (conflicts.length > 0) state = "over-constrained";
   return { state, degreesOfFreedom: dof, conflicts, satisfied };
+}
+
+/**
+ * Snap line curves to exact horizontal/vertical when already near-axis, then re-diagnose.
+ * Pure diagnostic assist — not a full constraint solver.
+ */
+export function snapStudioCadSketchAxes(sketch: StudioCadSketch, eps = 1e-3): StudioCadSketch {
+  const curves = sketch.curves.map((curve) => {
+    if (curve.kind !== "line") return curve;
+    const dx = curve.b[0] - curve.a[0];
+    const dy = curve.b[1] - curve.a[1];
+    if (Math.abs(dy) < eps) {
+      return { ...curve, b: [curve.b[0], curve.a[1]] as const };
+    }
+    if (Math.abs(dx) < eps) {
+      return { ...curve, b: [curve.a[0], curve.b[1]] as const };
+    }
+    return curve;
+  });
+  return { ...sketch, curves };
 }
 
 export interface StudioCadSolidMesh {

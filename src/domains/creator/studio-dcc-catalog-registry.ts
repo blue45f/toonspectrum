@@ -3,7 +3,7 @@
  * Used by gating tests to assert every §12.1 / P0–P1 ID has a concrete API.
  */
 
-export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 3 as const;
+export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 4 as const;
 
 export type StudioCatalogStatus =
   | "shipped"
@@ -33,7 +33,7 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "DOC-007", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccSelectiveUndo"] },
   { id: "DOC-012", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccRegisterAsset"] },
   { id: "DOC-015", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-diagnostics.ts", apis: ["scanStudioHybridDccCorruption"] },
-  { id: "DOC-008", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabAppendOp"] },
+  { id: "DOC-008", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabAppendOp", "collabConflictReport", "collabMergeOpLogs", "collabLatestGeometryHints"] },
   // MOD
   { id: "MOD-001", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
   { id: "MOD-002", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
@@ -92,7 +92,7 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-GLB", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-VRM", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-OBJ", priority: "P0", status: "shipped", module: "studio-import-compatibility-report.ts", apis: ["parseStudioObjToSceneIR"] },
-  { id: "FMT-FBX", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxAsciiDocument", "importStudioFbxDocument", "isStudioFbxBinary"] },
+  { id: "FMT-FBX", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxAsciiDocument", "importStudioFbxDocument", "isStudioFbxBinary", "sniffStudioFbxBinaryHeader"] },
   { id: "FMT-STL", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStl"] },
   { id: "FMT-PLY", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioPlyAscii"] },
   { id: "FMT-DAE", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioDaeMinimal"] },
@@ -114,10 +114,11 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "WS-API", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["createStudioHybridDccWorkspace"] },
   { id: "UI-HYBRID-PANEL", priority: "P1", status: "shipped", module: "StudioHybridDccPanel.tsx", apis: ["StudioHybridDccPanel", "StudioHybridDccDialog"] },
   // CAD / sculpt / cloth promoted from deferred lite kernels
-  { id: "CAD-001", priority: "P3", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["createStudioCadSketch", "diagnoseStudioCadConstraints"] },
+  { id: "CAD-001", priority: "P3", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["createStudioCadSketch", "diagnoseStudioCadConstraints", "snapStudioCadSketchAxes"] },
   { id: "CAD-015", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["extrudeStudioCadProfile", "workspaceCadProp"] },
   { id: "SCP-001", priority: "P3", status: "shipped", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke", "workspaceSculptActive"] },
   { id: "GAR-005", priority: "P3", status: "shipped", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd", "workspaceClothStep"] },
+  { id: "WS-WAVE-LOOP", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["runStudioHybridDccWaveProductLoop"] },
 ];
 
 export function studioCatalogByPriority(

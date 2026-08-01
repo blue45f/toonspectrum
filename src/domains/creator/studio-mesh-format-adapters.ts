@@ -540,10 +540,47 @@ export function importStudioBvhMotion(text: string): StudioMeshAdapterResult {
 }
 
 /** IFC STEP-physical shell: extract IfcCartesianPoint / IfcSpace names (not full geometry tessellation). */
+function aabbMeshFromPoints(points: number[][]): { positions: number[]; faces: number[][] } {
+  if (!points.length) return { positions: [], faces: [] };
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p[0]!);
+    minY = Math.min(minY, p[1]!);
+    minZ = Math.min(minZ, p[2]!);
+    maxX = Math.max(maxX, p[0]!);
+    maxY = Math.max(maxY, p[1]!);
+    maxZ = Math.max(maxZ, p[2]!);
+  }
+  if (!Number.isFinite(minX)) return { positions: [], faces: [] };
+  // Degenerate pad
+  if (maxX - minX < 1e-6) maxX = minX + 0.1;
+  if (maxY - minY < 1e-6) maxY = minY + 0.1;
+  if (maxZ - minZ < 1e-6) maxZ = minZ + 0.1;
+  const positions = [
+    minX, minY, minZ, maxX, minY, minZ, maxX, maxY, minZ, minX, maxY, minZ,
+    minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ,
+  ];
+  const faces = [
+    [0, 1, 2], [0, 2, 3],
+    [4, 6, 5], [4, 7, 6],
+    [0, 4, 5], [0, 5, 1],
+    [2, 6, 7], [2, 7, 3],
+    [0, 3, 7], [0, 7, 4],
+    [1, 5, 6], [1, 6, 2],
+  ];
+  return { positions, faces };
+}
+
 export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   const unsupported: { kind: string; reason: string }[] = [];
   const points: number[][] = [];
   const spaces: string[] = [];
+  const storeys: string[] = [];
   const pointRe = /IFCCARTESIANPOINT\s*\(\s*\(([^)]+)\)/giu;
   let m: RegExpExecArray | null;
   while ((m = pointRe.exec(text)) !== null) {
@@ -552,35 +589,30 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
       points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
     }
   }
-  const spaceRe = /IFCSPACE\s*\([^;]*'([^']*)'/giu;
-  while ((m = spaceRe.exec(text)) !== null) {
-    spaces.push(m[1]!);
-  }
-  const wallCount = (text.match(/IFCWALL\b/giu) ?? []).length;
+  const namedEntity = (type: string, into: string[]) => {
+    const re = new RegExp(`${type}\\s*\\(([^;]*)\\)`, "giu");
+    let em: RegExpExecArray | null;
+    while ((em = re.exec(text)) !== null) {
+      const quoted = [...em[1]!.matchAll(/'([^']*)'/gu)].map((x) => x[1]!);
+      // IFC naming: often (GlobalId, OwnerHistory, Name, ...) — prefer Name (3rd) then 2nd.
+      const name = quoted[2] || quoted[1] || quoted[0];
+      if (name) into.push(name);
+    }
+  };
+  namedEntity("IFCSPACE", spaces);
+  namedEntity("IFCBUILDINGSTOREY", storeys);
+  const wallCount = (text.match(/IFCWALL(?:STANDARDCASE)?\b/giu) ?? []).length;
   const slabCount = (text.match(/IFCSLAB\b/giu) ?? []).length;
+  const doorCount = (text.match(/IFCDOOR\b/giu) ?? []).length;
+  const windowCount = (text.match(/IFCWINDOW\b/giu) ?? []).length;
   if (!points.length && !spaces.length && !wallCount) {
     unsupported.push({ kind: "ifc", reason: "no recognizable IFC entities" });
   }
-  // Build point-cloud boxes / hull ribbon for preview
-  const positions: number[] = [];
-  const faces: number[][] = [];
-  const sample = points.slice(0, 64);
-  for (const p of sample) {
-    const base = positions.length / 3;
-    const [x, y, z] = p;
-    const s = 0.05;
-    positions.push(
-      x, y, z,
-      x + s, y, z,
-      x + s, y + s, z,
-      x, y + s, z,
-    );
-    faces.push([base, base + 1, base + 2], [base, base + 2, base + 3]);
-  }
+  const hull = aabbMeshFromPoints(points);
   let meshes: StudioEditableMesh[] = [];
-  if (faces.length) {
+  if (hull.faces.length) {
     try {
-      meshes = [meshFromSoup(positions, faces)];
+      meshes = [meshFromSoup(hull.positions, hull.faces)];
     } catch {
       // leave empty
     }
@@ -588,25 +620,35 @@ export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
   const scene = sceneShell(
     "ifc",
     meshes.length
-      ? [{ name: "ifc-shell", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      ? [{ name: "ifc-aabb-shell", vertexCount: hull.positions.length / 3, triangleCount: hull.faces.length }]
       : [],
     [
       ...unsupported,
       {
         kind: "ifc-subset",
-        reason: `points=${points.length} spaces=${spaces.length} walls=${wallCount} slabs=${slabCount}; full BREP tessellation deferred to web-ifc WASM path`,
+        reason: `points=${points.length} spaces=${spaces.length} storeys=${storeys.length} walls=${wallCount} slabs=${slabCount} doors=${doorCount} windows=${windowCount}; full BREP tessellation deferred to web-ifc WASM path`,
       },
     ],
   );
+  const semanticRich = spaces.length > 0 || storeys.length > 0 || doorCount + windowCount > 0;
   const result = finish("ifc", "studio-mesh-format-adapters/ifc", text, scene, meshes, {
-    geometry: meshes.length ? "C" : "P",
+    geometry: meshes.length ? "B" : "P",
     material: "X",
     rigAnimation: "X",
-    semanticHistory: spaces.length ? "B" : "P",
+    semanticHistory: semanticRich ? "B" : "P",
   });
   return {
     ...result,
-    extras: { spaces, wallCount, slabCount, pointCount: points.length },
+    extras: {
+      spaces,
+      storeys,
+      wallCount,
+      slabCount,
+      doorCount,
+      windowCount,
+      pointCount: points.length,
+      aabbVertexCount: hull.positions.length / 3,
+    },
   };
 }
 
@@ -623,26 +665,28 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
     const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
     if (nums.length >= 2) points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
   }
+  // Also accept unquoted form: CARTESIAN_POINT('',(x,y,z)) already covered; bare lists:
+  const bareRe = /CARTESIAN_POINT\s*\([^,]*,\s*\(([^)]+)\)/giu;
+  while ((m = bareRe.exec(text)) !== null) {
+    const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
+    if (nums.length >= 2) points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
+  }
   const products = [...text.matchAll(/PRODUCT\s*\(\s*'([^']*)'/giu)].map((x) => x[1]!);
   const advancedFaces = (text.match(/ADVANCED_FACE\b/giu) ?? []).length;
+  const closedShells = (text.match(/CLOSED_SHELL\b/giu) ?? []).length;
+  const openShells = (text.match(/OPEN_SHELL\b/giu) ?? []).length;
+  const directions = (text.match(/DIRECTION\s*\(/giu) ?? []).length;
   if (!points.length && !products.length && !advancedFaces) {
     unsupported.push({
       kind: "step",
       reason: isIges ? "IGES shell without mapped entities" : "no STEP cartesian/product entities",
     });
   }
-  const positions: number[] = [];
-  const faces: number[][] = [];
-  for (const p of points.slice(0, 48)) {
-    const base = positions.length / 3;
-    const s = 0.04;
-    positions.push(p[0]!, p[1]!, p[2]!, p[0]! + s, p[1]!, p[2]!, p[0]! + s, p[1]! + s, p[2]!, p[0]!, p[1]! + s, p[2]!);
-    faces.push([base, base + 1, base + 2], [base, base + 2, base + 3]);
-  }
+  const hull = aabbMeshFromPoints(points);
   let meshes: StudioEditableMesh[] = [];
-  if (faces.length) {
+  if (hull.faces.length) {
     try {
-      meshes = [meshFromSoup(positions, faces)];
+      meshes = [meshFromSoup(hull.positions, hull.faces)];
     } catch {
       // leave empty
     }
@@ -650,25 +694,34 @@ export function importStudioStepShell(text: string): StudioMeshAdapterResult {
   const scene = sceneShell(
     "step",
     meshes.length
-      ? [{ name: "step-shell", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      ? [{ name: "step-aabb-shell", vertexCount: hull.positions.length / 3, triangleCount: hull.faces.length }]
       : [],
     [
       ...unsupported,
       {
         kind: "step-subset",
-        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces}; B-Rep tessellation needs OCCT`,
+        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces} closedShells=${closedShells} openShells=${openShells} directions=${directions}; B-Rep tessellation needs OCCT`,
       },
     ],
   );
   const result = finish("step", "studio-mesh-format-adapters/step", text, scene, meshes, {
-    geometry: meshes.length ? "C" : "P",
+    geometry: meshes.length ? "B" : "P",
     material: "X",
     rigAnimation: "X",
-    semanticHistory: products.length ? "B" : "P",
+    semanticHistory: products.length || closedShells > 0 ? "B" : "P",
   });
   return {
     ...result,
-    extras: { products, advancedFaces, pointCount: points.length, isIges },
+    extras: {
+      products,
+      advancedFaces,
+      closedShells,
+      openShells,
+      directions,
+      pointCount: points.length,
+      isIges,
+      aabbVertexCount: hull.positions.length / 3,
+    },
   };
 }
 

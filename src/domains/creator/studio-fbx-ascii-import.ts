@@ -17,6 +17,12 @@ import {
 
 export const STUDIO_FBX_ASCII_IMPORT_REVISION = 1 as const;
 
+export type StudioFbxBinarySniff = {
+  readonly byteLength: number;
+  readonly version: number | null;
+  readonly magicOk: boolean;
+};
+
 export type StudioFbxImportResult =
   | {
       readonly ok: true;
@@ -25,7 +31,26 @@ export type StudioFbxImportResult =
       readonly commit: ReturnType<typeof commitStudioImportToDocument>;
       readonly meshes: readonly StudioEditableMesh[];
     }
-  | { readonly ok: false; readonly detail: string };
+  | {
+      readonly ok: false;
+      readonly detail: string;
+      readonly report?: StudioImportCompatibilityReport;
+      readonly binary?: StudioFbxBinarySniff;
+    };
+
+/** Read Kaydara binary header version field (uint32 LE at offset 23) when magic matches. */
+export function sniffStudioFbxBinaryHeader(bytes: Uint8Array): StudioFbxBinarySniff {
+  const magicOk = isStudioFbxBinary(bytes);
+  let version: number | null = null;
+  if (magicOk && bytes.length >= 27) {
+    version =
+      bytes[23]!
+      | (bytes[24]! << 8)
+      | (bytes[25]! << 16)
+      | (bytes[26]! << 24);
+  }
+  return { byteLength: bytes.length, version, magicOk };
+}
 
 function parseNumberList(body: string): number[] {
   const values: number[] = [];
@@ -131,6 +156,7 @@ export function importStudioFbxDocument(
   options: { readonly parser?: string } = {},
 ): StudioFbxImportResult {
   if (typeof source !== "string" && isStudioFbxBinary(source)) {
+    const sniff = sniffStudioFbxBinaryHeader(source);
     const report = buildStudioImportCompatibilityReport({
       parser: options.parser ?? "studio-fbx-binary-sniff",
       sourceBytes: source,
@@ -148,15 +174,27 @@ export function importStudioFbxDocument(
         unsupported: [
           {
             kind: "fbx-binary",
-            reason: "Binary FBX detected; use ufbx WASM / Assimp bridge — not parsed in browser pure core",
+            reason: `Binary FBX v${sniff.version ?? "?"} (${sniff.byteLength} bytes); use ufbx WASM / Assimp bridge — not parsed in browser pure core`,
           },
         ],
       },
       committed: false,
     });
+    const fidelityReport: StudioImportCompatibilityReport = {
+      ...report,
+      fidelity: {
+        ...report.fidelity,
+        geometry: "X",
+        material: "X",
+        rigAnimation: "X",
+        semanticHistory: "P",
+      },
+    };
     return {
       ok: false,
-      detail: `binary-fbx:${report.sourceHash}`,
+      detail: `binary-fbx:${fidelityReport.sourceHash}`,
+      report: fidelityReport,
+      binary: sniff,
     };
   }
   return importStudioFbxAsciiDocument(source, options);

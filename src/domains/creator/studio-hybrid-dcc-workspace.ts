@@ -20,6 +20,7 @@ import {
 import {
   collabAppendOp,
   collabJoin,
+  collabConflictReport,
   createStudioDccCollabRoom,
   type StudioDccCollabRoom,
 } from "./studio-dcc-collab-shell";
@@ -286,7 +287,11 @@ export function workspaceImportBytes(
       ...ws,
       session,
       activeAssetId: assetId,
-      lastImportReport: meshAdapter.report,
+      lastImportReport: {
+        ...meshAdapter.report,
+        adapterFormat: meshAdapter.format,
+        extras: meshAdapter.extras ?? null,
+      },
     };
   }
   const gradeA = importStudioGradeAAsset({ fileName, bytes });
@@ -625,4 +630,115 @@ export function workspaceDecimateActive(
     hashStudioEditableMesh(dec.value),
   );
   return { ...ws, session, bridge };
+}
+
+export type StudioHybridDccWaveProductLoopResult = {
+  readonly workspace: StudioHybridDccWorkspace;
+  readonly package: StudioToon3dPackage;
+  readonly metrics: {
+    readonly assetCount: number;
+    readonly shotCount: number;
+    readonly bomLines: number;
+    readonly collabEpoch: number;
+    readonly collabOps: number;
+    readonly collabConflicts: number;
+    readonly uvMode: string | null;
+    readonly packageHash: string;
+    readonly documentHasGeo: boolean;
+    readonly importFormat: string | null;
+    readonly importGeometryFidelity: string | null;
+    readonly diagnosticErrors: number;
+  };
+};
+
+/**
+ * End-to-end product loop (wave): geo-nodes → edit → IFC import shell → retarget/BOM/collab → .toon3d.
+ * Pure workspace APIs only — gated by product tests asserting concrete metrics.
+ */
+export async function runStudioHybridDccWaveProductLoop(
+  documentId = "wave-product-loop",
+): Promise<StudioHybridDccWaveProductLoopResult> {
+  let ws = createStudioHybridDccWorkspace(documentId);
+  ws = workspaceAddGeoNodesPrimitive(ws, "sphere", "geo-sphere", 6);
+  ws = workspaceKnifeActive(ws, { x: 0, y: 1, z: 0 });
+  ws = workspaceSculptActive(ws, 0.08);
+  ws = workspaceUvUnwrapActive(ws, "box");
+
+  const ifcText = [
+    "ISO-10303-21;",
+    "DATA;",
+    "#1=IFCCARTESIANPOINT((0.,0.,0.));",
+    "#2=IFCCARTESIANPOINT((4.,0.,0.));",
+    "#3=IFCCARTESIANPOINT((4.,3.,0.));",
+    "#4=IFCCARTESIANPOINT((0.,3.,2.));",
+    "#5=IFCSPACE('1','Lobby','',$,$,$,$,$,.ELEMENT.,$,$);",
+    "#6=IFCBUILDINGSTOREY('2','L1','',$,$,$,$,$,.ELEMENT.,$);",
+    "#7=IFCWALL('3','W1',$,$,$,$,$,$,$);",
+    "#8=IFCDOOR('4','D1',$,$,$,$,$,$,$);",
+    "ENDSEC;",
+  ].join("\n");
+  ws = workspaceImportBytes(ws, "lobby.ifc", new TextEncoder().encode(ifcText));
+  const importRec =
+    ws.lastImportReport && typeof ws.lastImportReport === "object" && ws.lastImportReport !== null
+      ? (ws.lastImportReport as {
+          adapterFormat?: string;
+          format?: string;
+          fidelity?: { geometry?: string };
+          sourceHash?: string;
+        })
+      : null;
+  const importFormat = importRec?.adapterFormat ?? importRec?.format ?? null;
+  const importGeometryFidelity = importRec?.fidelity?.geometry ?? null;
+
+  ws = workspaceRetargetFromBvhExtras(ws, ["Hips", "Spine", "Head", "LeftArm", "RightArm"]);
+  ws = workspaceRebuildBom(ws);
+  ws = workspaceCollabJoin(ws, "artist-a", "Artist A");
+  const active = ws.activeAssetId ?? "geo-sphere";
+  const geoHash =
+    ws.session.state.geometry.records[active]?.meshHash ?? hashStudioEditableMesh(
+      ws.session.state.geometry.records[Object.keys(ws.session.state.geometry.records)[0]!]!.mesh,
+    );
+  ws = {
+    ...ws,
+    collab: collabAppendOp(ws.collab, {
+      kind: "lock",
+      peerId: "artist-a",
+      assetId: active,
+      at: Date.now(),
+    }),
+  };
+  ws = {
+    ...ws,
+    collab: collabAppendOp(ws.collab, {
+      kind: "geometry-hint",
+      peerId: "artist-a",
+      assetId: active,
+      geometryHash: geoHash,
+      at: Date.now(),
+    }),
+  };
+  ws = workspaceEnsureShots(ws, 4);
+  const pkg = workspaceExportToon3d(ws);
+  const diag = workspaceDiagnostics(ws);
+  const conflicts = collabConflictReport(ws.collab);
+
+  return {
+    workspace: ws,
+    package: pkg,
+    metrics: {
+      assetCount: Object.keys(ws.session.state.geometry.records).length,
+      shotCount: ws.bridge.shots.length,
+      bomLines: ws.bom.lines.length,
+      collabEpoch: ws.collab.epoch,
+      collabOps: ws.collab.ops.length,
+      collabConflicts: conflicts.length,
+      uvMode: ws.lastUvMap?.mode ?? null,
+      packageHash: pkg.manifest.packageHash,
+      documentHasGeo: (pkg.files["document/document.json"] ?? "").includes("geo-sphere")
+        || (pkg.files["document/document.json"] ?? "").includes("import-lobby"),
+      importFormat,
+      importGeometryFidelity,
+      diagnosticErrors: diag.errorCount,
+    },
+  };
 }
