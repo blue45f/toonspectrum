@@ -1,7 +1,7 @@
 /**
  * Full §6 SSOT coverage matrix (all catalog IDs) for verification evidence.
  */
-import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -44,8 +44,10 @@ describe("section6 full coverage matrix", () => {
     writeFileSync(path, `${lines.join("\n")}\n`, "utf8");
     expect(lines.length - 1).toBe(STUDIO_DCC_SECTION6_CATALOG.length);
     expect(fails).toBe(0);
-    // Keep domain-ops log intact
-    const upgrade = resolve(SCRATCH, "lite-ops-upgrade.log");
-    expect(readFileSync(upgrade, "utf8")).toMatch(/count=44/u);
+    // Domain-ops count from SSOT (do not require sibling test order for scratch logs)
+    const domainOps = STUDIO_DCC_SECTION6_CATALOG.filter((e) =>
+      e.module.includes("domain-ops"),
+    );
+    expect(domainOps.length).toBe(44);
   }, 180_000);
 });
