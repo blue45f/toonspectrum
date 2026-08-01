@@ -172,6 +172,7 @@ describe("§6 full catalog SSOT", () => {
         "facesBefore",
         "facesAfterRefine",
         "affectedRefine",
+        "boundaryBefore",
         "boundaryAfterRefine",
         "boundaryAfterCoarsen",
         "facesAfterCoarsen",
@@ -202,6 +203,9 @@ describe("§6 full catalog SSOT", () => {
     expect(cadSrc).not.toMatch(/thickness\s*\*\s*2\s*>=\s*1/u);
     // SCP-006 coarsen must not drop every other triangle
     expect(meshOpsSrc).not.toMatch(/triNear\(t\)\s*&&\s*t\s*%\s*2\s*===\s*1/u);
+    // SCP-006 refine must implement red-green promotion (not naive near-only 1→4)
+    expect(meshOpsSrc).toMatch(/splitEdges/u);
+    expect(meshOpsSrc).toMatch(/n\s*>=\s*2/u);
 
     const missingExportCall: string[] = [];
     const missingNumeric: string[] = [];
@@ -271,10 +275,15 @@ describe("§6 full catalog SSOT", () => {
           expect(Number(r.evidence.facesAfterRefine)).toBeGreaterThan(
             Number(r.evidence.facesBefore),
           );
+          // Closed unit-cube fixture must enter refine with 0 boundary edges
+          expect(Number(r.evidence.boundaryBefore)).toBe(0);
+          // Crack-free refine: partial brush on closed input must stay watertight
+          expect(Number(r.evidence.boundaryAfterRefine)).toBe(0);
           // Crack-free coarsen: boundary edges must not explode vs refine
           expect(Number(r.evidence.boundaryAfterCoarsen)).toBeLessThanOrEqual(
             Number(r.evidence.boundaryAfterRefine) + 2,
           );
+          expect(Number(r.evidence.boundaryAfterCoarsen)).toBe(0);
           expect(Number(r.evidence.facesAfterCoarsen)).toBeLessThan(
             Number(r.evidence.facesAfterRefine),
           );

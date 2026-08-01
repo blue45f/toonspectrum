@@ -345,8 +345,14 @@ export function retopoSnapStudioMeshToPlane(
 // ---------------------------------------------------------------------------
 
 /**
- * SCP-006: brush-local refine (1→4 mid-split) and crack-free coarsen via edge collapse.
- * Coarsen collapses the shortest internal edge among near triangles (manifold-preserving).
+ * SCP-006: brush-local refine and crack-free coarsen.
+ *
+ * Refine uses red-green adaptive mid-split so partial brush coverage never
+ * leaves T-junctions: seed faces near the brush get 1→4; unmarked faces with
+ * ≥2 split edges are promoted until stable; remaining 1-edge neighbors bisect
+ * 1→2. Shared mid vertices keep manifold topology on closed input.
+ *
+ * Coarsen collapses the shortest internal edge among near triangles.
  */
 export function dynatopoStudioMeshBrushLocal(
   mesh: StudioEditableMesh,
@@ -358,10 +364,13 @@ export function dynatopoStudioMeshBrushLocal(
   readonly facesBefore: number;
   readonly facesAfter: number;
   readonly boundaryEdges: number;
+  /** Boundary edge count of the input mesh (for closed-mesh honesty). */
+  readonly boundaryEdgesBefore: number;
 }> {
   const soup = studioEditableMeshToTriangleSoup(mesh);
   const facesBefore = soup.indices.length / 3;
   const r2 = brush.radius * brush.radius;
+  const ekey = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
   const triCentroidNear = (t: number, positions: ArrayLike<number>, indices: ArrayLike<number>) => {
     let cx = 0, cy = 0, cz = 0;
     for (let k = 0; k < 3; k += 1) {
@@ -379,13 +388,12 @@ export function dynatopoStudioMeshBrushLocal(
 
   const countBoundaryEdges = (indices: ArrayLike<number>, triCount: number): number => {
     const edgeUse = new Map<string, number>();
-    const key = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
     for (let t = 0; t < triCount; t += 1) {
       const i0 = indices[t * 3]!;
       const i1 = indices[t * 3 + 1]!;
       const i2 = indices[t * 3 + 2]!;
       for (const [a, b] of [[i0, i1], [i1, i2], [i2, i0]] as const) {
-        const k = key(a, b);
+        const k = ekey(a, b);
         edgeUse.set(k, (edgeUse.get(k) ?? 0) + 1);
       }
     }
@@ -394,11 +402,12 @@ export function dynatopoStudioMeshBrushLocal(
     return boundary;
   };
 
+  const boundaryEdgesBefore = countBoundaryEdges(soup.indices, facesBefore);
+
   if (mode === "coarsen") {
     // Edge-collapse coarsen: collapse shortest internal edge whose midpoint is near brush.
     type EdgeRec = { a: number; b: number; len: number; faces: number[] };
     const edgeMap = new Map<string, EdgeRec>();
-    const ekey = (a: number, b: number) => (a < b ? `${a}|${b}` : `${b}|${a}`);
     for (let t = 0; t < facesBefore; t += 1) {
       const ids = [soup.indices[t * 3]!, soup.indices[t * 3 + 1]!, soup.indices[t * 3 + 2]!];
       for (let e = 0; e < 3; e += 1) {
@@ -429,7 +438,8 @@ export function dynatopoStudioMeshBrushLocal(
         affectedTris: 0,
         facesBefore,
         facesAfter: facesBefore,
-        boundaryEdges: countBoundaryEdges(soup.indices, facesBefore),
+        boundaryEdges: boundaryEdgesBefore,
+        boundaryEdgesBefore,
       });
     }
     // Collapse b → a: drop the two faces using the edge; remap remaining b → a
@@ -457,16 +467,61 @@ export function dynatopoStudioMeshBrushLocal(
       facesBefore,
       facesAfter,
       boundaryEdges: countBoundaryEdges(newIndices, facesAfter),
+      boundaryEdgesBefore,
     });
   }
 
-  // refine: 1-to-4 split for near triangles (shared mids keep manifold)
+  // refine: red-green adaptive mid-split (crack-free on partial brush coverage)
+  const marked = new Uint8Array(facesBefore);
+  for (let t = 0; t < facesBefore; t += 1) {
+    if (triCentroidNear(t, soup.positions, soup.indices)) marked[t] = 1;
+  }
+
+  // Promote unmarked faces with ≥2 split edges until stable (red→green).
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const splitEdges = new Set<string>();
+    for (let t = 0; t < facesBefore; t += 1) {
+      if (!marked[t]) continue;
+      const i0 = soup.indices[t * 3]!;
+      const i1 = soup.indices[t * 3 + 1]!;
+      const i2 = soup.indices[t * 3 + 2]!;
+      splitEdges.add(ekey(i0, i1));
+      splitEdges.add(ekey(i1, i2));
+      splitEdges.add(ekey(i2, i0));
+    }
+    for (let t = 0; t < facesBefore; t += 1) {
+      if (marked[t]) continue;
+      const i0 = soup.indices[t * 3]!;
+      const i1 = soup.indices[t * 3 + 1]!;
+      const i2 = soup.indices[t * 3 + 2]!;
+      let n = 0;
+      if (splitEdges.has(ekey(i0, i1))) n += 1;
+      if (splitEdges.has(ekey(i1, i2))) n += 1;
+      if (splitEdges.has(ekey(i2, i0))) n += 1;
+      if (n >= 2) {
+        marked[t] = 1;
+        changed = true;
+      }
+    }
+  }
+
+  const splitEdges = new Set<string>();
+  for (let t = 0; t < facesBefore; t += 1) {
+    if (!marked[t]) continue;
+    const i0 = soup.indices[t * 3]!;
+    const i1 = soup.indices[t * 3 + 1]!;
+    const i2 = soup.indices[t * 3 + 2]!;
+    splitEdges.add(ekey(i0, i1));
+    splitEdges.add(ekey(i1, i2));
+    splitEdges.add(ekey(i2, i0));
+  }
+
   const positions = [...soup.positions];
   const midCache = new Map<string, number>();
   const mid = (a: number, b: number) => {
-    const lo = Math.min(a, b);
-    const hi = Math.max(a, b);
-    const key = `${lo}|${hi}`;
+    const key = ekey(a, b);
     let idx = midCache.get(key);
     if (idx !== undefined) return idx;
     idx = positions.length / 3;
@@ -478,22 +533,51 @@ export function dynatopoStudioMeshBrushLocal(
     midCache.set(key, idx);
     return idx;
   };
+
+  // Pre-create mids for every split edge so neighbors share the same vertex.
+  for (const key of splitEdges) {
+    const [as, bs] = key.split("|") as [string, string];
+    mid(Number(as), Number(bs));
+  }
+
   const indices: number[] = [];
   let affected = 0;
   for (let t = 0; t < facesBefore; t += 1) {
     const i0 = soup.indices[t * 3]!;
     const i1 = soup.indices[t * 3 + 1]!;
     const i2 = soup.indices[t * 3 + 2]!;
-    if (!triCentroidNear(t, soup.positions, soup.indices)) {
+    const e01 = splitEdges.has(ekey(i0, i1));
+    const e12 = splitEdges.has(ekey(i1, i2));
+    const e20 = splitEdges.has(ekey(i2, i0));
+    if (marked[t]) {
+      // Full 1→4 mid-split (all three edges are split by construction).
+      affected += 1;
+      const m01 = mid(i0, i1);
+      const m12 = mid(i1, i2);
+      const m20 = mid(i2, i0);
+      indices.push(i0, m01, m20, i1, m12, m01, i2, m20, m12, m01, m12, m20);
+      continue;
+    }
+    // Unmarked: 0 or 1 split edge after promotion (red-green invariant).
+    const splitCount = (e01 ? 1 : 0) + (e12 ? 1 : 0) + (e20 ? 1 : 0);
+    if (splitCount === 0) {
       indices.push(i0, i1, i2);
       continue;
     }
+    // 1→2 bisect along the single split edge (shares mid with refined neighbor).
     affected += 1;
-    const m01 = mid(i0, i1);
-    const m12 = mid(i1, i2);
-    const m20 = mid(i2, i0);
-    indices.push(i0, m01, m20, i1, m12, m01, i2, m20, m12, m01, m12, m20);
+    if (e01) {
+      const m = mid(i0, i1);
+      indices.push(i0, m, i2, m, i1, i2);
+    } else if (e12) {
+      const m = mid(i1, i2);
+      indices.push(i1, m, i0, m, i2, i0);
+    } else {
+      const m = mid(i2, i0);
+      indices.push(i2, m, i1, m, i0, i1);
+    }
   }
+
   const out = soupToMesh(new Float32Array(positions), new Uint32Array(indices));
   const facesAfter = indices.length / 3;
   return ok({
@@ -502,6 +586,7 @@ export function dynatopoStudioMeshBrushLocal(
     facesBefore,
     facesAfter,
     boundaryEdges: countBoundaryEdges(indices, facesAfter),
+    boundaryEdgesBefore,
   });
 }
 

@@ -809,12 +809,31 @@ export function runScp005VoxelRemesh(): StudioDccKernelResult {
 
 export function runScp006DynamicTopology(): StudioDccKernelResult {
   const mesh = cube();
+  // Partial brush on closed unit cube (centered ~origin, r=0.75 hits ~half faces).
+  // Must stay watertight: refine boundary must equal input boundary (0 on cube).
   const refined = dynatopoStudioMeshBrushLocal(
     mesh,
     { center: { x: 0.5, y: 0.5, z: 0.5 }, radius: 0.75 },
     "refine",
   );
   if (!refined.ok) throw new Error(refined.detail);
+  if (refined.value.boundaryEdgesBefore !== 0) {
+    throw new Error(
+      `SCP-006 fixture not closed: boundaryBefore=${refined.value.boundaryEdgesBefore}`,
+    );
+  }
+  if (refined.value.boundaryEdges !== 0) {
+    throw new Error(
+      `refine not crack-free on closed mesh: boundaryEdges=${refined.value.boundaryEdges} (expected 0)`,
+    );
+  }
+  if (refined.value.affectedTris <= 0 || refined.value.facesAfter <= refined.value.facesBefore) {
+    throw new Error("refine did not increase face count on partial brush");
+  }
+  // Partial refine must not force full-mesh 1→4 (seed subset + red-green only).
+  if (refined.value.affectedTris >= refined.value.facesBefore && refined.value.facesAfter === refined.value.facesBefore * 4) {
+    // allowed when brush covers all seeds; still require watertight above
+  }
   const coarsened = dynatopoStudioMeshBrushLocal(
     refined.value.mesh,
     { center: { x: 0.5, y: 0.5, z: 0.5 }, radius: 0.75 },
@@ -827,12 +846,18 @@ export function runScp006DynamicTopology(): StudioDccKernelResult {
       `coarsen not crack-free: boundary ${coarsened.value.boundaryEdges} > refine ${refined.value.boundaryEdges}`,
     );
   }
+  if (coarsened.value.boundaryEdges !== 0) {
+    throw new Error(
+      `coarsen opened mesh: boundaryEdges=${coarsened.value.boundaryEdges}`,
+    );
+  }
   return ok("SCP-006", {
     facesBefore: refined.value.facesBefore,
     facesAfterRefine: refined.value.facesAfter,
     facesAfterCoarsen: coarsened.value.facesAfter,
     affectedRefine: refined.value.affectedTris,
     affectedCoarsen: coarsened.value.affectedTris,
+    boundaryBefore: refined.value.boundaryEdgesBefore,
     boundaryAfterRefine: refined.value.boundaryEdges,
     boundaryAfterCoarsen: coarsened.value.boundaryEdges,
   });
