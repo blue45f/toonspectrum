@@ -3,20 +3,27 @@
  * Pure workspace kernels drive state; this panel is the React shell only.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   createStudioHybridDccWorkspace,
   workspaceAddArtistInk,
   workspaceAddUnitCube,
   workspaceBooleanDifference,
+  workspaceCadProp,
+  workspaceClothStep,
+  workspaceCollabJoin,
   workspaceDiagnostics,
   workspaceEnsureShots,
   workspaceExportToon3d,
   workspaceExtrudeActive,
+  workspaceImportBytes,
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
+  workspaceMirrorActive,
+  workspaceSculptActive,
   workspaceUndo,
+  workspaceUvUnwrapActive,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
 
@@ -26,13 +33,19 @@ export function StudioHybridDccPanel() {
   );
   const [log, setLog] = useState<string>("Ready.");
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const run = async (label: string, fn: () => StudioHybridDccWorkspace | Promise<StudioHybridDccWorkspace>) => {
+  const run = async (
+    label: string,
+    fn: () => StudioHybridDccWorkspace | Promise<StudioHybridDccWorkspace>,
+  ) => {
     setBusy(true);
     try {
       const next = await fn();
       setWs(next);
-      setLog(`${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length}`);
+      setLog(
+        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep}`,
+      );
     } catch (error) {
       setLog(`${label} failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -50,8 +63,24 @@ export function StudioHybridDccPanel() {
     >
       <header className="font-medium">Hybrid 2D·3D DCC</header>
       <p className="text-muted-foreground text-xs">
-        Document kernels: geometry authority, modifiers, live bridge, import, OPFS recovery.
+        Document kernels: geometry authority, modifiers, live bridge, CAD/sculpt/cloth shells, import, OPFS recovery.
       </p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".stl,.ply,.dae,.dxf,.off,.3mf,.bvh,.ifc,.obj,.glb,.gltf,.vrm,.fbx"
+        className="sr-only"
+        data-studio-hybrid-dcc-import="true"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          void run(`Import ${file.name}`, async () => {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            return workspaceImportBytes(ws, file.name, buf);
+          });
+        }}
+      />
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -88,6 +117,54 @@ export function StudioHybridDccPanel() {
         <button
           type="button"
           className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Mirror", () => workspaceMirrorActive(ws))}
+        >
+          Mirror
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("UV", () => workspaceUvUnwrapActive(ws))}
+        >
+          UV unwrap
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Sculpt", () => workspaceSculptActive(ws))}
+        >
+          Sculpt
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("CAD prop", () => workspaceCadProp(ws))}
+        >
+          CAD prop
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("Cloth", () => workspaceClothStep(ws))}
+        >
+          Cloth step
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("Collab join", () => workspaceCollabJoin(ws, "peer-local", "Artist"))}
+        >
+          Collab
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
           disabled={busy}
           onClick={() => run("8 shots", () => workspaceEnsureShots(ws, 8))}
         >
@@ -113,6 +190,14 @@ export function StudioHybridDccPanel() {
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          Import mesh…
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
           onClick={() => run("Undo", () => workspaceUndo(ws))}
         >
           Undo
@@ -123,7 +208,9 @@ export function StudioHybridDccPanel() {
           disabled={busy}
           onClick={() => {
             const pkg = workspaceExportToon3d(ws);
-            setLog(`.toon3d packed hash=${pkg.manifest.packageHash.slice(0, 18)}… files=${Object.keys(pkg.files).length}`);
+            setLog(
+              `.toon3d packed hash=${pkg.manifest.packageHash.slice(0, 18)}… files=${Object.keys(pkg.files).length}`,
+            );
           }}
         >
           Export .toon3d

@@ -35,15 +35,15 @@ export const STUDIO_DCC_FORMAT_MATRIX: readonly StudioFormatEntry[] = [
   { id: "3ds", extensions: [".3ds"], category: "mesh", grade: "B", path: "Three/Assimp", priority: "P2", notes: "legacy limits" },
   { id: "ply", extensions: [".ply"], category: "mesh", grade: "A", path: "Three PLYLoader", priority: "P1", notes: "vertex color" },
   { id: "stl", extensions: [".stl"], category: "mesh", grade: "A", path: "Three STLLoader", priority: "P1", notes: "print mesh" },
-  { id: "3mf", extensions: [".3mf"], category: "mesh", grade: "B", path: "lib3mf WASM", priority: "P2", notes: "print package" },
-  { id: "off", extensions: [".off"], category: "mesh", grade: "B", path: "custom/Assimp", priority: "P3", notes: "minimal" },
+  { id: "3mf", extensions: [".3mf"], category: "mesh", grade: "B", path: "studio-mesh-format-adapters/3mf + lib3mf WASM optional", priority: "P2", notes: "print package XML mesh subset" },
+  { id: "off", extensions: [".off"], category: "mesh", grade: "A", path: "studio-mesh-format-adapters/off", priority: "P3", notes: "minimal" },
   { id: "usdz", extensions: [".usdz"], category: "package", grade: "B", path: "Three USDZLoader", priority: "P2", notes: "not full USD" },
   { id: "usd", extensions: [".usd", ".usda", ".usdc"], category: "package", grade: "C", path: "OpenUSD sidecar", priority: "P4", notes: "heavy" },
   { id: "abc", extensions: [".abc"], category: "animation", grade: "C", path: "DCC bridge", priority: "P4", notes: "cache only" },
   // Character
   { id: "vrm", extensions: [".vrm"], category: "character", grade: "A", path: "three-vrm + studio-glb-scene-ir", priority: "P0", notes: "0.x→1.0 IR" },
   { id: "vrma", extensions: [".vrma"], category: "animation", grade: "A", path: "three-vrm-animation", priority: "P2", notes: "humanoid motion" },
-  { id: "bvh", extensions: [".bvh"], category: "animation", grade: "B", path: "Three BVHLoader + retarget", priority: "P2", notes: "axis/scale report" },
+  { id: "bvh", extensions: [".bvh"], category: "animation", grade: "B", path: "studio-mesh-format-adapters/bvh + retarget", priority: "P2", notes: "hierarchy + stick preview" },
   { id: "pmx", extensions: [".pmx", ".pmd"], category: "character", grade: "B", path: "Three MMDLoader", priority: "P2", notes: "license" },
   { id: "vmd", extensions: [".vmd"], category: "animation", grade: "B", path: "Three MMDLoader", priority: "P2", notes: "MMD motion" },
   // CAD / BIM
@@ -53,7 +53,7 @@ export const STUDIO_DCC_FORMAT_MATRIX: readonly StudioFormatEntry[] = [
   { id: "3dm", extensions: [".3dm"], category: "cad", grade: "B", path: "rhino3dm.js", priority: "P3", notes: "NURBS subset" },
   { id: "dxf", extensions: [".dxf"], category: "cad", grade: "B", path: "dxf-parser", priority: "P2", notes: "plan import" },
   { id: "dwg", extensions: [".dwg"], category: "cad", grade: "X", path: "LibreDWG GPL converter only", priority: "P4", notes: "not in browser core" },
-  { id: "ifc", extensions: [".ifc"], category: "bim", grade: "B", path: "web-ifc", priority: "P3", notes: "property/space" },
+  { id: "ifc", extensions: [".ifc"], category: "bim", grade: "B", path: "studio-mesh-format-adapters/ifc shell + web-ifc optional", priority: "P3", notes: "point/space/wall shell" },
   // Documents / images
   { id: "psd", extensions: [".psd", ".psb"], category: "document", grade: "A", path: "ag-psd / @webtoon/psd", priority: "P0", notes: "export report" },
   { id: "png", extensions: [".png"], category: "image", grade: "A", path: "browser codecs", priority: "P0", notes: "source master" },

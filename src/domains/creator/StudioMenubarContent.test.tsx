@@ -124,6 +124,7 @@ function createProps(
     setCharacterBibleOpen: vi.fn(),
     setCheckpointPanelOpen: vi.fn(),
     setProductionBibleOpen: vi.fn(),
+    setHybridDccOpen: vi.fn(),
     setSceneSnapshotOpen: vi.fn(),
     setExportFormat: vi.fn(),
     setExportMenuOpen: vi.fn(),
@@ -281,6 +282,23 @@ describe("StudioMenubarContent", () => {
     expect(trigger.className).toContain("min-h-11");
     fireEvent.click(trigger);
     expect(setProductionBibleOpen).toHaveBeenCalledWith(true);
+  });
+
+  it("opens Hybrid DCC workspace from project actions", () => {
+    const setHybridDccOpen = vi.fn();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          setHybridDccOpen,
+        })}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: /Hybrid DCC/i });
+    expect(trigger.getAttribute("data-studio-hybrid-dcc-open")).toBe("true");
+    fireEvent.click(trigger);
+    expect(setHybridDccOpen).toHaveBeenCalledWith(true);
   });
 
   it("opens the placed-asset rights ledger from project actions", () => {

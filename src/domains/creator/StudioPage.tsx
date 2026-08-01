@@ -1633,6 +1633,12 @@ const LazyStudioAnimaticTimelineDialog = lazy(() =>
   )
 );
 
+const LazyStudioHybridDccDialog = lazy(() =>
+  import("./StudioHybridDccDialog").then(({ StudioHybridDccDialog }) => ({
+    default: StudioHybridDccDialog,
+  }))
+);
+
 const LazyStudioQuickAccessSurface = lazy(() =>
   import("./StudioQuickAccessSurface").then(({ StudioQuickAccessSurface }) => ({
     default: StudioQuickAccessSurface,
@@ -4453,6 +4459,7 @@ function StudioCuttoonEditor() {
   const [sceneSnapshotOpen, setSceneSnapshotOpen] = useState(false);
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
+  const [hybridDccOpen, setHybridDccOpen] = useState(false);
   const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
@@ -4869,6 +4876,7 @@ function StudioCuttoonEditor() {
     setMasterPanelOpen(false);
     setCharacterBibleOpen(false);
     setProductionBibleOpen(false);
+    setHybridDccOpen(false);
     setWriterRoomOpen(false);
     setPublicationOperationsOpen(false);
     setPublishPreflightOpen(false);
@@ -36163,6 +36171,24 @@ function clearSelectionForEdit() {
         />
       </Suspense>
     ) : null}
+    {hybridDccOpen ? (
+      <Suspense
+        fallback={(
+          <div
+            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
+            role="status"
+            aria-live="polite"
+          >
+            Hybrid DCC를 여는 중…
+          </div>
+        )}
+      >
+        <LazyStudioHybridDccDialog
+          open
+          onClose={() => setHybridDccOpen(false)}
+        />
+      </Suspense>
+    ) : null}
     {assetRightsAuditOpen ? (
       <Suspense
         fallback={(
@@ -36369,6 +36395,7 @@ function clearSelectionForEdit() {
           setCharacterBibleOpen={setCharacterBibleOpen}
           setCheckpointPanelOpen={setCheckpointPanelOpen}
           setProductionBibleOpen={setProductionBibleOpen}
+          setHybridDccOpen={setHybridDccOpen}
           setSceneSnapshotOpen={setSceneSnapshotOpen}
           setExportFormat={setExportFormat}
           setExportMenuOpen={setExportMenuOpen}

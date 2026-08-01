@@ -1,5 +1,6 @@
 import {
   Bookmark,
+  Box,
   Camera,
   ChevronDown,
   Clapperboard,
@@ -242,6 +243,7 @@ export interface StudioMenubarContentProps {
   setCharacterBibleOpen: Dispatch<SetStateAction<boolean>>;
   setCheckpointPanelOpen: Dispatch<SetStateAction<boolean>>;
   setProductionBibleOpen: Dispatch<SetStateAction<boolean>>;
+  setHybridDccOpen: Dispatch<SetStateAction<boolean>>;
   setSceneSnapshotOpen: Dispatch<SetStateAction<boolean>>;
   setExportFormat: Dispatch<SetStateAction<ExportFormat>>;
   setExportMenuOpen: Dispatch<SetStateAction<boolean>>;
@@ -316,6 +318,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   setCharacterBibleOpen,
   setCheckpointPanelOpen,
   setProductionBibleOpen,
+  setHybridDccOpen,
   setSceneSnapshotOpen,
   setExportFormat,
   setExportMenuOpen,
@@ -891,6 +894,24 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             }
           >
             <MapPinned size={14} /> 제작 바이블
+          </button>
+          <button
+            type="button"
+            onClick={() => setHybridDccOpen(true)}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={
+              collaborationDocumentLocked
+                ? collaborationLockMessage()
+                : "하이브리드 2D·3D DCC: 메시 편집, 불리언, 샷·잉크, CAD/스컬프/클로스, .toon3d"
+            }
+            data-studio-hybrid-dcc-open="true"
+          >
+            <Box size={14} /> Hybrid DCC
           </button>
           <button
             type="button"

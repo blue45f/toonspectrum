@@ -6,13 +6,32 @@
 
 import { getStudioBg3dRoomPreset, buildStudioBg3dRoomParts } from "./studio-bg3d-room-builder";
 import {
+  createStudioCadSketch,
+  extrudeStudioCadProfile,
+} from "./studio-cad-kernel-lite";
+import {
+  retargetStudioMotionReport,
+  type StudioRetargetReport,
+} from "./studio-character-animation-p2";
+import {
+  createStudioClothGrid,
+  stepStudioClothXpbd,
+} from "./studio-cloth-pattern-kernel";
+import {
+  collabAppendOp,
+  collabJoin,
+  createStudioDccCollabRoom,
+  type StudioDccCollabRoom,
+} from "./studio-dcc-collab-shell";
+import {
+  createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   extrudeStudioEditableMeshFaces,
   hashStudioEditableMesh,
   knifeStudioEditableMesh,
+  studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
-import { studioEditableMeshToTriangleSoup } from "./studio-editable-half-edge-mesh";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
@@ -26,6 +45,7 @@ import {
   snapshotStudioHybridDccState,
   type StudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
+import { applyStudioSculptStroke } from "./studio-hybrid-sculpt-kernel";
 import {
   createStudioLiveBridgeDocument,
   createStudioSharedSet,
@@ -44,8 +64,13 @@ import {
 } from "./studio-mesh-modifier-stack";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 import { packStudioToon3dPackage, type StudioToon3dPackage } from "./studio-toon3d-package";
+import {
+  unwrapStudioMeshBox,
+  unwrapStudioMeshPlanar,
+  type StudioUvMap,
+} from "./studio-uv-unwrap-lite";
 
-export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 1 as const;
+export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 2 as const;
 
 export interface StudioHybridDccWorkspace {
   readonly revision: typeof STUDIO_HYBRID_DCC_WORKSPACE_REVISION;
@@ -53,6 +78,10 @@ export interface StudioHybridDccWorkspace {
   bridge: StudioLiveBridgeDocument;
   activeAssetId: string | null;
   lastImportReport: unknown | null;
+  lastUvMap: StudioUvMap | null;
+  lastRetarget: StudioRetargetReport | null;
+  collab: StudioDccCollabRoom;
+  clothStep: number;
 }
 
 export function createStudioHybridDccWorkspace(
@@ -67,6 +96,10 @@ export function createStudioHybridDccWorkspace(
     bridge,
     activeAssetId: null,
     lastImportReport: null,
+    lastUvMap: null,
+    lastRetarget: null,
+    collab: createStudioDccCollabRoom(`${documentId}-collab`),
+    clothStep: 0,
   };
 }
 
@@ -298,4 +331,183 @@ export function workspaceActiveMesh(
 ): StudioEditableMesh | null {
   if (!ws.activeAssetId) return null;
   return ws.session.state.geometry.records[ws.activeAssetId]?.mesh ?? null;
+}
+
+export async function workspaceMirrorActive(
+  ws: StudioHybridDccWorkspace,
+  axis: "x" | "y" | "z" = "x",
+): Promise<StudioHybridDccWorkspace> {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  let stack = createStudioMeshModifierStack(record.mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "mirror",
+    id: "ws-mirror",
+    enabled: true,
+    axis,
+    merge: true,
+    mergeThreshold: 1e-4,
+    bisect: false,
+    clip: false,
+  });
+  const evaluated = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!evaluated.ok) throw new Error(evaluated.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, evaluated.value.mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    evaluated.value.resultHash,
+  );
+  return { ...ws, session, bridge };
+}
+
+export function workspaceUvUnwrapActive(
+  ws: StudioHybridDccWorkspace,
+  mode: "planar-xy" | "box" = "box",
+): StudioHybridDccWorkspace {
+  const mesh = workspaceActiveMesh(ws);
+  if (!mesh) throw new Error("no active asset");
+  const uv = mode === "box" ? unwrapStudioMeshBox(mesh) : unwrapStudioMeshPlanar(mesh, "planar-xy");
+  return { ...ws, lastUvMap: uv };
+}
+
+export function workspaceCadProp(
+  ws: StudioHybridDccWorkspace,
+  assetId = "cad-prop",
+): StudioHybridDccWorkspace {
+  const sketch = createStudioCadSketch(
+    [
+      { kind: "line", a: [0, 0], b: [1, 0] },
+      { kind: "line", a: [1, 0], b: [1, 0.6] },
+      { kind: "line", a: [1, 0.6], b: [0, 0.6] },
+      { kind: "line", a: [0, 0.6], b: [0, 0] },
+    ],
+    [
+      { kind: "horizontal", curveIndex: 0 },
+      { kind: "vertical", curveIndex: 1 },
+    ],
+  );
+  void sketch;
+  const solid = extrudeStudioCadProfile(
+    [
+      [0, 0],
+      [1, 0],
+      [1, 0.6],
+      [0, 0.6],
+    ],
+    0.4,
+  );
+  if (!solid) throw new Error("cad extrude failed");
+  const verts = [];
+  for (let i = 0; i + 2 < solid.positions.length; i += 3) {
+    verts.push({
+      x: solid.positions[i]!,
+      y: solid.positions[i + 1]!,
+      z: solid.positions[i + 2]!,
+    });
+  }
+  const faces: number[][] = [];
+  for (let i = 0; i + 2 < solid.indices.length; i += 3) {
+    faces.push([solid.indices[i]!, solid.indices[i + 1]!, solid.indices[i + 2]!]);
+  }
+  const mesh = createStudioEditableMeshFromPolygons(verts, faces);
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, mesh, {
+      source: "cad-extrude",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId };
+}
+
+export function workspaceSculptActive(
+  ws: StudioHybridDccWorkspace,
+  strength = 0.15,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const sculpted = applyStudioSculptStroke(record.mesh, {
+    kind: "inflate",
+    center: { x: 0.5, y: 0.5, z: 0.5 },
+    radius: 0.75,
+    strength,
+  });
+  if (!sculpted.ok) throw new Error(sculpted.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, sculpted.mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    hashStudioEditableMesh(sculpted.mesh),
+  );
+  return { ...ws, session, bridge };
+}
+
+export function workspaceClothStep(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
+  const grid = createStudioClothGrid(1, 1, 4, 4);
+  const stepped = stepStudioClothXpbd(grid, 1 / 60, 4);
+  void stepped;
+  return { ...ws, clothStep: ws.clothStep + 1 };
+}
+
+export function workspaceCollabJoin(
+  ws: StudioHybridDccWorkspace,
+  peerId: string,
+  displayName: string,
+): StudioHybridDccWorkspace {
+  let collab = collabJoin(ws.collab, {
+    peerId,
+    displayName,
+    color: "#4f8cff",
+    selection: ws.activeAssetId ? [ws.activeAssetId] : [],
+  });
+  if (ws.activeAssetId) {
+    collab = collabAppendOp(collab, {
+      kind: "select",
+      peerId,
+      assetIds: [ws.activeAssetId],
+      at: Date.now(),
+    });
+  }
+  return { ...ws, collab };
+}
+
+/** BVH/humanoid retarget report (CHR-P2) — pure diagnostics, no bake. */
+export function workspaceRetargetFromBvhExtras(
+  ws: StudioHybridDccWorkspace,
+  sourceBones: readonly string[],
+  targetBones: readonly string[] = [
+    "hips",
+    "spine",
+    "chest",
+    "neck",
+    "head",
+    "leftUpperArm",
+    "rightUpperArm",
+    "leftUpperLeg",
+    "rightUpperLeg",
+  ],
+): StudioHybridDccWorkspace {
+  const lastRetarget = retargetStudioMotionReport({
+    source: "bvh",
+    target: "vrm-humanoid",
+    sourceBones,
+    targetBones,
+    sourceUp: "y",
+    targetUp: "y",
+    sourceUnit: 1,
+    targetUnit: 1,
+  });
+  return { ...ws, lastRetarget };
 }

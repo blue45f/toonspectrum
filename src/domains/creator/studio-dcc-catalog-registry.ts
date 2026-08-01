@@ -3,7 +3,7 @@
  * Used by gating tests to assert every §12.1 / P0–P1 ID has a concrete API.
  */
 
-export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 2 as const;
+export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 3 as const;
 
 export type StudioCatalogStatus =
   | "shipped"
@@ -33,7 +33,7 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "DOC-007", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccSelectiveUndo"] },
   { id: "DOC-012", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccRegisterAsset"] },
   { id: "DOC-015", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-diagnostics.ts", apis: ["scanStudioHybridDccCorruption"] },
-  { id: "DOC-008", priority: "P2", status: "deferred-p2", module: "studio-live-collaboration-room.ts", apis: ["existing-yjs-partial"] },
+  { id: "DOC-008", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabAppendOp"] },
   // MOD
   { id: "MOD-001", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
   { id: "MOD-002", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
@@ -97,14 +97,23 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-PLY", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioPlyAscii"] },
   { id: "FMT-DAE", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioDaeMinimal"] },
   { id: "FMT-DXF", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioDxfPlan"] },
+  { id: "FMT-OFF", priority: "P3", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioOff"] },
+  { id: "FMT-3MF", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudio3mfMinimal"] },
+  { id: "FMT-BVH", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioBvhMotion"] },
+  { id: "FMT-IFC", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioIfcShell"] },
+  { id: "FMT-STEP", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStepShell"] },
   { id: "FMT-TOON3D", priority: "P0", status: "shipped", module: "studio-toon3d-package.ts", apis: ["packStudioToon3dPackage"] },
+  { id: "MAT-004", priority: "P2", status: "shipped", module: "studio-uv-unwrap-lite.ts", apis: ["unwrapStudioMeshBox", "unwrapStudioMeshPlanar"] },
+  { id: "CHR-RETARGET", priority: "P2", status: "shipped", module: "studio-character-animation-p2.ts", apis: ["retargetStudioMotionReport", "workspaceRetargetFromBvhExtras"] },
   // Workspace vertical
   { id: "V1-VERTICAL", priority: "P1", status: "shipped", module: "studio-webtoon-object-creator-v1-demo.ts", apis: ["runStudioWebtoonObjectCreatorV1Demo"] },
   { id: "WS-API", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["createStudioHybridDccWorkspace"] },
-  // Deferred samples
-  { id: "CAD-015", priority: "P3", status: "deferred-p3", module: "studio-cad-kernel-lite.ts", apis: ["extrudeStudioCadProfile"] },
-  { id: "SCP-001", priority: "P3", status: "partial", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke"] },
-  { id: "GAR-005", priority: "P3", status: "partial", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd"] },
+  { id: "UI-HYBRID-PANEL", priority: "P1", status: "shipped", module: "StudioHybridDccPanel.tsx", apis: ["StudioHybridDccPanel", "StudioHybridDccDialog"] },
+  // CAD / sculpt / cloth promoted from deferred lite kernels
+  { id: "CAD-001", priority: "P3", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["createStudioCadSketch", "diagnoseStudioCadConstraints"] },
+  { id: "CAD-015", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["extrudeStudioCadProfile", "workspaceCadProp"] },
+  { id: "SCP-001", priority: "P3", status: "shipped", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke", "workspaceSculptActive"] },
+  { id: "GAR-005", priority: "P3", status: "shipped", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd", "workspaceClothStep"] },
 ];
 
 export function studioCatalogByPriority(

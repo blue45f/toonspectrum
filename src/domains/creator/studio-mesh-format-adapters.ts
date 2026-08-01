@@ -17,22 +17,36 @@ import {
 
 export const STUDIO_MESH_FORMAT_ADAPTERS_REVISION = 1 as const;
 
+export type StudioMeshAdapterFormat =
+  | "stl"
+  | "ply"
+  | "dae"
+  | "dxf"
+  | "off"
+  | "3mf"
+  | "bvh"
+  | "ifc"
+  | "step";
+
 export type StudioMeshAdapterResult = {
-  readonly format: "stl" | "ply" | "dae" | "dxf";
+  readonly format: StudioMeshAdapterFormat;
   readonly scene: StudioImportSceneIR;
   readonly report: StudioImportCompatibilityReport;
   readonly commitHash: string;
   readonly meshes: readonly StudioEditableMesh[];
+  readonly extras?: Readonly<Record<string, unknown>>;
 };
 
 function sceneShell(
-  format: StudioMeshAdapterResult["format"],
+  format: StudioMeshAdapterFormat,
   meshes: { name: string; vertexCount: number; triangleCount: number }[],
   unsupported: { kind: string; reason: string }[] = [],
 ): StudioImportSceneIR {
+  const planLike =
+    format === "dxf" || format === "bvh" || format === "ifc" || format === "step";
   return {
-    format: format === "dxf" ? "unknown" : "obj",
-    units: format === "dxf" ? "unitless" : "meters",
+    format: planLike ? "unknown" : "obj",
+    units: planLike ? "unitless" : "meters",
     axis: "y-up",
     meshes,
     materials: [],
@@ -324,14 +338,356 @@ export function importStudioDxfPlan(text: string): StudioMeshAdapterResult {
   });
 }
 
+/** OFF (Object File Format) — vertices then faces. */
+export function importStudioOff(text: string): StudioMeshAdapterResult {
+  const lines = text
+    .split(/\r?\n/u)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
+  const unsupported: { kind: string; reason: string }[] = [];
+  if (lines.length === 0 || !/^OFF\b/iu.test(lines[0]!)) {
+    unsupported.push({ kind: "off", reason: "missing OFF header" });
+  }
+  let countsLine = 1;
+  if (lines[0] && /^OFF\s+\d/iu.test(lines[0]!)) {
+    // "OFF nV nF nE" single line form
+    countsLine = 0;
+  }
+  const counts = (lines[countsLine] ?? "0 0 0").replace(/^OFF\s+/iu, "").split(/\s+/u).map(Number);
+  const vertexCount = counts[0] ?? 0;
+  const faceCount = counts[1] ?? 0;
+  const start = countsLine === 0 ? 1 : 2;
+  const positions: number[] = [];
+  const faces: number[][] = [];
+  let cursor = start;
+  for (let v = 0; v < vertexCount && cursor < lines.length; v += 1, cursor += 1) {
+    const p = lines[cursor]!.split(/\s+/u).map(Number);
+    positions.push(p[0] ?? 0, p[1] ?? 0, p[2] ?? 0);
+  }
+  for (let f = 0; f < faceCount && cursor < lines.length; f += 1, cursor += 1) {
+    const p = lines[cursor]!.split(/\s+/u).map(Number);
+    const n = p[0] ?? 0;
+    const idx = p.slice(1, 1 + n);
+    if (idx.length >= 3) faces.push(idx);
+  }
+  let meshes: StudioEditableMesh[] = [];
+  if (faces.length) {
+    try {
+      meshes = [meshFromSoup(positions, faces)];
+    } catch (e) {
+      unsupported.push({
+        kind: "topology",
+        reason: e instanceof Error ? e.message : "rebuild failed",
+      });
+    }
+  }
+  const scene = sceneShell(
+    "off",
+    meshes.length
+      ? [{ name: "off-mesh", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      : [],
+    unsupported,
+  );
+  return finish("off", "studio-mesh-format-adapters/off", text, scene, meshes, {
+    geometry: meshes.length ? "A" : "X",
+    material: "X",
+    rigAnimation: "X",
+    semanticHistory: "P",
+  });
+}
+
+/** Minimal 3MF: mesh vertices/triangles inside model XML (no full OPC ZIP expand required for raw XML). */
+export function importStudio3mfMinimal(text: string): StudioMeshAdapterResult {
+  const unsupported: { kind: string; reason: string }[] = [];
+  const positions: number[] = [];
+  const faces: number[][] = [];
+  const vertexRe = /<vertex\b[^>]*\bx=["']?([-\d.eE+]+)["']?[^>]*\by=["']?([-\d.eE+]+)["']?[^>]*\bz=["']?([-\d.eE+]+)["']?/giu;
+  let m: RegExpExecArray | null;
+  while ((m = vertexRe.exec(text)) !== null) {
+    positions.push(Number(m[1]), Number(m[2]), Number(m[3]));
+  }
+  const triRe = /<triangle\b[^>]*\bv1=["']?(\d+)["']?[^>]*\bv2=["']?(\d+)["']?[^>]*\bv3=["']?(\d+)["']?/giu;
+  while ((m = triRe.exec(text)) !== null) {
+    faces.push([Number(m[1]), Number(m[2]), Number(m[3])]);
+  }
+  if (!positions.length) {
+    unsupported.push({ kind: "3mf", reason: "no <vertex> elements (ZIP package may need unzip first)" });
+  }
+  let meshes: StudioEditableMesh[] = [];
+  if (faces.length && positions.length >= 9) {
+    try {
+      meshes = [meshFromSoup(positions, faces)];
+    } catch (e) {
+      unsupported.push({
+        kind: "topology",
+        reason: e instanceof Error ? e.message : "rebuild failed",
+      });
+    }
+  }
+  const scene = sceneShell(
+    "3mf",
+    meshes.length
+      ? [{ name: "3mf-mesh", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      : [],
+    unsupported,
+  );
+  return finish("3mf", "studio-mesh-format-adapters/3mf", text, scene, meshes, {
+    geometry: meshes.length ? "B" : "X",
+    material: "P",
+    rigAnimation: "X",
+    semanticHistory: "P",
+  });
+}
+
+export type StudioBvhJoint = {
+  readonly name: string;
+  readonly offset: readonly [number, number, number];
+  readonly channels: readonly string[];
+  readonly children: readonly StudioBvhJoint[];
+};
+
+/** BVH skeleton + frame channel count (motion retarget report path). */
+export function importStudioBvhMotion(text: string): StudioMeshAdapterResult {
+  const unsupported: { kind: string; reason: string }[] = [];
+  const joints: { name: string; offset: [number, number, number] }[] = [];
+  const lines = text.split(/\r?\n/u);
+  let frameCount = 0;
+  let frameTime = 0;
+  let channelTotal = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i]!.trim();
+    if (/^(ROOT|JOINT)\s+/u.test(line)) {
+      const name = line.replace(/^(ROOT|JOINT)\s+/u, "").trim();
+      let offset: [number, number, number] = [0, 0, 0];
+      for (let j = i; j < Math.min(i + 8, lines.length); j += 1) {
+        const o = /^\s*OFFSET\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/u.exec(lines[j]!);
+        if (o) {
+          offset = [Number(o[1]), Number(o[2]), Number(o[3])];
+          break;
+        }
+      }
+      joints.push({ name, offset });
+    }
+    const ch = /^\s*CHANNELS\s+(\d+)/u.exec(line);
+    if (ch) channelTotal += Number(ch[1]);
+    if (line.startsWith("Frames:")) frameCount = Number(line.split(":")[1]?.trim() ?? 0);
+    if (line.startsWith("Frame Time:")) frameTime = Number(line.split(":")[1]?.trim() ?? 0);
+  }
+  if (!joints.length) {
+    unsupported.push({ kind: "bvh", reason: "no ROOT/JOINT hierarchy" });
+  }
+  // Build a stick-figure mesh from joint offsets (parent chain approximated as sequential)
+  const positions: number[] = [];
+  const faces: number[][] = [];
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (let i = 0; i < joints.length; i += 1) {
+    const j = joints[i]!;
+    const nx = cx + j.offset[0];
+    const ny = cy + j.offset[1];
+    const nz = cz + j.offset[2];
+    const base = positions.length / 3;
+    // thin box segment from parent to joint
+    const s = 0.02;
+    positions.push(
+      cx, cy, cz,
+      nx, ny, nz,
+      nx + s, ny, nz,
+      cx + s, cy, cz,
+    );
+    faces.push([base, base + 1, base + 2], [base, base + 2, base + 3]);
+    cx = nx;
+    cy = ny;
+    cz = nz;
+  }
+  let meshes: StudioEditableMesh[] = [];
+  if (faces.length) {
+    try {
+      meshes = [meshFromSoup(positions, faces)];
+    } catch {
+      // leave empty
+    }
+  }
+  const scene = sceneShell(
+    "bvh",
+    meshes.length
+      ? [{ name: "bvh-stick", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      : [],
+    [
+      ...unsupported,
+      {
+        kind: "bvh-motion",
+        reason: `hierarchy joints=${joints.length} channels=${channelTotal} frames=${frameCount} dt=${frameTime}; skin weights not in BVH`,
+      },
+    ],
+  );
+  const result = finish("bvh", "studio-mesh-format-adapters/bvh", text, scene, meshes, {
+    geometry: meshes.length ? "B" : "P",
+    material: "X",
+    rigAnimation: frameCount > 0 ? "B" : "P",
+    semanticHistory: "P",
+  });
+  return {
+    ...result,
+    extras: {
+      joints: joints.map((j) => j.name),
+      frameCount,
+      frameTime,
+      channelTotal,
+    },
+  };
+}
+
+/** IFC STEP-physical shell: extract IfcCartesianPoint / IfcSpace names (not full geometry tessellation). */
+export function importStudioIfcShell(text: string): StudioMeshAdapterResult {
+  const unsupported: { kind: string; reason: string }[] = [];
+  const points: number[][] = [];
+  const spaces: string[] = [];
+  const pointRe = /IFCCARTESIANPOINT\s*\(\s*\(([^)]+)\)/giu;
+  let m: RegExpExecArray | null;
+  while ((m = pointRe.exec(text)) !== null) {
+    const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
+    if (nums.length >= 2) {
+      points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
+    }
+  }
+  const spaceRe = /IFCSPACE\s*\([^;]*'([^']*)'/giu;
+  while ((m = spaceRe.exec(text)) !== null) {
+    spaces.push(m[1]!);
+  }
+  const wallCount = (text.match(/IFCWALL\b/giu) ?? []).length;
+  const slabCount = (text.match(/IFCSLAB\b/giu) ?? []).length;
+  if (!points.length && !spaces.length && !wallCount) {
+    unsupported.push({ kind: "ifc", reason: "no recognizable IFC entities" });
+  }
+  // Build point-cloud boxes / hull ribbon for preview
+  const positions: number[] = [];
+  const faces: number[][] = [];
+  const sample = points.slice(0, 64);
+  for (const p of sample) {
+    const base = positions.length / 3;
+    const [x, y, z] = p;
+    const s = 0.05;
+    positions.push(
+      x, y, z,
+      x + s, y, z,
+      x + s, y + s, z,
+      x, y + s, z,
+    );
+    faces.push([base, base + 1, base + 2], [base, base + 2, base + 3]);
+  }
+  let meshes: StudioEditableMesh[] = [];
+  if (faces.length) {
+    try {
+      meshes = [meshFromSoup(positions, faces)];
+    } catch {
+      // leave empty
+    }
+  }
+  const scene = sceneShell(
+    "ifc",
+    meshes.length
+      ? [{ name: "ifc-shell", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      : [],
+    [
+      ...unsupported,
+      {
+        kind: "ifc-subset",
+        reason: `points=${points.length} spaces=${spaces.length} walls=${wallCount} slabs=${slabCount}; full BREP tessellation deferred to web-ifc WASM path`,
+      },
+    ],
+  );
+  const result = finish("ifc", "studio-mesh-format-adapters/ifc", text, scene, meshes, {
+    geometry: meshes.length ? "C" : "P",
+    material: "X",
+    rigAnimation: "X",
+    semanticHistory: spaces.length ? "B" : "P",
+  });
+  return {
+    ...result,
+    extras: { spaces, wallCount, slabCount, pointCount: points.length },
+  };
+}
+
+/**
+ * STEP/IGES shell — cartesian points + product names (tessellation deferred to OCCT WASM).
+ */
+export function importStudioStepShell(text: string): StudioMeshAdapterResult {
+  const unsupported: { kind: string; reason: string }[] = [];
+  const isIges = /^\s*S\s*\d+/m.test(text) || text.includes("START SECTION");
+  const points: number[][] = [];
+  const cartRe = /CARTESIAN_POINT\s*\(\s*'[^']*'\s*,\s*\(([^)]+)\)/giu;
+  let m: RegExpExecArray | null;
+  while ((m = cartRe.exec(text)) !== null) {
+    const nums = m[1]!.split(",").map((s) => Number(s.trim())).filter(Number.isFinite);
+    if (nums.length >= 2) points.push([nums[0]!, nums[1]!, nums[2] ?? 0]);
+  }
+  const products = [...text.matchAll(/PRODUCT\s*\(\s*'([^']*)'/giu)].map((x) => x[1]!);
+  const advancedFaces = (text.match(/ADVANCED_FACE\b/giu) ?? []).length;
+  if (!points.length && !products.length && !advancedFaces) {
+    unsupported.push({
+      kind: "step",
+      reason: isIges ? "IGES shell without mapped entities" : "no STEP cartesian/product entities",
+    });
+  }
+  const positions: number[] = [];
+  const faces: number[][] = [];
+  for (const p of points.slice(0, 48)) {
+    const base = positions.length / 3;
+    const s = 0.04;
+    positions.push(p[0]!, p[1]!, p[2]!, p[0]! + s, p[1]!, p[2]!, p[0]! + s, p[1]! + s, p[2]!, p[0]!, p[1]! + s, p[2]!);
+    faces.push([base, base + 1, base + 2], [base, base + 2, base + 3]);
+  }
+  let meshes: StudioEditableMesh[] = [];
+  if (faces.length) {
+    try {
+      meshes = [meshFromSoup(positions, faces)];
+    } catch {
+      // leave empty
+    }
+  }
+  const scene = sceneShell(
+    "step",
+    meshes.length
+      ? [{ name: "step-shell", vertexCount: positions.length / 3, triangleCount: faces.length }]
+      : [],
+    [
+      ...unsupported,
+      {
+        kind: "step-subset",
+        reason: `points=${points.length} products=${products.length} advancedFaces=${advancedFaces}; B-Rep tessellation needs OCCT`,
+      },
+    ],
+  );
+  const result = finish("step", "studio-mesh-format-adapters/step", text, scene, meshes, {
+    geometry: meshes.length ? "C" : "P",
+    material: "X",
+    rigAnimation: "X",
+    semanticHistory: products.length ? "B" : "P",
+  });
+  return {
+    ...result,
+    extras: { products, advancedFaces, pointCount: points.length, isIges },
+  };
+}
+
 export function importStudioMeshByExtension(
   fileName: string,
   bytes: Uint8Array,
 ): StudioMeshAdapterResult | null {
   const lower = fileName.toLowerCase();
+  const text = () => new TextDecoder().decode(bytes);
   if (lower.endsWith(".stl")) return importStudioStl(bytes);
-  if (lower.endsWith(".ply")) return importStudioPlyAscii(new TextDecoder().decode(bytes));
-  if (lower.endsWith(".dae")) return importStudioDaeMinimal(new TextDecoder().decode(bytes));
-  if (lower.endsWith(".dxf")) return importStudioDxfPlan(new TextDecoder().decode(bytes));
+  if (lower.endsWith(".ply")) return importStudioPlyAscii(text());
+  if (lower.endsWith(".dae")) return importStudioDaeMinimal(text());
+  if (lower.endsWith(".dxf")) return importStudioDxfPlan(text());
+  if (lower.endsWith(".off")) return importStudioOff(text());
+  if (lower.endsWith(".3mf") || lower.endsWith(".model")) return importStudio3mfMinimal(text());
+  if (lower.endsWith(".bvh")) return importStudioBvhMotion(text());
+  if (lower.endsWith(".ifc")) return importStudioIfcShell(text());
+  if (lower.endsWith(".step") || lower.endsWith(".stp") || lower.endsWith(".iges") || lower.endsWith(".igs")) {
+    return importStudioStepShell(text());
+  }
   return null;
 }
