@@ -93,6 +93,51 @@ describe("production domain environment validation", () => {
   });
 });
 
+describe("authentication boundary environment validation", () => {
+  it("accepts explicit auth proxy/rate-limit boundary values", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(
+      validateEnv(
+        {
+          NODE_ENV: "test",
+          AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
+          AUTH_TRUSTED_PROXY_ENABLED: "true",
+          AUTH_TRUSTED_PROXY_IPS: "203.0.113.10,2001:db8::10",
+          AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
+          AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "8",
+        },
+        logger,
+      ),
+    ).toMatchObject({
+      AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
+      AUTH_TRUSTED_PROXY_ENABLED: "true",
+      AUTH_TRUSTED_PROXY_IPS: "203.0.113.10,2001:db8::10",
+      AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
+      AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "8",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns without fatal error for malformed auth boundary values", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(
+      validateEnv(
+        {
+          NODE_ENV: "test",
+          AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "TRUE",
+          AUTH_TRUSTED_PROXY_ENABLED: "enabled",
+          AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forward-for",
+          AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "0",
+        },
+        logger,
+      ),
+    ).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Studio AI quota environment validation", () => {
   it("accepts positive distributed quota overrides", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
