@@ -92,7 +92,7 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-GLB", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-VRM", priority: "P0", status: "shipped", module: "studio-glb-scene-ir.ts", apis: ["importStudioGlbDocument"] },
   { id: "FMT-OBJ", priority: "P0", status: "shipped", module: "studio-import-compatibility-report.ts", apis: ["parseStudioObjToSceneIR"] },
-  { id: "FMT-FBX", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxAsciiDocument", "convertStudioBg3dModelFilesToGlb"] },
+  { id: "FMT-FBX", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxAsciiDocument", "importStudioFbxDocument", "isStudioFbxBinary"] },
   { id: "FMT-STL", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStl"] },
   { id: "FMT-PLY", priority: "P1", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioPlyAscii"] },
   { id: "FMT-DAE", priority: "P2", status: "shipped", module: "studio-mesh-format-adapters.ts", apis: ["importStudioDaeMinimal"] },
@@ -105,6 +105,8 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "FMT-TOON3D", priority: "P0", status: "shipped", module: "studio-toon3d-package.ts", apis: ["packStudioToon3dPackage"] },
   { id: "MAT-004", priority: "P2", status: "shipped", module: "studio-uv-unwrap-lite.ts", apis: ["unwrapStudioMeshBox", "unwrapStudioMeshPlanar"] },
   { id: "CHR-RETARGET", priority: "P2", status: "shipped", module: "studio-character-animation-p2.ts", apis: ["retargetStudioMotionReport", "workspaceRetargetFromBvhExtras"] },
+  { id: "CAD-BOM", priority: "P4", status: "shipped", module: "studio-manufacturing-bom-lite.ts", apis: ["bomFromAssetParts", "bomRollupByMaterial", "workspaceRebuildBom"] },
+  { id: "MOD-ARRAY-WS", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceArrayActive", "workspaceSubdivideActive"] },
   // Workspace vertical
   { id: "V1-VERTICAL", priority: "P1", status: "shipped", module: "studio-webtoon-object-creator-v1-demo.ts", apis: ["runStudioWebtoonObjectCreatorV1Demo"] },
   { id: "WS-API", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["createStudioHybridDccWorkspace"] },

@@ -9,6 +9,7 @@ import {
   createStudioHybridDccWorkspace,
   workspaceAddArtistInk,
   workspaceAddUnitCube,
+  workspaceArrayActive,
   workspaceBooleanDifference,
   workspaceCadProp,
   workspaceClothStep,
@@ -21,7 +22,9 @@ import {
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
   workspaceMirrorActive,
+  workspaceRebuildBom,
   workspaceSculptActive,
+  workspaceSubdivideActive,
   workspaceUndo,
   workspaceUvUnwrapActive,
   type StudioHybridDccWorkspace,
@@ -44,7 +47,7 @@ export function StudioHybridDccPanel() {
       const next = await fn();
       setWs(next);
       setLog(
-        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep}`,
+        `${label} OK · assets=${Object.keys(next.session.state.geometry.records).length} shots=${next.bridge.shots.length} ink=${next.bridge.artistCorrections.deltas.length} uv=${next.lastUvMap ? next.lastUvMap.mode : "—"} collab=${next.collab.peers.length} cloth=${next.clothStep} bom=${next.bom.lines.length}`,
       );
     } catch (error) {
       setLog(`${label} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -121,6 +124,30 @@ export function StudioHybridDccPanel() {
           onClick={() => run("Mirror", () => workspaceMirrorActive(ws))}
         >
           Mirror
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Subdiv", () => workspaceSubdivideActive(ws, 1))}
+        >
+          Subdiv
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          onClick={() => run("Array", () => workspaceArrayActive(ws, 3))}
+        >
+          Array
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          onClick={() => run("BOM", () => workspaceRebuildBom(ws))}
+        >
+          BOM
         </button>
         <button
           type="button"

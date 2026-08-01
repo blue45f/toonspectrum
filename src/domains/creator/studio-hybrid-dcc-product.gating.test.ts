@@ -18,17 +18,28 @@ import {
   createStudioDccCollabRoom,
 } from "./studio-dcc-collab-shell";
 import {
+  importStudioFbxDocument,
+  isStudioFbxBinary,
+} from "./studio-fbx-ascii-import";
+import {
   createStudioHybridDccWorkspace,
   workspaceAddUnitCube,
+  workspaceArrayActive,
   workspaceCadProp,
   workspaceClothStep,
   workspaceCollabJoin,
   workspaceExportToon3d,
   workspaceMirrorActive,
+  workspaceRebuildBom,
   workspaceRetargetFromBvhExtras,
   workspaceSculptActive,
+  workspaceSubdivideActive,
   workspaceUvUnwrapActive,
 } from "./studio-hybrid-dcc-workspace";
+import {
+  bomRollupByMaterial,
+  bomEstimateMassKg,
+} from "./studio-manufacturing-bom-lite";
 import {
   importStudio3mfMinimal,
   importStudioBvhMotion,
@@ -157,8 +168,25 @@ describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
     ws = workspaceRetargetFromBvhExtras(ws, ["Hips", "Spine", "Head", "LeftArm"]);
     expect(ws.lastRetarget).not.toBeNull();
     expect(ws.lastRetarget!.source).toBe("bvh");
+    ws = workspaceAddUnitCube(ws, "subdiv-target");
+    ws = workspaceSubdivideActive(ws, 1);
+    ws = await workspaceArrayActive(ws, 2);
+    ws = workspaceRebuildBom(ws);
+    expect(ws.bom.lines.length).toBeGreaterThan(0);
+    expect(bomRollupByMaterial(ws.bom).length).toBeGreaterThan(0);
+    expect(bomEstimateMassKg(ws.bom)).toBeGreaterThan(0);
     const pkg = workspaceExportToon3d(ws);
     expect(pkg.manifest.format).toBe("toonspectrum.toon3d");
+  });
+
+  it("sniffs binary FBX without fabricating geometry", () => {
+    const magic = new TextEncoder().encode("Kaydara FBX Binary  \0");
+    const bytes = new Uint8Array(64);
+    bytes.set(magic);
+    expect(isStudioFbxBinary(bytes)).toBe(true);
+    const result = importStudioFbxDocument(bytes);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.detail.startsWith("binary-fbx:")).toBe(true);
   });
 });
 

@@ -113,6 +113,55 @@ export function parseStudioFbxAscii(text: string): {
   return { positions, polygons, modelNames, unsupported };
 }
 
+/** Detect Kaydara FBX binary magic (Kaydara FBX Binary  \x00). */
+export function isStudioFbxBinary(bytes: Uint8Array): boolean {
+  if (bytes.length < 23) return false;
+  const magic = "Kaydara FBX Binary  ";
+  for (let i = 0; i < magic.length; i += 1) {
+    if (bytes[i] !== magic.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+/**
+ * Unified FBX entry: ASCII mesh path, or binary → report-only bridge (no silent fake mesh).
+ */
+export function importStudioFbxDocument(
+  source: string | Uint8Array,
+  options: { readonly parser?: string } = {},
+): StudioFbxImportResult {
+  if (typeof source !== "string" && isStudioFbxBinary(source)) {
+    const report = buildStudioImportCompatibilityReport({
+      parser: options.parser ?? "studio-fbx-binary-sniff",
+      sourceBytes: source,
+      scene: {
+        format: "unknown",
+        units: "cm",
+        axis: "y-up",
+        meshes: [],
+        materials: [],
+        textures: [],
+        nodes: [{ name: "RootNode" }],
+        bones: [],
+        animations: [],
+        morphTargets: [],
+        unsupported: [
+          {
+            kind: "fbx-binary",
+            reason: "Binary FBX detected; use ufbx WASM / Assimp bridge — not parsed in browser pure core",
+          },
+        ],
+      },
+      committed: false,
+    });
+    return {
+      ok: false,
+      detail: `binary-fbx:${report.sourceHash}`,
+    };
+  }
+  return importStudioFbxAsciiDocument(source, options);
+}
+
 export function importStudioFbxAsciiDocument(
   source: string | Uint8Array,
   options: { readonly parser?: string } = {},
@@ -121,6 +170,9 @@ export function importStudioFbxAsciiDocument(
     typeof source === "string"
       ? source
       : new TextDecoder().decode(source);
+  if (typeof source !== "string" && isStudioFbxBinary(source)) {
+    return importStudioFbxDocument(source, options);
+  }
   const parsed = parseStudioFbxAscii(text);
   if (parsed.positions.length < 9 || parsed.polygons.length === 0) {
     return {

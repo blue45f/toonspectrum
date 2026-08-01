@@ -56,12 +56,17 @@ import {
   STUDIO_TOON_PASS_KINDS,
   type StudioLiveBridgeDocument,
 } from "./studio-live-2d3d-bridge";
+import {
+  bomFromAssetParts,
+  type StudioManufacturingBom,
+} from "./studio-manufacturing-bom-lite";
 import { importStudioMeshByExtension } from "./studio-mesh-format-adapters";
 import {
   createStudioMeshModifierStack,
   evaluateStudioMeshModifierStack,
   withStudioMeshModifier,
 } from "./studio-mesh-modifier-stack";
+import { subdivideStudioMeshCatmullLite } from "./studio-mesh-ops-advanced";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 import { packStudioToon3dPackage, type StudioToon3dPackage } from "./studio-toon3d-package";
 import {
@@ -80,6 +85,7 @@ export interface StudioHybridDccWorkspace {
   lastImportReport: unknown | null;
   lastUvMap: StudioUvMap | null;
   lastRetarget: StudioRetargetReport | null;
+  bom: StudioManufacturingBom;
   collab: StudioDccCollabRoom;
   clothStep: number;
 }
@@ -98,6 +104,7 @@ export function createStudioHybridDccWorkspace(
     lastImportReport: null,
     lastUvMap: null,
     lastRetarget: null,
+    bom: bomFromAssetParts(documentId, []),
     collab: createStudioDccCollabRoom(`${documentId}-collab`),
     clothStep: 0,
   };
@@ -510,4 +517,63 @@ export function workspaceRetargetFromBvhExtras(
     targetUnit: 1,
   });
   return { ...ws, lastRetarget };
+}
+
+export function workspaceSubdivideActive(
+  ws: StudioHybridDccWorkspace,
+  levels = 1,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const subdiv = subdivideStudioMeshCatmullLite(record.mesh, levels);
+  if (!subdiv.ok) throw new Error(subdiv.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, subdiv.value);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    hashStudioEditableMesh(subdiv.value),
+  );
+  return { ...ws, session, bridge };
+}
+
+export async function workspaceArrayActive(
+  ws: StudioHybridDccWorkspace,
+  count = 3,
+): Promise<StudioHybridDccWorkspace> {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  let stack = createStudioMeshModifierStack(record.mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "array",
+    id: "ws-array",
+    enabled: true,
+    count: Math.max(1, Math.min(16, Math.trunc(count))),
+    offset: { x: 1.2, y: 0, z: 0 },
+    mode: "linear",
+    realizeInstances: true,
+  });
+  const evaluated = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!evaluated.ok) throw new Error(evaluated.detail);
+  const session = hybridDccCommitGeometry(ws.session, id, evaluated.value.mesh);
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    id,
+    evaluated.value.resultHash,
+  );
+  return { ...ws, session, bridge };
+}
+
+export function workspaceRebuildBom(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
+  const parts = Object.entries(ws.session.state.geometry.records).map(([id, rec]) => ({
+    id,
+    name: id,
+    volumeM3: Math.max(0.001, rec.mesh.faces.length * 0.0001),
+  }));
+  return { ...ws, bom: bomFromAssetParts(ws.session.state.documentId, parts) };
 }
