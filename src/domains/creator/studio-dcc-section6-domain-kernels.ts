@@ -115,6 +115,7 @@ import {
   shrinkwrapStudioMesh,
   subdivideStudioMeshCatmullLite,
 } from "./studio-mesh-ops-advanced";
+import { occtSolidWorksGradeSuite } from "./studio-occt-wasm-facade";
 import {
   applyStudioClonerField,
   arrayStudioAlongCurve,
@@ -130,16 +131,15 @@ import {
   parseStudioRhino3dmOpenNurbs,
 } from "./studio-rhino3dm-nurbs";
 import {
-  createStudioIfcCityFixture,
-  importStudioIfcCity,
-} from "./studio-web-ifc-city";
-import { occtSolidWorksGradeSuite } from "./studio-occt-wasm-facade";
-import {
   buildStudioAnimaticTimeline,
   diffStudioShotContinuity,
   studioCameraFovY,
 } from "./studio-shot-continuity";
 import { packStudioUvIslands, unwrapStudioMeshBox } from "./studio-uv-unwrap-lite";
+import {
+  createStudioIfcCityFixture,
+  importStudioIfcCity,
+} from "./studio-web-ifc-city";
 
 export const STUDIO_DCC_SECTION6_DOMAIN_KERNELS_REVISION = 1 as const;
 
