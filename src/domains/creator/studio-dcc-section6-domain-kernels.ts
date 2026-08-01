@@ -4,13 +4,18 @@
  * outputs — not ID-hash theater.
  */
 
+import { mapStudioBimIfcToRoomBuilder } from "./studio-bim-room-builder-map";
 import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
   extrudeStudioCadProfile,
-  revolveStudioCadProfile,
+  loftStudioCadProfiles,
   measureStudioCadExtrusion,
   orderStudioCadFeatureTree,
+  revolveStudioCadProfile,
+  shellDraftStudioCadExtrusion,
+  solveStudioCadAssemblyMates,
+  sweepStudioCadProfile,
   type StudioCadSketch,
 } from "./studio-cad-kernel-lite";
 import {
@@ -32,14 +37,11 @@ import {
 } from "./studio-cloth-pattern-kernel";
 import {
   arrangeStudioGarmentOnAvatar,
-  assembleStudioCadMateLite,
   assignStudioSculptFaceSetPolygroup,
   bakeStudioGarmentSkinning,
-  bakeStudioSculptPasses,
   bridgeStudioCloMarvelous,
   bridgeStudioDxfAamaPattern,
   bridgeStudioMtoonPbr,
-  bridgeStudioRhino3dmLite,
   buildStudioAuditLogRolePermission,
   buildStudioAvatarCollisionProxy,
   buildStudioComponentMetadata,
@@ -64,7 +66,6 @@ import {
   listStudioFabricPresets,
   listStudioPlanElevationSectionViews,
   listStudioStylePresets,
-  mapStudioBimToRoomBuilder,
   mergeStudioBinaryLockBranch,
   orderStudioGarmentLayers,
   packStudioAtlasTextureSet,
@@ -104,8 +105,11 @@ import {
 import { bomFromAssetParts, bomRollupByMaterial, bomEstimateMassKg } from "./studio-manufacturing-bom-lite";
 import { importStudioDxfPlan, importStudioIfcShell } from "./studio-mesh-format-adapters";
 import {
+  autoRetopoStudioMeshBasic,
+  bakeStudioMeshMaps,
   decimateStudioMesh,
   deformStudioMeshBend,
+  dynatopoStudioMeshBrushLocal,
   repairStudioMesh,
   retopoSnapStudioMeshToPlane,
   shrinkwrapStudioMesh,
@@ -116,6 +120,7 @@ import {
   arrayStudioAlongCurve,
   scatterStudioInstances,
 } from "./studio-procedural-scatter";
+import { parseStudioRhino3dmLite } from "./studio-rhino3dm-lite";
 import {
   buildStudioAnimaticTimeline,
   diffStudioShotContinuity,
@@ -420,18 +425,29 @@ export function runCad005ExtrudeRevolve(): StudioDccKernelResult {
 }
 
 export function runCad006SweepLoft(): StudioDccKernelResult {
-  // Lite: extrude as sweep proxy + measure
-  const solid = extrudeStudioCadProfile(
-    [
-      [0, 0],
-      [0.5, 0],
-      [0.5, 0.5],
-      [0, 0.5],
-    ],
-    2,
-  );
-  if (!solid) throw new Error("sweep failed");
-  return ok("CAD-006", { tris: solid.indices.length / 3, length: 2 });
+  const profile: [number, number][] = [
+    [0, 0],
+    [0.2, 0],
+    [0.2, 0.2],
+    [0, 0.2],
+  ];
+  const path: [number, number, number][] = [
+    [0, 0, 0],
+    [1, 0.2, 0],
+    [2, 0.2, 1],
+    [3, 0, 1],
+  ];
+  const sweep = sweepStudioCadProfile(profile, path);
+  if (!sweep.ok) throw new Error(sweep.reason);
+  const loft = loftStudioCadProfiles(profile, profile.map(([x, z]) => [x * 1.2, z * 0.8] as [number, number]), 1);
+  if (!loft.ok) throw new Error(loft.reason);
+  return ok("CAD-006", {
+    sweepTris: sweep.indices.length / 3,
+    loftTris: loft.indices.length / 3,
+    pathSamples: sweep.pathSamples,
+    failedSections: sweep.failedSections + loft.failedSections,
+    continuity: sweep.continuity,
+  });
 }
 
 export function runCad007FilletChamfer(): StudioDccKernelResult {
@@ -444,7 +460,7 @@ export function runCad007FilletChamfer(): StudioDccKernelResult {
 }
 
 export function runCad008ShellDraft(): StudioDccKernelResult {
-  const outer = measureStudioCadExtrusion(
+  const shell = shellDraftStudioCadExtrusion(
     [
       [0, 0],
       [1, 0],
@@ -452,13 +468,16 @@ export function runCad008ShellDraft(): StudioDccKernelResult {
       [0, 1],
     ],
     1,
+    0.05,
+    2,
   );
-  const thickness = 0.05;
-  const innerVol = Math.max(0, (1 - 2 * thickness) ** 2 * (1 - thickness));
+  if (!shell.ok) throw new Error(`${shell.reason}:${shell.failureFaces.join(",")}`);
   return ok("CAD-008", {
-    outerVolume: outer.volume,
-    shellVolume: outer.volume - innerVol,
-    thickness,
+    outerVolume: shell.outerVolume,
+    shellVolume: shell.shellVolume,
+    thickness: shell.thickness,
+    draftDeg: shell.draftDeg,
+    failureFaces: shell.failureFaces.length,
   });
 }
 
@@ -491,11 +510,27 @@ export function runCad011FeatureHistoryTree(): StudioDccKernelResult {
 }
 
 export function runCad012AssemblyMateLite(): StudioDccKernelResult {
-  const r = assembleStudioCadMateLite([
-    { a: "partA", b: "partB", kind: "coincident" },
-    { a: "partB", b: "partC", kind: "concentric" },
-  ]);
-  return ok("CAD-012", { mateCount: r.mateCount, kinds: r.kinds });
+  const solved = solveStudioCadAssemblyMates(
+    [
+      { id: "partA", position: [0, 0, 0], rotationRad: [0, 0, 0] },
+      { id: "partB", position: [5, 0, 0], rotationRad: [0, 0, 0] },
+      { id: "partC", position: [0, 2, 0], rotationRad: [0, 0.1, 0] },
+    ],
+    [
+      { id: "m1", kind: "coincident", partA: "partA", partB: "partB" },
+      { id: "m2", kind: "concentric", partA: "partA", partB: "partC" },
+      { id: "m3", kind: "distance", partA: "partA", partB: "partB", value: 0.5 },
+      { id: "m4", kind: "angle", partA: "partA", partB: "partC", value: Math.PI / 4 },
+      { id: "m5", kind: "lock", partA: "partA", partB: "partB" },
+    ],
+  );
+  const b = solved.poses.find((p) => p.id === "partB")!;
+  return ok("CAD-012", {
+    mateCount: solved.solved,
+    locked: solved.locked,
+    kinds: solved.kinds.length,
+    partBX: b.position[0],
+  });
 }
 
 export function runCad013ConfigurationVariant(): StudioDccKernelResult {
@@ -517,8 +552,30 @@ export function runCad014ExactMeasureMass(): StudioDccKernelResult {
 }
 
 export function runCad016Rhino3dmBridge(): StudioDccKernelResult {
-  const r = bridgeStudioRhino3dmLite({ objectCount: 4, layerCount: 2 });
-  return ok("CAD-016", { objects: r.objects, layers: r.layers, format: r.format });
+  const src = JSON.stringify({
+    layers: [
+      { id: "L0", name: "Default", color: "#fff" },
+      { id: "L1", name: "Curves", color: "#0af" },
+    ],
+    curves: [
+      { id: "C1", layerId: "L1", points: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] },
+    ],
+    surfaces: [{ id: "S1", layerId: "L0", uCount: 4, vCount: 4 }],
+    objects: [
+      { id: "O1", layerId: "L0", name: "Box", attributes: { material: "plastic" } },
+    ],
+  });
+  const parsed = parseStudioRhino3dmLite(src);
+  if (!parsed.ok || !parsed.doc) throw new Error(parsed.losses.join(","));
+  return ok("CAD-016", {
+    layers: parsed.doc.layers.length,
+    curves: parsed.doc.curves.length,
+    surfaces: parsed.doc.surfaces.length,
+    objects: parsed.doc.objects.length,
+    curvePoints: parsed.doc.curves[0]?.pointCount ?? 0,
+    losses: parsed.losses.length,
+    format: parsed.format,
+  });
 }
 
 export function runCad017DxfPlanImportExport(): StudioDccKernelResult {
@@ -568,8 +625,32 @@ export function runCad018IfcPropertySpaceWall(): StudioDccKernelResult {
 }
 
 export function runCad019BimToRoomBuilder(): StudioDccKernelResult {
-  const r = mapStudioBimToRoomBuilder({ ifcSpaces: 3, rooms: 2 });
-  return ok("CAD-019", { spaces: r.spaces, rooms: r.rooms, mapped: r.mapped });
+  const ifc = [
+    "ISO-10303-21;",
+    "DATA;",
+    "#1=IFCCARTESIANPOINT((0.,0.,0.));",
+    "#2=IFCCARTESIANPOINT((4.,0.,0.));",
+    "#3=IFCCARTESIANPOINT((4.,0.,3.));",
+    "#4=IFCCARTESIANPOINT((0.,0.,3.));",
+    "#10=IFCSPACE('gid0','RoomA','',$,$,$,$,$,.ELEMENT.,$,$);",
+    "#11=IFCWALLSTANDARDCASE('gid1','W1',$,$,$,$,$,$,$);",
+    "#12=IFCWALLSTANDARDCASE('gid2','W2',$,$,$,$,$,$,$);",
+    "#13=IFCSLAB('gid3','Floor',$,$,$,$,$,$,$);",
+    "#14=IFCDOOR('gid4','D1',$,$,$,$,$,$,$);",
+    "#15=IFCWINDOW('gid5','Win1',$,$,$,$,$,$,$);",
+    "ENDSEC;",
+  ].join("\n");
+  const mapped = mapStudioBimIfcToRoomBuilder(ifc);
+  return ok("CAD-019", {
+    parts: mapped.parts.length,
+    spaces: mapped.spaces,
+    walls: mapped.walls,
+    slabs: mapped.slabs,
+    doors: mapped.doors,
+    windows: mapped.windows,
+    meshCount: mapped.meshCount,
+    pointCount: mapped.pointCount,
+  });
 }
 
 export function runCad020DrawingSheetBomLite(): StudioDccKernelResult {
@@ -628,11 +709,24 @@ export function runScp005VoxelRemesh(): StudioDccKernelResult {
 
 export function runScp006DynamicTopology(): StudioDccKernelResult {
   const mesh = cube();
-  const sub = subdivideStudioMeshCatmullLite(mesh, 1);
-  if (!sub.ok) throw new Error(sub.detail);
+  const refined = dynatopoStudioMeshBrushLocal(
+    mesh,
+    { center: { x: 0.5, y: 0.5, z: 0.5 }, radius: 0.75 },
+    "refine",
+  );
+  if (!refined.ok) throw new Error(refined.detail);
+  const coarsened = dynatopoStudioMeshBrushLocal(
+    refined.value.mesh,
+    { center: { x: 0.5, y: 0.5, z: 0.5 }, radius: 0.75 },
+    "coarsen",
+  );
+  if (!coarsened.ok) throw new Error(coarsened.detail);
   return ok("SCP-006", {
-    facesBefore: mesh.faces.length,
-    facesAfter: sub.value.faces.length,
+    facesBefore: refined.value.facesBefore,
+    facesAfterRefine: refined.value.facesAfter,
+    facesAfterCoarsen: coarsened.value.facesAfter,
+    affectedRefine: refined.value.affectedTris,
+    affectedCoarsen: coarsened.value.affectedTris,
   });
 }
 
@@ -697,11 +791,24 @@ export function runScp010ProjectDetail(): StudioDccKernelResult {
 
 export function runScp011AutomaticRetopoBasic(): StudioDccKernelResult {
   const mesh = cube();
-  const dec = decimateStudioMesh(mesh, 0.75);
-  if (!dec.ok) throw new Error(dec.detail);
+  const ret = autoRetopoStudioMeshBasic(mesh, {
+    targetFaces: 4,
+    symmetryX: true,
+    guideStroke: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 1, y: 1, z: 0 },
+    ],
+  });
+  if (!ret.ok) throw new Error(ret.detail);
   return ok("SCP-011", {
-    facesBefore: mesh.faces.length,
-    facesAfter: dec.value.faces.length,
+    facesBefore: ret.value.facesBefore,
+    facesAfter: ret.value.facesAfter,
+    targetFaces: ret.value.targetFaces,
+    symmetryX: ret.value.symmetryX,
+    guideSamples: ret.value.guideSamples,
+    meanError: ret.value.meanError,
+    errorMapLen: ret.value.errorMap.length,
   });
 }
 
@@ -743,8 +850,24 @@ export function runScp013UvUnwrapPack(): StudioDccKernelResult {
 }
 
 export function runScp014BakePasses(): StudioDccKernelResult {
-  const r = bakeStudioSculptPasses({ passCount: 3, resolution: 64 });
-  return ok("SCP-014", { passes: r.passes, texels: r.texels });
+  const bake = bakeStudioMeshMaps(cube(), {
+    resolution: 32,
+    paddingPx: 2,
+    cageScale: 1.05,
+  });
+  let normalSum = 0;
+  for (let i = 0; i < bake.normal.length; i += 1) normalSum += bake.normal[i]!;
+  let aoSum = 0;
+  for (let i = 0; i < bake.ao.length; i += 1) aoSum += bake.ao[i]!;
+  return ok("SCP-014", {
+    resolution: bake.resolution,
+    paddingPx: bake.paddingPx,
+    cageScale: bake.cageScale,
+    texelCount: bake.texelCount,
+    normalSum,
+    aoMean: aoSum / bake.ao.length,
+    idNonZero: bake.objectId.reduce((s, v) => s + (v > 0 ? 1 : 0), 0),
+  });
 }
 
 export function runScp015ProxyHighResLink(): StudioDccKernelResult {

@@ -118,14 +118,47 @@ describe("§6 full catalog SSOT", () => {
       resolve(__dirname, "studio-dcc-catalog-feature-dispatch.ts"),
       "utf8",
     );
-    const combined = `${coreSrc}\n${domainSrc}\n${liteSrc}\n${dispatchSrc}`;
+    const cadSrc = readFileSync(resolve(__dirname, "studio-cad-kernel-lite.ts"), "utf8");
+    const meshOpsSrc = readFileSync(resolve(__dirname, "studio-mesh-ops-advanced.ts"), "utf8");
+    const matSrc = readFileSync(
+      resolve(__dirname, "studio-dcc-material-publish-draw-lite.ts"),
+      "utf8",
+    );
+    const rhinoSrc = readFileSync(resolve(__dirname, "studio-rhino3dm-lite.ts"), "utf8");
+    const bimSrc = readFileSync(resolve(__dirname, "studio-bim-room-builder-map.ts"), "utf8");
+    const combined = [
+      coreSrc,
+      domainSrc,
+      liteSrc,
+      dispatchSrc,
+      cadSrc,
+      meshOpsSrc,
+      matSrc,
+      rhinoSrc,
+      bimSrc,
+    ].join("\n");
     // Structural ban on presence-only theater
     expect(combined).not.toMatch(/typeof\s+\w+\s*===\s*["']function["']/u);
     const typeofOnlyHits = [...combined.matchAll(/api:\s*typeof\s+/gu)];
     expect(typeofOnlyHits).toEqual([]);
 
+    /** Doc 구현·완료 기준 → required evidence keys (skeptic residual set). */
+    const DOC_CRITERIA_EVIDENCE: Readonly<Record<string, readonly string[]>> = {
+      "CAD-006": ["sweepTris", "loftTris", "pathSamples", "failedSections"],
+      "CAD-008": ["shellVolume", "thickness", "draftDeg", "failureFaces"],
+      "CAD-012": ["mateCount", "locked", "kinds"],
+      "CAD-015": ["exportBytes", "importMeshes", "importPoints", "exportPoints"],
+      "CAD-016": ["layers", "curves", "surfaces", "objects", "curvePoints"],
+      "CAD-019": ["parts", "walls", "doors", "windows", "spaces"],
+      "SCP-006": ["facesBefore", "facesAfterRefine", "affectedRefine"],
+      "SCP-011": ["targetFaces", "guideSamples", "meanError", "errorMapLen", "symmetryX"],
+      "SCP-014": ["resolution", "paddingPx", "texelCount", "cageScale"],
+      "DRW-007": ["parseOk", "width", "height", "exportBytes", "parseLosses", "exportLosses"],
+    };
+
     const missingExportCall: string[] = [];
     const missingNumeric: string[] = [];
+    const missingCriteria: string[] = [];
     for (const entry of STUDIO_DCC_SECTION6_CATALOG) {
       const primary = entry.apis[0]!;
       // Primary export must appear as a call site in sealed runner sources
@@ -145,9 +178,37 @@ describe("§6 full catalog SSOT", () => {
       if (numericKeys.length === 0) {
         missingNumeric.push(entry.id);
       }
+      const required = DOC_CRITERIA_EVIDENCE[entry.id];
+      if (required) {
+        for (const key of required) {
+          if (!(key in r.evidence)) {
+            missingCriteria.push(`${entry.id}:missing-evidence:${key}`);
+          }
+        }
+        // Ban pure extrude-proxy theater for CAD-006 (must have sweep path samples)
+        if (entry.id === "CAD-006") {
+          expect(Number(r.evidence.pathSamples)).toBeGreaterThan(2);
+          expect(Number(r.evidence.sweepTris)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CAD-015") {
+          expect(Number(r.evidence.exportBytes)).toBeGreaterThan(50);
+          expect(Number(r.evidence.importPoints)).toBeGreaterThan(0);
+        }
+        if (entry.id === "DRW-007") {
+          expect(r.evidence.parseOk).toBe(true);
+          expect(Number(r.evidence.width)).toBe(64);
+          expect(Number(r.evidence.exportBytes)).toBeGreaterThan(26);
+        }
+        if (entry.id === "SCP-006") {
+          expect(Number(r.evidence.facesAfterRefine)).toBeGreaterThan(
+            Number(r.evidence.facesBefore),
+          );
+        }
+      }
     }
     expect(missingExportCall).toEqual([]);
     expect(missingNumeric).toEqual([]);
+    expect(missingCriteria).toEqual([]);
   });
 });
 

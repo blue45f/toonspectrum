@@ -15,11 +15,13 @@ import {
   createStudioPbrMaterialLite,
   createStudioRasterVectorLayerStack,
   createStudioToonHatchToneMaterial,
+  exportStudioPsdPsbLite,
   fillStudioCloseGapRegion,
+  importStudioPsdPsbHeader,
   measureStudioBrushLatencyBudget,
+  overrideStudioMaterialByShot,
   planStudioPressureBrushStroke,
   reportStudioPsdPsbCompatibility,
-  overrideStudioMaterialByShot,
   resolveStudioColorManagementProfile,
   snapStudioRulerGuide,
   transformStudioLayer,
@@ -150,12 +152,43 @@ function runDrawMatPubKernel(id: string): StudioDccKernelResult {
       return { id, ok: true, evidence: { mean: tone.mean, toneSteps: tone.toneSteps } };
     }
     case "DRW-007": {
+      // Minimal valid PSD signature + version1 header (26 bytes)
+      const header = new Uint8Array(26);
+      header[0] = 0x38; header[1] = 0x42; header[2] = 0x50; header[3] = 0x53; // 8BPS
+      const view = new DataView(header.buffer);
+      view.setUint16(4, 1, false); // PSD
+      view.setUint16(12, 4, false);
+      view.setUint32(14, 64, false); // height
+      view.setUint32(18, 64, false); // width
+      view.setUint16(22, 8, false);
+      view.setUint16(24, 3, false); // RGB
+      const parsed = importStudioPsdPsbHeader(header);
+      const exported = exportStudioPsdPsbLite({
+        kind: "psd",
+        width: 64,
+        height: 64,
+        rgba: new Uint8Array(64 * 64 * 4),
+      });
       const report = reportStudioPsdPsbCompatibility({
         kind: "psd",
         layerCount: 4,
         hasSmartObjects: true,
       });
-      return { id, ok: true, evidence: { grade: report.grade, losses: report.losses.length } };
+      return {
+        id,
+        ok: true,
+        evidence: {
+          grade: report.grade,
+          losses: report.losses.length,
+          parseOk: parsed.ok,
+          parseGrade: parsed.grade,
+          parseLosses: parsed.losses.length,
+          width: parsed.width,
+          height: parsed.height,
+          exportBytes: exported.byteLength,
+          exportLosses: exported.losses.length,
+        },
+      };
     }
     case "MAT-001": {
       const m = createStudioPbrMaterialLite("m1", { metallic: 0.1, roughness: 0.5 });

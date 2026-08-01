@@ -463,3 +463,111 @@ export function reportStudioPsdPsbCompatibility(input: {
   const grade = losses.length === 0 ? "A" : losses.length === 1 ? "B" : "C";
   return { kind: input.kind, grade, layerCount: input.layerCount, losses };
 }
+
+/** Minimal PSD signature/header parse for DRW-007 import path (bytes → grade/loss). */
+export function importStudioPsdPsbHeader(bytes: Uint8Array): {
+  readonly ok: boolean;
+  readonly kind: "psd" | "psb" | "unknown";
+  readonly width: number;
+  readonly height: number;
+  readonly channels: number;
+  readonly depth: number;
+  readonly colorMode: number;
+  readonly losses: readonly string[];
+  readonly grade: "A" | "B" | "C" | "X";
+} {
+  const losses: string[] = [];
+  if (bytes.length < 26) {
+    return {
+      ok: false,
+      kind: "unknown",
+      width: 0,
+      height: 0,
+      channels: 0,
+      depth: 0,
+      colorMode: 0,
+      losses: ["truncated-header"],
+      grade: "X",
+    };
+  }
+  const sig = String.fromCharCode(bytes[0]!, bytes[1]!, bytes[2]!, bytes[3]!);
+  if (sig !== "8BPS") {
+    return {
+      ok: false,
+      kind: "unknown",
+      width: 0,
+      height: 0,
+      channels: 0,
+      depth: 0,
+      colorMode: 0,
+      losses: ["bad-signature"],
+      grade: "X",
+    };
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const version = view.getUint16(4, false); // big-endian
+  const kind = version === 2 ? "psb" : version === 1 ? "psd" : "unknown";
+  if (kind === "unknown") losses.push("unsupported-version");
+  const channels = view.getUint16(12, false);
+  const height = view.getUint32(14, false);
+  const width = view.getUint32(18, false);
+  const depth = view.getUint16(22, false);
+  const colorMode = view.getUint16(24, false);
+  if (depth !== 8 && depth !== 16) losses.push(`depth-${depth}-approx`);
+  if (colorMode !== 3) losses.push("non-rgb-color-mode");
+  if (kind === "psb") losses.push("psb-large-document-subset");
+  if (channels > 4) losses.push("extra-channels-dropped");
+  // Layer section not fully parsed — honest loss
+  losses.push("layer-structure-summary-only");
+  const grade =
+    losses.length <= 1 ? "A" : losses.length === 2 ? "B" : losses.length <= 4 ? "C" : "X";
+  return {
+    ok: kind !== "unknown",
+    kind: kind === "unknown" ? "psd" : kind,
+    width,
+    height,
+    channels,
+    depth,
+    colorMode,
+    losses,
+    grade: kind === "unknown" ? "X" : grade,
+  };
+}
+
+/** DRW-007 export: emit a minimal valid PSD-like header + flattened pixel note (loss report). */
+export function exportStudioPsdPsbLite(input: {
+  readonly kind: "psd" | "psb";
+  readonly width: number;
+  readonly height: number;
+  readonly rgba?: Uint8Array;
+}): {
+  readonly bytes: Uint8Array;
+  readonly losses: readonly string[];
+  readonly grade: "B" | "C";
+  readonly byteLength: number;
+} {
+  const losses = [
+    "layers-flattened",
+    "smart-objects-not-written",
+    "adjustment-layers-not-written",
+  ];
+  const w = Math.max(1, Math.min(8192, Math.trunc(input.width)));
+  const h = Math.max(1, Math.min(8192, Math.trunc(input.height)));
+  const buf = new Uint8Array(32 + (input.rgba?.byteLength ?? 0));
+  // 8BPS
+  buf[0] = 0x38; buf[1] = 0x42; buf[2] = 0x50; buf[3] = 0x53;
+  const view = new DataView(buf.buffer);
+  view.setUint16(4, input.kind === "psb" ? 2 : 1, false);
+  view.setUint16(12, 4, false); // channels
+  view.setUint32(14, h, false);
+  view.setUint32(18, w, false);
+  view.setUint16(22, 8, false); // depth
+  view.setUint16(24, 3, false); // RGB
+  if (input.rgba) buf.set(input.rgba.subarray(0, Math.min(input.rgba.length, buf.length - 32)), 32);
+  return {
+    bytes: buf,
+    losses,
+    grade: "B",
+    byteLength: buf.byteLength,
+  };
+}

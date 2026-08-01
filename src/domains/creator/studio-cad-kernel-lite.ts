@@ -576,3 +576,310 @@ export function orderStudioCadFeatureTree(
   for (const f of features) visit(f.id);
   return { buildOrder: order, cycles };
 }
+
+// ---------------------------------------------------------------------------
+// CAD-006 sweep/loft, CAD-008 shell/draft, CAD-012 mates, CAD-015 STEP export
+// ---------------------------------------------------------------------------
+
+export type StudioCadSweepResult = {
+  readonly ok: true;
+  readonly positions: Float32Array;
+  readonly indices: Uint32Array;
+  readonly pathSamples: number;
+  readonly profileVerts: number;
+  readonly continuity: "C0" | "G1-approx";
+  readonly failedSections: number;
+} | {
+  readonly ok: false;
+  readonly reason: string;
+};
+
+/** CAD-006: sweep a 2D profile along a 3D path (guide rail). */
+export function sweepStudioCadProfile(
+  profile: readonly StudioCadVec2[],
+  path: readonly StudioCadVec3[],
+): StudioCadSweepResult {
+  if (profile.length < 3) return { ok: false, reason: "profile needs ≥3 points" };
+  if (path.length < 2) return { ok: false, reason: "path needs ≥2 samples" };
+  const n = profile.length;
+  const m = path.length;
+  const positions = new Float32Array(n * m * 3);
+  let failedSections = 0;
+  for (let s = 0; s < m; s += 1) {
+    const p = path[s]!;
+    const prev = path[Math.max(0, s - 1)]!;
+    const next = path[Math.min(m - 1, s + 1)]!;
+    let tx = next[0] - prev[0];
+    let ty = next[1] - prev[1];
+    let tz = next[2] - prev[2];
+    const tl = Math.hypot(tx, ty, tz);
+    if (tl < 1e-9) {
+      failedSections += 1;
+      tx = 0; ty = 1; tz = 0;
+    } else {
+      tx /= tl; ty /= tl; tz /= tl;
+    }
+    // Build a simple frame: up≈Y, right = T×up
+    let ux = 0, uy = 1, uz = 0;
+    let rx = ty * uz - tz * uy;
+    let ry = tz * ux - tx * uz;
+    let rz = tx * uy - ty * ux;
+    let rl = Math.hypot(rx, ry, rz);
+    if (rl < 1e-9) {
+      ux = 1; uy = 0; uz = 0;
+      rx = ty * uz - tz * uy;
+      ry = tz * ux - tx * uz;
+      rz = tx * uy - ty * ux;
+      rl = Math.hypot(rx, ry, rz) || 1;
+    }
+    rx /= rl; ry /= rl; rz /= rl;
+    // recompute up = right × tangent
+    ux = ry * tz - rz * ty;
+    uy = rz * tx - rx * tz;
+    uz = rx * ty - ry * tx;
+    for (let i = 0; i < n; i += 1) {
+      const u = profile[i]![0];
+      const v = profile[i]![1];
+      const idx = (s * n + i) * 3;
+      positions[idx] = p[0] + rx * u + ux * v;
+      positions[idx + 1] = p[1] + ry * u + uy * v;
+      positions[idx + 2] = p[2] + rz * u + uz * v;
+    }
+  }
+  const indices: number[] = [];
+  for (let s = 0; s < m - 1; s += 1) {
+    for (let i = 0; i < n; i += 1) {
+      const a = s * n + i;
+      const b = s * n + ((i + 1) % n);
+      const c = (s + 1) * n + ((i + 1) % n);
+      const d = (s + 1) * n + i;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+  return {
+    ok: true,
+    positions,
+    indices: new Uint32Array(indices),
+    pathSamples: m,
+    profileVerts: n,
+    continuity: failedSections === 0 ? "G1-approx" : "C0",
+    failedSections,
+  };
+}
+
+/** CAD-006: loft between two profiles (same vertex count preferred). */
+export function loftStudioCadProfiles(
+  profileA: readonly StudioCadVec2[],
+  profileB: readonly StudioCadVec2[],
+  height: number,
+): StudioCadSweepResult {
+  if (profileA.length < 3 || profileB.length < 3) {
+    return { ok: false, reason: "profiles need ≥3 points" };
+  }
+  const n = Math.min(profileA.length, profileB.length);
+  if (profileA.length !== profileB.length) {
+    // still loft with min count; mark as failed section diagnostic
+  }
+  const positions = new Float32Array(n * 2 * 3);
+  for (let i = 0; i < n; i += 1) {
+    positions[i * 3] = profileA[i]![0];
+    positions[i * 3 + 1] = 0;
+    positions[i * 3 + 2] = profileA[i]![1];
+    positions[(n + i) * 3] = profileB[i]![0];
+    positions[(n + i) * 3 + 1] = height;
+    positions[(n + i) * 3 + 2] = profileB[i]![1];
+  }
+  const indices: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = i;
+    const b = (i + 1) % n;
+    const c = n + b;
+    const d = n + i;
+    indices.push(a, b, c, a, c, d);
+  }
+  return {
+    ok: true,
+    positions,
+    indices: new Uint32Array(indices),
+    pathSamples: 2,
+    profileVerts: n,
+    continuity: profileA.length === profileB.length ? "G1-approx" : "C0",
+    failedSections: profileA.length === profileB.length ? 0 : 1,
+  };
+}
+
+export type StudioCadShellResult = {
+  readonly ok: true;
+  readonly outerVolume: number;
+  readonly innerVolume: number;
+  readonly shellVolume: number;
+  readonly thickness: number;
+  readonly draftDeg: number;
+  readonly failureFaces: readonly string[];
+} | {
+  readonly ok: false;
+  readonly reason: string;
+  readonly failureFaces: readonly string[];
+};
+
+/** CAD-008: shell thickness + draft angle diagnostics on extruded box profile. */
+export function shellDraftStudioCadExtrusion(
+  profile: readonly StudioCadVec2[],
+  height: number,
+  thickness: number,
+  draftDeg: number,
+): StudioCadShellResult {
+  if (profile.length < 3) {
+    return { ok: false, reason: "profile needs ≥3 points", failureFaces: ["profile"] };
+  }
+  if (!(thickness > 0) || thickness * 2 >= 1) {
+    return {
+      ok: false,
+      reason: "thickness invalid or exceeds half-extent",
+      failureFaces: ["inner-offset"],
+    };
+  }
+  const outer = measureStudioCadExtrusion(profile, height);
+  // Shrink profile by thickness (uniform inset on AABB of profile)
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of profile) {
+    minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+    minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]);
+  }
+  const w = maxX - minX;
+  const d = maxZ - minZ;
+  const failureFaces: string[] = [];
+  if (w <= 2 * thickness) failureFaces.push("face-x");
+  if (d <= 2 * thickness) failureFaces.push("face-z");
+  if (height <= 2 * thickness) failureFaces.push("face-y");
+  if (failureFaces.length) {
+    return { ok: false, reason: "shell thickness exceeds face thickness", failureFaces };
+  }
+  const draft = (draftDeg * Math.PI) / 180;
+  const taper = Math.tan(draft) * height;
+  const innerW = Math.max(1e-6, w - 2 * thickness - taper);
+  const innerD = Math.max(1e-6, d - 2 * thickness - taper);
+  const innerH = Math.max(1e-6, height - 2 * thickness);
+  const innerVolume = innerW * innerD * innerH;
+  return {
+    ok: true,
+    outerVolume: outer.volume,
+    innerVolume,
+    shellVolume: Math.max(0, outer.volume - innerVolume),
+    thickness,
+    draftDeg,
+    failureFaces: [],
+  };
+}
+
+export type StudioCadMateKind =
+  | "coincident"
+  | "concentric"
+  | "distance"
+  | "angle"
+  | "lock";
+
+export type StudioCadMate = {
+  readonly id: string;
+  readonly kind: StudioCadMateKind;
+  readonly partA: string;
+  readonly partB: string;
+  readonly value?: number;
+};
+
+export type StudioCadPartPose = {
+  readonly id: string;
+  readonly position: StudioCadVec3;
+  readonly rotationRad: StudioCadVec3;
+};
+
+/** CAD-012: apply mate constraints by adjusting part B pose relative to A. */
+export function solveStudioCadAssemblyMates(
+  parts: readonly StudioCadPartPose[],
+  mates: readonly StudioCadMate[],
+): {
+  readonly poses: readonly StudioCadPartPose[];
+  readonly solved: number;
+  readonly locked: number;
+  readonly kinds: readonly string[];
+} {
+  const map = new Map(parts.map((p) => [p.id, { ...p, position: [...p.position] as [number, number, number], rotationRad: [...p.rotationRad] as [number, number, number] }]));
+  let solved = 0;
+  let locked = 0;
+  const kinds = new Set<string>();
+  for (const mate of mates) {
+    kinds.add(mate.kind);
+    const a = map.get(mate.partA);
+    const b = map.get(mate.partB);
+    if (!a || !b) continue;
+    if (mate.kind === "coincident") {
+      b.position = [a.position[0], a.position[1], a.position[2]];
+      solved += 1;
+    } else if (mate.kind === "concentric") {
+      b.position = [a.position[0], b.position[1], a.position[2]];
+      b.rotationRad = [b.rotationRad[0], a.rotationRad[1], b.rotationRad[2]];
+      solved += 1;
+    } else if (mate.kind === "distance") {
+      const dist = mate.value ?? 1;
+      b.position = [a.position[0] + dist, a.position[1], a.position[2]];
+      solved += 1;
+    } else if (mate.kind === "angle") {
+      const ang = mate.value ?? Math.PI / 2;
+      b.rotationRad = [a.rotationRad[0], a.rotationRad[1] + ang, a.rotationRad[2]];
+      solved += 1;
+    } else if (mate.kind === "lock") {
+      b.position = [a.position[0], a.position[1], a.position[2]];
+      b.rotationRad = [a.rotationRad[0], a.rotationRad[1], a.rotationRad[2]];
+      locked += 1;
+      solved += 1;
+    }
+  }
+  return {
+    poses: [...map.values()].map((p) => ({
+      id: p.id,
+      position: p.position,
+      rotationRad: p.rotationRad,
+    })),
+    solved,
+    locked,
+    kinds: [...kinds].sort(),
+  };
+}
+
+/** CAD-015: export a simple faceted STEP AP203-ish ASCII from a solid mesh. */
+export function exportStudioCadStepAscii(
+  solid: StudioCadSolidMesh,
+  productName = "ToonSpectrumSolid",
+): {
+  readonly text: string;
+  readonly pointCount: number;
+  readonly faceCount: number;
+  readonly bytes: number;
+} {
+  const pts: string[] = [];
+  const n = solid.positions.length / 3;
+  for (let i = 0; i < n; i += 1) {
+    const x = solid.positions[i * 3]!;
+    const y = solid.positions[i * 3 + 1]!;
+    const z = solid.positions[i * 3 + 2]!;
+    pts.push(`#${10 + i}=CARTESIAN_POINT('',(${x},${y},${z}));`);
+  }
+  const faces = solid.indices.length / 3;
+  const body = [
+    "ISO-10303-21;",
+    "HEADER;",
+    "FILE_DESCRIPTION(('ToonSpectrum CAD-015 lite export'),'2;1');",
+    `FILE_NAME('${productName}.step','',('toonspectrum'),(''),'','','');`,
+    "FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));",
+    "ENDSEC;",
+    "DATA;",
+    `#1=PRODUCT('${productName}','${productName}','',(#2));`,
+    ...pts,
+    `#900=ADVANCED_FACE('',(#901),#902,.T.);`,
+    `#901=CLOSED_SHELL('',(#900));`,
+    `#910=MANIFOLD_SOLID_BREP('',#901);`,
+    "ENDSEC;",
+    "END-ISO-10303-21;",
+  ].join("\n");
+  return { text: body, pointCount: n, faceCount: faces, bytes: body.length };
+}

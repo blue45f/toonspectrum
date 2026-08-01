@@ -29,6 +29,7 @@ import {
   buildStudioCadRectangleSketch,
   diagnoseStudioCadConstraints,
   exerciseStudioCad001SketchPrimitives,
+  exportStudioCadStepAscii,
   extrudeStudioCadProfile,
 } from "./studio-cad-kernel-lite";
 import { resolveStudioCameraWallHide } from "./studio-camera-wall-hide";
@@ -732,7 +733,32 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
       ],
       0.5,
     );
-    return ok("CAD-015", { tris: solid ? solid.indices.length / 3 : 0 });
+    if (!solid) throw new Error("extrude failed");
+    const exported = exportStudioCadStepAscii(solid, "CadProp");
+    const imported = importStudioStepShell(exported.text);
+    // also import external STEP fixture path
+    const stepText = [
+      "ISO-10303-21;",
+      "DATA;",
+      "#10=CARTESIAN_POINT('',(0.,0.,0.));",
+      "#11=CARTESIAN_POINT('',(1.,0.,0.));",
+      "#12=CARTESIAN_POINT('',(1.,1.,0.));",
+      "#20=PRODUCT('Prop','Prop','',(#30));",
+      "#40=ADVANCED_FACE('',(#50),#60,.T.);",
+      "ENDSEC;",
+    ].join("\n");
+    const imported2 = importStudioStepShell(stepText);
+    return ok("CAD-015", {
+      extrudeTris: solid.indices.length / 3,
+      exportBytes: exported.bytes,
+      exportPoints: exported.pointCount,
+      exportFaces: exported.faceCount,
+      importMeshes: imported.meshes.length + imported2.meshes.length,
+      importPoints:
+        Number(imported.extras?.pointCount ?? 0)
+        + Number(imported2.extras?.pointCount ?? 0),
+      committed: imported.report.committed && imported2.report.committed,
+    });
   },
   "SCP-001": () => {
     const before = cube();

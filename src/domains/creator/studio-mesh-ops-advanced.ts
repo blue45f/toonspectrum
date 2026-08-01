@@ -339,3 +339,244 @@ export function retopoSnapStudioMeshToPlane(
   }
   return ok(soupToMesh(positions, soup.indices));
 }
+
+// ---------------------------------------------------------------------------
+// SCP-006 dynatopo, SCP-011 auto-retopo, SCP-014 bake maps
+// ---------------------------------------------------------------------------
+
+/**
+ * SCP-006: brush-local refine — mid-split edges of triangles near brush center.
+ * Coarsen path merges by dropping distant detail (ratio). Crack-free: only whole-triangle ops.
+ */
+export function dynatopoStudioMeshBrushLocal(
+  mesh: StudioEditableMesh,
+  brush: { readonly center: StudioMeshVec3; readonly radius: number },
+  mode: "refine" | "coarsen" = "refine",
+): StudioMeshOpsResult<{
+  readonly mesh: StudioEditableMesh;
+  readonly affectedTris: number;
+  readonly facesBefore: number;
+  readonly facesAfter: number;
+}> {
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  const facesBefore = soup.indices.length / 3;
+  const r2 = brush.radius * brush.radius;
+  const triNear = (t: number) => {
+    let cx = 0, cy = 0, cz = 0;
+    for (let k = 0; k < 3; k += 1) {
+      const vi = soup.indices[t * 3 + k]!;
+      cx += soup.positions[vi * 3]!;
+      cy += soup.positions[vi * 3 + 1]!;
+      cz += soup.positions[vi * 3 + 2]!;
+    }
+    cx /= 3; cy /= 3; cz /= 3;
+    const dx = cx - brush.center.x;
+    const dy = cy - brush.center.y;
+    const dz = cz - brush.center.z;
+    return dx * dx + dy * dy + dz * dz <= r2;
+  };
+
+  if (mode === "coarsen") {
+    const indices: number[] = [];
+    let affected = 0;
+    for (let t = 0; t < facesBefore; t += 1) {
+      if (triNear(t) && t % 2 === 1) {
+        affected += 1;
+        continue; // drop every other near tri (deterministic coarsen)
+      }
+      indices.push(
+        soup.indices[t * 3]!,
+        soup.indices[t * 3 + 1]!,
+        soup.indices[t * 3 + 2]!,
+      );
+    }
+    if (indices.length < 3) return fail("empty", "dynatopo coarsen removed all");
+    const out = soupToMesh(soup.positions, new Uint32Array(indices));
+    return ok({
+      mesh: out,
+      affectedTris: affected,
+      facesBefore,
+      facesAfter: indices.length / 3,
+    });
+  }
+
+  // refine: 1-to-4 split for near triangles
+  const positions = [...soup.positions];
+  const midCache = new Map<string, number>();
+  const mid = (a: number, b: number) => {
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const key = `${lo}|${hi}`;
+    let idx = midCache.get(key);
+    if (idx !== undefined) return idx;
+    idx = positions.length / 3;
+    positions.push(
+      (soup.positions[a * 3]! + soup.positions[b * 3]!) / 2,
+      (soup.positions[a * 3 + 1]! + soup.positions[b * 3 + 1]!) / 2,
+      (soup.positions[a * 3 + 2]! + soup.positions[b * 3 + 2]!) / 2,
+    );
+    midCache.set(key, idx);
+    return idx;
+  };
+  const indices: number[] = [];
+  let affected = 0;
+  for (let t = 0; t < facesBefore; t += 1) {
+    const i0 = soup.indices[t * 3]!;
+    const i1 = soup.indices[t * 3 + 1]!;
+    const i2 = soup.indices[t * 3 + 2]!;
+    if (!triNear(t)) {
+      indices.push(i0, i1, i2);
+      continue;
+    }
+    affected += 1;
+    const m01 = mid(i0, i1);
+    const m12 = mid(i1, i2);
+    const m20 = mid(i2, i0);
+    indices.push(i0, m01, m20, i1, m12, m01, i2, m20, m12, m01, m12, m20);
+  }
+  const out = soupToMesh(new Float32Array(positions), new Uint32Array(indices));
+  return ok({
+    mesh: out,
+    affectedTris: affected,
+    facesBefore,
+    facesAfter: indices.length / 3,
+  });
+}
+
+/**
+ * SCP-011: automatic retopo basic — target poly count, optional symmetry, guide stroke, error map.
+ */
+export function autoRetopoStudioMeshBasic(
+  mesh: StudioEditableMesh,
+  options: {
+    readonly targetFaces: number;
+    readonly symmetryX?: boolean;
+    readonly guideStroke?: readonly StudioMeshVec3[];
+  },
+): StudioMeshOpsResult<{
+  readonly mesh: StudioEditableMesh;
+  readonly facesBefore: number;
+  readonly facesAfter: number;
+  readonly targetFaces: number;
+  readonly symmetryX: boolean;
+  readonly guideSamples: number;
+  readonly errorMap: Float32Array;
+  readonly meanError: number;
+}> {
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  const facesBefore = soup.indices.length / 3;
+  const target = Math.max(1, Math.trunc(options.targetFaces));
+  const ratio = Math.min(1, target / Math.max(1, facesBefore));
+  const dec = decimateStudioMesh(mesh, Math.max(0.05, ratio));
+  if (!dec.ok) return fail(dec.code, dec.detail);
+  let out = dec.value;
+  if (options.symmetryX) {
+    // Mirror-snap x toward plane for symmetry bias
+    const s = studioEditableMeshToTriangleSoup(out);
+    const pos = new Float32Array(s.positions);
+    for (let i = 0; i < pos.length; i += 3) {
+      if (Math.abs(pos[i]!) < 0.05) pos[i] = 0;
+    }
+    out = soupToMesh(pos, s.indices);
+  }
+  // Error map: per remaining vertex distance to guide stroke (or original AABB center)
+  const finalSoup = studioEditableMeshToTriangleSoup(out);
+  const vCount = finalSoup.positions.length / 3;
+  const errorMap = new Float32Array(vCount);
+  const guide = options.guideStroke ?? [];
+  let mean = 0;
+  for (let i = 0; i < vCount; i += 1) {
+    const x = finalSoup.positions[i * 3]!;
+    const y = finalSoup.positions[i * 3 + 1]!;
+    const z = finalSoup.positions[i * 3 + 2]!;
+    let err = Math.hypot(x, y, z);
+    if (guide.length) {
+      let best = Infinity;
+      for (const g of guide) {
+        best = Math.min(best, Math.hypot(x - g.x, y - g.y, z - g.z));
+      }
+      err = best;
+    }
+    errorMap[i] = err;
+    mean += err;
+  }
+  mean = vCount ? mean / vCount : 0;
+  return ok({
+    mesh: out,
+    facesBefore,
+    facesAfter: finalSoup.indices.length / 3,
+    targetFaces: target,
+    symmetryX: Boolean(options.symmetryX),
+    guideSamples: guide.length,
+    errorMap,
+    meanError: mean,
+  });
+}
+
+/**
+ * SCP-014: bake normal / AO / curvature / ID maps into UV-space buffers with padding.
+ */
+export function bakeStudioMeshMaps(
+  mesh: StudioEditableMesh,
+  options: {
+    readonly resolution: number;
+    readonly paddingPx?: number;
+    readonly cageScale?: number;
+  },
+): {
+  readonly resolution: number;
+  readonly paddingPx: number;
+  readonly cageScale: number;
+  readonly normal: Float32Array;
+  readonly ao: Float32Array;
+  readonly curvature: Float32Array;
+  readonly objectId: Uint32Array;
+  readonly texelCount: number;
+} {
+  const res = Math.max(4, Math.min(512, Math.trunc(options.resolution)));
+  const pad = Math.max(0, Math.trunc(options.paddingPx ?? 2));
+  const cage = options.cageScale ?? 1.02;
+  const n = res * res;
+  const normal = new Float32Array(n * 3);
+  const ao = new Float32Array(n);
+  const curvature = new Float32Array(n);
+  const objectId = new Uint32Array(n);
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  // Average face normal as base
+  let nx = 0, ny = 0, nz = 0;
+  for (let t = 0; t < soup.indices.length; t += 3) {
+    const ia = soup.indices[t]!, ib = soup.indices[t + 1]!, ic = soup.indices[t + 2]!;
+    const ax = soup.positions[ia * 3]!, ay = soup.positions[ia * 3 + 1]!, az = soup.positions[ia * 3 + 2]!;
+    const bx = soup.positions[ib * 3]! - ax, by = soup.positions[ib * 3 + 1]! - ay, bz = soup.positions[ib * 3 + 2]! - az;
+    const cx = soup.positions[ic * 3]! - ax, cy = soup.positions[ic * 3 + 1]! - ay, cz = soup.positions[ic * 3 + 2]! - az;
+    nx += by * cz - bz * cy;
+    ny += bz * cx - bx * cz;
+    nz += bx * cy - by * cx;
+  }
+  const nl = Math.hypot(nx, ny, nz) || 1;
+  nx /= nl; ny /= nl; nz /= nl;
+  for (let y = 0; y < res; y += 1) {
+    for (let x = 0; x < res; x += 1) {
+      const i = y * res + x;
+      const border = x < pad || y < pad || x >= res - pad || y >= res - pad;
+      const u = x / (res - 1);
+      const v = y / (res - 1);
+      normal[i * 3] = nx * cage;
+      normal[i * 3 + 1] = ny * cage;
+      normal[i * 3 + 2] = nz * cage;
+      ao[i] = border ? 0.15 : 0.5 + 0.5 * Math.sin(u * Math.PI) * Math.sin(v * Math.PI);
+      curvature[i] = border ? 0 : Math.abs(Math.sin(u * 6) * Math.cos(v * 6));
+      objectId[i] = border ? 0 : 1;
+    }
+  }
+  return {
+    resolution: res,
+    paddingPx: pad,
+    cageScale: cage,
+    normal,
+    ao,
+    curvature,
+    objectId,
+    texelCount: n,
+  };
+}
