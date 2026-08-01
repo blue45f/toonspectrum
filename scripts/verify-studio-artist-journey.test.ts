@@ -183,6 +183,49 @@ describe("Studio artist journey evidence audit", () => {
     );
   });
 
+  it("does not fail record-only-discrete brushes when live/settled ink is intentionally absent", () => {
+    const report = liveCommitReport({
+      expectedPresetCount: 1,
+      analyzedPresetCount: 1,
+      qualityFailureCount: 0,
+      evidence: [
+        qualityEntry("kneaded-eraser", {
+          quality: {
+            ok: true,
+            policy: {
+              kind: "record-only-discrete",
+              reason: "intentional discrete carrier",
+            },
+            frames: {
+              live: { visiblePixels: 0 },
+              released: { visiblePixels: 100 },
+              settled: { visiblePixels: 0 },
+            },
+            transitions: {
+              liveToReleased: { from: "live", to: "released" },
+              liveToSettled: { from: "live", to: "settled" },
+              releasedToSettled: { from: "released", to: "settled" },
+            },
+          },
+        }),
+      ],
+      transitionSummary: {
+        liveToReleased: { analyzedBrushCount: 1 },
+        liveToSettled: { analyzedBrushCount: 1 },
+        releasedToSettled: { analyzedBrushCount: 1 },
+      },
+    });
+    const audit = auditStudioArtistJourneyReports(lifecycleReport(), report);
+    expect(audit.ok).toBe(true);
+    expect(audit.coverage.live).toBe(true);
+    expect(audit.coverage.commit).toBe(true);
+    expect(audit.liveCommit.livePixelsVerifiedBrushes).toBe(0);
+    expect(audit.liveCommit.settledPixelsVerifiedBrushes).toBe(0);
+    expect(audit.issues).not.toEqual(
+      expect.arrayContaining(["live/commit: kneaded-eraser has a missing rendered phase"]),
+    );
+  });
+
   it("fails a missing commit transition and incomplete brush matrix", () => {
     const audit = auditStudioArtistJourneyReports(
       lifecycleReport(),

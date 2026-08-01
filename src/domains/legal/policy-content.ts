@@ -116,8 +116,8 @@ export function shouldAutoFetchPolicyDocument(): boolean {
   const explicit = import.meta.env.VITE_POLICY_API_AUTO;
   if (explicit === "false") return false;
   if (explicit === "true") return true;
-  const { hostname, port } = globalThis.location;
-  const isLocalPreview = (hostname === "127.0.0.1" || hostname === "localhost") && port === "4173";
+  const { hostname } = globalThis.location;
+  const isLocalPreview = hostname === "127.0.0.1" || hostname === "localhost";
   return !isLocalPreview;
 }
 

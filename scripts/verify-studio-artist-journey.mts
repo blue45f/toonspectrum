@@ -363,6 +363,7 @@ function auditLiveCommitReport(
 
   let livePixelsVerifiedBrushes = 0;
   let settledPixelsVerifiedBrushes = 0;
+  let policyScopedBrushCount = 0;
   let qualityPassedBrushes = 0;
   const ids = new Set<string>();
   let everySave = evidence.length > 0;
@@ -375,6 +376,11 @@ function auditLiveCommitReport(
       ids.add(id);
     }
     const quality = record(entry?.quality);
+    const policyKind = record(quality?.policy)?.kind;
+    const isRecordOnlyDiscrete = policyKind === "record-only-discrete";
+    if (!isRecordOnlyDiscrete) {
+      policyScopedBrushCount += 1;
+    }
     const frames = record(quality?.frames);
     const live = record(frames?.live);
     const released = record(frames?.released);
@@ -382,10 +388,15 @@ function auditLiveCommitReport(
     const livePixels = positiveInteger(live?.visiblePixels) ?? 0;
     const releasedPixels = positiveInteger(released?.visiblePixels) ?? 0;
     const settledPixels = positiveInteger(settled?.visiblePixels) ?? 0;
-    if (livePixels > 0) livePixelsVerifiedBrushes += 1;
-    if (settledPixels > 0) settledPixelsVerifiedBrushes += 1;
+    if (!isRecordOnlyDiscrete) {
+      if (livePixels > 0) livePixelsVerifiedBrushes += 1;
+      if (settledPixels > 0) settledPixelsVerifiedBrushes += 1;
+    }
     if (quality?.ok === true) qualityPassedBrushes += 1;
-    if (livePixels === 0 || releasedPixels === 0 || settledPixels === 0) {
+    if (
+      releasedPixels === 0
+      || (!isRecordOnlyDiscrete && (livePixels === 0 || settledPixels === 0))
+    ) {
       issues.push(`live/commit: ${id || index} has a missing rendered phase`);
     }
     if (quality?.ok !== true) {
@@ -443,10 +454,12 @@ function auditLiveCommitReport(
     settledPixelsVerifiedBrushes,
     qualityPassedBrushes,
     pointer: complete,
-    live: complete && livePixelsVerifiedBrushes === analyzedBrushes,
+    live:
+      complete
+      && livePixelsVerifiedBrushes === policyScopedBrushCount,
     commit:
       complete
-      && settledPixelsVerifiedBrushes === analyzedBrushes
+      && settledPixelsVerifiedBrushes === policyScopedBrushCount
       && qualityPassedBrushes === analyzedBrushes,
     // A completed long-brush report is emitted only after every per-brush Undo assertion passes.
     undo: complete && report?.completed === true,
