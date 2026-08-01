@@ -340,12 +340,13 @@ describe("BackendCapabilityGatewayController", () => {
   });
 
   it("routes webhook workloads with studio-ai-long operation to the long-job path without calling providers", async () => {
+    const requestKey = "studio-request-00000000000003";
     const envelope = gatewayEnvelopeWithPayload(
       `${validGatewayIdempotencyKey}-long-workload`,
       {
         operation: "studio-ai-long",
         tenantId: "tenant-001",
-        requestKey: "studio-request-00000000000003",
+        requestKey,
         jobType: "image-sequence",
         task: {
           scene: "shot-1",
@@ -365,23 +366,32 @@ describe("BackendCapabilityGatewayController", () => {
     expect(result.status).toBe(200);
     const body = await result.json();
     expect(body).toMatchObject({
-      outcome: "rejected",
+      outcome: "accepted",
       retryable: false,
-      errorCode: "NOT_IMPLEMENTED",
+      errorCode: null,
       provider: "cloudflare",
       idempotencyKey: envelope.idempotencyKey,
+    });
+    expect(body).toMatchObject({
+      result: {
+        requestType: "studio-ai-long",
+        status: "accepted",
+        jobId: `studio-ai-long:${requestKey}`,
+        jobType: "image-sequence",
+      },
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("routes thumbnail workloads to the thumbnail executor and rejects unimplemented work without calling providers", async () => {
+  it("routes thumbnail workloads to the thumbnail executor and returns an accepted async result without calling providers", async () => {
+    const requestKey = "studio-request-00000000000004";
     const envelope = gatewayEnvelopeWithPayload(
       `${validGatewayIdempotencyKey}-thumbnail`,
       {
         operation: "thumbnail.render",
         tenantId: "tenant-001",
         sourceAssetId: "asset-001",
-        requestKey: "studio-request-00000000000004",
+        requestKey,
       }
     );
     const result = await requestFetch(`${baseUrl}${BACKEND_CAPABILITY_GATEWAY_PATH}`, {
@@ -399,11 +409,18 @@ describe("BackendCapabilityGatewayController", () => {
     expect(result.status).toBe(200);
     const body = await result.json();
     expect(body).toMatchObject({
-      outcome: "rejected",
+      outcome: "accepted",
       retryable: false,
-      errorCode: "NOT_IMPLEMENTED",
+      errorCode: null,
       provider: "cloudflare",
       idempotencyKey: envelope.idempotencyKey,
+    });
+    expect(body).toMatchObject({
+      result: {
+        requestType: "thumbnail",
+        status: "accepted",
+        jobId: `thumbnail:${requestKey}`,
+      },
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

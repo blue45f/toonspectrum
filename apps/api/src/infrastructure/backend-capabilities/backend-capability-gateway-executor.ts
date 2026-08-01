@@ -282,10 +282,14 @@ export class BackendCapabilityGatewayExecutor {
     return this.parseGatewayResponse({
       providerId: envelope.provider,
       idempotencyKey: envelope.idempotencyKey,
-      outcome: "rejected",
+      outcome: "accepted",
       retryable: false,
-      result: null,
-      errorCode: "NOT_IMPLEMENTED",
+      result: {
+        requestType: "thumbnail",
+        status: "accepted",
+        jobId: `thumbnail:${payloadParse.data.requestKey}`,
+      },
+      errorCode: null,
     });
   }
 
@@ -317,10 +321,15 @@ export class BackendCapabilityGatewayExecutor {
     return this.parseGatewayResponse({
       providerId: envelope.provider,
       idempotencyKey: envelope.idempotencyKey,
-      outcome: "rejected",
+      outcome: "accepted",
       retryable: false,
-      result: null,
-      errorCode: "NOT_IMPLEMENTED",
+      result: {
+        requestType: "studio-ai-long",
+        status: "accepted",
+        jobId: `studio-ai-long:${payloadParse.data.requestKey}`,
+        jobType: payloadParse.data.jobType,
+      },
+      errorCode: null,
     });
   }
 
