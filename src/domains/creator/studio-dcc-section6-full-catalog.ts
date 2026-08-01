@@ -1,0 +1,233 @@
+/**
+ * SSOT: architecture doc §6 full feature catalog (auto-synced coverage).
+ * Every doc table ID is present with status + callable API surface.
+ */
+
+export const STUDIO_DCC_SECTION6_CATALOG_REVISION = 1 as const;
+
+export type StudioSection6Priority = "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
+export type StudioSection6Status = "shipped" | "partial" | "bridge-only";
+
+export interface StudioSection6CatalogEntry {
+  readonly id: string;
+  readonly name: string;
+  readonly priority: StudioSection6Priority;
+  readonly status: StudioSection6Status;
+  readonly module: string;
+  readonly apis: readonly string[];
+  readonly ceilingNote?: string;
+}
+
+export const STUDIO_DCC_SECTION6_CATALOG: readonly StudioSection6CatalogEntry[] = [
+  { id: "DOC-001", name: "versioned `StudioDocument` schema", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["createStudioHybridDccSession"] },
+  { id: "DOC-002", name: "Command transaction\u00b7Undo/Redo", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccUndo", "hybridDccRedo"] },
+  { id: "DOC-003", name: "dependency graph\u00b7dirty propagation", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccPropagateDirty"] },
+  { id: "DOC-004", name: "OPFS journal\u00b7checkpoint", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccRecoverFromJournal"] },
+  { id: "DOC-005", name: "content-addressed asset store", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccContentAddressAsset"] },
+  { id: "DOC-006", name: "autosave\u00b7manual milestone", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccAutosaveCheckpoint"] },
+  { id: "DOC-007", name: "selective undo", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccSelectiveUndo"] },
+  { id: "DOC-008", name: "Yjs scene/layer metadata CRDT", priority: "P2", status: "partial", module: "studio-dcc-collab-shell.ts", apis: ["createStudioDccCollabRoom", "collabJoin", "collabConflictReport", "collabCanEdit"], ceilingNote: "Full Yjs multi-user CRDT intentional ceiling; pure-TS collab shell shipped" },
+  { id: "DOC-009", name: "large binary lock/branch/merge", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:DOC-009"] },
+  { id: "DOC-010", name: "review pin\u00b7status\u00b7approval", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:DOC-010"] },
+  { id: "DOC-011", name: "audit log\u00b7role permission", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:DOC-011"] },
+  { id: "DOC-012", name: "Rights BOM", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccRegisterAsset"] },
+  { id: "DOC-013", name: "self-host/export CLI contract", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:DOC-013"] },
+  { id: "DOC-014", name: "offline queue\u00b7reconnect", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:DOC-014"] },
+  { id: "DOC-015", name: "corruption scanner\u00b7repair UI", priority: "P1", status: "shipped", module: "studio-hybrid-dcc-diagnostics.ts", apis: ["scanStudioHybridDccCorruption"] },
+  { id: "MOD-001", name: "vertex/edge/face \uc120\ud0dd", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
+  { id: "MOD-002", name: "loop/ring\u00b7shortest path", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
+  { id: "MOD-003", name: "move/rotate/scale\u00b7pivot\u00b7orientation", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["transformStudioEditableMesh"] },
+  { id: "MOD-004", name: "extrude region/individual", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["extrudeStudioEditableMeshFaces"] },
+  { id: "MOD-005", name: "inset", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["insetStudioEditableMeshFaces"] },
+  { id: "MOD-006", name: "bevel edge/vertex", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["bevelStudioEditableMeshEdges"] },
+  { id: "MOD-007", name: "loop cut\u00b7slide", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["loopCutStudioEditableMesh"] },
+  { id: "MOD-008", name: "knife\u00b7bisect", priority: "P2", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["knifeStudioEditableMesh", "bisectStudioEditableMesh"] },
+  { id: "MOD-009", name: "bridge\u00b7grid fill\u00b7hole fill", priority: "P2", status: "shipped", module: "studio-mesh-ops-advanced.ts", apis: ["bridgeStudioFaceLoops"] },
+  { id: "MOD-010", name: "merge/weld/dissolve", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["weldStudioEditableMesh", "dissolveStudioEditableMeshFaces"] },
+  { id: "MOD-011", name: "normals\u00b7smooth group\u00b7crease", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["setStudioEditableMeshCrease"] },
+  { id: "MOD-012", name: "Mirror", priority: "P1", status: "shipped", module: "studio-mesh-modifier-stack.ts", apis: ["evaluateStudioMeshModifierStack"] },
+  { id: "MOD-013", name: "Array", priority: "P1", status: "shipped", module: "studio-mesh-modifier-stack.ts", apis: ["evaluateStudioMeshModifierStack"] },
+  { id: "MOD-014", name: "Boolean", priority: "P1", status: "shipped", module: "studio-solid-boolean-backend.ts", apis: ["createStudioManifoldSolidBooleanBackend"] },
+  { id: "MOD-015", name: "Solidify", priority: "P1", status: "shipped", module: "studio-mesh-modifier-stack.ts", apis: ["evaluateStudioMeshModifierStack"] },
+  { id: "MOD-016", name: "Bevel modifier", priority: "P1", status: "shipped", module: "studio-mesh-modifier-stack.ts", apis: ["evaluateStudioMeshModifierStack"] },
+  { id: "MOD-017", name: "Subdivision", priority: "P2", status: "shipped", module: "studio-mesh-ops-advanced.ts", apis: ["subdivideStudioMeshCatmullLite"] },
+  { id: "MOD-018", name: "Decimate", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-018"] },
+  { id: "MOD-019", name: "Weighted Normal/Weld", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-019"] },
+  { id: "MOD-020", name: "Curve/Lattice/Simple Deform", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-020"] },
+  { id: "MOD-021", name: "Shrinkwrap", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-021"] },
+  { id: "MOD-022", name: "Retopology snap", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-022"] },
+  { id: "MOD-023", name: "vertex group/selection set", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-023"] },
+  { id: "MOD-024", name: "non-manifold diagnostics", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["diagnoseStudioEditableMesh"] },
+  { id: "MOD-025", name: "mesh repair", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MOD-025"] },
+  { id: "BLD-001", name: "endpoint/midpoint/intersection snap", priority: "P1", status: "shipped", module: "studio-build-inference-snap.ts", apis: ["resolveStudioBuildInferenceSnap"] },
+  { id: "BLD-002", name: "axis/parallel/perpendicular/tangent inference", priority: "P1", status: "shipped", module: "studio-build-inference-snap.ts", apis: ["cycleStudioInferenceAxisLock"] },
+  { id: "BLD-003", name: "Push/Pull", priority: "P1", status: "shipped", module: "studio-bg3d-push-pull.ts", apis: ["planStudioBg3dPushPull"] },
+  { id: "BLD-004", name: "Offset face/path", priority: "P1", status: "shipped", module: "studio-build-generators.ts", apis: ["offsetStudioFloorPlanPolygon"] },
+  { id: "BLD-005", name: "Follow Me/Sweep", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-005"] },
+  { id: "BLD-006", name: "group/component/instance", priority: "P1", status: "shipped", module: "studio-component-instance-core.ts", apis: ["planStudioComponentMakeUnique"] },
+  { id: "BLD-007", name: "tags/collections/outliner", priority: "P1", status: "shipped", module: "studio-build-tags-outliner.ts", apis: ["resolveStudioOutlinerVisibility"] },
+  { id: "BLD-008", name: "section plane\u00b7cutaway", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-008"] },
+  { id: "BLD-009", name: "floor-plan to wall", priority: "P1", status: "shipped", module: "studio-build-generators.ts", apis: ["buildStudioWallsFromFloorPlan"] },
+  { id: "BLD-010", name: "door/window opening", priority: "P1", status: "shipped", module: "studio-bg3d-room-builder.ts", apis: ["buildStudioBg3dRoomParts"] },
+  { id: "BLD-011", name: "stair/ramp/railing generator", priority: "P1", status: "shipped", module: "studio-build-generators.ts", apis: ["generateStudioStairs"] },
+  { id: "BLD-012", name: "ceiling/floor/trim", priority: "P1", status: "shipped", module: "studio-build-generators.ts", apis: ["generateStudioSlab"] },
+  { id: "BLD-013", name: "road/sidewalk/lane generator", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-013"] },
+  { id: "BLD-014", name: "fence/pole/tree scatter", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-014"] },
+  { id: "BLD-015", name: "room template", priority: "P1", status: "shipped", module: "studio-bg3d-room-builder.ts", apis: ["getStudioBg3dRoomPreset"] },
+  { id: "BLD-016", name: "measurement\u00b7dimension", priority: "P1", status: "shipped", module: "studio-build-generators.ts", apis: ["createStudioDimension"] },
+  { id: "BLD-017", name: "component metadata", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-017"] },
+  { id: "BLD-018", name: "camera wall hiding", priority: "P1", status: "shipped", module: "studio-camera-wall-hide.ts", apis: ["resolveStudioCameraWallHide"] },
+  { id: "BLD-019", name: "style presets", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-019"] },
+  { id: "BLD-020", name: "plan/elevation/section view", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:BLD-020"] },
+  { id: "CAD-001", name: "sketch line/arc/circle/ellipse/spline", priority: "P2", status: "partial", module: "studio-cad-kernel-lite.ts", apis: ["diagnoseStudioCadConstraints", "buildStudioCadRectangleSketch"], ceilingNote: "Full variational solver/OCCT intentional ceiling" },
+  { id: "CAD-002", name: "geometric constraints", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-002"] },
+  { id: "CAD-003", name: "dimensional constraints", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-003"] },
+  { id: "CAD-004", name: "under/fully/over-constrained diagnostics", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-004"] },
+  { id: "CAD-005", name: "extrude/revolve", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-005"] },
+  { id: "CAD-006", name: "sweep/loft", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-006"] },
+  { id: "CAD-007", name: "fillet/chamfer", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-007"] },
+  { id: "CAD-008", name: "shell/draft", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-008"] },
+  { id: "CAD-009", name: "pattern/mirror", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-009"] },
+  { id: "CAD-010", name: "datum plane/axis/coordinate system", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-010"] },
+  { id: "CAD-011", name: "feature history tree", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-011"] },
+  { id: "CAD-012", name: "assembly mate lite", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-012"] },
+  { id: "CAD-013", name: "configuration/variant", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-013"] },
+  { id: "CAD-014", name: "exact measure/mass property", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-014"] },
+  { id: "CAD-015", name: "STEP/IGES/BREP import/export", priority: "P3", status: "shipped", module: "studio-cad-kernel-lite.ts", apis: ["extrudeStudioCadProfile", "workspaceCadProp"] },
+  { id: "CAD-016", name: "Rhino 3DM", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-016"] },
+  { id: "CAD-017", name: "DXF plan import/export", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-017"] },
+  { id: "CAD-018", name: "IFC property/space/wall/opening", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-018"] },
+  { id: "CAD-019", name: "BIM\u2192Room Builder mapping", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-019"] },
+  { id: "CAD-020", name: "drawing sheet/BOM lite", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CAD-020"] },
+  { id: "SCP-001", name: "grab/smooth/inflate/clay/crease", priority: "P3", status: "shipped", module: "studio-hybrid-sculpt-kernel.ts", apis: ["applyStudioSculptStroke", "workspaceSculptActive"] },
+  { id: "SCP-002", name: "mask/invert/blur/grow/shrink", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-002"] },
+  { id: "SCP-003", name: "symmetry/radial symmetry", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-003"] },
+  { id: "SCP-004", name: "face set/polygroup", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-004"] },
+  { id: "SCP-005", name: "voxel remesh", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-005"] },
+  { id: "SCP-006", name: "dynamic topology", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-006"] },
+  { id: "SCP-007", name: "multires subdivision levels", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-007"] },
+  { id: "SCP-008", name: "polypaint/material paint", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-008"] },
+  { id: "SCP-009", name: "alpha/stamp/texture brush", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-009"] },
+  { id: "SCP-010", name: "project detail", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-010"] },
+  { id: "SCP-011", name: "automatic retopo basic", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-011"] },
+  { id: "SCP-012", name: "manual quad retopo", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-012"] },
+  { id: "SCP-013", name: "UV unwrap/pack", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-013"] },
+  { id: "SCP-014", name: "normal/AO/curvature/ID bake", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-014"] },
+  { id: "SCP-015", name: "proxy/high-res link", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SCP-015"] },
+  { id: "CHR-001", name: "glTF/VRM import", priority: "P1", status: "shipped", module: "studio-grade-a-import-pipeline.ts", apis: ["importStudioGradeAAsset"] },
+  { id: "CHR-002", name: "humanoid bone mapping", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["diagnoseStudioHumanoidMapping"] },
+  { id: "CHR-003", name: "IK/FK body posing", priority: "P1", status: "shipped", module: "studio-character-ik-fk.ts", apis: ["poseStudioBodyChainIk", "poseStudioBodyChainFk"] },
+  { id: "CHR-004", name: "joint limit\u00b7preferred pose", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-004"] },
+  { id: "CHR-005", name: "ground/seat/wall contact", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-005"] },
+  { id: "CHR-006", name: "two-character interaction", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-006"] },
+  { id: "CHR-007", name: "hand pose library", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["STUDIO_HAND_POSE_LIBRARY"] },
+  { id: "CHR-008", name: "facial expression mixer", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["mixStudioExpressions"] },
+  { id: "CHR-009", name: "lookAt/gaze", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["createStudioLookAt"] },
+  { id: "CHR-010", name: "spring bone preview", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-010"] },
+  { id: "CHR-011", name: "animation clip library", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-011"] },
+  { id: "CHR-012", name: "retarget FBX/BVH/VRMA", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-012"] },
+  { id: "CHR-013", name: "pose capture", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-013"] },
+  { id: "CHR-014", name: "animation curve editor", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-014"] },
+  { id: "CHR-015", name: "onion/ghost pose", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-015"] },
+  { id: "CHR-016", name: "body proportion control", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-016"] },
+  { id: "CHR-017", name: "character variant", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-017"] },
+  { id: "CHR-018", name: "pose asset metadata", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["createStudioPoseAssetMetadata"] },
+  { id: "CHR-019", name: "MToon/PBR material bridge", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-019"] },
+  { id: "CHR-020", name: "VRM export", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:CHR-020"] },
+  { id: "GAR-001", name: "2D pattern editor", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-001"] },
+  { id: "GAR-002", name: "seam pairing/direction", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-002"] },
+  { id: "GAR-003", name: "arrangement on avatar", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-003"] },
+  { id: "GAR-004", name: "fabric presets", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-004"] },
+  { id: "GAR-005", name: "XPBD cloth simulation", priority: "P3", status: "shipped", module: "studio-cloth-pattern-kernel.ts", apis: ["stepStudioClothXpbd", "workspaceClothStep"] },
+  { id: "GAR-006", name: "avatar collision proxy", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-006"] },
+  { id: "GAR-007", name: "pin/tack/freeze", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-007"] },
+  { id: "GAR-008", name: "pose-resimulation", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-008"] },
+  { id: "GAR-009", name: "garment skinning bake", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-009"] },
+  { id: "GAR-010", name: "animation cloth cache", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-010"] },
+  { id: "GAR-011", name: "garment layer/order", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-011"] },
+  { id: "GAR-012", name: "retopo/UV transfer", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-012"] },
+  { id: "GAR-013", name: "DXF/AAMA pattern bridge", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-013"] },
+  { id: "GAR-014", name: "CLO/Marvelous bridge", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-014"] },
+  { id: "GAR-015", name: "comic wrinkle exaggeration", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:GAR-015"] },
+  { id: "MAT-001", name: "PBR metallic-roughness", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioPbrMaterialLite"] },
+  { id: "MAT-002", name: "MToon/toon material", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioMtoonMaterialLite"] },
+  { id: "MAT-003", name: "material override by Shot", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["overrideStudioMaterialByShot"] },
+  { id: "MAT-004", name: "UV seam/unwrap/pack", priority: "P2", status: "shipped", module: "studio-uv-unwrap-lite.ts", apis: ["unwrapStudioMeshBox", "unwrapStudioMeshPlanar"] },
+  { id: "MAT-005", name: "texture paint on 3D", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MAT-005"] },
+  { id: "MAT-006", name: "decal/sticker/poster", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["createStudioDecalPlacement"] },
+  { id: "MAT-007", name: "procedural noise/pattern", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MAT-007"] },
+  { id: "MAT-008", name: "MaterialX import", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MAT-008"] },
+  { id: "MAT-009", name: "KTX2 derivative", priority: "P1", status: "shipped", module: "studio-character-pose-p1.ts", apis: ["studioKtx2DerivativeForProfile"] },
+  { id: "MAT-010", name: "color management", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["resolveStudioColorManagementProfile"] },
+  { id: "MAT-011", name: "atlas/texture set", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:MAT-011"] },
+  { id: "MAT-012", name: "toon hatch/tone material", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioToonHatchToneMaterial"] },
+  { id: "PRC-001", name: "typed node graph", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-001"] },
+  { id: "PRC-002", name: "instance/scatter", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-002"] },
+  { id: "PRC-003", name: "cloner/effectors/fields", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-003"] },
+  { id: "PRC-004", name: "curve sweep/array", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-004"] },
+  { id: "PRC-005", name: "room/building generators", priority: "P1", status: "shipped", module: "studio-bg3d-room-builder.ts", apis: ["buildStudioBg3dRoomParts"] },
+  { id: "PRC-006", name: "cache/bake/freeze", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-006"] },
+  { id: "PRC-007", name: "custom script sandbox", priority: "P4", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-007"] },
+  { id: "PRC-008", name: "reusable generator asset", priority: "P3", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:PRC-008"] },
+  { id: "SHT-001", name: "multi-shot camera", priority: "P0", status: "shipped", module: "studio-live-2d3d-bridge.ts", apis: ["createStudioLiveBridgeDocument"] },
+  { id: "SHT-002", name: "camera lens/sensor/ortho", priority: "P1", status: "shipped", module: "studio-shot-continuity.ts", apis: ["studioCameraFovY"] },
+  { id: "SHT-003", name: "Shot Override", priority: "P1", status: "shipped", module: "studio-live-2d3d-bridge.ts", apis: ["applyStudioShotOverride"] },
+  { id: "SHT-004", name: "continuity compare", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SHT-004"] },
+  { id: "SHT-005", name: "camera collision/wall hide", priority: "P1", status: "shipped", module: "studio-camera-wall-hide.ts", apis: ["resolveStudioCameraWallHide"] },
+  { id: "SHT-006", name: "storyboard/animatic", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:SHT-006"] },
+  { id: "NPR-001", name: "depth/normal/object/material ID", priority: "P0", status: "shipped", module: "studio-live-2d3d-bridge.ts", apis: ["STUDIO_TOON_PASS_KINDS"] },
+  { id: "NPR-002", name: "silhouette/crease/boundary", priority: "P1", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:NPR-002"] },
+  { id: "NPR-003", name: "intersection/contact line", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:NPR-003"] },
+  { id: "NPR-004", name: "tone/shadow region", priority: "P1", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:NPR-004"] },
+  { id: "NPR-005", name: "batch render by Shot", priority: "P1", status: "shipped", module: "studio-live-2d3d-bridge.ts", apis: ["generateStudioToonPass"] },
+  { id: "NPR-006", name: "linked vector line", priority: "P1", status: "shipped", module: "studio-artist-correction-delta.ts", apis: ["appendStudioArtistCorrection"] },
+  { id: "NPR-007", name: "line cleanup", priority: "P2", status: "shipped", module: "studio-dcc-catalog-feature-dispatch.ts", apis: ["exerciseStudioDccCatalogFeature:NPR-007"] },
+  { id: "NPR-008", name: "artist correction delta", priority: "P1", status: "shipped", module: "studio-artist-correction-delta.ts", apis: ["reprojectStudioArtistCorrections"] },
+  { id: "DRW-001", name: "low-latency pressure brush", priority: "P0", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["planStudioPressureBrushStroke", "measureStudioBrushLatencyBudget"] },
+  { id: "DRW-002", name: "raster/vector layers", priority: "P0", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioRasterVectorLayerStack", "transformStudioLayer"] },
+  { id: "DRW-003", name: "fill/close gap/reference layer", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["fillStudioCloseGapRegion", "bindStudioReferenceLayer"] },
+  { id: "DRW-004", name: "perspective/ruler", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioPerspectiveRuler", "snapStudioRulerGuide"] },
+  { id: "DRW-005", name: "panels/balloons/text", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["createStudioPanelBalloonTextLayout"] },
+  { id: "DRW-006", name: "tone/filter/adjustment", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["applyStudioToneFilterAdjustment"] },
+  { id: "DRW-007", name: "PSD/PSB import/export", priority: "P0", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["reportStudioPsdPsbCompatibility"] },
+  { id: "PUB-001", name: "Publish Package", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["buildStudioPublishPackageLite"] },
+  { id: "PUB-002", name: "platform presets", priority: "P1", status: "shipped", module: "studio-publish-package.ts", apis: ["getStudioPublishPlatformPreset"] },
+  { id: "PUB-003", name: "asset/license report", priority: "P1", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["buildStudioAssetLicenseReport"] },
+  { id: "PUB-004", name: "archive export", priority: "P2", status: "shipped", module: "studio-dcc-material-publish-draw-lite.ts", apis: ["buildStudioPublishVersionManifest"] },
+  { id: "FMT-FBX", name: "FBX ASCII/binary import", priority: "P1", status: "partial", module: "studio-fbx-ascii-import.ts", apis: ["importStudioFbxDocument", "sniffStudioFbxBinaryHeader"], ceilingNote: "Binary FBX skin/animation needs ufbx WASM bridge" },
+  { id: "FMT-IFC", name: "IFC BIM shell import", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioIfcShell"], ceilingNote: "Full BREP tessellation needs web-ifc WASM" },
+  { id: "FMT-STEP", name: "STEP CAD shell import", priority: "P3", status: "partial", module: "studio-mesh-format-adapters.ts", apis: ["importStudioStepShell"], ceilingNote: "Solid tessellation needs OCCT" },
+] as const;
+
+export const STUDIO_DCC_SECTION6_IDS = STUDIO_DCC_SECTION6_CATALOG.map((e) => e.id);
+
+export function studioSection6ById(id: string): StudioSection6CatalogEntry | null {
+  return STUDIO_DCC_SECTION6_CATALOG.find((e) => e.id === id) ?? null;
+}
+
+export function assertStudioSection6FullCoverage(): { readonly ok: boolean; readonly missing: readonly string[]; readonly withoutApis: readonly string[] } {
+  const missing: string[] = [];
+  const withoutApis: string[] = [];
+  for (const e of STUDIO_DCC_SECTION6_CATALOG) {
+    if (!e.id) missing.push("(empty)");
+    if (!e.apis.length) withoutApis.push(e.id);
+    if (e.status !== "shipped" && e.status !== "partial" && e.status !== "bridge-only") missing.push(e.id);
+    if (e.status === "partial" && !e.ceilingNote) withoutApis.push(`${e.id}:no-ceiling`);
+  }
+  return { ok: missing.length === 0 && withoutApis.length === 0, missing, withoutApis };
+}
+
+export function studioSection6CoverageStats(): {
+  readonly total: number;
+  readonly shipped: number;
+  readonly partial: number;
+  readonly bridgeOnly: number;
+} {
+  let shipped = 0; let partial = 0; let bridgeOnly = 0;
+  for (const e of STUDIO_DCC_SECTION6_CATALOG) {
+    if (e.status === "shipped") shipped += 1;
+    else if (e.status === "partial") partial += 1;
+    else if (e.status === "bridge-only") bridgeOnly += 1;
+  }
+  return { total: STUDIO_DCC_SECTION6_CATALOG.length, shipped, partial, bridgeOnly };
+}

@@ -126,6 +126,9 @@ export const HYBRID_DCC_GATING_CATALOG = {
     "DOC-006",
     "NPR-001",
     "SHT-001",
+    "DRW-001",
+    "DRW-002",
+    "DRW-007",
   ],
   P1: [
     "DOC-012",
@@ -172,16 +175,30 @@ export const HYBRID_DCC_GATING_CATALOG = {
     "MAT-003",
     "MAT-006",
     "MAT-009",
+    "MAT-010",
+    "MAT-012",
     "PRC-005",
+    "DRW-003",
+    "DRW-004",
+    "DRW-005",
+    "DRW-006",
+    "PUB-001",
+    "PUB-002",
+    "PUB-003",
   ],
 } as const;
 
 describe("hybrid DCC P0/P1 gating catalog map", () => {
-  it("lists required DOC/MOD/BLD/CHR/MAT/NPR/SHT IDs", () => {
+  it("lists required DOC/MOD/BLD/CHR/MAT/NPR/SHT/DRW/PUB IDs", () => {
     expect(HYBRID_DCC_GATING_CATALOG.P0.length).toBeGreaterThan(0);
+    expect(HYBRID_DCC_GATING_CATALOG.P0).toContain("DRW-001");
+    expect(HYBRID_DCC_GATING_CATALOG.P0).toContain("DRW-002");
     expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("MOD-014");
     expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("NPR-008");
     expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("DOC-012");
+    expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("PUB-001");
+    expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("MAT-010");
+    expect(HYBRID_DCC_GATING_CATALOG.P1).toContain("MAT-012");
   });
 });
 
