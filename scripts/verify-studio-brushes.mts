@@ -443,13 +443,16 @@ function expectedStaticPreviewError(message: string, studioUrl: string): boolean
 
   const socketUrl =
     `ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket`;
-  const expectedMessage =
-    `WebSocket connection to '${socketUrl}' failed: `
-    + "Connection closed before receiving a handshake response";
-  if (message === expectedMessage) return true;
+  const expectedMessages = [
+    `WebSocket connection to '${socketUrl}' failed: Connection closed before receiving a handshake response`,
+    `WebSocket connection to '${socketUrl}' failed: Error during WebSocket handshake: Unexpected response code: 400`,
+  ];
+  if (expectedMessages.includes(message)) return true;
 
-  const sourcePrefix = `${expectedMessage} @ `;
-  if (!message.startsWith(sourcePrefix)) return false;
+  const sourcePrefix = expectedMessages
+    .map((expectedMessage) => `${expectedMessage} @ `)
+    .find((source) => message.startsWith(source));
+  if (!sourcePrefix) return false;
   try {
     const sourceUrl = new URL(message.slice(sourcePrefix.length));
     return sourceUrl.origin === previewUrl.origin

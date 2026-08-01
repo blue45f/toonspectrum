@@ -191,9 +191,12 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "`ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket`",
     );
     expect(harness).toContain(
-      '"Connection closed before receiving a handshake response"',
+      "Connection closed before receiving a handshake response",
     );
-    expect(harness).toContain("message === expectedMessage");
+    expect(harness).toContain(
+      "Error during WebSocket handshake: Unexpected response code: 400",
+    );
+    expect(harness).toContain("expectedMessages.includes(message)");
     expect(harness).toContain("sourceUrl.origin === previewUrl.origin");
     expect(harness).toContain(
       "/^\\/assets\\/[A-Za-z0-9._-]+\\.js$/u.test(sourceUrl.pathname)",

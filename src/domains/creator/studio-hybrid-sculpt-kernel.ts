@@ -1,6 +1,10 @@
 /**
- * Sculpt / voxel-lite kernel (SCP-001–005, 008 subset).
- * Operates on dense triangle soup; not production multires.
+ * Hybrid DCC sculpt / voxel-lite kernel (SCP-001–005, 008 subset).
+ *
+ * ## 한계
+ * - 프로덕션 multires / dynamesh / face-set GPU 스컬프 코어(`studio-sculpt-*`)가 아니다.
+ * - 삼각형 soup 위에서 동작하며 ZBrush급 수천만 poly·멀티레벨 델타를 지원하지 않는다.
+ * - voxel remesh는 격자 스냅 근사(상세 손실 있음).
  */
 
 import {

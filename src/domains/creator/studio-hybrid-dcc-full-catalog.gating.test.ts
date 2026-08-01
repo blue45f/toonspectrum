@@ -47,6 +47,13 @@ import {
   hybridDccSelectiveUndo,
 } from "./studio-hybrid-dcc-document";
 import {
+  applyStudioSculptStroke,
+  createStudioSculptMask,
+  invertStudioSculptMask,
+  polypaintStudioMesh,
+  voxelRemeshStudioMesh,
+} from "./studio-hybrid-sculpt-kernel";
+import {
   bisectStudioEditableMesh,
   bridgeStudioFaceLoops,
   decimateStudioMesh,
@@ -61,13 +68,6 @@ import {
   arrayStudioAlongCurve,
   scatterStudioInstances,
 } from "./studio-procedural-scatter";
-import {
-  applyStudioSculptStroke,
-  createStudioSculptMask,
-  invertStudioSculptMask,
-  polypaintStudioMesh,
-  voxelRemeshStudioMesh,
-} from "./studio-sculpt-kernel-lite";
 import {
   buildStudioAnimaticTimeline,
   diffStudioShotContinuity,
