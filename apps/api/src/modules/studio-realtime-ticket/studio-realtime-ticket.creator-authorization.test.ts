@@ -96,6 +96,7 @@ describe("CreatorStudioRealtimeTicketAuthorization", () => {
           manageMembers: false,
         },
       },
+      authorizationEpoch: "2026-07-31T23:59:59.000Z",
       authorizationExpiresAt: "2026-08-01T00:00:00.000Z",
     });
 
@@ -111,6 +112,7 @@ describe("CreatorStudioRealtimeTicketAuthorization", () => {
         edit: false,
         manageMembers: false,
       },
+      authorizationEpoch: "2026-07-31T23:59:59.000Z",
       authorizationExpiresAt: "2026-08-01T00:00:00.000Z",
     });
     expect(getAuthorization).toHaveBeenCalledWith(

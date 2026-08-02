@@ -52,6 +52,7 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     const result = await signer().issue({
       actorUserId: "editor-1",
       sessionVersion: 7,
+      authorizationEpochMs: NOW - 1_000,
       sessionExpiresAtEpochMs: NOW + 60 * 60 * 1_000,
       sessionId: "session-1",
       scope: { workId: "work-1", roomId: "room-1" },
@@ -79,6 +80,7 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     expect(verified.claims).toMatchObject({
       subject: "editor-1",
       sessionVersion: 7,
+      authorizationEpochMs: NOW - 1_000,
       workId: "work-1",
       roomId: "room-1",
       clientId: "session-1",
@@ -94,6 +96,7 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     const result = await signer().issue({
       actorUserId: "commenter-1",
       sessionVersion: 3,
+      authorizationEpochMs: NOW - 1_000,
       sessionExpiresAtEpochMs: NOW + 60 * 60 * 1_000,
       sessionId: "session-1",
       scope: { workId: "work-1", roomId: "room-review" },
@@ -136,6 +139,7 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     const result = await signer().issue({
       actorUserId: "editor-2",
       sessionVersion: 11,
+      authorizationEpochMs: NOW - 1_000,
       sessionExpiresAtEpochMs: sourceSessionExpiresAt,
       sessionId: "session-2",
       scope: { workId: "work-2", roomId: "room-2" },

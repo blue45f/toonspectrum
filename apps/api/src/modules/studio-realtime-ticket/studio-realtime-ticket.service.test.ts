@@ -30,6 +30,7 @@ const ALLOWED = {
   ...REQUEST,
   allowed: true,
   actorUserId: "commenter-1",
+  authorizationEpoch: "2026-07-31T00:59:59.000Z",
   origin: ORIGIN,
   role: "commenter",
   creatorCapabilities: {
@@ -104,6 +105,7 @@ describe("StudioRealtimeTicketService", () => {
     expect(subject.issue).toHaveBeenCalledWith({
       actorUserId: "commenter-1",
       sessionVersion: PRINCIPAL.sessionVersion,
+      authorizationEpochMs: Date.parse(ALLOWED.authorizationEpoch),
       sessionExpiresAtEpochMs: PRINCIPAL.expiresAt,
       sessionId: "session-1",
       scope: REQUEST.scope,
