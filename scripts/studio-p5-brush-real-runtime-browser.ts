@@ -88,6 +88,21 @@ function runWorker(name: string): Promise<StudioP5BrushRealWorkerResult> {
   });
 }
 
+async function runSequentialWorkerReplay(): Promise<void> {
+  // Each verifier Worker intentionally creates several private WebGL2 surfaces.
+  // Running both Workers together can exceed Chromium's active Worker-context
+  // budget and force an older context to be lost, especially under SwiftShader.
+  // Keep both exact-byte Worker/WebGL2 executions, but isolate their lifetimes
+  // so this gate measures renderer determinism rather than harness interference.
+  const workerResult = await runWorker(
+    "studio-p5-brush-real-runtime-primary",
+  );
+  const freshWorkerReplay = await runWorker(
+    "studio-p5-brush-real-runtime-fresh-replay",
+  );
+  publish(workerResult, freshWorkerReplay);
+}
+
 if (typeof Worker !== "function") {
   const error = errorResult(
     "Chromium does not expose the Worker constructor.",
@@ -95,18 +110,5 @@ if (typeof Worker !== "function") {
   );
   publish(error, error);
 } else {
-  void Promise.all([
-    runWorker("studio-p5-brush-real-runtime-primary"),
-    runWorker("studio-p5-brush-real-runtime-fresh-replay"),
-  ]).then(([workerResult, freshWorkerReplay]) => {
-    if (!workerResult || !freshWorkerReplay) {
-      const error = errorResult(
-        "The p5.brush real-runtime Worker result was missing.",
-        null,
-      );
-      publish(error, error);
-      return;
-    }
-    publish(workerResult, freshWorkerReplay);
-  });
+  void runSequentialWorkerReplay();
 }

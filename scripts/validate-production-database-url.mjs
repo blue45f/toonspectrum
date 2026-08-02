@@ -119,7 +119,11 @@ export function validateProductionDatabaseUrl(
   if (!allowLoopback && loopback) {
     fail("production migrations cannot use a loopback endpoint");
   }
-  validateDnsHostname(hostname);
+  // `localhost` is intentionally not a canonical production DNS name. Once
+  // the caller has crossed the explicit disposable-test boundary, do not run
+  // that single-label loopback name through the production DNS validator.
+  // All non-loopback authorities still require the exact production contract.
+  if (!loopback) validateDnsHostname(hostname);
   if (
     !loopback &&
     FORBIDDEN_EFFECTIVE_HOST_MARKERS.some((marker) =>

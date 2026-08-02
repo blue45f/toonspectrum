@@ -105,6 +105,14 @@ for (const [name, value, pattern] of [
     /loopback/u,
   ],
   [
+    "localhost production endpoint",
+    DIRECT_URL.replace(
+      "ep-direct.ap-southeast-1.aws.neon.tech",
+      "localhost",
+    ),
+    /loopback/u,
+  ],
+  [
     "percent-encoded hostname",
     DIRECT_URL.replace("ep-direct", "ep%2ddirect"),
     /percent-encoded/u,
@@ -130,13 +138,36 @@ for (const [name, value, pattern] of [
   });
 }
 
-test("allows a credentialed loopback URL only behind the explicit test switch", () => {
+test.each([
+  "postgresql://webdex:webdex@127.0.0.1:55432/webdex",
+  "postgresql://webdex:webdex@localhost:55432/webdex",
+  "postgresql://webdex:webdex@[::1]:55432/webdex",
+])(
+  "allows a credentialed loopback URL only behind the explicit test switch: %s",
+  (databaseUrl) => {
+    expect(
+      validateProductionDatabaseUrl(databaseUrl, { allowLoopback: true })
+        .tlsVerified,
+    ).toBe(false);
+  },
+);
+
+test("maps the CI localhost contract to a non-TLS libpq environment", () => {
   expect(
-    validateProductionDatabaseUrl(
-      "postgresql://webdex:webdex@127.0.0.1:55432/webdex",
-      { allowLoopback: true },
-    ).tlsVerified,
-  ).toBe(false);
+    createPsqlEnvironment(
+      "postgres://webdex:webdex@localhost:5432/webdex",
+      { allowLoopback: true, baseEnvironment: { PATH: "/usr/bin" } },
+    ),
+  ).toEqual({
+    PATH: "/usr/bin",
+    PGHOST: "localhost",
+    PGPORT: "5432",
+    PGUSER: "webdex",
+    PGPASSWORD: "webdex",
+    PGDATABASE: "webdex",
+    PGSSLMODE: "disable",
+    PGCHANNELBINDING: "disable",
+  });
 });
 
 test("still rejects query overrides in loopback test mode", () => {
@@ -147,6 +178,15 @@ test("still rejects query overrides in loopback test mode", () => {
         { allowLoopback: true },
       ),
   ).toThrow(/query parameter "host"/u);
+});
+
+test("the loopback switch does not admit arbitrary single-label authorities", () => {
+  expect(() =>
+    validateProductionDatabaseUrl(
+      "postgresql://webdex:webdex@database:55432/webdex",
+      { allowLoopback: true },
+    ),
+  ).toThrow(/canonical DNS name/u);
 });
 
 test("builds an override-resistant libpq environment without putting the URL in argv", () => {

@@ -23,6 +23,14 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
       'new URL("./studio-p5-brush-real-runtime-worker.ts", import.meta.url)',
     );
     expect(browser).toContain('type: "module"');
+    expect(browser).toContain("async function runSequentialWorkerReplay()");
+    expect(browser).toContain(
+      'const workerResult = await runWorker(\n    "studio-p5-brush-real-runtime-primary",',
+    );
+    expect(browser).toContain(
+      'const freshWorkerReplay = await runWorker(\n    "studio-p5-brush-real-runtime-fresh-replay",',
+    );
+    expect(browser).not.toContain("Promise.all([");
     expect(worker).toContain(
       'from "../src/domains/creator/studio-p5-brush-standalone-runtime-adapter"',
     );
