@@ -18,7 +18,7 @@ import {
 } from "./studio-procedural-artistic-brush-provider";
 
 export const STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION =
-  "2.2.1-adapter.3" as const;
+  "2.2.1-adapter.4" as const;
 
 export const STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES = Object.freeze([
   "procedural:flow-field",
@@ -736,6 +736,16 @@ function createAdapter(
           );
         }
         try {
+          // The standalone package creates renderer-, fill- and Gaussian-pool
+          // state while load()/the first render() bind a WebGL target. Some of
+          // that initialization consumes the package RNG, so seeding only the
+          // two technique passes leaves fresh one-shot Workers with different
+          // cache bytes on software WebGL implementations. Seed before binding
+          // the private target as well; each production render owns a fresh
+          // Worker, therefore the request seed is the canonical initialization
+          // seed for both caches and retained artwork.
+          runtime.seed(input.seed);
+          runtime.noiseSeed(input.seed);
           runtime.load(input.surface.canvas);
           // p5.brush initializes renderer-, mask-, and framebuffer-owned state
           // lazily. Prime the newly loaded target before clear() can touch

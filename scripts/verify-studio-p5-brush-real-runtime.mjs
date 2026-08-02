@@ -27,7 +27,7 @@ const SCRATCH =
 const HARNESS_PATH = "/__studio_p5_brush_real_runtime__";
 const HARNESS_ENTRY = "/scripts/studio-p5-brush-real-runtime-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;
-const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.3";
+const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.4";
 const EXPECTED_CASE_IDS = [
   "flow-field",
   "hatch",
@@ -181,7 +181,12 @@ function validateSuccess(result, contextAffinityStress, diagnostics) {
     || contextAffinityStress.surfaceDisposeCount !== 2
     || contextAffinityStress.webGlErrorFree !== true
   ) {
-    failures.push("real p5.brush context-affinity stress did not fail closed");
+    const contextDetail = contextAffinityStress
+      ? JSON.stringify(contextAffinityStress)
+      : "missing result";
+    failures.push(
+      `real p5.brush context-affinity stress did not fail closed: ${contextDetail}`,
+    );
   }
   if (
     diagnostics.consoleErrors.length > 0

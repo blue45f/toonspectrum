@@ -221,9 +221,9 @@ function createHarness(runtime: FakeModule) {
 }
 
 describe("Studio p5.brush standalone concrete adapter", () => {
-  it("advertises the five proven artistic techniques at adapter revision 3", async () => {
+  it("advertises the five proven artistic techniques at adapter revision 4", async () => {
     expect(STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION).toBe(
-      "2.2.1-adapter.3",
+      "2.2.1-adapter.4",
     );
     expect(STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES).toEqual([
       "procedural:flow-field",
@@ -279,6 +279,8 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     if (result.status !== "completed") return;
 
     expect(runtime.load).toHaveBeenCalledWith(target.canvas);
+    expect(runtime.seed).toHaveBeenCalledBefore(runtime.load);
+    expect(runtime.noiseSeed).toHaveBeenCalledBefore(runtime.load);
     expect(runtime.seed).toHaveBeenCalledWith(0x1234_abcd);
     expect(runtime.noiseSeed).toHaveBeenCalledWith(0x1234_abcd);
     expect(runtime.translate).toHaveBeenCalledWith(-1, -1);
@@ -293,10 +295,10 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect(runtime.render).toHaveBeenCalledTimes(3);
     expect(
       runtime.seed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       runtime.noiseSeed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(target.gl.finish).toHaveBeenCalledBefore(target.gl.readPixels);
     expect([...result.artifact.pixels.slice(0, 8)]).toEqual(
       Array.from({ length: 8 }, () => 2),
@@ -601,10 +603,10 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect(runtime.polygon).toHaveBeenCalledTimes(2);
     expect(
       runtime.seed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       runtime.noiseSeed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(runtime.noStroke).toHaveBeenCalledTimes(6);
     expect(runtime.noFill).toHaveBeenCalledTimes(6);
     expect(runtime.noHatch).toHaveBeenCalledTimes(6);
