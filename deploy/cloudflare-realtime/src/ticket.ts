@@ -164,6 +164,7 @@ export function parseRealtimeTicketClaims(
   }
 
   if (
+    value.authorizationEpochMs > value.issuedAtMs ||
     value.expiresAtMs <= value.issuedAtMs ||
     value.expiresAtMs - value.issuedAtMs > REALTIME_TICKET_MAX_AGE_MS ||
     value.sessionExpiresAtMs < value.expiresAtMs ||

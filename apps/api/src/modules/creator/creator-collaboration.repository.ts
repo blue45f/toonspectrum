@@ -1089,7 +1089,29 @@ export class CreatorCollaborationRepository {
       const context = await this.loadContext(unit, actorUserId, workId, true);
       this.requireManageMember(context, actorUserId, targetUserId);
       const targetMembership = await unit.findMembership(workId, targetUserId);
-      if (!targetMembership || normalizeCreatorCollaborationStatus(targetMembership.status) === "declined") {
+      if (!targetMembership) {
+        // A synchronous edge-control delivery may fail after this transaction
+        // committed. Preserve idempotency by replaying the durable removal
+        // audit epoch instead of turning the retry into member_not_found.
+        // The work-row lock serializes this branch against a re-invite, so an
+        // old removal epoch cannot revoke a later authorization grant.
+        const previousRemoval = await unit.findLatestRemovalEvent(
+          workId,
+          targetUserId,
+        );
+        if (previousRemoval !== null) {
+          return {
+            snapshot: await this.buildMutationSnapshot(
+              unit,
+              actorUserId,
+              context.work,
+            ),
+            authorizationEpochMs: previousRemoval.createdAt.getTime(),
+          };
+        }
+        throw new CreatorCollaborationNotFoundError("member_not_found");
+      }
+      if (normalizeCreatorCollaborationStatus(targetMembership.status) === "declined") {
         throw new CreatorCollaborationNotFoundError("member_not_found");
       }
       const beforeState = membershipEventState(targetMembership);

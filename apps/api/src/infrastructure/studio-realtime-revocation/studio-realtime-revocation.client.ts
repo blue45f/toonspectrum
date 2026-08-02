@@ -10,9 +10,13 @@ import {
   type RealtimeControlEvent,
 } from "../../../../../deploy/cloudflare-realtime/src/control";
 
-import type { StudioRealtimeRevocationConfiguration } from "./studio-realtime-revocation.configuration";
+import type {
+  EnabledStudioRealtimeRevocationConfiguration,
+  StudioRealtimeRevocationConfiguration,
+} from "./studio-realtime-revocation.configuration";
 
 const MAX_CONTROL_BATCHES = 8;
+const MAX_CONTROL_ATTEMPTS_PER_BATCH = 3;
 const MAX_CONTROL_RESPONSE_BYTES = 4_096;
 
 function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -29,6 +33,12 @@ export interface StudioRealtimeRevocationRuntime {
 
 export interface StudioRealtimeRevocationResult {
   readonly enabled: boolean;
+  readonly roomsRevoked: number;
+  readonly connectionsRevoked: number;
+}
+
+interface StudioRealtimeRevocationBatchResult {
+  readonly complete: boolean;
   readonly roomsRevoked: number;
   readonly connectionsRevoked: number;
 }
@@ -91,6 +101,31 @@ export class StudioRealtimeRevocationService {
     let roomsRevoked = 0;
     let connectionsRevoked = 0;
     for (let batch = 0; batch < MAX_CONTROL_BATCHES; batch += 1) {
+      const result = await this.dispatchBatch(
+        this.configuration,
+        createEvent,
+      );
+      roomsRevoked += result.roomsRevoked;
+      connectionsRevoked += result.connectionsRevoked;
+      if (result.complete) {
+        return { enabled: true, roomsRevoked, connectionsRevoked };
+      }
+    }
+    throw new StudioRealtimeRevocationUnavailableError();
+  }
+
+  private async dispatchBatch(
+    configuration: EnabledStudioRealtimeRevocationConfiguration,
+    createEvent: (issuedAtMs: number, nonce: string) => RealtimeControlEvent,
+  ): Promise<StudioRealtimeRevocationBatchResult> {
+    for (
+      let attempt = 0;
+      attempt < MAX_CONTROL_ATTEMPTS_PER_BATCH;
+      attempt += 1
+    ) {
+      // Every retry is independently signed with a fresh nonce. Reusing the
+      // first request would be rejected by the actor Durable Object's replay
+      // fence after a partial edge execution.
       const event = createEvent(
         Math.trunc(this.runtime.nowEpochMs()),
         this.runtime.createNonce(),
@@ -99,14 +134,14 @@ export class StudioRealtimeRevocationService {
       try {
         signed = await signRealtimeControlEvent(
           event,
-          this.configuration.controlSecret,
+          configuration.controlSecret,
         );
       } catch {
         throw new StudioRealtimeRevocationUnavailableError();
       }
       let response: Response;
       try {
-        response = await this.runtime.fetch(this.configuration.controlUrl, {
+        response = await this.runtime.fetch(configuration.controlUrl, {
           method: "POST",
           headers: {
             "Cache-Control": "no-store",
@@ -117,17 +152,24 @@ export class StudioRealtimeRevocationService {
           },
           body: copyToArrayBuffer(signed.body),
           redirect: "error",
-          signal: AbortSignal.timeout(this.configuration.timeoutMs),
+          signal: AbortSignal.timeout(configuration.timeoutMs),
         });
       } catch {
+        if (attempt + 1 < MAX_CONTROL_ATTEMPTS_PER_BATCH) continue;
+        throw new StudioRealtimeRevocationUnavailableError();
+      }
+      if (response.status >= 400 && response.status < 500) {
         throw new StudioRealtimeRevocationUnavailableError();
       }
       const responseBytes = new Uint8Array(await response.arrayBuffer());
       if (
         !response.ok ||
+        response.headers.get("Content-Type")?.toLowerCase() !==
+          "application/json; charset=utf-8" ||
         responseBytes.byteLength === 0 ||
         responseBytes.byteLength > MAX_CONTROL_RESPONSE_BYTES
       ) {
+        if (attempt + 1 < MAX_CONTROL_ATTEMPTS_PER_BATCH) continue;
         throw new StudioRealtimeRevocationUnavailableError();
       }
       let value: unknown;
@@ -136,6 +178,7 @@ export class StudioRealtimeRevocationService {
           new TextDecoder("utf-8", { fatal: true }).decode(responseBytes),
         );
       } catch {
+        if (attempt + 1 < MAX_CONTROL_ATTEMPTS_PER_BATCH) continue;
         throw new StudioRealtimeRevocationUnavailableError();
       }
       if (
@@ -153,17 +196,18 @@ export class StudioRealtimeRevocationService {
           (value as { connectionsRevoked: number }).connectionsRevoked,
         ) < 0
       ) {
+        if (attempt + 1 < MAX_CONTROL_ATTEMPTS_PER_BATCH) continue;
         throw new StudioRealtimeRevocationUnavailableError();
       }
-      roomsRevoked += Number(
-        (value as { roomsRevoked: number }).roomsRevoked,
-      );
-      connectionsRevoked += Number(
-        (value as { connectionsRevoked: number }).connectionsRevoked,
-      );
-      if ((value as { complete: boolean }).complete) {
-        return { enabled: true, roomsRevoked, connectionsRevoked };
-      }
+      return {
+        complete: (value as { complete: boolean }).complete,
+        roomsRevoked: Number(
+          (value as { roomsRevoked: number }).roomsRevoked,
+        ),
+        connectionsRevoked: Number(
+          (value as { connectionsRevoked: number }).connectionsRevoked,
+        ),
+      };
     }
     throw new StudioRealtimeRevocationUnavailableError();
   }

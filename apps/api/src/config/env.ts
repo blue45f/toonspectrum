@@ -233,6 +233,24 @@ const envSchema = z.object({
     .regex(/^[1-9]\d*$/u)
     .refine((value) => Number(value) <= 300)
     .optional(),
+  // 인증/ACL 폐기를 realtime edge에 즉시 전달하는 별도 HMAC control plane.
+  // 실제 module factory가 exact path, secret 분리, 부분 설정을 fail-closed 검증한다.
+  STUDIO_REALTIME_REVOCATION_ENABLED: z.enum(["true", "false"]).optional(),
+  STUDIO_REALTIME_CLOUDFLARE_CONTROL_URL: z
+    .url({ protocol: /^https$/u })
+    .max(2_048)
+    .optional(),
+  STUDIO_REALTIME_CLOUDFLARE_CONTROL_SECRET: z
+    .string()
+    .min(32)
+    .max(4_096)
+    .refine((value) => value === value.trim())
+    .optional(),
+  STUDIO_REALTIME_CLOUDFLARE_CONTROL_TIMEOUT_MS: boundedPositiveInteger(
+    "STUDIO_REALTIME_CLOUDFLARE_CONTROL_TIMEOUT_MS",
+    500,
+    10_000,
+  ).optional(),
   // 원본·파생물·내보내기를 목적별 private bucket으로 분리한 정본 저장소.
   // 실제 모듈 factory는 활성화 시 필수값·서로 다른 bucket 조건을 fail-closed로 재검증한다.
   SUPABASE_OBJECT_STORAGE_ENABLED: z.enum(["true", "false"]).optional(),
@@ -468,6 +486,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "STUDIO_LIVE_POSTGRES_INTEGRATION_URL",
   "STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL",
   "STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET", // gitleaks:allow -- environment variable identifier only
+  "STUDIO_REALTIME_CLOUDFLARE_CONTROL_SECRET", // gitleaks:allow -- environment variable identifier only
   "SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY",
   "UPSTASH_COORDINATION_REST_TOKEN",
   "UPSTASH_COORDINATION_KEY_HASH_SECRET",

@@ -25,6 +25,7 @@ import type {
   CreatorCollaborationMembershipRecord,
   CreatorCollaborationMembershipWithUserRecord,
   CreatorCollaborationPersistence,
+  CreatorCollaborationRemovalRecord,
   CreatorCollaborationUnitOfWork,
   CreatorCollaborationUserRecord,
   CreatorCollaborationWorkRecord,
@@ -564,6 +565,41 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
 
   async appendEvent(input: AppendCreatorCollaborationEventInput): Promise<void> {
     await this.executor.insert(creatorWorkCollaborationEvents).values(input);
+  }
+
+  async findLatestRemovalEvent(
+    workId: string,
+    targetUserId: string
+  ): Promise<CreatorCollaborationRemovalRecord | null> {
+    const row = await this.executor
+      .select({
+        workId: creatorWorkCollaborationEvents.workId,
+        targetUserId: creatorWorkCollaborationEvents.targetUserId,
+        createdAt: creatorWorkCollaborationEvents.createdAt,
+      })
+      .from(creatorWorkCollaborationEvents)
+      .where(
+        and(
+          eq(creatorWorkCollaborationEvents.workId, workId),
+          eq(creatorWorkCollaborationEvents.targetUserId, targetUserId),
+          eq(creatorWorkCollaborationEvents.action, "remove")
+        )
+      )
+      .orderBy(desc(creatorWorkCollaborationEvents.sequence))
+      .limit(1)
+      .then((rows) => rows[0]);
+    if (
+      row?.targetUserId !== targetUserId ||
+      !(row.createdAt instanceof Date) ||
+      !Number.isFinite(row.createdAt.getTime())
+    ) {
+      return null;
+    }
+    return {
+      workId: row.workId,
+      targetUserId,
+      createdAt: row.createdAt,
+    };
   }
 
   async listAuthorizedEvents(

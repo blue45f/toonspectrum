@@ -9,6 +9,9 @@ before routing production clients to the Worker.
       deployment that owns `POST /api/studio-realtime/tickets`.
 - [ ] Configure all `STUDIO_REALTIME_CLOUDFLARE_*` values from the README; a
       partially enabled configuration must fail API bootstrap.
+- [ ] Enable `STUDIO_REALTIME_REVOCATION_ENABLED` only after the exact control
+      URL and a dedicated control secret are present; never reuse the ticket
+      secret.
 - [ ] Authorize the actor's access to the exact `workId + roomId` scope before
       signing.
 - [ ] Confirm saved and provisional clients send their creator work ID as both
@@ -28,11 +31,14 @@ before routing production clients to the Worker.
 - [ ] Review `wrangler.jsonc` against the target account and deployed namespace
       history. `wrangler.jsonc.example` is a documentation mirror; do not
       deploy `wrangler.test.jsonc`.
-- [ ] Confirm `RealtimeRoom` is SQLite-backed. Do not create a KV-backed
-      namespace.
+- [ ] Confirm `RealtimeRoom` and `RealtimeActorDirectory` are SQLite-backed.
+      Do not create KV-backed namespaces.
 - [ ] Bind `REALTIME_ROOMS` to `RealtimeRoom`.
+- [ ] Bind `REALTIME_ACTORS` to `RealtimeActorDirectory`.
 - [ ] Store `REALTIME_TICKET_SECRET` with a Workers secret or Secrets Store
       binding, never in `vars`, source control, CI output, or shell history.
+- [ ] Store a distinct `REALTIME_CONTROL_SECRET` the same way and inject the
+      matching value into Nest only through its server secret store.
 - [ ] For local Worker development, keep the secret only in `.dev.vars` (or an
       environment-specific `.dev.vars.*`) after confirming the nested
       `.gitignore` excludes it. Never copy the secret into
@@ -56,7 +62,7 @@ legacy one-time migration may use:
   "migrations": [
     {
       "tag": "realtime-sqlite-v1",
-      "new_sqlite_classes": ["RealtimeRoom"]
+      "new_sqlite_classes": ["RealtimeRoom", "RealtimeActorDirectory"]
     }
   ]
 }
@@ -83,6 +89,8 @@ schema and the namespace's deployed history.
 ## 4. Logging and observability
 
 - [ ] Disable request-header/body capture for this route.
+- [ ] Exclude `/v1/control/revocations` headers and body entirely; never log its
+      timestamp, nonce, signature, actor/work/room identifiers, or raw error.
 - [ ] Redact `Sec-WebSocket-Protocol` in Cloudflare Logpush, Tail Workers,
       tracing, error reporting, support tooling, and third-party proxies.
 - [ ] Log only aggregate non-secret counters such as accepted connections,
@@ -114,6 +122,9 @@ schema and the namespace's deployed history.
 - [ ] Test one-time ticket replay, wrong work, wrong room, wrong origin, wrong
       audience, expiry, future issue time, malformed signature, and secret
       rotation.
+- [ ] Test HMAC control body tampering, stale/future timestamp, nonce replay,
+      partial configuration, session logout across multiple rooms, exact-room
+      ACL removal, and preflight/revocation/final-confirm interleaving.
 - [ ] Test binary frames, raster data URLs, oversized comments/SDP/ICE, unknown
       keys, and unknown message kinds.
 - [ ] Test room capacity, per-actor capacity, slow-client backpressure, and

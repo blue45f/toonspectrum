@@ -146,6 +146,12 @@ export interface CreatorCollaborationEventRecord {
   createdAt: Date;
 }
 
+export interface CreatorCollaborationRemovalRecord {
+  workId: string;
+  targetUserId: string;
+  createdAt: Date;
+}
+
 export interface CreatorCollaborationAuthorizedEventsRecord {
   authorized: true;
   events: CreatorCollaborationEventRecord[];
@@ -205,6 +211,10 @@ export interface CreatorCollaborationUnitOfWork {
     limit: number
   ): Promise<CreatorCollaborationInvitationRecord[]>;
   appendEvent(input: AppendCreatorCollaborationEventInput): Promise<void>;
+  findLatestRemovalEvent(
+    workId: string,
+    targetUserId: string
+  ): Promise<CreatorCollaborationRemovalRecord | null>;
   listAuthorizedEvents(
     actorUserId: string,
     workId: string,

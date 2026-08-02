@@ -330,6 +330,25 @@ class MemoryCollaborationStore
     this.events.push({ ...input, sequence: this.nextEventSequence++ });
   }
 
+  async findLatestRemovalEvent(workId: string, targetUserId: string) {
+    const event = this.events
+      .filter(
+        (candidate) =>
+          candidate.workId === workId &&
+          candidate.targetUserId === targetUserId &&
+          candidate.action === "remove" &&
+          isMemoryEventValid(candidate),
+      )
+      .sort((left, right) => right.sequence - left.sequence)[0];
+    return event
+      ? {
+          workId,
+          targetUserId,
+          createdAt: event.createdAt,
+        }
+      : null;
+  }
+
   async listAuthorizedEvents(actorUserId: string, workId: string, limit: number) {
     this.authorizedEventReads.push({ actorUserId, workId, limit });
     const beforeRead = this.beforeAuthorizedEventRead;
@@ -1241,6 +1260,24 @@ describe("CreatorCollaborationRepository", () => {
     await expect(repository.removeMember("admin", "work-1", "admin")).rejects.toEqual(
       new CreatorCollaborationForbiddenError("member_management_denied")
     );
+  });
+
+  it("replays the durable removal epoch when edge revocation delivery is retried", async () => {
+    const { repository } = createFixture();
+
+    const first = await repository.removeMemberWithRevocation(
+      "owner",
+      "work-1",
+      "editor",
+    );
+    const retry = await repository.removeMemberWithRevocation(
+      "owner",
+      "work-1",
+      "editor",
+    );
+
+    expect(retry.authorizationEpochMs).toBe(first.authorizationEpochMs);
+    expect(retry.snapshot).toEqual(first.snapshot);
   });
 
   it("초대함은 로그인 사용자 자신의 pending 초대만 최신순·limit 안에서 최소 정보로 투영한다", async () => {

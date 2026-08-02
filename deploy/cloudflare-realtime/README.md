@@ -25,6 +25,7 @@ Cloudflare Worker entry
   ├─ exact HTTPS Origin allowlist
   ├─ no query credentials
   ├─ HMAC ticket verification
+  ├─ separate HMAC revocation control plane
   └─ object key = work:<workId>:room:<roomId>
        ▼
 SQLite-backed RealtimeRoom Durable Object
@@ -37,6 +38,9 @@ SQLite-backed RealtimeRoom Durable Object
   ├─ persists connection-level presence and signaling ACL state
   ├─ enforces actor/channel publish and connection resume/egress budgets
   └─ broadcasts only authorized presence/comments/screen-signaling
+       ▲
+       │ actor → bounded room directory + revocation fences
+SQLite-backed RealtimeActorDirectory Durable Object
 ```
 
 The Durable Object uses Cloudflare's WebSocket Hibernation API. Connection
@@ -107,6 +111,7 @@ The exact canonical claim object is:
   "audience": "toonspectrum-realtime",
   "subject": "actor-id",
   "sessionVersion": 1,
+  "authorizationEpochMs": 1699999999000,
   "workId": "work-id",
   "roomId": "room-id",
   "clientId": "browser-client-id",
@@ -125,6 +130,8 @@ Rules:
 - the connection session is at most five minutes and never outlives the verified web session or
   the authoritative room-authorization lease;
 - issuer, audience, work, room, and exact browser origin are signed bindings;
+- `authorizationEpochMs` is no later than `issuedAtMs` and fences the exact ACL
+  snapshot used by the API;
 - every nonce is consumed once in the work's SQLite Durable Object;
 - the secret is at least 32 UTF-8 bytes;
 - claim keys and scope values are exact; unknown keys fail;
@@ -150,6 +157,10 @@ STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE=toonspectrum-realtime
 STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET=<same value as REALTIME_TICKET_SECRET>
 STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS=120
 STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS=300
+STUDIO_REALTIME_REVOCATION_ENABLED=true
+STUDIO_REALTIME_CLOUDFLARE_CONTROL_URL=https://realtime.toonstudio.cloud/v1/control/revocations
+STUDIO_REALTIME_CLOUDFLARE_CONTROL_SECRET=<same value as Worker REALTIME_CONTROL_SECRET, different from ticket secret>
+STUDIO_REALTIME_CLOUDFLARE_CONTROL_TIMEOUT_MS=3000
 ```
 
 The API issuer/audience must exactly match the Worker vars, and the two secret
@@ -158,6 +169,32 @@ belongs in the Nest deployment secret store and `wrangler secret put`; it must
 not be placed in either environment example, `vars`, or a `VITE_` value.
 Enabling the Nest route with a missing, weak, whitespace-padded, or out-of-range
 value aborts API bootstrap without printing the secret.
+
+## Immediate revocation control plane
+
+`POST /v1/control/revocations` is server-to-server only. It accepts the exact
+vendor JSON content type and an HMAC-SHA256 signature over the method, fixed
+path, timestamp, UUID nonce, and body digest. Credentials are never accepted in
+the URL. Requests older than 30 seconds, future timestamps, altered bodies,
+unknown fields, replayed actor nonces, weak/equal ticket and control secrets,
+or partially enabled configuration fail closed.
+
+The actor Durable Object stores only bounded `actor → room` registrations and
+short-lived session/room fences. Room admission uses a preflight and a final
+post-accept confirmation: a revocation between those phases either closes the
+already accepted socket or makes final confirmation reject it. Logout raises
+the durable session version before the control event and retains the signed
+browser cookie on a `503`, allowing a safe retry. Member removal persists an
+append-only removal epoch in the same PostgreSQL transaction; a repeated
+DELETE replays that epoch, so a transient edge failure cannot become a
+permanent revocation-delivery gap. A later re-invite receives a newer
+authorization epoch and is not closed by a delayed older event.
+
+`REALTIME_CONTROL_SECRET` belongs in the Worker secret store and must match
+`STUDIO_REALTIME_CLOUDFLARE_CONTROL_SECRET`; it must never equal
+`REALTIME_TICKET_SECRET`, appear in `vars`, a `VITE_` value, request logs,
+tracing, metrics, or query strings. Both `REALTIME_ROOMS` and
+`REALTIME_ACTORS` must be bound as SQLite Durable Objects.
 
 The current Studio transport uses the creator work ID as its canonical live
 room ID. This is also true for unsaved collaboration: provisioning creates a

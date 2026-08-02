@@ -146,6 +146,18 @@ describe("realtime HMAC ticket", () => {
     ).rejects.toThrow("Invalid realtime ticket claims");
   });
 
+  it("rejects an ACL authorization epoch later than ticket issuance", async () => {
+    await expect(
+      signRealtimeTicket(
+        claims({
+          authorizationEpochMs: NOW,
+          issuedAtMs: NOW - 1,
+        }),
+        SECRET,
+      ),
+    ).rejects.toThrow("Invalid realtime ticket claims");
+  });
+
   it("extracts a ticket only from the exact two-subprotocol handshake", () => {
     const ticket = "payload.signature";
     expect(
