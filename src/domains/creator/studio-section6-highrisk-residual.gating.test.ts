@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -25,6 +25,7 @@ const HIGH = [
 describe("goal high-risk spotcheck", () => {
   it("MOD-014/CHR-012 and residual industrial IDs succeed with real metrics", async () => {
     const lines: string[] = ["# high-risk spotcheck"];
+    mkdirSync(SCRATCH, { recursive: true });
     for (const id of HIGH) {
       const r = await exerciseStudioDccCatalogFeature(id);
       expect(r.ok).toBe(true);
