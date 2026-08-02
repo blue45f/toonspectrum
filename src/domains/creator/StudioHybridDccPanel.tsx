@@ -37,6 +37,7 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctTorus,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
   workspaceRetopoActive,
@@ -202,6 +203,15 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT sphere", () => workspaceOcctSphere(ws))}
         >
           OCCT sphere
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-torus"
+          onClick={() => run("OCCT torus", () => workspaceOcctTorus(ws))}
+        >
+          OCCT torus
         </button>
         <button
           type="button"

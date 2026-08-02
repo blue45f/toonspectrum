@@ -799,6 +799,48 @@ export async function occtMakeSphereSolid(
   });
 }
 
+/** Torus solid — BRepPrimAPI_MakeTorus (major/minor radii). */
+export async function occtMakeTorusSolid(
+  majorRadius: number,
+  minorRadius: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    let shape: unknown = null;
+    for (const key of [
+      "BRepPrimAPI_MakeTorus_1",
+      "BRepPrimAPI_MakeTorus_2",
+      "BRepPrimAPI_MakeTorus",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const builder = owner.own(new oc[key](majorRadius, minorRadius));
+        shape = owner.own(builder.Shape());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-torus-ctor", detail: "MakeTorus overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "torus produced no triangles" };
+    }
+    return packResult(
+      "BRepPrimAPI_MakeTorus",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      2 * Math.PI * Math.PI * majorRadius * minorRadius * minorRadius,
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
 /** Cone solid — BRepPrimAPI_MakeCone. */
 export async function occtMakeConeSolid(
   radius1: number,
@@ -1284,6 +1326,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("box", () => occtMakeBoxSolid(2, 1, 1));
   await run("cyl", () => occtMakeCylinderSolid(0.4, 1.5));
   await run("sphere", () => occtMakeSphereSolid(0.6));
+  await run("torus", () => occtMakeTorusSolid(0.8, 0.2));
   await run("cone", () => occtMakeConeSolid(0.5, 0.1, 1.2));
   await run("prism", () => occtExtrudeRectangle(1.2, 0.8, 0.6));
   await run("revolve", () => occtRevolveCylinderLike(0.5, 1.0));

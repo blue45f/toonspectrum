@@ -1030,6 +1030,22 @@ export async function workspaceOcctSphere(
   return commitOcctResult(ws, assetId, "occt-wasm-sphere", result);
 }
 
+/** Industrial OCCT torus solid → workspace. */
+export async function workspaceOcctTorus(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-torus",
+  majorRadius = 0.8,
+  minorRadius = 0.2,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "torus",
+    majorRadius,
+    minorRadius,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-torus", result);
+}
+
 /** Industrial OCCT fillet box → workspace. */
 export async function workspaceOcctFillet(
   ws: StudioHybridDccWorkspace,

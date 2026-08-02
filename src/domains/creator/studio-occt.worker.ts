@@ -6,6 +6,7 @@ import {
   occtLoftedTower,
   occtMakeBoxSolid,
   occtMakeSphereSolid,
+  occtMakeTorusSolid,
   occtRevolveCylinderLike,
 } from "./studio-occt-wasm-facade";
 
@@ -24,6 +25,8 @@ async function runOperation(
       return occtMakeBoxSolid(...operation.size);
     case "sphere":
       return occtMakeSphereSolid(operation.radius);
+    case "torus":
+      return occtMakeTorusSolid(operation.majorRadius, operation.minorRadius);
     case "revolve":
       return occtRevolveCylinderLike(operation.radius, operation.height);
     case "fillet-box":

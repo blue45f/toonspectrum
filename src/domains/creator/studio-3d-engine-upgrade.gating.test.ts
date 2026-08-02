@@ -19,6 +19,7 @@ import {
 } from "./studio-hybrid-dcc-workspace";
 import {
   occtLoftedTower,
+  occtMakeTorusSolid,
   occtSolidWorksGradeSuite,
   STUDIO_OCCT_WASM_FACADE_REVISION,
 } from "./studio-occt-wasm-facade";
@@ -82,6 +83,14 @@ describe("3D engine upgrades", () => {
     expect(ws.lastOcct?.operation).toBe("BRepOffsetAPI_ThruSections");
     expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
   }, 180_000);
+
+  it("OCCT torus solid tessellates with many triangles", async () => {
+    const torus = await occtMakeTorusSolid(0.9, 0.22);
+    expect(torus.ok).toBe(true);
+    if (!torus.ok) return;
+    expect(torus.operation).toBe("BRepPrimAPI_MakeTorus");
+    expect(torus.triangleCount).toBeGreaterThan(100);
+  }, 60_000);
 
   it("workspace Manifold boolean on unit cube is non-degenerate", async () => {
     let ws = createStudioHybridDccWorkspace("bool-ws");

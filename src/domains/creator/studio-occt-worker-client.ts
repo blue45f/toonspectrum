@@ -134,6 +134,8 @@ async function runOnNode(
         return facade.occtMakeBoxSolid(...operation.size);
       case "sphere":
         return facade.occtMakeSphereSolid(operation.radius);
+      case "torus":
+        return facade.occtMakeTorusSolid(operation.majorRadius, operation.minorRadius);
       case "revolve":
         return facade.occtRevolveCylinderLike(operation.radius, operation.height);
       case "fillet-box":

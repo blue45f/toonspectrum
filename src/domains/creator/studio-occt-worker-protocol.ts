@@ -13,6 +13,11 @@ export type StudioOcctWorkerOperation =
       readonly radius: number;
     }
   | {
+      readonly kind: "torus";
+      readonly majorRadius: number;
+      readonly minorRadius: number;
+    }
+  | {
       readonly kind: "revolve";
       readonly radius: number;
       readonly height: number;
