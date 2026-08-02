@@ -24,8 +24,8 @@ import {
   normalizeStudioLiquifyMode,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { LucideIcon } from "lucide-react";

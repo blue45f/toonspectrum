@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { dodgeBurnStroke } from "./studio-dodge-burn";
 import {
   encodeStudioRetouchCanvasPng,
   runStudioDodgeBurnRetouch,
   runStudioWetMixRetouch,
 } from "./studio-retouch-browser";
-import { dodgeBurnStroke } from "./studio-dodge-burn";
 import { wetMixStroke } from "./studio-wet-mix";
 
 class FakeFileReader {

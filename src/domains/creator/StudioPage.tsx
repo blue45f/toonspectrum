@@ -1056,15 +1056,6 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
-import {
-  appendStudioPendingRasterRetouchGesturePoint,
-  beginStudioPendingRasterRetouchGesture,
-  canApplyStudioPendingRasterRetouchGesture,
-  endStudioPendingRasterRetouchGesture,
-  normalizeStudioPendingRasterRetouchGesture,
-  type StudioPendingRasterRetouchGesture,
-  type StudioRasterRetouchGestureTool,
-} from "./studio-retouch-raster-gesture";
 import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
@@ -1086,6 +1077,15 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import {
+  appendStudioPendingRasterRetouchGesturePoint,
+  beginStudioPendingRasterRetouchGesture,
+  canApplyStudioPendingRasterRetouchGesture,
+  endStudioPendingRasterRetouchGesture,
+  normalizeStudioPendingRasterRetouchGesture,
+  type StudioPendingRasterRetouchGesture,
+  type StudioRasterRetouchGestureTool,
+} from "./studio-retouch-raster-gesture";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   clampCanvasPlacementCenter,
@@ -12421,7 +12421,7 @@ function StudioCuttoonEditor() {
     };
     requestRasterRetouchReplay();
   }
-  function attachPendingRasterRetouchTarget(
+  function _attachPendingRasterRetouchTarget(
     runId: number,
     target: { frame: SelectionFrame; id: string },
   ): void {

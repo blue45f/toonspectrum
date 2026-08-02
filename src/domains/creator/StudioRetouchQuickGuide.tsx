@@ -5,10 +5,11 @@ import {
   type StudioRetouchToolId,
 } from "./studio-retouch-help";
 
-import { cn } from "@/lib/utils";
 
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
+
+import { cn } from "@/lib/utils";
 
 type RetouchPresentationState = "ready" | "active" | "busy" | "blocked";
 

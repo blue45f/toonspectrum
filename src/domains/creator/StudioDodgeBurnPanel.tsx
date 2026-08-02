@@ -26,8 +26,8 @@ import {
   type DodgeBurnRange,
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";

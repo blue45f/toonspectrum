@@ -12,8 +12,8 @@
 import { Blend } from "lucide-react";
 import { useId } from "react";
 
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { SMUDGE_RADIUS_RANGE, SMUDGE_STRENGTH_RANGE } from "./studio-smudge";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 

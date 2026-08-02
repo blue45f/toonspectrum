@@ -56,8 +56,8 @@ export class StudioAssetBatchInserter {
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      let posX = currentX;
-      let posY = currentY;
+      let posX: number;
+      let posY: number;
 
       switch (options.mode) {
         case "horizontal":

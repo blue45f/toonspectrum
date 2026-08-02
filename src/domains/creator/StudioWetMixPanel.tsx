@@ -19,8 +19,8 @@
 import { Droplets } from "lucide-react";
 import { useId } from "react";
 
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import {
   WET_MIX_HARDNESS_RANGE,
   WET_MIX_PICKUP_RANGE,
