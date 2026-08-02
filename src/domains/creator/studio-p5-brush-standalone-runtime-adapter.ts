@@ -665,10 +665,16 @@ function verifySurfaceContext(
     throw new TypeError("OffscreenCanvas dimensions or context API are invalid.");
   }
   const requestedContext = canvas.getContext("webgl2", {
+    antialias: false,
+    depth: false,
     premultipliedAlpha: true,
     preserveDrawingBuffer: true,
+    stencil: false,
   }) ?? canvas.getContext("webgl2", {
+    antialias: false,
+    depth: false,
     preserveDrawingBuffer: true,
+    stencil: false,
   });
   if (requestedContext !== input.surface.context) {
     throw new TypeError("Surface WebGL2 context identity mismatch.");
@@ -682,6 +688,8 @@ function createAdapter(
   runtime: P5BrushStandaloneModule,
   environment: StudioP5BrushStandaloneEnvironment,
 ): StudioProceduralArtisticBrushAdapter {
+  let contextAuthority: object | null = null;
+  let canvasAuthority: object | null = null;
   return Object.freeze({
     descriptor: Object.freeze({
       id: "p5-brush-standalone-worker",
@@ -715,8 +723,25 @@ function createAdapter(
       return withGlobalRuntimeLock(signal, async () => {
         throwIfAborted(signal);
         const gl = verifySurfaceContext(input, environment);
+        if (contextAuthority === null && canvasAuthority === null) {
+          contextAuthority = input.surface.context;
+          canvasAuthority = input.surface.canvas;
+        } else if (
+          contextAuthority !== input.surface.context
+          || canvasAuthority !== input.surface.canvas
+        ) {
+          throw new TypeError(
+            "A p5.brush standalone adapter is context-affine and cannot "
+            + "bind a second OffscreenCanvas WebGL2 context.",
+          );
+        }
         try {
           runtime.load(input.surface.canvas);
+          // p5.brush initializes renderer-, mask-, and framebuffer-owned state
+          // lazily. Prime the newly loaded target before clear() can touch
+          // those caches, then seed both retained drawing passes explicitly.
+          await runtime.render();
+          throwIfAborted(signal);
           runtime.clear();
           resetStandaloneState(runtime);
 

@@ -1109,6 +1109,569 @@ export class AdminService {
       event: normalizeRevenueEvent(full),
     };
   }
+
+  // ── 감사 로그 ─────────────────────────────────────────────────────────────
+  async logAuditAction(
+    adminId: string,
+    action: string,
+    targetType: string,
+    targetId: string | null = null,
+    details: Record<string, unknown> = {}
+  ) {
+    try {
+      await ensureAdminSchema();
+      const admin = await requireAdminUser(adminId);
+      const id = crypto.randomUUID();
+      await dbClient.execute({
+        sql: `INSERT INTO admin_audit_logs (id, "adminId", "adminEmail", action, "targetType", "targetId", details, "createdAt") VALUES (?, ?, ?, ?, ?, ?, ?, now())`,
+        args: [id, admin.id, admin.email ?? null, action, targetType, targetId, JSON.stringify(details)],
+      });
+    } catch (err) {
+      console.error(`[admin/audit-log] insert failed: ${(err as Error)?.message ?? err}`);
+    }
+  }
+
+  async getAuditLogs(
+    userId: string,
+    query: { action?: string; adminId?: string; search?: string; limit?: number | string } = {}
+  ) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const actionFilter = String(query.action ?? "").trim();
+    const adminFilter = String(query.adminId ?? "").trim();
+    const search = String(query.search ?? "").trim().toLowerCase();
+
+    try {
+      let sqlQuery = `SELECT id, "adminId", "adminEmail", action, "targetType", "targetId", details, "createdAt" FROM admin_audit_logs WHERE 1=1`;
+      const args: unknown[] = [];
+      if (actionFilter) {
+        sqlQuery += ` AND action = ?`;
+        args.push(actionFilter);
+      }
+      if (adminFilter) {
+        sqlQuery += ` AND "adminId" = ?`;
+        args.push(adminFilter);
+      }
+      if (search) {
+        sqlQuery += ` AND (lower(action) LIKE ? OR lower(coalesce("adminEmail", '')) LIKE ? OR lower("targetType") LIKE ?)`;
+        const pat = `%${search}%`;
+        args.push(pat, pat, pat);
+      }
+      sqlQuery += ` ORDER BY "createdAt" DESC LIMIT ${limit}`;
+      const result = await dbClient.execute({ sql: sqlQuery, args });
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  // ── 시스템 헬스 & 점검 모드 ──────────────────────────────────────────────
+  async getSystemHealth(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+
+    let dbStatus = "ok";
+    let latencyMs = 0;
+    const start = Date.now();
+    try {
+      await dbClient.execute("SELECT 1");
+      latencyMs = Date.now() - start;
+    } catch {
+      dbStatus = "error";
+    }
+
+    const userCount = await countFrom(users);
+    const reviewCount = await countFrom(reviews);
+    const fanPostCount = await countFrom(fanPosts);
+    const revenueCount = await countFrom(revenueLedger);
+    const config = await getAppConfig();
+
+    const memory = process.memoryUsage();
+    return {
+      status: dbStatus === "ok" ? "healthy" : "degraded",
+      database: {
+        status: dbStatus,
+        latencyMs,
+      },
+      counts: {
+        users: userCount,
+        reviews: reviewCount,
+        fanPosts: fanPostCount,
+        revenueEvents: revenueCount,
+      },
+      maintenance: {
+        enabled: config.maintenanceModeEnabled,
+        message: config.maintenanceMessage,
+      },
+      system: {
+        uptimeSeconds: Math.floor(process.uptime()),
+        heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(memory.heapTotal / 1024 / 1024),
+        rssMb: Math.round(memory.rss / 1024 / 1024),
+        nodeVersion: process.version,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async setMaintenanceMode(userId: string, enabled: boolean, message?: string) {
+    await requireAdminUser(userId);
+    const updated = await setAppConfig({
+      maintenanceModeEnabled: enabled,
+      maintenanceMessage: message ?? "시스템 점검 중입니다.",
+    });
+    void this.logAuditAction(userId, "MAINTENANCE_TOGGLE", "system", null, { enabled, message });
+    return updated;
+  }
+
+  // ── 회원 관리 ─────────────────────────────────────────────────────────────
+  async getUserDetails(userId: string, targetUserId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const [target] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        suspendedAt: users.suspendedAt,
+        suspensionReason: users.suspensionReason,
+        deletedAt: users.deletedAt,
+        createdAt: users.createdAt,
+        bio: users.bio,
+      })
+      .from(users)
+      .where(eq(users.id, targetUserId))
+      .limit(1);
+
+    if (!target) throw new BadRequestException("해당 회원을 찾을 수 없습니다.");
+
+    const [reviewsCount, fanPostsCount, ratingsCount] = await Promise.all([
+      countFrom(reviews, eq(reviews.userId, targetUserId)),
+      countFrom(fanPosts, eq(fanPosts.userId, targetUserId)),
+      countFrom(ratings, eq(ratings.userId, targetUserId)),
+    ]);
+
+    const paidRows = await db
+      .select({ amount: revenueLedger.amountCents })
+      .from(revenueLedger)
+      .where(and(eq(revenueLedger.payerId, targetUserId), eq(revenueLedger.status, "paid")));
+
+    const totalPaidCents = paidRows.reduce((acc, r) => acc + Number(r.amount ?? 0), 0);
+
+    return {
+      user: target,
+      activity: {
+        reviewsCount,
+        fanPostsCount,
+        ratingsCount,
+        totalPaidCents,
+      },
+    };
+  }
+
+  async bulkSetUserStatus(userId: string, userIds: string[], status: MemberStatus, reason?: string) {
+    const admin = await requireAdminUser(userId);
+    if (!Array.isArray(userIds) || !userIds.length) {
+      throw new BadRequestException("대상 회원을 1명 이상 선택해 주세요.");
+    }
+    const filteredIds = userIds.filter((id) => id !== admin.id);
+    for (const id of filteredIds) {
+      await setUserLifecycleStatus(id, status, reason);
+    }
+    void this.logAuditAction(userId, "USER_BULK_STATUS_CHANGE", "user", null, { userIds: filteredIds, status, reason });
+    return { ok: true, count: filteredIds.length };
+  }
+
+  async exportUsersCsv(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const rows = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(5000);
+
+    const header = "ID,Name,Email,Role,Status,CreatedAt\n";
+    const body = rows
+      .map(
+        (r) =>
+          `"${r.id}","${(r.name ?? "").replace(/"/g, '""')}","${(r.email ?? "").replace(/"/g, '""')}","${r.role}","${r.status}","${r.createdAt ? new Date(r.createdAt).toISOString() : ""}"`
+      )
+      .join("\n");
+
+    return header + body;
+  }
+
+  // ── 정산 관리 ─────────────────────────────────────────────────────────────
+  async exportRevenueCsv(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const rows = await db
+      .select({
+        id: revenueLedger.id,
+        payerId: revenueLedger.payerId,
+        recipientId: revenueLedger.recipientId,
+        kind: revenueLedger.kind,
+        status: revenueLedger.status,
+        amountCents: revenueLedger.amountCents,
+        currency: revenueLedger.currency,
+        settledAt: revenueLedger.settledAt,
+        createdAt: revenueLedger.createdAt,
+      })
+      .from(revenueLedger)
+      .orderBy(desc(revenueLedger.createdAt))
+      .limit(5000);
+
+    const header = "ID,PayerID,RecipientID,Kind,Status,AmountCents,Currency,SettledAt,CreatedAt\n";
+    const body = rows
+      .map(
+        (r) =>
+          `"${r.id}","${r.payerId}","${r.recipientId}","${r.kind}","${r.status}",${r.amountCents},"${r.currency}","${r.settledAt ? new Date(r.settledAt).toISOString() : ""}","${r.createdAt ? new Date(r.createdAt).toISOString() : ""}"`
+      )
+      .join("\n");
+
+    return header + body;
+  }
+
+  async bulkSetRevenueStatus(userId: string, eventIds: string[], status: RevenueStatus, note?: string) {
+    await requireAdminUser(userId);
+    if (!Array.isArray(eventIds) || !eventIds.length) {
+      throw new BadRequestException("대상 정산건을 선택해 주세요.");
+    }
+    for (const id of eventIds) {
+      await this.setRevenueStatus(userId, id, { status, note });
+    }
+    void this.logAuditAction(userId, "REVENUE_BULK_STATUS_CHANGE", "revenue", null, { eventIds, status, note });
+    return { ok: true, count: eventIds.length };
+  }
+
+  // ── 모더레이션 & 금칙어 ──────────────────────────────────────────────────
+  async listModerationComments(userId: string, query: { q?: string; limit?: number | string } = {}) {
+    await requireAdminUser(userId);
+    await ensureCommunityTables();
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const search = String(query.q ?? "").trim().toLowerCase();
+
+    const conds: SQL[] = [];
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`;
+      conds.push(sql`lower(${fanPostReplies.text}) LIKE ${pattern} ESCAPE '\\'`);
+    }
+
+    const rows = await db
+      .select({
+        id: fanPostReplies.id,
+        postId: fanPostReplies.postId,
+        userId: fanPostReplies.userId,
+        text: fanPostReplies.text,
+        createdAt: fanPostReplies.createdAt,
+        authorName: users.name,
+        authorEmail: users.email,
+      })
+      .from(fanPostReplies)
+      .leftJoin(users, eq(fanPostReplies.userId, users.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(fanPostReplies.createdAt))
+      .limit(limit);
+
+    return { items: rows };
+  }
+
+  async listModerationReviews(userId: string, query: { q?: string; limit?: number | string } = {}) {
+    await requireAdminUser(userId);
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const search = String(query.q ?? "").trim().toLowerCase();
+
+    const conds: SQL[] = [];
+    if (search) {
+      const pattern = `%${escapeLike(search)}%`;
+      conds.push(sql`lower(${reviews.text}) LIKE ${pattern} ESCAPE '\\'`);
+    }
+
+    const rows = await db
+      .select({
+        id: reviews.id,
+        titleId: reviews.titleId,
+        userId: reviews.userId,
+        text: reviews.text,
+        hidden: reviews.hidden,
+        createdAt: reviews.createdAt,
+        authorName: users.name,
+        authorEmail: users.email,
+      })
+      .from(reviews)
+      .leftJoin(users, eq(reviews.userId, users.id))
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(reviews.createdAt))
+      .limit(limit);
+
+    return { items: rows };
+  }
+
+  async getBannedWords(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    try {
+      const result = await dbClient.execute("SELECT id, word, category, \"createdBy\", \"createdAt\" FROM admin_banned_words ORDER BY \"createdAt\" DESC");
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async addBannedWord(userId: string, word: string, category = "general") {
+    const admin = await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const trimmed = word.trim();
+    if (!trimmed) throw new BadRequestException("금칙어를 입력해 주세요.");
+    const id = crypto.randomUUID();
+    try {
+      await dbClient.execute({
+        sql: `INSERT INTO admin_banned_words (id, word, category, "createdBy", "createdAt") VALUES (?, ?, ?, ?, now()) ON CONFLICT (word) DO NOTHING`,
+        args: [id, trimmed, category, admin.id],
+      });
+      void this.logAuditAction(userId, "BANNED_WORD_ADD", "moderation", id, { word: trimmed, category });
+      return { ok: true, id, word: trimmed };
+    } catch {
+      throw new BadRequestException("금칙어 추가 중 오류가 발생했습니다.");
+    }
+  }
+
+  async deleteBannedWord(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `DELETE FROM admin_banned_words WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "BANNED_WORD_DELETE", "moderation", id, {});
+    return { ok: true, id };
+  }
+
+  async testBannedWords(userId: string, text: string) {
+    await requireAdminUser(userId);
+    const { items } = await this.getBannedWords(userId);
+    const words = (items as Array<Record<string, unknown>>).map((i) => String(i.word ?? "")).filter(Boolean);
+    const matched = words.filter((w) => text.includes(w));
+    return {
+      containsBannedWords: matched.length > 0,
+      matchedWords: matched,
+    };
+  }
+
+  // ── 프로모션 & 쿠폰 ───────────────────────────────────────────────────────
+  async getPromos(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    try {
+      const result = await dbClient.execute("SELECT id, code, \"discountType\", \"discountValue\", \"maxUses\", \"usedCount\", \"isActive\", \"expiresAt\", \"createdAt\" FROM admin_promos ORDER BY \"createdAt\" DESC");
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async upsertPromo(userId: string, payload: Record<string, unknown>) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const code = String(payload.code ?? "").trim().toUpperCase();
+    if (!code) throw new BadRequestException("프로모션 코드를 입력해 주세요.");
+    const id = payload.id ? String(payload.id) : crypto.randomUUID();
+    const discountType = payload.discountType === "fixed" ? "fixed" : "percent";
+    const discountValue = Math.max(1, Number(payload.discountValue ?? 10));
+    const maxUses = Math.max(1, Number(payload.maxUses ?? 100));
+    const isActive = payload.isActive !== false;
+    const expiresAt = payload.expiresAt ? new Date(String(payload.expiresAt)) : null;
+
+    await dbClient.execute({
+      sql: `INSERT INTO admin_promos (id, code, "discountType", "discountValue", "maxUses", "usedCount", "isActive", "expiresAt", "createdAt")
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?, now())
+            ON CONFLICT (code) DO UPDATE SET
+              "discountType" = EXCLUDED."discountType",
+              "discountValue" = EXCLUDED."discountValue",
+              "maxUses" = EXCLUDED."maxUses",
+              "isActive" = EXCLUDED."isActive",
+              "expiresAt" = EXCLUDED."expiresAt"`,
+      args: [id, code, discountType, discountValue, maxUses, isActive, expiresAt],
+    });
+
+    void this.logAuditAction(userId, "PROMO_UPSERT", "promo", id, { code, discountType, discountValue });
+    return { ok: true, id, code };
+  }
+
+  async togglePromo(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `UPDATE admin_promos SET "isActive" = NOT "isActive" WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "PROMO_TOGGLE", "promo", id, {});
+    return { ok: true, id };
+  }
+
+  async deletePromo(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `DELETE FROM admin_promos WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "PROMO_DELETE", "promo", id, {});
+    return { ok: true, id };
+  }
+
+  // ── 공지사항 & 글로벌 배너 ──────────────────────────────────────────────
+  async getAnnouncements(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    try {
+      const result = await dbClient.execute("SELECT id, title, content, level, placement, \"targetRole\", \"isActive\", \"startsAt\", \"endsAt\", \"createdAt\" FROM admin_announcements ORDER BY \"createdAt\" DESC");
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async upsertAnnouncement(userId: string, payload: Record<string, unknown>) {
+    const admin = await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const title = String(payload.title ?? "").trim();
+    if (!title) throw new BadRequestException("공지사항 제목을 입력해 주세요.");
+    const id = payload.id ? String(payload.id) : crypto.randomUUID();
+    const content = String(payload.content ?? "").trim();
+    const level = String(payload.level ?? "info");
+    const placement = String(payload.placement ?? "top_banner");
+    const targetRole = String(payload.targetRole ?? "all");
+    const isActive = payload.isActive !== false;
+
+    await dbClient.execute({
+      sql: `INSERT INTO admin_announcements (id, title, content, level, placement, "targetRole", "isActive", "createdBy", "createdAt")
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())
+            ON CONFLICT (id) DO UPDATE SET
+              title = EXCLUDED.title,
+              content = EXCLUDED.content,
+              level = EXCLUDED.level,
+              placement = EXCLUDED.placement,
+              "targetRole" = EXCLUDED."targetRole",
+              "isActive" = EXCLUDED."isActive"`,
+      args: [id, title, content, level, placement, targetRole, isActive, admin.id],
+    });
+
+    void this.logAuditAction(userId, "ANNOUNCEMENT_UPSERT", "announcement", id, { title, level });
+    return { ok: true, id, title };
+  }
+
+  async toggleAnnouncement(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `UPDATE admin_announcements SET "isActive" = NOT "isActive" WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "ANNOUNCEMENT_TOGGLE", "announcement", id, {});
+    return { ok: true, id };
+  }
+
+  async deleteAnnouncement(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `DELETE FROM admin_announcements WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "ANNOUNCEMENT_DELETE", "announcement", id, {});
+    return { ok: true, id };
+  }
+
+  // ── 보안 & IP 차단 정책 ──────────────────────────────────────────────────
+  async getSecurityIpRules(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    try {
+      const result = await dbClient.execute("SELECT id, \"ipAddress\", reason, action, \"createdAt\" FROM admin_security_policies ORDER BY \"createdAt\" DESC");
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async addSecurityIpRule(userId: string, ipAddress: string, reason = "보안 우려 IP 차단") {
+    const admin = await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const trimmed = ipAddress.trim();
+    if (!trimmed) throw new BadRequestException("IP 주소를 입력해 주세요.");
+    const id = crypto.randomUUID();
+    await dbClient.execute({
+      sql: `INSERT INTO admin_security_policies (id, "ipAddress", reason, action, "createdBy", "createdAt") VALUES (?, ?, ?, 'block', ?, now()) ON CONFLICT ("ipAddress") DO NOTHING`,
+      args: [id, trimmed, reason, admin.id],
+    });
+    void this.logAuditAction(userId, "SECURITY_IP_BLOCK", "security", id, { ipAddress: trimmed, reason });
+    return { ok: true, id, ipAddress: trimmed };
+  }
+
+  async deleteSecurityIpRule(userId: string, id: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute({
+      sql: `DELETE FROM admin_security_policies WHERE id = ?`,
+      args: [id],
+    });
+    void this.logAuditAction(userId, "SECURITY_IP_UNBLOCK", "security", id, {});
+    return { ok: true, id };
+  }
+
+  // ── 신고 처리 큐 ─────────────────────────────────────────────────────────
+  async getContentReports(userId: string, query: { status?: string; limit?: number | string } = {}) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const limit = parsePositiveInt(query.limit, 50, 1, 200);
+    const statusFilter = String(query.status ?? "pending").trim();
+    try {
+      let sqlQuery = `SELECT r.id, r."reporterId", u.name AS "reporterName", u.email AS "reporterEmail", r."targetType", r."targetId", r.reason, r.status, r."resolutionNote", r."createdAt" FROM admin_content_reports r LEFT JOIN "user" u ON r."reporterId" = u.id WHERE 1=1`;
+      const args: unknown[] = [];
+      if (statusFilter !== "all") {
+        sqlQuery += ` AND r.status = ?`;
+        args.push(statusFilter);
+      }
+      sqlQuery += ` ORDER BY r."createdAt" DESC LIMIT ${limit}`;
+      const result = await dbClient.execute({ sql: sqlQuery, args });
+      return { items: result.rows };
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async resolveContentReport(userId: string, reportId: string, action: "resolve" | "dismiss", note?: string) {
+    const admin = await requireAdminUser(userId);
+    await ensureAdminSchema();
+    const status = action === "resolve" ? "resolved" : "dismissed";
+    await dbClient.execute({
+      sql: `UPDATE admin_content_reports SET status = ?, "resolvedBy" = ?, "resolvedAt" = now(), "resolutionNote" = ? WHERE id = ?`,
+      args: [status, admin.id, note ?? "", reportId],
+    });
+    void this.logAuditAction(userId, "CONTENT_REPORT_RESOLVE", "report", reportId, { status, note });
+    return { ok: true, reportId, status };
+  }
+
+  // ── 시스템 제어 ─────────────────────────────────────────────────────────
+  async revokeAllSessions(userId: string) {
+    await requireAdminUser(userId);
+    await ensureAdminSchema();
+    await dbClient.execute(`UPDATE "user" SET "sessionVersion" = "sessionVersion" + 1`);
+    void this.logAuditAction(userId, "SYSTEM_REVOKE_ALL_SESSIONS", "system", null, {});
+    return { ok: true, message: "모든 사용자의 기존 로그인 세션이 무효화되었습니다." };
+  }
 }
 
 async function requireAdminUser(userId: string): Promise<{ id: string; name: string | null; email: string | null; role: AdminRole }> {
@@ -1429,6 +1992,16 @@ function getAdminMigrationSql() {
     "CREATE TABLE IF NOT EXISTS revenue_ledger ( id text PRIMARY KEY, \"payerId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"recipientId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"planId\" text REFERENCES monetization_plan(id) ON DELETE SET NULL, \"campaignId\" text REFERENCES creator_campaign(id) ON DELETE SET NULL, kind text NOT NULL DEFAULT 'plan', status text NOT NULL DEFAULT 'paid', \"amountCents\" bigint NOT NULL, currency text NOT NULL DEFAULT 'KRW', metadata jsonb NOT NULL DEFAULT '{}'::jsonb, \"reviewedBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"reviewedAt\" timestamp, \"reviewNote\" text DEFAULT '', \"settledAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
     "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_createdAt ON revenue_ledger(\"createdAt\")",
     "CREATE INDEX IF NOT EXISTS idx_revenue_ledger_status_createdAt ON revenue_ledger(status, \"createdAt\")",
+    "CREATE TABLE IF NOT EXISTS admin_audit_logs ( id text PRIMARY KEY, \"adminId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"adminEmail\" text, action text NOT NULL, \"targetType\" text NOT NULL DEFAULT 'system', \"targetId\" text, details jsonb NOT NULL DEFAULT '{}'::jsonb, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_createdAt ON admin_audit_logs(\"createdAt\")",
+    "CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action)",
+    "CREATE TABLE IF NOT EXISTS admin_banned_words ( id text PRIMARY KEY, word text NOT NULL UNIQUE, category text NOT NULL DEFAULT 'general', \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS admin_promos ( id text PRIMARY KEY, code text NOT NULL UNIQUE, \"discountType\" text NOT NULL DEFAULT 'percent', \"discountValue\" integer NOT NULL DEFAULT 10, \"maxUses\" integer NOT NULL DEFAULT 100, \"usedCount\" integer NOT NULL DEFAULT 0, \"isActive\" boolean NOT NULL DEFAULT true, \"expiresAt\" timestamp, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS admin_announcements ( id text PRIMARY KEY, title text NOT NULL, content text NOT NULL DEFAULT '', level text NOT NULL DEFAULT 'info', placement text NOT NULL DEFAULT 'top_banner', \"targetRole\" text NOT NULL DEFAULT 'all', \"isActive\" boolean NOT NULL DEFAULT true, \"startsAt\" timestamp, \"endsAt\" timestamp, \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE INDEX IF NOT EXISTS idx_admin_announcements_active ON admin_announcements(\"isActive\")",
+    "CREATE TABLE IF NOT EXISTS admin_security_policies ( id text PRIMARY KEY, \"ipAddress\" text NOT NULL UNIQUE, reason text NOT NULL DEFAULT '', action text NOT NULL DEFAULT 'block', \"createdBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE TABLE IF NOT EXISTS admin_content_reports ( id text PRIMARY KEY, \"reporterId\" text NOT NULL REFERENCES \"user\"(id) ON DELETE CASCADE, \"targetType\" text NOT NULL, \"targetId\" text NOT NULL, reason text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'pending', \"resolvedBy\" text REFERENCES \"user\"(id) ON DELETE SET NULL, \"resolvedAt\" timestamp, \"resolutionNote\" text DEFAULT '', \"createdAt\" timestamp NOT NULL DEFAULT now() )",
+    "CREATE INDEX IF NOT EXISTS idx_admin_reports_status ON admin_content_reports(status)",
   ];
 }
 

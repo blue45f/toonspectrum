@@ -240,6 +240,230 @@ export class AdminController {
     const uid = enforceUserOrError(userId);
     return this.adminService.deleteCampaign(uid, id);
   }
+
+  // ── 확장 고도화 엔드포인트: 감사 로그 & 시스템 헬스 ────────────────
+  @Get("audit-logs")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getAuditLogs(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { action?: string; adminId?: string; search?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getAuditLogs(uid, query);
+  }
+
+  @Get("system/health")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getSystemHealth(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getSystemHealth(uid);
+  }
+
+  @Post("system/maintenance")
+  async setMaintenanceMode(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { enabled?: boolean; message?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.setMaintenanceMode(uid, !!body.enabled, body.message);
+  }
+
+  // ── 확장 회원 관리 ────────────────────────────────────────────────────
+  @Get("users/:id/details")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getUserDetails(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getUserDetails(uid, id);
+  }
+
+  @Post("users/bulk-status")
+  async bulkSetUserStatus(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { userIds?: string[]; status?: unknown; reason?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.bulkSetUserStatus(uid, body.userIds ?? [], body.status as never, body.reason);
+  }
+
+  @Get("users/export/csv")
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  @Header("Content-Disposition", 'attachment; filename="members.csv"')
+  async exportUsersCsv(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.exportUsersCsv(uid);
+  }
+
+  // ── 확장 정산 관리 ────────────────────────────────────────────────────
+  @Post("revenue/bulk-status")
+  async bulkSetRevenueStatus(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { eventIds?: string[]; status?: unknown; note?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.bulkSetRevenueStatus(uid, body.eventIds ?? [], body.status as never, body.note);
+  }
+
+  @Get("revenue/export/csv")
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  @Header("Content-Disposition", 'attachment; filename="revenue_ledger.csv"')
+  async exportRevenueCsv(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.exportRevenueCsv(uid);
+  }
+
+  // ── 확장 모더레이션 & 금칙어 ──────────────────────────────────────────
+  @Get("moderation/comments")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listModerationComments(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { q?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.listModerationComments(uid, query);
+  }
+
+  @Get("moderation/reviews")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listModerationReviews(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { q?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.listModerationReviews(uid, query);
+  }
+
+  @Get("moderation/banned-words")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getBannedWords(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getBannedWords(uid);
+  }
+
+  @Post("moderation/banned-words")
+  async addBannedWord(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { word?: string; category?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.addBannedWord(uid, body.word ?? "", body.category);
+  }
+
+  @Delete("moderation/banned-words/:id")
+  async deleteBannedWord(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deleteBannedWord(uid, id);
+  }
+
+  @Post("moderation/banned-words/test")
+  async testBannedWords(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { text?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.testBannedWords(uid, body.text ?? "");
+  }
+
+  // ── 확장 프로모션 쿠폰 관리 ─────────────────────────────────────────────
+  @Get("promos")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getPromos(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getPromos(uid);
+  }
+
+  @Post("promos")
+  async upsertPromo(@Headers("x-user-id") userId: string | undefined, @Body() body: Record<string, unknown>) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.upsertPromo(uid, body);
+  }
+
+  @Post("promos/:id/toggle")
+  async togglePromo(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.togglePromo(uid, id);
+  }
+
+  @Delete("promos/:id")
+  async deletePromo(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deletePromo(uid, id);
+  }
+
+  // ── 확장 공지사항 & 글로벌 배너 ──────────────────────────────────────────
+  @Get("announcements")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getAnnouncements(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getAnnouncements(uid);
+  }
+
+  @Post("announcements")
+  async upsertAnnouncement(@Headers("x-user-id") userId: string | undefined, @Body() body: Record<string, unknown>) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.upsertAnnouncement(uid, body);
+  }
+
+  @Post("announcements/:id/toggle")
+  async toggleAnnouncement(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.toggleAnnouncement(uid, id);
+  }
+
+  @Delete("announcements/:id")
+  async deleteAnnouncement(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deleteAnnouncement(uid, id);
+  }
+
+  // ── 확장 보안 & IP 정책 ────────────────────────────────────────────────
+  @Get("security/ip-rules")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getSecurityIpRules(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getSecurityIpRules(uid);
+  }
+
+  @Post("security/ip-rules")
+  async addSecurityIpRule(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body() body: { ipAddress?: string; reason?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.addSecurityIpRule(uid, body.ipAddress ?? "", body.reason);
+  }
+
+  @Delete("security/ip-rules/:id")
+  async deleteSecurityIpRule(@Headers("x-user-id") userId: string | undefined, @Param("id") id: string) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.deleteSecurityIpRule(uid, id);
+  }
+
+  // ── 확장 신고 처리 큐 ───────────────────────────────────────────────────
+  @Get("reports")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async getContentReports(
+    @Headers("x-user-id") userId: string | undefined,
+    @Query() query: { status?: string; limit?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.getContentReports(uid, query);
+  }
+
+  @Post("reports/:id/resolve")
+  async resolveContentReport(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { action?: "resolve" | "dismiss"; note?: string }
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.resolveContentReport(uid, id, body.action ?? "resolve", body.note);
+  }
+
+  @Post("system/revoke-sessions")
+  async revokeAllSessions(@Headers("x-user-id") userId: string | undefined) {
+    const uid = enforceUserOrError(userId);
+    return this.adminService.revokeAllSessions(uid);
+  }
 }
 
 interface CampaignPayload {

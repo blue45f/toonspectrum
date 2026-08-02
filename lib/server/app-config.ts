@@ -64,6 +64,9 @@ export interface AppConfig {
   showAvailability: boolean; // 플랫폼 유통·유료무료 "어디서 봐"
   showSynopsis: boolean; // 시놉시스 원문
   showRelatedInfo: boolean; // 관련 정보(크롤 링크: 유튜브·뉴스·위키)
+  // 전역 비상 점검 모드 스위치
+  maintenanceModeEnabled?: boolean;
+  maintenanceMessage?: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -75,6 +78,8 @@ const DEFAULTS: AppConfig = {
   showAvailability: true,
   showSynopsis: true,
   showRelatedInfo: true,
+  maintenanceModeEnabled: false,
+  maintenanceMessage: "시스템 점검 중입니다.",
 };
 const CONFIG_KEY = "config";
 

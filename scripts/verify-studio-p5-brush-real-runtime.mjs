@@ -1,14 +1,14 @@
 /**
  * Permanent real-runtime gate for ToonSpectrum's p5.brush standalone adapter.
  *
- * The only successful path is:
- * Chromium page -> module Dedicated Worker -> production provider -> production
- * adapter -> p5.brush/standalone -> private Worker OffscreenCanvas WebGL2 ->
- * copied RGBA pixels.
+ * The successful path is the exact product topology:
+ * Chromium page -> production Worker client -> one-shot module Dedicated Worker
+ * -> production provider -> production adapter -> p5.brush/standalone ->
+ * private Worker OffscreenCanvas WebGL2 -> transferred owned RGBA pixels.
  *
  * Exit codes:
- *   0 = all real Worker/WebGL2 render and deterministic replay gates passed
- *   1 = harness, import, provider, adapter, pixel or policy regression
+ *   0 = all one-shot Worker/WebGL2 render, quality and replay gates passed
+ *   1 = harness, product path, adapter, pixel, context or policy regression
  *   2 = structured environment skip because WebGL2 context creation is absent
  */
 
@@ -36,6 +36,7 @@ const EXPECTED_CASE_IDS = [
   "flat-wash",
 ];
 const EXPECTED_SURFACE_COUNT = 10;
+const EXPECTED_RENDER_WORKER_COUNT = 10;
 const WIDTH = 160;
 const HEIGHT = 128;
 const EXPECTED_BYTES = WIDTH * HEIGHT * 4;
@@ -79,8 +80,8 @@ function writeJson(fileName, value) {
 
 function validatePixelEvidence(caseId, label, evidence, failures) {
   if (
-    evidence.byteLength !== EXPECTED_BYTES
-    || typeof evidence.pixelHash !== "string"
+    evidence?.byteLength !== EXPECTED_BYTES
+    || typeof evidence?.pixelHash !== "string"
     || !/^sha256:[0-9a-f]{64}$/u.test(evidence.pixelHash)
     || evidence.alphaSum <= 0
     || evidence.nonTransparentPixels <= 0
@@ -91,10 +92,13 @@ function validatePixelEvidence(caseId, label, evidence, failures) {
   }
 }
 
-function validateSuccess(result, diagnostics) {
+function validateSuccess(result, contextAffinityStress, diagnostics) {
   const failures = [];
   if (result.backend !== "p5.brush/standalone-offscreen-webgl2") {
     failures.push(`unexpected backend: ${String(result.backend)}`);
+  }
+  if (result.topology !== "production-one-shot-worker-per-render") {
+    failures.push(`unexpected execution topology: ${String(result.topology)}`);
   }
   if (result.adapterVersion !== EXPECTED_ADAPTER_VERSION) {
     failures.push(
@@ -107,9 +111,13 @@ function validateSuccess(result, diagnostics) {
     || result.capabilities?.workerScopeConstructor !== "DedicatedWorkerGlobalScope"
     || result.capabilities?.offscreenCanvas !== true
     || result.capabilities?.webgl2 !== true
+    || result.capabilities?.privateSurface !== true
+    || result.capabilities?.mainThreadFallback !== false
     || !String(result.capabilities?.webglVersion).includes("WebGL 2")
   ) {
-    failures.push("execution was not a real Dedicated Worker OffscreenCanvas WebGL2 path");
+    failures.push(
+      "execution was not a real production Dedicated Worker OffscreenCanvas WebGL2 path",
+    );
   }
   if (
     JSON.stringify(result.cases?.map((entry) => entry.id))
@@ -117,13 +125,13 @@ function validateSuccess(result, diagnostics) {
   ) {
     failures.push("five-technique real-runtime case coverage drifted");
   }
-  if (EXPECTED_CASE_IDS.length * 2 !== EXPECTED_SURFACE_COUNT) {
-    failures.push("expected case count no longer matches the surface contract");
-  }
-  if (result.surfaceCount !== EXPECTED_SURFACE_COUNT) {
+  if (
+    result.probeWorkerCount !== 1
+    || result.renderWorkerCount !== EXPECTED_RENDER_WORKER_COUNT
+    || result.surfaceCount !== EXPECTED_SURFACE_COUNT
+  ) {
     failures.push(
-      `expected ${EXPECTED_SURFACE_COUNT} private surfaces, got `
-      + String(result.surfaceCount),
+      "the release gate no longer creates one product Worker/surface per render",
     );
   }
   for (const evidence of result.cases ?? []) {
@@ -153,20 +161,27 @@ function validateSuccess(result, diagnostics) {
       || !evidence.quality.metrics
       || evidence.quality.findings?.length !== 0
     ) {
-      failures.push(
-        `${evidence.id}: golden structural quality policy failed`,
-      );
+      failures.push(`${evidence.id}: golden structural quality policy failed`);
     }
     if (
       evidence.exactPixelReplay !== true
       || evidence.first?.pixelHash !== evidence.replay?.pixelHash
     ) {
       failures.push(
-        `${evidence.id}: seeded byte-for-byte replay was not deterministic `
-        + `(${String(evidence.first?.pixelHash)} !== `
-        + `${String(evidence.replay?.pixelHash)})`,
+        `${evidence.id}: two production one-shot Workers did not produce identical bytes`,
       );
     }
+  }
+  if (
+    contextAffinityStress?.status !== "ok"
+    || contextAffinityStress.sameContextExactPixelReplay !== true
+    || contextAffinityStress.crossContextRejected !== true
+    || !String(contextAffinityStress.crossContextMessage).includes("context-affine")
+    || contextAffinityStress.surfaceCount !== 2
+    || contextAffinityStress.surfaceDisposeCount !== 2
+    || contextAffinityStress.webGlErrorFree !== true
+  ) {
+    failures.push("real p5.brush context-affinity stress did not fail closed");
   }
   if (
     diagnostics.consoleErrors.length > 0
@@ -176,46 +191,7 @@ function validateSuccess(result, diagnostics) {
   ) {
     failures.push("browser diagnostics or CSP policy violations were observed");
   }
-  if (failures.length > 0) {
-    throw new Error(failures.join("\n"));
-  }
-}
-
-function validateFreshWorkerReplay(primary, replay) {
-  const comparisons = [];
-  const failures = [];
-  if (replay.status !== "ok") {
-    return {
-      comparisons,
-      failures: [
-        `fresh Worker replay failed: ${replay.message ?? replay.status}`,
-      ],
-    };
-  }
-  for (const primaryCase of primary.cases ?? []) {
-    const replayCase = replay.cases.find(
-      (candidate) => candidate.id === primaryCase.id,
-    );
-    const pixelHashEqual =
-      replayCase?.first?.pixelHash === primaryCase.first?.pixelHash;
-    const paintedPixelsEqual =
-      replayCase?.first?.paintedPixels === primaryCase.first?.paintedPixels;
-    comparisons.push({
-      id: primaryCase.id,
-      primaryPixelHash: primaryCase.first?.pixelHash ?? null,
-      replayPixelHash: replayCase?.first?.pixelHash ?? null,
-      pixelHashEqual,
-      primaryPaintedPixels: primaryCase.first?.paintedPixels ?? null,
-      replayPaintedPixels: replayCase?.first?.paintedPixels ?? null,
-      paintedPixelsEqual,
-    });
-    if (!pixelHashEqual) {
-      failures.push(
-        `${primaryCase.id}: two fresh Workers did not produce identical bytes`,
-      );
-    }
-  }
-  return { comparisons, failures };
+  if (failures.length > 0) throw new Error(failures.join("\n"));
 }
 
 async function main() {
@@ -242,7 +218,7 @@ async function main() {
           response.end(
             "<!doctype html><html><head><meta charset=\"utf-8\">"
             + "<title>Studio p5.brush real runtime</title></head>"
-            + "<body><main>Running real p5.brush Worker/WebGL2 gate…</main>"
+            + "<body><main>Running production p5.brush Worker gate…</main>"
             + `<script type="module" src="${HARNESS_ENTRY}"></script>`
             + "</body></html>",
           );
@@ -297,24 +273,17 @@ async function main() {
     diagnostics.securityPolicyViolations = [
       ...(browserResult.securityPolicyViolations ?? []),
     ];
-    const result = browserResult.workerResult;
+    const result = browserResult.result;
     if (result.status === "unsupported") {
       invariant(
         result.reason === "webgl2-unavailable"
         && result.probe?.webgl2ContextAttempted === true,
-        "only a genuine WebGL2 context-creation absence may skip this gate",
-      );
-      invariant(
-        browserResult.freshWorkerReplay?.status === "unsupported"
-        && browserResult.freshWorkerReplay.reason === "webgl2-unavailable"
-        && browserResult.freshWorkerReplay.probe?.webgl2ContextAttempted === true,
-        "the fresh Worker must independently confirm WebGL2 absence",
+        "only a genuine production Worker WebGL2 context absence may skip this gate",
       );
       const report = {
         status: "unsupported",
-        policy: "skip-only-when-worker-offscreen-webgl2-context-is-null",
+        policy: "skip-only-when-product-worker-offscreen-webgl2-is-null",
         result,
-        freshWorkerReplay: browserResult.freshWorkerReplay,
         diagnostics,
         artifactDirectory: SCRATCH,
       };
@@ -325,30 +294,24 @@ async function main() {
     }
     invariant(
       result.status === "ok",
-      `real-runtime Worker failed: ${result.message ?? "unknown error"}`,
-    );
-    const freshWorkerReplay = validateFreshWorkerReplay(
-      result,
-      browserResult.freshWorkerReplay,
+      `production one-shot gate failed: ${result.message ?? "unknown error"}`,
     );
     writeJson("raw-observations.json", {
       result,
-      freshWorkerReplayResult: browserResult.freshWorkerReplay,
-      freshWorkerReplay,
+      contextAffinityStress: browserResult.contextAffinityStress,
       diagnostics,
       artifactDirectory: SCRATCH,
     });
-    invariant(
-      freshWorkerReplay.failures.length === 0,
-      freshWorkerReplay.failures.join("\n"),
+    validateSuccess(
+      result,
+      browserResult.contextAffinityStress,
+      diagnostics,
     );
-    validateSuccess(result, diagnostics);
     const report = {
       status: "observed",
-      policy: "real-worker-offscreen-webgl2-required",
+      policy: "production-one-shot-worker-offscreen-webgl2-required",
       result,
-      freshWorkerReplayResult: browserResult.freshWorkerReplay,
-      freshWorkerReplay,
+      contextAffinityStress: browserResult.contextAffinityStress,
       diagnostics,
       artifactDirectory: SCRATCH,
     };

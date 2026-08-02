@@ -646,6 +646,10 @@ describe("renderStudioProceduralArtisticBrushInWorker", () => {
     );
     expect(worker).toContain("new OffscreenCanvas(width, height)");
     expect(worker).toContain('canvas.getContext("webgl2"');
+    expect(worker).toContain("antialias: false");
+    expect(worker).toContain("depth: false");
+    expect(worker).toContain("stencil: false");
+    expect(worker).toContain('getExtension("WEBGL_lose_context")');
     expect(worker).toContain('executionLocality: "dedicated-worker"');
     expect(worker).toContain("transferredFromMainThread: false");
   });

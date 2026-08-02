@@ -45,6 +45,13 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     );
     expect(worker).toContain('new OffscreenCanvas(width, height)');
     expect(worker).toContain('canvas.getContext("webgl2"');
+    expect(worker).toContain('gl.getExtension("WEBGL_lose_context")');
+    expect(worker).toContain("gl.isContextLost()");
+    expect(worker).toContain("const code = gl.getError()");
+    expect(worker).toContain("canvas.width = 1");
+    expect(worker).toContain("canvas.height = 1");
+    expect(worker).toContain("surfaceDisposeCount !== surfaceCount");
+    expect(worker).toContain("assertNoWebGlLifecycleFailures(");
   });
 
   it("gates all supported techniques, non-empty pixels and exact seeded replay", () => {

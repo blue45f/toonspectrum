@@ -57,6 +57,9 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
     expect(source).toContain("isOffscreenCanvas");
     expect(source).toContain("isWebGl2Context");
     expect(source).toContain("readTopLeftRgbaInPlace");
+    expect(source).toContain("contextAuthority");
+    expect(source).toContain("context-affine");
+    expect(source).toContain("await runtime.render();");
     expect(source).toContain("pixels.copyWithin");
     expect(source).not.toContain("new Uint8Array(pixels)");
     expect(source).not.toContain('"tip:image"');

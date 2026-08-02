@@ -290,7 +290,7 @@ describe("Studio p5.brush standalone concrete adapter", () => {
       [1, 0, 0.5],
       [1, 1, 0.75],
     ], 0.65);
-    expect(runtime.render).toHaveBeenCalledTimes(2);
+    expect(runtime.render).toHaveBeenCalledTimes(3);
     expect(
       runtime.seed.mock.calls.filter(([seed]) => seed === 0x1234_abcd),
     ).toHaveLength(2);
@@ -354,6 +354,66 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect([...output.pixels.slice(8, 12)]).toEqual(
       Array.from({ length: 4 }, () => 1),
     );
+  });
+
+  it("replays deterministically on its first context and rejects a second context", async () => {
+    const runtime = fakeModule();
+    const firstTarget = fakeSurface();
+    const secondTarget = fakeSurface();
+    const load = createStudioP5BrushStandaloneAdapterLoader({
+      importStandalone: async () => runtime,
+      environment: ENVIRONMENT,
+    });
+    const adapter = await load();
+    if (!adapter) throw new Error("adapter creation failed");
+    const brushRequest = request("watercolor-fill", {
+      parameters: {
+        angle: Math.PI / 6,
+        color: "#315f8f",
+        density: 0.64,
+        opacity: 0.72,
+        strength: 0.34,
+      },
+    });
+    const input = {
+      requestSequence: brushRequest.requestSequence,
+      engineEpoch: brushRequest.engineEpoch,
+      strokeId: brushRequest.strokeId,
+      stage: "settled" as const,
+      seed: brushRequest.seed,
+      width: brushRequest.width,
+      height: brushRequest.height,
+      pixelRatio: brushRequest.pixelRatio,
+      plan: brushRequest.plan,
+      surface: firstTarget.surface,
+    };
+
+    const first = await adapter.renderSettled(
+      input,
+      new AbortController().signal,
+    );
+    const replay = await adapter.renderSettled(
+      {
+        ...input,
+        requestSequence: input.requestSequence + 1,
+        strokeId: `${input.strokeId}-replay`,
+      },
+      new AbortController().signal,
+    );
+    expect([...replay.pixels]).toEqual([...first.pixels]);
+    expect(runtime.load).toHaveBeenCalledTimes(2);
+    expect(runtime.render).toHaveBeenCalledTimes(6);
+
+    await expect(adapter.renderSettled(
+      {
+        ...input,
+        requestSequence: input.requestSequence + 2,
+        strokeId: `${input.strokeId}-foreign-context`,
+        surface: secondTarget.surface,
+      },
+      new AbortController().signal,
+    )).rejects.toThrow(/context-affine/u);
+    expect(runtime.load).toHaveBeenCalledTimes(2);
   });
 
   it("rejects an oversized direct adapter call before runtime or readback allocation", async () => {
@@ -638,6 +698,8 @@ describe("Studio p5.brush standalone concrete adapter", () => {
       "first-start",
       "first-end",
       "first-retained",
+      "first-retained",
+      "second",
       "second",
       "second",
     ]);

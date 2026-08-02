@@ -31,6 +31,7 @@ export interface StudioP5BrushRealRuntimeCaseEvidence {
   readonly seed: number;
   readonly first: StudioP5BrushRealRuntimePixelEvidence;
   readonly replay: StudioP5BrushRealRuntimePixelEvidence;
+  /** Exact byte equality between two independent product one-shot Workers. */
   readonly exactPixelReplay: boolean;
   readonly quality: Readonly<{
     readonly ok: boolean;
@@ -65,33 +66,37 @@ export interface StudioP5BrushRealRuntimeCaseEvidence {
 export interface StudioP5BrushRealRuntimeCapabilities {
   readonly worker: true;
   readonly dedicatedWorkerScope: true;
-  readonly workerScopeConstructor: string;
+  readonly workerScopeConstructor: "DedicatedWorkerGlobalScope";
   readonly offscreenCanvas: true;
   readonly webgl2: true;
+  readonly privateSurface: true;
+  readonly mainThreadFallback: false;
   readonly webglVersion: string;
-  readonly webglVendor: string;
-  readonly webglRenderer: string;
-  readonly unmaskedVendor: string | null;
-  readonly unmaskedRenderer: string | null;
 }
 
-export type StudioP5BrushRealWorkerResult =
+export type StudioP5BrushRealRuntimeResult =
   | Readonly<{
       status: "ok";
       backend: "p5.brush/standalone-offscreen-webgl2";
+      topology: "production-one-shot-worker-per-render";
       adapterVersion: string;
       capabilities: StudioP5BrushRealRuntimeCapabilities;
       cases: readonly StudioP5BrushRealRuntimeCaseEvidence[];
+      probeWorkerCount: 1;
+      renderWorkerCount: number;
       surfaceCount: number;
     }>
   | Readonly<{
       status: "unsupported";
-      reason: "webgl2-unavailable";
+      reason:
+        | "dedicated-worker-unavailable"
+        | "offscreen-canvas-unavailable"
+        | "webgl2-unavailable";
       message: string;
       probe: Readonly<{
         dedicatedWorkerScope: boolean;
         offscreenCanvas: boolean;
-        webgl2ContextAttempted: true;
+        webgl2ContextAttempted: boolean;
       }>;
     }>
   | Readonly<{
@@ -105,6 +110,22 @@ export type StudioP5BrushRealWorkerResult =
       }>;
     }>;
 
+export type StudioP5BrushContextAffinityStressResult =
+  | Readonly<{
+      status: "ok";
+      sameContextExactPixelReplay: true;
+      crossContextRejected: true;
+      crossContextMessage: string;
+      surfaceCount: 2;
+      surfaceDisposeCount: 2;
+      webGlErrorFree: true;
+    }>
+  | Readonly<{
+      status: "error";
+      message: string;
+      stack: string | null;
+    }>;
+
 export interface StudioP5BrushSecurityPolicyViolation {
   readonly blockedUri: string;
   readonly effectiveDirective: string;
@@ -113,8 +134,9 @@ export interface StudioP5BrushSecurityPolicyViolation {
 }
 
 export interface StudioP5BrushRealBrowserResult {
-  readonly workerResult: StudioP5BrushRealWorkerResult;
-  readonly freshWorkerReplay: StudioP5BrushRealWorkerResult;
+  readonly result: StudioP5BrushRealRuntimeResult;
+  readonly contextAffinityStress:
+    StudioP5BrushContextAffinityStressResult | null;
   readonly mainThread: Readonly<{
     worker: boolean;
     userAgent: string;

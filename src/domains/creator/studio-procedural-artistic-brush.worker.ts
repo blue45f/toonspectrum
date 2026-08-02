@@ -22,11 +22,24 @@ import {
 
 const CONTEXT_ATTRIBUTES = Object.freeze({
   alpha: true,
-  antialias: true,
-  depth: true,
+  antialias: false,
+  depth: false,
   premultipliedAlpha: true,
   preserveDrawingBuffer: true,
+  stencil: false,
 });
+
+function releaseContext(
+  canvas: OffscreenCanvas,
+  context: WebGL2RenderingContext,
+): void {
+  try {
+    context.getExtension("WEBGL_lose_context")?.loseContext();
+  } finally {
+    canvas.width = 1;
+    canvas.height = 1;
+  }
+}
 
 interface StudioProceduralArtisticBrushWorkerScope {
   readonly constructor?: Readonly<{ name?: string }>;
@@ -100,8 +113,7 @@ function probeCapabilities():
   const context = canvas.getContext("webgl2", CONTEXT_ATTRIBUTES);
   if (!context) return "webgl2-unavailable";
   const webglVersion = String(context.getParameter(context.VERSION));
-  canvas.width = 1;
-  canvas.height = 1;
+  releaseContext(canvas, context);
   return Object.freeze({
     workerScope: "DedicatedWorkerGlobalScope",
     dedicatedWorker: true,
@@ -133,8 +145,7 @@ const createSurface: StudioProceduralArtisticSurfaceFactory = ({
     canvas,
     context,
     dispose: () => {
-      canvas.width = 1;
-      canvas.height = 1;
+      releaseContext(canvas, context);
     },
   };
 };
