@@ -112,6 +112,7 @@ const collaborationRepository = {
   invite: vi.fn(),
   updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
+  removeMemberWithRevocation: vi.fn(),
   respondToInvitation: vi.fn(),
 };
 
@@ -156,6 +157,7 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.invite.mockReset();
     collaborationRepository.updateMemberRole.mockReset();
     collaborationRepository.removeMember.mockReset();
+    collaborationRepository.removeMemberWithRevocation.mockReset();
     collaborationRepository.respondToInvitation.mockReset();
     draftCollaborationRepository.provision.mockReset();
     draftCollaborationRepository.promote.mockReset();
@@ -503,12 +505,17 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.getAuthorization.mockResolvedValue({
       workId: snapshot.workId,
       viewer: snapshot.viewer,
+      authorizationEpoch: "2026-08-02T00:00:00.000Z",
     });
     collaborationRepository.listInvitations.mockResolvedValue([]);
     collaborationRepository.getActivity.mockResolvedValue([]);
     collaborationRepository.invite.mockResolvedValue(snapshot);
     collaborationRepository.updateMemberRole.mockResolvedValue(snapshot);
     collaborationRepository.removeMember.mockResolvedValue(snapshot);
+    collaborationRepository.removeMemberWithRevocation.mockResolvedValue({
+      snapshot,
+      authorizationEpochMs: Date.parse("2026-08-02T00:00:00.000Z"),
+    });
     const invitationResponse = {
       workId: "work-team",
       role: "editor",
@@ -521,6 +528,7 @@ describe("CreatorService safety gates", () => {
     await expect(service.getWorkAuthorization("owner", "work-team")).resolves.toEqual({
       workId: snapshot.workId,
       viewer: snapshot.viewer,
+      authorizationEpoch: "2026-08-02T00:00:00.000Z",
     });
     await service.listWorkTeamInvitations("artist", 12);
     await service.getWorkTeamActivity("owner", "work-team", 9);
@@ -542,7 +550,9 @@ describe("CreatorService safety gates", () => {
       "artist",
       "commenter"
     );
-    expect(collaborationRepository.removeMember).toHaveBeenCalledWith("owner", "work-team", "artist");
+    expect(
+      collaborationRepository.removeMemberWithRevocation,
+    ).toHaveBeenCalledWith("owner", "work-team", "artist");
     expect(collaborationRepository.respondToInvitation).toHaveBeenCalledWith(
       "artist",
       "work-team",
