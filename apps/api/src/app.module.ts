@@ -4,6 +4,10 @@ import { LoggerModule } from "nestjs-pino";
 
 import { AllExceptionsFilter } from "./common/all-exceptions.filter";
 import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities/backend-capabilities.module";
+import {
+  SAFE_HTTP_LOG_REDACT_PATHS,
+  SAFE_HTTP_LOG_SERIALIZERS,
+} from "./logging/http-log-serializers";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
@@ -27,13 +31,12 @@ const studioRealtimeTicketModule =
       pinoHttp: {
         // pino-pretty 는 개발에서만 — 프로덕션은 JSON 라인(파싱/수집 친화).
         transport: process.env.NODE_ENV !== "production" ? { target: "pino-pretty" } : undefined,
-        // 인증/세션 헤더는 로그에서 가린다(자격증명 유출 방지).
-        redact: [
-          "req.headers.authorization",
-          "req.headers.cookie",
-          "req.headers['x-user-id']",
-          "req.headers['sec-websocket-protocol']",
-        ],
+        // 운영 프록시가 주입하는 OIDC/서명 헤더까지 전체를 제외한다.
+        // wrapSerializers=false로 raw req/res를 허용 목록 직렬화기에 바로 전달한다.
+        wrapSerializers: false,
+        serializers: SAFE_HTTP_LOG_SERIALIZERS,
+        // 직렬화 경계가 변경되더라도 헤더 bag 자체는 2차로 차단한다.
+        redact: [...SAFE_HTTP_LOG_REDACT_PATHS],
       },
     }),
     BackendCapabilitiesModule,
