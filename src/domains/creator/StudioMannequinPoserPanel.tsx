@@ -385,6 +385,14 @@ export function StudioMannequinCameraSection({
   webcamLoading,
   webcamError,
   onToggleWebcam,
+  poseFrozen = false,
+  onTogglePoseFreeze,
+  mirrorMode = true,
+  onToggleMirrorMode,
+  fingerTracking = true,
+  onToggleFingerTracking,
+  facialTracking = true,
+  onToggleFacialTracking,
 }: {
   projection: StudioMannequinProjection;
   onProjectionChange: (projection: StudioMannequinProjection) => void;
@@ -398,6 +406,14 @@ export function StudioMannequinCameraSection({
   webcamLoading: boolean;
   webcamError: string | null;
   onToggleWebcam: () => void;
+  poseFrozen?: boolean;
+  onTogglePoseFreeze?: () => void;
+  mirrorMode?: boolean;
+  onToggleMirrorMode?: () => void;
+  fingerTracking?: boolean;
+  onToggleFingerTracking?: () => void;
+  facialTracking?: boolean;
+  onToggleFacialTracking?: () => void;
 }): ReactElement {
   return (
     <div className="space-y-3">
@@ -434,6 +450,56 @@ export function StudioMannequinCameraSection({
           )}
           {webcamActive ? "🔴 실시간 동작 인식 중지" : "📹 웹캠 실시간 동작 인식 시작"}
         </button>
+
+        {webcamActive && (
+          <div className="grid grid-cols-2 gap-1 pt-1.5" role="group" aria-label="모션 캡처 옵션">
+            <button
+              type="button"
+              onClick={onTogglePoseFreeze}
+              className={buttonClass({
+                size: "sm",
+                variant: poseFrozen ? "solid" : "quiet",
+                className: "text-[0.7rem] justify-center gap-1",
+              })}
+            >
+              {poseFrozen ? "🔒 포즈 고정됨" : "🔓 포즈 고정"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleMirrorMode}
+              className={buttonClass({
+                size: "sm",
+                variant: mirrorMode ? "solid" : "quiet",
+                className: "text-[0.7rem] justify-center gap-1",
+              })}
+            >
+              {mirrorMode ? "↔️ 좌우 반전 ON" : "↔️ 좌우 반전"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleFingerTracking}
+              className={buttonClass({
+                size: "sm",
+                variant: fingerTracking ? "solid" : "quiet",
+                className: "text-[0.7rem] justify-center gap-1",
+              })}
+            >
+              {fingerTracking ? "🖐️ 손가락 솔버 ON" : "🖐️ 손가락 솔버"}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleFacialTracking}
+              className={buttonClass({
+                size: "sm",
+                variant: facialTracking ? "solid" : "quiet",
+                className: "text-[0.7rem] justify-center gap-1",
+              })}
+            >
+              {facialTracking ? "😀 표정 맵핑 ON" : "😀 표정 맵핑"}
+            </button>
+          </div>
+        )}
+
         {webcamError ? (
           <p className="text-[0.7rem] text-rose-500 mt-1">{webcamError}</p>
         ) : null}
@@ -534,6 +600,10 @@ export function StudioMannequinPoserPanel({
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoading, setWebcamLoading] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [poseFrozen, setPoseFrozen] = useState(false);
+  const [mirrorMode, setMirrorMode] = useState(true);
+  const [fingerTracking, setFingerTracking] = useState(true);
+  const [facialTracking, setFacialTracking] = useState(true);
 
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
@@ -1014,6 +1084,14 @@ export function StudioMannequinPoserPanel({
                   webcamLoading={webcamLoading}
                   webcamError={webcamError}
                   onToggleWebcam={handleToggleWebcam}
+                  poseFrozen={poseFrozen}
+                  onTogglePoseFreeze={() => setPoseFrozen((prev) => !prev)}
+                  mirrorMode={mirrorMode}
+                  onToggleMirrorMode={() => setMirrorMode((prev) => !prev)}
+                  fingerTracking={fingerTracking}
+                  onToggleFingerTracking={() => setFingerTracking((prev) => !prev)}
+                  facialTracking={facialTracking}
+                  onToggleFacialTracking={() => setFacialTracking((prev) => !prev)}
                 />
               ) : null}
               <video ref={webcamVideoRef} className="hidden" playsInline muted />

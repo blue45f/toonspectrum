@@ -751,17 +751,16 @@ export class BackendCapabilityGatewayExecutor {
       });
     }
 
+    // A provider acknowledgement is durable execution evidence, not a locally fabricated job ID.
+    // Until a thumbnail worker port can prove enqueue/execute ownership, fail closed so rollout
+    // canaries cannot mistake this facade for a functioning container worker.
     return this.parseGatewayResponse({
       providerId: envelope.provider,
       idempotencyKey: envelope.idempotencyKey,
-      outcome: "accepted",
-      retryable: false,
-      result: {
-        requestType: "thumbnail",
-        status: "accepted",
-        jobId: `thumbnail:${payloadParse.data.requestKey}`,
-      },
-      errorCode: null,
+      outcome: "rejected",
+      retryable: true,
+      result: null,
+      errorCode: "THUMBNAIL_EXECUTOR_UNAVAILABLE",
     });
   }
 
@@ -790,18 +789,15 @@ export class BackendCapabilityGatewayExecutor {
       });
     }
 
+    // Parsing a long-running command is not the same as durably enqueueing it. Keep the facade
+    // unavailable until a real queue/worker adapter returns provider-backed execution evidence.
     return this.parseGatewayResponse({
       providerId: envelope.provider,
       idempotencyKey: envelope.idempotencyKey,
-      outcome: "accepted",
-      retryable: false,
-      result: {
-        requestType: "studio-ai-long",
-        status: "accepted",
-        jobId: `studio-ai-long:${payloadParse.data.requestKey}`,
-        jobType: payloadParse.data.jobType,
-      },
-      errorCode: null,
+      outcome: "rejected",
+      retryable: true,
+      result: null,
+      errorCode: "LONG_AI_EXECUTOR_UNAVAILABLE",
     });
   }
 

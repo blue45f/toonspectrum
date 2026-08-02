@@ -410,7 +410,7 @@ describe("BackendCapabilityGatewayController", () => {
     });
   });
 
-  it("routes webhook workloads with studio-ai-long operation to the long-job path without calling providers", async () => {
+  it("fails long AI workloads closed until a durable executor is installed", async () => {
     const requestKey = "studio-request-00000000000003";
     const envelope = gatewayEnvelopeWithPayload(
       `${validGatewayIdempotencyKey}-long-workload`,
@@ -437,24 +437,17 @@ describe("BackendCapabilityGatewayController", () => {
     expect(result.status).toBe(200);
     const body = await result.json();
     expect(body).toMatchObject({
-      outcome: "accepted",
-      retryable: false,
-      errorCode: null,
+      outcome: "rejected",
+      retryable: true,
+      errorCode: "LONG_AI_EXECUTOR_UNAVAILABLE",
       provider: "cloudflare",
       idempotencyKey: envelope.idempotencyKey,
-    });
-    expect(body).toMatchObject({
-      result: {
-        requestType: "studio-ai-long",
-        status: "accepted",
-        jobId: `studio-ai-long:${requestKey}`,
-        jobType: "image-sequence",
-      },
+      result: null,
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("routes thumbnail workloads to the thumbnail executor and returns an accepted async result without calling providers", async () => {
+  it("fails thumbnail workloads closed until a real worker executor is installed", async () => {
     const requestKey = "studio-request-00000000000004";
     const envelope = gatewayEnvelopeWithPayload(
       `${validGatewayIdempotencyKey}-thumbnail`,
@@ -480,18 +473,12 @@ describe("BackendCapabilityGatewayController", () => {
     expect(result.status).toBe(200);
     const body = await result.json();
     expect(body).toMatchObject({
-      outcome: "accepted",
-      retryable: false,
-      errorCode: null,
+      outcome: "rejected",
+      retryable: true,
+      errorCode: "THUMBNAIL_EXECUTOR_UNAVAILABLE",
       provider: "cloudflare",
       idempotencyKey: envelope.idempotencyKey,
-    });
-    expect(body).toMatchObject({
-      result: {
-        requestType: "thumbnail",
-        status: "accepted",
-        jobId: `thumbnail:${requestKey}`,
-      },
+      result: null,
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
