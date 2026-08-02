@@ -100,7 +100,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   "pixel-transform": {
     id: "pixel-transform",
     label: "선택 내용 변형",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "pixel-selection",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,
@@ -108,7 +108,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   "content-aware-fill": {
     id: "content-aware-fill",
     label: "콘텐츠 인식 채우기",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "pixel-selection",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,
@@ -116,7 +116,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   crop: {
     id: "crop",
     label: "자르기",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "crop-change",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,
@@ -180,7 +180,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   "puppet-warp": {
     id: "puppet-warp",
     label: "퍼펫 워프",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "puppet-displacement",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,

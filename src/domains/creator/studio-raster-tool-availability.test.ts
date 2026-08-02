@@ -70,11 +70,7 @@ describe("Studio raster tool availability matrix", () => {
     "pixel-marquee",
     "pixel-lasso",
     "magic-wand",
-    "pixel-transform",
-    "content-aware-fill",
-    "crop",
     "history-brush",
-    "puppet-warp",
     "layer-mask",
   ] as const)("offers an explicit non-destructive raster copy for %s", (tool) => {
     expect(resolveStudioRasterToolAvailability(tool, {
@@ -91,7 +87,18 @@ describe("Studio raster tool availability matrix", () => {
     });
   });
 
-  it.each(["smudge", "dodge-burn", "wet-mix", "liquify", "heal", "clone-stamp"] as const)(
+  it.each([
+    "smudge",
+    "dodge-burn",
+    "wet-mix",
+    "liquify",
+    "heal",
+    "clone-stamp",
+    "crop",
+    "pixel-transform",
+    "content-aware-fill",
+    "puppet-warp",
+  ] as const)(
     "lets %s prepare and enter from faithful vector-only page content",
     (tool) => {
       const availability = resolveStudioRasterToolAvailability(tool, {
@@ -109,6 +116,12 @@ describe("Studio raster tool availability matrix", () => {
       });
       if (tool === "heal" || tool === "clone-stamp") {
         expect(availability.apply.action?.id).toBe("pick-clone-source");
+      } else if (tool === "pixel-transform" || tool === "content-aware-fill") {
+        expect(availability.apply.action?.id).toBe("make-pixel-selection");
+      } else if (tool === "puppet-warp") {
+        expect(availability.apply.action?.id).toBe("move-puppet-pin");
+      } else if (tool === "crop") {
+        expect(availability.apply.action?.id).toBe("adjust-crop-area");
       } else {
         expect(availability.apply.enabled).toBe(true);
       }
