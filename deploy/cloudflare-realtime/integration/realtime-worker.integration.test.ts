@@ -8,6 +8,21 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 import {
+  REALTIME_ACTOR_REGISTER_PATH,
+  REALTIME_INTERNAL_CONTROL_HEADER,
+  REALTIME_INTERNAL_CONTROL_VALUE,
+} from "../src/actor-directory";
+import {
+  REALTIME_CONTROL_CONTENT_TYPE,
+  REALTIME_CONTROL_NONCE_HEADER,
+  REALTIME_CONTROL_PATH,
+  REALTIME_CONTROL_SIGNATURE_HEADER,
+  REALTIME_CONTROL_TIMESTAMP_HEADER,
+  REALTIME_CONTROL_VERSION,
+  signRealtimeControlEvent,
+  type RealtimeControlEvent,
+} from "../src/control";
+import {
   REALTIME_PROTOCOL_VERSION,
   REALTIME_TICKET_PROTOCOL_PREFIX,
   REALTIME_WEBSOCKET_PROTOCOL,
@@ -28,6 +43,8 @@ import {
 const TEST_ORIGIN = "https://toonstudio.cloud";
 const TEST_SECRET =
   "toonspectrum-cloudflare-test-secret-32-bytes-minimum";
+const TEST_CONTROL_SECRET =
+  "toonspectrum-cloudflare-control-test-secret-32-bytes-minimum";
 
 interface UpgradeResponse extends Response {
   readonly webSocket?: WebSocket;
@@ -138,7 +155,12 @@ function buildClaims(
   overrides: Partial<
     Pick<
       RealtimeTicketClaims,
-      "subject" | "clientId" | "scopes" | "sessionExpiresAtMs"
+      | "subject"
+      | "clientId"
+      | "scopes"
+      | "sessionVersion"
+      | "authorizationEpochMs"
+      | "sessionExpiresAtMs"
     >
   > = {},
 ): RealtimeTicketClaims {
@@ -160,6 +182,22 @@ function buildClaims(
     sessionExpiresAtMs: nowMs + 4 * 60_000,
     ...overrides,
   };
+}
+
+async function dispatchControlEvent(
+  event: RealtimeControlEvent,
+): Promise<Response> {
+  const signed = await signRealtimeControlEvent(event, TEST_CONTROL_SECRET);
+  return await SELF.fetch(`https://realtime.test${REALTIME_CONTROL_PATH}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": REALTIME_CONTROL_CONTENT_TYPE,
+      [REALTIME_CONTROL_NONCE_HEADER]: signed.headers.nonce,
+      [REALTIME_CONTROL_TIMESTAMP_HEADER]: signed.headers.timestamp,
+      [REALTIME_CONTROL_SIGNATURE_HEADER]: signed.headers.signature,
+    },
+    body: signed.body,
+  });
 }
 
 async function upgradeRealtimeRoom(
@@ -206,6 +244,97 @@ describe("Cloudflare realtime Worker integration", () => {
       status: "ok",
       service: "cloudflare-realtime-coordinator",
     });
+  });
+
+  it("rejects a stale connection when revocation interleaves between directory preflight and final confirmation", async () => {
+    const nowMs = Date.now();
+    const scope = {
+      workId: "work.interleaving",
+      roomId: "room.interleaving",
+    } satisfies RealtimeRoomScope;
+    const actorId = "artist.interleaving";
+    const registration = {
+      connectionId: "connection.interleaving",
+      workId: scope.workId,
+      roomId: scope.roomId,
+      roomObjectName: normalizeRealtimeRoomObjectName(scope),
+      sessionVersion: 1,
+      authorizationEpochMs: nowMs - 5_000,
+      sessionExpiresAtMs: nowMs + 4 * 60_000,
+    };
+    const actorStub = env.REALTIME_ACTORS.get(
+      env.REALTIME_ACTORS.idFromName(actorId),
+    );
+    const register = () =>
+      actorStub.fetch(
+        new Request(
+          `https://internal.invalid${REALTIME_ACTOR_REGISTER_PATH}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              [REALTIME_INTERNAL_CONTROL_HEADER]:
+                REALTIME_INTERNAL_CONTROL_VALUE,
+            },
+            body: JSON.stringify(registration),
+          },
+        ),
+      );
+
+    await expect(register()).resolves.toMatchObject({ status: 204 });
+    const revocation = await dispatchControlEvent({
+      version: REALTIME_CONTROL_VERSION,
+      kind: "session-version",
+      actorId,
+      minimumSessionVersion: 2,
+      issuedAtMs: Date.now(),
+      nonce: crypto.randomUUID(),
+    });
+    expect(revocation.status).toBe(200);
+    await expect(revocation.json()).resolves.toMatchObject({
+      ok: true,
+      complete: true,
+      roomsRevoked: 1,
+      connectionsRevoked: 0,
+    });
+
+    const finalConfirmation = await register();
+    expect(finalConfirmation.status).toBe(409);
+    await expect(finalConfirmation.json()).resolves.toMatchObject({
+      code: "session-revoked",
+    });
+
+    const staleTicket = await signRealtimeTicket(
+      buildClaims(
+        scope,
+        `nonce-${crypto.randomUUID()}`,
+        Date.now(),
+        { subject: actorId, sessionVersion: 1 },
+      ),
+      TEST_SECRET,
+    );
+    const staleUpgrade = await upgradeRealtimeRoom(scope, staleTicket);
+    expect(staleUpgrade.status).toBe(401);
+    await expect(staleUpgrade.json()).resolves.toMatchObject({
+      code: "ticket-revoked",
+    });
+
+    const currentTicket = await signRealtimeTicket(
+      buildClaims(
+        scope,
+        `nonce-${crypto.randomUUID()}`,
+        Date.now(),
+        { subject: actorId, sessionVersion: 2 },
+      ),
+      TEST_SECRET,
+    );
+    const currentUpgrade = await upgradeRealtimeRoom(scope, currentTicket);
+    expect(currentUpgrade.status).toBe(101);
+    const currentSocket = currentUpgrade.webSocket as
+      | AcceptedWebSocket
+      | undefined;
+    currentSocket?.accept();
+    currentSocket?.close(1000, "test-complete");
   });
 
   it("persists channel state, rejects nonce replay, and survives hibernation plus alarms", async () => {

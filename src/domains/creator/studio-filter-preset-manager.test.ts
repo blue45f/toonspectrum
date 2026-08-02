@@ -16,7 +16,7 @@ describe("StudioFilterPresetManager", () => {
       name: "테스트 툰 필터",
       category: "custom",
       createdAt: "2026-08-02",
-      draft: { kind: "photo-filter", values: { brightness: 5 } },
+      draft: { kind: "brightness-contrast", brightness: 5, contrast: 10 },
     });
 
     expect(manager.getPreset("custom-1")?.name).toBe("테스트 툰 필터");

@@ -104,8 +104,8 @@ export class StudioFilterPresetManager {
         description: "화사하고 따뜻한 분홍빛 툰 보정",
         createdAt: "2026-08-01",
         draft: {
-          kind: "photo-filter",
-          values: { brightness: 10, contrast: 5, saturation: 15, tintColor: "#ffc0cb", tintAmount: 20 },
+          kind: "duotone",
+          values: { color1: "#ffc0cb", color2: "#8b0000", opacity: 0.8 },
         },
       },
       {
@@ -115,8 +115,8 @@ export class StudioFilterPresetManager {
         description: "음영 강조 및 거친 잉크 텍스처",
         createdAt: "2026-08-01",
         draft: {
-          kind: "photo-filter",
-          values: { brightness: -15, contrast: 30, saturation: -20, tintColor: "#1a1a2e", tintAmount: 35 },
+          kind: "vignette",
+          values: { radius: 60, amount: 80, softness: 40 },
         },
       },
       {
@@ -126,8 +126,8 @@ export class StudioFilterPresetManager {
         description: "강렬한 채도와 네온 블루/시안 강조",
         createdAt: "2026-08-01",
         draft: {
-          kind: "photo-filter",
-          values: { brightness: 5, contrast: 25, saturation: 40, tintColor: "#00f0ff", tintAmount: 25 },
+          kind: "glitch",
+          values: { intensity: 50, slices: 12, split: 6 },
         },
       },
       {
@@ -137,8 +137,9 @@ export class StudioFilterPresetManager {
         description: "흑백 연필 선화 느낌의 질감 감성",
         createdAt: "2026-08-01",
         draft: {
-          kind: "photo-filter",
-          values: { brightness: 0, contrast: 40, saturation: -100, tintColor: "#000000", tintAmount: 0 },
+          kind: "brightness-contrast",
+          brightness: 0,
+          contrast: 40,
         },
       },
     ];

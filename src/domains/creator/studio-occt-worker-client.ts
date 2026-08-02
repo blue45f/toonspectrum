@@ -176,7 +176,7 @@ function isStudioOcctWorkerResponse(
     && Number.isFinite(result.volumeApprox)
     && validBodySemantics
     && validMeshShape
-    && result.vertexCount === mesh.vertices.length
+    && result.vertexCount === (mesh.vertices as unknown[]).length
     && canonicalTopologyMatches;
 }
 
