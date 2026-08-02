@@ -1085,6 +1085,83 @@ export async function workspaceOcctMirror(
   return commitOcctResult(ws, assetId, "occt-wasm-mirror", result);
 }
 
+/** Industrial OCCT thick/shell box → workspace. */
+export async function workspaceOcctThickShell(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-thick",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "thick-shell-box",
+    size: [1, 1, 0.5],
+    thickness: 0.05,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-thick", result);
+}
+
+/** Industrial STEP write+read round-trip box → workspace. */
+export async function workspaceOcctStepRoundTrip(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-step",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "step-roundtrip-box",
+    size: [1, 1, 1],
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-step", result);
+}
+
+/**
+ * Multi-asset solid boolean: difference of two registered geometry assets
+ * via the default Manifold backend (MOD-014 product path).
+ */
+export async function workspaceBooleanBetweenAssets(
+  ws: StudioHybridDccWorkspace,
+  leftAssetId: string,
+  rightAssetId: string,
+  operation: "difference" | "union" | "intersection" = "difference",
+  outAssetId = "boolean-result",
+): Promise<StudioHybridDccWorkspace> {
+  const leftRec = ws.session.state.geometry.records[leftAssetId];
+  const rightRec = ws.session.state.geometry.records[rightAssetId];
+  if (!leftRec || !rightRec) {
+    throw new Error(`missing assets left=${leftAssetId} right=${rightAssetId}`);
+  }
+  const leftSoup = studioEditableMeshToTriangleSoup(leftRec.mesh);
+  const rightSoup = studioEditableMeshToTriangleSoup(rightRec.mesh);
+  let stack = createStudioMeshModifierStack(leftRec.mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "boolean",
+    id: "multi-asset-bool",
+    enabled: true,
+    operation,
+    operand: { positions: rightSoup.positions, indices: rightSoup.indices },
+  });
+  const e = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!e.ok) throw new Error(e.detail);
+  const soupOut = studioEditableMeshToTriangleSoup(e.value.mesh);
+  if (soupOut.indices.length / 3 < 4) {
+    throw new Error(`multi-asset boolean degenerate tris=${soupOut.indices.length / 3}`);
+  }
+  let session = ws.session;
+  if (!session.state.geometry.records[outAssetId]) {
+    session = hybridDccRegisterAsset(session, outAssetId, e.value.mesh, {
+      source: `boolean-${operation}`,
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, outAssetId, e.value.mesh);
+  }
+  void leftSoup;
+  return { ...ws, session, activeAssetId: outAssetId };
+}
+
 /** Industrial OCCT fillet box → workspace. */
 export async function workspaceOcctFillet(
   ws: StudioHybridDccWorkspace,

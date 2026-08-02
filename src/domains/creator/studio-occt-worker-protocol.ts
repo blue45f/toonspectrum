@@ -27,6 +27,15 @@ export type StudioOcctWorkerOperation =
       readonly size: readonly [number, number, number];
     }
   | {
+      readonly kind: "thick-shell-box";
+      readonly size: readonly [number, number, number];
+      readonly thickness: number;
+    }
+  | {
+      readonly kind: "step-roundtrip-box";
+      readonly size: readonly [number, number, number];
+    }
+  | {
       readonly kind: "revolve";
       readonly radius: number;
       readonly height: number;

@@ -38,8 +38,11 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceBooleanBetweenAssets,
   workspaceOcctMirror,
   workspaceOcctPipe,
+  workspaceOcctStepRoundTrip,
+  workspaceOcctThickShell,
   workspaceOcctTorus,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
@@ -233,6 +236,41 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT mirror", () => workspaceOcctMirror(ws))}
         >
           OCCT mirror
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-thick"
+          onClick={() => run("OCCT thick shell", () => workspaceOcctThickShell(ws))}
+        >
+          OCCT thick
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-step"
+          onClick={() => run("OCCT STEP round-trip", () => workspaceOcctStepRoundTrip(ws))}
+        >
+          OCCT STEP
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="boolean-two-assets"
+          onClick={() =>
+            run("Boolean two assets", async () => {
+              let next = workspaceAddUnitCube(ws);
+              next = await workspaceOcctBox(next, "occt-cutter", [0.6, 0.6, 0.6]);
+              const ids = Object.keys(next.session.state.geometry.records);
+              const left = ids.find((id) => id !== "occt-cutter") ?? ids[0]!;
+              return workspaceBooleanBetweenAssets(next, left, "occt-cutter", "difference");
+            })
+          }
+        >
+          Boolean 2 assets
         </button>
         <button
           type="button"

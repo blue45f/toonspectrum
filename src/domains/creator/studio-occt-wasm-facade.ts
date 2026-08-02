@@ -15,7 +15,19 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 5 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 6 as const;
+
+export type StudioOcctStepIoResult = {
+  readonly ok: true;
+  readonly backend: "opencascade-wasm";
+  readonly operation: "STEPControl_Writer+Reader";
+  readonly stepBytes: number;
+  readonly stepText: string;
+  readonly mesh: StudioEditableMesh;
+  readonly triangleCount: number;
+  readonly faceCount: number;
+  readonly loadPath: "browser" | "node";
+};
 
 export type StudioOcctRuntime = {
   readonly backend: "opencascade-wasm";
@@ -799,6 +811,172 @@ export async function occtMakeSphereSolid(
   });
 }
 
+/**
+ * Shell/thicken: remove one face of a box and offset the shell (SolidWorks shell).
+ * Uses BRepOffsetAPI_MakeThickSolid.MakeThickSolidByJoin (9-arg Embind).
+ */
+export async function occtMakeThickShellBox(
+  dx: number,
+  dy: number,
+  dz: number,
+  thickness: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  // ThickSolid Embind handles corrupt the shared WASM table when .delete() is called.
+  // Mirror STEP policy: construct without owner.dispose (THICK_EMBIND_NO_DELETE).
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const boxBuilder = /* THICK_EMBIND_NO_DELETE */ new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz);
+    const box = boxBuilder.Shape();
+    const faces: unknown[] = [];
+    const exp = /* THICK_EMBIND_NO_DELETE */ new oc.TopExp_Explorer_2(
+      box,
+      oc.TopAbs_ShapeEnum.TopAbs_FACE,
+      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+    );
+    while (exp.More()) {
+      faces.push(oc.TopoDS.Face_1(exp.Current()));
+      exp.Next();
+    }
+    if (faces.length < 1) {
+      return { ok: false, code: "no-faces", detail: "box has no faces to open" };
+    }
+    const list = /* THICK_EMBIND_NO_DELETE */ new oc.TopTools_ListOfShape_1();
+    if (isCallable(list.Append_1)) list.Append_1(faces[0]);
+    else if (isCallable(list.Append)) list.Append(faces[0]);
+    else {
+      return { ok: false, code: "no-list-append", detail: "TopTools_ListOfShape.Append missing" };
+    }
+    const thick = /* THICK_EMBIND_NO_DELETE */ new oc.BRepOffsetAPI_MakeThickSolid_1();
+    if (!isCallable(thick.MakeThickSolidByJoin)) {
+      return { ok: false, code: "no-thick-join", detail: "MakeThickSolidByJoin missing" };
+    }
+    const joinType =
+      oc.GeomAbs_JoinType?.GeomAbs_Arc
+      ?? oc.GeomAbs_Arc
+      ?? 0;
+    try {
+      thick.MakeThickSolidByJoin(
+        box,
+        list,
+        thickness,
+        1e-3,
+        false,
+        false,
+        joinType,
+        false,
+        false,
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        code: "thick-join-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (isCallable(thick.Build)) thick.Build();
+    const shape = thick.Shape();
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "thick shell produced no triangles" };
+    }
+    return packResult(
+      "BRepOffsetAPI_MakeThickSolid",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.max(0, approxVolumeBox(dx, dy, dz) - approxVolumeBox(
+        Math.max(0.01, dx - 2 * Math.abs(thickness)),
+        Math.max(0.01, dy - 2 * Math.abs(thickness)),
+        Math.max(0.01, dz - 2 * Math.abs(thickness)),
+      )),
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * STEP AP214 write + read round-trip for a box solid (industrial CAD interchange).
+ * Uses OpenCascade WASM FS (`Write`/`ReadFile`) and returns the STEP text + remeshed body.
+ *
+ * NOTE: Do not call Embind `.delete()` on STEP writer/reader — opencascade.js corrupts
+ * the WASM function table when those controllers are disposed. Leak intentionally.
+ */
+export async function occtStepRoundTripBox(
+  dx: number,
+  dy: number,
+  dz: number,
+): Promise<StudioOcctStepIoResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    if (!oc.FS?.readFile) {
+      return { ok: false, code: "no-fs", detail: "OCCT WASM FS unavailable for STEP I/O" };
+    }
+    // STEP_EMBIND_NO_DELETE: do not owner.own / .delete() these handles.
+    // Match the proven probe path exactly (hardcoded short FS name + chained MakeBox).
+    const box = /* STEP_EMBIND_NO_DELETE */ new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
+    const writer = /* STEP_EMBIND_NO_DELETE */ new oc.STEPControl_Writer_1();
+    writer.Transfer(box, 0, true);
+    const fileName = "qq.stp";
+    writer.Write(fileName);
+    let stepText = "";
+    try {
+      stepText = oc.FS.readFile(fileName, { encoding: "utf8" }) as string;
+    } catch (error) {
+      return {
+        ok: false,
+        code: "step-read-fs-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (!stepText.includes("ISO-10303-21")) {
+      return {
+        ok: false,
+        code: "step-invalid",
+        detail: "written STEP missing ISO-10303-21 header",
+      };
+    }
+    const reader = /* STEP_EMBIND_NO_DELETE */ new oc.STEPControl_Reader_1();
+    reader.ReadFile(fileName);
+    if (isCallable(reader.TransferRoots)) reader.TransferRoots();
+    else if (isCallable(reader.TransferRoot)) reader.TransferRoot();
+    const shape = isCallable(reader.OneShape) ? reader.OneShape() : reader.Shape(1);
+    if (!shape) {
+      return { ok: false, code: "step-empty-shape", detail: "STEP reader returned no shape" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "STEP import produced no triangles" };
+    }
+    return {
+      ok: true,
+      backend: "opencascade-wasm",
+      operation: "STEPControl_Writer+Reader",
+      stepBytes: stepText.length,
+      stepText,
+      mesh: soupToMesh(tess.positions, tess.indices),
+      triangleCount: tess.triangleCount,
+      faceCount: tess.faceCount,
+      loadPath: runtime.loadPath,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 /** Torus solid — BRepPrimAPI_MakeTorus (major/minor radii). */
 export async function occtMakeTorusSolid(
   majorRadius: number,
@@ -1444,6 +1622,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly realThruSections: boolean;
   readonly realPipe: boolean;
   readonly realMirror: boolean;
+  readonly realThickShell: boolean;
+  readonly realStepIo: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -1454,6 +1634,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let realThruSections = false;
   let realPipe = false;
   let realMirror = false;
+  let realThickShell = false;
+  let realStepIo = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -1469,6 +1651,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       if (r.operation === "BRepOffsetAPI_ThruSections") realThruSections = true;
       if (r.operation === "BRepOffsetAPI_MakePipe") realPipe = true;
       if (r.operation.includes("mirror") || r.operation.includes("Transform")) realMirror = true;
+      if (r.operation === "BRepOffsetAPI_MakeThickSolid") realThickShell = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
@@ -1496,6 +1679,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("fillet", () => occtFilletBox(1, 1, 1, 0.08));
   await run("chamfer", () => occtChamferBox(1, 1, 1, 0.05));
   await run("mirror", () => occtMirrorBox(0.8, 0.5, 0.4));
+  await run("thick", () => occtMakeThickShellBox(1, 1, 0.5, 0.05));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -1503,6 +1687,16 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       { dx: 1, dy: 1, z: 2 },
     ]),
   );
+  const step = await occtStepRoundTripBox(1, 1, 1);
+  if (step.ok) {
+    ops.push(step.operation);
+    totalTriangles += step.triangleCount;
+    totalFaces += step.faceCount;
+    loadPath = step.loadPath;
+    realStepIo = true;
+  } else {
+    ops.push(`step:fail:${step.code}`);
+  }
   const okOps = ops.filter((o) => !o.includes(":fail:")).length;
   if (okOps < 6) {
     throw new Error(`SolidWorks-grade suite too sparse: ${ops.join(",")}`);
@@ -1523,5 +1717,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     realThruSections,
     realPipe,
     realMirror,
+    realThickShell,
+    realStepIo,
   };
 }

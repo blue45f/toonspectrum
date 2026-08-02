@@ -7,9 +7,11 @@ import {
   occtMakeBoxSolid,
   occtMakeSphereSolid,
   occtMakePipeSolid,
+  occtMakeThickShellBox,
   occtMakeTorusSolid,
   occtMirrorBox,
   occtRevolveCylinderLike,
+  occtStepRoundTripBox,
 } from "./studio-occt-wasm-facade";
 
 import type {
@@ -33,6 +35,34 @@ async function runOperation(
       return occtMakePipeSolid(operation.length, operation.radius);
     case "mirror-box":
       return occtMirrorBox(operation.size[0], operation.size[1], operation.size[2]);
+    case "thick-shell-box":
+      return occtMakeThickShellBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.thickness,
+      );
+    case "step-roundtrip-box": {
+      const step = await occtStepRoundTripBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+      );
+      if (!step.ok) {
+        return { ok: false as const, code: step.code, detail: step.detail };
+      }
+      return {
+        ok: true as const,
+        mesh: step.mesh,
+        faceCount: step.faceCount,
+        triangleCount: step.triangleCount,
+        vertexCount: step.mesh.vertices.length,
+        volumeApprox: operation.size[0] * operation.size[1] * operation.size[2],
+        backend: "opencascade-wasm" as const,
+        operation: step.operation,
+        loadPath: step.loadPath,
+      };
+    }
     case "revolve":
       return occtRevolveCylinderLike(operation.radius, operation.height);
     case "fillet-box":

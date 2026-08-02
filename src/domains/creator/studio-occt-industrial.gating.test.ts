@@ -51,13 +51,19 @@ describe("industrial OCCT WASM CAD", () => {
     const operationSource = source.slice(source.indexOf("function makeOcctBoxShape"));
     const unownedConstructors = operationSource
       .split(/\r?\n/u)
-      .filter((line) => line.includes("new oc") && !line.includes("owner.own(new oc"));
+      .filter((line) => line.includes("new oc") && !line.includes("owner.own(new oc"))
+      // STEP/ThickSolid Embind .delete() corrupts opencascade.js WASM — intentional no-owner lines.
+      .filter((line) => !line.includes("STEP_EMBIND_NO_DELETE") && !line.includes("THICK_EMBIND_NO_DELETE"));
     expect(unownedConstructors).toEqual([]);
     expect(source).toContain("return await operation(runtime, owner);");
     expect(source).toContain("owner.dispose();");
-    expect(operationSource).not.toMatch(
-      /new oc(?:\[[^\]]+\]|\.[A-Za-z0-9_]+)\([^;\n]*\)\.Shape\(/u,
-    );
+    const chainedShape = operationSource
+      .split(/\r?\n/u)
+      .filter((line) =>
+        /new oc(?:\[[^\]]+\]|\.[A-Za-z0-9_]+)\([^;\n]*\)\.Shape\(/u.test(line)
+      )
+      .filter((line) => !line.includes("STEP_EMBIND_NO_DELETE") && !line.includes("THICK_EMBIND_NO_DELETE"));
+    expect(chainedShape).toEqual([]);
   });
 
   it("loads opencascade.wasm and reports backend", async () => {

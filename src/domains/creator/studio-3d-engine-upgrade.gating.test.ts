@@ -12,19 +12,25 @@ import {
 import {
   createStudioHybridDccWorkspace,
   workspaceAddUnitCube,
+  workspaceBooleanBetweenAssets,
   workspaceManifoldBooleanActive,
+  workspaceOcctBox,
   workspaceOcctFillet,
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctStepRoundTrip,
+  workspaceOcctThickShell,
 } from "./studio-hybrid-dcc-workspace";
 import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
 import {
   occtLoftedTower,
   occtMakePipeSolid,
+  occtMakeThickShellBox,
   occtMakeTorusSolid,
   occtMirrorBox,
   occtSolidWorksGradeSuite,
+  occtStepRoundTripBox,
   STUDIO_OCCT_WASM_FACADE_REVISION,
 } from "./studio-occt-wasm-facade";
 import {
@@ -115,6 +121,48 @@ describe("3D engine upgrades", () => {
     const suite = await occtSolidWorksGradeSuite();
     expect(suite.realPipe).toBe(true);
     expect(suite.realMirror).toBe(true);
+  }, 180_000);
+
+  it("OCCT thick shell and STEP write/read produce body geometry", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(6);
+    const thick = await occtMakeThickShellBox(1, 1, 0.5, 0.05);
+    expect(thick.ok).toBe(true);
+    if (!thick.ok) return;
+    expect(thick.operation).toBe("BRepOffsetAPI_MakeThickSolid");
+    expect(thick.triangleCount).toBeGreaterThanOrEqual(12);
+
+    const step = await occtStepRoundTripBox(1, 1, 1);
+    expect(step.ok).toBe(true);
+    if (!step.ok) return;
+    expect(step.operation).toBe("STEPControl_Writer+Reader");
+    expect(step.stepBytes).toBeGreaterThan(500);
+    expect(step.stepText).toMatch(/ISO-10303-21/u);
+    expect(step.triangleCount).toBeGreaterThanOrEqual(12);
+  }, 120_000);
+
+  it("SolidWorks suite reports realThickShell and realStepIo", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realThickShell).toBe(true);
+    expect(suite.realStepIo).toBe(true);
+  }, 180_000);
+
+  it("workspace thick shell + STEP + multi-asset boolean register meshes", async () => {
+    let ws = createStudioHybridDccWorkspace("thick-step-ws");
+    ws = await workspaceOcctThickShell(ws, "thick1");
+    expect(ws.lastOcct?.operation).toBe("BRepOffsetAPI_MakeThickSolid");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
+
+    ws = await workspaceOcctStepRoundTrip(ws, "step1");
+    expect(ws.lastOcct?.operation).toMatch(/STEP/u);
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
+
+    ws = workspaceAddUnitCube(ws);
+    ws = await workspaceOcctBox(ws, "cutter", [0.55, 0.55, 0.55]);
+    const leftId = Object.keys(ws.session.state.geometry.records).find((id) => id !== "cutter")!;
+    ws = await workspaceBooleanBetweenAssets(ws, leftId, "cutter", "difference", "bool-out");
+    expect(ws.activeAssetId).toBe("bool-out");
+    const out = ws.session.state.geometry.records["bool-out"]!.mesh;
+    expect(out.faces.length).toBeGreaterThanOrEqual(4);
   }, 180_000);
 
   it("orientStudioMeshOutward flips inverted cube faces for CSG readiness", () => {
