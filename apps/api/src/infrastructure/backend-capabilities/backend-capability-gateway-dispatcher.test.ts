@@ -177,6 +177,23 @@ function coordinationMock(): CoordinationMock {
 }
 
 describe("backend capability HTTPS gateway dispatcher", () => {
+  it("accepts the versioned gateway media type when the HTTP server adds charset", async () => {
+    const fetchMock = vi.fn<BackendCapabilityGatewayRuntime["fetch"]>(async () => {
+      const response = gatewayResponse("cloudflare");
+      response.headers.set(
+        "content-type",
+        "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+      );
+      return response;
+    });
+    const { dispatcher } = createDispatcher(fetchMock);
+
+    await expect(dispatcher.dispatch(command)).resolves.toMatchObject({
+      ok: true,
+      providerId: "cloudflare",
+      outcome: "completed",
+    });
+  });
   it("boots with explicit DI tokens under the metadata-light tsx runtime", async () => {
     const application = await NestFactory.createApplicationContext(
       BackendCapabilitiesModule,

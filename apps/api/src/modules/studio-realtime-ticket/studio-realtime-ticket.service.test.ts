@@ -21,6 +21,11 @@ const REQUEST = {
   ],
 } as const;
 const ORIGIN = "https://www.toonstudio.cloud";
+const PRINCIPAL = {
+  userId: "commenter-1",
+  sessionVersion: 7,
+  expiresAt: 2_000_000_000_000,
+} as const;
 const ALLOWED = {
   ...REQUEST,
   allowed: true,
@@ -86,7 +91,7 @@ describe("StudioRealtimeTicketService", () => {
     const subject = harness(authorize);
 
     const response = await subject.service.issue(
-      "commenter-1",
+      PRINCIPAL,
       ORIGIN,
       REQUEST,
     );
@@ -98,6 +103,8 @@ describe("StudioRealtimeTicketService", () => {
     });
     expect(subject.issue).toHaveBeenCalledWith({
       actorUserId: "commenter-1",
+      sessionVersion: PRINCIPAL.sessionVersion,
+      sessionExpiresAtEpochMs: PRINCIPAL.expiresAt,
       sessionId: "session-1",
       scope: REQUEST.scope,
       workloads: REQUEST.workloads,
@@ -121,7 +128,7 @@ describe("StudioRealtimeTicketService", () => {
     const subject = harness((input) => denyAll.authorize(input as never));
 
     await expect(
-      subject.service.issue("commenter-1", ORIGIN, REQUEST),
+      subject.service.issue(PRINCIPAL, ORIGIN, REQUEST),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(subject.issue).not.toHaveBeenCalled();
   });
@@ -134,7 +141,7 @@ describe("StudioRealtimeTicketService", () => {
       })),
     );
     await expect(
-      mismatch.service.issue("commenter-1", ORIGIN, REQUEST),
+      mismatch.service.issue(PRINCIPAL, ORIGIN, REQUEST),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(mismatch.issue).not.toHaveBeenCalled();
 
@@ -149,7 +156,7 @@ describe("StudioRealtimeTicketService", () => {
       })),
     );
     await expect(
-      viewer.service.issue("commenter-1", ORIGIN, REQUEST),
+      viewer.service.issue(PRINCIPAL, ORIGIN, REQUEST),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(viewer.issue).not.toHaveBeenCalled();
   });
@@ -166,7 +173,7 @@ describe("StudioRealtimeTicketService", () => {
     );
 
     await expect(
-      subject.service.issue("commenter-1", ORIGIN, REQUEST),
+      subject.service.issue(PRINCIPAL, ORIGIN, REQUEST),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(subject.issue).not.toHaveBeenCalled();
   });
@@ -179,7 +186,7 @@ describe("StudioRealtimeTicketService", () => {
       }),
     );
     const authorizationError = await failedAuthorization.service
-      .issue("commenter-1", ORIGIN, REQUEST)
+      .issue(PRINCIPAL, ORIGIN, REQUEST)
       .catch((error: unknown) => error);
     expect(authorizationError).toBeInstanceOf(ServiceUnavailableException);
     expect(String(authorizationError)).not.toContain(authorizationSecret);
@@ -194,7 +201,7 @@ describe("StudioRealtimeTicketService", () => {
       },
     );
     const signerError = await failedSigner.service
-      .issue("commenter-1", ORIGIN, REQUEST)
+      .issue(PRINCIPAL, ORIGIN, REQUEST)
       .catch((error: unknown) => error);
     expect(signerError).toBeInstanceOf(ServiceUnavailableException);
     expect(String(signerError)).not.toContain(signerSecret);

@@ -147,6 +147,7 @@ interface EmittedRecord {
 
 class FakeSocket implements StudioLiveSocketLike {
   connected = false;
+  connectCalls = 0;
   auth: Record<string, unknown>;
   readonly emitted: EmittedRecord[] = [];
   readonly listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -160,6 +161,7 @@ class FakeSocket implements StudioLiveSocketLike {
   }
 
   connect(): StudioLiveSocketLike {
+    this.connectCalls += 1;
     this.connected = true;
     this.serverEmit("connect");
     return this;
@@ -3807,6 +3809,82 @@ describe("StudioLiveSocketTransport", () => {
     expect(
       socket.emitted.filter((event) => event.event === "studio:join")
     ).toHaveLength(joinCountBeforeRejection);
+    room.close();
+  });
+
+  it("refreshes an expired admission ticket once in memory before reconnecting", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const refreshedTicket = "fresh-short-lived-admission-ticket";
+    const refreshSocketCredential = vi.fn(async () => refreshedTicket);
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          refreshSocketCredential,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+      },
+    });
+    await room.start();
+    const initialConnectCalls = socket.connectCalls;
+
+    socket.serverDisconnect();
+    socket.serverEmit(
+      "connect_error",
+      Object.assign(new Error("입장권이 만료되었습니다."), {
+        data: { code: "unauthenticated" },
+      }),
+    );
+
+    await vi.waitFor(() => expect(room.ready).toBe(true));
+    expect(refreshSocketCredential).toHaveBeenCalledOnce();
+    expect(socket.auth).toEqual({ sessionToken: refreshedTicket });
+    expect(socket.connectCalls).toBe(initialConnectCalls + 1);
+    room.close();
+  });
+
+  it("fails closed when a one-shot admission refresh cannot reauthenticate", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const refreshSocketCredential = vi.fn(async () => {
+      throw new Error("cookie session unavailable");
+    });
+    const statuses: StudioLiveRoomEvent[] = [];
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          refreshSocketCredential,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+      },
+    });
+    room.subscribe((event) => event.type === "transport-status" && statuses.push(event));
+    await room.start();
+
+    socket.serverDisconnect();
+    socket.serverEmit(
+      "connect_error",
+      Object.assign(new Error("입장권이 만료되었습니다."), {
+        data: { code: "unauthenticated" },
+      }),
+    );
+
+    await vi.waitFor(() => expect(socket.auth).toEqual({}));
+    expect(refreshSocketCredential).toHaveBeenCalledOnce();
+    expect(room.ready).toBe(false);
+    expect(statuses.at(-1)).toEqual(expect.objectContaining({
+      status: {
+        state: "revoked",
+        message: "입장권이 만료되었습니다.",
+        recoverable: false,
+      },
+    }));
     room.close();
   });
 

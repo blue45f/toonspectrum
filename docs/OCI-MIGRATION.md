@@ -1,28 +1,51 @@
-# ToonSpectrum — Oracle Cloud(OCI) 백엔드 이전 런북
+# ToonSpectrum — Oracle Cloud(OCI) 선택형 폴백 런북 (보관됨)
 
-프론트엔드는 **Vercel 유지**(무료 글로벌 CDN). **API(NestJS) + Postgres + KR 크롤 cron** 을 OCI
-**Always-Free ARM(Ampere A1, 최대 4 OCPU / 24GB RAM, 영구 무료)** VM 한 대로 옮긴다. 비용 $0.
+> **운영 권위가 아닌 보관 자료입니다.** 이 디렉터리는 현재 production을 설명하지 않으며,
+> 장애 복구 실험이나 명시적으로 승인된 장기 실행 컨테이너 폴백에만 사용합니다. OCI 무료 등급,
+> 리전 가용성, 한도와 과금은 변경될 수 있으므로 `Always-Free`, 영구 무료 또는 비용 $0을 전제로
+> production을 전환하지 않습니다.
 
-## 왜 옮기나 (이번에 확인된 근거)
+2026-08-02 기준 권위 배치는 다음과 같습니다.
+
+| 목적 | 현재 권위 | 상태 |
+| --- | --- | --- |
+| SPA와 bounded HTTP API | Vercel | production |
+| 관계형 데이터·migration 원장 | Neon/호환 PostgreSQL | `0001`~`0024` checksum 원장·capability 검증 완료 |
+| Studio ephemeral realtime | Cloudflare Durable Objects | `workers.dev` origin 활성, custom hostname/DNS/TLS는 별도 대기 |
+| 분산 제한·coordination | Upstash | production 활성 |
+| 비공개 원본·파생·export object | Supabase private Storage | production 활성 |
+| Google OAuth | Vercel 동일 출처 callback | production 수정·검증 완료 |
+| AI provider secrets/budget | Vercel production env | 다음 승인 배포 반영 대기 |
+
+OCI를 다시 채택하더라도 위 목적들을 한 VM으로 합치지 않습니다. 해당 workload의 권위와 동일한
+인증·ACL·migration·readiness·canary 계약을 먼저 증명한 뒤 **그 목적만** 전환합니다.
+
+## 과거 검토 근거 (현재 운영 사실이 아님)
 - **Neon 데이터 전송 쿼터 초과** — 무료 티어 한도를 이미 넘겨 DB 기능(리뷰·커뮤니티·피드백·인증)이 간헐 차단. OCI 자가호스트 Postgres(egress 10TB/월 무료)로 해소.
 - **GH 러너 크롤 한계** — 비KR egress라 ~23.4k(novelpia 0)밖에 못 함. OCI **서울/춘천 리전** VM에서 크롤하면 풀 수확(~30k) + cron 자동 갱신.
-- 콜드스타트 제거, API+DB+크롤 한 곳 통합.
+- 콜드스타트 제거와 API+DB+크롤 통합을 검토했지만, 단일 VM 장애 도메인과 운영 부담 때문에 현재
+  production 구조로 채택하지 않았다.
 
-## 아키텍처
+## 현재 권위 아키텍처
 ```
-브라우저 → Vercel(정적 SPA + /data 카탈로그 CDN)
-            └ /api/* ──(Vercel rewrite, 동일 출처)──▶ OCI VM: Caddy(443,자동HTTPS) → NestJS API → Postgres
-OCI VM cron: 크롤(KR) → validate 게이트 → catalog.json.gz 커밋/푸시 → Vercel 재배포 + Discord 알림
+브라우저 → Vercel(정적 SPA + bounded Nest API) → Neon/PostgreSQL
+         ├ Studio realtime → Cloudflare Durable Objects (workers.dev)
+         └ private assets → 서명된 API 경계 → Supabase Storage
+API coordination/rate-limit → Upstash
 ```
 
-## 0. 준비물
-- OCI 계정(무료 가입, 결제카드 본인확인만 — Always-Free는 과금 없음).
+아래 절차는 이 구조를 설명하지 않습니다. OCI 폴백을 별도 승인한 경우의 재현 가능한 scaffold일
+뿐이며, 실행 전 `DEPLOY.md`와 `docs/BACKEND_CAPABILITY_DISTRIBUTION.md`의 현재 계약을 우선합니다.
+
+## 0. 폴백 활성화 전 준비물
+- OCI 계정과 실제 tenancy의 현재 quota·billing alert·egress 정책 검토.
 - API용 도메인 1개(예: `api.example.com`). 서브도메인이면 충분.
 - 로컬에 빌드/검증 완료된 이 레포(`deploy/oci/` 일체 + 스모크 테스트 통과 확인됨).
 
 ## 1. ARM 인스턴스 생성 (OCI 콘솔)
 1. **Compute → Instances → Create**.
-2. Image: **Ubuntu 22.04/24.04 (aarch64)**. Shape: **VM.Standard.A1.Flex** — OCPU 2~4, RAM 12~24GB(Always-Free 한도 내). *ARM 무료 용량은 인기 리전에서 품귀일 수 있음 → 안 잡히면 다른 AD/리전(서울·춘천) 재시도.*
+2. Image: **Ubuntu 24.04 (aarch64)**. Shape: **VM.Standard.A1.Flex**. OCPU/RAM은 현재
+   tenancy quota와 billing 설정을 직접 확인해 결정한다. 저장소 문서는 무료 용량을 보장하지 않는다.
 3. Networking: 새 VCN + public subnet, **퍼블릭 IP 할당**.
 4. SSH 키 등록(본인 공개키).
 5. **Advanced → Management → cloud-init**: `deploy/oci/cloud-init.yaml` 내용 붙여넣기.
@@ -38,9 +61,9 @@ VCN → Subnet → Security List → **Ingress 0.0.0.0/0 TCP 80, 443 추가**(SS
 ## 4. .env 작성 (SSH 접속 후)
 ```bash
 ssh ubuntu@<VM_IP>
-cd /opt/webdex/deploy/oci
-cp .env.example .env && nano .env     # DOMAIN, POSTGRES_PASSWORD, AUTH_SECRET, AUTH_*,
-                                      # ADMIN_EMAILS 등 — 현재 Vercel/.env.local 값 복사
+cd /opt/toonspectrum/deploy/oci
+cp .env.example .env && nano .env     # DOMAIN, DB/OAuth/session 등 폴백 목적에 필요한
+                                      # 최소 값만 승인된 secret manager에서 주입
 ```
 
 ## 5. DB bootstrap/upgrade + 스택 기동
@@ -53,7 +76,7 @@ cp .env.example .env && nano .env     # DOMAIN, POSTGRES_PASSWORD, AUTH_SECRET, 
 먼저 DB와 API 이미지만 준비하되 writer는 시작하지 않는다.
 
 ```bash
-cd /opt/webdex/deploy/oci
+cd /opt/toonspectrum/deploy/oci
 docker compose up -d db
 docker compose build api
 ```
@@ -65,12 +88,12 @@ docker compose build api
 상태에서 먼저 읽기 전용 계획을 실행한다.
 
 ```bash
-cd /opt/webdex
+cd /opt/toonspectrum
 export MIGRATION_DATABASE_URL='<OCI direct migrator URL>'
 release_sha="$(git rev-parse HEAD)"
 pnpm db:bootstrap:production-empty -- \
   --plan \
-  --runtime-database-role webdex_runtime \
+  --runtime-database-role toonspectrum_runtime \
   --release-sha "$release_sha"
 ```
 
@@ -82,7 +105,7 @@ pnpm db:bootstrap:production-empty -- \
 export BOOTSTRAP_RUNTIME_DATABASE_PASSWORD='<runtime-role-secret-if-missing>'
 pnpm db:bootstrap:production-empty -- \
   --execute \
-  --runtime-database-role webdex_runtime \
+  --runtime-database-role toonspectrum_runtime \
   --release-sha "$release_sha" \
   --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
 unset BOOTSTRAP_RUNTIME_DATABASE_PASSWORD MIGRATION_DATABASE_URL
@@ -104,7 +127,7 @@ relation 소유권을 거부하고, migration ledger의 PUBLIC/runtime 접근 �
 포착 가능한 오류에서는 `finally`로 `LOGIN`을 복원한 뒤 최종 verifier가 역할 경계를 다시
 검증한다. VM 강제 종료 등으로 복원 단계 자체가 실행되지 못했다면 이는 의도적인 fail-closed
 상태다. bootstrap 프로세스가 없고 DB client가 0임을 확인한 운영자만 direct migrator 연결에서
-`ALTER ROLE webdex_runtime LOGIN;`을 실행하고, 다시 `--plan`과 capability verifier를 통과시킨다.
+`ALTER ROLE toonspectrum_runtime LOGIN;`을 실행하고, 다시 `--plan`과 capability verifier를 통과시킨다.
 계획 모드는 이 게이트를 활성화하지 않으며 완전히 읽기 전용이다.
 
 Neon의 **전체 DB archive를 복제할 예정이면 이 bootstrap을 먼저 실행하지 않는다.** §6-A처럼
@@ -144,7 +167,7 @@ full archive를 한 transaction으로 복원한다.
 
 ```bash
 # Neon 전송 쿼터가 충분할 때 실행
-pg_dump "$NEON_DATABASE_URL" --no-owner --no-privileges -Fc -f webdex-neon.dump
+pg_dump "$NEON_DATABASE_URL" --no-owner --no-privileges -Fc -f toonspectrum-neon.dump
 
 # 결과가 null이어야 한다. relation이 있으면 중지하고 새 빈 DB를 준비한다.
 psql "$OCI_DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atc \
@@ -152,7 +175,7 @@ psql "$OCI_DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atc \
 
 pg_restore --exit-on-error --single-transaction \
   --no-owner --no-privileges \
-  -d "$OCI_DATABASE_URL" webdex-neon.dump
+  -d "$OCI_DATABASE_URL" toonspectrum-neon.dump
 ```
 
 복원된 원장에 historical adoption marker가 없다면 정확한 release SHA로 workflow `adopt`를 한 번
@@ -166,10 +189,10 @@ pg_restore --exit-on-error --single-transaction \
 
 ```bash
 pg_dump "$NEON_DATABASE_URL" --data-only --exclude-schema=toonspectrum_ops \
-  --no-owner --no-privileges -Fc -f webdex-neon-data.dump
+  --no-owner --no-privileges -Fc -f toonspectrum-neon-data.dump
 pg_restore --data-only --exit-on-error --single-transaction \
   --no-owner --no-privileges \
-  -d "$OCI_DATABASE_URL" webdex-neon-data.dump
+  -d "$OCI_DATABASE_URL" toonspectrum-neon-data.dump
 ```
 
 복원 후 workflow `apply`와 capability verifier를 다시 실행하고 writer를 재개한다. 충돌을 무시하는
@@ -179,19 +202,23 @@ pg_restore --data-only --exit-on-error --single-transaction \
 ## 7. 크롤 + 백업 cron + git push 키
 ```bash
 # git push용 deploy key(쓰기 권한) 생성 후 GitHub repo → Deploy keys 등록(Allow write)
-ssh-keygen -t ed25519 -f ~/.ssh/webdex_deploy -N ""
-cat ~/.ssh/webdex_deploy.pub   # → GitHub Deploy keys 에 추가(write)
-git -C /opt/webdex remote set-url origin git@github.com:blue45f/toonspectrum.git
-git -C /opt/webdex config user.name "webdex-oci"; git -C /opt/webdex config user.email "oci@webdex"
+ssh-keygen -t ed25519 -f ~/.ssh/toonspectrum_deploy -N ""
+cat ~/.ssh/toonspectrum_deploy.pub   # → GitHub Deploy keys 에 추가(write)
+git -C /opt/toonspectrum remote set-url origin git@github.com:blue45f/toonspectrum.git
+git -C /opt/toonspectrum config user.name "toonspectrum-oci"; git -C /opt/toonspectrum config user.email "oci@toonstudio.cloud"
 
 crontab -e
 # 매일 04:00 KST 크롤→검증→커밋→배포→알림
-0 19 * * *  bash /opt/webdex/deploy/oci/crawl-update.sh >> /var/log/webdex-crawl.log 2>&1
+0 19 * * *  bash /opt/toonspectrum/deploy/oci/crawl-update.sh >> /var/log/toonspectrum-crawl.log 2>&1
 # 매일 03:30 KST DB 백업(14개 로테이션)
-30 18 * * * bash /opt/webdex/deploy/oci/backup-db.sh >> /var/log/webdex-backup.log 2>&1
+30 18 * * * bash /opt/toonspectrum/deploy/oci/backup-db.sh >> /var/log/toonspectrum-backup.log 2>&1
 ```
 
-## 8. Vercel을 OCI API로 전환 (선택적 rewrite — OCI-fit)
+## 8. Vercel을 OCI API로 전환 (보관된 비기본 절차)
+
+현재 production에서는 이 rewrite를 사용하지 않습니다. exact workload 계약, OAuth/session/CSRF,
+CORS, migration identity, observability, 용량과 장애 복구 canary를 새 OCI 배포에서 다시 증명하고
+release 승인을 받은 경우에만 적용합니다.
 **고볼륨·캐시 가능한 엔드포인트는 Vercel 엣지에 남기고, DB가 필요한 동적 엔드포인트만 OCI로** 보낸다.
 `/api/cover`(표지 프록시, `<img>`로 매 표지 호출 → 엣지 30일 캐시)와 `/title/:slug`→`/api/og`(공유 미리보기)를
 전부 OCI로 보내면 CDN 엣지 캐시를 잃어 성능·대역폭이 나빠진다. 순서가 중요(구체 규칙 먼저):
@@ -208,11 +235,16 @@ rewrite 하든 무관하다. 실제 네트워크를 타는 동적 fetch(리뷰·
 커밋 → Vercel 재배포. 그 뒤 **인증 콜백 동작 확인**(Google/Kakao OAuth redirect/callback이 Vercel 도메인
 기준으로 정상인지 — 필요 시 각 콘솔의 redirect URI 점검). `api/index.js`는 cover/og 처리로 계속 사용된다.
 
-## 9. 컷오버 / 롤백
-- 컷오버: §8 적용 후 리뷰 작성·로그인·커뮤니티 글쓰기 E2E 확인.
-- 롤백: `vercel.json` rewrite를 `/api/index` 로 되돌리고 재배포 → 즉시 기존 서버리스+Neon 경로 복귀.
+## 9. 선택형 컷오버 / 복구
+- 컷오버: §8 적용 후 인증·session/CSRF·저장·Studio ACL·readiness E2E와 provider canary 확인.
+- 복구: OCI 목적 라우팅만 제거하고 마지막으로 승인된 Vercel+Neon release로 되돌린다. DB를 이중
+  writer로 두지 않으며, 데이터 권위 전환에는 별도 drain·reconciliation 절차가 필요하다.
 
-## 10. Studio 음성 TURN 데이터 플레인(선택, 운영 음성에는 필수)
+## 10. Studio 음성 TURN 데이터 플레인(기본 비활성·별도 선택)
+
+production 기본값은 `STUDIO_LIVE_VOICE_ENABLED=false`입니다. 음성은 현재 핵심 Studio 계약이
+아니며 OCI 폴백을 띄운다고 함께 활성화되지 않습니다. 비용·개인정보·abuse·relay quota 승인과
+실제 forced-relay canary를 별도로 통과한 배포에서만 아래 보관 절차를 사용합니다.
 
 Nest API는 짧은 수명의 TURN 자격증명만 발급하고 미디어를 릴레이하지 않는다. 운영 음성 작업실은
 공인 고정 IP·전용 DNS·TLS 인증서·UDP relay 포트를 가진 coturn/관리형 TURN이 별도로 필요하다.

@@ -238,6 +238,12 @@ export interface StudioLiveSocketLike {
 export interface StudioLiveSocketTransportDependencies {
   createSocket?: (auth: { sessionToken: string }) => StudioLiveSocketLike;
   /**
+   * Refreshes the short-lived Socket.IO admission credential in memory after an
+   * unauthenticated handshake. It must never return the browser's web-session
+   * cookie or persist the returned credential.
+   */
+  refreshSocketCredential?: () => Promise<string>;
+  /**
    * Test/deployment seam. `null` explicitly keeps collaboration local without
    * constructing Socket.IO; omitted uses the environment/location policy.
    */
@@ -277,12 +283,11 @@ function resolveStudioRealtimeProviderId(
 /**
  * Activates the purpose-specific Cloudflare data plane only for an exact HTTPS origin. Missing or
  * malformed browser configuration leaves the proven primary transport untouched. The ticket
- * endpoint intentionally remains the same trusted API base instead of accepting another VITE URL
- * that could receive the signed session header.
+ * endpoint intentionally remains the same trusted API base so its HttpOnly cookie and CSRF
+ * boundary cannot be redirected to a runtime-configured third-party origin.
  */
 export function applyStudioRealtimePurposeRouting(
   primaryFactory: StudioLiveTransportFactory,
-  sessionToken: string,
   environment: StudioRealtimePurposeRoutingEnvironment,
 ): StudioLiveTransportFactory {
   const realtimeOrigin = resolveStudioCloudflareRealtimeOrigin(
@@ -297,7 +302,6 @@ export function applyStudioRealtimePurposeRouting(
     if (primary.mode !== "server") return primary;
     return createStudioCloudflarePurposeRoutedLiveTransportFactory({
       primaryFactory: () => primary,
-      sessionToken,
       realtimeOrigin,
       providerId,
     })(context);
@@ -410,6 +414,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly cancelTimeout: (handle: unknown) => void;
   private readonly voiceJoinAckTimeoutMs: number;
   private readonly lockAckTimeoutMs: number;
+  private readonly refreshSocketCredential?: () => Promise<string>;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
@@ -476,6 +481,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private selectedCrdtWireFormat: StudioCrdtWireFormat | null = null;
   private crdtWireSelectionTimeout: unknown = null;
   private crdtReconnectTimeout: unknown = null;
+  private credentialRefreshAttempted = false;
+  private credentialRefreshPromise: Promise<void> | null = null;
 
   constructor(
     context: StudioLiveTransportContext,
@@ -491,6 +498,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.randomId = dependencies.randomId ?? defaultRandomId;
     this.scheduleTimeout = dependencies.setTimeout ?? defaultSetTimeout;
     this.cancelTimeout = dependencies.clearTimeout ?? defaultClearTimeout;
+    this.refreshSocketCredential = dependencies.refreshSocketCredential;
     this.voiceJoinAckTimeoutMs = Math.min(
       30_000,
       Math.max(
@@ -1402,6 +1410,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private readonly onConnect = () => {
     if (!this.closed && !this.accessRevoked) {
+      this.credentialRefreshAttempted = false;
       this.clearCrdtReconnectTimeout();
       this.clearJoinRetry(true);
       this.beginJoin();
@@ -1410,7 +1419,17 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private readonly onConnectError = (error: unknown) => {
     const message = eventMessage(error, "팀 서버에 연결하지 못했습니다.");
-    if (isTerminalConnectErrorCode(connectErrorCode(error))) {
+    const code = connectErrorCode(error);
+    if (
+      code === "unauthenticated"
+      && this.refreshSocketCredential
+      && !this.credentialRefreshAttempted
+    ) {
+      this.credentialRefreshAttempted = true;
+      this.refreshCredentialAfterAuthenticationError(message);
+      return;
+    }
+    if (isTerminalConnectErrorCode(code)) {
       this.revokeFromConnectError(message);
       return;
     }
@@ -1423,6 +1442,39 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.clearCrdtWireSelectionTimeout();
     this.emitStatus({ state: "error", message, recoverable: true });
   };
+
+  private refreshCredentialAfterAuthenticationError(fallbackMessage: string): void {
+    if (
+      this.credentialRefreshPromise
+      || !this.refreshSocketCredential
+      || this.closed
+      || this.accessRevoked
+    ) return;
+    this.emitStatus({
+      state: "connecting",
+      message: "로그인 상태를 다시 확인하고 팀 서버에 재연결하는 중입니다.",
+      recoverable: true,
+    });
+    this.credentialRefreshPromise = Promise.resolve()
+      .then(() => this.refreshSocketCredential?.())
+      .then((credential) => {
+        if (this.closed || this.accessRevoked) return;
+        if (!safeString(credential, MAX_TOKEN_LENGTH)) {
+          throw new Error("실시간 팀 연결 정보가 올바르지 않습니다.");
+        }
+        this.sessionToken = credential;
+        this.socket.auth = { sessionToken: credential };
+        this.socket.connect();
+      })
+      .catch(() => {
+        if (!this.closed && !this.accessRevoked) {
+          this.revokeFromConnectError(fallbackMessage);
+        }
+      })
+      .finally(() => {
+        this.credentialRefreshPromise = null;
+      });
+  }
 
   private revokeFromConnectError(message: string): void {
     this.revokePendingLockReleases("access_revoked", message);
@@ -4526,7 +4578,7 @@ export function createStudioServerLiveTransportFactory(
       })()
     : localTransportFactory;
 
-  return applyStudioRealtimePurposeRouting(primaryFactory, sessionToken, {
+  return applyStudioRealtimePurposeRouting(primaryFactory, {
     realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
     providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
   });

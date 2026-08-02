@@ -38,6 +38,7 @@
     "test:cloudflare-realtime": "vitest run --config deploy/cloudflare-realtime/vitest.config.mts",
     "typecheck:cloudflare-realtime": "tsc -p deploy/cloudflare-realtime/tsconfig.json && tsc -p deploy/cloudflare-realtime/tsconfig.integration.json",
     "verify:cloudflare-realtime": "pnpm run test:cloudflare-realtime && pnpm run typecheck:cloudflare-realtime && pnpm exec wrangler deploy --dry-run --config deploy/cloudflare-realtime/wrangler.jsonc",
+    "verify:backend-capability-worker": "node scripts/canary-backend-capability-worker.mjs",
     "verify:csp": "node scripts/verify-vercel-csp.mjs index.html",
     "validate:architecture": "node scripts/validate-architecture.mjs",
     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",

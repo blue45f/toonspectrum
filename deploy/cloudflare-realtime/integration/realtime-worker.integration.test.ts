@@ -147,6 +147,7 @@ function buildClaims(
     issuer: "toonspectrum-api",
     audience: "toonspectrum-realtime",
     subject: "artist.integration",
+    sessionVersion: 1,
     workId: scope.workId,
     roomId: scope.roomId,
     clientId: "client.integration",
@@ -155,7 +156,7 @@ function buildClaims(
     nonce,
     issuedAtMs: nowMs,
     expiresAtMs: nowMs + 60_000,
-    sessionExpiresAtMs: nowMs + 60 * 60_000,
+    sessionExpiresAtMs: nowMs + 4 * 60_000,
     ...overrides,
   };
 }

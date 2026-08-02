@@ -6,10 +6,13 @@ import {
   SESSION_HMAC_SECRET_MIN_BYTES,
   SESSION_TOKEN_TTL_MS,
   signSession,
+  signStudioLiveAdmissionTicket,
   studioLivePrincipalFingerprint,
   verifySession,
   verifySessionToken,
+  verifyStudioLiveAdmissionTicket,
 } from "../server/session";
+import { STUDIO_LIVE_AUTH_TICKET_TTL_MS } from "../studio-live-auth-ticket";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -87,6 +90,57 @@ describe("세션 JWT(HS256) 발급/검증", () => {
     expect(first).not.toContain("user-123");
     expect(studioLivePrincipalFingerprint("user-123")).toBe(first);
     expect(studioLivePrincipalFingerprint("user-456")).not.toBe(first);
+  });
+});
+
+describe("Studio 실시간 단기 입장권 경계", () => {
+  const now = 1_700_000_000_000;
+  const principal = {
+    userId: "studio-user",
+    sessionVersion: 7,
+    expiresAt: now + SESSION_TOKEN_TTL_MS,
+  };
+
+  it("1분 이하 입장권만 발급하고 원래 세션 만료 경계를 보존한다", () => {
+    const signed = signStudioLiveAdmissionTicket(principal, now);
+    expect(signed.expiresAt - signed.issuedAt).toBe(STUDIO_LIVE_AUTH_TICKET_TTL_MS);
+    expect(verifyStudioLiveAdmissionTicket(signed.ticket, now)).toEqual(principal);
+
+    const [, body] = signed.ticket.split(".");
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    expect(payload).toMatchObject({
+      sub: principal.userId,
+      sv: principal.sessionVersion,
+      iss: "toonspectrum",
+      aud: "toonspectrum-studio-live",
+      sexp: Math.floor(principal.expiresAt / 1_000),
+    });
+    expect(payload.jti).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
+    );
+  });
+
+  it("웹 세션과 Studio 입장권을 서로의 검증 경계에서 재사용하지 못한다", () => {
+    const webSession = signSession(principal.userId, principal.sessionVersion, now);
+    const admission = signStudioLiveAdmissionTicket(principal, now).ticket;
+
+    expect(verifyStudioLiveAdmissionTicket(webSession, now)).toBeNull();
+    expect(verifySessionToken(admission, now)).toBeNull();
+  });
+
+  it("입장 창이 지나면 거부하고 원래 세션이 곧 만료되면 수명을 더 줄인다", () => {
+    const admission = signStudioLiveAdmissionTicket(principal, now);
+    expect(
+      verifyStudioLiveAdmissionTicket(
+        admission.ticket,
+        now + STUDIO_LIVE_AUTH_TICKET_TTL_MS,
+      ),
+    ).toBeNull();
+
+    const shortPrincipal = { ...principal, expiresAt: now + 10_000 };
+    const shortAdmission = signStudioLiveAdmissionTicket(shortPrincipal, now);
+    expect(shortAdmission.expiresAt).toBe(shortPrincipal.expiresAt);
+    expect(shortAdmission.expiresAt - shortAdmission.issuedAt).toBe(10_000);
   });
 });
 

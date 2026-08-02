@@ -22,7 +22,7 @@ const CONFIGURATION: CloudflareStudioRealtimeTicketSignerConfiguration = {
   audience: "toonspectrum-realtime",
   hmacSecret: SECRET,
   ticketTtlSeconds: 120,
-  sessionTtlSeconds: 4 * 60 * 60,
+  sessionTtlSeconds: 5 * 60,
   workloads: ["presence", "comments", "screen-signaling"],
   capabilities: [
     "presence.snapshot-v1",
@@ -51,6 +51,8 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
   it("issues a canonical two-part ticket accepted by the deployment verifier", async () => {
     const result = await signer().issue({
       actorUserId: "editor-1",
+      sessionVersion: 7,
+      sessionExpiresAtEpochMs: NOW + 60 * 60 * 1_000,
       sessionId: "session-1",
       scope: { workId: "work-1", roomId: "room-1" },
       workloads: ["comments", "screen-signaling"],
@@ -76,13 +78,14 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     if (!verified.ok) throw new Error("ticket fixture was not verified");
     expect(verified.claims).toMatchObject({
       subject: "editor-1",
+      sessionVersion: 7,
       workId: "work-1",
       roomId: "room-1",
       clientId: "session-1",
       scopes: ["comments", "screen-signaling"],
       issuedAtMs: NOW,
       expiresAtMs: NOW + 120_000,
-      sessionExpiresAtMs: NOW + 4 * 60 * 60 * 1_000,
+      sessionExpiresAtMs: NOW + 5 * 60 * 1_000,
     });
   });
 
@@ -90,6 +93,8 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
     const authorizationExpiresAtEpochMs = NOW + 42_000;
     const result = await signer().issue({
       actorUserId: "commenter-1",
+      sessionVersion: 3,
+      sessionExpiresAtEpochMs: NOW + 60 * 60 * 1_000,
       sessionId: "session-1",
       scope: { workId: "work-1", roomId: "room-review" },
       workloads: ["comments"],
@@ -124,6 +129,37 @@ describe("CloudflareStudioRealtimeTicketSigner", () => {
       authorizationExpiresAtEpochMs,
     );
     expect(wrongRoom).toEqual({ ok: false, code: "binding-mismatch" });
+  });
+
+  it("caps both the ticket and edge lease at the verified source session expiry", async () => {
+    const sourceSessionExpiresAt = NOW + 90_000;
+    const result = await signer().issue({
+      actorUserId: "editor-2",
+      sessionVersion: 11,
+      sessionExpiresAtEpochMs: sourceSessionExpiresAt,
+      sessionId: "session-2",
+      scope: { workId: "work-2", roomId: "room-2" },
+      workloads: ["presence"],
+      capabilities: ["presence.snapshot-v1"],
+      origin: "https://www.toonstudio.cloud",
+    });
+    const verified = await verifyRealtimeTicket(result.ticket, SECRET, {
+      issuer: CONFIGURATION.issuer,
+      audience: CONFIGURATION.audience,
+      workId: "work-2",
+      roomId: "room-2",
+      origin: "https://www.toonstudio.cloud",
+      nowMs: NOW,
+    });
+
+    expect(verified.ok).toBe(true);
+    if (!verified.ok) throw new Error("ticket fixture was not verified");
+    expect(verified.claims).toMatchObject({
+      subject: "editor-2",
+      sessionVersion: 11,
+      expiresAtMs: sourceSessionExpiresAt,
+      sessionExpiresAtMs: sourceSessionExpiresAt,
+    });
   });
 
   it("keeps secrets out of the public descriptor and generic failures", () => {

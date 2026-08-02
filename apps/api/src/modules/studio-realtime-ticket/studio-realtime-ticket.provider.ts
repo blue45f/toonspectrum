@@ -65,6 +65,8 @@ export const StudioRealtimeTicketSignerResultSchema = z
 
 export interface IssueStudioRealtimeTicketSignerInput {
   readonly actorUserId: string;
+  readonly sessionVersion: number;
+  readonly sessionExpiresAtEpochMs: number;
   readonly sessionId: string;
   readonly scope: StudioRealtimeTicketScope;
   readonly workloads: readonly StudioRealtimeTicketWorkload[];
@@ -145,6 +147,8 @@ implements StudioRealtimeTicketSignerPort {
     const inputShape = z
       .object({
         actorUserId: StudioRealtimeTicketIdentifierSchema,
+        sessionVersion: z.number().int().safe().positive(),
+        sessionExpiresAtEpochMs: z.number().int().safe().positive(),
         sessionId: StudioRealtimeTicketIdentifierSchema,
         scope: StudioRealtimeTicketScopeSchema,
         workloads: StudioRealtimeTicketWorkloadListSchema,
@@ -190,13 +194,17 @@ implements StudioRealtimeTicketSignerPort {
     const authorizationExpiry =
       inputShape.data.authorizationExpiresAtEpochMs ??
       Number.MAX_SAFE_INTEGER;
+    const credentialExpiry = Math.min(
+      authorizationExpiry,
+      inputShape.data.sessionExpiresAtEpochMs,
+    );
     const expiresAtMs = Math.min(
       issuedAtMs + this.configuration.ticketTtlSeconds * 1_000,
-      authorizationExpiry,
+      credentialExpiry,
     );
     const sessionExpiresAtMs = Math.min(
       issuedAtMs + this.configuration.sessionTtlSeconds * 1_000,
-      authorizationExpiry,
+      credentialExpiry,
     );
     if (
       !Number.isSafeInteger(expiresAtMs) ||
@@ -214,6 +222,7 @@ implements StudioRealtimeTicketSignerPort {
         issuer: this.configuration.issuer,
         audience: this.configuration.audience,
         subject: inputShape.data.actorUserId,
+        sessionVersion: inputShape.data.sessionVersion,
         workId: inputShape.data.scope.workId,
         roomId: inputShape.data.scope.roomId,
         clientId: inputShape.data.sessionId,

@@ -14,6 +14,7 @@ import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import {
@@ -33,42 +34,6 @@ let appPromise: Promise<Express> | null = null;
 type ServerlessRuntimeEnvironment = Partial<
   Record<"API_RUNTIME_ROLE", string | undefined>
 >;
-
-function safeDecodePath(path: string): string {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    return path;
-  }
-}
-
-function rewriteQueryPathToUrl(req: Request): void {
-  const pathValue =
-    req.query && typeof req.query === "object" ? req.query.path : undefined;
-  const extractedPath = Array.isArray(pathValue)
-    ? pathValue
-        .filter((value): value is string => typeof value === "string")
-        .join("/")
-    : typeof pathValue === "string"
-      ? pathValue
-      : undefined;
-  if (typeof extractedPath === "string") {
-    const nextPath = extractedPath.startsWith("/")
-      ? extractedPath
-      : `/${extractedPath}`;
-    const safeNormalizedPath = safeDecodePath(nextPath);
-    const normalizedPath = safeNormalizedPath.startsWith("/")
-      ? safeNormalizedPath.startsWith("/api")
-        ? safeNormalizedPath
-        : `/api${safeNormalizedPath}`
-      : `/api/${safeNormalizedPath}`;
-    const rewriteUrl = new URL(req.url, "https://example.local");
-    rewriteUrl.pathname = normalizedPath;
-    rewriteUrl.searchParams.delete("path");
-    req.url = `${rewriteUrl.pathname}${rewriteUrl.search}`;
-    delete (req.query as Record<string, unknown>).path;
-  }
-}
 
 /**
  * Vercel cannot own the long-lived Socket.IO lifecycle. A role typo or an accidentally shared

@@ -5,6 +5,10 @@ import { CreatorCollaborationRepository } from "../creator/creator-collaboration
 import { CreatorModule } from "../creator/creator.module";
 
 import {
+  STUDIO_REALTIME_SESSION_MAX_TTL_SECONDS,
+  type CloudflareStudioRealtimeTicketSignerConfiguration,
+} from "./studio-realtime-ticket.configuration";
+import {
   CreatorStudioRealtimeTicketAuthorization,
 } from "./studio-realtime-ticket.creator-authorization";
 import {
@@ -15,13 +19,13 @@ import {
   CloudflareStudioRealtimeTicketSigner,
 } from "./studio-realtime-ticket.provider";
 
-import type {
-  CloudflareStudioRealtimeTicketSignerConfiguration,
-} from "./studio-realtime-ticket.configuration";
 import type { DynamicModule } from "@nestjs/common";
 
 const STUDIO_REALTIME_TICKET_DEFAULT_TTL_SECONDS = 120;
-const STUDIO_REALTIME_SESSION_DEFAULT_TTL_SECONDS = 4 * 60 * 60;
+// Keep the edge lease short until logout/ACL revocation has a dedicated control plane. The
+// provider reconnects with a fresh cookie-authenticated ticket when this bounded lease ends.
+const STUDIO_REALTIME_SESSION_DEFAULT_TTL_SECONDS =
+  STUDIO_REALTIME_SESSION_MAX_TTL_SECONDS;
 
 const CanonicalPositiveIntegerStringSchema = z
   .string()

@@ -1,4 +1,9 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
+
+import {
+  STUDIO_LIVE_AUTH_TICKET_MAX_CODE_UNITS,
+  STUDIO_LIVE_AUTH_TICKET_TTL_MS,
+} from "../studio-live-auth-ticket";
 
 // 서명 세션 토큰 — HttpOnly 쿠키(및 마이그레이션 기간의 x-user-id 헤더)를 서버 비밀로 검증한다.
 //
@@ -114,6 +119,19 @@ interface JwtPayload {
   exp: number;
 }
 
+interface StudioLiveAdmissionTicketPayload extends JwtPayload {
+  jti: string;
+  sexp: number;
+}
+
+const STUDIO_LIVE_JWT_AUDIENCE = "toonspectrum-studio-live";
+
+export interface SignedStudioLiveAdmissionTicket {
+  readonly ticket: string;
+  readonly issuedAt: number;
+  readonly expiresAt: number;
+}
+
 // ── 신규 발급: HS256 JWT ──
 export function signSession(userId: string, sessionVersion: number = 1, now: number = Date.now()): string {
   const safeVersion = normalizeSessionVersion(sessionVersion);
@@ -131,6 +149,120 @@ export function signSession(userId: string, sessionVersion: number = 1, now: num
   const body = b64url(JSON.stringify(payload));
   const signingInput = `${header}.${body}`;
   return `${signingInput}.${hmac(signingInput)}`;
+}
+
+/**
+ * Issues a short-lived, admission-only credential for the long-running Studio Socket.IO host.
+ * The browser never receives the month-long cookie session token. `sexp` keeps the admitted
+ * principal bounded by that original session after the one-minute admission window closes.
+ */
+export function signStudioLiveAdmissionTicket(
+  principal: VerifiedSessionToken,
+  now: number = Date.now(),
+): SignedStudioLiveAdmissionTicket {
+  if (
+    !principal.userId
+    || principal.userId.length > 512
+    || !Number.isSafeInteger(principal.sessionVersion)
+    || principal.sessionVersion < 1
+    || !Number.isFinite(principal.expiresAt)
+    || principal.expiresAt <= now + 1_000
+  ) {
+    throw new Error("Cannot issue a Studio admission ticket for an invalid session principal");
+  }
+  const iat = Math.floor(now / 1_000);
+  const sessionExp = Math.floor(principal.expiresAt / 1_000);
+  const exp = Math.min(
+    sessionExp,
+    Math.floor((now + STUDIO_LIVE_AUTH_TICKET_TTL_MS) / 1_000),
+  );
+  if (exp <= iat) {
+    throw new Error("Cannot issue an already-expired Studio admission ticket");
+  }
+  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const payload: StudioLiveAdmissionTicketPayload = {
+    sub: principal.userId,
+    sv: principal.sessionVersion,
+    iss: JWT_ISSUER,
+    aud: STUDIO_LIVE_JWT_AUDIENCE,
+    iat,
+    exp,
+    sexp: sessionExp,
+    jti: randomUUID(),
+  };
+  const body = b64url(JSON.stringify(payload));
+  const signingInput = `${header}.${body}`;
+  return {
+    ticket: `${signingInput}.${hmac(signingInput)}`,
+    issuedAt: iat * 1_000,
+    expiresAt: exp * 1_000,
+  };
+}
+
+/** Verifies only Studio admission JWTs; normal web-session JWTs are deliberately rejected. */
+export function verifyStudioLiveAdmissionTicket(
+  ticket: string | null | undefined,
+  now: number = Date.now(),
+): VerifiedSessionToken | null {
+  if (
+    typeof ticket !== "string"
+    || ticket.length === 0
+    || ticket.length > STUDIO_LIVE_AUTH_TICKET_MAX_CODE_UNITS
+  ) return null;
+  const parts = ticket.split(".");
+  if (parts.length !== 3) return null;
+  const [encodedHeader, encodedPayload, provided] = parts;
+  if (!encodedHeader || !encodedPayload || !provided) return null;
+  if (!safeEqual(provided, hmac(`${encodedHeader}.${encodedPayload}`))) return null;
+
+  let header: unknown;
+  let payload: unknown;
+  try {
+    header = JSON.parse(Buffer.from(encodedHeader, "base64url").toString("utf8"));
+    payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (
+    typeof header !== "object"
+    || header === null
+    || (header as { alg?: unknown }).alg !== "HS256"
+    || (header as { typ?: unknown }).typ !== "JWT"
+    || typeof payload !== "object"
+    || payload === null
+  ) return null;
+
+  const claims = payload as Partial<StudioLiveAdmissionTicketPayload>;
+  const nowSeconds = Math.floor(now / 1_000);
+  if (
+    claims.iss !== JWT_ISSUER
+    || claims.aud !== STUDIO_LIVE_JWT_AUDIENCE
+    || typeof claims.sub !== "string"
+    || claims.sub.length === 0
+    || claims.sub.length > 512
+    || !Number.isSafeInteger(claims.sv)
+    || Number(claims.sv) < 1
+    || !Number.isSafeInteger(claims.iat)
+    || !Number.isSafeInteger(claims.exp)
+    || !Number.isSafeInteger(claims.sexp)
+    || typeof claims.jti !== "string"
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(claims.jti)
+  ) return null;
+  const issuedAt = Number(claims.iat);
+  const admissionExpiresAt = Number(claims.exp);
+  const sessionExpiresAt = Number(claims.sexp);
+  if (
+    issuedAt > nowSeconds + 5
+    || admissionExpiresAt <= nowSeconds
+    || sessionExpiresAt <= nowSeconds
+    || sessionExpiresAt < admissionExpiresAt
+    || admissionExpiresAt - issuedAt > STUDIO_LIVE_AUTH_TICKET_TTL_MS / 1_000
+  ) return null;
+  return {
+    userId: claims.sub,
+    sessionVersion: Number(claims.sv),
+    expiresAt: sessionExpiresAt * 1_000,
+  };
 }
 
 function verifyJwt(token: string, now: number): VerifiedSessionToken | null {

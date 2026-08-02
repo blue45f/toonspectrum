@@ -125,6 +125,36 @@ class GatewayTransportError extends Error {
   }
 }
 
+function isBackendCapabilityGatewayContentType(value: string | null): boolean {
+  if (!value) return false;
+  const [rawMediaType, ...rawParameters] = value.split(";");
+  const expectedMediaType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (rawMediaType?.trim().toLowerCase() !== expectedMediaType) return false;
+
+  let version: string | null = null;
+  for (const rawParameter of rawParameters) {
+    const separator = rawParameter.indexOf("=");
+    if (separator <= 0) return false;
+    const name = rawParameter.slice(0, separator).trim().toLowerCase();
+    let parameterValue = rawParameter.slice(separator + 1).trim();
+    if (
+      parameterValue.length >= 2
+      && parameterValue.startsWith('"')
+      && parameterValue.endsWith('"')
+    ) {
+      parameterValue = parameterValue.slice(1, -1);
+    }
+    if (!name || !parameterValue) return false;
+    if (name !== "version") continue;
+    if (version !== null && version !== parameterValue) return false;
+    version = parameterValue;
+  }
+  return version === "1";
+}
+
 interface GatewayProviderAttemptResult {
   readonly leaseOutcome: BackendCapabilityLeaseOutcome;
   readonly attemptOutcome: BackendCapabilityGatewayAttempt["outcome"];
@@ -779,7 +809,7 @@ export class BackendCapabilityGatewayDispatcher {
         };
       }
       const contentType = response.headers.get("content-type");
-      if (contentType !== BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE) {
+      if (!isBackendCapabilityGatewayContentType(contentType)) {
         await cancelResponseBody(response);
         throw new GatewayTransportError("invalid-response");
       }

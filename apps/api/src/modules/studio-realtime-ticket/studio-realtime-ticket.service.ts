@@ -31,6 +31,7 @@ import type {
 import type {
   StudioRealtimeTicketSignerPort,
 } from "./studio-realtime-ticket.provider";
+import type { VerifiedSessionToken } from "../../../../../lib/server/session";
 
 const TICKET_FORBIDDEN_MESSAGE =
   "이 작업실의 실시간 기능을 사용할 권한이 없습니다.";
@@ -77,10 +78,11 @@ export class StudioRealtimeTicketService {
   ) {}
 
   async issue(
-    actorUserId: string,
+    principal: VerifiedSessionToken,
     originHeader: string | undefined,
     body: IssueStudioRealtimeTicketDto,
   ): Promise<StudioRealtimeTicketResponse> {
+    const actorUserId = principal.userId;
     const request = IssueStudioRealtimeTicketSchema.parse(body);
     const origin = normalizeStudioRealtimeTicketOrigin(originHeader);
     if (originHeader !== undefined && origin === null) {
@@ -183,6 +185,8 @@ export class StudioRealtimeTicketService {
     try {
       rawSignedTicket = await signer.issue({
         actorUserId,
+        sessionVersion: principal.sessionVersion,
+        sessionExpiresAtEpochMs: principal.expiresAt,
         sessionId: request.sessionId,
         scope: request.scope,
         workloads: request.workloads,

@@ -290,6 +290,12 @@ describe("BackendCapabilityGatewayController", () => {
       body: JSON.stringify(envelope),
     });
     expect(result.status).toBe(200);
+    expect(result.headers.get("content-type")).toBe(
+      "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+    );
+    expect(result.headers.get("cache-control")).toBe(
+      "private, no-store, max-age=0",
+    );
     const body = await result.json();
     expect(body).toMatchObject({
       version: "toonspectrum.backend-capability.v1",

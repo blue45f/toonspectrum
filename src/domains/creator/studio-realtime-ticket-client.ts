@@ -10,10 +10,8 @@ import { apiPath } from "@/src/infrastructure/api";
 
 const DEFAULT_TICKET_TIMEOUT_MS = 8_000;
 const MAX_TICKET_RESPONSE_BYTES = 16 * 1024;
-const MAX_SESSION_TOKEN_CODE_UNITS = 8_192;
 
 export interface StudioRealtimeHttpTicketIssuerOptions {
-  readonly sessionToken: string;
   readonly endpoint?: string;
   readonly fetch?: typeof globalThis.fetch;
   readonly timeoutMs?: number;
@@ -74,12 +72,11 @@ async function readBoundedResponseBody(response: Response): Promise<string> {
 }
 
 /**
- * Short-lived ticket client. The signed session token and returned provider ticket remain in one
- * request stack only; neither is copied into storage, URL parameters, errors, or status objects.
+ * Short-lived provider-ticket client. Authentication is exclusively the HttpOnly session cookie;
+ * neither the cookie nor the returned provider ticket enters storage, URLs, errors, or status.
  */
 export class StudioRealtimeHttpTicketIssuer
 implements StudioRealtimeTicketIssuer {
-  private readonly sessionToken: string;
   private readonly endpoint: string;
   private readonly fetchRequest: typeof globalThis.fetch;
   private readonly timeoutMs: number;
@@ -87,21 +84,10 @@ implements StudioRealtimeTicketIssuer {
   private readonly cancelTimeout: (handle: unknown) => void;
 
   constructor(options: StudioRealtimeHttpTicketIssuerOptions) {
-    if (
-      !options.sessionToken ||
-      options.sessionToken.length > MAX_SESSION_TOKEN_CODE_UNITS ||
-      Array.from(options.sessionToken).some((character) => {
-        const codePoint = character.codePointAt(0) ?? 0;
-        return codePoint <= 32 || (codePoint >= 127 && codePoint <= 159);
-      })
-    ) {
-      throw new Error("실시간 입장권 인증 정보가 올바르지 않습니다.");
-    }
     const endpoint = options.endpoint ?? apiPath("/studio-realtime/tickets");
     if (!endpoint || endpoint.includes("#")) {
       throw new Error("실시간 입장권 발급 주소가 올바르지 않습니다.");
     }
-    this.sessionToken = options.sessionToken;
     this.endpoint = endpoint;
     this.fetchRequest = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.timeoutMs = Math.min(
@@ -135,11 +121,10 @@ implements StudioRealtimeTicketIssuer {
         method: "POST",
         headers: withCsrfHeader({
           "Content-Type": "application/json",
-          "x-user-id": this.sessionToken,
         }),
         body: JSON.stringify(request.data),
         cache: "no-store",
-        credentials: "same-origin",
+        credentials: "include",
         redirect: "error",
         referrerPolicy: "no-referrer",
         signal: controller.signal,

@@ -20,6 +20,8 @@ import { studioCrdtRasterCheckpointRepositoryProvider } from "./studio-crdt-rast
 import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
+import { StudioLiveAuthTicketController } from "./studio-live-auth-ticket.controller";
+import { StudioLiveAuthTicketService } from "./studio-live-auth-ticket.service";
 import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
 import { studioLiveFeaturePolicyProvider } from "./studio-live-feature-policy";
 import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
@@ -63,6 +65,7 @@ const supabaseObjectStorageModule =
   imports: supabaseObjectStorageModule ? [supabaseObjectStorageModule] : [],
   controllers: [
     CreatorController,
+    StudioLiveAuthTicketController,
     StudioRasterAssetController,
     StudioRemoteReferenceImageController,
     StudioTeamCommentController,
@@ -97,6 +100,7 @@ const supabaseObjectStorageModule =
     StudioWorkAssetUploadGuard,
     StudioCrdtService,
     StudioCrdtRasterCheckpointCoordinator,
+    StudioLiveAuthTicketService,
     studioLiveSessionAuthenticatorProvider,
     studioLiveSessionRevalidatorProvider,
     StudioLiveAdapterCleanupService,

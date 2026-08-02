@@ -1,22 +1,37 @@
 # ToonSpectrum 배포 가이드
 
-현재 기본 배포는 **Vercel 단일 프로젝트**입니다. 프론트는 정적 SPA로, `/api/*`는 `api/index.js`가 컴파일된 NestJS 서버리스 앱(`apps/api/src/serverless.ts`)으로 위임합니다. 카탈로그 검색·탐색·랭킹은 빌드 시 생성된 `public/data/*.json` 정적 스냅샷을 기본으로 사용하고, 리뷰·인증·커뮤니티 같은 동적 기능만 API/DB를 사용합니다.
+현재 production은 workload 별로 권위를 분리합니다. Vercel은 정적 SPA와 bounded
+NestJS HTTP API를, Neon/호환 PostgreSQL은 동적 데이터와 migration 원장을, Cloudflare
+Durable Objects는 Studio ephemeral realtime을, Upstash는 분산 제한·coordination을,
+Supabase private Storage는 원본·파생·export object를 담당합니다. 한 provider가 다른
+provider의 전체 폴백이 되지 않으며, 반드시 같은 목적의 전체 계약을 증명해야 합니다.
 
 | 레이어 | 스택 | 기본 호스트 | 배포 산출물 |
 | --- | --- | --- | --- |
 | 프론트 | Vite + React SPA | Vercel | `dist/` |
 | 카탈로그 | 정적 스냅샷 | Vercel CDN | `public/data/*.json` |
 | API | NestJS serverless | Vercel Functions | `api/index.js` → `apps/api/dist/.../serverless` |
-| DB | PostgreSQL | Neon 또는 호환 Postgres | 리뷰·인증·커뮤니티·ingest 폴백 |
+| DB | PostgreSQL | Neon/호환 Postgres | 동적 데이터 + checksum migration 원장 |
+| Studio realtime | Durable Objects | Cloudflare `workers.dev` | presence·comment invalidation·screen-share signaling |
+| 분산 제한/조정 | Redis | Upstash | auth rate-limit·lease·coordination |
+| object storage | private buckets | Supabase Storage | source·derived·export |
 
-`render.yaml`은 Studio Socket.IO 연결을 검증하기 위한 별도 장기 실행 호스트 Blueprint입니다.
+`render.yaml`은 Studio Socket.IO 연결을 검증하기 위한 **선택형 폴백** Blueprint입니다.
 `API_RUNTIME_ROLE=studio-live`는 health probe와 Socket.IO만 허용하므로 일반 HTTP API의 대체
 호스트가 아닙니다. 현재 `vercel.json`은 `/api/*`를 Vercel 함수로 라우팅하며 이 경계는
 Render를 사용해도 유지합니다.
 
+### 운영 검증 스냅샷 (2026-08-02)
+
+- production DB `0001`~`0024` exact ledger와 runtime capability 검증 완료
+- Cloudflare realtime `workers.dev` 활성; `realtime.toonstudio.cloud` custom hostname/DNS/TLS는 대기
+- Upstash coordination과 Supabase private buckets 활성
+- Google OAuth production callback 수정·검증 완료
+- AI provider production secret·budget/failover 값은 다음 승인 배포 반영 대기
+
 ## 0. 준비물
 
-- Node 22.12+와 pnpm 11 (`corepack enable` 권장)
+- Node 24.16+와 pnpm 11 (`corepack enable` 권장)
 - Vercel 계정
 - Neon 또는 호환 PostgreSQL `DATABASE_URL`
 - 소셜 로그인 실연동 시 Google Cloud / Kakao Developers 앱
@@ -46,7 +61,7 @@ pnpm run verify
    - `API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud`: 운영 웹 origin exact allowlist.
    - `OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud`: OAuth callback 기준 URL.
    - `WEB_APP_BASE_URL=https://www.toonstudio.cloud`: 로그인 완료 후 복귀 URL.
-   - `WEBDEX_SITE_URL=https://www.toonstudio.cloud`: 알림·카탈로그 링크 기준 URL.
+   - `WEBDEX_SITE_URL=https://www.toonstudio.cloud`: 알림 스크립트의 기존 호환 키(링크 기준 URL).
    - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`: 선택.
    - `KAKAO_REST_API_KEY`, `KAKAO_CLIENT_SECRET`: 선택.
    - `ADMIN_EMAILS`: 선택.
@@ -98,7 +113,15 @@ Google Identity Services의 승인된 JavaScript origin에는
 - 표지 프록시(`/api/cover?u=...`)가 이미지를 반환하거나 안전하게 폴백하는지 확인.
 - 로그인/리뷰/커뮤니티 기능이 DB 연결로 동작하는지 확인.
 
-## 6. Studio realtime 호스트
+## 6. Studio realtime 권위와 선택형 Socket.IO 폴백
+
+현재 ephemeral realtime production 권위는 Cloudflare Durable Objects `workers.dev`
+origin입니다. `realtime.toonstudio.cloud`는 DNS zone·custom hostname·TLS가 완료되기 전에
+사용하지 않습니다. Cloudflare는 presence, comment invalidation, screen-share signaling을
+역할별 ticket으로 처리하며 raster pixel, 작품 ACL, 음성 media 권위가 아닙니다.
+
+아래 Render/Socket.IO 경로는 CRDT fanout·lock에 별도 long-running Nest host가 필요할
+때의 선택형 폴백입니다. 현재 Cloudflare 권위를 무시하고 자동 활성하지 않습니다.
 
 `render.yaml`의 Nest 프로세스는 전체 모듈 그래프를 재사용하지만
 `API_RUNTIME_ROLE=studio-live`가 공개 표면을 다음으로 제한합니다.
@@ -123,7 +146,7 @@ VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonstudio.cloud
 
 # 장기 실행 Nest 서버의 비공개 환경변수
 STUDIO_LIVE_CLUSTER_ADAPTER=postgres
-STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/webdex?sslmode=verify-full&channel_binding=require
+STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/toonspectrum?sslmode=verify-full&channel_binding=require
 STUDIO_LIVE_POSTGRES_POOL_MAX=2
 API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 

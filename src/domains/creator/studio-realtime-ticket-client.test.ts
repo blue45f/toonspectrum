@@ -21,7 +21,7 @@ const request: StudioRealtimeTicketRequest = {
 };
 
 describe("StudioRealtimeHttpTicketIssuer", () => {
-  it("uses the existing signed-session header and keeps tickets out of URLs", async () => {
+  it("uses only the HttpOnly cookie boundary and keeps tickets out of URLs", async () => {
     const response = {
       version: 1,
       providerId: "cloudflare-realtime",
@@ -40,7 +40,6 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
         }),
     );
     const issuer = new StudioRealtimeHttpTicketIssuer({
-      sessionToken: "signed-session-token",
       endpoint: "/api/studio-realtime/tickets",
       fetch,
     });
@@ -53,8 +52,9 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
     expect(String(url)).not.toContain(response.ticket);
     const headers = new Headers(init?.headers);
     expect(headers.get("content-type")).toBe("application/json");
-    expect(headers.get("x-user-id")).toBe("signed-session-token");
+    expect(headers.has("x-user-id")).toBe(false);
     expect(headers.get("x-toonspectrum-csrf")).toBe("1");
+    expect(init?.credentials).toBe("include");
     expect(JSON.stringify(init)).not.toContain(response.ticket);
   });
 
@@ -69,7 +69,6 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
         ),
     );
     const issuer = new StudioRealtimeHttpTicketIssuer({
-      sessionToken: "signed-session-token",
       endpoint: "/api/studio-realtime/tickets",
       fetch,
     });
@@ -91,7 +90,6 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
       cancel,
     });
     const issuer = new StudioRealtimeHttpTicketIssuer({
-      sessionToken: "signed-session-token",
       endpoint: "/api/studio-realtime/tickets",
       fetch: vi.fn<typeof globalThis.fetch>(
         async () => new Response(body, { status: 200 }),
@@ -104,7 +102,7 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
-  it("aborts a timed-out request without retaining the session credential", async () => {
+  it("aborts a timed-out request without exposing a browser session credential", async () => {
     vi.useFakeTimers();
     try {
       const fetch = vi.fn<typeof globalThis.fetch>(
@@ -116,7 +114,6 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
           }),
       );
       const issuer = new StudioRealtimeHttpTicketIssuer({
-        sessionToken: "signed-session-token",
         endpoint: "/api/studio-realtime/tickets",
         fetch,
         timeoutMs: 1_000,

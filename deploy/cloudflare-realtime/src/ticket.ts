@@ -10,7 +10,7 @@ import {
 export const REALTIME_TICKET_VERSION =
   "toonspectrum.realtime-ticket.v1" as const;
 export const REALTIME_TICKET_MAX_AGE_MS = 2 * 60 * 1000;
-export const REALTIME_SESSION_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+export const REALTIME_SESSION_MAX_AGE_MS = 5 * 60 * 1000;
 export const REALTIME_TICKET_CLOCK_SKEW_MS = 15 * 1000;
 export const REALTIME_TICKET_MAX_BYTES = 4096;
 
@@ -24,6 +24,7 @@ export interface RealtimeTicketClaims {
   readonly issuer: string;
   readonly audience: string;
   readonly subject: string;
+  readonly sessionVersion: number;
   readonly workId: string;
   readonly roomId: string;
   readonly clientId: string;
@@ -126,6 +127,7 @@ export function parseRealtimeTicketClaims(
       "issuer",
       "audience",
       "subject",
+      "sessionVersion",
       "workId",
       "roomId",
       "clientId",
@@ -140,6 +142,9 @@ export function parseRealtimeTicketClaims(
     !isRealtimeId(value.issuer) ||
     !isRealtimeId(value.audience) ||
     !isRealtimeId(value.subject) ||
+    typeof value.sessionVersion !== "number" ||
+    !Number.isSafeInteger(value.sessionVersion) ||
+    value.sessionVersion < 1 ||
     !isRealtimeId(value.workId) ||
     !isRealtimeId(value.roomId) ||
     !isRealtimeId(value.clientId) ||

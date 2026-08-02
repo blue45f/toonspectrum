@@ -7,15 +7,23 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Req,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ZodSerializerDto } from "nestjs-zod";
+
+import {
+  getSessionAuthenticationPrincipal,
+  getSessionAuthenticationSource,
+} from "../../session-middleware";
 
 import {
   IssueStudioRealtimeTicketDto,
   StudioRealtimeTicketResponseDto,
 } from "./studio-realtime-ticket.dto";
 import { StudioRealtimeTicketService } from "./studio-realtime-ticket.service";
+
+import type { Request } from "express";
 
 @Controller("studio-realtime")
 export class StudioRealtimeTicketController {
@@ -32,13 +40,15 @@ export class StudioRealtimeTicketController {
   @Header("Vary", "Origin")
   @ZodSerializerDto(StudioRealtimeTicketResponseDto)
   issue(
-    @Headers("x-user-id") userId: string | undefined,
+    @Req() request: Request,
     @Headers("origin") origin: string | undefined,
     @Body() body: IssueStudioRealtimeTicketDto,
   ): Promise<StudioRealtimeTicketResponseDto> {
-    if (!userId) {
+    if (getSessionAuthenticationSource(request) !== "cookie") {
       throw new UnauthorizedException("로그인이 필요해요.");
     }
-    return this.service.issue(userId, origin, body);
+    const principal = getSessionAuthenticationPrincipal(request);
+    if (!principal) throw new UnauthorizedException("로그인이 필요해요.");
+    return this.service.issue(principal, origin, body);
   }
 }

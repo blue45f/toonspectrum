@@ -137,6 +137,14 @@ Every provider facade implements one fixed endpoint:
 
 `/.well-known/toonspectrum/backend-capabilities/v1/execute`
 
+Container providers share the checked-in `API_RUNTIME_ROLE=capability-worker` image rather than the
+full application graph. That role publishes only `/api/health/live`, the exact execute endpoint and
+the signed readiness endpoint at
+`/.well-known/toonspectrum/backend-capabilities/v1/health`. Signed readiness uses a provider-scoped
+HMAC and a 60-second timestamp window; the gateway credential itself is not sent in the health
+request. Render, Fly and Railway templates live in `deploy/capability-worker/` and all run the same
+non-root Docker image without `DATABASE_URL`, auth/session secrets, CRDT or Socket.IO modules.
+
 The dispatcher sends a canonical, versioned JSON envelope containing the provider, capability,
 workload, timestamp, UUID nonce and idempotency key. It also sends immutable execution requirements:
 
@@ -177,6 +185,15 @@ exports must be uploaded losslessly to object storage and referenced by immutabl
 presigned URL. The dispatcher rejects an oversized inline body/result without truncating,
 resampling or sending it.
 
+The shipped thumbnail worker consumes a strict immutable Supabase source-object reference. It
+checks the signed response MIME type, exact byte count and SHA-256 before decode, rejects image and
+pixel bombs against explicit source/output budgets, preserves aspect ratio, and stores deterministic
+PNG/JPEG output in the private derived bucket. Concurrent commands with the same tenant/key share
+one process promise, key reuse with a different fingerprint is rejected, and content-addressed
+immutable upload makes restart replay safe. WebP stays explicitly unsupported instead of silently
+changing fidelity. Long AI has the same strict command/submission port, but remains unadvertised and
+fail-closed until a durable queue adapter proves acceptance.
+
 The gateway token is present only in `x-toonspectrum-gateway-token`. The token never appears in the
 body, status snapshot or result. Base URLs are secure origins only; userinfo, paths, queries and
 fragments are rejected. The code fixes the path, omits browser credentials/referrers and disables
@@ -197,7 +214,8 @@ failover.
    for presence, comment invalidation and screen-share signaling.
 4. Deploy the long-running Nest Socket.IO host for CRDT fanout and locks; point
    `VITE_STUDIO_LIVE_ORIGIN` at its exact HTTPS origin.
-5. Enable one idempotent thumbnail adapter on a full container worker such as Cloud Run.
+5. Deploy one `deploy/capability-worker` template, run the signed health and exact thumbnail canary,
+   then enable that provider in the source API's workload order.
 6. Enable remote gateway execution only after its exact adapter, budget, lease, receipt and
    end-to-end failure-path tests pass.
 

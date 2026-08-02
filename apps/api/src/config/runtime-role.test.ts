@@ -38,6 +38,47 @@ describe("API runtime role", () => {
     ).toBe(false);
   });
 
+  it("limits a capability worker to liveness, signed readiness and the exact gateway", () => {
+    expect(
+      resolveApiRuntimeRole({ API_RUNTIME_ROLE: "capability-worker" }),
+    ).toBe("capability-worker");
+    expect(
+      isApiRuntimeRolePathAllowed("capability-worker", "/api/health/live"),
+    ).toBe(true);
+    expect(
+      isApiRuntimeRolePathAllowed(
+        "capability-worker",
+        "/.well-known/toonspectrum/backend-capabilities/v1/health",
+      ),
+    ).toBe(true);
+    expect(
+      isApiRuntimeRolePathAllowed(
+        "capability-worker",
+        "/.well-known/toonspectrum/backend-capabilities/v1/execute",
+      ),
+    ).toBe(true);
+    expect(
+      isApiRuntimeRolePathAllowed("capability-worker", "/api/auth/providers"),
+    ).toBe(false);
+    expect(
+      isApiRuntimeRolePathAllowed("capability-worker", "/socket.io/"),
+    ).toBe(false);
+    expect(
+      isApiRuntimeRolePathAllowed(
+        "capability-worker",
+        "/api/health/live",
+        "POST",
+      ),
+    ).toBe(false);
+    expect(
+      isApiRuntimeRolePathAllowed(
+        "capability-worker",
+        "/.well-known/toonspectrum/backend-capabilities/v1/execute",
+        "GET",
+      ),
+    ).toBe(false);
+  });
+
   it("fails closed on an unknown role", () => {
     expect(() =>
       resolveApiRuntimeRole({ API_RUNTIME_ROLE: "everything" }),

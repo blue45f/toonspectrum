@@ -15,7 +15,47 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 10 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 11 as const;
+
+export type StudioOcctTopologyReceipt = {
+  readonly source: "tessellated-triangle-mesh";
+  readonly boundaryEdgeCount: number;
+  readonly nonManifoldEdgeCount: number;
+  readonly orientationConflictEdgeCount: number;
+  readonly degenerateTriangleCount: number;
+  readonly consistentOrientation: boolean;
+  readonly watertight: boolean;
+  readonly closedSolid: boolean;
+  /** Signed tetrahedral volume of the canonical tessellation. */
+  readonly signedVolume: number;
+};
+
+export type StudioOcctInertiaTensor = {
+  readonly xx: number;
+  readonly yy: number;
+  readonly zz: number;
+  readonly xy: number;
+  readonly xz: number;
+  readonly yz: number;
+};
+
+export type StudioOcctMassProperties = {
+  /** OCCT B-Rep is authoritative; fallback values are explicitly labelled. */
+  readonly source: "occt-brep" | "mixed-fallback";
+  readonly density: 1;
+  readonly densityUnit: "mass/model-unit^3";
+  readonly mass: number;
+  readonly volume: number;
+  readonly volumeSource: "occt-brep" | "analytic-fallback" | "tessellated-mesh";
+  readonly surfaceArea: number;
+  readonly surfaceAreaSource: "occt-brep" | "tessellated-mesh";
+  readonly centroid: StudioMeshVec3 | null;
+  readonly centroidSource: "occt-brep" | "tessellated-mesh" | "unavailable";
+  /** Unit-density inertia about the centre of mass, in model units. */
+  readonly inertia: StudioOcctInertiaTensor | null;
+  readonly inertiaSource: "occt-brep" | "unavailable";
+  readonly approximate: boolean;
+};
 
 export type StudioOcctStepIoResult = {
   readonly ok: true;
@@ -26,6 +66,11 @@ export type StudioOcctStepIoResult = {
   readonly mesh: StudioEditableMesh;
   readonly triangleCount: number;
   readonly faceCount: number;
+  readonly vertexCount: number;
+  /** Compatibility scalar; see massProperties.volumeSource before treating it as exact. */
+  readonly volumeApprox: number;
+  readonly topology: StudioOcctTopologyReceipt;
+  readonly massProperties: StudioOcctMassProperties;
   readonly loadPath: "browser" | "node";
 };
 
@@ -48,7 +93,10 @@ export type StudioOcctSolidResult = {
   readonly faceCount: number;
   readonly triangleCount: number;
   readonly vertexCount: number;
+  /** Compatibility scalar; see massProperties.volumeSource before treating it as exact. */
   readonly volumeApprox: number;
+  readonly topology: StudioOcctTopologyReceipt;
+  readonly massProperties: StudioOcctMassProperties;
   readonly backend: "opencascade-wasm";
   readonly operation: string;
   readonly loadPath: "browser" | "node";
@@ -423,18 +471,150 @@ function soupToMesh(positions: Float32Array, indices: Uint32Array): StudioEditab
   return createStudioEditableMeshFromPolygons(verts, faces);
 }
 
+type StudioOcctTessellationMeasurement = {
+  readonly topology: StudioOcctTopologyReceipt;
+  readonly surfaceArea: number;
+  readonly volumeCentroid: StudioMeshVec3 | null;
+};
+
+function measureStudioOcctTessellation(
+  mesh: StudioEditableMesh,
+): StudioOcctTessellationMeasurement {
+  const edges = new Map<string, { uses: number; directionBalance: number }>();
+  let degenerateTriangleCount = 0;
+  let signedVolume = 0;
+  let surfaceArea = 0;
+  let centroidX = 0;
+  let centroidY = 0;
+  let centroidZ = 0;
+
+  for (const face of mesh.faces) {
+    const vertexIds: number[] = [];
+    let halfEdgeId = face.he;
+    const visited = new Set<number>();
+    while (
+      halfEdgeId >= 0
+      && halfEdgeId < mesh.halfEdges.length
+      && !visited.has(halfEdgeId)
+    ) {
+      visited.add(halfEdgeId);
+      const halfEdge = mesh.halfEdges[halfEdgeId]!;
+      const previous = mesh.halfEdges[halfEdge.prev];
+      const origin = previous?.vertex ?? -1;
+      const destination = halfEdge.vertex;
+      if (origin >= 0 && destination >= 0) {
+        vertexIds.push(origin);
+        const low = Math.min(origin, destination);
+        const high = Math.max(origin, destination);
+        const key = `${low}|${high}`;
+        const entry = edges.get(key) ?? { uses: 0, directionBalance: 0 };
+        entry.uses += 1;
+        entry.directionBalance += origin === low ? 1 : -1;
+        edges.set(key, entry);
+      }
+      halfEdgeId = halfEdge.next;
+      if (halfEdgeId === face.he) break;
+    }
+
+    const first = mesh.vertices[vertexIds[0] ?? -1]?.position;
+    if (!first) continue;
+    for (let index = 1; index + 1 < vertexIds.length; index += 1) {
+      const b = mesh.vertices[vertexIds[index]!]!.position;
+      const c = mesh.vertices[vertexIds[index + 1]!]!.position;
+      const abx = b.x - first.x;
+      const aby = b.y - first.y;
+      const abz = b.z - first.z;
+      const acx = c.x - first.x;
+      const acy = c.y - first.y;
+      const acz = c.z - first.z;
+      const crossX = aby * acz - abz * acy;
+      const crossY = abz * acx - abx * acz;
+      const crossZ = abx * acy - aby * acx;
+      const doubledArea = Math.hypot(crossX, crossY, crossZ);
+      if (doubledArea <= 1e-12) {
+        degenerateTriangleCount += 1;
+        continue;
+      }
+      surfaceArea += doubledArea / 2;
+      const tetraVolume = (
+        first.x * (b.y * c.z - b.z * c.y)
+        - first.y * (b.x * c.z - b.z * c.x)
+        + first.z * (b.x * c.y - b.y * c.x)
+      ) / 6;
+      signedVolume += tetraVolume;
+      centroidX += tetraVolume * (first.x + b.x + c.x) / 4;
+      centroidY += tetraVolume * (first.y + b.y + c.y) / 4;
+      centroidZ += tetraVolume * (first.z + b.z + c.z) / 4;
+    }
+  }
+
+  let boundaryEdgeCount = 0;
+  let nonManifoldEdgeCount = 0;
+  let orientationConflictEdgeCount = 0;
+  for (const edge of edges.values()) {
+    if (edge.uses === 1) boundaryEdgeCount += 1;
+    else if (edge.uses > 2) nonManifoldEdgeCount += 1;
+    else if (edge.uses === 2 && edge.directionBalance !== 0) {
+      orientationConflictEdgeCount += 1;
+    }
+  }
+  const consistentOrientation = orientationConflictEdgeCount === 0;
+  const watertight = boundaryEdgeCount === 0 && nonManifoldEdgeCount === 0;
+  const closedSolid = watertight
+    && consistentOrientation
+    && degenerateTriangleCount === 0
+    && Math.abs(signedVolume) > 1e-12;
+  const volumeCentroid = closedSolid
+    ? {
+        x: centroidX / signedVolume,
+        y: centroidY / signedVolume,
+        z: centroidZ / signedVolume,
+      }
+    : null;
+
+  return {
+    topology: {
+      source: "tessellated-triangle-mesh",
+      boundaryEdgeCount,
+      nonManifoldEdgeCount,
+      orientationConflictEdgeCount,
+      degenerateTriangleCount,
+      consistentOrientation,
+      watertight,
+      closedSolid,
+      signedVolume,
+    },
+    surfaceArea,
+    volumeCentroid,
+  };
+}
+
+export function inspectStudioOcctMeshTopology(
+  mesh: StudioEditableMesh,
+): StudioOcctTopologyReceipt {
+  return measureStudioOcctTessellation(mesh).topology;
+}
+
 function approxVolumeBox(dx: number, dy: number, dz: number): number {
   return Math.abs(dx * dy * dz);
 }
 
-function readStudioOcctVolume(
+function readStudioOcctMassProperties(
   oc: StudioOcctModule,
   shape: unknown,
-  fallback: number,
-): number {
-  let props: unknown = null;
+  analyticVolumeFallback: number,
+  tessellation: StudioOcctTessellationMeasurement,
+): StudioOcctMassProperties {
+  let volumeProps: unknown = null;
+  let surfaceProps: unknown = null;
+  let centre: unknown = null;
+  let inertiaMatrix: unknown = null;
+  let volume: number | null = null;
+  let surfaceArea: number | null = null;
+  let centroid: StudioMeshVec3 | null = null;
+  let inertia: StudioOcctInertiaTensor | null = null;
   try {
-    props = new oc.GProp_GProps_1();
+    volumeProps = new oc.GProp_GProps_1();
     for (const methodName of [
       "VolumeProperties_1",
       "VolumeProperties_2",
@@ -443,19 +623,107 @@ function readStudioOcctVolume(
       const method = oc.BRepGProp?.[methodName];
       if (!isCallable(method)) continue;
       try {
-        method.call(oc.BRepGProp, shape, props, true, false, false);
-        const mass = (props as { Mass?: () => number }).Mass?.();
-        if (Number.isFinite(mass) && Math.abs(Number(mass)) > 1e-12) {
-          return Math.abs(Number(mass));
+        method.call(oc.BRepGProp, shape, volumeProps, true, false, false);
+        const mass = (volumeProps as { Mass?: () => number }).Mass?.();
+        if (!Number.isFinite(mass)) continue;
+        const volumeOrientationSign = Number(mass) < 0 ? -1 : 1;
+        volume = Math.abs(Number(mass));
+        if (volume > 1e-12) {
+          centre = (volumeProps as { CentreOfMass?: () => unknown }).CentreOfMass?.() ?? null;
+          const point = centre as { X?: () => number; Y?: () => number; Z?: () => number } | null;
+          const x = point?.X?.();
+          const y = point?.Y?.();
+          const z = point?.Z?.();
+          if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+            centroid = { x: Number(x), y: Number(y), z: Number(z) };
+          }
+          inertiaMatrix = (
+            volumeProps as { MatrixOfInertia?: () => unknown }
+          ).MatrixOfInertia?.() ?? null;
+          const matrix = inertiaMatrix as { Value?: (row: number, column: number) => number } | null;
+          const xx = matrix?.Value?.(1, 1);
+          const yy = matrix?.Value?.(2, 2);
+          const zz = matrix?.Value?.(3, 3);
+          const xy = matrix?.Value?.(1, 2);
+          const xz = matrix?.Value?.(1, 3);
+          const yz = matrix?.Value?.(2, 3);
+          if ([xx, yy, zz, xy, xz, yz].every(Number.isFinite)) {
+            inertia = {
+              xx: Number(xx) * volumeOrientationSign,
+              yy: Number(yy) * volumeOrientationSign,
+              zz: Number(zz) * volumeOrientationSign,
+              xy: Number(xy) * volumeOrientationSign,
+              xz: Number(xz) * volumeOrientationSign,
+              yz: Number(yz) * volumeOrientationSign,
+            };
+          }
         }
+        break;
       } catch {
         // Try the next generated overload name.
       }
     }
-    return fallback;
+
+    surfaceProps = new oc.GProp_GProps_1();
+    for (const methodName of [
+      "SurfaceProperties_1",
+      "SurfaceProperties_2",
+      "SurfaceProperties2",
+    ]) {
+      const method = oc.BRepGProp?.[methodName];
+      if (!isCallable(method)) continue;
+      try {
+        method.call(oc.BRepGProp, shape, surfaceProps, true, false);
+        const mass = (surfaceProps as { Mass?: () => number }).Mass?.();
+        if (!Number.isFinite(mass)) continue;
+        surfaceArea = Math.abs(Number(mass));
+        break;
+      } catch {
+        // Try the next generated overload name.
+      }
+    }
   } finally {
-    disposeOcctObjects(props);
+    disposeOcctObjects(inertiaMatrix, centre, surfaceProps, volumeProps);
   }
+
+  const volumeSource: StudioOcctMassProperties["volumeSource"] = volume !== null
+    ? "occt-brep"
+    : tessellation.topology.closedSolid
+      ? "tessellated-mesh"
+      : "analytic-fallback";
+  const resolvedVolume = volume
+    ?? (tessellation.topology.closedSolid
+      ? Math.abs(tessellation.topology.signedVolume)
+      : Math.max(0, analyticVolumeFallback));
+  const surfaceAreaSource: StudioOcctMassProperties["surfaceAreaSource"] = surfaceArea !== null
+    ? "occt-brep"
+    : "tessellated-mesh";
+  const resolvedSurfaceArea = surfaceArea ?? tessellation.surfaceArea;
+  const centroidSource: StudioOcctMassProperties["centroidSource"] = centroid
+    ? "occt-brep"
+    : tessellation.volumeCentroid
+      ? "tessellated-mesh"
+      : "unavailable";
+  const resolvedCentroid = centroid ?? tessellation.volumeCentroid;
+  const approximate = volumeSource !== "occt-brep"
+    || surfaceAreaSource !== "occt-brep"
+    || centroidSource !== "occt-brep"
+    || inertia === null;
+  return {
+    source: approximate ? "mixed-fallback" : "occt-brep",
+    density: 1,
+    densityUnit: "mass/model-unit^3",
+    mass: resolvedVolume,
+    volume: resolvedVolume,
+    volumeSource,
+    surfaceArea: resolvedSurfaceArea,
+    surfaceAreaSource,
+    centroid: resolvedCentroid,
+    centroidSource,
+    inertia,
+    inertiaSource: inertia ? "occt-brep" : "unavailable",
+    approximate,
+  };
 }
 
 function packResult(
@@ -468,16 +736,41 @@ function packResult(
   oc?: StudioOcctModule,
   shape?: unknown,
 ): StudioOcctSolidResult {
-  const measuredVolume = oc && shape
-    ? readStudioOcctVolume(oc, shape, volumeApprox)
-    : volumeApprox;
+  const tessellation = measureStudioOcctTessellation(mesh);
+  const massProperties = oc && shape
+    ? readStudioOcctMassProperties(oc, shape, volumeApprox, tessellation)
+    : {
+        source: "mixed-fallback" as const,
+        density: 1 as const,
+        densityUnit: "mass/model-unit^3" as const,
+        mass: tessellation.topology.closedSolid
+          ? Math.abs(tessellation.topology.signedVolume)
+          : Math.max(0, volumeApprox),
+        volume: tessellation.topology.closedSolid
+          ? Math.abs(tessellation.topology.signedVolume)
+          : Math.max(0, volumeApprox),
+        volumeSource: tessellation.topology.closedSolid
+          ? "tessellated-mesh" as const
+          : "analytic-fallback" as const,
+        surfaceArea: tessellation.surfaceArea,
+        surfaceAreaSource: "tessellated-mesh" as const,
+        centroid: tessellation.volumeCentroid,
+        centroidSource: tessellation.volumeCentroid
+          ? "tessellated-mesh" as const
+          : "unavailable" as const,
+        inertia: null,
+        inertiaSource: "unavailable" as const,
+        approximate: true,
+      };
   return {
     ok: true,
     mesh,
     faceCount,
     triangleCount,
     vertexCount: mesh.vertices.length,
-    volumeApprox: measuredVolume,
+    volumeApprox: massProperties.volume,
+    topology: tessellation.topology,
+    massProperties,
     backend: "opencascade-wasm",
     operation,
     loadPath,
@@ -821,8 +1114,10 @@ export async function occtMakeThickShellBox(
   dz: number,
   thickness: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  // ThickSolid Embind handles corrupt the shared WASM table when .delete() is called.
-  // Construct without owner.dispose; still unchain .Shape() (AC4).
+  // ThickSolid Embind handles corrupt the WASM table when .delete() is called.
+  // The product client therefore runs this whole call in a fresh one-shot Worker
+  // realm and terminates that realm after the response. Direct Node calls are
+  // certification-only and rely on the test-process boundary.
   try {
     const runtime = await loadStudioOcctRuntime();
     const oc = runtime.module;
@@ -908,7 +1203,8 @@ export async function occtMakeThickShellBox(
  * Uses OpenCascade WASM FS (`Write`/`ReadFile`) and returns the STEP text + remeshed body.
  *
  * NOTE: Do not call Embind `.delete()` on STEP writer/reader — opencascade.js corrupts
- * the WASM function table when those controllers are disposed. Leak intentionally.
+ * the WASM function table when those controllers are disposed. The browser product
+ * path bounds those handles inside a one-shot Worker realm.
  */
 export async function occtStepRoundTripBox(
   dx: number,
@@ -921,7 +1217,8 @@ export async function occtStepRoundTripBox(
     if (!oc.FS?.readFile) {
       return { ok: false, code: "no-fs", detail: "OCCT WASM FS unavailable for STEP I/O" };
     }
-    // No Embind .delete() on STEP handles (corrupts wasmTable). Still unchain .Shape().
+    // No Embind .delete() on STEP handles (corrupts wasmTable). The caller owns
+    // terminating the one-shot realm. Still unchain .Shape().
     const boxBuilder = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz);
     const box = boxBuilder.Shape();
     const writer = new oc.STEPControl_Writer_1();
@@ -957,15 +1254,30 @@ export async function occtStepRoundTripBox(
     if (tess.triangleCount < 1) {
       return { ok: false, code: "empty-tessellation", detail: "STEP import produced no triangles" };
     }
+    const mesh = soupToMesh(tess.positions, tess.indices);
+    const packed = packResult(
+      "STEPControl_Writer+Reader",
+      mesh,
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(dx, dy, dz),
+      runtime.loadPath,
+      oc,
+      shape,
+    );
     return {
       ok: true,
       backend: "opencascade-wasm",
       operation: "STEPControl_Writer+Reader",
       stepBytes: stepText.length,
       stepText,
-      mesh: soupToMesh(tess.positions, tess.indices),
+      mesh,
       triangleCount: tess.triangleCount,
       faceCount: tess.faceCount,
+      vertexCount: packed.vertexCount,
+      volumeApprox: packed.volumeApprox,
+      topology: packed.topology,
+      massProperties: packed.massProperties,
       loadPath: runtime.loadPath,
     };
   } catch (error) {
@@ -1148,8 +1460,8 @@ export async function occtOffsetShapeBox(
  * Uses BRepFilletAPI_MakeFillet2d + BRepPrimAPI_MakePrism.
  *
  * NOTE: Fillet2d Embind handles corrupt when .delete() runs on intermediate TopoDS
- * casts during owner.dispose — construct without owner (same discipline as ThickSolid).
- * Still unchain .Shape() (AC4).
+ * casts during owner.dispose. The product client runs the operation in a one-shot
+ * Worker realm, then terminates it. Still unchain .Shape() (AC4).
  */
 export async function occtFillet2dExtrudeSolid(
   width: number,

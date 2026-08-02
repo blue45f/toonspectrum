@@ -15,6 +15,17 @@ type PendingOperation = {
 let nextRequestId = 1;
 let worker: Worker | null = null;
 const pending = new Map<number, PendingOperation>();
+const isolatedTerminators = new Set<(error: Error) => void>();
+
+/**
+ * opencascade.js@1.1.1 wrappers whose `.delete()` corrupts the Embind table.
+ * They are safe only when the entire WASM instance is discarded with its Worker.
+ */
+const REALM_ISOLATED_OPERATION_KINDS = new Set<StudioOcctWorkerOperation["kind"]>([
+  "thick-shell-box",
+  "fillet2d-extrude",
+  "step-roundtrip-box",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -22,6 +33,62 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+function isFiniteNonNegative(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isFiniteVec3(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.x === "number"
+    && Number.isFinite(value.x)
+    && typeof value.y === "number"
+    && Number.isFinite(value.y)
+    && typeof value.z === "number"
+    && Number.isFinite(value.z);
+}
+
+function isStudioOcctTopologyReceipt(value: unknown): boolean {
+  return isRecord(value)
+    && value.source === "tessellated-triangle-mesh"
+    && isNonNegativeInteger(value.boundaryEdgeCount)
+    && isNonNegativeInteger(value.nonManifoldEdgeCount)
+    && isNonNegativeInteger(value.orientationConflictEdgeCount)
+    && isNonNegativeInteger(value.degenerateTriangleCount)
+    && typeof value.consistentOrientation === "boolean"
+    && typeof value.watertight === "boolean"
+    && typeof value.closedSolid === "boolean"
+    && typeof value.signedVolume === "number"
+    && Number.isFinite(value.signedVolume);
+}
+
+function isStudioOcctMassProperties(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const inertia = value.inertia;
+  const validInertia = inertia === null || (
+    isRecord(inertia)
+    && ["xx", "yy", "zz", "xy", "xz", "yz"].every((key) => (
+      typeof inertia[key] === "number" && Number.isFinite(inertia[key])
+    ))
+  );
+  return (value.source === "occt-brep" || value.source === "mixed-fallback")
+    && value.density === 1
+    && value.densityUnit === "mass/model-unit^3"
+    && isFiniteNonNegative(value.mass)
+    && isFiniteNonNegative(value.volume)
+    && ["occt-brep", "analytic-fallback", "tessellated-mesh"].includes(
+      String(value.volumeSource),
+    )
+    && isFiniteNonNegative(value.surfaceArea)
+    && ["occt-brep", "tessellated-mesh"].includes(String(value.surfaceAreaSource))
+    && (value.centroid === null || isFiniteVec3(value.centroid))
+    && ["occt-brep", "tessellated-mesh", "unavailable"].includes(
+      String(value.centroidSource),
+    )
+    && validInertia
+    && ["occt-brep", "unavailable"].includes(String(value.inertiaSource))
+    && typeof value.approximate === "boolean";
 }
 
 function isStudioOcctWorkerResponse(value: unknown): value is StudioOcctWorkerResponse {
@@ -45,6 +112,8 @@ function isStudioOcctWorkerResponse(value: unknown): value is StudioOcctWorkerRe
     && isNonNegativeInteger(result.vertexCount)
     && typeof result.volumeApprox === "number"
     && Number.isFinite(result.volumeApprox)
+    && isStudioOcctTopologyReceipt(result.topology)
+    && isStudioOcctMassProperties(result.massProperties)
     && isRecord(mesh)
     && mesh.revision === 1
     && Array.isArray(mesh.vertices)
@@ -119,6 +188,82 @@ function ensureWorker(): Worker {
   });
   worker = next;
   return next;
+}
+
+function runInOneShotBrowserWorker(
+  id: number,
+  operation: StudioOcctWorkerOperation,
+  options: {
+    readonly signal?: AbortSignal;
+    readonly timeoutMs: number;
+  },
+): Promise<StudioOcctSolidResult> {
+  const isolatedWorker = new Worker(new URL("./studio-occt.worker.ts", import.meta.url), {
+    name: `toonspectrum-occt-isolated-${id}`,
+    type: "module",
+  });
+  return new Promise<StudioOcctSolidResult>((resolve, reject) => {
+    let settled = false;
+    const settle = (
+      next: { readonly ok: true; readonly result: StudioOcctSolidResult }
+        | { readonly ok: false; readonly error: Error },
+    ) => {
+      if (settled) return;
+      settled = true;
+      isolatedTerminators.delete(terminateWithError);
+      clearTimeout(timeoutId);
+      options.signal?.removeEventListener("abort", abort);
+      isolatedWorker.terminate();
+      if (next.ok) resolve(next.result);
+      else reject(next.error);
+    };
+    const abort = () => settle({
+      ok: false,
+      error: new DOMException("OCCT operation aborted", "AbortError"),
+    });
+    const terminateWithError = (error: Error) => settle({ ok: false, error });
+    const timeoutId = setTimeout(() => settle({
+      ok: false,
+      error: new Error(`OCCT Worker timed out after ${options.timeoutMs}ms`),
+    }), options.timeoutMs);
+    isolatedTerminators.add(terminateWithError);
+    options.signal?.addEventListener("abort", abort, { once: true });
+    isolatedWorker.addEventListener("message", (event: MessageEvent<unknown>) => {
+      if (!isStudioOcctWorkerResponse(event.data) || event.data.id !== id) {
+        settle({
+          ok: false,
+          error: new Error("OCCT Worker returned an invalid response payload"),
+        });
+        return;
+      }
+      if (!event.data.result.ok) {
+        settle({
+          ok: false,
+          error: new Error(`${event.data.result.code}: ${event.data.result.detail}`),
+        });
+        return;
+      }
+      settle({ ok: true, result: event.data.result });
+    });
+    isolatedWorker.addEventListener("error", (event) => settle({
+      ok: false,
+      error: new Error(event.message || "OCCT Worker crashed"),
+    }));
+    isolatedWorker.addEventListener("messageerror", () => settle({
+      ok: false,
+      error: new Error("OCCT Worker returned an unreadable result"),
+    }));
+
+    try {
+      const request: StudioOcctWorkerRequest = { id, operation };
+      isolatedWorker.postMessage(request);
+    } catch (error) {
+      settle({
+        ok: false,
+        error: workerTransportError("OCCT Worker postMessage failed", error),
+      });
+    }
+  });
 }
 
 async function runOnNode(
@@ -217,8 +362,10 @@ async function runOnNode(
           mesh: step.mesh,
           faceCount: step.faceCount,
           triangleCount: step.triangleCount,
-          vertexCount: step.mesh.vertices.length,
-          volumeApprox: operation.size[0] * operation.size[1] * operation.size[2],
+          vertexCount: step.vertexCount,
+          volumeApprox: step.volumeApprox,
+          topology: step.topology,
+          massProperties: step.massProperties,
           backend: "opencascade-wasm" as const,
           operation: step.operation,
           loadPath: step.loadPath,
@@ -269,6 +416,12 @@ export async function runStudioOcctOperation(
   const id = nextRequestId;
   nextRequestId += 1;
   const timeoutMs = Math.max(1_000, Math.min(300_000, options.timeoutMs ?? 120_000));
+  if (REALM_ISOLATED_OPERATION_KINDS.has(operation.kind)) {
+    return runInOneShotBrowserWorker(id, operation, {
+      signal: options.signal,
+      timeoutMs,
+    });
+  }
   const activeWorker = ensureWorker();
   return new Promise<StudioOcctSolidResult>((resolve, reject) => {
     const abort = () => {
@@ -291,4 +444,7 @@ export async function runStudioOcctOperation(
 
 export function disposeStudioOcctWorker(): void {
   terminateWorker(new Error("OCCT Worker disposed"));
+  for (const terminate of [...isolatedTerminators]) {
+    terminate(new Error("OCCT Worker disposed"));
+  }
 }

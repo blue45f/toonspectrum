@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import {
-  verifySessionToken,
+  verifyStudioLiveAdmissionTicket,
   type VerifiedSessionToken,
 } from "../../../../../lib/server/session";
 import { isSessionAllowed } from "../../../../../lib/server/user-lifecycle";
@@ -950,7 +950,7 @@ export const studioLiveSessionAuthenticatorProvider = {
   provide: STUDIO_LIVE_SESSION_AUTHENTICATOR,
   useValue: (async (token: string): Promise<StudioLiveAuthPrincipal | null> => {
     try {
-      const session = verifySessionToken(token);
+      const session = verifyStudioLiveAdmissionTicket(token);
       if (!session) return null;
       return (await isSessionAllowed(session.userId, session.sessionVersion)) ? session : null;
     } catch {

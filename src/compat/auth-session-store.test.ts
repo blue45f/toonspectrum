@@ -9,6 +9,7 @@ import {
   signInWithGoogleIdToken,
   signOut,
   synchronizeServerSession,
+  synchronizeServerSessionState,
 } from "./auth-session-store";
 
 const apiRaw = vi.hoisted(() => vi.fn());
@@ -183,6 +184,17 @@ describe("auth session store", () => {
     expect(getAuthSession()).toBeNull();
   });
 
+  it("401은 캐시와 구분되는 권위 있는 미인증 상태로 반환한다", async () => {
+    persistSession({ user: { id: "expired-user" }, token: null });
+    apiRaw.mockResolvedValue(new Response(null, { status: 401 }));
+
+    await expect(synchronizeServerSessionState("focus")).resolves.toEqual({
+      status: "unauthenticated",
+      session: null,
+    });
+    expect(getAuthSession()).toBeNull();
+  });
+
   it("로그인 도중 도착한 이전 세션 응답이 새 계정을 덮어쓰지 않는다", async () => {
     const oldSessionResponse = deferred<Response>();
     apiRaw.mockImplementation((path: string) => {
@@ -283,6 +295,40 @@ describe("auth session store", () => {
       }),
     );
     await expect(synchronizeServerSession("focus")).resolves.toEqual(cached);
+    expect(getAuthSession()).toEqual(cached);
+  });
+
+  it("네트워크·5xx·손상 응답을 미인증이 아닌 미확정 상태로 구분한다", async () => {
+    const cached = { user: { id: "cached-user" }, token: null };
+    persistSession(cached);
+
+    apiRaw.mockRejectedValueOnce(new TypeError("offline"));
+    await expect(synchronizeServerSessionState("startup")).resolves.toEqual({
+      status: "indeterminate",
+      session: cached,
+    });
+
+    apiRaw.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "temporarily unavailable" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await expect(synchronizeServerSessionState("startup")).resolves.toEqual({
+      status: "indeterminate",
+      session: cached,
+    });
+
+    apiRaw.mockResolvedValueOnce(
+      new Response("not-json", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await expect(synchronizeServerSessionState("startup")).resolves.toEqual({
+      status: "indeterminate",
+      session: cached,
+    });
     expect(getAuthSession()).toEqual(cached);
   });
 

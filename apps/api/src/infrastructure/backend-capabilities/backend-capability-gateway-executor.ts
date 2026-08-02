@@ -12,6 +12,7 @@ import {
 } from "../../modules/studio-ai/studio-ai-provider";
 import { STUDIO_AI_BILLING_FAILOVER_REASON, studioAiProviderRequestId } from "../../modules/studio-ai/studio-ai-provider";
 import { StudioAiTaskSchema, type StudioAiProviderPreference } from "../../modules/studio-ai/studio-ai.dto";
+import { SupabaseObjectReferenceSchema } from "../supabase-object-storage/supabase-object-storage.contract";
 
 import {
   BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
@@ -28,6 +29,7 @@ import {
 import {
   BACKEND_CAPABILITY_GATEWAY_VERSION,
   BackendCapabilityGatewayResponseSchema,
+  CanonicalJsonValueSchema,
   canonicalJsonStringify,
   type BackendCapabilityGatewayEnvelope,
   type BackendCapabilityGatewayResponse,
@@ -38,6 +40,13 @@ import {
   type BackendRemoteProviderId,
 } from "./backend-capability-policy";
 import { BACKEND_CAPABILITY_POLICY } from "./backend-capability-router";
+import {
+  BACKEND_CAPABILITY_WORKER_PORT,
+  BackendCapabilityWorkerReadinessSchema,
+  BackendCapabilityWorkerSubmissionSchema,
+  type BackendCapabilityWorkerPort,
+  type BackendCapabilityWorkerReadiness,
+} from "./backend-capability-worker.port";
 
 interface GatewayReceipt {
   commandFingerprint: string;
@@ -76,6 +85,7 @@ type StudioAiAttempt =
 
 const IDEMPOTENCY_TTL_MS = 6 * 60 * 60 * 1000;
 const DURABLE_QUEUE_READINESS_TIMEOUT_MS = 2_500;
+const CAPABILITY_WORKER_READINESS_TIMEOUT_MS = 2_500;
 
 class DurableQueueCallAbortedError extends Error {
   constructor() {
@@ -172,6 +182,7 @@ const ThumbnailPayloadSchema = z
     operation: z.literal("thumbnail.render"),
     tenantId: z.string().min(1).max(256),
     sourceAssetId: z.string().min(1).max(256),
+    sourceObject: SupabaseObjectReferenceSchema.optional(),
     format: z.enum(["webp", "png", "jpeg"]).optional(),
     maxWidth: z.number().int().positive().max(8_192).optional(),
     maxHeight: z.number().int().positive().max(8_192).optional(),
@@ -191,7 +202,7 @@ const LongStudioAiPayloadSchema = z
       .transform((value) => parseStudioAiIdempotencyKey(value))
       .pipe(z.string()),
     jobType: z.string().min(1).max(128),
-    task: z.record(z.string(), z.unknown()),
+    task: CanonicalJsonValueSchema,
   })
   .strict();
 
@@ -263,11 +274,51 @@ export class BackendCapabilityGatewayExecutor {
     private readonly policy: BackendCapabilityPolicy,
     @Optional()
     @Inject(BACKEND_CAPABILITY_DURABLE_QUEUE_PORT)
-    private readonly durableQueue?: BackendCapabilityDurableQueuePort
+    private readonly durableQueue?: BackendCapabilityDurableQueuePort,
+    @Optional()
+    @Inject(BACKEND_CAPABILITY_WORKER_PORT)
+    private readonly capabilityWorker?: BackendCapabilityWorkerPort,
   ) {}
 
   hasDurableQueueExecutor(): boolean {
     return this.durableQueue !== undefined;
+  }
+
+  hasCapabilityWorkerExecutor(): boolean {
+    return this.capabilityWorker !== undefined;
+  }
+
+  async isCapabilityWorkerReady(
+    signal: AbortSignal | undefined = undefined,
+  ): Promise<boolean> {
+    return (await this.capabilityWorkerReadiness(signal))?.ready === true;
+  }
+
+  async capabilityWorkerReadiness(
+    signal: AbortSignal | undefined = undefined,
+  ): Promise<BackendCapabilityWorkerReadiness | null> {
+    const worker = this.capabilityWorker;
+    if (!worker) return null;
+    const scope = createDurableQueueAbortScope(
+      CAPABILITY_WORKER_READINESS_TIMEOUT_MS,
+      signal,
+    );
+    try {
+      const rawReadiness = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          worker.verifyReadiness({ signal: scope.signal }),
+        ),
+        scope.signal,
+      );
+      const readiness = BackendCapabilityWorkerReadinessSchema.safeParse(
+        rawReadiness,
+      );
+      return readiness.success ? readiness.data : null;
+    } catch {
+      return null;
+    } finally {
+      scope.dispose();
+    }
   }
 
   /**
@@ -422,12 +473,12 @@ export class BackendCapabilityGatewayExecutor {
       case "webhook": {
         const operation = this.extractPayloadOperation(envelope.payload);
         if (operation === "studio-ai-long") {
-          return this.executeLongAiPayload(envelope);
+          return this.executeLongAiPayload(envelope, signal);
         }
         return this.executeWebhookPayload(envelope, signal);
       }
       case "thumbnail":
-        return this.executeThumbnailPayload(envelope);
+        return this.executeThumbnailPayload(envelope, signal);
       case "cleanup":
       case "notification":
         return this.executeDurableQueuePayload(envelope, signal);
@@ -727,77 +778,265 @@ export class BackendCapabilityGatewayExecutor {
   }
 
   private async executeThumbnailPayload(
-    envelope: BackendCapabilityGatewayEnvelope
+    envelope: BackendCapabilityGatewayEnvelope,
+    signal: AbortSignal | undefined,
   ): Promise<BackendCapabilityGatewayResponse> {
     const payloadParse = ThumbnailPayloadSchema.safeParse(envelope.payload);
     if (!payloadParse.success) {
-      return this.parseGatewayResponse({
-        providerId: envelope.provider,
-        idempotencyKey: envelope.idempotencyKey,
-        outcome: "rejected",
-        retryable: false,
-        result: null,
-        errorCode: "INVALID_WEBHOOK_PAYLOAD",
-      });
+      return this.rejectCapabilityWorker(
+        envelope,
+        "INVALID_THUMBNAIL_PAYLOAD",
+        false,
+      );
     }
-    if (payloadParse.data.operation !== "thumbnail.render") {
-      return this.parseGatewayResponse({
-        providerId: envelope.provider,
-        idempotencyKey: envelope.idempotencyKey,
-        outcome: "rejected",
-        retryable: false,
-        result: null,
-        errorCode: "UNSUPPORTED_OPERATION",
-      });
+    const payload = payloadParse.data;
+    if (!this.capabilityWorker) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "THUMBNAIL_EXECUTOR_UNAVAILABLE",
+        true,
+      );
     }
-
-    // A provider acknowledgement is durable execution evidence, not a locally fabricated job ID.
-    // Until a thumbnail worker port can prove enqueue/execute ownership, fail closed so rollout
-    // canaries cannot mistake this facade for a functioning container worker.
-    return this.parseGatewayResponse({
-      providerId: envelope.provider,
-      idempotencyKey: envelope.idempotencyKey,
-      outcome: "rejected",
-      retryable: true,
-      result: null,
-      errorCode: "THUMBNAIL_EXECUTOR_UNAVAILABLE",
-    });
+    if (
+      payload.tenantId !== envelope.tenantId ||
+      payload.requestKey !== envelope.idempotencyKey ||
+      !envelope.idempotent
+    ) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "THUMBNAIL_COMMAND_BINDING_INVALID",
+        false,
+      );
+    }
+    if (!payload.sourceObject) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "THUMBNAIL_SOURCE_REFERENCE_REQUIRED",
+        false,
+      );
+    }
+    if (payload.format === "webp") {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "THUMBNAIL_FORMAT_UNSUPPORTED",
+        false,
+      );
+    }
+    return this.executeCapabilityWorkerCommand(
+      envelope,
+      {
+        operation: "thumbnail.render",
+        tenantId: envelope.tenantId,
+        idempotencyKey: envelope.idempotencyKey,
+        sourceAssetId: payload.sourceAssetId,
+        sourceObject: payload.sourceObject,
+        format: payload.format ?? "png",
+        maxWidth: payload.maxWidth ?? 512,
+        maxHeight: payload.maxHeight ?? 512,
+      },
+      "THUMBNAIL",
+      signal,
+    );
   }
 
   private async executeLongAiPayload(
-    envelope: BackendCapabilityGatewayEnvelope
+    envelope: BackendCapabilityGatewayEnvelope,
+    signal: AbortSignal | undefined,
   ): Promise<BackendCapabilityGatewayResponse> {
     const payloadParse = LongStudioAiPayloadSchema.safeParse(envelope.payload);
     if (!payloadParse.success) {
-      return this.parseGatewayResponse({
-        providerId: envelope.provider,
-        idempotencyKey: envelope.idempotencyKey,
-        outcome: "rejected",
-        retryable: false,
-        result: null,
-        errorCode: "INVALID_WEBHOOK_PAYLOAD",
-      });
+      return this.rejectCapabilityWorker(
+        envelope,
+        "INVALID_LONG_AI_PAYLOAD",
+        false,
+      );
     }
-    if (payloadParse.data.operation !== "studio-ai-long") {
-      return this.parseGatewayResponse({
-        providerId: envelope.provider,
-        idempotencyKey: envelope.idempotencyKey,
-        outcome: "rejected",
-        retryable: false,
-        result: null,
-        errorCode: "UNSUPPORTED_OPERATION",
-      });
+    const payload = payloadParse.data;
+    if (!this.capabilityWorker) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "LONG_AI_EXECUTOR_UNAVAILABLE",
+        true,
+      );
     }
+    if (
+      payload.tenantId !== envelope.tenantId ||
+      payload.requestKey !== envelope.idempotencyKey ||
+      !envelope.idempotent ||
+      envelope.execution.durability !== "durable"
+    ) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        "LONG_AI_COMMAND_BINDING_INVALID",
+        false,
+      );
+    }
+    return this.executeCapabilityWorkerCommand(
+      envelope,
+      {
+        operation: "studio-ai-long",
+        tenantId: envelope.tenantId,
+        idempotencyKey: envelope.idempotencyKey,
+        jobType: payload.jobType,
+        task: payload.task,
+      },
+      "LONG_AI",
+      signal,
+    );
+  }
 
-    // Parsing a long-running command is not the same as durably enqueueing it. Keep the facade
-    // unavailable until a real queue/worker adapter returns provider-backed execution evidence.
+  private async executeCapabilityWorkerCommand(
+    envelope: BackendCapabilityGatewayEnvelope,
+    command: Parameters<BackendCapabilityWorkerPort["submit"]>[0],
+    errorPrefix: "LONG_AI" | "THUMBNAIL",
+    signal: AbortSignal | undefined,
+  ): Promise<BackendCapabilityGatewayResponse> {
+    const worker = this.capabilityWorker;
+    if (!worker) {
+      return this.rejectCapabilityWorker(
+        envelope,
+        `${errorPrefix}_EXECUTOR_UNAVAILABLE`,
+        true,
+      );
+    }
+    const provider = this.policy.providers[envelope.provider];
+    const timeoutMs = Math.max(
+      1,
+      Math.min(provider.maxExecutionMs, envelope.execution.estimatedDurationMs),
+    );
+    const scope = createDurableQueueAbortScope(timeoutMs, signal);
+    try {
+      const rawReadiness = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          worker.verifyReadiness({ signal: scope.signal }),
+        ),
+        scope.signal,
+      );
+      const readiness = BackendCapabilityWorkerReadinessSchema.safeParse(
+        rawReadiness,
+      );
+      if (
+        !readiness.success ||
+        !readiness.data.ready ||
+        !readiness.data.operations.includes(command.operation)
+      ) {
+        return this.rejectCapabilityWorker(
+          envelope,
+          `${errorPrefix}_EXECUTOR_NOT_READY`,
+          true,
+        );
+      }
+
+      const rawSubmission = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          worker.submit(command, { signal: scope.signal }),
+        ),
+        scope.signal,
+      );
+      const submission = BackendCapabilityWorkerSubmissionSchema.safeParse(
+        rawSubmission,
+      );
+      if (!submission.success) {
+        return this.rejectCapabilityWorker(
+          envelope,
+          `${errorPrefix}_EXECUTOR_INVALID_RESPONSE`,
+          true,
+        );
+      }
+      switch (submission.data.outcome) {
+        case "accepted":
+        case "duplicate":
+          return this.parseGatewayResponse({
+            providerId: envelope.provider,
+            idempotencyKey: envelope.idempotencyKey,
+            outcome: submission.data.outcome,
+            retryable: false,
+            result: {
+              operation: command.operation,
+              status: "accepted",
+              jobId: submission.data.jobId,
+            },
+            errorCode: null,
+          });
+        case "completed":
+          if (
+            !this.isCapabilityWorkerResultWithinProviderLimit(
+              envelope.provider,
+              submission.data.result,
+            )
+          ) {
+            return this.rejectCapabilityWorker(
+              envelope,
+              "PROVIDER_RESPONSE_LIMIT_EXCEEDED",
+              false,
+            );
+          }
+          return this.parseGatewayResponse({
+            providerId: envelope.provider,
+            idempotencyKey: envelope.idempotencyKey,
+            outcome: "completed",
+            retryable: false,
+            result: submission.data.result,
+            errorCode: null,
+          });
+        case "rejected":
+          return this.rejectCapabilityWorker(
+            envelope,
+            submission.data.errorCode,
+            submission.data.retryable,
+          );
+      }
+    } catch (error) {
+      if (scope.callerAborted()) {
+        return this.rejectCapabilityWorker(
+          envelope,
+          `${errorPrefix}_EXECUTION_ABORTED`,
+          true,
+        );
+      }
+      if (scope.timedOut() || error instanceof DurableQueueCallAbortedError) {
+        return this.rejectCapabilityWorker(
+          envelope,
+          `${errorPrefix}_EXECUTION_TIMEOUT`,
+          true,
+        );
+      }
+      return this.rejectCapabilityWorker(
+        envelope,
+        `${errorPrefix}_EXECUTION_FAILED`,
+        true,
+      );
+    } finally {
+      scope.dispose();
+    }
+  }
+
+  private isCapabilityWorkerResultWithinProviderLimit(
+    providerId: BackendRemoteProviderId,
+    result: unknown,
+  ): boolean {
+    try {
+      return (
+        Buffer.byteLength(canonicalJsonStringify(result), "utf8") <=
+        this.policy.providers[providerId].maxResponseBytes
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private rejectCapabilityWorker(
+    envelope: BackendCapabilityGatewayEnvelope,
+    errorCode: string,
+    retryable: boolean,
+  ): BackendCapabilityGatewayResponse {
     return this.parseGatewayResponse({
       providerId: envelope.provider,
       idempotencyKey: envelope.idempotencyKey,
       outcome: "rejected",
-      retryable: true,
+      retryable,
       result: null,
-      errorCode: "LONG_AI_EXECUTOR_UNAVAILABLE",
+      errorCode,
     });
   }
 

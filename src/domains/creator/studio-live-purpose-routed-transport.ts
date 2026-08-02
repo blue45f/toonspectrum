@@ -52,7 +52,6 @@ export interface StudioPurposeRoutedLiveTransportFactoryOptions {
 
 export interface StudioCloudflarePurposeRoutedFactoryOptions {
   readonly primaryFactory: StudioLiveTransportFactory;
-  readonly sessionToken: string;
   readonly realtimeOrigin: string;
   readonly providerId?: string;
   readonly roomId?: (context: StudioLiveTransportContext) => string;
@@ -976,9 +975,7 @@ export function createStudioCloudflarePurposeRoutedLiveTransportFactory(
             ],
           },
         ],
-        ticketIssuer: createStudioRealtimeHttpTicketIssuer({
-          sessionToken: options.sessionToken,
-        }),
+        ticketIssuer: createStudioRealtimeHttpTicketIssuer({}),
       });
     },
   });

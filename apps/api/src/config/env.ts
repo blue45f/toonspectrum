@@ -61,7 +61,35 @@ const privateBucketName = z
 // 모든 키가 선택(optional) — 폴백을 가진 값이 많고, 검증 실패가 부팅을 막아선 안 된다.
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
-  API_RUNTIME_ROLE: z.enum(["full", "studio-live"]).optional(),
+  API_RUNTIME_ROLE: z
+    .enum(["full", "studio-live", "capability-worker"])
+    .optional(),
+  BACKEND_CAPABILITY_WORKER_ENABLED: z.enum(["true", "false"]).optional(),
+  BACKEND_THUMBNAIL_WORKER_MAXIMUM_SOURCE_BYTES: boundedPositiveInteger(
+    "BACKEND_THUMBNAIL_WORKER_MAXIMUM_SOURCE_BYTES",
+    1_024,
+    67_108_864,
+  ).optional(),
+  BACKEND_THUMBNAIL_WORKER_MAXIMUM_SOURCE_PIXELS: boundedPositiveInteger(
+    "BACKEND_THUMBNAIL_WORKER_MAXIMUM_SOURCE_PIXELS",
+    1,
+    268_435_456,
+  ).optional(),
+  BACKEND_THUMBNAIL_WORKER_MAXIMUM_OUTPUT_PIXELS: boundedPositiveInteger(
+    "BACKEND_THUMBNAIL_WORKER_MAXIMUM_OUTPUT_PIXELS",
+    1,
+    67_108_864,
+  ).optional(),
+  BACKEND_THUMBNAIL_WORKER_MAXIMUM_OUTPUT_BYTES: boundedPositiveInteger(
+    "BACKEND_THUMBNAIL_WORKER_MAXIMUM_OUTPUT_BYTES",
+    1_024,
+    67_108_864,
+  ).optional(),
+  BACKEND_THUMBNAIL_WORKER_SIGNED_URL_TTL_SECONDS: boundedPositiveInteger(
+    "BACKEND_THUMBNAIL_WORKER_SIGNED_URL_TTL_SECONDS",
+    30,
+    300,
+  ).optional(),
   CI: z.enum(["true", "false", "1", "0"]).optional(),
   TZ: z
     .string()
@@ -200,7 +228,7 @@ const envSchema = z.object({
   STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: z
     .string()
     .regex(/^[1-9]\d*$/u)
-    .refine((value) => Number(value) <= 14_400)
+    .refine((value) => Number(value) <= 300)
     .optional(),
   // 원본·파생물·내보내기를 목적별 private bucket으로 분리한 정본 저장소.
   // 실제 모듈 factory는 활성화 시 필수값·서로 다른 bucket 조건을 fail-closed로 재검증한다.
@@ -486,7 +514,10 @@ function assertStrongProductionHmacSecret(
 }
 
 function assertProductionAuthSecrets(source: NodeJS.ProcessEnv): void {
-  if (source.NODE_ENV !== "production") return;
+  if (
+    source.NODE_ENV !== "production"
+    || source.API_RUNTIME_ROLE === "capability-worker"
+  ) return;
 
   const sessionSecret =
     normalizedConfiguredSecret(source.AUTH_SESSION_SECRET) ??
@@ -555,7 +586,11 @@ export function validateEnv(
       }
     }
     // 세션 비밀이 둘 다 비어 있으면 폴백(insecure) 사용 — production 에서 위험.
-    if (!source.AUTH_SESSION_SECRET?.trim() && !source.AUTH_STATE_SECRET?.trim()) {
+    if (
+      source.API_RUNTIME_ROLE !== "capability-worker"
+      && !source.AUTH_SESSION_SECRET?.trim()
+      && !source.AUTH_STATE_SECRET?.trim()
+    ) {
       logger.error(
         `\n${"!".repeat(72)}\n` +
           `[env] 보안 경고: production 인데 AUTH_SESSION_SECRET/AUTH_STATE_SECRET 미설정 —\n` +

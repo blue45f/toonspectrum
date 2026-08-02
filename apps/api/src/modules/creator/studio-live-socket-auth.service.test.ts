@@ -35,6 +35,33 @@ describe("StudioLiveSocketAuthService", () => {
     expect(client.data).toEqual({});
   });
 
+  it("admits only the explicit bounded v1 guest credential shape", async () => {
+    const authenticate = vi.fn(async () => null);
+    const service = new StudioLiveSocketAuthService(authenticate, vi.fn(async () => true));
+    const validGuest = socket(
+      "guest",
+      "guest:v1:7a75f75a-4abc-4def-8abc-04c9e58a52f1",
+    );
+
+    await expect(service.authenticate(validGuest)).resolves.toBe(true);
+    expect(service.principal(validGuest)?.userId).toBe(
+      "guest_7a75f75a-4abc-4def-8abc-04c9e58a52f1",
+    );
+    expect(validGuest.handshake.auth).not.toHaveProperty("sessionToken");
+    expect(authenticate).not.toHaveBeenCalled();
+
+    for (const legacy of [
+      "guest:guessable",
+      "anonymous:legacy",
+      "guest:v1:not-a-uuid",
+    ]) {
+      const client = socket(legacy, legacy);
+      await expect(service.authenticate(client)).resolves.toBe(false);
+      expect(client.handshake.auth).not.toHaveProperty("sessionToken");
+    }
+    expect(authenticate).toHaveBeenCalledTimes(3);
+  });
+
   it.each([
     ["rejected", async () => null],
     ["expired", async () => principal("owner", Date.now() - 1)],
@@ -57,6 +84,7 @@ describe("StudioLiveSocketAuthService", () => {
       const client = socket("owner", token);
       await expect(service.authenticate(client)).resolves.toBe(false);
       expect(service.principal(client)).toBeUndefined();
+      expect(client.handshake.auth).not.toHaveProperty("sessionToken");
     }
     expect(authenticate).not.toHaveBeenCalled();
   });
@@ -82,6 +110,19 @@ describe("StudioLiveSocketAuthService", () => {
     expect(service.principal(client)?.userId).toBe("replacement");
     expect(service.isPrincipalCurrent(client, original as StudioLiveAuthPrincipal, "owner"))
       .toBe(false);
+  });
+
+  it("does not classify an authenticated account as a guest by user-id prefix", async () => {
+    const revalidate = vi.fn(async () => false);
+    const service = new StudioLiveSocketAuthService(
+      vi.fn(async () => principal("guest_legitimate-account")),
+      revalidate,
+    );
+    const client = socket("prefixed-account");
+
+    await expect(service.authenticate(client)).resolves.toBe(true);
+    await expect(service.revalidate(client)).resolves.toBe(false);
+    expect(revalidate).toHaveBeenCalledOnce();
   });
 
   it("turns revalidation exceptions and expiration into a private boolean denial", async () => {

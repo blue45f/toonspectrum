@@ -23,6 +23,7 @@ function claims(
     issuer: "toonspectrum-api",
     audience: "toonspectrum-realtime",
     subject: "artist-1",
+    sessionVersion: 4,
     workId: "work-1",
     roomId: "room-1",
     clientId: "client-1",
@@ -31,7 +32,7 @@ function claims(
     nonce: "nonce_0123456789abcdef",
     issuedAtMs: NOW - 1_000,
     expiresAtMs: NOW + 60_000,
-    sessionExpiresAtMs: NOW + 60 * 60 * 1000,
+    sessionExpiresAtMs: NOW + 4 * 60 * 1000,
     ...overrides,
   };
 }
@@ -110,6 +111,7 @@ describe("realtime HMAC ticket", () => {
       claims({
         issuedAtMs: NOW - 120_000,
         expiresAtMs: NOW - 1,
+        sessionExpiresAtMs: NOW + 60_000,
       }),
       SECRET,
     );
@@ -135,6 +137,12 @@ describe("realtime HMAC ticket", () => {
     await expect(
       verifyRealtimeTicket(ticket, "too-short", expectation),
     ).resolves.toEqual({ ok: false, code: "invalid-secret" });
+  });
+
+  it("requires a positive signed source-session version", async () => {
+    await expect(
+      signRealtimeTicket(claims({ sessionVersion: 0 }), SECRET),
+    ).rejects.toThrow("Invalid realtime ticket claims");
   });
 
   it("extracts a ticket only from the exact two-subprotocol handshake", () => {

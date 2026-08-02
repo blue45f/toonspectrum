@@ -689,20 +689,20 @@ describe("Studio purpose-routed live transport", () => {
     const primaryFactory: StudioLiveTransportFactory = () =>
       new FakePrimaryTransport();
     expect(
-      applyStudioRealtimePurposeRouting(primaryFactory, "signed-token", {}),
+      applyStudioRealtimePurposeRouting(primaryFactory, {}),
     ).toBe(primaryFactory);
     expect(
-      applyStudioRealtimePurposeRouting(primaryFactory, "signed-token", {
+      applyStudioRealtimePurposeRouting(primaryFactory, {
         realtimeOrigin: "http://worker.example.com",
       }),
     ).toBe(primaryFactory);
     expect(
-      applyStudioRealtimePurposeRouting(primaryFactory, "signed-token", {
+      applyStudioRealtimePurposeRouting(primaryFactory, {
         realtimeOrigin: "https://worker.example.com/v1",
       }),
     ).toBe(primaryFactory);
     expect(
-      applyStudioRealtimePurposeRouting(primaryFactory, "signed-token", {
+      applyStudioRealtimePurposeRouting(primaryFactory, {
         realtimeOrigin: "https://worker.example.com",
         providerId: "invalid provider",
       }),
@@ -710,7 +710,6 @@ describe("Studio purpose-routed live transport", () => {
 
     const routed = applyStudioRealtimePurposeRouting(
       primaryFactory,
-      "signed-token",
       {
         realtimeOrigin: "https://worker.example.com",
         providerId: "cloudflare-realtime-v1",

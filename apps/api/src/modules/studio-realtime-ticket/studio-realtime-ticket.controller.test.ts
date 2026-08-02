@@ -1,7 +1,23 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  getSessionAuthenticationPrincipal,
+  getSessionAuthenticationSource,
+} from "../../session-middleware";
+
 import { StudioRealtimeTicketController } from "./studio-realtime-ticket.controller";
+
+vi.mock("../../session-middleware", () => ({
+  getSessionAuthenticationPrincipal: vi.fn(),
+  getSessionAuthenticationSource: vi.fn(),
+}));
+
+const PRINCIPAL = {
+  userId: "owner",
+  sessionVersion: 7,
+  expiresAt: Date.parse("2026-07-31T02:00:00.000Z"),
+} as const;
 
 const REQUEST = {
   version: 1,
@@ -13,11 +29,22 @@ const REQUEST = {
 } as const;
 
 describe("StudioRealtimeTicketController", () => {
-  it("requires the verified session middleware user id", () => {
+  it("requires an HttpOnly-cookie-authenticated middleware identity", () => {
     const issue = vi.fn();
     const controller = new StudioRealtimeTicketController({ issue } as never);
+    const request = {} as never;
 
-    expect(() => controller.issue(undefined, undefined, REQUEST))
+    vi.mocked(getSessionAuthenticationSource).mockReturnValue(null);
+    vi.mocked(getSessionAuthenticationPrincipal).mockReturnValue(null);
+    expect(() => controller.issue(request, undefined, REQUEST))
+      .toThrow(UnauthorizedException);
+    vi.mocked(getSessionAuthenticationSource).mockReturnValue("header");
+    vi.mocked(getSessionAuthenticationPrincipal).mockReturnValue(PRINCIPAL);
+    expect(() => controller.issue(request, undefined, REQUEST))
+      .toThrow(UnauthorizedException);
+    vi.mocked(getSessionAuthenticationSource).mockReturnValue("cookie");
+    vi.mocked(getSessionAuthenticationPrincipal).mockReturnValue(null);
+    expect(() => controller.issue(request, undefined, REQUEST))
       .toThrow(UnauthorizedException);
     expect(issue).not.toHaveBeenCalled();
   });
@@ -35,16 +62,19 @@ describe("StudioRealtimeTicketController", () => {
     } as const;
     const issue = vi.fn(async () => response);
     const controller = new StudioRealtimeTicketController({ issue } as never);
+    const request = {} as never;
+    vi.mocked(getSessionAuthenticationSource).mockReturnValue("cookie");
+    vi.mocked(getSessionAuthenticationPrincipal).mockReturnValue(PRINCIPAL);
 
     await expect(
       controller.issue(
-        "owner",
+        request,
         "https://www.toonstudio.cloud",
         REQUEST,
       ),
     ).resolves.toBe(response);
     expect(issue).toHaveBeenCalledWith(
-      "owner",
+      PRINCIPAL,
       "https://www.toonstudio.cloud",
       REQUEST,
     );

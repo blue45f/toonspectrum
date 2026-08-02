@@ -154,6 +154,9 @@ describe("3D engine upgrades", () => {
     expect(step.stepBytes).toBeGreaterThan(500);
     expect(step.stepText).toMatch(/ISO-10303-21/u);
     expect(step.triangleCount).toBeGreaterThanOrEqual(12);
+    expect(step.volumeApprox).toBeCloseTo(1, 6);
+    expect(step.massProperties.volumeSource).toBe("occt-brep");
+    expect(step.topology.closedSolid).toBe(true);
   }, 120_000);
 
   it("SolidWorks suite reports realThickShell and realStepIo", async () => {

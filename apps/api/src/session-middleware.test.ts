@@ -5,6 +5,7 @@ import { isSessionAllowed } from "../../../lib/server/user-lifecycle";
 
 import { AUTH_SESSION_COOKIE_NAME, resolveSessionCookieValue } from "./session-cookie";
 import {
+  getSessionAuthenticationPrincipal,
   getSessionAuthenticationSource,
   sessionAuth,
 } from "./session-middleware";
@@ -44,6 +45,10 @@ describe("session middleware", () => {
 
     expect(req.headers["x-user-id"]).toBe("header-user");
     expect(getSessionAuthenticationSource(req)).toBe("header");
+    expect(getSessionAuthenticationPrincipal(req)).toMatchObject({
+      userId: "header-user",
+      sessionVersion: 1,
+    });
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -64,6 +69,10 @@ describe("session middleware", () => {
 
     expect(req.headers["x-user-id"]).toBe("cookie-user");
     expect(getSessionAuthenticationSource(req)).toBe("cookie");
+    expect(getSessionAuthenticationPrincipal(req)).toMatchObject({
+      userId: "cookie-user",
+      sessionVersion: 1,
+    });
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -78,6 +87,7 @@ describe("session middleware", () => {
 
     expect(req.headers).toEqual({});
     expect(getSessionAuthenticationSource(req)).toBeNull();
+    expect(getSessionAuthenticationPrincipal(req)).toBeNull();
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -97,6 +107,7 @@ describe("session middleware", () => {
 
     expect(req.headers["x-user-id"]).toBeUndefined();
     expect(getSessionAuthenticationSource(req)).toBeNull();
+    expect(getSessionAuthenticationPrincipal(req)).toBeNull();
     expect(next).toHaveBeenCalledWith(dependencyError);
   });
 
@@ -124,6 +135,10 @@ describe("session middleware", () => {
 
     expect(req.headers["x-user-id"]).toBe("cookie-user");
     expect(getSessionAuthenticationSource(req)).toBe("cookie");
+    expect(getSessionAuthenticationPrincipal(req)).toMatchObject({
+      userId: "cookie-user",
+      sessionVersion: 1,
+    });
     expect(next).toHaveBeenCalledTimes(1);
   });
 });

@@ -14,6 +14,7 @@ import type {
 class FakeOcctWorker extends EventTarget {
   static mode: "post-message-throw" | "silent" | "success" = "success";
   static latest: FakeOcctWorker | null = null;
+  static instances: FakeOcctWorker[] = [];
 
   lastRequest: StudioOcctWorkerRequest | null = null;
   terminated = false;
@@ -21,6 +22,7 @@ class FakeOcctWorker extends EventTarget {
   constructor() {
     super();
     FakeOcctWorker.latest = this;
+    FakeOcctWorker.instances.push(this);
   }
 
   postMessage(request: StudioOcctWorkerRequest): void {
@@ -39,6 +41,32 @@ class FakeOcctWorker extends EventTarget {
           triangleCount: 12,
           vertexCount: 8,
           volumeApprox: 1,
+          topology: {
+            source: "tessellated-triangle-mesh",
+            boundaryEdgeCount: 0,
+            nonManifoldEdgeCount: 0,
+            orientationConflictEdgeCount: 0,
+            degenerateTriangleCount: 0,
+            consistentOrientation: true,
+            watertight: true,
+            closedSolid: true,
+            signedVolume: 1,
+          },
+          massProperties: {
+            source: "occt-brep",
+            density: 1,
+            densityUnit: "mass/model-unit^3",
+            mass: 1,
+            volume: 1,
+            volumeSource: "occt-brep",
+            surfaceArea: 6,
+            surfaceAreaSource: "occt-brep",
+            centroid: { x: 0, y: 0, z: 0 },
+            centroidSource: "occt-brep",
+            inertia: { xx: 1, yy: 1, zz: 1, xy: 0, xz: 0, yz: 0 },
+            inertiaSource: "occt-brep",
+            approximate: false,
+          },
           backend: "opencascade-wasm",
           operation: "BRepPrimAPI_MakeBox",
           loadPath: "browser",
@@ -72,6 +100,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   FakeOcctWorker.latest = null;
+  FakeOcctWorker.instances = [];
   FakeOcctWorker.mode = "success";
 });
 
@@ -88,6 +117,50 @@ describe("Studio OCCT Worker client", () => {
     expect(result.vertexCount).toBe(8);
     expect(result.mesh.faces).toHaveLength(6);
     expect(FakeOcctWorker.latest?.terminated).toBe(false);
+  });
+
+  it("realm-isolates Embind no-delete operations in a fresh one-shot Worker", async () => {
+    useFakeBrowserWorker();
+    await runStudioOcctOperation({
+      kind: "thick-shell-box",
+      size: [1, 1, 1],
+      thickness: 0.1,
+    });
+    const first = FakeOcctWorker.latest;
+    expect(first?.terminated).toBe(true);
+
+    await runStudioOcctOperation({
+      kind: "fillet2d-extrude",
+      width: 1,
+      height: 1,
+      depth: 0.5,
+      filletRadius: 0.1,
+    });
+    const second = FakeOcctWorker.latest;
+    expect(second).not.toBe(first);
+    expect(second?.terminated).toBe(true);
+
+    await runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    });
+    const third = FakeOcctWorker.latest;
+    expect(third).not.toBe(second);
+    expect(third?.terminated).toBe(true);
+    expect(FakeOcctWorker.instances).toHaveLength(3);
+  });
+
+  it("disposes an in-flight realm-isolated operation", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "silent";
+    const operation = runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    });
+    const assertion = expect(operation).rejects.toThrow("OCCT Worker disposed");
+    disposeStudioOcctWorker();
+    await assertion;
+    expect(FakeOcctWorker.latest?.terminated).toBe(true);
   });
 
   it("terminates the shared Worker and rejects on cancellation", async () => {

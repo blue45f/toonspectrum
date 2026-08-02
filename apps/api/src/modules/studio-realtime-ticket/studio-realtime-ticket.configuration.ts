@@ -7,6 +7,8 @@ import {
   StudioRealtimeTicketWorkloadListSchema,
 } from "./studio-realtime-ticket.dto";
 
+export const STUDIO_REALTIME_SESSION_MAX_TTL_SECONDS = 5 * 60;
+
 export const StudioRealtimeTicketProviderKindSchema = z.enum([
   "cloudflare",
   "supabase",
@@ -46,7 +48,11 @@ export const CloudflareStudioRealtimeTicketSignerConfigurationSchema =
     issuer: StudioRealtimeTicketIdentifierSchema,
     hmacSecret: z.string().min(32).max(4_096),
     ticketTtlSeconds: z.number().int().min(1).max(120),
-    sessionTtlSeconds: z.number().int().min(1).max(4 * 60 * 60),
+    sessionTtlSeconds: z
+      .number()
+      .int()
+      .min(1)
+      .max(STUDIO_REALTIME_SESSION_MAX_TTL_SECONDS),
   })
     .strict()
     .superRefine((configuration, context) => {

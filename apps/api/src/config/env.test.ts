@@ -49,6 +49,20 @@ describe("production domain environment validation", () => {
     expect(JSON.stringify(logger)).not.toContain("too-short");
   });
 
+  it("does not require unrelated auth secrets in the isolated production capability worker", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "production",
+      API_RUNTIME_ROLE: "capability-worker",
+      BACKEND_CAPABILITY_WORKER_ENABLED: "true",
+    }, logger)).toMatchObject({
+      API_RUNTIME_ROLE: "capability-worker",
+      BACKEND_CAPABILITY_WORKER_ENABLED: "true",
+    });
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it("requires a strong state secret only when production OAuth state is used", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
     const sessionSecret =
@@ -272,7 +286,7 @@ describe("Studio realtime ticket environment validation", () => {
         STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET:
           "test-only-ticket-secret-with-at-least-32-bytes",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
-        STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "14400",
+        STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "300",
       },
       logger,
     );
@@ -282,7 +296,7 @@ describe("Studio realtime ticket environment validation", () => {
       STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
         "cloudflare-realtime-v1",
       STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
-      STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "14400",
+      STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "300",
     });
     expect(logger.warn).not.toHaveBeenCalled();
   });

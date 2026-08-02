@@ -111,6 +111,8 @@ export type StudioOcctSolidResult = {
   readonly triangleCount: number;
   readonly vertexCount: number;
   readonly volumeApprox: number;
+  readonly topology: import("./studio-occt-wasm-facade").StudioOcctTopologyReceipt;
+  readonly massProperties: import("./studio-occt-wasm-facade").StudioOcctMassProperties;
   readonly backend: "opencascade-wasm";
   readonly operation: string;
   readonly loadPath?: "browser" | "node";

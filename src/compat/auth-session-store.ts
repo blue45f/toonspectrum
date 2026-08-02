@@ -27,17 +27,20 @@ export type { Session } from "./auth-session-state";
 export type SessionContextValue =
   | {
       data: NonNullable<Session>;
+      ready: boolean;
       status: "authenticated";
       update: () => Promise<Session>;
     }
   | {
       data: null;
+      ready: boolean;
       status: "unauthenticated";
       update: () => Promise<Session>;
     };
 
 export const SessionContext = createContext<SessionContextValue>({
   data: null,
+  ready: false,
   status: "unauthenticated",
   update: async () => null,
 });
@@ -56,7 +59,21 @@ type ServerSessionPayload =
       user: null;
     };
 
-let serverSessionRequest: Promise<Session> | null = null;
+export type ServerSessionSynchronization =
+  | {
+      status: "authenticated";
+      session: NonNullable<Session>;
+    }
+  | {
+      status: "unauthenticated";
+      session: null;
+    }
+  | {
+      status: "indeterminate";
+      session: Session;
+    };
+
+let serverSessionRequest: Promise<ServerSessionSynchronization> | null = null;
 const SERVER_SESSION_ROLES = new Set(["admin", "creator", "operator", "user"]);
 
 function isNullableString(value: unknown): value is string | null {
@@ -90,17 +107,19 @@ function parseServerSessionPayload(value: unknown): ServerSessionPayload | null 
 }
 
 /**
- * Reconciles the browser cache with the HttpOnly-cookie session. Transport or
- * malformed-response failures retain the last known state; only an explicit
- * logged-out response (or 401) clears it.
+ * Reconciles the browser cache with the HttpOnly-cookie session while keeping
+ * server verification distinct from the last public profile cached in this
+ * tab. Transport, 5xx, and malformed-response failures are indeterminate and
+ * retain the cache; only a valid 200 response or an authoritative 401 verifies
+ * the current authentication state.
  */
-export function synchronizeServerSession(
+export function synchronizeServerSessionState(
   _reason: SessionSyncReason = "manual",
-): Promise<Session> {
+): Promise<ServerSessionSynchronization> {
   if (serverSessionRequest) return serverSessionRequest;
   const requestRevision = getAuthSessionRevision();
   const requestIsCurrent = () => getAuthSessionRevision() === requestRevision;
-  serverSessionRequest = (async () => {
+  const request = (async (): Promise<ServerSessionSynchronization> => {
     let response: Response;
     try {
       response = await api.raw(apiPath("/auth/session"), {
@@ -109,32 +128,57 @@ export function synchronizeServerSession(
         throwHttpErrors: false,
       });
     } catch {
-      return getAuthSession();
+      return { status: "indeterminate", session: getAuthSession() };
     }
 
-    if (!requestIsCurrent()) return getAuthSession();
+    if (!requestIsCurrent()) {
+      return { status: "indeterminate", session: getAuthSession() };
+    }
     if (!response.ok) {
-      if (response.status === 401) persistSession(null);
-      return getAuthSession();
+      if (response.status === 401) {
+        persistSession(null);
+        return { status: "unauthenticated", session: null };
+      }
+      return { status: "indeterminate", session: getAuthSession() };
     }
 
     const payload = parseServerSessionPayload(
       await response.json().catch(() => null),
     );
-    if (!requestIsCurrent()) return getAuthSession();
-    if (!payload) return getAuthSession();
+    if (!requestIsCurrent()) {
+      return { status: "indeterminate", session: getAuthSession() };
+    }
+    if (!payload) {
+      return { status: "indeterminate", session: getAuthSession() };
+    }
     if (!payload.authenticated) {
       persistSession(null);
-      return null;
+      return { status: "unauthenticated", session: null };
     }
 
     const next = { user: payload.user, token: null };
     persistSession(next);
-    return getAuthSession();
+    const synchronizedSession = getAuthSession();
+    if (!synchronizedSession) {
+      return { status: "indeterminate", session: null };
+    }
+    return { status: "authenticated", session: synchronizedSession };
   })().finally(() => {
     serverSessionRequest = null;
   });
-  return serverSessionRequest;
+  serverSessionRequest = request;
+  return request;
+}
+
+/**
+ * Compatibility facade for callers that only need the latest public profile.
+ * SessionProvider uses synchronizeServerSessionState() so an empty cache is
+ * never confused with an authoritative unauthenticated response.
+ */
+export async function synchronizeServerSession(
+  reason: SessionSyncReason = "manual",
+): Promise<Session> {
+  return (await synchronizeServerSessionState(reason)).session;
 }
 
 // GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을

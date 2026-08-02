@@ -19,7 +19,7 @@ CANONICAL_HOST=www.toonstudio.cloud
 API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 OAUTH_REDIRECT_BASE_URL=https://www.toonstudio.cloud
 WEB_APP_BASE_URL=https://www.toonstudio.cloud
-WEBDEX_SITE_URL=https://www.toonstudio.cloud
+WEBDEX_SITE_URL=https://www.toonstudio.cloud # 기존 알림 스크립트 호환 키
 ```
 
 프론트와 `/api`가 같은 Vercel 배포에 있으므로 `VITE_API_BASE_URL`은 비워 둡니다. 브라우저는
@@ -41,14 +41,28 @@ Google Identity Services의 승인된 JavaScript origin에는
 
 ## Studio 실시간 협업
 
-Vercel Functions는 장기 실행 Socket.IO 서버가 아닙니다. 실시간 협업을 운영할 때는 Nest
-서버를 장기 실행 호스트(예: `https://realtime.toonstudio.cloud`)에 배포하고 다음 값을
-설정합니다.
+2026-08-02 기준 ephemeral realtime 권위는 Cloudflare Durable Objects이며, 검증된
+`workers.dev` origin을 사용합니다. `realtime.toonstudio.cloud`는 Cloudflare zone이 없어
+custom hostname/DNS/TLS가 완료되지 않았으므로 아직 권위 origin으로 설정하지 않습니다.
 
 프론트(Vercel build-time):
 
 ```dotenv
-VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonstudio.cloud
+VITE_STUDIO_REALTIME_ORIGIN=https://toonspectrum-realtime.toonstudio-realtime.workers.dev
+```
+
+Cloudflare와 Vercel은 같은 `STUDIO_REALTIME_TICKET_SECRET`을 각각의 secret manager에서
+주입해야 하며, 브라우저·Git·`VITE_` 변수에는 노출하지 않습니다. Cloudflare는
+presence, comment invalidation, screen-share signaling만 담당하고 작품 ACL·raster
+pixel·음성 media 권위가 아닙니다.
+
+Vercel Functions는 장기 실행 Socket.IO 서버가 아닙니다. CRDT fanout·lock에 별도
+Nest Socket.IO host가 필요한 승인된 폴백에서만 다음 경계를 추가합니다.
+
+프론트(Vercel build-time, 선택):
+
+```dotenv
+VITE_STUDIO_LIVE_ORIGIN=https://approved-socket-origin.example.com
 ```
 
 장기 실행 Nest 서버:
@@ -59,8 +73,8 @@ API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 WEB_APP_BASE_URL=https://www.toonstudio.cloud
 ```
 
-명시적 `VITE_STUDIO_LIVE_ORIGIN`이 없는 Vercel/custom-domain 빌드에서는 클라이언트가
-`wss://www.toonstudio.cloud/socket.io`에 잘못 연결하지 않고 실시간 연결을 비활성화합니다.
+명시적 `VITE_STUDIO_LIVE_ORIGIN`이 없는 Vercel/custom-domain 빌드에서는 선택형 Socket.IO가
+`wss://www.toonstudio.cloud/socket.io`에 잘못 연결하지 않고 Socket.IO transport만 비활성화합니다.
 Socket.IO의 HTTP CORS와 WebSocket upgrade `Origin` 검사는 같은 exact allowlist를 사용하며,
 credentialed wildcard CORS는 사용하지 않습니다.
 

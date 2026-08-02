@@ -1,0 +1,42 @@
+# Run `fly launch --copy-config --config deploy/capability-worker/fly.toml` once to assign `app`.
+primary_region = "sin"
+
+[build]
+  dockerfile = "deploy/capability-worker/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  API_RUNTIME_ROLE = "capability-worker"
+  BACKEND_CAPABILITY_WORKER_ENABLED = "true"
+  BACKEND_DISTRIBUTION_ENABLED = "true"
+  BACKEND_FLY_ENABLED = "true"
+  BACKEND_FLY_DAILY_REQUEST_BUDGET = "1000"
+  BACKEND_FLY_DAILY_COST_BUDGET = "100000"
+  BACKEND_FLY_MAX_EXECUTION_MS = "30000"
+  BACKEND_FLY_MAX_PAYLOAD_BYTES = "1048576"
+  BACKEND_FLY_MAX_RESPONSE_BYTES = "65536"
+  BACKEND_FLY_MAX_CONCURRENCY = "2"
+  SUPABASE_OBJECT_STORAGE_ENABLED = "true"
+  SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET = "studio-source-assets-v1"
+  SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET = "studio-derived-assets-v1"
+  SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET = "studio-exports-v1"
+
+[http_service]
+  internal_port = 4001
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "stop"
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health/live"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

@@ -40,7 +40,7 @@ function enabledEnvironment(
       "toonspectrum-realtime",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET: TEST_SECRET,
     STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
-    STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "14400",
+    STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "300",
     ...overrides,
   };
 }
@@ -70,7 +70,7 @@ describe("Studio realtime ticket deployment configuration", () => {
       issuer: "toonspectrum-api",
       audience: "toonspectrum-realtime",
       ticketTtlSeconds: 120,
-      sessionTtlSeconds: 14_400,
+      sessionTtlSeconds: 300,
       workloads: [
         "presence",
         "comments",
@@ -141,7 +141,11 @@ describe("Studio realtime ticket deployment configuration", () => {
     );
 
     const response = await service.issue(
-      "artist-1",
+      {
+        userId: "artist-1",
+        sessionVersion: 9,
+        expiresAt: Date.now() + 4 * 60 * 1_000,
+      },
       "https://www.toonstudio.cloud",
       {
         version: 1,
@@ -177,6 +181,7 @@ describe("Studio realtime ticket deployment configuration", () => {
       ok: true,
       claims: {
         subject: "artist-1",
+        sessionVersion: 9,
         workId: "work-1",
         roomId: "work-1",
         scopes: [
@@ -215,6 +220,12 @@ describe("Studio realtime ticket deployment configuration", () => {
       label: "session shorter than ticket",
       override: {
         STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "60",
+      },
+    },
+    {
+      label: "session longer than the bounded revocation lease",
+      override: {
+        STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "301",
       },
     },
   ])("fails closed for $label", ({ override }) => {

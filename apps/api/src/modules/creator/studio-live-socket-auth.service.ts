@@ -1,6 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 
 import {
+  STUDIO_LIVE_GUEST_CREDENTIAL_TTL_MS,
+  StudioLiveGuestCredentialSchema,
+} from "../../../../../lib/studio-live-auth-ticket";
+
+import {
   STUDIO_LIVE_SESSION_AUTHENTICATOR,
   STUDIO_LIVE_SESSION_REVALIDATOR,
 } from "./studio-live.protocol";
@@ -21,6 +26,7 @@ const STUDIO_LIVE_MAX_SESSION_TOKEN_LENGTH = 8_192;
 @Injectable()
 export class StudioLiveSocketAuthService {
   private readonly principalsBySocket = new Map<StudioLiveSocket, StudioLiveAuthPrincipal>();
+  private readonly guestSockets = new Set<StudioLiveSocket>();
 
   constructor(
     @Inject(STUDIO_LIVE_SESSION_AUTHENTICATOR)
@@ -47,27 +53,30 @@ export class StudioLiveSocketAuthService {
 
   async authenticate(client: StudioLiveSocket): Promise<boolean> {
     const token = this.handshakeToken(client);
-    if (!token) {
-      this.clear(client);
-      return false;
-    }
-    if (token.startsWith("guest:") || token.startsWith("anonymous:")) {
-      const guestId = token.slice(token.indexOf(":") + 1) || "guest";
-      const principal: StudioLiveAuthPrincipal = {
-        userId: `guest_${guestId}`,
-        sessionVersion: 1,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-      };
-      this.principalsBySocket.set(client, principal);
-      return true;
-    }
     try {
+      if (!token) {
+        this.clear(client);
+        return false;
+      }
+      const guestCredential = StudioLiveGuestCredentialSchema.safeParse(token);
+      if (guestCredential.success) {
+        const guestId = guestCredential.data.slice("guest:v1:".length);
+        const principal: StudioLiveAuthPrincipal = {
+          userId: `guest_${guestId}`,
+          sessionVersion: 1,
+          expiresAt: Date.now() + STUDIO_LIVE_GUEST_CREDENTIAL_TTL_MS,
+        };
+        this.principalsBySocket.set(client, principal);
+        this.guestSockets.add(client);
+        return true;
+      }
       const principal = await this.authenticateSession(token);
       if (!principal || principal.expiresAt <= Date.now()) {
         this.clear(client);
         return false;
       }
       this.principalsBySocket.set(client, { ...principal });
+      this.guestSockets.delete(client);
       return true;
     } catch {
       this.clear(client);
@@ -83,7 +92,7 @@ export class StudioLiveSocketAuthService {
   async revalidate(client: StudioLiveSocket): Promise<boolean> {
     const principal = this.principalsBySocket.get(client);
     if (!principal || principal.expiresAt <= Date.now()) return false;
-    if (principal.userId.startsWith("guest_")) {
+    if (this.guestSockets.has(client)) {
       return this.isPrincipalCurrent(client, principal, principal.userId);
     }
     try {
@@ -96,6 +105,7 @@ export class StudioLiveSocketAuthService {
 
   clear(client: StudioLiveSocket): void {
     this.principalsBySocket.delete(client);
+    this.guestSockets.delete(client);
   }
 
   clearBySocketId(socketId: string, currentSocket?: StudioLiveSocket): void {
@@ -104,12 +114,13 @@ export class StudioLiveSocketAuthService {
       return;
     }
     for (const socket of this.principalsBySocket.keys()) {
-      if (socket.id === socketId) this.principalsBySocket.delete(socket);
+      if (socket.id === socketId) this.clear(socket);
     }
   }
 
   clearAll(): void {
     this.principalsBySocket.clear();
+    this.guestSockets.clear();
   }
 
   private handshakeToken(client: StudioLiveSocket): string | null {

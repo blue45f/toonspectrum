@@ -100,6 +100,28 @@ describe("industrial OCCT WASM CAD", () => {
     expect(box.triangleCount).toBeGreaterThanOrEqual(12);
     expect(box.vertexCount).toBe(8);
     expect(box.volumeApprox).toBeCloseTo(6, 5);
+    expect(box.topology).toMatchObject({
+      boundaryEdgeCount: 0,
+      nonManifoldEdgeCount: 0,
+      orientationConflictEdgeCount: 0,
+      consistentOrientation: true,
+      watertight: true,
+      closedSolid: true,
+    });
+    expect(box.massProperties).toMatchObject({
+      source: "occt-brep",
+      density: 1,
+      mass: 6,
+      volume: 6,
+      volumeSource: "occt-brep",
+      surfaceArea: 22,
+      surfaceAreaSource: "occt-brep",
+      centroid: { x: 1, y: 0.5, z: 1.5 },
+      centroidSource: "occt-brep",
+      inertia: { xx: 5, yy: 6.5, zz: 2.5, xy: 0, xz: 0, yz: 0 },
+      inertiaSource: "occt-brep",
+      approximate: false,
+    });
     expect(box.mesh.faces.length).toBeGreaterThan(0);
     expect(studioEditableMeshStats(box.mesh).boundaryEdgeCount).toBe(0);
     expect(signedMeshVolume(box.mesh)).toBeCloseTo(6, 5);

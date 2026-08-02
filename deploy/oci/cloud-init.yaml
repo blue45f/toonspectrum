@@ -1,7 +1,7 @@
 #cloud-config
-# OCI Always-Free ARM(Ampere A1) VM 부트스트랩 — Ubuntu 22.04/24.04(arm64) 기준.
+# ARCHIVED OPTIONAL FALLBACK — OCI ARM(Ampere A1) Ubuntu 24.04(arm64) bootstrap.
 # OCI 인스턴스 생성 시 "고급 옵션 → Cloud-init 스크립트"에 붙여넣는다.
-# Docker + git + Node22 + pnpm 설치, 80/443 개방, 레포 클론, deps 설치까지. 비밀(.env)·compose up·
+# Docker + git + Node 24 + pnpm 설치, 80/443 개방, 레포 클론, deps 설치까지. 비밀(.env)·compose up·
 # cron 등록은 SSH 접속 후 런북(docs/OCI-MIGRATION.md)대로 수동(시크릿을 cloud-init에 두지 않기 위함).
 
 package_update: true
@@ -16,7 +16,7 @@ packages:
 
 write_files:
   # OCI Ubuntu 이미지는 기본 iptables가 SSH 외 차단 — 80/443 허용 규칙 영구화.
-  - path: /etc/webdex-firewall.sh
+  - path: /etc/toonspectrum-firewall.sh
     permissions: "0755"
     content: |
       #!/usr/bin/env bash
@@ -34,15 +34,15 @@ runcmd:
   - apt-get update
   - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - systemctl enable --now docker
-  # Node 22 + pnpm (호스트에서 크롤 cron 실행용)
-  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  # Node 24 + pnpm (package.json engines and container runtime must stay aligned)
+  - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
   - apt-get install -y nodejs
   - corepack enable && corepack prepare pnpm@11.4.0 --activate
   # 방화벽
-  - bash /etc/webdex-firewall.sh
+  - bash /etc/toonspectrum-firewall.sh
   # 레포 클론 + deps (공개 repo)
-  - git clone https://github.com/blue45f/toonspectrum.git /opt/webdex
-  - cd /opt/webdex && pnpm install --frozen-lockfile
-  - chmod +x /opt/webdex/deploy/oci/*.sh || true
+  - git clone https://github.com/blue45f/toonspectrum.git /opt/toonspectrum
+  - cd /opt/toonspectrum && pnpm install --frozen-lockfile
+  - chmod +x /opt/toonspectrum/deploy/oci/*.sh || true
 
 final_message: "ToonSpectrum VM 준비 완료. SSH 접속 후 docs/OCI-MIGRATION.md 의 §4~§7(.env 작성·compose up·cron) 진행."

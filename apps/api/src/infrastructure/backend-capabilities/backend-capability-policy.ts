@@ -323,7 +323,14 @@ const GlobalEnvSchema = z.object({
 const ProviderEnvSchema = z.object({
   enabled: z.enum(["true", "false"]).optional(),
   baseUrl: z.url().optional(),
-  authToken: z.string().min(32).max(4_096).optional(),
+  authToken: z
+    .string()
+    .min(32)
+    .max(4_096)
+    .refine((value) => value === value.trim(), {
+      message: "auth token cannot have surrounding whitespace",
+    })
+    .optional(),
   dailyRequestBudget: positiveIntegerString(1, 100_000_000).optional(),
   dailyCostBudget: positiveIntegerString(1, 1_000_000_000).optional(),
   maxExecutionMs: positiveIntegerString(100, 86_400_000).optional(),

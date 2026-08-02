@@ -84,6 +84,16 @@ describe("backend capability policy", () => {
     expect(policy.configurationIssues).toContain("render:invalid-config");
     expect(logger.warn).toHaveBeenCalledOnce();
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain("weak");
+
+    const padded = resolveBackendCapabilityPolicy({
+      NODE_ENV: "production",
+      BACKEND_DISTRIBUTION_ENABLED: "true",
+      ...configuredCloudflare,
+      BACKEND_CLOUDFLARE_AUTH_TOKEN:
+        ` ${configuredCloudflare.BACKEND_CLOUDFLARE_AUTH_TOKEN}`,
+    });
+    expect(padded.providers.cloudflare.enabled).toBe(false);
+    expect(padded.configurationIssues).toContain("cloudflare:invalid-config");
   });
 
   it("rejects provider origins containing credentials, paths, queries or fragments", () => {

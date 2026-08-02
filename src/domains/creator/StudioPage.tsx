@@ -723,7 +723,6 @@ import {
   releaseStudioLiveMutationLocks,
   replaceStudioLiveMutationLocks,
 } from "./studio-live-mutation-lock-coordinator";
-import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import {
   StudioLiveStrokeRenderBackendCoordinator,
@@ -1373,6 +1372,7 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
+import { useStudioLiveTransportAuth } from "./use-studio-live-transport-auth";
 import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
@@ -1782,7 +1782,7 @@ function requireStudioDrawingPointerTransport(ref: {
 interface StudioBg3dRecoveryAccessSnapshot {
   readonly open: boolean;
   readonly authUserId: string | null;
-  readonly hasSessionToken: boolean;
+  readonly hasAuthenticatedSession: boolean;
   readonly workId: string | null;
   readonly remixId: string | null;
   readonly authorizedWorkId: string | null;
@@ -1857,7 +1857,7 @@ function isStudioBg3dRecoveryScopeLocallyCurrent(
   }
   return Boolean(
     snapshot.authUserId &&
-    snapshot.hasSessionToken &&
+    snapshot.hasAuthenticatedSession &&
     snapshot.workId &&
     !snapshot.remixId &&
     snapshot.authorizedWorkId === snapshot.workId &&
@@ -2525,7 +2525,7 @@ function StudioCuttoonEditor() {
   const navigate = useNavigate();
   const t = useT();
   const [params] = useSearchParams();
-  const { data: session } = useSession();
+  const { data: session, ready: studioAuthReady } = useSession();
   const workId = params.get("id");
   const remixId = params.get("remix");
   const creationLinks = studioCreationLinkParams({
@@ -2538,27 +2538,11 @@ function StudioCuttoonEditor() {
   const linkedSeriesId = creationLinks.seriesId;
   const linkedChallengeId = creationLinks.challengeId;
   const studioAuthUserId = session?.user?.id ?? null;
-  const studioSessionToken = session?.token ?? null;
-  const guestSessionTokenRef = useRef<string | null>(null);
-  if (!guestSessionTokenRef.current && typeof window !== "undefined") {
-    let stored: string | null = null;
-    try { stored = sessionStorage.getItem("toonspectrum_guest_live_token"); } catch {}
-    if (!stored) {
-      stored = `guest:${Math.random().toString(36).slice(2, 10)}`;
-      try { sessionStorage.setItem("toonspectrum_guest_live_token", stored); } catch {}
-    }
-    guestSessionTokenRef.current = stored;
-  }
-  const effectiveSessionToken = studioSessionToken ?? guestSessionTokenRef.current;
-  // Factory identity controls the lifetime of the external Socket.IO resource. Keep it stable
-  // across editor renders, but rotate it immediately when the signed session token changes.
-  const studioLiveTransportFactory = useMemo(
-    () =>
-      effectiveSessionToken
-        ? createStudioServerLiveTransportFactory(effectiveSessionToken)
-        : undefined,
-    [effectiveSessionToken]
-  );
+  const studioHasAuthenticatedSession = Boolean(studioAuthUserId);
+  const studioLiveTransportFactory = useStudioLiveTransportAuth({
+    authReady: studioAuthReady,
+    userId: studioAuthUserId,
+  });
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
@@ -7271,7 +7255,6 @@ function StudioCuttoonEditor() {
   );
   const bg3dDurableRecoveryAllowed = Boolean(
     studioAuthUserId &&
-    studioSessionToken &&
     workId &&
     !remixId &&
     authorizedWorkAssetScopeId === workId &&
@@ -7325,7 +7308,7 @@ function StudioCuttoonEditor() {
   const bg3dRecoveryAccessSnapshotRef = useRef<StudioBg3dRecoveryAccessSnapshot>({
     open: bg3dOpen,
     authUserId: studioAuthUserId,
-    hasSessionToken: Boolean(studioSessionToken),
+    hasAuthenticatedSession: studioHasAuthenticatedSession,
     workId,
     remixId,
     authorizedWorkId: authorizedWorkAssetScopeId,
@@ -7349,7 +7332,7 @@ function StudioCuttoonEditor() {
   bg3dRecoveryAccessSnapshotRef.current = {
     open: bg3dOpen,
     authUserId: studioAuthUserId,
-    hasSessionToken: Boolean(studioSessionToken),
+    hasAuthenticatedSession: studioHasAuthenticatedSession,
     workId,
     remixId,
     authorizedWorkId: authorizedWorkAssetScopeId,

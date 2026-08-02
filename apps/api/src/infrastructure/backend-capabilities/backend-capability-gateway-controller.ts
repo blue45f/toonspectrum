@@ -2,14 +2,17 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Header,
   Headers,
   Inject,
   Request,
   HttpCode,
+  PayloadTooLargeException,
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
 
+import { resolveApiRuntimeRole } from "../../config/runtime-role";
 
 import {
   BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE,
@@ -20,9 +23,11 @@ import {
   type BackendCapabilityGatewayResponse,
 } from "./backend-capability-gateway-contract";
 import { BackendCapabilityGatewayExecutor } from "./backend-capability-gateway-executor";
+import { BACKEND_CAPABILITY_POLICY } from "./backend-capability-router";
 import {
-  BACKEND_CAPABILITY_POLICY,
-} from "./backend-capability-router";
+  backendCapabilityTokensEqual,
+  getBackendCapabilityWorkerHttpAdmission,
+} from "./backend-capability-worker-http-admission";
 
 import type { BackendCapabilityPolicy } from "./backend-capability-policy";
 import type { Request as ExpressRequest } from "express";
@@ -92,6 +97,8 @@ export class BackendCapabilityGatewayController {
 
   @Post(BACKEND_CAPABILITY_GATEWAY_PATH)
   @HttpCode(200)
+  @Header("Content-Type", BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE)
+  @Header("Cache-Control", "private, no-store, max-age=0")
   async execute(
     @Headers(BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER) tokenHeader: string | string[] | undefined,
     @Headers(BACKEND_CAPABILITY_IDEMPOTENCY_HEADER) idempotencyHeader: string | string[] | undefined,
@@ -113,6 +120,21 @@ export class BackendCapabilityGatewayController {
     }
 
     const envelope = parsed.data;
+    const runtimeRole = resolveApiRuntimeRole(process.env);
+    if (runtimeRole === "capability-worker") {
+      const admission = getBackendCapabilityWorkerHttpAdmission(request);
+      if (!admission || admission.providerId !== envelope.provider) {
+        throw new UnauthorizedException("Invalid gateway token");
+      }
+      if (
+        admission.rawBodyBytes === null
+        || admission.rawBodyBytes > admission.maximumBodyBytes
+      ) {
+        throw new PayloadTooLargeException(
+          "Gateway payload exceeds the provider budget",
+        );
+      }
+    }
     const headerToken = requireSingleHeader(
       tokenHeader,
       BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER
@@ -123,8 +145,30 @@ export class BackendCapabilityGatewayController {
     }
 
     const policyProvider = this.policy.providers[envelope.provider];
-    if (!policyProvider.enabled || policyProvider.authToken !== headerToken) {
+    if (
+      !policyProvider.enabled
+      || typeof policyProvider.authToken !== "string"
+      || !backendCapabilityTokensEqual(headerToken, policyProvider.authToken)
+    ) {
       throw new UnauthorizedException("Invalid gateway token");
+    }
+    if (runtimeRole === "capability-worker") {
+      const payload = envelope.payload;
+      const operation =
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as Record<string, unknown>).operation
+          : undefined;
+      const allowedWorkload =
+        envelope.workload === "thumbnail" ||
+        (envelope.workload === "webhook" && operation === "studio-ai-long");
+      if (
+        !allowedWorkload ||
+        !policyProvider.placementRoles.has("container-worker")
+      ) {
+        throw new BadRequestException(
+          "Workload is not available on this runtime role",
+        );
+      }
     }
 
     const abortScope = createGatewayRequestAbortScope(request);

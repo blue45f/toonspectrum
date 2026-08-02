@@ -1,6 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 
-export const API_RUNTIME_ROLES = ["full", "studio-live"] as const;
+export const API_RUNTIME_ROLES = [
+  "full",
+  "studio-live",
+  "capability-worker",
+] as const;
 
 export type ApiRuntimeRole = (typeof API_RUNTIME_ROLES)[number];
 
@@ -12,22 +16,54 @@ const STUDIO_LIVE_HTTP_PATHS = new Set([
   "/api/health/live",
   "/api/health/ready",
 ]);
+const CAPABILITY_WORKER_GATEWAY_PATH =
+  "/.well-known/toonspectrum/backend-capabilities/v1/execute";
+const CAPABILITY_WORKER_HEALTH_PATH =
+  "/.well-known/toonspectrum/backend-capabilities/v1/health";
 
 export function resolveApiRuntimeRole(
   environment: RuntimeRoleEnvironment = process.env,
 ): ApiRuntimeRole {
   const value = environment.API_RUNTIME_ROLE?.trim() || "full";
-  if (value === "full" || value === "studio-live") return value;
+  if (
+    value === "full" ||
+    value === "studio-live" ||
+    value === "capability-worker"
+  ) {
+    return value;
+  }
   throw new Error("API_RUNTIME_ROLE is invalid");
 }
 
 export function isApiRuntimeRolePathAllowed(
   role: ApiRuntimeRole,
   pathname: string,
+  method?: string,
 ): boolean {
   if (role === "full") return true;
-  if (STUDIO_LIVE_HTTP_PATHS.has(pathname)) return true;
-  return pathname === "/socket.io" || pathname.startsWith("/socket.io/");
+  const normalizedMethod = method?.toUpperCase();
+  const isReadMethod =
+    normalizedMethod === undefined
+    || normalizedMethod === "GET"
+    || normalizedMethod === "HEAD";
+  if (role === "capability-worker") {
+    return (
+      (pathname === "/api/health/live" && isReadMethod)
+      || (pathname === CAPABILITY_WORKER_GATEWAY_PATH
+        && (normalizedMethod === undefined || normalizedMethod === "POST"))
+      || (pathname === CAPABILITY_WORKER_HEALTH_PATH && isReadMethod)
+    );
+  }
+  if (STUDIO_LIVE_HTTP_PATHS.has(pathname)) return isReadMethod;
+  return (
+    pathname === "/socket.io"
+    || pathname.startsWith("/socket.io/")
+  ) && (
+    normalizedMethod === undefined
+    || normalizedMethod === "GET"
+    || normalizedMethod === "POST"
+    || normalizedMethod === "OPTIONS"
+  );
 }
 
 /**
@@ -40,7 +76,7 @@ export function createApiRuntimeRoleGuard(
 ): (request: Request, response: Response, next: NextFunction) => void {
   const role = resolveApiRuntimeRole(environment);
   return (request, response, next) => {
-    if (isApiRuntimeRolePathAllowed(role, request.path)) {
+    if (isApiRuntimeRolePathAllowed(role, request.path, request.method)) {
       next();
       return;
     }

@@ -11,14 +11,25 @@ import {
 } from "express";
 import { Logger } from "nestjs-pino";
 
-import { AppModule } from "./app.module";
+import { CapabilityWorkerAppModule } from "./capability-worker-app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
-import { createApiRuntimeRoleGuard } from "./config/runtime-role";
+import {
+  createApiRuntimeRoleGuard,
+  resolveApiRuntimeRole,
+} from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
 import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
+import { resolveBackendCapabilityPolicy } from "./infrastructure/backend-capabilities/backend-capability-policy";
+import { BACKEND_CAPABILITY_WORKER_HEALTH_PATH } from "./infrastructure/backend-capabilities/backend-capability-worker-health.controller";
+import {
+  backendCapabilityWorkerParserLimitBytes,
+  createBackendCapabilityWorkerPreBodyAdmission,
+  verifyBackendCapabilityWorkerRawBody,
+} from "./infrastructure/backend-capabilities/backend-capability-worker-http-admission";
 import {
   createStudioLivePostgresIoAdapter,
   type StudioLivePostgresIoAdapter,
@@ -28,69 +39,83 @@ import { sessionAuth } from "./session-middleware";
 async function bootstrap() {
   // env 검증(NON-FATAL) — load-env 이후라 .env.local 주입이 반영된다. 실패해도 부팅은 계속.
   validateEnv();
+  const runtimeRole = resolveApiRuntimeRole(process.env);
+  const capabilityWorkerPolicy = runtimeRole === "capability-worker"
+    ? resolveBackendCapabilityPolicy(process.env)
+    : null;
   // 기본 본문 파서(100kb) 대신 직접 등록 — 창작 스튜디오가 data-URL 이미지(페이지/문서)를 전송하므로 한도를 키운다.
   // bufferLogs: nestjs-pino 로거가 준비되기 전 로그를 버퍼링했다가 useLogger 이후 flush 한다.
   const gatewayContentType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
     .toLowerCase()
     .split(";")[0]
     .trim();
-  const app = await NestFactory.create(AppModule, { bodyParser: false, bufferLogs: true });
+  const rootModule =
+    runtimeRole === "capability-worker"
+      ? CapabilityWorkerAppModule
+      : (await import("./app.module")).AppModule;
+  const app = await NestFactory.create(rootModule, { bodyParser: false, bufferLogs: true });
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(예외 필터의 5xx 로깅도 이걸 사용)
   app.enableShutdownHooks();
   app.use(createApiSecurityHeadersMiddleware(process.env));
-  configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
+  if (runtimeRole !== "capability-worker") {
+    configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
+  }
+  // Vercel/compatibility callers may tunnel the canonical API path through `?path=`. Rewrite it
+  // before every role, authentication and CSRF boundary so those guards authorize the route that
+  // Nest will actually dispatch, never the harmless-looking pre-rewrite path.
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    rewriteQueryPathToUrl(req);
+    next();
+  });
   app.use(createApiRuntimeRoleGuard(process.env));
-  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
-  app.use(createCsrfProtectionMiddleware(process.env));
+  if (capabilityWorkerPolicy) {
+    app.use(
+      createBackendCapabilityWorkerPreBodyAdmission(capabilityWorkerPolicy),
+    );
+  }
+  if (runtimeRole !== "capability-worker") {
+    app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
+    app.use(createCsrfProtectionMiddleware(process.env));
+  }
   app.use(
     json({
-      limit: "16mb",
+      limit: capabilityWorkerPolicy
+        ? backendCapabilityWorkerParserLimitBytes(capabilityWorkerPolicy)
+        : "16mb",
       type: (request) => {
         const contentType = String(request.headers["content-type"] ?? "")
           .toLowerCase()
           .split(";")[0]
           .trim();
+        if (capabilityWorkerPolicy) {
+          return (request as Request).path === BACKEND_CAPABILITY_GATEWAY_PATH
+            && contentType === gatewayContentType;
+        }
         return contentType === "application/json" || contentType === gatewayContentType;
       },
+      ...(capabilityWorkerPolicy
+        ? {
+            verify: (request, response, buffer) =>
+              verifyBackendCapabilityWorkerRawBody(
+                request as Request,
+                response as Response,
+                buffer,
+              ),
+          }
+        : {}),
     })
   );
-  app.use(urlencoded({ extended: true, limit: "16mb" }));
-  app.use((req: Request, _res: Response, next: NextFunction) => {
-    const pathValue =
-      req.query && typeof req.query === "object" ? req.query.path : undefined;
-    const extractedPath = Array.isArray(pathValue)
-      ? pathValue
-          .filter((value): value is string => typeof value === "string")
-          .join("/")
-      : typeof pathValue === "string"
-        ? pathValue
-        : undefined;
-    if (typeof extractedPath === "string") {
-      const nextPath = extractedPath.startsWith("/")
-        ? extractedPath
-        : `/${extractedPath}`;
-      const safeNormalizedPath = (() => {
-        try {
-          return decodeURIComponent(nextPath);
-        } catch {
-          return nextPath;
-        }
-      })();
-      const normalizedPath = safeNormalizedPath.startsWith("/")
-        ? safeNormalizedPath.startsWith("/api")
-          ? safeNormalizedPath
-          : `/api${safeNormalizedPath}`
-        : `/api/${safeNormalizedPath}`;
-      const rewriteUrl = new URL(req.url, "https://example.local");
-      rewriteUrl.pathname = normalizedPath;
-      rewriteUrl.searchParams.delete("path");
-      req.url = `${rewriteUrl.pathname}${rewriteUrl.search}`;
-      delete (req.query as Record<string, unknown>).path;
-    }
-    next();
-  });
+  if (!capabilityWorkerPolicy) {
+    app.use(urlencoded({ extended: true, limit: "16mb" }));
+  }
   app.setGlobalPrefix("api", {
-    exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
+    exclude: [
+      { path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL },
+      {
+        path: BACKEND_CAPABILITY_WORKER_HEALTH_PATH,
+        method: RequestMethod.GET,
+      },
+    ],
   });
   // 표준 Zod 검증 파이프. createZodDto DTO 만 검증하고 그 외(@Body() body: unknown)는 통과.
   app.useGlobalPipes(new ZodValidationPipe());
@@ -99,9 +124,12 @@ async function bootstrap() {
   try {
     // 명시적으로 postgres 모드를 선택한 장기 실행 API에서만 클러스터 adapter를 장착한다.
     // Vercel serverless 경로(serverless.ts)는 WebSocket 수명주기가 다르므로 이 factory를 호출하지 않는다.
-    studioLiveAdapter = await createStudioLivePostgresIoAdapter(app, process.env, {
-      logger: app.get(Logger),
-    });
+    studioLiveAdapter =
+      runtimeRole === "capability-worker"
+        ? null
+        : await createStudioLivePostgresIoAdapter(app, process.env, {
+            logger: app.get(Logger),
+          });
     if (studioLiveAdapter) app.useWebSocketAdapter(studioLiveAdapter);
 
     // PaaS(Render/Railway/Fly 등)는 PORT를 주입한다. 로컬은 NEST_API_PORT, 둘 다 없으면 4001.

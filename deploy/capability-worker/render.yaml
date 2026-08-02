@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: toonspectrum-thumbnail-worker
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./deploy/capability-worker/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health/live
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_RUNTIME_ROLE
+        value: capability-worker
+      - key: BACKEND_CAPABILITY_WORKER_ENABLED
+        value: "true"
+      - key: BACKEND_DISTRIBUTION_ENABLED
+        value: "true"
+      - key: BACKEND_RENDER_ENABLED
+        value: "true"
+      - key: BACKEND_RENDER_BASE_URL
+        sync: false
+      - key: BACKEND_RENDER_AUTH_TOKEN
+        sync: false
+      - key: BACKEND_RENDER_DAILY_REQUEST_BUDGET
+        value: "1000"
+      - key: BACKEND_RENDER_DAILY_COST_BUDGET
+        value: "100000"
+      - key: BACKEND_RENDER_MAX_EXECUTION_MS
+        value: "30000"
+      - key: BACKEND_RENDER_MAX_PAYLOAD_BYTES
+        value: "1048576"
+      - key: BACKEND_RENDER_MAX_RESPONSE_BYTES
+        value: "65536"
+      - key: BACKEND_RENDER_MAX_CONCURRENCY
+        value: "2"
+      - key: SUPABASE_OBJECT_STORAGE_ENABLED
+        value: "true"
+      - key: SUPABASE_OBJECT_STORAGE_URL
+        sync: false
+      - key: SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET
+        value: studio-source-assets-v1
+      - key: SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET
+        value: studio-derived-assets-v1
+      - key: SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET
+        value: studio-exports-v1

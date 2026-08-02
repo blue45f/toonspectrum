@@ -121,7 +121,8 @@ The exact canonical claim object is:
 Rules:
 
 - the ticket TTL is at most two minutes;
-- the connection session is at most four hours;
+- the connection session is at most five minutes and never outlives the verified web session or
+  the authoritative room-authorization lease;
 - issuer, audience, work, room, and exact browser origin are signed bindings;
 - every nonce is consumed once in the work's SQLite Durable Object;
 - the secret is at least 32 UTF-8 bytes;
@@ -147,7 +148,7 @@ STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER=toonspectrum-api
 STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE=toonspectrum-realtime
 STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET=<same value as REALTIME_TICKET_SECRET>
 STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS=120
-STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS=14400
+STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS=300
 ```
 
 The API issuer/audience must exactly match the Worker vars, and the two secret
