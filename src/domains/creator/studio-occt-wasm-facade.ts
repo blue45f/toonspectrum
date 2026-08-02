@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 3 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 4 as const;
 
 export type StudioOcctRuntime = {
   readonly backend: "opencascade-wasm";
@@ -1134,7 +1134,8 @@ export async function occtFilletBox(
 }
 
 /**
- * Multi-solid loft analogue: fused thin section solids of varying size.
+ * Multi-section loft via real BRepOffsetAPI_ThruSections (rectangular wires),
+ * falling back to fused thin section solids if ThruSections is unavailable.
  */
 export async function occtLoftedTower(
   levels: readonly { readonly dx: number; readonly dy: number; readonly z: number }[],
@@ -1144,30 +1145,81 @@ export async function occtLoftedTower(
     if (levels.length < 2) {
       return { ok: false, code: "need-levels", detail: "loft needs ≥2 sections" };
     }
-    // Industrial section stack: fuse thin positioned boxes into one measurable body.
-    let acc: unknown = null;
-    for (const lvl of levels) {
-      const box = makePositionedOcctBoxShape(oc, owner, {
-        dx: lvl.dx,
-        dy: lvl.dy,
-        dz: 0.2,
-        ox: -lvl.dx / 2,
-        oy: -lvl.dy / 2,
-        oz: lvl.z,
-      });
-      if (!acc) {
-        acc = box;
-        continue;
+
+    const makeRectWire = (dx: number, dy: number, z: number): unknown | null => {
+      try {
+        const hx = dx / 2;
+        const hy = dy / 2;
+        const p1 = owner.own(new oc.gp_Pnt_3(-hx, -hy, z));
+        const p2 = owner.own(new oc.gp_Pnt_3(hx, -hy, z));
+        const p3 = owner.own(new oc.gp_Pnt_3(hx, hy, z));
+        const p4 = owner.own(new oc.gp_Pnt_3(-hx, hy, z));
+        const poly = owner.own(new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true));
+        return owner.own(poly.Wire());
+      } catch {
+        return null;
       }
-      acc = runOcctBinaryShapeOperation(
-        oc,
-        owner,
-        ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
-        acc,
-        box,
-      ) ?? box;
+    };
+
+    let loftShape: unknown = null;
+    let operation = "BRepOffsetAPI_ThruSections";
+    if (isCallable(oc.BRepOffsetAPI_ThruSections)) {
+      try {
+        const loft = owner.own(new oc.BRepOffsetAPI_ThruSections(true, false, 1e-6));
+        let added = 0;
+        for (const lvl of levels) {
+          const wire = makeRectWire(lvl.dx, lvl.dy, lvl.z);
+          if (!wire) continue;
+          if (isCallable(loft.AddWire)) {
+            loft.AddWire(wire);
+            added += 1;
+          } else if (isCallable(loft.AddWire_1)) {
+            loft.AddWire_1(wire);
+            added += 1;
+          }
+        }
+        if (added >= 2) {
+          try {
+            if (isCallable(loft.CheckCompatibility)) loft.CheckCompatibility(false);
+          } catch {
+            // optional
+          }
+          if (isCallable(loft.Build)) loft.Build();
+          loftShape = owner.own(loft.Shape());
+        }
+      } catch {
+        loftShape = null;
+      }
     }
-    const loftShape = acc;
+
+    // Fallback: fuse thin positioned boxes (still a real OCCT multi-body solid).
+    if (!loftShape) {
+      operation = "BRepAlgoAPI_Fuse(section-stack)";
+      let acc: unknown = null;
+      for (const lvl of levels) {
+        const box = makePositionedOcctBoxShape(oc, owner, {
+          dx: lvl.dx,
+          dy: lvl.dy,
+          dz: 0.2,
+          ox: -lvl.dx / 2,
+          oy: -lvl.dy / 2,
+          oz: lvl.z,
+        });
+        if (!acc) {
+          acc = box;
+          continue;
+        }
+        acc = runOcctBinaryShapeOperation(
+          oc,
+          owner,
+          ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
+          acc,
+          box,
+        ) ?? box;
+      }
+      loftShape = acc;
+    }
+
     if (!loftShape) {
       return { ok: false, code: "loft-failed", detail: "no loft shape" };
     }
@@ -1176,7 +1228,7 @@ export async function occtLoftedTower(
       return { ok: false, code: "empty-tessellation", detail: "loft produced no triangles" };
     }
     return packResult(
-      "BRepAlgoAPI_Fuse(section-stack)",
+      operation,
       soupToMesh(tess.positions, tess.indices),
       tess.faceCount,
       tess.triangleCount,
@@ -1203,6 +1255,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly solidWorksFeatureParity: true;
   readonly realRevolve: boolean;
   readonly realPrism: boolean;
+  readonly realThruSections: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -1210,6 +1263,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let loadPath: "browser" | "node" = "node";
   let realRevolve = false;
   let realPrism = false;
+  let realThruSections = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -1222,6 +1276,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       loadPath = r.loadPath;
       if (r.operation === "BRepPrimAPI_MakeRevol") realRevolve = true;
       if (r.operation === "BRepPrimAPI_MakePrism") realPrism = true;
+      if (r.operation === "BRepOffsetAPI_ThruSections") realThruSections = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
@@ -1270,5 +1325,6 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     solidWorksFeatureParity: true,
     realRevolve,
     realPrism,
+    realThruSections,
   };
 }

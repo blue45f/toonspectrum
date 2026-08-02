@@ -157,6 +157,77 @@ export function createStudioPureConvexSolidBooleanBackend(): StudioSolidBooleanB
   };
 }
 
+type Aabb = {
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+};
+
+function meshAabb(pos: Float32Array): Aabb {
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = pos[i]!;
+    const y = pos[i + 1]!;
+    const z = pos[i + 2]!;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (z < minZ) minZ = z;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+    if (z > maxZ) maxZ = z;
+  }
+  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] };
+}
+
+/** True when every vertex sits near an AABB corner (unit-cube / box solids). */
+function isAabbLikeMesh(pos: Float32Array, aabb: Aabb, eps = 1e-4): boolean {
+  const corners: Array<readonly [number, number, number]> = [];
+  for (const x of [aabb.min[0], aabb.max[0]]) {
+    for (const y of [aabb.min[1], aabb.max[1]]) {
+      for (const z of [aabb.min[2], aabb.max[2]]) {
+        corners.push([x, y, z]);
+      }
+    }
+  }
+  for (let i = 0; i < pos.length; i += 3) {
+    const p: readonly [number, number, number] = [pos[i]!, pos[i + 1]!, pos[i + 2]!];
+    let near = false;
+    for (const c of corners) {
+      if (
+        Math.abs(p[0] - c[0]) <= eps
+        && Math.abs(p[1] - c[1]) <= eps
+        && Math.abs(p[2] - c[2]) <= eps
+      ) {
+        near = true;
+        break;
+      }
+    }
+    if (!near) return false;
+  }
+  const dx = aabb.max[0] - aabb.min[0];
+  const dy = aabb.max[1] - aabb.min[1];
+  const dz = aabb.max[2] - aabb.min[2];
+  return dx > eps && dy > eps && dz > eps;
+}
+
+/** Outward half-spaces for an axis-aligned solid (n·p + d ≤ 0 inside). */
+function aabbOutwardPlanes(aabb: Aabb): Plane[] {
+  const [x0, y0, z0] = aabb.min;
+  const [x1, y1, z1] = aabb.max;
+  return [
+    { n: [1, 0, 0], d: -x1 },
+    { n: [-1, 0, 0], d: x0 },
+    { n: [0, 1, 0], d: -y1 },
+    { n: [0, -1, 0], d: y0 },
+    { n: [0, 0, 1], d: -z1 },
+    { n: [0, 0, -1], d: z0 },
+  ];
+}
+
 function pureConvexMeshBoolean(
   leftPos: Float32Array,
   leftIdx: Uint32Array,
@@ -166,23 +237,33 @@ function pureConvexMeshBoolean(
 ): StudioSolidBooleanResult {
   const leftTris = trianglesOf(leftPos, leftIdx);
   const rightTris = trianglesOf(rightPos, rightIdx);
-  const rightPlanes = planesOf(rightTris);
-  const leftPlanes = planesOf(leftTris);
+  const leftAabb = meshAabb(leftPos);
+  const rightAabb = meshAabb(rightPos);
+  // Prefer exact AABB half-spaces for box solids — triangle-derived planes can be
+  // coplanar-duplicated or inverted and collapse cube difference to garbage.
+  const rightPlanes = isAabbLikeMesh(rightPos, rightAabb)
+    ? aabbOutwardPlanes(rightAabb)
+    : planesOf(rightTris);
+  const leftPlanes = isAabbLikeMesh(leftPos, leftAabb)
+    ? aabbOutwardPlanes(leftAabb)
+    : planesOf(leftTris);
+  const diagTag = isAabbLikeMesh(leftPos, leftAabb) && isAabbLikeMesh(rightPos, rightAabb)
+    ? "pure-convex-aabb"
+    : "pure-convex";
 
   if (operation === "union") {
-    // Outside left of right + outside right of left + boundary clips
     const a = clipMeshOutsideSolid(leftTris, rightPlanes);
     const b = clipMeshOutsideSolid(rightTris, leftPlanes);
-    return meshFromTriangles([...a, ...b], `pure-convex:union`);
+    return meshFromTriangles([...a, ...b], `${diagTag}:union`);
   }
   if (operation === "intersection") {
     const a = clipMeshInsideSolid(leftTris, rightPlanes);
-    return meshFromTriangles(a, `pure-convex:intersection`);
+    return meshFromTriangles(a, `${diagTag}:intersection`);
   }
   // difference = left outside right + inverted right faces inside left
   const a = clipMeshOutsideSolid(leftTris, rightPlanes);
   const b = clipMeshInsideSolid(rightTris, leftPlanes).map(flipTri);
-  return meshFromTriangles([...a, ...b], `pure-convex:difference`);
+  return meshFromTriangles([...a, ...b], `${diagTag}:difference`);
 }
 
 type Tri = readonly [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];

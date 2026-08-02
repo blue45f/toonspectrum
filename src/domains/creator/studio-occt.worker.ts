@@ -2,7 +2,11 @@
 
 import {
   occtBooleanCutBoxes,
+  occtFilletBox,
+  occtLoftedTower,
   occtMakeBoxSolid,
+  occtMakeSphereSolid,
+  occtRevolveCylinderLike,
 } from "./studio-occt-wasm-facade";
 
 import type {
@@ -12,12 +16,42 @@ import type {
 
 const workerScope = self as DedicatedWorkerGlobalScope;
 
+async function runOperation(
+  operation: StudioOcctWorkerRequest["operation"],
+) {
+  switch (operation.kind) {
+    case "box":
+      return occtMakeBoxSolid(...operation.size);
+    case "sphere":
+      return occtMakeSphereSolid(operation.radius);
+    case "revolve":
+      return occtRevolveCylinderLike(operation.radius, operation.height);
+    case "fillet-box":
+      return occtFilletBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.radius,
+      );
+    case "loft":
+      return occtLoftedTower(operation.levels);
+    case "cut-boxes":
+      return occtBooleanCutBoxes(operation.a, operation.b);
+    default: {
+      const _exhaustive: never = operation;
+      return {
+        ok: false as const,
+        code: "unknown-op",
+        detail: String(_exhaustive),
+      };
+    }
+  }
+}
+
 workerScope.addEventListener("message", (event: MessageEvent<StudioOcctWorkerRequest>) => {
   const request = event.data;
   void (async () => {
-    const result = request.operation.kind === "box"
-      ? await occtMakeBoxSolid(...request.operation.size)
-      : await occtBooleanCutBoxes(request.operation.a, request.operation.b);
+    const result = await runOperation(request.operation);
     const response: StudioOcctWorkerResponse = { id: request.id, result };
     workerScope.postMessage(response);
   })().catch((error: unknown) => {

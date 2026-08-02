@@ -30,8 +30,13 @@ import {
   workspaceLoadRoomPreset,
   workspaceMirrorActive,
   workspaceImportIfcCity,
+  workspaceManifoldBooleanActive,
   workspaceOcctBooleanCut,
   workspaceOcctBox,
+  workspaceOcctFillet,
+  workspaceOcctLoft,
+  workspaceOcctRevolve,
+  workspaceOcctSphere,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
   workspaceRetopoActive,
@@ -179,6 +184,51 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT cut", () => workspaceOcctBooleanCut(ws))}
         >
           OCCT boolean
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-revolve"
+          onClick={() => run("OCCT revolve", () => workspaceOcctRevolve(ws))}
+        >
+          OCCT revolve
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-sphere"
+          onClick={() => run("OCCT sphere", () => workspaceOcctSphere(ws))}
+        >
+          OCCT sphere
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-fillet"
+          onClick={() => run("OCCT fillet", () => workspaceOcctFillet(ws))}
+        >
+          OCCT fillet
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-loft"
+          onClick={() => run("OCCT loft", () => workspaceOcctLoft(ws))}
+        >
+          OCCT loft
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          data-studio-hybrid-dcc-action="manifold-boolean"
+          onClick={() => run("Manifold boolean", () => workspaceManifoldBooleanActive(ws))}
+        >
+          Manifold boolean
         </button>
         <button
           type="button"

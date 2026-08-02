@@ -9,6 +9,28 @@ export type StudioOcctWorkerOperation =
       readonly size: readonly [number, number, number];
     }
   | {
+      readonly kind: "sphere";
+      readonly radius: number;
+    }
+  | {
+      readonly kind: "revolve";
+      readonly radius: number;
+      readonly height: number;
+    }
+  | {
+      readonly kind: "fillet-box";
+      readonly size: readonly [number, number, number];
+      readonly radius: number;
+    }
+  | {
+      readonly kind: "loft";
+      readonly levels: readonly {
+        readonly dx: number;
+        readonly dy: number;
+        readonly z: number;
+      }[];
+    }
+  | {
       readonly kind: "cut-boxes";
       readonly a: { readonly dx: number; readonly dy: number; readonly dz: number };
       readonly b: {

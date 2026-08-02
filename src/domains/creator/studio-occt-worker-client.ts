@@ -128,9 +128,35 @@ async function runOnNode(
   const facade = await import(
     /* @vite-ignore */ facadeModuleId
   ) as typeof import("./studio-occt-wasm-facade");
-  const result = operation.kind === "box"
-    ? await facade.occtMakeBoxSolid(...operation.size)
-    : await facade.occtBooleanCutBoxes(operation.a, operation.b);
+  const result = await (async () => {
+    switch (operation.kind) {
+      case "box":
+        return facade.occtMakeBoxSolid(...operation.size);
+      case "sphere":
+        return facade.occtMakeSphereSolid(operation.radius);
+      case "revolve":
+        return facade.occtRevolveCylinderLike(operation.radius, operation.height);
+      case "fillet-box":
+        return facade.occtFilletBox(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+          operation.radius,
+        );
+      case "loft":
+        return facade.occtLoftedTower(operation.levels);
+      case "cut-boxes":
+        return facade.occtBooleanCutBoxes(operation.a, operation.b);
+      default: {
+        const _exhaustive: never = operation;
+        return {
+          ok: false as const,
+          code: "unknown-op",
+          detail: String(_exhaustive),
+        };
+      }
+    }
+  })();
   if (!result.ok) throw new Error(`${result.code}: ${result.detail}`);
   return result;
 }

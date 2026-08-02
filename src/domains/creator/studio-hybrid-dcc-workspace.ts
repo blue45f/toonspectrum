@@ -986,6 +986,113 @@ export async function workspaceOcctBooleanCut(
   return { ...ws, session, activeAssetId: assetId, lastOcct: result };
 }
 
+async function commitOcctResult(
+  ws: StudioHybridDccWorkspace,
+  assetId: string,
+  source: string,
+  result: import("./studio-occt-wasm-facade").StudioOcctSolidResult,
+): Promise<StudioHybridDccWorkspace> {
+  let session = ws.session;
+  if (!session.state.geometry.records[assetId]) {
+    session = hybridDccRegisterAsset(session, assetId, result.mesh, {
+      source,
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
+    });
+  } else {
+    session = hybridDccCommitGeometry(session, assetId, result.mesh);
+  }
+  return { ...ws, session, activeAssetId: assetId, lastOcct: result };
+}
+
+/** Industrial OCCT revolve solid → workspace. */
+export async function workspaceOcctRevolve(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-revolve",
+  radius = 0.5,
+  height = 1,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({ kind: "revolve", radius, height });
+  return commitOcctResult(ws, assetId, "occt-wasm-revolve", result);
+}
+
+/** Industrial OCCT sphere solid → workspace. */
+export async function workspaceOcctSphere(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-sphere",
+  radius = 0.75,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({ kind: "sphere", radius });
+  return commitOcctResult(ws, assetId, "occt-wasm-sphere", result);
+}
+
+/** Industrial OCCT fillet box → workspace. */
+export async function workspaceOcctFillet(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-fillet",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "fillet-box",
+    size: [1, 1, 1],
+    radius: 0.08,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-fillet", result);
+}
+
+/** Industrial OCCT ThruSections loft → workspace. */
+export async function workspaceOcctLoft(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-loft",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "loft",
+    levels: [
+      { dx: 2, dy: 2, z: 0 },
+      { dx: 1.4, dy: 1.4, z: 1 },
+      { dx: 0.8, dy: 0.8, z: 2 },
+    ],
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-loft", result);
+}
+
+/**
+ * MOD-014 Manifold (default backend) solid difference on the active mesh
+ * against an offset/scaled copy of itself.
+ */
+export async function workspaceManifoldBooleanActive(
+  ws: StudioHybridDccWorkspace,
+): Promise<StudioHybridDccWorkspace> {
+  const mesh = workspaceActiveMesh(ws);
+  if (!mesh) throw new Error("no active asset");
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  const op = new Float32Array(soup.positions);
+  for (let i = 0; i < op.length; i += 3) op[i]! += 0.35;
+  for (let i = 0; i < op.length; i += 1) op[i]! *= 0.72;
+  let stack = createStudioMeshModifierStack(mesh);
+  stack = withStudioMeshModifier(stack, {
+    kind: "boolean",
+    id: "manifold-diff",
+    enabled: true,
+    operation: "difference",
+    operand: { positions: op, indices: soup.indices },
+  });
+  const e = await evaluateStudioMeshModifierStack(stack, {
+    booleanBackend: createStudioDefaultSolidBooleanBackend(),
+  });
+  if (!e.ok) throw new Error(e.detail);
+  const soupOut = studioEditableMeshToTriangleSoup(e.value.mesh);
+  if (soupOut.indices.length / 3 < 8) {
+    throw new Error(`manifold boolean degenerate tris=${soupOut.indices.length / 3}`);
+  }
+  return commitActiveMesh(ws, e.value.mesh);
+}
+
 /** SCP-006 dynatopo refine/coarsen on active mesh. */
 export function workspaceDynatopoActive(
   ws: StudioHybridDccWorkspace,
