@@ -710,21 +710,51 @@ export interface ThreeObject {
   rotation: { set(x: number, y: number, z: number): void };
   scale: { setScalar(s: number): void };
   name: string;
+  /** Present on real THREE.Mesh objects; optional so the headless injected test factory stays tiny. */
+  castShadow?: boolean;
+  receiveShadow?: boolean;
+}
+
+export interface PropGeometryQualityAdapter {
+  /** Optional production renderer hook; headless/legacy callers retain plain boxes. */
+  readonly roundedBox?: (
+    width: number,
+    height: number,
+    depth: number,
+    radius: number,
+  ) => unknown;
 }
 
 /** 소품 한 종의 메시 그룹을 만든다. 색상은 인스턴스 색을 우선 적용한다. */
-export function buildPropObject(three: ThreeLike, def: PropDef, color: string | null): ThreeObject {
+export function buildPropObject(
+  three: ThreeLike,
+  def: PropDef,
+  color: string | null,
+  qualityAdapter?: PropGeometryQualityAdapter,
+): ThreeObject {
   const group = new three.Group();
   group.name = `prop:${def.id}`;
   const hex = color ?? def.defaultColor ?? "#cccccc";
   const mat = (roughness = 0.6, metalness = 0.1, c: string = hex) =>
     new three.MeshStandardMaterial({ color: new three.Color(c), roughness, metalness, side: three.DoubleSide });
-  const mesh = (geo: unknown, material: unknown): ThreeObject => new three.Mesh(geo, material);
+  const roundedBox = (width: number, height: number, depth: number): unknown => {
+    const radius = Math.max(0.000_15, Math.min(width, height, depth) * 0.18);
+    return qualityAdapter?.roundedBox?.(width, height, depth, radius)
+      ?? new three.BoxGeometry(width, height, depth);
+  };
+  const mesh = (geo: unknown, material: unknown): ThreeObject => {
+    const object = new three.Mesh(geo, material);
+    // Props previously looked detached from the character because they ignored the scene's key and
+    // fill shadows.  Opt every generated surface into the same lighting contract as the avatar.
+    object.castShadow = true;
+    object.receiveShadow = true;
+    return object;
+  };
 
   switch (def.id) {
     case "smartphone": {
-      group.add(mesh(new three.BoxGeometry(0.07, 0.14, 0.008), mat(0.3, 0.4)));
-      const screen = mesh(new three.BoxGeometry(0.06, 0.12, 0.001), mat(0.1, 0, "#3a6ea5"));
+      group.add(mesh(roundedBox(0.07, 0.14, 0.008), mat(0.3, 0.4)));
+      const screen = mesh(roundedBox(0.06, 0.12, 0.001), mat(0.1, 0, "#3a6ea5"));
       screen.position.set(0, 0, 0.006);
       group.add(screen);
       break;
@@ -738,8 +768,8 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "sword": {
-      group.add(mesh(new three.BoxGeometry(0.025, 0.6, 0.008), mat(0.25, 0.85)));
-      const guard = mesh(new three.BoxGeometry(0.12, 0.02, 0.02), mat(0.4, 0.7, "#8a6a3c"));
+      group.add(mesh(roundedBox(0.025, 0.6, 0.008), mat(0.25, 0.85)));
+      const guard = mesh(roundedBox(0.12, 0.02, 0.02), mat(0.4, 0.7, "#8a6a3c"));
       guard.position.set(0, -0.3, 0);
       group.add(guard);
       const grip = mesh(new three.CylinderGeometry(0.014, 0.014, 0.12, 12), mat(0.7, 0.1, "#3a2b1c"));
@@ -762,8 +792,8 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "book": {
-      group.add(mesh(new three.BoxGeometry(0.14, 0.2, 0.03), mat(0.7)));
-      const pages = mesh(new three.BoxGeometry(0.13, 0.19, 0.025), mat(0.8, 0, "#f0ece0"));
+      group.add(mesh(roundedBox(0.14, 0.2, 0.03), mat(0.7)));
+      const pages = mesh(roundedBox(0.13, 0.19, 0.025), mat(0.8, 0, "#f0ece0"));
       pages.position.set(0.005, 0, 0);
       group.add(pages);
       break;
@@ -789,11 +819,11 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "clipboard": {
-      group.add(mesh(new three.BoxGeometry(0.145, 0.205, 0.012), mat(0.72, 0.05)));
-      const paper = mesh(new three.BoxGeometry(0.125, 0.175, 0.002), mat(0.92, 0, "#f8fafc"));
+      group.add(mesh(roundedBox(0.145, 0.205, 0.012), mat(0.72, 0.05)));
+      const paper = mesh(roundedBox(0.125, 0.175, 0.002), mat(0.92, 0, "#f8fafc"));
       paper.position.set(0, -0.004, 0.008);
       group.add(paper);
-      const clip = mesh(new three.BoxGeometry(0.045, 0.025, 0.01), mat(0.28, 0.72, "#94a3b8"));
+      const clip = mesh(roundedBox(0.045, 0.025, 0.01), mat(0.28, 0.72, "#94a3b8"));
       clip.position.set(0, 0.095, 0.012);
       group.add(clip);
       break;
@@ -803,7 +833,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       const plunger = mesh(new three.CylinderGeometry(0.007, 0.007, 0.09, 12), mat(0.35, 0.25, "#64748b"));
       plunger.position.set(0, -0.115, 0);
       group.add(plunger);
-      const flange = mesh(new three.BoxGeometry(0.065, 0.012, 0.018), mat(0.4, 0.12, hex));
+      const flange = mesh(roundedBox(0.065, 0.012, 0.018), mat(0.4, 0.12, hex));
       flange.position.set(0, -0.08, 0);
       group.add(flange);
       const needle = mesh(new three.CylinderGeometry(0.0015, 0.0015, 0.1, 8), mat(0.2, 0.9, "#cbd5e1"));
@@ -812,21 +842,21 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "medicalBag": {
-      group.add(mesh(new three.BoxGeometry(0.24, 0.16, 0.1), mat(0.72, 0.08)));
+      group.add(mesh(roundedBox(0.24, 0.16, 0.1), mat(0.72, 0.08)));
       const handle = mesh(new three.TorusGeometry(0.065, 0.012, 8, 20, Math.PI), mat(0.58, 0.1, "#7f1d1d"));
       handle.position.set(0, 0.09, 0);
       group.add(handle);
-      const crossVertical = mesh(new three.BoxGeometry(0.025, 0.09, 0.008), mat(0.5, 0.05, "#f8fafc"));
+      const crossVertical = mesh(roundedBox(0.025, 0.09, 0.008), mat(0.5, 0.05, "#f8fafc"));
       crossVertical.position.set(0, 0, 0.055);
       group.add(crossVertical);
-      const crossHorizontal = mesh(new three.BoxGeometry(0.09, 0.025, 0.008), mat(0.5, 0.05, "#f8fafc"));
+      const crossHorizontal = mesh(roundedBox(0.09, 0.025, 0.008), mat(0.5, 0.05, "#f8fafc"));
       crossHorizontal.position.set(0, 0, 0.055);
       group.add(crossHorizontal);
       break;
     }
     case "cap": {
       group.add(mesh(new three.SphereGeometry(0.1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0.6)));
-      const brim = mesh(new three.BoxGeometry(0.16, 0.01, 0.1), mat(0.6));
+      const brim = mesh(roundedBox(0.16, 0.01, 0.1), mat(0.6));
       brim.position.set(0, 0, 0.11);
       group.add(brim);
       break;
@@ -844,7 +874,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       left.position.set(-0.035, 0, 0);
       const right = mesh(new three.TorusGeometry(0.03, 0.005, 8, 20), frameMat);
       right.position.set(0.035, 0, 0);
-      const bridge = mesh(new three.BoxGeometry(0.02, 0.004, 0.004), frameMat);
+      const bridge = mesh(roundedBox(0.02, 0.004, 0.004), frameMat);
       group.add(left);
       group.add(right);
       group.add(bridge);
@@ -891,7 +921,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "faceMask": {
-      const mask = mesh(new three.BoxGeometry(0.12, 0.075, 0.012), mat(0.86, 0.01));
+      const mask = mesh(roundedBox(0.12, 0.075, 0.012), mat(0.86, 0.01));
       group.add(mask);
       for (const side of [-1, 1] as const) {
         const strap = mesh(new three.TorusGeometry(0.035, 0.003, 6, 16, Math.PI), mat(0.65, 0, "#f8fafc"));
@@ -902,21 +932,21 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "backpack": {
-      group.add(mesh(new three.BoxGeometry(0.18, 0.24, 0.1), mat(0.7)));
-      const pocket = mesh(new three.BoxGeometry(0.14, 0.1, 0.04), mat(0.7));
+      group.add(mesh(roundedBox(0.18, 0.24, 0.1), mat(0.7)));
+      const pocket = mesh(roundedBox(0.14, 0.1, 0.04), mat(0.7));
       pocket.position.set(0, -0.05, 0.06);
       group.add(pocket);
       break;
     }
     case "shoulderbag": {
-      group.add(mesh(new three.BoxGeometry(0.16, 0.14, 0.05), mat(0.7)));
+      group.add(mesh(roundedBox(0.16, 0.14, 0.05), mat(0.7)));
       const strap = mesh(new three.TorusGeometry(0.14, 0.008, 6, 24, Math.PI), mat(0.7));
       strap.position.set(0, 0.05, 0);
       group.add(strap);
       break;
     }
     case "cape": {
-      const cloth = mesh(new three.BoxGeometry(0.4, 0.6, 0.01), mat(0.85));
+      const cloth = mesh(roundedBox(0.4, 0.6, 0.01), mat(0.85));
       cloth.position.set(0, -0.3, 0);
       group.add(cloth);
       break;
@@ -948,14 +978,14 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "idBadge": {
-      group.add(mesh(new three.BoxGeometry(0.065, 0.09, 0.008), mat(0.74, 0.04)));
-      const portrait = mesh(new three.BoxGeometry(0.022, 0.028, 0.003), mat(0.55, 0.04, "#93c5fd"));
+      group.add(mesh(roundedBox(0.065, 0.09, 0.008), mat(0.74, 0.04)));
+      const portrait = mesh(roundedBox(0.022, 0.028, 0.003), mat(0.55, 0.04, "#93c5fd"));
       portrait.position.set(-0.015, 0.015, 0.006);
       group.add(portrait);
-      const stripe = mesh(new three.BoxGeometry(0.055, 0.008, 0.003), mat(0.5, 0.05, "#2563eb"));
+      const stripe = mesh(roundedBox(0.055, 0.008, 0.003), mat(0.5, 0.05, "#2563eb"));
       stripe.position.set(0, -0.025, 0.006);
       group.add(stripe);
-      const clip = mesh(new three.BoxGeometry(0.018, 0.018, 0.01), mat(0.3, 0.65, "#94a3b8"));
+      const clip = mesh(roundedBox(0.018, 0.018, 0.01), mat(0.3, 0.65, "#94a3b8"));
       clip.position.set(0, 0.052, 0);
       group.add(clip);
       break;
@@ -1035,14 +1065,14 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       const neckRing = mesh(new three.TorusGeometry(0.095, 0.022, 10, 16), mat(0.8, 0));
       neckRing.rotation.set(Math.PI / 2, 0, 0);
       group.add(neckRing);
-      const hanging = mesh(new three.BoxGeometry(0.04, 0.28, 0.015), mat(0.8, 0));
+      const hanging = mesh(roundedBox(0.04, 0.28, 0.015), mat(0.8, 0));
       hanging.position.set(0.05, -0.14, 0.07);
       hanging.rotation.set(0.1, -0.05, -0.1);
       group.add(hanging);
       break;
     }
     case "holster": {
-      group.add(mesh(new three.BoxGeometry(0.07, 0.14, 0.04), mat(0.75, 0.1, "#543825")));
+      group.add(mesh(roundedBox(0.07, 0.14, 0.04), mat(0.75, 0.1, "#543825")));
       const grip = mesh(new three.CylinderGeometry(0.01, 0.012, 0.08, 8), mat(0.6, 0.2, "#2b2b2b"));
       grip.position.set(0.02, 0.07, 0.03);
       grip.rotation.set(0.3, 0, 0.6);
@@ -1053,7 +1083,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       const loop = mesh(new three.TorusGeometry(0.14, 0.01, 8, 24), mat(0.7, 0.2, "#1e293b"));
       loop.rotation.set(Math.PI / 2, 0, 0);
       group.add(loop);
-      const buckle = mesh(new three.BoxGeometry(0.035, 0.028, 0.022), mat(0.2, 0.9, "#fbbf24"));
+      const buckle = mesh(roundedBox(0.035, 0.028, 0.022), mat(0.2, 0.9, "#fbbf24"));
       buckle.position.set(0, 0, 0.14);
       group.add(buckle);
       break;
@@ -1091,12 +1121,12 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "camera": {
-      group.add(mesh(new three.BoxGeometry(0.1, 0.065, 0.045), mat(0.55, 0.15)));
+      group.add(mesh(roundedBox(0.1, 0.065, 0.045), mat(0.55, 0.15)));
       const lens = mesh(new three.CylinderGeometry(0.022, 0.022, 0.035, 16), mat(0.2, 0.6, "#111827"));
       lens.position.set(0, 0, 0.035);
       lens.rotation.set(Math.PI / 2, 0, 0);
       group.add(lens);
-      const flash = mesh(new three.BoxGeometry(0.03, 0.015, 0.02), mat(0.3, 0.2, "#e2e8f0"));
+      const flash = mesh(roundedBox(0.03, 0.015, 0.02), mat(0.3, 0.2, "#e2e8f0"));
       flash.position.set(0.03, 0.04, 0);
       group.add(flash);
       break;
@@ -1122,20 +1152,20 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "laptop": {
-      const base = mesh(new three.BoxGeometry(0.22, 0.01, 0.15), mat(0.4, 0.35));
+      const base = mesh(roundedBox(0.22, 0.01, 0.15), mat(0.4, 0.35));
       group.add(base);
-      const screen = mesh(new three.BoxGeometry(0.22, 0.14, 0.008), mat(0.35, 0.4));
+      const screen = mesh(roundedBox(0.22, 0.14, 0.008), mat(0.35, 0.4));
       screen.position.set(0, 0.07, -0.07);
       screen.rotation.set(-0.35, 0, 0);
       group.add(screen);
-      const display = mesh(new three.BoxGeometry(0.19, 0.11, 0.002), mat(0.2, 0.2, "#0ea5e9"));
+      const display = mesh(roundedBox(0.19, 0.11, 0.002), mat(0.2, 0.2, "#0ea5e9"));
       display.position.set(0, 0.075, -0.065);
       display.rotation.set(-0.35, 0, 0);
       group.add(display);
       break;
     }
     case "shield": {
-      group.add(mesh(new three.BoxGeometry(0.22, 0.28, 0.03), mat(0.35, 0.55)));
+      group.add(mesh(roundedBox(0.22, 0.28, 0.03), mat(0.35, 0.55)));
       const boss = mesh(new three.SphereGeometry(0.035, 12, 12), mat(0.25, 0.8, "#cbd5e1"));
       boss.position.set(0, 0, 0.02);
       group.add(boss);
@@ -1168,8 +1198,8 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "gun": {
-      group.add(mesh(new three.BoxGeometry(0.04, 0.05, 0.14), mat(0.4, 0.35)));
-      const grip = mesh(new three.BoxGeometry(0.03, 0.08, 0.04), mat(0.55, 0.15, "#1c1c1c"));
+      group.add(mesh(roundedBox(0.04, 0.05, 0.14), mat(0.4, 0.35)));
+      const grip = mesh(roundedBox(0.03, 0.08, 0.04), mat(0.55, 0.15, "#1c1c1c"));
       grip.position.set(0, -0.05, -0.03);
       group.add(grip);
       const barrel = mesh(new three.CylinderGeometry(0.01, 0.01, 0.08, 10), mat(0.3, 0.5, "#374151"));
@@ -1207,8 +1237,8 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "eyepatch": {
-      group.add(mesh(new three.BoxGeometry(0.055, 0.04, 0.01), mat(0.7, 0.05)));
-      const strap = mesh(new three.BoxGeometry(0.14, 0.01, 0.006), mat(0.65, 0.05, "#1c1c1c"));
+      group.add(mesh(roundedBox(0.055, 0.04, 0.01), mat(0.7, 0.05)));
+      const strap = mesh(roundedBox(0.14, 0.01, 0.006), mat(0.65, 0.05, "#1c1c1c"));
       strap.position.set(-0.02, 0.01, -0.01);
       group.add(strap);
       break;
@@ -1232,7 +1262,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "hairpin": {
-      group.add(mesh(new three.BoxGeometry(0.05, 0.01, 0.006), mat(0.25, 0.75)));
+      group.add(mesh(roundedBox(0.05, 0.01, 0.006), mat(0.25, 0.75)));
       const gem = mesh(new three.SphereGeometry(0.012, 10, 10), mat(0.15, 0.8, "#f472b6"));
       gem.position.set(0.02, 0.01, 0);
       group.add(gem);
@@ -1255,11 +1285,11 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
     }
     case "guitar": {
       // 테스트 더블 mesh는 scale.set을 갖지 않을 수 있어 타원 변형 대신 박스 바디를 쓴다.
-      group.add(mesh(new three.BoxGeometry(0.16, 0.22, 0.055), mat(0.55, 0.15)));
-      const neck = mesh(new three.BoxGeometry(0.03, 0.28, 0.02), mat(0.5, 0.1, "#5a4632"));
+      group.add(mesh(roundedBox(0.16, 0.22, 0.055), mat(0.55, 0.15)));
+      const neck = mesh(roundedBox(0.03, 0.28, 0.02), mat(0.5, 0.1, "#5a4632"));
       neck.position.set(0, 0.2, 0);
       group.add(neck);
-      const headstock = mesh(new three.BoxGeometry(0.05, 0.06, 0.02), mat(0.5, 0.1, "#5a4632"));
+      const headstock = mesh(roundedBox(0.05, 0.06, 0.02), mat(0.5, 0.1, "#5a4632"));
       headstock.position.set(0, 0.35, 0);
       group.add(headstock);
       break;
@@ -1274,18 +1304,18 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     case "nameTag": {
-      group.add(mesh(new three.BoxGeometry(0.07, 0.035, 0.006), mat(0.55, 0.05)));
-      const bar = mesh(new three.BoxGeometry(0.06, 0.01, 0.003), mat(0.4, 0.1, "#2563eb"));
+      group.add(mesh(roundedBox(0.07, 0.035, 0.006), mat(0.55, 0.05)));
+      const bar = mesh(roundedBox(0.06, 0.01, 0.003), mat(0.4, 0.1, "#2563eb"));
       bar.position.set(0, 0.008, 0.004);
       group.add(bar);
       break;
     }
     case "apron": {
-      group.add(mesh(new three.BoxGeometry(0.28, 0.35, 0.02), mat(0.8, 0.02)));
-      const strapL = mesh(new three.BoxGeometry(0.03, 0.2, 0.01), mat(0.75, 0.02));
+      group.add(mesh(roundedBox(0.28, 0.35, 0.02), mat(0.8, 0.02)));
+      const strapL = mesh(roundedBox(0.03, 0.2, 0.01), mat(0.75, 0.02));
       strapL.position.set(-0.1, 0.22, -0.02);
       group.add(strapL);
-      const strapR = mesh(new three.BoxGeometry(0.03, 0.2, 0.01), mat(0.75, 0.02));
+      const strapR = mesh(roundedBox(0.03, 0.2, 0.01), mat(0.75, 0.02));
       strapR.position.set(0.1, 0.22, -0.02);
       group.add(strapR);
       break;
@@ -1300,7 +1330,7 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       break;
     }
     default:
-      group.add(mesh(new three.BoxGeometry(0.05, 0.05, 0.05), mat()));
+      group.add(mesh(roundedBox(0.05, 0.05, 0.05), mat()));
   }
   return group;
 }

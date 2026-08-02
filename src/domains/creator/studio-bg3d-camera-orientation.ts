@@ -17,6 +17,23 @@ export interface StudioBg3dCameraOrientationLike {
 export const STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP = 0.1;
 export const STUDIO_BG3D_CAMERA_MIN_NEAR_CLIP = 0.01;
 export const STUDIO_BG3D_CAMERA_MAX_NEAR_CLIP = 50;
+
+/** Bounded depth/orbit limits derived from the authored camera instead of a small fixed scene. */
+export function resolveStudioBg3dCameraDistanceLimits(
+  position: StudioBg3dCameraOrientationVec3,
+  target: StudioBg3dCameraOrientationVec3,
+) {
+  const distance = Math.hypot(
+    position[0] - target[0],
+    position[1] - target[1],
+    position[2] - target[2],
+  );
+  return Object.freeze({
+    farClip: Math.min(20_000, Math.max(200, distance * 8)),
+    maxOrbitDistance: Math.min(10_000, Math.max(60, distance * 4)),
+  });
+}
+
 export const STUDIO_BG3D_CAMERA_DEFAULT_UP = Object.freeze(
   [0, 1, 0] as const,
 ) satisfies StudioBg3dCameraOrientationVec3;

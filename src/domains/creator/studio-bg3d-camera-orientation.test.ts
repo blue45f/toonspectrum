@@ -7,6 +7,7 @@ import {
   isStudioBg3dCameraUpVectorValid,
   normalizeStudioBg3dCameraUpVector,
   readStudioBg3dCameraDutchRollDegrees,
+  resolveStudioBg3dCameraDistanceLimits,
   resolveStudioBg3dCameraNearClip,
   resolveStudioBg3dCameraUpVector,
 } from "./studio-bg3d-camera-orientation";
@@ -28,6 +29,21 @@ describe("Studio BG3D Camera vNext orientation", () => {
     expect(isStudioBg3dCameraNearClip(50)).toBe(true);
     expect(isStudioBg3dCameraNearClip(0)).toBe(false);
     expect(isStudioBg3dCameraNearClip(50.01)).toBe(false);
+  });
+
+  it("expands far clipping and orbit reach for large authored scenes", () => {
+    expect(resolveStudioBg3dCameraDistanceLimits([0, 0, 5], [0, 0, 0])).toEqual({
+      farClip: 200,
+      maxOrbitDistance: 60,
+    });
+    expect(resolveStudioBg3dCameraDistanceLimits([0, 0, 100], [0, 0, 0])).toEqual({
+      farClip: 800,
+      maxOrbitDistance: 400,
+    });
+    expect(resolveStudioBg3dCameraDistanceLimits([0, 0, 100_000], [0, 0, 0])).toEqual({
+      farClip: 20_000,
+      maxOrbitDistance: 10_000,
+    });
   });
 
   it("normalizes finite up references into stable unit vectors", () => {

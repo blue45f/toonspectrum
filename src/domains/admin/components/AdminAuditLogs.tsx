@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { adminFetch, formatDate } from "./admin-client";
 import { LiveAutoRefresh } from "./LiveAutoRefresh";
 
+import { useT } from "@/lib/i18n";
+
 export interface AuditLogItem {
   id: string;
   adminId: string;
@@ -14,7 +16,6 @@ export interface AuditLogItem {
   details: Record<string, unknown>;
   createdAt: string;
 }
-
 interface AdminAuditLogsProps {
   userId: string;
 }
@@ -24,6 +25,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   // Modal detail
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
@@ -38,11 +40,11 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
       const res = await adminFetch<{ items: AuditLogItem[] }>(`/audit-logs${queryStr}`, userId);
       setLogs(res.items ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "감사 로그를 불러오지 못했습니다.");
+      setError(err instanceof Error ? err.message : t("admin.auditLogs.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [userId, search]);
+  }, [userId, search, t]);
 
   useEffect(() => {
     void loadData();
@@ -54,10 +56,10 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <History className="w-5 h-5 text-indigo-400" />
-            관리자 감사 로그 (Audit Logs)
+            {t("admin.auditLogs.title")}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            관리자 권한으로 수행된 모든 주요 조치 및 권한/설정 변경 이력을 추적합니다.
+            {t("admin.auditLogs.desc")}
           </p>
         </div>
 
@@ -67,7 +69,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
-              placeholder="검색 (이메일/작업)..."
+              placeholder={t("admin.auditLogs.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
@@ -83,21 +85,21 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">감사 로그 로딩 중...</div>
+        <div className="p-12 text-center text-slate-400">{t("admin.auditLogs.loading")}</div>
       ) : logs.length === 0 ? (
         <div className="p-12 text-center bg-slate-900/30 border border-slate-800 rounded-2xl text-slate-400">
-          기록된 감사 로그가 없습니다.
+          {t("admin.auditLogs.empty")}
         </div>
       ) : (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/60 text-slate-400 font-medium uppercase text-xs border-b border-slate-800">
               <tr>
-                <th className="p-4">일시</th>
-                <th className="p-4">수행 관리자</th>
-                <th className="p-4">작업 (Action)</th>
-                <th className="p-4">대상 (Target)</th>
-                <th className="p-4 text-right">상세</th>
+                <th className="p-4">{t("admin.security.thDate")}</th>
+                <th className="p-4">{t("admin.auditLogs.thAdmin")}</th>
+                <th className="p-4">{t("admin.auditLogs.thAction")}</th>
+                <th className="p-4">{t("admin.auditLogs.thTarget")}</th>
+                <th className="p-4 text-right">{t("admin.auditLogs.thDetail")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -119,7 +121,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
                       className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-medium"
                     >
                       <FileText className="w-4 h-4" />
-                      보기
+                      {t("admin.auditLogs.view")}
                     </button>
                   </td>
                 </tr>
@@ -140,7 +142,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
             </button>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <FileText className="w-5 h-5 text-indigo-400" />
-              감사 로그 상세 (ID: {selectedLog.id.slice(0, 8)})
+              {t("admin.auditLogs.modalTitle")} ({selectedLog.id.slice(0, 8)})
             </h3>
             <div className="space-y-2 text-sm text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs">
               <p><span className="text-slate-500">Action:</span> {selectedLog.action}</p>
@@ -159,7 +161,7 @@ export function AdminAuditLogs({ userId }: AdminAuditLogsProps) {
                 onClick={() => setSelectedLog(null)}
                 className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-700"
               >
-                닫기
+                {t("admin.auditLogs.close")}
               </button>
             </div>
           </div>

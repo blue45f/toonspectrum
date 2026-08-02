@@ -4,12 +4,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   AVATAR_FORGE_BANG_STYLE_OPTIONS,
+  AVATAR_FORGE_BODY_LIMITS,
+  AVATAR_FORGE_BODY_PRESETS,
   AVATAR_FORGE_HAIR_LIMITS,
   AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
   AVATAR_FORGE_VERSION,
+  applyAvatarForgeBodyPreset,
   avatarForgeBraidSegmentCount,
   buildAvatarForgeHairParts,
+  buildAvatarForgeBodyAdjustmentPlan,
   createAvatarForgeState,
   parseAvatarForgeState,
   sanitizeAvatarForgeState,
@@ -193,11 +197,11 @@ describe("studio-vrm-avatar-forge state", () => {
   });
 });
 
-/* ── v1 → v2 하위호환 ──────────────────────────────────────────────────── */
+/* ── v1 → v3 하위호환 ──────────────────────────────────────────────────── */
 
 describe("v1 하위호환(바이트 단위 지오메트리 고정)", () => {
-  it("스키마 버전이 2로 올라갔다", () => {
-    expect(AVATAR_FORGE_VERSION).toBe(2);
+  it("스키마 버전이 3으로 올라갔다", () => {
+    expect(AVATAR_FORGE_VERSION).toBe(3);
   });
 
   it.each(V1_STYLES)("v1 스타일 %s의 파츠 계획이 v1과 문자 단위로 같다", (style) => {
@@ -307,6 +311,105 @@ describe("v1 하위호환(바이트 단위 지오메트리 고정)", () => {
         expect("waveFrequency" in part).toBe(false);
       }
     }
+  });
+});
+
+/* ── v3 체형 실루엣 ─────────────────────────────────────────────────────── */
+
+describe("v3 체형 실루엣", () => {
+  it("v1·v2 문서는 새 체형 키를 신뢰하지 않고 원본 비율로 안전하게 승격한다", () => {
+    for (const version of [1, 2]) {
+      const restored = sanitizeAvatarForgeState({
+        version,
+        bodyPresetId: "hero",
+        body: {
+          shoulderWidth: 1.14,
+          torsoLength: 1.12,
+          hipWidth: 1.12,
+          armLength: 1.1,
+          legLength: 1.12,
+        },
+      });
+
+      expect(restored.body).toEqual({
+        shoulderWidth: 1,
+        torsoLength: 1,
+        hipWidth: 1,
+        armLength: 1,
+        legLength: 1,
+      });
+      expect(restored.bodyPresetId).toBeUndefined();
+    }
+  });
+
+  it("v3 체형을 한계값 안으로 정규화하고 직렬화 왕복에서 보존한다", () => {
+    const serialized = serializeAvatarForgeState({
+      version: AVATAR_FORGE_VERSION,
+      bodyPresetId: "long-line",
+      body: {
+        shoulderWidth: 9,
+        torsoLength: "1.06",
+        hipWidth: -2,
+        armLength: 1.05,
+        legLength: Number.NaN,
+      },
+    });
+
+    expect(serialized.body).toEqual({
+      shoulderWidth: AVATAR_FORGE_BODY_LIMITS.shoulderWidth.max,
+      torsoLength: 1.06,
+      hipWidth: AVATAR_FORGE_BODY_LIMITS.hipWidth.min,
+      armLength: 1.05,
+      legLength: 1,
+    });
+    expect(serialized.bodyPresetId).toBe("long-line");
+    expect(parseAvatarForgeState(JSON.stringify(serialized))).toEqual(serialized);
+  });
+
+  it("체형 프리셋은 결정론적이고 얼굴·헤어·색상 디테일을 보존한다", () => {
+    const source = createAvatarForgeState("wave-diva");
+    const first = applyAvatarForgeBodyPreset(source, "hero");
+    const second = applyAvatarForgeBodyPreset(source, "hero");
+
+    expect(AVATAR_FORGE_BODY_PRESETS).toHaveLength(5);
+    expect(first).toEqual(second);
+    expect(first.bodyPresetId).toBe("hero");
+    expect(first.presetId).toBeUndefined();
+    expect(first.body).toEqual(
+      AVATAR_FORGE_BODY_PRESETS.find((preset) => preset.id === "hero")?.body,
+    );
+    expect(first.face).toEqual(source.face);
+    expect(first.hair).toEqual(source.hair);
+    expect(first.faceAccents).toEqual(source.faceAccents);
+    expect(first.body).not.toBe(
+      AVATAR_FORGE_BODY_PRESETS.find((preset) => preset.id === "hero")?.body,
+    );
+  });
+
+  it("본 조정 계획은 폭과 길이를 구분해 유한하고 중복 없는 본만 만든다", () => {
+    const body = applyAvatarForgeBodyPreset(createAvatarForgeState(), "hero").body;
+    const first = buildAvatarForgeBodyAdjustmentPlan(body);
+    const second = buildAvatarForgeBodyAdjustmentPlan(body);
+    const byBone = new Map(first.map((entry) => [entry.bone, entry]));
+
+    expect(first).toEqual(second);
+    expect(new Set(first.map((entry) => entry.bone)).size).toBe(first.length);
+    expect(byBone.get("chest")?.scaleMultiplier).toEqual([body.shoulderWidth, 1, 1]);
+    expect(byBone.get("hips")?.scaleMultiplier).toEqual([body.hipWidth, 1, 1]);
+    expect(byBone.get("leftHand")?.positionMultiplier).toEqual([
+      body.armLength,
+      body.armLength,
+      body.armLength,
+    ]);
+    expect(byBone.get("leftFoot")?.positionMultiplier).toEqual([
+      body.legLength,
+      body.legLength,
+      body.legLength,
+    ]);
+    expect(first.flatMap((entry) => [
+      ...entry.positionMultiplier,
+      ...entry.scaleMultiplier,
+    ]).every(Number.isFinite)).toBe(true);
   });
 });
 

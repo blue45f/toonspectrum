@@ -30,12 +30,19 @@ import {
   type StudioDccCollabRoom,
 } from "./studio-dcc-collab-shell";
 import {
+  bevelStudioEditableMeshEdges,
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
+  dissolveStudioEditableMeshFaces,
   extrudeStudioEditableMeshFaces,
   hashStudioEditableMesh,
+  insetStudioEditableMeshFaces,
   knifeStudioEditableMesh,
+  loopCutStudioEditableMesh,
+  setStudioEditableMeshCrease,
+  setStudioEditableMeshFaceSmooth,
   studioEditableMeshToTriangleSoup,
+  weldStudioEditableMesh,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
 import {
@@ -48,7 +55,10 @@ import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
   createStudioHybridDccSession,
   hybridDccCommitGeometry,
+  hybridDccCommitObjectTransform,
+  hybridDccDuplicateAsset,
   hybridDccRegisterAsset,
+  hybridDccRemoveAsset,
   hybridDccUndo,
   hybridDccRedo,
   hybridDccCanUndo,
@@ -56,6 +66,10 @@ import {
   snapshotStudioHybridDccState,
   type StudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
+import {
+  createStudioHybridDccIdentityTransform,
+  type StudioHybridDccObjectTransform,
+} from "./studio-hybrid-dcc-object-transform";
 import {
   applyStudioSculptStroke,
   voxelRemeshStudioMesh,
@@ -66,6 +80,7 @@ import {
   applyStudioShotOverride,
   addStudioArtistDelta,
   mutateStudioSharedObjectGeometry,
+  mutateStudioSharedObjectVisibility,
   generateStudioToonPass,
   STUDIO_TOON_PASS_KINDS,
   type StudioLiveBridgeDocument,
@@ -119,7 +134,7 @@ export type StudioOcctSolidResult = {
   readonly loadPath?: "browser" | "node";
 };
 
-export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 3 as const;
+export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 4 as const;
 
 export interface StudioHybridDccWorkspace {
   readonly revision: typeof STUDIO_HYBRID_DCC_WORKSPACE_REVISION;
@@ -176,44 +191,179 @@ export function createStudioHybridDccWorkspace(
   };
 }
 
+/**
+ * Selects one canonical geometry asset without mutating geometry, history, or the live bridge.
+ * The viewport/outliner may call this freely; an unknown id fails closed instead of retaining a
+ * stale renderer-only selection.
+ */
+export function workspaceSelectAsset(
+  ws: StudioHybridDccWorkspace,
+  assetId: string | null,
+): StudioHybridDccWorkspace {
+  if (assetId === null) {
+    return ws.activeAssetId === null ? ws : { ...ws, activeAssetId: null };
+  }
+  if (!Object.hasOwn(ws.session.state.geometry.records, assetId)) {
+    throw new Error(`missing ${assetId}`);
+  }
+  return ws.activeAssetId === assetId ? ws : { ...ws, activeAssetId: assetId };
+}
+
+/** Controls scene/outliner visibility without deleting or mutating canonical geometry. */
+export function workspaceSetAssetVisibility(
+  ws: StudioHybridDccWorkspace,
+  assetId: string,
+  visible: boolean,
+): StudioHybridDccWorkspace {
+  if (!Object.hasOwn(ws.session.state.geometry.records, assetId)) {
+    throw new Error(`missing ${assetId}`);
+  }
+  const bridge = mutateStudioSharedObjectVisibility(ws.bridge, assetId, visible);
+  return bridge === ws.bridge ? ws : { ...ws, bridge };
+}
+
+function nextWorkspaceDuplicateId(ws: StudioHybridDccWorkspace, sourceAssetId: string): string {
+  const base = `${sourceAssetId}-copy`;
+  if (!Object.hasOwn(ws.session.state.geometry.records, base)) return base;
+  for (let suffix = 2; suffix <= 10_000; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!Object.hasOwn(ws.session.state.geometry.records, candidate)) return candidate;
+  }
+  throw new Error("duplicate asset id budget exhausted");
+}
+
+function nextWorkspaceAssetId(ws: StudioHybridDccWorkspace, base: string): string {
+  if (!Object.hasOwn(ws.session.state.geometry.records, base)) return base;
+  for (let suffix = 2; suffix <= 10_000; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!Object.hasOwn(ws.session.state.geometry.records, candidate)) return candidate;
+  }
+  throw new Error("asset id budget exhausted");
+}
+
+/** Creates an offset editable copy and selects it. */
+export function workspaceDuplicateActive(
+  ws: StudioHybridDccWorkspace,
+  duplicateAssetId?: string,
+): StudioHybridDccWorkspace {
+  const sourceAssetId = ws.activeAssetId;
+  if (!sourceAssetId) throw new Error("no active asset");
+  const nextId = duplicateAssetId ?? nextWorkspaceDuplicateId(ws, sourceAssetId);
+  const session = hybridDccDuplicateAsset(ws.session, sourceAssetId, nextId);
+  return {
+    ...synchronizeWorkspaceGeometryAuthority(ws, session),
+    activeAssetId: nextId,
+  };
+}
+
+/** Deletes the selected object from authority; document undo restores it exactly. */
+export function workspaceDeleteActive(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const session = hybridDccRemoveAsset(ws.session, assetId);
+  return {
+    ...synchronizeWorkspaceGeometryAuthority(ws, session),
+    activeAssetId: null,
+  };
+}
+
+function synchronizeWorkspaceGeometryAuthority(
+  ws: StudioHybridDccWorkspace,
+  session: StudioHybridDccSession,
+): StudioHybridDccWorkspace {
+  const previousAuthorityIds = new Set(Object.keys(ws.session.state.geometry.records));
+  const nextRecords = session.state.geometry.records;
+  const retained = ws.bridge.set.objects.filter((object) => (
+    !previousAuthorityIds.has(object.id) && !Object.hasOwn(nextRecords, object.id)
+  ));
+  const canonicalObjects = Object.values(nextRecords)
+    .toSorted((left, right) => left.assetId < right.assetId ? -1 : left.assetId > right.assetId ? 1 : 0)
+    .map((record) => {
+      const previous = ws.bridge.set.objects.find((object) => object.id === record.assetId);
+      return {
+        id: record.assetId,
+        geometryHash: record.meshHash,
+        visible: previous?.visible ?? true,
+        materialId: previous?.materialId ?? "default",
+        transform: session.state.objectTransforms[record.assetId]!,
+      };
+    });
+  const set = createStudioSharedSet(ws.bridge.set.id, [...retained, ...canonicalObjects]);
+  const bridge: StudioLiveBridgeDocument = {
+    ...ws.bridge,
+    set,
+    shots: ws.bridge.shots.map((shot) => ({
+      ...shot,
+      dirtyPasses: [...STUDIO_TOON_PASS_KINDS],
+    })),
+    commandSequence: ws.bridge.commandSequence + 1,
+  };
+  return { ...ws, session, bridge };
+}
+
 export function workspaceAddUnitCube(
   ws: StudioHybridDccWorkspace,
-  assetId = "asset-cube",
+  assetId?: string,
 ): StudioHybridDccWorkspace {
+  const resolvedAssetId = assetId ?? nextWorkspaceAssetId(ws, "asset-cube");
+  const generatedCubeCount = assetId === undefined
+    ? Object.keys(ws.session.state.geometry.records)
+      .filter((id) => id === "asset-cube" || /^asset-cube-\d+$/u.test(id)).length
+    : 0;
+  const initialTransform = createStudioHybridDccIdentityTransform();
   const mesh = createStudioUnitCubeMesh();
-  const session = hybridDccRegisterAsset(ws.session, assetId, mesh, {
-    source: "primitive",
-    creator: "studio",
-    license: "CC0-1.0",
-    useScope: "commercial",
-    derivative: "original",
-  });
-  const objects = [
-    ...ws.bridge.set.objects.filter((o) => o.id !== assetId),
+  const session = hybridDccRegisterAsset(
+    ws.session,
+    resolvedAssetId,
+    mesh,
     {
-      id: assetId,
-      geometryHash: hashStudioEditableMesh(mesh),
-      visible: true,
-      materialId: "default",
+      source: "primitive",
+      creator: "studio",
+      license: "CC0-1.0",
+      useScope: "commercial",
+      derivative: "original",
     },
-  ];
-  const set = createStudioSharedSet(ws.bridge.set.id, objects);
-  const bridge = createStudioLiveBridgeDocument(
-    set,
-    ws.bridge.shots.map((s) => s.id),
+    generatedCubeCount === 0
+      ? initialTransform
+      : {
+          ...initialTransform,
+          position: [generatedCubeCount * 1.25, 0, 0],
+        },
   );
-  return { ...ws, session, bridge, activeAssetId: assetId };
+  return {
+    ...synchronizeWorkspaceGeometryAuthority(ws, session),
+    activeAssetId: resolvedAssetId,
+  };
+}
+
+export function workspaceCommitActiveObjectTransform(
+  ws: StudioHybridDccWorkspace,
+  transform: StudioHybridDccObjectTransform,
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  return workspaceCommitObjectTransform(ws, assetId, transform);
+}
+
+export function workspaceCommitObjectTransform(
+  ws: StudioHybridDccWorkspace,
+  assetId: string,
+  transform: StudioHybridDccObjectTransform,
+): StudioHybridDccWorkspace {
+  const session = hybridDccCommitObjectTransform(ws.session, assetId, transform);
+  return session === ws.session ? ws : synchronizeWorkspaceGeometryAuthority(ws, session);
 }
 
 export function workspaceExtrudeActive(
   ws: StudioHybridDccWorkspace,
   distance: number,
+  faceIds: readonly number[] = [0],
 ): StudioHybridDccWorkspace {
   const id = ws.activeAssetId;
   if (!id) throw new Error("no active asset");
   const record = ws.session.state.geometry.records[id];
   if (!record) throw new Error(`missing ${id}`);
-  const extruded = extrudeStudioEditableMeshFaces(record.mesh, [0], distance);
+  const extruded = extrudeStudioEditableMeshFaces(record.mesh, faceIds, distance);
   if (!extruded.ok) throw new Error(extruded.detail);
   const session = hybridDccCommitGeometry(ws.session, id, extruded.value);
   const hash = hashStudioEditableMesh(extruded.value);
@@ -238,6 +388,119 @@ export function workspaceKnifeActive(
   const hash = hashStudioEditableMesh(knifed.value);
   const bridge = mutateStudioSharedObjectGeometry(ws.bridge, id, hash);
   return { ...ws, session, bridge };
+}
+
+function commitWorkspaceActiveMesh(
+  ws: StudioHybridDccWorkspace,
+  assetId: string,
+  mesh: StudioEditableMesh,
+): StudioHybridDccWorkspace {
+  const session = hybridDccCommitGeometry(ws.session, assetId, mesh);
+  const bridge = mutateStudioSharedObjectGeometry(ws.bridge, assetId, hashStudioEditableMesh(mesh));
+  return { ...ws, session, bridge, activeAssetId: assetId };
+}
+
+export function workspaceInsetActive(
+  ws: StudioHybridDccWorkspace,
+  factor = 0.2,
+  faceIds: readonly number[] = [0],
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const result = insetStudioEditableMeshFaces(record.mesh, faceIds, factor);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceBevelEdgesActive(
+  ws: StudioHybridDccWorkspace,
+  amount = 0.12,
+  halfEdgeIds?: readonly number[],
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const selected = halfEdgeIds ?? record.mesh.halfEdges.slice(0, 1).map(({ id }) => id);
+  const result = bevelStudioEditableMeshEdges(record.mesh, selected, amount);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceLoopCutActive(
+  ws: StudioHybridDccWorkspace,
+  factor = 0.5,
+  startHalfEdgeId?: number,
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const selected = startHalfEdgeId ?? record.mesh.halfEdges[0]?.id;
+  if (selected === undefined) throw new Error("mesh has no edge to cut");
+  const result = loopCutStudioEditableMesh(record.mesh, selected, factor);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceWeldActive(
+  ws: StudioHybridDccWorkspace,
+  distance = 1e-5,
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const result = weldStudioEditableMesh(record.mesh, distance);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceDissolveFaceActive(
+  ws: StudioHybridDccWorkspace,
+  faceIds: readonly number[] = [0],
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const result = dissolveStudioEditableMeshFaces(record.mesh, faceIds);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceCreaseActive(
+  ws: StudioHybridDccWorkspace,
+  crease = 0.75,
+  halfEdgeIds?: readonly number[],
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const selected = halfEdgeIds ?? record.mesh.halfEdges.slice(0, 1).map(({ id }) => id);
+  const result = setStudioEditableMeshCrease(record.mesh, selected, crease);
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
+}
+
+export function workspaceShadeActive(
+  ws: StudioHybridDccWorkspace,
+  smooth: boolean,
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const result = setStudioEditableMeshFaceSmooth(
+    record.mesh,
+    record.mesh.faces.map(({ id }) => id),
+    smooth,
+  );
+  if (!result.ok) throw new Error(result.detail);
+  return commitWorkspaceActiveMesh(ws, assetId, result.value);
 }
 
 export async function workspaceBooleanDifference(
@@ -278,7 +541,13 @@ export function workspaceEnsureShots(
 ): StudioHybridDccWorkspace {
   const n = Math.max(1, Math.min(64, Math.trunc(count)));
   const ids = Array.from({ length: n }, (_, i) => `shot-${i + 1}`);
-  let bridge = createStudioLiveBridgeDocument(ws.bridge.set, ids);
+  const defaults = createStudioLiveBridgeDocument(ws.bridge.set, ids);
+  const existingById = new Map(ws.bridge.shots.map((shot) => [shot.id, shot] as const));
+  let bridge: StudioLiveBridgeDocument = {
+    ...ws.bridge,
+    shots: defaults.shots.map((shot) => existingById.get(shot.id) ?? shot),
+    commandSequence: ws.bridge.commandSequence + 1,
+  };
   for (let i = 0; i < n; i += 1) {
     bridge = applyStudioShotOverride(bridge, ids[i]!, {
       camera: {
@@ -342,8 +611,7 @@ export function workspaceImportBytes(
       session = hybridDccCommitGeometry(session, assetId, meshAdapter.meshes[0]);
     }
     return {
-      ...ws,
-      session,
+      ...synchronizeWorkspaceGeometryAuthority(ws, session),
       activeAssetId: assetId,
       lastImportReport: {
         ...meshAdapter.report,
@@ -373,21 +641,36 @@ export function workspaceLoadRoomPreset(
     },
   ];
   const set = createStudioSharedSet(ws.bridge.set.id, objects);
-  const bridge = createStudioLiveBridgeDocument(
+  const bridge: StudioLiveBridgeDocument = {
+    ...ws.bridge,
     set,
-    ws.bridge.shots.map((s) => s.id),
-  );
+    commandSequence: ws.bridge.commandSequence + 1,
+  };
   return { ...ws, bridge };
 }
 
 export function workspaceUndo(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
   if (!hybridDccCanUndo(ws.session)) return ws;
-  return { ...ws, session: hybridDccUndo(ws.session) };
+  const session = hybridDccUndo(ws.session);
+  const next = synchronizeWorkspaceGeometryAuthority(ws, session);
+  return {
+    ...next,
+    activeAssetId: ws.activeAssetId && Object.hasOwn(session.state.geometry.records, ws.activeAssetId)
+      ? ws.activeAssetId
+      : Object.keys(session.state.geometry.records).sort().at(-1) ?? null,
+  };
 }
 
 export function workspaceRedo(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
   if (!hybridDccCanRedo(ws.session)) return ws;
-  return { ...ws, session: hybridDccRedo(ws.session) };
+  const session = hybridDccRedo(ws.session);
+  const next = synchronizeWorkspaceGeometryAuthority(ws, session);
+  return {
+    ...next,
+    activeAssetId: ws.activeAssetId && Object.hasOwn(session.state.geometry.records, ws.activeAssetId)
+      ? ws.activeAssetId
+      : Object.keys(session.state.geometry.records).sort().at(-1) ?? null,
+  };
 }
 
 export function workspaceDiagnostics(ws: StudioHybridDccWorkspace) {

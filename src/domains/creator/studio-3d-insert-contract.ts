@@ -9,10 +9,7 @@ import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 export type StudioBg3dLtRasterLayerRole =
-  | "color"
-  | "main-line"
-  | "texture-line"
-  | "tone";
+  | "color" | "main-line" | "texture-line" | "tone";
 
 export interface StudioBackground3DLtLayer {
   readonly role: StudioBg3dLtRasterLayerRole;
@@ -45,6 +42,11 @@ export interface StudioBackground3DInsertResult {
   }[];
   /** Optional single-object Magic Layer mask captured in the same frame as every LT raster. */
   readonly magicFilterMask?: StudioBackground3DMagicFilterMask;
+  /** Full-fidelity VRM sources baked in this capture; Studio may hide, but never delete, them. */
+  readonly linkedCharacterCapture?: {
+    readonly kind: "full-fidelity-linked-vrm-capture";
+    readonly elementIds: readonly string[];
+  };
   readonly bg3dScene: StudioBg3dSceneDocument;
 }
 

@@ -97,7 +97,6 @@ import {
 import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-event";
 
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
-import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
 const SOCKET_PATH = "/socket.io";
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -257,14 +256,58 @@ export interface StudioLiveSocketTransportDependencies {
   lockAckTimeoutMs?: number;
 }
 
+export interface StudioLiveSocketRuntimeEnvironment {
+  readonly explicitOrigin?: string | null;
+  readonly locationOrigin?: string | null;
+  readonly development?: boolean;
+  /**
+   * Vite's same-origin Socket.IO proxy is intentionally opt-in. A development build alone is not
+   * proof that the proxy exists (production-preview harnesses also execute Vite output locally).
+   */
+  readonly devProxyEnabled?: boolean;
+}
+
+function nonBlank(value: string | null | undefined): string | null {
+  return value?.trim() || null;
+}
+
+/**
+ * Runtime admission policy for Socket.IO. Missing configuration is a deliberate local-only mode,
+ * never an instruction to probe the current static/Vercel origin and start a reconnect loop.
+ */
+export function resolveStudioLiveSocketRuntimeEndpoint(
+  environment: StudioLiveSocketRuntimeEnvironment,
+): string | null {
+  const explicitOrigin = nonBlank(environment.explicitOrigin);
+  if (explicitOrigin) {
+    try {
+      const url = new URL(explicitOrigin);
+      if (url.pathname !== "/" || url.search || url.hash) return null;
+    } catch {
+      // Relative Vite/API paths are not proof of a long-running realtime origin.
+      return null;
+    }
+    return resolveStudioLiveSocketEndpoint({
+      explicitOrigin,
+      locationOrigin: environment.locationOrigin,
+      allowInsecureLoopback: environment.development === true,
+      localDevelopment: environment.development === true,
+    });
+  }
+
+  if (environment.development === true && environment.devProxyEnabled === true) {
+    return "/studio-live";
+  }
+  return null;
+}
+
 function runtimeSocketEndpoint(): string | null {
-  return resolveStudioLiveSocketEndpoint({
+  return resolveStudioLiveSocketRuntimeEndpoint({
     explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
-    viteApiBase: import.meta.env.VITE_API_BASE,
-    runtimeApiBase: getRuntimeApiBase(),
     locationOrigin: globalThis.location?.origin,
-    allowInsecureLoopback: import.meta.env.DEV,
-    localDevelopment: import.meta.env.DEV,
+    development: import.meta.env.DEV,
+    devProxyEnabled:
+      import.meta.env.VITE_STUDIO_LIVE_DEV_PROXY_ENABLED === "true",
   });
 }
 

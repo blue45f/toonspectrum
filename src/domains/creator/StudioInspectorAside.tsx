@@ -114,7 +114,7 @@ import {
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
-import { isPressureWidthBrush, type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
+import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { type PageGrade } from "./studio-page-grade";
 import {
   StudioAdvancedRulerPanel,
@@ -208,6 +208,7 @@ import { StudioInspectorBubbleShapeControls } from "./StudioInspectorBubbleShape
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
+import { StudioInspectorFreehandPathControls } from "./StudioInspectorFreehandPathControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import {
   StudioInspectorBrushCatalogButton,
@@ -223,7 +224,6 @@ import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
-import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
 import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
 import {
@@ -1796,7 +1796,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       </div>
                     </div>
                   )}
-
                   {selected.kind && selected.kind !== "freehand" && (
                     <div className="mt-2.5 border-t border-line/40 pt-2.5">
                       <Suspense fallback={<StudioPanelLoading label="선 스타일 패널을 여는 중..." />}>
@@ -1827,33 +1826,27 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       </Suspense>
                     </div>
                   )}
-
                   {(selected.kind ?? "freehand") === "freehand" && (
-                    <div className="mt-2.5 border-t border-line/40 pt-2.5">
-                      <StudioNodeEditPanel
-                        active={nodeEditTool !== null}
-                        tool={nodeEditTool ?? "move"}
-                        handleCount={nodeEditHandles.length}
-                        widthModeSupported={isPressureWidthBrush(selected.brush, selected.mode)}
-                        smoothStrength={nodeSmoothStrength}
-                        refinementBusy={paperVectorRefinementBusy}
-                        refinementUnavailableReason={
-                          paperVectorRefinementUnavailableReason
-                        }
-                        onSmoothStrengthChange={setNodeSmoothStrength}
-                        onToggle={() => {
-                          if (nodeEditTool) {
-                            setNodeEditTool(null);
-                            return;
-                          }
-                          disarmAllPixelTools();
-                          setNodeEditTool("move");
-                        }}
-                        onToolChange={(t) => setNodeEditTool(t)}
-                        onRefine={applyPaperVectorRefinement}
-                        onCancelRefinement={cancelPaperVectorRefinement}
-                      />
-                    </div>
+                    <StudioInspectorFreehandPathControls
+                      selected={selected} nodeEditTool={nodeEditTool} nodeEditHandleCount={nodeEditHandles.length} nodeSmoothStrength={nodeSmoothStrength}
+                      refinementBusy={paperVectorRefinementBusy} refinementUnavailableReason={paperVectorRefinementUnavailableReason}
+                      currentColor={color} documentWidth={CANVAS_W} documentHeight={canvasH}
+                      pageId={currentPageId} masterEditMode={masterEditMode}
+                      locks={{ collaboration: collaborationDocumentLocked,
+                        surfaceReview: activeSurfaceReviewLocked,
+                        selectedContent: selectedContentMutationLocked }}
+                      onToggleNodeEdit={() => {
+                        if (nodeEditTool) { setNodeEditTool(null); return; }
+                        disarmAllPixelTools(); setNodeEditTool("move");
+                      }}
+                      onNodeEditToolChange={setNodeEditTool} onNodeSmoothStrengthChange={setNodeSmoothStrength}
+                      onRequestSelectStroke={() => {
+                        setNodeEditTool(null); disarmAllPixelTools(); setTool("select");
+                        announceDrawingShortcut("경로를 정리할 자유곡선 선화를 선택하세요 · Esc로 취소");
+                      }}
+                      onRefine={applyPaperVectorRefinement} onCancelRefinement={cancelPaperVectorRefinement}
+                      onReplace={replaceDrawWithHokusaiNaturalMedia}
+                    />
                   )}
                 </div>
               )}
@@ -2942,6 +2935,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onToggleActive={toggleSmudgeTool}
                           onRadiusChange={setSmudgeRadius}
                           onStrengthChange={setSmudgeStrength}
+                          onOpenTutorial={() => openFeatureTutorial("smudge")}
                         />
                         <StudioDodgeBurnPanel
                           active={dodgeBurnActive}
@@ -2959,6 +2953,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onRadiusChange={setDodgeBurnRadius}
                           onHardnessChange={setDodgeBurnHardness}
                           onExposureChange={setDodgeBurnExposure}
+                          onOpenTutorial={() => openFeatureTutorial("dodge-burn")}
                         />
                         <StudioWetMixPanel
                           active={wetMixActive}
@@ -2975,6 +2970,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onWetnessChange={setWetMixWetness}
                           onPickupChange={setWetMixPickup}
                           onHardnessChange={setWetMixHardness}
+                          onOpenTutorial={() => openFeatureTutorial("wet-mix")}
                         />
                         <StudioLiquifyPanel
                           active={liquifyActive}
@@ -2986,6 +2982,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           onModeChange={setLiquifyMode}
                           onRadiusChange={setLiquifyRadius}
                           onStrengthChange={setLiquifyStrength}
+                          onOpenTutorial={() => openFeatureTutorial("liquify")}
                         />
                         <StudioHealClonePanel
                           mode={healCloneTool}
@@ -3588,6 +3585,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   locks={{ collaboration: collaborationDocumentLocked,
                     surfaceReview: activeSurfaceReviewLocked,
                     selectedContent: selectedContentMutationLocked }}
+                  onRequestSelectStroke={() => {
+                    disarmAllPixelTools();
+                    setTool("select");
+                    announceDrawingShortcut("캔버스에서 변환할 자유곡선 선화를 선택하세요");
+                  }}
                   onReplace={replaceDrawWithHokusaiNaturalMedia}
                 />
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
@@ -3957,7 +3959,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   );
                 })
                   : null}
-
                 {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용) */}
                 {scrollPos.scrollWidth > 0 && (
                   <div
@@ -3973,7 +3974,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               </div>
             </div>
           </div>
-
           <StudioInspectorPublishPanel
             active={inspectorLayout.primary === "publish"}
             description={description}

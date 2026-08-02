@@ -220,6 +220,24 @@ if (!fs.existsSync(manifestPath)) {
       .map(([key]) => key);
   }
 
+  // Test/source modules are never production runtime assets. This is a hard integrity boundary,
+  // not a byte-budget observation: a templated `new URL()` can otherwise make Vite glob a nearby
+  // `*.test.ts` file and publish its source verbatim without joining an eager JS closure.
+  const emittedTestSourceEntries = Object.entries(manifest)
+    .filter(([key, entry]) => {
+      const source = String(entry.src ?? key);
+      const file = String(entry.file ?? "");
+      return /(?:^|\/)\.?(?:[^/]+\.)?(?:test|spec)\.(?:[cm]?[jt]sx?)$/iu.test(source)
+        || /(?:^|\/)[^/]+\.(?:test|spec)-[^/]+\.(?:[cm]?[jt]sx?)$/iu.test(file)
+        || /\.(?:ts|tsx)$/iu.test(file);
+    })
+    .map(([key]) => key);
+  if (emittedTestSourceEntries.length > 0) {
+    fail(
+      `production manifest emitted test/source assets: ${emittedTestSourceEntries.join(", ")}`,
+    );
+  }
+
   function checkDynamicBoundary(label, pattern, staticKeys) {
     const matching = matchingManifestEntries(pattern);
     const dynamicEntries = matching.filter((key) => manifest[key].isDynamicEntry === true);

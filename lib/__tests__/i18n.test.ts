@@ -116,6 +116,14 @@ function collectSourceI18nKeys(): Set<string> {
   return used;
 }
 
+function readRouteDictionary(relativePath: string): Record<string, string> {
+  const parsed = JSON.parse(readFileSync(relativePath, "utf8")) as unknown;
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Invalid route dictionary: ${relativePath}`);
+  }
+  return parsed as Record<string, string>;
+}
+
 
 describe("i18n locale candidates", () => {
   it("prioritizes requested locale and fallback chain", () => {
@@ -320,12 +328,23 @@ describe("runtime translation bundles", () => {
 });
 
 describe("translation dictionary completeness", () => {
-  it("keeps every t() key covered by base dictionaries", () => {
+  it("keeps every t() key covered by its shell or lazy route dictionaries", () => {
     const usedKeys = collectSourceI18nKeys();
-    const sourceKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
-    const missing = [...usedKeys].filter((key) => !sourceKeys.has(key)).sort();
+    const shellKeys = new Set([...Object.keys(i18nDict.ko), ...Object.keys(i18nDict.en)]);
+    const adminEn = readRouteDictionary("public/i18n/admin/en.json");
+    const adminKo = readRouteDictionary("public/i18n/admin/ko.json");
+    const adminKeys = [...usedKeys].filter((key) => key.startsWith("admin."));
+    const shellMissing = [...usedKeys]
+      .filter((key) => !key.startsWith("admin.") && !shellKeys.has(key))
+      .sort();
+    const adminEnMissing = adminKeys.filter((key) => !adminEn[key]).sort();
+    const adminKoMissing = adminKeys.filter((key) => !adminKo[key]).sort();
 
-    expect(missing).toEqual([]);
+    expect({ shellMissing, adminEnMissing, adminKoMissing }).toEqual({
+      shellMissing: [],
+      adminEnMissing: [],
+      adminKoMissing: [],
+    });
   });
 
   it("covers all registered world base locales in DICT with at least 525 App keys each", () => {

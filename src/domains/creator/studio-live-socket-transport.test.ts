@@ -32,6 +32,7 @@ import {
   STUDIO_LIVE_SOCKET_RETRY_POLICY,
   StudioLiveSocketTransport,
   createStudioServerLiveTransportFactory,
+  resolveStudioLiveSocketRuntimeEndpoint,
   type StudioLiveSocketLike,
 } from "./studio-live-socket-transport";
 
@@ -281,6 +282,100 @@ describe("StudioLiveSocketTransport", () => {
       randomizationFactor: 0.25,
       timeout: 15_000,
     });
+  });
+
+  it("fails closed to local collaboration when runtime realtime configuration is absent", () => {
+    expect(resolveStudioLiveSocketRuntimeEndpoint({})).toBeNull();
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        locationOrigin: "https://preview-branch.vercel.app",
+      }),
+    ).toBeNull();
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        locationOrigin: "http://127.0.0.1:5199",
+        development: true,
+      }),
+    ).toBeNull();
+
+    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "");
+    vi.stubEnv("VITE_API_BASE", "");
+    vi.stubEnv("VITE_STUDIO_LIVE_DEV_PROXY_ENABLED", "");
+    const localTransport: StudioLiveTransport = {
+      mode: "local",
+      ready: true,
+      connect: () => Promise.resolve(),
+      send: () => false,
+      subscribe: () => () => undefined,
+      close: () => undefined,
+    };
+    const localFactory = vi.fn(() => localTransport);
+    const factory = createStudioServerLiveTransportFactory(TOKEN, {
+      createLocalTransport: localFactory,
+    });
+
+    expect(factory(context())).toBe(localTransport);
+    expect(localFactory).toHaveBeenCalledOnce();
+  });
+
+  it("does not probe Socket.IO merely because a production HTTP API base exists", () => {
+    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "");
+    vi.stubEnv("VITE_API_BASE", "https://api.toonstudio.cloud/api");
+    vi.stubEnv("VITE_STUDIO_LIVE_DEV_PROXY_ENABLED", "");
+    const localTransport: StudioLiveTransport = {
+      mode: "local",
+      ready: true,
+      connect: () => Promise.resolve(),
+      send: () => false,
+      subscribe: () => () => undefined,
+      close: () => undefined,
+    };
+    const localFactory = vi.fn(() => localTransport);
+
+    const transport = createStudioServerLiveTransportFactory(TOKEN, {
+      createLocalTransport: localFactory,
+    })(context());
+
+    expect(transport).toBe(localTransport);
+    expect(transport.mode).toBe("local");
+    expect(localFactory).toHaveBeenCalledOnce();
+  });
+
+  it("admits only an exact absolute realtime origin", () => {
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        explicitOrigin: "https://realtime.toonstudio.cloud",
+        locationOrigin: "https://www.toonstudio.cloud",
+      }),
+    ).toBe("https://realtime.toonstudio.cloud/studio-live");
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        explicitOrigin: "/api",
+        locationOrigin: "https://www.toonstudio.cloud",
+      }),
+    ).toBeNull();
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        explicitOrigin: "https://realtime.toonstudio.cloud/api?probe=true",
+        locationOrigin: "https://www.toonstudio.cloud",
+      }),
+    ).toBeNull();
+  });
+
+  it("keeps the Vite Socket.IO proxy behind an exact development opt-in", () => {
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        locationOrigin: "http://127.0.0.1:5199",
+        development: true,
+        devProxyEnabled: true,
+      }),
+    ).toBe("/studio-live");
+    expect(
+      resolveStudioLiveSocketRuntimeEndpoint({
+        locationOrigin: "https://www.toonstudio.cloud",
+        devProxyEnabled: true,
+      }),
+    ).toBeNull();
   });
 
   it("returns the exact local transport even when optional purpose routing is configured", async () => {

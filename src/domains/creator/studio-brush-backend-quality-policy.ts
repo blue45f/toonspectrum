@@ -18,9 +18,14 @@ import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   type StudioBrushRuntimePresetId,
 } from "./studio-brush-runtime-contract";
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "./studio-hokusai-live-brush-protocol";
+import { resolveStudioHokusaiLivePreset } from "./studio-hokusai-live-brush-router";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
-export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 5 as const;
+export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 7 as const;
 
 export type StudioBrushBackendQualityFamily =
   | "continuous-ink"
@@ -68,6 +73,7 @@ export type StudioBrushBackendConnection =
   | "conditional-product"
   | "active-settled-tool"
   | "active-layer-generator"
+  | "implemented-live-provider-unwired"
   | "implemented-unwired"
   | "not-a-brush-backend";
 
@@ -90,7 +96,7 @@ export interface StudioBrushBackendIntegrationAudit {
   readonly evidence: string;
 }
 
-export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 3 as const;
+export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 5 as const;
 
 /**
  * Admission policy for the installed Hokusai/libmypaint natural-media provider.
@@ -98,9 +104,10 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 3 as const;
  * The upstream 0.3.0 WASM facade returns a full surface composited over opaque white. That stock
  * facade is intentionally not admissible for Studio. The installed local wrapper pins the three
  * Hokusai crates exactly, reads the dirty rectangle as packed transparent RGBA8 inside a Dedicated
- * Worker and returns a verified crop-sized transparent PNG plus a deterministic receipt. It is an
- * explicit selected-stroke settled transform; it is not installed as the full live brush core or
- * as a default shelf route.
+ * Worker and returns packed dirty live frames plus a verified crop-sized canonical PNG and parity
+ * receipt. Pencil, charcoal, oil, calligraphy and marker identities may opt into this automatic
+ * live route only after prewarm and the complete admission receipt. The explicit selected-stroke
+ * settled transform remains available as a conversion fallback.
  */
 export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   policyVersion: STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION,
@@ -114,6 +121,7 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   adapterVersion: "0.3.0-packed-dirty-frame-adapter.2" as const,
   customBinding: "toonspectrum-packed-dirty-frame" as const,
   eligibleFamilies: Object.freeze([
+    "continuous-ink",
     "dry-media",
     "wet-media",
   ] as const),
@@ -122,15 +130,23 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
     internalFormat: "premultiplied-linear-rgba-fix15" as const,
     transferFormat: "packed-dirty-rgba8" as const,
     productBoundary:
-      "verified-transparent-packed-dirty-png-plus-receipt" as const,
+      "transferable-packed-dirty-live-plus-canonical-png-parity-receipt" as const,
     stockOpaqueWhiteFlatteningAllowed: false as const,
   }),
   rollout: Object.freeze({
-    defaultMode: "selected-stroke-settled-transform" as const,
+    defaultMode: "automatic-natural-media-live-provider-active-19-presets" as const,
     settledRequiresExplicitOptIn: true as const,
-    fullLiveCoreInstalled: false as const,
+    fullLiveCoreInstalled: true as const,
     runtimeMustBeReady: true as const,
-    defaultBrushRoutesChanged: false as const,
+    defaultBrushRoutesChanged: true as const,
+    verifiedAutomaticRouteCount: 19 as const,
+    prewarmAtBrushSelection: true as const,
+    admissionPinnedAtStrokeStart: true as const,
+    midStrokeProviderSwitchAllowed: false as const,
+    inFlightTransferableFrameLimit: 1 as const,
+    stalePresentationPolicy: "coalesce-latest" as const,
+    inputDropAllowed: false as const,
+    explicitSelectedStrokeConversionFallback: true as const,
     licenseGatePassed: true as const,
     reproducibleReleaseGatePassed: true as const,
     realBrowserRuntimeGatePassed: true as const,
@@ -146,14 +162,40 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   }),
 });
 
-export interface StudioHokusaiMybProviderOptIn {
+interface StudioHokusaiMybProviderOptInBase {
   readonly backendId: "hokusai-myb-worker";
-  readonly mode: "settled";
   readonly engineVersion: "0.3.0";
   readonly adapterVersion: "0.3.0-packed-dirty-frame-adapter.2";
   readonly customBinding: "toonspectrum-packed-dirty-frame";
   readonly surfaceContract: "packed-dirty-rgba8";
 }
+
+export interface StudioHokusaiMybSettledProviderOptIn
+  extends StudioHokusaiMybProviderOptInBase {
+  readonly mode: "settled";
+}
+
+export interface StudioHokusaiMybLiveProviderOptIn
+  extends StudioHokusaiMybProviderOptInBase {
+  readonly mode: "live";
+  readonly liveAdapterVersion: typeof STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION;
+  readonly protocolVersion: typeof STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION;
+  readonly admission: Readonly<{
+    readonly prewarmedAtStrokeStart: true;
+    readonly packedDirtyTransfer: true;
+    readonly singleInFlightFrame: true;
+    readonly stalePresentationCoalesced: true;
+    readonly inputSamplesPreserved: true;
+    readonly epochCancellation: true;
+    readonly canonicalPng: true;
+    readonly exactLiveCommitParity: true;
+    readonly midStrokePromotion: false;
+  }>;
+}
+
+export type StudioHokusaiMybProviderOptIn =
+  | StudioHokusaiMybSettledProviderOptIn
+  | StudioHokusaiMybLiveProviderOptIn;
 
 /**
  * Code-audited connection state. "implemented-unwired" is deliberately different from missing:
@@ -382,15 +424,16 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     id: "hokusai-myb-worker",
     implementation:
       "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
-    connection: "active-settled-tool",
-    phases: ["settled"],
+    connection: "active-product",
+    phases: ["live", "commit", "settled"],
     asynchronous: true,
     defaultAvailability: "loading",
-    brushPixelAuthority: false,
+    brushPixelAuthority: true,
     evidence:
-      "The Inspector can transform one selected DrawEl into a crop-sized transparent PNG whose "
-      + "packed dirty RGBA pixels, output dimensions, dirty bounds, input and PNG are receipted; "
-      + "the original vector remains recoverable and no live brush route changes.",
+      "StudioPage and StudioCanvasViewport automatically route the 19 verified pencil, charcoal "
+      + "and oil identities through the prewarmed packed-dirty provider. StudioKonvaImageNode "
+      + "holds canonical PNG commit ownership until its hash-keyed drawScene receipt; the prior "
+      + "runtime-stroke-boundary path remains the atomic failure fallback.",
   },
   {
     id: "vnext-provider-router",
@@ -488,6 +531,7 @@ Readonly<Record<StudioBrushBackendQualityFamily, StudioBrushBackendFamilyPolicy>
         "canvas2d-stamp-pattern",
         "canonical-webgpu-analytic",
         "canonical-webgpu-textured",
+        "hokusai-myb-worker",
       ],
       ["paper-vector-refinement", "canvaskit-path-specialist"],
       COMMON_FORBIDDEN,
@@ -501,6 +545,7 @@ Readonly<Record<StudioBrushBackendQualityFamily, StudioBrushBackendFamilyPolicy>
         "canonical-webgpu-textured",
         "professional-bristle-webgpu",
         "fiber-bristle-worker",
+        "hokusai-myb-worker",
       ],
       ["hokusai-myb-worker"],
       ["generic-round-circle-carrier", "cross-family-round-dab", ...COMMON_FORBIDDEN],
@@ -516,6 +561,7 @@ Readonly<Record<StudioBrushBackendQualityFamily, StudioBrushBackendFamilyPolicy>
         "canonical-webgpu-wet-specialist",
         "professional-bristle-webgpu",
         "fiber-bristle-worker",
+        "hokusai-myb-worker",
       ],
       ["hokusai-myb-worker"],
       ["generic-round-circle-carrier", "cross-family-round-dab", ...COMMON_FORBIDDEN],
@@ -1057,7 +1103,7 @@ export type StudioBrushBackendQualityRouteResult =
       semanticContract: string;
       parity: StudioBrushBackendFamilyPolicy["parity"];
       settledEnhancer?: "hokusai-myb-worker";
-      providerOptInMode?: "settled";
+      providerOptInMode?: "live" | "settled";
     }>
   | Readonly<{
       status: "pending";
@@ -1136,11 +1182,22 @@ function validHokusaiProviderOptIn(
     || value.customBinding !== STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.customBinding
     || value.surfaceContract
       !== STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.surface.transferFormat
-    || value.mode !== "settled"
   ) {
     return false;
   }
-  return true;
+  if (value.mode === "settled") return true;
+  return value.mode === "live"
+    && value.liveAdapterVersion === STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION
+    && value.protocolVersion === STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION
+    && value.admission.prewarmedAtStrokeStart === true
+    && value.admission.packedDirtyTransfer === true
+    && value.admission.singleInFlightFrame === true
+    && value.admission.stalePresentationCoalesced === true
+    && value.admission.inputSamplesPreserved === true
+    && value.admission.epochCancellation === true
+    && value.admission.canonicalPng === true
+    && value.admission.exactLiveCommitParity === true
+    && value.admission.midStrokePromotion === false;
 }
 
 export function resolveStudioBrushBackendQualityRoute(
@@ -1172,6 +1229,13 @@ export function resolveStudioBrushBackendQualityRoute(
     if (
       !STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.eligibleFamilies.some(
         (family) => family === identity.family,
+      )
+      || (
+        identity.family === "continuous-ink"
+        && !resolveStudioHokusaiLivePreset(
+          identity.runtimeBrushId,
+          identity.catalogId,
+        )
       )
     ) {
       return {
@@ -1206,6 +1270,31 @@ export function resolveStudioBrushBackendQualityRoute(
         preserveExistingSurface: true,
         emitApproximation: false,
       };
+    }
+    if (naturalMediaOptIn.mode === "live") {
+      if (!resolveStudioHokusaiLivePreset(
+        identity.runtimeBrushId,
+        identity.catalogId,
+      )) {
+        return {
+          status: "rejected",
+          reason: "provider-family-ineligible",
+          identity,
+          policy,
+          preserveExistingSurface: true,
+          emitApproximation: false,
+        };
+      }
+      return Object.freeze({
+        status: "ready",
+        identity,
+        policy,
+        liveBackend: "hokusai-myb-worker",
+        commitBackend: "hokusai-myb-worker",
+        semanticContract: "hokusai-live-canonical-v1",
+        parity: policy.parity,
+        providerOptInMode: "live" as const,
+      });
     }
     settledEnhancer = naturalMediaOptIn.backendId;
   }

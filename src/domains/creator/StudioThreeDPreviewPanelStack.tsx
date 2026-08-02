@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { Suspense, memo } from "react";
+import { Suspense, memo, useMemo } from "react";
 
 import { isStudioAiConfigured } from "./studio-ai-client";
 import {
@@ -14,6 +14,7 @@ import {
   StudioVrmPoser,
 } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
+import { createStudioShared3dSceneSessionFromElements } from "./studio-shared-3d-scene-bridge";
 
 import type {
   StudioLazyPanelStackHandlers,
@@ -43,6 +44,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "activePage"
   | "bg3dInitialDataUrl"
   | "bg3dInitialScene"
+  | "bg3dOperation"
   | "bg3dBatchRecoveryScope"
   | "validateRecoveryAccess"
   | "bg3dOpen"
@@ -210,6 +212,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   activePage,
   bg3dInitialDataUrl,
   bg3dInitialScene,
+  bg3dOperation,
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
@@ -271,6 +274,12 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   const poserInitialScene = poserInitialElement?.type === "image"
     ? poserInitialElement.vrmScene
     : undefined;
+  const shared3dSceneSession = useMemo(
+    () => createStudioShared3dSceneSessionFromElements(
+      masterEditMode ? [] : (activePage?.elements ?? []),
+    ),
+    [activePage?.elements, masterEditMode],
+  );
 
   return (
     <>
@@ -320,6 +329,8 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             open
             initialDataUrl={bg3dInitialDataUrl}
             initialScene={bg3dInitialScene}
+            sharedSceneSession={shared3dSceneSession}
+            operation={bg3dOperation}
             recoveryScope={bg3dBatchRecoveryScope}
             validateRecoveryAccess={validateRecoveryAccess}
             onClose={() => {

@@ -12,16 +12,8 @@ import {
 import { AdminNotice, AdminSpinner, Stat, StatGroup, StatusBadge } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-
-const FILTERS: { value: RevenueStatus | "all"; label: string }[] = [
-  { value: "all", label: "전체" },
-  { value: "pending", label: "대기" },
-  { value: "approved", label: "승인" },
-  { value: "paid", label: "정산완료" },
-  { value: "rejected", label: "반려" },
-  { value: "revoked", label: "취소" },
-];
 
 const shortId = (id: string) => (id.length > 10 ? `${id.slice(0, 8)}…` : id);
 
@@ -30,6 +22,16 @@ export function AdminRevenue({ uid }: { uid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<RevenueStatus | "all">("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const t = useT();
+
+  const filters: { value: RevenueStatus | "all"; label: string }[] = [
+    { value: "all", label: t("admin.revenue.filterAll") },
+    { value: "pending", label: t("admin.revenue.filterPending") },
+    { value: "approved", label: t("admin.revenue.filterApproved") },
+    { value: "paid", label: t("admin.revenue.filterPaid") },
+    { value: "rejected", label: t("admin.revenue.filterRejected") },
+    { value: "revoked", label: t("admin.revenue.filterRevoked") },
+  ];
 
   const load = useCallback(() => {
     setError(null);
@@ -66,23 +68,23 @@ export function AdminRevenue({ uid }: { uid: string }) {
     }
   };
 
-  if (error && !data) return <AdminNotice title="정산 내역을 불러오지 못했어요" body={error} />;
+  if (error && !data) return <AdminNotice title={t("admin.revenue.loadError")} body={error} />;
   if (!data) return <AdminSpinner />;
 
   const s = data.summary;
 
   return (
     <div className="flex flex-col gap-6">
-      <StatGroup label="정산 요약 (최근 30일)">
-        <Stat label="대기" value={`${formatWon(s.pendingAmount)} · ${formatNum(s.pendingEvents)}건`} />
-        <Stat label="승인" value={`${formatWon(s.approvedAmount)} · ${formatNum(s.approvedEvents)}건`} />
-        <Stat label="정산완료" value={`${formatWon(s.paidAmount)} · ${formatNum(s.paidEvents)}건`} />
-        <Stat label="반려" value={formatNum(s.rejectedEvents)} />
-        <Stat label="전체 건수" value={formatNum(s.totalEvents)} />
+      <StatGroup label={t("admin.revenue.summaryTitle")}>
+        <Stat label={t("admin.revenue.filterPending")} value={`${formatWon(s.pendingAmount)} · ${formatNum(s.pendingEvents)}`} />
+        <Stat label={t("admin.revenue.filterApproved")} value={`${formatWon(s.approvedAmount)} · ${formatNum(s.approvedEvents)}`} />
+        <Stat label={t("admin.revenue.filterPaid")} value={`${formatWon(s.paidAmount)} · ${formatNum(s.paidEvents)}`} />
+        <Stat label={t("admin.revenue.filterRejected")} value={formatNum(s.rejectedEvents)} />
+        <Stat label={t("admin.dashboard.userTotal")} value={formatNum(s.totalEvents)} />
       </StatGroup>
 
       <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
+        {filters.map((f) => (
           <button
             key={f.value}
             onClick={() => setFilter(f.value)}
@@ -103,18 +105,18 @@ export function AdminRevenue({ uid }: { uid: string }) {
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
-              <th className="px-4 py-2.5 font-medium">이벤트</th>
-              <th className="px-4 py-2.5 font-medium">금액</th>
-              <th className="px-4 py-2.5 font-medium">상태</th>
-              <th className="px-4 py-2.5 font-medium">일시</th>
-              <th className="px-4 py-2.5 font-medium">처리</th>
+              <th className="px-4 py-2.5 font-medium">Event</th>
+              <th className="px-4 py-2.5 font-medium">Amount</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 font-medium">Date</th>
+              <th className="px-4 py-2.5 font-medium">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.events.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-fg-3">
-                  해당 상태의 정산 이벤트가 없어요.
+                  {t("admin.revenue.empty")}
                 </td>
               </tr>
             )}
@@ -130,26 +132,26 @@ export function AdminRevenue({ uid }: { uid: string }) {
                 <td className="px-4 py-3">
                   <StatusBadge status={event.status} />
                 </td>
-                <td className="px-4 py-3 text-xs text-fg-3">{new Date(event.createdAt).toLocaleDateString("ko-KR")}</td>
+                <td className="px-4 py-3 text-xs text-fg-3">{new Date(event.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1.5">
                     {event.status === "pending" && (
                       <>
                         <button className={adminButtonClass("accent")} disabled={busyId === event.id} onClick={() => void act(event, { kind: "status", status: "approved" })}>
-                          승인
+                          {t("admin.revenue.approve")}
                         </button>
                         <button className={adminButtonClass("danger")} disabled={busyId === event.id} onClick={() => void act(event, { kind: "status", status: "rejected" })}>
-                          반려
+                          {t("admin.revenue.reject")}
                         </button>
                       </>
                     )}
                     {event.status === "approved" && (
                       <>
                         <button className={adminButtonClass("accent")} disabled={busyId === event.id} onClick={() => void act(event, { kind: "settle" })}>
-                          정산완료
+                          {t("admin.revenue.settle")}
                         </button>
                         <button className={adminButtonClass("danger")} disabled={busyId === event.id} onClick={() => void act(event, { kind: "status", status: "revoked" })}>
-                          취소
+                          {t("admin.revenue.revoke")}
                         </button>
                       </>
                     )}

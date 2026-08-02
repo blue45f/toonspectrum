@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
 
+import { useT } from "@/lib/i18n";
+
 export interface AnnouncementItem {
   id: string;
   title: string;
@@ -24,6 +26,7 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
   const [items, setItems] = useState<AnnouncementItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   // New item modal
   const [showModal, setShowModal] = useState(false);
@@ -41,11 +44,11 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
       const res = await adminFetch<{ items: AnnouncementItem[] }>("/announcements", userId);
       setItems(res.items ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "공지 목록을 불러오지 못했습니다.");
+      setError(err instanceof Error ? err.message : t("admin.announcements.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     void loadData();
@@ -65,7 +68,7 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
       setContent("");
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "등록에 실패했습니다.");
+      alert(err instanceof Error ? err.message : "Error");
     } finally {
       setSaving(false);
     }
@@ -76,17 +79,17 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
       await adminFetch(`/announcements/${id}/toggle`, userId, { method: "POST" });
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "상태 변경 실패");
+      alert(err instanceof Error ? err.message : "Error");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("이 공지사항을 삭제하시겠습니까?")) return;
+    if (!confirm(t("admin.announcements.confirmDelete"))) return;
     try {
       await adminFetch(`/announcements/${id}`, userId, { method: "DELETE" });
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "삭제 실패");
+      alert(err instanceof Error ? err.message : "Error");
     }
   };
 
@@ -96,10 +99,10 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Megaphone className="w-5 h-5 text-indigo-400" />
-            전역 공지사항 & 배너 관리
+            {t("admin.announcements.title")}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            상단 긴급 안내 배너, 팝업 모달 및 커뮤니티 전역 공지를 실시간으로 배치하고 관리합니다.
+            {t("admin.announcements.desc")}
           </p>
         </div>
         <button
@@ -107,7 +110,7 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-indigo-600/20"
         >
           <Plus className="w-4 h-4" />
-          새 공지/배너 작성
+          {t("admin.announcements.create")}
         </button>
       </div>
 
@@ -118,10 +121,10 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">공지 목록 로딩 중...</div>
+        <div className="p-12 text-center text-slate-400">{t("admin.announcements.loading")}</div>
       ) : items.length === 0 ? (
         <div className="p-12 text-center bg-slate-900/30 border border-slate-800 rounded-2xl text-slate-400">
-          등록된 공지사항이나 배너가 없습니다.
+          {t("admin.announcements.empty")}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -138,48 +141,37 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
+                      className={`px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider ${
                         item.level === "critical"
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                          ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                           : item.level === "warning"
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
                       }`}
                     >
                       {item.level}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300">
-                      {item.placement === "top_banner"
-                        ? "상단 배너"
-                        : item.placement === "popup_modal"
-                        ? "팝업 모달"
-                        : "커뮤니티 상단"}
+                    <span className="px-2 py-0.5 text-[10px] font-mono rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                      {item.placement}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-800/40">
-                      대상: {item.targetRole === "all" ? "전체 회원" : item.targetRole}
+                    <span className="text-xs text-slate-500">
+                      Target: {item.targetRole}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-white pt-1">{item.title}</h3>
-                  {item.content && <p className="text-sm text-slate-300 whitespace-pre-wrap">{item.content}</p>}
-                  <p className="text-xs text-slate-500 pt-1">생성일: {formatDate(item.createdAt)}</p>
+                  <h3 className="text-base font-bold text-white pt-1">{item.title}</h3>
+                  {item.content && <p className="text-sm text-slate-300 leading-relaxed">{item.content}</p>}
+                  <p className="text-[11px] text-slate-500 font-mono pt-2">Created: {formatDate(item.createdAt)}</p>
                 </div>
-
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => void handleToggle(item.id)}
-                    title={item.isActive ? "비활성화" : "활성화"}
-                    className="text-slate-400 hover:text-white transition-colors"
+                    className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
                   >
-                    {item.isActive ? (
-                      <ToggleRight className="w-8 h-8 text-emerald-400" />
-                    ) : (
-                      <ToggleLeft className="w-8 h-8 text-slate-600" />
-                    )}
+                    {item.isActive ? <ToggleRight className="w-6 h-6 text-emerald-400" /> : <ToggleLeft className="w-6 h-6 text-slate-600" />}
                   </button>
                   <button
                     onClick={() => void handleDelete(item.id)}
-                    className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                    title="삭제"
+                    className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -191,88 +183,85 @@ export function AdminAnnouncements({ userId }: AdminAnnouncementsProps) {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <form
-            onSubmit={(e) => void handleCreate(e)}
-            className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-lg space-y-4 shadow-2xl"
+            onSubmit={handleCreate}
+            className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl"
           >
-            <h3 className="text-lg font-bold text-white">새 공지 / 배너 생성</h3>
-            <div>
-              <label htmlFor="announcement-title" className="text-xs font-medium text-slate-400 block mb-1">제목</label>
+            <h3 className="text-lg font-bold text-white">{t("admin.announcements.modalTitle")}</h3>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-medium">{t("admin.announcements.inputTitle")}</label>
               <input
-                id="announcement-title"
-                type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="공지사항 제목을 입력하세요"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <div>
-              <label htmlFor="announcement-content" className="text-xs font-medium text-slate-400 block mb-1">내용 (선택)</label>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-400 font-medium">{t("admin.announcements.inputContent")}</label>
               <textarea
-                id="announcement-content"
                 rows={3}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="상세 내용을 입력하세요..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label htmlFor="announcement-level" className="text-xs font-medium text-slate-400 block mb-1">중요도 레벨</label>
+                <label className="text-xs text-slate-400 font-medium block mb-1">{t("admin.announcements.inputLevel")}</label>
                 <select
-                  id="announcement-level"
                   value={level}
-                  onChange={(e) => setLevel(e.target.value as never)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  onChange={(e) => setLevel(e.target.value as "info" | "warning" | "critical")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"
                 >
-                  <option value="info">일반 (Info)</option>
-                  <option value="warning">주의 (Warning)</option>
-                  <option value="critical">긴급 (Critical)</option>
+                  <option value="info">{t("admin.announcements.levelInfo")}</option>
+                  <option value="warning">{t("admin.announcements.levelWarning")}</option>
+                  <option value="critical">{t("admin.announcements.levelCritical")}</option>
                 </select>
               </div>
+
               <div>
-                <label htmlFor="announcement-placement" className="text-xs font-medium text-slate-400 block mb-1">노출 위치</label>
+                <label className="text-xs text-slate-400 font-medium block mb-1">{t("admin.announcements.inputPlacement")}</label>
                 <select
-                  id="announcement-placement"
                   value={placement}
-                  onChange={(e) => setPlacement(e.target.value as never)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  onChange={(e) => setPlacement(e.target.value as "top_banner" | "popup_modal" | "community_top")}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"
                 >
-                  <option value="top_banner">상단 긴급 배너</option>
-                  <option value="popup_modal">팝업 모달</option>
-                  <option value="community_top">커뮤니티 상단 고정</option>
+                  <option value="top_banner">{t("admin.announcements.placementBanner")}</option>
+                  <option value="popup_modal">{t("admin.announcements.placementModal")}</option>
+                  <option value="community_top">{t("admin.announcements.placementCommunity")}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-400 font-medium block mb-1">{t("admin.announcements.inputTarget")}</label>
+                <select
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"
+                >
+                  <option value="all">{t("admin.announcements.targetAll")}</option>
+                  <option value="creator">{t("admin.announcements.targetCreator")}</option>
+                  <option value="user">{t("admin.announcements.targetUser")}</option>
                 </select>
               </div>
             </div>
-            <div>
-              <label htmlFor="announcement-target-role" className="text-xs font-medium text-slate-400 block mb-1">대상 타겟</label>
-              <select
-                id="announcement-target-role"
-                value={targetRole}
-                onChange={(e) => setTargetRole(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="all">전체 회원</option>
-                <option value="creator">크리에이터 전용</option>
-                <option value="user">일반 독자 전용</option>
-              </select>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
+
+            <div className="flex justify-end gap-2 pt-4">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-700"
               >
-                취소
+                {t("admin.plans.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/20"
               >
                 {saving ? "저장 중..." : "등록하기"}
               </button>

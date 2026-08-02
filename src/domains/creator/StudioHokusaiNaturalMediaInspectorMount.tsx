@@ -24,6 +24,7 @@ interface StudioHokusaiNaturalMediaInspectorMountProps {
     surfaceReview: boolean;
     selectedContent: boolean;
   }>;
+  readonly onRequestSelectStroke?: () => void;
   readonly onReplace: StudioHokusaiNaturalMediaReplaceHandler;
 }
 
@@ -52,6 +53,7 @@ export function StudioHokusaiNaturalMediaInspectorMount({
   pageId,
   masterEditMode,
   locks,
+  onRequestSelectStroke,
   onReplace,
 }: StudioHokusaiNaturalMediaInspectorMountProps): ReactElement | null {
   if (!visible) return null;
@@ -74,6 +76,7 @@ export function StudioHokusaiNaturalMediaInspectorMount({
         masterEditMode={masterEditMode}
         disabled={reason !== null}
         disabledReason={reason}
+        onRequestSelectStroke={onRequestSelectStroke}
         onReplace={onReplace}
       />
     </Suspense>

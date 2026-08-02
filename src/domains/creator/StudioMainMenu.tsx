@@ -1,6 +1,6 @@
 /**
  * StudioMainMenu — CSP/Photopea-style top application menu.
- * File · Edit · Insert · View · Draw · AI as compact dropdowns.
+ * File · Edit · Insert · View · Filter · Draw · AI · Help as compact dropdowns.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX).
@@ -59,6 +59,9 @@ type StudioMainMenuHintMeta = Omit<StudioToolHintSpec, "title" | "description" |
   titleKey: string;
   descriptionKey: string;
   tipKey?: string;
+  titleFallback?: string;
+  descriptionFallback?: string;
+  tipFallback?: string;
 };
 
 const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
@@ -111,6 +114,15 @@ const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
     tipKey: "studio.mainMenu.hint.ai.tip",
     preview: "ai-assist",
   },
+  help: {
+    id: "main-menu-help",
+    titleKey: "studio.mainMenu.hint.help.title",
+    descriptionKey: "studio.mainMenu.hint.help.description",
+    tipKey: "studio.mainMenu.hint.help.tip",
+    descriptionFallback: "기능 사용법과 단계별 튜토리얼을 찾거나 익숙한 기본 조작과 단축키를 확인합니다.",
+    tipFallback: "‘채우기’, ‘색 섞기’, ‘확대’처럼 하고 싶은 결과로 검색해 보세요.",
+    preview: "settings",
+  },
 };
 
 const MAIN_MENU_ITEM_HINTS: Readonly<Record<StudioMainMenuHintKey, StudioToolHintSpec>> = {
@@ -137,20 +149,28 @@ function resolveMainMenuHint(
       ),
     };
   }
+  const isKoreanHelp = group.id === "help" && group.label === "도움말";
+  const descriptionFallback = group.id === "help" && !isKoreanHelp
+    ? "Find step-by-step feature guides, familiar editor controls, and keyboard shortcuts."
+    : hint.descriptionFallback ?? "";
+  const tipFallback = group.id === "help" && !isKoreanHelp
+    ? "Search for the result you want, such as fill, blend color, or zoom."
+    : hint.tipFallback ?? "";
   const localizedHint = {
     ...hint,
     title: localizeText(
       t,
-      localizeText(t, group.label, `studio.mainMenu.group.${group.id}.label`),
+      hint.titleFallback
+        ?? localizeText(t, group.label, `studio.mainMenu.group.${group.id}.label`),
       hint.titleKey,
     ),
     description: localizeText(
       t,
-      "",
+      descriptionFallback,
       hint.descriptionKey,
     ),
     ...(hint.tipKey
-      ? { tip: localizeText(t, "", hint.tipKey) }
+      ? { tip: localizeText(t, tipFallback, hint.tipKey) }
       : {}),
   };
   // `hint` is a valid discriminated StudioToolHintSpec with only its localized
@@ -531,7 +551,7 @@ function MenuDropdown({
             // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
             // The chevron is decorative (aria-haspopup owns the affordance), so compact it
             // before allowing labels to collide inside the compressible menubar lane.
-            "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem]",
+            "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem] pointer-coarse:h-11 pointer-coarse:px-2",
             STUDIO_EASE,
             STUDIO_FOCUS_RING,
             open

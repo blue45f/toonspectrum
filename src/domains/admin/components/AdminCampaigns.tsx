@@ -16,11 +16,13 @@ import {
 import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
+import { useT } from "@/lib/i18n";
+
 const campaignFormSchema = z.object({
-  creatorId: z.string().trim().min(1, "크리에이터 ID와 제목은 필수예요."),
+  creatorId: z.string().trim().min(1, "Creator ID & title are required."),
   titleId: z.string(),
   planId: z.string(),
-  title: z.string().trim().min(1, "크리에이터 ID와 제목은 필수예요."),
+  title: z.string().trim().min(1, "Creator ID & title are required."),
   description: z.string(),
   targetWon: z.string(),
   raisedWon: z.string(),
@@ -66,6 +68,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const t = useT();
 
   const {
     register,
@@ -114,15 +117,16 @@ export function AdminCampaigns({ uid }: { uid: string }) {
         body: JSON.stringify({
           id: editing?.id,
           creatorId: values.creatorId.trim(),
-          titleId: values.titleId.trim() || null,
-          planId: values.planId.trim() || null,
+          titleId: values.titleId.trim() || undefined,
+          planId: values.planId.trim() || undefined,
           title: values.title.trim(),
-          description: values.description.trim(),
+          description: values.description.trim() || undefined,
           targetAmountCents: wonToCents(Number(values.targetWon)),
           raisedAmountCents: wonToCents(Number(values.raisedWon)),
+          currency: "KRW",
           isActive: values.isActive,
-          startsAt: values.startsAt || null,
-          endsAt: values.endsAt || null,
+          startsAt: values.startsAt ? new Date(values.startsAt).toISOString() : undefined,
+          endsAt: values.endsAt ? new Date(values.endsAt).toISOString() : undefined,
         }),
       });
       setEditing(null);
@@ -133,7 +137,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
   });
 
   const remove = async (c: Campaign) => {
-    if (!globalThis.confirm(`캠페인 “${c.title}”을(를) 삭제할까요?`)) return;
+    if (!globalThis.confirm(`"${c.title}"`)) return;
     try {
       await adminFetch(`/campaigns/${encodeURIComponent(c.id)}`, uid, { method: "DELETE" });
       load();
@@ -142,7 +146,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
     }
   };
 
-  if (error) return <AdminNotice title="캠페인을 불러오지 못했어요" body={error} />;
+  if (error) return <AdminNotice title={t("admin.campaigns.loadError")} body={error} />;
   if (!items) return <AdminSpinner />;
 
   const validationError = errors.creatorId?.message ?? errors.title?.message ?? null;
@@ -151,11 +155,11 @@ export function AdminCampaigns({ uid }: { uid: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-fg-3">
-          크리에이터 캠페인 <span className="numeral text-fg">{formatNum(items.length)}</span>개
+          {t("admin.campaigns.count").replace("{count}", formatNum(items.length))}
         </p>
         {!editing && (
           <button className={adminButtonClass("accent")} onClick={openNew}>
-            <Plus size={15} /> 새 캠페인
+            <Plus size={15} /> {t("admin.campaigns.new")}
           </button>
         )}
       </div>
@@ -166,51 +170,51 @@ export function AdminCampaigns({ uid }: { uid: string }) {
           onSubmit={submit}
         >
           <div className="flex items-center justify-between sm:col-span-2">
-            <h3 className="text-sm font-semibold text-fg">{editing.id ? "캠페인 수정" : "새 캠페인"}</h3>
-            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={close}>
+            <h3 className="text-sm font-semibold text-fg">{editing.id ? t("admin.campaigns.edit") : t("admin.campaigns.new")}</h3>
+            <button type="button" aria-label="Close" className="text-fg-3 hover:text-fg" onClick={close}>
               <X size={16} />
             </button>
           </div>
-          <Field label="제목 *" full>
+          <Field label={t("admin.campaigns.titleLabel")} full>
             <input className={adminInputClass} {...register("title")} />
           </Field>
-          <Field label="크리에이터 ID *">
+          <Field label={t("admin.campaigns.creatorId")}>
             <input className={adminInputClass} {...register("creatorId")} />
           </Field>
-          <Field label="플랜 ID (선택)">
+          <Field label={t("admin.campaigns.planId")}>
             <input className={adminInputClass} {...register("planId")} />
           </Field>
-          <Field label="작품 ID (선택)">
+          <Field label={t("admin.campaigns.workId")}>
             <input className={adminInputClass} {...register("titleId")} placeholder="nw-..." />
           </Field>
-          <Field label="설명" full>
+          <Field label={t("admin.plans.description")} full>
             <input className={adminInputClass} {...register("description")} />
           </Field>
-          <Field label="목표 금액(원)">
+          <Field label={t("admin.campaigns.targetWon")}>
             <input type="number" min={0} className={adminInputClass} {...register("targetWon")} />
           </Field>
-          <Field label="모금 금액(원)">
+          <Field label={t("admin.campaigns.raisedWon")}>
             <input type="number" min={0} className={adminInputClass} {...register("raisedWon")} />
           </Field>
-          <Field label="시작일">
+          <Field label={t("admin.campaigns.startsAt")}>
             <input type="date" className={adminInputClass} {...register("startsAt")} />
           </Field>
-          <Field label="종료일">
+          <Field label={t("admin.campaigns.endsAt")}>
             <input type="date" className={adminInputClass} {...register("endsAt")} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-fg-2">
             <input type="checkbox" {...register("isActive")} />
-            활성화
+            {t("admin.plans.active")}
           </label>
           <div className="flex items-center justify-end gap-2 sm:col-span-2">
             {(validationError || formError) && (
               <span className="mr-auto text-xs text-bad">{validationError ?? formError}</span>
             )}
             <button type="button" className={adminButtonClass("ghost")} onClick={close}>
-              취소
+              {t("admin.plans.cancel")}
             </button>
             <button type="submit" className={adminButtonClass("accent")} disabled={isSubmitting}>
-              {isSubmitting ? "저장 중…" : "저장"}
+              {isSubmitting ? t("admin.plans.saving") : t("admin.plans.save")}
             </button>
           </div>
         </form>
@@ -219,7 +223,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
       <div className="flex flex-col gap-3">
         {items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-line bg-card/40 px-5 py-10 text-center text-sm text-fg-3">
-            등록된 캠페인이 없어요. “새 캠페인”으로 추가하세요.
+            {t("admin.campaigns.empty")}
           </div>
         )}
         {items.map((c) => {
@@ -230,7 +234,9 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className="truncate font-semibold text-fg">{c.title}</h3>
-                    <span className={c.isActive ? "text-xs text-good" : "text-xs text-fg-3"}>{c.isActive ? "활성" : "비활성"}</span>
+                    <span className={c.isActive ? "text-xs text-good" : "text-xs text-fg-3"}>
+                      {c.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
+                    </span>
                   </div>
                   <p className="mt-0.5 text-xs text-fg-3">
                     {c.creatorName ?? c.creatorId}
@@ -240,9 +246,9 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button className={adminButtonClass("ghost")} onClick={() => openEdit(c)}>
-                    <Pencil size={13} /> 수정
+                    <Pencil size={13} /> {t("admin.plans.tableHeaderAction")}
                   </button>
-                  <button className={adminButtonClass("danger")} onClick={() => void remove(c)} aria-label="삭제">
+                  <button className={adminButtonClass("danger")} onClick={() => void remove(c)} aria-label="Delete">
                     <Trash2 size={13} />
                   </button>
                 </div>

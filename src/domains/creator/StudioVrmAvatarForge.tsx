@@ -3,8 +3,10 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 
 import {
+  buildAvatarForgeBodyAdjustmentPlan,
   buildAvatarForgeHairParts,
   sanitizeAvatarForgeState,
+  type AvatarForgeBodyParams,
   type AvatarForgeFaceAccent,
   type AvatarForgeHairPart,
   type AvatarForgeState,
@@ -457,6 +459,55 @@ function applyHeadScale(
   };
 }
 
+/**
+ * Applies v3 body proportions to raw humanoid nodes and returns an exact restore.
+ *
+ * `@pixiv/three-vrm` treats normalized bones as the pose-control rig and copies their rotation
+ * (plus the hips position) to the raw/skinned rig during `VRMHumanoid.update()`. Body dimensions
+ * therefore have one owner here: the raw rig that actually deforms the mesh. Writing the same
+ * offsets to both rigs would make the result depend on the next humanoid update. Geometry, skin
+ * attributes, normalized pose controls, and source VRM data are never rewritten.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function applyAvatarForgeBodyProportions(
+  vrm: VRM,
+  body: AvatarForgeBodyParams,
+) {
+  const originals = new Map<
+    THREE.Object3D,
+    { readonly position: THREE.Vector3; readonly scale: THREE.Vector3 }
+  >();
+
+  for (const adjustment of buildAvatarForgeBodyAdjustmentPlan(body)) {
+    const node = vrm.humanoid?.getRawBoneNode(adjustment.bone) ?? null;
+    if (!node || originals.has(node)) continue;
+    const original = {
+      position: node.position.clone(),
+      scale: node.scale.clone(),
+    };
+    originals.set(node, original);
+    node.position.set(
+      original.position.x * adjustment.positionMultiplier[0],
+      original.position.y * adjustment.positionMultiplier[1],
+      original.position.z * adjustment.positionMultiplier[2],
+    );
+    node.scale.set(
+      original.scale.x * adjustment.scaleMultiplier[0],
+      original.scale.y * adjustment.scaleMultiplier[1],
+      original.scale.z * adjustment.scaleMultiplier[2],
+    );
+  }
+  vrm.scene.updateMatrixWorld(true);
+
+  return () => {
+    for (const [node, original] of originals) {
+      node.position.copy(original.position);
+      node.scale.copy(original.scale);
+    }
+    vrm.scene.updateMatrixWorld(true);
+  };
+}
+
 export type StudioVrmAvatarForgeProps = {
   vrm: VRM;
   state: AvatarForgeState;
@@ -492,6 +543,11 @@ export function StudioVrmAvatarForge({ vrm, state }: StudioVrmAvatarForgeProps) 
       [widthScale, heightScale, safeState.face.headDepth]
     );
   }, [normalizedHead, rawHead, safeState.face]);
+
+  useEffect(
+    () => applyAvatarForgeBodyProportions(vrm, safeState.body),
+    [safeState.body, vrm],
+  );
 
   useEffect(() => {
     if (!safeState.hair.replaceOriginal || safeState.hair.style === "none") return;

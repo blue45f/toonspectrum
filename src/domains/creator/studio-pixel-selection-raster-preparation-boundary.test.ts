@@ -101,6 +101,7 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(prepare).toContain("materializeStudioEditableRasterCopy(");
     expect(prepare).toContain("applyStudioEditableRasterCopy(");
     expect(prepare.match(/\bcommit\(/gu)).toHaveLength(1);
+    expect(prepare).toContain("flushSync(() => {");
     expect(prepare).toContain("setSelectedId(composite.id)");
     expect(prepare).toContain("applyPixelSelectionActivation(kind)");
   });
@@ -121,6 +122,8 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
   it("journals and replays a quick first pointer without losing its selection geometry", () => {
     const journal = nestedFunction("journalPendingPixelSelectionRasterGesture");
     const finish = nestedFunction("finishPendingPixelSelectionRasterGesture");
+    const nodeInteractionBegin = nestedFunction("nodeInteractionBegin");
+    const stageDown = nestedFunction("onStageDown");
     const prepare = nestedFunction("preparePixelMarqueeRasterTarget");
 
     expect(journal).toContain("pendingPixelSelectionRasterGestureRef.current");
@@ -138,6 +141,16 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(prepare).toContain('pending.tool === "poly-lasso"');
     expect(prepare).toContain('pending.tool === "wand"');
     expect(prepare).toContain("pixelDragRef.current =");
+    expect(prepare).toContain("pixelMarqueeRasterPreparationActivationRef.current = preparationTool");
+    expect(stageDown).toContain("pixelMarqueeRasterPreparationActivationRef.current");
+    expect(stageDown.indexOf("pixelMarqueeRasterPreparationActivationRef.current"))
+      .toBeLessThan(stageDown.indexOf("pixelToolGestureArmed"));
+    expect(stageDown).toContain("forceCircle: pendingSelectionPreparation.forceCircle");
+    expect(nodeInteractionBegin).toContain(
+      "pixelMarqueeRasterPreparationActivationRef.current",
+    );
+    expect(nodeInteractionBegin.indexOf("pixelMarqueeRasterPreparationActivationRef.current"))
+      .toBeLessThan(nodeInteractionBegin.indexOf("canvasInteractionUnitIds(elementId)"));
   });
 
   it("aborts a stale preparation and releases its pointer journal on tool ownership change", () => {

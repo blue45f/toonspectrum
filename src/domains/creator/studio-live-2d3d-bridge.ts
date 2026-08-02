@@ -11,9 +11,14 @@ import {
   type StudioArtistStrokeDelta,
   type StudioToonPassKind,
 } from "./studio-artist-correction-delta";
+import {
+  hashStudioHybridDccObjectTransform,
+  normalizeStudioHybridDccObjectTransform,
+  type StudioHybridDccObjectTransform,
+} from "./studio-hybrid-dcc-object-transform";
 import { sha256HexPortable } from "./studio-sha256";
 
-export const STUDIO_LIVE_2D3D_BRIDGE_REVISION = 1 as const;
+export const STUDIO_LIVE_2D3D_BRIDGE_REVISION = 2 as const;
 
 export const STUDIO_TOON_PASS_KINDS = [
   "line",
@@ -45,6 +50,8 @@ export interface StudioSharedSetObject {
   readonly geometryHash: string;
   readonly visible: boolean;
   readonly materialId: string;
+  /** Canonical base placement. Legacy bridge records without it are interpreted as identity. */
+  readonly transform?: StudioHybridDccObjectTransform;
 }
 
 export interface StudioSharedSet {
@@ -79,9 +86,63 @@ export function createStudioSharedSet(
 ): StudioSharedSet {
   const setHash = stableHash([
     id,
-    ...objects.map((o) => `${o.id}:${o.geometryHash}:${o.visible}:${o.materialId}`),
+    ...objects.map((object) => (
+      `${object.id}:${object.geometryHash}:${object.visible}:${object.materialId}:`
+        + (object.transform ? hashStudioHybridDccObjectTransform(object.transform) : "identity-v0")
+    )),
   ]);
   return { id, objects, setHash };
+}
+
+/** Updates base object placement, invalidating only dependent render passes. */
+export function mutateStudioSharedObjectTransform(
+  doc: StudioLiveBridgeDocument,
+  objectId: string,
+  value: StudioHybridDccObjectTransform,
+): StudioLiveBridgeDocument {
+  if (!doc.set.objects.some((object) => object.id === objectId)) {
+    throw new Error(`shared object ${objectId} not found`);
+  }
+  const transform = normalizeStudioHybridDccObjectTransform(value);
+  const objects = doc.set.objects.map((object) => (
+    object.id === objectId ? { ...object, transform } : object
+  ));
+  const set = createStudioSharedSet(doc.set.id, objects);
+  const shots = doc.shots.map((shot) => ({
+    ...shot,
+    dirtyPasses: [...STUDIO_TOON_PASS_KINDS],
+  }));
+  return {
+    ...doc,
+    set,
+    shots,
+    commandSequence: doc.commandSequence + 1,
+  };
+}
+
+/** Updates base scene visibility and invalidates every image pass that can contain the object. */
+export function mutateStudioSharedObjectVisibility(
+  doc: StudioLiveBridgeDocument,
+  objectId: string,
+  visible: boolean,
+): StudioLiveBridgeDocument {
+  if (typeof visible !== "boolean") throw new Error("shared object visibility must be boolean");
+  const current = doc.set.objects.find((object) => object.id === objectId);
+  if (!current) throw new Error(`shared object ${objectId} not found`);
+  if (current.visible === visible) return doc;
+  const set = createStudioSharedSet(
+    doc.set.id,
+    doc.set.objects.map((object) => object.id === objectId ? { ...object, visible } : object),
+  );
+  return {
+    ...doc,
+    set,
+    shots: doc.shots.map((shot) => ({
+      ...shot,
+      dirtyPasses: [...STUDIO_TOON_PASS_KINDS],
+    })),
+    commandSequence: doc.commandSequence + 1,
+  };
 }
 
 export function createStudioLiveBridgeDocument(

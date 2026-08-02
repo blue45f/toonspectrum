@@ -1118,6 +1118,7 @@ export class StudioOpfsRecoveryJournal {
   readonly #lockName: string;
   readonly #now: () => number;
   readonly #randomToken: () => string;
+  readonly #stagingAttempts = new Map<string, number>();
 
   constructor(options: StudioOpfsRecoveryJournalOptions) {
     this.#adapter = options.adapter;
@@ -1127,7 +1128,9 @@ export class StudioOpfsRecoveryJournal {
     assertStorageId(rootPath, "rootPath");
     this.#basePath = `${rootPath}/${this.#identity.documentId}`;
     const longestEntryPath =
-      `${this.#basePath}/cp-999999999999-e${Number.MAX_SAFE_INTEGER}-c99999.bin`;
+      `${this.#basePath}/cp-999999999999-e${Number.MAX_SAFE_INTEGER}-a${
+        Number.MAX_SAFE_INTEGER
+      }-c99999.bin`;
     if (longestEntryPath.length > OPFS_FILESYSTEM_MAX_PATH_CHARS) {
       journalError(
         "INVALID_ARGUMENT",
@@ -1159,21 +1162,48 @@ export class StudioOpfsRecoveryJournal {
     return `${this.#basePath}/writer-lease.bin`;
   }
 
-  #descriptorPath(kind: EntryKind, sequence: number, epoch: number): string {
+  #stagingAttemptKey(kind: EntryKind, sequence: number, epoch: number): string {
+    return `${kind}:${sequence}:${epoch}`;
+  }
+
+  #reserveStagingAttempt(kind: EntryKind, sequence: number, epoch: number): number {
+    const key = this.#stagingAttemptKey(kind, sequence, epoch);
+    const attempt = this.#stagingAttempts.get(key) ?? 0;
+    if (attempt >= Number.MAX_SAFE_INTEGER) {
+      journalError(
+        "JOURNAL_LIMIT_EXCEEDED",
+        "복구 entry staging attempt 공간을 모두 사용했습니다.",
+      );
+    }
+    this.#stagingAttempts.set(key, attempt + 1);
+    return attempt;
+  }
+
+  #descriptorPath(
+    kind: EntryKind,
+    sequence: number,
+    epoch: number,
+    attempt: number,
+  ): string {
     const prefix = kind === "operation" ? "op" : "cp";
-    return `${this.#basePath}/${prefix}-${sequence.toString(10).padStart(12, "0")}-e${epoch}.meta`;
+    const attemptSuffix = attempt === 0 ? "" : `-a${attempt}`;
+    return `${this.#basePath}/${prefix}-${sequence.toString(10).padStart(12, "0")}-e${epoch}${
+      attemptSuffix
+    }.meta`;
   }
 
   #chunkPath(
     kind: EntryKind,
     sequence: number,
     epoch: number,
+    attempt: number,
     index: number,
   ): string {
     const prefix = kind === "operation" ? "op" : "cp";
-    return `${this.#basePath}/${prefix}-${sequence.toString(10).padStart(12, "0")}-e${epoch}-c${
-      index.toString(10).padStart(5, "0")
-    }.bin`;
+    const attemptSuffix = attempt === 0 ? "" : `-a${attempt}`;
+    return `${this.#basePath}/${prefix}-${sequence.toString(10).padStart(12, "0")}-e${epoch}${
+      attemptSuffix
+    }-c${index.toString(10).padStart(5, "0")}.bin`;
   }
 
   async #read(path: string, signal?: AbortSignal): Promise<Uint8Array | null> {
@@ -1596,6 +1626,7 @@ export class StudioOpfsRecoveryJournal {
     writer: StudioOpfsRecoveryWriterLease,
     input: StudioOpfsRecoveryAppendInput,
     sequence: number,
+    stagingAttempt: number,
     compactThroughSequence: number | null,
     signal?: AbortSignal,
   ): Promise<StagedEntry> {
@@ -1624,7 +1655,13 @@ export class StudioOpfsRecoveryJournal {
       if (streamedBytes > byteLength || streamedBytes > this.#limits.maxEntryBytes) {
         journalError("INVALID_ARGUMENT", "payload stream이 선언한 byteLength를 초과했습니다.");
       }
-      const path = this.#chunkPath(kind, sequence, writer.epoch, chunkIndex);
+      const path = this.#chunkPath(
+        kind,
+        sequence,
+        writer.epoch,
+        stagingAttempt,
+        chunkIndex,
+      );
       await this.#writeImmutable(path, chunk, signal);
       chunks.push({
         path,
@@ -1657,7 +1694,12 @@ export class StudioOpfsRecoveryJournal {
       chunks,
       compactThroughSequence,
     };
-    const descriptorPath = this.#descriptorPath(kind, sequence, writer.epoch);
+    const descriptorPath = this.#descriptorPath(
+      kind,
+      sequence,
+      writer.epoch,
+      stagingAttempt,
+    );
     const descriptorBytes = encodeFrame("descriptor", descriptor);
     await this.#writeImmutable(descriptorPath, descriptorBytes, signal);
     storedBytes += descriptorBytes.byteLength;
@@ -1820,6 +1862,7 @@ export class StudioOpfsRecoveryJournal {
         writer,
         input,
         sequence,
+        this.#reserveStagingAttempt(kind, sequence, writer.epoch),
         compactThroughSequence,
         options.signal,
       );
@@ -1870,6 +1913,9 @@ export class StudioOpfsRecoveryJournal {
         sequence,
         staged.entry.createdAt,
         options.signal,
+      );
+      this.#stagingAttempts.delete(
+        this.#stagingAttemptKey(kind, sequence, writer.epoch),
       );
       return staged.entry;
     });

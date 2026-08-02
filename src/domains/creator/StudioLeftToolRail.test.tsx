@@ -18,6 +18,7 @@ interface MockRailButtonProps {
   readonly "aria-expanded"?: boolean;
   readonly "aria-keyshortcuts"?: string;
   readonly active?: boolean;
+  readonly className?: string;
   readonly description?: string;
   readonly disabled?: boolean;
   readonly hintPreview?: string;
@@ -36,6 +37,7 @@ vi.mock("./studio-chrome-ui", () => ({
     "aria-expanded": ariaExpanded,
     "aria-keyshortcuts": ariaKeyShortcuts,
     active,
+    className,
     description,
     disabled,
     hintPreview,
@@ -54,6 +56,7 @@ vi.mock("./studio-chrome-ui", () => ({
       aria-keyshortcuts={ariaKeyShortcuts}
       aria-label={label}
       aria-pressed={active}
+      className={className}
       data-hint-description={description}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
@@ -121,6 +124,8 @@ function createHandlers(): StudioLeftToolRailHandlers {
     clearPolyLassoDraft: vi.fn(),
     commitAppSettings: vi.fn(),
     disarmAllPixelTools: vi.fn(),
+    onRequestPixelSelection: vi.fn(),
+    onRequestSelectImage: vi.fn(),
     onPickImage: vi.fn(async () => undefined),
     toggleAdvancedFill: vi.fn(),
     toggleDodgeBurnTool: vi.fn(),
@@ -214,6 +219,25 @@ it("shows the configured comment shortcut in the placement tool and preserves th
   const unboundComment = screen.getByRole("button", { name: "댓글 핀 배치" });
   expect(unboundComment.getAttribute("aria-keyshortcuts")).toBeNull();
 
+});
+
+it("keeps all four retouch labels and aria shortcuts in sync with remapped settings", () => {
+  const appSettings = defaultStudioAppSettings();
+  appSettings.shortcuts["tool-blend"] = "Alt+S";
+  appSettings.shortcuts["tool-wet-mix"] = "Mod+Shift+W";
+  appSettings.shortcuts["tool-dodge-burn"] = "D";
+  appSettings.shortcuts["tool-liquify"] = "";
+  render(<StudioLeftToolRail {...createProps({ appSettings })} />);
+
+  const smudge = screen.getByRole("button", { name: "색 밀어 섞기 · 스머지 (⌥·S)" });
+  const wetMix = screen.getByRole("button", { name: "물감 섞어 칠하기 · 혼색 (⌘·⇧·W)" });
+  const dodgeBurn = screen.getByRole("button", { name: "밝기·채도 붓 · 닷지·번 (D)" });
+  const liquify = screen.getByRole("button", { name: "형태 밀어 변형 · 리퀴파이" });
+
+  expect(smudge.getAttribute("aria-keyshortcuts")).toBe("Alt+S");
+  expect(wetMix.getAttribute("aria-keyshortcuts")).toBe("Mod+Shift+W");
+  expect(dodgeBurn.getAttribute("aria-keyshortcuts")).toBe("D");
+  expect(liquify.getAttribute("aria-keyshortcuts")).toBeNull();
 });
 
 function stubAnimationFrame(): void {
@@ -311,7 +335,7 @@ describe("StudioLeftToolRail", () => {
     expect(props.stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
   });
 
-  it("enables page-raster retouch while keeping transform and frame animation image-only", () => {
+  it("keeps image-only entries actionable through explicit 44px recovery CTAs", () => {
     const props = createProps({
       pixelSel: USABLE_SELECTION,
       pixelToolTargetAvailable: false,
@@ -322,22 +346,33 @@ describe("StudioLeftToolRail", () => {
 
     for (const name of [
       "자르기 (C)",
-      "혼합 (스머지) (N)",
-      "혼색 브러시 (Shift+N)",
-      "닷지/번 (O)",
-      "리퀴파이 (J)",
+      "색 밀어 섞기 · 스머지 (N)",
+      "물감 섞어 칠하기 · 혼색 (⇧·N)",
+      "밝기·채도 붓 · 닷지·번 (O)",
+      "형태 밀어 변형 · 리퀴파이 (J)",
     ]) {
       const button = screen.getByRole<HTMLButtonElement>("button", { name });
       expect(button.disabled).toBe(false);
       expect(button.getAttribute("data-hint-description")).toContain(
-        "현재 페이지 합성본을 자동 준비",
+        "편집용 이미지 복사본을 자동",
       );
     }
 
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "변형 (⇧T)" }).disabled)
-      .toBe(true);
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "프레임 애니메이션" }).disabled)
-      .toBe(true);
+    const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "선택 시작하기",
+    });
+    const imageRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "이미지 선택하기",
+    });
+    expect(selectionRecovery.disabled).toBe(false);
+    expect(selectionRecovery.className).toContain("size-11");
+    expect(imageRecovery.disabled).toBe(false);
+    expect(imageRecovery.className).toContain("size-11");
+
+    fireEvent.click(selectionRecovery);
+    fireEvent.click(imageRecovery);
+    expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
+    expect(props.stableHandlers.onRequestSelectImage).toHaveBeenCalledOnce();
   });
 
   it("disables only inactive raster-retouch tools when neither image nor page target is available", () => {
@@ -349,15 +384,15 @@ describe("StudioLeftToolRail", () => {
 
     for (const name of [
       "자르기 (C)",
-      "혼합 (스머지) (N)",
-      "혼색 브러시 (Shift+N)",
-      "닷지/번 (O)",
-      "리퀴파이 (J)",
+      "색 밀어 섞기 · 스머지 (N)",
+      "물감 섞어 칠하기 · 혼색 (⇧·N)",
+      "밝기·채도 붓 · 닷지·번 (O)",
+      "형태 밀어 변형 · 리퀴파이 (J)",
     ]) {
       const button = screen.getByRole<HTMLButtonElement>("button", { name });
       expect(button.disabled).toBe(true);
       expect(button.getAttribute("data-unavailable-reason")).toContain(
-        "현재 페이지 합성본을 자동 준비",
+        "편집용 이미지 복사본을 자동",
       );
     }
   });
@@ -374,22 +409,22 @@ describe("StudioLeftToolRail", () => {
         handler: (props) => props.stableHandlers.openSelectedLayerCrop as ReturnType<typeof vi.fn>,
       },
       {
-        name: "혼합 (스머지) (N)",
+        name: "색 밀어 섞기 · 스머지 (N)",
         overrides: { smudgeActive: true },
         handler: (props) => props.stableHandlers.toggleSmudgeTool as ReturnType<typeof vi.fn>,
       },
       {
-        name: "혼색 브러시 (Shift+N)",
+        name: "물감 섞어 칠하기 · 혼색 (⇧·N)",
         overrides: { wetMixActive: true },
         handler: (props) => props.stableHandlers.toggleWetMixTool as ReturnType<typeof vi.fn>,
       },
       {
-        name: "닷지/번 (O)",
+        name: "밝기·채도 붓 · 닷지·번 (O)",
         overrides: { dodgeBurnActive: true },
         handler: (props) => props.stableHandlers.toggleDodgeBurnTool as ReturnType<typeof vi.fn>,
       },
       {
-        name: "리퀴파이 (J)",
+        name: "형태 밀어 변형 · 리퀴파이 (J)",
         overrides: { liquifyActive: true },
         handler: (props) => props.stableHandlers.toggleLiquifyTool as ReturnType<typeof vi.fn>,
       },
@@ -478,7 +513,7 @@ describe("StudioLeftToolRail", () => {
       "false"
     );
     expect(
-      screen.getByRole("button", { name: "혼합 (스머지) (N)" }).getAttribute("aria-pressed")
+      screen.getByRole("button", { name: "색 밀어 섞기 · 스머지 (N)" }).getAttribute("aria-pressed")
     ).toBe("true");
 
     view.rerender(

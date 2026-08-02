@@ -6,7 +6,7 @@
  * patchEl 히스토리 1건으로 커밋되는 일반 드래그 상호작용이라 onApply/onCancel/로컬 상태가
  * 필요 없다. 상위(StudioPage)가 소유하는 fully-controlled 프레젠테이션 컴포넌트.
  */
-import { Loader2, Spline } from "lucide-react";
+import { Loader2, MousePointer2, Spline } from "lucide-react";
 
 import { NODE_EDIT_TOOLS, type NodeEditTool } from "./studio-node-edit";
 import {
@@ -44,6 +44,8 @@ export type StudioNodeEditPanelProps = {
   onRefine?: (operation: "simplify" | "smooth") => void;
   /** 진행 중인 경로 정리 요청을 취소한다. */
   onCancelRefinement?: () => void;
+  /** 현재 획이 부적합할 때 선택 도구로 전환해 다른 자유선 획을 고르게 한다. */
+  onRequestSelectStroke?: () => void;
 };
 
 export function StudioNodeEditPanel({
@@ -59,6 +61,7 @@ export function StudioNodeEditPanel({
   onSmoothStrengthChange,
   onRefine,
   onCancelRefinement,
+  onRequestSelectStroke,
 }: StudioNodeEditPanelProps): ReactElement {
   const refinementDisabled = refinementBusy || Boolean(refinementUnavailableReason);
   const refinementStatus = refinementBusy
@@ -212,6 +215,29 @@ export function StudioNodeEditPanel({
           >
             {refinementStatus}
           </p>
+          {refinementUnavailableReason && onRequestSelectStroke && !refinementBusy ? (
+            <button
+              type="button"
+              onClick={onRequestSelectStroke}
+              className={cn(
+                PANEL_CHIP_CLASS,
+                "min-h-11 w-full justify-center gap-1.5 pointer-coarse:min-h-11",
+              )}
+              aria-label="선화 선택하기"
+              aria-describedby="studio-node-refinement-selection-help"
+            >
+              <MousePointer2 className="size-3.5" aria-hidden />
+              선화 선택하기
+            </button>
+          ) : null}
+          {refinementUnavailableReason && onRequestSelectStroke && !refinementBusy ? (
+            <p
+              id="studio-node-refinement-selection-help"
+              className="text-[0.65rem] leading-relaxed text-fg-3"
+            >
+              선택 도구로 전환합니다. Esc를 누르면 선택을 취소할 수 있어요.
+            </p>
+          ) : null}
         </section>
       ) : null}
     </div>

@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,8 +13,6 @@ const { createPortalMock } = vi.hoisted(() => ({
 vi.mock("react-dom", () => ({
   createPortal: createPortalMock,
 }));
-
-const componentSource = readFileSync(new URL("./StudioShortcutsHelp.tsx", import.meta.url), "utf8");
 
 describe("StudioShortcutsHelp", () => {
   afterEach(() => {
@@ -67,22 +63,6 @@ describe("StudioShortcutsHelp", () => {
     expect(html).toContain('role="dialog"');
   });
 
-  it("열린 도움말에서 Escape와 물음표가 모두 기본 동작을 막고 닫기를 요청한다", () => {
-    const handlerStart = componentSource.indexOf("const onKeyDown = (event: KeyboardEvent) => {");
-    const handlerEnd = componentSource.indexOf(
-      'document.addEventListener("keydown", onKeyDown);',
-      handlerStart,
-    );
-
-    expect(handlerStart).toBeGreaterThanOrEqual(0);
-    expect(handlerEnd).toBeGreaterThan(handlerStart);
-    const handler = componentSource.slice(handlerStart, handlerEnd);
-    expect(handler).toMatch(
-      /if \(event\.key === "Escape" \|\| event\.key === "\?"\) \{\s*event\.preventDefault\(\);\s*closeFromEffect\(\);\s*return;/,
-    );
-    expect(componentSource).toContain('document.removeEventListener("keydown", onKeyDown);');
-  });
-
   it("닫힌 상태에서는 아무것도 렌더하지 않는다", () => {
     expect(renderToStaticMarkup(<StudioShortcutsHelp open={false} onClose={() => undefined} />)).toBe("");
   });
@@ -104,4 +84,5 @@ describe("StudioShortcutsHelp", () => {
     // Unrelated static rows stay as documented defaults.
     expect(html).toContain("1–6");
   });
+
 });

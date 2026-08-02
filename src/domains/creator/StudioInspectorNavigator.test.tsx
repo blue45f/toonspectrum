@@ -50,6 +50,7 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain("페이지");
     expect(html).toContain("게시");
     expect(html).toContain("99+");
+    expect(html).toContain('data-studio-inspector-primary-tab="layers"');
     expect(html).toContain('aria-label="패널과 기능 찾기"');
   });
 

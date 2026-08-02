@@ -62,7 +62,7 @@ describe("studio edit availability", () => {
     hasPixelEditing: false,
     pixelBusy: false,
     selectedImage: false,
-    pixelToolTargetAvailable: false,
+    rasterRetouchTargetAvailable: false,
     interactionLocked: false,
     mutationLocked: false,
     selectedContentMutationLocked: false,
@@ -126,7 +126,7 @@ describe("studio edit availability", () => {
       hasPixelSelection: true,
       hasPixelEditing: true,
       selectedImage: true,
-      pixelToolTargetAvailable: true,
+      rasterRetouchTargetAvailable: true,
       masterEditMode: true,
     })).toMatchObject({
       undoDisabled: true,
@@ -145,7 +145,7 @@ describe("studio edit availability", () => {
       hasElementSelection: false,
       hasSingleElementSelection: false,
       selectedImage: false,
-      pixelToolTargetAvailable: true,
+      rasterRetouchTargetAvailable: true,
     }).cropLayerDisabled).toBe(false);
   });
 
@@ -153,12 +153,12 @@ describe("studio edit availability", () => {
     expect(resolveStudioEditAvailability({
       ...editableSelection,
       selectedImage: true,
-      pixelToolTargetAvailable: false,
+      rasterRetouchTargetAvailable: false,
     }).cropLayerDisabled).toBe(true);
     expect(resolveStudioEditAvailability({
       ...editableSelection,
       selectedImage: true,
-      pixelToolTargetAvailable: true,
+      rasterRetouchTargetAvailable: true,
       mutationLocked: true,
     }).cropLayerDisabled).toBe(true);
   });

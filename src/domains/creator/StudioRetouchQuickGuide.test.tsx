@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
@@ -44,5 +44,22 @@ describe("StudioRetouchQuickGuide", () => {
     expect(list.textContent).toContain("벡터 선·도형");
     expect(list.textContent).toContain("편집용 이미지 복사본");
     expect(list.textContent).toContain("⌘Z");
+  });
+
+  it("짧은 안내에서 같은 도구의 상세 튜토리얼로 한 번에 이동한다", () => {
+    const onOpenTutorial = vi.fn();
+    render(
+      <StudioRetouchQuickGuide
+        toolId="liquify"
+        active={false}
+        onOpenTutorial={onOpenTutorial}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("처음이라면 · 3단계"));
+    const button = screen.getByRole("button", { name: "형태 밀어 변형 상세 튜토리얼 열기" });
+    expect(button.className).toContain("min-h-11");
+    fireEvent.click(button);
+    expect(onOpenTutorial).toHaveBeenCalledOnce();
   });
 });

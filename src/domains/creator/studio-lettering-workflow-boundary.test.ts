@@ -15,7 +15,12 @@ describe("Studio lettering workflow boundary", () => {
     expect(page).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
     expect(page).toContain("void startEditText(selected.id)");
     expect(page).toContain("addBubble(lastLettering.variant, undefined, true)");
-    expect(help).toContain('keys: "T", labelKey: "studio.shortcuts.row.edit.text", actionId: "tool-lettering"');
+    const textShortcutStart = help.indexOf('keys: "T",');
+    const textShortcutEnd = help.indexOf("},", textShortcutStart);
+    const textShortcut = help.slice(textShortcutStart, textShortcutEnd);
+    expect(textShortcutStart).toBeGreaterThanOrEqual(0);
+    expect(textShortcut).toContain('labelKey: "studio.shortcuts.row.edit.text"');
+    expect(textShortcut).toContain('actionId: "tool-lettering"');
   });
 
   it("starts inline editing from click insertion but leaves drag-and-drop placement uninterrupted", () => {

@@ -68,7 +68,9 @@ describe("Studio advanced fill entry boundary", () => {
     expect(toggle).toContain("advancedFillAutoArmTargetRef.current = { targetId: target.id, status: readyStatus }");
     expect(editor).toContain("const pendingAutoArm = advancedFillAutoArmTargetRef.current");
     expect(editor).toContain("if (pendingAutoArm?.targetId === selectedId)");
+    expect(editor).toContain("setAdvancedFillVirtualTarget(pendingAutoArm.virtualTarget)");
     expect(editor).toContain("setAdvancedFillStatus(pendingAutoArm.status)");
+    expect(toggle).toContain("virtualTarget: entry.target");
     expect(toggle).toContain('selectInspectorRoute({ primary: "properties", image: "fill" }');
     expect(toggle).not.toContain(
       'openInspectorRoute({ primary: "properties", image: "fill" }, null)',

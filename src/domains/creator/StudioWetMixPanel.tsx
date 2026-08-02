@@ -19,8 +19,8 @@
 import { Droplets } from "lucide-react";
 import { useId } from "react";
 
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import {
   WET_MIX_HARDNESS_RANGE,
   WET_MIX_PICKUP_RANGE,
@@ -57,6 +57,7 @@ export type StudioWetMixPanelProps = {
   onWetnessChange: (value: number) => void;
   onPickupChange: (value: number) => void;
   onHardnessChange: (value: number) => void;
+  onOpenTutorial?: () => void;
 };
 
 export function StudioWetMixPanel({
@@ -75,6 +76,7 @@ export function StudioWetMixPanel({
   onWetnessChange,
   onPickupChange,
   onHardnessChange,
+  onOpenTutorial,
 }: StudioWetMixPanelProps): ReactElement {
   const titleId = useId();
   const help = studioRetouchToolHelp("wet-mix");
@@ -87,7 +89,11 @@ export function StudioWetMixPanel({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 id={titleId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2">
+          <h3
+            id={titleId}
+            aria-label={`${help.actionName} · ${help.technicalName}`}
+            className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2"
+          >
             <Droplets size={12} aria-hidden />
             {help.actionName}
             <span className="text-[0.66rem] font-medium text-fg-3">{help.technicalName}</span>
@@ -181,6 +187,7 @@ export function StudioWetMixPanel({
         active={active}
         busy={busy}
         disabled={disabled}
+        onOpenTutorial={onOpenTutorial}
       />
     </section>
   );

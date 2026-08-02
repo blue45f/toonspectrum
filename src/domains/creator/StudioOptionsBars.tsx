@@ -10,12 +10,19 @@ import type { StudioBrushStampTuning } from "./studio-brush-library";
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 import type { DrawShapeKind } from "./studio-editor-tool-model";
+import type { StudioLivingInkMaterialControls } from "./studio-living-ink-gpu-protocol";
+import type {
+  StudioLivingInkStrokeMode,
+  StudioLivingInkStudioState,
+} from "./studio-living-ink-studio-coordinator";
 import type {
   StudioDrawModeUi,
   StudioPressureCurveUi,
   StudioStabilizerModeUi,
   StudioSymmetryUi,
 } from "./StudioDrawOptionsBar";
+
+import { useIsMobile } from "@/components/use-media-query";
 
 export interface StudioOptionsBarsDrawModel {
   visible: boolean;
@@ -60,6 +67,19 @@ export interface StudioOptionsBarsDrawModel {
   stampTuning: StudioBrushStampTuning | null;
   strokeWidth: number;
   symmetryType: StudioSymmetryUi;
+  livingInk: Readonly<{
+    supported: boolean;
+    state: StudioLivingInkStudioState;
+    mode: StudioLivingInkStrokeMode;
+    scope: "all" | "selection";
+    selectionAvailable: boolean;
+    busy: boolean;
+    fixAvailable: boolean;
+    fixUnavailableReason?: string;
+    material: StudioLivingInkMaterialControls;
+    materialLocked: boolean;
+    materialLockedReason?: string;
+  }>;
 }
 
 export interface StudioOptionsBarsSelectionModel {
@@ -107,6 +127,11 @@ export interface StudioOptionsBarsHandlers {
   toggleQuickShape: () => void;
   toggleSelectedLock: () => void;
   toggleSizeLock: () => void;
+  setLivingInkMode: (mode: StudioLivingInkStrokeMode) => void;
+  setLivingInkScope: (scope: "all" | "selection") => void;
+  applyLivingInkFix: () => void;
+  applyLivingInkClear: () => void;
+  patchLivingInkMaterial: (patch: Partial<StudioLivingInkMaterialControls>) => void;
 }
 
 export interface StudioOptionsBarsProps {
@@ -120,6 +145,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
   selection,
   stableHandlers,
 }: StudioOptionsBarsProps) {
+  const isMobile = useIsMobile();
   return (
     <>
       {draw.visible ? (
@@ -189,6 +215,16 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             favoriteBrushIds={draw.favoriteBrushIds}
             onToggleFavoriteBrush={stableHandlers.toggleFavoriteBrush}
             onCycleStabilizer={stableHandlers.cycleStabilizer}
+            livingInk={isMobile
+              ? undefined
+              : {
+                  ...draw.livingInk,
+                  onModeChange: stableHandlers.setLivingInkMode,
+                  onScopeChange: stableHandlers.setLivingInkScope,
+                  onFix: stableHandlers.applyLivingInkFix,
+                  onClear: stableHandlers.applyLivingInkClear,
+                  onMaterialChange: stableHandlers.patchLivingInkMaterial,
+                }}
           />
         </Suspense>
       ) : null}

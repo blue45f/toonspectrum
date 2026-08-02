@@ -39,15 +39,35 @@ describe("Studio inspector raster recovery boundary", () => {
     expect(implementation).toContain('"pixel-selection"');
     expect(implementation).toContain("isStudioEditableRasterCopyPlanCurrent");
     expect(implementation).toContain("applyStudioEditableRasterCopy");
+    expect(implementation).toContain("flushSync(() => {");
     expect(implementation).toContain("commit(applied.elements");
     expect(implementation).toContain("setSelectedId(composite.id)");
     expect(implementation).toContain("resolveStudioRasterToolResumePlan");
+    expect(implementation).toContain("attachPendingRasterRetouchTarget");
     expect(implementation).toContain('case "arm-retouch"');
     expect(implementation).toContain('case "start-crop"');
     expect(implementation).toContain('case "activate-selection"');
     expect(pageSource).toContain("createEditableRasterCopyForInspector,");
     expect(pageSource).toContain("studioFilterPreparationBusy={studioFilterPreparationBusy}");
     expect(pageSource).toContain("timelinePlaying={timelinePlaying}");
+  });
+
+  it("journals and replays the first retouch gesture drawn during vector raster preparation", () => {
+    const stageDown = functionBody(pageSource, "onStageDown");
+    const stageMove = functionBody(pageSource, "onStageMove");
+    const pendingEnd = functionBody(pageSource, "finishPendingRasterRetouchGesture");
+    const nodeInteractionBegin = functionBody(pageSource, "nodeInteractionBegin");
+
+    expect(stageDown).toContain("studioRasterRetouchPreparationRef.current");
+    expect(stageDown).toContain("journalPendingRasterRetouchGesture");
+    expect(stageMove).toContain("appendStudioPendingRasterRetouchGesturePoint");
+    expect(pendingEnd).toContain("endStudioPendingRasterRetouchGesture");
+    expect(pendingEnd).toContain("queuePendingRasterRetouchGesture");
+    expect(pageSource).toContain("normalizeStudioPendingRasterRetouchGesture");
+    expect(pageSource).toContain("applyQueuedRasterRetouchReplayRef.current");
+    expect(nodeInteractionBegin).toContain("studioRasterRetouchPreparationRef.current");
+    expect(nodeInteractionBegin.indexOf("studioRasterRetouchPreparationRef.current"))
+      .toBeLessThan(nodeInteractionBegin.indexOf("canvasInteractionUnitIds(elementId)"));
   });
 
   it.each([

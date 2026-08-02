@@ -103,6 +103,30 @@ function hasAncestor(
 }
 
 describe("Studio background 3D bundle boundary", () => {
+  it("does not let the OCCT Node isolation URL glob test sources into production", () => {
+    const workerClient = readFileSync(
+      new URL("./studio-occt-worker-client.ts", import.meta.url),
+      "utf8",
+    );
+    const bundleCheck = readFileSync(
+      new URL("../../../scripts/check-studio-bundle.mjs", import.meta.url),
+      "utf8",
+    );
+
+    expect(workerClient).toContain("const moduleUrl = import.meta.url;");
+    expect(workerClient).not.toContain("`./studio-occt-worker-client.${");
+    expect(bundleCheck).toContain("production manifest emitted test/source assets");
+    expect(bundleCheck).toContain("emittedTestSourceEntries");
+  });
+
+  it("keeps the room-builder metadata path independent of Three.js geometry", () => {
+    const imports = moduleImports("./studio-bg3d-room-builder.ts");
+
+    expect(imports.valueImports).toContain("./studio-id");
+    expect(imports.valueImports).not.toContain("./studio-background-3d-primitives");
+    expect(imports.valueImports).not.toContain("three");
+  });
+
   it("keeps StudioPage tool detection on the Three-free metadata module", () => {
     const imports = moduleImports("./StudioPage.tsx");
 

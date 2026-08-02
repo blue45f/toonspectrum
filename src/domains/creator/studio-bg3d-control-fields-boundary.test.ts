@@ -78,6 +78,7 @@ describe("Studio BG3D control-field ownership boundary", () => {
       "react",
       "./studio-background-3d-sky",
       "./studio-bg3d-animation-time",
+      "./StudioThreeDToggle",
     ]);
     expect(imports.valueImports).not.toContain("three");
     expect(imports.valueImports.some((source) => source.startsWith("@react-three/"))).toBe(false);

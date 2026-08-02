@@ -97,6 +97,30 @@ describe("StudioBrushStudio", () => {
     expect(screen.getByText(/굵기·불투명도·필압·보정·촉을 함께 복원/)).toBeTruthy();
   });
 
+  it("recovers an incompatible brush through one explicit 44px dynamics preset CTA", async () => {
+    const onSelectDynamicsPreset = vi.fn();
+    render(
+      <StudioBrushStudio
+        {...props({
+          brushId: "pen",
+          onSelectDynamicsPreset,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(await screen.findByRole("tab", { name: /반응/ }));
+
+    const recovery = screen.getByRole("button", { name: "호환 브러시 선택하기" });
+    expect(recovery.className).toContain("min-h-11");
+    fireEvent.click(recovery);
+
+    expect(onSelectDynamicsPreset).toHaveBeenCalledWith(
+      "ink-particle",
+      studioBrushDynamicsPresetSettings("ink-particle"),
+    );
+  });
+
   it("confirms one atomic transaction, preserves identity/color, and offers one-step undo", async () => {
     const onRestoreDefaults = vi.fn();
     const currentSnapshot = {

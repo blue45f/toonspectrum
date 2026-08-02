@@ -54,18 +54,25 @@ import {
   type StudioFilterPackValues,
 } from "./studio-filter-pack";
 import { isStudioFilterUnionWaveKind } from "./studio-filter-union-wave";
-import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import {
+  STUDIO_EASE,
+  STUDIO_FOCUS_RING,
+  studioSegmentChipClass,
+} from "./studio-panel-ui";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { useStudioHistogramSource } from "./useStudioHistogramSource";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { CurvePoint, CurveRgbChannels } from "./studio-curves";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
+import type { StudioSelectionFilterMaskScope } from "./studio-selection-filter-mask-transaction";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 type FilterPatch = Partial<ImageFilterFields>;
+
+export type StudioFilterApplicationScope = "whole" | StudioSelectionFilterMaskScope;
 
 type StudioFilterGalleryView =
   | "all"
@@ -137,8 +144,16 @@ interface StudioFilterDialogProps {
   mutationLocked?: boolean;
   mutationLockReason?: string;
   applying?: boolean;
+  /** A usable pixel selection captured for this image-filter session. */
+  selectionAvailable?: boolean;
+  selectionFeatherPx?: number;
+  selectionInverted?: boolean;
   onPreview: (patch: FilterPatch | null) => void;
-  onApply: (patch: FilterPatch, draft: StudioFilterDraft) => void;
+  onApply: (
+    patch: FilterPatch,
+    draft: StudioFilterDraft,
+    scope: StudioFilterApplicationScope,
+  ) => void;
   onClose: () => void;
 }
 
@@ -330,6 +345,9 @@ export function StudioFilterDialog({
   mutationLocked = false,
   mutationLockReason,
   applying = false,
+  selectionAvailable = false,
+  selectionFeatherPx = 0,
+  selectionInverted = false,
   onPreview,
   onApply,
   onClose,
@@ -342,6 +360,10 @@ export function StudioFilterDialog({
     initialDraft && initialDraft.kind === kind
       ? cloneStudioFilterDraft(initialDraft)
       : createStudioFilterDraft(kind, image),
+  );
+  const canUseSelectionScope = targetKind === "image" && selectionAvailable;
+  const [applicationScope, setApplicationScope] = useState<StudioFilterApplicationScope>(
+    () => canUseSelectionScope ? "inside" : "whole",
   );
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -377,6 +399,12 @@ export function StudioFilterDialog({
   useEffect(() => {
     reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
   }, [draft, previewEnabled]);
+
+  useEffect(() => {
+    if (!canUseSelectionScope && applicationScope !== "whole") {
+      setApplicationScope("whole");
+    }
+  }, [applicationScope, canUseSelectionScope]);
 
   useEffect(() => () => reportPreview(null), []);
 
@@ -824,6 +852,51 @@ export function StudioFilterDialog({
         </div>
 
         <footer className="shrink-0 border-t border-line bg-card/35 px-4 py-3">
+          {canUseSelectionScope ? (
+            <fieldset
+              disabled={mutationLocked || applying}
+              className="mb-3 min-w-0 space-y-1.5"
+              aria-describedby="studio-filter-selection-scope-note"
+            >
+              <legend className="text-[0.68rem] font-bold text-fg-2">적용 범위</legend>
+              <div className="grid min-w-0 grid-cols-3 gap-1.5">
+                {([
+                  ["whole", "전체 이미지"],
+                  ["inside", "선택 안"],
+                  ["outside", "선택 밖"],
+                ] as const).map(([scope, label]) => (
+                  <label
+                    key={scope}
+                    className={cn(
+                      studioSegmentChipClass(applicationScope === scope),
+                      "min-h-11 min-w-0 cursor-pointer justify-center px-2 text-center disabled:pointer-events-none",
+                      (mutationLocked || applying) && "cursor-not-allowed opacity-45",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="studio-filter-application-scope"
+                      value={scope}
+                      checked={applicationScope === scope}
+                      disabled={mutationLocked || applying}
+                      onChange={() => setApplicationScope(scope)}
+                      className="sr-only"
+                    />
+                    <span className="truncate">{label}</span>
+                  </label>
+                ))}
+              </div>
+              <p
+                id="studio-filter-selection-scope-note"
+                className="text-[0.66rem] leading-relaxed text-fg-3"
+              >
+                현재 선택{selectionInverted ? "(반전)" : ""}
+                {selectionFeatherPx > 0 ? ` · 페더 ${selectionFeatherPx}px` : ""}를 마스크로
+                저장합니다. 미리보기는 필터 값 확인을 위해 전체 이미지로 보이며, 적용 뒤에는
+                필터 마스크에 계속 칠할 수 있어요.
+              </p>
+            </fieldset>
+          ) : null}
           {mutationLocked ? (
             <p
               id={lockMessageId}
@@ -853,14 +926,24 @@ export function StudioFilterDialog({
               aria-describedby={mutationLocked ? lockMessageId : undefined}
               onClick={() => {
                 if (mutationLocked || applying) return;
-                onApply(studioFilterDraftToPatch(draft), cloneStudioFilterDraft(draft));
+                onApply(
+                  studioFilterDraftToPatch(draft),
+                  cloneStudioFilterDraft(draft),
+                  applicationScope,
+                );
               }}
               className={buttonClass({
                 variant: "solid",
                 className: "min-h-11 sm:min-h-10 pointer-coarse:min-h-11",
               })}
             >
-              {applying ? "적용 중…" : "적용"}
+              {applying
+                ? "적용 중…"
+                : applicationScope === "inside"
+                  ? "선택 안에 적용"
+                  : applicationScope === "outside"
+                    ? "선택 밖에 적용"
+                    : "적용"}
             </button>
           </div>
         </footer>

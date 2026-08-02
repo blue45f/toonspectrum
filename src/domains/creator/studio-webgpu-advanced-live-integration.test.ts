@@ -20,7 +20,19 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain("|| wetInkOverlayStarted");
     expect(page).toContain("|| gpuPin");
     expect(page).toContain("|| dynamicBrushDirect");
-    expect(page).toContain("overlayCandidate\n          && !gpuPin");
+    const liveSurfaceStart = page.slice(
+      page.indexOf("function beginStudioDrawLiveSurfaces("),
+      page.indexOf("function onStageDown("),
+    );
+    expect(liveSurfaceStart).toContain("overlayCandidate");
+    for (const higherPriorityOwner of [
+      "&& !livingInkAdmitted",
+      "&& !hokusaiPinned",
+      "&& !stampDirect",
+      "&& !gpuPin",
+    ]) {
+      expect(liveSurfaceStart).toContain(higherPriorityOwner);
+    }
     expect(page).toContain('destination: "transparent-overlay"');
     expect(page).toContain(
       "const gpuStartEligible = pendingGpuAuthorityPromoted"

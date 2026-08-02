@@ -209,6 +209,30 @@ describe("Studio Hokusai natural-media texture v2", () => {
     }
   });
 
+  it("keeps antialiased small-radius graphite visibly legible", () => {
+    const pixels = ribbon(24);
+    const before = channelValues(pixels, 3);
+    applyStudioHokusaiNaturalMediaTextureV2(
+      pixels,
+      {
+        ...plan("pencil"),
+        raster: {
+          width: WIDTH,
+          height: HEIGHT,
+          scale: 1,
+          radiusPixels: 1.25,
+        },
+      },
+      fullLayout(),
+    );
+    const after = channelValues(pixels, 3);
+    const mean = after.reduce((sum, value) => sum + value, 0) / after.length;
+    expect(Math.min(...after)).toBeGreaterThan(0);
+    expect(mean).toBeGreaterThan(40);
+    expect(standardDeviation(after)).toBeGreaterThan(4.5);
+    expect(after.every((value, index) => value >= (before[index] ?? 0))).toBe(true);
+  });
+
   it("renders a packed dirty frame byte-identically to the same full-frame region", () => {
     for (const presetId of ["pencil", "charcoal", "oil"] as const) {
       const full = ribbon(196);

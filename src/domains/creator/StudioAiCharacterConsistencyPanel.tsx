@@ -10,7 +10,7 @@
 // 캔버스에서 선택된 요소가 이미지 타입인지 여부(hasReference)와 그 src(referenceThumbnail)를 부모가
 // 그대로 넘겨준다(선택 상태는 StudioPage.tsx가 이미 소유한 `selected`의 파생값이라 이중 소유를
 // 피한다).
-import { Loader2, UserRoundCheck } from "lucide-react";
+import { Loader2, MousePointer2, UserRoundCheck } from "lucide-react";
 
 export function StudioAiCharacterConsistencyPanel({
   configured,
@@ -21,6 +21,7 @@ export function StudioAiCharacterConsistencyPanel({
   busy,
   error,
   onGenerate,
+  onRequestSelectReference,
 }: {
   configured: boolean;
   /** 캔버스에서 선택된 요소가 이미지 타입이라 기준 캐릭터로 쓸 수 있는 상태인지. */
@@ -32,6 +33,8 @@ export function StudioAiCharacterConsistencyPanel({
   busy: boolean;
   error: string | null;
   onGenerate: () => void;
+  /** 캔버스 선택 모드로 전환해 기준 캐릭터 이미지를 고르게 한다. */
+  onRequestSelectReference: () => void;
 }) {
   const canGenerate = configured && hasReference && !busy && prompt.trim().length > 0;
 
@@ -50,10 +53,26 @@ export function StudioAiCharacterConsistencyPanel({
       )}
 
       {configured && !hasReference && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          캔버스에서 기준으로 쓸 <span className="font-semibold text-fg-2">캐릭터 이미지</span>를 먼저
-          선택하세요.
-        </p>
+        <div
+          className="rounded-md border border-line bg-card/70 p-2 text-[0.63rem] leading-relaxed text-fg-3"
+          role="status"
+          aria-live="polite"
+        >
+          <p>
+            캔버스에서 기준으로 쓸 <span className="font-semibold text-fg-2">캐릭터 이미지</span>를 먼저
+            선택하세요.
+          </p>
+          <button
+            type="button"
+            onClick={onRequestSelectReference}
+            className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/45 bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
+            aria-label="기준 이미지 선택하기"
+          >
+            <MousePointer2 size={14} aria-hidden />
+            기준 이미지 선택하기
+          </button>
+          <p className="mt-1.5 text-[0.6rem] text-fg-3">Esc를 누르면 선택을 취소할 수 있어요.</p>
+        </div>
       )}
 
       {hasReference && referenceThumbnail && (

@@ -190,6 +190,10 @@ jobs:
               --runtime-database-role webdex_runtime \
               --allow-loopback
       - run: pnpm run test
+      # The root Vitest run intentionally skips Redis without a disposable target.
+      # This runner owns a password-protected loopback container and always removes it.
+      - name: Verify distributed Redis coordination against a disposable instance
+        run: pnpm run test:redis:integration
       # root Vitest suite에는 source unit만 포함된다. workerd runtime integration과 Worker
       # 전용 tsconfig를 별도 gate하지 않으면 Durable Object/runtime 회귀가 false-green이 된다.
       - run: pnpm run test:cloudflare-realtime

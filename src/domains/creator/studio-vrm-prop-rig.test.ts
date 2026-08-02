@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { clampStudioVrmJointRotation } from "./studio-vrm-joint-limits";
 import {
   DEFAULT_VRM_PROP_RIG_METRICS,
   PROP_RIG_FIT_MAX,
@@ -50,12 +51,36 @@ function createMeasuredVrm(options: { omitFingers?: boolean; noHumanoid?: boolea
   add("rightHand", [-0.56, 1.2, 0]);
   if (!options.omitFingers) {
     // 양손에서 index/little의 X 순서를 반전해 실측 basis도 좌우 반사되게 한다.
+    add("leftThumbMetacarpal", [0.535, 1.2, 0.025]);
+    add("leftThumbProximal", [0.515, 1.2, 0.045]);
+    add("leftThumbDistal", [0.505, 1.2, 0.065]);
     add("leftMiddleProximal", [0.56, 1.2, 0.08]);
+    add("leftMiddleIntermediate", [0.56, 1.2, 0.12]);
+    add("leftMiddleDistal", [0.56, 1.2, 0.15]);
     add("leftIndexProximal", [0.535, 1.2, 0.08]);
+    add("leftIndexIntermediate", [0.535, 1.2, 0.115]);
+    add("leftIndexDistal", [0.535, 1.2, 0.14]);
+    add("leftRingProximal", [0.575, 1.2, 0.078]);
+    add("leftRingIntermediate", [0.575, 1.2, 0.112]);
+    add("leftRingDistal", [0.575, 1.2, 0.137]);
     add("leftLittleProximal", [0.585, 1.2, 0.08]);
+    add("leftLittleIntermediate", [0.585, 1.2, 0.108]);
+    add("leftLittleDistal", [0.585, 1.2, 0.13]);
+    add("rightThumbMetacarpal", [-0.535, 1.2, 0.025]);
+    add("rightThumbProximal", [-0.515, 1.2, 0.045]);
+    add("rightThumbDistal", [-0.505, 1.2, 0.065]);
     add("rightMiddleProximal", [-0.56, 1.2, 0.08]);
+    add("rightMiddleIntermediate", [-0.56, 1.2, 0.12]);
+    add("rightMiddleDistal", [-0.56, 1.2, 0.15]);
     add("rightIndexProximal", [-0.535, 1.2, 0.08]);
+    add("rightIndexIntermediate", [-0.535, 1.2, 0.115]);
+    add("rightIndexDistal", [-0.535, 1.2, 0.14]);
+    add("rightRingProximal", [-0.575, 1.2, 0.078]);
+    add("rightRingIntermediate", [-0.575, 1.2, 0.112]);
+    add("rightRingDistal", [-0.575, 1.2, 0.137]);
     add("rightLittleProximal", [-0.585, 1.2, 0.08]);
+    add("rightLittleIntermediate", [-0.585, 1.2, 0.108]);
+    add("rightLittleDistal", [-0.585, 1.2, 0.13]);
   }
   scene.updateMatrixWorld(true);
 
@@ -73,6 +98,10 @@ function expectVecClose(actual: Vec3, expected: Vec3, precision = 6) {
   expect(actual[0]).toBeCloseTo(expected[0], precision);
   expect(actual[1]).toBeCloseTo(expected[1], precision);
   expect(actual[2]).toBeCloseTo(expected[2], precision);
+}
+
+function createCompleteGripMetrics() {
+  return measureVrmPropRigMetrics(createMeasuredVrm());
 }
 
 describe("VRM 소품 리그 실측", () => {
@@ -270,7 +299,11 @@ describe("자동 손 그립과 양손 보조 target", () => {
   it("grip kind를 좌우 부호가 맞는 FingerRotationMap 호환 값으로 만든다", () => {
     const right = createPropInstance("sword", "right")!;
     const left = createPropInstance("book", "left")!;
-    const overrides = createAutoGripFingerOverrides([right, left]);
+    const overrides = createAutoGripFingerOverrides(
+      [right, left],
+      propDefById,
+      createCompleteGripMetrics()
+    );
 
     expect(overrides.rightIndexIntermediate[2]).toBeGreaterThan(0);
     expect(overrides.leftIndexIntermediate[2]).toBeLessThan(0);
@@ -282,7 +315,11 @@ describe("자동 손 그립과 양손 보조 target", () => {
     const def = propDefById("sword")!;
     const item = createPropInstance("sword", "two-hand")!;
     item.rig = { ...item.rig!, secondary: createDefaultSecondaryRig(def, item.bone)! };
-    const overrides = createAutoGripFingerOverrides([item]);
+    const overrides = createAutoGripFingerOverrides(
+      [item],
+      propDefById,
+      createCompleteGripMetrics()
+    );
     expect(overrides.rightMiddleProximal).toBeDefined();
     expect(overrides.leftMiddleProximal).toBeDefined();
 
@@ -297,12 +334,13 @@ describe("자동 손 그립과 양손 보조 target", () => {
       ...item.rig!,
       secondary: { ...createDefaultSecondaryRig(def, item.bone)!, influence: 0.5 },
     };
-    const half = createAutoGripFingerOverrides([item]);
+    const metrics = createCompleteGripMetrics();
+    const half = createAutoGripFingerOverrides([item], propDefById, metrics);
     item.rig = {
       ...item.rig,
       secondary: { ...item.rig.secondary!, influence: 1 },
     };
-    const full = createAutoGripFingerOverrides([item]);
+    const full = createAutoGripFingerOverrides([item], propDefById, metrics);
 
     expect(Math.abs(half.leftMiddleIntermediate[2])).toBeCloseTo(
       Math.abs(full.leftMiddleIntermediate[2]) * 0.5,
@@ -313,7 +351,7 @@ describe("자동 손 그립과 양손 보조 target", () => {
       ...item.rig,
       secondary: { ...item.rig.secondary!, influence: 0 },
     };
-    const zero = createAutoGripFingerOverrides([item]);
+    const zero = createAutoGripFingerOverrides([item], propDefById, metrics);
     expect(zero.leftMiddleIntermediate).toBeUndefined();
     expect(zero.rightMiddleIntermediate).toBeDefined();
   });
@@ -323,12 +361,154 @@ describe("자동 손 그립과 양손 보조 target", () => {
     const large = createPropInstance("mug", "large-radius")!;
     large.rig = { ...large.rig!, autoScale: false, deltaScale: 2 };
 
-    const normalGrip = createAutoGripFingerOverrides([normal]);
-    const largeGrip = createAutoGripFingerOverrides([large]);
+    const metrics = createCompleteGripMetrics();
+    const normalGrip = createAutoGripFingerOverrides([normal], propDefById, metrics);
+    const largeGrip = createAutoGripFingerOverrides([large], propDefById, metrics);
 
     expect(Math.abs(largeGrip.rightMiddleIntermediate[2])).toBeLessThan(
       Math.abs(normalGrip.rightMiddleIntermediate[2])
     );
+  });
+
+  it("PIP 중심으로 굽힘을 분배하고 DIP를 작게 결합해 갈고리 모양을 막는다", () => {
+    const item = createPropInstance("sword", "distributed-curl")!;
+    const grip = createAutoGripFingerOverrides(
+      [item],
+      propDefById,
+      createCompleteGripMetrics()
+    );
+    const proximal = Math.abs(grip.rightMiddleProximal[2]);
+    const intermediate = Math.abs(grip.rightMiddleIntermediate[2]);
+    const distal = Math.abs(grip.rightMiddleDistal[2]);
+
+    expect(intermediate).toBeGreaterThan(proximal);
+    expect(proximal).toBeGreaterThan(distal);
+    expect(distal / intermediate).toBeLessThanOrEqual(0.55);
+  });
+
+  it("pinch는 검지·중지를 접촉시키고 약지·소지는 이완한다", () => {
+    const item = createPropInstance("pencil", "tripod-pinch")!;
+    const grip = createAutoGripFingerOverrides(
+      [item],
+      propDefById,
+      createCompleteGripMetrics()
+    );
+
+    expect(Math.abs(grip.rightIndexIntermediate[2])).toBeGreaterThan(
+      Math.abs(grip.rightRingIntermediate[2])
+    );
+    expect(Math.abs(grip.rightMiddleIntermediate[2])).toBeGreaterThan(
+      Math.abs(grip.rightLittleIntermediate[2])
+    );
+    expect(Math.abs(grip.rightIndexDistal[2])).toBeLessThan(
+      Math.abs(grip.rightIndexIntermediate[2])
+    );
+  });
+
+  it("프로필 반경이 아니라 선택된 접촉 anchor 반경으로 손가락 닫힘을 계산한다", () => {
+    const base = propDefById("mug")!;
+    const item = createPropInstance("mug", "contact-radius")!;
+    const definitionWithRadius = (gripRadius: number) => ({
+      ...base,
+      anchors: base.anchors.map((candidate) => ({ ...candidate, gripRadius })),
+      // 두 경우 프로필 반경은 같게 두어 anchor가 실제 접촉 권위인지 검증한다.
+      grip: { ...base.grip!, radius: 0.08 },
+    });
+    const metrics = createCompleteGripMetrics();
+    const thin = createAutoGripFingerOverrides(
+      [item],
+      () => definitionWithRadius(0.004),
+      metrics
+    );
+    const thick = createAutoGripFingerOverrides(
+      [item],
+      () => definitionWithRadius(0.025),
+      metrics
+    );
+
+    expect(Math.abs(thick.rightMiddleIntermediate[2])).toBeLessThan(
+      Math.abs(thin.rightMiddleIntermediate[2])
+    );
+  });
+
+  it("엄지 대립을 세 관절에 분배하고 좌우 방향과 모든 hard limit를 지킨다", () => {
+    const right = createPropInstance("sword", "thumb-right")!;
+    const left = createPropInstance("sword", "thumb-left")!;
+    left.bone = "leftHand";
+    const grip = createAutoGripFingerOverrides(
+      [right, left],
+      propDefById,
+      createCompleteGripMetrics()
+    );
+
+    for (const segment of ["Metacarpal", "Proximal", "Distal"] as const) {
+      const rightName = `rightThumb${segment}`;
+      const leftName = `leftThumb${segment}`;
+      expect(grip[rightName][1]).toBeCloseTo(-grip[leftName][1], 10);
+      expect(grip[rightName][2]).toBeCloseTo(-grip[leftName][2], 10);
+    }
+    const authoredOpposition = THREE.MathUtils.degToRad(propDefById("sword")!.grip!.thumbOppositionDeg);
+    const distributedY = ["Metacarpal", "Proximal", "Distal"].reduce(
+      (sum, segment) => sum + Math.abs(grip[`rightThumb${segment}`][1]),
+      0
+    );
+    expect(distributedY).toBeLessThan(authoredOpposition);
+    for (const [boneName, rotation] of Object.entries(grip)) {
+      expect(rotation).toEqual(clampStudioVrmJointRotation(boneName, rotation));
+    }
+  });
+
+  it("빈·불완전 손가락 리그와 손상된 접촉 basis는 fail-closed한다", () => {
+    const item = createPropInstance("mug", "incomplete-rig")!;
+    const missingAllFingers = measureVrmPropRigMetrics(createMeasuredVrm({ omitFingers: true }));
+    expect(createAutoGripFingerOverrides([item], propDefById, missingAllFingers)).toEqual({});
+    expect(createAutoGripFingerOverrides(
+      [item],
+      propDefById,
+      DEFAULT_VRM_PROP_RIG_METRICS
+    )).toEqual({});
+
+    const missingOneBone = createCompleteGripMetrics();
+    delete missingOneBone.boneWorldPositions.rightIndexDistal;
+    expect(createAutoGripFingerOverrides([item], propDefById, missingOneBone)).toEqual({});
+
+    const base = propDefById("mug")!;
+    const badBasis = {
+      ...base,
+      anchors: base.anchors.map((anchor) => ({
+        ...anchor,
+        forward: [0, 0, 0] as Vec3,
+      })),
+    };
+    expect(createAutoGripFingerOverrides(
+      [item],
+      () => badBasis,
+      createCompleteGripMetrics()
+    )).toEqual({});
+
+    const excessiveCurl = {
+      ...base,
+      grip: { ...base.grip!, fingerCurlDeg: 999 },
+    };
+    expect(createAutoGripFingerOverrides(
+      [item],
+      () => excessiveCurl,
+      createCompleteGripMetrics()
+    )).toEqual({});
+    expect(createAutoGripFingerOverrides(
+      [item],
+      () => ({ ...base, anchors: [] }),
+      createCompleteGripMetrics()
+    )).toEqual({});
+  });
+
+  it("한 손에 유효한 접촉이 둘이면 배열 순서로 덮지 않고 해당 손을 fail-closed한다", () => {
+    const first = createPropInstance("mug", "conflict-a")!;
+    const second = createPropInstance("sword", "conflict-b")!;
+    const metrics = createCompleteGripMetrics();
+
+    expect(createAutoGripFingerOverrides([first, second], propDefById, metrics)).toEqual({});
+    expect(createAutoGripFingerOverrides([second, first], propDefById, metrics)).toEqual({});
   });
 
   it("secondary anchor에서 손바닥 오프셋을 빼 손목 목표를 계산한다", () => {
@@ -390,6 +570,10 @@ describe("자동 손 그립과 양손 보조 target", () => {
     const hand = createPropInstance("mug", "off")!;
     hand.rig = { ...hand.rig!, autoFingerPose: false };
     const head = createPropInstance("cap", "head")!;
-    expect(createAutoGripFingerOverrides([hand, head])).toEqual({});
+    expect(createAutoGripFingerOverrides(
+      [hand, head],
+      propDefById,
+      createCompleteGripMetrics()
+    )).toEqual({});
   });
 });

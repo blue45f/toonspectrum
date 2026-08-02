@@ -54,6 +54,26 @@ function hokusaiOptIn(): StudioHokusaiMybProviderOptIn {
   };
 }
 
+function hokusaiLiveOptIn(): StudioHokusaiMybProviderOptIn {
+  return {
+    ...hokusaiOptIn(),
+    mode: "live",
+    liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.2",
+    protocolVersion: 1,
+    admission: {
+      prewarmedAtStrokeStart: true,
+      packedDirtyTransfer: true,
+      singleInFlightFrame: true,
+      stalePresentationCoalesced: true,
+      inputSamplesPreserved: true,
+      epochCancellation: true,
+      canonicalPng: true,
+      exactLiveCommitParity: true,
+      midStrokePromotion: false,
+    },
+  };
+}
+
 describe("studio brush backend integration audit", () => {
   it("records every current and future backend once without treating scene overlays as brushes", () => {
     const ids = STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT.map(({ id }) => id);
@@ -113,18 +133,18 @@ describe("studio brush backend integration audit", () => {
     expect(auditById.get("hokusai-myb-worker")).toMatchObject({
       implementation:
         "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
-      connection: "active-settled-tool",
-      phases: ["settled"],
+      connection: "active-product",
+      phases: ["live", "commit", "settled"],
       asynchronous: true,
       defaultAvailability: "loading",
-      brushPixelAuthority: false,
+      brushPixelAuthority: true,
     });
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("original vector remains recoverable");
+      .toContain("automatically route the 19 verified");
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("crop-sized transparent PNG");
+      .toContain("canonical PNG commit ownership");
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("output dimensions");
+      .toContain("atomic failure fallback");
   });
 });
 
@@ -233,7 +253,7 @@ describe("studio brush material backend policy", () => {
         "cross-family-round-dab",
       ]));
       expect(policy.allowedPrimaryBackends).not.toContain("canvas2d-causal-ink");
-      expect(policy.allowedPrimaryBackends).not.toContain("hokusai-myb-worker");
+      expect(policy.allowedPrimaryBackends).toContain("hokusai-myb-worker");
       expect(policy.allowedSettledEnhancers).toContain("hokusai-myb-worker");
     }
 
@@ -300,10 +320,10 @@ describe("studio brush material backend policy", () => {
 
 describe("Hokusai .myb provider admission", () => {
   it("pins the v2 packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
-    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(5);
-    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(3);
+    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(7);
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(5);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY).toMatchObject({
-      policyVersion: 3,
+      policyVersion: 5,
       backendId: "hokusai-myb-worker",
       crate: "hokusai-wasm",
       exactVersion: "0.3.0",
@@ -318,15 +338,23 @@ describe("Hokusai .myb provider admission", () => {
         internalFormat: "premultiplied-linear-rgba-fix15",
         transferFormat: "packed-dirty-rgba8",
         productBoundary:
-          "verified-transparent-packed-dirty-png-plus-receipt",
+          "transferable-packed-dirty-live-plus-canonical-png-parity-receipt",
         stockOpaqueWhiteFlatteningAllowed: false,
       },
       rollout: {
-        defaultMode: "selected-stroke-settled-transform",
+        defaultMode: "automatic-natural-media-live-provider-active-19-presets",
         settledRequiresExplicitOptIn: true,
-        fullLiveCoreInstalled: false,
+        fullLiveCoreInstalled: true,
         runtimeMustBeReady: true,
-        defaultBrushRoutesChanged: false,
+        defaultBrushRoutesChanged: true,
+        verifiedAutomaticRouteCount: 19,
+        prewarmAtBrushSelection: true,
+        admissionPinnedAtStrokeStart: true,
+        midStrokeProviderSwitchAllowed: false,
+        inFlightTransferableFrameLimit: 1,
+        stalePresentationPolicy: "coalesce-latest",
+        inputDropAllowed: false,
+        explicitSelectedStrokeConversionFallback: true,
         licenseGatePassed: true,
         reproducibleReleaseGatePassed: true,
         realBrowserRuntimeGatePassed: true,
@@ -339,7 +367,7 @@ describe("Hokusai .myb provider admission", () => {
       },
     });
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.eligibleFamilies)
-      .toEqual(["dry-media", "wet-media"]);
+      .toEqual(["continuous-ink", "dry-media", "wet-media"]);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.determinism.risk)
       .toContain("Young upstream project");
     expect(Object.isFrozen(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY)).toBe(true);
@@ -421,16 +449,10 @@ describe("Hokusai .myb provider admission", () => {
     });
   });
 
-  it("rejects any attempted promotion of Hokusai into the full live brush core", () => {
+  it("admits the live provider only with every parity, transfer, epoch and cancellation receipt", () => {
     const forgedLiveOptIn = {
       ...hokusaiOptIn(),
       mode: "live",
-      liveParityReceipt: {
-        sameAuthoritativeSamples: true,
-        sameVersionedRecipe: true,
-        samePersistedSeed: true,
-        complete: true,
-      },
     } as unknown as StudioHokusaiMybProviderOptIn;
     expect(resolveStudioBrushBackendQualityRoute({
       brushId: "watercolor",
@@ -443,6 +465,39 @@ describe("Hokusai .myb provider admission", () => {
       reason: "provider-opt-in-invalid",
       preserveExistingSurface: true,
       emitApproximation: false,
+    });
+
+    expect(resolveStudioBrushBackendQualityRoute({
+      brushId: "charcoal",
+      availability: {
+        "hokusai-myb-worker": "ready",
+      },
+      naturalMediaProviderOptIn: hokusaiLiveOptIn(),
+    })).toMatchObject({
+      status: "ready",
+      liveBackend: "hokusai-myb-worker",
+      commitBackend: "hokusai-myb-worker",
+      semanticContract: "hokusai-live-canonical-v1",
+      providerOptInMode: "live",
+    });
+
+    const missingBackpressure = {
+      ...hokusaiLiveOptIn(),
+      admission: {
+        ...(hokusaiLiveOptIn() as Extract<
+          StudioHokusaiMybProviderOptIn,
+          { mode: "live" }
+        >).admission,
+        singleInFlightFrame: false,
+      },
+    } as unknown as StudioHokusaiMybProviderOptIn;
+    expect(resolveStudioBrushBackendQualityRoute({
+      brushId: "marker",
+      availability: { "hokusai-myb-worker": "ready" },
+      naturalMediaProviderOptIn: missingBackpressure,
+    })).toMatchObject({
+      status: "rejected",
+      reason: "provider-opt-in-invalid",
     });
   });
 

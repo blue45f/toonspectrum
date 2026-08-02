@@ -74,6 +74,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     const start = page.indexOf("function onStageDown");
     const end = page.indexOf("// 복구 브러시/도장 호버 커서", start);
     const onStageDown = page.slice(start, end);
+    const liveSurfaceStart = page.indexOf("function beginStudioDrawLiveSurfaces");
+    const liveSurface = page.slice(liveSurfaceStart, start);
     const pointCommentStart = page.indexOf("function handleStudioPointCommentStageDown");
     const pointCommentHandler = page.slice(pointCommentStart, start);
 
@@ -103,11 +105,13 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-27): 벡터-only 문서의 첫 픽셀 선택 제스처를 합성 준비 동안
     // journal/replay하고 도구 전환 시 안전하게 취소하는 경계 추가(1_050 → 1_120).
     // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
-    // 의도적 변경(2026-07-29): 사용자 선택 precision 획의 mutable lazy-brush authority와
-    // specialty native overlay가 generic live tap을 즉시 지우는 권위 전환 경계를
-    // pointerdown에 함께 고정했다. 이 블록을 다시 키우기 전에 별도 lifecycle 함수 추출을
-    // 우선 검토해야 한다.
+    // 의도적 변경(2026-08-03): specialist/native/GPU 표면 admission과 presentation을
+    // beginStudioDrawLiveSurfaces로 추출해 onStageDown은 입력·CRDT 순서만 소유한다.
     expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_190);
+    expect(liveSurfaceStart).toBeGreaterThan(-1);
+    expect(liveSurface).toContain("const livingInkAdmitted =");
+    expect(liveSurface).toContain("resolveStudioStrokeSurfaceRoute({");
+    expect(liveSurface).toContain("flushDirectLiveDraftNow(next)");
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",
@@ -132,7 +136,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "requireStudioDrawingPointerTransport(drawingPointerTransportRef).start({",
       "drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately",
       "drawingRef.current = next",
-      "flushDirectLiveDraftNow(next)",
+      "beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin)",
       "drawingCrdtPublisherRef.current.begin(next.id",
       "startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp)",
     ]);

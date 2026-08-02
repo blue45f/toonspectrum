@@ -156,16 +156,16 @@ export function StudioQuickShapePanel({
                 </p>
               )}
             </div>
-            {onOpenTutorial ? (
-              <button
-                type="button"
-                onClick={onOpenTutorial}
-                className="w-full rounded-xl border border-line/50 bg-canvas/30 py-1.5 text-[0.65rem] font-medium text-fg-3 transition-colors hover:border-accent/30 hover:bg-raised/60 hover:text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                {localizeText(t, "스마트 도형 튜토리얼 보기", "studio.quickShape.openTutorial")}
-              </button>
-            ) : null}
           </div>
+        ) : null}
+        {onOpenTutorial ? (
+          <button
+            type="button"
+            onClick={onOpenTutorial}
+            className="min-h-11 w-full rounded-xl border border-line/50 bg-canvas/30 px-2 py-1.5 text-[0.65rem] font-medium text-fg-3 transition-colors hover:border-accent/30 hover:bg-raised/60 hover:text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9 pointer-coarse:min-h-11"
+          >
+            {localizeText(t, "스마트 도형 튜토리얼 보기", "studio.quickShape.openTutorial")}
+          </button>
         ) : null}
       </div>
     </div>

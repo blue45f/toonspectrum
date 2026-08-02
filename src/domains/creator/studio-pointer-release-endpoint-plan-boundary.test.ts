@@ -71,25 +71,38 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
 
   it("leaves stabilizer ownership, ref replacement, CRDT publication, and finalization in StudioPage", () => {
     const page = moduleFacts("./StudioPage.tsx").source;
+    const sealStart = page.indexOf("function sealStudioDrawReleaseInput");
+    const sealEnd = page.indexOf("function finishStudioSpecialistStroke", sealStart);
+    const sealInput = page.slice(sealStart, sealEnd);
     const start = page.indexOf("function finishDrawingPointer");
     const end = page.indexOf("function onStagePointerCancel", start);
     const finish = page.slice(start, end);
 
     expect(page).toContain('from "./studio-pointer-release-endpoint-plan"');
-    expect(finish).toContain("planStudioPointerReleaseEndpoint({");
-    expect(finish).not.toContain("const appendAligned =");
-    expect(finish).not.toContain("const capturePointerDynamics =");
-    expect(finish).not.toContain("const tangentialPressure =");
+    expect(sealStart).toBeGreaterThan(-1);
+    expect(sealEnd).toBeGreaterThan(sealStart);
+    expect(sealInput).toContain("planStudioPointerReleaseEndpoint({");
+    expect(sealInput).not.toContain("const appendAligned =");
+    expect(sealInput).not.toContain("const capturePointerDynamics =");
+    expect(sealInput).not.toContain("const tangentialPressure =");
 
-    expectTokenOrder(finish, [
+    expectTokenOrder(sealInput, [
       "flushStudioStrokeStabilizerEndpoint(liveState)",
       "drawingStabilizerRef.current = flushed.state",
       "const endpointPlan = planStudioPointerReleaseEndpoint({",
       "if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke",
       "appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart)",
+      "appendStudioLivingInkAuthoritativeSuffix(",
+      "appendStudioHokusaiAuthoritativeSuffix(",
       "authoritativeLiveStroke = drawingRef.current",
       "flushDirectLiveDraftNow(authoritativeLiveStroke)",
+      "drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id)",
+    ]);
+    expectTokenOrder(finish, [
+      "authoritativeLiveStroke = sealStudioDrawReleaseInput(",
       "planStudioDrawPointerRelease({",
+      "const finished = releasePlan.stroke",
+      "finishStudioSpecialistStroke(finished)",
       "const committed = commit([...baseElements, finished])",
       "finally {",
       "releaseDrawingPointerSession()",

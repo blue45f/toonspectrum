@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_DRAWING_LIBRARY_STRATEGY_VERSION =
-  "studio-drawing-library-strategy-v7" as const;
+  "studio-drawing-library-strategy-v8" as const;
 
 export type StudioDrawingLibraryProductLayer =
   | "live-stroke-geometry"
@@ -39,7 +39,8 @@ export type StudioDrawingLibraryDecision =
   | "runtime-pressure-outline"
   | "opt-in-input-stabilizer"
   | "runtime-rough-shape-renderer"
-  | "isolated-settled-first-natural-media-provider"
+  | "isolated-live-natural-media-provider-ready-for-wiring"
+  | "isolated-live-natural-media-provider-active-19-routes"
   | "isolated-settled-only-provider"
   | "runtime-object-selection-overlay"
   | "isolated-gpu-scene-overlay-provider"
@@ -138,13 +139,15 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       packageName: "studio-hokusai-wasm",
       license: "MIT OR Apache-2.0",
       productLayer: "natural-media-worker",
-      decision: "isolated-settled-first-natural-media-provider",
+      decision: "isolated-live-natural-media-provider-active-19-routes",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly; adapter 0.3.0-packed-dirty-frame-adapter.2 reads a crop-sized packed dirty RGBA8 frame inside a Dedicated Worker and returns a verified transparent PNG plus receipt for an explicit selected-stroke transform.",
+        "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly. Nineteen verified pencil, charcoal and oil identities now auto-route through its transferable packed-dirty Dedicated Worker; the canonical transparent PNG plus hash-keyed Konva draw receipt owns commit handoff.",
       riskNotes: [
-        "This is an active settled selected-stroke natural-media transform, not the normal live brush core or a default brush route.",
-        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own packed dirty-frame binding and fail-closed Worker protocol v2.",
+        "Only 19 quality-gated pencil, charcoal and oil identities changed default routing; the other 207 shelf identities keep their existing exact routes.",
+        "Provider failure stays on the runtime-stroke-boundary fallback for the whole stroke; mid-stroke pixel-authority promotion remains forbidden.",
+        "The explicit selected-stroke transparent PNG transform remains available as the protocol-v2 conversion fallback.",
+        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own packed dirty-frame binding and fail-closed live Worker protocol v1.",
         "License inventory, checked-in integrity hashes, byte-reproducible release build and real-browser runtime QA gate the local provider.",
         "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter, dirty bounds, output dimensions, pixel layout and output hashes must be receipted.",
       ],
@@ -605,7 +608,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "brush-renderer-overlap",
     rationale:
-      "The installed 0.3.0-packed-dirty-frame-adapter.2 Rust/WASM binding powers an explicit selected-stroke natural-media transform in a Dedicated Worker and returns only a crop-sized transparent PNG plus protocol-v2 receipt with dirty bounds, output dimensions and packed-dirty-rgba8 layout; it is not the full live brush core or a default shelf route.",
+      "The installed Rust/WASM binding is automatically wired for 19 verified pencil, charcoal and oil identities: packed dirty deltas, one-frame backpressure, finish-tail acknowledgement, overlay composition, canonical full-frame parity, transparent PNG and a hash-keyed document draw receipt. The other 207 shelf identities retain their existing routes, while runtime-stroke-boundary and the selected-stroke protocol-v2 transform remain explicit failure/conversion fallbacks.",
   }),
   sourceAudit({
     id: "p5-brush",

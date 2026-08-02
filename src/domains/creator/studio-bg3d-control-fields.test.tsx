@@ -47,7 +47,9 @@ describe("Studio BG3D control fields", () => {
 
     const sliders = screen.getAllByRole("slider");
     fireEvent.change(sliders[0]!, { target: { value: "1.4" } });
-    fireEvent.click(screen.getByRole("button", { name: "윤곽선" }));
+    const toggle = screen.getByRole("switch", { name: "윤곽선" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
     const xInput = screen.getByRole("spinbutton", { name: "위치 X" }) as HTMLInputElement;
     expect(xInput.value).toBe("1.23");
     expect(xInput.closest("label")?.className).toContain("pointer-coarse:min-h-11");

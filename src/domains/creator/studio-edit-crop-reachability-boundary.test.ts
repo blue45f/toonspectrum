@@ -81,23 +81,22 @@ function resolvesLiteralCall(
 
 /**
  * Reachability contract (2026-07-24): Edit → 레이어 자르기 must stay aligned with the
- * left-rail Crop button and keyboard C, which both route through ensurePixelToolTarget
- * (sole editable image auto-select / arm-anytime). Requiring selectedImage alone left the
- * menu item hard-disabled while the rail/keyboard still worked.
+ * left-rail Crop button and keyboard C. All three accept a selected/sole editable image or prepare
+ * visible vector/page content as one editable raster copy before opening the non-destructive crop.
  */
 describe("Studio edit crop reachability boundary", () => {
-  it("derives cropLayerDisabled from pixelToolTargetAvailable, not selectedImage alone", () => {
+  it("derives cropLayerDisabled from the shared raster-retouch preparation gate", () => {
     const controls = source("./studio-edit-controls.ts");
-    expect(controls).toContain("pixelToolTargetAvailable: boolean");
+    expect(controls).toContain("rasterRetouchTargetAvailable: boolean");
     expect(controls).toContain(
-      "cropLayerDisabled: input.mutationLocked || !input.pixelToolTargetAvailable",
+      "cropLayerDisabled: input.mutationLocked || !input.rasterRetouchTargetAvailable",
     );
     expect(controls).not.toMatch(
       /cropLayerDisabled:\s*!input\.selectedImage\s*\|\|\s*input\.selectedContentMutationLocked/u,
     );
   });
 
-  it("wires StudioPage ensurePixelToolTarget availability into the edit menu matrix", () => {
+  it("wires StudioPage raster preparation availability into the edit menu matrix", () => {
     const page = source("./StudioPage.tsx");
     const pageFile = ts.createSourceFile(
       "StudioPage.tsx",
@@ -110,23 +109,26 @@ describe("Studio edit crop reachability boundary", () => {
       resolvesLiteralCall(
         pageFile,
         "openSelectedLayerCrop",
-        "ensurePixelToolTarget",
-        "레이어 자르기",
+        "ensureOrPrepareRasterRetouchTarget",
+        "crop",
       ),
     ).toBe(true);
-    expect(page).toContain("pixelToolTargetAvailable,");
+    expect(page).toContain("rasterRetouchTargetAvailable,");
     expect(page).toContain("resolveStudioEditAvailability({");
-    // The availability object must pass the rail gate rather than re-deriving selectedImage.
+    // The menu must pass the same preparation gate rather than re-deriving selectedImage.
     const availabilityStart = page.indexOf("resolveStudioEditAvailability({");
     const availabilityEnd = page.indexOf("});", availabilityStart);
     const availability = page.slice(availabilityStart, availabilityEnd);
-    expect(availability).toContain("pixelToolTargetAvailable");
+    expect(availability).toContain("rasterRetouchTargetAvailable");
     expect(availability).toContain("selectedImage: selected?.type === \"image\"");
   });
 
   it("keeps the left rail Crop button on the same availability gate", () => {
     const rail = source("./StudioLeftToolRail.tsx");
-    expect(rail).toContain("disabled={!pixelToolTargetAvailable}");
+    expect(rail).toContain("const rasterRetouchCanStart =");
+    expect(rail).toContain("rasterRetouchTargetAvailable");
+    expect(rail).toContain("disabled={!cropActive && !rasterRetouchCanStart}");
+    expect(rail).toContain("unavailableReason={rasterRetouchUnavailableReason(cropActive)}");
     expect(rail).toContain("onClick={openSelectedLayerCrop}");
   });
 });

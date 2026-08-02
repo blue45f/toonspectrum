@@ -1,7 +1,8 @@
 // 절차형 아바타 조형(헤어/얼굴 디테일)의 순수 코어.
 //
 // v2에서 헤어 스타일 7종 → 14종, 앞머리 형태(bangStyle)·웨이브(wave)·삐침머리(ahoge)·
-// 묶음 높이(tailHeight) 파라미터가 추가됐다.
+// 묶음 높이(tailHeight) 파라미터가 추가됐다. v3에서는 기존 VRM 리그를 유지하는 안전 범위의
+// 체형 실루엣과 결정론적 체형 프리셋을 추가했다.
 //
 // ⚠ 하위호환 계약(회귀 금지)
 //   v1로 저장된 AvatarForgeState는 buildAvatarForgeHairParts에서 **바이트 단위로 동일한**
@@ -12,9 +13,9 @@
 //     3) 파츠에 붙는 신규 필드(wave/waveFrequency)는 값이 0일 때 **키 자체를 만들지 않는다**
 //        (JSON.stringify 결과가 v1과 문자 단위로 같아야 하므로).
 //   studio-vrm-avatar-forge.test.ts의 V1_GEOMETRY_DIGESTS가 이 계약을 SHA-256으로 잠근다.
-export const AVATAR_FORGE_VERSION = 2 as const;
+export const AVATAR_FORGE_VERSION = 3 as const;
 
-/** v1 문서를 v2로 승격할 때 강제되는 "v1과 동일한 렌더" 파라미터. */
+/** v1 문서를 현재 스키마로 승격할 때 강제되는 "v1과 동일한 렌더" 파라미터. */
 const V1_EQUIVALENT_HAIR = {
   bangStyle: "full",
   wave: 0,
@@ -52,6 +53,21 @@ export type AvatarForgeFaceParams = {
   chinLength: number;
 };
 
+export type AvatarForgeBodyParams = {
+  shoulderWidth: number;
+  torsoLength: number;
+  hipWidth: number;
+  armLength: number;
+  legLength: number;
+};
+
+export type AvatarForgeBodyPresetId =
+  | "balanced"
+  | "hero"
+  | "long-line"
+  | "compact"
+  | "soft";
+
 export type AvatarForgeHairParams = {
   style: AvatarForgeHairStyle;
   replaceOriginal: boolean;
@@ -83,7 +99,9 @@ export type AvatarForgeFaceAccent = {
 export type AvatarForgeState = {
   version: typeof AVATAR_FORGE_VERSION;
   presetId?: string;
+  bodyPresetId?: AvatarForgeBodyPresetId;
   face: AvatarForgeFaceParams;
+  body: AvatarForgeBodyParams;
   hair: AvatarForgeHairParams;
   faceAccents?: AvatarForgeFaceAccent[];
 };
@@ -131,6 +149,14 @@ export const AVATAR_FORGE_FACE_LIMITS: Record<keyof AvatarForgeFaceParams, Avata
   headDepth: { label: "얼굴 입체감", min: 0.88, max: 1.14, step: 0.01, unit: "×" },
   cheekVolume: { label: "볼륨", min: 0, max: 1, step: 0.01 },
   chinLength: { label: "턱 길이", min: 0.88, max: 1.14, step: 0.01, unit: "×" },
+};
+
+export const AVATAR_FORGE_BODY_LIMITS: Record<keyof AvatarForgeBodyParams, AvatarForgeNumericLimit> = {
+  shoulderWidth: { label: "어깨 너비", min: 0.88, max: 1.14, step: 0.01, unit: "×" },
+  torsoLength: { label: "몸통 길이", min: 0.9, max: 1.12, step: 0.01, unit: "×" },
+  hipWidth: { label: "골반 너비", min: 0.9, max: 1.12, step: 0.01, unit: "×" },
+  armLength: { label: "팔 길이", min: 0.92, max: 1.1, step: 0.01, unit: "×" },
+  legLength: { label: "다리 길이", min: 0.92, max: 1.12, step: 0.01, unit: "×" },
 };
 
 export type AvatarForgeHairLimitKey =
@@ -210,6 +236,60 @@ const DEFAULT_FACE: AvatarForgeFaceParams = {
   chinLength: 1,
 };
 
+const DEFAULT_BODY: AvatarForgeBodyParams = {
+  shoulderWidth: 1,
+  torsoLength: 1,
+  hipWidth: 1,
+  armLength: 1,
+  legLength: 1,
+};
+
+export type AvatarForgeBodyPreset = {
+  readonly id: AvatarForgeBodyPresetId;
+  readonly label: string;
+  readonly hint: string;
+  readonly emoji: string;
+  readonly body: AvatarForgeBodyParams;
+};
+
+export const AVATAR_FORGE_BODY_PRESETS: readonly AvatarForgeBodyPreset[] = [
+  {
+    id: "balanced",
+    label: "균형형",
+    emoji: "◇",
+    hint: "원본 비율을 유지하는 기본 실루엣",
+    body: { ...DEFAULT_BODY },
+  },
+  {
+    id: "hero",
+    label: "히어로",
+    emoji: "◆",
+    hint: "넓은 어깨와 긴 팔다리의 또렷한 실루엣",
+    body: { shoulderWidth: 1.1, torsoLength: 1.03, hipWidth: 0.96, armLength: 1.04, legLength: 1.06 },
+  },
+  {
+    id: "long-line",
+    label: "롱라인",
+    emoji: "│",
+    hint: "길어진 몸통과 다리의 세로형 실루엣",
+    body: { shoulderWidth: 0.97, torsoLength: 1.07, hipWidth: 0.96, armLength: 1.05, legLength: 1.1 },
+  },
+  {
+    id: "compact",
+    label: "컴팩트",
+    emoji: "●",
+    hint: "짧은 팔다리와 안정적인 중심 실루엣",
+    body: { shoulderWidth: 1.02, torsoLength: 0.95, hipWidth: 1.02, armLength: 0.95, legLength: 0.94 },
+  },
+  {
+    id: "soft",
+    label: "소프트",
+    emoji: "◯",
+    hint: "부드러운 어깨와 넓은 골반의 곡선 실루엣",
+    body: { shoulderWidth: 0.94, torsoLength: 0.99, hipWidth: 1.08, armLength: 0.98, legLength: 0.99 },
+  },
+] as const;
+
 const DEFAULT_HAIR: AvatarForgeHairParams = {
   style: "none",
   replaceOriginal: false,
@@ -232,7 +312,9 @@ const DEFAULT_ACCENTS: AvatarForgeFaceAccent[] = [
 
 export const DEFAULT_AVATAR_FORGE_STATE: AvatarForgeState = {
   version: AVATAR_FORGE_VERSION,
+  bodyPresetId: "balanced",
   face: { ...DEFAULT_FACE },
+  body: { ...DEFAULT_BODY },
   hair: { ...DEFAULT_HAIR },
   faceAccents: DEFAULT_ACCENTS.map((accent) => ({ ...accent })),
 };
@@ -255,7 +337,9 @@ function preset(
     state: {
       version: AVATAR_FORGE_VERSION,
       presetId: id,
+      bodyPresetId: "balanced",
       face: { ...DEFAULT_FACE, ...face },
+      body: { ...DEFAULT_BODY },
       hair: { ...DEFAULT_HAIR, ...hair },
       faceAccents,
     },
@@ -290,6 +374,9 @@ export const AVATAR_FORGE_PRESETS: ReadonlyArray<AvatarForgePreset> = [
 const HAIR_STYLE_IDS = new Set<AvatarForgeHairStyle>(AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => option.id));
 const BANG_STYLE_IDS = new Set<AvatarForgeBangStyle>(AVATAR_FORGE_BANG_STYLE_OPTIONS.map((option) => option.id));
 const ACCENT_IDS = new Set<AvatarForgeFaceAccentId>(AVATAR_FORGE_FACE_ACCENT_OPTIONS.map((option) => option.id));
+const BODY_PRESET_IDS = new Set<AvatarForgeBodyPresetId>(
+  AVATAR_FORGE_BODY_PRESETS.map((option) => option.id),
+);
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 function clampNumber(value: unknown, limit: AvatarForgeNumericLimit, fallback: number) {
@@ -321,8 +408,11 @@ function documentVersion(raw: unknown): number {
 export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
   const source = record(raw);
   const face = record(source.face);
+  const body = record(source.body);
   const hair = record(source.hair);
-  const legacy = documentVersion(source.version) < 2;
+  const sourceVersion = documentVersion(source.version);
+  const legacy = sourceVersion < 2;
+  const legacyBody = sourceVersion < 3;
   const style = HAIR_STYLE_IDS.has(hair.style as AvatarForgeHairStyle)
     ? (hair.style as AvatarForgeHairStyle)
     : DEFAULT_HAIR.style;
@@ -345,12 +435,32 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
     ...(typeof source.presetId === "string" && source.presetId.trim()
       ? { presetId: source.presetId.trim().slice(0, 64) }
       : {}),
+    ...(!legacyBody && BODY_PRESET_IDS.has(source.bodyPresetId as AvatarForgeBodyPresetId)
+      ? { bodyPresetId: source.bodyPresetId as AvatarForgeBodyPresetId }
+      : {}),
     face: {
       headWidth: clampNumber(face.headWidth, AVATAR_FORGE_FACE_LIMITS.headWidth, DEFAULT_FACE.headWidth),
       headHeight: clampNumber(face.headHeight, AVATAR_FORGE_FACE_LIMITS.headHeight, DEFAULT_FACE.headHeight),
       headDepth: clampNumber(face.headDepth, AVATAR_FORGE_FACE_LIMITS.headDepth, DEFAULT_FACE.headDepth),
       cheekVolume: clampNumber(face.cheekVolume, AVATAR_FORGE_FACE_LIMITS.cheekVolume, DEFAULT_FACE.cheekVolume),
       chinLength: clampNumber(face.chinLength, AVATAR_FORGE_FACE_LIMITS.chinLength, DEFAULT_FACE.chinLength),
+    },
+    body: {
+      shoulderWidth: legacyBody
+        ? DEFAULT_BODY.shoulderWidth
+        : clampNumber(body.shoulderWidth, AVATAR_FORGE_BODY_LIMITS.shoulderWidth, DEFAULT_BODY.shoulderWidth),
+      torsoLength: legacyBody
+        ? DEFAULT_BODY.torsoLength
+        : clampNumber(body.torsoLength, AVATAR_FORGE_BODY_LIMITS.torsoLength, DEFAULT_BODY.torsoLength),
+      hipWidth: legacyBody
+        ? DEFAULT_BODY.hipWidth
+        : clampNumber(body.hipWidth, AVATAR_FORGE_BODY_LIMITS.hipWidth, DEFAULT_BODY.hipWidth),
+      armLength: legacyBody
+        ? DEFAULT_BODY.armLength
+        : clampNumber(body.armLength, AVATAR_FORGE_BODY_LIMITS.armLength, DEFAULT_BODY.armLength),
+      legLength: legacyBody
+        ? DEFAULT_BODY.legLength
+        : clampNumber(body.legLength, AVATAR_FORGE_BODY_LIMITS.legLength, DEFAULT_BODY.legLength),
     },
     hair: {
       style,
@@ -409,6 +519,83 @@ export function createAvatarForgeState(presetId?: string): AvatarForgeState {
   if (!presetId) return sanitizeAvatarForgeState(DEFAULT_AVATAR_FORGE_STATE);
   const selected = AVATAR_FORGE_PRESETS.find((item) => item.id === presetId);
   return sanitizeAvatarForgeState(selected?.state ?? DEFAULT_AVATAR_FORGE_STATE);
+}
+
+/**
+ * Applies one named body recipe without replacing the user's face, hair, colors, or accents.
+ * The same state + preset id always produces the same serialized result.
+ */
+export function applyAvatarForgeBodyPreset(
+  state: AvatarForgeState,
+  presetId: AvatarForgeBodyPresetId,
+): AvatarForgeState {
+  const selected = AVATAR_FORGE_BODY_PRESETS.find((item) => item.id === presetId);
+  if (!selected) return sanitizeAvatarForgeState(state);
+  return sanitizeAvatarForgeState({
+    ...state,
+    presetId: undefined,
+    bodyPresetId: selected.id,
+    body: { ...selected.body },
+  });
+}
+
+export type AvatarForgeBodyBoneName =
+  | "hips"
+  | "spine"
+  | "chest"
+  | "upperChest"
+  | "leftLowerArm"
+  | "rightLowerArm"
+  | "leftHand"
+  | "rightHand"
+  | "leftLowerLeg"
+  | "rightLowerLeg"
+  | "leftFoot"
+  | "rightFoot";
+
+export type AvatarForgeBodyBoneAdjustment = {
+  readonly bone: AvatarForgeBodyBoneName;
+  readonly positionMultiplier: readonly [number, number, number];
+  readonly scaleMultiplier: readonly [number, number, number];
+};
+
+/**
+ * Builds a renderer-independent, deterministic rig adjustment plan. Width is applied as a
+ * conservative torso scale; length uses child-bone offsets so arbitrary source bone axes remain
+ * intact and the original mesh/geometry buffers never change.
+ */
+export function buildAvatarForgeBodyAdjustmentPlan(
+  body: AvatarForgeBodyParams,
+): readonly AvatarForgeBodyBoneAdjustment[] {
+  const shoulder = clampNumber(
+    body.shoulderWidth,
+    AVATAR_FORGE_BODY_LIMITS.shoulderWidth,
+    DEFAULT_BODY.shoulderWidth,
+  );
+  const torso = clampNumber(
+    body.torsoLength,
+    AVATAR_FORGE_BODY_LIMITS.torsoLength,
+    DEFAULT_BODY.torsoLength,
+  );
+  const hip = clampNumber(body.hipWidth, AVATAR_FORGE_BODY_LIMITS.hipWidth, DEFAULT_BODY.hipWidth);
+  const arm = clampNumber(body.armLength, AVATAR_FORGE_BODY_LIMITS.armLength, DEFAULT_BODY.armLength);
+  const leg = clampNumber(body.legLength, AVATAR_FORGE_BODY_LIMITS.legLength, DEFAULT_BODY.legLength);
+  const unchanged = [1, 1, 1] as const;
+
+  return [
+    { bone: "hips", positionMultiplier: unchanged, scaleMultiplier: [hip, 1, 1] },
+    { bone: "spine", positionMultiplier: [torso, torso, torso], scaleMultiplier: unchanged },
+    { bone: "chest", positionMultiplier: [torso, torso, torso], scaleMultiplier: [shoulder, 1, 1] },
+    { bone: "upperChest", positionMultiplier: [torso, torso, torso], scaleMultiplier: [shoulder, 1, 1] },
+    { bone: "leftLowerArm", positionMultiplier: [arm, arm, arm], scaleMultiplier: unchanged },
+    { bone: "rightLowerArm", positionMultiplier: [arm, arm, arm], scaleMultiplier: unchanged },
+    { bone: "leftHand", positionMultiplier: [arm, arm, arm], scaleMultiplier: unchanged },
+    { bone: "rightHand", positionMultiplier: [arm, arm, arm], scaleMultiplier: unchanged },
+    { bone: "leftLowerLeg", positionMultiplier: [leg, leg, leg], scaleMultiplier: unchanged },
+    { bone: "rightLowerLeg", positionMultiplier: [leg, leg, leg], scaleMultiplier: unchanged },
+    { bone: "leftFoot", positionMultiplier: [leg, leg, leg], scaleMultiplier: unchanged },
+    { bone: "rightFoot", positionMultiplier: [leg, leg, leg], scaleMultiplier: unchanged },
+  ];
 }
 
 /** 웨이브 스펙. amount가 0이면 파츠에 키를 만들지 않는다(하위호환 계약). */

@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  rasterizeStudioVectorReferenceOffscreen,
-  StudioVectorReferenceError,
-} from "./studio-vector-fill-reference";
+import { rasterizeStudioVectorReferenceOffscreen } from "./studio-vector-fill-reference";
 
 import type {
   StudioOffscreenRasterRunInput,

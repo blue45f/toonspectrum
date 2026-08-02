@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { adminFetch, formatNum, formatWon, type AdminApiError } from "./admin-client";
 import { AdminNotice, AdminSpinner, Stat, StatGroup } from "./admin-ui";
 
+import { useT } from "@/lib/i18n";
+
 interface Dashboard {
   updatedAt: string;
   users: { total: number; activeLast7d: number; activeLast30d: number; admins: number; creators: number };
@@ -18,10 +20,10 @@ interface Dashboard {
     periodDays: number;
   };
 }
-
 export function AdminDashboard({ uid }: { uid: string }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   useEffect(() => {
     let alive = true;
@@ -35,37 +37,41 @@ export function AdminDashboard({ uid }: { uid: string }) {
     };
   }, [uid]);
 
-  if (error) return <AdminNotice title="지표를 불러오지 못했어요" body={error} />;
+  if (error) return <AdminNotice title={t("admin.dashboard.loadError")} body={error} />;
   if (!data) return <AdminSpinner />;
+
+  const periodText = t("admin.dashboard.period")
+    .replace("{days}", String(data.monetization.periodDays))
+    .replace("{date}", new Date(data.updatedAt).toLocaleString());
 
   return (
     <div className="flex flex-col gap-8">
       <p className="text-xs text-fg-3">
-        최근 {data.monetization.periodDays}일 · {new Date(data.updatedAt).toLocaleString("ko-KR")} 기준
+        {periodText}
       </p>
-      <StatGroup icon={<Users size={15} />} label="사용자">
-        <Stat label="전체" value={formatNum(data.users.total)} />
-        <Stat label="7일 활성" value={formatNum(data.users.activeLast7d)} />
-        <Stat label="30일 활성" value={formatNum(data.users.activeLast30d)} />
-        <Stat label="관리자" value={formatNum(data.users.admins)} />
-        <Stat label="크리에이터" value={formatNum(data.users.creators)} />
+      <StatGroup icon={<Users size={15} />} label={t("admin.dashboard.groupUsers")}>
+        <Stat label={t("admin.dashboard.userTotal")} value={formatNum(data.users.total)} />
+        <Stat label={t("admin.dashboard.userActive7d")} value={formatNum(data.users.activeLast7d)} />
+        <Stat label={t("admin.dashboard.userActive30d")} value={formatNum(data.users.activeLast30d)} />
+        <Stat label={t("admin.dashboard.userAdmins")} value={formatNum(data.users.admins)} />
+        <Stat label={t("admin.dashboard.userCreators")} value={formatNum(data.users.creators)} />
       </StatGroup>
-      <StatGroup icon={<MessagesSquare size={15} />} label="커뮤니티">
-        <Stat label="펜카페 글" value={formatNum(data.community.fanPosts)} />
-        <Stat label="펜카페 댓글" value={formatNum(data.community.fanReplies)} />
-        <Stat label="리뷰" value={formatNum(data.community.reviews)} />
-        <Stat label="리뷰 댓글" value={formatNum(data.community.reviewReplies)} />
-        <Stat label="활동 사용자" value={formatNum(data.community.userActivity)} />
+      <StatGroup icon={<MessagesSquare size={15} />} label={t("admin.dashboard.groupCommunity")}>
+        <Stat label={t("admin.dashboard.communityPosts")} value={formatNum(data.community.fanPosts)} />
+        <Stat label={t("admin.dashboard.communityReplies")} value={formatNum(data.community.fanReplies)} />
+        <Stat label={t("admin.dashboard.communityReviews")} value={formatNum(data.community.reviews)} />
+        <Stat label={t("admin.dashboard.communityReviewReplies")} value={formatNum(data.community.reviewReplies)} />
+        <Stat label={t("admin.dashboard.communityActiveUsers")} value={formatNum(data.community.userActivity)} />
       </StatGroup>
-      <StatGroup icon={<Coins size={15} />} label="수익">
+      <StatGroup icon={<Coins size={15} />} label={t("admin.dashboard.groupMonetization")}>
         <Stat
-          label="활성/전체 플랜"
+          label={t("admin.dashboard.planRatio")}
           value={`${formatNum(data.monetization.activePlanCount)}/${formatNum(data.monetization.planCount)}`}
         />
-        <Stat label="캠페인" value={formatNum(data.monetization.campaignCount)} />
-        <Stat label="대기 정산건" value={formatNum(data.monetization.pendingEvents)} />
-        <Stat label="정산 완료액" value={formatWon(data.monetization.revenuePaidCents)} />
-        <Stat label="대기 금액" value={formatWon(data.monetization.revenuePendingCents)} />
+        <Stat label={t("admin.dashboard.campaigns")} value={formatNum(data.monetization.campaignCount)} />
+        <Stat label={t("admin.dashboard.pendingSettlements")} value={formatNum(data.monetization.pendingEvents)} />
+        <Stat label={t("admin.dashboard.paidAmount")} value={formatWon(data.monetization.revenuePaidCents)} />
+        <Stat label={t("admin.dashboard.pendingAmount")} value={formatWon(data.monetization.revenuePendingCents)} />
       </StatGroup>
     </div>
   );

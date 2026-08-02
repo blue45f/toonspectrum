@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  disposeStudioMannequinPoseLandmarker,
+  getStudioMannequinWebcamErrorMessage,
+  initStudioMannequinPoseLandmarker,
   solvePoseToMannequinJoints,
   smoothMannequinJointRotations,
   type PoseLandmark,
+  type StudioMannequinPoseLandmarker,
 } from "./studio-mannequin-webcam-tracking";
+
+afterEach(() => {
+  disposeStudioMannequinPoseLandmarker();
+});
 
 describe("studio-mannequin-webcam-tracking", () => {
   it("solves MediaPipe pose landmarks into 3D mannequin joint rotations", () => {
@@ -38,5 +48,100 @@ describe("studio-mannequin-webcam-tracking", () => {
     expect(smoothed.leftUpperArm?.[0]).toBe(0.5);
     expect(smoothed.leftUpperArm?.[1]).toBe(0.5);
     expect(smoothed.leftUpperArm?.[2]).toBe(0.5);
+  });
+
+  it("loads SIMD and non-SIMD Wasm from Vite-owned URLs instead of a CSP-blocked CDN", () => {
+    const runtimeSource = readFileSync(
+      new URL("./studio-mannequin-webcam-tracking.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(runtimeSource).toContain("vision_wasm_internal.js?url");
+    expect(runtimeSource).toContain("vision_wasm_nosimd_internal.js?url");
+    expect(runtimeSource).toContain("modelAssetBuffer");
+    expect(runtimeSource).not.toMatch(/cdn\.jsdelivr\.net|unpkg\.com/i);
+  });
+
+  it("deduplicates concurrent VIDEO runtime initialization and closes the cached task", async () => {
+    const landmarker: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(() => {
+        throw new Error("MediaPipe close failed");
+      }),
+    };
+    let resolveFactory: ((value: StudioMannequinPoseLandmarker) => void) | undefined;
+    const factory = vi.fn(
+      () =>
+        new Promise<StudioMannequinPoseLandmarker>((resolve) => {
+          resolveFactory = resolve;
+        }),
+    );
+
+    const first = initStudioMannequinPoseLandmarker({ factory });
+    const second = initStudioMannequinPoseLandmarker({ factory });
+    expect(factory).toHaveBeenCalledTimes(1);
+
+    resolveFactory?.(landmarker);
+    await expect(first).resolves.toBe(landmarker);
+    await expect(second).resolves.toBe(landmarker);
+
+    expect(() => disposeStudioMannequinPoseLandmarker()).not.toThrow();
+    expect(landmarker.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("best-effort closes a stale task after stop/dispose and allows a clean retry", async () => {
+    const staleLandmarker: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(() => {
+        throw new Error("Stale MediaPipe close failed");
+      }),
+    };
+    let resolveFactory: ((value: StudioMannequinPoseLandmarker) => void) | undefined;
+    const pending = initStudioMannequinPoseLandmarker({
+      factory: () =>
+        new Promise<StudioMannequinPoseLandmarker>((resolve) => {
+          resolveFactory = resolve;
+        }),
+    });
+
+    disposeStudioMannequinPoseLandmarker();
+    resolveFactory?.(staleLandmarker);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(staleLandmarker.close).toHaveBeenCalledTimes(1);
+
+    const retryLandmarker: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    };
+    await expect(
+      initStudioMannequinPoseLandmarker({ factory: async () => retryLandmarker }),
+    ).resolves.toBe(retryLandmarker);
+  });
+
+  it("distinguishes permission, busy-camera, model timeout, and runtime file failures", () => {
+    expect(
+      getStudioMannequinWebcamErrorMessage(
+        "camera",
+        Object.assign(new Error(), { name: "NotAllowedError" }),
+      ),
+    ).toContain("카메라 권한");
+    expect(
+      getStudioMannequinWebcamErrorMessage(
+        "camera",
+        Object.assign(new Error(), { name: "NotReadableError" }),
+      ),
+    ).toContain("다른 앱");
+    expect(
+      getStudioMannequinWebcamErrorMessage(
+        "engine",
+        Object.assign(new Error(), { name: "StudioMannequinPoseModelTimeoutError" }),
+      ),
+    ).toContain("시간이 오래");
+    expect(
+      getStudioMannequinWebcamErrorMessage(
+        "engine",
+        Object.assign(new Error(), { name: "StudioMannequinVisionWasmLoadError" }),
+      ),
+    ).toContain("엔진 파일");
   });
 });

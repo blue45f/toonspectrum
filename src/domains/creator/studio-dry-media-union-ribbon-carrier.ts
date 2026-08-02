@@ -541,6 +541,13 @@ export function planStudioDryMediaUnionRibbonCarrier(
     marks: readonly StudioDryMediaUnionRibbonSourceMark[];
     materialIdentity?: StudioDynamicBrushMaterialIdentity;
     dynamics: NormalizedStudioBrushDynamicsSettings;
+    /**
+     * Physical bridged marks supplied only as causal context. They participate in predecessor
+     * lookup but are omitted from the returned suffix polygons. Live drawing uses one complete
+     * predecessor station so a newly appended lane starts at the exact previous fibre centre
+     * without rebuilding the whole stroke.
+     */
+    skipLeadingMarks?: number;
   }>,
 ): StudioDryMediaUnionRibbonPlanResult {
   if (
@@ -575,7 +582,20 @@ export function planStudioDryMediaUnionRibbonCarrier(
   const laneCount = studioDryMediaDynamicBridgeMarkMultiplier(
     input.materialIdentity,
   );
+  const skipLeadingMarks = input.skipLeadingMarks ?? 0;
   if (laneCount === 1 || input.dabs.length % laneCount !== 0) {
+    return Object.freeze({
+      applied: false,
+      reason: "mark-dab-mismatch",
+      marks: input.marks,
+    });
+  }
+  if (
+    !Number.isSafeInteger(skipLeadingMarks)
+    || skipLeadingMarks < 0
+    || skipLeadingMarks >= input.marks.length
+    || skipLeadingMarks % laneCount !== 0
+  ) {
     return Object.freeze({
       applied: false,
       reason: "mark-dab-mismatch",
@@ -599,7 +619,11 @@ export function planStudioDryMediaUnionRibbonCarrier(
   const brushId = input.materialIdentity?.brushId as CoreDryMediaId;
   const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[brushId];
   const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
-  for (let index = 0; index < input.dabs.length; index += 1) {
+  for (
+    let index = skipLeadingMarks;
+    index < input.dabs.length;
+    index += 1
+  ) {
     const dab = input.dabs[index]!;
     const mark = input.marks[index]!;
     const travel = Math.max(0, finite(dab.distanceFromPrevious, 0));
@@ -643,7 +667,11 @@ export function planStudioDryMediaUnionRibbonCarrier(
         startHalfWidth: start.halfWidth,
         endHalfWidth: coverageHalfWidth(mark),
         seed: grainSeed,
-        stationIndex: Math.floor(index / laneCount),
+        // The carrier may receive an arbitrary causal suffix during live drawing. Local array
+        // indices restart at zero for that suffix, while the segment frame retains the immutable
+        // source-dab index. Seed paper tooth from that causal identity so chunking a stroke does
+        // not move, add or remove grain pores compared with the pointer-up full replay.
+        stationIndex: frame.index + 1,
         laneIndex: index % laneCount,
         policy: grainPolicy,
       });

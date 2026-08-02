@@ -1,6 +1,7 @@
 import { ArrowLeft, Ban, CheckCircle2, Eye, EyeOff, ImageOff, MessagesSquare, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import { adminFetch, type AdminApiError } from "./components/admin-client";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
@@ -10,6 +11,7 @@ import type { SharedAssetModerationQueueItem } from "@/src/infrastructure/creato
 
 import { Container } from "@/components/section";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/lib/community-ui";
+import { useI18n, useT } from "@/lib/i18n";
 import { cn, relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { verifyStudioSharedAssetContent } from "@/src/domains/creator/studio-shared-asset-content";
@@ -19,8 +21,6 @@ import {
   listSharedAssetModerationQueue,
   moderateSharedAsset,
 } from "@/src/infrastructure/creator-client";
-
-
 
 interface ModerationPost {
   id: string;
@@ -36,36 +36,30 @@ interface ModerationPost {
   author: { id: string; name: string | null; email: string | null };
   replyCount: number;
 }
-
-const SCOPE_FILTERS: { value: FanCafeScopeFilter; label: string }[] = (
-  ["all", "title", "author", "pencafe", "cafe"] as const
-).map((value) => ({ value, label: COMMUNITY_SCOPE_LABEL_WITH_ALL[value] }));
-
-const VISIBILITY_FILTERS = [
-  { value: "all", label: "전체" },
-  { value: "visible", label: "노출 중" },
-  { value: "hidden", label: "숨김" },
-] as const;
-type VisibilityFilter = (typeof VISIBILITY_FILTERS)[number]["value"];
-
 // 커뮤니티 모더레이션 분할 라우트(/admin/community) — 게시글 숨김/해제·첨부 제거·완전 삭제.
 export function AdminCommunityPage() {
-  useDocumentTitle("커뮤니티 관리");
+  const t = useT();
+  const lang = useI18n((s) => s.lang);
+  useDocumentTitle(t("admin.community.title"));
   const { gate, uid } = useAdminGate();
+
+  useEffect(() => {
+    void loadAdminI18nLocale(lang);
+  }, [lang]);
 
   return (
     <Container size="wide" className="py-10">
       <header className="mb-8">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <MessagesSquare size={13} /> ADMIN · COMMUNITY
+          <MessagesSquare size={13} /> {t("admin.community.eyebrow")}
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">커뮤니티 글 관리</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("admin.community.title")}</h1>
         <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-3">
-          신고·권리침해 대응 — 게시글 숨김(가역), 첨부 이미지 제거, 완전 삭제(비가역)를 처리합니다.
+          {t("admin.community.desc")}
         </p>
         <Link href="/admin" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent">
           <ArrowLeft size={13} />
-          관리자 콘솔로
+          {t("admin.members.backToConsole")}
         </Link>
       </header>
 
@@ -80,6 +74,7 @@ export function AdminCommunityPage() {
   );
 }
 
+
 function AssetModerationBoard() {
   const [items, setItems] = useState<SharedAssetModerationQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +87,7 @@ function AssetModerationBoard() {
   } | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const t = useT();
 
   useEffect(() => {
     let alive = true;
@@ -102,7 +98,7 @@ function AssetModerationBoard() {
         if (alive) setItems(data);
       })
       .catch((reason) => {
-        if (alive) setError(reason instanceof Error ? reason.message : "에셋 신고를 불러오지 못했습니다.");
+        if (alive) setError(reason instanceof Error ? reason.message : "Error loading reports.");
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -130,7 +126,7 @@ function AssetModerationBoard() {
         setOriginalInspection((current) => current?.assetId === item.asset.id ? null : current);
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "에셋 검수 상태를 변경하지 못했습니다.");
+      setError(reason instanceof Error ? reason.message : "Status update failed.");
     } finally {
       setBusyId(null);
     }
@@ -149,7 +145,7 @@ function AssetModerationBoard() {
       const verified = await verifyStudioSharedAssetContent(item.asset, content);
       setOriginalInspection({ assetId: item.asset.id, dataUrl: verified.dataUrl });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "에셋 원본을 검수용으로 불러오지 못했습니다.");
+      setError(reason instanceof Error ? reason.message : "Error inspecting original.");
     } finally {
       setInspectionBusyId(null);
     }
@@ -160,11 +156,11 @@ function AssetModerationBoard() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-warn"><ShieldAlert size={13} /> ASSET REPORTS</p>
-          <h2 id="asset-moderation-title" className="mt-1 text-xl font-bold text-fg">공유 에셋 신고 검수</h2>
-          <p className="mt-1 text-xs leading-relaxed text-fg-3">사용권·권리침해·유해 콘텐츠 신고를 검토하고 공개 상태를 결정합니다.</p>
+          <h2 id="asset-moderation-title" className="mt-1 text-xl font-bold text-fg">{t("admin.community.assetReportsTitle")}</h2>
+          <p className="mt-1 text-xs leading-relaxed text-fg-3">{t("admin.community.assetReportsDesc")}</p>
         </div>
         <button type="button" onClick={() => setRefreshTick((tick) => tick + 1)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised">
-          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> 신고 갱신
+          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> {t("admin.community.refreshReports")}
         </button>
       </div>
 
@@ -172,7 +168,7 @@ function AssetModerationBoard() {
       {loading ? (
         <div className="space-y-2.5">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="skeleton h-40 rounded-xl" />)}</div>
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-8 text-center text-sm text-fg-3">처리할 에셋 신고가 없습니다.</div>
+        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-8 text-center text-sm text-fg-3">{t("admin.community.noAssetReports")}</div>
       ) : (
         <ul className="space-y-3">
           {items.map((item) => {
@@ -185,7 +181,7 @@ function AssetModerationBoard() {
                   <div className="flex h-36 items-center justify-center overflow-hidden rounded-xl border border-line bg-raised/50">
                     <img
                       src={showingOriginal ? originalInspection.dataUrl : item.asset.previewDataUrl}
-                      alt={`${item.asset.name} ${showingOriginal ? "검증된 원본" : "카탈로그 미리보기"}`}
+                      alt={item.asset.name}
                       className="max-h-full max-w-full object-contain"
                     />
                   </div>
@@ -197,29 +193,29 @@ function AssetModerationBoard() {
                     className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45"
                   >
                     <Eye size={12} />
-                    {loadingOriginal ? "원본 검증 중…" : showingOriginal ? "미리보기로 전환" : "검증된 원본 확인"}
+                    {loadingOriginal ? t("admin.community.verifying") : showingOriginal ? t("admin.community.previewData") : t("admin.community.verifyOriginal")}
                   </button>
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
                     <span className="rounded-full bg-bad/10 px-2 py-0.5 font-semibold text-bad">{item.reason}</span>
                     <span>{item.asset.licenseLabel ?? item.asset.license}</span>
-                    {item.asset.containsAi && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">AI 포함</span>}
-                    <span className="ml-auto">누적 신고 {item.asset.reportCount ?? 1}</span>
+                    {item.asset.containsAi && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">AI</span>}
+                    <span className="ml-auto">Reports {item.asset.reportCount ?? 1}</span>
                   </div>
                   <h3 className="mt-2 truncate text-sm font-bold text-fg">{item.asset.name}</h3>
-                  <p className="mt-1 text-xs text-fg-3">공유자 {item.asset.author.name} · 신고자 ID {item.reporter.id}</p>
+                  <p className="mt-1 text-xs text-fg-3">{item.asset.author.name} · {item.reporter.id}</p>
                   {item.details && <p className="mt-2 rounded-lg bg-raised/60 px-3 py-2 text-xs leading-relaxed text-fg-2">{item.details}</p>}
                   <input
                     value={notes[item.reportId] ?? ""}
                     onChange={(event) => setNotes((current) => ({ ...current, [item.reportId]: event.target.value.slice(0, 500) }))}
-                    placeholder="검수 메모(선택)"
+                    placeholder={t("admin.community.notePlaceholder")}
                     className="mt-3 min-h-11 w-full rounded-lg border border-line bg-canvas/50 px-3 text-xs text-fg outline-none focus:border-accent"
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" disabled={busy} onClick={() => void review(item, "published")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-good/40 px-3 text-xs font-semibold text-good hover:bg-good/10 disabled:opacity-45"><CheckCircle2 size={13} /> 문제 없음</button>
-                    <button type="button" disabled={busy} onClick={() => void review(item, "under_review")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-warn/40 px-3 text-xs font-semibold text-warn hover:bg-warn/10 disabled:opacity-45"><ShieldAlert size={13} /> 검수 중 숨김</button>
-                    <button type="button" disabled={busy} onClick={() => void review(item, "rejected")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/40 px-3 text-xs font-semibold text-bad hover:bg-bad/10 disabled:opacity-45"><Ban size={13} /> 게시 거절</button>
+                    <button type="button" disabled={busy} onClick={() => void review(item, "published")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-good/40 px-3 text-xs font-semibold text-good hover:bg-good/10 disabled:opacity-45"><CheckCircle2 size={13} /> {t("admin.community.approveAsset")}</button>
+                    <button type="button" disabled={busy} onClick={() => void review(item, "under_review")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-warn/40 px-3 text-xs font-semibold text-warn hover:bg-warn/10 disabled:opacity-45"><ShieldAlert size={13} /> {t("admin.community.reviewAsset")}</button>
+                    <button type="button" disabled={busy} onClick={() => void review(item, "rejected")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/40 px-3 text-xs font-semibold text-bad hover:bg-bad/10 disabled:opacity-45"><Ban size={13} /> {t("admin.community.rejectAsset")}</button>
                   </div>
                 </div>
               </li>
@@ -236,12 +232,23 @@ function ModerationBoard({ uid }: { uid: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scope, setScope] = useState<FanCafeScopeFilter>("all");
-  const [visibility, setVisibility] = useState<VisibilityFilter>("all");
+  const [visibility, setVisibility] = useState<"all" | "visible" | "hidden">("all");
   const [searchText, setSearchText] = useState("");
   const [queryText, setQueryText] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const t = useT();
+
+  const scopeFilters: { value: FanCafeScopeFilter; label: string }[] = (
+    ["all", "title", "author", "pencafe", "cafe"] as const
+  ).map((value) => ({ value, label: COMMUNITY_SCOPE_LABEL_WITH_ALL[value] }));
+
+  const visibilityFilters = [
+    { value: "all", label: t("admin.revenue.filterAll") },
+    { value: "visible", label: t("admin.plans.statusActive") },
+    { value: "hidden", label: t("admin.community.hidePost") },
+  ] as const;
 
   useEffect(() => {
     const timer = setTimeout(() => setQueryText(searchText.trim()), 250);
@@ -272,7 +279,7 @@ function ModerationBoard({ uid }: { uid: string }) {
     try {
       await action();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "처리하지 못했습니다.");
+      setActionError(e instanceof Error ? e.message : "Failed.");
     } finally {
       setBusyId(null);
     }
@@ -289,7 +296,7 @@ function ModerationBoard({ uid }: { uid: string }) {
   }
 
   function clearAttachments(post: ModerationPost) {
-    if (!globalThis.confirm(`이 글의 첨부 이미지 ${post.imageCount}장을 모두 제거할까요? (본문은 유지)`)) return;
+    if (!globalThis.confirm(`${post.imageCount}`)) return;
     void run(post.id, async () => {
       await adminFetch(`/community/posts/${encodeURIComponent(post.id)}/attachments/clear`, uid, { method: "POST" });
       setPosts((current) => current.map((item) => (item.id === post.id ? { ...item, imageCount: 0 } : item)));
@@ -297,7 +304,7 @@ function ModerationBoard({ uid }: { uid: string }) {
   }
 
   function deletePost(post: ModerationPost) {
-    if (!globalThis.confirm(`"${post.title}" 글을 완전히 삭제할까요? 답글도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    if (!globalThis.confirm(`"${post.title}"`)) return;
     void run(post.id, async () => {
       await adminFetch(`/community/posts/${encodeURIComponent(post.id)}`, uid, { method: "DELETE" });
       setPosts((current) => current.filter((item) => item.id !== post.id));
@@ -313,12 +320,12 @@ function ModerationBoard({ uid }: { uid: string }) {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
-            placeholder="제목·본문·보드·작성자 검색"
+            placeholder={t("admin.community.searchPostPlaceholder")}
             className="h-7 w-56 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
           />
         </div>
         <div className="inline-flex flex-wrap rounded-xl border border-line bg-raised/40">
-          {SCOPE_FILTERS.map((option) => (
+          {scopeFilters.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -334,11 +341,11 @@ function ModerationBoard({ uid }: { uid: string }) {
           ))}
         </div>
         <div className="inline-flex rounded-xl border border-line bg-raised/40">
-          {VISIBILITY_FILTERS.map((option) => (
+          {visibilityFilters.map((option) => (
             <button
               key={option.value}
               type="button"
-              onClick={() => setVisibility(option.value)}
+              onClick={() => setVisibility(option.value as "all" | "visible" | "hidden")}
               aria-pressed={visibility === option.value}
               className={cn(
                 "px-2.5 py-1.5 text-xs font-medium transition-colors first:rounded-l-xl last:rounded-r-xl",
@@ -354,7 +361,7 @@ function ModerationBoard({ uid }: { uid: string }) {
           onClick={() => setRefreshTick((tick) => tick + 1)}
           className="ml-auto inline-flex items-center gap-1 text-xs text-fg-3 transition-colors hover:text-fg"
         >
-          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> 갱신
+          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> {t("admin.members.refresh")}
         </button>
       </div>
 
@@ -370,7 +377,7 @@ function ModerationBoard({ uid }: { uid: string }) {
         </div>
       ) : posts.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-3">
-          조건에 맞는 게시글이 없어요.
+          {t("admin.community.noPosts")}
         </div>
       ) : (
         <ul className="space-y-2.5">
@@ -388,11 +395,11 @@ function ModerationBoard({ uid }: { uid: string }) {
                   </span>
                   {post.hidden && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 font-medium text-warn">
-                      <EyeOff size={10} /> 숨김
+                      <EyeOff size={10} /> {t("admin.community.hidePost")}
                     </span>
                   )}
                   {post.imageCount > 0 && (
-                    <span className="rounded-full bg-raised/60 px-2 py-0.5">이미지 {post.imageCount}</span>
+                    <span className="rounded-full bg-raised/60 px-2 py-0.5">Img {post.imageCount}</span>
                   )}
                   <span className="ml-auto">{post.createdAt ? relativeDate(post.createdAt) : "—"}</span>
                 </div>
@@ -411,10 +418,10 @@ function ModerationBoard({ uid }: { uid: string }) {
                 <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-fg-3">{post.excerpt}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
                   <span>
-                    {post.author.name ?? "이름 없음"}
+                    {post.author.name ?? "—"}
                     {post.author.email ? ` · ${post.author.email}` : ""}
                   </span>
-                  <span>· 답글 {post.replyCount}</span>
+                  <span>· {post.replyCount}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
@@ -424,7 +431,7 @@ function ModerationBoard({ uid }: { uid: string }) {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:border-accent/45 hover:text-accent disabled:opacity-45"
                   >
                     {post.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-                    {post.hidden ? "노출 복구" : "숨기기"}
+                    {post.hidden ? t("admin.community.unhidePost") : t("admin.community.hidePost")}
                   </button>
                   {post.imageCount > 0 && (
                     <button
@@ -434,7 +441,7 @@ function ModerationBoard({ uid }: { uid: string }) {
                       className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
                     >
                       <ImageOff size={13} />
-                      첨부 제거
+                      {t("admin.community.clearAttachments")}
                     </button>
                   )}
                   <button
@@ -444,7 +451,7 @@ function ModerationBoard({ uid }: { uid: string }) {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
                   >
                     <Trash2 size={13} />
-                    완전 삭제
+                    {t("admin.community.deletePost")}
                   </button>
                 </div>
               </li>

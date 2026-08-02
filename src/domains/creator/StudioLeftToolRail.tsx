@@ -60,6 +60,10 @@ import {
 } from "./studio-left-tool-rail-position";
 import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
 import {
+  STUDIO_RETOUCH_EDITABLE_COPY_NOTE,
+  studioRetouchToolHelp,
+} from "./studio-retouch-help";
+import {
   isSelectionUsable,
   type PixelSelection,
   type SelectionToolKind,
@@ -71,10 +75,9 @@ import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
 const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
-const RASTER_RETOUCH_AUTO_TARGET_GUIDANCE =
-  "이미지 레이어를 선택하지 않아도 현재 페이지 합성본을 자동 준비해 새 래스터 레이어에서 시작합니다.";
+const RASTER_RETOUCH_AUTO_TARGET_GUIDANCE = STUDIO_RETOUCH_EDITABLE_COPY_NOTE;
 const RASTER_RETOUCH_AUTO_TARGET_UNAVAILABLE_REASON =
-  "편집 가능한 이미지가 없고 현재 페이지 합성본을 자동 준비할 그리기 내용도 없습니다.";
+  "편집 가능한 이미지도, 편집용 이미지 복사본을 자동 준비할 벡터 선·도형도 없습니다.";
 const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
 const STUDIO_RAIL_MORE_GAP_PX = 4;
@@ -83,6 +86,10 @@ const STUDIO_RAIL_MORE_MAX_HEIGHT_PX = 28 * 16;
 const STUDIO_RAIL_MORE_WIDTH_PX = 13 * 16;
 
 type PositionedStudioRailMore = StudioRailMorePosition & { readonly maxHeight: number };
+
+function labelWithShortcut(label: string, shortcut: string | undefined): string {
+  return shortcut ? `${label} (${formatStudioShortcutChord(shortcut)})` : label;
+}
 
 function currentStudioRailMoreViewport(): StudioRailMoreViewport {
   const visualViewport = globalThis.visualViewport;
@@ -147,6 +154,8 @@ export interface StudioLeftToolRailHandlers {
   clearPolyLassoDraft: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
   disarmAllPixelTools: () => void;
+  onRequestPixelSelection: () => void;
+  onRequestSelectImage: () => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   toggleAdvancedFill: () => void;
   toggleDodgeBurnTool: () => void;
@@ -281,6 +290,14 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const zoomShortcut = appSettings.shortcuts["tool-zoom"];
   const rotateViewShortcut = appSettings.shortcuts["tool-rotate-view"];
   const commentShortcut = appSettings.shortcuts["tool-comment"];
+  const smudgeShortcut = appSettings.shortcuts["tool-blend"];
+  const wetMixShortcut = appSettings.shortcuts["tool-wet-mix"];
+  const dodgeBurnShortcut = appSettings.shortcuts["tool-dodge-burn"];
+  const liquifyShortcut = appSettings.shortcuts["tool-liquify"];
+  const smudgeHelp = studioRetouchToolHelp("smudge");
+  const wetMixHelp = studioRetouchToolHelp("wet-mix");
+  const dodgeBurnHelp = studioRetouchToolHelp("dodge-burn");
+  const liquifyHelp = studioRetouchToolHelp("liquify");
   const formattedCommentShortcut = commentShortcut
     ? formatStudioShortcutChord(commentShortcut)
     : null;
@@ -354,6 +371,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     commitAppSettings,
     disarmAllPixelTools,
     fitCanvasToWidth,
+    onRequestPixelSelection,
+    onRequestSelectImage,
     onPickImage,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
@@ -366,6 +385,14 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     openPixelSelectionTransform,
     openSelectedLayerCrop,
   } = stableHandlers;
+  const pixelTransformNeedsSelection =
+    !pixelToolTargetAvailable || !isSelectionUsable(pixelSel);
+  const frameAnimationNeedsImage =
+    selected?.type !== "image" || !pixelToolTargetAvailable;
+  const pixelTransformRecoveryAvailable =
+    pixelTransformNeedsSelection && !activeSurfaceReviewLocked && !selectedImageLocked;
+  const frameAnimationRecoveryAvailable =
+    frameAnimationNeedsImage && !activeSurfaceReviewLocked && !selectedImageLocked;
 
   useEffect(() => {
     if (!railMoreOpen) return;
@@ -616,20 +643,27 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("transform") ? (
             <StudioRailToolButton
               icon={Maximize2}
-              label="변형 (⇧T)"
-              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+              label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
+              description={
+                pixelTransformRecoveryAvailable
+                  ? "변형할 이미지 레이어를 먼저 고르세요. 이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요. 지금 사각 선택을 시작하고, 선택 뒤 이 위치에서 변형을 바로 열 수 있어요."
+                  : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+              }
               active={false}
-              disabled={!pixelToolTargetAvailable || !isSelectionUsable(pixelSel)}
+              disabled={activeSurfaceReviewLocked || selectedImageLocked}
               unavailableReason={
-                selected?.type !== "image"
-                  ? "변형할 이미지 레이어를 먼저 고르세요."
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
-                    : !isSelectionUsable(pixelSel)
-                      ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
-                      : undefined
+                    : undefined
               }
-              onClick={openPixelSelectionTransform}
+              className={pixelTransformRecoveryAvailable ? "size-11" : undefined}
+              onClick={
+                pixelTransformRecoveryAvailable
+                  ? onRequestPixelSelection
+                  : openPixelSelectionTransform
+              }
             />
             ) : null}
             {isRailToolVisible("crop") ? (
@@ -700,8 +734,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("blend") ? (
             <StudioRailToolButton
               icon={Wind}
-              label="혼합 (스머지) (N)"
-              description={rasterRetouchDescription("이미지 픽셀을 문질러 색을 섞습니다.")}
+              label={labelWithShortcut(smudgeHelp.railName, smudgeShortcut)}
+              aria-keyshortcuts={smudgeShortcut || undefined}
+              description={rasterRetouchDescription(smudgeHelp.summary)}
               active={smudgeActive}
               disabled={!smudgeActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(smudgeActive)}
@@ -711,10 +746,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("wet-mix") ? (
             <StudioRailToolButton
               icon={Droplets}
-              label="혼색 브러시 (Shift+N)"
-              description={rasterRetouchDescription(
-                "바닥색을 묻혀 섞어가며 안료를 얹는 CSP식 색혼합 브러시입니다."
-              )}
+              label={labelWithShortcut(wetMixHelp.railName, wetMixShortcut)}
+              aria-keyshortcuts={wetMixShortcut || undefined}
+              description={rasterRetouchDescription(wetMixHelp.summary)}
               active={wetMixActive}
               disabled={!wetMixActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(wetMixActive)}
@@ -724,10 +758,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("dodge-burn") ? (
             <StudioRailToolButton
               icon={Sun}
-              label="닷지/번 (O)"
-              description={rasterRetouchDescription(
-                "어둡거나 밝은 영역을 브러시로 밝히거나 태우고, 스펀지로 채도를 조절합니다."
-              )}
+              label={labelWithShortcut(dodgeBurnHelp.railName, dodgeBurnShortcut)}
+              aria-keyshortcuts={dodgeBurnShortcut || undefined}
+              description={rasterRetouchDescription(dodgeBurnHelp.summary)}
               active={dodgeBurnActive}
               disabled={!dodgeBurnActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(dodgeBurnActive)}
@@ -737,8 +770,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("liquify") ? (
             <StudioRailToolButton
               icon={Move}
-              label="리퀴파이 (J)"
-              description={rasterRetouchDescription("이미지 위를 밀어 국소 왜곡합니다.")}
+              label={labelWithShortcut(liquifyHelp.railName, liquifyShortcut)}
+              aria-keyshortcuts={liquifyShortcut || undefined}
+              description={rasterRetouchDescription(liquifyHelp.summary)}
               active={liquifyActive}
               disabled={!liquifyActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(liquifyActive)}
@@ -1054,18 +1088,27 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               icon={Film}
-              label="프레임 애니메이션"
-              description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
+              label={frameAnimationRecoveryAvailable ? "이미지 선택하기" : "프레임 애니메이션"}
+              description={
+                frameAnimationRecoveryAvailable
+                  ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요. 선택 모드에서 고른 뒤 이 위치에서 프레임 편집기로 돌아올 수 있어요."
+                  : "선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
+              }
               active={frameAnimOpen && frameAnimTargetId === selected?.id}
-              disabled={!pixelToolTargetAvailable}
+              disabled={activeSurfaceReviewLocked || selectedImageLocked}
               unavailableReason={
-                selected?.type !== "image"
-                  ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요."
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
                   : selectedImageMutationLocked
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
-              onClick={openFrameAnimationForSelected}
+              className={frameAnimationRecoveryAvailable ? "size-11" : undefined}
+              onClick={
+                frameAnimationRecoveryAvailable
+                  ? onRequestSelectImage
+                  : openFrameAnimationForSelected
+              }
             />
             ) : null}
             {isRailToolVisible("mannequin3d") ? (

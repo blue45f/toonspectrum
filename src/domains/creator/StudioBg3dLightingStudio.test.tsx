@@ -155,7 +155,7 @@ describe("StudioBg3dLightingStudio", () => {
       },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "키 라이트 그림자" }));
+    fireEvent.click(screen.getByRole("switch", { name: "키 라이트 그림자" }));
     expect(onUpdateLighting).toHaveBeenLastCalledWith({
       key: { ...DEFAULT_LIGHTING.key, castsShadow: false },
     });
@@ -204,8 +204,8 @@ describe("StudioBg3dLightingStudio", () => {
     );
     const rangeInputs = screen.getAllByRole("slider");
     const shadowToggles = [
-      screen.getByRole("button", { name: "키 라이트 그림자" }),
-      screen.getByRole("button", { name: "필 라이트 그림자" }),
+      screen.getByRole("switch", { name: "키 라이트 그림자" }),
+      screen.getByRole("switch", { name: "필 라이트 그림자" }),
     ];
 
     for (const control of [

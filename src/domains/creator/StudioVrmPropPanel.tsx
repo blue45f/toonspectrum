@@ -32,6 +32,7 @@ import {
   type PropRigV2,
   type Vec3,
 } from "./studio-vrm-props";
+import { StudioThreeDToggleControl } from "./StudioThreeDToggle";
 
 import { cn } from "@/lib/utils";
 
@@ -396,45 +397,17 @@ function ToggleRow({
   label,
   onChange,
 }: ToggleRowProps) {
-  const descriptionId = useId();
-
   return (
-    <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/60 py-1.5 last:border-b-0">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold text-fg-2">{label}</p>
-        <p id={descriptionId} className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3">
-          {description}
-        </p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        disabled={disabled}
-        aria-label={label}
-        aria-describedby={descriptionId}
-        className={cn(
-          "relative min-h-11 min-w-11 shrink-0 rounded-full disabled:cursor-not-allowed disabled:opacity-45",
-          FOCUS_RING
-        )}
-        onClick={() => onChange(!checked)}
-      >
-        <span
-          aria-hidden
-          className={cn(
-            "absolute left-1/2 top-1/2 h-6 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border transition-colors duration-150 motion-reduce:transition-none",
-            checked ? "border-accent/60 bg-accent" : "border-line bg-raised"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-5 rounded-full bg-fg shadow-sm transition-transform duration-150 motion-reduce:transition-none",
-              checked ? "translate-x-[1.05rem]" : "translate-x-0.5"
-            )}
-          />
-        </span>
-      </button>
-    </div>
+    <StudioThreeDToggleControl
+      checked={checked}
+      disabled={disabled}
+      label={label}
+      description={description}
+      className="border-b border-line/60 py-1.5 last:border-b-0"
+      labelClassName="text-xs font-semibold text-fg-2 group-hover:text-fg"
+      descriptionClassName="text-[0.64rem] leading-relaxed text-fg-3"
+      onChange={onChange}
+    />
   );
 }
 

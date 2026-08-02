@@ -40,6 +40,8 @@ export interface StudioHokusaiNaturalMediaInspectorSectionProps {
   readonly masterEditMode: boolean;
   readonly disabled: boolean;
   readonly disabledReason: string | null;
+  /** Moves the editor into object-selection mode so the artist can pick a finished stroke. */
+  readonly onRequestSelectStroke?: () => void;
   readonly onReplace: (
     result: StudioHokusaiNaturalMediaProductResult,
     targetPageId: string,
@@ -105,6 +107,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
   masterEditMode,
   disabled,
   disabledReason,
+  onRequestSelectStroke,
   onReplace,
 }: StudioHokusaiNaturalMediaInspectorSectionProps): ReactElement {
   const selectedDraw = selectedFreehand(selected);
@@ -337,6 +340,21 @@ export function StudioHokusaiNaturalMediaInspectorSection({
             <p className="mt-0.5 text-[0.6rem] leading-relaxed text-fg-3">
               변환 성공 시 원본 벡터는 숨김 보존하고 같은 위치에 투명 래스터를 만듭니다. 실행 취소로 즉시 되돌릴 수 있습니다.
             </p>
+            {!selectedDraw && onRequestSelectStroke ? (
+              <button
+                type="button"
+                disabled={disabled || busy}
+                onClick={onRequestSelectStroke}
+                className={cn(
+                  "mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft/45 px-3 text-xs font-bold text-accent hover:bg-accent-soft/70",
+                  STUDIO_FOCUS_RING,
+                  "disabled:cursor-not-allowed disabled:opacity-45",
+                )}
+              >
+                <Sparkles size={14} aria-hidden />
+                선화 선택하기
+              </button>
+            ) : null}
           </div>
 
           <fieldset

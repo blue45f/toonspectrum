@@ -26,8 +26,8 @@ import {
   type DodgeBurnRange,
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";
@@ -64,6 +64,7 @@ export type StudioDodgeBurnPanelProps = {
   onRadiusChange: (value: number) => void;
   onHardnessChange: (value: number) => void;
   onExposureChange: (value: number) => void;
+  onOpenTutorial?: () => void;
 };
 
 export function StudioDodgeBurnPanel({
@@ -83,6 +84,7 @@ export function StudioDodgeBurnPanel({
   onRadiusChange,
   onHardnessChange,
   onExposureChange,
+  onOpenTutorial,
 }: StudioDodgeBurnPanelProps): ReactElement {
   const titleId = useId();
   const help = studioRetouchToolHelp("dodge-burn");
@@ -94,7 +96,11 @@ export function StudioDodgeBurnPanel({
       aria-labelledby={titleId}
     >
       <div className="min-w-0">
-        <h3 id={titleId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2">
+        <h3
+          id={titleId}
+          aria-label={`${help.actionName} · ${help.technicalName}`}
+          className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2"
+        >
           <Contrast size={12} aria-hidden />
           {help.actionName}
           <span className="text-[0.66rem] font-medium text-fg-3">{help.technicalName}</span>
@@ -199,6 +205,7 @@ export function StudioDodgeBurnPanel({
         active={active}
         busy={busy}
         disabled={disabled}
+        onOpenTutorial={onOpenTutorial}
       />
     </section>
   );

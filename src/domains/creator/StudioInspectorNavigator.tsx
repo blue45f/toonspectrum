@@ -272,6 +272,7 @@ export function StudioInspectorNavigator({
             <button
               key={tab.id}
               type="button"
+              data-studio-inspector-primary-tab={tab.id}
               role="tab"
               aria-selected={active}
               tabIndex={active ? 0 : -1}

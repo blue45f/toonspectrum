@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import {
@@ -17,6 +17,7 @@ import {
 import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
 import { resizableNodeProps } from "./studio-node-props";
 import { computePanelAutoFitPatch } from "./studio-panel-autofit";
+import { sha256HexPortable } from "./studio-sha256";
 import { toKonvaSkewAttrs } from "./studio-skew";
 
 import type { FrameEl, ImageEl } from "./studio-element-model";
@@ -35,6 +36,23 @@ const PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT = 1;
 const IMAGE_FILTER_INTERACTIVE_MAX_PIXELS = 16 * 1024 * 1024;
 // HiDPI 필터 슈퍼샘플 상한 — 3D 인서트 캡처와 같은 이유로 2를 넘기지 않는다(픽셀 4× 메모리 캡).
 const IMAGE_FILTER_SUPERSAMPLE_MAX = 2;
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure handoff verifier is tested independently from the Konva node
+export function verifyStudioLivingInkPngDataUrlHash(
+  src: string,
+  expected: `sha256:${string}` | undefined,
+): `sha256:${string}` | null {
+  if (!expected || !src.startsWith("data:image/png;base64,")) return null;
+  try {
+    const binary = globalThis.atob(src.slice("data:image/png;base64,".length));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const actual = `sha256:${sha256HexPortable(bytes)}` as const;
+    return actual === expected ? actual : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 밀도 불변이 증명된 buildImageFilters attrs 화이트리스트(명시적 per-attr 목록).
@@ -290,6 +308,21 @@ export interface StudioKonvaImageNodeProps {
   onInteractionEnd?: () => void;
   /** 라이브 스트로크가 진행 중이면 GIF 재생 batchDraw 를 쉬어 포인터 프레임 예산을 지킨다. */
   liveStrokeRef?: { readonly current: unknown };
+  /**
+   * Hokusai 라이브 표면을 canonical PNG로 넘기는 실제 표시 영수증.
+   * 이미지 decode만으로는 충분하지 않다. 이 노드가 정확한 PNG를 메인 Konva 레이어에
+   * 동기 drawScene한 뒤에만 호출되어, 상위 편집기가 임시 라이브 표면을 빈 프레임 없이 해제한다.
+   */
+  onHokusaiCanonicalImageReady?: (
+    elementId: string,
+    pngHash: `sha256:${string}`,
+  ) => void;
+  /** Same synchronous main-layer receipt for the flattened Living Ink physical layer. */
+  onLivingInkCanonicalImageReady?: (
+    elementId: string,
+    pngHash: `sha256:${string}`,
+    routeKey: string,
+  ) => void;
 }
 
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
@@ -304,6 +337,8 @@ export function StudioKonvaImageNode({
   onInteractionBegin,
   onInteractionEnd,
   liveStrokeRef,
+  onHokusaiCanonicalImageReady,
+  onLivingInkCanonicalImageReady,
 }: StudioKonvaImageNodeProps) {
   const [loadedImage, setLoadedImage] = useState<LoadedImageState>();
   const [displayImage, setDisplayImage] = useState<DisplayImageState>();
@@ -313,12 +348,15 @@ export function StudioKonvaImageNode({
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const [workerRequiredFailureKey, setWorkerRequiredFailureKey] = useState<string>();
+  const [verifiedLivingInkHash, setVerifiedLivingInkHash] = useState<`sha256:${string}` | null>(null);
   const imageRef = useRef<Konva.Image | null>(null);
   const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
   const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
   const workerSourceRevisionRef = useRef(0);
   const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
   const workerFailureNoticeRef = useRef<{ key: string } | null>(null);
+  const hokusaiPresentationReceiptRef = useRef<string | null>(null);
+  const livingInkPresentationReceiptRef = useRef<string | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
   const elRef = useRef(el);
@@ -942,6 +980,52 @@ export function StudioKonvaImageNode({
     raf = globalThis.requestAnimationFrame(tick);
     return () => globalThis.cancelAnimationFrame(raf);
   }, [el.isAnimatedGif, el.frames, displayImg, liveStrokeRef]);
+
+  const hokusaiPngHash = el.hokusaiLiveReceipt?.canonical.pngHash;
+  useLayoutEffect(() => {
+    if (!displayImg || !hokusaiPngHash || !onHokusaiCanonicalImageReady) return;
+    const node = imageRef.current;
+    const layer = node?.getLayer();
+    if (!node || !layer) return;
+    const receiptKey = `${el.id}:${hokusaiPngHash}`;
+    if (hokusaiPresentationReceiptRef.current === receiptKey) return;
+    // React-Konva has already applied `image={displayImg}` by layout-effect time. drawScene is
+    // synchronous, so returning from this call is the first point at which the main surface is
+    // guaranteed to contain the decoded canonical pixels (batchDraw would only schedule them).
+    layer.drawScene();
+    hokusaiPresentationReceiptRef.current = receiptKey;
+    onHokusaiCanonicalImageReady(el.id, hokusaiPngHash);
+  }, [displayImg, el.id, hokusaiPngHash, onHokusaiCanonicalImageReady]);
+
+  const livingInkPngHash = el.livingInkReceipt?.canonicalPngSha256;
+  const livingInkRouteKey = el.livingInkReceipt?.routeKey;
+  useEffect(() => {
+    setVerifiedLivingInkHash(verifyStudioLivingInkPngDataUrlHash(el.src, livingInkPngHash));
+  }, [el.src, livingInkPngHash]);
+  useLayoutEffect(() => {
+    if (
+      !displayImg
+      || !livingInkPngHash
+      || !livingInkRouteKey
+      || verifiedLivingInkHash !== livingInkPngHash
+      || !onLivingInkCanonicalImageReady
+    ) return;
+    const node = imageRef.current;
+    const layer = node?.getLayer();
+    if (!node || !layer) return;
+    const receiptKey = `${el.id}:${livingInkPngHash}:${livingInkRouteKey}`;
+    if (livingInkPresentationReceiptRef.current === receiptKey) return;
+    layer.drawScene();
+    livingInkPresentationReceiptRef.current = receiptKey;
+    onLivingInkCanonicalImageReady(el.id, livingInkPngHash, livingInkRouteKey);
+  }, [
+    displayImg,
+    el.id,
+    livingInkPngHash,
+    livingInkRouteKey,
+    onLivingInkCanonicalImageReady,
+    verifiedLivingInkHash,
+  ]);
 
   if (!displayImg) return null;
 

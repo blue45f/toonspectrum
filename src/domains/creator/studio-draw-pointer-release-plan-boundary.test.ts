@@ -76,6 +76,11 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     const start = page.indexOf("function finishDrawingPointer");
     const end = page.indexOf("function onStagePointerCancel", start);
     const finish = page.slice(start, end);
+    const sealStart = page.indexOf("function sealStudioDrawReleaseInput");
+    const sealEnd = page.indexOf("function finishStudioSpecialistStroke", sealStart);
+    const sealInput = page.slice(sealStart, sealEnd);
+    const specialistEnd = page.indexOf("function finishDrawingPointer", sealEnd);
+    const specialistRelease = page.slice(sealEnd, specialistEnd);
 
     expect(page).toContain('from "./studio-draw-pointer-release-plan"');
     expect(finish).toContain("planStudioDrawPointerRelease({");
@@ -84,9 +89,8 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     expect(finish).not.toContain("isStudioImmediateFreehandCommit(");
     expect(finish).not.toContain("let finished = drawingRef.current");
     expect(finish.split("\n").length).toBeLessThanOrEqual(400);
-
-    expectTokenOrder(finish, [
-      "stopFixedRateStrokePump()",
+    expect(sealStart).toBeGreaterThan(-1);
+    expectTokenOrder(sealInput, [
       "updateActiveShapeEndpoint(stage, pointerEvent, false)",
       "consumeFreehandPointerBatch(stage, pointerEvent, false",
       'transitionFixedRateStrokeFilter(fixedRateState, { type: "release" })',
@@ -94,10 +98,18 @@ describe("studio draw pointer-release planning ownership boundary", () => {
       "sealCausalPostCorrectionState(drawingRef.current)",
       "authoritativeLiveStroke = drawingRef.current",
       "flushDirectLiveDraftNow(authoritativeLiveStroke)",
+    ]);
+    expect(specialistRelease).toContain("finishStudioLivingInkStroke(livingInkStroke, finished)");
+    expect(specialistRelease).toContain("finishStudioHokusaiLiveStroke(hokusaiStroke, finished)");
+
+    expectTokenOrder(finish, [
+      "stopFixedRateStrokePump()",
+      "authoritativeLiveStroke = sealStudioDrawReleaseInput(",
       "isCompleteStudioDrawOp(drawingRef.current)",
       "const overlayRenderer = liveInkOverlayRendererRef.current",
       "planStudioDrawPointerRelease({",
       "announceDrawingShortcut(`스마트 도형",
+      "finishStudioSpecialistStroke(finished)",
       'releasePlan.commitMode === "deferred"',
       "queueDeferredStrokeCommit(finished)",
       "const committed = commit([...baseElements, finished])",

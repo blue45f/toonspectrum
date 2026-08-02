@@ -1,14 +1,16 @@
 import { RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 
+import { useT } from "@/lib/i18n";
+
 interface LiveAutoRefreshProps {
   onRefresh: () => void;
   loading?: boolean;
 }
-
 export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshProps) {
   const [intervalSec, setIntervalSec] = useState<number>(0); // 0 = off
   const [countdown, setCountdown] = useState<number>(0);
+  const t = useT();
 
   useEffect(() => {
     if (intervalSec <= 0) {
@@ -35,17 +37,17 @@ export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshP
       <button
         onClick={onRefresh}
         disabled={loading}
-        title="지금 새로고침"
+        title={t("admin.refresh.now")}
         className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1 font-medium"
       >
         <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-indigo-400" : ""}`} />
-        <span>새로고침</span>
+        <span>{t("admin.refresh.now")}</span>
       </button>
 
       <span className="w-px h-4 bg-slate-800" />
 
       <div className="flex items-center gap-1">
-        <span className="text-slate-400 font-medium pl-1">자동:</span>
+        <span className="text-slate-400 font-medium pl-1">{t("admin.refresh.auto")}</span>
         {([0, 5, 15, 30] as const).map((sec) => (
           <button
             key={sec}
@@ -56,7 +58,7 @@ export function LiveAutoRefresh({ onRefresh, loading = false }: LiveAutoRefreshP
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
             }`}
           >
-            {sec === 0 ? "Off" : `${sec}초`}
+            {sec === 0 ? "Off" : t("admin.refresh.seconds").replace("{sec}", String(sec))}
           </button>
         ))}
       </div>

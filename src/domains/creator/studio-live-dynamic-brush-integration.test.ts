@@ -16,7 +16,10 @@ describe("Studio live dynamic brush integration boundary", () => {
     expect(pointerStart).toContain(
       "liveDynamicBrushOverlayRendererRef.current.begin(next).status === \"started\"",
     );
-    expect(pointerStart).toContain("liveDynamicBrushDraftDirectRef.current = dynamicBrushDirect");
+    expect(pointerStart).toContain("dynamicAdmitted: dynamicBrushDirect");
+    expect(pointerStart).toContain(
+      'liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic"',
+    );
     expect(pointerStart).toContain(
       "if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted)",
     );

@@ -569,7 +569,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
-    await quickstart.getByRole("button", { name: "닫기", exact: true }).click();
+    await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
   if (
     clearAutosave
@@ -609,7 +609,9 @@ async function activateDesktopPen(page: Page): Promise<void> {
   // its public tab UI so the verifier is deterministic without reaching into persisted state.
   const inspectorNavigator = page.getByTestId("studio-inspector-navigator");
   await inspectorNavigator.waitFor({ state: "visible" });
-  const propertiesTab = inspectorNavigator.getByRole("tab", { name: "속성", exact: true });
+  const propertiesTab = inspectorNavigator.locator(
+    '[data-studio-inspector-primary-tab="properties"]',
+  );
   if (await propertiesTab.getAttribute("aria-selected") !== "true") await propertiesTab.click();
 }
 

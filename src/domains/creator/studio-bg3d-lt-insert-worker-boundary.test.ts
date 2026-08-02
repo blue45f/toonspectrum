@@ -158,6 +158,10 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
       'layer.role === "color" || layer.role === "tone"',
     );
     expect(insert).toContain(
+      "operation,",
+    );
+    expect(editorSource).toContain('operation = "insert"');
+    expect(editorSource).not.toContain(
       'operation: initialScene || initialDataUrl ? "update" : "insert"',
     );
   });

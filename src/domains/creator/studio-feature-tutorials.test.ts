@@ -44,11 +44,13 @@ describe("studio-feature-tutorials catalog", () => {
 
   it("신규 도구 웨이브(보정·선택 등) 튜토리얼이 포함된다", () => {
     const newIds = [
+      "smudge",
       "wet-mix",
       "dual-brush",
       "sketch-shape",
       "special-rulers",
       "dodge-burn",
+      "liquify",
       "quick-mask",
       "color-range",
       "path-boolean",
@@ -59,7 +61,49 @@ describe("studio-feature-tutorials catalog", () => {
     for (const id of newIds) {
       expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has(id), `missing tutorial: ${id}`).toBe(true);
     }
-    expect(STUDIO_FEATURE_TUTORIALS.length).toBe(22);
+    expect(STUDIO_FEATURE_TUTORIALS.length).toBe(32);
+  });
+
+  it("자주 막히는 기본 작업 8종을 행동 중심 3단계로 안내하고 가짜 실행 버튼을 만들지 않는다", () => {
+    const workflowIds = [
+      "canvas-view",
+      "select-move-group",
+      "eraser",
+      "fill",
+      "filters",
+      "asset-drop",
+      "comment-collaboration",
+      "save-recovery",
+    ] as const;
+
+    for (const id of workflowIds) {
+      const tutorial = STUDIO_FEATURE_TUTORIAL_BY_ID.get(id);
+      expect(tutorial, `missing workflow tutorial: ${id}`).toBeDefined();
+      expect(tutorial?.steps).toHaveLength(3);
+      expect(tutorial?.tryAction, `unwired tutorial must stay explanatory: ${id}`).toBeUndefined();
+    }
+
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("canvas-view")?.steps[2]?.body).toContain("배율 잠금");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("select-move-group")?.steps[2]?.body).toContain("그룹 잠금");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("fill")?.steps[0]?.body).toContain("편집용 이미지 복사본");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("filters")?.steps[0]?.body).toContain("편집용 이미지 복사본");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("save-recovery")?.steps[1]?.body).toContain("revision");
+  });
+
+  it("래스터 리터치 4종은 쉬운 행동 이름·자동 편집 복사본·3단계 실행취소를 안내한다", () => {
+    for (const id of ["smudge", "wet-mix", "dodge-burn", "liquify"]) {
+      const tutorial = STUDIO_FEATURE_TUTORIAL_BY_ID.get(id);
+      expect(tutorial, `missing retouch tutorial: ${id}`).toBeDefined();
+      expect(tutorial?.steps).toHaveLength(3);
+      expect(tutorial?.steps[0]?.body).toContain("직접 그린 벡터 선·도형");
+      expect(tutorial?.steps[0]?.body).toContain("편집용 이미지 복사본을 자동");
+      expect(tutorial?.steps[2]?.body).toContain("⌘Z");
+    }
+
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("smudge")?.title).toContain("색 밀어 섞기");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("wet-mix")?.title).toContain("물감 섞어 칠하기");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("dodge-burn")?.title).toContain("밝기·채도 붓");
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.get("liquify")?.title).toContain("형태 밀어 변형");
   });
 
   it("배지는 1~2자, tryAction 은 StudioPage 가 배선한 키만 쓴다", () => {

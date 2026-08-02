@@ -369,6 +369,60 @@ describe("StudioOpfsRecoveryJournal exhaustive commit crash matrix", () => {
       });
     }
   }
+
+  it("retries on fresh immutable paths after a pre-head crash without replacing committed authority", async () => {
+    const harness = makeHarness();
+    const writer = await acquire(harness);
+    await appendBaseOperation(harness, writer);
+    const retryPayload = bytes(6_000, 71);
+
+    harness.adapter.armRelativeWriteFault(5, "before");
+    await expect(harness.journal.appendOperation(writer, {
+      id: "operation-2",
+      pageId: "page-1",
+      revision: 2,
+      payload: retryPayload,
+    })).rejects.toEqual(expectJournalError("STORAGE_FAILED"));
+
+    const committedBeforeRetry = await harness.journal.scan();
+    expect(committedBeforeRetry).toMatchObject({
+      generation: 1,
+      lastSequence: 1,
+    });
+    expect(committedBeforeRetry.entries.map((entry) => entry.id)).toEqual([
+      "operation-1",
+    ]);
+    const orphanPaths = [...harness.adapter.files.keys()]
+      .filter((path) => path.includes("/op-000000000002-e1"))
+      .sort((left, right) => left.localeCompare(right));
+    expect(orphanPaths).toHaveLength(3);
+
+    harness.advance(1);
+    harness.adapter.fault = null;
+    const retried = await harness.journal.appendOperation(writer, {
+      id: "operation-2",
+      pageId: "page-1",
+      revision: 2,
+      payload: retryPayload,
+    });
+
+    expect(retried).toMatchObject({ sequence: 2, writerEpoch: 1 });
+    expect(retried.descriptorPath).toContain("/op-000000000002-e1-a1.meta");
+    expect(retried.chunks.every((chunk) => chunk.path.includes("-e1-a1-c"))).toBe(true);
+    expect(orphanPaths.every((path) => harness.adapter.files.has(path))).toBe(true);
+    await expect(collect(harness.journal.readPayload(retried))).resolves.toEqual(retryPayload);
+
+    const committedAfterRetry = await harness.journal.scan();
+    expect(committedAfterRetry).toMatchObject({
+      generation: 2,
+      lastSequence: 2,
+      selectedSlot: "b",
+    });
+    expect(committedAfterRetry.entries.map((entry) => entry.id)).toEqual([
+      "operation-1",
+      "operation-2",
+    ]);
+  });
 });
 
 describe("StudioOpfsRecoveryJournal integrity and version fences", () => {

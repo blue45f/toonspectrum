@@ -66,6 +66,7 @@ import {
 } from "./studio-dry-media-dynamic-bridge";
 import {
   planStudioDryMediaUnionRibbonCarrier,
+  studioDryMediaUnionRibbonCarrierOwnsMaterial,
   type StudioDryMediaUnionRibbonPolygon,
 } from "./studio-dry-media-union-ribbon-carrier";
 import {
@@ -303,6 +304,12 @@ export interface StudioDynamicBrushCoverageMarkPlanInput {
    * the global 16 MiB allowance; incremental live callers pass the unspent suffix budget.
    */
   readonly r8AlphaMapByteBudget?: number;
+  /**
+   * Core dry-media live suffixes may prepend complete causal source dabs solely to recover the
+   * exact previous fibre centres. The bridge and carrier consume that context but omit its
+   * polygons from the returned marks. Full retained/export plans leave this at zero.
+   */
+  readonly dryMediaUnionLeadingSourceDabsToSkip?: number;
 }
 
 function isStudioDynamicBrushSegmentedDabVariation(
@@ -921,6 +928,22 @@ export function planStudioDynamicBrushCoverageMarks(
     coverageBudgetContract.specialistCarrier === "competitor-specialty-ribbon";
   const professionalShelfRibbonAuthority =
     coverageBudgetContract.specialistCarrier === "professional-shelf-ribbon";
+  const dryMediaUnionRibbonAuthority =
+    r8GrainSampler === null
+    && studioDryMediaUnionRibbonCarrierOwnsMaterial(
+      input.materialIdentity,
+      dynamics,
+    );
+  const dryMediaUnionLeadingSourceDabsToSkip = Math.max(
+    0,
+    Math.floor(input.dryMediaUnionLeadingSourceDabsToSkip ?? 0),
+  );
+  if (
+    dryMediaUnionLeadingSourceDabsToSkip > 0
+    && !dryMediaUnionRibbonAuthority
+  ) {
+    return { ok: false, reason: "dry-media-bridge" };
+  }
   const causalRenderBudget = isStudioDynamicBrushCausalDepositPipeline(
     dynamics.depositPipeline,
   )
@@ -1013,7 +1036,9 @@ export function planStudioDynamicBrushCoverageMarks(
       : studioBrushTipUsesSolidEllipse(tip))
   ));
   const tipAlphaMaps = tipDefinitions.map((tip, tipIndex) => (
-    tipUsesEllipse[tipIndex] || tipUsesAnalyticFalloff[tipIndex]
+    dryMediaUnionRibbonAuthority
+      || tipUsesEllipse[tipIndex]
+      || tipUsesAnalyticFalloff[tipIndex]
       ? null
       : tipIndex === 0
         ? composeStudioBrushDualTipAlphaMap(tip, dualBrush)
@@ -1297,6 +1322,52 @@ export function planStudioDynamicBrushCoverageMarks(
         dynamicSeed,
         dynamics.colorDynamics
       );
+      if (dryMediaUnionRibbonAuthority) {
+        /*
+         * The connected dry-media carrier consumes only the pressure-resolved footprint,
+         * deposition alpha and colour. It deliberately discards the transient per-dab bitmap tip
+         * after turning its five causal fibres into one non-zero union. Building and retaining a
+         * full texture mark for every fibre before immediately throwing it away made a 2k input
+         * stroke allocate tens of thousands of short-lived objects and blocked the pointer thread.
+         *
+         * Lower the exact same authoritative channels directly into the union source mark. This
+         * is not a lower-quality approximation: the old path's texture/falloff fields never
+         * reached the union result, and radius/alpha/colour use the identical equations below.
+         * Asset-backed R8 paper is excluded by the authority gate above because its per-fragment
+         * bytes must remain authoritative rather than being collapsed to a scalar.
+         */
+        const depositionAlpha = clampAlpha(dab.opacity * dab.flow);
+        if (depositionAlpha <= 0) continue;
+        const radiusX = Math.max(0.25, dab.size / 2);
+        const radiusY = radiusX * dab.roundness;
+        const angleRadians = dab.angle * Math.PI / 180;
+        const directMark: StudioDynamicBrushCoverageMark = {
+          x: dab.x,
+          y: dab.y,
+          radiusX,
+          radiusY,
+          angleRadians,
+          alpha: clampAlpha(
+            depositionAlpha * grainAcrossFootprint(
+              dab.x,
+              dab.y,
+              radiusX,
+              radiusY,
+              angleRadians,
+            ),
+          ),
+          color: dabColor,
+        };
+        if (!markIsValid(directMark)) {
+          return { ok: false, reason: "invalid-mark" };
+        }
+        if (!appendMark(directMark)) {
+          return { ok: false, reason: "mark-budget" };
+        }
+        visiblePrimaryDabs.push(dab);
+        visiblePrimaryMarks.push(directMark);
+        continue;
+      }
       const primaryMarkStart = marks.length;
       const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
@@ -1384,6 +1455,15 @@ export function planStudioDynamicBrushCoverageMarks(
       marks: variationMarks,
       materialIdentity: input.materialIdentity,
       dynamics,
+      ...(dryMediaUnionLeadingSourceDabsToSkip > 0
+        ? {
+            skipLeadingMarks:
+              dryMediaUnionLeadingSourceDabsToSkip
+              * studioDryMediaDynamicBridgeMarkMultiplier(
+                input.materialIdentity,
+              ),
+          }
+        : {}),
     });
     if (dryMediaRibbonPlan.applied) {
       marks.splice(
@@ -1392,6 +1472,11 @@ export function planStudioDynamicBrushCoverageMarks(
         ...dryMediaRibbonPlan.marks,
       );
       continue;
+    }
+    if (dryMediaUnionRibbonAuthority) {
+      // A core dry medium must never degrade back to visible circular carriers. The runtime can
+      // retain the previous frame and report its existing fail-closed material-plan result.
+      return { ok: false, reason: "dry-media-bridge" };
     }
     const ribbonPlan = planStudioFlatNibRibbonCarrier({
       dabs: visiblePrimaryDabs,

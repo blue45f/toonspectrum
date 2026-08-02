@@ -229,6 +229,7 @@ export interface StudioLazyPanelStackProps {
   autoActionStatus: string | null;
   bg3dInitialDataUrl: string | undefined;
   bg3dInitialScene: StudioBg3dSceneDocument | undefined;
+  bg3dOperation: "insert" | "update";
   bg3dBatchRecoveryScope: StudioBg3dShotBatchRecoveryScope | null;
   validateRecoveryAccess: (
     scope: StudioBg3dShotBatchRecoveryScope,
@@ -407,6 +408,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   autoActionStatus,
   bg3dInitialDataUrl,
   bg3dInitialScene,
+  bg3dOperation,
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
@@ -613,6 +615,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         activePage={activePage}
         bg3dInitialDataUrl={bg3dInitialDataUrl}
         bg3dInitialScene={bg3dInitialScene}
+        bg3dOperation={bg3dOperation}
         bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
         validateRecoveryAccess={validateRecoveryAccess}
         bg3dOpen={bg3dOpen}

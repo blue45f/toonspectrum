@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 
 import { adminFetch, formatDate } from "./admin-client";
 
+import { useT } from "@/lib/i18n";
+
 export interface PromoItem {
   id: string;
   code: string;
@@ -23,6 +25,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
   const [promos, setPromos] = useState<PromoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   // New promo modal
   const [showModal, setShowModal] = useState(false);
@@ -40,11 +43,11 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       const res = await adminFetch<{ items: PromoItem[] }>("/promos", userId);
       setPromos(res.items ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "프로모션 로딩 실패");
+      setError(err instanceof Error ? err.message : t("admin.promos.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     void loadData();
@@ -72,7 +75,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       setExpiresAt("");
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "쿠폰 생성 실패");
+      alert(err instanceof Error ? err.message : "Error");
     } finally {
       setSubmitting(false);
     }
@@ -83,17 +86,17 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       await adminFetch(`/promos/${id}/toggle`, userId, { method: "POST" });
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "상태 변경 실패");
+      alert(err instanceof Error ? err.message : "Error");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("이 프로모션 쿠폰을 삭제하시겠습니까?")) return;
+    if (!confirm(t("admin.promos.confirmDelete"))) return;
     try {
       await adminFetch(`/promos/${id}`, userId, { method: "DELETE" });
       void loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "삭제 실패");
+      alert(err instanceof Error ? err.message : "Error");
     }
   };
 
@@ -103,10 +106,10 @@ export function AdminPromos({ userId }: AdminPromosProps) {
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Ticket className="w-5 h-5 text-indigo-400" />
-            구독 할인 프로모션 & 쿠폰 관리
+            {t("admin.promos.title")}
           </h2>
           <p className="text-sm text-slate-400 mt-1">
-            구독 결제 시 사용할 수 있는 정율(%) 및 정액(원) 프로모션 할인 코드를 발급 및 관리합니다.
+            {t("admin.promos.desc")}
           </p>
         </div>
 
@@ -115,7 +118,7 @@ export function AdminPromos({ userId }: AdminPromosProps) {
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2 self-start sm:self-auto shadow-lg shadow-indigo-600/20"
         >
           <Plus className="w-4 h-4" />
-          새 프로모션 발급
+          {t("admin.promos.create")}
         </button>
       </div>
 
@@ -126,22 +129,22 @@ export function AdminPromos({ userId }: AdminPromosProps) {
       )}
 
       {loading ? (
-        <div className="p-12 text-center text-slate-400">프로모션 로딩 중...</div>
+        <div className="p-12 text-center text-slate-400">{t("admin.promos.loading")}</div>
       ) : promos.length === 0 ? (
         <div className="p-12 text-center bg-slate-900/30 border border-slate-800 rounded-2xl text-slate-400">
-          발급된 프로모션 쿠폰이 없습니다.
+          {t("admin.promos.empty")}
         </div>
       ) : (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl">
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-950/60 text-slate-400 font-medium uppercase text-xs border-b border-slate-800">
               <tr>
-                <th className="p-4">쿠폰 코드</th>
-                <th className="p-4">할인 혜택</th>
-                <th className="p-4">사용 수 / 한도</th>
-                <th className="p-4">상태</th>
-                <th className="p-4">만료일</th>
-                <th className="p-4 text-right">관리</th>
+                <th className="p-4">{t("admin.promos.thCode")}</th>
+                <th className="p-4">{t("admin.promos.thBenefit")}</th>
+                <th className="p-4">{t("admin.promos.thUsage")}</th>
+                <th className="p-4">{t("admin.plans.tableHeaderStatus")}</th>
+                <th className="p-4">{t("admin.campaigns.endsAt")}</th>
+                <th className="p-4 text-right">{t("admin.plans.tableHeaderAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -150,43 +153,45 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   <td className="p-4 font-mono font-bold text-indigo-300">{item.code}</td>
                   <td className="p-4 font-semibold text-white">
                     {item.discountType === "percent"
-                      ? `${item.discountValue}% 할인`
-                      : `₩${item.discountValue.toLocaleString()} 할인`}
+                      ? `${item.discountValue}%`
+                      : `₩${item.discountValue.toLocaleString()}`}
                   </td>
                   <td className="p-4 text-slate-300">
-                    {item.usedCount} / {item.maxUses} 회
+                    {item.usedCount} / {item.maxUses}
                   </td>
                   <td className="p-4">
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                         item.isActive
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                          : "bg-slate-700/40 text-slate-400 border border-slate-700/50"
+                          : "bg-slate-800 text-slate-400 border border-slate-700"
                       }`}
                     >
-                      {item.isActive ? "활성" : "비활성"}
+                      {item.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
                     </span>
                   </td>
-                  <td className="p-4 text-slate-400 text-xs">{formatDate(item.expiresAt)}</td>
-                  <td className="p-4 text-right flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => void handleToggle(item.id)}
-                      className="text-slate-400 hover:text-white transition-colors"
-                      title={item.isActive ? "비활성화" : "활성화"}
-                    >
-                      {item.isActive ? (
-                        <ToggleRight className="w-7 h-7 text-emerald-400" />
-                      ) : (
-                        <ToggleLeft className="w-7 h-7 text-slate-600" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => void handleDelete(item.id)}
-                      className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="삭제"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <td className="p-4 text-slate-400 text-xs font-mono">
+                    {item.expiresAt ? formatDate(item.expiresAt) : "Unlimited"}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => void handleToggle(item.id)}
+                        className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                      >
+                        {item.isActive ? (
+                          <ToggleRight className="w-5 h-5 text-emerald-400" />
+                        ) : (
+                          <ToggleLeft className="w-5 h-5 text-slate-600" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => void handleDelete(item.id)}
+                        className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -201,36 +206,41 @@ export function AdminPromos({ userId }: AdminPromosProps) {
             onSubmit={(e) => void handleCreate(e)}
             className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md space-y-4 shadow-2xl"
           >
-            <h3 className="text-lg font-bold text-white">새 프로모션 쿠폰 발급</h3>
+            <h3 className="text-lg font-bold text-white">{t("admin.promos.modalTitle")}</h3>
+
             <div>
-              <label htmlFor="promo-code" className="text-xs font-medium text-slate-400 block mb-1">쿠폰 코드</label>
+              <label htmlFor="promo-code" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputCode")}</label>
               <input
                 id="promo-code"
                 type="text"
                 required
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="예: SUMMER2026"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white font-mono uppercase focus:outline-none focus:border-indigo-500"
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="WELCOME2026"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-discount-type" className="text-xs font-medium text-slate-400 block mb-1">할인 방식</label>
+                <label htmlFor="promo-discount-type" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputType")}</label>
                 <select
                   id="promo-discount-type"
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as "percent" | "fixed")}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="percent">비율 (%)</option>
-                  <option value="fixed">고정 금액 (원)</option>
+                  <option value="percent">{t("admin.promos.typePercent")}</option>
+                  <option value="fixed">{t("admin.promos.typeFixed")}</option>
                 </select>
               </div>
+
               <div>
-                <label htmlFor="promo-discount-value" className="text-xs font-medium text-slate-400 block mb-1">할인 수치</label>
+                <label htmlFor="promo-discount-val" className="text-xs font-medium text-slate-400 block mb-1">
+                  {discountType === "percent" ? t("admin.promos.inputValuePercent") : t("admin.promos.inputValueFixed")}
+                </label>
                 <input
-                  id="promo-discount-value"
+                  id="promo-discount-val"
                   type="number"
                   required
                   min={1}
@@ -240,9 +250,10 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="promo-max-uses" className="text-xs font-medium text-slate-400 block mb-1">최대 사용 횟수</label>
+                <label htmlFor="promo-max-uses" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputMaxUses")}</label>
                 <input
                   id="promo-max-uses"
                   type="number"
@@ -253,8 +264,9 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-indigo-500"
                 />
               </div>
+
               <div>
-                <label htmlFor="promo-expires-at" className="text-xs font-medium text-slate-400 block mb-1">만료 일자 (선택)</label>
+                <label htmlFor="promo-expires-at" className="text-xs font-medium text-slate-400 block mb-1">{t("admin.promos.inputExpiresAt")}</label>
                 <input
                   id="promo-expires-at"
                   type="date"
@@ -264,20 +276,21 @@ export function AdminPromos({ userId }: AdminPromosProps) {
                 />
               </div>
             </div>
+
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-700"
               >
-                취소
+                {t("admin.plans.cancel")}
               </button>
               <button
                 type="submit"
                 disabled={submitting}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/20"
               >
-                {submitting ? "발급 중..." : "쿠폰 생성"}
+                {submitting ? t("admin.announcements.submitting") : t("admin.promos.submit")}
               </button>
             </div>
           </form>

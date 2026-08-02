@@ -23,6 +23,18 @@ describe("studio tool hints (rich hover copy)", () => {
     expect(studioToolHint("missing")).toBeNull();
   });
 
+  it("전문 용어보다 사용 결과를 먼저 설명하고 익숙한 이름은 함께 보존한다", () => {
+    expect(studioToolHint("fill")).toMatchObject({
+      title: "색 채우기 (페인트 버킷)",
+    });
+    expect(studioToolHint("fill")?.description).toContain("한 번에 색칠");
+    expect(studioToolHint("fill")?.tip).toContain("틈 닫기");
+    expect(studioToolHint("eyedropper")?.title).toBe("색 가져오기 (스포이드)");
+    expect(studioToolHint("filter")?.description).toContain("흐리게");
+    expect(studioToolHint("lasso")?.description).toContain("고칠 부분의 둘레");
+    expect(studioToolHint("pixel-select")?.description).toContain("선택한 부분에만");
+  });
+
   it("infers purposeful visuals for dynamic rail tools", () => {
     expect(
       studioToolHintPreview({

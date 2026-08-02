@@ -183,6 +183,13 @@ describe("파츠 빌더", () => {
     switch (part.shape.kind) {
       case "cylinder":
         return [part.shape.rTop, part.shape.rBottom, part.shape.h];
+      case "lathe": {
+        const ys = part.shape.profile.map((point) => point.y);
+        return [
+          ...part.shape.profile.map((point) => point.radius),
+          Math.max(...ys) - Math.min(...ys),
+        ];
+      }
       case "box":
         return [part.shape.w, part.shape.h, part.shape.d];
       case "sphere":
@@ -221,12 +228,13 @@ describe("파츠 빌더", () => {
   it("fit 배율은 반경을 키운다", () => {
     const base = buildGarmentParts("blazer", FALLBACK_WARDROBE_METRICS, 1);
     const loose = buildGarmentParts("blazer", FALLBACK_WARDROBE_METRICS, 1.4);
-    const baseTorso = base.find((p) => p.bone === "spine" && p.shape.kind === "cylinder");
-    const looseTorso = loose.find((p) => p.bone === "spine" && p.shape.kind === "cylinder");
-    if (baseTorso?.shape.kind !== "cylinder" || looseTorso?.shape.kind !== "cylinder") {
-      throw new Error("torso cylinder part missing");
+    const baseTorso = base.find((p) => p.bone === "spine" && p.shape.kind === "lathe");
+    const looseTorso = loose.find((p) => p.bone === "spine" && p.shape.kind === "lathe");
+    if (baseTorso?.shape.kind !== "lathe" || looseTorso?.shape.kind !== "lathe") {
+      throw new Error("torso silhouette part missing");
     }
-    expect(looseTorso.shape.rTop).toBeGreaterThan(baseTorso.shape.rTop);
+    expect(Math.max(...looseTorso.shape.profile.map((point) => point.radius)))
+      .toBeGreaterThan(Math.max(...baseTorso.shape.profile.map((point) => point.radius)));
   });
 
   it("치수는 체형을 따른다 — 작은 골격이면 파츠도 작아진다", () => {
@@ -239,11 +247,37 @@ describe("파츠 빌더", () => {
     });
     const bigTorso = buildGarmentParts("tshirt", FALLBACK_WARDROBE_METRICS)[0];
     const smallTorso = buildGarmentParts("tshirt", small)[0];
-    if (bigTorso.shape.kind !== "cylinder" || smallTorso.shape.kind !== "cylinder") {
+    if (bigTorso.shape.kind !== "lathe" || smallTorso.shape.kind !== "lathe") {
       throw new Error("unexpected torso shape");
     }
-    expect(smallTorso.shape.rTop).toBeLessThan(bigTorso.shape.rTop);
-    expect(smallTorso.shape.h).toBeLessThan(bigTorso.shape.h);
+    expect(Math.max(...smallTorso.shape.profile.map((point) => point.radius)))
+      .toBeLessThan(Math.max(...bigTorso.shape.profile.map((point) => point.radius)));
+    const bigYs = bigTorso.shape.profile.map((point) => point.y);
+    const smallYs = smallTorso.shape.profile.map((point) => point.y);
+    expect(Math.max(...smallYs) - Math.min(...smallYs))
+      .toBeLessThan(Math.max(...bigYs) - Math.min(...bigYs));
+  });
+
+  it("몸통과 스커트는 직선 원통 대신 곡선 실루엣 프로필을 만든다", () => {
+    const blazerTorso = buildGarmentParts("blazer", FALLBACK_WARDROBE_METRICS)
+      .find((part) => part.bone === "spine" && part.shape.kind === "lathe");
+    const skirt = buildGarmentParts("pleated", FALLBACK_WARDROBE_METRICS)
+      .find((part) => part.bone === "hips" && part.shape.kind === "lathe");
+    if (blazerTorso?.shape.kind !== "lathe" || skirt?.shape.kind !== "lathe") {
+      throw new Error("curved garment profiles missing");
+    }
+
+    expect(blazerTorso.shape.profile).toHaveLength(6);
+    const torsoRadii = blazerTorso.shape.profile.map((point) => point.radius);
+    expect(torsoRadii[2]).toBeLessThan(torsoRadii[0]);
+    expect(torsoRadii[2]).toBeLessThan(torsoRadii[4]);
+    expect(new Set(torsoRadii.map((radius) => radius.toFixed(6))).size).toBeGreaterThan(3);
+
+    expect(skirt.shape.profile).toHaveLength(5);
+    expect(skirt.shape.profile[0]!.radius).toBeGreaterThan(skirt.shape.profile.at(-1)!.radius);
+    expect(skirt.shape.profile.every((point, index, points) => (
+      index === 0 || point.y > points[index - 1]!.y
+    ))).toBe(true);
   });
 
   it("미지의 아이템은 빈 배열을 준다", () => {

@@ -1,11 +1,13 @@
 import { ArrowLeft, Ban, RefreshCw, RotateCcw, Search, UserX, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import { adminFetch, formatNum, type AdminApiError } from "./components/admin-client";
 import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
 
 import { Container } from "@/components/section";
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
@@ -23,25 +25,11 @@ interface MemberRow {
   postCount: number;
   reviewCount: number;
 }
-
-const ROLES = [
-  { value: "user", label: "일반" },
-  { value: "creator", label: "크리에이터" },
-  { value: "operator", label: "운영자" },
-  { value: "admin", label: "관리자" },
-] as const;
-
 const ROLE_TONE: Record<string, string> = {
   admin: "bg-accent/15 text-accent",
   operator: "bg-good/15 text-good",
   creator: "bg-warn/15 text-warn",
   user: "bg-raised/70 text-fg-3",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  active: "활성",
-  suspended: "정지",
-  deleted: "탈퇴",
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -50,26 +38,32 @@ const STATUS_TONE: Record<string, string> = {
   deleted: "bg-bad/15 text-bad",
 };
 
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("ko-KR") : "—");
+const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString() : "—");
 
 // 회원 관리 분할 라우트(/admin/members) — 검색·역할 변경(자기 자신 제외).
 export function AdminMembersPage() {
-  useDocumentTitle("회원 관리");
+  const t = useT();
+  const lang = useI18n((s) => s.lang);
+  useDocumentTitle(t("admin.members.title"));
   const { gate, uid } = useAdminGate();
+
+  useEffect(() => {
+    void loadAdminI18nLocale(lang);
+  }, [lang]);
 
   return (
     <Container size="wide" className="py-10">
       <header className="mb-8">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <UsersRound size={13} /> ADMIN · MEMBERS
+          <UsersRound size={13} /> {t("admin.members.eyebrow")}
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">회원 관리</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("admin.members.title")}</h1>
         <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-fg-3">
-          가입 회원을 검색하고 역할(일반·크리에이터·운영자·관리자)을 조정합니다. 자기 자신의 역할은 바꿀 수 없어요.
+          {t("admin.members.desc")}
         </p>
         <Link href="/admin" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent">
           <ArrowLeft size={13} />
-          관리자 콘솔로
+          {t("admin.members.backToConsole")}
         </Link>
       </header>
 
@@ -88,6 +82,20 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
   const [refreshTick, setRefreshTick] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const t = useT();
+
+  const roles = [
+    { value: "user", label: t("admin.members.roleUser") },
+    { value: "creator", label: t("admin.members.roleCreator") },
+    { value: "operator", label: t("admin.members.roleOperator") },
+    { value: "admin", label: t("admin.members.roleAdmin") },
+  ] as const;
+
+  const statusLabels: Record<string, string> = {
+    active: t("admin.members.statusActive"),
+    suspended: t("admin.members.statusSuspended"),
+    deleted: t("admin.members.statusDeleted"),
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setQueryText(searchText.trim()), 250);
@@ -111,8 +119,8 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
 
   async function changeRole(member: MemberRow, role: string) {
     if (busyId || role === member.role || member.status === "deleted") return;
-    const roleLabel = ROLES.find((item) => item.value === role)?.label ?? role;
-    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} 님의 역할을 "${roleLabel}"(으)로 바꿀까요?`)) return;
+    const roleLabel = roles.find((item) => item.value === role)?.label ?? role;
+    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} -> "${roleLabel}"?`)) return;
     setBusyId(member.id);
     setActionError(null);
     try {
@@ -122,7 +130,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
       });
       setMembers((current) => current.map((item) => (item.id === member.id ? { ...item, role } : item)));
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "역할을 변경하지 못했습니다.");
+      setActionError(e instanceof Error ? e.message : "Role change failed.");
     } finally {
       setBusyId(null);
     }
@@ -132,10 +140,10 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
     if (busyId || member.status === status || member.status === "deleted") return;
     const reason =
       status === "suspended"
-        ? globalThis.prompt(`${member.name ?? member.email ?? member.id} 님을 정지하는 사유를 입력해 주세요.`, member.suspensionReason ?? "")
+        ? globalThis.prompt(`${member.name ?? member.email ?? member.id}`, member.suspensionReason ?? "")
         : "";
     if (status === "suspended" && reason === null) return;
-    if (status === "active" && !globalThis.confirm(`${member.name ?? member.email ?? member.id} 님의 계정을 복구할까요?`)) return;
+    if (status === "active" && !globalThis.confirm(`${member.name ?? member.email ?? member.id}`)) return;
     setBusyId(member.id);
     setActionError(null);
     try {
@@ -157,7 +165,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         )
       );
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "회원 상태를 변경하지 못했습니다.");
+      setActionError(e instanceof Error ? e.message : "Status update failed.");
     } finally {
       setBusyId(null);
     }
@@ -165,8 +173,8 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
 
   async function deleteMember(member: MemberRow) {
     if (busyId || member.status === "deleted") return;
-    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id} 님을 탈퇴 처리할까요? 되돌릴 수 없습니다.`)) return;
-    const reason = globalThis.prompt("탈퇴 처리 사유를 입력해 주세요.", "admin soft delete");
+    if (!globalThis.confirm(`${member.name ?? member.email ?? member.id}`)) return;
+    const reason = globalThis.prompt("Reason:", "admin soft delete");
     if (reason === null) return;
     setBusyId(member.id);
     setActionError(null);
@@ -180,7 +188,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
           item.id === member.id
             ? {
                 ...item,
-                name: "탈퇴한 사용자",
+                name: t("admin.members.statusDeleted"),
                 email: null,
                 role: "user",
                 status: "deleted",
@@ -192,7 +200,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         )
       );
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "회원을 탈퇴 처리하지 못했습니다.");
+      setActionError(e instanceof Error ? e.message : "Delete failed.");
     } finally {
       setBusyId(null);
     }
@@ -207,19 +215,19 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             maxLength={80}
-            placeholder="이름·이메일 검색"
+            placeholder={t("admin.members.searchPlaceholder")}
             className="h-7 w-56 min-w-0 border-none bg-transparent text-xs outline-none placeholder:text-fg-3"
           />
         </div>
         <span className="text-xs text-fg-3">
-          {loading ? "불러오는 중..." : `${formatNum(members.length)}명 표시`}
+          {loading ? t("admin.ui.loading") : t("admin.members.countShowing").replace("{count}", formatNum(members.length))}
         </span>
         <button
           type="button"
           onClick={() => setRefreshTick((tick) => tick + 1)}
           className="ml-auto inline-flex items-center gap-1 text-xs text-fg-3 transition-colors hover:text-fg"
         >
-          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> 갱신
+          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> {t("admin.members.refresh")}
         </button>
       </div>
 
@@ -235,20 +243,20 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
         </div>
       ) : members.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-3">
-          조건에 맞는 회원이 없어요.
+          {t("admin.members.empty")}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line bg-card/60">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <caption className="sr-only">회원 목록</caption>
+            <caption className="sr-only">{t("admin.members.title")}</caption>
             <thead>
               <tr className="border-b border-line text-[0.7rem] uppercase tracking-wide text-fg-3">
-                <th scope="col" className="px-4 py-3 font-medium">회원</th>
-                <th scope="col" className="px-4 py-3 font-medium">상태</th>
-                <th scope="col" className="px-4 py-3 font-medium">역할</th>
-                <th scope="col" className="px-4 py-3 font-medium">활동</th>
-                <th scope="col" className="px-4 py-3 font-medium">가입일</th>
-                <th scope="col" className="px-4 py-3 font-medium">관리</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colMember")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colStatus")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colRole")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colActivity")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colJoined")}</th>
+                <th scope="col" className="px-4 py-3 font-medium">{t("admin.members.colActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -258,7 +266,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                 return (
                   <tr key={member.id} className="border-b border-line/60 last:border-b-0">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-fg">{member.name ?? "이름 없음"}</p>
+                      <p className="font-medium text-fg">{member.name ?? "—"}</p>
                       <p className="text-[0.7rem] text-fg-3">{member.email ?? member.id}</p>
                     </td>
                     <td className="px-4 py-3">
@@ -268,7 +276,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                           STATUS_TONE[member.status] ?? STATUS_TONE.active
                         )}
                       >
-                        {STATUS_LABEL[member.status] ?? member.status}
+                        {statusLabels[member.status] ?? member.status}
                       </span>
                       {member.suspensionReason && member.status === "suspended" && (
                         <p className="mt-1 max-w-[11rem] truncate text-[0.65rem] text-fg-3" title={member.suspensionReason}>
@@ -283,17 +291,17 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                           ROLE_TONE[member.role] ?? ROLE_TONE.user
                         )}
                       >
-                        {ROLES.find((item) => item.value === member.role)?.label ?? member.role}
+                        {roles.find((item) => item.value === member.role)?.label ?? member.role}
                       </span>
-                      {isSelf && <span className="ml-1.5 text-[0.65rem] text-fg-3">(나)</span>}
+                      {isSelf && <span className="ml-1.5 text-[0.65rem] text-fg-3">{t("admin.members.selfTag")}</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-fg-2">
-                      글 {formatNum(member.postCount)} · 리뷰 {formatNum(member.reviewCount)}
+                      {formatNum(member.postCount)} / {formatNum(member.reviewCount)}
                     </td>
                     <td className="px-4 py-3 text-xs text-fg-3">{formatDate(member.createdAt)}</td>
                     <td className="px-4 py-3">
                       <label className="sr-only" htmlFor={`role-${member.id}`}>
-                        {member.name ?? member.id} 역할 변경
+                        {member.name ?? member.id}
                       </label>
                       <select
                         id={`role-${member.id}`}
@@ -302,7 +310,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                         onChange={(event) => void changeRole(member, event.target.value)}
                         className="rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg outline-none focus:border-accent/50 disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        {ROLES.map((role) => (
+                        {roles.map((role) => (
                           <option key={role.value} value={role.value}>
                             {role.label}
                           </option>
@@ -317,7 +325,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-2 transition-colors hover:border-good/45 hover:text-good disabled:opacity-45"
                           >
                             <RotateCcw size={11} />
-                            복구
+                            {t("admin.members.restore")}
                           </button>
                         ) : (
                           <button
@@ -327,7 +335,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                             className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-2 transition-colors hover:border-warn/45 hover:text-warn disabled:opacity-45"
                           >
                             <Ban size={11} />
-                            정지
+                            {t("admin.members.suspend")}
                           </button>
                         )}
                         <button
@@ -337,7 +345,7 @@ function MemberBoard({ uid, selfId }: { uid: string; selfId: string }) {
                           className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[0.68rem] text-fg-3 transition-colors hover:border-bad/45 hover:text-bad disabled:opacity-45"
                         >
                           <UserX size={11} />
-                          탈퇴
+                          {t("admin.members.delete")}
                         </button>
                       </div>
                     </td>

@@ -580,8 +580,27 @@ import {
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import {
+  StudioHokusaiLiveOverlayRenderer,
+} from "./studio-hokusai-live-brush-overlay";
+import {
+  type StudioHokusaiLiveSampleLike,
+} from "./studio-hokusai-live-brush-protocol";
+import {
+  resolveStudioHokusaiLivePreset,
+  type StudioHokusaiLiveRouteResult,
+} from "./studio-hokusai-live-brush-router";
+import {
+  StudioHokusaiLiveBrushProvider,
+  type StudioHokusaiLiveCanonicalResult,
+  type StudioHokusaiLiveStrokeSession,
+} from "./studio-hokusai-live-brush-runtime";
+import {
+  createStudioHokusaiLiveCanonicalTransaction,
+} from "./studio-hokusai-live-brush-transaction";
+import {
   studioHokusaiSourceRevision,
 } from "./studio-hokusai-natural-media-contract";
+import { createStudioHybridDccLatestTaskQueue } from "./studio-hybrid-dcc-latest-task-queue";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -734,6 +753,37 @@ import {
   StudioLiveWetInkOverlayRenderer,
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
+import {
+  createStudioLivingInkCanonicalTransaction,
+  studioLivingInkReceiptReplayToken,
+  verifyStudioLivingInkCanonicalImageAuthority,
+  type StudioLivingInkCanonicalResult,
+} from "./studio-living-ink-document";
+import {
+  DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS,
+  type StudioLivingInkMaterialControls,
+} from "./studio-living-ink-gpu-protocol";
+import {
+  StudioLivingInkOverlayRenderer,
+  type StudioLivingInkOverlayPresentationReceipt,
+} from "./studio-living-ink-overlay";
+import {
+  studioLivingInkCanReuseAcceptedAuthority,
+  studioLivingInkFailureDisposition,
+  studioLivingInkProductAdmissionBlocked,
+  type StudioLivingInkAcceptedAuthority,
+} from "./studio-living-ink-product-admission";
+import {
+  planStudioLivingInkProductExecutionConfig,
+  studioLivingInkConfigMeetsProductQualityFloor,
+} from "./studio-living-ink-product-policy";
+import {
+  StudioLivingInkStudioCoordinator,
+  type StudioLivingInkAuthoritativeSample,
+  type StudioLivingInkFinishedWork,
+  type StudioLivingInkStrokeMode,
+  type StudioLivingInkStudioState,
+} from "./studio-living-ink-studio-coordinator";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -1056,15 +1106,6 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
-import {
-  appendStudioPendingRasterRetouchGesturePoint,
-  beginStudioPendingRasterRetouchGesture,
-  canApplyStudioPendingRasterRetouchGesture,
-  endStudioPendingRasterRetouchGesture,
-  normalizeStudioPendingRasterRetouchGesture,
-  type StudioPendingRasterRetouchGesture,
-  type StudioRasterRetouchGestureTool,
-} from "./studio-retouch-raster-gesture";
 import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
@@ -1086,6 +1127,16 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import {
+  appendStudioPendingRasterRetouchGesturePoint,
+  beginStudioPendingRasterRetouchGesture,
+  canApplyStudioPendingRasterRetouchGesture,
+  endStudioPendingRasterRetouchGesture,
+  normalizeStudioPendingRasterRetouchGesture,
+  type StudioPendingRasterRetouchGesture,
+  type StudioRasterRetouchGestureTool,
+  type StudioRasterRetouchNormalizedPoint,
+} from "./studio-retouch-raster-gesture";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   clampCanvasPlacementCenter,
@@ -1096,6 +1147,10 @@ import {
   unionBounds,
   viewportSpawnCenter,
 } from "./studio-selection";
+import {
+  commitStudioSelectionFilterMaskTransaction,
+  createStudioSelectionFilterMaskTransaction,
+} from "./studio-selection-filter-mask-transaction";
 import {
   appendBrushPoint,
   appendPolyLassoVertex,
@@ -1147,6 +1202,7 @@ import {
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
+import { planStudioShared3dCapturedSourceLayerVisibility } from "./studio-shared-3d-scene-bridge";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
@@ -1200,6 +1256,12 @@ import {
   type StudioStrokeStabilizerBridge,
   type StudioStrokeStabilizerState,
 } from "./studio-stroke-stabilizer";
+import {
+  claimStudioStrokeSurfaceLifecycle,
+  resolveStudioStrokeSurfaceRoute,
+  studioStrokeSurfaceRouteSuppressesDraft,
+  type StudioStrokeSurfaceRoute,
+} from "./studio-stroke-surface-route";
 import {
   decideStudioTeamCommentLiveResponse,
   mergeStudioTeamCommentMutationReceipt,
@@ -1337,6 +1399,8 @@ import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
   StudioCanvasViewport,
   type StudioCanvasViewportHandlers,
+  type StudioHokusaiLiveOverlaySurfaceBinding,
+  type StudioLivingInkOverlaySurfaceBinding,
 } from "./StudioCanvasViewport";
 import {
   type CvdMode,
@@ -1456,6 +1520,7 @@ import type {
   StudioFilterKind,
   StudioFilterPreview,
 } from "./studio-filter-menu";
+import type { StudioHybridDccWorkspace } from "./studio-hybrid-dcc-workspace";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import type {
@@ -1465,6 +1530,10 @@ import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
+import type {
+  StudioLivingInkExecutionConfig,
+} from "./studio-living-ink-execution-protocol";
+import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -1574,6 +1643,22 @@ type StudioAutosaveOpfsSession = NonNullable<
   Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
 >;
 
+type StudioHybridDccWorkspacePersistence = ReturnType<
+  typeof import("./studio-hybrid-dcc-workspace-persistence")
+    .createStudioHybridDccWorkspacePersistenceFromFileSystem
+>;
+
+type StudioHybridDccPersistenceStatus =
+  import("./StudioHybridDccPanel").StudioHybridDccPersistenceStatus;
+
+interface StudioHybridDccPersistenceUiState {
+  readonly scope: string;
+  readonly status: StudioHybridDccPersistenceStatus;
+}
+
+const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
+const STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS = 12_000;
+
 type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
 
@@ -1596,6 +1681,193 @@ type StudioLiveStrokeBackendAuditSession = {
   gpuRequest: StudioLiveStrokeGpuRequestToken | null;
   canonicalCanvasRequest: StudioLiveStrokeCanonicalCanvasToken | null;
 };
+
+type StudioHokusaiReadyRoute = Extract<
+  StudioHokusaiLiveRouteResult,
+  { status: "ready" }
+>;
+
+type StudioHokusaiPinnedLiveStroke = {
+  readonly abortController: AbortController;
+  readonly pageId: string;
+  readonly route: StudioHokusaiReadyRoute;
+  readonly strokeId: string;
+  readonly surfaceKey: string;
+  beginPromise: Promise<StudioHokusaiLiveStrokeSession> | null;
+  session: StudioHokusaiLiveStrokeSession | null;
+  queuedSamples: StudioHokusaiLiveSampleLike[];
+  forwardedSampleCount: number;
+  overlayPresented: boolean;
+  failed: boolean;
+  finishing: boolean;
+  finalDrawing: DrawEl | null;
+  canonicalImageId: string | null;
+  canonicalPngHash: `sha256:${string}` | null;
+  transactionCommitted: boolean;
+};
+
+type StudioHokusaiLiveOverlaySurfaceState = {
+  readonly binding: StudioHokusaiLiveOverlaySurfaceBinding;
+  readonly renderer: StudioHokusaiLiveOverlayRenderer;
+};
+
+type StudioLivingInkRoute = Extract<StudioStrokeSurfaceRoute, { kind: "living-ink" }>;
+
+type StudioLivingInkPinnedStroke = {
+  readonly mode: StudioLivingInkStrokeMode;
+  readonly pageId: string;
+  readonly strokeId: string;
+  readonly route: StudioLivingInkRoute;
+  readonly surfaceKey: string;
+  forwardedSampleCount: number;
+  overlayPresented: boolean;
+  failed: boolean;
+  finishing: boolean;
+  finalDrawing: DrawEl | null;
+  canonicalImageId: string | null;
+  canonicalPngHash: `sha256:${string}` | null;
+  transactionCommitted: boolean;
+};
+
+type StudioLivingInkOverlaySurfaceState = {
+  readonly binding: StudioLivingInkOverlaySurfaceBinding;
+  readonly renderer: StudioLivingInkOverlayRenderer;
+};
+
+type StudioLivingInkCanonicalHandoff = Readonly<{
+  token: string;
+  kind: "action" | "stroke";
+  pageId: string;
+  imageId: string;
+  pngHash: `sha256:${string}`;
+  strokeId: string | null;
+}>;
+
+const STUDIO_LIVING_INK_BRUSH_IDS = new Set([
+  "watercolor",
+  "ink-wash",
+  "sumi",
+  "sumi-e",
+  "watercolor-flat-wash",
+  "watercolor-wet-wash",
+  "watercolor-edge-stain",
+  "watercolor-dry-granule",
+  "watercolor-backrun-ring",
+]);
+
+function studioLivingInkSupportsBrush(
+  brushId: string | null | undefined,
+  catalogId: string | null | undefined,
+): boolean {
+  return [brushId, catalogId]
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.toLowerCase())
+    .some((id) => STUDIO_LIVING_INK_BRUSH_IDS.has(id) || /(?:watercolor|ink-wash|sumi)/u.test(id));
+}
+
+function studioLivingInkSupportsElement(element: DrawEl): boolean {
+  return element.mode === "pen"
+    && (element.kind ?? "freehand") === "freehand"
+    && !element.fill
+    && (element.symmetry?.type ?? "none") === "none"
+    && studioLivingInkSupportsBrush(element.brush, element.brushCatalogId);
+}
+
+function studioLivingInkLinearColor(value: string): readonly [number, number, number, number] | null {
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(value);
+  if (!match) return null;
+  const linear = (channel: string) => {
+    const normalized = Number.parseInt(channel, 16) / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return Object.freeze([linear(match[1]!), linear(match[2]!), linear(match[3]!), 1]);
+}
+
+const STUDIO_HOKUSAI_AUTOMATIC_PRESETS = new Set(["pencil", "charcoal", "oil"]);
+
+function studioHokusaiAutomaticPreset(
+  brushId: string,
+  catalogId: string | null | undefined,
+): "pencil" | "charcoal" | "oil" | null {
+  const preset = resolveStudioHokusaiLivePreset(brushId, catalogId);
+  return preset && STUDIO_HOKUSAI_AUTOMATIC_PRESETS.has(preset)
+    ? preset as "pencil" | "charcoal" | "oil"
+    : null;
+}
+
+function studioHokusaiColor(value: string): `#${string}` | null {
+  return /^#[0-9a-f]{6}$/iu.test(value) ? value.toLowerCase() as `#${string}` : null;
+}
+
+function studioHokusaiStrokeSeed(element: DrawEl): number {
+  const persistedSeed = element.brushDynamics?.seed;
+  if (Number.isSafeInteger(persistedSeed) && (persistedSeed ?? -1) >= 0) {
+    return (persistedSeed as number) >>> 0;
+  }
+  let hash = 0x811c_9dc5;
+  for (let index = 0; index < element.id.length; index += 1) {
+    hash ^= element.id.charCodeAt(index);
+    hash = Math.imul(hash, 0x0100_0193) >>> 0;
+  }
+  return hash;
+}
+
+function studioHokusaiSamplesFromDrawElement(
+  element: DrawEl,
+  startSampleIndex: number,
+): StudioHokusaiLiveSampleLike[] {
+  const sampleCount = Math.floor(element.points.length / 2);
+  const start = Math.max(0, Math.min(sampleCount, Math.floor(startSampleIndex)));
+  const samples: StudioHokusaiLiveSampleLike[] = [];
+  for (let index = start; index < sampleCount; index += 1) {
+    const x = element.points[index * 2];
+    const y = element.points[index * 2 + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const pressure = element.pressures?.[index];
+    const tiltX = element.tiltXs?.[index];
+    const tiltY = element.tiltYs?.[index];
+    const timeMilliseconds = element.sampleTimeOffsets?.[index];
+    samples.push({
+      x: x as number,
+      y: y as number,
+      ...(Number.isFinite(pressure) ? { pressure } : {}),
+      ...(Number.isFinite(tiltX) ? { tiltX } : {}),
+      ...(Number.isFinite(tiltY) ? { tiltY } : {}),
+      ...(Number.isFinite(timeMilliseconds) ? { timeMilliseconds } : {}),
+    });
+  }
+  return samples;
+}
+
+function studioLivingInkSamplesFromDrawElement(
+  element: DrawEl,
+  startSampleIndex: number,
+  fieldScale: number,
+): StudioLivingInkAuthoritativeSample[] {
+  const sampleCount = Math.floor(element.points.length / 2);
+  const start = Math.max(0, Math.min(sampleCount, Math.floor(startSampleIndex)));
+  const samples: StudioLivingInkAuthoritativeSample[] = [];
+  for (let index = start; index < sampleCount; index += 1) {
+    const x = element.points[index * 2];
+    const y = element.points[index * 2 + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const pressure = element.pressures?.[index];
+    const timeMs = element.sampleTimeOffsets?.[index];
+    const tiltX = element.tiltXs?.[index];
+    const tiltY = element.tiltYs?.[index];
+    samples.push(Object.freeze({
+      x: (x as number) * fieldScale,
+      y: (y as number) * fieldScale,
+      pressure: Number.isFinite(pressure) ? Math.max(0, Math.min(1, pressure as number)) : 0.5,
+      timeMs: Number.isFinite(timeMs) ? Math.max(0, timeMs as number) : index * 8,
+      ...(Number.isFinite(tiltX) ? { tiltX } : {}),
+      ...(Number.isFinite(tiltY) ? { tiltY } : {}),
+    }));
+  }
+  return samples;
+}
 
 const LazyStudioMenubarContent = lazy(() =>
   import("./StudioMenubarContent").then(({ StudioMenubarContent }) => ({
@@ -2890,6 +3162,17 @@ function StudioCuttoonEditor() {
     return expanded.length > 0 ? expanded : [elementId];
   }
   function nodeInteractionBegin(elementId: string): boolean {
+    // Konva registers a draggable child's pending drag before the Stage pointerdown bubbles to
+    // onStageDown.  Returning from the Stage handler therefore journals the pixel/retouch gesture
+    // but does not, by itself, cancel the child's native drag.  Fail this drag-start synchronously
+    // while a vector-only raster preparation owns the contact; resizableNodeProps calls stopDrag()
+    // on false, keeping the source geometry and preparation mutation ticket intact for replay.
+    if (
+      pixelMarqueeRasterPreparationActivationRef.current
+      || studioRasterRetouchPreparationRef.current
+    ) {
+      return false;
+    }
     const unitIds = canvasInteractionUnitIds(elementId);
     const lockedMember = unitIds
       .map((id) => elementById.get(id))
@@ -4456,6 +4739,331 @@ function StudioCuttoonEditor() {
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
   const [hybridDccOpen, setHybridDccOpen] = useState(false);
+  const hybridDccDraftPersistenceIdentityRef = useRef<{
+    readonly ownerId: string;
+    readonly workScope: string;
+  } | null>(null);
+  if (studioAuthReady
+    && !workId
+    && !liveRoomQueryParam
+    && !hybridDccDraftPersistenceIdentityRef.current) {
+    hybridDccDraftPersistenceIdentityRef.current = {
+      ownerId: studioAuthUserId ?? "guest",
+      workScope: `draft:${autosaveKey}`,
+    };
+  }
+  const hybridDccPersistenceOwnerId = workId || liveRoomQueryParam
+    ? studioAuthUserId ?? "guest"
+    : hybridDccDraftPersistenceIdentityRef.current?.ownerId ?? "auth-pending";
+  const hybridDccPersistenceWorkScope = workId
+    ? `work:${workId}`
+    : liveRoomQueryParam
+      ? `room:${liveRoomQueryParam}`
+      : hybridDccDraftPersistenceIdentityRef.current?.workScope ?? "draft:auth-pending";
+  const hybridDccWorkspaceScope =
+    `${hybridDccPersistenceOwnerId}\u0000${hybridDccPersistenceWorkScope}`;
+  const hybridDccWorkspaceDocumentId = `hybrid-dcc-${hybridDccPersistenceWorkScope
+    .replace(/[^A-Za-z0-9._~-]/gu, "-")
+    .slice(0, 96)}`;
+  const [hybridDccWorkspaceState, setHybridDccWorkspaceState] = useState<{
+    readonly scope: string;
+    readonly workspace: StudioHybridDccWorkspace;
+  } | null>(null);
+  const hybridDccPersistenceRef =
+    useRef<Promise<StudioHybridDccWorkspacePersistence | null> | null>(null);
+  const hybridDccPersistenceTimerRef = useRef<number | null>(null);
+  const hybridDccPersistenceScopeGenerationRef = useRef(0);
+  const hybridDccPersistenceGenerationRef = useRef(0);
+  const hybridDccPersistenceSaveQueueRef = useRef(createStudioHybridDccLatestTaskQueue());
+  const hybridDccLatestWorkspaceRef = useRef<{
+    readonly scope: string;
+    readonly workspace: StudioHybridDccWorkspace;
+  } | null>(null);
+  const hybridDccAuthFallbackScopeRef = useRef<string | null>(null);
+  const hybridDccPreviousWorkspaceScopeRef = useRef(hybridDccWorkspaceScope);
+  const hybridDccScopeTransferRef = useRef<{
+    readonly fromScope: string;
+    readonly toScope: string;
+    readonly workspace: StudioHybridDccWorkspace;
+  } | null>(null);
+  const previousHybridDccWorkspaceScope = hybridDccPreviousWorkspaceScopeRef.current;
+  if (previousHybridDccWorkspaceScope !== hybridDccWorkspaceScope) {
+    if (hybridDccAuthFallbackScopeRef.current === previousHybridDccWorkspaceScope) {
+      const pendingWorkspace = hybridDccLatestWorkspaceRef.current?.scope
+        === previousHybridDccWorkspaceScope
+        ? hybridDccLatestWorkspaceRef.current.workspace
+        : hybridDccWorkspaceState?.scope === previousHybridDccWorkspaceScope
+          ? hybridDccWorkspaceState.workspace
+          : null;
+      if (pendingWorkspace) {
+        hybridDccScopeTransferRef.current = {
+          fromScope: previousHybridDccWorkspaceScope,
+          toScope: hybridDccWorkspaceScope,
+          workspace: pendingWorkspace,
+        };
+        // Re-key the live in-memory authority synchronously so an auth response arriving while the
+        // artist edits cannot make the remounted dialog flash or emit a blank replacement.
+        hybridDccLatestWorkspaceRef.current = {
+          scope: hybridDccWorkspaceScope,
+          workspace: pendingWorkspace,
+        };
+      }
+    }
+    hybridDccPreviousWorkspaceScopeRef.current = hybridDccWorkspaceScope;
+  }
+  const [hybridDccPersistenceUiState, setHybridDccPersistenceUiState] =
+    useState<StudioHybridDccPersistenceUiState>(() => ({
+      scope: hybridDccWorkspaceScope,
+      status: "checking",
+    }));
+  const hybridDccPersistenceStatus =
+    hybridDccPersistenceUiState.scope === hybridDccWorkspaceScope
+      ? hybridDccPersistenceUiState.status
+      : "checking";
+  const hybridDccPersistenceCurrentScopeRef = useRef(hybridDccWorkspaceScope);
+  hybridDccPersistenceCurrentScopeRef.current = hybridDccWorkspaceScope;
+
+  useEffect(() => {
+    let cancelled = false;
+    let recoveryTimedOut = false;
+    const scopeGeneration = ++hybridDccPersistenceScopeGenerationRef.current;
+    setHybridDccPersistenceUiState({
+      scope: hybridDccWorkspaceScope,
+      status: "checking",
+    });
+    if (!studioAuthReady) {
+      hybridDccPersistenceRef.current = null;
+      const authScopeTimeoutId = window.setTimeout(() => {
+        if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) return;
+        // Authentication is indeterminate, so user-scoped durable storage remains closed. The
+        // editor itself may proceed in memory; a later authoritative auth result transfers this
+        // exact workspace once and checkpoints it without discarding an older durable recovery.
+        hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope;
+        setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "session-only",
+        });
+      }, STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(authScopeTimeoutId);
+      };
+    }
+    const persistenceSaveQueue = hybridDccPersistenceSaveQueueRef.current;
+    const recoveryTimeoutId = window.setTimeout(() => {
+      if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) return;
+      recoveryTimedOut = true;
+      hybridDccPersistenceRef.current = null;
+      setHybridDccPersistenceUiState({
+        scope: hybridDccWorkspaceScope,
+        status: "error",
+      });
+    }, STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS);
+    const persistencePromise = Promise.all([
+      import("./studio-opfs-filesystem"),
+      import("./studio-hybrid-dcc-workspace-persistence"),
+    ]).then(async ([{ selectStudioOpfsFileSystem }, {
+      createStudioHybridDccWorkspacePersistenceFromFileSystem,
+    }]) => {
+      const lockManager = typeof navigator === "undefined" ? null : navigator.locks ?? null;
+      if (!lockManager || typeof lockManager.request !== "function") {
+        if (!cancelled) setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "session-only",
+        });
+        return null;
+      }
+      const selection = await selectStudioOpfsFileSystem(globalThis, {
+        rootName: "toonspectrum-hybrid-dcc-v1",
+      });
+      if (recoveryTimedOut) return null;
+      if (selection.kind !== "opfs") {
+        if (!cancelled) setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "session-only",
+        });
+        return null;
+      }
+      const storage = typeof navigator === "undefined" ? null : navigator.storage;
+      const persistence = createStudioHybridDccWorkspacePersistenceFromFileSystem({
+        fileSystem: selection.fs,
+        lockManager,
+        quotaEstimator: storage && typeof storage.estimate === "function"
+          ? { estimate: () => storage.estimate() }
+          : null,
+        scope: {
+          userId: hybridDccPersistenceOwnerId,
+          workId: hybridDccPersistenceWorkScope,
+        },
+        ownerId: `hybrid-dcc-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+      });
+      const loaded = await persistence.load();
+      if (recoveryTimedOut) return null;
+      if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) {
+        return persistence;
+      }
+      const scopeTransfer = hybridDccScopeTransferRef.current?.toScope
+        === hybridDccWorkspaceScope
+        ? hybridDccScopeTransferRef.current
+        : null;
+      if (scopeTransfer) {
+        const pendingWorkspace = hybridDccLatestWorkspaceRef.current?.scope
+          === hybridDccWorkspaceScope
+          ? hybridDccLatestWorkspaceRef.current.workspace
+          : scopeTransfer.workspace;
+        setHybridDccWorkspaceState({
+          scope: hybridDccWorkspaceScope,
+          workspace: pendingWorkspace,
+        });
+        // `load()` has already admitted any prior durable authority. Saving the uninterrupted
+        // session-only edit now creates a newer checkpoint, so neither side of the auth transition
+        // is silently discarded.
+        await persistence.save(pendingWorkspace);
+        if (hybridDccScopeTransferRef.current === scopeTransfer) {
+          hybridDccScopeTransferRef.current = null;
+        }
+        if (hybridDccAuthFallbackScopeRef.current === scopeTransfer.fromScope) {
+          hybridDccAuthFallbackScopeRef.current = null;
+        }
+        setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "saved",
+        });
+        return persistence;
+      }
+      if (loaded.status === "restored") {
+        setHybridDccWorkspaceState((current) => (
+          current?.scope === hybridDccWorkspaceScope
+            ? current
+            : {
+                scope: hybridDccWorkspaceScope,
+                workspace: loaded.workspace,
+              }
+        ));
+        setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "saved",
+        });
+      } else {
+        setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "ready",
+        });
+      }
+      return persistence;
+    }).catch((cause: unknown) => {
+      if (!cancelled && !recoveryTimedOut
+        && scopeGeneration === hybridDccPersistenceScopeGenerationRef.current) {
+        setHybridDccPersistenceUiState({
+          scope: hybridDccWorkspaceScope,
+          status: "error",
+        });
+        console.warn("Hybrid DCC workspace recovery is unavailable.", cause);
+      }
+      // A corrupt or unsupported durable record must not be overwritten by a fresh workspace.
+      return null;
+    }).finally(() => window.clearTimeout(recoveryTimeoutId));
+    hybridDccPersistenceRef.current = persistencePromise;
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(recoveryTimeoutId);
+      hybridDccPersistenceGenerationRef.current += 1;
+      const pending = hybridDccLatestWorkspaceRef.current;
+      if (hybridDccPersistenceTimerRef.current !== null) {
+        window.clearTimeout(hybridDccPersistenceTimerRef.current);
+        hybridDccPersistenceTimerRef.current = null;
+      }
+      if (pending?.scope === hybridDccWorkspaceScope) {
+        persistenceSaveQueue.enqueue(pending.scope, {
+          run: async () => {
+            const persistence = await persistencePromise;
+            if (persistence) await persistence.save(pending.workspace);
+          },
+        });
+      }
+      if (hybridDccPersistenceRef.current === persistencePromise) {
+        hybridDccPersistenceRef.current = null;
+      }
+    };
+  }, [
+    hybridDccPersistenceOwnerId,
+    hybridDccPersistenceWorkScope,
+    hybridDccWorkspaceScope,
+    studioAuthReady,
+  ]);
+
+  const persistHybridDccWorkspace = (
+    pending: { readonly scope: string; readonly workspace: StudioHybridDccWorkspace },
+    generation: number,
+    persistencePromise: Promise<StudioHybridDccWorkspacePersistence | null>,
+  ) => {
+    hybridDccPersistenceSaveQueueRef.current.enqueue(pending.scope, {
+      run: async () => {
+        const persistence = await persistencePromise;
+        if (!persistence) return;
+        if (generation === hybridDccPersistenceGenerationRef.current
+          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
+          setHybridDccPersistenceUiState({
+            scope: pending.scope,
+            status: "saving",
+          });
+        }
+        await persistence.save(pending.workspace);
+        if (generation === hybridDccPersistenceGenerationRef.current
+          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
+          setHybridDccPersistenceUiState({
+            scope: pending.scope,
+            status: "saved",
+          });
+        }
+      },
+      onError: (cause: unknown) => {
+        if (generation === hybridDccPersistenceGenerationRef.current
+          && pending.scope === hybridDccPersistenceCurrentScopeRef.current) {
+          setHybridDccPersistenceUiState({
+            scope: pending.scope,
+            status: "error",
+          });
+          console.warn("Hybrid DCC workspace autosave failed.", cause);
+        }
+      },
+    });
+  };
+
+  const scheduleHybridDccWorkspacePersistence = (workspace: StudioHybridDccWorkspace) => {
+    const pending = { scope: hybridDccWorkspaceScope, workspace } as const;
+    if (hybridDccLatestWorkspaceRef.current?.scope === pending.scope
+      && hybridDccLatestWorkspaceRef.current.workspace === workspace) return;
+    hybridDccLatestWorkspaceRef.current = pending;
+    const persistencePromise = hybridDccPersistenceRef.current;
+    if (!persistencePromise || hybridDccPersistenceStatus === "session-only") return;
+    if (hybridDccPersistenceTimerRef.current !== null) {
+      window.clearTimeout(hybridDccPersistenceTimerRef.current);
+    }
+    const generation = ++hybridDccPersistenceGenerationRef.current;
+    hybridDccPersistenceTimerRef.current = window.setTimeout(() => {
+      hybridDccPersistenceTimerRef.current = null;
+      persistHybridDccWorkspace(pending, generation, persistencePromise);
+    }, 900);
+  };
+
+  const flushHybridDccWorkspacePersistence = () => {
+    const pending = hybridDccLatestWorkspaceRef.current;
+    const persistencePromise = hybridDccPersistenceRef.current;
+    if (!pending || pending.scope !== hybridDccWorkspaceScope || !persistencePromise) return;
+    if (hybridDccPersistenceTimerRef.current !== null) {
+      window.clearTimeout(hybridDccPersistenceTimerRef.current);
+      hybridDccPersistenceTimerRef.current = null;
+    }
+    const generation = ++hybridDccPersistenceGenerationRef.current;
+    persistHybridDccWorkspace(pending, generation, persistencePromise);
+  };
+  const scopedHybridDccWorkspace = hybridDccWorkspaceState?.scope === hybridDccWorkspaceScope
+    ? hybridDccWorkspaceState.workspace
+    : hybridDccScopeTransferRef.current?.toScope === hybridDccWorkspaceScope
+      ? hybridDccScopeTransferRef.current.workspace
+      : undefined;
   const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
@@ -6308,6 +6916,8 @@ function StudioCuttoonEditor() {
         elementId: string;
         kind: StudioFilterKind;
         initialDraft?: StudioFilterDraft;
+        /** Dialog-open snapshot so async mask encoding cannot observe a different selection. */
+        selection?: PixelSelection;
       }
     | {
         id: number;
@@ -6351,6 +6961,11 @@ function StudioCuttoonEditor() {
   };
   const pendingPixelSelectionRasterGestureRef =
     useRef<PendingPixelSelectionRasterGesture | null>(null);
+  const pixelMarqueeRasterPreparationActivationRef = useRef<{
+    forceCircle: boolean;
+    runId: number;
+    tool: SelectionToolKind | "wand";
+  } | null>(null);
   const studioRasterRetouchPreparationRef = useRef<{
     runId: number;
     tool: StudioRasterRetouchGestureTool;
@@ -6365,7 +6980,7 @@ function StudioCuttoonEditor() {
   const queuedRasterRetouchReplayRef = useRef<{
     liquifyMode: StudioLiquifyMode;
     pageId: string;
-    points: readonly SelPoint[];
+    points: readonly StudioRasterRetouchNormalizedPoint[];
     targetId: string;
     tool: StudioRasterRetouchGestureTool;
   } | null>(null);
@@ -6375,7 +6990,7 @@ function StudioCuttoonEditor() {
   );
   const applyQueuedRasterRetouchReplayRef = useRef<(input: {
     liquifyMode: StudioLiquifyMode;
-    points: readonly SelPoint[];
+    points: readonly StudioRasterRetouchNormalizedPoint[];
     targetId: string;
     tool: StudioRasterRetouchGestureTool;
   }) => void>(() => undefined);
@@ -6387,6 +7002,7 @@ function StudioCuttoonEditor() {
     pixelMarqueeRasterPreparationRunIdRef.current += 1;
     pixelMarqueeRasterPreparationAbortRef.current?.abort();
     pixelMarqueeRasterPreparationAbortRef.current = null;
+    pixelMarqueeRasterPreparationActivationRef.current = null;
     setPixelBusy(false);
     studioRasterRetouchPreparationRef.current = null;
     const retouchPending = pendingRasterRetouchGestureRef.current;
@@ -6467,7 +7083,10 @@ function StudioCuttoonEditor() {
     setTutorialHubOpen(true);
   }
   /** 튜토리얼 「따라 해보기」— 해당 도구/메뉴를 실제로 연다. */
-  function handleTutorialTry(action: StudioTutorialTryAction) {
+  function handleTutorialTry(
+    action: StudioTutorialTryAction,
+    trigger: HTMLButtonElement,
+  ) {
     setTutorialHubOpen(false);
     switch (action) {
       case "pen":
@@ -6483,8 +7102,7 @@ function StudioCuttoonEditor() {
         setMenu("bubble");
         break;
       case "brush":
-        activatePrimaryCanvasTool("draw", "pen");
-        applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
+        openBrushCatalogFromHelp(trigger);
         announceDrawingShortcut(t("studio.tutorialTry.brush"));
         break;
       case "template":
@@ -7080,6 +7698,16 @@ function StudioCuttoonEditor() {
     setBrushCatalogSession((current) =>
       current?.placement === placement ? null : { placement, trigger }
     );
+  }
+
+  function openBrushCatalogFromHelp(trigger: HTMLButtonElement) {
+    activatePrimaryCanvasTool("draw", "pen");
+    if (isMobile) {
+      setMobileSheet("draw");
+      toggleBuiltInBrushCatalog("mobile-sheet", trigger);
+      return;
+    }
+    toggleBuiltInBrushCatalog("desktop-dock", trigger);
   }
 
   function closeBuiltInBrushCatalog(
@@ -8837,12 +9465,22 @@ function StudioCuttoonEditor() {
         ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
         : null,
     }).pagesList as PageState[];
-    // 빈 문서(요소·게시 정보 모두 없음)는 저장하지 않는다 — 의미 없는 복구 배너를 막고,
-    // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
-    if (!studioProjectSnapshotHasMeaningfulContent(
+    // 새 빈 문서는 저장하지 않지만, 이미 임시저장된 작업을 Undo로 완전히 비운 경우에는
+    // 이전 스냅샷을 남겨 두면 다음 실행에서 삭제한 획이 되살아난다. 복구 배너 결정 전은
+    // 위의 hasAutosave 가 계속 보호하고, 여기서는 현재 편집 세대가 권위일 때만 tombstone 한다.
+    const hasMeaningfulAutosaveContent = studioProjectSnapshotHasMeaningfulContent(
       buildCurrentStudioProjectFileSnapshot(durablePages, "content-check"),
       { canvasWidth: CANVAS_W }
-    )) return;
+    );
+    let hasExistingAutosaveAuthority = studioLifecycleDurableGenerationRef.current > 0;
+    if (!hasMeaningfulAutosaveContent && !hasExistingAutosaveAuthority) {
+      try {
+        hasExistingAutosaveAuthority = globalThis.localStorage.getItem(autosaveKey) !== null;
+      } catch {
+        // OPFS 세대가 없고 브라우저 저장소도 확인할 수 없으면 새 빈 문서로 취급한다.
+      }
+    }
+    if (!hasMeaningfulAutosaveContent && !hasExistingAutosaveAuthority) return;
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
     const scheduledPendingFingerprint = pendingBatch
       ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
@@ -8852,6 +9490,43 @@ function StudioCuttoonEditor() {
         scheduledGeneration <= studioLifecycleDurableGenerationRef.current
         && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
       ) {
+        return;
+      }
+      if (!hasMeaningfulAutosaveContent) {
+        const sessionPromise = autosaveOpfsSessionRef.current;
+        void (async () => {
+          const session = await (sessionPromise ?? Promise.resolve(null));
+          if (
+            studioRevisionProjectGenerationRef.current !== scheduledGeneration
+            || (
+              sessionPromise !== null
+              && autosaveOpfsSessionRef.current !== sessionPromise
+            )
+          ) return;
+          await session?.clear();
+          // 새 편집이 clear 도중 시작됐다면 그 편집의 기존 브라우저 복구 슬롯은 보존한다.
+          // 뒤따르는 최신 세대 저장이 직렬 OPFS journal을 다시 채운다.
+          if (studioRevisionProjectGenerationRef.current !== scheduledGeneration) return;
+          globalThis.localStorage.removeItem(autosaveKey);
+          globalThis.localStorage.removeItem(
+            studioLifecycleAutosaveSidecarKey(autosaveKey)
+          );
+          if (!workId && !remixId) {
+            globalThis.localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
+          }
+          studioLifecycleDurableGenerationRef.current = Math.max(
+            studioLifecycleDurableGenerationRef.current,
+            scheduledGeneration
+          );
+          studioLifecycleDurablePendingFingerprintRef.current =
+            scheduledPendingFingerprint;
+        })().catch((cause: unknown) => {
+          // Durable snapshot을 지우지 못했는데 local fallback만 지우면 다음 재진입에서 오래된
+          // OPFS 내용이 복원된다. 두 권위를 그대로 보존하고 다음 편집/clear에서 재시도한다.
+          if (import.meta.env.DEV) {
+            console.warn("Studio empty autosave tombstone could not be written.", cause);
+          }
+        });
         return;
       }
       const payload: StudioAutosavePayload = {
@@ -8945,6 +9620,7 @@ function StudioCuttoonEditor() {
     autosaveChecked,
     hasAutosave,
     workId,
+    remixId,
     sharedDocument,
   ]);
 
@@ -9721,6 +10397,791 @@ function StudioCuttoonEditor() {
     []
   );
   const drawingRef = useRef<DrawEl | null>(null);
+  const hokusaiLiveProviderRef = useRef<StudioHokusaiLiveBrushProvider>(null as never);
+  hokusaiLiveProviderRef.current ??= new StudioHokusaiLiveBrushProvider();
+  const hokusaiLiveOverlaySurfaceRef =
+    useRef<StudioHokusaiLiveOverlaySurfaceState | null>(null);
+  const hokusaiLiveStrokeRef = useRef<StudioHokusaiPinnedLiveStroke | null>(null);
+  const hokusaiLiveOverlayVisibleRef = useRef(false);
+  const hokusaiLiveFinalizingRef = useRef(false);
+
+  function showStudioHokusaiVectorShadow(
+    element?: DrawEl | null,
+    pageId = currentPageIdRef.current,
+  ): void {
+    hokusaiLiveOverlayVisibleRef.current = false;
+    // A page switch can dispose the old overlay while its Worker is still settling. Never paint
+    // that old page's retained DrawEl into the newly active page's direct-draft layer.
+    if (pageId !== currentPageIdRef.current) return;
+    const retained = element ?? drawingRef.current;
+    if (retained) {
+      liveDraftVisualRef.current = retained;
+      liveDraftPendingRef.current = retained;
+      liveDraftDirectRef.current = true;
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function failStudioHokusaiLiveStroke(
+    state: StudioHokusaiPinnedLiveStroke,
+    reason: string,
+  ): void {
+    if (state.failed) return;
+    if (state.transactionCommitted) {
+      releaseStudioHokusaiLivePresentation(state);
+      return;
+    }
+    state.failed = true;
+    state.abortController.abort();
+    hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    showStudioHokusaiVectorShadow(state.finalDrawing, state.pageId);
+    setError(`자연매체 라이브 표면을 유지하지 못해 원본 벡터 획으로 복구했습니다. ${reason}`);
+  }
+
+  function releaseStudioHokusaiLivePresentation(
+    state: StudioHokusaiPinnedLiveStroke,
+  ): void {
+    if (hokusaiLiveStrokeRef.current !== state) return;
+    hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    hokusaiLiveOverlayVisibleRef.current = false;
+    hokusaiLiveStrokeRef.current = null;
+    hokusaiLiveFinalizingRef.current = false;
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function onHokusaiCanonicalImageReady(
+    elementId: string,
+    pngHash: `sha256:${string}`,
+  ): void {
+    const state = hokusaiLiveStrokeRef.current;
+    if (
+      !state
+      || !state.transactionCommitted
+      || state.canonicalImageId !== elementId
+      || state.canonicalPngHash !== pngHash
+    ) return;
+    // StudioKonvaImageNode has synchronously drawn this exact decoded PNG into the main layer.
+    // Only that receipt may relinquish the live material canvas; a guessed rAF is not authority.
+    releaseStudioHokusaiLivePresentation(state);
+  }
+
+  function discardStudioHokusaiLiveStroke(strokeId?: string | null): void {
+    const state = hokusaiLiveStrokeRef.current;
+    if (!state || (strokeId && state.strokeId !== strokeId)) return;
+    state.abortController.abort();
+    hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    hokusaiLiveOverlayVisibleRef.current = false;
+    hokusaiLiveStrokeRef.current = null;
+    hokusaiLiveFinalizingRef.current = false;
+  }
+
+  function setHokusaiLiveOverlaySurface(
+    binding: StudioHokusaiLiveOverlaySurfaceBinding | null,
+  ): void {
+    const previous = hokusaiLiveOverlaySurfaceRef.current;
+    if (previous?.binding.canvas === binding?.canvas
+      && previous?.binding.surfaceKey === binding?.surfaceKey) return;
+    previous?.renderer.dispose();
+    hokusaiLiveOverlaySurfaceRef.current = binding
+      ? {
+          binding,
+          renderer: new StudioHokusaiLiveOverlayRenderer(binding.canvas),
+        }
+      : null;
+    const active = hokusaiLiveStrokeRef.current;
+    if (active && !active.failed && active.surfaceKey !== binding?.surfaceKey) {
+      if (active.transactionCommitted) {
+        // The canonical document transaction is already durable. Leaving its page or replacing the
+        // viewport surface no longer needs a fallback history entry; the destination page will
+        // decode that canonical ImageEl normally when it is visible again.
+        releaseStudioHokusaiLivePresentation(active);
+        return;
+      }
+      failStudioHokusaiLiveStroke(
+        active,
+        "캔버스 보기 배율·스크롤 또는 표면 크기가 획 도중 바뀌었습니다.",
+      );
+    }
+  }
+
+  function appendStudioHokusaiAuthoritativeSuffix(
+    element: DrawEl,
+    requestedStartSampleIndex: number,
+  ): void {
+    const state = hokusaiLiveStrokeRef.current;
+    if (!state || state.failed || state.finishing || state.strokeId !== element.id) return;
+    const sampleCount = Math.floor(element.points.length / 2);
+    const start = Math.max(
+      state.forwardedSampleCount,
+      Math.max(0, Math.floor(requestedStartSampleIndex)),
+    );
+    if (sampleCount <= start) return;
+    const samples = studioHokusaiSamplesFromDrawElement(element, start);
+    state.forwardedSampleCount = sampleCount;
+    if (samples.length === 0) return;
+    if (!state.session) {
+      state.queuedSamples.push(...samples);
+      return;
+    }
+    try {
+      state.session.append(samples);
+    } catch (cause) {
+      failStudioHokusaiLiveStroke(
+        state,
+        cause instanceof Error ? cause.message : "권위 샘플 전송에 실패했습니다.",
+      );
+    }
+  }
+
+  function beginStudioHokusaiLiveStroke(element: DrawEl): boolean {
+    const surface = hokusaiLiveOverlaySurfaceRef.current;
+    const color = studioHokusaiColor(element.stroke);
+    if (
+      !surface
+      || hokusaiLiveFinalizingRef.current
+      || hokusaiLiveStrokeRef.current
+      || element.mode !== "pen"
+      || (element.kind ?? "freehand") !== "freehand"
+      || element.fill
+      || (element.symmetry?.type ?? "none") !== "none"
+      || quickShapeActive
+      || postCorrection > 0
+      || masterEditMode
+      || canvasFlipH
+      || canvasRotation !== 0
+      || !color
+      || !studioHokusaiAutomaticPreset(element.brush ?? "pen", element.brushCatalogId)
+    ) return false;
+    // Hokusai finishes asynchronously. Start it only from a clean history boundary so its one
+    // canonical transaction cannot overtake an older 200ms deferred stroke batch.
+    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return false;
+    const route = hokusaiLiveProviderRef.current.admitStroke({
+      brushId: element.brush ?? "pen",
+      catalogId: element.brushCatalogId,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      firstX: element.points[0] ?? 0,
+      firstY: element.points[1] ?? 0,
+      radiusPixels: Math.max(0.5, studioLiveBrushEffectiveDiameter(element) / 2),
+      color,
+      opacity: Math.max(0.01, Math.min(1, element.opacity ?? 1)),
+      seed: studioHokusaiStrokeSeed(element),
+    });
+    if (route.status !== "ready") return false;
+
+    const abortController = new AbortController();
+    const state: StudioHokusaiPinnedLiveStroke = {
+      abortController,
+      pageId: activePage.id,
+      route,
+      strokeId: element.id,
+      surfaceKey: surface.binding.surfaceKey,
+      beginPromise: null,
+      session: null,
+      queuedSamples: [],
+      forwardedSampleCount: 0,
+      overlayPresented: false,
+      failed: false,
+      finishing: false,
+      finalDrawing: null,
+      canonicalImageId: null,
+      canonicalPngHash: null,
+      transactionCommitted: false,
+    };
+    hokusaiLiveStrokeRef.current = state;
+    hokusaiLiveOverlayVisibleRef.current = false;
+    state.beginPromise = hokusaiLiveProviderRef.current.beginStroke(route, {
+      strokeId: element.id,
+      signal: abortController.signal,
+      onFrame: (frame) => {
+        if (hokusaiLiveStrokeRef.current !== state || state.failed) return;
+        const currentSurface = hokusaiLiveOverlaySurfaceRef.current;
+        if (!currentSurface || currentSurface.binding.surfaceKey !== state.surfaceKey) {
+          failStudioHokusaiLiveStroke(state, "라이브 표면의 좌표계가 변경되었습니다.");
+          return;
+        }
+        const presented = currentSurface.renderer.present(
+          frame,
+          currentSurface.binding.projection,
+        );
+        if (presented.status !== "presented") {
+          failStudioHokusaiLiveStroke(state, "질감 프레임을 캔버스에 표시하지 못했습니다.");
+          return;
+        }
+        if (!state.overlayPresented) {
+          state.overlayPresented = true;
+          hokusaiLiveOverlayVisibleRef.current = true;
+          // The exact DrawEl remains retained but ceases presentation only after the first valid
+          // material frame has been composed. This handshake prevents a blank first contact.
+          liveDraftLayerRef.current?.drawScene();
+        }
+      },
+    });
+    void state.beginPromise.then((session) => {
+      if (hokusaiLiveStrokeRef.current !== state || state.failed) {
+        session.cancel("epoch-replaced");
+        return;
+      }
+      state.session = session;
+      if (state.queuedSamples.length > 0) {
+        const queued = state.queuedSamples;
+        state.queuedSamples = [];
+        try {
+          session.append(queued);
+        } catch (cause) {
+          failStudioHokusaiLiveStroke(
+            state,
+            cause instanceof Error ? cause.message : "초기 샘플 전송에 실패했습니다.",
+          );
+        }
+      }
+    }).catch((cause) => {
+      if (hokusaiLiveStrokeRef.current !== state || state.failed) return;
+      failStudioHokusaiLiveStroke(
+        state,
+        cause instanceof Error ? cause.message : "자연매체 Worker를 시작하지 못했습니다.",
+      );
+    });
+    appendStudioHokusaiAuthoritativeSuffix(element, 0);
+    return true;
+  }
+
+  useEffect(() => {
+    if (!studioHokusaiAutomaticPreset(brush, activeCatalogBrush.id)) return;
+    void hokusaiLiveProviderRef.current.prewarm().catch(() => undefined);
+  }, [activeCatalogBrush.id, brush]);
+
+  useEffect(() => () => {
+    hokusaiLiveStrokeRef.current?.abortController.abort();
+    hokusaiLiveStrokeRef.current = null;
+    hokusaiLiveOverlayVisibleRef.current = false;
+    hokusaiLiveOverlaySurfaceRef.current?.renderer.dispose();
+    hokusaiLiveOverlaySurfaceRef.current = null;
+    hokusaiLiveProviderRef.current.close();
+  }, []);
+
+  const [livingInkState, setLivingInkState] = useState<StudioLivingInkStudioState>("unavailable");
+  const [livingInkStateMessage, setLivingInkStateMessage] = useState<string | undefined>();
+  const [livingInkMode, setLivingInkMode] = useState<StudioLivingInkStrokeMode>("ink");
+  const [livingInkScope, setLivingInkScope] = useState<"all" | "selection">("all");
+  const [livingInkMaterial, setLivingInkMaterial] = useState<StudioLivingInkMaterialControls>(
+    () => ({ ...DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS }),
+  );
+  const [livingInkBusy, setLivingInkBusy] = useState(false);
+  const livingInkConfigRef = useRef<StudioLivingInkExecutionConfig | null>(null);
+  const livingInkOverlaySurfaceRef = useRef<StudioLivingInkOverlaySurfaceState | null>(null);
+  const livingInkStrokeRef = useRef<StudioLivingInkPinnedStroke | null>(null);
+  const livingInkOverlayVisibleRef = useRef(false);
+  const livingInkFinalizingRef = useRef(false);
+  const livingInkCanonicalHandoffRef = useRef<StudioLivingInkCanonicalHandoff | null>(null);
+  const livingInkCanonicalHandoffTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null);
+  const livingInkAcceptedAuthorityRef = useRef<StudioLivingInkAcceptedAuthority | null>(null);
+  const livingInkRejectedAuthorityRef = useRef<StudioLivingInkAcceptedAuthority | null>(null);
+  const livingInkAuthorityVerificationEpochRef = useRef(0);
+  const livingInkAuthorityVerificationAbortRef = useRef<AbortController | null>(null);
+  const livingInkWaterNoopStrokeIdsRef = useRef<Set<string>>(new Set());
+  const studioStrokeSurfaceRouteRef = useRef<StudioStrokeSurfaceRoute | null>(null);
+  const studioStrokeSurfaceEpochRef = useRef(0);
+  const livingInkCoordinatorRef = useRef<StudioLivingInkStudioCoordinator>(null as never);
+  livingInkCoordinatorRef.current ??= new StudioLivingInkStudioCoordinator({
+    onStateChange: (state, message) => {
+      setLivingInkState(state);
+      setLivingInkStateMessage(message);
+    },
+    onCapacityDiagnostic: (message) => setError(message),
+    onInteractiveFrame: (frame, routeKey) => {
+      const state = livingInkStrokeRef.current;
+      const surface = livingInkOverlaySurfaceRef.current;
+      if (
+        !state
+        || state.failed
+        || state.route.routeKey !== routeKey
+        || !surface
+        || state.surfaceKey !== surface.binding.surfaceKey
+      ) {
+        frame.image.close();
+        return;
+      }
+      const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
+        phase: "append",
+        routeKey,
+        strokeId: state.strokeId,
+        kind: "living-ink",
+      });
+      if (claim.status !== "owned") {
+        frame.image.close();
+        failStudioLivingInkStroke(state, "라이브 표면 소유권 영수증이 일치하지 않습니다.");
+        return;
+      }
+      const accepted = surface.renderer.offer(
+        frame,
+        routeKey,
+        surface.binding.projection,
+        (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
+      );
+      if (!accepted) failStudioLivingInkStroke(state, "물리 프레임을 캔버스에 표시하지 못했습니다.");
+    },
+  });
+
+  function onStudioLivingInkOverlayPresented(
+    state: StudioLivingInkPinnedStroke,
+    receipt: StudioLivingInkOverlayPresentationReceipt,
+  ): void {
+    if (livingInkStrokeRef.current !== state || state.failed) return;
+    if (!studioStrokeSurfaceRouteSuppressesDraft(state.route, {
+      routeKey: receipt.routeKey,
+      kind: "living-ink",
+      status: receipt.status,
+    })) return;
+    const canvas = livingInkOverlaySurfaceRef.current?.binding.canvas;
+    if (canvas) {
+      canvas.setAttribute("data-studio-living-ink-active", "true");
+      canvas.setAttribute("data-studio-living-ink-presentation", "presented");
+      canvas.setAttribute("data-studio-living-ink-route-key", receipt.routeKey);
+      canvas.setAttribute("data-studio-living-ink-display-sha256", receipt.displaySha256);
+      canvas.setAttribute("data-studio-living-ink-presentation-revision", String(receipt.revision));
+    }
+    if (!state.overlayPresented) {
+      state.overlayPresented = true;
+      livingInkOverlayVisibleRef.current = true;
+      liveDraftLayerRef.current?.drawScene();
+    }
+  }
+
+  function showStudioLivingInkVectorShadow(
+    element?: DrawEl | null,
+    pageId = currentPageIdRef.current,
+  ): void {
+    livingInkOverlayVisibleRef.current = false;
+    if (pageId !== currentPageIdRef.current) return;
+    const retained = element ?? drawingRef.current;
+    if (retained) {
+      liveDraftVisualRef.current = retained;
+      liveDraftPendingRef.current = retained;
+      liveDraftDirectRef.current = true;
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function failStudioLivingInkStroke(
+    state: StudioLivingInkPinnedStroke,
+    reason: string,
+  ): void {
+    if (state.failed || state.transactionCommitted) return;
+    state.failed = true;
+    livingInkOverlaySurfaceRef.current?.renderer.clear();
+    if (studioLivingInkFailureDisposition(state.mode) === "save-vector-fallback") {
+      showStudioLivingInkVectorShadow(state.finalDrawing, state.pageId);
+    } else {
+      livingInkOverlayVisibleRef.current = false;
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+      liveDraftLayerRef.current?.drawScene();
+    }
+    void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
+    setError(
+      studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop"
+        ? `Living Ink 물 도구를 적용하지 못해 문서를 변경하지 않았습니다. ${reason}`
+        : `Living Ink 물리 표면을 유지하지 못해 원본 벡터 획으로 복구합니다. ${reason}`,
+    );
+  }
+
+  function discardStudioLivingInkStroke(strokeId?: string | null): void {
+    if (strokeId) livingInkWaterNoopStrokeIdsRef.current.delete(strokeId);
+    const state = livingInkStrokeRef.current;
+    if (!state || (strokeId && state.strokeId !== strokeId)) return;
+    const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
+      phase: "cancel",
+      routeKey: state.route.routeKey,
+      strokeId: state.strokeId,
+      kind: "living-ink",
+    });
+    if (claim.status !== "owned") return;
+    livingInkOverlaySurfaceRef.current?.renderer.clear();
+    livingInkOverlayVisibleRef.current = false;
+    livingInkStrokeRef.current = null;
+    livingInkFinalizingRef.current = false;
+    studioStrokeSurfaceRouteRef.current = null;
+    setLivingInkBusy(false);
+    void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
+  }
+
+  function releaseStudioLivingInkPresentation(expectedToken?: string): boolean {
+    const handoff = livingInkCanonicalHandoffRef.current;
+    if (expectedToken && handoff?.token !== expectedToken) return false;
+    if (
+      handoff?.kind === "stroke"
+      && handoff.strokeId
+      && livingInkStrokeRef.current
+      && livingInkStrokeRef.current.strokeId !== handoff.strokeId
+    ) return false;
+    if (livingInkCanonicalHandoffTimerRef.current !== null) {
+      globalThis.clearTimeout(livingInkCanonicalHandoffTimerRef.current);
+      livingInkCanonicalHandoffTimerRef.current = null;
+    }
+    const canvas = livingInkOverlaySurfaceRef.current?.binding.canvas;
+    if (canvas) canvas.setAttribute("data-studio-living-ink-active", "false");
+    livingInkOverlaySurfaceRef.current?.renderer.clear();
+    livingInkOverlayVisibleRef.current = false;
+    if (!handoff || handoff.kind === "stroke") {
+      livingInkStrokeRef.current = null;
+      livingInkFinalizingRef.current = false;
+      studioStrokeSurfaceRouteRef.current = null;
+    }
+    livingInkCanonicalHandoffRef.current = null;
+    setLivingInkBusy(false);
+    liveDraftLayerRef.current?.drawScene();
+    return true;
+  }
+
+  function armStudioLivingInkCanonicalHandoffTimeout(): void {
+    if (livingInkCanonicalHandoffTimerRef.current !== null) {
+      globalThis.clearTimeout(livingInkCanonicalHandoffTimerRef.current);
+    }
+    const expected = livingInkCanonicalHandoffRef.current;
+    livingInkCanonicalHandoffTimerRef.current = globalThis.setTimeout(() => {
+      livingInkCanonicalHandoffTimerRef.current = null;
+      if (!expected || livingInkCanonicalHandoffRef.current !== expected) return;
+      const message = [
+        "Living Ink 저장 PNG의 실제 바이트 해시와 메인 캔버스 표시 영수증을 확인하지 못했습니다.",
+        "물리 표면은 화면에 그대로 보존되며 실행 취소 후 다시 시도할 수 있습니다.",
+      ].join(" ");
+      setError(message);
+      void livingInkCoordinatorRef.current.failClosed(message);
+    }, 15_000);
+  }
+
+  function onLivingInkCanonicalImageReady(
+    elementId: string,
+    pngHash: `sha256:${string}`,
+    routeKey: string,
+  ): void {
+    const handoff = livingInkCanonicalHandoffRef.current;
+    if (
+      !handoff
+      || handoff.imageId !== elementId
+      || handoff.pngHash !== pngHash
+      || handoff.token !== `${routeKey}:canonical`
+    ) return;
+    const canvas = livingInkOverlaySurfaceRef.current?.binding.canvas;
+    if (canvas) {
+      canvas.setAttribute("data-studio-living-ink-canonical-handoff", "presented");
+      canvas.setAttribute("data-studio-living-ink-canonical-png-sha256", pngHash);
+    }
+    releaseStudioLivingInkPresentation(handoff.token);
+  }
+
+  function setLivingInkOverlaySurface(
+    binding: StudioLivingInkOverlaySurfaceBinding | null,
+  ): void {
+    const previous = livingInkOverlaySurfaceRef.current;
+    if (
+      previous?.binding.canvas === binding?.canvas
+      && previous?.binding.surfaceKey === binding?.surfaceKey
+    ) return;
+    previous?.renderer.dispose();
+    livingInkOverlaySurfaceRef.current = binding
+      ? { binding, renderer: new StudioLivingInkOverlayRenderer(binding.canvas) }
+      : null;
+    if (binding) binding.canvas.setAttribute("data-studio-living-ink-active", "false");
+    const active = livingInkStrokeRef.current;
+    if (active && !active.failed && active.surfaceKey !== binding?.surfaceKey) {
+      if (active.transactionCommitted) {
+        releaseStudioLivingInkPresentation(livingInkCanonicalHandoffRef.current?.token);
+      } else {
+        failStudioLivingInkStroke(
+          active,
+          "캔버스 보기 배율·스크롤 또는 물리 표면이 획 도중 변경되었습니다.",
+        );
+      }
+    }
+  }
+
+  function livingInkSelectionSnapshot(
+    config: StudioLivingInkExecutionConfig,
+  ): StudioLivingInkSelectionMask | null {
+    if (!isSelectionUsable(pixelSelRef.current)) return null;
+    const selectedElement = activeElementsRef.current.find(({ id }) => id === selectedIdRef.current);
+    if (
+      !selectedElement
+      || selectedElement.type !== "image"
+      || selectedElement.livingInkReceipt?.pageId !== currentPageIdRef.current
+      || selectedElement.x !== 0
+      || selectedElement.y !== 0
+    ) return null;
+    const alpha = selectionToMask(pixelSelRef.current, config.fieldWidth, config.fieldHeight, {
+      featherScale: config.fieldWidth / Math.max(1, selectedElement.width),
+    });
+    if (alpha.length !== config.fieldWidth * config.fieldHeight) return null;
+    return Object.freeze({
+      kind: "studio-living-ink-selection-mask",
+      version: 1,
+      bounds: Object.freeze({ x: 0, y: 0, width: config.fieldWidth, height: config.fieldHeight }),
+      coverage: Object.freeze(Array.from(alpha, (value) => value / 255)),
+    });
+  }
+
+  function beginStudioLivingInkStroke(element: DrawEl, pointerEvent: PointerEvent): boolean {
+    const surface = livingInkOverlaySurfaceRef.current;
+    const config = livingInkConfigRef.current;
+    const color = studioLivingInkLinearColor(element.stroke);
+    if (
+      !surface
+      || !config
+      || livingInkState !== "ready"
+      || studioLivingInkProductAdmissionBlocked({
+        busy: livingInkBusy,
+        finalizing: livingInkFinalizingRef.current,
+        hasActiveStroke: Boolean(livingInkStrokeRef.current),
+        hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
+      })
+      || !studioLivingInkSupportsElement(element)
+      || quickShapeActive
+      || postCorrection > 0
+      || masterEditMode
+      || canvasFlipH
+      || canvasRotation !== 0
+      || !color
+    ) return false;
+    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return false;
+    const fieldScale = config.fieldWidth / CANVAS_W;
+    const selection = livingInkScope === "selection"
+      ? livingInkSelectionSnapshot(config)
+      : null;
+    if (livingInkScope === "selection" && !selection) return false;
+    return livingInkCoordinatorRef.current.admitStroke({
+      pageId: activePage.id,
+      strokeId: element.id,
+      recipe: {
+        mode: livingInkMode,
+        tool: "pigment-water-brush",
+        baseWidth: Math.max(0.5, studioLiveBrushEffectiveDiameter(element)),
+        fieldScale,
+        waterLoad: livingInkMode === "water" ? 0.9 : Math.max(0.1, livingInkMaterial.flow),
+        pigmentLoad: livingInkMode === "water" ? 0 : Math.max(0.1, livingInkMaterial.brushPigmentLoad),
+        color: Object.freeze([
+          color[0],
+          color[1],
+          color[2],
+          Math.max(0.01, Math.min(1, element.opacity ?? 1)),
+        ]),
+        pointerSource: pointerEvent.pointerType === "pen"
+          ? "pen"
+          : pointerEvent.pointerType === "touch" ? "finger" : "mouse",
+        selection,
+      },
+    });
+  }
+
+  function appendStudioLivingInkAuthoritativeSuffix(
+    element: DrawEl,
+    requestedStartSampleIndex: number,
+  ): void {
+    const state = livingInkStrokeRef.current;
+    const config = livingInkConfigRef.current;
+    if (!state || !config || state.failed || state.finishing || state.strokeId !== element.id) return;
+    const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
+      phase: "append",
+      routeKey: state.route.routeKey,
+      strokeId: state.strokeId,
+      kind: "living-ink",
+    });
+    if (claim.status !== "owned") {
+      failStudioLivingInkStroke(state, "추가 샘플의 route가 pointer-down 영수증과 다릅니다.");
+      return;
+    }
+    const sampleCount = Math.floor(element.points.length / 2);
+    const start = Math.max(state.forwardedSampleCount, Math.max(0, requestedStartSampleIndex));
+    if (sampleCount <= start) return;
+    const samples = studioLivingInkSamplesFromDrawElement(
+      element,
+      start,
+      config.fieldWidth / CANVAS_W,
+    );
+    state.forwardedSampleCount = sampleCount;
+    if (
+      samples.length > 0
+      && !livingInkCoordinatorRef.current.append(state.strokeId, state.route.routeKey, samples)
+    ) {
+      failStudioLivingInkStroke(
+        state,
+        livingInkCoordinatorRef.current.capacityDiagnostic ?? "권위 샘플 전송에 실패했습니다.",
+      );
+    }
+  }
+
+  const livingInkCanonicalImage = elements.find((element): element is ImageEl =>
+    element.type === "image"
+    && element.livingInkReceipt?.pageId === activePage.id
+  );
+  const livingInkReplayToken = studioLivingInkReceiptReplayToken(
+    livingInkCanonicalImage?.livingInkReceipt,
+  );
+  const livingInkCanonicalSrc = livingInkCanonicalImage?.src ?? "";
+  useEffect(() => {
+    const canonicalImage = activeElementsRef.current.find((element): element is ImageEl =>
+      element.type === "image"
+      && element.livingInkReceipt?.pageId === activePage.id
+    );
+    const receipt = canonicalImage?.livingInkReceipt;
+    const freshPlan = planStudioLivingInkProductExecutionConfig({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      material: livingInkMaterial,
+      seed: studioHokusaiStrokeSeed({ id: activePage.id } as DrawEl),
+    });
+    const config = receipt?.config ?? (freshPlan.ok ? freshPlan.config : null);
+    const qualityFailure = receipt && !studioLivingInkConfigMeetsProductQualityFloor(receipt.config)
+      ? "저장된 Living Ink 물리 필드가 현재 제품 해상도 하한보다 낮아 PNG만 보존하고 물리 편집은 열지 않았습니다."
+      : !freshPlan.ok ? freshPlan.message : null;
+    if (!config || qualityFailure) {
+      livingInkAuthorityVerificationEpochRef.current += 1;
+      livingInkAuthorityVerificationAbortRef.current?.abort();
+      livingInkAuthorityVerificationAbortRef.current = null;
+      livingInkAcceptedAuthorityRef.current = null;
+      livingInkRejectedAuthorityRef.current = null;
+      livingInkConfigRef.current = null;
+      setLivingInkState("unavailable");
+      setLivingInkStateMessage(qualityFailure ?? "Living Ink 물리 필드를 만들 수 없습니다.");
+      if (qualityFailure) setError(qualityFailure);
+      void livingInkCoordinatorRef.current.dispose();
+      return;
+    }
+    const locallyRejected = livingInkRejectedAuthorityRef.current;
+    if (
+      receipt
+      && canonicalImage
+      && locallyRejected?.pageId === activePage.id
+      && locallyRejected.replayToken === livingInkReplayToken
+      && locallyRejected.canonicalSrc === canonicalImage.src
+    ) {
+      livingInkAuthorityVerificationEpochRef.current += 1;
+      livingInkAuthorityVerificationAbortRef.current?.abort();
+      livingInkAuthorityVerificationAbortRef.current = null;
+      livingInkConfigRef.current = null;
+      setLivingInkState("failed");
+      setLivingInkStateMessage(
+        "로컬 canonical 저장 뒤 Worker 상태 수락에 실패했습니다. PNG는 보존하고 다시 열기 전까지 물리 편집을 비활성화합니다.",
+      );
+      return;
+    }
+    if (locallyRejected) livingInkRejectedAuthorityRef.current = null;
+    livingInkConfigRef.current = config;
+    let disposed = false;
+    const epoch = ++livingInkAuthorityVerificationEpochRef.current;
+    livingInkAuthorityVerificationAbortRef.current?.abort();
+    const controller = new AbortController();
+    livingInkAuthorityVerificationAbortRef.current = controller;
+    const isCurrent = () => !disposed
+      && !controller.signal.aborted
+      && livingInkAuthorityVerificationEpochRef.current === epoch
+      && currentPageIdRef.current === activePage.id;
+
+    void (async () => {
+      if (receipt && canonicalImage) {
+        if (studioLivingInkCanReuseAcceptedAuthority({
+          accepted: livingInkAcceptedAuthorityRef.current,
+          pageId: activePage.id,
+          replayToken: livingInkReplayToken,
+          canonicalSrc: canonicalImage.src,
+          coordinatorPageId: livingInkCoordinatorRef.current.pageId,
+          coordinatorState: livingInkCoordinatorRef.current.state,
+        })) return;
+        setLivingInkState("loading");
+        setLivingInkStateMessage("저장 PNG 실제 바이트와 물리 영수증을 확인하는 중입니다.");
+        const authority = await verifyStudioLivingInkCanonicalImageAuthority({
+          image: canonicalImage,
+          expectedPageId: activePage.id,
+          signal: controller.signal,
+        });
+        if (!isCurrent()) return;
+        if (!authority.ok) {
+          const message = [
+            authority.message,
+            "PNG는 화면에 보존하지만 물·정착 편집 권한은 비활성화했습니다.",
+          ].join(" ");
+          livingInkAcceptedAuthorityRef.current = null;
+          livingInkRejectedAuthorityRef.current = null;
+          livingInkConfigRef.current = null;
+          setLivingInkState("failed");
+          setLivingInkStateMessage(message);
+          setError(message);
+          await livingInkCoordinatorRef.current.failClosed(message);
+          return;
+        }
+      } else {
+        livingInkAcceptedAuthorityRef.current = null;
+        livingInkRejectedAuthorityRef.current = null;
+      }
+
+      const ready = await livingInkCoordinatorRef.current.activate({
+        pageId: activePage.id,
+        config,
+        journal: receipt?.journal,
+        expectedFinalReceipt: receipt?.finalExecutionReceipt,
+      });
+      if (!isCurrent()) return;
+      if (!ready && receipt) {
+        livingInkAcceptedAuthorityRef.current = null;
+        setError(
+          "저장된 Living Ink PNG는 그대로 보존했지만 GPU 물리 상태 재열기 검증에 실패해 물·정착 편집을 비활성화했습니다.",
+        );
+        return;
+      }
+      if (ready && receipt && canonicalImage) {
+        livingInkRejectedAuthorityRef.current = null;
+        livingInkAcceptedAuthorityRef.current = Object.freeze({
+          pageId: activePage.id,
+          replayToken: livingInkReplayToken,
+          canonicalSrc: canonicalImage.src,
+        });
+      }
+    })().catch((cause) => {
+      if (!isCurrent() || (cause instanceof DOMException && cause.name === "AbortError")) return;
+      const message = cause instanceof Error
+        ? cause.message
+        : "Living Ink 저장 PNG 무결성을 확인하지 못했습니다.";
+      livingInkAcceptedAuthorityRef.current = null;
+      livingInkRejectedAuthorityRef.current = null;
+      livingInkConfigRef.current = null;
+      setLivingInkState("failed");
+      setLivingInkStateMessage(message);
+      setError(message);
+      void livingInkCoordinatorRef.current.failClosed(message);
+    });
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (livingInkAuthorityVerificationAbortRef.current === controller) {
+        livingInkAuthorityVerificationAbortRef.current = null;
+      }
+    };
+  }, [
+    activePage.id,
+    canvasH,
+    livingInkCanonicalSrc,
+    livingInkMaterial,
+    livingInkReplayToken,
+  ]);
+
+  useEffect(() => () => {
+    livingInkOverlaySurfaceRef.current?.renderer.dispose();
+    livingInkOverlaySurfaceRef.current = null;
+    livingInkStrokeRef.current = null;
+    livingInkOverlayVisibleRef.current = false;
+    livingInkAcceptedAuthorityRef.current = null;
+    livingInkRejectedAuthorityRef.current = null;
+    livingInkAuthorityVerificationEpochRef.current += 1;
+    livingInkAuthorityVerificationAbortRef.current?.abort();
+    livingInkAuthorityVerificationAbortRef.current = null;
+    livingInkWaterNoopStrokeIdsRef.current.clear();
+    if (livingInkCanonicalHandoffTimerRef.current !== null) {
+      globalThis.clearTimeout(livingInkCanonicalHandoffTimerRef.current);
+      livingInkCanonicalHandoffTimerRef.current = null;
+    }
+    void livingInkCoordinatorRef.current.dispose();
+  }, []);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   /**
    * Mutable lazy-brush authority is isolated from the legacy pure state ref. Only real precision
@@ -11494,6 +12955,18 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next) return;
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (
+      hokusaiStroke
+      && !hokusaiStroke.failed
+      && hokusaiStroke.strokeId === next.id
+    ) {
+      liveDraftVisualRef.current = next;
+      // Before the first valid material frame the retained vector is deliberately visible. Once
+      // receipted pixels arrive, the viewport Shape reads the visibility ref and stops painting it.
+      liveDraftLayerRef.current?.drawScene();
+      return;
+    }
     if (liveWetInkDraftDirectRef.current) {
       const renderer = liveWetInkOverlayRendererRef.current;
       if (!studioLiveWetInkOverlaySupportsElement(next) || !renderer.isActive) {
@@ -12108,6 +13581,7 @@ function StudioCuttoonEditor() {
   const advancedFillAutoArmTargetRef = useRef<{
     targetId: string;
     status: string;
+    virtualTarget?: StudioAdvancedFillVirtualTarget;
   } | null>(null);
   const advancedFillTouchPanRef = useRef<{
     pointerId: number;
@@ -12138,6 +13612,7 @@ function StudioCuttoonEditor() {
   const [liquifyStrength, setLiquifyStrength] = useState(50);
   const [liquifyMode, setLiquifyMode] = useState<StudioLiquifyMode>("push");
   const [liquifyBusy, setLiquifyBusy] = useState(false);
+  const liquifyAbortRef = useRef<AbortController | null>(null);
   const liquifyDragRef = useRef<StudioLiquifyPointerSession | null>(null);
   const liquifyCaptureTargetRef = useRef<Element | null>(null);
   const liquifyHandledNativeEndEventsRef = useRef(new WeakSet<Event>());
@@ -12198,6 +13673,7 @@ function StudioCuttoonEditor() {
   const [smudgeRadius, setSmudgeRadius] = useState(SMUDGE_RADIUS_DEFAULT);
   const [smudgeStrength, setSmudgeStrength] = useState(SMUDGE_STRENGTH_DEFAULT); // %
   const [smudgeBusy, setSmudgeBusy] = useState(false);
+  const smudgeAbortRef = useRef<AbortController | null>(null);
   const smudgeDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
   const smudgeCursorRef = useRef<Konva.Circle>(null);
   // 닷지/번/스펀지 브러시 — 스머지와 동일한 armed 픽셀 툴 패턴(설정값은 disarm 후에도 유지).
@@ -12209,6 +13685,7 @@ function StudioCuttoonEditor() {
   const [dodgeBurnHardness, setDodgeBurnHardness] = useState(DODGE_BURN_HARDNESS_DEFAULT);
   const [dodgeBurnExposure, setDodgeBurnExposure] = useState(DODGE_BURN_EXPOSURE_DEFAULT); // %
   const [dodgeBurnBusy, setDodgeBurnBusy] = useState(false);
+  const dodgeBurnAbortRef = useRef<AbortController | null>(null);
   const dodgeBurnDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
   // 혼색 브러시(CSP 색혼합) — 바닥색을 묻혀가며 안료를 얹는 armed 픽셀 툴(설정값은 disarm 후 유지).
   const [wetMixActive, setWetMixActive] = useState(false);
@@ -12218,7 +13695,18 @@ function StudioCuttoonEditor() {
   const [wetMixPickup, setWetMixPickup] = useState(WET_MIX_PICKUP_DEFAULT); // %
   const [wetMixHardness, setWetMixHardness] = useState(WET_MIX_HARDNESS_DEFAULT); // 0..1
   const [wetMixBusy, setWetMixBusy] = useState(false);
+  const wetMixAbortRef = useRef<AbortController | null>(null);
   const wetMixDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  useEffect(() => () => {
+    smudgeAbortRef.current?.abort();
+    smudgeAbortRef.current = null;
+    dodgeBurnAbortRef.current?.abort();
+    dodgeBurnAbortRef.current = null;
+    wetMixAbortRef.current?.abort();
+    wetMixAbortRef.current = null;
+    liquifyAbortRef.current?.abort();
+    liquifyAbortRef.current = null;
+  }, []);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
   const pixelDragRef = useRef<{
@@ -12548,6 +14036,9 @@ function StudioCuttoonEditor() {
     advancedFillVirtualReferenceRef.current = null;
     setAdvancedFillStatus(null);
     if (pendingAutoArm?.targetId === selectedId) {
+      if (pendingAutoArm.virtualTarget) {
+        setAdvancedFillVirtualTarget(pendingAutoArm.virtualTarget);
+      }
       setAdvancedFillActive(true);
       setAdvancedFillStatus(pendingAutoArm.status);
     }
@@ -17966,6 +19457,18 @@ const puppetWarpArmed =
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
     cancelLiquifyPointerSession();
+    smudgeAbortRef.current?.abort();
+    smudgeAbortRef.current = null;
+    dodgeBurnAbortRef.current?.abort();
+    dodgeBurnAbortRef.current = null;
+    wetMixAbortRef.current?.abort();
+    wetMixAbortRef.current = null;
+    liquifyAbortRef.current?.abort();
+    liquifyAbortRef.current = null;
+    setSmudgeBusy(false);
+    setDodgeBurnBusy(false);
+    setWetMixBusy(false);
+    setLiquifyBusy(false);
     cancelPixelSelectionPointerSession();
     clearPendingPixelSelectionRasterGesture();
     pixelMarqueeRasterPreparationRunIdRef.current += 1;
@@ -19943,7 +21446,19 @@ const puppetWarpArmed =
       setError(magicAttachment.message);
       return false;
     }
-    const nextElements = magicAttachment.nextElements;
+    const sharedCharacterVisibility = planStudioShared3dCapturedSourceLayerVisibility({
+      elements: magicAttachment.nextElements,
+      capturedElementIds:
+        result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
+          ? result.linkedCharacterCapture.elementIds
+          : [],
+      isLocked: (element) => isEffectivelyLocked(element, groups),
+    });
+    if (!sharedCharacterVisibility.ok) {
+      setError(sharedCharacterVisibility.message);
+      return false;
+    }
+    const nextElements = [...sharedCharacterVisibility.nextElements];
     const anchor = nextElements.find((element) => element.id === plan.anchorElementId);
     const mappedGuides = anchor?.type === "image"
       ? mapStudioBg3dPerspectiveGuidesToAnchor(result.perspectiveGuides, anchor)
@@ -20019,6 +21534,11 @@ const puppetWarpArmed =
     }
     setSelectedId(plan.anchorElementId);
     setTool("select");
+    if (sharedCharacterVisibility.hiddenElementIds.length > 0) {
+      announceDrawingShortcut(
+        `공유 캐릭터 ${sharedCharacterVisibility.hiddenElementIds.length}명 합성 · 원본 레이어는 숨김 상태로 보존`,
+      );
+    }
     return true;
   }
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
@@ -20818,6 +22338,36 @@ const puppetWarpArmed =
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
   const undo = () => {
     if (masterEditMode || collaborationDocumentLocked) return;
+    const pendingLivingInkHandoff = livingInkCanonicalHandoffRef.current;
+    if (pendingLivingInkHandoff) {
+      releaseStudioLivingInkPresentation(pendingLivingInkHandoff.token);
+    }
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (livingInkStroke) {
+      if (livingInkStroke.transactionCommitted) {
+        releaseStudioLivingInkPresentation();
+      } else {
+        if (hasActiveDrawingPointerSession()) discardDrawingPointerSession();
+        else discardStudioLivingInkStroke(livingInkStroke.strokeId);
+        announceDrawingShortcut("저장 중이던 Living Ink 획을 취소했습니다");
+        return;
+      }
+    }
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (hokusaiStroke) {
+      if (hokusaiStroke.transactionCommitted) {
+        // The exact image is already the latest history entry. Release its temporary presentation
+        // first, then let the ordinary history undo below remove source+PNG atomically.
+        releaseStudioHokusaiLivePresentation(hokusaiStroke);
+      } else {
+        // Before the one-entry transaction exists, this live/finalizing stroke itself is the last
+        // user action. Abort it instead of undoing an unrelated older history snapshot.
+        if (hasActiveDrawingPointerSession()) discardDrawingPointerSession();
+        else discardStudioHokusaiLiveStroke(hokusaiStroke.strokeId);
+        announceDrawingShortcut("저장 중이던 자연매체 획을 취소했습니다");
+        return;
+      }
+    }
     // 커밋 동기화를 기다리는 획이 있으면 그것이 "마지막 동작"이다 — 이번 undo 는 대기 획
     // 폐기로 소비된다(히스토리 밖이므로 redo 로 되살릴 수는 없다).
     if (pendingStrokeCommitsRef.current) {
@@ -20840,6 +22390,24 @@ const puppetWarpArmed =
   };
   const redo = () => {
     if (masterEditMode || collaborationDocumentLocked) return;
+    const pendingLivingInkHandoff = livingInkCanonicalHandoffRef.current;
+    if (pendingLivingInkHandoff) {
+      releaseStudioLivingInkPresentation(pendingLivingInkHandoff.token);
+    }
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (livingInkStroke && !livingInkStroke.transactionCommitted) {
+      announceDrawingShortcut("Living Ink 획을 저장한 뒤 다시 실행할 수 있어요");
+      return;
+    }
+    if (livingInkStroke?.transactionCommitted) releaseStudioLivingInkPresentation();
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (hokusaiStroke && !hokusaiStroke.transactionCommitted) {
+      announceDrawingShortcut("자연매체 획을 저장한 뒤 다시 실행할 수 있어요");
+      return;
+    }
+    if (hokusaiStroke?.transactionCommitted) {
+      releaseStudioHokusaiLivePresentation(hokusaiStroke);
+    }
     // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
     if (pendingStrokeCommitsRef.current) {
       flushPendingStrokeCommitsRef.current();
@@ -24753,9 +26321,13 @@ const puppetWarpArmed =
   }
 
   // 문지르기 브러시 — 누적된 정규화 좌표 스트로크로 픽셀을 재인코딩한다.
-  async function applyLiquifyStroke(elId: string, points: SelPoint[]) {
-    if (liquifyBusy) return;
-    const target = elementById.get(elId);
+  async function applyLiquifyStroke(
+    elId: string,
+    points: readonly StudioRasterRetouchNormalizedPoint[],
+    strokeMode: StudioLiquifyMode = liquifyMode,
+  ) {
+    if (liquifyBusy || liquifyAbortRef.current) return;
+    const target = activeElementsRef.current.find((element) => element.id === elId);
     if (
       !target ||
       target.type !== "image" ||
@@ -24765,15 +26337,19 @@ const puppetWarpArmed =
       return;
     }
     const mutationTicket = captureStudioMutationTicket();
+    const controller = new AbortController();
+    liquifyAbortRef.current = controller;
     setLiquifyBusy(true);
     try {
       const img = await loadStudioPixelEditImage(target.src);
+      if (controller.signal.aborted) return;
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       // 정규화 → 디바이스 px 궤적
       const devicePts = points.map((p) => ({
         x: p.x * w,
         y: p.y * h,
+        ...(p.pressure === undefined ? {} : { pressure: p.pressure }),
       }));
       const radiusDevice = (liquifyRadius / Math.max(1, target.width)) * w;
       const { bakeLiquifyStrokeToCanvas } = await import("./studio-liquify-browser");
@@ -24788,21 +26364,28 @@ const puppetWarpArmed =
         {
           flipX: target.flipped ?? false,
           flipY: target.flippedY ?? false,
-          mode: liquifyMode,
+          mode: strokeMode,
+          signal: controller.signal,
         }
       );
       if (!out) return;
       const { encodeStudioRetouchCanvasPng } = await loadStudioPixelEditBrushRuntime();
-      const src = await encodeStudioRetouchCanvasPng(out as HTMLCanvasElement);
+      const src = await encodeStudioRetouchCanvasPng(out as HTMLCanvasElement, {
+        signal: controller.signal,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
       }
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       console.error("Failed to apply liquify stroke:", err);
       setError(err instanceof Error ? err.message : "리퀴파이 적용에 실패했습니다.");
     } finally {
-      setLiquifyBusy(false);
+      if (liquifyAbortRef.current === controller) {
+        liquifyAbortRef.current = null;
+        setLiquifyBusy(false);
+      }
     }
   }
 
@@ -24832,7 +26415,9 @@ const puppetWarpArmed =
     if (outcome.kind === "ignored") return false;
     liquifyDragRef.current = null;
     releaseLiquifyPointerCapture(session);
-    if (outcome.kind === "apply") void applyLiquifyStroke(outcome.elId, outcome.points);
+    if (outcome.kind === "apply") {
+      void applyLiquifyStroke(outcome.elId, outcome.points, session.mode);
+    }
     return true;
   }
   liquifyPointerGlobalEndRef.current = (event, cancelled) =>
@@ -24876,6 +26461,10 @@ const puppetWarpArmed =
     const pending = pendingRasterRetouchGestureRef.current;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     if (!pending || pending.pointerId !== pointerId) return false;
+    // Releasing our own capture after a successful pointerup can emit lostpointercapture. That
+    // lifecycle notification must not rewrite the already-finished journal as a cancellation while
+    // its vector raster copy is still rendering.
+    if (pending.released) return true;
     let releasePoint: { x: number; y: number } | undefined;
     if (!cancelled && stage) {
       try {
@@ -24959,9 +26548,9 @@ const puppetWarpArmed =
     || finishPendingPixelSelectionRasterGesture(event, cancelled)
     || finishPixelSelectionPointerSession(event, cancelled);
 
-  async function applySmudgeStroke(elId: string, points: SelPoint[]) {
-    if (smudgeBusy) return;
-    const target = elementById.get(elId);
+  async function applySmudgeStroke(elId: string, points: readonly SelPoint[]) {
+    if (smudgeBusy || smudgeAbortRef.current) return;
+    const target = activeElementsRef.current.find((element) => element.id === elId);
     if (
       !target ||
       target.type !== "image" ||
@@ -24969,6 +26558,8 @@ const puppetWarpArmed =
       isEffectivelyLocked(target, groups)
     ) return;
     const mutationTicket = captureStudioMutationTicket();
+    const controller = new AbortController();
+    smudgeAbortRef.current = controller;
     setSmudgeBusy(true);
     try {
       const { smudgeStrokeImage } = await loadStudioPixelEditBrushRuntime();
@@ -24976,6 +26567,7 @@ const puppetWarpArmed =
       const src = await smudgeStrokeImage(target.src, points, radiusNorm, smudgeStrength / 100, {
         flipX: target.flipped,
         flipY: target.flippedY,
+        signal: controller.signal,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
@@ -24983,18 +26575,22 @@ const puppetWarpArmed =
       }
       setError(null);
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       console.error("Failed to apply smudge stroke:", err);
       setError(err instanceof Error ? err.message : "문지르기를 적용하지 못했습니다.");
     } finally {
-      setSmudgeBusy(false);
+      if (smudgeAbortRef.current === controller) {
+        smudgeAbortRef.current = null;
+        setSmudgeBusy(false);
+      }
     }
   }
 
   // 닷지/번/스펀지 스트로크 적용 — 스머지와 동일하게 스트로크 1회 = patchEl 1회 = undo 1스텝.
   // 픽셀 수학은 studio-dodge-burn 엔진(순수 함수), 캔버스 오케스트레이션만 여기서 한다.
-  async function applyDodgeBurnStroke(elId: string, points: SelPoint[]) {
-    if (dodgeBurnBusy) return;
-    const target = elementById.get(elId);
+  async function applyDodgeBurnStroke(elId: string, points: readonly SelPoint[]) {
+    if (dodgeBurnBusy || dodgeBurnAbortRef.current) return;
+    const target = activeElementsRef.current.find((element) => element.id === elId);
     if (
       !target ||
       target.type !== "image" ||
@@ -25002,6 +26598,8 @@ const puppetWarpArmed =
       isEffectivelyLocked(target, groups)
     ) return;
     const mutationTicket = captureStudioMutationTicket();
+    const controller = new AbortController();
+    dodgeBurnAbortRef.current = controller;
     setDodgeBurnBusy(true);
     try {
       const {
@@ -25022,28 +26620,41 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (dodgeBurnRadius / Math.max(1, target.width)) * w);
-      const pixels = await runStudioDodgeBurnRetouch(imageData.data, w, h, pixelPoints, {
-        radiusPx,
-        hardness: dodgeBurnHardness,
-        exposure: dodgeBurnExposure,
-        mode: dodgeBurnMode,
-        range: dodgeBurnRange,
-        sponge: dodgeBurnSponge,
-      });
+      const pixels = await runStudioDodgeBurnRetouch(
+        imageData.data,
+        w,
+        h,
+        pixelPoints,
+        {
+          radiusPx,
+          hardness: dodgeBurnHardness,
+          exposure: dodgeBurnExposure,
+          mode: dodgeBurnMode,
+          range: dodgeBurnRange,
+          sponge: dodgeBurnSponge,
+        },
+        { signal: controller.signal },
+      );
       const output = made.ctx.createImageData(w, h);
       output.data.set(pixels);
       made.ctx.putImageData(output, 0, 0);
-      const src = await encodeStudioRetouchCanvasPng(made.canvas);
+      const src = await encodeStudioRetouchCanvasPng(made.canvas, {
+        signal: controller.signal,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
       }
       setError(null);
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       console.error("Failed to apply dodge/burn stroke:", err);
       setError(err instanceof Error ? err.message : "닷지/번을 적용하지 못했습니다.");
     } finally {
-      setDodgeBurnBusy(false);
+      if (dodgeBurnAbortRef.current === controller) {
+        dodgeBurnAbortRef.current = null;
+        setDodgeBurnBusy(false);
+      }
     }
   }
 
@@ -25109,9 +26720,9 @@ const puppetWarpArmed =
   }
 
   // 혼색 브러시 스트로크 적용 — 닷지/번과 동일한 오프스크린 캔버스 골격(스트로크 1회 = undo 1스텝).
-  async function applyWetMixStroke(elId: string, points: SelPoint[]) {
-    if (wetMixBusy) return;
-    const target = elementById.get(elId);
+  async function applyWetMixStroke(elId: string, points: readonly SelPoint[]) {
+    if (wetMixBusy || wetMixAbortRef.current) return;
+    const target = activeElementsRef.current.find((element) => element.id === elId);
     if (
       !target ||
       target.type !== "image" ||
@@ -25119,6 +26730,8 @@ const puppetWarpArmed =
       isEffectivelyLocked(target, groups)
     ) return;
     const mutationTicket = captureStudioMutationTicket();
+    const controller = new AbortController();
+    wetMixAbortRef.current = controller;
     setWetMixBusy(true);
     try {
       const {
@@ -25139,30 +26752,55 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (wetMixRadius / Math.max(1, target.width)) * w);
-      const pixels = await runStudioWetMixRetouch(imageData.data, w, h, pixelPoints, {
-        radiusPx,
-        hardness: wetMixHardness,
-        strength: wetMixStrength / 100,
-        wetness: wetMixWetness / 100,
-        pickup: wetMixPickup / 100,
-        paintColor: hexToRgb(color),
-      });
+      const pixels = await runStudioWetMixRetouch(
+        imageData.data,
+        w,
+        h,
+        pixelPoints,
+        {
+          radiusPx,
+          hardness: wetMixHardness,
+          strength: wetMixStrength / 100,
+          wetness: wetMixWetness / 100,
+          pickup: wetMixPickup / 100,
+          paintColor: hexToRgb(color),
+        },
+        { signal: controller.signal },
+      );
       const output = made.ctx.createImageData(w, h);
       output.data.set(pixels);
       made.ctx.putImageData(output, 0, 0);
-      const src = await encodeStudioRetouchCanvasPng(made.canvas);
+      const src = await encodeStudioRetouchCanvasPng(made.canvas, {
+        signal: controller.signal,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
       }
       setError(null);
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       console.error("Failed to apply wet mix stroke:", err);
       setError(err instanceof Error ? err.message : "혼색 브러시를 적용하지 못했습니다.");
     } finally {
-      setWetMixBusy(false);
+      if (wetMixAbortRef.current === controller) {
+        wetMixAbortRef.current = null;
+        setWetMixBusy(false);
+      }
     }
   }
+
+  applyQueuedRasterRetouchReplayRef.current = ({
+    liquifyMode: replayLiquifyMode,
+    points,
+    targetId,
+    tool: replayTool,
+  }) => {
+    if (replayTool === "smudge") void applySmudgeStroke(targetId, points);
+    else if (replayTool === "dodge-burn") void applyDodgeBurnStroke(targetId, points);
+    else if (replayTool === "wet-mix") void applyWetMixStroke(targetId, points);
+    else void applyLiquifyStroke(targetId, points, replayLiquifyMode);
+  };
 
   // ── 레이어 마스크 브러시 스트로크 굽기 — 스트로크 종료마다 자동 실행(붓처럼 즉시 반영).
   // heal-clone과 동일하게 target은 elementById에서 다시 읽는다(await 사이 selected가 바뀌어도
@@ -25718,11 +27356,22 @@ const puppetWarpArmed =
       setTool("select");
       setMarqueeIds([]);
       const shouldAutoSelectLatestDraw = selected?.type !== "image" && selected?.type !== "draw";
+      const readyStatus = entry.target.sourceElementCount > 0
+        ? `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`
+        : "빈 페이지 전체를 채울 준비가 됐어요. 캔버스를 탭하면 가장 아래에 색 레이어를 만들고, 적용 전까지 문서는 바뀌지 않습니다.";
       const openInspector = () => {
         if (shouldAutoSelectLatestDraw) {
           for (let i = activeElementsRef.current.length - 1; i >= 0; i -= 1) {
             const candidate = activeElementsRef.current[i];
             if (candidate.type === "draw" && !isEffectivelyHidden(candidate, groups)) {
+              // selectedId changes invalidate fill work by default. Carry this virtual target
+              // through that owner transition just like the existing auto-selected raster path,
+              // otherwise the rail flashes active and immediately drops the first fill session.
+              advancedFillAutoArmTargetRef.current = {
+                targetId: candidate.id,
+                status: readyStatus,
+                virtualTarget: entry.target,
+              };
               setSelectedId(candidate.id);
               break;
             }
@@ -25731,11 +27380,7 @@ const puppetWarpArmed =
         setAdvancedFillVirtualTarget(entry.target);
         advancedFillVirtualReferenceRef.current = null;
         setAdvancedFillActive(true);
-        setAdvancedFillStatus(
-          entry.target.sourceElementCount > 0
-            ? `표시 중인 벡터 선화 ${entry.target.sourceElementCount}개를 참조합니다. 닫힌 영역을 탭하세요. 적용 전까지 문서는 바뀌지 않습니다.`
-            : "빈 페이지 전체를 채울 준비가 됐어요. 캔버스를 탭하면 가장 아래에 색 레이어를 만들고, 적용 전까지 문서는 바뀌지 않습니다.",
-        );
+        setAdvancedFillStatus(readyStatus);
         setMobileSheet(null);
         setError(null);
         selectInspectorRoute({ primary: "properties", image: "fill" });
@@ -26325,6 +27970,8 @@ const puppetWarpArmed =
   }
   function discardDrawingPointerSession() {
     const discardedId = drawingRef.current?.id;
+    discardStudioLivingInkStroke(discardedId);
+    discardStudioHokusaiLiveStroke(discardedId);
     if (discardedId) cancelLiveStrokeBackendAudit(discardedId);
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -26443,6 +28090,8 @@ const puppetWarpArmed =
   // pointer capture and the collaboration lease. This path intentionally avoids React state work.
   drawingUnmountCleanupRef.current = () => {
     const discardedId = drawingRef.current?.id;
+    discardStudioLivingInkStroke(discardedId);
+    discardStudioHokusaiLiveStroke(discardedId);
     cancelAllLiveStrokeBackendAudits();
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -26841,6 +28490,313 @@ const puppetWarpArmed =
     return true;
   }
 
+  function beginStudioDrawLiveSurfaces(
+    next: DrawEl,
+    pointerSample: PointerEvent,
+    strokeOrigin: Readonly<{ x: number; y: number }>,
+  ): void {
+    // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
+    // 않는다. GPU 파인은 백엔드가 이미 준비된 경우에만 스트로크 단위로 한 번 결정한다.
+    {
+      // 새 획이 시작되면 대기 배치의 유휴 타이머를 보류한다 — 획 중간에 커밋 렌더(수백 ms)가
+      // 끼어들지 않는다. 이 획이 끝나면 큐잉이 타이머를 다시 잡고, 취소/즉시커밋 경로는
+      // 어차피 배치를 직접 소비한다.
+      const pendingBatch = pendingStrokeCommitsRef.current;
+      if (pendingBatch?.timer) {
+        globalThis.clearTimeout(pendingBatch.timer);
+        pendingBatch.timer = null;
+      }
+      // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
+      // gated for future experiments, while production post-correction runs once on release.
+      // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
+      const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
+      const causalPostCorrectionEligible = !pixelDirect
+        && studioPostCorrectionRunsDuringPointerContact()
+        && isDirectLiveDraftEl(next)
+        && postCorrection > 0
+        && (next.opacity ?? 1) === 1
+        && next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none";
+      const overlayCandidate = !pixelDirect
+        && isDirectLiveDraftEl(next)
+        && (next.opacity ?? 1) === 1
+        && liveInkOverlayRendererRef.current.isNativeSurfaceReady
+        && studioLiveInkFastOverlaySupportsStyle(liveInkStyleFor(next));
+      const pendingGpuAuthorityPromoted = (
+        pendingGpuStrokesRef.current.length === 0
+        && pendingGpuDrawAuthoritiesRef.current.length === 0
+      ) || promotePendingGpuAuthoritiesToKonva();
+      if (!pendingGpuAuthorityPromoted) {
+        // Source-over order is global, not backend-specific. If corrupted bookkeeping prevents
+        // semantic promotion, hide the older DOM GPU surface before any Canvas/stamp/wet-ink
+        // host can paint the newer physical stroke underneath it. The canonical main scene and
+        // retained vectors stay fail-visible while the handoff queue repairs the mismatch.
+        reportAllLiveStrokeGpuAuditFailures("surface-lost");
+        webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
+        mainLayerRef.current?.drawScene();
+        draftPreviewNormalLayerRef.current?.drawScene();
+        draftPreviewDynamicLayerRef.current?.drawScene();
+      }
+      // Admissions are side-effecting. Attempt them strictly in product priority order and stop
+      // invoking lower providers after the first accepted owner; resolving all probes first would
+      // start multiple translucent surfaces and create a cancellation race.
+      const livingInkAdmitted = pendingGpuAuthorityPromoted
+        && beginStudioLivingInkStroke(next, pointerSample);
+      const hokusaiPinned = pendingGpuAuthorityPromoted
+        && !livingInkAdmitted
+        && beginStudioHokusaiLiveStroke(next);
+      const stampKind = resolveStudioStampBrushKind(next.brush);
+      const stampDirect = Boolean(
+        !livingInkAdmitted
+        && !hokusaiPinned
+        && stampKind
+        && isDirectLiveStampDraftEl(next)
+        && liveStampOverlayRendererRef.current.begin(
+          resolveStudioStampBrushStyle(
+            stampKind,
+            {
+              color: next.stroke,
+              size: Math.max(1, next.strokeWidth),
+              opacity: next.opacity ?? 1,
+            },
+            next.stamp
+          ),
+          next.points[0] ?? strokeOrigin.x,
+          next.points[1] ?? strokeOrigin.y,
+          next.pressures?.[0] ?? 0.5
+        )
+      );
+      // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
+      // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
+      // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
+      // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
+      const gpuStartEligible = pendingGpuAuthorityPromoted
+        && !livingInkAdmitted
+        && !hokusaiPinned
+        && !stampDirect
+        && STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
+        && webGpuBackendRef.current === "webgpu"
+        && gpuLiveStrokePlannerRef.current !== null
+        && !pixelDirect
+        && isDirectLiveDraftEl(next);
+      gpuLiveOperationOrderKeyRef.current = gpuStartEligible
+        ? nextGpuLiveOperationOrderKey()
+        : null;
+      const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null;
+      const liveInkBackendDecision = decideStudioLiveInkBackend({
+        preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
+        resolvedBackend: webGpuBackendRef.current,
+        // Advanced GPU preparation is a deferred capability. Until its small helper chunk is
+        // warm, the exact Canvas2D overlay owns the first stroke instead of racing module load.
+        direct: overlayCandidate && gpuStartPlan !== null,
+        postCorrectionActive: causalPostCorrectionEligible,
+        mode: next.mode,
+        fill: next.fill,
+        opacity: next.opacity ?? 1,
+        symmetryType: next.symmetry?.type ?? "none",
+        preparedStroke: gpuStartPlan?.preparation,
+      });
+      let gpuPin = liveInkBackendDecision.backend === "webgpu";
+      gpuLiveSourceJournalRef.current = null;
+      gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+      if (gpuPin && !beginLiveStrokeBackendAudit(next.id, "webgpu")) {
+        gpuPin = false;
+      }
+      if (gpuPin && (!gpuStartPlan || !beginGpuLiveSourceJournal(next, gpuStartPlan))) {
+        // The exact Konva draft remains authoritative when the compact journal cannot establish
+        // its one-time root. Do not let a nominal WebGPU decision hide that visible fallback.
+        cancelLiveStrokeBackendAudit(next.id);
+        gpuPin = false;
+        gpuLiveOperationOrderKeyRef.current = null;
+      }
+      // Canvas overlay admission is authoritative only after begin succeeds at native DPR.
+      // A missing 2D context or an oversized 4K/high-DPR backing surface therefore keeps the
+      // exact retained draft visible instead of silently presenting a blurred reduced surface.
+      liveInkOverlayClearGenRef.current += 1;
+      let liveInkOverlayStarted = false;
+      if (
+        overlayCandidate
+        && !livingInkAdmitted
+        && !hokusaiPinned
+        && !stampDirect
+        && !gpuPin
+        && next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none"
+      ) {
+        const liveInkStyle = liveInkStyleFor(next);
+        liveInkOverlayStarted = causalPostCorrectionEligible
+          ? liveInkOverlayRendererRef.current.beginDeferred(liveInkStyle)
+          : liveInkOverlayRendererRef.current.begin(
+              liveInkStyle,
+              next.points[0] ?? strokeOrigin.x,
+              next.points[1] ?? strokeOrigin.y,
+              studioLiveBrushPressure(next, next.pressures?.[0])
+            );
+      } else {
+        // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
+        liveInkOverlayRendererRef.current.resetActive();
+      }
+      const wetInkOverlayStarted = !pixelDirect
+        && !livingInkAdmitted
+        && !hokusaiPinned
+        && !stampDirect
+        && !liveInkOverlayStarted
+        && !gpuPin
+        && studioLiveWetInkOverlaySupportsElement(next)
+        && liveWetInkOverlayRendererRef.current.isNativeSurfaceReady
+        && liveWetInkOverlayRendererRef.current.begin(next, {
+          pageEpoch: currentPageId,
+          hidden: next.hidden === true,
+        }).status === "started";
+      const dynamicBrushDirect = !pixelDirect
+        && !livingInkAdmitted
+        && !hokusaiPinned
+        && !stampDirect
+        && !liveInkOverlayStarted
+        && !wetInkOverlayStarted
+        && !gpuPin
+        && studioLiveDynamicBrushOverlaySupportsElement(next)
+        && liveDynamicBrushOverlayRendererRef.current.begin(next).status === "started";
+      let strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({
+        strokeId: next.id,
+        pointerId: Math.max(0, pointerSample.pointerId),
+        strokeEpoch: studioStrokeSurfaceEpochRef.current++,
+        livingInk: {
+          eligible: studioLivingInkSupportsElement(next),
+          providerState: livingInkState,
+          capabilitiesAccepted: livingInkState === "ready",
+          admitted: livingInkAdmitted,
+        },
+        hokusai: {
+          admitted: hokusaiPinned,
+          surface: hokusaiPinned ? "supported" : "unavailable",
+        },
+        stampAdmitted: stampDirect,
+        gpuAdmitted: gpuPin,
+        liveInkAdmitted: liveInkOverlayStarted,
+        wetFallbackAdmitted: wetInkOverlayStarted,
+        dynamicAdmitted: dynamicBrushDirect,
+      });
+      if (strokeSurfaceRoute.kind === "living-ink") {
+        const pinned = livingInkCoordinatorRef.current.pinActiveRoute(
+          next.id,
+          strokeSurfaceRoute.routeKey,
+        );
+        const surface = livingInkOverlaySurfaceRef.current;
+        if (!pinned || !surface) {
+          void livingInkCoordinatorRef.current.cancelStroke(next.id);
+          if (livingInkMode === "water") {
+            livingInkWaterNoopStrokeIdsRef.current.add(next.id);
+            setError("Living Ink 물 도구 route를 고정하지 못해 문서를 변경하지 않습니다.");
+          } else {
+            setError("Living Ink pointer route를 고정하지 못해 현재 획은 벡터로 보존합니다.");
+          }
+          // No lower provider was started after Living Ink admission. Re-resolve this still-
+          // pointerdown snapshot as ordinary Konva so the retained draft stays visible; this is
+          // not a mid-stroke promotion and no specialist pixels have been appended.
+          strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({
+            strokeId: next.id,
+            pointerId: Math.max(0, pointerSample.pointerId),
+            strokeEpoch: Math.max(0, studioStrokeSurfaceEpochRef.current - 1),
+            livingInk: {
+              eligible: studioLivingInkSupportsElement(next),
+              providerState: livingInkState,
+              capabilitiesAccepted: livingInkState === "ready",
+              admitted: false,
+            },
+            hokusai: { admitted: false, surface: "unavailable" },
+            stampAdmitted: false,
+            gpuAdmitted: false,
+            liveInkAdmitted: false,
+            wetFallbackAdmitted: false,
+            dynamicAdmitted: false,
+          });
+        } else {
+          livingInkStrokeRef.current = {
+            mode: livingInkMode,
+            pageId: activePage.id,
+            strokeId: next.id,
+            route: strokeSurfaceRoute,
+            surfaceKey: surface.binding.surfaceKey,
+            forwardedSampleCount: 0,
+            overlayPresented: false,
+            failed: false,
+            finishing: false,
+            finalDrawing: null,
+            canonicalImageId: null,
+            canonicalPngHash: null,
+            transactionCommitted: false,
+          };
+          appendStudioLivingInkAuthoritativeSuffix(next, 0);
+        }
+      }
+      studioStrokeSurfaceRouteRef.current = strokeSurfaceRoute;
+      const direct =
+        strokeSurfaceRoute.kind === "living-ink"
+        || hokusaiPinned
+        || pixelDirect
+        || liveInkOverlayStarted
+        || wetInkOverlayStarted
+        || gpuPin
+        || dynamicBrushDirect;
+      liveDraftDirectRef.current = direct;
+      liveStampDraftDirectRef.current = strokeSurfaceRoute.kind === "stamp";
+      liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic";
+      liveWetInkDraftDirectRef.current = strokeSurfaceRoute.kind === "wet-fallback";
+      gpuLiveInkPinnedRef.current = strokeSurfaceRoute.kind === "gpu";
+      if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
+      if (!dynamicBrushDirect) liveDynamicBrushOverlayRendererRef.current.resetActive();
+      if (!wetInkOverlayStarted) liveWetInkOverlayRendererRef.current.resetActive();
+      liveDraftVisualRef.current = direct || stampDirect ? next : null;
+      liveDraftPendingRef.current = direct || stampDirect ? next : null;
+      if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted) {
+        // A generic retained tap can be painted during the pointer-down transition before the
+        // specialist overlay wins authority. Clear that one-purpose layer synchronously; the
+        // specialist native canvas already contains its exact tap and otherwise both remain
+        // visible until pointer-up (most obvious as a large round blob on watercolor).
+        liveDraftLayerRef.current?.drawScene();
+      }
+      const predictionTailEligible = canUseStudioPointerPredictionForSession(
+        STUDIO_POINTER_PREDICTION_ENABLED,
+        drawingPointerTransportRef.current?.getSession()
+      )
+        && liveInkOverlayStarted
+        && next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none";
+      armTransientPenInkSurfaces({
+        pointerEvent: pointerSample,
+        drawing: next,
+        causalPostCorrectionEligible,
+        nativePredictionEligible: predictionTailEligible,
+      });
+      // A pin grants only a write route, never visibility. The exact retained Konva vector stays
+      // visible until coordinator token + imperative receipt both authorize the GPU frame.
+      applyLiveStrokeBackendPresentationEffects();
+      if (gpuPin && gpuLiveAcceptedRequestIdRef.current) {
+        beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current);
+        // A synchronous early receipt becomes exact only after the watchdog epoch is armed.
+        applyLiveStrokeBackendPresentationEffects();
+      } else {
+        cancelGpuPinnedRequestWatchdog();
+      }
+      if (gpuLingerRafRef.current) {
+        globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+        gpuLingerRafRef.current = 0;
+      }
+      if (direct || stampDirect) {
+        // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
+        // draft, and the stamp renderer owns its dot at begin, so neither waits for pointermove.
+        flushDirectLiveDraftNow(next);
+      } else {
+        // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
+        draftPreviewStoreRef.current.setActive(next);
+        setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
+      }
+    }
+  }
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (
       e.target.name() === "symmetry-handle"
@@ -26866,6 +28822,22 @@ const puppetWarpArmed =
     if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
     if (canvasInteractionBlocked && !commentPinArmed) return;
     const pendingRetouchPreparation = studioRasterRetouchPreparationRef.current;
+    const pendingSelectionPreparation = pixelMarqueeRasterPreparationActivationRef.current;
+    if (pendingSelectionPreparation && !isSpacePressed) {
+      const position = e.target.getStage()?.getRelativePointerPosition();
+      if (position) {
+        journalPendingPixelSelectionRasterGesture({
+          captureFallback: e.target.getStage()?.container() ?? null,
+          event: stagePointerEvent,
+          forceCircle: pendingSelectionPreparation.forceCircle,
+          position,
+          tool: pendingSelectionPreparation.tool,
+        });
+      }
+      // The requested pixel tool may not have reached this render's closure yet. Preparation owns
+      // the contact through its synchronous ref so the first fast drag cannot move a source vector.
+      return;
+    }
     if (pendingRetouchPreparation && !isSpacePressed) {
       const position = e.target.getStage()?.getRelativePointerPosition();
       if (position) {
@@ -27549,6 +29521,14 @@ const puppetWarpArmed =
       return;
     }
     if (tool === "draw") {
+      if (livingInkFinalizingRef.current) {
+        announceDrawingShortcut("Living Ink 물리 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
+        return;
+      }
+      if (hokusaiLiveFinalizingRef.current) {
+        announceDrawingShortcut("자연매체 획을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
+        return;
+      }
       const pointerSample = e.evt as PointerEvent;
       // Capture the frame-clock anchor alongside pointerdown, before CRDT/render setup can add
       // device-dependent latency. The pump later maps this elapsed time back to the event clock.
@@ -27800,211 +29780,7 @@ const puppetWarpArmed =
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       advancedRulerSnapRef.current = null;
-      // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
-      // 않는다. GPU 파인은 백엔드가 이미 준비된 경우에만 스트로크 단위로 한 번 결정한다.
-      {
-        // 새 획이 시작되면 대기 배치의 유휴 타이머를 보류한다 — 획 중간에 커밋 렌더(수백 ms)가
-        // 끼어들지 않는다. 이 획이 끝나면 큐잉이 타이머를 다시 잡고, 취소/즉시커밋 경로는
-        // 어차피 배치를 직접 소비한다.
-        const pendingBatch = pendingStrokeCommitsRef.current;
-        if (pendingBatch?.timer) {
-          globalThis.clearTimeout(pendingBatch.timer);
-          pendingBatch.timer = null;
-        }
-        // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
-        // gated for future experiments, while production post-correction runs once on release.
-        // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
-        const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
-        const causalPostCorrectionEligible = !pixelDirect
-          && studioPostCorrectionRunsDuringPointerContact()
-          && isDirectLiveDraftEl(next)
-          && postCorrection > 0
-          && (next.opacity ?? 1) === 1
-          && next.mode !== "eraser"
-          && !next.fill
-          && (next.symmetry?.type ?? "none") === "none";
-        const overlayCandidate = !pixelDirect
-          && isDirectLiveDraftEl(next)
-          && (next.opacity ?? 1) === 1
-          && liveInkOverlayRendererRef.current.isNativeSurfaceReady
-          && studioLiveInkFastOverlaySupportsStyle(liveInkStyleFor(next));
-        const pendingGpuAuthorityPromoted = (
-          pendingGpuStrokesRef.current.length === 0
-          && pendingGpuDrawAuthoritiesRef.current.length === 0
-        ) || promotePendingGpuAuthoritiesToKonva();
-        if (!pendingGpuAuthorityPromoted) {
-          // Source-over order is global, not backend-specific. If corrupted bookkeeping prevents
-          // semantic promotion, hide the older DOM GPU surface before any Canvas/stamp/wet-ink
-          // host can paint the newer physical stroke underneath it. The canonical main scene and
-          // retained vectors stay fail-visible while the handoff queue repairs the mismatch.
-          reportAllLiveStrokeGpuAuditFailures("surface-lost");
-          webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
-          mainLayerRef.current?.drawScene();
-          draftPreviewNormalLayerRef.current?.drawScene();
-          draftPreviewDynamicLayerRef.current?.drawScene();
-        }
-        const stampKind = resolveStudioStampBrushKind(next.brush);
-        const stampDirect = Boolean(
-          stampKind
-          && isDirectLiveStampDraftEl(next)
-          && liveStampOverlayRendererRef.current.begin(
-            resolveStudioStampBrushStyle(
-              stampKind,
-              {
-                color: next.stroke,
-                size: Math.max(1, next.strokeWidth),
-                opacity: next.opacity ?? 1,
-              },
-              next.stamp
-            ),
-            next.points[0] ?? strokeOrigin.x,
-            next.points[1] ?? strokeOrigin.y,
-            next.pressures?.[0] ?? 0.5
-          )
-        );
-        // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
-        // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
-        // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
-        // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuStartEligible = pendingGpuAuthorityPromoted
-          && STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"
-          && webGpuBackendRef.current === "webgpu"
-          && gpuLiveStrokePlannerRef.current !== null
-          && !pixelDirect
-          && isDirectLiveDraftEl(next);
-        gpuLiveOperationOrderKeyRef.current = gpuStartEligible
-          ? nextGpuLiveOperationOrderKey()
-          : null;
-        const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null;
-        const liveInkBackendDecision = decideStudioLiveInkBackend({
-          preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
-          resolvedBackend: webGpuBackendRef.current,
-          // Advanced GPU preparation is a deferred capability. Until its small helper chunk is
-          // warm, the exact Canvas2D overlay owns the first stroke instead of racing module load.
-          direct: overlayCandidate && gpuStartPlan !== null,
-          postCorrectionActive: causalPostCorrectionEligible,
-          mode: next.mode,
-          fill: next.fill,
-          opacity: next.opacity ?? 1,
-          symmetryType: next.symmetry?.type ?? "none",
-          preparedStroke: gpuStartPlan?.preparation,
-        });
-        let gpuPin = liveInkBackendDecision.backend === "webgpu";
-        gpuLiveSourceJournalRef.current = null;
-        gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
-        if (gpuPin && !beginLiveStrokeBackendAudit(next.id, "webgpu")) {
-          gpuPin = false;
-        }
-        if (gpuPin && (!gpuStartPlan || !beginGpuLiveSourceJournal(next, gpuStartPlan))) {
-          // The exact Konva draft remains authoritative when the compact journal cannot establish
-          // its one-time root. Do not let a nominal WebGPU decision hide that visible fallback.
-          cancelLiveStrokeBackendAudit(next.id);
-          gpuPin = false;
-          gpuLiveOperationOrderKeyRef.current = null;
-        }
-        // Canvas overlay admission is authoritative only after begin succeeds at native DPR.
-        // A missing 2D context or an oversized 4K/high-DPR backing surface therefore keeps the
-        // exact retained draft visible instead of silently presenting a blurred reduced surface.
-        liveInkOverlayClearGenRef.current += 1;
-        let liveInkOverlayStarted = false;
-        if (
-          overlayCandidate
-          && !gpuPin
-          && next.mode !== "eraser"
-          && !next.fill
-          && (next.symmetry?.type ?? "none") === "none"
-        ) {
-          const liveInkStyle = liveInkStyleFor(next);
-          liveInkOverlayStarted = causalPostCorrectionEligible
-            ? liveInkOverlayRendererRef.current.beginDeferred(liveInkStyle)
-            : liveInkOverlayRendererRef.current.begin(
-                liveInkStyle,
-                next.points[0] ?? strokeOrigin.x,
-                next.points[1] ?? strokeOrigin.y,
-                studioLiveBrushPressure(next, next.pressures?.[0])
-              );
-        } else {
-          // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
-          liveInkOverlayRendererRef.current.resetActive();
-        }
-        const wetInkOverlayStarted = !pixelDirect
-          && !stampDirect
-          && !liveInkOverlayStarted
-          && !gpuPin
-          && studioLiveWetInkOverlaySupportsElement(next)
-          && liveWetInkOverlayRendererRef.current.isNativeSurfaceReady
-          && liveWetInkOverlayRendererRef.current.begin(next, {
-            pageEpoch: currentPageId,
-            hidden: next.hidden === true,
-          }).status === "started";
-        const dynamicBrushDirect = !pixelDirect
-          && !stampDirect
-          && !liveInkOverlayStarted
-          && !wetInkOverlayStarted
-          && !gpuPin
-          && studioLiveDynamicBrushOverlaySupportsElement(next)
-          && liveDynamicBrushOverlayRendererRef.current.begin(next).status === "started";
-        const direct =
-          pixelDirect
-          || liveInkOverlayStarted
-          || wetInkOverlayStarted
-          || gpuPin
-          || dynamicBrushDirect;
-        liveDraftDirectRef.current = direct;
-        liveStampDraftDirectRef.current = stampDirect;
-        liveDynamicBrushDraftDirectRef.current = dynamicBrushDirect;
-        liveWetInkDraftDirectRef.current = wetInkOverlayStarted;
-        gpuLiveInkPinnedRef.current = gpuPin;
-        if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
-        if (!dynamicBrushDirect) liveDynamicBrushOverlayRendererRef.current.resetActive();
-        if (!wetInkOverlayStarted) liveWetInkOverlayRendererRef.current.resetActive();
-        liveDraftVisualRef.current = direct || stampDirect ? next : null;
-        liveDraftPendingRef.current = direct || stampDirect ? next : null;
-        if (stampDirect || dynamicBrushDirect || wetInkOverlayStarted) {
-          // A generic retained tap can be painted during the pointer-down transition before the
-          // specialist overlay wins authority. Clear that one-purpose layer synchronously; the
-          // specialist native canvas already contains its exact tap and otherwise both remain
-          // visible until pointer-up (most obvious as a large round blob on watercolor).
-          liveDraftLayerRef.current?.drawScene();
-        }
-        const predictionTailEligible = canUseStudioPointerPredictionForSession(
-          STUDIO_POINTER_PREDICTION_ENABLED,
-          drawingPointerTransportRef.current?.getSession()
-        )
-          && liveInkOverlayStarted
-          && next.mode !== "eraser"
-          && !next.fill
-          && (next.symmetry?.type ?? "none") === "none";
-        armTransientPenInkSurfaces({
-          pointerEvent: pointerSample,
-          drawing: next,
-          causalPostCorrectionEligible,
-          nativePredictionEligible: predictionTailEligible,
-        });
-        // A pin grants only a write route, never visibility. The exact retained Konva vector stays
-        // visible until coordinator token + imperative receipt both authorize the GPU frame.
-        applyLiveStrokeBackendPresentationEffects();
-        if (gpuPin && gpuLiveAcceptedRequestIdRef.current) {
-          beginGpuPinnedReceiptEpoch(gpuLiveAcceptedRequestIdRef.current);
-          // A synchronous early receipt becomes exact only after the watchdog epoch is armed.
-          applyLiveStrokeBackendPresentationEffects();
-        } else {
-          cancelGpuPinnedRequestWatchdog();
-        }
-        if (gpuLingerRafRef.current) {
-          globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
-          gpuLingerRafRef.current = 0;
-        }
-        if (direct || stampDirect) {
-          // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
-          // draft, and the stamp renderer owns its dot at begin, so neither waits for pointermove.
-          flushDirectLiveDraftNow(next);
-        } else {
-          // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
-          draftPreviewStoreRef.current.setActive(next);
-          setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
-        }
-      }
+      beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin);
       drawingCrdtPublisherRef.current.cancel();
       drawingCrdtStrokeActiveRef.current = false;
       const crdtDocument = studioCrdtDocumentRef.current;
@@ -29827,6 +31603,8 @@ const puppetWarpArmed =
   function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
+    appendStudioLivingInkAuthoritativeSuffix(authoritativeDrawing, startSample);
+    appendStudioHokusaiAuthoritativeSuffix(authoritativeDrawing, startSample);
     if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
       if (causalPostCorrectionStateRef.current) {
         appendCausalPostCorrectionState(authoritativeDrawing, startSample);
@@ -30412,6 +32190,486 @@ const puppetWarpArmed =
     };
   }
 
+  function studioPageElementsFromHistory(pageId: string): El[] {
+    const history = pagesHistoryRef.current;
+    const index = Math.max(0, Math.min(pagesHiRef.current, Math.max(0, history.length - 1)));
+    return [...(
+      history[index]?.find((page) => page.id === pageId)?.elements
+      ?? pages.find((page) => page.id === pageId)?.elements
+      ?? []
+    )];
+  }
+
+  function withStudioHokusaiSource(
+    baseElements: readonly El[],
+    source: DrawEl,
+  ): El[] {
+    const next = [...baseElements];
+    const index = next.findIndex(({ id }) => id === source.id);
+    if (index >= 0) next[index] = source;
+    else next.push(source);
+    return next;
+  }
+
+  function commitStudioHokusaiFallbackVector(
+    state: StudioHokusaiPinnedLiveStroke,
+    finished: DrawEl,
+    reason: string,
+  ): void {
+    const fallbackElements = withStudioHokusaiSource(
+      studioPageElementsFromHistory(state.pageId),
+      finished,
+    );
+    const currentPage = currentPageIdRef.current === state.pageId;
+    if (currentPage) {
+      // The pointerup finally-block has already cleared the direct DrawEl refs. Install an exact
+      // settled copy before removing the material overlay so async Worker failure never flashes a
+      // blank frame while the React history commit reaches the main layer.
+      draftPreviewStoreRef.current.settle(finished);
+      draftPreviewNormalLayerRef.current?.drawScene();
+    }
+    const committed = commit(fallbackElements, undefined, state.pageId);
+    hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    hokusaiLiveOverlayVisibleRef.current = false;
+    hokusaiLiveStrokeRef.current = null;
+    hokusaiLiveFinalizingRef.current = false;
+    if (committed) {
+      if (currentPage) {
+        setSelectedId(finished.id);
+        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
+      }
+      announceDrawingShortcut("자연매체 표면 복구 · 원본 벡터 획 저장");
+      setError(`자연매체 획을 원본 벡터로 저장했습니다. ${reason}`);
+    } else {
+      restorePendingStrokeCommits({
+        pageId: state.pageId,
+        strokes: [finished],
+        retryCount: 0,
+      });
+      // There is no active surface for an inactive page. Its bounded recovery queue remains the
+      // sole authority until that page is opened and the commit retry succeeds.
+      setError(`자연매체 결과와 벡터 저장을 즉시 확정하지 못했습니다. 복구 큐에 보존했습니다. ${reason}`);
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function completeStudioLivingInkWaterNoop(strokeId: string, reason: string): void {
+    livingInkWaterNoopStrokeIdsRef.current.delete(strokeId);
+    const state = livingInkStrokeRef.current;
+    if (state?.strokeId === strokeId) livingInkStrokeRef.current = null;
+    livingInkOverlaySurfaceRef.current?.renderer.clear();
+    livingInkOverlayVisibleRef.current = false;
+    livingInkFinalizingRef.current = false;
+    studioStrokeSurfaceRouteRef.current = null;
+    liveDraftVisualRef.current = null;
+    liveDraftPendingRef.current = null;
+    liveDraftDirectRef.current = false;
+    setLivingInkBusy(false);
+    void livingInkCoordinatorRef.current.cancelStroke(strokeId);
+    liveDraftLayerRef.current?.drawScene();
+    announceDrawingShortcut("Living Ink 물 도구 · 변경 없음");
+    setError(`Living Ink 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
+  }
+
+  function commitStudioLivingInkFallbackVector(
+    state: StudioLivingInkPinnedStroke,
+    finished: DrawEl,
+    reason: string,
+  ): void {
+    if (studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop") {
+      completeStudioLivingInkWaterNoop(state.strokeId, reason);
+      return;
+    }
+    const cancelClaim = claimStudioStrokeSurfaceLifecycle(state.route, {
+      phase: "cancel",
+      routeKey: state.route.routeKey,
+      strokeId: state.strokeId,
+      kind: "living-ink",
+    });
+    if (cancelClaim.status !== "owned") return;
+    const fallbackElements = withStudioHokusaiSource(
+      studioPageElementsFromHistory(state.pageId),
+      finished,
+    );
+    const currentPage = currentPageIdRef.current === state.pageId;
+    if (currentPage) {
+      draftPreviewStoreRef.current.settle(finished);
+      draftPreviewNormalLayerRef.current?.drawScene();
+    }
+    const committed = commit(fallbackElements, undefined, state.pageId);
+    livingInkOverlaySurfaceRef.current?.renderer.clear();
+    livingInkOverlayVisibleRef.current = false;
+    livingInkStrokeRef.current = null;
+    livingInkFinalizingRef.current = false;
+    studioStrokeSurfaceRouteRef.current = null;
+    setLivingInkBusy(false);
+    void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
+    if (committed) {
+      if (currentPage) {
+        setSelectedId(finished.id);
+        queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
+      }
+      announceDrawingShortcut("Living Ink 복구 · 원본 벡터 획 저장");
+      setError(`Living Ink 결과를 원본 벡터로 저장했습니다. ${reason}`);
+    } else {
+      restorePendingStrokeCommits({
+        pageId: state.pageId,
+        strokes: [finished],
+        retryCount: 0,
+      });
+      setError(`Living Ink 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  async function finishStudioLivingInkStroke(
+    state: StudioLivingInkPinnedStroke,
+    finished: DrawEl,
+  ): Promise<void> {
+    let work: StudioLivingInkFinishedWork | null = null;
+    try {
+      const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
+        phase: "finish",
+        routeKey: state.route.routeKey,
+        strokeId: state.strokeId,
+        kind: "living-ink",
+      });
+      if (claim.status !== "owned") throw new Error("pointer-down 물리 route 소유권이 바뀌었습니다.");
+      const surface = livingInkOverlaySurfaceRef.current;
+      const config = livingInkConfigRef.current;
+      if (
+        !surface
+        || surface.binding.surfaceKey !== state.surfaceKey
+        || !config
+        || livingInkStrokeRef.current !== state
+      ) throw new Error("Living Ink 최종 표면이 캔버스 좌표계와 일치하지 않습니다.");
+      work = await livingInkCoordinatorRef.current.finishStroke(
+        state.strokeId,
+        state.route.routeKey,
+      );
+      const presentation = await surface.renderer.presentCanonical(
+        work.frame,
+        state.route.routeKey,
+        surface.binding.projection,
+        (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
+      );
+      const result: StudioLivingInkCanonicalResult = Object.freeze({
+        src: presentation.src,
+        pngSha256: presentation.pngSha256,
+        routeKey: state.route.routeKey,
+        pageId: state.pageId,
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        config,
+        journal: work.journal,
+        finalExecutionReceipt: work.frame.receipt,
+      });
+      const baseElements = withStudioHokusaiSource(
+        studioPageElementsFromHistory(state.pageId),
+        finished,
+      );
+      const existingImage = baseElements.find((element) =>
+        element.type === "image" && element.livingInkReceipt?.pageId === state.pageId
+      );
+      const transaction = createStudioLivingInkCanonicalTransaction({
+        elements: baseElements,
+        sourceElementId: finished.id,
+        canonicalImageId: existingImage?.id ?? uid(),
+        result,
+        mutationLocked:
+          collaborationAccessRef.current.locked
+          || activeSurfaceReviewLockedRef.current,
+      });
+      if (!transaction.ok) throw new Error(transaction.message);
+      const handoffClaim = claimStudioStrokeSurfaceLifecycle(state.route, {
+        phase: "handoff",
+        routeKey: state.route.routeKey,
+        strokeId: state.strokeId,
+        kind: "living-ink",
+      });
+      if (handoffClaim.status !== "owned") {
+        throw new Error("canonical 이미지 인계 route가 pointer-down 영수증과 다릅니다.");
+      }
+      const committed = commit(
+        [...transaction.transaction.nextElements],
+        undefined,
+        state.pageId,
+      );
+      if (!committed) throw new Error("문서가 잠겨 Living Ink 단일 트랜잭션을 확정하지 못했습니다.");
+      state.canonicalImageId = transaction.transaction.canonicalImageId;
+      state.canonicalPngHash = presentation.pngSha256;
+      state.transactionCommitted = true;
+      livingInkCanonicalHandoffRef.current = Object.freeze({
+        token: `${state.route.routeKey}:canonical`,
+        kind: "stroke",
+        pageId: state.pageId,
+        imageId: transaction.transaction.canonicalImageId,
+        pngHash: presentation.pngSha256,
+        strokeId: state.strokeId,
+      });
+      armStudioLivingInkCanonicalHandoffTimeout();
+      const committedCanonicalImage = transaction.transaction.nextElements.find(
+        (element): element is ImageEl =>
+          element.type === "image"
+          && element.id === transaction.transaction.canonicalImageId,
+      );
+      const committedAuthority = committedCanonicalImage?.livingInkReceipt
+        ? Object.freeze({
+            pageId: state.pageId,
+            replayToken: studioLivingInkReceiptReplayToken(committedCanonicalImage.livingInkReceipt),
+            canonicalSrc: committedCanonicalImage.src,
+          })
+        : null;
+      if (!livingInkCoordinatorRef.current.acceptFinishedStroke(work)) {
+        livingInkAcceptedAuthorityRef.current = null;
+        livingInkRejectedAuthorityRef.current = committedAuthority;
+        const message =
+          "Living Ink PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
+        setError(message);
+        void livingInkCoordinatorRef.current.failClosed(message);
+      } else {
+        livingInkRejectedAuthorityRef.current = null;
+        livingInkAcceptedAuthorityRef.current = committedAuthority;
+      }
+      if (currentPageIdRef.current === state.pageId) {
+        setSelectedId(transaction.transaction.selectionId);
+      }
+      announceDrawingShortcut("Living Ink · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
+      // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
+      // PNG hash into the main layer. No guessed requestAnimationFrame handoff is allowed.
+    } catch (cause) {
+      if (state.transactionCommitted || livingInkStrokeRef.current !== state) return;
+      if (work) await livingInkCoordinatorRef.current.rollbackFinishedStroke(work).catch(() => undefined);
+      commitStudioLivingInkFallbackVector(
+        state,
+        finished,
+        cause instanceof Error ? cause.message : "최종 물리 프레임을 검증하지 못했습니다.",
+      );
+    }
+  }
+
+  async function finishStudioHokusaiLiveStroke(
+    state: StudioHokusaiPinnedLiveStroke,
+    finished: DrawEl,
+  ): Promise<void> {
+    try {
+      const session = state.session ?? await state.beginPromise;
+      if (!session || state.failed || hokusaiLiveStrokeRef.current !== state) {
+        throw new Error("라이브 자연매체 세션이 최종화 전에 해제되었습니다.");
+      }
+      state.session = session;
+      if (state.queuedSamples.length > 0) {
+        const queued = state.queuedSamples;
+        state.queuedSamples = [];
+        session.append(queued);
+      }
+      const result: StudioHokusaiLiveCanonicalResult = await session.finish();
+      if (state.failed || hokusaiLiveStrokeRef.current !== state) {
+        throw new Error("최종 질감 결과가 도착하기 전에 문서 표면이 변경되었습니다.");
+      }
+      const expectedSourceRevision = studioHokusaiSourceRevision(finished);
+      const transaction = createStudioHokusaiLiveCanonicalTransaction({
+        elements: withStudioHokusaiSource(
+          studioPageElementsFromHistory(state.pageId),
+          finished,
+        ),
+        sourceElementId: finished.id,
+        expectedSourceRevision,
+        canonicalImageId: uid(),
+        result,
+        mutationLocked:
+          collaborationAccessRef.current.locked
+          || activeSurfaceReviewLockedRef.current,
+      });
+      if (!transaction.ok) throw new Error(transaction.message);
+      state.canonicalImageId = transaction.transaction.canonicalImageId;
+      state.canonicalPngHash = result.receipt.pngHash;
+      state.transactionCommitted = true;
+      const committed = commit(
+        [...transaction.transaction.nextElements],
+        undefined,
+        state.pageId,
+      );
+      if (!committed) {
+        state.transactionCommitted = false;
+        state.canonicalImageId = null;
+        state.canonicalPngHash = null;
+        throw new Error("문서가 저장 중이거나 잠겨 있어 단일 Hokusai 트랜잭션을 확정하지 못했습니다.");
+      }
+      if (currentPageIdRef.current === state.pageId) {
+        setSelectedId(transaction.transaction.selectionId);
+      }
+      announceDrawingShortcut("Hokusai 자연매체 획 · 라이브와 저장 결과 일치");
+      // StudioKonvaImageNode will release the material overlay only after the exact PNG is decoded
+      // and synchronously painted into the main layer. Until then the receipted live pixels stay
+      // visible; there is deliberately no requestAnimationFrame timeout handoff here.
+    } catch (cause) {
+      // Explicit cancel, route unmount, or an already committed transaction must never be turned
+      // into a late second history entry by the async rejection path.
+      if (
+        (state.abortController.signal.aborted && hokusaiLiveStrokeRef.current !== state)
+        || state.transactionCommitted
+      ) return;
+      commitStudioHokusaiFallbackVector(
+        state,
+        finished,
+        cause instanceof Error ? cause.message : "최종 질감 결과를 검증하지 못했습니다.",
+      );
+    }
+  }
+
+  function sealStudioDrawReleaseInput(
+    stage: Konva.Stage | null,
+    pointerEvent: PointerEvent,
+    consumeReleaseSample: boolean,
+  ): DrawEl | null {
+    const inputSettings = drawingInputSettingsRef.current;
+    let authoritativeLiveStroke: DrawEl | null = null;
+    if (
+      consumeReleaseSample
+      && drawingRef.current
+      && (drawingRef.current.kind ?? "freehand") !== "freehand"
+      && stage
+    ) {
+      updateActiveShapeEndpoint(stage, pointerEvent, false);
+    }
+    const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
+      ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
+    if (
+      consumeReleaseSample
+      && drawingRef.current
+      && (drawingRef.current.kind ?? "freehand") === "freehand"
+      && stage
+    ) {
+      consumeFreehandPointerBatch(stage, pointerEvent, false, {
+        dispatchedPressureOverride: pointerEvent.pointerType === "pen"
+          ? resolveStudioBrushReleasePressure({
+              brushId: drawingRef.current.brush,
+              pointerType: "pen",
+              rawPressure: pointerEvent.pressure,
+              lastContactPressure: releaseLastContactPressure,
+              pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+              pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
+              fallbackPressure: releaseLastContactPressure,
+            })
+          : undefined,
+        authoritativeSource: "parent-only",
+      });
+    }
+    if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
+      // The release coordinate above has already been published. Stabilizer endpoint/drain
+      // samples are locally generated, so publish only that suffix before finalizing the stroke.
+      const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
+      const fixedRateState = drawingFixedRateFilterRef.current;
+      if (fixedRateState) {
+        const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
+        drawingFixedRateFilterRef.current = released.state;
+        // Geometry and paint complete in the pointerup task. Deferring only the pixels across
+        // rAF made a released stroke continue changing while the next stroke had already begun.
+        appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
+      } else {
+        const liveState = drawingStabilizerRef.current;
+        const flushed =
+          drawingPrecisionStabilizerBridgeRef.current?.flush()
+          ?? (liveState ? flushStudioStrokeStabilizerEndpoint(liveState) : null);
+        if (flushed) {
+          drawingStabilizerRef.current = flushed.state;
+          const current = drawingRef.current;
+          const endpointPlan = planStudioPointerReleaseEndpoint({
+            stroke: current,
+            endpoint: { x: flushed.point[0], y: flushed.point[1] },
+            pointer: releaseEndpointPointerSample(pointerEvent, current),
+            pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+            pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
+          });
+          if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
+        }
+      }
+      if (drawingRef.current) {
+        appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart);
+        appendStudioLivingInkAuthoritativeSuffix(
+          drawingRef.current,
+          crdtReleaseSampleStart,
+        );
+        appendStudioHokusaiAuthoritativeSuffix(
+          drawingRef.current,
+          crdtReleaseSampleStart,
+        );
+      }
+      const causalPostCorrection = causalPostCorrectionStateRef.current;
+      if (drawingRef.current && causalPostCorrection?.phase === "active") {
+        const sourceSampleCount = Math.floor(drawingRef.current.points.length / 2);
+        if (sourceSampleCount > causalPostCorrection.sourceSampleCount) {
+          appendCausalPostCorrectionState(
+            drawingRef.current,
+            causalPostCorrection.sourceSampleCount
+          );
+        }
+        drawingRef.current = sealCausalPostCorrectionState(drawingRef.current);
+      }
+      authoritativeLiveStroke = drawingRef.current;
+      // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
+      // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
+      flushDirectLiveDraftNow(authoritativeLiveStroke);
+      drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
+    }
+    // Shapes do not append freehand suffixes, but their deferred begin must still precede the
+    // final scene publication (or deletion of an intentionally incomplete gesture).
+    if (drawingRef.current) {
+      drawingCrdtPublisherRef.current.flush(drawingRef.current.id);
+    }
+    return authoritativeLiveStroke;
+  }
+  function finishStudioSpecialistStroke(
+    finished: DrawEl,
+  ): "ordinary" | "handled" | "handled-preserve-ink" {
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (livingInkStroke?.strokeId === finished.id) {
+      if (!livingInkStroke.failed) {
+        appendStudioLivingInkAuthoritativeSuffix(
+          finished,
+          livingInkStroke.forwardedSampleCount,
+        );
+        livingInkStroke.finalDrawing = finished;
+        livingInkStroke.finishing = true;
+        livingInkFinalizingRef.current = true;
+        setLivingInkBusy(true);
+        void finishStudioLivingInkStroke(livingInkStroke, finished);
+        return "handled-preserve-ink";
+      }
+      if (studioLivingInkFailureDisposition(livingInkStroke.mode) === "preserve-document-noop") {
+        completeStudioLivingInkWaterNoop(
+          livingInkStroke.strokeId,
+          "물리 계산 또는 표시 영수증이 중단되었습니다.",
+        );
+        return "handled";
+      }
+      livingInkStrokeRef.current = null;
+      livingInkOverlayVisibleRef.current = false;
+      studioStrokeSurfaceRouteRef.current = null;
+    }
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (hokusaiStroke?.strokeId === finished.id) {
+      if (!hokusaiStroke.failed) {
+        appendStudioHokusaiAuthoritativeSuffix(
+          finished,
+          hokusaiStroke.forwardedSampleCount,
+        );
+        hokusaiStroke.finalDrawing = finished;
+        hokusaiStroke.finishing = true;
+        hokusaiLiveFinalizingRef.current = true;
+        // The receipted material canvas remains visible while the Worker settles and hashes
+        // its canonical PNG. No provisional vector is committed, so undo receives one entry.
+        void finishStudioHokusaiLiveStroke(hokusaiStroke, finished);
+        return "handled-preserve-ink";
+      }
+      // A boundary/Worker/surface failure already restored the exact retained DrawEl. From
+      // here the ordinary synchronous commit path owns this whole stroke.
+      hokusaiLiveStrokeRef.current = null;
+      hokusaiLiveOverlayVisibleRef.current = false;
+    }
+    return "ordinary";
+  }
   function finishDrawingPointer(
     stage: Konva.Stage | null,
     pointerEvent: PointerEvent,
@@ -30436,96 +32694,16 @@ const puppetWarpArmed =
     // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
         let deferInkCleanup = false;
         // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
-        let authoritativeLiveStroke: DrawEl | null = null;
+        let authoritativeLiveStroke: DrawEl | null;
         // Release-planner geometry used to reauthor settled live ink before handoff (anti-flicker).
         let releaseAuthoritativeStroke: DrawEl | null = null;
         let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
         try {
-      if (
-        options.consumeReleaseSample !== false
-        && drawingRef.current
-        && (drawingRef.current.kind ?? "freehand") !== "freehand"
-        && stage
-      ) {
-        updateActiveShapeEndpoint(stage, pointerEvent, false);
-      }
-      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
-        ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
-      if (
-        options.consumeReleaseSample !== false
-        && drawingRef.current
-        && (drawingRef.current.kind ?? "freehand") === "freehand"
-        && stage
-      ) {
-        consumeFreehandPointerBatch(stage, pointerEvent, false, {
-          dispatchedPressureOverride: pointerEvent.pointerType === "pen"
-            ? resolveStudioBrushReleasePressure({
-                brushId: drawingRef.current.brush,
-                pointerType: "pen",
-                rawPressure: pointerEvent.pressure,
-                lastContactPressure: releaseLastContactPressure,
-                pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-                pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-                fallbackPressure: releaseLastContactPressure,
-              })
-            : undefined,
-          authoritativeSource: "parent-only",
-        });
-      }
-      if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
-        // The release coordinate above has already been published. Stabilizer endpoint/drain
-        // samples are locally generated, so publish only that suffix before finalizing the stroke.
-        const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
-        const fixedRateState = drawingFixedRateFilterRef.current;
-        if (fixedRateState) {
-          const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
-          drawingFixedRateFilterRef.current = released.state;
-          // Geometry and paint complete in the pointerup task. Deferring only the pixels across
-          // rAF made a released stroke continue changing while the next stroke had already begun.
-          appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
-        } else {
-          const liveState = drawingStabilizerRef.current;
-          const flushed =
-            drawingPrecisionStabilizerBridgeRef.current?.flush()
-            ?? (liveState ? flushStudioStrokeStabilizerEndpoint(liveState) : null);
-          if (flushed) {
-            drawingStabilizerRef.current = flushed.state;
-            const current = drawingRef.current;
-            const endpointPlan = planStudioPointerReleaseEndpoint({
-              stroke: current,
-              endpoint: { x: flushed.point[0], y: flushed.point[1] },
-              pointer: releaseEndpointPointerSample(pointerEvent, current),
-              pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-              pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
-            });
-            if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
-          }
-        }
-        if (drawingRef.current) {
-          appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart);
-        }
-        const causalPostCorrection = causalPostCorrectionStateRef.current;
-        if (drawingRef.current && causalPostCorrection?.phase === "active") {
-          const sourceSampleCount = Math.floor(drawingRef.current.points.length / 2);
-          if (sourceSampleCount > causalPostCorrection.sourceSampleCount) {
-            appendCausalPostCorrectionState(
-              drawingRef.current,
-              causalPostCorrection.sourceSampleCount
-            );
-          }
-          drawingRef.current = sealCausalPostCorrectionState(drawingRef.current);
-        }
-        authoritativeLiveStroke = drawingRef.current;
-        // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
-        // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
-        flushDirectLiveDraftNow(authoritativeLiveStroke);
-        drawingCrdtPublisherRef.current.flush(authoritativeLiveStroke.id);
-      }
-      // Shapes do not append freehand suffixes, but their deferred begin must still precede the
-      // final scene publication (or deletion of an intentionally incomplete gesture).
-      if (drawingRef.current) {
-        drawingCrdtPublisherRef.current.flush(drawingRef.current.id);
-      }
+      authoritativeLiveStroke = sealStudioDrawReleaseInput(
+        stage,
+        pointerEvent,
+        options.consumeReleaseSample !== false,
+      );
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         const completedDrawing = drawingRef.current;
         completedLiveStrokeBackendAudit = true;
@@ -30568,6 +32746,13 @@ const puppetWarpArmed =
           releasePlan = planRelease(releasePostCorrectionStrength);
         }
         const finished = releasePlan.stroke;
+        if (livingInkWaterNoopStrokeIdsRef.current.has(finished.id)) {
+          completeStudioLivingInkWaterNoop(
+            finished.id,
+            "물리 route가 시작 전에 거부되었습니다.",
+          );
+          return;
+        }
         if (hasStudioCanonicalVNextQualityShadowRuntime()) {
           // Explicitly opted-in material providers receive the exact final DrawEl once for a
           // non-authoritative parity audit. Existing retained Studio pixels stay authoritative:
@@ -30586,6 +32771,11 @@ const puppetWarpArmed =
         if (releasePlan.quickShapeAnnouncementKind) {
           const kind = releasePlan.quickShapeAnnouncementKind;
           announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
+        }
+        const specialistRelease = finishStudioSpecialistStroke(finished);
+        if (specialistRelease !== "ordinary") {
+          deferInkCleanup = specialistRelease === "handled-preserve-ink";
+          return;
         }
         const deferCommit = releasePlan.commitMode === "deferred";
         if (deferCommit) {
@@ -30755,6 +32945,7 @@ const puppetWarpArmed =
     } finally {
       // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
       stopQuickShapeTracking();
+      if (finishingStrokeId) livingInkWaterNoopStrokeIdsRef.current.delete(finishingStrokeId);
       // No error or stale tool ref may strand DOM capture or a predicted RAF after the stroke ends.
       releaseDrawingPointerSession();
       drawingRef.current = null;
@@ -30817,6 +33008,10 @@ const puppetWarpArmed =
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
+    if (pendingRasterRetouchGestureRef.current) {
+      if (!finishPendingRasterRetouchGesture(pointerEvent, true, e.target.getStage())) return;
+      return;
+    }
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
     // pointer (typically a palm) cannot cancel the pen that opened the stroke.
@@ -30912,6 +33107,10 @@ const puppetWarpArmed =
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
+    if (pendingRasterRetouchGestureRef.current) {
+      if (!finishPendingRasterRetouchGesture(pointerEvent, false, e.target.getStage())) return;
+      return;
+    }
     const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     if (drawingRef.current || drawingPointerSession) {
       if (!drawingPointerSession) {
@@ -32491,6 +34690,14 @@ function clearSelectionForEdit() {
     pixelMarqueeRasterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
     pixelMarqueeRasterPreparationAbortRef.current = controller;
+    const preparationTool = pixelSelectionToolForActivation(kind);
+    pixelMarqueeRasterPreparationActivationRef.current = preparationTool
+      ? {
+          forceCircle: kind === "circle",
+          runId,
+          tool: preparationTool,
+        }
+      : null;
     setPixelBusy(true);
     setError(null);
     announceDrawingShortcut("벡터 원본을 보존하며 픽셀 선택 대상을 준비하고 있어요");
@@ -32572,7 +34779,14 @@ function clearSelectionForEdit() {
         || currentPageIdRef.current !== pageId
         || !canApplyStudioMutation(mutationTicket)
       ) return;
-      if (!commit(applied.elements, undefined, pageId)) return;
+      let rasterCopyCommitted = false;
+      // The preparation promise can resolve between the tool-button click and the artist's first
+      // pointerdown. Publish the composite before releasing this task so that Stage event closures
+      // cannot still see/move the source vectors after the preparation ref has been retired.
+      flushSync(() => {
+        rasterCopyCommitted = commit(applied.elements, undefined, pageId);
+      });
+      if (!rasterCopyCommitted) return;
       pixelSelectionAutoTargetRef.current = composite.id;
       setMarqueeIds([]);
       setSelectedId(composite.id);
@@ -32691,6 +34905,9 @@ function clearSelectionForEdit() {
       );
     } finally {
       if (runId === pixelMarqueeRasterPreparationRunIdRef.current) {
+        if (pixelMarqueeRasterPreparationActivationRef.current?.runId === runId) {
+          pixelMarqueeRasterPreparationActivationRef.current = null;
+        }
         const pending = pendingPixelSelectionRasterGestureRef.current;
         if (pending?.runId === runId) {
           // Epoch/page/collaboration rejection can return before the success replay block. Never
@@ -32974,6 +35191,10 @@ function clearSelectionForEdit() {
         setError("타임라인 재생을 멈춘 뒤 선택 이미지에 필터를 적용해 주세요.");
         return;
       }
+      // Selection replay publishes to the owner-scoped ref before React exposes the next render.
+      // Capture that event-time authority so opening a filter from the menu on the same frame does
+      // not silently degrade an inside/outside request into a whole-image-only dialog.
+      const selectionAtOpen = pixelSelRef.current;
       setStudioFilterPreview(null);
       studioFilterSessionIdRef.current += 1;
       setStudioFilterSession({
@@ -32982,6 +35203,9 @@ function clearSelectionForEdit() {
         elementId: selected.id,
         kind,
         ...(initialDraft?.kind === kind ? { initialDraft } : {}),
+        ...(selectionAtOpen && isSelectionUsable(selectionAtOpen)
+          ? { selection: selectionAtOpen }
+          : {}),
       });
       return;
     }
@@ -33077,6 +35301,9 @@ function clearSelectionForEdit() {
     if (!prepareStudioDocumentReplacement("편집용 래스터 복사본을 준비", { flushPending: true })) {
       return;
     }
+    const resumePlan = resumeToolId
+      ? resolveStudioRasterToolResumePlan(resumeToolId)
+      : null;
 
     const mutationTicket = captureStudioMutationTicket();
     const historyIndex = pagesHiRef.current;
@@ -33086,6 +35313,9 @@ function clearSelectionForEdit() {
     studioFilterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
     studioFilterPreparationAbortRef.current = controller;
+    studioRasterRetouchPreparationRef.current = resumePlan?.kind === "arm-retouch"
+      ? { runId, tool: resumePlan.retouchTool }
+      : null;
     setStudioFilterPreparationBusy(true);
     setError(null);
     announceDrawingShortcut("원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요");
@@ -33147,10 +35377,14 @@ function clearSelectionForEdit() {
         currentPageIdRef.current !== pageId ||
         !canApplyStudioMutation(mutationTicket)
       ) return;
-      if (!commit(applied.elements, undefined, pageId)) return;
-      const resumePlan = resumeToolId
-        ? resolveStudioRasterToolResumePlan(resumeToolId)
-        : null;
+      let rasterCopyCommitted = false;
+      // Keep the prepared target and Stage's event closure in one observable commit. Otherwise a
+      // fast first retouch contact can run against the previous vector-only render and replace the
+      // freshly appended composite with a stale source-element array.
+      flushSync(() => {
+        rasterCopyCommitted = commit(applied.elements, undefined, pageId);
+      });
+      if (!rasterCopyCommitted) return;
       if (resumePlan?.kind === "activate-selection") {
         pixelSelectionAutoTargetRef.current = composite.id;
       } else if (resumePlan?.kind === "start-crop") {
@@ -33162,6 +35396,18 @@ function clearSelectionForEdit() {
       setPixelForceCircle(false);
       setPixelTool(null);
       setError(null);
+      if (resumePlan?.kind === "arm-retouch") {
+        attachPendingRasterRetouchTarget(runId, {
+          frame: {
+            x: composite.x,
+            y: composite.y,
+            width: composite.width,
+            height: composite.height,
+            rotation: composite.rotation,
+          },
+          id: composite.id,
+        });
+      }
       if (!resumePlan) {
         announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
         return;
@@ -33230,6 +35476,9 @@ function clearSelectionForEdit() {
       }
     } catch (preparationError) {
       if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
+      if (pendingRasterRetouchGestureRef.current?.runId === runId) {
+        clearPendingRasterRetouchGesture();
+      }
       setError(
         preparationError instanceof Error
           ? preparationError.message
@@ -33239,6 +35488,15 @@ function clearSelectionForEdit() {
       if (runId === studioFilterPreparationRunIdRef.current) {
         studioFilterPreparationAbortRef.current = null;
         setStudioFilterPreparationBusy(false);
+      }
+      if (studioRasterRetouchPreparationRef.current?.runId === runId) {
+        studioRasterRetouchPreparationRef.current = null;
+      }
+      if (
+        pendingRasterRetouchGestureRef.current?.runId === runId
+        && pendingRasterRetouchTargetRef.current === null
+      ) {
+        clearPendingRasterRetouchGesture();
       }
     }
   }
@@ -33335,8 +35593,8 @@ function clearSelectionForEdit() {
     hasPixelEditing: menuHasPixelEditing,
     pixelBusy,
     selectedImage: selected?.type === "image",
-    // Same sole-image auto-select gate as the left rail Crop button (ensurePixelToolTarget).
-    pixelToolTargetAvailable,
+    // Same direct-image or editable-page-composite gate as Crop on the left rail.
+    rasterRetouchTargetAvailable,
     interactionLocked: timelapseCapturing,
     mutationLocked: activeSurfaceReviewLocked || timelapseCapturing,
     selectedContentMutationLocked: selectedContentMutationLocked || timelapseCapturing,
@@ -35447,6 +37705,20 @@ function clearSelectionForEdit() {
     clearPolyLassoDraft,
     commitAppSettings,
     disarmAllPixelTools,
+    onRequestPixelSelection: () => {
+      activatePixelSelectionToolFromInspector("rect");
+      announceDrawingShortcut(
+        "변형할 픽셀 영역을 드래그해 선택하세요 · Esc로 취소",
+      );
+    },
+    onRequestSelectImage: () => {
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      announceDrawingShortcut(
+        "프레임 애니메이션으로 편집할 이미지를 선택하세요 · Esc로 취소",
+      );
+    },
     onPickImage,
     toggleAdvancedFill,
     toggleDodgeBurnTool,
@@ -35787,6 +38059,189 @@ function clearSelectionForEdit() {
     movePageUp,
   });
 
+  function livingInkSelectionAvailable(): boolean {
+    const selectedElement = activeElementsRef.current.find(({ id }) => id === selectedIdRef.current);
+    return Boolean(
+      isSelectionUsable(pixelSelRef.current)
+      && selectedElement?.type === "image"
+      && selectedElement.livingInkReceipt?.pageId === currentPageIdRef.current
+      && selectedElement.x === 0
+      && selectedElement.y === 0,
+    );
+  }
+
+  function patchStudioLivingInkMaterial(
+    patch: Partial<StudioLivingInkMaterialControls>,
+  ): void {
+    const hasPersistedLayer = activeElementsRef.current.some((element) =>
+      element.type === "image"
+      && element.livingInkReceipt?.pageId === currentPageIdRef.current
+    );
+    if (hasPersistedLayer) {
+      setError(
+        "기존 Living Ink 획의 물리 결과를 바꾸지 않도록 재질을 잠갔습니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
+      );
+      return;
+    }
+    setLivingInkMaterial((current) => ({ ...current, ...patch }));
+  }
+
+  async function applyStudioLivingInkAction(kind: "clear" | "fix"): Promise<void> {
+    if (
+      livingInkState !== "ready"
+      || studioLivingInkProductAdmissionBlocked({
+        busy: livingInkBusy,
+        finalizing: livingInkFinalizingRef.current,
+        hasActiveStroke: Boolean(livingInkStrokeRef.current),
+        hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
+      })
+    ) return;
+    if (
+      kind === "clear"
+      &&
+      livingInkScope === "all"
+      && !globalThis.confirm("현재 페이지의 Living Ink 물리 레이어 전체를 지울까요? 실행 취소로 되돌릴 수 있습니다.")
+    ) return;
+    if (
+      kind === "fix"
+      && !activeElementsRef.current.some((element) =>
+        element.type === "image"
+        && element.livingInkReceipt?.pageId === currentPageIdRef.current
+      )
+    ) {
+      setError("먼저 Living Ink 잉크나 물 획을 저장한 뒤 정착해 주세요.");
+      return;
+    }
+    const surface = livingInkOverlaySurfaceRef.current;
+    const config = livingInkConfigRef.current;
+    if (!surface || !config) return;
+    const selection = livingInkScope === "selection"
+      ? livingInkSelectionSnapshot(config)
+      : null;
+    if (livingInkScope === "selection" && !selection) {
+      setError("현재 Living Ink 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
+      return;
+    }
+    const routeKey = `studio-living-ink-action:${activePage.id}:${kind}:${uid()}`;
+    let work: Awaited<ReturnType<StudioLivingInkStudioCoordinator["applyAction"]>> | null = null;
+    let transactionCommitted = false;
+    setLivingInkBusy(true);
+    try {
+      work = await livingInkCoordinatorRef.current.applyAction({
+        routeKey,
+        kind,
+        scope: livingInkScope,
+        selection,
+      });
+      const presentation = await surface.renderer.presentCanonical(
+        work.frame,
+        routeKey,
+        surface.binding.projection,
+        (receipt) => {
+          const canvas = surface.binding.canvas;
+          canvas.setAttribute("data-studio-living-ink-active", "true");
+          canvas.setAttribute("data-studio-living-ink-presentation", "presented");
+          canvas.setAttribute("data-studio-living-ink-route-key", receipt.routeKey);
+          canvas.setAttribute("data-studio-living-ink-display-sha256", receipt.displaySha256);
+          canvas.setAttribute("data-studio-living-ink-presentation-revision", String(receipt.revision));
+          livingInkOverlayVisibleRef.current = true;
+          liveDraftLayerRef.current?.drawScene();
+        },
+      );
+      const result: StudioLivingInkCanonicalResult = Object.freeze({
+        src: presentation.src,
+        pngSha256: presentation.pngSha256,
+        routeKey,
+        pageId: activePage.id,
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        config,
+        journal: work.journal,
+        finalExecutionReceipt: work.frame.receipt,
+      });
+      const baseElements = studioPageElementsFromHistory(activePage.id);
+      const existingImage = baseElements.find((element) =>
+        element.type === "image" && element.livingInkReceipt?.pageId === activePage.id
+      );
+      const transaction = createStudioLivingInkCanonicalTransaction({
+        elements: baseElements,
+        canonicalImageId: existingImage?.id ?? uid(),
+        result,
+        mutationLocked:
+          collaborationAccessRef.current.locked
+          || activeSurfaceReviewLockedRef.current,
+      });
+      if (!transaction.ok) throw new Error(transaction.message);
+      if (!commit([...transaction.transaction.nextElements], undefined, activePage.id)) {
+        throw new Error(
+          `문서가 잠겨 Living Ink ${kind === "fix" ? "정착" : "지우기"}를 저장하지 못했습니다.`,
+        );
+      }
+      transactionCommitted = true;
+      livingInkCanonicalHandoffRef.current = Object.freeze({
+        token: `${routeKey}:canonical`,
+        kind: "action",
+        pageId: activePage.id,
+        imageId: transaction.transaction.canonicalImageId,
+        pngHash: presentation.pngSha256,
+        strokeId: null,
+      });
+      armStudioLivingInkCanonicalHandoffTimeout();
+      const committedCanonicalImage = transaction.transaction.nextElements.find(
+        (element): element is ImageEl =>
+          element.type === "image"
+          && element.id === transaction.transaction.canonicalImageId,
+      );
+      const committedAuthority = committedCanonicalImage?.livingInkReceipt
+        ? Object.freeze({
+            pageId: activePage.id,
+            replayToken: studioLivingInkReceiptReplayToken(committedCanonicalImage.livingInkReceipt),
+            canonicalSrc: committedCanonicalImage.src,
+          })
+        : null;
+      if (!livingInkCoordinatorRef.current.acceptAction(work)) {
+        livingInkAcceptedAuthorityRef.current = null;
+        livingInkRejectedAuthorityRef.current = committedAuthority;
+        const actionLabel = kind === "fix" ? "정착" : "지우기";
+        const message = `${actionLabel} PNG는 저장됐지만 물리 상태 고정에 실패해 재열기 전까지 편집을 비활성화합니다.`;
+        setError(message);
+        void livingInkCoordinatorRef.current.failClosed(message);
+      } else {
+        livingInkRejectedAuthorityRef.current = null;
+        livingInkAcceptedAuthorityRef.current = committedAuthority;
+      }
+      setSelectedId(transaction.transaction.selectionId);
+      announceDrawingShortcut(
+        `Living Ink · ${livingInkScope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
+      );
+    } catch (cause) {
+      if (work && !transactionCommitted) {
+        await livingInkCoordinatorRef.current.rollbackAction(work).catch(() => undefined);
+      }
+      if (!transactionCommitted) {
+        surface.renderer.clear();
+        livingInkOverlayVisibleRef.current = false;
+      }
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : `Living Ink ${kind === "fix" ? "정착" : "지우기"}를 완료하지 못했습니다.`,
+      );
+    } finally {
+      // A committed action remains input-exclusive until StudioKonvaImageNode proves that the
+      // exact PNG bytes are visible. The token-scoped image-ready callback releases this lock.
+      if (!transactionCommitted) setLivingInkBusy(false);
+    }
+  }
+
+  function applyStudioLivingInkFix(): void {
+    void applyStudioLivingInkAction("fix");
+  }
+
+  function applyStudioLivingInkClear(): void {
+    void applyStudioLivingInkAction("clear");
+  }
+
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
     assignBrushSlot: (index) => {
       setBrushSlotsState((prev) => {
@@ -35854,6 +38309,8 @@ function clearSelectionForEdit() {
       }
     },
     setDrawShape,
+    setLivingInkMode,
+    setLivingInkScope,
     setPostCorrection,
     setPressureCurvePreset: (id) => setPressureCurve(pressureCurveValueForPreset(id)),
     setSecondaryColor,
@@ -35863,6 +38320,9 @@ function clearSelectionForEdit() {
     setStampTuning,
     setStrokeWidth,
     setSymmetryType,
+    applyLivingInkFix: applyStudioLivingInkFix,
+    applyLivingInkClear: applyStudioLivingInkClear,
+    patchLivingInkMaterial: patchStudioLivingInkMaterial,
     swapColors: () => {
       setColor(secondaryColor);
       setSecondaryColor(color);
@@ -35913,6 +38373,11 @@ function clearSelectionForEdit() {
     },
   });
 
+  const livingInkPersistedLayer = elements.some((element) =>
+    element.type === "image" && element.livingInkReceipt?.pageId === activePage.id
+  );
+  const livingInkSelectionReady = livingInkSelectionAvailable();
+  const livingInkBrushSupported = studioLivingInkSupportsBrush(brush, activeCatalogBrush.id);
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
     () => ({
       visible: tool === "draw" && !canvasOnlyMode,
@@ -35956,6 +38421,24 @@ function clearSelectionForEdit() {
       drawShape,
       eraseToIntersection,
       favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
+      livingInk: {
+        supported: livingInkBrushSupported,
+        state: livingInkState,
+        mode: livingInkMode,
+        scope: livingInkSelectionReady ? livingInkScope : "all",
+        selectionAvailable: livingInkSelectionReady,
+        busy: livingInkBusy,
+        fixAvailable: livingInkPersistedLayer && livingInkState === "ready",
+        fixUnavailableReason:
+          livingInkStateMessage
+          ?? (livingInkPersistedLayer
+            ? "Living Ink 물리 상태를 복원한 뒤 정착할 수 있습니다."
+            : "먼저 Living Ink 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
+        material: livingInkMaterial,
+        materialLocked: livingInkPersistedLayer,
+        materialLockedReason:
+          "기존 획의 물리 재질은 저장 결과와 함께 고정됩니다. 전체 지우기 뒤 새 재질로 시작해 주세요.",
+      },
       opacityLocked: proDrawPrefs.opacityLocked,
       postCorrection,
       pressureCurveId: pressureCurvePresetId(pressureCurve),
@@ -35989,6 +38472,15 @@ function clearSelectionForEdit() {
       drawShape,
       eraseToIntersection,
       leftResize.width,
+      livingInkBrushSupported,
+      livingInkBusy,
+      livingInkMaterial,
+      livingInkMode,
+      livingInkPersistedLayer,
+      livingInkScope,
+      livingInkSelectionReady,
+      livingInkState,
+      livingInkStateMessage,
       postCorrection,
       presentationPanelsHidden,
       pressureCurve,
@@ -36091,6 +38583,10 @@ function clearSelectionForEdit() {
   onWebGpuDeviceLost,
   onWebGpuBackendChange,
   setWebGpuCanvasHandle,
+  setHokusaiLiveOverlaySurface,
+  onHokusaiCanonicalImageReady,
+  setLivingInkOverlaySurface,
+  onLivingInkCanonicalImageReady,
   setElementNodeRef,
   isCanvasGroupDragActive,
   selectElementFromCanvas,
@@ -36126,6 +38622,7 @@ function clearSelectionForEdit() {
     reorderSelectedElements,
     mergeSelectedBubbles,
     handleTutorialTry,
+    openBrushCatalogFromHelp,
     hideBrushCursor,
     hideFilterMaskCursor,
     hideHealCloneCursors,
@@ -36440,8 +38937,40 @@ function clearSelectionForEdit() {
         )}
       >
         <LazyStudioHybridDccDialog
+          key={hybridDccWorkspaceScope}
+          loading={hybridDccPersistenceStatus === "checking"}
           open
-          onClose={() => setHybridDccOpen(false)}
+          onClose={() => {
+            flushHybridDccWorkspacePersistence();
+            setHybridDccOpen(false);
+          }}
+          initialWorkspace={scopedHybridDccWorkspace}
+          persistenceStatus={hybridDccPersistenceStatus}
+          workspaceDocumentId={hybridDccWorkspaceDocumentId}
+          onWorkspaceChange={(workspace) => {
+            setHybridDccWorkspaceState((current) => (
+              current?.scope === hybridDccWorkspaceScope && current?.workspace === workspace
+                ? current
+                : {
+                    scope: hybridDccWorkspaceScope,
+                    workspace,
+                  }
+            ));
+            scheduleHybridDccWorkspacePersistence(workspace);
+          }}
+          onOpenInBackground3D={(result) => {
+            announceDrawingShortcut(
+              result.losses.length > 0
+                ? `3D 장면을 열었습니다 · 파생 손실 ${result.losses.length}건은 DCC 원본에 보존됨`
+                : `3D 장면을 열었습니다 · ${result.assets.length}개 메시, ${result.shots.length}개 Shot`,
+            );
+            flushHybridDccWorkspacePersistence();
+            setHybridDccOpen(false);
+            setBg3dInitialDataUrl(undefined);
+            setBg3dInitialElementId(undefined);
+            setBg3dInitialScene(result.scene);
+            setBg3dOpen(true);
+          }}
         />
       </Suspense>
     ) : null}
@@ -37324,6 +39853,8 @@ function clearSelectionForEdit() {
           frameAnimTargetId={frameAnimTargetId}
           gpuCanvasShadowVisibleRef={gpuCanvasShadowVisibleRef}
           gpuLiveInkPinnedRef={gpuLiveInkPinnedRef}
+          hokusaiLiveOverlayVisibleRef={hokusaiLiveOverlayVisibleRef}
+          livingInkOverlayVisibleRef={livingInkOverlayVisibleRef}
           gridSize={gridSize}
           groups={groups}
           guides={guides}
@@ -38076,6 +40607,14 @@ function clearSelectionForEdit() {
           hi={hi}
           history={history}
           isMobile={isMobile}
+          livingInk={{
+            ...studioOptionsBarsDrawModel.livingInk,
+            onModeChange: studioOptionsBarsHandlers.setLivingInkMode,
+            onScopeChange: studioOptionsBarsHandlers.setLivingInkScope,
+            onFix: studioOptionsBarsHandlers.applyLivingInkFix,
+            onClear: studioOptionsBarsHandlers.applyLivingInkClear,
+            onMaterialChange: studioOptionsBarsHandlers.patchLivingInkMaterial,
+          }}
           marqueeIds={marqueeIds}
           mobileBrushDockButtonRef={mobileBrushDockButtonRef}
           mobileKeyboardInset={mobileKeyboardInset}
@@ -38156,6 +40695,7 @@ function clearSelectionForEdit() {
           autoActionStatus={autoActionStatus}
           bg3dInitialDataUrl={bg3dInitialDataUrl}
           bg3dInitialScene={bg3dInitialScene}
+          bg3dOperation={bg3dInitialElementId ? "update" : "insert"}
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
           bg3dOpen={bg3dOpen}
@@ -38332,6 +40872,19 @@ function clearSelectionForEdit() {
               ? { mutationLockReason: studioFilterDialogMutationLockReason }
               : {})}
             applying={studioFilterApplying}
+            selectionAvailable={
+              studioFilterSession.target === "image" && !!studioFilterSession.selection
+            }
+            selectionFeatherPx={
+              studioFilterSession.target === "image"
+                ? studioFilterSession.selection?.featherPx
+                : undefined
+            }
+            selectionInverted={
+              studioFilterSession.target === "image"
+                ? studioFilterSession.selection?.invert
+                : undefined
+            }
             onPreview={(patch) => {
               setStudioFilterPreview(
                 patch
@@ -38339,14 +40892,84 @@ function clearSelectionForEdit() {
                   : null,
               );
             }}
-            onApply={async (patch, draft) => {
+            onApply={async (patch, draft, applicationScope) => {
               if (studioFilterApplyBusyRef.current) return;
               if (studioFilterSession.target === "image") {
-                if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
-                setStudioFilterPreview(null);
-                setLastStudioFilterDraft(draft);
-                setStudioFilterApplying(false);
-                setStudioFilterSession(null);
+                if (applicationScope === "whole") {
+                  if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
+                  setStudioFilterPreview(null);
+                  setLastStudioFilterDraft(draft);
+                  setStudioFilterApplying(false);
+                  setStudioFilterSession(null);
+                  return;
+                }
+                const selection = studioFilterSession.selection;
+                if (!selection) {
+                  setError("필터를 적용할 픽셀 영역을 먼저 선택하세요.");
+                  return;
+                }
+                const target = elementById.get(studioFilterSession.elementId);
+                if (!target || target.type !== "image") {
+                  setError("필터 대상 이미지가 현재 페이지에 없습니다. 다시 선택해 주세요.");
+                  return;
+                }
+                const applySessionId = studioFilterSession.id;
+                const mutationTicket = captureStudioMutationTicket();
+                studioFilterApplyBusyRef.current = true;
+                setStudioFilterApplying(true);
+                try {
+                  const source = await loadStudioPixelEditImage(target.src);
+                  if (
+                    applySessionId !== studioFilterSessionIdRef.current
+                    || !canApplyStudioMutation(mutationTicket)
+                    || isLatestLayerContentMutationLocked(target.id)
+                  ) return;
+                  const result = createStudioSelectionFilterMaskTransaction({
+                    target,
+                    selection,
+                    scope: applicationScope,
+                    imageWidth: source.naturalWidth || source.width,
+                    imageHeight: source.naturalHeight || source.height,
+                    filterPatch: patch,
+                    createCanvas: createStudioPixelEditCanvas,
+                    serializeMask: (mask) =>
+                      (mask as HTMLCanvasElement).toDataURL("image/png"),
+                    mutationLocked:
+                      activeSurfaceReviewLocked || isEffectivelyLocked(target, groups),
+                  });
+                  if (!result.ok) {
+                    setError(result.message);
+                    return;
+                  }
+                  const committed = commitStudioSelectionFilterMaskTransaction(
+                    result.transaction,
+                    (transaction) => patchEl(
+                      transaction.targetId,
+                      transaction.patch as Partial<El>,
+                    ),
+                  );
+                  if (!committed) return;
+                  setStudioFilterPreview(null);
+                  setLastStudioFilterDraft(draft);
+                  setError(null);
+                  setStudioFilterSession(null);
+                  announceDrawingShortcut(
+                    applicationScope === "inside"
+                      ? "필터를 선택 안에 적용하고 마스크로 저장했어요"
+                      : "필터를 선택 밖에 적용하고 마스크로 저장했어요",
+                  );
+                } catch (selectionFilterError) {
+                  setError(
+                    selectionFilterError instanceof Error
+                      ? selectionFilterError.message
+                      : "선택 영역 필터 마스크를 만들지 못했습니다.",
+                  );
+                } finally {
+                  if (applySessionId === studioFilterSessionIdRef.current) {
+                    studioFilterApplyBusyRef.current = false;
+                    setStudioFilterApplying(false);
+                  }
+                }
                 return;
               }
               studioFilterApplyBusyRef.current = true;

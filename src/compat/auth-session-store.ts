@@ -189,8 +189,19 @@ export type GoogleIdTokenSignInResult =
   | { ok: false; error: string; status: number };
 
 const GOOGLE_ID_TOKEN_MAX_LENGTH = 16_384;
+const GOOGLE_SIGN_IN_FALLBACK_ERROR = "Google 로그인에 실패했어요. 다시 시도해 주세요.";
 const SIGN_OUT_RETRY_DELAYS_MS = [150, 600] as const;
 const SIGN_OUT_MAXIMUM_RETRY_DELAY_MS = 2_000;
+
+function readGoogleSignInError(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return null;
+  }
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error !== "string") return null;
+  const message = error.trim();
+  return message || null;
+}
 
 export type SignOutResult =
   | {
@@ -248,12 +259,12 @@ export async function signInWithGoogleIdToken(
       signal: options?.signal,
     });
     const payload = (await response.json().catch(() => null)) as
-      | { user?: NonNullable<Session>["user"]; error?: string }
+      | { user?: NonNullable<Session>["user"]; error?: unknown }
       | null;
     if (!response.ok || !payload?.user) {
       return {
         ok: false,
-        error: payload?.error ?? "Google 로그인에 실패했어요. 다시 시도해 주세요.",
+        error: readGoogleSignInError(payload) ?? GOOGLE_SIGN_IN_FALLBACK_ERROR,
         status: response.status,
       };
     }

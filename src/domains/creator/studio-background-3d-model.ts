@@ -6,6 +6,10 @@
 import * as THREE from "three";
 
 import { loadStudioBg3dMeshoptDecoder } from "./studio-bg3d-meshopt";
+import {
+  computeStudioBg3dAutoFitScale,
+  STUDIO_BG3D_AUTO_FIT_TARGET_SIZE,
+} from "./studio-bg3d-model-scale-contract";
 import { bakeStudioBg3dRigPoseLayer } from "./studio-bg3d-rig-pose-bake";
 import { isStudioBg3dThreeAnalyticIkMatrixSupported } from "./studio-bg3d-three-hierarchy";
 import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
@@ -53,7 +57,6 @@ export interface BgCustomModelInstance {
 }
 
 // PRIMITIVE_DEFS 도형들의 대략적인 크기 감각(반경 0.5~1m대)과 맞춘 오토핏 목표 치수.
-const DEFAULT_AUTO_FIT_TARGET_SIZE = 2;
 // 레거시 단일-Blob .obj가 .mtl 없이 올라왔을 때 씌우는 무광 중립색 — 도형 프리셋
 // 팔레트(예: box "#c9a876", cylinder "#9fb4c9")와 톤을 맞추되 특정 프리셋과 겹치지 않는
 // 회색조를 고른다. 현행 다중 파일 가져오기는 OBJ와 MTL/텍스처를 함께 해석해 GLB로 정규화한다.
@@ -138,12 +141,11 @@ export function cloneBgCustomModelInstances(instances: BgCustomModelInstance[]):
  * 보정하는 유일한 지점이다. 치수가 유한하지 않거나 0 이하(빈/퇴화 지오메트리 방어)면 1(무변경)을
  * 반환한다.
  */
-export function computeAutoFitScale(boundingSize: [number, number, number], targetSize: number = DEFAULT_AUTO_FIT_TARGET_SIZE): number {
-  const maxDimension = Math.max(...boundingSize.map((v) => Math.abs(v)));
-  if (!Number.isFinite(maxDimension) || maxDimension <= 0 || !Number.isFinite(targetSize) || targetSize <= 0) {
-    return 1;
-  }
-  return targetSize / maxDimension;
+export function computeAutoFitScale(
+  boundingSize: [number, number, number],
+  targetSize: number = STUDIO_BG3D_AUTO_FIT_TARGET_SIZE,
+): number {
+  return computeStudioBg3dAutoFitScale(boundingSize, targetSize);
 }
 
 /** 로드된 모델 루트의 월드축 정렬 바운딩 박스 변 길이(x/y/z)를 측정한다 — computeAutoFitScale의 입력. */

@@ -12,6 +12,13 @@ import {
 function completeSchemaCatalog() {
   return {
     relationNames: [...REQUIRED_DATABASE_RELATIONS],
+    authUserColumnsReady: true,
+    authUserConstraintsReady: true,
+    authUserStatusIndexReady: true,
+    authAccountColumnsReady: true,
+    authAccountConstraintsReady: true,
+    authAccountUserIndexReady: true,
+    authRuntimeDmlReady: true,
     marketplaceSearchGenerated: true,
     marketplaceSearchIndexReady: true,
     marketplaceTagIndexReady: true,
@@ -82,6 +89,14 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(catalogQuery).toContain(
       "owning_extension.extname = 'pg_trgm'",
     );
+    expect(catalogQuery).toContain("to_regclass('public.\"user\"')");
+    expect(catalogQuery).toContain("to_regclass('public.account')");
+    expect(catalogQuery).toContain("idx_user_status_created");
+    expect(catalogQuery).toContain("idx_account_user");
+    expect(catalogQuery).toContain("user_status_check");
+    expect(catalogQuery).toContain("user_session_version_check");
+    expect(catalogQuery).toContain("authRuntimeDmlReady");
+    expect(catalogQuery).toContain("SELECT, INSERT, UPDATE, DELETE");
     expect(query.mock.calls[1]?.[0]).toMatchObject({
       query_timeout: HEALTH_READINESS_QUERY_TIMEOUT_MS,
       values: [[...REQUIRED_DATABASE_MIGRATIONS]],
@@ -104,6 +119,13 @@ describe("PostgresHealthReadinessRepository", () => {
   });
 
   it.each([
+    "authUserColumnsReady",
+    "authUserConstraintsReady",
+    "authUserStatusIndexReady",
+    "authAccountColumnsReady",
+    "authAccountConstraintsReady",
+    "authAccountUserIndexReady",
+    "authRuntimeDmlReady",
     "marketplaceSearchGenerated",
     "marketplaceSearchIndexReady",
     "marketplaceTagIndexReady",

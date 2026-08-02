@@ -101,7 +101,6 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
       { id: "canvas-only", label: "캔버스만", shortcut: "`", onSelect: vi.fn(), separatorAfter: true },
       { id: "left-panel", label: "왼쪽 패널 보이기", onSelect: vi.fn() },
       { id: "right-panel", label: "속성 패널 보이기", onSelect: vi.fn() },
-      { id: "shortcuts", label: "단축키 도움말", shortcut: "?", onSelect: vi.fn() },
     ],
   },
   {
@@ -140,6 +139,14 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
       { id: "ai-assist", label: "AI 어시스트", onSelect: vi.fn() },
       { id: "stock", label: "스톡 이미지", onSelect: vi.fn() },
       { id: "integrations", label: "연동 설정", onSelect: vi.fn() },
+    ],
+  },
+  {
+    id: "help",
+    label: "도움말",
+    items: [
+      { id: "feature-tutorials", label: "사용법 · 기능 튜토리얼", onSelect: vi.fn() },
+      { id: "shortcuts", label: "단축키 · 기본 조작", shortcut: "?", onSelect: vi.fn() },
     ],
   },
 ];
@@ -225,7 +232,7 @@ describe("StudioMainMenu", () => {
     expect(mainMenuSource).not.toContain("restoreFocusTimerRef");
   });
 
-  it("exposes the full commercial File/Edit/Insert/View/Filter/Draw/AI catalog labels", () => {
+  it("exposes the full commercial File/Edit/Insert/View/Filter/Draw/AI/Help catalog labels", () => {
     const html = renderToStaticMarkup(<StudioMainMenu groups={PRODUCTION_MENU_CATALOG} />);
     expect(html).toContain('aria-label="메인 메뉴"');
     for (const group of PRODUCTION_MENU_CATALOG) {
@@ -240,6 +247,7 @@ describe("StudioMainMenu", () => {
       "filter",
       "draw",
       "ai",
+      "help",
     ]);
     const itemLabels = PRODUCTION_MENU_CATALOG.flatMap((g) => g.items.map((i) => i.label));
     for (const required of [
@@ -280,7 +288,8 @@ describe("StudioMainMenu", () => {
       "원근 도우미 보기",
       "나만 숨긴 레이어 모두 표시",
       "제작 인사이트…",
-      "단축키 도움말",
+      "사용법 · 기능 튜토리얼",
+      "단축키 · 기본 조작",
       "마지막 필터…",
       "가우시안 블러",
       "모션 블러",
@@ -330,6 +339,7 @@ describe("StudioMainMenu", () => {
       ["insert", "insert-content"],
       ["view", "view-workflow"],
       ["draw", "draw-workflow"],
+      ["help", "settings"],
     ]) {
       const groupStart = mainMenuSource.indexOf(`  ${group}: {`);
       expect(groupStart, `missing ${group} menu hint`).toBeGreaterThanOrEqual(0);

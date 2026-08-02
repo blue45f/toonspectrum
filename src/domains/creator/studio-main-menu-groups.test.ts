@@ -133,7 +133,10 @@ type StateOverrides = Partial<Omit<StudioMainMenuBuilderState, "edit">> & {
   edit?: Partial<StudioMainMenuEditAvailability>;
 };
 
-function buildMenu(stateOverrides: StateOverrides = {}) {
+function buildMenu(
+  stateOverrides: StateOverrides = {},
+  translate: (key: string) => string = (key) => key,
+) {
   const editor = createEditorActions();
   const ui = createUiActions();
   const state: StudioMainMenuBuilderState = {
@@ -148,7 +151,7 @@ function buildMenu(stateOverrides: StateOverrides = {}) {
     state,
     editor,
     ui,
-    t: (key) => key,
+    t: translate,
   });
   return { editor, groups, ui };
 }
@@ -165,6 +168,24 @@ function menuItem(
 }
 
 describe("buildStudioMainMenuGroups", () => {
+  it("keeps the new Help group localized by reusing the established item keys", () => {
+    const english = buildMenu({}, (key) => ({
+      "studio.mainMenu.item.view.feature-tutorials": "Feature tutorials",
+      "studio.mainMenu.item.view.shortcuts": "Shortcut help",
+    }[key] ?? key)).groups;
+    const korean = buildMenu({}, (key) => ({
+      "studio.mainMenu.item.view.feature-tutorials": "기능 튜토리얼",
+      "studio.mainMenu.item.view.shortcuts": "단축키 도움말",
+    }[key] ?? key)).groups;
+
+    expect(english.find((group) => group.id === "help")?.label).toBe("Help");
+    expect(menuItem(english, "help", "feature-tutorials").label).toBe("Feature tutorials");
+    expect(menuItem(english, "help", "shortcuts").label).toBe("Shortcut help");
+    expect(korean.find((group) => group.id === "help")?.label).toBe("도움말");
+    expect(menuItem(korean, "help", "feature-tutorials").label).toBe("사용법 · 기능 튜토리얼");
+    expect(menuItem(korean, "help", "shortcuts").label).toBe("단축키 · 기본 조작");
+  });
+
   it("preserves the complete group and item order", () => {
     const { groups } = buildMenu();
 
@@ -176,6 +197,7 @@ describe("buildStudioMainMenuGroups", () => {
       "filter",
       "draw",
       "ai",
+      "help",
     ]);
     expect(groups.map((group) => group.items.map((item) => item.id))).toEqual([
       [
@@ -256,8 +278,6 @@ describe("buildStudioMainMenuGroups", () => {
         "quick-access-palette",
         "left-panel",
         "right-panel",
-        "feature-tutorials",
-        "shortcuts",
         "app-settings",
       ],
       [
@@ -297,6 +317,7 @@ describe("buildStudioMainMenuGroups", () => {
       ],
       ["pen", "eraser", "fill", "smart-shape", "bg", "style"],
       ["ai-assist", "stock", "integrations"],
+      ["feature-tutorials", "shortcuts"],
     ]);
   });
 
@@ -526,7 +547,8 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "view", "density-full").onSelect();
     menuItem(groups, "view", "tools-companion").onSelect();
     menuItem(groups, "view", "quick-access-palette").onSelect();
-    menuItem(groups, "view", "feature-tutorials").onSelect();
+    menuItem(groups, "help", "feature-tutorials").onSelect();
+    menuItem(groups, "help", "shortcuts").onSelect();
     menuItem(groups, "view", "app-settings").onSelect();
     menuItem(groups, "filter", "last-filter").onSelect();
     menuItem(groups, "filter", "gaussian-blur").onSelect();
@@ -545,6 +567,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(ui.openToolsCompanion).toHaveBeenCalledOnce();
     expect(ui.toggleQuickAccessPalette).toHaveBeenCalledOnce();
     expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
+    expect(ui.openShortcuts).toHaveBeenCalledOnce();
     expect(ui.openAppSettings).toHaveBeenCalledWith();
     expect(editor.openStudioFilter).toHaveBeenNthCalledWith(
       1,

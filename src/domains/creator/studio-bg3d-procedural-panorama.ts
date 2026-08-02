@@ -243,7 +243,12 @@ export function createStudioBg3dProceduralPanoramaTexture(
   return texture;
 }
 
-/** Owns one scene background texture and restores any prior scene state on teardown. */
+/**
+ * Owns one scene background + PBR environment texture and restores prior scene state on teardown.
+ * The same deterministic local panorama now lights metallic/roughness materials instead of acting
+ * as a decorative backdrop only. Three derives its renderer-local PMREM cache; the source texture
+ * remains the sole resource owned and disposed by this binding.
+ */
 export function mountStudioBg3dProceduralPanorama(
   scene: THREE.Scene,
   presetId: StudioBg3dSkyPresetId,
@@ -251,19 +256,27 @@ export function mountStudioBg3dProceduralPanorama(
 ): StudioBg3dProceduralPanoramaBinding {
   const previousBackground = scene.background;
   const previousRotation = scene.backgroundRotation.clone();
+  const previousEnvironment = scene.environment;
+  const previousEnvironmentRotation = scene.environmentRotation.clone();
   const texture = createStudioBg3dProceduralPanoramaTexture(presetId);
   const mountedBackground = texture;
+  const mountedEnvironment = texture;
   let disposed = false;
 
   scene.background = mountedBackground;
+  scene.environment = mountedEnvironment;
 
   const setRotation = (nextRotationDegrees: number) => {
-    if (disposed || scene.background !== mountedBackground) return;
-    scene.backgroundRotation.set(
-      0,
-      THREE.MathUtils.degToRad(normalizePanoramaRotationDegrees(nextRotationDegrees)),
-      0,
+    if (disposed) return;
+    const yaw = THREE.MathUtils.degToRad(
+      normalizePanoramaRotationDegrees(nextRotationDegrees),
     );
+    if (scene.background === mountedBackground) {
+      scene.backgroundRotation.set(0, yaw, 0);
+    }
+    if (scene.environment === mountedEnvironment) {
+      scene.environmentRotation.set(0, yaw, 0);
+    }
   };
   setRotation(rotationDegrees);
 
@@ -276,6 +289,10 @@ export function mountStudioBg3dProceduralPanorama(
       if (scene.background === mountedBackground) {
         scene.background = previousBackground;
         scene.backgroundRotation.copy(previousRotation);
+      }
+      if (scene.environment === mountedEnvironment) {
+        scene.environment = previousEnvironment;
+        scene.environmentRotation.copy(previousEnvironmentRotation);
       }
       texture?.dispose();
     },

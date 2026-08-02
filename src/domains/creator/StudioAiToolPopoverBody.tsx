@@ -84,13 +84,16 @@ export function StudioAiToolPopoverBody({
     setAiRecentPrompts,
     setMenu,
     setScenarioOpen,
+    setTool,
     textAiConfigured,
     textAiTransport,
   } = toolBelt;
   const {
     addDialogueSuggestionToScript,
+    announceDrawingShortcut,
     applyAiAssistPresetPrompt,
     beginTrackedStudioAiOperation,
+    disarmAllPixelTools,
     executeSuggestColorPalette,
     executeSuggestDialogueLines,
     insertAiCompositionNote,
@@ -260,6 +263,13 @@ export function StudioAiToolPopoverBody({
                       onPromptChange={setAiCharacterPrompt}
                       busy={aiCharacterBusy}
                       error={aiCharacterError}
+                      onRequestSelectReference={() => {
+                        disarmAllPixelTools();
+                        setTool("select");
+                        announceDrawingShortcut(
+                          "기준 캐릭터 이미지를 선택하세요 · Esc로 취소",
+                        );
+                      }}
                       onGenerate={() => {
                         const prompt = aiCharacterPrompt.trim();
                         if (prompt) {

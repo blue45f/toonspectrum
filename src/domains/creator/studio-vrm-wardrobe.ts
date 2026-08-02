@@ -497,6 +497,12 @@ export const WARDROBE_BONES: readonly WardrobeBone[] = [
 
 export type GarmentShape =
   | { kind: "cylinder"; rTop: number; rBottom: number; h: number; open?: boolean }
+  | {
+      kind: "lathe";
+      /** Bottom-to-top garment silhouette in the part's local +Y axis. */
+      profile: readonly { radius: number; y: number }[];
+      segments?: number;
+    }
   | { kind: "box"; w: number; h: number; d: number }
   | { kind: "sphere"; r: number }
   | { kind: "torus"; r: number; tube: number; arc?: number };
@@ -554,9 +560,24 @@ function torsoShell(
   const topY = m.spineToNeck * (opts.topExt ?? 0.92);
   const h = topY - bottomY;
   const r = m.shoulderW * 0.56 * (opts.rMul ?? 1);
+  const rBottom = r * (opts.flare ?? 0.94);
+  const waist = Math.min(r, rBottom) * 0.86;
   return {
     bone: "spine",
-    shape: { kind: "cylinder", rTop: r, rBottom: r * (opts.flare ?? 0.94), h, open: true },
+    // A straight cylinder makes every outfit look like a barrel.  The five-ring profile keeps
+    // enough overlap at the hips and shoulders while introducing an anatomical waist/chest curve.
+    shape: {
+      kind: "lathe",
+      profile: [
+        { radius: rBottom * 0.98, y: -h * 0.5 },
+        { radius: rBottom, y: -h * 0.38 },
+        { radius: waist, y: -h * 0.06 },
+        { radius: r * 0.94, y: h * 0.24 },
+        { radius: r, y: h * 0.4 },
+        { radius: r * 0.78, y: h * 0.5 },
+      ],
+      segments: 32,
+    },
     offset: scaleVec(m.up, (topY + bottomY) / 2),
     align: m.up,
     // 몸통 단면은 폭 대비 깊이 ~0.85 타원 — 얕으면 가슴/배가 옷을 관통한다.
@@ -574,9 +595,22 @@ function skirtCone(
 ): GarmentPart {
   const topY = m.hipsToSpine * 0.55;
   const rTop = Math.max(m.hipW * 0.95, m.shoulderW * 0.42) * (opts.rTopMul ?? 1);
+  const rBottom = rTop * opts.flare;
   return {
     bone: "hips",
-    shape: { kind: "cylinder", rTop, rBottom: rTop * opts.flare, h: opts.len, open: true },
+    // A slightly eased hem reads as cloth instead of a rigid traffic cone while retaining a
+    // deterministic, inexpensive surface that can follow the hips bone in every browser.
+    shape: {
+      kind: "lathe",
+      profile: [
+        { radius: rBottom, y: -opts.len * 0.5 },
+        { radius: rBottom * 0.97, y: -opts.len * 0.42 },
+        { radius: rTop + (rBottom - rTop) * 0.58, y: -opts.len * 0.08 },
+        { radius: rTop * 1.02, y: opts.len * 0.4 },
+        { radius: rTop, y: opts.len * 0.5 },
+      ],
+      segments: 32,
+    },
     offset: scaleVec(m.up, topY - opts.len / 2),
     align: m.up,
     squash: [1, 1, 0.88],

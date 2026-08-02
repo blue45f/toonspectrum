@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
+import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import {
   StudioOptionsBars,
   type StudioOptionsBarsDrawModel,
@@ -18,6 +19,11 @@ import type { StudioSelectOptionsBarProps } from "./StudioSelectOptionsBar";
 const capturedLazyProps = vi.hoisted(() => ({
   draw: null as StudioDrawOptionsBarProps | null,
   selection: null as StudioSelectOptionsBarProps | null,
+}));
+const viewportState = vi.hoisted(() => ({ mobile: false }));
+
+vi.mock("@/components/use-media-query", () => ({
+  useIsMobile: () => viewportState.mobile,
 }));
 
 vi.mock("./studio-page-lazy-ui", () => ({
@@ -70,6 +76,17 @@ const DRAW_MODEL: StudioOptionsBarsDrawModel = {
   stampTuning: { flow: 0.65, hardness: 0.8, minSize: 0.2 },
   strokeWidth: 18,
   symmetryType: "radial",
+  livingInk: {
+    supported: true,
+    state: "ready",
+    mode: "ink",
+    scope: "all",
+    selectionAvailable: false,
+    busy: false,
+    fixAvailable: false,
+    material: DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS,
+    materialLocked: true,
+  },
 };
 
 const SELECTION_MODEL: StudioOptionsBarsSelectionModel = {
@@ -90,6 +107,8 @@ function createHandlers(): StudioOptionsBarsHandlers {
     duplicateSelection: vi.fn(),
     editSelectionText: vi.fn(),
     fitSelectionBubble: vi.fn(),
+    applyLivingInkClear: vi.fn(),
+    applyLivingInkFix: vi.fn(),
     openBrushStudio: vi.fn(),
     recallBrushSlot: vi.fn(),
     reorderSelection: vi.fn(),
@@ -97,6 +116,8 @@ function createHandlers(): StudioOptionsBarsHandlers {
     selectBrushId: vi.fn(),
     setBrushOpacity: vi.fn(),
     setColor: vi.fn(),
+    setLivingInkMode: vi.fn(),
+    setLivingInkScope: vi.fn(),
     setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),
     setPostCorrection: vi.fn(),
@@ -117,6 +138,7 @@ function createHandlers(): StudioOptionsBarsHandlers {
     toggleQuickShape: vi.fn(),
     toggleSelectedLock: vi.fn(),
     toggleSizeLock: vi.fn(),
+    patchLivingInkMaterial: vi.fn(),
   };
 }
 
@@ -140,6 +162,7 @@ afterEach(() => {
   cleanup();
   capturedLazyProps.draw = null;
   capturedLazyProps.selection = null;
+  viewportState.mobile = false;
   vi.clearAllMocks();
 });
 
@@ -240,6 +263,26 @@ describe("StudioOptionsBars", () => {
     expect(drawProps.recentBrushIds).toEqual(["marker", "gpen"]);
     expect(drawProps.sizeLocked).toBe(false);
     expect(drawProps.opacityLocked).toBe(true);
+    expect(drawProps.livingInk).toMatchObject({
+      supported: true,
+      state: "ready",
+      mode: "ink",
+      fixAvailable: false,
+      materialLocked: true,
+    });
+  });
+
+  it("does not duplicate hidden desktop Living Ink controls on a mobile surface", () => {
+    viewportState.mobile = true;
+    render(
+      <StudioOptionsBars
+        {...createProps({ draw: { drawMode: "pen" } })}
+      />,
+    );
+
+    const drawProps = capturedLazyProps.draw;
+    if (!drawProps) throw new Error("draw options props were not captured");
+    expect(drawProps.livingInk).toBeUndefined();
   });
 
   it("delegates draw interactions through the semantic stable handler contract", () => {
@@ -268,6 +311,11 @@ describe("StudioOptionsBars", () => {
     drawProps.onToggleSizeLock?.();
     drawProps.onToggleOpacityLock?.();
     drawProps.onToggleEyedropper?.();
+    drawProps.livingInk?.onModeChange("water");
+    drawProps.livingInk?.onScopeChange("selection");
+    drawProps.livingInk?.onClear();
+    drawProps.livingInk?.onFix();
+    drawProps.livingInk?.onMaterialChange({ bleed: 0.8 });
 
     expect(stableHandlers.toggleBrushCatalog).toHaveBeenCalledWith(trigger);
     expect(stableHandlers.selectBrushId).toHaveBeenCalledWith("marker");
@@ -287,6 +335,11 @@ describe("StudioOptionsBars", () => {
     expect(stableHandlers.toggleSizeLock).toHaveBeenCalledOnce();
     expect(stableHandlers.toggleOpacityLock).toHaveBeenCalledOnce();
     expect(stableHandlers.toggleEyedropper).toHaveBeenCalledOnce();
+    expect(stableHandlers.setLivingInkMode).toHaveBeenCalledWith("water");
+    expect(stableHandlers.setLivingInkScope).toHaveBeenCalledWith("selection");
+    expect(stableHandlers.applyLivingInkClear).toHaveBeenCalledOnce();
+    expect(stableHandlers.applyLivingInkFix).toHaveBeenCalledOnce();
+    expect(stableHandlers.patchLivingInkMaterial).toHaveBeenCalledWith({ bleed: 0.8 });
   });
 
   it("passes selection state and delegates selection actions without leaking an element", () => {

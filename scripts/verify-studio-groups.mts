@@ -291,7 +291,7 @@ async function installSeededMobileState(page: Page): Promise<void> {
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
-    await quickstart.getByRole("button", { name: "닫기", exact: true }).click();
+    await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
   if (
     clearAutosave
@@ -889,8 +889,7 @@ async function activateSelectionTool(page: Page): Promise<void> {
 async function openLayerNavigator(page: Page): Promise<void> {
   const navigator = page.getByTestId("studio-inspector-navigator");
   await navigator.waitFor({ state: "visible" });
-  // The visible layer-count badge participates in the accessible name (`레이어 3`).
-  const tab = navigator.getByRole("tab", { name: /^레이어(?:\s+\d+)?$/u });
+  const tab = navigator.locator('[data-studio-inspector-primary-tab="layers"]');
   if (await tab.getAttribute("aria-selected") !== "true") await tab.click();
 }
 

@@ -116,6 +116,55 @@ describe("StudioFilterDialog", () => {
     expect(html).not.toContain('id="studio-filter-composite-notice"');
   });
 
+  it("defaults an active pixel selection to inside and exposes whole/outside scopes", () => {
+    const onApply = vi.fn();
+    render(
+      <StudioFilterDialog
+        activeKey="filter:motion-blur-selection"
+        kind="motion-blur"
+        image={{}}
+        initialDraft={{ kind: "motion-blur", distance: 12, angle: -45 }}
+        rootRef={createRef<HTMLElement>()}
+        selectionAvailable
+        selectionFeatherPx={8}
+        selectionInverted
+        onPreview={vi.fn()}
+        onApply={onApply}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "적용 범위" })).toBeTruthy();
+    expect((screen.getByRole("radio", { name: "선택 안" }) as HTMLInputElement).checked)
+      .toBe(true);
+    expect(screen.getByText(/현재 선택\(반전\).*페더 8px/u)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "선택 안에 적용" })).toBeTruthy();
+
+    fireEvent.click(screen.getByText("선택 밖"));
+    fireEvent.click(screen.getByRole("button", { name: "선택 밖에 적용" }));
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApply.mock.calls[0]?.[2]).toBe("outside");
+  });
+
+  it("keeps selection scope hidden for page composites", () => {
+    const html = renderToStaticMarkup(
+      <StudioFilterDialog
+        activeKey="filter:page-selection"
+        kind="motion-blur"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        targetKind="page-composite"
+        selectionAvailable
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(html).not.toContain("적용 범위");
+    expect(html).not.toContain("선택 안에 적용");
+  });
+
   it("explains page compositing, source preservation, and one-step undo accessibly", () => {
     const html = renderMotionFilterDialog(false, "page-composite");
 

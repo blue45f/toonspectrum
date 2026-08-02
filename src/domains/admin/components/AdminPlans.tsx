@@ -16,9 +16,11 @@ import {
 import { AdminNotice, AdminSpinner, Field, adminInputClass } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
+import { useT } from "@/lib/i18n";
+
 const planFormSchema = z.object({
-  code: z.string().trim().min(1, "코드와 이름은 필수예요."),
-  name: z.string().trim().min(1, "코드와 이름은 필수예요."),
+  code: z.string().trim().min(1, "Code & name are required."),
+  name: z.string().trim().min(1, "Code & name are required."),
   description: z.string(),
   intervalDays: z.string(),
   priceWon: z.string(),
@@ -49,12 +51,12 @@ function toDraft(plan: Plan): PlanFormValues {
     isActive: plan.isActive,
   };
 }
-
 export function AdminPlans({ uid }: { uid: string }) {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const t = useT();
 
   const {
     register,
@@ -119,7 +121,7 @@ export function AdminPlans({ uid }: { uid: string }) {
     }
   });
 
-  if (error) return <AdminNotice title="플랜을 불러오지 못했어요" body={error} />;
+  if (error) return <AdminNotice title={t("admin.plans.loadError")} body={error} />;
   if (!plans) return <AdminSpinner />;
 
   const validationError = errors.code?.message ?? errors.name?.message ?? null;
@@ -128,11 +130,11 @@ export function AdminPlans({ uid }: { uid: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <p className="text-sm text-fg-3">
-          구독 플랜 <span className="numeral text-fg">{formatNum(plans.length)}</span>개
+          {t("admin.plans.count").replace("{count}", formatNum(plans.length))}
         </p>
         {!editing && (
           <button className={adminButtonClass("accent")} onClick={openNew}>
-            <Plus size={15} /> 새 플랜
+            <Plus size={15} /> {t("admin.plans.new")}
           </button>
         )}
       </div>
@@ -143,42 +145,42 @@ export function AdminPlans({ uid }: { uid: string }) {
           onSubmit={submit}
         >
           <div className="flex items-center justify-between sm:col-span-2">
-            <h3 className="text-sm font-semibold text-fg">{editing.id ? "플랜 수정" : "새 플랜"}</h3>
-            <button type="button" aria-label="닫기" className="text-fg-3 hover:text-fg" onClick={close}>
+            <h3 className="text-sm font-semibold text-fg">{editing.id ? t("admin.plans.edit") : t("admin.plans.new")}</h3>
+            <button type="button" aria-label="Close" className="text-fg-3 hover:text-fg" onClick={close}>
               <X size={16} />
             </button>
           </div>
-          <Field label="코드 *">
+          <Field label={t("admin.plans.code")}>
             <input className={adminInputClass} {...register("code")} />
           </Field>
-          <Field label="이름 *">
+          <Field label={t("admin.plans.name")}>
             <input className={adminInputClass} {...register("name")} />
           </Field>
-          <Field label="설명" full>
+          <Field label={t("admin.plans.description")} full>
             <input className={adminInputClass} {...register("description")} />
           </Field>
-          <Field label="결제 주기(일)">
+          <Field label={t("admin.plans.interval")}>
             <input type="number" min={1} className={adminInputClass} {...register("intervalDays")} />
           </Field>
-          <Field label="가격(원)">
+          <Field label={t("admin.plans.price")}>
             <input type="number" min={0} className={adminInputClass} {...register("priceWon")} />
           </Field>
-          <Field label="혜택(쉼표로 구분)" full>
-            <input className={adminInputClass} {...register("perks")} placeholder="광고 제거, 조기 열람, 전용 뱃지" />
+          <Field label={t("admin.plans.perks")} full>
+            <input className={adminInputClass} {...register("perks")} placeholder={t("admin.plans.perksPlaceholder")} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-fg-2">
             <input type="checkbox" {...register("isActive")} />
-            활성화
+            {t("admin.plans.active")}
           </label>
           <div className="flex items-center justify-end gap-2 sm:col-span-2">
             {(validationError || formError) && (
               <span className="mr-auto text-xs text-bad">{validationError ?? formError}</span>
             )}
             <button type="button" className={adminButtonClass("ghost")} onClick={close}>
-              취소
+              {t("admin.plans.cancel")}
             </button>
             <button type="submit" className={adminButtonClass("accent")} disabled={isSubmitting}>
-              {isSubmitting ? "저장 중…" : "저장"}
+              {isSubmitting ? t("admin.plans.saving") : t("admin.plans.save")}
             </button>
           </div>
         </form>
@@ -188,10 +190,10 @@ export function AdminPlans({ uid }: { uid: string }) {
         <table className="w-full text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
-              <th className="px-4 py-2.5 font-medium">플랜</th>
-              <th className="px-4 py-2.5 font-medium">가격 / 주기</th>
-              <th className="px-4 py-2.5 font-medium">혜택</th>
-              <th className="px-4 py-2.5 font-medium">상태</th>
+              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPlan")}</th>
+              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPrice")}</th>
+              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderPerks")}</th>
+              <th className="px-4 py-2.5 font-medium">{t("admin.plans.tableHeaderStatus")}</th>
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
@@ -199,7 +201,7 @@ export function AdminPlans({ uid }: { uid: string }) {
             {plans.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-fg-3">
-                  등록된 플랜이 없어요. “새 플랜”으로 추가하세요.
+                  {t("admin.plans.empty")}
                 </td>
               </tr>
             )}
@@ -211,15 +213,17 @@ export function AdminPlans({ uid }: { uid: string }) {
                 </td>
                 <td className="px-4 py-3 text-fg-2">
                   <span className="numeral">{formatWon(plan.priceCents)}</span>
-                  <span className="text-fg-3"> / {formatNum(plan.intervalDays)}일</span>
+                  <span className="text-fg-3"> / {formatNum(plan.intervalDays)}</span>
                 </td>
-                <td className="px-4 py-3 text-fg-3">{(plan.perks ?? []).length}개</td>
+                <td className="px-4 py-3 text-fg-3">{(plan.perks ?? []).length}</td>
                 <td className="px-4 py-3">
-                  <span className={plan.isActive ? "text-good" : "text-fg-3"}>{plan.isActive ? "활성" : "비활성"}</span>
+                  <span className={plan.isActive ? "text-good" : "text-fg-3"}>
+                    {plan.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button className={adminButtonClass("ghost")} onClick={() => openEdit(plan)}>
-                    <Pencil size={13} /> 수정
+                    <Pencil size={13} /> {t("admin.plans.tableHeaderAction")}
                   </button>
                 </td>
               </tr>

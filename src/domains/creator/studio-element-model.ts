@@ -33,6 +33,7 @@ import type { StudioGradientSpec } from "./studio-gradient-engine";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
 import type { Halftone } from "./studio-halftone";
+import type { StudioHokusaiLiveDocumentReceipt } from "./studio-hokusai-live-brush-document-receipt";
 import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
 import type { InkWash } from "./studio-ink-wash";
 import type {
@@ -41,6 +42,7 @@ import type {
 } from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
 import type { LineArtCleanupOptions } from "./studio-line-cleanup";
+import type { StudioLivingInkDocumentReceipt } from "./studio-living-ink-document";
 import type {
   StudioMaterialMinimumDiameterRatio,
   StudioMaterialPressureModel,
@@ -205,6 +207,10 @@ export interface ImageEl {
   aiProvenance?: StudioPublishAiProvenance;
   /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */
   builtinRasterAssetId?: StudioRasterAsset["id"];
+  /** Hokusai live 획의 PNG/입력/픽셀 권위. JSON 문서·CRDT 왕복 뒤에도 원본 DrawEl과 함께 보존한다. */
+  hokusaiLiveReceipt?: StudioHokusaiLiveDocumentReceipt;
+  /** Living Ink의 물리 operation journal과 flattened PNG 복구 영수증. */
+  livingInkReceipt?: StudioLivingInkDocumentReceipt;
   /** 고급 채우기가 선화 경계로 읽는 명시적 래스터 참조 레이어. */
   fillReference?: boolean;
   /** 재편집 가능한 3D 장면 원본. PNG src와 분리하며 로컬 저장소 ID는 포함하지 않는다. */

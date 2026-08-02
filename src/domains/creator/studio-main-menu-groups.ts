@@ -220,6 +220,9 @@ export function buildStudioMainMenuGroups({
   const filterUnavailableReason = state.filterDisabled
     ? state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다."
     : undefined;
+  // Reuse the former View labels while the dedicated Help group locale packs catch up.
+  const localizedFeatureTutorialLabel = t("studio.mainMenu.item.view.feature-tutorials");
+  const helpGroupLabel = localizedFeatureTutorialLabel === "기능 튜토리얼" ? "도움말" : "Help";
 
   const groups = [
     {
@@ -856,25 +859,9 @@ export function buildStudioMainMenuGroups({
           id: "right-panel",
           label: state.rightPanelOpen ? "속성 패널 숨기기" : "속성 패널 보이기",
           icon: SlidersHorizontal,
+          separatorAfter: true,
           onSelect: () => {
             ui.toggleRightPanel();
-          },
-        },
-        {
-          id: "feature-tutorials",
-          label: "기능 튜토리얼",
-          icon: BookOpen,
-          onSelect: () => {
-            editor.openFeatureTutorial();
-          },
-        },
-        {
-          id: "shortcuts",
-          label: "단축키 도움말",
-          icon: Command,
-          shortcut: "?",
-          onSelect: () => {
-            ui.openShortcuts();
           },
         },
         {
@@ -1094,6 +1081,35 @@ export function buildStudioMainMenuGroups({
           icon: Settings2,
           onSelect: () => {
             ui.openStudioMenu("integrations");
+          },
+        },
+      ],
+    },
+    {
+      id: "help",
+      label: helpGroupLabel,
+      items: [
+        {
+          id: "feature-tutorials",
+          label: "사용법 · 기능 튜토리얼",
+          ...(helpGroupLabel === "도움말"
+            ? {}
+            : { labelKey: "studio.mainMenu.item.view.feature-tutorials" }),
+          icon: BookOpen,
+          onSelect: () => {
+            editor.openFeatureTutorial();
+          },
+        },
+        {
+          id: "shortcuts",
+          label: "단축키 · 기본 조작",
+          ...(helpGroupLabel === "도움말"
+            ? {}
+            : { labelKey: "studio.mainMenu.item.view.shortcuts" }),
+          icon: Command,
+          shortcut: "?",
+          onSelect: () => {
+            ui.openShortcuts();
           },
         },
       ],

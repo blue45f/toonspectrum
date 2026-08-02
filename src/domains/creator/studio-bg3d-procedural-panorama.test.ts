@@ -85,28 +85,38 @@ describe("Studio BG3D procedural panorama", () => {
     texture?.dispose();
   });
 
-  it("updates only scene yaw while dragging and restores prior scene state exactly once", () => {
+  it("lights PBR from the local sky, updates scene yaw, and restores prior state exactly once", () => {
     const scene = new THREE.Scene();
     const previousBackground = new THREE.Color("#123456");
+    const previousEnvironment = new THREE.DataTexture();
     scene.background = previousBackground;
+    scene.environment = previousEnvironment;
     scene.backgroundRotation.set(0.1, 0.2, 0.3);
+    scene.environmentRotation.set(0.4, 0.5, 0.6);
     const previousRotation = scene.backgroundRotation.clone();
+    const previousEnvironmentRotation = scene.environmentRotation.clone();
     const binding = mountStudioBg3dProceduralPanorama(scene, "sunset", 45);
     expect(binding.texture).toBeInstanceOf(THREE.DataTexture);
     expect(scene.background).toBe(binding.texture);
+    expect(scene.environment).toBe(binding.texture);
     expect(scene.backgroundRotation.y).toBeCloseTo(Math.PI / 4);
+    expect(scene.environmentRotation.y).toBeCloseTo(Math.PI / 4);
 
     const texture = binding.texture;
     binding.setRotation(270);
     expect(binding.texture).toBe(texture);
     expect(scene.backgroundRotation.y).toBeCloseTo(-Math.PI / 2);
+    expect(scene.environmentRotation.y).toBeCloseTo(-Math.PI / 2);
 
     const dispose = vi.spyOn(texture!, "dispose");
     binding.dispose();
     binding.dispose();
     expect(scene.background).toBe(previousBackground);
+    expect(scene.environment).toBe(previousEnvironment);
     expect(scene.backgroundRotation).toEqual(previousRotation);
+    expect(scene.environmentRotation).toEqual(previousEnvironmentRotation);
     expect(dispose).toHaveBeenCalledOnce();
+    previousEnvironment.dispose();
   });
 
   it("does not overwrite a newer scene owner during stale cleanup", () => {
@@ -119,5 +129,6 @@ describe("Studio BG3D procedural panorama", () => {
     binding.dispose();
     expect(scene.background).toBe(newerBackground);
     expect(scene.backgroundRotation.y).toBeCloseTo(1.2);
+    expect(scene.environment).toBeNull();
   });
 });

@@ -152,6 +152,8 @@ const IMAGE_NODE_PROPS = [
   "onInteractionBegin",
   "onInteractionEnd",
   "liveStrokeRef",
+  "onHokusaiCanonicalImageReady",
+  "onLivingInkCanonicalImageReady",
 ] as const;
 
 const MOVED_DECLARATIONS = [
@@ -187,7 +189,7 @@ describe("Studio Konva image node boundary", () => {
     expect(page.source).not.toMatch(/\bUrlImage\b/u);
   });
 
-  it("preserves the exact ten-prop effective image call contract", () => {
+  it("preserves the exact twelve-prop effective image call contract", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
     const contract = propertyNames(
@@ -207,6 +209,10 @@ describe("Studio Konva image node boundary", () => {
     expect(attributes.get("onInteractionBegin")).toContain("nodeInteractionBegin(el.id)");
     expect(attributes.get("onInteractionEnd")).toBe("{endLiveResourceEdit}");
     expect(attributes.get("liveStrokeRef")).toBe("{drawingRef}");
+    expect(attributes.get("onHokusaiCanonicalImageReady"))
+      .toBe("{onHokusaiCanonicalImageReady}");
+    expect(attributes.get("onLivingInkCanonicalImageReady"))
+      .toBe("{onLivingInkCanonicalImageReady}");
   });
 
   it("keeps filters and the worker behind literal image-node intent boundaries", () => {

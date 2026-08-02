@@ -124,6 +124,7 @@ describe("Studio options-bars module boundary", () => {
       "react",
       "./studio-draw-color-swatches",
       "./studio-page-lazy-ui",
+      "@/components/use-media-query",
     ]);
     expect(optionsBars.allImports).not.toContain("konva");
     expect(optionsBars.allImports).not.toContain("react-konva");

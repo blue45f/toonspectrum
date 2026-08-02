@@ -31,13 +31,13 @@ describe("StudioWetMixPanel", () => {
     const onToggleActive = vi.fn();
     const { rerender } = render(<StudioWetMixPanel {...baseProps({ onToggleActive })} />);
 
-    const toggle = screen.getByRole("button", { name: "혼색 브러시 켜기" });
+    const toggle = screen.getByRole("button", { name: "물감 섞어 칠하기 켜기" });
     expect(toggle.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(toggle);
     expect(onToggleActive).toHaveBeenCalledOnce();
 
     rerender(<StudioWetMixPanel {...baseProps({ onToggleActive, active: true })} />);
-    const off = screen.getByRole("button", { name: "혼색 브러시 끄기" });
+    const off = screen.getByRole("button", { name: "물감 섞어 칠하기 끄기" });
     expect(off.getAttribute("aria-pressed")).toBe("true");
   });
 
@@ -89,20 +89,21 @@ describe("StudioWetMixPanel", () => {
 
   it("announces state through the aria-live status line", () => {
     const { rerender } = render(<StudioWetMixPanel {...baseProps()} />);
-    expect(screen.getByRole("status").textContent).toContain("켜고 이미지 위를 드래그");
+    expect(screen.getByRole("status").textContent).toContain("준비됨");
+    expect(screen.getByRole("status").textContent).toContain("현재 색을 새로 칠");
 
     rerender(<StudioWetMixPanel {...baseProps({ active: true })} />);
-    expect(screen.getByRole("status").textContent).toContain("색과 섞입니다");
+    expect(screen.getByRole("status").textContent).toContain("바닥색 위를 드래그");
 
     rerender(<StudioWetMixPanel {...baseProps({ active: true, busy: true })} />);
-    expect(screen.getByRole("status").textContent).toContain("적용하는 중");
+    expect(screen.getByRole("status").textContent).toContain("반영 중");
   });
 
   it("disables every control at the panel boundary and swallows interactions", () => {
     const props = baseProps({ disabled: true });
     render(<StudioWetMixPanel {...props} />);
 
-    const toggle = screen.getByRole("button", { name: "혼색 브러시 켜기" }) as HTMLButtonElement;
+    const toggle = screen.getByRole("button", { name: "물감 섞어 칠하기 켜기" }) as HTMLButtonElement;
     const sliders = screen.getAllByRole("slider") as HTMLInputElement[];
     expect(toggle.disabled).toBe(true);
     expect(sliders.every((slider) => slider.disabled)).toBe(true);
@@ -113,7 +114,7 @@ describe("StudioWetMixPanel", () => {
     fireEvent.change(sliders[0]!, { target: { value: "64" } });
     expect(props.onToggleActive).not.toHaveBeenCalled();
     expect(props.onRadiusChange).not.toHaveBeenCalled();
-    expect(screen.getByRole("status").textContent).toContain("이미지 레이어를 선택하면");
+    expect(screen.getByRole("status").textContent).toContain("편집용 이미지 복사본");
   });
 
   it("locks controls while busy without losing the current values", () => {
@@ -122,7 +123,7 @@ describe("StudioWetMixPanel", () => {
 
     const sliders = screen.getAllByRole("slider") as HTMLInputElement[];
     expect(sliders.every((slider) => slider.disabled)).toBe(true);
-    expect((screen.getByRole("button", { name: "혼색 브러시 끄기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "물감 섞어 칠하기 끄기" }) as HTMLButtonElement).disabled).toBe(true);
     expect(sliders[0]!.value).toBe("32");
 
     fireEvent.change(sliders[2]!, { target: { value: "90" } });

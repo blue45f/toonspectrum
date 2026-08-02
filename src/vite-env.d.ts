@@ -11,6 +11,9 @@ interface ImportMetaEnv {
   readonly VITE_STUDIO_LIVE_INK_KILL_SWITCH?: string;
   // 장기 실행 Nest Socket.IO origin. Vercel serverless HTTP API와 realtime을 분리할 때 사용.
   readonly VITE_STUDIO_LIVE_ORIGIN?: string;
+  // 로컬 Vite의 /socket.io + /studio-live 프록시를 실제 Nest 개발 서버에 연결할 때만 true.
+  // 미설정이면 개발 빌드도 브라우저 로컬 협업으로 fail-closed한다.
+  readonly VITE_STUDIO_LIVE_DEV_PROXY_ENABLED?: "true";
   // Cloudflare Durable Objects 기반 presence·댓글 invalidation·화면공유 signaling origin.
   // 경로·쿼리·인증정보 없는 정확한 HTTPS origin만 허용하며 미설정/오류 시 기존 transport를 유지한다.
   readonly VITE_STUDIO_REALTIME_ORIGIN?: string;

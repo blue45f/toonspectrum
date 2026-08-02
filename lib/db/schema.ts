@@ -69,26 +69,30 @@ export const socketIoAttachments = pgTable(
 // 이미 커버하므로 별도 인덱스를 만들지 않는다.
 
 // ── 인증 사용자 테이블 + 확장 컬럼 ──────────────
-export const users = pgTable("user", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name"),
-  email: text("email").unique(),
-  emailVerified: timestamp("emailVerified", { mode: "date" }),
-  image: text("image"),
-  role: text("role").notNull().default("user"),
-  status: text("status").notNull().default("active"), // active | suspended | deleted
-  sessionVersion: integer("sessionVersion").notNull().default(1), // 서버 로그아웃·정지·탈퇴 시 증가해 기존 토큰 무효화
-  suspendedAt: timestamp("suspendedAt", { mode: "date" }),
-  suspensionReason: text("suspensionReason"),
-  deletedAt: timestamp("deletedAt", { mode: "date" }),
-  // 확장: 크리덴셜 로그인·프로필
-  passwordHash: text("passwordHash"),
-  avatar: text("avatar"), // 아바타 컬러 hex
-  bio: text("bio"),
-  createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
-});
+export const users = pgTable(
+  "user",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name"),
+    email: text("email").unique(),
+    emailVerified: timestamp("emailVerified", { mode: "date" }),
+    image: text("image"),
+    role: text("role").notNull().default("user"),
+    status: text("status").notNull().default("active"), // active | suspended | deleted
+    sessionVersion: integer("sessionVersion").notNull().default(1), // 서버 로그아웃·정지·탈퇴 시 증가해 기존 토큰 무효화
+    suspendedAt: timestamp("suspendedAt", { mode: "date" }),
+    suspensionReason: text("suspensionReason"),
+    deletedAt: timestamp("deletedAt", { mode: "date" }),
+    // 확장: 크리덴셜 로그인·프로필
+    passwordHash: text("passwordHash"),
+    avatar: text("avatar"), // 아바타 컬러 hex
+    bio: text("bio"),
+    createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
+  },
+  (u) => [index("idx_user_status_created").on(u.status, u.createdAt)]
+);
 
 export const accounts = pgTable(
   "account",

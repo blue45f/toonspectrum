@@ -1,14 +1,26 @@
-import { CircleUserRound, Palette, RotateCcw, Scissors, Sparkles, WandSparkles } from "lucide-react";
+import {
+  CircleUserRound,
+  Palette,
+  PersonStanding,
+  RotateCcw,
+  Scissors,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
 import { useId, useState } from "react";
 
 import {
   AVATAR_FORGE_BANG_STYLE_OPTIONS,
+  AVATAR_FORGE_BODY_LIMITS,
+  AVATAR_FORGE_BODY_PRESETS,
   AVATAR_FORGE_FACE_ACCENT_OPTIONS,
   AVATAR_FORGE_FACE_LIMITS,
   AVATAR_FORGE_HAIR_LIMITS,
   AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
+  applyAvatarForgeBodyPreset,
   createAvatarForgeState,
+  type AvatarForgeBodyParams,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
@@ -18,7 +30,7 @@ import {
 /** 정밀 파라미터 슬라이더 순서 — 라벨/범위는 AVATAR_FORGE_HAIR_LIMITS가 단일 소스. */
 const HAIR_DETAIL_KEYS = ["strandWidth", "fringe", "curl", "shine", "wave", "ahoge", "tailHeight"] as const;
 
-type ForgeView = "presets" | "hair" | "face";
+type ForgeView = "presets" | "body" | "hair" | "face";
 
 type StudioVrmAvatarForgePanelProps = {
   state: AvatarForgeState;
@@ -34,6 +46,7 @@ const VIEWS: ReadonlyArray<{
   icon: typeof WandSparkles;
 }> = [
   { id: "presets", label: "스타일", hint: "완성형 조합으로 시작", icon: WandSparkles },
+  { id: "body", label: "체형", hint: "몸의 실루엣과 비율 조절", icon: PersonStanding },
   { id: "hair", label: "헤어", hint: "형태·색·광택 조절", icon: Scissors },
   { id: "face", label: "얼굴", hint: "비율·디테일 조절", icon: CircleUserRound },
 ];
@@ -53,6 +66,15 @@ export function StudioVrmAvatarForgePanel({
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
     onChange({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
+  };
+
+  const updateBody = <K extends keyof AvatarForgeBodyParams>(key: K, value: AvatarForgeBodyParams[K]) => {
+    onChange({
+      ...state,
+      presetId: undefined,
+      bodyPresetId: undefined,
+      body: { ...state.body, [key]: value },
+    });
   };
 
   const updateHair = <K extends keyof AvatarForgeHairParams>(key: K, value: AvatarForgeHairParams[K]) => {
@@ -87,7 +109,7 @@ export function StudioVrmAvatarForgePanel({
               </span>
             </div>
             <p className="mt-1 max-w-[34rem] text-[0.68rem] leading-relaxed text-fg-3">
-              리그와 표정을 보존하면서 헤어 파츠와 얼굴 비율을 비파괴로 조형합니다. 모든 변경은 저장·공유·되돌리기에 포함돼요.
+              리그와 표정을 보존하면서 체형·헤어·얼굴을 비파괴로 조형합니다. 모든 변경은 저장·공유·되돌리기에 포함돼요.
             </p>
           </div>
           <button
@@ -102,7 +124,7 @@ export function StudioVrmAvatarForgePanel({
           </button>
         </div>
 
-        <div role="tablist" aria-label="아바타 조형 단계" className="mt-3 grid grid-cols-3 gap-1 rounded-xl border border-line/70 bg-panel/65 p-1">
+        <div role="tablist" aria-label="아바타 조형 단계" className="mt-3 grid grid-cols-4 gap-1 rounded-xl border border-line/70 bg-panel/65 p-1">
           {VIEWS.map((item) => {
             const Icon = item.icon;
             const selected = item.id === view;
@@ -114,14 +136,14 @@ export function StudioVrmAvatarForgePanel({
                 aria-selected={selected}
                 title={item.hint}
                 onClick={() => setView(item.id)}
-                className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                   selected
                     ? "border-accent/45 bg-accent-soft text-accent shadow-sm"
                     : "border-transparent text-fg-3 hover:bg-raised hover:text-fg"
                 }`}
               >
-                <Icon size={14} aria-hidden />
-                {item.label}
+                <Icon size={14} className="shrink-0 max-[360px]:hidden" aria-hidden />
+                <span className="min-w-0 truncate">{item.label}</span>
               </button>
             );
           })}
@@ -164,9 +186,95 @@ export function StudioVrmAvatarForgePanel({
                 다음 단계
               </p>
               <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
-                스타일을 고른 뒤 헤어 탭에서 길이·컬·투톤을, 얼굴 탭에서 머리 비율과 메이크업 디테일을 조절하세요.
+                스타일을 고른 뒤 체형 탭에서 실루엣을, 헤어·얼굴 탭에서 형태와 색을 세밀하게 조절하세요.
               </p>
             </div>
+          </div>
+        ) : null}
+
+        {view === "body" ? (
+          <div role="tabpanel" aria-label="체형 실루엣 편집" className="space-y-3.5">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[0.68rem] font-bold text-fg-2">체형 시작 프리셋</p>
+                <span className="text-[0.6rem] text-fg-3">얼굴·헤어는 유지</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {AVATAR_FORGE_BODY_PRESETS.map((preset) => {
+                  const selected = state.bodyPresetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={disabled}
+                      aria-pressed={selected}
+                      aria-label={`${preset.label} 체형: ${preset.hint}`}
+                      onClick={() => onChange(applyAvatarForgeBodyPreset(state, preset.id))}
+                      className={`flex min-h-16 min-w-0 items-start gap-2 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
+                        selected
+                          ? "border-accent bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg hover:bg-raised"
+                      }`}
+                    >
+                      <span className="mt-0.5 shrink-0 text-base leading-none" aria-hidden>
+                        {preset.emoji}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[0.68rem] font-extrabold">
+                          {preset.label}
+                        </span>
+                        <span className="mt-0.5 line-clamp-2 block text-[0.6rem] leading-snug text-fg-3">
+                          {preset.hint}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-line bg-card/70 p-3">
+              <p className="mb-1 text-[0.68rem] font-bold text-fg-2">리그 보존 체형 비율</p>
+              <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
+                원본 메시를 다시 쓰지 않고 본 사이 거리와 안전한 폭만 조절합니다. 포즈·의상·소품은 같은 리그를 계속 따라가요.
+              </p>
+              <div className="space-y-3">
+                {(Object.keys(AVATAR_FORGE_BODY_LIMITS) as Array<keyof AvatarForgeBodyParams>).map((key) => {
+                  const limit = AVATAR_FORGE_BODY_LIMITS[key];
+                  return (
+                    <label key={key} className="block">
+                      <span className="mb-1 flex items-center justify-between gap-2 text-[0.65rem] font-semibold text-fg-2">
+                        {limit.label}
+                        <output className="tabular-nums text-fg-3">
+                          {formatValue(state.body[key], limit.unit)}
+                        </output>
+                      </span>
+                      <input
+                        type="range"
+                        aria-label={limit.label}
+                        min={limit.min}
+                        max={limit.max}
+                        step={limit.step}
+                        value={state.body[key]}
+                        disabled={disabled}
+                        onChange={(event) => updateBody(key, Number(event.target.value))}
+                        className="h-11 w-full cursor-pointer accent-accent disabled:cursor-not-allowed sm:h-8"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <p
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-line/70 bg-panel/55 px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3"
+            >
+              {state.bodyPresetId
+                ? `${AVATAR_FORGE_BODY_PRESETS.find((preset) => preset.id === state.bodyPresetId)?.label ?? "선택한"} 체형 적용 중 · 슬라이더를 움직이면 직접 조절로 전환됩니다.`
+                : "직접 조절 중 · 얼굴, 헤어, 색상 설정은 그대로 보존됩니다."}
+            </p>
           </div>
         ) : null}
 

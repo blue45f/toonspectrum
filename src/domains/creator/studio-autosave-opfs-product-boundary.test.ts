@@ -37,10 +37,26 @@ describe("Studio OPFS autosave product boundary", () => {
     expect(autosave).toContain("persistStudioAutosaveWithOpfsPrimary");
     expect(autosave).toContain("sessionPromise ?? Promise.resolve(null)");
     expect(autosave).toContain("storage: globalThis.localStorage");
-    expect(autosave.indexOf("persistStudioAutosaveWithOpfsPrimary")).toBeLessThan(
-      autosave.indexOf("studioLifecycleDurableGenerationRef.current = Math.max"),
+    const persistIndex = autosave.indexOf("persistStudioAutosaveWithOpfsPrimary");
+    expect(persistIndex).toBeLessThan(
+      autosave.indexOf("studioLifecycleDurableGenerationRef.current = Math.max", persistIndex),
     );
     expect(autosave).toContain("The diagnostic below reports both an unavailable OPFS authority");
+  });
+
+  it("tombstones a previous recovery snapshot when Undo returns the document to empty", () => {
+    const autosave = sourceBetween(
+      "// 오토세이브 임시저장 리스너",
+      "// 서버 자동저장",
+    );
+
+    expect(autosave).toContain("hasMeaningfulAutosaveContent");
+    expect(autosave).toContain("hasExistingAutosaveAuthority");
+    expect(autosave).toContain("await session?.clear()");
+    expect(autosave).toContain("studioRevisionProjectGenerationRef.current !== scheduledGeneration");
+    expect(autosave.indexOf("await session?.clear()")).toBeLessThan(
+      autosave.indexOf("globalThis.localStorage.removeItem(autosaveKey)"),
+    );
   });
 
   it("reconciles the newest durable checkpoint before exposing the recovery banner", () => {

@@ -3,19 +3,21 @@ import { useState, useEffect } from "react";
 
 import { adminFetch } from "./admin-client";
 
+import { useT } from "@/lib/i18n";
+
 interface SystemHealthRes {
   status: string;
   database: { latencyMs: number };
   counts: { users: number; reviews: number; fanPosts: number; revenueEvents: number };
   maintenance: { enabled: boolean };
 }
-
 interface AdminHeaderStatsProps {
   userId: string;
 }
 
 export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
   const [health, setHealth] = useState<SystemHealthRes | null>(null);
+  const t = useT();
 
   useEffect(() => {
     let unmounted = false;
@@ -44,10 +46,10 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <Activity className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">시스템 헬스</p>
+          <p className="text-[11px] font-medium text-slate-400">{t("admin.stats.health")}</p>
           <p className="text-xs font-bold text-white flex items-center gap-1.5 pt-0.5">
             <span className={`w-2 h-2 rounded-full ${health.status === "healthy" ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
-            {health.status === "healthy" ? "정상 작동 중" : "저하됨"}
+            {health.status === "healthy" ? t("admin.stats.healthy") : t("admin.stats.degraded")}
             <span className="text-[10px] text-slate-500 font-mono">({health.database.latencyMs}ms)</span>
           </p>
         </div>
@@ -58,9 +60,9 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <DollarSign className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">누적 결제/정산 건수</p>
+          <p className="text-[11px] font-medium text-slate-400">{t("admin.stats.revenueEvents")}</p>
           <p className="text-xs font-bold text-white pt-0.5">
-            {health.counts.revenueEvents.toLocaleString()} 건
+            {health.counts.revenueEvents.toLocaleString()}
           </p>
         </div>
       </div>
@@ -70,9 +72,9 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <Flag className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">총 회원 / 커뮤니티</p>
+          <p className="text-[11px] font-medium text-slate-400">{t("admin.stats.usersCommunity")}</p>
           <p className="text-xs font-bold text-white pt-0.5">
-            {health.counts.users.toLocaleString()} 명 / {health.counts.fanPosts.toLocaleString()} 글
+            {health.counts.users.toLocaleString()} / {health.counts.fanPosts.toLocaleString()}
           </p>
         </div>
       </div>
@@ -82,12 +84,12 @@ export function AdminHeaderStats({ userId }: AdminHeaderStatsProps) {
           <ShieldAlert className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-[11px] font-medium text-slate-400">점검 모드 상태</p>
+          <p className="text-[11px] font-medium text-slate-400">{t("admin.stats.maintenance")}</p>
           <p className="text-xs font-bold text-white pt-0.5">
             {health.maintenance.enabled ? (
-              <span className="text-rose-400 font-bold">비상 점검 중 (ON)</span>
+              <span className="text-rose-400 font-bold">{t("admin.stats.maintenanceOn")}</span>
             ) : (
-              <span className="text-slate-300">정상 운영 중 (OFF)</span>
+              <span className="text-slate-300">{t("admin.stats.maintenanceOff")}</span>
             )}
           </p>
         </div>

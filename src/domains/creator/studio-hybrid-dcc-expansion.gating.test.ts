@@ -24,6 +24,7 @@ import {
   workspaceImportBytes,
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
+  workspaceSelectAsset,
   workspaceUndo,
 } from "./studio-hybrid-dcc-workspace";
 import {
@@ -51,6 +52,16 @@ describe("§12.1 callable-kernel compatibility coverage", () => {
 });
 
 describe("hybrid DCC workspace API", () => {
+  it("keeps outliner selection canonical and rejects renderer-only stale ids", () => {
+    let ws = createStudioHybridDccWorkspace("ws-selection");
+    ws = workspaceAddUnitCube(ws, "hero-prop");
+    ws = workspaceAddUnitCube(ws, "set-prop");
+
+    expect(workspaceSelectAsset(ws, "hero-prop").activeAssetId).toBe("hero-prop");
+    expect(workspaceSelectAsset(ws, null).activeAssetId).toBeNull();
+    expect(() => workspaceSelectAsset(ws, "stale-render-object")).toThrow("missing stale-render-object");
+  });
+
   it("cube → extrude → knife → 8 shots → ink → room → toon3d pack", async () => {
     let ws = createStudioHybridDccWorkspace("ws-exp");
     ws = workspaceAddUnitCube(ws, "hero-prop");

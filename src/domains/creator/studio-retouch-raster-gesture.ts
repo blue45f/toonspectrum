@@ -9,6 +9,10 @@ export type StudioRasterRetouchGestureTool =
   | "wet-mix"
   | "liquify";
 
+export type StudioRasterRetouchNormalizedPoint = SelPoint & {
+  readonly pressure?: number;
+};
+
 export interface StudioRasterRetouchGesturePoint {
   readonly x: number;
   readonly y: number;
@@ -121,7 +125,7 @@ export function endStudioPendingRasterRetouchGesture(
 export function normalizeStudioPendingRasterRetouchGesture(
   gesture: StudioPendingRasterRetouchGesture,
   frame: SelectionFrame,
-): readonly SelPoint[] {
+): readonly StudioRasterRetouchNormalizedPoint[] {
   return gesture.points.map((point) => {
     const normalized = canvasPointToNormalized(point.x, point.y, frame);
     return point.pressure === undefined
@@ -132,7 +136,7 @@ export function normalizeStudioPendingRasterRetouchGesture(
 
 export function canApplyStudioPendingRasterRetouchGesture(
   gesture: StudioPendingRasterRetouchGesture,
-  normalizedPoints: readonly SelPoint[],
+  normalizedPoints: readonly StudioRasterRetouchNormalizedPoint[],
 ): boolean {
   if (gesture.cancelled || !gesture.released) return false;
   if (gesture.tool === "smudge") return normalizedPoints.length >= 2;

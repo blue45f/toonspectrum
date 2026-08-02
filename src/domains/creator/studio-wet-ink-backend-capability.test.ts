@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   planStudioInteractiveWetInkBrushReplay,
+  resolveStudioWetInkInteractiveBackendCapability,
+  STUDIO_LIVING_INK_INTERACTIVE_PROVIDER_FOUNDATION,
   STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY,
   STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY_VERSION,
   studioWetInkInteractiveBackendSupportsElement,
@@ -26,14 +28,14 @@ function wetStroke(id: string): DrawEl {
 }
 
 describe("interactive wet-ink backend capability", () => {
-  it("keeps physical wet ink fail-closed until an async provider owns it", () => {
+  it("keeps physical wet ink fail-closed until a device probe receipt is accepted", () => {
     expect(STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY).toEqual({
       version: STUDIO_WET_INK_INTERACTIVE_BACKEND_CAPABILITY_VERSION,
-      backendId: "worker-webgpu-wet-ink-v1",
-      availability: "unavailable",
+      backendId: "worker-webgl2-living-ink-v1",
+      availability: "probe-required",
       mainThreadPhysicalField: false,
       fallbackRenderer: "wet-ribbon-carrier-v2",
-      reason: "async-provider-not-installed",
+      reason: "runtime-capability-receipt-required",
     });
     expect(studioWetInkInteractiveBackendSupportsElement(
       wetStroke("watercolor-gate"),
@@ -42,6 +44,61 @@ describe("interactive wet-ink backend capability", () => {
       ...wetStroke("ink-wash-gate"),
       brush: "ink-wash",
     })).toBe(false);
+    expect(STUDIO_LIVING_INK_INTERACTIVE_PROVIDER_FOUNDATION).toEqual({
+      fieldVersion: 1,
+      gpuProtocolVersion: 1,
+      operationAdapter: "coalesced-wet-replay-samples-v1",
+      workerBoundary: "dedicated-worker-offscreen",
+      canonicalAuthority: "worker-webgl2-rgba8-plus-operation-journal",
+      rollout: "per-device-runtime-capability-receipt",
+    });
+  });
+
+  it("opens only after the exact Worker WebGL2 capability receipt is accepted", () => {
+    const accepted = resolveStudioWetInkInteractiveBackendCapability({
+      providerState: "ready",
+      capabilityReceiptAccepted: true,
+      backend: "webgl2-offscreen-half-float",
+    });
+    expect(accepted.availability).toBe("available");
+    expect(accepted.reason).toBe("runtime-capability-receipt-accepted");
+    expect(studioWetInkInteractiveBackendSupportsElement(
+      wetStroke("accepted-watercolor"),
+      accepted,
+    )).toBe(true);
+
+    for (const rejected of [
+      resolveStudioWetInkInteractiveBackendCapability({
+        providerState: "ready",
+        capabilityReceiptAccepted: false,
+        backend: "webgl2-offscreen-half-float",
+      }),
+      resolveStudioWetInkInteractiveBackendCapability({
+        providerState: "failed",
+        capabilityReceiptAccepted: true,
+        backend: "webgl2-offscreen-half-float",
+      }),
+      resolveStudioWetInkInteractiveBackendCapability({
+        providerState: "unavailable",
+        capabilityReceiptAccepted: false,
+        backend: null,
+      }),
+    ]) {
+      expect(rejected.availability).toBe("unavailable");
+      expect(rejected.reason).toBe("runtime-capability-receipt-rejected");
+      expect(studioWetInkInteractiveBackendSupportsElement(
+        wetStroke("rejected-watercolor"),
+        rejected,
+      )).toBe(false);
+    }
+
+    const loading = resolveStudioWetInkInteractiveBackendCapability({
+      providerState: "loading",
+      capabilityReceiptAccepted: false,
+      backend: null,
+    });
+    expect(loading.availability).toBe("probe-required");
+    expect(loading.reason).toBe("runtime-capability-receipt-required");
   });
 
   it("does not read or plan 50/100/200-sample physical fields on the interactive main thread", () => {

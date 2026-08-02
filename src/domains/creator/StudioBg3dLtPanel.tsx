@@ -3,6 +3,7 @@ import {
   roundStudioBg3dNumber as round,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
+import { StudioThreeDToggleIndicator } from "./StudioThreeDToggle";
 
 import type {
   StudioBg3dLtPreset,
@@ -167,22 +168,7 @@ export function StudioBg3dMagicLayerControl({
             컬러 레이어에 편집 가능한 필터 범위를 함께 만듭니다.
           </span>
         </span>
-        <span
-          aria-hidden
-          className={cx(
-            "flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors motion-reduce:transition-none",
-            enabled
-              ? "border-accent bg-accent"
-              : "border-line bg-panel",
-          )}
-        >
-          <span
-            className={cx(
-              "size-3.5 rounded-full bg-fg shadow-sm transition-transform motion-reduce:transition-none",
-              enabled ? "translate-x-3.5" : "translate-x-0",
-            )}
-          />
-        </span>
+        <StudioThreeDToggleIndicator checked={enabled} />
       </button>
       <p
         id="bg3d-magic-layer-status"

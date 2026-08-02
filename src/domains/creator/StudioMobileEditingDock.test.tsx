@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
@@ -212,6 +213,22 @@ function createProps(
     hi: 0,
     history: [[], []],
     isMobile: false,
+    livingInk: {
+      supported: false,
+      state: "ready",
+      mode: "ink",
+      onModeChange: vi.fn(),
+      scope: "all",
+      onScopeChange: vi.fn(),
+      selectionAvailable: false,
+      busy: false,
+      fixAvailable: false,
+      onFix: vi.fn(),
+      onClear: vi.fn(),
+      material: DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS,
+      materialLocked: false,
+      onMaterialChange: vi.fn(),
+    },
     marqueeIds: [],
     mobileBrushDockButtonRef: { current: null },
     mobileKeyboardInset: 0,
@@ -661,6 +678,44 @@ describe("StudioMobileEditingDock", () => {
     expect(brushManager.style.bottom).toBe("22px");
     within(brushManager).getByRole("button", { name: "브러시 관리 닫기" }).click();
     expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
+  });
+
+  it("exposes the shared Living Ink Water, Fix, and Clear controls in the mobile brush sheet", () => {
+    const onModeChange = vi.fn();
+    const onFix = vi.fn();
+    const onClear = vi.fn();
+
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          livingInk: {
+            ...createProps().livingInk,
+            supported: true,
+            fixAvailable: true,
+            onModeChange,
+            onFix,
+            onClear,
+          },
+        })}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    const livingInk = within(sheet).getByRole("region", {
+      name: "Living Ink 빠른 도구",
+    });
+    expect(livingInk.getAttribute("data-studio-mobile-living-ink")).toBe("true");
+    expect(document.querySelectorAll('[data-studio-living-ink-controls="true"]')).toHaveLength(1);
+
+    within(livingInk).getByRole("button", { name: "Living Ink 물" }).click();
+    within(livingInk).getByRole("button", { name: "Living Ink 정착" }).click();
+    within(livingInk).getByRole("button", { name: "Living Ink 지우기" }).click();
+
+    expect(onModeChange).toHaveBeenCalledWith("water");
+    expect(onFix).toHaveBeenCalledOnce();
+    expect(onClear).toHaveBeenCalledOnce();
   });
 
   it("uses one touch-safe selected-brush restore action for modified, loading, unavailable, and undo states", () => {

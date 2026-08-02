@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const background3dSource = [
   "./StudioBackground3D.tsx",
+  "./StudioBg3dDirectionalShadowLight.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
@@ -53,5 +54,20 @@ describe("Studio BG3D mood/render integration boundary", () => {
     expect(canvas).toContain(
       "applyStudioBg3dThreeWebglRenderSettings(gl, sceneBaseDocument.render)",
     );
+  });
+
+  it("uses the radius-softened PCF path with dynamically fitted, acne-resistant shadows", () => {
+    expect(background3dSource).toContain("type: THREE.PCFShadowMap");
+    expect(background3dSource).not.toContain("type: THREE.PCFSoftShadowMap");
+    expect(background3dSource).toContain("fitStudioBg3dDirectionalShadowFrustum({");
+    expect(background3dSource).toContain("shadow-normalBias={fit.normalBias}");
+    expect(background3dSource).toContain("shadow-radius={radius}");
+    expect(background3dSource).toContain("shadow-camera-far={fit.far}");
+    expect(background3dSource).toContain("far={mainCameraFarClip}");
+    expect(background3dSource).toContain("maxDistance={mainCameraMaxOrbitDistance}");
+    expect(background3dSource).toContain("shadow-camera-left={fit.left}");
+    expect(background3dSource).toContain("readStudioBg3dShadowModelLocalBounds(");
+    expect(background3dSource).toContain("<mesh receiveShadow rotation-x={-Math.PI / 2}");
+    expect(background3dSource).toContain("<meshStandardMaterial");
   });
 });

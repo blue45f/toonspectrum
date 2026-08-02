@@ -439,7 +439,12 @@ function materialCoverage(
   // body and cannot invert one-pass/retrace coverage ordering.
   switch (presetId) {
     case "pencil":
-      return Math.min(1, normalized ** 1.08 * 1.18);
+      // A sub-3px graphite stroke is dominated by antialias coverage rather
+      // than a fully opaque core. A gamma below one raises those legitimate
+      // edge/core samples without painting transparent pixels, so the same
+      // material transfer remains deterministic for packed live patches and
+      // the canonical crop. Larger pencils still saturate naturally.
+      return Math.min(1, normalized ** 0.72 * 1.35);
     case "charcoal":
       return Math.min(1, normalized ** 1.35 * 1.65);
     case "oil":

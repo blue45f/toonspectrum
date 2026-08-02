@@ -53,16 +53,16 @@ const HINTS: Record<string, StudioToolHintSpec> = {
   },
   fill: {
     id: "fill",
-    title: "고급 채우기",
-    description: "선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요.",
+    title: "색 채우기 (페인트 버킷)",
+    description: "선으로 둘러싸인 곳을 클릭해 한 번에 색칠합니다. 어느 선까지 경계로 볼지는 오른쪽 속성에서 바꿀 수 있어요.",
     shortcut: "G",
     preview: "fill",
-    tip: "작은 틈이 있다면 속성에서 경계 닫기 강도를 먼저 높여보세요.",
+    tip: "선이 조금 끊겼다면 ‘틈 닫기’를 올리고, 여러 레이어의 선을 보려면 ‘참조’를 바꿔보세요.",
   },
   eyedropper: {
     id: "eyedropper",
-    title: "스포이드",
-    description: "캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요.",
+    title: "색 가져오기 (스포이드)",
+    description: "캔버스에서 원하는 색을 클릭해 현재 그리기 색으로 가져옵니다. 펜을 쓰는 중에는 Alt+클릭으로 잠깐 사용할 수 있어요.",
     shortcut: "I",
     preview: "sample",
     tip: "펜 사용 중에는 Alt를 잠깐 눌러 도구 전환 없이 색을 고를 수 있어요.",
@@ -113,13 +113,13 @@ const HINTS: Record<string, StudioToolHintSpec> = {
   "frame-anim": {
     id: "frame-anim",
     title: "프레임 애니메이션",
-    description: "선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다.",
+    description: "조금씩 다른 그림을 순서대로 쌓아 움직이는 장면을 만듭니다. 타임라인에서 그림마다 보이는 시간을 조절해요.",
     preview: "frame-sequence",
   },
   filter: {
     id: "filter",
     title: "필터",
-    description: "이미지에 가우시안/모션 블러, 곡선, 레벨 등 보정 필터를 쌓아 관리합니다.",
+    description: "선택한 그림을 흐리게 하거나 선명하게 하고, 색과 밝기를 조절합니다. 효과를 여러 개 쌓아 순서도 바꿀 수 있어요.",
     preview: "filter",
     tip: "필터 스택은 원본을 보존하므로 순서와 강도를 언제든 다시 바꿀 수 있어요.",
   },
@@ -127,9 +127,9 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "lasso",
     title: "올가미 선택",
     description:
-      "이미지 픽셀을 자유 올가미(드래그 닫기) 또는 다각형 올가미(클릭 꼭짓점 → Enter/더블클릭 닫기)로 고릅니다. 합치기·빼기·교집합, 페더, 확장/축소, 밝기·색조·콘텐츠 인식 채우기를 속성 패널에서 이어서 쓸 수 있어요.",
+      "고칠 부분의 둘레를 자유롭게 그려 선택합니다. 모서리가 분명한 곳은 점을 차례로 찍고 Enter나 더블클릭으로 닫을 수 있어요.",
     preview: "lasso",
-    tip: "선택 모드는 속성 패널의 새 선택·합치기·빼기·교집합 버튼에서 바꿀 수 있어요.",
+    tip: "선택을 더하거나 빼려면 오른쪽 속성의 ‘더하기’와 ‘빼기’를 사용하세요.",
   },
   "poly-lasso": {
     id: "poly-lasso",
@@ -141,7 +141,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "pixel-select",
     title: "픽셀 선택",
     description:
-      "사각·타원·올가미·브러시로 이미지 안쪽 픽셀을 고른 뒤 부분 조정·삭제·콘텐츠 인식 채우기를 적용합니다.",
+      "그림 안에서 고칠 부분만 사각형·원·올가미·브러시로 고릅니다. 선택한 부분에만 색 보정, 삭제, 자동 메우기를 적용할 수 있어요.",
     preview: "lasso",
   },
 };

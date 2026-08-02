@@ -1,0 +1,456 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+  STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE,
+  packStudioHokusaiLiveSamples,
+  snapshotStudioHokusaiLiveInboundMessage,
+  studioHokusaiLiveInboundTransfers,
+  type StudioHokusaiLiveBrushCapabilities,
+} from "./studio-hokusai-live-brush-protocol";
+import {
+  STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
+  STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+  planStudioHokusaiLiveSegment,
+  resolveStudioHokusaiLiveAutoRouteDecision,
+  resolveStudioHokusaiLivePreset,
+  resolveStudioHokusaiLiveRoute,
+  studioHokusaiLiveSampleFitsPinnedSegment,
+} from "./studio-hokusai-live-brush-router";
+import {
+  StudioHokusaiLiveBrushProvider,
+  type StudioHokusaiLiveWorkerLike,
+} from "./studio-hokusai-live-brush-runtime";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
+
+const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
+  engine: "reearth-hokusai",
+  engineVersion: "0.3.0",
+  surfaceAdapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+  liveAdapterVersion: STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  wasm: true,
+  dedicatedWorker: true,
+  packedDirtyFrames: true,
+  transferableFrames: true,
+  epochCancellation: true,
+  canonicalPng: true,
+  liveCommitParityReceipt: true,
+  materialTexture: "studio-hokusai-material-texture-v2",
+  endpointPolicy: "tapered-start-no-dab-carrier-v1",
+  mainThreadFullFrameCopy: false,
+};
+
+function routeInput() {
+  return {
+    brushId: "charcoal",
+    documentWidth: 1_440,
+    documentHeight: 80_000,
+    firstX: 720,
+    firstY: 40_000,
+    radiusPixels: 18,
+    color: "#223344" as const,
+    opacity: 0.8,
+    seed: 17,
+  };
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hash(buffer: ArrayBuffer): Promise<`sha256:${string}`> {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+  return `sha256:${bytesToHex(new Uint8Array(digest))}`;
+}
+
+class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
+  readonly sent: Readonly<{ message: unknown; transfer: readonly Transferable[] }>[] = [];
+  readonly #messageListeners = new Set<(event: MessageEvent<unknown>) => void>();
+  readonly #errorListeners = new Set<(event: ErrorEvent) => void>();
+  readonly #messageErrorListeners = new Set<(event: MessageEvent<unknown>) => void>();
+  #lastIdentity: { requestId: number; engineEpoch: number; strokeId: string } | null = null;
+  #lastSequence = 0;
+  #config: Record<string, unknown> | null = null;
+
+  addEventListener(
+    type: "error" | "message" | "messageerror",
+    listener: ((event: ErrorEvent) => void) | ((event: MessageEvent<unknown>) => void),
+  ): void {
+    if (type === "message") {
+      this.#messageListeners.add(listener as (event: MessageEvent<unknown>) => void);
+    } else if (type === "error") {
+      this.#errorListeners.add(listener as (event: ErrorEvent) => void);
+    } else {
+      this.#messageErrorListeners.add(listener as (event: MessageEvent<unknown>) => void);
+    }
+  }
+
+  removeEventListener(
+    type: "error" | "message" | "messageerror",
+    listener: ((event: ErrorEvent) => void) | ((event: MessageEvent<unknown>) => void),
+  ): void {
+    if (type === "message") {
+      this.#messageListeners.delete(listener as (event: MessageEvent<unknown>) => void);
+    } else if (type === "error") {
+      this.#errorListeners.delete(listener as (event: ErrorEvent) => void);
+    } else {
+      this.#messageErrorListeners.delete(listener as (event: MessageEvent<unknown>) => void);
+    }
+  }
+
+  postMessage(message: unknown, transfer: readonly Transferable[] = []): void {
+    (this.sent as { message: unknown; transfer: readonly Transferable[] }[]).push({
+      message,
+      transfer,
+    });
+    if (typeof message !== "object" || message === null) return;
+    const candidate = message as Record<string, unknown>;
+    if (candidate.type === "studio-hokusai-live/begin") {
+      this.#lastIdentity = {
+        requestId: candidate.requestId as number,
+        engineEpoch: candidate.engineEpoch as number,
+        strokeId: candidate.strokeId as string,
+      };
+      this.#config = candidate.config as Record<string, unknown>;
+      queueMicrotask(() => this.emit({
+        type: "studio-hokusai-live/begun",
+        version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+        ...this.#lastIdentity,
+      }));
+    } else if (candidate.type === "studio-hokusai-live/append") {
+      this.#lastSequence = candidate.sequence as number;
+      queueMicrotask(() => void this.#emitFrame());
+    } else if (candidate.type === "studio-hokusai-live/finish") {
+      queueMicrotask(() => void this.#emitComplete());
+    } else if (candidate.type === "studio-hokusai-live/cancel") {
+      queueMicrotask(() => this.emit({
+        type: "studio-hokusai-live/cancelled",
+        version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+        ...this.#lastIdentity,
+      }));
+    }
+  }
+
+  terminate(): void {}
+
+  emit(data: unknown): void {
+    const event = { data } as MessageEvent<unknown>;
+    for (const listener of this.#messageListeners) listener(event);
+  }
+
+  ready(): void {
+    this.emit({
+      type: "studio-hokusai-live/ready",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      capabilities: CAPABILITIES,
+    });
+  }
+
+  async #emitFrame(): Promise<void> {
+    const pixels = Uint8Array.from([12, 34, 56, 255]).buffer;
+    const pixelHash = await hash(pixels);
+    this.emit({
+      type: "studio-hokusai-live/frame",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      ...this.#lastIdentity,
+      sequence: this.#lastSequence,
+      phase: "live",
+      segmentIndex: 0,
+      dirtyBounds: [0, 0, 1, 1],
+      logicalPlacement: {
+        x: this.#config?.logicalOriginX ?? 0,
+        y: this.#config?.logicalOriginY ?? 0,
+        width: 1,
+        height: 1,
+      },
+      pixelLayout: "packed-dirty-rgba8",
+      pixels,
+      pixelHash,
+    });
+  }
+
+  async #emitComplete(): Promise<void> {
+    const pixels = Uint8Array.from([12, 34, 56, 255]).buffer;
+    const pngBytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]).buffer;
+    const [pixelHash, pngHash, inputHash] = await Promise.all([
+      hash(pixels),
+      hash(pngBytes),
+      hash(Uint8Array.from([1, 2, 3]).buffer),
+    ]);
+    const logicalPlacement = {
+      x: this.#config?.logicalOriginX ?? 0,
+      y: this.#config?.logicalOriginY ?? 0,
+      width: 1,
+      height: 1,
+    };
+    this.emit({
+      type: "studio-hokusai-live/complete",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      ...this.#lastIdentity,
+      finalSequence: this.#lastSequence,
+      segmentIndex: 0,
+      dirtyBounds: [0, 0, 1, 1],
+      logicalPlacement,
+      pixelLayout: "packed-dirty-rgba8",
+      pixels,
+      pngBytes,
+      receipt: {
+        kind: "studio-hokusai-live/canonical-receipt",
+        version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+        ...this.#lastIdentity,
+        presetId: this.#config?.presetId,
+        seed: this.#config?.seed,
+        sampleCount: 2,
+        finalSequence: this.#lastSequence,
+        segmentCount: 1,
+        segments: [{ segmentIndex: 0, logicalPlacement, pixelHash, pngHash }],
+        dirtyBounds: [0, 0, 1, 1],
+        pixelLayout: "packed-dirty-rgba8",
+        inputHash,
+        lastLivePixelHash: pixelHash,
+        settledPixelHash: pixelHash,
+        pngHash,
+        exactLiveCommitParity: true,
+        materialTexture: "studio-hokusai-material-texture-v2",
+        endpointPolicy: "tapered-start-no-dab-carrier-v1",
+        colorOpacityApplication: "worker-once-before-material-transfer-v1",
+        execution: "dedicated-worker-wasm-packed-dirty-live",
+        canonicalAuthority: "settled-png-receipt-v1",
+        undoAuthority: "single-stroke-transaction-v1",
+        saveAuthority: "canonical-png-plus-versioned-receipt-v1",
+        complete: true,
+      },
+    });
+  }
+}
+
+describe("Studio Hokusai live brush vertical slice", () => {
+  it("automatically maps only quality-gated pencil, charcoal and oil core shelves", () => {
+    expect(resolveStudioHokusaiLivePreset("pencil-6b")).toBe("pencil");
+    expect(resolveStudioHokusaiLivePreset("charcoal")).toBe("charcoal");
+    expect(resolveStudioHokusaiLivePreset("acrylic")).toBe("oil");
+    expect(resolveStudioHokusaiLivePreset("parallel-pen")).toBeNull();
+    expect(resolveStudioHokusaiLivePreset("alcohol-marker")).toBeNull();
+    expect(resolveStudioHokusaiLivePreset("gpen")).toBeNull();
+    expect(resolveStudioHokusaiLiveAutoRouteDecision(
+      "dry-media",
+      "precision-pencil",
+    )).toEqual({
+      status: "rejected",
+      reason: "catalog-identity-not-quality-gated",
+    });
+  });
+
+  it("admits an 80,000px webtoon document through a bounded stroke-local surface", () => {
+    const route = resolveStudioHokusaiLiveRoute({
+      ...routeInput(),
+      providerState: "ready",
+      capabilities: CAPABILITIES,
+    });
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    expect(route.config.documentHeight).toBe(80_000);
+    expect(route.config.surfaceWidth).toBeLessThanOrEqual(4_096);
+    expect(route.config.surfaceHeight).toBeLessThanOrEqual(4_096);
+    expect(route.config.surfaceWidth * route.config.surfaceHeight)
+      .toBeLessThanOrEqual(16_777_216);
+    expect(route.config.logicalOriginY).toBeGreaterThan(0);
+    expect(route.autoRoutePolicy).toEqual({
+      version: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
+      qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+      identity: "charcoal",
+      identityAuthority: "brush-id",
+    });
+    expect(route.admission).toMatchObject({
+      boundary: "stroke-start",
+      ownership: "pinned-for-entire-stroke",
+      midStrokePromotion: false,
+      inFlightFrameLimit: 1,
+      stalePresentationPolicy: "coalesce-latest",
+      inputDropAllowed: false,
+      segmentPolicy: "single-bounded-4096-fail-closed",
+      midStrokeFallbackForbiddenReason:
+        "would-split-pixel-authority-and-break-live-commit-undo-save-parity",
+    });
+  });
+
+  it("plans bounded rebased segments without treating document height as a WASM allocation", () => {
+    const first = planStudioHokusaiLiveSegment({
+      documentWidth: 1_440,
+      documentHeight: 120_000,
+      contactX: 200,
+      contactY: 2_000,
+      radiusPixels: 32,
+      segmentIndex: 0,
+    });
+    const rebased = planStudioHokusaiLiveSegment({
+      documentWidth: 1_440,
+      documentHeight: 120_000,
+      contactX: 1_100,
+      contactY: 90_000,
+      radiusPixels: 32,
+      segmentIndex: 1,
+    });
+    expect(first).not.toBeNull();
+    expect(rebased).not.toBeNull();
+    expect(rebased).toMatchObject({
+      documentHeight: 120_000,
+      segmentIndex: 1,
+    });
+    expect(rebased!.surfaceHeight).toBeLessThanOrEqual(4_096);
+    expect(rebased!.logicalOriginY).toBeGreaterThan(first!.logicalOriginY);
+  });
+
+  it("exposes the v1 single-segment limit instead of clipping or silently switching mid-stroke", () => {
+    const route = resolveStudioHokusaiLiveRoute({
+      ...routeInput(),
+      providerState: "ready",
+      capabilities: CAPABILITIES,
+    });
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    expect(studioHokusaiLiveSampleFitsPinnedSegment(route.config, {
+      x: 720,
+      y: 40_100,
+    })).toBe(true);
+    expect(studioHokusaiLiveSampleFitsPinnedSegment(route.config, {
+      x: 720,
+      y: 47_000,
+    })).toBe(false);
+    expect(route.admission.midStrokeFallbackForbiddenReason)
+      .toContain("break-live-commit-undo-save-parity");
+  });
+
+  it("pins an exact fallback for the whole first stroke and retries promotion only next stroke", () => {
+    expect(resolveStudioHokusaiLiveRoute({
+      ...routeInput(),
+      providerState: "loading",
+      capabilities: null,
+    })).toEqual({
+      status: "fallback",
+      reason: "provider-loading",
+      backendId: "existing-exact-route",
+      ownership: "pinned-for-entire-stroke",
+      retryPromotion: "next-stroke-only",
+      selectedStrokeConversionAvailable: true,
+    });
+    const incomplete = { ...CAPABILITIES, liveCommitParityReceipt: false };
+    expect(resolveStudioHokusaiLiveRoute({
+      ...routeInput(),
+      providerState: "ready",
+      capabilities: incomplete as unknown as StudioHokusaiLiveBrushCapabilities,
+    })).toMatchObject({
+      status: "fallback",
+      reason: "runtime-capability-rejected",
+      ownership: "pinned-for-entire-stroke",
+      retryPromotion: "next-stroke-only",
+    });
+  });
+
+  it("packs coalesced input into one transferable Float32 batch", () => {
+    const samples = packStudioHokusaiLiveSamples([
+      { x: 10, y: 20, pressure: 0.2, tiltX: -45, tiltY: 90, timeMilliseconds: 4 },
+      { x: 12, y: 23, pressure: 0.8, tiltX: 45, tiltY: -90, timeMilliseconds: 8 },
+    ]);
+    const message = snapshotStudioHokusaiLiveInboundMessage({
+      type: "studio-hokusai-live/append",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      requestId: 1,
+      engineEpoch: 1,
+      strokeId: "stroke-1",
+      sequence: 1,
+      sampleCount: 2,
+      sampleStride: STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE,
+      samples,
+    });
+    expect(message?.type).toBe("studio-hokusai-live/append");
+    if (message?.type !== "studio-hokusai-live/append") return;
+    expect(studioHokusaiLiveInboundTransfers(message)).toEqual([samples]);
+    const packed = Array.from(new Float32Array(samples));
+    expect(packed).toHaveLength(12);
+    expect(packed.slice(0, 2)).toEqual([10, 20]);
+    expect(packed[2]).toBeCloseTo(0.2);
+    expect(packed.slice(3, 8)).toEqual([-0.5, 1, 4, 12, 23]);
+    expect(packed[8]).toBeCloseTo(0.8);
+    expect(packed.slice(9)).toEqual([0.5, -1, 8]);
+  });
+
+  it("prewarms before admission, transfers live dirty pixels and validates canonical parity", async () => {
+    const worker = new FakeHokusaiLiveWorker();
+    const provider = new StudioHokusaiLiveBrushProvider({
+      workerFactory: () => worker,
+      startupTimeoutMs: 1_000,
+      finishTimeoutMs: 1_000,
+    });
+    expect(provider.admitStroke(routeInput())).toMatchObject({
+      status: "fallback",
+      reason: "provider-loading",
+      retryPromotion: "next-stroke-only",
+    });
+    const warming = provider.prewarm();
+    worker.ready();
+    await warming;
+    const route = provider.admitStroke(routeInput());
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    const frames: Uint8Array[] = [];
+    const session = await provider.beginStroke(route, {
+      strokeId: "live-stroke-1",
+      signal: new AbortController().signal,
+      onFrame: ({ pixels }) => frames.push(pixels),
+    });
+    session.append([
+      { x: 720, y: 40_000, pressure: 0.4, timeMilliseconds: 1 },
+      { x: 722, y: 40_002, pressure: 0.8, timeMilliseconds: 3 },
+    ]);
+    const completed = await session.finish();
+    expect(frames).toHaveLength(1);
+    expect(Array.from(frames[0]!)).toEqual([12, 34, 56, 255]);
+    expect(completed.receipt).toMatchObject({
+      exactLiveCommitParity: true,
+      materialTexture: "studio-hokusai-material-texture-v2",
+      endpointPolicy: "tapered-start-no-dab-carrier-v1",
+      colorOpacityApplication: "worker-once-before-material-transfer-v1",
+      canonicalAuthority: "settled-png-receipt-v1",
+      undoAuthority: "single-stroke-transaction-v1",
+      saveAuthority: "canonical-png-plus-versioned-receipt-v1",
+      segmentCount: 1,
+    });
+    const append = worker.sent.find(({ message }) => (
+      (message as { type?: string }).type === "studio-hokusai-live/append"
+    ));
+    expect(append?.transfer).toHaveLength(1);
+    expect(worker.sent.some(({ message }) => (
+      (message as { type?: string }).type === "studio-hokusai-live/frame-ack"
+    ))).toBe(true);
+    provider.close();
+  });
+
+  it("streams incremental dirty deltas and reads one full frame only at canonical finish", () => {
+    const source = readFileSync(
+      new URL("./studio-hokusai-live-brush.worker.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("frameInFlight");
+    expect(source).toContain("pendingPresentationSequence");
+    expect(source).toContain("Input is never dropped");
+    expect(source).toContain("await emitLiveFrame(stroke, pending)");
+    expect(source).toContain("pixels.slice()");
+    expect(source).toContain("canvas.dirtyFrame()");
+    expect(source).toContain("stroke.canvas.clearDirty()");
+    expect(source).toContain("writePackedPatch(stroke.retainedPixels");
+    expect(source).toContain("writePackedPatch(\n    stroke.rawRetainedPixels");
+    expect(source).toContain("applyStudioHokusaiNaturalMediaTextureV2");
+    expect(source).toContain("applyTaperedStart");
+    expect(source.match(/stroke\.canvas\.fullFrame\(\)/gu)).toHaveLength(1);
+    expect(source).toContain("raw acknowledged patch composition differs");
+    expect(source).toContain('"settle-tail"');
+    expect(source).not.toContain("document.");
+    expect(source).not.toContain("window.");
+  });
+});

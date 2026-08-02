@@ -62,6 +62,28 @@ describe("StudioNodeEditPanel", () => {
     ).toContain("닫힌 벡터 경로를 선택하세요.");
   });
 
+  it("offers a 44px selection recovery CTA instead of ending at an unavailable reason", () => {
+    const onRequestSelectStroke = vi.fn();
+    render(
+      <StudioNodeEditPanel
+        {...createProps({
+          onRefine: vi.fn(),
+          onRequestSelectStroke,
+          refinementUnavailableReason: "자유선 펜 획 하나를 선택하세요.",
+        })}
+      />,
+    );
+
+    const recovery = screen.getByRole("button", { name: "선화 선택하기" });
+    expect(recovery.className).toContain("min-h-11");
+    expect(recovery.getAttribute("aria-describedby")).toBe(
+      "studio-node-refinement-selection-help",
+    );
+    fireEvent.click(recovery);
+    expect(onRequestSelectStroke).toHaveBeenCalledOnce();
+    expect(screen.getByText(/Esc를 누르면 선택을 취소/)).toBeTruthy();
+  });
+
   it("announces busy state and exposes cancellation only while work is active", () => {
     const onCancelRefinement = vi.fn();
     const view = render(

@@ -57,13 +57,26 @@ describe("StudioPage lazy precision stabilizer product boundary", () => {
   });
 
   it("flushes on release and resets the mutable provider through shared cleanup", () => {
+    const releaseInput = sourceBetween(
+      "function sealStudioDrawReleaseInput(",
+      "function finishStudioSpecialistStroke("
+    );
+    expect(releaseInput).toMatch(
+      /drawingPrecisionStabilizerBridgeRef\.current\?\.flush\(\)\s*\?\? \(liveState \? flushStudioStrokeStabilizerEndpoint\(liveState\) : null\)/u
+    );
+    expect(releaseInput.indexOf("drawingPrecisionStabilizerBridgeRef.current?.flush()"))
+      .toBeLessThan(releaseInput.indexOf("drawingStabilizerRef.current = flushed.state"));
+    expect(releaseInput.indexOf("drawingStabilizerRef.current = flushed.state"))
+      .toBeLessThan(releaseInput.indexOf("appendDrawingCrdtSampleSuffix("));
+
     const finish = sourceBetween(
       "function finishDrawingPointer(",
       "function onStagePointerCancel("
     );
-    expect(finish).toMatch(
-      /drawingPrecisionStabilizerBridgeRef\.current\?\.flush\(\)\s*\?\? \(liveState \? flushStudioStrokeStabilizerEndpoint\(liveState\) : null\)/u
-    );
+    expect(finish.indexOf("authoritativeLiveStroke = sealStudioDrawReleaseInput("))
+      .toBeLessThan(finish.indexOf("planStudioDrawPointerRelease({"));
+    expect(finish.indexOf("planStudioDrawPointerRelease({"))
+      .toBeLessThan(finish.indexOf("finally {"));
 
     const release = sourceBetween(
       "function releaseDrawingPointerSession()",

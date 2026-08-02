@@ -21,9 +21,17 @@ describe("Studio native live-surface quality integration", () => {
     expect(start).toContain(
       "liveInkOverlayStarted = causalPostCorrectionEligible",
     );
-    expect(start).toMatch(
-      /const direct =\s*pixelDirect\s*\|\| liveInkOverlayStarted\s*\|\| wetInkOverlayStarted\s*\|\| gpuPin\s*\|\| dynamicBrushDirect;/,
-    );
+    const directStart = start.indexOf("const direct =");
+    const directEnd = start.indexOf(";", directStart);
+    const directAuthority = start.slice(directStart, directEnd);
+    expect(directAuthority).toContain('strokeSurfaceRoute.kind === "living-ink"');
+    expect(directAuthority).toContain("|| hokusaiPinned");
+    expect(directAuthority).toContain("|| pixelDirect");
+    expect(directAuthority).toContain("|| liveInkOverlayStarted");
+    expect(directAuthority).toContain("|| wetInkOverlayStarted");
+    expect(directAuthority).toContain("|| gpuPin");
+    expect(directAuthority).toContain("|| dynamicBrushDirect");
+    expect(directAuthority).not.toContain("overlayCandidate");
     expect(start).not.toContain(
       "const direct = pixelDirect || overlayCandidate || gpuPin",
     );

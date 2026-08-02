@@ -1,5 +1,5 @@
-import { Clapperboard, Maximize2, Minimize2, Eraser, BookOpen, FlipHorizontal2, Grid3X3, ImagePlus, Lock, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Sparkles, Square, Unlock, Wind, Shapes, MessageSquare } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
+import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -31,6 +31,7 @@ import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type O
 import { type SharedGutterSegment } from "./studio-frame-folder";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { computeHistoryBrushAvailability } from "./studio-history-brush";
+import { type StudioHokusaiLiveOverlayProjection } from "./studio-hokusai-live-brush-overlay";
 import { uid } from "./studio-id";
 import { imageFilterCacheKey } from "./studio-konva-filter-fields";
 import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
@@ -38,6 +39,7 @@ import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./stu
 import { type StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
 import { StudioLiveInkOverlayRenderer, StudioLiveInkPredictionRenderer } from "./studio-live-ink-overlay";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
+import { type StudioLivingInkOverlayProjection } from "./studio-living-ink-overlay";
 import { MASTER_EDIT_GHOST_OPACITY, createEmptyDocumentMaster, togglePageHideMaster, type DocumentMaster } from "./studio-master-page";
 import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { vignetteCss, type PageGrade } from "./studio-page-grade";
@@ -317,6 +319,21 @@ export interface StudioCanvasViewportHandlers {
   onWebGpuDeviceLost: () => void;
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
   setWebGpuCanvasHandle: (handle: StudioWebGpuCanvasHandle | null) => void;
+  setHokusaiLiveOverlaySurface: (
+    surface: StudioHokusaiLiveOverlaySurfaceBinding | null
+  ) => void;
+  setLivingInkOverlaySurface: (
+    surface: StudioLivingInkOverlaySurfaceBinding | null
+  ) => void;
+  onHokusaiCanonicalImageReady: (
+    elementId: string,
+    pngHash: `sha256:${string}`,
+  ) => void;
+  onLivingInkCanonicalImageReady: (
+    elementId: string,
+    pngHash: `sha256:${string}`,
+    routeKey: string,
+  ) => void;
   setElementNodeRef: (elId: string, node: Konva.Node | null) => void;
   isCanvasGroupDragActive: (elementId: string) => boolean;
   selectElementFromCanvas: (
@@ -360,7 +377,11 @@ export interface StudioCanvasViewportHandlers {
   toggleSelectedElementsLocked: () => void;
   reorderSelectedElements: (direction: "front" | "back") => void;
   mergeSelectedBubbles: () => void;
-  handleTutorialTry: (action: StudioTutorialTryAction) => void;
+  handleTutorialTry: (
+    action: StudioTutorialTryAction,
+    trigger: HTMLButtonElement,
+  ) => void;
+  openBrushCatalogFromHelp: (trigger: HTMLButtonElement) => void;
   hideBrushCursor: () => void;
   hideFilterMaskCursor: () => void;
   hideHealCloneCursors: () => void;
@@ -418,6 +439,20 @@ export interface StudioCanvasViewportHandlers {
   beginSharedGutterDrag: (segment: SharedGutterSegment) => void;
   previewSharedGutterDrag: (segment: SharedGutterSegment, delta: number) => void;
   commitSharedGutterDrag: (segment: SharedGutterSegment, delta: number) => void;
+}
+
+export interface StudioHokusaiLiveOverlaySurfaceBinding {
+  readonly canvas: HTMLCanvasElement;
+  readonly projection: StudioHokusaiLiveOverlayProjection;
+  /** Any change invalidates pixels composed against the previous viewport transform. */
+  readonly surfaceKey: string;
+}
+
+export interface StudioLivingInkOverlaySurfaceBinding {
+  readonly canvas: HTMLCanvasElement;
+  readonly projection: StudioLivingInkOverlayProjection;
+  /** Any page/viewport transform change invalidates pending ImageBitmap presentation. */
+  readonly surfaceKey: string;
 }
 
 export interface StudioCanvasViewportProps {
@@ -492,6 +527,8 @@ export interface StudioCanvasViewportProps {
   frameAnimTargetId: string | null;
   gpuCanvasShadowVisibleRef: import("react").RefObject<boolean>;
   gpuLiveInkPinnedRef: import("react").RefObject<boolean>;
+  hokusaiLiveOverlayVisibleRef: import("react").RefObject<boolean>;
+  livingInkOverlayVisibleRef: import("react").RefObject<boolean>;
   gridSize: number;
   groups: LayerGroup[];
   guides: { x: number[]; y: number[]; };
@@ -788,6 +825,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   frameAnimTargetId,
   gpuCanvasShadowVisibleRef,
   gpuLiveInkPinnedRef,
+  hokusaiLiveOverlayVisibleRef,
+  livingInkOverlayVisibleRef,
   gridSize,
   groups,
   guides,
@@ -1046,6 +1085,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     reorderSelectedElements,
     mergeSelectedBubbles,
     handleTutorialTry,
+    openBrushCatalogFromHelp,
     hideBrushCursor,
     hideFilterMaskCursor,
     hideHealCloneCursors,
@@ -1110,6 +1150,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     isCanvasGroupDragActive,
     selectElementFromCanvas,
     setWebGpuCanvasHandle,
+    setHokusaiLiveOverlaySurface,
+    setLivingInkOverlaySurface,
+    onHokusaiCanonicalImageReady,
+    onLivingInkCanonicalImageReady,
     onWebGpuBackendChange,
     onWebGpuDeviceLost,
     onWebGpuFrameInvalid,
@@ -1120,6 +1164,140 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canonicalDryMediaCanvasAuthority,
     setCanonicalDryMediaCanvasAuthority,
   ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
+  const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
+  const livingInkCanvasRef = useRef<HTMLCanvasElement>(null);
+  const hokusaiSurfaceLeft = webGpuViewportSurface?.surface.left;
+  const hokusaiSurfaceTop = webGpuViewportSurface?.surface.top;
+  const hokusaiSurfaceWidth = webGpuViewportSurface?.surface.width;
+  const hokusaiSurfaceHeight = webGpuViewportSurface?.surface.height;
+
+  useLayoutEffect(() => {
+    const canvas = hokusaiLiveCanvasRef.current;
+    // v1 is axis-aligned. A mirrored or quarter-turn view keeps the exact retained DrawEl route;
+    // presenting unmirrored material pixels would be worse than a visible capability fallback.
+    if (
+      !canvas
+      || hokusaiSurfaceLeft === undefined
+      || hokusaiSurfaceTop === undefined
+      || hokusaiSurfaceWidth === undefined
+      || hokusaiSurfaceHeight === undefined
+      || canvasFlipH
+      || canvasRotation !== 0
+      || !(effScale > 0)
+    ) {
+      setHokusaiLiveOverlaySurface(null);
+      return undefined;
+    }
+    const dpr = Math.max(1, Math.min(4, globalThis.devicePixelRatio || 1));
+    const backingWidth = Math.max(1, Math.ceil(hokusaiSurfaceWidth * dpr));
+    const backingHeight = Math.max(1, Math.ceil(hokusaiSurfaceHeight * dpr));
+    if (canvas.width !== backingWidth) canvas.width = backingWidth;
+    if (canvas.height !== backingHeight) canvas.height = backingHeight;
+    const surfaceKey = [
+      activePage.id,
+      hokusaiSurfaceLeft,
+      hokusaiSurfaceTop,
+      hokusaiSurfaceWidth,
+      hokusaiSurfaceHeight,
+      effScale,
+      dpr,
+    ].join(":");
+    setHokusaiLiveOverlaySurface({
+      canvas,
+      surfaceKey,
+      projection: {
+        documentX: hokusaiSurfaceLeft / effScale,
+        documentY: hokusaiSurfaceTop / effScale,
+        scaleX: effScale,
+        scaleY: effScale,
+        devicePixelRatio: dpr,
+      },
+    });
+    // A parent render can update this effect while canvas geometry is unchanged. Publishing a
+    // transient null from dependency cleanup would cancel an admitted Hokusai route before the
+    // exact same binding is registered again. The guarded branch above clears genuinely missing
+    // surfaces, and StudioPage owns final provider/renderer disposal when the editor unmounts.
+    return undefined;
+  }, [
+    activePage.id,
+    canvasFlipH,
+    canvasRotation,
+    effScale,
+    hokusaiSurfaceHeight,
+    hokusaiSurfaceLeft,
+    hokusaiSurfaceTop,
+    hokusaiSurfaceWidth,
+    setHokusaiLiveOverlaySurface,
+  ]);
+
+  useLayoutEffect(() => {
+    const canvas = livingInkCanvasRef.current;
+    if (
+      !canvas
+      || hokusaiSurfaceLeft === undefined
+      || hokusaiSurfaceTop === undefined
+      || hokusaiSurfaceWidth === undefined
+      || hokusaiSurfaceHeight === undefined
+      || canvasFlipH
+      || canvasRotation !== 0
+      || !(effScale > 0)
+    ) {
+      setLivingInkOverlaySurface(null);
+      return undefined;
+    }
+    const dpr = Math.max(1, Math.min(4, globalThis.devicePixelRatio || 1));
+    const backingWidth = Math.max(1, Math.ceil(hokusaiSurfaceWidth * dpr));
+    const backingHeight = Math.max(1, Math.ceil(hokusaiSurfaceHeight * dpr));
+    if (canvas.width !== backingWidth) canvas.width = backingWidth;
+    if (canvas.height !== backingHeight) canvas.height = backingHeight;
+    // Living Ink frames are full-field composites. The overlay's visible clip width/height can
+    // resize when contextual editor chrome opens or closes without changing document projection;
+    // canvas resizing clears old pixels, then the next full frame safely repopulates the clip.
+    // Keep only physical-field/projection identity in the route key so that UI reflow cannot
+    // cancel an otherwise valid pointer contact. Hokusai above stays stricter because it receives
+    // incremental dirty patches whose accumulated canvas is invalidated by a backing resize.
+    const surfaceKey = [
+      "living-ink",
+      activePage.id,
+      hokusaiSurfaceLeft,
+      hokusaiSurfaceTop,
+      effScale,
+      dpr,
+      CANVAS_W,
+      canvasH,
+    ].join(":");
+    setLivingInkOverlaySurface({
+      canvas,
+      surfaceKey,
+      projection: {
+        documentX: hokusaiSurfaceLeft / effScale,
+        documentY: hokusaiSurfaceTop / effScale,
+        scaleX: effScale,
+        scaleY: effScale,
+        devicePixelRatio: dpr,
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+      },
+    });
+    // Dependency updates can be caused by an ordinary parent render (for example clearing the
+    // selected canonical image when a Water stroke begins). Do not publish a transient null
+    // surface from effect cleanup: the next layout effect often registers the exact same canvas
+    // and key, but that momentary teardown would fail-close the already admitted pointer route.
+    // A genuinely unavailable surface is cleared by the guarded branch above, while editor
+    // unmount disposes the coordinator and renderer at the owning StudioPage boundary.
+    return undefined;
+  }, [
+    activePage.id,
+    canvasFlipH,
+    canvasH,
+    canvasRotation,
+    effScale,
+    hokusaiSurfaceHeight,
+    hokusaiSurfaceLeft,
+    hokusaiSurfaceTop,
+    hokusaiSurfaceWidth,
+    setLivingInkOverlaySurface,
+  ]);
 
   function splitDialogueText(pageId: string, elementId: string, text: string, offset: number) {
     const newElementId = uid();
@@ -2422,6 +2600,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         onInteractionBegin={() => nodeInteractionBegin(el.id)}
                         onInteractionEnd={endLiveResourceEdit}
                         liveStrokeRef={drawingRef}
+                        onHokusaiCanonicalImageReady={onHokusaiCanonicalImageReady}
+                        onLivingInkCanonicalImageReady={onLivingInkCanonicalImageReady}
                       />
                     </Fragment>
                   );
@@ -3077,6 +3257,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         gpuLiveInkPinnedRef.current
                         && !gpuCanvasShadowVisibleRef.current
                       )
+                      || hokusaiLiveOverlayVisibleRef.current
+                      || livingInkOverlayVisibleRef.current
                       || liveInkOverlayRendererRef.current.isActive
                       || liveStampOverlayRenderer.isActive
                       || liveDynamicBrushOverlayRenderer.isActive
@@ -3494,6 +3676,34 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             ) : null}
           </Suspense>
           {webGpuViewportSurface ? (
+            <canvas
+              ref={livingInkCanvasRef}
+              aria-hidden="true"
+              data-studio-living-ink-overlay="true"
+              className="pointer-events-none absolute z-[13] mix-blend-multiply"
+              style={{
+                left: webGpuViewportSurface.surface.left,
+                top: webGpuViewportSurface.surface.top,
+                width: webGpuViewportSurface.surface.width,
+                height: webGpuViewportSurface.surface.height,
+              }}
+            />
+          ) : null}
+          {webGpuViewportSurface ? (
+            <canvas
+              ref={hokusaiLiveCanvasRef}
+              aria-hidden="true"
+              data-studio-hokusai-live-overlay="true"
+              className="pointer-events-none absolute z-[12]"
+              style={{
+                left: webGpuViewportSurface.surface.left,
+                top: webGpuViewportSurface.surface.top,
+                width: webGpuViewportSurface.surface.width,
+                height: webGpuViewportSurface.surface.height,
+              }}
+            />
+          ) : null}
+          {webGpuViewportSurface ? (
             <Suspense fallback={null}>
               <StudioCanonicalVNextDryMediaCanvas
                 element={canonicalDryMediaCandidate}
@@ -3608,11 +3818,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 setDrawMode("pen");
                 applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pen") ?? BRUSH_PRESETS[0]);
               }}
-              onBrushKit={() => {
+              onBrushKit={(trigger) => {
                 dismissQuickStart();
-                setTool("draw");
-                setDrawMode("pen");
-                applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
+                openBrushCatalogFromHelp(trigger);
               }}
               onCollabFocus={() => {
                 dismissQuickStart();
@@ -3624,6 +3832,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 dismissQuickStart();
                 openFeatureTutorial(null);
               }}
+              shortcuts={appSettings.shortcuts}
               />
             </Suspense>
           ) : null}
@@ -3671,7 +3880,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             aria-expanded={showQuickStart}
             title={localizeText(t, "도구 빠른 실행", "studio.canvas.openQuickStart")}
           >
-            ?
+            <CircleHelp size={16} aria-hidden />
           </button>
 
           <button
@@ -3689,7 +3898,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             aria-label={t("studio.shortcuts.row.view.help")}
             title={t("studio.shortcuts.row.view.help")}
           >
-            ⌨
+            <Keyboard size={16} aria-hidden />
           </button>
 
           <button

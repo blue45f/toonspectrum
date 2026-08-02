@@ -360,13 +360,34 @@ export function StudioBrushDynamicsPreview({
   );
 }
 
-function DynamicsRequiredNotice({ children }: { children?: ReactNode }) {
+function DynamicsRequiredNotice({
+  children,
+  onRequestCompatibleBrush,
+}: {
+  children?: ReactNode;
+  onRequestCompatibleBrush: () => void;
+}) {
   return (
-    <div className="rounded-xl border border-accent/35 bg-accent-soft/30 p-4 text-xs leading-relaxed text-fg-2 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.08)]">
+    <div
+      className="rounded-xl border border-accent/35 bg-accent-soft/30 p-4 text-xs leading-relaxed text-fg-2 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.08)]"
+      role="status"
+      aria-live="polite"
+    >
       <p className="font-semibold text-fg">입자 브러시를 먼저 선택하세요</p>
       <p className="mt-1 text-fg-3 text-pretty">
         빠른 설정에서 잉크 입자, 에어브러시, 드라이 미디어 중 하나를 고르면 이 설정이 실제 획에 적용됩니다.
       </p>
+      <button
+        type="button"
+        onClick={onRequestCompatibleBrush}
+        className={cn(
+          "mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-accent/45 bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2",
+          STUDIO_FOCUS_RING,
+        )}
+        aria-label="호환 브러시 선택하기"
+      >
+        호환 브러시 선택하기
+      </button>
       {children}
     </div>
   );
@@ -945,6 +966,14 @@ export function StudioBrushStudio({
     setRestoreSession(null);
   }
 
+  function onRequestCompatibleBrush(): void {
+    onSelectDynamicsPreset(
+      "ink-particle",
+      studioBrushDynamicsPresetSettings("ink-particle"),
+    );
+    setCategory("presets");
+  }
+
   const launcherSummary = dynamicsActive
     ? `${matchedPreset ? STUDIO_BRUSH_DYNAMICS_PRESETS.find((preset) => preset.id === matchedPreset)?.name : "사용자 지정"} · ${mappingCount}개 연결`
     : brushId === "calligraphy"
@@ -1066,7 +1095,7 @@ export function StudioBrushStudio({
           onSettingsChange={onSettingsChange}
         />
       </div>
-    ) : <DynamicsRequiredNotice />
+    ) : <DynamicsRequiredNotice onRequestCompatibleBrush={onRequestCompatibleBrush} />
   ) : category === "stamp" ? (
     dynamicsActive ? (
       <div className="space-y-2.5">
@@ -1144,7 +1173,7 @@ export function StudioBrushStudio({
           onSettingsChange={onSettingsChange}
         />
       </div>
-    ) : <DynamicsRequiredNotice />
+    ) : <DynamicsRequiredNotice onRequestCompatibleBrush={onRequestCompatibleBrush} />
   ) : category === "tip" ? (
     dynamicsActive ? (
       <div className="space-y-2.5">
@@ -1298,7 +1327,7 @@ export function StudioBrushStudio({
           onChange={onTipRoundnessChange}
         />
       </div>
-    ) : <DynamicsRequiredNotice />
+    ) : <DynamicsRequiredNotice onRequestCompatibleBrush={onRequestCompatibleBrush} />
   ) : (
     <div>
       <StudioSectionHeader

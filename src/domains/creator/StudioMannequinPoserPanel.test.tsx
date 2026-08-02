@@ -38,16 +38,46 @@ const sceneHandle: StudioMannequinSceneHandle = {
 
 const createScene = vi.fn((_options: unknown) => sceneHandle);
 
+const webcamRuntimeMocks = vi.hoisted(() => ({
+  dispose: vi.fn(),
+  init: vi.fn(),
+}));
+
 vi.mock("./studio-mannequin-scene", () => ({
   createStudioMannequinScene: (options: unknown) => createScene(options),
 }));
 
+vi.mock("./studio-mannequin-webcam-tracking", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-mannequin-webcam-tracking")>();
+  return {
+    ...actual,
+    disposeStudioMannequinPoseLandmarker: webcamRuntimeMocks.dispose,
+    initStudioMannequinPoseLandmarker: webcamRuntimeMocks.init,
+  };
+});
+
 const { StudioMannequinPoserPanel } = await import("./StudioMannequinPoserPanel");
+
+const originalMediaDevicesDescriptor = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+const originalSecureContextDescriptor = Object.getOwnPropertyDescriptor(window, "isSecureContext");
 
 afterEach(() => {
   cleanup();
-  vi.clearAllMocks();
   localStorage.clear();
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  webcamRuntimeMocks.init.mockReset();
+  webcamRuntimeMocks.dispose.mockReset();
+  if (originalMediaDevicesDescriptor) {
+    Object.defineProperty(navigator, "mediaDevices", originalMediaDevicesDescriptor);
+  } else {
+    Reflect.deleteProperty(navigator, "mediaDevices");
+  }
+  if (originalSecureContextDescriptor) {
+    Object.defineProperty(window, "isSecureContext", originalSecureContextDescriptor);
+  } else {
+    Reflect.deleteProperty(window, "isSecureContext");
+  }
 });
 
 class ResizeObserverStub {
@@ -68,6 +98,21 @@ function renderPanel(overrides: {
       onInsert={overrides.onInsert ?? vi.fn()}
     />,
   );
+}
+
+function installWebcamBrowserStubs(getUserMedia: ReturnType<typeof vi.fn>): void {
+  Object.defineProperty(window, "isSecureContext", {
+    configurable: true,
+    value: true,
+  });
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia },
+  });
+  vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 17);
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
 }
 
 describe("StudioMannequinPoserPanel", () => {
@@ -143,6 +188,104 @@ describe("StudioMannequinPoserPanel", () => {
         height: 400,
       });
     });
+  });
+
+  it("same-origin 동작 인식 엔진이 준비되면 카메라를 시작하고 중지 시 모든 자원을 정리한다", async () => {
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    installWebcamBrowserStubs(getUserMedia);
+    webcamRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    });
+    expect(webcamRuntimeMocks.init).toHaveBeenCalledTimes(1);
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: false,
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: { ideal: "user" },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "실시간 동작 인식 중지" }));
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    expect(webcamRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();
+  });
+
+  it("엔진 자산 로드 실패를 카메라 권한 오류와 구분하고 즉시 재시도 버튼을 제공한다", async () => {
+    const getUserMedia = vi.fn();
+    installWebcamBrowserStubs(getUserMedia);
+    webcamRuntimeMocks.init.mockRejectedValue(
+      Object.assign(new Error("Failed to load local Wasm loader."), {
+        name: "StudioMannequinVisionWasmLoadError",
+      }),
+    );
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("엔진 파일");
+    });
+    expect(screen.getByRole("button", { name: "웹캠 동작 인식 다시 시도" })).toBeTruthy();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(webcamRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("카메라 권한 거부를 정확히 안내하고 준비 중 취소도 AbortSignal로 중단한다", async () => {
+    const permissionDenied = Object.assign(new Error("Permission denied"), {
+      name: "NotAllowedError",
+    });
+    const getUserMedia = vi.fn().mockRejectedValue(permissionDenied);
+    installWebcamBrowserStubs(getUserMedia);
+    webcamRuntimeMocks.init.mockResolvedValueOnce({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("카메라 권한이 차단");
+    });
+    expect(screen.getByRole("button", { name: "웹캠 동작 인식 다시 시도" })).toBeTruthy();
+
+    let receivedSignal: AbortSignal | undefined;
+    webcamRuntimeMocks.init.mockImplementationOnce(
+      ({ signal }: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          receivedSignal = signal;
+          signal?.addEventListener(
+            "abort",
+            () => reject(Object.assign(new Error("cancelled"), { name: "AbortError" })),
+            { once: true },
+          );
+        }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 동작 인식 다시 시도" }));
+    expect(screen.getByRole("button", { name: "동작 인식 준비 취소" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "동작 인식 준비 취소" }));
+
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();
   });
 
   it("onInsert 가 false 를 반환하면 닫지 않고 오류를 보여준다", async () => {

@@ -23,13 +23,18 @@ export function studioHokusaiNaturalMediaPresetSettings(
     case "pencil":
       return {
         anti_aliasing: setting(1),
-        dabs_per_actual_radius: setting(7.5),
+        // Small Studio pencil sizes used to collapse below one device pixel:
+        // the pressure radius curve reduced the requested radius a second time,
+        // then sparse antialiased dabs left an occasional transparent centre.
+        // Keep enough overlap for a continuous graphite core while preserving
+        // pressure taper at both ends of a stylus stroke.
+        dabs_per_actual_radius: setting(9.5),
         dabs_per_basic_radius: setting(0.75),
         dabs_per_second: setting(55),
         direction_filter: setting(0.3),
         hardness: setting(0.78),
-        opaque: setting(0.88, {
-          pressure: [[0, -0.35], [0.25, -0.18], [0.62, 0], [1, 0.12]],
+        opaque: setting(0.96, {
+          pressure: [[0, -0.28], [0.2, -0.12], [0.45, 0], [1, 0.08]],
         }),
         opaque_linearize: setting(0.95),
         opaque_multiply: setting(0, {
@@ -37,7 +42,14 @@ export function studioHokusaiNaturalMediaPresetSettings(
         }),
         radius_by_random: setting(0.015),
         radius_logarithmic: setting(1, {
-          pressure: [[0, -1.15], [0.25, -0.92], [0.55, -0.65], [1, -0.32]],
+          pressure: [
+            [0, -0.82],
+            [0.15, -0.48],
+            [0.35, -0.22],
+            [0.55, -0.04],
+            [0.8, 0.12],
+            [1, 0.24],
+          ],
         }),
         slow_tracking: setting(1.2),
         slow_tracking_per_dab: setting(0.5),

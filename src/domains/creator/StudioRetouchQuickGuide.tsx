@@ -1,14 +1,14 @@
-import { CircleCheck, ImageDown, Loader2, MousePointer2 } from "lucide-react";
+import { BookOpen, CircleCheck, ImageDown, Loader2, MousePointer2 } from "lucide-react";
 
 import {
   studioRetouchToolHelp,
   type StudioRetouchToolId,
 } from "./studio-retouch-help";
 
-import { cn } from "@/lib/utils";
-
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
+
+import { cn } from "@/lib/utils";
 
 type RetouchPresentationState = "ready" | "active" | "busy" | "blocked";
 
@@ -33,6 +33,8 @@ export type StudioRetouchQuickGuideProps = {
   busy?: boolean;
   disabled?: boolean;
   disabledReason?: string;
+  /** 패널의 짧은 안내에서 검색 가능한 전체 튜토리얼 허브로 이동한다. */
+  onOpenTutorial?: () => void;
 };
 
 /**
@@ -45,6 +47,7 @@ export function StudioRetouchQuickGuide({
   busy = false,
   disabled = false,
   disabledReason,
+  onOpenTutorial,
 }: StudioRetouchQuickGuideProps): ReactElement {
   const help = studioRetouchToolHelp(toolId);
   const state = resolveState(active, busy, disabled);
@@ -108,6 +111,17 @@ export function StudioRetouchQuickGuide({
             </li>
           ))}
         </ol>
+        {onOpenTutorial ? (
+          <button
+            type="button"
+            onClick={onOpenTutorial}
+            aria-label={`${help.actionName} 상세 튜토리얼 열기`}
+            className="mb-1 ml-auto flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[0.7rem] font-semibold text-accent outline-none transition-colors hover:bg-accent-soft/60 focus-visible:ring-2 focus-visible:ring-accent/70 md:min-h-9 pointer-coarse:min-h-11 motion-reduce:transition-none"
+          >
+            <BookOpen className="size-3.5" aria-hidden />
+            상세 튜토리얼
+          </button>
+        ) : null}
       </details>
     </div>
   );

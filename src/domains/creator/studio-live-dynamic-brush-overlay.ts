@@ -55,6 +55,7 @@ import {
 } from "./studio-competitor-specialty-ribbon-carrier";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
@@ -203,6 +204,10 @@ interface ActiveDynamicStroke {
   acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
   stampGrid: StudioDynamicBrushRenderStampGrid;
   transitionedFromTap: boolean;
+  /** Last globally admitted causal dab, retained as one-station geometry context for dry media. */
+  lastAcceptedCausalDab?: StudioDynamicBrushDab;
+  /** Prefix-stable union geometry; suffix planning appends without rebuilding causal history. */
+  dryMediaUnionAccumulator?: DryMediaUnionAccumulator;
 }
 
 interface SettledDynamicStroke {
@@ -213,12 +218,32 @@ interface SettledDynamicStroke {
 interface ExactDynamicPlan {
   readonly dabCount: number;
   readonly firstDab?: StudioDynamicBrushDab;
+  readonly lastDab?: StudioDynamicBrushDab;
   readonly lastSpacing: number;
   readonly marks: readonly StudioDynamicBrushCoverageMark[];
   readonly stampGrid: StudioDynamicBrushRenderStampGrid;
   readonly dabCapped: boolean;
   readonly r8AlphaMapBytes: number;
   readonly acceptedPrefixReceipt?: StudioDynamicBrushAcceptedPrefixReceipt;
+}
+
+type DryMediaUnionRibbon = Extract<
+  NonNullable<StudioDynamicBrushCoverageMark["ribbon"]>,
+  { readonly kind: "dry-media-union-ribbon-polygon" }
+>;
+
+interface DryMediaUnionAccumulatorEntry {
+  readonly color: string;
+  readonly ribbonVersion: DryMediaUnionRibbon["version"];
+  readonly polygons: Array<readonly number[]>;
+  minimumX: number;
+  minimumY: number;
+  maximumX: number;
+  maximumY: number;
+}
+
+interface DryMediaUnionAccumulator {
+  readonly entries: DryMediaUnionAccumulatorEntry[];
 }
 
 interface PresentationPixelRect {
@@ -240,6 +265,129 @@ function exactPlanUsesWholePrefixRibbonUnion(
           || mark.ribbon.kind === "competitor-specialty-ribbon-polygon"
         ),
     );
+}
+
+function dryMediaUnionPolygonBounds(
+  polygons: readonly (readonly number[])[],
+): Readonly<{
+  minimumX: number;
+  minimumY: number;
+  maximumX: number;
+  maximumY: number;
+}> | null {
+  let minimumX = Number.POSITIVE_INFINITY;
+  let minimumY = Number.POSITIVE_INFINITY;
+  let maximumX = Number.NEGATIVE_INFINITY;
+  let maximumY = Number.NEGATIVE_INFINITY;
+  for (const polygon of polygons) {
+    if (polygon.length < 6 || polygon.length % 2 !== 0) return null;
+    for (let index = 0; index < polygon.length; index += 2) {
+      const x = polygon[index];
+      const y = polygon[index + 1];
+      if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      minimumX = Math.min(minimumX, x);
+      minimumY = Math.min(minimumY, y);
+      maximumX = Math.max(maximumX, x);
+      maximumY = Math.max(maximumY, y);
+    }
+  }
+  return maximumX > minimumX && maximumY > minimumY
+    ? { minimumX, minimumY, maximumX, maximumY }
+    : null;
+}
+
+function quantizeDryMediaUnionCoordinate(value: number): number {
+  return Math.round(
+    clamp(value, -MAX_COORDINATE_ABS, MAX_COORDINATE_ABS) * 10_000,
+  ) / 10_000;
+}
+
+function createDryMediaUnionAccumulator(
+  marks: readonly StudioDynamicBrushCoverageMark[],
+): DryMediaUnionAccumulator | null {
+  if (marks.length === 0) return null;
+  const entries: DryMediaUnionAccumulatorEntry[] = [];
+  for (const mark of marks) {
+    const ribbon = mark.ribbon;
+    if (
+      ribbon?.kind !== "dry-media-union-ribbon-polygon"
+      || ribbon.role !== "stroke-union"
+      || mark.alpha !== 1
+    ) return null;
+    const bounds = dryMediaUnionPolygonBounds(ribbon.polygons);
+    if (!bounds) return null;
+    entries.push({
+      color: mark.color,
+      ribbonVersion: ribbon.version,
+      polygons: [...ribbon.polygons],
+      ...bounds,
+    });
+  }
+  return { entries };
+}
+
+function appendDryMediaUnionAccumulator(
+  accumulator: DryMediaUnionAccumulator,
+  suffixMarks: readonly StudioDynamicBrushCoverageMark[],
+): boolean {
+  if (suffixMarks.length !== accumulator.entries.length) return false;
+  const pending: Array<Readonly<{
+    polygons: readonly (readonly number[])[];
+    minimumX: number;
+    minimumY: number;
+    maximumX: number;
+    maximumY: number;
+  }>> = [];
+  for (const [index, mark] of suffixMarks.entries()) {
+    const entry = accumulator.entries[index];
+    const ribbon = mark.ribbon;
+    if (
+      !entry
+      || ribbon?.kind !== "dry-media-union-ribbon-polygon"
+      || ribbon.role !== "stroke-union"
+      || ribbon.version !== entry.ribbonVersion
+      || mark.alpha !== 1
+      || mark.color !== entry.color
+    ) return false;
+    const bounds = dryMediaUnionPolygonBounds(ribbon.polygons);
+    if (!bounds) return false;
+    pending.push({ polygons: ribbon.polygons, ...bounds });
+  }
+  for (const [index, suffix] of pending.entries()) {
+    const entry = accumulator.entries[index]!;
+    entry.polygons.push(...suffix.polygons);
+    entry.minimumX = Math.min(entry.minimumX, suffix.minimumX);
+    entry.minimumY = Math.min(entry.minimumY, suffix.minimumY);
+    entry.maximumX = Math.max(entry.maximumX, suffix.maximumX);
+    entry.maximumY = Math.max(entry.maximumY, suffix.maximumY);
+  }
+  return true;
+}
+
+function snapshotDryMediaUnionAccumulator(
+  accumulator: DryMediaUnionAccumulator,
+): readonly StudioDynamicBrushCoverageMark[] {
+  return accumulator.entries.map((entry) => ({
+    x: quantizeDryMediaUnionCoordinate((entry.minimumX + entry.maximumX) / 2),
+    y: quantizeDryMediaUnionCoordinate((entry.minimumY + entry.maximumY) / 2),
+    radiusX: quantizeDryMediaUnionCoordinate(
+      Math.max(0.25, (entry.maximumX - entry.minimumX) / 2),
+    ),
+    radiusY: quantizeDryMediaUnionCoordinate(
+      Math.max(0.25, (entry.maximumY - entry.minimumY) / 2),
+    ),
+    angleRadians: 0,
+    alpha: 1,
+    color: entry.color,
+    ribbon: {
+      kind: "dry-media-union-ribbon-polygon",
+      version: entry.ribbonVersion,
+      role: "stroke-union",
+      polygons: entry.polygons,
+    },
+  }));
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -969,7 +1117,32 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           : {}),
       };
     }
-    const remainingMarks = markBudget - active.markCount;
+    const dryMediaIncrementalUnion = causal
+      && active.style.dynamics.grain.source === undefined
+      && studioDryMediaUnionRibbonCarrierOwnsMaterial(
+        active.style.materialIdentity,
+        active.style.dynamics,
+      );
+    const dryMediaPredecessor = dryMediaIncrementalUnion
+      && active.dryMediaUnionAccumulator
+      ? active.lastAcceptedCausalDab
+      : undefined;
+    if (
+      dryMediaIncrementalUnion
+      && ((active.dryMediaUnionAccumulator === undefined)
+        !== (active.lastAcceptedCausalDab === undefined))
+    ) {
+      return this.failActive("material-plan");
+    }
+    const remainingMarks = dryMediaIncrementalUnion
+      ? markBudget + (
+          dryMediaPredecessor
+            ? studioDryMediaDynamicBridgeMarkMultiplier(
+                active.style.materialIdentity,
+              ) * active.style.transforms.length
+            : 0
+        )
+      : markBudget - active.markCount;
     if (remainingMarks <= 0) {
       if (!causal) return this.failActive("mark-budget");
       return {
@@ -982,8 +1155,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           : {}),
       };
     }
+    const planningDabPrefix = dryMediaPredecessor
+      ? [dryMediaPredecessor, ...acceptedDabPrefix]
+      : acceptedDabPrefix;
     const variations = studioDynamicBrushDabVariationsFromTransforms(
-      acceptedDabPrefix,
+      planningDabPrefix,
       active.style.transforms,
     );
     const plan = planStudioDynamicBrushCoverageMarks({
@@ -995,6 +1171,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       stroke: active.style.color,
       stampGrid: active.stampGrid,
       markBudget: remainingMarks,
+      ...(dryMediaPredecessor
+        ? { dryMediaUnionLeadingSourceDabsToSkip: 1 }
+        : {}),
       r8AlphaMapByteBudget: Math.max(
         0,
         STUDIO_DYNAMIC_COVERAGE_R8_ALPHA_MAP_BYTE_BUDGET
@@ -1005,6 +1184,52 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       return this.failActive(
         plan.reason === "mark-budget" ? "mark-budget" : "material-plan",
       );
+    }
+    if (dryMediaIncrementalUnion) {
+      const planAcceptedDabs = plan.acceptedPrefixReceipt
+        ? plan.acceptedPrefixReceipt.acceptedDabsPerVariation
+        : planningDabPrefix.length;
+      if (planAcceptedDabs !== planningDabPrefix.length) {
+        return this.failActive("mark-budget");
+      }
+      if (dryMediaPredecessor) {
+        if (
+          !active.dryMediaUnionAccumulator
+          || !appendDryMediaUnionAccumulator(
+            active.dryMediaUnionAccumulator,
+            plan.marks,
+          )
+        ) {
+          return this.failActive("material-plan");
+        }
+      } else {
+        const accumulator = createDryMediaUnionAccumulator(plan.marks);
+        if (!accumulator) return this.failActive("material-plan");
+        active.dryMediaUnionAccumulator = accumulator;
+      }
+      const cumulativeMarks = snapshotDryMediaUnionAccumulator(
+        active.dryMediaUnionAccumulator,
+      );
+      // The expensive causal deposit and material bridge are now O(new suffix). Repainting the
+      // single canonical union keeps the transient command byte-identical to pointer-up while the
+      // active coverage surface remains one-opacity, crossing-safe paint authority.
+      this.clearActiveRect();
+      if (!this.drawMarksToActive(cumulativeMarks, active.style.opacity)) {
+        return this.failActive("surface-render");
+      }
+      active.acceptedCausalDabCount += acceptedDabPrefix.length;
+      active.lastAcceptedCausalDab = acceptedDabPrefix.at(-1);
+      active.markCount = cumulativeMarks.length;
+      active.r8AlphaMapBytes = 0;
+      return {
+        status: "appended",
+        consumedSourcePoints: active.consumedSourcePoints,
+        appendedDabs: acceptedDabPrefix.length,
+        appendedMarks: plan.marks.length,
+        ...(active.acceptedPrefixReceipt
+          ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+          : {}),
+      };
     }
     if (active.markCount + plan.marks.length > markBudget) {
       return this.failActive("mark-budget");
@@ -1093,11 +1318,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.transitionedFromTap = planned.state.transitionedFromTap;
 
     const requiresWholePrefixRibbonReplay =
-      studioDryMediaUnionRibbonCarrierOwnsMaterial(
-        active.style.materialIdentity,
-        active.style.dynamics,
-      )
-      || studioProfessionalShelfRibbonCarrierOwnsMaterial(
+      studioProfessionalShelfRibbonCarrierOwnsMaterial(
         active.style.materialIdentity,
         active.style.dynamics,
       )
@@ -1154,6 +1375,23 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       };
     }
 
+    if (
+      planned.replaceInitialTap
+      && active.style.dynamics.grain.source === undefined
+      && studioDryMediaUnionRibbonCarrierOwnsMaterial(
+        active.style.materialIdentity,
+        active.style.dynamics,
+      )
+    ) {
+      active.markCount = 0;
+      active.r8AlphaMapBytes = 0;
+      active.acceptedCausalDabCount = 0;
+      active.acceptedPrefixReceipt = undefined;
+      active.lastAcceptedCausalDab = undefined;
+      active.dryMediaUnionAccumulator = undefined;
+      return this.appendDabs(active, planned.dabs);
+    }
+
     let appendedDabs = planned.dabs;
     let replacementDabs = 0;
     let replacementMarks = 0;
@@ -1163,6 +1401,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       active.r8AlphaMapBytes = 0;
       active.acceptedCausalDabCount = 0;
       active.acceptedPrefixReceipt = undefined;
+      active.lastAcceptedCausalDab = undefined;
+      active.dryMediaUnionAccumulator = undefined;
       const [replacement, ...suffix] = planned.dabs;
       if (!replacement) return this.failActive("material-plan");
       const replacementResult = this.appendDabs(active, [replacement]);
@@ -1333,6 +1573,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       return {
         dabCount: acceptedDabCount,
         ...(firstDab ? { firstDab } : {}),
+        ...(lastDab ? { lastDab } : {}),
         lastSpacing: Math.max(0.25, lastDab?.spacing ?? 0.25),
         marks: marks.marks,
         stampGrid,
@@ -1402,6 +1643,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     return {
       dabCount: dabs.length,
       ...(dabs[0] ? { firstDab: dabs[0] } : {}),
+      ...(dabs.at(-1) ? { lastDab: dabs.at(-1) } : {}),
       lastSpacing: Math.max(0.25, dabs.at(-1)?.spacing ?? 0.25),
       marks: marks.marks,
       stampGrid: renderBudget.stampGrid,
@@ -1525,6 +1767,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     active.acceptedCausalDabCount = exact.dabCount;
     active.acceptedPrefixReceipt = exact.acceptedPrefixReceipt;
     active.stampGrid = exact.stampGrid;
+    const dryMediaAccumulator = createDryMediaUnionAccumulator(exact.marks);
+    active.dryMediaUnionAccumulator = dryMediaAccumulator ?? undefined;
+    active.lastAcceptedCausalDab = dryMediaAccumulator
+      ? exact.lastDab
+      : undefined;
   }
 
   private failActive(

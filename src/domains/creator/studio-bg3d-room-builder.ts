@@ -14,7 +14,9 @@
 // (지붕처럼 X/Z축이 이미 튼 파츠가 없다는 것이 이 단순화의 전제 — 카탈로그에 그런 파츠를 추가하려면
 // scene-templates의 rotateEulerYaw 방식으로 바꿔야 한다).
 
-import { uid, type BgPrimitive, type BgPrimitiveKind } from "./studio-background-3d-primitives";
+import { uid } from "./studio-id";
+
+import type { BgPrimitive, BgPrimitiveKind } from "./studio-background-3d-metadata";
 
 export const STUDIO_BG3D_ROOM_WALL_IDS = ["north", "south", "west", "east"] as const;
 export type StudioBg3dRoomWallId = (typeof STUDIO_BG3D_ROOM_WALL_IDS)[number];
@@ -426,7 +428,7 @@ export function buildStudioBg3dRoomParts(rawSpec: Partial<StudioBg3dRoomSpec>): 
 
 /**
  * 씬 템플릿과 같은 "결정적 X 오프셋 + uid" 전개. 테스트는 idFactory를 주입해 완전 결정적으로
- * 검증한다(프로덕션 uid는 기존 계약 그대로 — 시간+난수 기반이지만 지오메트리에는 영향 없음).
+ * 검증한다(프로덕션 ID는 공용 UUID 계약을 쓰며 지오메트리에는 영향 없음).
  */
 export function instantiateStudioBg3dRoomBuild(
   spec: Partial<StudioBg3dRoomSpec>,

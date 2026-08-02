@@ -1,0 +1,256 @@
+import { describe, expect, it } from "vitest";
+
+import { BRUSH_PRESETS } from "./studio-brush";
+import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  type StudioHokusaiLiveBrushCapabilities,
+} from "./studio-hokusai-live-brush-protocol";
+import {
+  STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY,
+  STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
+  STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+  resolveStudioHokusaiLiveAutoRouteDecision,
+  resolveStudioHokusaiLiveRoute,
+} from "./studio-hokusai-live-brush-router";
+import {
+  planStudioHokusaiNaturalMediaRender,
+  type StudioHokusaiNaturalMediaPresetId,
+} from "./studio-hokusai-natural-media-contract";
+import {
+  studioHokusaiNaturalMediaPresetSettings,
+} from "./studio-hokusai-natural-media-presets";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
+
+import type { DrawEl } from "./studio-element-model";
+
+const EXPECTED_CORE_AUTO_ROUTE = new Map<string, StudioHokusaiNaturalMediaPresetId>([
+  ["pencil", "pencil"],
+  ["pencil-2b", "pencil"],
+  ["pencil-6b", "pencil"],
+  ["soft-pencil", "pencil"],
+  ["colored-pencil", "pencil"],
+  ["erodible-pencil", "pencil"],
+  ["pencil-grain", "pencil"],
+  ["charcoal", "charcoal"],
+  ["chalk", "charcoal"],
+  ["crayon", "charcoal"],
+  ["dry-media", "charcoal"],
+  ["pastel", "charcoal"],
+  ["oil-pastel", "charcoal"],
+  ["oil", "oil"],
+  ["acrylic", "oil"],
+  ["paint-tube", "oil"],
+  ["gouache", "oil"],
+  ["brush", "oil"],
+  ["flat-brush", "oil"],
+]);
+
+const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
+  engine: "reearth-hokusai",
+  engineVersion: "0.3.0",
+  surfaceAdapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+  liveAdapterVersion: STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  wasm: true,
+  dedicatedWorker: true,
+  packedDirtyFrames: true,
+  transferableFrames: true,
+  epochCancellation: true,
+  canonicalPng: true,
+  liveCommitParityReceipt: true,
+  materialTexture: "studio-hokusai-material-texture-v2",
+  endpointPolicy: "tapered-start-no-dab-carrier-v1",
+  mainThreadFullFrameCopy: false,
+};
+
+function stableSeed(identity: string): number {
+  let seed = 0x811c_9dc5;
+  for (const character of identity) {
+    seed ^= character.codePointAt(0) ?? 0;
+    seed = Math.imul(seed, 0x0100_0193) >>> 0;
+  }
+  return seed;
+}
+
+function stableColor(index: number): `#${string}` {
+  const red = (0x25 + index * 23) & 0xff;
+  const green = (0x47 + index * 37) & 0xff;
+  const blue = (0x69 + index * 53) & 0xff;
+  return `#${[red, green, blue]
+    .map((channel) => channel.toString(16).padStart(2, "0"))
+    .join("")}` as `#${string}`;
+}
+
+function sourceStroke(
+  brushId: string,
+  width: number,
+  color: `#${string}`,
+): DrawEl {
+  return {
+    id: `hokusai-policy-${brushId}`,
+    type: "draw",
+    kind: "freehand",
+    mode: "pen",
+    points: [80, 100, 140, 112, 210, 96, 280, 108],
+    pressures: [0.2, 0.45, 0.7, 0.9],
+    stroke: color,
+    strokeWidth: width,
+    opacity: 1,
+    brush: brushId,
+  };
+}
+
+describe("Studio Hokusai auto-route catalogue quality policy", () => {
+  it("keeps the small-pencil pressure core continuous instead of sub-pixel collapsing", () => {
+    const pencil = studioHokusaiNaturalMediaPresetSettings("pencil");
+    expect(pencil.dabs_per_actual_radius?.base_value).toBeGreaterThanOrEqual(9);
+    expect(pencil.opaque?.base_value).toBeGreaterThanOrEqual(0.95);
+    expect(pencil.radius_logarithmic?.inputs.pressure).toEqual([
+      [0, -0.82],
+      [0.15, -0.48],
+      [0.35, -0.22],
+      [0.55, -0.04],
+      [0.8, 0.12],
+      [1, 0.24],
+    ]);
+  });
+
+  it("audits all 226 identities and never promotes a procedural carrier as charcoal", () => {
+    const professional = materializeAllStudioBrushPackSelections();
+    const identities = [
+      ...BRUSH_PRESETS.map((preset) => ({
+        source: "core" as const,
+        catalogId: preset.id,
+        runtimeBrushId: preset.id,
+      })),
+      ...professional.map((selection) => ({
+        source: "pro" as const,
+        catalogId: selection.catalogId,
+        runtimeBrushId: selection.runtimeBrushId,
+      })),
+    ];
+    expect(identities).toHaveLength(226);
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(professional.length);
+    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(226);
+
+    const admitted = identities.filter(({ catalogId, runtimeBrushId }) => (
+      resolveStudioHokusaiLiveAutoRouteDecision(runtimeBrushId, catalogId).status
+        === "admitted"
+    ));
+    expect(new Set(admitted.map(({ catalogId }) => catalogId))).toEqual(
+      new Set(EXPECTED_CORE_AUTO_ROUTE.keys()),
+    );
+    expect(admitted.every(({ source }) => source === "core")).toBe(true);
+
+    const sharedDryMediaCarriers = identities.filter(({ source, runtimeBrushId }) => (
+      source === "pro" && runtimeBrushId === "dry-media"
+    ));
+    expect(sharedDryMediaCarriers.length).toBeGreaterThan(20);
+    for (const identity of sharedDryMediaCarriers) {
+      expect(resolveStudioHokusaiLiveAutoRouteDecision(
+        identity.runtimeBrushId,
+        identity.catalogId,
+      )).toEqual({
+        status: "rejected",
+        reason: "catalog-identity-not-quality-gated",
+      });
+    }
+  });
+
+  it("preserves every admitted core preset's width, opacity, color and seed in both contracts", () => {
+    const eligiblePresets = BRUSH_PRESETS.filter(({ id }) => (
+      EXPECTED_CORE_AUTO_ROUTE.has(id)
+    ));
+    expect(eligiblePresets).toHaveLength(EXPECTED_CORE_AUTO_ROUTE.size);
+
+    for (const [index, preset] of eligiblePresets.entries()) {
+      const presetId = EXPECTED_CORE_AUTO_ROUTE.get(preset.id)!;
+      const color = (preset.defaultColor ?? stableColor(index)) as `#${string}`;
+      const seed = stableSeed(preset.id);
+      const route = resolveStudioHokusaiLiveRoute({
+        brushId: preset.id,
+        catalogId: preset.id,
+        documentWidth: 1_440,
+        documentHeight: 8_000,
+        firstX: 180,
+        firstY: 1_200,
+        radiusPixels: preset.defaultWidth,
+        color,
+        opacity: preset.defaultOpacity,
+        seed,
+        providerState: "ready",
+        capabilities: CAPABILITIES,
+      });
+      expect(route.status, preset.id).toBe("ready");
+      if (route.status !== "ready") continue;
+      expect(route.presetId).toBe(presetId);
+      expect(route.config).toMatchObject({
+        presetId,
+        radiusPixels: preset.defaultWidth,
+        opacity: preset.defaultOpacity,
+        color,
+        seed,
+      });
+      expect(route.autoRoutePolicy).toEqual({
+        version: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
+        qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+        identity: preset.id,
+        identityAuthority: "catalog-id",
+      });
+
+      const planned = planStudioHokusaiNaturalMediaRender(
+        sourceStroke(preset.id, preset.defaultWidth, color),
+        {
+          presetId,
+          color,
+          sizeScale: 1,
+          opacity: preset.defaultOpacity,
+          seed,
+        },
+        { width: 1_440, height: 8_000 },
+      );
+      expect(planned.ok, preset.id).toBe(true);
+      if (!planned.ok) continue;
+      expect(planned.plan).toMatchObject({
+        presetId,
+        color,
+        opacity: preset.defaultOpacity,
+        seed,
+        raster: { radiusPixels: preset.defaultWidth },
+      });
+    }
+  });
+
+  it("withholds calligraphy and marker until a specialist parity gate exists", () => {
+    expect(STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.qualityGate).toEqual({
+      id: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+      admittedPresets: ["pencil", "charcoal", "oil"],
+      requiredEvidence: [
+        "real-wasm-visible-output",
+        "deterministic-seed-replay",
+        "pressure-response",
+        "exact-live-commit-receipt",
+        "catalog-default-config-snapshot",
+      ],
+    });
+    const withheld = STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.withheldSpecialistIdentities;
+    expect(withheld).toHaveLength(11);
+    expect(new Set(withheld.map(({ candidatePresetId }) => candidatePresetId))).toEqual(
+      new Set(["calligraphy", "marker"]),
+    );
+    for (const { brushId } of withheld) {
+      expect(resolveStudioHokusaiLiveAutoRouteDecision(brushId, brushId)).toEqual({
+        status: "rejected",
+        reason: "catalog-identity-not-quality-gated",
+      });
+    }
+    expect(resolveStudioHokusaiLiveAutoRouteDecision("dry-media", "pencil"))
+      .toEqual({
+        status: "rejected",
+        reason: "catalog-runtime-identity-mismatch",
+      });
+  });
+});

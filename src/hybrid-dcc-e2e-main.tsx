@@ -5,6 +5,7 @@
 import { createRoot } from "react-dom/client";
 
 import { StudioHybridDccPanel } from "./domains/creator/StudioHybridDccPanel";
+import "./styles/globals.css";
 
 const root = document.getElementById("root");
 if (!root) {

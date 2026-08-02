@@ -183,7 +183,13 @@ export function createStudioUnitCubeMesh(): StudioEditableMesh {
     [0, 4, 7, 3], // -X
     [1, 2, 6, 5], // +X
   ];
-  return createStudioEditableMeshFromPolygons(positions, quads);
+  const mesh = createStudioEditableMeshFromPolygons(positions, quads);
+  // A box is hard-surface geometry. Flat faces keep its planar silhouette/specular response;
+  // callers that want a rounded cube can explicitly enable smoothing or bevel it.
+  return {
+    ...mesh,
+    faces: mesh.faces.map((face) => ({ ...face, smooth: false })),
+  };
 }
 
 export function createStudioEditableMeshFromPolygons(
@@ -357,8 +363,22 @@ export function diagnoseStudioEditableMesh(
   return out;
 }
 
+const studioEditableFaceIndexCache = new WeakMap<
+  StudioEditableMesh,
+  ReadonlyMap<number, StudioEditableFace>
+>();
+
+function indexedFace(mesh: StudioEditableMesh, faceId: number): StudioEditableFace | undefined {
+  let index = studioEditableFaceIndexCache.get(mesh);
+  if (!index) {
+    index = new Map(mesh.faces.map((face) => [face.id, face] as const));
+    studioEditableFaceIndexCache.set(mesh, index);
+  }
+  return index.get(faceId);
+}
+
 function faceLoopVertexIds(mesh: StudioEditableMesh, faceId: number): number[] {
-  const face = mesh.faces.find((f) => f.id === faceId);
+  const face = indexedFace(mesh, faceId);
   if (!face) return [];
   const ids: number[] = [];
   let he = face.he;
@@ -890,7 +910,20 @@ export interface StudioEditableMeshSnapshot {
   readonly revision: typeof STUDIO_EDITABLE_MESH_REVISION;
   readonly positions: readonly (readonly [number, number, number])[];
   readonly faces: readonly (readonly number[])[];
-  readonly creases?: readonly { readonly a: number; readonly b: number; readonly crease: number }[];
+  readonly faceAttributes?: readonly {
+    readonly faceIndex: number;
+    readonly materialSlot: number;
+    readonly smooth: boolean;
+  }[];
+  readonly vertexCreases?: readonly {
+    readonly vertexIndex: number;
+    readonly crease: number;
+  }[];
+  readonly halfEdgeCreases?: readonly {
+    readonly faceIndex: number;
+    readonly edgeIndex: number;
+    readonly crease: number;
+  }[];
 }
 
 export function serializeStudioEditableMesh(
@@ -903,10 +936,36 @@ export function serializeStudioEditableMesh(
   const faces = mesh.faces.map((face) =>
     faceLoopVertexIds(mesh, face.id).map((id) => idMap.get(id)!),
   );
+  const halfEdgeCreases: Array<{
+    readonly faceIndex: number;
+    readonly edgeIndex: number;
+    readonly crease: number;
+  }> = [];
+  mesh.faces.forEach((face, faceIndex) => {
+    let halfEdgeId = face.he;
+    let edgeIndex = 0;
+    do {
+      const halfEdge = mesh.halfEdges[halfEdgeId]!;
+      if (halfEdge.crease !== 0) {
+        halfEdgeCreases.push({ faceIndex, edgeIndex, crease: halfEdge.crease });
+      }
+      halfEdgeId = halfEdge.next;
+      edgeIndex += 1;
+    } while (halfEdgeId !== face.he && edgeIndex <= mesh.halfEdges.length);
+  });
   return {
     revision: STUDIO_EDITABLE_MESH_REVISION,
     positions,
     faces,
+    faceAttributes: mesh.faces.map((face, faceIndex) => ({
+      faceIndex,
+      materialSlot: face.materialSlot,
+      smooth: face.smooth,
+    })),
+    vertexCreases: mesh.vertices.flatMap((vertex, vertexIndex) => (
+      vertex.crease === 0 ? [] : [{ vertexIndex, crease: vertex.crease }]
+    )),
+    halfEdgeCreases,
   };
 }
 
@@ -914,7 +973,47 @@ export function deserializeStudioEditableMesh(
   snapshot: StudioEditableMeshSnapshot,
 ): StudioEditableMesh {
   const positions = snapshot.positions.map(([x, y, z]) => vec(x, y, z));
-  return createStudioEditableMeshFromPolygons(positions, snapshot.faces);
+  const base = createStudioEditableMeshFromPolygons(positions, snapshot.faces);
+  const vertexCreases = new Map(
+    (snapshot.vertexCreases ?? []).map((entry) => [entry.vertexIndex, entry.crease] as const),
+  );
+  const faceAttributes = new Map(
+    (snapshot.faceAttributes ?? []).map((entry) => [entry.faceIndex, entry] as const),
+  );
+  const halfEdgeCreases = new Map<string, number>(
+    (snapshot.halfEdgeCreases ?? []).map((entry) => (
+      [`${entry.faceIndex}:${entry.edgeIndex}`, entry.crease] as const
+    )),
+  );
+  const halfEdgeLocation = new Map<number, string>();
+  base.faces.forEach((face, faceIndex) => {
+    let halfEdgeId = face.he;
+    let edgeIndex = 0;
+    do {
+      halfEdgeLocation.set(halfEdgeId, `${faceIndex}:${edgeIndex}`);
+      halfEdgeId = base.halfEdges[halfEdgeId]!.next;
+      edgeIndex += 1;
+    } while (halfEdgeId !== face.he && edgeIndex <= base.halfEdges.length);
+  });
+  return {
+    ...base,
+    vertices: base.vertices.map((vertex, vertexIndex) => ({
+      ...vertex,
+      crease: vertexCreases.get(vertexIndex) ?? 0,
+    })),
+    halfEdges: base.halfEdges.map((halfEdge) => ({
+      ...halfEdge,
+      crease: halfEdgeCreases.get(halfEdgeLocation.get(halfEdge.id) ?? "") ?? 0,
+    })),
+    faces: base.faces.map((face, faceIndex) => {
+      const attributes = faceAttributes.get(faceIndex);
+      return attributes ? {
+        ...face,
+        materialSlot: attributes.materialSlot,
+        smooth: attributes.smooth,
+      } : face;
+    }),
+  };
 }
 
 /** Loop cut on a quad strip: inserts a ring of vertices at factor along each selected edge pair. */

@@ -174,6 +174,7 @@ import {
   STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
   createStudioBg3dCameraUpForDutchRoll,
   readStudioBg3dCameraDutchRollDegrees,
+  resolveStudioBg3dCameraDistanceLimits,
   resolveStudioBg3dCameraNearClip,
   resolveStudioBg3dCameraUpVector,
 } from "./studio-bg3d-camera-orientation";
@@ -464,6 +465,12 @@ import {
   type StudioBg3dSemanticMaterialConfidence,
   type StudioBg3dSemanticMaterialSlot,
 } from "./studio-bg3d-semantic-materials";
+import {
+  collectStudioBg3dShadowSceneBounds,
+  fitStudioBg3dDirectionalShadowFrustum,
+  readStudioBg3dShadowGeometryLocalBounds,
+  readStudioBg3dShadowModelLocalBounds,
+} from "./studio-bg3d-shadow-frustum";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
   STUDIO_BG3D_SHOT_BATCH_PASSES,
@@ -516,6 +523,10 @@ import {
   parseStudioGeneric3dWorkflowMetadata,
 } from "./studio-generic-3d-workflow-metadata";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
+import {
+  createStudioShared3dCharacterShadowEntity,
+} from "./studio-shared-3d-scene-bridge";
+import { StudioBg3dDirectionalShadowLight } from "./StudioBg3dDirectionalShadowLight";
 import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";
 import { StudioBg3dMeasurementPanel } from "./StudioBg3dMeasurementPanel";
 import { StudioBg3dMeasurementViewport } from "./StudioBg3dMeasurementViewport";
@@ -529,6 +540,8 @@ import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioBg3dShapesPanel } from "./StudioBg3dShapesPanel";
+import { StudioBg3dSharedCharacterSceneContent } from "./StudioBg3dSharedCharacterSceneContent";
+import { StudioBg3dSharedCharacterStatusOverlay } from "./StudioBg3dSharedCharacterStatusOverlay";
 import {
   StudioBg3dViewPanel,
   type StudioBg3dBabylonDiagnosticBackend,
@@ -539,6 +552,7 @@ import {
   type StudioGeneric3dControlMode,
 } from "./StudioGeneric3dModelModePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import { useStudioBg3dSharedCharacterStatus } from "./useStudioBg3dSharedCharacterStatus";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type {
@@ -573,6 +587,9 @@ import type {
 } from "./studio-bg3d-shot-batch-recovery-store";
 import type { StudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtime-loader";
 import type { StudioBg3dShotContactSheetImage } from "./studio-bg3d-shot-contact-sheet-contract";
+import type {
+  StudioShared3dSceneSession,
+} from "./studio-shared-3d-scene-bridge";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
 export type {
@@ -590,6 +607,9 @@ export interface StudioBackground3DProps {
   open: boolean;
   initialDataUrl?: string;
   initialScene?: StudioBg3dSceneDocument;
+  /** Runtime-only page composition. Character documents remain owned by their source layers. */
+  sharedSceneSession?: StudioShared3dSceneSession;
+  operation?: "insert" | "update";
   recoveryScope: StudioBg3dShotBatchRecoveryScope | null;
   validateRecoveryAccess: (
     scope: StudioBg3dShotBatchRecoveryScope,
@@ -1910,9 +1930,15 @@ function BgGroundHelper({ visible }: { visible: boolean }) {
   return (
     <group ref={registerStudioBg3dCaptureExcludedObject} visible={visible}>
       <gridHelper args={[40, 40, "#c7ccd6", "#e7e9ee"]} position={[0, -0.001, 0]} />
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]}>
+      <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, -0.002, 0]}>
         <circleGeometry args={[9, 40]} />
-        <meshBasicMaterial color="#eef1f5" transparent opacity={0.55} />
+        <meshStandardMaterial
+          color="#eef1f5"
+          metalness={0}
+          opacity={0.76}
+          roughness={0.94}
+          transparent
+        />
       </mesh>
     </group>
   );
@@ -2554,6 +2580,8 @@ export function StudioBackground3D({
   open,
   initialDataUrl,
   initialScene,
+  sharedSceneSession,
+  operation = "insert",
   recoveryScope,
   validateRecoveryAccess,
   onClose,
@@ -2563,6 +2591,14 @@ export function StudioBackground3D({
 }: StudioBackground3DProps) {
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
+  const {
+    captureReadiness: sharedCharacterCaptureReadiness,
+    characters: sharedCharacters,
+    previewOmissionCount: sharedCharacterPreviewOmissionCount,
+    readyCount: sharedCharacterReadyCount,
+    unavailableCount: sharedCharacterUnavailableCount,
+    updateStatus: updateSharedCharacterStatus,
+  } = useStudioBg3dSharedCharacterStatus(sharedSceneSession);
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
@@ -3245,18 +3281,23 @@ export function StudioBackground3D({
   const hasPendingClone = customModels.some(
     (model) => !readyCloneIds.has(model.id) && !failedCloneIds.has(model.id)
   );
+  const hasPendingSharedCharacter =
+    sharedCharacterCaptureReadiness.phase === "loading";
+  const hasUnavailableSharedCharacter =
+    sharedCharacterCaptureReadiness.phase === "unavailable";
   const physicsInteractionLocked = isStudioBg3dPhysicsTransientPhase(physicsPhase);
   const transformSpace =
     transformSpaceOverride ?? (transformMode === "rotate" ? "local" : "world");
   const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
-    isRestoringScene || physicsInteractionLocked || isBatchRenderingShots;
+    hasPendingSharedCharacter || hasUnavailableSharedCharacter || isRestoringScene ||
+    physicsInteractionLocked || isBatchRenderingShots;
   const magicLayerEffectivelyVisibleIds =
     collectStudioBg3dEffectivelyVisibleEntityIds([...primitives, ...customModels]);
   const magicLayerSelectedPrimitive = selectedIds.size === 1
     ? primitives.find((primitive) => selectedIds.has(primitive.id)) ?? null
     : null;
   const magicLayerLensShift = sceneBaseDocument.camera.lensShift;
-  const magicLayerUnavailableReason = initialScene || initialDataUrl
+  const magicLayerUnavailableReason = operation === "update"
     ? "첫 단계에서는 새 3D 배경을 추가할 때만 매직 마스크를 만들 수 있어요."
     : customModels.length > 0
       ? "첫 단계에서는 외부 모델이 없는 프리미티브 장면만 정확하게 분리할 수 있어요."
@@ -3284,13 +3325,17 @@ export function StudioBackground3D({
       ? "불러오기에 실패한 3D 모델이 있어 컷 배치 출력을 막았습니다. 모델 파일 상태를 확인해 주세요."
       : hasPendingClone
         ? "3D 모델 렌더 복제본을 준비하는 중입니다. 모든 모델이 표시된 뒤 컷 배치 출력을 다시 실행해 주세요."
-        : isRestoringScene
-          ? "3D 장면을 복원하는 중입니다. 복원이 끝난 뒤 컷 배치 출력을 실행해 주세요."
-          : physicsInteractionLocked
-            ? "물리 미리보기 중에는 컷 배치 출력을 실행할 수 없습니다. 현재 자세를 적용하거나 미리보기를 초기화해 주세요."
-            : isCapturing || isBatchRenderingShots
-              ? "다른 3D 캡처가 진행 중입니다. 완료하거나 취소한 뒤 컷 배치 출력을 다시 실행해 주세요."
-              : null;
+        : hasUnavailableSharedCharacter
+          ? "연결된 3D 캐릭터 모델을 불러오지 못해 컷 배치 출력을 막았습니다. 캐릭터 레이어의 모델 파일을 확인해 주세요."
+          : hasPendingSharedCharacter
+            ? "연결된 3D 캐릭터를 준비하는 중입니다. 모든 캐릭터가 표시된 뒤 컷 배치 출력을 다시 실행해 주세요."
+            : isRestoringScene
+              ? "3D 장면을 복원하는 중입니다. 복원이 끝난 뒤 컷 배치 출력을 실행해 주세요."
+              : physicsInteractionLocked
+                ? "물리 미리보기 중에는 컷 배치 출력을 실행할 수 없습니다. 현재 자세를 적용하거나 미리보기를 초기화해 주세요."
+                : isCapturing || isBatchRenderingShots
+                  ? "다른 3D 캡처가 진행 중입니다. 완료하거나 취소한 뒤 컷 배치 출력을 다시 실행해 주세요."
+                  : null;
 
   // This editor is portalled to document.body, so body is the nearest shared root that contains
   // both the dialog and the Studio launcher. Setting it in an earlier layout effect satisfies the
@@ -7317,7 +7362,13 @@ export function StudioBackground3D({
       return;
     }
     if (insertBlocked) {
-      setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
+      setError(
+        hasUnavailableSharedCharacter
+          ? "연결된 3D 캐릭터 중 불러오지 못한 모델이 있어 합성을 중단했어요. 캐릭터 레이어의 모델 파일을 확인해 주세요."
+          : hasPendingSharedCharacter
+            ? "연결된 3D 캐릭터를 모두 불러온 뒤 합성할 수 있어요."
+            : "3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.",
+      );
       return;
     }
     if (!insertBackgroundIntent.ok) {
@@ -7372,7 +7423,7 @@ export function StudioBackground3D({
         return;
       }
       const magicSelection = resolveStudioBg3dMagicSelection({
-        operation: initialScene || initialDataUrl ? "update" : "insert",
+        operation,
         document: adapted.document,
         selectedIds: Object.freeze([...selectedIds]),
       });
@@ -7626,6 +7677,14 @@ export function StudioBackground3D({
         compositePngDataUrl: encoded.compositePngDataUrl,
         perspectiveGuides,
         ...(magicFilterMask ? { magicFilterMask } : {}),
+        ...(sharedCharacterCaptureReadiness.capturableElementIds.length > 0
+          ? {
+              linkedCharacterCapture: {
+                kind: "full-fidelity-linked-vrm-capture" as const,
+                elementIds: sharedCharacterCaptureReadiness.capturableElementIds,
+              },
+            }
+          : {}),
         bg3dScene: adapted.document,
       });
       if (accepted === false) {
@@ -9294,6 +9353,56 @@ export function StudioBackground3D({
       </BgCustomModelMesh>
     );
   };
+
+  const sharedCharacterSceneContent = (
+    <StudioBg3dSharedCharacterSceneContent
+      characters={sharedCharacters}
+      onStatus={updateSharedCharacterStatus}
+    />
+  );
+
+  const shadowSceneBounds = collectStudioBg3dShadowSceneBounds([
+    ...primitives.map((primitive) => ({
+      id: primitive.id,
+      parentId: primitive.parentId,
+      position: primitive.position,
+      rotation: primitive.rotation,
+      scale: primitive.scale,
+      visible: primitive.visible,
+      localBounds: readStudioBg3dShadowGeometryLocalBounds(
+        primitiveGeometryPool.get(primitive.kind).geometry,
+      ),
+    })),
+    ...customModels.map((model) => ({
+      id: model.id,
+      parentId: model.parentId,
+      position: model.position,
+      rotation: model.rotation,
+      scale: model.scale,
+      visible: model.visible,
+      localBounds: readStudioBg3dShadowModelLocalBounds(
+        modelRootCacheRef.current.get(model.modelId)?.root,
+      ),
+    })),
+    ...sharedCharacters.map(createStudioShared3dCharacterShadowEntity),
+  ]);
+  const shadowMapSize = deviceQuality.shadowMapSize || 1_024;
+  const keyShadowFit = fitStudioBg3dDirectionalShadowFrustum({
+    bounds: shadowSceneBounds.bounds,
+    boundsWereClamped: shadowSceneBounds.clamped,
+    direction: sceneBaseDocument.lighting.key.direction,
+    focus: sceneBaseDocument.camera.target,
+    groundY: 0,
+    mapSize: shadowMapSize,
+  });
+  const fillShadowFit = fitStudioBg3dDirectionalShadowFrustum({
+    bounds: shadowSceneBounds.bounds,
+    boundsWereClamped: shadowSceneBounds.clamped,
+    direction: sceneBaseDocument.lighting.fill.direction,
+    focus: sceneBaseDocument.camera.target,
+    groundY: 0,
+    mapSize: shadowMapSize,
+  });
   
   const sceneContent = (
     <Fragment>
@@ -9312,21 +9421,19 @@ export function StudioBackground3D({
         color={sceneBaseDocument.lighting.ambientColor}
         intensity={sceneBaseDocument.lighting.ambientIntensity}
       />
-      <directionalLight
+      <StudioBg3dDirectionalShadowLight
+        fit={keyShadowFit}
         castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.key.castsShadow}
         color={sceneBaseDocument.lighting.key.color}
         intensity={sceneBaseDocument.lighting.key.intensity}
-        position={[...sceneBaseDocument.lighting.key.direction]}
-        shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
-        shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+        radius={1.5}
       />
-      <directionalLight
+      <StudioBg3dDirectionalShadowLight
+        fit={fillShadowFit}
         castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.fill.castsShadow}
         color={sceneBaseDocument.lighting.fill.color}
         intensity={sceneBaseDocument.lighting.fill.intensity}
-        position={[...sceneBaseDocument.lighting.fill.direction]}
-        shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
-        shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+        radius={1.25}
       />
       <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
       <BgSectionPlaneController state={sectionPlane} />
@@ -9413,6 +9520,10 @@ export function StudioBackground3D({
   const mainCameraNearClip = resolveStudioBg3dCameraNearClip(
     sceneBaseDocument.camera.nearClip,
   );
+  const { farClip: mainCameraFarClip, maxOrbitDistance: mainCameraMaxOrbitDistance } =
+    resolveStudioBg3dCameraDistanceLimits(
+      sceneBaseDocument.camera.position, sceneBaseDocument.camera.target,
+    );
   const mainCameraUp = resolveStudioBg3dCameraUpVector(sceneBaseDocument.camera);
   const applyLensShift = (c: THREE.PerspectiveCamera | THREE.OrthographicCamera) => {
     c.near = mainCameraNearClip;
@@ -9436,7 +9547,7 @@ export function StudioBackground3D({
       position={[...sceneBaseDocument.camera.position]}
       zoom={sceneBaseDocument.camera.zoom ?? 1}
       near={mainCameraNearClip}
-      far={200}
+      far={mainCameraFarClip}
       onUpdate={applyLensShift}
     />
   ) : (
@@ -9446,7 +9557,7 @@ export function StudioBackground3D({
       position={[...sceneBaseDocument.camera.position]}
       zoom={sceneBaseDocument.camera.zoom ?? 1}
       near={mainCameraNearClip}
-      far={200}
+      far={mainCameraFarClip}
       onUpdate={applyLensShift}
     />
   );
@@ -9459,7 +9570,7 @@ export function StudioBackground3D({
       enablePan
       enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive}
       minDistance={2}
-      maxDistance={60}
+      maxDistance={mainCameraMaxOrbitDistance}
     />
   );
 
@@ -9529,6 +9640,7 @@ export function StudioBackground3D({
             <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(92vw,960px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
               <div
                 ref={viewportHostRef}
+                data-testid="studio-bg3d-viewport"
                 className="relative aspect-video h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-white shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[360px]"
               >
                 {effectiveIsQuadView && (
@@ -9611,6 +9723,7 @@ export function StudioBackground3D({
                       <View track={viewPerspRef as unknown as React.RefObject<HTMLElement>}>
                         {mainCameraNode}
                         {sceneContent}
+                        {sharedCharacterSceneContent}
                         {commonOrbitControls}
                       </View>
                     </Fragment>
@@ -9618,10 +9731,21 @@ export function StudioBackground3D({
                     <Fragment>
                       {mainCameraNode}
                       {sceneContent}
+                      {sharedCharacterSceneContent}
                       {commonOrbitControls}
                     </Fragment>
                   )}
                 </Canvas>
+
+                {!isCapturing ? (
+                  <StudioBg3dSharedCharacterStatusOverlay
+                    totalCount={sharedCharacters.length}
+                    readyCount={sharedCharacterReadyCount}
+                    unavailableCount={sharedCharacterUnavailableCount}
+                    previewOmissionCount={sharedCharacterPreviewOmissionCount}
+                    capacityOmissionCount={sharedSceneSession?.omittedCharacterCount ?? 0}
+                  />
+                ) : null}
 
                 {/* 세이프 프레임: 삽입될 사각형을 그대로 그리고, 잘려 나갈 영역을 레터/필러박스로
                     덮는다. 캡처와 같은 순수 함수에서 나오므로 화면과 결과가 어긋날 수 없다.
@@ -10906,7 +11030,7 @@ export function StudioBackground3D({
               </div>
             ) : null}
 
-            {isRestoringScene || hasPendingClone ? (
+            {isRestoringScene || hasPendingClone || hasPendingSharedCharacter ? (
               <div aria-live="polite" className="mx-4 mb-2 flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-fg-2 sm:mx-5">
                 <Loader2 className="shrink-0 animate-spin text-accent" size={14} aria-hidden />
                 {isRestoringScene ? "검증된 3D 장면 원본을 복원하는 중입니다." : "모델 렌더 인스턴스를 준비하는 중입니다."}
@@ -10978,12 +11102,16 @@ export function StudioBackground3D({
                   CONTROL_BUTTON,
                   "min-w-0 shrink whitespace-nowrap border-accent/60 bg-accent text-on-accent hover:bg-accent/90 min-[360px]:min-w-36",
                 )}
-                disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing || insertBlocked}
+                disabled={(
+                  primitives.length === 0 &&
+                  customModels.length === 0 &&
+                  sharedCharacterCaptureReadiness.capturableElementIds.length === 0
+                ) || isCapturing || insertBlocked}
                 onClick={handleInsert}
               >
-                {isCapturing || isRestoringScene || hasPendingClone ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+                {isCapturing || isRestoringScene || hasPendingClone || hasPendingSharedCharacter ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
                 <span className="max-[359px]:hidden">
-                  {initialScene || initialDataUrl
+                  {operation === "update"
                     ? "3D 배경 업데이트"
                     : !hasFilledOutput
                       ? "선화만 추가"
@@ -10992,7 +11120,7 @@ export function StudioBackground3D({
                         : "톤 배경 추가"}
                 </span>
                 <span className="hidden max-[359px]:inline">
-                  {initialScene || initialDataUrl ? "업데이트" : "배경 추가"}
+                  {operation === "update" ? "업데이트" : "배경 추가"}
                 </span>
               </button>
             </footer>

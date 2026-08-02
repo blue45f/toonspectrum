@@ -4,6 +4,7 @@ import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, Imag
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
 import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
@@ -1482,6 +1483,11 @@ function schedulePropDisposal(object: THREE.Object3D) {
 const VRM_FRAME_BASE_PRIORITY = -3;
 const VRM_FRAME_PROP_PRIORITY = -2;
 const VRM_FRAME_COMMIT_PRIORITY = -1;
+const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
+  roundedBox: (width: number, height: number, depth: number, radius: number) => (
+    new RoundedBoxGeometry(width, height, depth, 3, radius)
+  ),
+});
 
 /**
  * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
@@ -1518,7 +1524,12 @@ function VrmPropAttachment({
   const object = useMemo(() => {
     const def = propDefById(instance.propId);
     if (!def) return null;
-    return buildPropObject(THREE as unknown as Parameters<typeof buildPropObject>[0], def, instance.color) as unknown as THREE.Object3D;
+    return buildPropObject(
+      THREE as unknown as Parameters<typeof buildPropObject>[0],
+      def,
+      instance.color,
+      STUDIO_VRM_PROP_GEOMETRY_QUALITY,
+    ) as unknown as THREE.Object3D;
   }, [instance.color, instance.propId]);
   const definition = propDefById(instance.propId);
   const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
@@ -1730,7 +1741,12 @@ const GARMENT_Z = new THREE.Vector3(0, 0, 1);
 function buildGarmentGeometry(shape: GarmentPart["shape"]): THREE.BufferGeometry {
   switch (shape.kind) {
     case "cylinder":
-      return new THREE.CylinderGeometry(shape.rTop, shape.rBottom, shape.h, 26, 1, shape.open ?? false);
+      return new THREE.CylinderGeometry(shape.rTop, shape.rBottom, shape.h, 32, 3, shape.open ?? false);
+    case "lathe":
+      return new THREE.LatheGeometry(
+        shape.profile.map(({ radius, y }) => new THREE.Vector2(radius, y)),
+        shape.segments ?? 32,
+      );
     case "box":
       return new THREE.BoxGeometry(shape.w, shape.h, shape.d);
     case "sphere":
@@ -1750,13 +1766,28 @@ function assembleGarmentGroups(parts: GarmentPart[], itemColor: string, name: st
       group.name = `${name}:${part.bone}`;
       groups.set(part.bone, group);
     }
-    const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(part.color ?? itemColor),
-      roughness: part.roughness ?? 0.75,
-      metalness: part.metalness ?? 0.05,
+    const color = new THREE.Color(part.color ?? itemColor);
+    const roughness = part.roughness ?? 0.75;
+    const metalness = part.metalness ?? 0.05;
+    const fabricSurface = metalness < 0.35;
+    const material = new THREE.MeshPhysicalMaterial({
+      color,
+      roughness,
+      metalness,
       side: THREE.DoubleSide,
+      // A restrained cloth sheen gives folds and silhouettes readable highlights without turning
+      // every procedural garment into plastic.  Metal parts use a small clear coat instead.
+      sheen: fabricSurface ? 0.28 : 0,
+      sheenRoughness: Math.max(0.55, roughness),
+      sheenColor: color.clone().lerp(new THREE.Color("#ffffff"), 0.12),
+      clearcoat: fabricSurface ? 0.015 : 0.2,
+      clearcoatRoughness: fabricSurface ? 0.9 : Math.max(0.18, roughness * 0.65),
     });
-    const mesh = new THREE.Mesh(buildGarmentGeometry(part.shape), material);
+    const geometry = buildGarmentGeometry(part.shape);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     mesh.position.set(part.offset[0], part.offset[1], part.offset[2]);
     if (part.align) {
       // 실린더/박스/구는 +Y, 토러스는 링 축(+Z)을 목표 방향으로 정렬.

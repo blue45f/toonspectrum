@@ -148,11 +148,10 @@ export interface StudioEditAvailabilityInput {
   pixelBusy: boolean;
   selectedImage: boolean;
   /**
-   * Same gate as the left tool rail / ensurePixelToolTarget: selected editable image, or
-   * exactly one editable image on the page that can be auto-selected (arm-anytime 2026-07-24).
-   * Crop must not stay hard-disabled when the sole-image auto-select path still works.
+   * Same gate as openSelectedLayerCrop and the left rail: a selected/sole editable image, or
+   * visible page content that can be prepared as an editable raster copy before Crop opens.
    */
-  pixelToolTargetAvailable: boolean;
+  rasterRetouchTargetAvailable: boolean;
   /** Temporary capture/playback state where even read-only selection must not inspect transient data. */
   interactionLocked: boolean;
   mutationLocked: boolean;
@@ -202,10 +201,9 @@ export function resolveStudioEditAvailability(
     duplicateDisabled: input.mutationLocked || !input.hasElementSelection,
     // 그룹/다중 선택도 PPT/Figma처럼 하나의 z-order 단위로 이동할 수 있다.
     reorderDisabled: input.mutationLocked || !input.hasElementSelection,
-    // Align with openSelectedLayerCrop → ensurePixelToolTarget and the rail Crop button.
-    // Requiring selectedImage alone made Edit → 레이어 자르기 a silent dead control when the
-    // page had exactly one editable image (keyboard C and the rail still worked).
-    cropLayerDisabled: input.mutationLocked || !input.pixelToolTargetAvailable,
+    // Align with openSelectedLayerCrop → ensureOrPrepareRasterRetouchTarget and the rail button.
+    // Vector-only pages remain reachable because Crop can prepare one editable page composite.
+    cropLayerDisabled: input.mutationLocked || !input.rasterRetouchTargetAvailable,
   };
 }
 

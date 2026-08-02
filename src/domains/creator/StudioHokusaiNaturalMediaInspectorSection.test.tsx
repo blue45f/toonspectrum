@@ -146,7 +146,8 @@ describe("Studio Hokusai natural-media inspector", () => {
     expect((action as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("fails visibly when no completed freehand vector is selected", () => {
+  it("offers a direct route into stroke selection when no completed freehand vector is selected", () => {
+    const onRequestSelectStroke = vi.fn();
     const { container } = render(
       <StudioHokusaiNaturalMediaInspectorSection
         selected={null}
@@ -157,11 +158,14 @@ describe("Studio Hokusai natural-media inspector", () => {
         masterEditMode={false}
         disabled={false}
         disabledReason={null}
+        onRequestSelectStroke={onRequestSelectStroke}
         onReplace={vi.fn(() => true)}
       />,
     );
     openSection(container);
     expect(screen.getByText(/자유곡선 선화를 먼저 선택/u)).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "선화 선택하기" }));
+    expect(onRequestSelectStroke).toHaveBeenCalledOnce();
     const action = screen.getByRole("button", {
       name: "선택 획을 자연매체로 변환",
     });

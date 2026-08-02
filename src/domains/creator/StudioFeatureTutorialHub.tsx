@@ -2,10 +2,17 @@
  * 기능별 튜토리얼 허브 — 목록 + 단계 카드 + 따라 해보기.
  * StudioShortcutsHelp 와 같은 모달 계약(포커스·Esc·포털).
  */
-import { BookOpen, Check, ChevronLeft, ChevronRight, Sparkles, X } from "lucide-react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { BookOpen, Check, ChevronLeft, ChevronRight, Search, Sparkles, X } from "lucide-react";
+import {
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { createPortal } from "react-dom";
 
+import { studioTutorialSourceCopy } from "./studio-feature-tutorial-en-fallbacks";
 import {
   groupStudioFeatureTutorials,
   isTutorialCompleted,
@@ -21,13 +28,46 @@ import {
   type StudioTutorialTryAction,
 } from "./studio-feature-tutorials";
 
-import { useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-function localizeText(_fallback: string, key: string, t: (key: string) => string): string {
+function localizeText(
+  _fallback: string,
+  key: string,
+  t: (key: string) => string,
+  preferFallback = false,
+): string {
+  if (preferFallback) return _fallback;
   const translated = t(key);
   return translated === key ? _fallback : translated;
 }
+
+const TUTORIAL_SEARCH_COPY = {
+  ko: {
+    label: "기능 튜토리얼 검색",
+    placeholder: "기능이나 하고 싶은 일을 검색하세요",
+    clear: "튜토리얼 검색어 지우기",
+    result: (count: number) => `검색 결과 ${count}개`,
+    all: (count: number) => `전체 기능 ${count}개`,
+    emptyTitle: "찾는 기능이 없어요",
+    emptyDescription: "‘밝게’, ‘색 섞기’, ‘말풍선’처럼 하고 싶은 결과로 검색해 보세요.",
+    emptyDetailTitle: "검색 결과를 찾지 못했어요",
+    emptyDetailDescription: "검색어를 지우면 카테고리와 진행도는 그대로 유지됩니다.",
+    showAll: "전체 기능 보기",
+  },
+  en: {
+    label: "Search feature tutorials",
+    placeholder: "Search for a feature or what you want to do",
+    clear: "Clear tutorial search",
+    result: (count: number) => `${count} search result${count === 1 ? "" : "s"}`,
+    all: (count: number) => `${count} features`,
+    emptyTitle: "No matching feature",
+    emptyDescription: "Try the result you want, such as brighten, mix color, or speech bubble.",
+    emptyDetailTitle: "No tutorial found",
+    emptyDetailDescription: "Clear the search to keep your categories and progress.",
+    showAll: "Show all features",
+  },
+} as const;
 
 const STUDIO_CATEGORY_LABEL_KEYS: Record<StudioTutorialCategory, string> = {
   drawing: "studio.tutorial.category.drawing",
@@ -38,13 +78,80 @@ const STUDIO_CATEGORY_LABEL_KEYS: Record<StudioTutorialCategory, string> = {
   aiExport: "studio.tutorial.category.aiExport",
 };
 
+function normalizeTutorialSearchText(value: string): string {
+  return value.trim().toLocaleLowerCase().replace(/\s+/gu, " ");
+}
+
+function localizedTutorialBadge(
+  badge: string,
+  localizedTitle: string,
+  preferKoreanSource: boolean,
+): string {
+  if (preferKoreanSource) return badge;
+  const words = localizedTitle.match(/[a-z0-9]+/giu) ?? [];
+  if (words.length >= 2) return `${words[0]![0]}${words[1]![0]}`.toLocaleUpperCase();
+  return words[0]?.slice(0, 2).toLocaleUpperCase() || "•";
+}
+
+function localizedTutorialSearchText(
+  tutorial: StudioFeatureTutorial,
+  t: (key: string) => string,
+  preferKoreanSource: boolean,
+): string {
+  const source = studioTutorialSourceCopy(tutorial, preferKoreanSource);
+  const localizedSteps = source.steps.flatMap((step, index) => [
+    localizeText(
+      step.title,
+      `studio.tutorial.${tutorial.id}.step.${index + 1}.title`,
+      t,
+    ),
+    localizeText(
+      step.body,
+      `studio.tutorial.${tutorial.id}.step.${index + 1}.body`,
+      t,
+    ),
+    step.tip
+      ? localizeText(
+          step.tip,
+          `studio.tutorial.${tutorial.id}.step.${index + 1}.tip`,
+          t,
+        )
+      : "",
+  ]);
+
+  return normalizeTutorialSearchText([
+    source.title,
+    source.summary,
+    ...source.steps.flatMap((step) => [step.title, step.body, step.tip ?? ""]),
+    localizeText(source.title, `studio.tutorial.${tutorial.id}.title`, t),
+    localizeText(source.summary, `studio.tutorial.${tutorial.id}.summary`, t),
+    ...localizedSteps,
+  ].join(" "));
+}
+
+function filterStudioFeatureTutorials(
+  tutorials: readonly StudioFeatureTutorial[],
+  query: string,
+  t: (key: string) => string,
+  preferKoreanSource: boolean,
+): StudioFeatureTutorial[] {
+  const normalizedQuery = normalizeTutorialSearchText(query);
+  if (!normalizedQuery) return [...tutorials];
+  return tutorials.filter((tutorial) =>
+    localizedTutorialSearchText(tutorial, t, preferKoreanSource).includes(normalizedQuery)
+  );
+}
+
 export type StudioFeatureTutorialHubProps = {
   open: boolean;
   onClose: () => void;
   /** 초기 선택 튜토리얼. 없으면 진행 상태 lastId 또는 첫 항목. */
   initialTutorialId?: string | null;
   /** 「따라 해보기」— 해당 도구/메뉴를 StudioPage 가 연다. */
-  onTryAction?: (action: StudioTutorialTryAction) => void;
+  onTryAction?: (
+    action: StudioTutorialTryAction,
+    trigger: HTMLButtonElement,
+  ) => void;
 };
 
 function resolveInitialId(preferred?: string | null, progress?: StudioTutorialProgress): string {
@@ -68,12 +175,27 @@ export function StudioFeatureTutorialHub({
   const [progress, setProgress] = useState<StudioTutorialProgress>(() => readTutorialProgress());
   const [activeId, setActiveId] = useState(() => resolveInitialId(initialTutorialId, readTutorialProgress()));
   const [stepIndex, setStepIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
   const t = useT();
+  const language = useI18n((state) => state.lang);
+  const preferSourceCopy = language.toLocaleLowerCase().startsWith("ko");
+  const searchCopy = preferSourceCopy ? TUTORIAL_SEARCH_COPY.ko : TUTORIAL_SEARCH_COPY.en;
 
-  const active = STUDIO_FEATURE_TUTORIAL_BY_ID.get(activeId) ?? STUDIO_FEATURE_TUTORIALS[0]!;
-  const steps = active.steps;
+  const visibleTutorials = filterStudioFeatureTutorials(
+    STUDIO_FEATURE_TUTORIALS,
+    searchQuery,
+    t,
+    preferSourceCopy,
+  );
+  const active = visibleTutorials.find((tutorial) => tutorial.id === activeId)
+    ?? visibleTutorials[0]
+    ?? STUDIO_FEATURE_TUTORIAL_BY_ID.get(activeId)
+    ?? STUDIO_FEATURE_TUTORIALS[0]!;
+  const activeSource = studioTutorialSourceCopy(active, preferSourceCopy);
+  const steps = activeSource.steps;
   const step = steps[Math.min(stepIndex, steps.length - 1)]!;
-  const groups = groupStudioFeatureTutorials();
+  const groups = groupStudioFeatureTutorials(visibleTutorials);
+  const hasSearchResults = visibleTutorials.length > 0;
   const { done, total } = tutorialCompletionRatio(progress);
   const completed = isTutorialCompleted(progress, active.id);
   const isLastStep = stepIndex >= steps.length - 1;
@@ -86,38 +208,88 @@ export function StudioFeatureTutorialHub({
     const id = resolveInitialId(initialTutorialId, nextProgress);
     setActiveId(id);
     setStepIndex(0);
+    setSearchQuery("");
   }, [open, initialTutorialId]);
 
-  // 모달 포커스·Esc·스크롤 잠금
+  // 진짜 modal 계약: 포커스 진입·순환·복원, 배경 inert, html/body 스크롤 잠금을 함께 관리한다.
   useEffect(() => {
     if (!open || typeof document === "undefined") return;
-    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const prevOverflow = document.body.style.overflow;
+    openerRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
-    const t = globalThis.setTimeout(() => closeButtonRef.current?.focus(), 0);
+    document.documentElement.style.overflow = "hidden";
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
+    const overlay = overlayRef.current;
+    const inertStates: Array<readonly [HTMLElement, boolean]> = [];
+    for (const child of document.body.children) {
+      if (!(child instanceof HTMLElement) || child === overlay) continue;
+      inertStates.push([child, child.inert]);
+      child.inert = true;
+    }
+    const focusFrame = requestAnimationFrame(() => {
+      closeButtonRef.current?.focus({ preventScroll: true });
+    });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
         closeFromEffect();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [])].filter((element) => !element.hidden && element.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current?.focus({ preventScroll: true });
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
-    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      globalThis.clearTimeout(t);
-      document.body.style.overflow = prevOverflow;
-      document.removeEventListener("keydown", onKey, true);
-      openerRef.current?.focus?.();
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
+      for (const [element, wasInert] of inertStates) element.inert = wasInert;
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [open]);
 
-  function selectTutorial(t: StudioFeatureTutorial) {
-    setActiveId(t.id);
+  function selectTutorial(tutorial: StudioFeatureTutorial) {
+    setActiveId(tutorial.id);
     setStepIndex(0);
-    const next = { ...progress, lastId: t.id };
+    const next = { ...progress, lastId: tutorial.id };
     setProgress(next);
     writeTutorialProgress(next);
+  }
+
+  function updateSearchQuery(nextQuery: string) {
+    const matches = filterStudioFeatureTutorials(
+      STUDIO_FEATURE_TUTORIALS,
+      nextQuery,
+      t,
+      preferSourceCopy,
+    );
+    setSearchQuery(nextQuery);
+    if (matches.length === 0 || matches.some((tutorial) => tutorial.id === activeId)) return;
+    setActiveId(matches[0]!.id);
+    setStepIndex(0);
   }
 
   function goNext() {
@@ -134,9 +306,9 @@ export function StudioFeatureTutorialHub({
     setStepIndex((i) => Math.max(0, i - 1));
   }
 
-  function handleTry() {
+  function handleTry(event: ReactMouseEvent<HTMLButtonElement>) {
     if (!active.tryAction || !onTryAction) return;
-    onTryAction(active.tryAction);
+    onTryAction(active.tryAction, event.currentTarget);
     onClose();
   }
 
@@ -147,7 +319,7 @@ export function StudioFeatureTutorialHub({
       ref={overlayRef}
       role="presentation"
       className="fixed inset-0 z-[90] flex items-end justify-center bg-[oklch(0.12_0.01_70_/_0.55)] p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
-      onMouseDown={(e) => {
+      onPointerDown={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
@@ -156,7 +328,8 @@ export function StudioFeatureTutorialHub({
         role="dialog"
         aria-modal="true"
         aria-labelledby="studio-tutorial-title"
-        className="flex max-h-[min(92dvh,44rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-line/70 bg-panel shadow-2xl sm:rounded-2xl"
+        tabIndex={-1}
+        className="flex max-h-[min(92dvh,44rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-line/70 bg-panel pb-[env(safe-area-inset-bottom)] shadow-2xl sm:rounded-2xl sm:pb-0"
       >
         {/* header */}
         <div className="relative shrink-0 overflow-hidden border-b border-line/50 bg-gradient-to-br from-accent-soft/40 via-card/50 to-panel px-4 py-3">
@@ -199,7 +372,7 @@ export function StudioFeatureTutorialHub({
               ref={closeButtonRef}
               type="button"
               onClick={onClose}
-              className="grid size-9 shrink-0 place-items-center rounded-xl border border-line/60 bg-card/70 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="grid size-11 shrink-0 place-items-center rounded-xl border border-line/60 bg-card/70 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9 pointer-coarse:size-11"
               aria-label={t("common.close")}
             >
               <X size={16} aria-hidden />
@@ -211,10 +384,47 @@ export function StudioFeatureTutorialHub({
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <nav
             aria-label={t("studio.hub.listAriaLabel")}
-            className="shrink-0 overflow-y-auto border-b border-line/45 md:w-[13.5rem] md:border-b-0 md:border-r md:border-line/45"
+            className="max-h-[min(36dvh,16rem)] shrink-0 overflow-y-auto border-b border-line/45 md:max-h-none md:min-h-0 md:w-[13.5rem] md:border-b-0 md:border-r md:border-line/45"
           >
-            <div className="space-y-2.5 p-2.5">
-              {groups.map((group) => (
+            <div className="sticky top-0 z-10 border-b border-line/45 bg-panel/95 p-2.5 backdrop-blur-sm">
+              <div className="relative">
+                <label htmlFor="studio-tutorial-search" className="sr-only">
+                  {searchCopy.label}
+                </label>
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-fg-3"
+                  aria-hidden
+                />
+                <input
+                  id="studio-tutorial-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => updateSearchQuery(event.currentTarget.value)}
+                  placeholder={searchCopy.placeholder}
+                  aria-label={searchCopy.label}
+                  aria-controls="studio-tutorial-search-results"
+                  className="min-h-11 w-full rounded-xl border border-line bg-card py-2 pl-9 pr-9 text-xs text-fg outline-none placeholder:text-fg-3 focus-visible:border-accent/70 focus-visible:ring-2 focus-visible:ring-accent/35 md:min-h-9 pointer-coarse:min-h-11"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => updateSearchQuery("")}
+                    aria-label={searchCopy.clear}
+                    className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent md:size-9 pointer-coarse:size-11"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+              <p className="mt-1.5 px-1 text-[0.66rem] text-fg-3" role="status" aria-live="polite">
+                {searchQuery.trim()
+                  ? searchCopy.result(visibleTutorials.length)
+                  : searchCopy.all(STUDIO_FEATURE_TUTORIALS.length)}
+              </p>
+            </div>
+
+            <div id="studio-tutorial-search-results" className="space-y-2.5 p-2.5">
+              {hasSearchResults ? groups.map((group) => (
                 <div key={group.category}>
                   <p className="mb-1 px-1.5 text-[0.6rem] font-semibold uppercase tracking-wider text-fg-3">
                     {t(STUDIO_CATEGORY_LABEL_KEYS[group.category] ?? group.category)}
@@ -223,14 +433,27 @@ export function StudioFeatureTutorialHub({
                     {group.items.map((item) => {
                       const isActive = item.id === active.id;
                       const isDone = isTutorialCompleted(progress, item.id);
+                      const itemSource = studioTutorialSourceCopy(item, preferSourceCopy);
+                      const localizedTitle = localizeText(
+                        itemSource.title,
+                        `studio.tutorial.${item.id}.title`,
+                        t,
+                        preferSourceCopy,
+                      );
+                      const localizedBadge = localizedTutorialBadge(
+                        item.badge,
+                        localizedTitle,
+                        preferSourceCopy,
+                      );
                       return (
                         <li key={item.id}>
                           <button
                             type="button"
                             onClick={() => selectTutorial(item)}
+                            aria-label={localizedTitle}
                             aria-current={isActive ? "true" : undefined}
                             className={cn(
-                              "flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors duration-150",
+                              "flex min-h-11 w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left transition-colors duration-150 md:min-h-9 pointer-coarse:min-h-11",
                               isActive
                                 ? "bg-accent-soft/70 text-fg ring-1 ring-accent/30"
                                 : "text-fg-2 hover:bg-raised/80 hover:text-fg"
@@ -242,15 +465,15 @@ export function StudioFeatureTutorialHub({
                                 isActive ? "bg-accent/20 text-accent" : "bg-canvas/60 text-fg-3 ring-1 ring-line/40"
                               )}
                             >
-                              {item.badge}
+                              {localizedBadge}
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-[0.72rem] font-semibold tracking-tight">
-                                {localizeText(item.title, `studio.tutorial.${item.id}.title`, t)}
+                                {localizedTitle}
                               </span>
                             </span>
                             {isDone ? (
-                    <Check className="size-3.5 shrink-0 text-good" aria-label={t("studio.hub.completed")} />
+                              <Check className="size-3.5 shrink-0 text-good" aria-label={t("studio.hub.completed")} />
                             ) : null}
                           </button>
                         </li>
@@ -258,11 +481,28 @@ export function StudioFeatureTutorialHub({
                     })}
                   </ul>
                 </div>
-              ))}
+              )) : (
+                <div className="px-2 py-5 text-center">
+                  <Search className="mx-auto size-5 text-fg-3" aria-hidden />
+                  <p className="mt-2 text-xs font-semibold text-fg-2">{searchCopy.emptyTitle}</p>
+                  <p className="mx-auto mt-1 max-w-[18rem] text-[0.7rem] leading-relaxed text-fg-3 text-pretty">
+                    {searchCopy.emptyDescription}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => updateSearchQuery("")}
+                    className="mt-3 min-h-11 rounded-xl border border-line px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent md:min-h-9 pointer-coarse:min-h-11"
+                  >
+                    {searchCopy.showAll}
+                  </button>
+                </div>
+              )}
             </div>
           </nav>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {hasSearchResults ? (
+            <>
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-accent-soft/60 px-2 py-0.5 text-[0.6rem] font-semibold text-accent ring-1 ring-accent/20">
@@ -276,15 +516,25 @@ export function StudioFeatureTutorialHub({
                 ) : null}
               </div>
               <h3 className="mt-2 text-base font-semibold tracking-tight text-fg">
-                {localizeText(active.title, `studio.tutorial.${active.id}.title`, t)}
+                {localizeText(
+                  activeSource.title,
+                  `studio.tutorial.${active.id}.title`,
+                  t,
+                  preferSourceCopy,
+                )}
               </h3>
               <p className="mt-1 text-[0.75rem] leading-relaxed text-fg-3">
-                {localizeText(active.summary, `studio.tutorial.${active.id}.summary`, t)}
+                {localizeText(
+                  activeSource.summary,
+                  `studio.tutorial.${active.id}.summary`,
+                  t,
+                  preferSourceCopy,
+                )}
               </p>
 
               {/* step dots */}
               <div
-                className="mt-4 flex items-center gap-1.5"
+                className="mt-2 flex items-center gap-0.5"
                 aria-label={`${t("studio.hub.stepAriaPrefix")} ${stepIndex + 1} / ${steps.length}`}
               >
                 {steps.map((_, i) => (
@@ -294,11 +544,16 @@ export function StudioFeatureTutorialHub({
                     onClick={() => setStepIndex(i)}
                     aria-label={`${t("studio.hub.stepAriaPrefix")} ${i + 1}`}
                     aria-current={i === stepIndex ? "step" : undefined}
-                    className={cn(
-                      "h-1.5 rounded-full transition-[width,background] duration-200 ease-out",
-                      i === stepIndex ? "w-6 bg-accent" : i < stepIndex ? "w-3 bg-accent/45" : "w-3 bg-line"
-                    )}
-                  />
+                    className="grid size-11 shrink-0 place-items-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:size-9 pointer-coarse:size-11"
+                  >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "h-1.5 rounded-full transition-[width,background] duration-200 ease-out",
+                        i === stepIndex ? "w-6 bg-accent" : i < stepIndex ? "w-3 bg-accent/45" : "w-3 bg-line"
+                      )}
+                    />
+                  </button>
                 ))}
               </div>
 
@@ -314,6 +569,7 @@ export function StudioFeatureTutorialHub({
                     step.title,
                     `studio.tutorial.${active.id}.step.${stepIndex + 1}.title`,
                     t,
+                    preferSourceCopy,
                   )}
                 </h4>
                 <p className="mt-1.5 text-[0.8rem] leading-relaxed text-fg-2">
@@ -321,13 +577,19 @@ export function StudioFeatureTutorialHub({
                     step.body,
                     `studio.tutorial.${active.id}.step.${stepIndex + 1}.body`,
                     t,
+                    preferSourceCopy,
                   )}
                 </p>
                 {step.tip ? (
                   <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-accent-soft/35 px-2.5 py-2 text-[0.7rem] leading-snug text-fg-2 ring-1 ring-accent/15">
                     <Sparkles className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
                     <span>
-                      {localizeText(step.tip, `studio.tutorial.${active.id}.step.${stepIndex + 1}.tip`, t)}
+                      {localizeText(
+                        step.tip,
+                        `studio.tutorial.${active.id}.step.${stepIndex + 1}.tip`,
+                        t,
+                        preferSourceCopy,
+                      )}
                     </span>
                   </p>
                 ) : null}
@@ -340,7 +602,7 @@ export function StudioFeatureTutorialHub({
                 onClick={goPrev}
                 disabled={stepIndex === 0}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 text-[0.75rem] font-semibold transition-colors",
+                  "inline-flex min-h-11 items-center gap-1 rounded-xl border px-3 text-[0.75rem] font-semibold transition-colors sm:min-h-9 pointer-coarse:min-h-11",
                   stepIndex === 0
                     ? "cursor-not-allowed border-line/40 text-fg-3"
                     : "border-line/60 bg-card text-fg-2 hover:bg-raised"
@@ -355,23 +617,42 @@ export function StudioFeatureTutorialHub({
                   <button
                     type="button"
                     onClick={handleTry}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/50 px-3 text-[0.75rem] font-semibold text-accent transition-colors hover:bg-accent-soft"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft/50 px-3 text-[0.75rem] font-semibold text-accent transition-colors hover:bg-accent-soft sm:min-h-9 pointer-coarse:min-h-11"
                   >
                     <Sparkles className="size-3.5" aria-hidden />
-                    {localizeText(active.tryLabel ?? "", `studio.tutorial.${active.id}.tryLabel`, t) ||
+                    {localizeText(
+                      activeSource.tryLabel ?? "",
+                      `studio.tutorial.${active.id}.tryLabel`,
+                      t,
+                      preferSourceCopy,
+                    ) ||
                       t("studio.hub.tryLabelDefault")}
                   </button>
                 ) : null}
                 <button
                   type="button"
                   onClick={goNext}
-                  className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-accent px-3.5 text-[0.75rem] font-semibold text-on-accent transition-opacity hover:opacity-95"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-xl bg-accent px-3.5 text-[0.75rem] font-semibold text-on-accent transition-opacity hover:opacity-95 sm:min-h-9 pointer-coarse:min-h-11"
                 >
                   {isLastStep ? (completed ? t("studio.hub.completed") : t("studio.hub.markComplete")) : t("studio.hub.next")}
                   {!isLastStep ? <ChevronRight className="size-4" aria-hidden /> : null}
                 </button>
               </div>
             </div>
+            </>
+            ) : (
+              <div className="grid min-h-[12rem] flex-1 place-items-center p-6 text-center">
+                <div className="max-w-sm">
+                  <Search className="mx-auto size-6 text-fg-3" aria-hidden />
+                  <p className="mt-2 text-sm font-semibold text-fg-2">
+                    {searchCopy.emptyDetailTitle}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3 text-pretty">
+                    {searchCopy.emptyDetailDescription}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

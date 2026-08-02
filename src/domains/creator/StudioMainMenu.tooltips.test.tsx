@@ -51,6 +51,29 @@ afterEach(() => {
 });
 
 describe("StudioMainMenu tooltips", () => {
+  it("uses an English Help fallback when a locale pack has not shipped the new hint keys yet", () => {
+    useI18n.getState().setLang("en");
+    render(
+      <StudioToolHintPreferencesProvider mode="compact" touchHoldDelayMs={640} reduceMotion>
+        <StudioMainMenu
+          groups={[
+            {
+              id: "help",
+              label: "Help",
+              items: [{ id: "shortcuts", label: "Shortcut help", onSelect: vi.fn() }],
+            },
+          ]}
+        />
+      </StudioToolHintPreferencesProvider>,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: "Help" }));
+    expect(screen.getByRole("tooltip").textContent).toContain(
+      "Find step-by-step feature guides",
+    );
+    expect(screen.getByRole("tooltip").textContent).not.toContain("기능 사용법");
+  });
+
   it("describes keyboard-focused top menus and keeps only the latest hint visible", () => {
     renderMenu();
     const file = screen.getByRole("button", { name: "파일" });
@@ -88,6 +111,7 @@ describe("StudioMainMenu tooltips", () => {
     vi.useFakeTimers();
     renderMenu();
     const file = screen.getByRole("button", { name: "파일" });
+    expect(file.className).toContain("pointer-coarse:h-11");
 
     fireEvent.pointerDown(file, { button: 0, pointerType: "touch", clientX: 12, clientY: 8 });
     act(() => vi.advanceTimersByTime(320));

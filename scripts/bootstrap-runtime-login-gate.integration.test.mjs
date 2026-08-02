@@ -8,7 +8,10 @@ import {
   buildRuntimeLoginGateVerificationSql,
   buildRuntimeLoginRestoreSql,
 } from "./bootstrap-empty-production-database.mjs";
-import { validatePostgresIntegrationUrl } from "./run-postgres-integration-tests.mjs";
+import {
+  VITEST_VALIDATED_REMOTE_DATABASE_MARKER,
+  validatePostgresIntegrationUrl,
+} from "./run-postgres-integration-tests.mjs";
 
 const { Client } = pg;
 const DATABASE_URL = process.env.TEST_DATABASE_URL?.trim() ?? "";
@@ -16,7 +19,10 @@ const DATABASE_URL = process.env.TEST_DATABASE_URL?.trim() ?? "";
 test.runIf(Boolean(DATABASE_URL))(
   "runtime NOLOGIN gate blocks new sessions even while PUBLIC retains CONNECT",
   async () => {
-    const target = validatePostgresIntegrationUrl(DATABASE_URL);
+    const target = validatePostgresIntegrationUrl(DATABASE_URL, {
+      allowRemoteTestDatabase:
+        process.env[VITEST_VALIDATED_REMOTE_DATABASE_MARKER] === "true",
+    });
     const suffix = randomBytes(6).toString("hex");
     const runtimeRole = `bootstrap_gate_${suffix}`;
     const runtimePassword = `gate-test-${randomBytes(18).toString("base64url")}`;

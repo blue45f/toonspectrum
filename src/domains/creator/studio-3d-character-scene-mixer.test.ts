@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { Studio3DCharacterSceneMixer } from "./studio-3d-character-scene-mixer";
 
 describe("Studio3DCharacterSceneMixer", () => {

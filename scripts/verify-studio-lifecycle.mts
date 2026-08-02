@@ -241,7 +241,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
 async function dismissQuickStart(page: Page): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 300 }).catch(() => false)) {
-    await quickstart.getByRole("button", { name: "닫기", exact: true }).click();
+    await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
 }
 

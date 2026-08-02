@@ -72,8 +72,14 @@ import {
   type StudioMannequinSceneHandle,
 } from "./studio-mannequin-scene";
 import {
+  disposeStudioMannequinPoseLandmarker,
+  getStudioMannequinWebcamErrorMessage,
+  initStudioMannequinPoseLandmarker,
+  isStudioMannequinWebcamAbortError,
   solvePoseToMannequinJoints,
   smoothMannequinJointRotations,
+  type StudioMannequinPoseLandmarker,
+  type StudioMannequinWebcamErrorStage,
 } from "./studio-mannequin-webcam-tracking";
 import {
   StudioPanelChip,
@@ -132,6 +138,12 @@ const BODY_SLIDERS: readonly {
 function getErrorText(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.trim()) return cause.message;
   return fallback;
+}
+
+function createWebcamPreflightError(name: string, message: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
 }
 
 export function StudioMannequinBodySection({
@@ -436,7 +448,8 @@ export function StudioMannequinCameraSection({
         <button
           type="button"
           onClick={onToggleWebcam}
-          disabled={webcamLoading}
+          aria-pressed={webcamActive}
+          aria-busy={webcamLoading}
           className={buttonClass({
             size: "sm",
             variant: webcamActive ? "solid" : "quiet",
@@ -448,8 +461,20 @@ export function StudioMannequinCameraSection({
           ) : (
             <Video size={13} aria-hidden />
           )}
-          {webcamActive ? "🔴 실시간 동작 인식 중지" : "📹 웹캠 실시간 동작 인식 시작"}
+          {webcamLoading
+            ? "동작 인식 준비 취소"
+            : webcamActive
+              ? "실시간 동작 인식 중지"
+              : webcamError
+                ? "웹캠 동작 인식 다시 시도"
+                : "웹캠 실시간 동작 인식 시작"}
         </button>
+
+        {webcamLoading ? (
+          <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
+            동작 인식 엔진과 카메라를 준비하고 있습니다. 처음에는 잠시 걸릴 수 있습니다.
+          </p>
+        ) : null}
 
         {webcamActive && (
           <div className="grid grid-cols-2 gap-1 pt-1.5" role="group" aria-label="모션 캡처 옵션">
@@ -501,7 +526,9 @@ export function StudioMannequinCameraSection({
         )}
 
         {webcamError ? (
-          <p className="text-[0.7rem] text-rose-500 mt-1">{webcamError}</p>
+          <p role="alert" className="mt-1 text-[0.7rem] leading-relaxed text-rose-500">
+            {webcamError}
+          </p>
         ) : null}
       </div>
       <div className="space-y-1">
@@ -607,73 +634,181 @@ export function StudioMannequinPoserPanel({
 
   const webcamVideoRef = useRef<HTMLVideoElement | null>(null);
   const webcamStreamRef = useRef<MediaStream | null>(null);
+  const webcamLandmarkerRef = useRef<StudioMannequinPoseLandmarker | null>(null);
+  const webcamFrameRef = useRef<number | null>(null);
+  const webcamAbortControllerRef = useRef<AbortController | null>(null);
+  const webcamSessionRef = useRef(0);
   const webcamActiveRef = useRef(false);
+  const webcamLoadingRef = useRef(false);
+  const poseFrozenRef = useRef(false);
+  const mirrorModeRef = useRef(true);
   webcamActiveRef.current = webcamActive;
+  webcamLoadingRef.current = webcamLoading;
+  poseFrozenRef.current = poseFrozen;
+  mirrorModeRef.current = mirrorMode;
+
+  const releaseWebcamResources = useCallback(() => {
+    webcamSessionRef.current += 1;
+    webcamActiveRef.current = false;
+    webcamLoadingRef.current = false;
+
+    webcamAbortControllerRef.current?.abort();
+    webcamAbortControllerRef.current = null;
+
+    if (webcamFrameRef.current !== null) {
+      cancelAnimationFrame(webcamFrameRef.current);
+      webcamFrameRef.current = null;
+    }
+
+    const video = webcamVideoRef.current;
+    if (video) {
+      try {
+        video.pause();
+      } catch {
+        // Some embedded browsers do not expose pause() until metadata has loaded.
+      }
+      video.srcObject = null;
+    }
+
+    const stream = webcamStreamRef.current;
+    webcamStreamRef.current = null;
+    stream?.getTracks().forEach((track) => track.stop());
+
+    webcamLandmarkerRef.current = null;
+    disposeStudioMannequinPoseLandmarker();
+  }, []);
+
+  const stopWebcam = useCallback(() => {
+    releaseWebcamResources();
+    setWebcamActive(false);
+    setWebcamLoading(false);
+    setWebcamError(null);
+  }, [releaseWebcamResources]);
 
   const handleToggleWebcam = useCallback(async () => {
-    if (webcamActive) {
-      setWebcamActive(false);
-      if (webcamStreamRef.current) {
-        webcamStreamRef.current.getTracks().forEach((track) => track.stop());
-        webcamStreamRef.current = null;
-      }
+    if (webcamActiveRef.current || webcamLoadingRef.current) {
+      stopWebcam();
       return;
     }
+
+    const session = webcamSessionRef.current + 1;
+    webcamSessionRef.current = session;
+    const abortController = new AbortController();
+    webcamAbortControllerRef.current = abortController;
+    webcamLoadingRef.current = true;
+    let failureStage: StudioMannequinWebcamErrorStage = "camera";
 
     try {
       setWebcamLoading(true);
       setWebcamError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: "user" },
-      });
-      webcamStreamRef.current = stream;
-      if (webcamVideoRef.current) {
-        webcamVideoRef.current.srcObject = stream;
-        await webcamVideoRef.current.play().catch(() => {});
+
+      if (window.isSecureContext === false) {
+        throw createWebcamPreflightError(
+          "StudioMannequinInsecureContextError",
+          "Camera access requires a secure context.",
+        );
       }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw createWebcamPreflightError(
+          "StudioMannequinCameraUnavailableError",
+          "navigator.mediaDevices.getUserMedia is unavailable.",
+        );
+      }
+
+      failureStage = "engine";
+      const landmarker = await initStudioMannequinPoseLandmarker({
+        signal: abortController.signal,
+      });
+      if (webcamSessionRef.current !== session || abortController.signal.aborted) return;
+
+      failureStage = "camera";
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: { ideal: "user" },
+        },
+      });
+      if (webcamSessionRef.current !== session || abortController.signal.aborted) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      webcamStreamRef.current = stream;
+      const video = webcamVideoRef.current;
+      if (!video) {
+        throw createWebcamPreflightError(
+          "StudioMannequinCameraUnavailableError",
+          "The webcam preview element is unavailable.",
+        );
+      }
+
+      video.srcObject = stream;
+      await video.play();
+      if (webcamSessionRef.current !== session || abortController.signal.aborted) {
+        stream.getTracks().forEach((track) => track.stop());
+        video.srcObject = null;
+        return;
+      }
+
+      webcamLandmarkerRef.current = landmarker;
+      webcamActiveRef.current = true;
+      webcamLoadingRef.current = false;
       setWebcamActive(true);
-    } catch {
-      setWebcamError("웹캠을 시작하지 못했습니다. 카메라 접근 권한을 확인해 주세요.");
+    } catch (cause) {
+      if (
+        webcamSessionRef.current !== session
+        || abortController.signal.aborted
+        || isStudioMannequinWebcamAbortError(cause)
+      ) {
+        return;
+      }
+
+      console.warn(`Studio mannequin webcam ${failureStage} initialization failed:`, cause);
+      releaseWebcamResources();
       setWebcamActive(false);
-    } finally {
       setWebcamLoading(false);
+      setWebcamError(getStudioMannequinWebcamErrorMessage(failureStage, cause));
+    } finally {
+      if (webcamSessionRef.current === session) {
+        webcamLoadingRef.current = false;
+        setWebcamLoading(false);
+      }
     }
-  }, [webcamActive]);
+  }, [releaseWebcamResources, stopWebcam]);
 
   useEffect(() => {
-    if (!open && webcamStreamRef.current) {
-      webcamStreamRef.current.getTracks().forEach((track) => track.stop());
-      webcamStreamRef.current = null;
-      setWebcamActive(false);
-    }
-  }, [open]);
+    if (!open) stopWebcam();
+  }, [open, stopWebcam]);
+
+  useEffect(() => () => releaseWebcamResources(), [releaseWebcamResources]);
 
   const poseRef = useRef(pose);
   poseRef.current = pose;
 
   useEffect(() => {
     if (!webcamActive) return;
-    let animId: number;
-    let poseLandmarkerInstance: unknown = null;
+    let lastVideoTime = -1;
 
-    async function startLoop() {
+    const loop = () => {
+      if (!webcamActiveRef.current) return;
       try {
-        const { initPoseLandmarker } = await import("./studio-vrm-webcam-tracking");
-        poseLandmarkerInstance = await initPoseLandmarker();
-
-        const loop = () => {
-          if (!webcamActiveRef.current) return;
-          const video = webcamVideoRef.current;
-          if (video && video.readyState >= 2 && poseLandmarkerInstance) {
-            const detection = (poseLandmarkerInstance as {
-              detectForVideo: (el: HTMLVideoElement, timestamp: number) => {
-                landmarks?: readonly (readonly { x: number; y: number; z: number; visibility?: number }[])[];
-              };
-            }).detectForVideo(video, performance.now());
-
+        const video = webcamVideoRef.current;
+        const landmarker = webcamLandmarkerRef.current;
+        if (
+          !poseFrozenRef.current
+          && video
+          && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+          && video.currentTime !== lastVideoTime
+          && landmarker
+        ) {
+          lastVideoTime = video.currentTime;
+          const detection = landmarker.detectForVideo(video, performance.now());
+          try {
             if (detection.landmarks && detection.landmarks[0]) {
               const rawJoints = solvePoseToMannequinJoints(detection.landmarks[0], {
-                mirrorMode: true,
+                mirrorMode: mirrorModeRef.current,
                 smoothing: 0.35,
               });
               const smoothedJoints = smoothMannequinJointRotations(
@@ -688,25 +823,34 @@ export function StudioMannequinPoserPanel({
                   ...smoothedJoints,
                 },
               };
+              poseRef.current = updatedPose;
               setPose(updatedPose);
               sceneRef.current?.setPose(updatedPose);
             }
+          } finally {
+            detection.close?.();
           }
-          animId = requestAnimationFrame(loop);
-        };
-        animId = requestAnimationFrame(loop);
-      } catch {
-        setWebcamError("실시간 동작 인식 엔진을 초기화하지 못했습니다.");
+        }
+      } catch (cause) {
+        console.warn("Studio mannequin webcam frame analysis failed:", cause);
+        releaseWebcamResources();
         setWebcamActive(false);
+        setWebcamLoading(false);
+        setWebcamError(getStudioMannequinWebcamErrorMessage("tracking", cause));
+        return;
       }
-    }
 
-    startLoop();
+      webcamFrameRef.current = requestAnimationFrame(loop);
+    };
+    webcamFrameRef.current = requestAnimationFrame(loop);
 
     return () => {
-      if (animId) cancelAnimationFrame(animId);
+      if (webcamFrameRef.current !== null) {
+        cancelAnimationFrame(webcamFrameRef.current);
+        webcamFrameRef.current = null;
+      }
     };
-  }, [webcamActive]);
+  }, [releaseWebcamResources, webcamActive]);
 
   const spec = useMemo(() => buildStudioMannequinSpec(params), [params]);
 

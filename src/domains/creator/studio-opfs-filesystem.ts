@@ -180,7 +180,7 @@ export function createStudioOpfsMemoryFileSystem(
 // (테스트가 가짜 핸들을 넘길 수 있고, 브라우저별 타입 편차에도 흔들리지 않는다).
 
 export interface StudioOpfsWritableLike {
-  write(data: Uint8Array): Promise<void>;
+  write(data: ArrayBuffer): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -199,7 +199,10 @@ export interface StudioOpfsDirectoryHandleLike {
     name: string,
     options?: { create?: boolean }
   ): Promise<StudioOpfsDirectoryHandleLike>;
-  getFileHandle(name: string, options?: { create?: boolean }): Promise<StudioOpfsFileHandleLike>;
+  getFileHandle(
+    name: string,
+    options?: { create?: boolean }
+  ): Promise<StudioOpfsFileHandleLike>;
   removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
   keys(): AsyncIterable<string>;
 }
@@ -301,7 +304,9 @@ export function createStudioOpfsNativeFileSystem(
         // 원본이 그대로 남으므로 이 write는 원자적이다(부분 파일이 생기지 않는다).
         const writable = await handle.createWritable();
         try {
-          await writable.write(bytes);
+          const payload = new Uint8Array(bytes.byteLength);
+          payload.set(bytes);
+          await writable.write(payload.buffer);
         } catch (error) {
           await writable.close().catch(() => undefined);
           throw error;
@@ -520,8 +525,13 @@ export function createStudioOpfsLocalStorageFileSystem(
 
 // ── 능력 탐지 + 팩토리 ───────────────────────────────────────────────────
 
+export interface StudioOpfsStorageManagerProbeLike {
+  getDirectory?: unknown;
+  estimate?: unknown;
+}
+
 export interface StudioOpfsFileSystemProbeScope {
-  navigator?: { storage?: Partial<StudioOpfsStorageManagerLike> };
+  navigator?: { storage?: StudioOpfsStorageManagerProbeLike };
   localStorage?: StudioOpfsLocalStorageLike;
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { clampPanoramaRotationDegrees } from "./studio-background-3d-sky";
 import { resolveStudioBg3dAnimationDisplayTime } from "./studio-bg3d-animation-time";
+import { StudioThreeDToggleControl } from "./StudioThreeDToggle";
 
 import type { StudioBg3dAnimationPlayback } from "./studio-bg3d-scene-document";
 
@@ -150,29 +151,14 @@ interface LtToggleRowProps {
 
 export function LtToggleRow({ checked, label, onChange, disabled = false }: LtToggleRowProps) {
   return (
-    <button
-      type="button"
-      aria-pressed={checked}
-      className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-line/70 py-2 text-left text-xs font-semibold text-fg-2 transition-colors last:border-b-0 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+    <StudioThreeDToggleControl
+      checked={checked}
+      label={label}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-    >
-      <span>{label}</span>
-      <span
-        aria-hidden
-        className={cx(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-          checked ? "border-accent bg-accent" : "border-line-strong bg-raised"
-        )}
-      >
-        <span
-          className={cx(
-            "absolute top-0.5 size-3.5 rounded-full bg-fg transition-transform",
-            checked ? "translate-x-[1.05rem]" : "translate-x-0.5"
-          )}
-        />
-      </span>
-    </button>
+      className="border-b border-line/70 py-2 last:border-b-0 hover:text-fg"
+      labelClassName="text-xs font-semibold text-fg-2 group-hover:text-fg"
+      onChange={onChange}
+    />
   );
 }
 

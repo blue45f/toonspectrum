@@ -211,7 +211,7 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 
 ### DB 준비 (PostgreSQL / Neon)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024~0025)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
 
 **A. 로컬 docker Postgres**
 
@@ -256,7 +256,7 @@ MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
 
 계획이 빈 DB임을 확인한 뒤 실행합니다. runtime role이 아직 없을 때만 별도 runtime 연결에
 사용할 24자 이상의 비밀번호를 환경변수로 제공합니다. 명령은 `pg_trgm`, 현재 Drizzle base,
-reviewed 0001~0019 구조, checksum adoption, 실제 0020~0022/0024 forward migration, runtime 최소
+reviewed 0001~0019 구조, checksum adoption, 실제 0020~0022/0024~0025 forward migration, runtime 최소
 권한, idempotent apply와 전체 capability verifier를 순서대로 수행합니다.
 
 ```bash
@@ -296,7 +296,8 @@ direct URL은 runtime 앱 role과 별개인 전용 DDL migrator role이어야 �
 role을 포함한 다른 role을 상속하거나 DB·extension·`public` 객체를 소유할 수 없고, DB 또는
 `public` schema의 `CREATE` 권한과 `toonspectrum_ops` schema/원장 table의 어떤 권한도 가질 수
 없습니다. migration runner는 `PUBLIC`과 runtime role의 원장 접근을 매번 회수한 뒤 verifier와
-동일한 0024 object-storage 컬럼 권한 계약을 적용합니다. runtime
+동일한 0024 object-storage 컬럼 권한 계약을 적용하고, 0025 인증 lifecycle 스키마·인덱스와
+runtime DML 권한을 검증합니다. runtime
 role의 public relation/sequence 최소 DML GRANT와 실제 `DATABASE_URL` canary는
 [`DEPLOY.md`](DEPLOY.md)의 운영 전제대로 별도 완료해야 합니다. URL은
 구조 파싱 후 `postgresql:`/`postgres:`

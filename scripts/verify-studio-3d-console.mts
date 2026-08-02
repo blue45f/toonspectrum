@@ -40,6 +40,7 @@ const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
@@ -1577,11 +1578,16 @@ async function runMagicLayerProductionAlignmentProof(
     if (typeof rendererCandidate !== "function") {
       throw new Error("could not identify the production Three WebGLRenderer");
     }
-    function findThreeConstructor(type: string): ThreeConstructor {
+    function findThreeConstructor(
+      type: string,
+      sourceIdentity: string,
+    ): ThreeConstructor {
       for (const value of Object.values(threeModule)) {
+        const source = functionSource(value);
         if (
           typeof value !== "function" ||
-          functionSource(value).includes("this.isWebGLRenderer")
+          source.includes("this.isWebGLRenderer") ||
+          !source.includes(sourceIdentity)
         ) {
           continue;
         }
@@ -1601,14 +1607,29 @@ async function runMagicLayerProductionAlignmentProof(
     }
 
     const WebGLRenderer = rendererCandidate as typeof import("three").WebGLRenderer;
-    const Scene = findThreeConstructor("Scene") as typeof import("three").Scene;
+    const Scene = findThreeConstructor(
+      "Scene",
+      "this.isScene",
+    ) as typeof import("three").Scene;
     const PerspectiveCamera =
-      findThreeConstructor("PerspectiveCamera") as typeof import("three").PerspectiveCamera;
+      findThreeConstructor(
+        "PerspectiveCamera",
+        "this.isPerspectiveCamera",
+      ) as typeof import("three").PerspectiveCamera;
     const BoxGeometry =
-      findThreeConstructor("BoxGeometry") as typeof import("three").BoxGeometry;
+      findThreeConstructor(
+        "BoxGeometry",
+        "BoxGeometry",
+      ) as typeof import("three").BoxGeometry;
     const MeshBasicMaterial =
-      findThreeConstructor("MeshBasicMaterial") as typeof import("three").MeshBasicMaterial;
-    const Mesh = findThreeConstructor("Mesh") as typeof import("three").Mesh;
+      findThreeConstructor(
+        "MeshBasicMaterial",
+        "this.isMeshBasicMaterial",
+      ) as typeof import("three").MeshBasicMaterial;
+    const Mesh = findThreeConstructor(
+      "Mesh",
+      "this.isMesh",
+    ) as typeof import("three").Mesh;
 
     function statsForMask(
       mask: Uint8Array,
@@ -1748,7 +1769,12 @@ async function runMagicLayerProductionAlignmentProof(
             layers.length !== 1
           ) {
             finish(() => reject(new Error(
-              "the production LT Worker result is malformed",
+              "the production LT Worker result is malformed: " + JSON.stringify({
+                height: Reflect.get(message, "height"),
+                kind: Reflect.get(message, "kind"),
+                layerCount: Array.isArray(layers) ? layers.length : null,
+                width: Reflect.get(message, "width"),
+              }),
             )));
             return;
           }
@@ -1988,6 +2014,16 @@ async function runMagicLayerProductionAlignmentProof(
         }
         if (camera.view?.enabled) {
           throw new Error(`[${scenario.id}] shipped capture-frame wrapper did not restore view`);
+        }
+
+        let capturedAlphaPixels = 0;
+        for (let offset = 0; offset < threeRgba.length; offset += 4) {
+          if (threeRgba[offset + 3]! > 0) capturedAlphaPixels += 1;
+        }
+        if (capturedAlphaPixels === 0) {
+          throw new Error(
+            `[${scenario.id}] production Three capture is empty before the LT Worker`,
+          );
         }
 
         const ltColorLayer = await renderLtColorInProductionWorker(

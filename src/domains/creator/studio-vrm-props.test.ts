@@ -383,8 +383,9 @@ describe("부착 인스턴스 생성·직렬화", () => {
 });
 
 /* three 목 — 메시 빌더가 three 없이도 동작하는지 검증 */
-function makeThreeMock(): { three: ThreeLike; created: string[] } {
+function makeThreeMock(): { three: ThreeLike; created: string[]; meshObjects: ThreeObject[] } {
   const created: string[] = [];
+  const meshObjects: ThreeObject[] = [];
   class Obj implements ThreeObject {
     name = "";
     children: Obj[] = [];
@@ -400,7 +401,9 @@ function makeThreeMock(): { three: ThreeLike; created: string[] } {
     Mesh: class {
       constructor() {
         created.push("mesh");
-        return new Obj();
+        const object = new Obj();
+        meshObjects.push(object);
+        return object;
       }
     } as unknown as ThreeLike["Mesh"],
     MeshStandardMaterial: class {} as unknown as ThreeLike["MeshStandardMaterial"],
@@ -412,7 +415,7 @@ function makeThreeMock(): { three: ThreeLike; created: string[] } {
     Color: class {} as unknown as ThreeLike["Color"],
     DoubleSide: 2,
   };
-  return { three, created };
+  return { three, created, meshObjects };
 }
 
 describe("소품 메시 빌더", () => {
@@ -429,5 +432,37 @@ describe("소품 메시 빌더", () => {
     const def = propDefById("cape")!;
     const obj = buildPropObject(three, def, "#123456");
     expect(obj.name).toBe("prop:cape");
+  });
+
+  it("모든 절차형 소품 표면이 캐릭터 장면의 그림자에 참여한다", () => {
+    for (const def of VRM_PROPS as readonly PropDef[]) {
+      const { three, meshObjects } = makeThreeMock();
+      buildPropObject(three, def, def.defaultColor);
+      expect(meshObjects.length, def.id).toBeGreaterThan(0);
+      expect(meshObjects.every((object) => object.castShadow && object.receiveShadow), def.id)
+        .toBe(true);
+    }
+  });
+
+  it("프로덕션 품질 어댑터가 있으면 날카로운 박스를 안전 반경의 둥근 모서리로 바꾼다", () => {
+    const { three } = makeThreeMock();
+    const roundedBox = vi.fn((
+      _width: number,
+      _height: number,
+      _depth: number,
+      _radius: number,
+    ) => ({ kind: "rounded-box" }));
+    buildPropObject(
+      three,
+      propDefById("smartphone")!,
+      null,
+      { roundedBox },
+    );
+
+    expect(roundedBox).toHaveBeenCalled();
+    for (const [width, height, depth, radius] of roundedBox.mock.calls) {
+      expect(radius).toBeGreaterThan(0);
+      expect(radius).toBeLessThanOrEqual(Math.min(width, height, depth) / 2);
+    }
   });
 });

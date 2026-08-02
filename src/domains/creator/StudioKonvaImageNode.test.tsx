@@ -3,6 +3,9 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
+import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
+import { sha256HexPortable } from "./studio-sha256";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
 import type { FrameEl, ImageEl } from "./studio-element-model";
@@ -39,7 +42,7 @@ class TestImage {
 }
 
 const konvaCapture = vi.hoisted(() => {
-  const layer = { batchDraw: vi.fn() };
+  const layer = { batchDraw: vi.fn(), drawScene: vi.fn() };
   return {
     layer,
     node: {
@@ -118,6 +121,123 @@ function imageEl(overrides: Partial<ImageEl> = {}): ImageEl {
     y: 20,
     ...overrides,
   };
+}
+
+const HOKUSAI_HASH = `sha256:${"a".repeat(64)}` as const;
+const HOKUSAI_PNG_HASH = `sha256:${"b".repeat(64)}` as const;
+const HOKUSAI_INPUT_HASH = `sha256:${"c".repeat(64)}` as const;
+
+function livingInkImageEl(): ImageEl {
+  const bytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const pngHash = `sha256:${sha256HexPortable(bytes)}` as const;
+  const routeKey = "studio-living-ink-action:page-1:clear-1";
+  return imageEl({
+    src: `data:image/png;base64,${globalThis.btoa(binary)}`,
+    livingInkReceipt: {
+      kind: "studio-living-ink/document-receipt",
+      version: 1,
+      protocolVersion: 1,
+      engineVersion: STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
+      pageId: "page-1",
+      routeKey,
+      documentWidth: 200,
+      documentHeight: 200,
+      config: {
+        displayWidth: 200,
+        displayHeight: 200,
+        fieldWidth: 128,
+        fieldHeight: 128,
+        coarseBase: 128,
+        seed: 7,
+        material: DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS,
+        displayMode: "composite",
+      },
+      journal: [{ kind: "clear", version: 1, sequence: 1, scope: "all", selection: null }],
+      sourceElementIds: [],
+      canonicalPngSha256: pngHash,
+      finalExecutionReceipt: {
+        kind: "studio-living-ink-execution-receipt",
+        version: 1,
+        engineVersion: STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
+        requestId: 1,
+        revision: 1,
+        operationKind: "clear",
+        backend: "webgl2-offscreen-half-float",
+        displaySha256: `sha256:${"a".repeat(64)}`,
+        operationSha256: `sha256:${"b".repeat(64)}`,
+        dirtyBounds: { x: 0, y: 0, width: 128, height: 128 },
+        dirtyTileCount: 16,
+        passCount: 1,
+        pressureIterations: 10,
+        simulationTicks: 0,
+        elapsedMilliseconds: 1,
+        fixedPigmentPolicy: "immutable",
+        dryingWindowSeconds: 2,
+        fixDurationSeconds: 1.2,
+        determinism: "same-runtime-replay",
+        crossDeviceBitExact: false,
+        cpuOperationHashCrossDeviceDeterministic: true,
+        canonicalFrameAuthority: "first-rendered-rgba8-frame",
+        replayValidation: "bounded-visual-parity",
+        displayReadbackOrientation: "webgl-bottom-left-row-major",
+        gpuError: 0,
+        readbackFormat: "rgba8-staging-fbo",
+        imageOwnership: "caller-must-close",
+        contextRecovery: "worker-rebuild-journal-replay",
+      },
+      restorePolicy: "replay-or-flattened-raster-fail-closed",
+      fixedPigmentPolicy: "immutable",
+      historyEntryCount: 1,
+    },
+  });
+}
+
+function hokusaiImageEl(): ImageEl {
+  const logicalPlacement = { x: 10, y: 20, width: 200, height: 200 } as const;
+  return imageEl({
+    hokusaiLiveReceipt: {
+      kind: "studio-hokusai-live/document-receipt",
+      version: 1,
+      liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.2",
+      sourceElementId: "source-stroke-1",
+      sourceRevision: `hokusai-source-v1:${"d".repeat(16)}`,
+      canonical: {
+        kind: "studio-hokusai-live/canonical-receipt",
+        version: 1,
+        requestId: 1,
+        engineEpoch: 1,
+        strokeId: "source-stroke-1",
+        presetId: "charcoal",
+        seed: 17,
+        sampleCount: 2,
+        finalSequence: 2,
+        segmentCount: 1,
+        segments: [{
+          segmentIndex: 0,
+          logicalPlacement,
+          pixelHash: HOKUSAI_HASH,
+          pngHash: HOKUSAI_PNG_HASH,
+        }],
+        dirtyBounds: [0, 0, 200, 200],
+        pixelLayout: "packed-dirty-rgba8",
+        inputHash: HOKUSAI_INPUT_HASH,
+        lastLivePixelHash: HOKUSAI_HASH,
+        settledPixelHash: HOKUSAI_HASH,
+        pngHash: HOKUSAI_PNG_HASH,
+        exactLiveCommitParity: true,
+        execution: "dedicated-worker-wasm-packed-dirty-live",
+        materialTexture: "studio-hokusai-material-texture-v2",
+        endpointPolicy: "tapered-start-no-dab-carrier-v1",
+        colorOpacityApplication: "worker-once-before-material-transfer-v1",
+        canonicalAuthority: "settled-png-receipt-v1",
+        undoAuthority: "single-stroke-transaction-v1",
+        saveAuthority: "canonical-png-plus-versioned-receipt-v1",
+        complete: true,
+      },
+    },
+  });
 }
 
 function latestImageProps(): CapturedImageProps {
@@ -202,6 +322,57 @@ afterEach(() => {
 });
 
 describe("StudioKonvaImageNode image lifecycle", () => {
+  it("acknowledges a Hokusai canonical image only after its decoded pixels draw on the main layer", async () => {
+    const onReady = vi.fn();
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={hokusaiImageEl()}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onHokusaiCanonicalImageReady={onReady}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(onReady).not.toHaveBeenCalled();
+    expect(konvaCapture.layer.drawScene).not.toHaveBeenCalled();
+    await resolveLatestImage();
+
+    await waitFor(() => {
+      expect(konvaCapture.layer.drawScene).toHaveBeenCalledTimes(1);
+      expect(onReady).toHaveBeenCalledWith("image-1", HOKUSAI_PNG_HASH);
+    });
+  });
+
+  it("acknowledges Living Ink with the exact route token only after byte verification and main-layer draw", async () => {
+    const onReady = vi.fn();
+    const element = livingInkImageEl();
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onLivingInkCanonicalImageReady={onReady}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(onReady).not.toHaveBeenCalled();
+    await resolveLatestImage();
+    await waitFor(() => {
+      expect(konvaCapture.layer.drawScene).toHaveBeenCalledTimes(1);
+      expect(onReady).toHaveBeenCalledWith(
+        "image-1",
+        element.livingInkReceipt?.canonicalPngSha256,
+        element.livingInkReceipt?.routeKey,
+      );
+    });
+  });
+
   it.each([
     ["horizontal", { flipped: true }, [64, 0], [-1, 1]],
     ["vertical", { flippedY: true }, [0, 48], [1, -1]],

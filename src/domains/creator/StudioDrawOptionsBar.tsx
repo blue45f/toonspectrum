@@ -56,10 +56,16 @@ import {
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioDualColorWell } from "./StudioDualColorWell";
+import { StudioLivingInkControls } from "./StudioLivingInkControls";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
+import type { StudioLivingInkMaterialControls } from "./studio-living-ink-gpu-protocol";
+import type {
+  StudioLivingInkStrokeMode,
+  StudioLivingInkStudioState,
+} from "./studio-living-ink-studio-coordinator";
 
 import { cn } from "@/lib/utils";
 
@@ -141,6 +147,24 @@ export interface StudioDrawOptionsBarProps {
   shapeFill?: boolean;
   onShapeFillChange?: (filled: boolean) => void;
   shapeSlot?: ReactNode;
+  livingInk?: Readonly<{
+    supported: boolean;
+    state: StudioLivingInkStudioState;
+    mode: StudioLivingInkStrokeMode;
+    scope: "all" | "selection";
+    selectionAvailable: boolean;
+    busy: boolean;
+    fixAvailable: boolean;
+    fixUnavailableReason?: string;
+    material: StudioLivingInkMaterialControls;
+    materialLocked: boolean;
+    materialLockedReason?: string;
+    onModeChange: (mode: StudioLivingInkStrokeMode) => void;
+    onScopeChange: (scope: "all" | "selection") => void;
+    onFix: () => void;
+    onClear: () => void;
+    onMaterialChange: (patch: Partial<StudioLivingInkMaterialControls>) => void;
+  }>;
   /** Float above the canvas bottom edge instead of consuming a second top row. */
   docked?: boolean;
   /** Desktop workspace chrome that the fixed dock must not cover. */
@@ -264,6 +288,7 @@ export function StudioDrawOptionsBar({
   shapeFill = false,
   onShapeFillChange,
   shapeSlot,
+  livingInk,
   docked = false,
   dockInsets = { left: 56, right: 56 },
   className,
@@ -726,6 +751,10 @@ export function StudioDrawOptionsBar({
               </StudioToolHintTarget>
             ) : null}
           </div>
+        ) : null}
+
+        {drawMode === "pen" && livingInk ? (
+          <StudioLivingInkControls {...livingInk} />
         ) : null}
 
         {drawMode === "shape" && onShapeKindChange ? (

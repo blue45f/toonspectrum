@@ -78,13 +78,38 @@ describe("product UI wiring", () => {
       resolve(import.meta.dirname, "./StudioMenubarContent.tsx"),
       "utf8",
     );
+    const handoff = readFileSync(
+      resolve(import.meta.dirname, "./studio-hybrid-dcc-bg3d-handoff.ts"),
+      "utf8",
+    );
     expect(page).toContain("LazyStudioHybridDccDialog");
     expect(page).toContain("setHybridDccOpen");
     expect(page).toContain("hybridDccOpen");
+    expect(page).toContain("onOpenInBackground3D");
+    expect(page).toContain("setBg3dInitialScene(result.scene)");
+    expect(page).toContain("key={hybridDccWorkspaceScope}");
+    expect(page).toContain(
+      "current?.scope === hybridDccWorkspaceScope && current?.workspace === workspace",
+    );
+    expect(page).toContain("STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS");
+    expect(page).toContain("hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope");
+    expect(page).toContain('status: "session-only"');
+    expect(page).toContain(
+      "hybridDccAuthFallbackScopeRef.current === previousHybridDccWorkspaceScope",
+    );
+    expect(page).toContain("await persistence.save(pendingWorkspace)");
+    expect(page).toContain(
+      "hybridDccScopeTransferRef.current?.toScope === hybridDccWorkspaceScope",
+    );
     expect(menubar).toContain("setHybridDccOpen");
+    expect(handoff).toContain("exportStudioHybridDccGlbBatch");
+    expect(handoff).not.toContain("exportStudioHybridDccAuthorityRecordGlb");
     expect(menubar).toContain('data-studio-hybrid-dcc-open="true"');
     expect(existsSync(resolve(import.meta.dirname, "./StudioHybridDccDialog.tsx"))).toBe(true);
     expect(existsSync(resolve(import.meta.dirname, "./StudioHybridDccPanel.tsx"))).toBe(true);
+    expect(
+      existsSync(resolve(import.meta.dirname, "./studio-hybrid-dcc-bg3d-handoff.ts")),
+    ).toBe(true);
     void root;
   });
 });

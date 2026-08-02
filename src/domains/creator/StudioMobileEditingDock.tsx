@@ -62,6 +62,10 @@ import {
 } from "./studio-vector-erase-to-intersection-apply";
 import { StudioColorBlindPreviewToggle } from "./StudioColorBlindPreviewToggle";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
+import {
+  StudioLivingInkControls,
+  type StudioLivingInkControlsProps,
+} from "./StudioLivingInkControls";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
 import type { BrushPreset } from "./studio-brush";
@@ -393,6 +397,7 @@ export interface StudioMobileEditingDockProps {
   hi: number;
   history: PageState[][];
   isMobile: boolean;
+  livingInk: StudioLivingInkControlsProps;
   marqueeIds: string[];
   mobileBrushDockButtonRef: import("react").RefObject<HTMLButtonElement | null>;
   mobileKeyboardInset: number;
@@ -485,6 +490,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   hi,
   history,
   isMobile,
+  livingInk,
   marqueeIds,
   mobileBrushDockButtonRef,
   mobileKeyboardInset,
@@ -1045,6 +1051,21 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     </div>
                   </Suspense>
                 </div>
+                {livingInk.supported ? (
+                  <section
+                    aria-label="Living Ink 빠른 도구"
+                    data-studio-mobile-living-ink="true"
+                    className="mb-2.5 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-2"
+                  >
+                    <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
+                      <p className="text-[0.68rem] font-bold text-fg-2">Living Ink</p>
+                      <p className="text-[0.6rem] text-fg-3">잉크 · 물 · 정착 · 지우기</p>
+                    </div>
+                    <div className="overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <StudioLivingInkControls {...livingInk} />
+                    </div>
+                  </section>
+                ) : null}
               </>
             )}
 

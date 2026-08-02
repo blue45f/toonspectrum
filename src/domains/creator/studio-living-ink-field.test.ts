@@ -1,0 +1,468 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  applyStudioLivingInkOperation,
+  createStudioLivingInkSession,
+  createStudioLivingInkStrokeOperation,
+  decodeStudioLivingInkSnapshot,
+  encodeStudioLivingInkSnapshot,
+  STUDIO_LIVING_INK_FIELD_VERSION,
+  STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
+  undoStudioLivingInkOperation,
+  type StudioLivingInkDepositOperation,
+  type StudioLivingInkSelectionMask,
+  type StudioLivingInkSession,
+} from "./studio-living-ink-field";
+
+import type {
+  StudioWetMediaTileFieldPaper,
+  StudioWetMediaTileFieldSettings,
+} from "./studio-wet-media-tile-field";
+
+function settings(width = 12, height = 12): StudioWetMediaTileFieldSettings {
+  return {
+    kind: "studio-wet-media-tile-field-settings",
+    version: 1,
+    model: "fixed-step-anisotropic-paper-v1",
+    width,
+    height,
+    waterDiffusionRate: 0.12,
+    pigmentDiffusionRate: 0.1,
+    anisotropy: 0.35,
+    absorptionRate: 0.08,
+    surfaceEvaporationRate: 0.02,
+    paperEvaporationRate: 0.005,
+    fixationRate: 0.16,
+    edgePoolingRate: 0.04,
+    rewetRate: 0.8,
+    backrunRate: 0.04,
+    rewetEnergyDecay: 0.2,
+    dryThreshold: 1,
+    maxCellWater: 100,
+    maxCellPigment: 100,
+  };
+}
+
+function paper(model: StudioWetMediaTileFieldSettings): StudioWetMediaTileFieldPaper {
+  const cells = model.width * model.height;
+  return {
+    kind: "studio-wet-media-tile-field-paper",
+    version: 1,
+    absorption: new Array<number>(cells).fill(0.55),
+    fiberDirectionRadians: new Array<number>(cells).fill(Math.PI / 8),
+    activeMask: new Array<number>(cells).fill(1),
+    cutBoundaryMask: new Array<number>(cells).fill(0),
+  };
+}
+
+function session(width = 12, height = 12): StudioLivingInkSession {
+  const model = settings(width, height);
+  const created = createStudioLivingInkSession(model, paper(model));
+  if (!created.ok) throw new Error(`${created.reason}:${created.path}`);
+  return created.value;
+}
+
+function total(values: readonly number[]): number {
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function ink(
+  sequence: number,
+  overrides: Partial<StudioLivingInkDepositOperation["marks"][number]> = {},
+): StudioLivingInkDepositOperation {
+  return {
+    kind: "ink",
+    version: STUDIO_LIVING_INK_FIELD_VERSION,
+    sequence,
+    tool: "brush",
+    marks: [{
+      x: 6,
+      y: 6,
+      radius: 2.4,
+      pressure: 0.7,
+      speed: 120,
+      waterMass: 6,
+      pigmentMass: 3,
+      color: [0.12, 0.24, 0.55, 1],
+      ...overrides,
+    }],
+    selection: null,
+  };
+}
+
+async function applied(
+  current: StudioLivingInkSession,
+  operation: Parameters<typeof applyStudioLivingInkOperation>[1],
+) {
+  const result = await applyStudioLivingInkOperation(current, operation);
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(`${result.reason}:${result.path}`);
+  return result.value;
+}
+
+describe("Studio Living Ink field", () => {
+  it("keeps white gouache canonical through dark→fix→white→save→fix→dark layering", async () => {
+    const initial = session();
+    const dark = await applied(initial, ink(1, {
+      x: 6,
+      y: 6,
+      radius: 3,
+      pigmentMass: 5,
+      waterMass: 2,
+      color: [0.06, 0.09, 0.14, 1],
+    }));
+    const darkFixed = await applied(dark.session, {
+      kind: "fix",
+      version: 1,
+      sequence: 2,
+      scope: "all",
+      selection: null,
+    });
+    const densityAfterDark = darkFixed.session.state.fixedPigmentOpticalDensity
+      .flat()
+      .reduce((sum, value) => sum + value, 0);
+
+    const whiteMobile = await applied(darkFixed.session, {
+      kind: "ink",
+      version: 1,
+      sequence: 3,
+      tool: "white-gouache",
+      marks: [{
+        x: 6,
+        y: 6,
+        radius: 2.5,
+        pressure: 1,
+        speed: 0,
+        waterMass: 1,
+        pigmentMass: 4,
+        color: [1, 1, 1, 1],
+      }],
+      selection: null,
+    });
+    expect(total(whiteMobile.session.mobileWhiteGouacheCoverage)).toBeGreaterThan(0);
+    expect(total(whiteMobile.session.state.mobilePigmentMass)).toBe(0);
+
+    const encodedWhite = encodeStudioLivingInkSnapshot(whiteMobile.session);
+    expect(encodedWhite.ok).toBe(true);
+    if (!encodedWhite.ok) return;
+    const restoredWhite = decodeStudioLivingInkSnapshot(
+      encodedWhite.value.bytes,
+      encodedWhite.value.receipt.sha256,
+    );
+    expect(restoredWhite.ok).toBe(true);
+    if (!restoredWhite.ok) return;
+    expect(restoredWhite.value.mobileWhiteGouacheCoverage)
+      .toEqual(whiteMobile.session.mobileWhiteGouacheCoverage);
+
+    const whiteFixed = await applied(restoredWhite.value, {
+      kind: "fix",
+      version: 1,
+      sequence: 4,
+      scope: "all",
+      selection: null,
+    });
+    const densityAfterWhite = whiteFixed.session.state.fixedPigmentOpticalDensity
+      .flat()
+      .reduce((sum, value) => sum + value, 0);
+    expect(densityAfterWhite).toBeLessThan(densityAfterDark * 0.8);
+    expect(total(whiteFixed.session.mobileWhiteGouacheCoverage)).toBe(0);
+
+    const darkAgain = await applied(whiteFixed.session, ink(5, {
+      x: 6,
+      y: 6,
+      radius: 1.5,
+      pigmentMass: 2,
+      waterMass: 0.5,
+      color: [0.02, 0.02, 0.02, 1],
+    }));
+    const darkAgainFixed = await applied(darkAgain.session, {
+      kind: "fix",
+      version: 1,
+      sequence: 6,
+      scope: "all",
+      selection: null,
+    });
+    const densityAfterDarkAgain = darkAgainFixed.session.state.fixedPigmentOpticalDensity
+      .flat()
+      .reduce((sum, value) => sum + value, 0);
+    expect(densityAfterDarkAgain).toBeGreaterThan(densityAfterWhite);
+    expect(STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION).toBe(2.35);
+
+    const reopened = encodeStudioLivingInkSnapshot(darkAgainFixed.session);
+    expect(reopened.ok).toBe(true);
+    if (!reopened.ok) return;
+    const decoded = decodeStudioLivingInkSnapshot(reopened.value.bytes, reopened.value.receipt.sha256);
+    expect(decoded).toEqual({ ok: true, value: darkAgainFixed.session });
+  });
+
+  it("advects mobile white coverage conservatively without crossing selection or cut boundaries", async () => {
+    const model = settings(8, 6);
+    const customPaper = paper(model);
+    const cuts = [...customPaper.cutBoundaryMask];
+    for (let y = 0; y < model.height; y += 1) {
+      cuts[y * model.width + 3] = 2;
+      cuts[y * model.width + 4] = 8;
+    }
+    const created = createStudioLivingInkSession(model, { ...customPaper, cutBoundaryMask: cuts });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const selection: StudioLivingInkSelectionMask = {
+      kind: "studio-living-ink-selection-mask",
+      version: 1,
+      bounds: { x: 0, y: 0, width: 4, height: 6 },
+      coverage: new Array<number>(24).fill(1),
+    };
+    const white = await applied(created.value, {
+      kind: "ink",
+      version: 1,
+      sequence: 1,
+      tool: "white-gouache",
+      marks: [{
+        x: 2,
+        y: 3,
+        radius: 1.25,
+        pressure: 1,
+        speed: 0,
+        waterMass: 12,
+        pigmentMass: 3,
+        color: [1, 1, 1, 1],
+      }],
+      selection,
+    });
+    const before = white.session.mobileWhiteGouacheCoverage;
+    const advanced = await applied(white.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 2,
+      fixedTicks: 12,
+    });
+    const after = advanced.session.mobileWhiteGouacheCoverage;
+    expect(advanced.receipt.estimatedCellWork)
+      .toBeGreaterThan(model.width * model.height * 12);
+    expect(after).not.toEqual(before);
+    expect(total(after)).toBeCloseTo(total(before), 10);
+    for (let y = 0; y < model.height; y += 1) {
+      for (let x = 4; x < model.width; x += 1) {
+        expect(after[y * model.width + x]).toBe(0);
+      }
+    }
+    expect(Object.isFrozen(after)).toBe(true);
+  });
+
+  it("keeps water, mobile pigment and fixed pigment as separate physical wells", async () => {
+    const initial = session();
+    const painted = await applied(initial, ink(1));
+    const mobileAfterInk = total(painted.session.state.mobilePigmentMass);
+    const fixedAfterInk = total(painted.session.state.fixedPigmentMass);
+    const waterAfterInk = total(painted.session.state.surfaceWater);
+    expect(mobileAfterInk).toBeGreaterThan(0);
+    expect(fixedAfterInk).toBe(0);
+    expect(waterAfterInk).toBeGreaterThan(0);
+
+    const watered = await applied(painted.session, {
+      kind: "water",
+      version: 1,
+      sequence: 2,
+      tool: "water-brush",
+      marks: [{ x: 6, y: 6, radius: 3, pressure: 0.8, speed: 40, waterMass: 4 }],
+      selection: null,
+    });
+    expect(total(watered.session.state.surfaceWater)).toBeGreaterThan(waterAfterInk);
+    expect(total(watered.session.state.mobilePigmentMass)).toBeCloseTo(mobileAfterInk, 12);
+    expect(total(watered.session.state.fixedPigmentMass)).toBe(fixedAfterInk);
+
+    const fixed = await applied(watered.session, {
+      kind: "fix",
+      version: 1,
+      sequence: 3,
+      scope: "all",
+      selection: null,
+    });
+    expect(total(fixed.session.state.mobilePigmentMass)).toBe(0);
+    expect(total(fixed.session.state.fixedPigmentMass)).toBeCloseTo(mobileAfterInk, 12);
+    expect(total(fixed.session.state.surfaceWater)).toBe(0);
+    expect(total(fixed.session.state.absorbedPaperWater)).toBe(0);
+
+    const rewetted = await applied(fixed.session, {
+      kind: "water",
+      version: 1,
+      sequence: 4,
+      tool: "water-brush",
+      marks: [{ x: 6, y: 6, radius: 3, pressure: 1, speed: 0, waterMass: 8 }],
+      selection: null,
+    });
+    const evolved = await applied(rewetted.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 5,
+      fixedTicks: 8,
+    });
+    expect(total(evolved.session.state.mobilePigmentMass)).toBe(0);
+    expect(total(evolved.session.state.fixedPigmentMass)).toBeCloseTo(mobileAfterInk, 10);
+  });
+
+  it("clips deposition and destructive operations to an alpha selection mask", async () => {
+    const initial = session(8, 8);
+    const selection: StudioLivingInkSelectionMask = {
+      kind: "studio-living-ink-selection-mask",
+      version: 1,
+      bounds: { x: 1, y: 1, width: 2, height: 2 },
+      coverage: [1, 1, 1, 0.5],
+    };
+    const painted = await applied(initial, {
+      ...ink(1, { x: 2, y: 2, radius: 4 }),
+      selection,
+    });
+    const state = painted.session.state;
+    for (let y = 0; y < 8; y += 1) {
+      for (let x = 0; x < 8; x += 1) {
+        const mass = state.mobilePigmentMass[y * 8 + x] ?? 0;
+        if (x >= 1 && x < 3 && y >= 1 && y < 3) expect(mass).toBeGreaterThan(0);
+        else expect(mass).toBe(0);
+      }
+    }
+    expect(painted.receipt.dirtyBounds).toEqual({ x: 1, y: 1, width: 2, height: 2 });
+
+    const cleared = await applied(painted.session, {
+      kind: "clear",
+      version: 1,
+      sequence: 2,
+      scope: "selection",
+      selection: {
+        kind: "studio-living-ink-selection-mask",
+        version: 1,
+        bounds: { x: 1, y: 1, width: 1, height: 1 },
+        coverage: [1],
+      },
+    });
+    expect(cleared.session.state.mobilePigmentMass[1 * 8 + 1]).toBe(0);
+    expect(total(cleared.session.state.mobilePigmentMass)).toBeGreaterThan(0);
+  });
+
+  it("applies pressure, speed and tool dynamics instead of treating every mark alike", async () => {
+    const slowStrong = await applied(session(), ink(1, { pressure: 1, speed: 0 }));
+    const fastLight = await applied(session(), ink(1, { pressure: 0.1, speed: 8_000 }));
+    expect(total(slowStrong.session.state.mobilePigmentMass))
+      .toBeGreaterThan(total(fastLight.session.state.mobilePigmentMass) * 3);
+    expect(total(slowStrong.session.state.surfaceWater))
+      .toBeGreaterThan(total(fastLight.session.state.surfaceWater) * 3);
+  });
+
+  it("uses the same reviewed reflectance floor as GPU replay for near-black pigment", async () => {
+    const belowFloor = await applied(session(), ink(1, { color: [0.001, 0.008, 0.014, 1] }));
+    const atFloor = await applied(session(), ink(1, { color: [0.015, 0.015, 0.015, 1] }));
+    const aboveFloor = await applied(session(), ink(1, { color: [0.02, 0.02, 0.02, 1] }));
+    expect(belowFloor.session.state.mobilePigmentOpticalDensity)
+      .toEqual(atFloor.session.state.mobilePigmentOpticalDensity);
+    expect(total(aboveFloor.session.state.mobilePigmentOpticalDensity[0]))
+      .toBeLessThan(total(atFloor.session.state.mobilePigmentOpticalDensity[0]));
+  });
+
+  it("keeps cancellation atomic and never exposes a partially deposited session", async () => {
+    const initial = session(32, 32);
+    const controller = new AbortController();
+    const marks = Array.from({ length: 40 }, (_, index) => ({
+      x: 2 + index * 0.5,
+      y: 12,
+      radius: 1.5,
+      pressure: 0.6,
+      speed: 100,
+      waterMass: 1,
+      pigmentMass: 0.5,
+      color: [0.2, 0.3, 0.4, 1] as const,
+    }));
+    const result = await applyStudioLivingInkOperation(initial, {
+      kind: "ink",
+      version: 1,
+      sequence: 1,
+      tool: "pen",
+      marks,
+      selection: null,
+    }, {
+      signal: controller.signal,
+      yieldControl: async () => {
+        controller.abort();
+      },
+    });
+    expect(result).toEqual({ ok: false, reason: "aborted", path: "$.operation" });
+    expect(total(initial.state.surfaceWater)).toBe(0);
+    expect(total(initial.state.mobilePigmentMass)).toBe(0);
+    expect(initial.revision).toBe(0);
+  });
+
+  it("round-trips canonical save bytes and restores exact immutable undo state", async () => {
+    const initial = session();
+    const painted = await applied(initial, ink(1));
+    const first = encodeStudioLivingInkSnapshot(painted.session);
+    const second = encodeStudioLivingInkSnapshot(painted.session);
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+    expect(first.value.bytes).toEqual(second.value.bytes);
+    expect(first.value.receipt.sha256).toBe(second.value.receipt.sha256);
+
+    const restored = decodeStudioLivingInkSnapshot(
+      first.value.bytes,
+      first.value.receipt.sha256,
+    );
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) return;
+    expect(restored.value).toEqual(painted.session);
+    expect(Object.isFrozen(restored.value.state.mobilePigmentMass)).toBe(true);
+
+    const undone = undoStudioLivingInkOperation(painted.session, painted.undo);
+    expect(undone).toEqual({ ok: true, value: initial });
+    expect(undoStudioLivingInkOperation(restored.value, painted.undo)).toEqual({
+      ok: false,
+      reason: "integrity-mismatch",
+      path: "$.undo.expectedSession",
+    });
+  });
+
+  it("interpolates current wet-brush samples densely enough to hide station gaps", () => {
+    const operation = createStudioLivingInkStrokeOperation(1, {
+      fieldScale: 4,
+      baseWidth: 10,
+      waterLoad: 0.4,
+      pigmentLoad: 0.25,
+      color: [0.1, 0.15, 0.2, 1],
+      tool: "brush",
+    }, [
+      { x: 2, y: 4, pressure: 0.3, timeMs: 0 },
+      { x: 92, y: 4, pressure: 0.9, timeMs: 20 },
+    ]);
+    expect(operation.marks.length).toBeGreaterThan(12);
+    for (let index = 1; index < operation.marks.length; index += 1) {
+      const previous = operation.marks[index - 1]!;
+      const current = operation.marks[index]!;
+      expect(Math.hypot(current.x - previous.x, current.y - previous.y)).toBeLessThanOrEqual(5.61);
+    }
+  });
+
+  it("deposits the opening station exactly once instead of creating a dark round blob", () => {
+    const operation = createStudioLivingInkStrokeOperation(1, {
+      fieldScale: 1,
+      baseWidth: 8,
+      waterLoad: 0.4,
+      pigmentLoad: 0.25,
+      color: [0.1, 0.15, 0.2, 1],
+      tool: "brush",
+    }, [{ x: 4, y: 7, pressure: 0.6, timeMs: 0 }]);
+    expect(operation.marks).toHaveLength(1);
+    expect(operation.marks[0]).toMatchObject({ x: 4, y: 7, pressure: 0.6 });
+  });
+
+  it("rejects a 4097+ mark segment instead of silently truncating its tail", () => {
+    expect(() => createStudioLivingInkStrokeOperation(1, {
+      fieldScale: 1,
+      baseWidth: 0.5,
+      waterLoad: 0.4,
+      pigmentLoad: 0.25,
+      color: [0.1, 0.15, 0.2, 1],
+      tool: "brush",
+    }, [
+      { x: 0, y: 0, pressure: 0.3, timeMs: 0 },
+      { x: 2_048, y: 0, pressure: 0.9, timeMs: 20 },
+    ])).toThrow(/requires 4097 marks; maximum is 4096/);
+  });
+});

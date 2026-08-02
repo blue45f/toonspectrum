@@ -24,8 +24,8 @@ import {
   normalizeStudioLiquifyMode,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
-import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { LucideIcon } from "lucide-react";
@@ -109,6 +109,7 @@ export type StudioLiquifyPanelProps = {
   /** 누적 displacement 세션이 준비된 호출부에서만 제공한다. */
   onReconstruct?: () => void;
   onSmooth?: () => void;
+  onOpenTutorial?: () => void;
 };
 
 export function StudioLiquifyPanel({
@@ -134,6 +135,7 @@ export function StudioLiquifyPanel({
   onTogglePressureStrength,
   onReconstruct,
   onSmooth,
+  onOpenTutorial,
 }: StudioLiquifyPanelProps): ReactElement {
   const titleId = useId();
   const help = studioRetouchToolHelp("liquify");
@@ -162,6 +164,7 @@ export function StudioLiquifyPanel({
         <div className="min-w-0">
           <h3
             id={titleId}
+            aria-label={`${help.actionName} · ${help.technicalName} · ${current.label}`}
             className="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-fg-2"
           >
             <CurrentIcon size={13} aria-hidden />
@@ -354,6 +357,7 @@ export function StudioLiquifyPanel({
         active={active}
         busy={busy}
         disabled={disabled}
+        onOpenTutorial={onOpenTutorial}
       />
     </section>
   );

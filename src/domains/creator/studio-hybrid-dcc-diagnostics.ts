@@ -7,6 +7,7 @@ import {
   type StudioEditableMesh,
   type StudioMeshDiagnostic,
 } from "./studio-editable-half-edge-mesh";
+import { normalizeStudioHybridDccObjectTransform } from "./studio-hybrid-dcc-object-transform";
 
 import type { StudioHybridDccDocumentState } from "./studio-hybrid-dcc-document";
 
@@ -18,6 +19,9 @@ export type StudioHybridCorruptionCode =
   | "missing-geometry"
   | "bad-mesh"
   | "rights-missing"
+  | "object-transform-missing"
+  | "object-transform-invalid"
+  | "object-transform-orphan"
   | "empty-document";
 
 export interface StudioHybridCorruptionFinding {
@@ -67,6 +71,25 @@ export function scanStudioHybridDccCorruption(
 
   const rightsIds = new Set(state.rightsBom.map((r) => r.assetId));
   for (const id of assetIds) {
+    if (!Object.hasOwn(state.objectTransforms, id)) {
+      findings.push({
+        code: "object-transform-missing",
+        severity: "error",
+        targetId: id,
+        message: `Asset ${id} has no canonical object transform`,
+      });
+    } else {
+      try {
+        normalizeStudioHybridDccObjectTransform(state.objectTransforms[id]);
+      } catch (error) {
+        findings.push({
+          code: "object-transform-invalid",
+          severity: "error",
+          targetId: id,
+          message: `Asset ${id} has an invalid object transform: ${error instanceof Error ? error.message : "invalid value"}`,
+        });
+      }
+    }
     if (!rightsIds.has(id)) {
       findings.push({
         code: "rights-missing",
@@ -94,6 +117,17 @@ export function scanStudioHybridDccCorruption(
         targetId: id,
         message: `Mesh ${id} has ${errors.length} topology error(s)`,
         meshDiagnostics: meshDiags,
+      });
+    }
+  }
+
+  for (const id of Object.keys(state.objectTransforms)) {
+    if (!assetIds.has(id)) {
+      findings.push({
+        code: "object-transform-orphan",
+        severity: "warning",
+        targetId: id,
+        message: `Object transform for missing asset ${id}`,
       });
     }
   }

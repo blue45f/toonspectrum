@@ -175,9 +175,7 @@ describe("StudioPage tool transition boundary", () => {
   });
 
   it("routes tutorial drawing actions through the stroke-safe primary transition", () => {
-    const start = studioPageSource.indexOf(
-      "function handleTutorialTry(action: StudioTutorialTryAction)",
-    );
+    const start = studioPageSource.indexOf("function handleTutorialTry(");
     const end = studioPageSource.indexOf(
       "const [quickStartDismissed",
       start,
@@ -186,13 +184,29 @@ describe("StudioPage tool transition boundary", () => {
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
-    for (const action of ["pen", "smart-shape", "brush"]) {
+    for (const action of ["pen", "smart-shape"]) {
       const caseStart = tutorial.indexOf(`case "${action}":`);
       const caseEnd = tutorial.indexOf("break;", caseStart);
       const branch = tutorial.slice(caseStart, caseEnd);
       expect(caseStart).toBeGreaterThanOrEqual(0);
       expect(branch).toContain('activatePrimaryCanvasTool("draw", "pen");');
     }
+
+    const brushStart = tutorial.indexOf('case "brush":');
+    const brushEnd = tutorial.indexOf("break;", brushStart);
+    expect(tutorial.slice(brushStart, brushEnd)).toContain(
+      "openBrushCatalogFromHelp(trigger);",
+    );
+    const catalogStart = studioPageSource.indexOf(
+      "function openBrushCatalogFromHelp(",
+    );
+    const catalogEnd = studioPageSource.indexOf(
+      "function closeBuiltInBrushCatalog(",
+      catalogStart,
+    );
+    expect(studioPageSource.slice(catalogStart, catalogEnd)).toContain(
+      'activatePrimaryCanvasTool("draw", "pen");',
+    );
   });
 
   it("routes saved, catalogue, and slot brush application through the same transition", () => {
