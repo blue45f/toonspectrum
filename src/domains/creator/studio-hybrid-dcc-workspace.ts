@@ -1099,6 +1099,38 @@ export async function workspaceOcctThickShell(
   return commitOcctResult(ws, assetId, "occt-wasm-thick", result);
 }
 
+/** Industrial OCCT wedge / draft solid → workspace. */
+export async function workspaceOcctWedge(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-wedge",
+  size: readonly [number, number, number] = [1, 1, 1],
+  ltx = 0.3,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "wedge",
+    size,
+    ltx,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-wedge", result);
+}
+
+/** Industrial OCCT offset shape (box expand) → workspace. */
+export async function workspaceOcctOffsetShape(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-offset",
+  size: readonly [number, number, number] = [1, 1, 1],
+  offset = 0.08,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "offset-shape-box",
+    size,
+    offset,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-offset", result);
+}
+
 /** Industrial STEP write+read round-trip box → workspace. */
 export async function workspaceOcctStepRoundTrip(
   ws: StudioHybridDccWorkspace,

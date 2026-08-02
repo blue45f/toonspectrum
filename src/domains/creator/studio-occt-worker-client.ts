@@ -151,6 +151,20 @@ async function runOnNode(
           operation.size[2],
           operation.thickness,
         );
+      case "wedge":
+        return facade.occtMakeWedgeSolid(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+          operation.ltx,
+        );
+      case "offset-shape-box":
+        return facade.occtOffsetShapeBox(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+          operation.offset,
+        );
       case "step-roundtrip-box": {
         const step = await facade.occtStepRoundTripBox(
           operation.size[0],

@@ -32,6 +32,16 @@ export type StudioOcctWorkerOperation =
       readonly thickness: number;
     }
   | {
+      readonly kind: "wedge";
+      readonly size: readonly [number, number, number];
+      readonly ltx: number;
+    }
+  | {
+      readonly kind: "offset-shape-box";
+      readonly size: readonly [number, number, number];
+      readonly offset: number;
+    }
+  | {
       readonly kind: "step-roundtrip-box";
       readonly size: readonly [number, number, number];
     }

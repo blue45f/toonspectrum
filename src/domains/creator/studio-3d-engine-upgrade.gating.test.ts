@@ -19,8 +19,10 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctOffsetShape,
   workspaceOcctStepRoundTrip,
   workspaceOcctThickShell,
+  workspaceOcctWedge,
 } from "./studio-hybrid-dcc-workspace";
 import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
 import {
@@ -28,7 +30,9 @@ import {
   occtMakePipeSolid,
   occtMakeThickShellBox,
   occtMakeTorusSolid,
+  occtMakeWedgeSolid,
   occtMirrorBox,
+  occtOffsetShapeBox,
   occtSolidWorksGradeSuite,
   occtStepRoundTripBox,
   STUDIO_OCCT_WASM_FACADE_REVISION,
@@ -146,6 +150,27 @@ describe("3D engine upgrades", () => {
     expect(suite.realStepIo).toBe(true);
   }, 180_000);
 
+  it("OCCT wedge and offset shape produce solids", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(7);
+    const wedge = await occtMakeWedgeSolid(1, 1, 1, 0.3);
+    expect(wedge.ok).toBe(true);
+    if (!wedge.ok) return;
+    expect(wedge.operation).toBe("BRepPrimAPI_MakeWedge");
+    expect(wedge.triangleCount).toBeGreaterThanOrEqual(12);
+
+    const offset = await occtOffsetShapeBox(1, 1, 1, 0.08);
+    expect(offset.ok).toBe(true);
+    if (!offset.ok) return;
+    expect(offset.operation).toBe("BRepOffsetAPI_MakeOffsetShape");
+    expect(offset.triangleCount).toBeGreaterThan(100);
+  }, 120_000);
+
+  it("SolidWorks suite reports realWedge and realOffsetShape", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realWedge).toBe(true);
+    expect(suite.realOffsetShape).toBe(true);
+  }, 180_000);
+
   it("workspace thick shell + STEP + multi-asset boolean register meshes", async () => {
     let ws = createStudioHybridDccWorkspace("thick-step-ws");
     ws = await workspaceOcctThickShell(ws, "thick1");
@@ -163,6 +188,19 @@ describe("3D engine upgrades", () => {
     expect(ws.activeAssetId).toBe("bool-out");
     const out = ws.session.state.geometry.records["bool-out"]!.mesh;
     expect(out.faces.length).toBeGreaterThanOrEqual(4);
+  }, 180_000);
+
+  it("workspace wedge + offset register non-empty assets", async () => {
+    let ws = createStudioHybridDccWorkspace("wedge-offset-ws");
+    ws = await workspaceOcctWedge(ws, "w1");
+    expect(ws.lastOcct?.operation).toBe("BRepPrimAPI_MakeWedge");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
+    expect(ws.session.state.geometry.records["w1"]).toBeTruthy();
+
+    ws = await workspaceOcctOffsetShape(ws, "o1");
+    expect(ws.lastOcct?.operation).toBe("BRepOffsetAPI_MakeOffsetShape");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThan(100);
+    expect(ws.session.state.geometry.records["o1"]).toBeTruthy();
   }, 180_000);
 
   it("orientStudioMeshOutward flips inverted cube faces for CSG readiness", () => {

@@ -40,10 +40,12 @@ import {
   workspaceOcctSphere,
   workspaceBooleanBetweenAssets,
   workspaceOcctMirror,
+  workspaceOcctOffsetShape,
   workspaceOcctPipe,
   workspaceOcctStepRoundTrip,
   workspaceOcctThickShell,
   workspaceOcctTorus,
+  workspaceOcctWedge,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
   workspaceRetopoActive,
@@ -245,6 +247,24 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT thick shell", () => workspaceOcctThickShell(ws))}
         >
           OCCT thick
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-wedge"
+          onClick={() => run("OCCT wedge", () => workspaceOcctWedge(ws))}
+        >
+          OCCT wedge
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-offset"
+          onClick={() => run("OCCT offset", () => workspaceOcctOffsetShape(ws))}
+        >
+          OCCT offset
         </button>
         <button
           type="button"

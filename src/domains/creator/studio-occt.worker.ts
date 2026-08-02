@@ -9,7 +9,9 @@ import {
   occtMakePipeSolid,
   occtMakeThickShellBox,
   occtMakeTorusSolid,
+  occtMakeWedgeSolid,
   occtMirrorBox,
+  occtOffsetShapeBox,
   occtRevolveCylinderLike,
   occtStepRoundTripBox,
 } from "./studio-occt-wasm-facade";
@@ -41,6 +43,20 @@ async function runOperation(
         operation.size[1],
         operation.size[2],
         operation.thickness,
+      );
+    case "wedge":
+      return occtMakeWedgeSolid(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.ltx,
+      );
+    case "offset-shape-box":
+      return occtOffsetShapeBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.offset,
       );
     case "step-roundtrip-box": {
       const step = await occtStepRoundTripBox(

@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 6 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 7 as const;
 
 export type StudioOcctStepIoResult = {
   readonly ok: true;
@@ -1020,6 +1020,130 @@ export async function occtMakeTorusSolid(
 }
 
 /**
+ * Wedge / draft solid — BRepPrimAPI_MakeWedge (SolidWorks draft / linear form analogue).
+ * `ltx` is the top-face X length (0 < ltx ≤ dx) producing a tapered prism.
+ */
+export async function occtMakeWedgeSolid(
+  dx: number,
+  dy: number,
+  dz: number,
+  ltx: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    let shape: unknown = null;
+    for (const key of ["BRepPrimAPI_MakeWedge_1", "BRepPrimAPI_MakeWedge_2", "BRepPrimAPI_MakeWedge"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const builder = owner.own(new oc[key](dx, dy, dz, ltx));
+        shape = owner.own(builder.Shape());
+        break;
+      } catch {
+        // next overload
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-wedge-ctor", detail: "MakeWedge overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "wedge produced no triangles" };
+    }
+    // Trapezoidal prism volume: average of base/top lengths along X * dy * dz.
+    const volumeApprox = ((dx + Math.max(0, Math.min(dx, ltx))) / 2) * dy * dz;
+    return packResult(
+      "BRepPrimAPI_MakeWedge",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      volumeApprox,
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
+/**
+ * Offset / shell expansion of a box solid via BRepOffsetAPI_MakeOffsetShape.PerformByJoin
+ * (8-arg Embind). SolidWorks Offset Surface / thicken-outward analogue.
+ */
+export async function occtOffsetShapeBox(
+  dx: number,
+  dy: number,
+  dz: number,
+  offset: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const boxBuilder = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz));
+    const box = owner.own(boxBuilder.Shape());
+    let shape: unknown = null;
+    for (const key of [
+      "BRepOffsetAPI_MakeOffsetShape_1",
+      "BRepOffsetAPI_MakeOffsetShape_2",
+      "BRepOffsetAPI_MakeOffsetShape",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const offsetter = owner.own(new oc[key]());
+        if (!isCallable(offsetter.PerformByJoin)) {
+          continue;
+        }
+        const joinType =
+          oc.GeomAbs_JoinType?.GeomAbs_Arc
+          ?? oc.GeomAbs_Arc
+          ?? 0;
+        const mode =
+          oc.BRepOffset_Mode?.BRepOffset_Skin
+          ?? oc.BRepOffset_Skin
+          ?? 0;
+        // OCCT Embind: PerformByJoin(S, Offset, Tol, Mode, Intersection, SelfInter, Join, RemoveIntEdges)
+        offsetter.PerformByJoin(
+          box,
+          offset,
+          1e-3,
+          mode,
+          false,
+          false,
+          joinType,
+          false,
+        );
+        if (isCallable(offsetter.Build)) offsetter.Build();
+        shape = owner.own(offsetter.Shape());
+        break;
+      } catch {
+        // next ctor
+      }
+    }
+    if (!shape) {
+      return {
+        ok: false,
+        code: "no-offset-shape",
+        detail: "MakeOffsetShape.PerformByJoin failed",
+      };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "offset shape produced no triangles" };
+    }
+    const ox = dx + 2 * Math.abs(offset);
+    const oy = dy + 2 * Math.abs(offset);
+    const oz = dz + 2 * Math.abs(offset);
+    return packResult(
+      "BRepOffsetAPI_MakeOffsetShape",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(ox, oy, oz),
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
+/**
  * Sweep / pipe solid: circular profile along a linear spine (BRepOffsetAPI_MakePipe).
  * SolidWorks-style sweep along path.
  */
@@ -1624,6 +1748,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly realMirror: boolean;
   readonly realThickShell: boolean;
   readonly realStepIo: boolean;
+  readonly realWedge: boolean;
+  readonly realOffsetShape: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -1636,6 +1762,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let realMirror = false;
   let realThickShell = false;
   let realStepIo = false;
+  let realWedge = false;
+  let realOffsetShape = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -1652,6 +1780,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       if (r.operation === "BRepOffsetAPI_MakePipe") realPipe = true;
       if (r.operation.includes("mirror") || r.operation.includes("Transform")) realMirror = true;
       if (r.operation === "BRepOffsetAPI_MakeThickSolid") realThickShell = true;
+      if (r.operation === "BRepPrimAPI_MakeWedge") realWedge = true;
+      if (r.operation === "BRepOffsetAPI_MakeOffsetShape") realOffsetShape = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
@@ -1661,6 +1791,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("sphere", () => occtMakeSphereSolid(0.6));
   await run("torus", () => occtMakeTorusSolid(0.8, 0.2));
   await run("cone", () => occtMakeConeSolid(0.5, 0.1, 1.2));
+  await run("wedge", () => occtMakeWedgeSolid(1, 1, 1, 0.3));
   await run("pipe", () => occtMakePipeSolid(1.5, 0.12));
   await run("prism", () => occtExtrudeRectangle(1.2, 0.8, 0.6));
   await run("revolve", () => occtRevolveCylinderLike(0.5, 1.0));
@@ -1680,6 +1811,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("chamfer", () => occtChamferBox(1, 1, 1, 0.05));
   await run("mirror", () => occtMirrorBox(0.8, 0.5, 0.4));
   await run("thick", () => occtMakeThickShellBox(1, 1, 0.5, 0.05));
+  await run("offset", () => occtOffsetShapeBox(1, 1, 1, 0.08));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -1719,5 +1851,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     realMirror,
     realThickShell,
     realStepIo,
+    realWedge,
+    realOffsetShape,
   };
 }
