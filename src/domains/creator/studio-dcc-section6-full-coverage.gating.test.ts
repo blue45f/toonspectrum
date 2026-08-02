@@ -152,6 +152,8 @@ describe("§6 full catalog SSOT", () => {
     /** Doc 구현·완료 기준 → required evidence keys (skeptic residual set). */
     const DOC_CRITERIA_EVIDENCE: Readonly<Record<string, readonly string[]>> = {
       "DOC-009": ["mergedHash", "parentCount", "mergeStrategy", "mergeRev", "conflict"],
+      "MOD-014": ["ok", "faces", "facesBefore", "backend"],
+      "CHR-012": ["ok", "missing", "mapped", "scale", "source", "target"],
       "CAD-006": ["sweepTris", "loftTris", "pathSamples", "failedSections"],
       "CAD-008": [
         "shellVolume",
@@ -266,6 +268,17 @@ describe("§6 full catalog SSOT", () => {
       }
       // Runtime evidence must include a non-constant-looking numeric domain metric
       const r = await exerciseStudioDccCatalogFeature(entry.id);
+      // Ban nested domain failure wrapped as catalog success
+      if (r.evidence.ok === false) {
+        countEchoFails.push(`${entry.id}:evidence.ok=false`);
+      }
+      if (
+        ("faces" in r.evidence || "facesAfter" in r.evidence)
+        && Number(r.evidence.faces ?? r.evidence.facesAfter ?? 0) === 0
+        && entry.id.startsWith("MOD-")
+      ) {
+        countEchoFails.push(`${entry.id}:mesh-faces=0`);
+      }
       const numericKeys = Object.entries(r.evidence).filter(
         ([, v]) => typeof v === "number" && Number.isFinite(v),
       );
@@ -296,6 +309,16 @@ describe("§6 full catalog SSOT", () => {
           }
         }
         // Ban pure extrude-proxy theater for CAD-006 (must have sweep path samples)
+        if (entry.id === "MOD-014") {
+          expect(r.evidence.ok).toBe(true);
+          expect(Number(r.evidence.faces)).toBeGreaterThan(0);
+          expect(Number(r.evidence.facesBefore)).toBeGreaterThan(0);
+        }
+        if (entry.id === "CHR-012") {
+          expect(r.evidence.ok).toBe(true);
+          expect(Number(r.evidence.missing)).toBe(0);
+          expect(Number(r.evidence.mapped)).toBeGreaterThan(0);
+        }
         if (entry.id === "CAD-006") {
           expect(Number(r.evidence.pathSamples)).toBeGreaterThan(2);
           expect(Number(r.evidence.sweepTris)).toBeGreaterThan(0);

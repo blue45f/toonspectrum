@@ -435,8 +435,10 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     const mesh = cube();
     const soup = (await import("./studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(mesh);
     let stack = createStudioMeshModifierStack(mesh);
+    // Offset + scale (same proven pattern as v1 solid-boolean gate) for real difference volume.
     const op = new Float32Array(soup.positions);
-    for (let i = 0; i < op.length; i += 1) op[i]! *= 0.5;
+    for (let i = 0; i < op.length; i += 3) op[i]! += 0.4;
+    for (let i = 0; i < op.length; i += 1) op[i]! *= 0.7;
     stack = withStudioMeshModifier(stack, {
       kind: "boolean",
       id: "b",
@@ -444,14 +446,31 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
       operation: "difference",
       operand: { positions: op, indices: soup.indices },
     });
-    const backend = createStudioManifoldSolidBooleanBackend();
-    const e = await evaluateStudioMeshModifierStack(stack, {
-      booleanBackend: backend,
-    });
+    // Pure-convex is the unit-testable solid path; Manifold when available via default fallback.
+    const { createStudioPureConvexSolidBooleanBackend } = await import(
+      "./studio-solid-boolean-backend"
+    );
+    const pure = createStudioPureConvexSolidBooleanBackend();
+    let e = await evaluateStudioMeshModifierStack(stack, { booleanBackend: pure });
+    let backendName = "pure-convex";
+    if (!e.ok) {
+      const manifold = createStudioManifoldSolidBooleanBackend();
+      e = await evaluateStudioMeshModifierStack(stack, { booleanBackend: manifold });
+      backendName = "manifold";
+    }
+    if (!e.ok) {
+      throw new Error(`MOD-014 boolean failed: ${e.detail}`);
+    }
+    const faces = e.value.mesh.faces.length;
+    if (faces < 1) {
+      throw new Error("MOD-014 boolean produced empty mesh (faces=0)");
+    }
     return ok("MOD-014", {
-      ok: e.ok,
-      faces: e.ok ? e.value.mesh.faces.length : 0,
-      backendReady: backend != null,
+      ok: true,
+      faces,
+      facesBefore: mesh.faces.length,
+      backend: backendName,
+      backendReady: true,
     });
   },
   "MOD-015": async () => {

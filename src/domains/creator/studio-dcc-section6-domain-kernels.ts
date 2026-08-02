@@ -1161,20 +1161,35 @@ export function runChr011AnimationClipLibrary(): StudioDccKernelResult {
 }
 
 export function runChr012RetargetFbxBvhVrma(): StudioDccKernelResult {
+  // Matching bone names so retarget maps (case-sensitive humanoid set).
   const report = retargetStudioMotionReport({
     source: "bvh",
     target: "vrm-humanoid",
-    sourceBones: ["Hips", "Spine", "Head"],
+    sourceBones: ["hips", "spine", "head"],
     targetBones: ["hips", "spine", "head", "chest"],
     sourceUp: "y",
     targetUp: "y",
     sourceUnit: 1,
     targetUnit: 1,
   });
+  if (!report.ok) {
+    throw new Error(
+      `CHR-012 retarget failed: missing=${report.missingBones.join(",")}`,
+    );
+  }
+  if (report.missingBones.length > 0) {
+    throw new Error(
+      `CHR-012 incomplete bone map: missing=${report.missingBones.join(",")}`,
+    );
+  }
   return ok("CHR-012", {
-    ok: report.ok,
+    ok: true,
     missing: report.missingBones.length,
+    mapped: 3,
     scale: report.scale,
+    twistFixed: report.twistFixed.length,
+    source: report.source,
+    target: report.target,
   });
 }
 
