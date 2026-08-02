@@ -853,7 +853,8 @@ export async function occtMakePipeSolid(
     const oc = runtime.module;
     const p0 = owner.own(new oc.gp_Pnt_3(0, 0, 0));
     const p1 = owner.own(new oc.gp_Pnt_3(0, 0, length));
-    const edge = owner.own(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1).Edge());
+    const edgeMaker = owner.own(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1));
+    const edge = owner.own(edgeMaker.Edge());
     const spineMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
     if (isCallable(spineMaker.Add_1)) spineMaker.Add_1(edge);
     else if (isCallable(spineMaker.Add)) spineMaker.Add(edge);
@@ -870,7 +871,8 @@ export async function occtMakePipeSolid(
     ]) {
       if (!isCallable(oc[key])) continue;
       try {
-        profileEdge = owner.own(new oc[key](circ).Edge());
+        const profileEdgeMaker = owner.own(new oc[key](circ));
+        profileEdge = owner.own(profileEdgeMaker.Edge());
         break;
       } catch {
         // next
@@ -927,7 +929,8 @@ export async function occtMirrorBox(
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
   return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const box = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape());
+    const boxBuilder = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz));
+    const box = owner.own(boxBuilder.Shape());
     const origin = owner.own(new oc.gp_Pnt_3(0, 0, 0));
     const yDir = owner.own(new oc.gp_Dir_4(0, 1, 0));
     const ax1 = owner.own(new oc.gp_Ax1_2(origin, yDir));

@@ -29,6 +29,7 @@ import {
   workspaceKnifeActive,
   workspaceLoadRoomPreset,
   workspaceMirrorActive,
+  workspaceOrientOutwardActive,
   workspaceImportIfcCity,
   workspaceManifoldBooleanActive,
   workspaceOcctBooleanCut,
@@ -309,6 +310,15 @@ export function StudioHybridDccPanel() {
           onClick={() => run("Decimate", () => workspaceDecimateActive(ws, 0.5))}
         >
           Decimate
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy || !ws.activeAssetId}
+          data-studio-hybrid-dcc-action="orient-outward"
+          onClick={() => run("Orient outward", () => workspaceOrientOutwardActive(ws))}
+        >
+          Orient outward
         </button>
         <button
           type="button"

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   studioEditableMeshToTriangleSoup,
 } from "./studio-editable-half-edge-mesh";
@@ -17,6 +18,7 @@ import {
   workspaceOcctRevolve,
   workspaceOcctSphere,
 } from "./studio-hybrid-dcc-workspace";
+import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
 import {
   occtLoftedTower,
   occtMakePipeSolid,
@@ -114,6 +116,37 @@ describe("3D engine upgrades", () => {
     expect(suite.realPipe).toBe(true);
     expect(suite.realMirror).toBe(true);
   }, 180_000);
+
+  it("orientStudioMeshOutward flips inverted cube faces for CSG readiness", () => {
+    // Build inverted winding cube via reverse quads
+    const mesh = createStudioUnitCubeMesh();
+    const soup = studioEditableMeshToTriangleSoup(mesh);
+    // Invert all tris
+    const inv = new Uint32Array(soup.indices);
+    for (let t = 0; t < inv.length; t += 3) {
+      const b = inv[t + 1]!;
+      inv[t + 1] = inv[t + 2]!;
+      inv[t + 2] = b;
+    }
+    const verts = [];
+    for (let i = 0; i < soup.positions.length; i += 3) {
+      verts.push({
+        x: soup.positions[i]!,
+        y: soup.positions[i + 1]!,
+        z: soup.positions[i + 2]!,
+      });
+    }
+    const faces: number[][] = [];
+    for (let t = 0; t < inv.length; t += 3) {
+      faces.push([inv[t]!, inv[t + 1]!, inv[t + 2]!]);
+    }
+    const inverted = createStudioEditableMeshFromPolygons(verts, faces);
+    const oriented = orientStudioMeshOutward(inverted);
+    expect(oriented.ok).toBe(true);
+    if (!oriented.ok) return;
+    expect(oriented.value.flippedFaces).toBeGreaterThan(0);
+    expect(oriented.value.faceCount).toBe(12);
+  });
 
   it("workspace Manifold boolean on unit cube is non-degenerate", async () => {
     let ws = createStudioHybridDccWorkspace("bool-ws");

@@ -90,6 +90,7 @@ import {
   decimateStudioMesh,
   deformStudioMeshBend,
   dynatopoStudioMeshBrushLocal,
+  orientStudioMeshOutward,
   repairStudioMesh,
   shrinkwrapStudioMesh,
   subdivideStudioMeshCatmullLite,
@@ -804,6 +805,19 @@ export function workspaceRepairActive(ws: StudioHybridDccWorkspace): StudioHybri
   const repaired = repairStudioMesh(record.mesh);
   if (!repaired.ok) throw new Error(repaired.detail);
   return commitActiveMesh(ws, repaired.value.mesh);
+}
+
+/** Flip inverted face windings so normals point outward (CSG/Manifold prep). */
+export function workspaceOrientOutwardActive(
+  ws: StudioHybridDccWorkspace,
+): StudioHybridDccWorkspace {
+  const id = ws.activeAssetId;
+  if (!id) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[id];
+  if (!record) throw new Error(`missing ${id}`);
+  const oriented = orientStudioMeshOutward(record.mesh);
+  if (!oriented.ok) throw new Error(oriented.detail);
+  return commitActiveMesh(ws, oriented.value.mesh);
 }
 
 export function workspaceShrinkwrapActive(

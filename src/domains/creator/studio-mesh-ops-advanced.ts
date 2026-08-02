@@ -11,7 +11,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_MESH_OPS_ADVANCED_REVISION = 1 as const;
+export const STUDIO_MESH_OPS_ADVANCED_REVISION = 2 as const;
 
 export type StudioMeshOpsResult<T> =
   | { readonly ok: true; readonly value: T }
@@ -261,6 +261,73 @@ export function shrinkwrapStudioMesh(
     positions[i + 2] = positions[i + 2]! + (target.z - positions[i + 2]!) * f;
   }
   return ok(soupToMesh(positions, soup.indices));
+}
+
+/**
+ * Flip triangle winding so face normals point outward relative to the mesh
+ * centroid (Manifold/CSG friendly). Counts how many faces were reversed.
+ */
+export function orientStudioMeshOutward(
+  mesh: StudioEditableMesh,
+): StudioMeshOpsResult<{
+  readonly mesh: StudioEditableMesh;
+  readonly flippedFaces: number;
+  readonly faceCount: number;
+}> {
+  const soup = studioEditableMeshToTriangleSoup(mesh);
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  const vCount = soup.positions.length / 3;
+  if (vCount < 3 || soup.indices.length < 3) {
+    return fail("empty-mesh", "need triangles to orient");
+  }
+  for (let i = 0; i < soup.positions.length; i += 3) {
+    cx += soup.positions[i]!;
+    cy += soup.positions[i + 1]!;
+    cz += soup.positions[i + 2]!;
+  }
+  cx /= vCount;
+  cy /= vCount;
+  cz /= vCount;
+  const indices = new Uint32Array(soup.indices);
+  let flipped = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const i0 = indices[t]!;
+    const i1 = indices[t + 1]!;
+    const i2 = indices[t + 2]!;
+    const ax = soup.positions[i0 * 3]!;
+    const ay = soup.positions[i0 * 3 + 1]!;
+    const az = soup.positions[i0 * 3 + 2]!;
+    const bx = soup.positions[i1 * 3]!;
+    const by = soup.positions[i1 * 3 + 1]!;
+    const bz = soup.positions[i1 * 3 + 2]!;
+    const cxv = soup.positions[i2 * 3]!;
+    const cyv = soup.positions[i2 * 3 + 1]!;
+    const czv = soup.positions[i2 * 3 + 2]!;
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abz = bz - az;
+    const acx = cxv - ax;
+    const acy = cyv - ay;
+    const acz = czv - az;
+    const nx = aby * acz - abz * acy;
+    const ny = abz * acx - abx * acz;
+    const nz = abx * acy - aby * acx;
+    const mx = (ax + bx + cxv) / 3 - cx;
+    const my = (ay + by + cyv) / 3 - cy;
+    const mz = (az + bz + czv) / 3 - cz;
+    if (nx * mx + ny * my + nz * mz < 0) {
+      indices[t + 1] = i2;
+      indices[t + 2] = i1;
+      flipped += 1;
+    }
+  }
+  return ok({
+    mesh: soupToMesh(soup.positions, indices),
+    flippedFaces: flipped,
+    faceCount: indices.length / 3,
+  });
 }
 
 /** MOD-025: mesh repair — drop degenerate triangles and re-weld by quantum. */
