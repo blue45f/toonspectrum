@@ -2,6 +2,8 @@
 
 ToonSpectrum 스튜디오는 2D 드로잉, 3D 마네킹/CAD 배경 선화 추출, VRM 포즈 트레이싱 및 웹캠 모션 캡처를 한곳에서 처리하는 웹 기반 전문 웹툰 저작 환경입니다.
 
+> 📘 **상세 3D DCC 하이브리드 아키텍처 매뉴얼**: [STUDIO_3D_DCC_MANUAL.md](file:///Users/hjunkim/WebstormProjects/toonspectrum/STUDIO_3D_DCC_MANUAL.md) 문서에서 다중 기하 커널, SketchUp 추론 스냅, Shot Override 및 포맷 매니페스트를 확인할 수 있습니다.
+
 ---
 
 ## 📌 목차 (Table of Contents)
