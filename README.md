@@ -240,79 +240,51 @@ provision된 DB의 upgrade나 운영 rolling migration에 사용하지 않습니
 constraint/index, comment re-anchor, AI gate/receipt, 0017 cutover marker를 먼저 증명한 뒤 해당
 checksum을 `adopted`로 기록하며 과거 migration을 재실행하지 않습니다.
 
+수동 DDL 대신 fail-closed bootstrap 명령 하나를 사용합니다. 먼저 `--plan`은 읽기 전용으로
+대상 DB, 다른 연결, 기존 application object, migrator/runtime 역할 분리, manifest와 schema
+fingerprint를 검사합니다. URL과 비밀번호는 출력하지 않습니다.
+
 ```bash
-set -euo pipefail
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 \
-  -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm'
-psql "$STUDIO_LIVE_POSTGRES_URL" -v ON_ERROR_STOP=1 <<'SQL'
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'webdex_runtime'
-  ) THEN
-    CREATE ROLE webdex_runtime
-      LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
-  END IF;
-END;
-$$;
-SELECT format(
-  'GRANT CONNECT ON DATABASE %I TO webdex_runtime',
-  current_database()
-)
-\gexec
-GRANT USAGE ON SCHEMA public TO webdex_runtime;
-SQL
-set +e
-push_output="$(
-  DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" pnpm exec drizzle-kit push --force 2>&1
-)"
-push_status=$?
-set -e
-printf '%s\n' "$push_output"
-if test "$push_status" -ne 0 \
-  || grep -Eiq '(^|[[:space:]])error:|severity:.*(ERROR|FATAL|PANIC)' <<< "$push_output"; then
-  echo 'drizzle-kit fresh schema provision 실패' >&2
-  exit 1
-fi
-
-# 빈 로컬 DB에서만 reviewed historical baseline을 한 번 구성합니다.
-# macOS 기본 Bash 3.2에서도 동작하도록 배열의 음수 인덱스를 사용하지 않습니다.
-while IFS= read -r migration_path; do
-  case "$migration_path" in
-    lib/db/migrations/0020_*) break ;;
-  esac
-  psql "$STUDIO_LIVE_POSTGRES_URL" -X -v ON_ERROR_STOP=1 \
-    -f "$migration_path"
-done < scripts/production-database-migrations.manifest
-
-# Drizzle push는 현재 최종 모델을 만들므로 빈 로컬 DB에서만 post-0019 객체를 제거해
-# genuine pending 0020~0022와 0024 경로를 검증합니다(0023은 원장 bootstrap).
-psql "$STUDIO_LIVE_POSTGRES_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
-DROP TABLE IF EXISTS
-  "creator_work_asset_storage_reference",
-  "creator_asset_storage_object",
-  "creator_marketplace_publish_gate",
-  "creator_marketplace_resource",
-  "creator_draft_collaboration_room"
-CASCADE;
-DROP EXTENSION IF EXISTS pg_trgm;
-SQL
-
 release_sha="$(git rev-parse HEAD)"
 MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
-  node scripts/run-production-database-migrations.mjs \
+  pnpm db:bootstrap:production-empty -- \
+    --plan \
     --allow-loopback \
-    --mode adopt \
+    --runtime-database-role webdex_runtime \
+    --release-sha "$release_sha"
+```
+
+계획이 빈 DB임을 확인한 뒤 실행합니다. runtime role이 아직 없을 때만 별도 runtime 연결에
+사용할 24자 이상의 비밀번호를 환경변수로 제공합니다. 명령은 `pg_trgm`, 현재 Drizzle base,
+reviewed 0001~0019 구조, checksum adoption, 실제 0020~0022/0024 forward migration, runtime 최소
+권한, idempotent apply와 전체 capability verifier를 순서대로 수행합니다.
+
+```bash
+MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
+BOOTSTRAP_RUNTIME_DATABASE_PASSWORD='<runtime-role-secret-if-missing>' \
+  pnpm db:bootstrap:production-empty -- \
+    --execute \
+    --allow-loopback \
     --runtime-database-role webdex_runtime \
     --release-sha "$release_sha" \
-    --confirmation ADOPT-TOONSPECTRUM-MIGRATION-HISTORY
-MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_URL" \
-  node scripts/verify-production-database-capabilities.mjs \
-    --runtime-database-role webdex_runtime \
-    --allow-loopback
-pnpm ingest
-pnpm dev:all
+    --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
 ```
+
+대상에 application object가 하나라도 있으면 실행은 거부됩니다. 백업과 대상 DB 확인을 마친
+**폐기 가능한 DB**만 계획 출력에 표시된 DB명 결합 토큰을 별도로 추가해 초기화할 수 있습니다.
+예: `--reset-confirmation RESET-AND-BOOTSTRAP-TOONSPECTRUM-DATABASE:webdex`. 이 승인은
+`public`과 `toonspectrum_ops` application schema의 모든 데이터를 삭제하며 다른 DB 이름에는
+재사용할 수 없습니다. 실행 중 schema/migration 소스가 바뀌거나 다른 client가 연결되면 즉시
+중단되고, 부분 상태를 자동 채택하지 않습니다.
+
+`--execute`는 사전 점검 뒤 runtime role을 대상 DB에 한정해 일시적으로 `NOLOGIN`으로
+전환하고, 전환 직후 다른 client가 끼어들지 않았는지 다시 확인한 다음에만 DDL을 시작합니다.
+따라서 `PUBLIC`의 기본 `CONNECT` 권한이 남아 있어도 새 runtime writer는 들어올 수 없습니다.
+정상 완료와 포착 가능한 실패에서는 `finally` 경계가 `LOGIN`을 복원하고 최종 verifier가 이를
+재확인합니다. 호스트 강제 종료처럼 복원 코드를 실행할 수 없었던 경우에는 fail-closed로
+`NOLOGIN`이 남을 수 있습니다. bootstrap 프로세스가 완전히 종료되고 다른 client가 없음을
+확인한 뒤 migrator로 `ALTER ROLE webdex_runtime LOGIN;`을 실행하고, 반드시 `--plan`과 capability
+verifier를 다시 통과시킨 후 API를 시작합니다. `--plan`은 역할이나 ACL을 변경하지 않습니다.
 
 기존 운영 DB upgrade에는 `drizzle-kit push`를 사용하지 않고, 앱 시작 시에는 어떤 DDL도 실행하지
 않습니다.
@@ -321,7 +293,10 @@ pnpm dev:all
 `production-database` GitHub Environment의 required reviewer 승인과
 `PRODUCTION_DATABASE_DIRECT_URL` secret, `PRODUCTION_RUNTIME_DATABASE_ROLE` variable을 사용합니다.
 direct URL은 runtime 앱 role과 별개인 전용 DDL migrator role이어야 하며 runtime role은 migrator
-role을 상속하거나 `toonspectrum_ops` schema/원장 table을 소유·사용·변경할 수 없습니다. runtime
+role을 포함한 다른 role을 상속하거나 DB·extension·`public` 객체를 소유할 수 없고, DB 또는
+`public` schema의 `CREATE` 권한과 `toonspectrum_ops` schema/원장 table의 어떤 권한도 가질 수
+없습니다. migration runner는 `PUBLIC`과 runtime role의 원장 접근을 매번 회수한 뒤 verifier와
+동일한 0024 object-storage 컬럼 권한 계약을 적용합니다. runtime
 role의 public relation/sequence 최소 DML GRANT와 실제 `DATABASE_URL` canary는
 [`DEPLOY.md`](DEPLOY.md)의 운영 전제대로 별도 완료해야 합니다. URL은
 구조 파싱 후 `postgresql:`/`postgres:`

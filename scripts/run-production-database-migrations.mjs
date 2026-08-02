@@ -150,6 +150,11 @@ export function buildCreatorAssetObjectStorageRuntimeAclSql(
 REVOKE ALL ON TABLE
   public.creator_asset_storage_object,
   public.creator_work_asset_storage_reference
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public.creator_asset_storage_object,
+  public.creator_work_asset_storage_reference
 FROM ${quotedRole};
 
 GRANT SELECT
@@ -186,6 +191,331 @@ GRANT UPDATE ("state", "deleteToken", "updatedAt")
   ON TABLE public.creator_work_asset_storage_reference
   TO ${quotedRole};
 `;
+}
+
+/**
+ * A true result means the runtime role has either lost a required lifecycle
+ * capability or gained a table/column capability outside the reviewed 0024
+ * object-storage contract. Keep this condition beside the GRANT builder so
+ * migration normalization and the production verifier cannot drift apart.
+ */
+export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_asset_storage_object',
+      'SELECT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_asset_storage_object',
+      'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'purpose',
+        'digest',
+        'contractVersion',
+        'objectPath',
+        'byteLength',
+        'contentType'
+      ]::text[]) AS insert_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_asset_storage_object',
+        insert_column,
+        'INSERT'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'state',
+        'deleteToken',
+        'createdAt',
+        'updatedAt',
+        'deletedAt'
+      ]::text[]) AS default_column
+      WHERE pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_asset_storage_object',
+        default_column,
+        'INSERT'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'state',
+        'deleteToken',
+        'updatedAt',
+        'deletedAt'
+      ]::text[]) AS lifecycle_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_asset_storage_object',
+        lifecycle_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'purpose',
+        'digest',
+        'contractVersion',
+        'objectPath',
+        'byteLength',
+        'contentType',
+        'createdAt'
+      ]::text[]) AS immutable_column
+      WHERE pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_asset_storage_object',
+        immutable_column,
+        'UPDATE'
+      )
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_asset_storage_reference',
+      'SELECT'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_asset_storage_reference',
+      'DELETE'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_asset_storage_reference',
+      'INSERT, UPDATE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'workId',
+        'purpose',
+        'referenceId',
+        'objectDigest',
+        'sourceAssetId',
+        'createdBy'
+      ]::text[]) AS insert_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_asset_storage_reference',
+        insert_column,
+        'INSERT'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'state',
+        'deleteToken',
+        'createdAt',
+        'updatedAt'
+      ]::text[]) AS default_column
+      WHERE pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_asset_storage_reference',
+        default_column,
+        'INSERT'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'state',
+        'deleteToken',
+        'updatedAt'
+      ]::text[]) AS lifecycle_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_asset_storage_reference',
+        lifecycle_column,
+        'UPDATE'
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'workId',
+        'purpose',
+        'referenceId',
+        'objectDigest',
+        'sourceAssetId',
+        'createdBy',
+        'createdAt'
+      ]::text[]) AS immutable_column
+      WHERE pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_asset_storage_reference',
+        immutable_column,
+        'UPDATE'
+      )
+    )
+  )`;
+}
+
+export function buildRuntimeDatabaseRoleBoundaryStateSql(
+  runtimeDatabaseRole,
+  { requireLogin = true } = {},
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  if (typeof requireLogin !== "boolean") {
+    fail("Runtime database login boundary mode must be explicit");
+  }
+  const loginBoundary = requireLogin ? "\n            OR NOT rolcanlogin" : "";
+  return `(
+    SELECT CASE
+      WHEN NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = ${sqlLiteral(role)}
+      ) THEN 'missing'
+      WHEN current_user = ${sqlLiteral(role)} THEN 'same-role'
+      WHEN EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = ${sqlLiteral(role)}
+          AND (
+            rolsuper
+            OR rolcreaterole
+            OR rolcreatedb
+            OR rolreplication
+            OR rolbypassrls${loginBoundary}
+          )
+      ) THEN 'unsafe-runtime-attributes'
+      WHEN EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles AS inherited_role
+        WHERE inherited_role.rolname <> ${sqlLiteral(role)}
+          AND pg_catalog.pg_has_role(
+            ${sqlLiteral(role)},
+            inherited_role.rolname,
+            'MEMBER'
+          )
+      ) THEN 'runtime-has-memberships'
+      WHEN EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_database AS database_record
+        JOIN pg_catalog.pg_roles AS owner
+          ON owner.oid = database_record.datdba
+        WHERE database_record.datname = current_database()
+          AND owner.rolname = ${sqlLiteral(role)}
+      ) THEN 'runtime-owns-database'
+      WHEN pg_catalog.has_database_privilege(
+        ${sqlLiteral(role)},
+        current_database(),
+        'CREATE'
+      ) THEN 'runtime-can-create-database-objects'
+      WHEN NOT pg_catalog.has_database_privilege(
+        ${sqlLiteral(role)},
+        current_database(),
+        'CONNECT'
+      ) THEN 'runtime-cannot-connect'
+      WHEN NOT pg_catalog.has_schema_privilege(
+        ${sqlLiteral(role)},
+        'public',
+        'USAGE'
+      ) THEN 'runtime-cannot-use-public-schema'
+      WHEN pg_catalog.has_schema_privilege(
+        ${sqlLiteral(role)},
+        'public',
+        'CREATE'
+      ) THEN 'runtime-can-create-public-objects'
+      WHEN EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_class AS relation
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = relation.relnamespace
+        JOIN pg_catalog.pg_roles AS owner
+          ON owner.oid = relation.relowner
+        WHERE namespace.nspname = 'public'
+          AND owner.rolname = ${sqlLiteral(role)}
+      ) THEN 'runtime-owns-public-relation'
+      WHEN EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_extension AS extension_record
+        JOIN pg_catalog.pg_roles AS owner
+          ON owner.oid = extension_record.extowner
+        WHERE owner.rolname = ${sqlLiteral(role)}
+      ) THEN 'runtime-owns-extension'
+      ELSE 'separated'
+    END
+  )`;
+}
+
+const MIGRATION_LEDGER_TABLE_PRIVILEGES = Object.freeze([
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+  "TRUNCATE",
+  "REFERENCES",
+  "TRIGGER",
+]);
+
+export function buildMigrationLedgerRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  return `
+DO $toonspectrum_ops_acl$
+BEGIN
+  EXECUTE 'REVOKE ALL ON SCHEMA toonspectrum_ops FROM PUBLIC';
+  EXECUTE 'REVOKE ALL ON ALL TABLES IN SCHEMA toonspectrum_ops FROM PUBLIC';
+  EXECUTE format(
+    'REVOKE ALL ON SCHEMA toonspectrum_ops FROM %I',
+    ${sqlLiteral(role)}
+  );
+  EXECUTE format(
+    'REVOKE ALL ON ALL TABLES IN SCHEMA toonspectrum_ops FROM %I',
+    ${sqlLiteral(role)}
+  );
+END
+$toonspectrum_ops_acl$;
+`;
+}
+
+export function buildMigrationLedgerRuntimeAclViolationSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const privileges = MIGRATION_LEDGER_TABLE_PRIVILEGES.map(sqlLiteral).join(
+    ",\n      ",
+  );
+  return `(
+    pg_catalog.has_schema_privilege(
+      ${sqlLiteral(role)},
+      'toonspectrum_ops',
+      'USAGE'
+    )
+    OR pg_catalog.has_schema_privilege(
+      ${sqlLiteral(role)},
+      'toonspectrum_ops',
+      'CREATE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        ${privileges}
+      ]::text[]) AS privilege_name
+      WHERE pg_catalog.has_table_privilege(
+        ${sqlLiteral(role)},
+        'toonspectrum_ops.deployment_migration',
+        privilege_name
+      )
+      OR pg_catalog.has_table_privilege(
+        ${sqlLiteral(role)},
+        'toonspectrum_ops.deployment_migration_lock',
+        privilege_name
+      )
+    )
+  )`;
 }
 
 function parseManifestLines(contents) {
@@ -319,53 +649,16 @@ function requireProvisionedBase(databaseUrl) {
   }
 }
 
-function requireMigrationRoleSeparation(databaseUrl, runtimeDatabaseRole) {
+function requireMigrationRoleSeparation(
+  databaseUrl,
+  runtimeDatabaseRole,
+  { requireRuntimeLogin = true } = {},
+) {
   const boundaryState = queryScalar(
     databaseUrl,
-    `
-      SELECT CASE
-        WHEN NOT EXISTS (
-          SELECT 1
-          FROM pg_catalog.pg_roles
-          WHERE rolname = ${sqlLiteral(runtimeDatabaseRole)}
-        ) THEN 'missing'
-        WHEN current_user = ${sqlLiteral(runtimeDatabaseRole)} THEN 'same-role'
-        WHEN EXISTS (
-          SELECT 1
-          FROM pg_catalog.pg_roles
-          WHERE rolname = ${sqlLiteral(runtimeDatabaseRole)}
-            AND (
-              rolsuper
-              OR rolcreaterole
-              OR rolcreatedb
-              OR rolreplication
-              OR rolbypassrls
-            )
-        ) THEN 'privileged-runtime'
-        WHEN EXISTS (
-          SELECT 1
-          FROM pg_catalog.pg_roles
-          WHERE rolname = ${sqlLiteral(runtimeDatabaseRole)}
-            AND NOT rolcanlogin
-        ) THEN 'runtime-cannot-login'
-        WHEN pg_catalog.pg_has_role(
-          ${sqlLiteral(runtimeDatabaseRole)},
-          current_user,
-          'MEMBER'
-        ) THEN 'runtime-inherits-migrator'
-        WHEN NOT pg_catalog.has_database_privilege(
-          ${sqlLiteral(runtimeDatabaseRole)},
-          current_database(),
-          'CONNECT'
-        ) THEN 'runtime-cannot-connect'
-        WHEN NOT pg_catalog.has_schema_privilege(
-          ${sqlLiteral(runtimeDatabaseRole)},
-          'public',
-          'USAGE'
-        ) THEN 'runtime-cannot-use-public-schema'
-        ELSE 'separated'
-      END;
-    `,
+    `SELECT ${buildRuntimeDatabaseRoleBoundaryStateSql(runtimeDatabaseRole, {
+      requireLogin: requireRuntimeLogin,
+    })};`,
   );
   if (boundaryState !== "separated") {
     fail(
@@ -381,58 +674,13 @@ function hardenAndVerifyLedgerRuntimeAcl(
   psql(
     databaseUrl,
     `
-      DO $toonspectrum_ops_acl$
-      BEGIN
-        EXECUTE format(
-          'REVOKE ALL ON SCHEMA toonspectrum_ops FROM %I',
-          ${sqlLiteral(runtimeDatabaseRole)}
-        );
-        EXECUTE format(
-          'REVOKE ALL ON ALL TABLES IN SCHEMA toonspectrum_ops FROM %I',
-          ${sqlLiteral(runtimeDatabaseRole)}
-        );
-      END
-      $toonspectrum_ops_acl$;
+      ${buildMigrationLedgerRuntimeAclSql(runtimeDatabaseRole)}
 
       DO $toonspectrum_ops_acl_verify$
       BEGIN
-        IF pg_catalog.has_schema_privilege(
-          ${sqlLiteral(runtimeDatabaseRole)},
-          'toonspectrum_ops',
-          'USAGE'
-        ) OR pg_catalog.has_schema_privilege(
-          ${sqlLiteral(runtimeDatabaseRole)},
-          'toonspectrum_ops',
-          'CREATE'
-        ) THEN
+        IF ${buildMigrationLedgerRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
           RAISE EXCEPTION
-            'runtime database role retains migration schema privileges';
-        END IF;
-
-        IF EXISTS (
-          SELECT 1
-          FROM unnest(ARRAY[
-            'SELECT',
-            'INSERT',
-            'UPDATE',
-            'DELETE',
-            'TRUNCATE',
-            'REFERENCES',
-            'TRIGGER'
-          ]::text[]) AS privilege_name
-          WHERE pg_catalog.has_table_privilege(
-            ${sqlLiteral(runtimeDatabaseRole)},
-            'toonspectrum_ops.deployment_migration',
-            privilege_name
-          )
-          OR pg_catalog.has_table_privilege(
-            ${sqlLiteral(runtimeDatabaseRole)},
-            'toonspectrum_ops.deployment_migration_lock',
-            privilege_name
-          )
-        ) THEN
-          RAISE EXCEPTION
-            'runtime database role retains migration ledger privileges';
+            'runtime database role retains migration schema or ledger privileges';
         END IF;
       END
       $toonspectrum_ops_acl_verify$;
@@ -1123,6 +1371,7 @@ export function runProductionDatabaseMigrations({
   staleLockOwnerToken = "",
   runtimeDatabaseRole,
   allowLoopback = false,
+  runtimeRoleLoginMode = "required",
 }) {
   validateProductionDatabaseUrl(databaseUrl, { allowLoopback });
   validateRuntimeDatabaseRole(runtimeDatabaseRole);
@@ -1141,7 +1390,15 @@ export function runProductionDatabaseMigrations({
   if (mode !== "repair" && staleLockOwnerToken) {
     fail("A stale migration lock owner token is valid only in repair mode");
   }
-  requireMigrationRoleSeparation(databaseUrl, runtimeDatabaseRole);
+  if (
+    runtimeRoleLoginMode !== "required" &&
+    runtimeRoleLoginMode !== "bootstrap-gated"
+  ) {
+    fail("Runtime role login mode must be required or bootstrap-gated");
+  }
+  requireMigrationRoleSeparation(databaseUrl, runtimeDatabaseRole, {
+    requireRuntimeLogin: runtimeRoleLoginMode === "required",
+  });
   requireProvisionedBase(databaseUrl);
   const manifest = loadMigrationManifest();
   const ledgerMigration = manifest.find(

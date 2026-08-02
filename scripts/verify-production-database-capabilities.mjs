@@ -6,7 +6,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { loadMigrationManifest } from "./run-production-database-migrations.mjs";
+import {
+  buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+  buildMigrationLedgerRuntimeAclViolationSql,
+  buildRuntimeDatabaseRoleBoundaryStateSql,
+  loadMigrationManifest,
+} from "./run-production-database-migrations.mjs";
 import {
   createPsqlEnvironment,
   validateProductionDatabaseUrl,
@@ -342,174 +347,7 @@ BEGIN
     RAISE EXCEPTION 'pg_trgm extension is missing';
   END IF;
 
-  IF NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'SELECT'
-    )
-    OR pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'purpose',
-        'digest',
-        'contractVersion',
-        'objectPath',
-        'byteLength',
-        'contentType'
-      ]::text[]) AS insert_column
-      WHERE NOT pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_asset_storage_object',
-        insert_column,
-        'INSERT'
-      )
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'state',
-        'deleteToken',
-        'createdAt',
-        'updatedAt',
-        'deletedAt'
-      ]::text[]) AS default_column
-      WHERE pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_asset_storage_object',
-        default_column,
-        'INSERT'
-      )
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'state',
-      'UPDATE'
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'deleteToken',
-      'UPDATE'
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'updatedAt',
-      'UPDATE'
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_asset_storage_object',
-      'deletedAt',
-      'UPDATE'
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'purpose',
-        'digest',
-        'contractVersion',
-        'objectPath',
-        'byteLength',
-        'contentType',
-        'createdAt'
-      ]::text[]) AS immutable_column
-      WHERE pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_asset_storage_object',
-        immutable_column,
-        'UPDATE'
-      )
-    )
-    OR NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'SELECT'
-    )
-    OR NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'DELETE'
-    )
-    OR pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'INSERT, UPDATE, TRUNCATE, REFERENCES, TRIGGER'
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'workId',
-        'purpose',
-        'referenceId',
-        'objectDigest',
-        'sourceAssetId',
-        'createdBy'
-      ]::text[]) AS insert_column
-      WHERE NOT pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_work_asset_storage_reference',
-        insert_column,
-        'INSERT'
-      )
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'state',
-        'deleteToken',
-        'createdAt',
-        'updatedAt'
-      ]::text[]) AS default_column
-      WHERE pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_work_asset_storage_reference',
-        default_column,
-        'INSERT'
-      )
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'state',
-      'UPDATE'
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'deleteToken',
-      'UPDATE'
-    )
-    OR NOT pg_catalog.has_column_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public.creator_work_asset_storage_reference',
-      'updatedAt',
-      'UPDATE'
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'workId',
-        'purpose',
-        'referenceId',
-        'objectDigest',
-        'sourceAssetId',
-        'createdBy',
-        'createdAt'
-      ]::text[]) AS immutable_column
-      WHERE pg_catalog.has_column_privilege(
-        ${sqlLiteral(runtimeDatabaseRole)},
-        'public.creator_work_asset_storage_reference',
-        immutable_column,
-        'UPDATE'
-      )
-    ) THEN
+  IF ${buildCreatorAssetObjectStorageRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact creator object-storage privileges';
   END IF;
@@ -519,33 +357,7 @@ BEGIN
     RAISE EXCEPTION 'deployment migration ledger capability is missing';
   END IF;
 
-  IF current_user = ${sqlLiteral(runtimeDatabaseRole)}
-    OR NOT EXISTS (
-      SELECT 1
-      FROM pg_catalog.pg_roles
-      WHERE rolname = ${sqlLiteral(runtimeDatabaseRole)}
-        AND NOT rolsuper
-        AND NOT rolcreaterole
-        AND NOT rolcreatedb
-        AND NOT rolreplication
-        AND NOT rolbypassrls
-        AND rolcanlogin
-    )
-    OR pg_catalog.pg_has_role(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      current_user,
-      'MEMBER'
-    )
-    OR NOT pg_catalog.has_database_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      current_database(),
-      'CONNECT'
-    )
-    OR NOT pg_catalog.has_schema_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'public',
-      'USAGE'
-    ) THEN
+  IF ${buildRuntimeDatabaseRoleBoundaryStateSql(runtimeDatabaseRole)} <> 'separated' THEN
     RAISE EXCEPTION
       'runtime and migration database roles are not safely separated';
   END IF;
@@ -567,43 +379,9 @@ BEGIN
     RAISE EXCEPTION 'runtime database role owns the migration ledger';
   END IF;
 
-  IF pg_catalog.has_schema_privilege(
-    ${sqlLiteral(runtimeDatabaseRole)},
-    'toonspectrum_ops',
-    'USAGE'
-  ) OR pg_catalog.has_schema_privilege(
-    ${sqlLiteral(runtimeDatabaseRole)},
-    'toonspectrum_ops',
-    'CREATE'
-  ) THEN
+  IF ${buildMigrationLedgerRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
-      'runtime database role retains migration schema privileges';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM unnest(ARRAY[
-      'SELECT',
-      'INSERT',
-      'UPDATE',
-      'DELETE',
-      'TRUNCATE',
-      'REFERENCES',
-      'TRIGGER'
-    ]::text[]) AS privilege_name
-    WHERE pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'toonspectrum_ops.deployment_migration',
-      privilege_name
-    )
-    OR pg_catalog.has_table_privilege(
-      ${sqlLiteral(runtimeDatabaseRole)},
-      'toonspectrum_ops.deployment_migration_lock',
-      privilege_name
-    )
-  ) THEN
-    RAISE EXCEPTION
-      'runtime database role retains migration ledger privileges';
+      'runtime database role retains migration schema or ledger privileges';
   END IF;
 
   IF (

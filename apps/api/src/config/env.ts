@@ -275,6 +275,47 @@ const envSchema = z.object({
     1_024,
     256 * 1_024
   ).optional(),
+  // The QStash REST API origin/publish credentials are distinct from the ToonSpectrum provider
+  // facade BASE_URL/admission token. The provider module enforces the official API-host boundary.
+  BACKEND_UPSTASH_QSTASH_API_BASE_URL: z
+    .url({ protocol: /^https$/u })
+    .optional(),
+  BACKEND_UPSTASH_QSTASH_PUBLISH_TOKEN: z
+    .string()
+    .min(16)
+    .max(4_096)
+    .optional(),
+  BACKEND_UPSTASH_QSTASH_URL_GROUP: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u)
+    .optional(),
+  BACKEND_UPSTASH_QSTASH_TIMEOUT_MS: boundedPositiveInteger(
+    "BACKEND_UPSTASH_QSTASH_TIMEOUT_MS",
+    100,
+    30_000
+  ).optional(),
+  BACKEND_UPSTASH_QSTASH_DELIVERY_TIMEOUT_SECONDS: boundedPositiveInteger(
+    "BACKEND_UPSTASH_QSTASH_DELIVERY_TIMEOUT_SECONDS",
+    1,
+    120
+  ).optional(),
+  BACKEND_UPSTASH_QSTASH_RETRIES: boundedNonNegativeInteger(
+    "BACKEND_UPSTASH_QSTASH_RETRIES",
+    0,
+    10
+  ).optional(),
+  BACKEND_UPSTASH_QSTASH_MAXIMUM_REQUEST_BYTES: boundedPositiveInteger(
+    "BACKEND_UPSTASH_QSTASH_MAXIMUM_REQUEST_BYTES",
+    1_024,
+    1_024 * 1_024
+  ).optional(),
+  BACKEND_UPSTASH_QSTASH_MAXIMUM_RESPONSE_BYTES: boundedPositiveInteger(
+    "BACKEND_UPSTASH_QSTASH_MAXIMUM_RESPONSE_BYTES",
+    1_024,
+    256 * 1_024
+  ).optional(),
   STUDIO_LIVE_VOICE_ENABLED: z.enum(["true", "false"]).optional(),
   STUDIO_VOICE_STUN_URLS: z.string().optional(),
   STUDIO_VOICE_TURN_URLS: z.string().optional(),
@@ -399,6 +440,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY",
   "UPSTASH_COORDINATION_REST_TOKEN",
   "UPSTASH_COORDINATION_KEY_HASH_SECRET",
+  "BACKEND_UPSTASH_QSTASH_PUBLISH_TOKEN",
   "STUDIO_VOICE_TURN_SHARED_SECRET",
   "OPENAI_API_KEY",
   "GEMINI_API_KEY",

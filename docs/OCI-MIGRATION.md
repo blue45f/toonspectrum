@@ -60,11 +60,52 @@ docker compose build api
 
 ### 5-A. 완전히 빈 OCI DB 최초 bootstrap
 
-빈 DB의 base schema 구성은 기존 운영 DB upgrade와 별개의 승인 작업이다. DB가 외부에 공개되지
-않고 모든 Studio writer가 중지된 상태에서만 [README의 “선택한 완전한 빈 로컬 DB 최초
-provision”](../README.md#db-%EC%A4%80%EB%B9%84-postgresql--neon) 절차를 OCI의 direct URL에 대해
-수행한다. 그 절차는 reviewed historical baseline을 구성하고 `adopt` 모드로 checksum 원장을
-초기화한 뒤 실제 pending migration만 적용한다. 원장 초기화가 끝나기 전에는 API를 시작하지 않는다.
+빈 DB의 base schema 구성은 기존 운영 DB upgrade와 별개의 승인 작업이다. cloud-init은 이 경로에
+필요한 `postgresql-client`를 설치한다. DB가 외부에 공개되지 않고 모든 Studio writer가 중지된
+상태에서 먼저 읽기 전용 계획을 실행한다.
+
+```bash
+cd /opt/webdex
+export MIGRATION_DATABASE_URL='<OCI direct migrator URL>'
+release_sha="$(git rev-parse HEAD)"
+pnpm db:bootstrap:production-empty -- \
+  --plan \
+  --runtime-database-role webdex_runtime \
+  --release-sha "$release_sha"
+```
+
+계획이 올바른 DB, 0개의 다른 client connection, 안전하게 분리된 runtime role을 확인한 뒤에만
+실행한다. runtime role이 없으면 `BOOTSTRAP_RUNTIME_DATABASE_PASSWORD`에 앱의 별도 runtime DB
+비밀번호를 제공한다. 이 값과 direct URL은 로그에 출력되지 않는다.
+
+```bash
+export BOOTSTRAP_RUNTIME_DATABASE_PASSWORD='<runtime-role-secret-if-missing>'
+pnpm db:bootstrap:production-empty -- \
+  --execute \
+  --runtime-database-role webdex_runtime \
+  --release-sha "$release_sha" \
+  --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
+unset BOOTSTRAP_RUNTIME_DATABASE_PASSWORD MIGRATION_DATABASE_URL
+```
+
+명령은 reviewed historical baseline을 구성하고 `adopt` 모드로 checksum 원장을 초기화한 뒤 실제
+pending migration을 적용하며, apply 재실행과 production capability verifier까지 성공해야 완료로
+판정한다. verifier는 runtime role의 role membership, DB/public DDL 권한, DB·extension·public
+relation 소유권을 거부하고, migration ledger의 PUBLIC/runtime 접근 차단 및 0024 object-storage
+컬럼 단위 권한을 migration runner와 같은 계약으로 확인한다. 대상이 비어 있지 않으면 자동
+삭제하지 않고 중단한다. 백업을 확인한 폐기 가능 DB만
+계획에 표시되는 `RESET-AND-BOOTSTRAP-TOONSPECTRUM-DATABASE:<정확한 DB명>` 토큰을 별도
+`--reset-confirmation`으로 제공할 수 있다. 이 토큰은 `public`과 `toonspectrum_ops`의 데이터 및
+객체를 삭제하므로 기존 운영 DB upgrade에는 사용하지 않는다. 원장 초기화가 끝나기 전에는 API를
+시작하지 않는다.
+
+실행 경로는 사전 drain 확인 후 runtime role을 임시 `NOLOGIN`으로 전환하고, 전환 직후 연결 수를
+재확인한 동안에만 schema와 migration을 변경한다. `PUBLIC CONNECT` 기본값은 바꾸지 않는다.
+포착 가능한 오류에서는 `finally`로 `LOGIN`을 복원한 뒤 최종 verifier가 역할 경계를 다시
+검증한다. VM 강제 종료 등으로 복원 단계 자체가 실행되지 못했다면 이는 의도적인 fail-closed
+상태다. bootstrap 프로세스가 없고 DB client가 0임을 확인한 운영자만 direct migrator 연결에서
+`ALTER ROLE webdex_runtime LOGIN;`을 실행하고, 다시 `--plan`과 capability verifier를 통과시킨다.
+계획 모드는 이 게이트를 활성화하지 않으며 완전히 읽기 전용이다.
 
 Neon의 **전체 DB archive를 복제할 예정이면 이 bootstrap을 먼저 실행하지 않는다.** §6-A처럼
 완전히 빈 대상 DB에 full archive를 먼저 복원한 뒤, 복원된 원장 유무에 맞춰 `adopt` 또는 `apply`를

@@ -5,8 +5,12 @@ import { expect, test } from "vitest";
 import {
   POST_BASELINE_RELATIONS,
   buildCreatorAssetObjectStorageRuntimeAclSql,
+  buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildHistoricalAdoptionVerificationSql,
+  buildMigrationLedgerRuntimeAclSql,
+  buildMigrationLedgerRuntimeAclViolationSql,
   buildRepairLockTakeoverSql,
+  buildRuntimeDatabaseRoleBoundaryStateSql,
   decideMigrationAction,
   loadMigrationManifest,
   validateMigrationSequenceContinuity,
@@ -50,6 +54,9 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
     'REVOKE ALL ON TABLE\n  public.creator_asset_storage_object,',
   );
   expect(sql).toContain(
+    'public.creator_work_asset_storage_reference\nFROM PUBLIC;',
+  );
+  expect(sql).toContain(
     'GRANT SELECT\n  ON TABLE public.creator_asset_storage_object',
   );
   expect(sql).toContain(
@@ -81,6 +88,90 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
     "sourceAssetId",
   ]) {
     expect(sql).not.toContain(`UPDATE ("${immutableColumn}"`);
+  }
+});
+
+test("creator object-storage grants and verification share one exact SQL contract", () => {
+  const violation = buildCreatorAssetObjectStorageRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  for (const requiredColumn of [
+    "contractVersion",
+    "objectPath",
+    "byteLength",
+    "contentType",
+    "deleteToken",
+    "deletedAt",
+    "objectDigest",
+    "sourceAssetId",
+    "createdBy",
+  ]) {
+    expect(violation).toContain(`'${requiredColumn}'`);
+  }
+  expect(violation).toContain("has_column_privilege");
+  expect(violation).toContain("has_table_privilege");
+  expect(violation).toContain("'toonspectrum_runtime'");
+});
+
+test("runtime role boundary rejects membership, DDL and ownership capabilities", () => {
+  const sql = buildRuntimeDatabaseRoleBoundaryStateSql(
+    "toonspectrum_runtime",
+  );
+  for (const boundary of [
+    "runtime-has-memberships",
+    "runtime-owns-database",
+    "runtime-can-create-database-objects",
+    "runtime-can-create-public-objects",
+    "runtime-owns-public-relation",
+    "runtime-owns-extension",
+  ]) {
+    expect(sql).toContain(boundary);
+  }
+  expect(sql).toContain("pg_catalog.pg_has_role");
+  expect(sql).toContain("pg_catalog.has_database_privilege");
+  expect(sql).toContain("pg_catalog.has_schema_privilege");
+  expect(sql).toContain("OR NOT rolcanlogin");
+
+  const bootstrapGatedSql = buildRuntimeDatabaseRoleBoundaryStateSql(
+    "toonspectrum_runtime",
+    { requireLogin: false },
+  );
+  expect(bootstrapGatedSql).not.toContain("OR NOT rolcanlogin");
+  expect(bootstrapGatedSql).toContain("runtime-has-memberships");
+  expect(() =>
+    buildRuntimeDatabaseRoleBoundaryStateSql("toonspectrum_runtime", {
+      requireLogin: "sometimes",
+    }),
+  ).toThrow(/login boundary mode/u);
+});
+
+test("migration ledger ACL revokes PUBLIC and runtime access and verifies effective denial", () => {
+  const normalization = buildMigrationLedgerRuntimeAclSql(
+    "toonspectrum_runtime",
+  );
+  expect(normalization).toContain(
+    "REVOKE ALL ON SCHEMA toonspectrum_ops FROM PUBLIC",
+  );
+  expect(normalization).toContain(
+    "REVOKE ALL ON ALL TABLES IN SCHEMA toonspectrum_ops FROM PUBLIC",
+  );
+  expect(normalization).toContain("FROM %I");
+
+  const violation = buildMigrationLedgerRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(violation).toContain("toonspectrum_ops.deployment_migration");
+  expect(violation).toContain("toonspectrum_ops.deployment_migration_lock");
+  for (const privilege of [
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+  ]) {
+    expect(violation).toContain(`'${privilege}'`);
   }
 });
 

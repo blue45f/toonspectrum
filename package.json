@@ -52,6 +52,7 @@
     "verify": "pnpm run ci",
     "verify:push": "pnpm run verify && pnpm run audit:security && pnpm run audit:licenses",
     "db:push": "drizzle-kit push",
+    "db:bootstrap:production-empty": "node scripts/bootstrap-empty-production-database.mjs",
     "db:seed": "tsx lib/db/seed.ts",
     "db:cleanup-creator-garbage": "tsx scripts/cleanup-creator-garbage.ts --dry-run",
     "db:cleanup-creator-garbage:dry-run": "tsx scripts/cleanup-creator-garbage.ts --dry-run",

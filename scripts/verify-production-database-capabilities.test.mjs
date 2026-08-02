@@ -5,6 +5,11 @@ import {
   loadHealthReadinessContract,
   validateRuntimeDatabaseRole,
 } from "./verify-production-database-capabilities.mjs";
+import {
+  buildCreatorAssetObjectStorageRuntimeAclViolationSql,
+  buildMigrationLedgerRuntimeAclViolationSql,
+  buildRuntimeDatabaseRoleBoundaryStateSql,
+} from "./run-production-database-migrations.mjs";
 
 test("loads the runtime health readiness relation and cutover contract", () => {
   const contract = loadHealthReadinessContract();
@@ -18,6 +23,15 @@ test("loads the runtime health readiness relation and cutover contract", () => {
 
 test("generated verification covers runtime capabilities and exact migration checksums", () => {
   const sql = buildProductionCapabilityVerificationSql("webdex_runtime");
+  expect(sql).toContain(
+    buildCreatorAssetObjectStorageRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildMigrationLedgerRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildRuntimeDatabaseRoleBoundaryStateSql("webdex_runtime"),
+  );
   for (const requiredFragment of [
     "creator_work_team_comment_activity_action_check",
     "creator_work_team_comment_mutation_operation_check",
@@ -38,6 +52,12 @@ test("generated verification covers runtime capabilities and exact migration che
     "runtime and migration database roles are not safely separated",
     "runtime database role owns the migration ledger",
     "runtime role lacks the exact creator object-storage privileges",
+    "runtime-has-memberships",
+    "runtime-can-create-database-objects",
+    "runtime-can-create-public-objects",
+    "runtime-owns-public-relation",
+    "runtime-owns-extension",
+    "runtime database role retains migration schema or ledger privileges",
     "creator_asset_storage_object",
     "creator_work_asset_storage_reference",
     "has_column_privilege",

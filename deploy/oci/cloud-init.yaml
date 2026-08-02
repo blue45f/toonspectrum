@@ -10,6 +10,9 @@ packages:
   - ca-certificates
   - curl
   - gnupg
+  # Repository bootstrap/migration commands execute psql on the host while
+  # the PostgreSQL server remains isolated in Docker.
+  - postgresql-client
 
 write_files:
   # OCI Ubuntu 이미지는 기본 iptables가 SSH 외 차단 — 80/443 허용 규칙 영구화.

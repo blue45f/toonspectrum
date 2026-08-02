@@ -158,12 +158,17 @@ turn the facade into an arbitrary callback/SSRF relay. A facade must declare the
 and workloads it serves, pass a bounded readiness probe, durably deduplicate the key, and return a
 strict accepted/completed/duplicate/rejected result. The default Nest application installs no such
 port: it remains ready as the authoritative API only while no cleanup/notification durable-queue
-provider role is enabled. Enabling Upstash QStash or Cloudflare for that role without registering a
-real adapter fails readiness before traffic is admitted; incoming execution also fails closed with a
-retryable rejection instead of fabricating a queue receipt. A process that explicitly registers the
-port must prove both workloads before its readiness check succeeds. The checked-in `AppModule` has
-no production QStash/Cloudflare queue adapter yet, so provider enablement is an operational blocker,
-not an implemented green path.
+provider role is enabled. Enabling a queue role without a real adapter fails readiness before traffic
+is admitted; incoming execution also fails closed instead of fabricating a queue receipt. The
+production module now installs the QStash producer only when distribution and the QStash provider
+are both explicitly enabled and every required value is valid. It verifies that the configured URL
+Group exists with at least one HTTPS endpoint, publishes a versioned bounded JSON command, uses a
+SHA-256 deduplication identifier, disables redirects/referrers/credentials, and redacts the body in
+QStash logs. The paid publish token is separate from the ToonSpectrum gateway admission token.
+QStash's provider-side deduplication window is ten minutes, so every URL Group consumer must still
+verify `Upstash-Signature` and durably deduplicate the command idempotency key at execution time.
+Cloudflare Queue remains an unregistered continuity adapter and therefore cannot report green
+readiness merely because its policy flag is enabled.
 
 The 16 MiB hard JSON request/response ceiling and each provider's smaller configured ceiling are
 control-plane safety boundaries, not artwork size or quality limits. They apply to both the request

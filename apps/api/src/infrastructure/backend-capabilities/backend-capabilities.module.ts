@@ -4,6 +4,7 @@ import { Module, type DynamicModule } from "@nestjs/common";
 
 import { SupabaseObjectStorageModule } from "../supabase-object-storage/supabase-object-storage.module";
 import { UpstashCoordinationModule } from "../upstash-coordination/upstash-coordination.module";
+import { UpstashQStashModule } from "../upstash-qstash/upstash-qstash.module";
 
 import {
   BACKEND_CAPABILITY_COORDINATION_RUNTIME,
@@ -30,14 +31,18 @@ const upstashCoordinationModule =
   UpstashCoordinationModule.fromEnvironment(process.env);
 const supabaseObjectStorageModule =
   SupabaseObjectStorageModule.fromEnvironment(process.env);
+const upstashQStashModule =
+  UpstashQStashModule.fromEnvironment(process.env);
 
 const optionalInfrastructureModules = [
   ...(upstashCoordinationModule ? [upstashCoordinationModule] : []),
   ...(supabaseObjectStorageModule ? [supabaseObjectStorageModule] : []),
+  ...(upstashQStashModule ? [upstashQStashModule] : []),
 ];
 const optionalInfrastructureExports = [
   ...(upstashCoordinationModule ? [UpstashCoordinationModule] : []),
   ...(supabaseObjectStorageModule ? [SupabaseObjectStorageModule] : []),
+  ...(upstashQStashModule ? [UpstashQStashModule] : []),
 ];
 
 @Module({
@@ -75,9 +80,8 @@ const optionalInfrastructureExports = [
 })
 export class BackendCapabilitiesModule {
   /**
-   * Provider-facade registration seam. The default application intentionally installs no durable
-   * queue adapter. It may stay ready only while no queue role is enabled; enabling one without a
-   * real adapter fails health readiness and requests reject instead of claiming a queue receipt.
+   * Test/custom provider registration seam. Production may install the fail-closed QStash adapter
+   * from environment. It may stay ready without a port only while no durable queue role is enabled.
    */
   static registerDurableQueue(
     durableQueue: BackendCapabilityDurableQueuePort
