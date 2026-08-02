@@ -109,6 +109,7 @@ async function runOperation(
       }
       return {
         ok: true as const,
+        bodyKind: step.bodyKind,
         mesh: step.mesh,
         faceCount: step.faceCount,
         triangleCount: step.triangleCount,

@@ -27,7 +27,7 @@ const SCRATCH =
 const HARNESS_PATH = "/__studio_p5_brush_real_runtime__";
 const HARNESS_ENTRY = "/scripts/studio-p5-brush-real-runtime-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;
-const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.4";
+const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.5";
 const EXPECTED_CASE_IDS = [
   "flow-field",
   "hatch",
@@ -161,14 +161,19 @@ function validateSuccess(result, contextAffinityStress, diagnostics) {
       || !evidence.quality.metrics
       || evidence.quality.findings?.length !== 0
     ) {
-      failures.push(`${evidence.id}: golden structural quality policy failed`);
+      failures.push(
+        `${evidence.id}: golden structural quality policy failed `
+        + `${JSON.stringify(evidence.quality?.findings ?? [])}`,
+      );
     }
     if (
       evidence.exactPixelReplay !== true
       || evidence.first?.pixelHash !== evidence.replay?.pixelHash
     ) {
       failures.push(
-        `${evidence.id}: two production one-shot Workers did not produce identical bytes`,
+        `${evidence.id}: two production one-shot Workers did not produce identical bytes `
+        + `(${String(evidence.first?.pixelHash)} != `
+        + `${String(evidence.replay?.pixelHash)})`,
       );
     }
   }

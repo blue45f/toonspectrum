@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
@@ -7,6 +8,13 @@ import { AuthController, authResponseUser } from "./auth.controller";
 import { AuthSessionResponseSchema } from "./auth.dto";
 
 import type { Response } from "express";
+
+const revokeUserSessions = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../../../lib/server/user-lifecycle", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../lib/server/user-lifecycle")>()),
+  revokeUserSessions,
+}));
 
 vi.mock("./auth-session-profile", () => ({
   resolveAuthSessionUser: vi.fn(),
@@ -29,6 +37,8 @@ function response(): Response {
 describe("AuthController session truth source", () => {
   beforeEach(() => {
     vi.mocked(resolveAuthSessionUser).mockReset();
+    revokeUserSessions.mockReset();
+    revokeUserSessions.mockResolvedValue({ ok: true, sessionVersion: 2 });
   });
 
   it("returns an explicit logged-out response and expires a stale cookie", async () => {
@@ -86,6 +96,38 @@ describe("AuthController session truth source", () => {
       authenticated: false,
       user: null,
     });
+    expect(res.clearCookie).toHaveBeenCalledOnce();
+  });
+
+  it("expires the HttpOnly cookie while preserving a 503 when durable revocation fails", async () => {
+    const res = response();
+    revokeUserSessions.mockRejectedValueOnce(
+      new Error("postgresql://user:secret@example.invalid/database"),
+    );
+
+    const error = await controller()
+      .logout("verified-user", res)
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect(revokeUserSessions).toHaveBeenCalledWith("verified-user");
+    expect(res.clearCookie).toHaveBeenCalledWith(
+      AUTH_SESSION_COOKIE_NAME,
+      expect.objectContaining({
+        httpOnly: true,
+        path: "/",
+        sameSite: "lax",
+        maxAge: 0,
+      }),
+    );
+    expect(JSON.stringify((error as ServiceUnavailableException).getResponse()))
+      .not.toContain("postgresql");
+  });
+
+  it("also expires an already-anonymous browser cookie", async () => {
+    const res = response();
+
+    await expect(controller().logout(undefined, res)).resolves.toEqual({ ok: true });
+    expect(revokeUserSessions).not.toHaveBeenCalled();
     expect(res.clearCookie).toHaveBeenCalledOnce();
   });
 

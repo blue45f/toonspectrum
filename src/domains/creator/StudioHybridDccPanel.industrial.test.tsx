@@ -32,6 +32,7 @@ class FakePanelOcctWorker extends EventTarget {
         id: request.id,
         result: {
           ok: true,
+          bodyKind: "solid",
           mesh: createStudioUnitCubeMesh(),
           faceCount: 6,
           triangleCount: 12,

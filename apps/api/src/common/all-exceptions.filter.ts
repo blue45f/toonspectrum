@@ -1,5 +1,7 @@
 import { ArgumentsHost, Catch, HttpException, HttpStatus, Logger } from "@nestjs/common";
 
+import { safeHttpRequestPathname } from "./http-request-path";
+
 import type { ExceptionFilter } from "@nestjs/common";
 import type { Request, Response } from "express";
 
@@ -30,20 +32,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     // 기존 envelope 보존: HttpException 객체 응답은 그대로 펼치고, 문자열/비-HttpException 은 표준 형태로 감싼다.
-    const base = this.toBaseBody(exception, status);
+    // A 5xx HttpException body can contain an upstream Error.message, signed URL or connection
+    // detail supplied by a nested service. Keep rich compatibility envelopes only for 4xx; the
+    // outer trust boundary always emits a generic 5xx body.
+    const base = status >= HttpStatus.INTERNAL_SERVER_ERROR
+      ? { statusCode: status, message: "Request could not be completed" }
+      : this.toBaseBody(exception, status);
+    const pathname = safeHttpRequestPathname(request);
 
     // path·timestamp 만 추가(기존 statusCode/message/error 는 base 가 그대로 보존).
     const body = {
       ...base,
-      path: request.url,
+      path: pathname,
       timestamp: new Date().toISOString(),
     };
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      this.logger.error(
-        `${request.method} ${request.url} -> ${status}`,
-        exception instanceof Error ? exception.stack : String(exception)
-      );
+      // Error messages/stacks can repeat an OAuth callback URL, signed object URL or a driver
+      // connection string. Keep the operational request/status signal without logging those
+      // untrusted exception details at this outermost credential boundary.
+      this.logger.error(`${request.method} ${pathname} -> ${status}`);
     }
 
     response.status(status).json(body);

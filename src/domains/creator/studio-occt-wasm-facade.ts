@@ -15,7 +15,9 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 11 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 12 as const;
+
+export type StudioOcctBodyKind = "solid" | "surface";
 
 export type StudioOcctTopologyReceipt = {
   readonly source: "tessellated-triangle-mesh";
@@ -57,8 +59,84 @@ export type StudioOcctMassProperties = {
   readonly approximate: boolean;
 };
 
+/** Final authority gate before a tessellated CAD body may cross into document geometry. */
+export function validateStudioOcctBodyReceipt(
+  bodyKind: StudioOcctBodyKind,
+  topology: StudioOcctTopologyReceipt,
+  massProperties: StudioOcctMassProperties,
+  operation = "OCCT operation",
+): StudioOcctFail | null {
+  const validTopologyNumbers = [
+    topology.boundaryEdgeCount,
+    topology.nonManifoldEdgeCount,
+    topology.orientationConflictEdgeCount,
+    topology.degenerateTriangleCount,
+  ].every((value) => Number.isSafeInteger(value) && value >= 0)
+    && Number.isFinite(topology.signedVolume);
+  const validMassNumbers = [
+    massProperties.mass,
+    massProperties.volume,
+    massProperties.surfaceArea,
+  ].every((value) => Number.isFinite(value) && value >= 0);
+  if (!validTopologyNumbers || !validMassNumbers) {
+    return {
+      ok: false,
+      code: "invalid-body-receipt",
+      detail: `${operation} returned non-finite or negative topology/mass evidence`,
+    };
+  }
+  if (
+    bodyKind === "solid"
+    && (
+      !topology.watertight
+      || !topology.closedSolid
+      || massProperties.volume <= 1e-12
+    )
+  ) {
+    return {
+      ok: false,
+      code: "invalid-solid-topology",
+      detail: [
+        `${operation} did not produce a closed positive-volume solid`,
+        `boundary=${topology.boundaryEdgeCount}`,
+        `nonManifold=${topology.nonManifoldEdgeCount}`,
+        `orientationConflicts=${topology.orientationConflictEdgeCount}`,
+        `degenerate=${topology.degenerateTriangleCount}`,
+        `volume=${massProperties.volume}`,
+      ].join("; "),
+    };
+  }
+  if (
+    bodyKind === "surface"
+    && (
+      topology.watertight
+      || topology.boundaryEdgeCount === 0
+      || topology.nonManifoldEdgeCount !== 0
+      || topology.orientationConflictEdgeCount !== 0
+      || topology.degenerateTriangleCount !== 0
+      || !topology.consistentOrientation
+      || massProperties.surfaceArea <= 1e-12
+      || topology.closedSolid
+      || massProperties.volume > 1e-12
+    )
+  ) {
+    return {
+      ok: false,
+      code: "invalid-surface-topology",
+      detail: [
+        `${operation} did not produce an open zero-volume positive-area surface`,
+        `closedSolid=${topology.closedSolid}`,
+        `surfaceArea=${massProperties.surfaceArea}`,
+        `volume=${massProperties.volume}`,
+      ].join("; "),
+    };
+  }
+  return null;
+}
+
 export type StudioOcctStepIoResult = {
   readonly ok: true;
+  readonly bodyKind: "solid";
   readonly backend: "opencascade-wasm";
   readonly operation: "STEPControl_Writer+Reader";
   readonly stepBytes: number;
@@ -89,6 +167,8 @@ export type StudioOcctModule = {
 
 export type StudioOcctSolidResult = {
   readonly ok: true;
+  /** Distinguishes volume-bearing CAD bodies from intentional open section surfaces. */
+  readonly bodyKind: StudioOcctBodyKind;
   readonly mesh: StudioEditableMesh;
   readonly faceCount: number;
   readonly triangleCount: number;
@@ -595,6 +675,34 @@ export function inspectStudioOcctMeshTopology(
   return measureStudioOcctTessellation(mesh).topology;
 }
 
+/**
+ * Recomputes topology from the canonical editable mesh before trusting a receipt transported
+ * across a Worker/process boundary. The receipt is evidence, never geometry authority.
+ */
+export function studioOcctTopologyReceiptMatchesMesh(
+  mesh: StudioEditableMesh,
+  receipt: StudioOcctTopologyReceipt,
+): boolean {
+  try {
+    const measured = inspectStudioOcctMeshTopology(mesh);
+    const signedVolumeTolerance = Math.max(
+      1e-12,
+      Math.abs(measured.signedVolume) * 1e-10,
+    );
+    return measured.source === receipt.source
+      && measured.boundaryEdgeCount === receipt.boundaryEdgeCount
+      && measured.nonManifoldEdgeCount === receipt.nonManifoldEdgeCount
+      && measured.orientationConflictEdgeCount === receipt.orientationConflictEdgeCount
+      && measured.degenerateTriangleCount === receipt.degenerateTriangleCount
+      && measured.consistentOrientation === receipt.consistentOrientation
+      && measured.watertight === receipt.watertight
+      && measured.closedSolid === receipt.closedSolid
+      && Math.abs(measured.signedVolume - receipt.signedVolume) <= signedVolumeTolerance;
+  } catch {
+    return false;
+  }
+}
+
 function approxVolumeBox(dx: number, dy: number, dz: number): number {
   return Math.abs(dx * dy * dz);
 }
@@ -735,7 +843,8 @@ function packResult(
   loadPath: "browser" | "node",
   oc?: StudioOcctModule,
   shape?: unknown,
-): StudioOcctSolidResult {
+  bodyKind: StudioOcctBodyKind = "solid",
+): StudioOcctSolidResult | StudioOcctFail {
   const tessellation = measureStudioOcctTessellation(mesh);
   const massProperties = oc && shape
     ? readStudioOcctMassProperties(oc, shape, volumeApprox, tessellation)
@@ -762,8 +871,16 @@ function packResult(
         inertiaSource: "unavailable" as const,
         approximate: true,
       };
+  const bodyReceiptFailure = validateStudioOcctBodyReceipt(
+    bodyKind,
+    tessellation.topology,
+    massProperties,
+    operation,
+  );
+  if (bodyReceiptFailure) return bodyReceiptFailure;
   return {
     ok: true,
+    bodyKind,
     mesh,
     faceCount,
     triangleCount,
@@ -1265,8 +1382,10 @@ export async function occtStepRoundTripBox(
       oc,
       shape,
     );
+    if (!packed.ok) return packed;
     return {
       ok: true,
+      bodyKind: "solid",
       backend: "opencascade-wasm",
       operation: "STEPControl_Writer+Reader",
       stepBytes: stepText.length,
@@ -1763,6 +1882,7 @@ export async function occtSectionBoxByPlane(
       runtime.loadPath,
       oc,
       faceShape,
+      "surface",
     );
   });
 }
@@ -2041,12 +2161,29 @@ export async function occtMakePipeSolid(
     if (isCallable(profileMaker.Add_1)) profileMaker.Add_1(profileEdge);
     else if (isCallable(profileMaker.Add)) profileMaker.Add(profileEdge);
     const profile = owner.own(profileMaker.Wire());
+    let sweptProfile: unknown = profile;
+    for (const key of [
+      "BRepBuilderAPI_MakeFace_15",
+      "BRepBuilderAPI_MakeFace_16",
+      "BRepBuilderAPI_MakeFace",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const faceMaker = owner.own(new oc[key](profile, true));
+        sweptProfile = owner.own(
+          isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape(),
+        );
+        break;
+      } catch {
+        // Try the next generated face overload. A wire-only sweep is rejected below as open.
+      }
+    }
 
     let shape: unknown = null;
     for (const key of ["BRepOffsetAPI_MakePipe_1", "BRepOffsetAPI_MakePipe"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        const pipe = owner.own(new oc[key](spine, profile));
+        const pipe = owner.own(new oc[key](spine, sweptProfile));
         if (isCallable(pipe.Build)) pipe.Build();
         shape = owner.own(pipe.Shape());
         break;
@@ -2115,28 +2252,23 @@ export async function occtMirrorBox(
     if (!shape) {
       return { ok: false, code: "transform-failed", detail: "BRepBuilderAPI_Transform failed" };
     }
-    // Fuse original + mirror for a measurable multi-body result when possible
-    const fused = runOcctBinaryShapeOperation(
-      oc,
-      owner,
-      ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
-      box,
-      shape,
-    );
-    const outShape = fused ?? shape;
-    const tess = tessellateStudioOcctShape(oc, outShape, 0.15);
+    // A mirror feature returns the transformed body. Fusing it back into the
+    // source box is a separate boolean feature and is unsafe here: when the
+    // two bodies only touch along an edge the fuse can be non-manifold even
+    // though both inputs are valid solids.
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
     if (tess.triangleCount < 1) {
       return { ok: false, code: "empty-tessellation", detail: "mirror produced no triangles" };
     }
     return packResult(
-      fused ? "BRepBuilderAPI_Transform+Fuse(mirror)" : "BRepBuilderAPI_Transform(mirror)",
+      "BRepBuilderAPI_Transform(mirror)",
       soupToMesh(tess.positions, tess.indices),
       tess.faceCount,
       tess.triangleCount,
-      approxVolumeBox(dx, dy, dz) * (fused ? 2 : 1),
+      approxVolumeBox(dx, dy, dz),
       runtime.loadPath,
       oc,
-      outShape,
+      shape,
     );
   });
 }

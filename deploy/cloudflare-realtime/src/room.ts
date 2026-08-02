@@ -1,6 +1,16 @@
 import { DurableObject } from "cloudflare:workers";
 
 import {
+  REALTIME_ACTOR_REGISTER_PATH,
+  REALTIME_INTERNAL_CONTROL_HEADER,
+  REALTIME_INTERNAL_CONTROL_VALUE,
+} from "./actor-directory";
+import {
+  REALTIME_CONTROL_MAX_BODY_BYTES,
+  parseRealtimeControlEvent,
+  type RealtimeControlEvent,
+} from "./control";
+import {
   REALTIME_CLIENT_PING_FRAME,
   REALTIME_MAX_OUTBOUND_FRAME_BYTES,
   REALTIME_MAX_REPLAY_EVENTS_PER_FRAME,
@@ -55,6 +65,7 @@ import {
   hasForbiddenCredentialQuery,
   isAllowedRealtimeOrigin,
   isWebSocketUpgrade,
+  normalizeRealtimeRoomObjectName,
   parseRealtimeRoomPath,
   resolveAllowedOrigins,
 } from "./security";
@@ -65,7 +76,7 @@ import {
 } from "./ticket";
 
 const CONNECTION_ATTACHMENT_VERSION =
-  "toonspectrum.realtime-connection.v2" as const;
+  "toonspectrum.realtime-connection.v3" as const;
 const MAX_PROTOCOL_VIOLATIONS = 3;
 
 type ResumeFrontiers = Readonly<Record<RealtimeChannel, number | null>>;
@@ -78,6 +89,8 @@ interface ConnectionAttachment {
   readonly actorId: string;
   readonly clientId: string;
   readonly scopes: readonly RealtimeChannel[];
+  readonly sessionVersion: number;
+  readonly authorizationEpochMs: number;
   readonly sessionExpiresAtMs: number;
   readonly lastClientSequence: number;
   readonly protocolViolations: number;
@@ -87,6 +100,21 @@ interface ConnectionAttachment {
   readonly resumeFrontiers: ResumeFrontiers;
   readonly completedResumeChannels: readonly RealtimeChannel[];
 }
+
+interface ActorDirectoryRegistration {
+  readonly connectionId: string;
+  readonly workId: string;
+  readonly roomId: string;
+  readonly roomObjectName: string;
+  readonly sessionVersion: number;
+  readonly authorizationEpochMs: number;
+  readonly sessionExpiresAtMs: number;
+}
+
+type DirectoryRegistrationResult =
+  | "accepted"
+  | "revoked"
+  | "unavailable";
 
 function jsonResponse(
   status: number,
@@ -127,6 +155,8 @@ function isConnectionAttachment(
     "actorId",
     "clientId",
     "scopes",
+    "sessionVersion",
+    "authorizationEpochMs",
     "sessionExpiresAtMs",
     "lastClientSequence",
     "protocolViolations",
@@ -150,6 +180,12 @@ function isConnectionAttachment(
     value.scopes.length <= 3 &&
     value.scopes.every(isRealtimeChannel) &&
     new Set(value.scopes).size === value.scopes.length &&
+    typeof value.sessionVersion === "number" &&
+    Number.isSafeInteger(value.sessionVersion) &&
+    value.sessionVersion > 0 &&
+    typeof value.authorizationEpochMs === "number" &&
+    Number.isSafeInteger(value.authorizationEpochMs) &&
+    value.authorizationEpochMs > 0 &&
     typeof value.sessionExpiresAtMs === "number" &&
     Number.isSafeInteger(value.sessionExpiresAtMs) &&
     value.sessionExpiresAtMs > 0 &&
@@ -200,6 +236,8 @@ function toConnectionAttachment(
     actorId: claims.subject,
     clientId: claims.clientId,
     scopes: claims.scopes,
+    sessionVersion: claims.sessionVersion,
+    authorizationEpochMs: claims.authorizationEpochMs,
     sessionExpiresAtMs: claims.sessionExpiresAtMs,
     lastClientSequence: 0,
     protocolViolations: 0,
@@ -288,6 +326,15 @@ export class RealtimeRoom extends DurableObject<RealtimeWorkerEnv> {
     await this.ready;
     const url = new URL(request.url);
     if (
+      request.method === "POST" &&
+      url.pathname === "/internal/room/revoke" &&
+      url.search === "" &&
+      request.headers.get(REALTIME_INTERNAL_CONTROL_HEADER) ===
+        REALTIME_INTERNAL_CONTROL_VALUE
+    ) {
+      return await this.handleInternalRevocation(request);
+    }
+    if (
       url.search !== "" ||
       hasForbiddenCredentialQuery(url) ||
       !isWebSocketUpgrade(request)
@@ -368,6 +415,28 @@ export class RealtimeRoom extends DurableObject<RealtimeWorkerEnv> {
     const [client, server] = createWebSocketPair();
     const serverSocket = server as HibernatableWebSocket;
     const connectionId = crypto.randomUUID();
+    const roomObjectName = normalizeRealtimeRoomObjectName(scope);
+    const actorRegistration: ActorDirectoryRegistration = {
+      connectionId,
+      workId: scope.workId,
+      roomId: scope.roomId,
+      roomObjectName,
+      sessionVersion: verified.claims.sessionVersion,
+      authorizationEpochMs: verified.claims.authorizationEpochMs,
+      sessionExpiresAtMs: verified.claims.sessionExpiresAtMs,
+    };
+    const directoryPreflight = await this.registerActorConnection(
+      verified.claims.subject,
+      actorRegistration,
+    );
+    if (directoryPreflight !== "accepted") {
+      return jsonResponse(
+        directoryPreflight === "revoked" ? 401 : 503,
+        directoryPreflight === "revoked"
+          ? "ticket-revoked"
+          : "revocation-directory-unavailable",
+      );
+    }
     if (
       !this.store.registerConnection({
         connectionId,
@@ -386,6 +455,31 @@ export class RealtimeRoom extends DurableObject<RealtimeWorkerEnv> {
     serverSocket.serializeAttachment(
       toConnectionAttachment(verified.claims, connectionId, nowMs),
     );
+
+    // The actor-directory admission is deliberately the final connection
+    // commit. A revocation that arrives before this call leaves a fence and
+    // rejects the registration; one that arrives after it observes both the
+    // directory row and the already accepted room socket. This closes the
+    // missing-row interleaving where a pre-registration could be revoked
+    // while the room was still awaiting its response and then accept a stale
+    // socket afterwards.
+    const directoryRegistration = await this.registerActorConnection(
+      verified.claims.subject,
+      actorRegistration,
+    );
+    if (directoryRegistration !== "accepted") {
+      this.cleanupConnection(
+        toConnectionAttachment(verified.claims, connectionId, nowMs),
+        nowMs,
+      );
+      closeSocket(serverSocket, 4003, "authorization-revoked");
+      return jsonResponse(
+        directoryRegistration === "revoked" ? 401 : 503,
+        directoryRegistration === "revoked"
+          ? "ticket-revoked"
+          : "revocation-directory-unavailable",
+      );
+    }
 
     const channelStates = this.store.getAllSequenceStates();
     this.sendMessage(serverSocket, {
@@ -417,6 +511,112 @@ export class RealtimeRoom extends DurableObject<RealtimeWorkerEnv> {
       },
       webSocket: client,
     } as ResponseInit & { readonly webSocket: WebSocket });
+  }
+
+  private async registerActorConnection(
+    actorId: string,
+    registration: ActorDirectoryRegistration,
+  ): Promise<DirectoryRegistrationResult> {
+    let response: Response;
+    try {
+      const actorDirectoryId = this.runtimeEnv.REALTIME_ACTORS.idFromName(
+        actorId,
+      );
+      response = await this.runtimeEnv.REALTIME_ACTORS.get(
+        actorDirectoryId,
+      ).fetch(
+        new Request(
+          `https://internal.invalid${REALTIME_ACTOR_REGISTER_PATH}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              [REALTIME_INTERNAL_CONTROL_HEADER]:
+                REALTIME_INTERNAL_CONTROL_VALUE,
+            },
+            body: JSON.stringify(registration),
+          },
+        ),
+      );
+    } catch {
+      return "unavailable";
+    }
+    if (response.status === 409) return "revoked";
+    return response.status === 204 ? "accepted" : "unavailable";
+  }
+
+  private async handleInternalRevocation(
+    request: Request,
+  ): Promise<Response> {
+    const declaredLength = request.headers.get("Content-Length");
+    if (
+      declaredLength !== null &&
+      (!/^(?:0|[1-9]\d*)$/u.test(declaredLength) ||
+        Number(declaredLength) > REALTIME_CONTROL_MAX_BODY_BYTES)
+    ) {
+      return jsonResponse(400, "invalid-control-event");
+    }
+    const body = new Uint8Array(await request.arrayBuffer());
+    if (
+      body.byteLength === 0 ||
+      body.byteLength > REALTIME_CONTROL_MAX_BODY_BYTES
+    ) {
+      return jsonResponse(400, "invalid-control-event");
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(body),
+      );
+    } catch {
+      return jsonResponse(400, "invalid-control-event");
+    }
+    const event = parseRealtimeControlEvent(value);
+    if (event === null) {
+      return jsonResponse(400, "invalid-control-event");
+    }
+    const nowMs = Date.now();
+    let connectionsRevoked = 0;
+    for (const socket of this.roomState.getWebSockets()) {
+      const attachment = socket.deserializeAttachment();
+      if (
+        !isConnectionAttachment(attachment) ||
+        !this.matchesRevocation(attachment, event)
+      ) {
+        continue;
+      }
+      this.cleanupConnection(attachment, nowMs);
+      closeSocket(socket, 4003, "authorization-revoked");
+      connectionsRevoked += 1;
+    }
+    await this.scheduleNextAlarm(nowMs);
+    return new Response(
+      JSON.stringify({ ok: true, connectionsRevoked }),
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json; charset=utf-8",
+          "X-Content-Type-Options": "nosniff",
+        },
+      },
+    );
+  }
+
+  private matchesRevocation(
+    attachment: ConnectionAttachment,
+    event: RealtimeControlEvent,
+  ): boolean {
+    if (attachment.actorId !== event.actorId) return false;
+    if (event.kind === "session-version") {
+      return attachment.sessionVersion < event.minimumSessionVersion;
+    }
+    return (
+      attachment.workId === event.workId &&
+      attachment.roomId === event.roomId &&
+      attachment.authorizationEpochMs <=
+        event.minimumAuthorizationEpochMs
+    );
   }
 
   async webSocketMessage(

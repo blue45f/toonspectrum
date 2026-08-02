@@ -221,9 +221,9 @@ function createHarness(runtime: FakeModule) {
 }
 
 describe("Studio p5.brush standalone concrete adapter", () => {
-  it("advertises the five proven artistic techniques at adapter revision 4", async () => {
+  it("advertises the five proven artistic techniques at adapter revision 5", async () => {
     expect(STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION).toBe(
-      "2.2.1-adapter.4",
+      "2.2.1-adapter.5",
     );
     expect(STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES).toEqual([
       "procedural:flow-field",
@@ -244,6 +244,71 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     const runtime = await load();
     expect(runtime?.descriptor.capabilities).not.toContain("tip:image");
     expect(runtime?.descriptor.capabilities).not.toContain("tip:custom");
+  });
+
+  it("uses identical bootstrap entropy for independent imports and restores Math.random", async () => {
+    const originalRandom = Math.random;
+    const observations: number[][] = [];
+    const createLoader = () => createStudioP5BrushStandaloneAdapterLoader({
+      importStandalone: async () => {
+        await Promise.resolve();
+        observations.push([
+          Math.random(),
+          Math.random(),
+          Math.random(),
+          Math.random(),
+        ]);
+        return fakeModule();
+      },
+      environment: ENVIRONMENT,
+    });
+
+    await expect(createLoader()()).resolves.not.toBeNull();
+    expect(Math.random).toBe(originalRandom);
+    await expect(createLoader()()).resolves.not.toBeNull();
+    expect(Math.random).toBe(originalRandom);
+    expect(observations).toHaveLength(2);
+    expect(observations[1]).toEqual(observations[0]);
+  });
+
+  it("restores Math.random when standalone module evaluation fails", async () => {
+    const originalRandom = Math.random;
+    const load = createStudioP5BrushStandaloneAdapterLoader({
+      importStandalone: async () => {
+        Math.random();
+        throw new Error("module evaluation failed");
+      },
+      environment: ENVIRONMENT,
+    });
+
+    await expect(load()).resolves.toBeNull();
+    expect(Math.random).toBe(originalRandom);
+  });
+
+  it("releases the import queue when the host forbids replacing Math.random", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Math, "random");
+    const originalRandom = Math.random;
+    Object.defineProperty(Math, "random", {
+      configurable: true,
+      enumerable: descriptor?.enumerable ?? false,
+      value: originalRandom,
+      writable: false,
+    });
+    try {
+      const blocked = createStudioP5BrushStandaloneAdapterLoader({
+        importStandalone: async () => fakeModule(),
+        environment: ENVIRONMENT,
+      });
+      await expect(blocked()).resolves.toBeNull();
+    } finally {
+      if (descriptor) Object.defineProperty(Math, "random", descriptor);
+    }
+
+    const recovered = createStudioP5BrushStandaloneAdapterLoader({
+      importStandalone: async () => fakeModule(),
+      environment: ENVIRONMENT,
+    });
+    await expect(recovered()).resolves.not.toBeNull();
   });
 
   it.each(["fill", "fillBleed", "fillTexture", "wash"] as const)(
@@ -403,8 +468,8 @@ describe("Studio p5.brush standalone concrete adapter", () => {
       new AbortController().signal,
     );
     expect([...replay.pixels]).toEqual([...first.pixels]);
-    expect(runtime.load).toHaveBeenCalledTimes(2);
-    expect(runtime.render).toHaveBeenCalledTimes(6);
+    expect(runtime.load).toHaveBeenCalledTimes(1);
+    expect(runtime.render).toHaveBeenCalledTimes(5);
 
     await expect(adapter.renderSettled(
       {
@@ -415,7 +480,7 @@ describe("Studio p5.brush standalone concrete adapter", () => {
       },
       new AbortController().signal,
     )).rejects.toThrow(/context-affine/u);
-    expect(runtime.load).toHaveBeenCalledTimes(2);
+    expect(runtime.load).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an oversized direct adapter call before runtime or readback allocation", async () => {

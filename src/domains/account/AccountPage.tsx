@@ -376,7 +376,8 @@ function ProfileTab() {
     setError(null);
     try {
       await deleteMyAccount();
-      await signOut();
+      const logout = await signOut();
+      if (!logout.ok) throw new Error(logout.error);
       globalThis.location.assign("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("account.profile.errorDelete"));

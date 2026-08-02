@@ -27,6 +27,7 @@ export const HEALTH_ENVIRONMENT = Symbol("HEALTH_ENVIRONMENT");
 export type HealthEnvironment = Partial<
   Record<
     | "NODE_ENV"
+    | "AUTH_RATE_LIMIT_MODE"
     | "AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED"
     | "BACKEND_DISTRIBUTION_ENABLED"
     | "STUDIO_LIVE_CLUSTER_ADAPTER"

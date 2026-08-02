@@ -131,6 +131,11 @@ describe("3D engine upgrades", () => {
     if (!mirror.ok) return;
     expect(mirror.operation).toMatch(/Transform|mirror/u);
     expect(mirror.triangleCount).toBeGreaterThanOrEqual(12);
+    expect(mirror.bodyKind).toBe("solid");
+    expect(mirror.topology.watertight).toBe(true);
+    expect(mirror.topology.closedSolid).toBe(true);
+    expect(mirror.topology.nonManifoldEdgeCount).toBe(0);
+    expect(mirror.massProperties.volume).toBeGreaterThan(0);
   }, 120_000);
 
   it("SolidWorks suite reports realPipe and realMirror", async () => {
@@ -146,6 +151,10 @@ describe("3D engine upgrades", () => {
     if (!thick.ok) return;
     expect(thick.operation).toBe("BRepOffsetAPI_MakeThickSolid");
     expect(thick.triangleCount).toBeGreaterThanOrEqual(12);
+    expect(thick).toMatchObject({
+      bodyKind: "solid",
+      topology: { watertight: true, closedSolid: true },
+    });
 
     const step = await occtStepRoundTripBox(1, 1, 1);
     expect(step.ok).toBe(true);
@@ -156,6 +165,8 @@ describe("3D engine upgrades", () => {
     expect(step.triangleCount).toBeGreaterThanOrEqual(12);
     expect(step.volumeApprox).toBeCloseTo(1, 6);
     expect(step.massProperties.volumeSource).toBe("occt-brep");
+    expect(step.bodyKind).toBe("solid");
+    expect(step.topology.watertight).toBe(true);
     expect(step.topology.closedSolid).toBe(true);
   }, 120_000);
 
@@ -225,18 +236,31 @@ describe("3D engine upgrades", () => {
     if (!f2d.ok) return;
     expect(f2d.operation).toBe("BRepFilletAPI_MakeFillet2d+Prism");
     expect(f2d.triangleCount).toBeGreaterThan(20);
+    expect(f2d).toMatchObject({
+      bodyKind: "solid",
+      topology: { watertight: true, closedSolid: true },
+    });
 
     const shell = await occtMakePipeShellSolid(2, 0.15);
     expect(shell.ok).toBe(true);
     if (!shell.ok) return;
     expect(shell.operation).toBe("BRepOffsetAPI_MakePipeShell");
     expect(shell.triangleCount).toBeGreaterThan(20);
+    expect(shell).toMatchObject({
+      bodyKind: "solid",
+      topology: { watertight: true, closedSolid: true },
+    });
 
     const section = await occtSectionBoxByPlane(1, 1, 1);
     expect(section.ok).toBe(true);
     if (!section.ok) return;
     expect(section.operation).toBe("BRepAlgoAPI_Section");
     expect(section.triangleCount).toBeGreaterThanOrEqual(2);
+    expect(section).toMatchObject({
+      bodyKind: "surface",
+      topology: { closedSolid: false },
+      massProperties: { volume: 0 },
+    });
   }, 120_000);
 
   it("SolidWorks suite reports realFillet2dExtrude realPipeShell realSection", async () => {
@@ -258,6 +282,8 @@ describe("3D engine upgrades", () => {
 
     ws = await workspaceOcctSection(ws, "sec1");
     expect(ws.lastOcct?.operation).toBe("BRepAlgoAPI_Section");
+    expect(ws.lastOcct?.bodyKind).toBe("surface");
+    expect(ws.lastOcct?.topology.closedSolid).toBe(false);
     expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(2);
   }, 180_000);
 

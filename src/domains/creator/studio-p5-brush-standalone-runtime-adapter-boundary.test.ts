@@ -47,17 +47,21 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
   });
 
   it("keeps the runtime settled-only, Worker-isolated and non-authoritative", () => {
-    expect(source).toContain('"2.2.1-adapter.4"');
+    expect(source).toContain('"2.2.1-adapter.5"');
     expect(source).toContain('"execution:settled-only"');
     expect(source).toContain('"surface:offscreen-canvas"');
     expect(source).toContain('"gpu:webgl2"');
     expect(source).toContain('"authority:none"');
     expect(source).toContain("globalRuntimeTail");
+    expect(source).toContain("globalImportTail");
+    expect(source).toContain("importWithDeterministicBootstrap");
+    expect(source).toContain("Math.random = previousRandom");
     expect(source).toContain("isDedicatedWorkerScope");
     expect(source).toContain("isOffscreenCanvas");
     expect(source).toContain("isWebGl2Context");
     expect(source).toContain("readTopLeftRgbaInPlace");
     expect(source).toContain("contextAuthority");
+    expect(source).toContain("targetLoaded");
     expect(source).toContain("context-affine");
     expect(source).toContain("await runtime.render();");
     expect(source).toContain("pixels.copyWithin");

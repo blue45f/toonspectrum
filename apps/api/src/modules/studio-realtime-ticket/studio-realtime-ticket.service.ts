@@ -129,6 +129,15 @@ export class StudioRealtimeTicketService {
       throw new ForbiddenException(TICKET_FORBIDDEN_MESSAGE);
     }
 
+    const authorizationEpochMs = Date.parse(decision.authorizationEpoch);
+    if (
+      !Number.isSafeInteger(authorizationEpochMs) ||
+      authorizationEpochMs < 1 ||
+      authorizationEpochMs > Date.now() + 5_000
+    ) {
+      throw new ServiceUnavailableException(TICKET_UNAVAILABLE_MESSAGE);
+    }
+
     let authorizationExpiresAtEpochMs: number | undefined;
     if (decision.authorizationExpiresAt !== undefined) {
       authorizationExpiresAtEpochMs = Date.parse(
@@ -186,6 +195,7 @@ export class StudioRealtimeTicketService {
       rawSignedTicket = await signer.issue({
         actorUserId,
         sessionVersion: principal.sessionVersion,
+        authorizationEpochMs,
         sessionExpiresAtEpochMs: principal.expiresAt,
         sessionId: request.sessionId,
         scope: request.scope,

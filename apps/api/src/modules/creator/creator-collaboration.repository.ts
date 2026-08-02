@@ -105,7 +105,18 @@ export interface CreatorCollaborationTeamSnapshot {
  */
 export interface CreatorCollaborationAuthorizationSnapshot
   extends Pick<CreatorCollaborationTeamSnapshot, "workId" | "viewer"> {
+  /**
+   * Transactionally fenced ACL observation time. Realtime tickets preserve
+   * this epoch so a later member-removal event closes only credentials issued
+   * from this or an older ACL snapshot.
+   */
+  authorizationEpoch: string;
   authorizationExpiresAt?: string;
+}
+
+export interface CreatorCollaborationMemberRemovalResult {
+  readonly snapshot: CreatorCollaborationTeamSnapshot;
+  readonly authorizationEpochMs: number;
 }
 
 export interface CreatorCollaborationInvitation {
@@ -881,6 +892,7 @@ export class CreatorCollaborationRepository {
       const snapshot: CreatorCollaborationAuthorizationSnapshot = {
         workId: context.work.id,
         viewer: this.viewerProjection(actorUserId, context),
+        authorizationEpoch: this.now().toISOString(),
       };
       if (context.authorizationExpiresAt) {
         snapshot.authorizationExpiresAt = context.authorizationExpiresAt;
@@ -1059,6 +1071,20 @@ export class CreatorCollaborationRepository {
     workId: string,
     targetUserId: string
   ): Promise<CreatorCollaborationTeamSnapshot> {
+    return (
+      await this.removeMemberWithRevocation(
+        actorUserId,
+        workId,
+        targetUserId,
+      )
+    ).snapshot;
+  }
+
+  async removeMemberWithRevocation(
+    actorUserId: string,
+    workId: string,
+    targetUserId: string,
+  ): Promise<CreatorCollaborationMemberRemovalResult> {
     return this.persistence.transaction(async (unit) => {
       const context = await this.loadContext(unit, actorUserId, workId, true);
       this.requireManageMember(context, actorUserId, targetUserId);
@@ -1084,7 +1110,14 @@ export class CreatorCollaborationRepository {
         createdAt: now,
       });
 
-      return this.buildMutationSnapshot(unit, actorUserId, context.work);
+      return {
+        snapshot: await this.buildMutationSnapshot(
+          unit,
+          actorUserId,
+          context.work,
+        ),
+        authorizationEpochMs: now.getTime(),
+      };
     });
   }
 

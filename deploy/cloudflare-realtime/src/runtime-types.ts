@@ -62,7 +62,9 @@ export interface DurableObjectNamespaceLike {
 
 export interface RealtimeWorkerEnv {
   readonly REALTIME_ROOMS: DurableObjectNamespaceLike;
+  readonly REALTIME_ACTORS: DurableObjectNamespaceLike;
   readonly REALTIME_TICKET_SECRET: string;
+  readonly REALTIME_CONTROL_SECRET: string;
   readonly REALTIME_TICKET_ISSUER: string;
   readonly REALTIME_TICKET_AUDIENCE: string;
   readonly REALTIME_ALLOWED_ORIGINS?: string;

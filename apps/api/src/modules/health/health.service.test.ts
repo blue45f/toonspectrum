@@ -109,6 +109,7 @@ describe("HealthService", () => {
       realtime: false,
       environment: {
         NODE_ENV: "production",
+        AUTH_RATE_LIMIT_MODE: "single-instance-local",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL: DIRECT_POSTGRES_URL,
       },
@@ -224,6 +225,7 @@ describe("HealthService", () => {
     const { runtime, service } = dependencies({
       environment: {
         NODE_ENV: "production",
+        AUTH_RATE_LIMIT_MODE: "single-instance-local",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
       },
     });
@@ -332,6 +334,33 @@ describe("HealthService", () => {
       environment: {
         ...VALID_COORDINATION_ENVIRONMENT,
         AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
+      },
+    });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: true,
+      coordination: true,
+    });
+    expect(coordination.ping).not.toHaveBeenCalled();
+  });
+
+  it("fails production readiness when auth rate-limit topology is not explicit", async () => {
+    const { coordination, service } = dependencies({
+      environment: { NODE_ENV: "production" },
+    });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: false,
+      coordination: false,
+    });
+    expect(coordination.ping).not.toHaveBeenCalled();
+  });
+
+  it("accepts explicit production single-instance local risk without probing Upstash", async () => {
+    const { coordination, service } = dependencies({
+      environment: {
+        NODE_ENV: "production",
+        AUTH_RATE_LIMIT_MODE: "single-instance-local",
       },
     });
 

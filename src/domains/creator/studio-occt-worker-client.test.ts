@@ -12,7 +12,7 @@ import type {
 } from "./studio-occt-worker-protocol";
 
 class FakeOcctWorker extends EventTarget {
-  static mode: "post-message-throw" | "silent" | "success" = "success";
+  static mode: "forged-solid" | "invalid-solid" | "post-message-throw" | "silent" | "success" = "success";
   static latest: FakeOcctWorker | null = null;
   static instances: FakeOcctWorker[] = [];
 
@@ -32,25 +32,30 @@ class FakeOcctWorker extends EventTarget {
     }
     if (FakeOcctWorker.mode === "silent") return;
     queueMicrotask(() => {
+      const validSolid = FakeOcctWorker.mode !== "invalid-solid";
+      const canonicalMesh = createStudioUnitCubeMesh();
       const response: StudioOcctWorkerResponse = {
         id: request.id,
         result: {
           ok: true,
-          mesh: createStudioUnitCubeMesh(),
-          faceCount: 6,
+          bodyKind: "solid",
+          mesh: FakeOcctWorker.mode === "forged-solid"
+            ? { ...canonicalMesh, faces: canonicalMesh.faces.slice(0, -1) }
+            : canonicalMesh,
+          faceCount: FakeOcctWorker.mode === "forged-solid" ? 5 : 6,
           triangleCount: 12,
           vertexCount: 8,
           volumeApprox: 1,
           topology: {
             source: "tessellated-triangle-mesh",
-            boundaryEdgeCount: 0,
+            boundaryEdgeCount: validSolid ? 0 : 3,
             nonManifoldEdgeCount: 0,
             orientationConflictEdgeCount: 0,
             degenerateTriangleCount: 0,
             consistentOrientation: true,
-            watertight: true,
-            closedSolid: true,
-            signedVolume: 1,
+            watertight: validSolid,
+            closedSolid: validSolid,
+            signedVolume: validSolid ? 1 : 0,
           },
           massProperties: {
             source: "occt-brep",
@@ -163,6 +168,33 @@ describe("Studio OCCT Worker client", () => {
     expect(FakeOcctWorker.latest?.terminated).toBe(true);
   });
 
+  it("cancels an isolated operation without leaving its realm alive", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "silent";
+    const controller = new AbortController();
+    const operation = runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    }, { signal: controller.signal });
+    controller.abort();
+    await expect(operation).rejects.toMatchObject({ name: "AbortError" });
+    expect(FakeOcctWorker.latest?.terminated).toBe(true);
+  });
+
+  it("times out and terminates an isolated operation", async () => {
+    vi.useFakeTimers();
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "silent";
+    const operation = runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    }, { timeoutMs: 1_000 });
+    const assertion = expect(operation).rejects.toThrow(/timed out after 1000ms/u);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await assertion;
+    expect(FakeOcctWorker.latest?.terminated).toBe(true);
+  });
+
   it("terminates the shared Worker and rejects on cancellation", async () => {
     useFakeBrowserWorker();
     FakeOcctWorker.mode = "silent";
@@ -174,6 +206,52 @@ describe("Studio OCCT Worker client", () => {
     controller.abort();
     await expect(operation).rejects.toMatchObject({ name: "AbortError" });
     expect(FakeOcctWorker.latest?.terminated).toBe(true);
+  });
+
+  it("keeps queued work alive when the active shared operation is cancelled", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "silent";
+    const controller = new AbortController();
+    const cancelled = runStudioOcctOperation(
+      { kind: "box", size: [1, 1, 1] },
+      { signal: controller.signal },
+    );
+    const survivor = runStudioOcctOperation({ kind: "sphere", radius: 1 });
+    const firstGeneration = FakeOcctWorker.latest;
+    expect(FakeOcctWorker.instances).toHaveLength(1);
+
+    FakeOcctWorker.mode = "success";
+    controller.abort();
+
+    await expect(cancelled).rejects.toMatchObject({ name: "AbortError" });
+    await expect(survivor).resolves.toMatchObject({ bodyKind: "solid" });
+    expect(firstGeneration?.terminated).toBe(true);
+    expect(FakeOcctWorker.instances).toHaveLength(2);
+  });
+
+  it("ignores late errors from a terminated Worker generation", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "silent";
+    const controller = new AbortController();
+    const first = runStudioOcctOperation(
+      { kind: "box", size: [1, 1, 1] },
+      { signal: controller.signal },
+    );
+    const oldGeneration = FakeOcctWorker.latest;
+    controller.abort();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+
+    const second = runStudioOcctOperation({ kind: "sphere", radius: 1 });
+    const currentGeneration = FakeOcctWorker.latest;
+    expect(currentGeneration).not.toBe(oldGeneration);
+    oldGeneration?.emitError("late old-generation error");
+    expect(currentGeneration?.terminated).toBe(false);
+
+    FakeOcctWorker.mode = "success";
+    const currentRequest = currentGeneration?.lastRequest;
+    expect(currentRequest).not.toBeNull();
+    if (currentRequest) currentGeneration?.postMessage(currentRequest);
+    await expect(second).resolves.toMatchObject({ bodyKind: "solid" });
   });
 
   it("terminates a wedged Worker at the bounded timeout", async () => {
@@ -243,6 +321,24 @@ describe("Studio OCCT Worker client", () => {
     expect(FakeOcctWorker.latest?.terminated).toBe(true);
   });
 
+  it("rejects a nominal solid response whose topology is open", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "invalid-solid";
+    await expect(
+      runStudioOcctOperation({ kind: "box", size: [1, 1, 1] }),
+    ).rejects.toThrow("invalid response payload");
+    expect(FakeOcctWorker.latest?.terminated).toBe(true);
+  });
+
+  it("rejects an open canonical mesh even when the Worker forges a closed-solid receipt", async () => {
+    useFakeBrowserWorker();
+    FakeOcctWorker.mode = "forged-solid";
+    await expect(
+      runStudioOcctOperation({ kind: "box", size: [1, 1, 1] }),
+    ).rejects.toThrow("invalid response payload");
+    expect(FakeOcctWorker.latest?.terminated).toBe(true);
+  });
+
   it("cleans up immediately when postMessage throws synchronously", async () => {
     useFakeBrowserWorker();
     FakeOcctWorker.mode = "post-message-throw";
@@ -252,4 +348,52 @@ describe("Studio OCCT Worker client", () => {
     ).rejects.toThrow("OCCT Worker postMessage failed: structured clone failed");
     expect(FakeOcctWorker.latest?.terminated).toBe(true);
   });
+
+  it("realm-isolates repeated unsafe Node operations and keeps the caller runtime healthy", async () => {
+    const first = await runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    }, { timeoutMs: 120_000 });
+    const second = await runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    }, { timeoutMs: 120_000 });
+    const ordinary = await runStudioOcctOperation({
+      kind: "box",
+      size: [1, 1, 1],
+    });
+
+    expect(first).toMatchObject({
+      bodyKind: "solid",
+      loadPath: "node",
+      topology: { closedSolid: true, watertight: true },
+    });
+    expect(second.massProperties.volume).toBeCloseTo(1, 6);
+    expect(ordinary).toMatchObject({
+      bodyKind: "solid",
+      loadPath: "node",
+      topology: { closedSolid: true },
+    });
+  }, 180_000);
+
+  it("aborts an in-flight unsafe Node realm without affecting later calls", async () => {
+    const controller = new AbortController();
+    const operation = runStudioOcctOperation({
+      kind: "step-roundtrip-box",
+      size: [1, 1, 1],
+    }, {
+      signal: controller.signal,
+      timeoutMs: 120_000,
+    });
+    setTimeout(() => controller.abort(), 10);
+
+    await expect(operation).rejects.toMatchObject({ name: "AbortError" });
+    await expect(runStudioOcctOperation({
+      kind: "box",
+      size: [1, 1, 1],
+    })).resolves.toMatchObject({
+      bodyKind: "solid",
+      topology: { closedSolid: true },
+    });
+  }, 120_000);
 });

@@ -9,12 +9,20 @@
       {
         "name": "REALTIME_ROOMS",
         "class_name": "RealtimeRoom"
+      },
+      {
+        "name": "REALTIME_ACTORS",
+        "class_name": "RealtimeActorDirectory"
       }
     ]
   },
 
   "exports": {
     "RealtimeRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "RealtimeActorDirectory": {
       "type": "durable-object",
       "storage": "sqlite"
     }
@@ -24,6 +32,7 @@
   // from Wrangler secrets and never from a committed `vars` value.
   "vars": {
     "REALTIME_TICKET_SECRET": "toonspectrum-cloudflare-test-secret-32-bytes-minimum",
+    "REALTIME_CONTROL_SECRET": "toonspectrum-cloudflare-control-test-secret-32-bytes-minimum",
     "REALTIME_TICKET_ISSUER": "toonspectrum-api",
     "REALTIME_TICKET_AUDIENCE": "toonspectrum-realtime",
     "REALTIME_ALLOWED_ORIGINS": "https://toonstudio.cloud",

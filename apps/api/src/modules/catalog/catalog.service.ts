@@ -537,10 +537,10 @@ export class CatalogService implements OnModuleInit {
         this.consecutiveIngestFailures = 0;
         return result;
       })
-      .catch((error) => {
+      .catch(() => {
         this.consecutiveIngestFailures += 1;
         // 크롤/적재 실패는 클라이언트 요청 문제(4xx)가 아니라 업스트림 수집 실패 → 502.
-        throw new BadGatewayException(error instanceof Error ? error.message : "catalog ingest failed");
+        throw new BadGatewayException("catalog ingest failed");
       })
       .finally(() => {
         this.ingestInProgress = null;

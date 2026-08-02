@@ -25,6 +25,7 @@ export interface RealtimeTicketClaims {
   readonly audience: string;
   readonly subject: string;
   readonly sessionVersion: number;
+  readonly authorizationEpochMs: number;
   readonly workId: string;
   readonly roomId: string;
   readonly clientId: string;
@@ -128,6 +129,7 @@ export function parseRealtimeTicketClaims(
       "audience",
       "subject",
       "sessionVersion",
+      "authorizationEpochMs",
       "workId",
       "roomId",
       "clientId",
@@ -145,6 +147,8 @@ export function parseRealtimeTicketClaims(
     typeof value.sessionVersion !== "number" ||
     !Number.isSafeInteger(value.sessionVersion) ||
     value.sessionVersion < 1 ||
+    !isSafeTimestamp(value.authorizationEpochMs) ||
+    value.authorizationEpochMs < 1 ||
     !isRealtimeId(value.workId) ||
     !isRealtimeId(value.roomId) ||
     !isRealtimeId(value.clientId) ||

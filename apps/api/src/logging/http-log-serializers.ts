@@ -1,5 +1,6 @@
+import { normalizeSafeHttpPathname } from "../common/http-request-path";
+
 const MAXIMUM_LOGGED_METHOD_LENGTH = 32;
-const MAXIMUM_LOGGED_PATH_LENGTH = 2_048;
 
 interface SafeRequestLog {
   readonly method?: string;
@@ -27,53 +28,6 @@ function sanitizeMethod(value: unknown): string | undefined {
   return normalized;
 }
 
-function boundedPathWithoutControlCharacters(value: string): string {
-  let result = "";
-  for (const character of value) {
-    const codePoint = character.codePointAt(0);
-    if (
-      codePoint === undefined ||
-      codePoint <= 0x1f ||
-      codePoint === 0x7f
-    ) {
-      continue;
-    }
-    result += character;
-    if (result.length >= MAXIMUM_LOGGED_PATH_LENGTH) break;
-  }
-  return result;
-}
-
-function sanitizePath(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return undefined;
-
-  let path = trimmed;
-  if (/^https?:\/\//iu.test(path)) {
-    try {
-      path = new URL(path).pathname;
-    } catch {
-      return undefined;
-    }
-  } else {
-    const queryIndex = path.indexOf("?");
-    const fragmentIndex = path.indexOf("#");
-    const boundary = [queryIndex, fragmentIndex]
-      .filter((index) => index >= 0)
-      .reduce(
-        (lowest, index) => Math.min(lowest, index),
-        path.length,
-      );
-    path = path.slice(0, boundary);
-  }
-
-  path = boundedPathWithoutControlCharacters(path);
-  if (path.length === 0) return undefined;
-  return path;
-}
-
 /**
  * Pino HTTP's default request serializer includes the complete header bag and
  * network address. Vercel injects bearer credentials and signed proxy metadata
@@ -83,7 +37,7 @@ export function serializeSafeHttpRequest(value: unknown): SafeRequestLog {
   if (!isRecord(value)) return {};
 
   const method = sanitizeMethod(value.method);
-  const url = sanitizePath(value.originalUrl ?? value.url);
+  const url = normalizeSafeHttpPathname(value.originalUrl ?? value.url);
 
   return {
     ...(method ? { method } : {}),

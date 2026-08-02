@@ -28,6 +28,7 @@ const CreatorRealtimeAuthorizationSnapshotSchema = z
         })
         .strict(),
     }),
+    authorizationEpoch: z.iso.datetime({ offset: true }),
     authorizationExpiresAt: z.iso.datetime({ offset: true }).optional(),
   });
 
@@ -143,6 +144,7 @@ implements StudioRealtimeTicketAuthorizationPort {
       ...input,
       role: authorization.data.viewer.role,
       creatorCapabilities: authorization.data.viewer.capabilities,
+      authorizationEpoch: authorization.data.authorizationEpoch,
       ...(authorization.data.authorizationExpiresAt === undefined
         ? {}
         : {

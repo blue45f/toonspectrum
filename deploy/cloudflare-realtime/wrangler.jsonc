@@ -9,6 +9,10 @@
       {
         "name": "REALTIME_ROOMS",
         "class_name": "RealtimeRoom"
+      },
+      {
+        "name": "REALTIME_ACTORS",
+        "class_name": "RealtimeActorDirectory"
       }
     ]
   },
@@ -19,13 +23,17 @@
     "RealtimeRoom": {
       "type": "durable-object",
       "storage": "sqlite"
+    },
+    "RealtimeActorDirectory": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
   },
 
   // Provision with `wrangler secret put REALTIME_TICKET_SECRET`; ticket
   // credentials must never be committed as plaintext production vars.
   "secrets": {
-    "required": ["REALTIME_TICKET_SECRET"]
+    "required": ["REALTIME_TICKET_SECRET", "REALTIME_CONTROL_SECRET"]
   },
 
   "vars": {

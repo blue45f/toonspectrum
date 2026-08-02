@@ -102,8 +102,11 @@ const envSchema = z.object({
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
-  // 인증/요청 경계: Upstash가 유효하면 분산 레이트리밋은 기본 활성화되고, 명시적 false는
-  // controlled single-instance fallback입니다. 신뢰 프록시는 항상 명시적으로 켜야 합니다.
+  // 인증/요청 경계: production은 topology를 명시하고, development/test만 Upstash 유무에
+  // 따라 자동 선택합니다. 신뢰 프록시는 항상 별도로 명시해야 합니다.
+  AUTH_RATE_LIMIT_MODE: z
+    .enum(["distributed", "single-instance-local"])
+    .optional(),
   AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: z.enum(["true", "false"]).optional(),
   AUTH_TRUSTED_PROXY_ENABLED: z.enum(["true", "false"]).optional(),
   AUTH_TRUSTED_PROXY_IPS: z.string().min(1).optional(),

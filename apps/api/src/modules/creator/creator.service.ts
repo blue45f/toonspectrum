@@ -15,6 +15,7 @@ import {
   CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
 } from "../../../../../lib/creator-asset-contract";
 import { rateLimit } from "../../../../../lib/rate-limit";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   addComment,
   bumpAssetDownloads,
@@ -127,6 +128,9 @@ export class CreatorService {
     private readonly creatorDraftCollaborationRepository: CreatorDraftCollaborationRepository,
     @Inject(StudioWorkAssetService)
     private readonly studioWorkAssetService: StudioWorkAssetService,
+    @Inject(StudioRealtimeRevocationService)
+    private readonly realtimeRevocation: StudioRealtimeRevocationService =
+      new StudioRealtimeRevocationService({ enabled: false }),
   ) {}
 
   async listWorks(q: ListQuery, viewerId?: string) {
@@ -401,8 +405,28 @@ export class CreatorService {
 
   async removeWorkTeamMember(userId: string, workId: string, targetUserId: string) {
     return this.runCreatorCollaborationOperation("remove_member", workId, () =>
-      this.creatorCollaborationRepository.removeMember(userId, workId, targetUserId)
+      this.removeWorkTeamMemberAndRevoke(userId, workId, targetUserId)
     );
+  }
+
+  private async removeWorkTeamMemberAndRevoke(
+    userId: string,
+    workId: string,
+    targetUserId: string,
+  ) {
+    const removed =
+      await this.creatorCollaborationRepository.removeMemberWithRevocation(
+        userId,
+        workId,
+        targetUserId,
+      );
+    await this.realtimeRevocation.revokeRoomAuthorization({
+      actorId: targetUserId,
+      workId,
+      roomId: workId,
+      minimumAuthorizationEpochMs: removed.authorizationEpochMs,
+    });
+    return removed.snapshot;
   }
 
   async respondToWorkTeamInvitation(

@@ -9,6 +9,10 @@
       {
         "name": "REALTIME_ROOMS",
         "class_name": "RealtimeRoom"
+      },
+      {
+        "name": "REALTIME_ACTORS",
+        "class_name": "RealtimeActorDirectory"
       }
     ]
   },
@@ -19,13 +23,17 @@
     "RealtimeRoom": {
       "type": "durable-object",
       "storage": "sqlite"
+    },
+    "RealtimeActorDirectory": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
   },
 
   // REALTIME_TICKET_SECRET is intentionally absent. Add it with Wrangler's
   // secret command or a Secrets Store binding; never put its value in this file.
   "secrets": {
-    "required": ["REALTIME_TICKET_SECRET"]
+    "required": ["REALTIME_TICKET_SECRET", "REALTIME_CONTROL_SECRET"]
   },
 
   "vars": {

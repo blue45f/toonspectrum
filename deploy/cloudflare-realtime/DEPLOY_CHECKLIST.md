@@ -14,8 +14,9 @@ before routing production clients to the Worker.
 - [ ] Confirm saved and provisional clients send their creator work ID as both
       `workId` and `roomId`; never substitute the `draft-room_<uuid>` lease ID.
 - [ ] Generate a cryptographically random, single-use nonce for every ticket.
-- [ ] Keep ticket TTL at or below two minutes and session TTL at or below four
-      hours.
+- [ ] Keep ticket TTL at or below two minutes and session TTL at or below five
+      minutes. The session lease must never outlive the verified web session or
+      the authoritative room-authorization lease.
 - [ ] Use the exact canonicalization and HMAC context in `src/ticket.ts`.
 - [ ] Return the ticket only to the authorized browser over HTTPS.
 - [ ] Never persist or log the ticket.

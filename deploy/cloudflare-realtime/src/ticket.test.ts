@@ -24,6 +24,7 @@ function claims(
     audience: "toonspectrum-realtime",
     subject: "artist-1",
     sessionVersion: 4,
+    authorizationEpochMs: NOW - 5_000,
     workId: "work-1",
     roomId: "room-1",
     clientId: "client-1",

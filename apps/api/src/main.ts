@@ -3,8 +3,6 @@ import "reflect-metadata";
 import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
-  json,
-  urlencoded,
   type NextFunction,
   type Request,
   type Response,
@@ -13,6 +11,7 @@ import { Logger } from "nestjs-pino";
 
 import { CapabilityWorkerAppModule } from "./capability-worker-app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundary";
 import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
@@ -22,14 +21,9 @@ import {
 } from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
-import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
+import { BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import { resolveBackendCapabilityPolicy } from "./infrastructure/backend-capabilities/backend-capability-policy";
 import { BACKEND_CAPABILITY_WORKER_HEALTH_PATH } from "./infrastructure/backend-capabilities/backend-capability-worker-health.controller";
-import {
-  backendCapabilityWorkerParserLimitBytes,
-  createBackendCapabilityWorkerPreBodyAdmission,
-  verifyBackendCapabilityWorkerRawBody,
-} from "./infrastructure/backend-capabilities/backend-capability-worker-http-admission";
 import {
   createStudioLivePostgresIoAdapter,
   type StudioLivePostgresIoAdapter,
@@ -45,10 +39,6 @@ async function bootstrap() {
     : null;
   // 기본 본문 파서(100kb) 대신 직접 등록 — 창작 스튜디오가 data-URL 이미지(페이지/문서)를 전송하므로 한도를 키운다.
   // bufferLogs: nestjs-pino 로거가 준비되기 전 로그를 버퍼링했다가 useLogger 이후 flush 한다.
-  const gatewayContentType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
-    .toLowerCase()
-    .split(";")[0]
-    .trim();
   const rootModule =
     runtimeRole === "capability-worker"
       ? CapabilityWorkerAppModule
@@ -68,45 +58,12 @@ async function bootstrap() {
     next();
   });
   app.use(createApiRuntimeRoleGuard(process.env));
-  if (capabilityWorkerPolicy) {
-    app.use(
-      createBackendCapabilityWorkerPreBodyAdmission(capabilityWorkerPolicy),
-    );
-  }
-  if (runtimeRole !== "capability-worker") {
+  if (runtimeRole === "capability-worker") {
+    configureApiBodyParserBoundary(app, capabilityWorkerPolicy);
+  } else {
     app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
     app.use(createCsrfProtectionMiddleware(process.env));
-  }
-  app.use(
-    json({
-      limit: capabilityWorkerPolicy
-        ? backendCapabilityWorkerParserLimitBytes(capabilityWorkerPolicy)
-        : "16mb",
-      type: (request) => {
-        const contentType = String(request.headers["content-type"] ?? "")
-          .toLowerCase()
-          .split(";")[0]
-          .trim();
-        if (capabilityWorkerPolicy) {
-          return (request as Request).path === BACKEND_CAPABILITY_GATEWAY_PATH
-            && contentType === gatewayContentType;
-        }
-        return contentType === "application/json" || contentType === gatewayContentType;
-      },
-      ...(capabilityWorkerPolicy
-        ? {
-            verify: (request, response, buffer) =>
-              verifyBackendCapabilityWorkerRawBody(
-                request as Request,
-                response as Response,
-                buffer,
-              ),
-          }
-        : {}),
-    })
-  );
-  if (!capabilityWorkerPolicy) {
-    app.use(urlencoded({ extended: true, limit: "16mb" }));
+    configureApiBodyParserBoundary(app, null);
   }
   app.setGlobalPrefix("api", {
     exclude: [

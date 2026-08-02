@@ -148,6 +148,7 @@ function buildClaims(
     audience: "toonspectrum-realtime",
     subject: "artist.integration",
     sessionVersion: 1,
+    authorizationEpochMs: nowMs - 5_000,
     workId: scope.workId,
     roomId: scope.roomId,
     clientId: "client.integration",

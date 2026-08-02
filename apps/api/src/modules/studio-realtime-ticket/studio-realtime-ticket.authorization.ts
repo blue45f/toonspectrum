@@ -46,6 +46,7 @@ export const StudioRealtimeTicketAuthorizationDecisionSchema =
       origin: StudioRealtimeTicketCanonicalOriginSchema.nullable(),
       role: StudioRealtimeTicketRoleSchema,
       creatorCapabilities: StudioRealtimeTicketCreatorCapabilitiesSchema,
+      authorizationEpoch: z.iso.datetime({ offset: true }),
       authorizationExpiresAt: z.iso.datetime({ offset: true }).optional(),
     }).strict(),
   ]);

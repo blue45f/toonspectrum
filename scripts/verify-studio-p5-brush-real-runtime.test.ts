@@ -69,7 +69,7 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(protocol).toContain('"watercolor-fill"');
     expect(protocol).toContain('"flat-wash"');
     expect(verifier).toContain(
-      'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.4"',
+      'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.5"',
     );
     expect(verifier).toContain("const EXPECTED_SURFACE_COUNT = 10");
     expect(verifier).toContain("const EXPECTED_RENDER_WORKER_COUNT = 10");

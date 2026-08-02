@@ -66,6 +66,7 @@ export const StudioRealtimeTicketSignerResultSchema = z
 export interface IssueStudioRealtimeTicketSignerInput {
   readonly actorUserId: string;
   readonly sessionVersion: number;
+  readonly authorizationEpochMs: number;
   readonly sessionExpiresAtEpochMs: number;
   readonly sessionId: string;
   readonly scope: StudioRealtimeTicketScope;
@@ -148,6 +149,7 @@ implements StudioRealtimeTicketSignerPort {
       .object({
         actorUserId: StudioRealtimeTicketIdentifierSchema,
         sessionVersion: z.number().int().safe().positive(),
+        authorizationEpochMs: z.number().int().safe().positive(),
         sessionExpiresAtEpochMs: z.number().int().safe().positive(),
         sessionId: StudioRealtimeTicketIdentifierSchema,
         scope: StudioRealtimeTicketScopeSchema,
@@ -223,6 +225,7 @@ implements StudioRealtimeTicketSignerPort {
         audience: this.configuration.audience,
         subject: inputShape.data.actorUserId,
         sessionVersion: inputShape.data.sessionVersion,
+        authorizationEpochMs: inputShape.data.authorizationEpochMs,
         workId: inputShape.data.scope.workId,
         roomId: inputShape.data.scope.roomId,
         clientId: inputShape.data.sessionId,

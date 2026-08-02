@@ -74,6 +74,7 @@ export type ServerSessionSynchronization =
     };
 
 let serverSessionRequest: Promise<ServerSessionSynchronization> | null = null;
+let signOutRequest: Promise<SignOutResult> | null = null;
 const SERVER_SESSION_ROLES = new Set(["admin", "creator", "operator", "user"]);
 
 function isNullableString(value: unknown): value is string | null {
@@ -188,6 +189,43 @@ export type GoogleIdTokenSignInResult =
   | { ok: false; error: string; status: number };
 
 const GOOGLE_ID_TOKEN_MAX_LENGTH = 16_384;
+const SIGN_OUT_RETRY_DELAYS_MS = [150, 600] as const;
+const SIGN_OUT_MAXIMUM_RETRY_DELAY_MS = 2_000;
+
+export type SignOutResult =
+  | {
+      readonly ok: true;
+      readonly status: "signed-out";
+      readonly attempts: number;
+      readonly httpStatus: number;
+      readonly error: null;
+    }
+  | {
+      readonly ok: false;
+      readonly status: "pending";
+      readonly attempts: number;
+      readonly httpStatus: number;
+      readonly error: string;
+    };
+
+export interface SignOutOptions {
+  /** Test/runtime override; values are bounded and at most two retries are accepted. */
+  readonly retryDelaysMs?: readonly number[];
+  readonly wait?: (delayMs: number) => Promise<void>;
+}
+
+function signOutRetryDelays(value: readonly number[] | undefined): readonly number[] {
+  return (value ?? SIGN_OUT_RETRY_DELAYS_MS)
+    .slice(0, SIGN_OUT_RETRY_DELAYS_MS.length)
+    .map((delay) => Math.min(
+      SIGN_OUT_MAXIMUM_RETRY_DELAY_MS,
+      Math.max(0, Number.isFinite(delay) ? Math.trunc(delay) : 0),
+    ));
+}
+
+function waitForSignOutRetry(delayMs: number): Promise<void> {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
+}
 
 export async function signInWithGoogleIdToken(
   idToken: string,
@@ -280,16 +318,62 @@ export async function signIn(provider?: string, options?: Record<string, unknown
   };
 }
 
-export async function signOut() {
-  await api
-    .raw(apiPath("/auth/logout"), {
-      method: "POST",
-      cache: "no-store",
-      throwHttpErrors: false,
-    })
-    .catch(() => {});
-  persistSession(null);
-  return undefined;
+async function performSignOut(
+  options: SignOutOptions = {},
+): Promise<SignOutResult> {
+  const retryDelays = signOutRetryDelays(options.retryDelaysMs);
+  const wait = options.wait ?? waitForSignOutRetry;
+  let httpStatus = 0;
+
+  for (let attempt = 1; attempt <= retryDelays.length + 1; attempt += 1) {
+    try {
+      const response = await api.raw(apiPath("/auth/logout"), {
+        method: "POST",
+        cache: "no-store",
+        throwHttpErrors: false,
+      });
+      httpStatus = response.status;
+      if (response.ok || response.status === 401) {
+        // This revision change also prevents an older /auth/session response from reviving the
+        // just-cleared profile after the authoritative logout response arrives.
+        persistSession(null);
+        return {
+          ok: true,
+          status: "signed-out",
+          attempts: attempt,
+          httpStatus: response.status,
+          error: null,
+        };
+      }
+    } catch {
+      httpStatus = 0;
+    }
+
+    const retryDelay = retryDelays[attempt - 1];
+    if (retryDelay !== undefined) await wait(retryDelay);
+  }
+
+  // A transport failure cannot prove whether the server received the request. Keep the public
+  // profile as pending/indeterminate instead of falsely announcing logout success; callers can
+  // surface this bounded result and let the user retry.
+  return {
+    ok: false,
+    status: "pending",
+    attempts: retryDelays.length + 1,
+    httpStatus,
+    error: "로그아웃 확인에 실패했어요. 연결을 확인한 뒤 다시 시도해 주세요.",
+  };
+}
+
+export function signOut(
+  options: SignOutOptions = {},
+): Promise<SignOutResult> {
+  if (signOutRequest) return signOutRequest;
+  const request = performSignOut(options).finally(() => {
+    if (signOutRequest === request) signOutRequest = null;
+  });
+  signOutRequest = request;
+  return request;
 }
 
 // OAuth 콜백 페이지가 핸드오프/데모로 받은 사용자 객체로 세션을 확정할 때 사용.

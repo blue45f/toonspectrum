@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { LogOut, Library, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { LoaderCircle, LogOut, Library, RotateCcw, UserRound, Settings as SettingsIcon, Shield } from "lucide-react";
+import { useState, useEffect, useId, useRef } from "react";
 
 import { AuthModal } from "./auth-modal";
 
@@ -37,7 +37,12 @@ export function AuthMenu({
   const { data: session, status } = useSession();
   const [modal, setModal] = useState(defaultOpen);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(defaultMenuOpen);
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const loginTriggerRef = useRef<HTMLButtonElement>(null);
+  const signOutInFlightRef = useRef(false);
+  const signOutStatusId = useId();
   const t = useT();
   const uid = session?.user?.id;
 
@@ -95,8 +100,38 @@ export function AuthMenu({
   const showAdmin = (u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin;
   const fallbackName = t("auth.menu.fallbackName");
 
+  async function handleSignOut() {
+    // State is committed on the next render; the ref closes the same-frame
+    // double-click/keyboard window before React can disable the menu item.
+    if (signOutInFlightRef.current) return;
+    signOutInFlightRef.current = true;
+    setSignOutPending(true);
+    setSignOutError(null);
+    try {
+      const result = await signOut();
+      if (result.ok) {
+        // The old menu closed on a successful selection. Keep that behavior
+        // even if session-provider propagation takes another render.
+        setMenuOpen(false);
+      } else {
+        setSignOutError(result.error);
+      }
+    } catch {
+      setSignOutError("로그아웃 확인에 실패했어요. 연결을 확인한 뒤 다시 시도해 주세요.");
+    } finally {
+      signOutInFlightRef.current = false;
+      setSignOutPending(false);
+    }
+  }
+
+  const signOutLabel = signOutPending
+    ? "실시간 연결 정리 중…"
+    : signOutError
+      ? "로그아웃 다시 시도"
+      : t("auth.menu.signOut");
+
   return (
-    <DropdownMenu.Root defaultOpen={defaultMenuOpen}>
+    <DropdownMenu.Root open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenu.Trigger
         className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
         aria-label={t("auth.menu.triggerLabel")}
@@ -136,11 +171,35 @@ export function AuthMenu({
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item
-            onSelect={() => signOut()}
-            className={cn(ITEM_CLASS, "hover:text-bad focus-visible:text-bad data-[highlighted]:text-bad")}
+            disabled={signOutPending}
+            onSelect={(event) => {
+              event.preventDefault();
+              void handleSignOut();
+            }}
+            aria-busy={signOutPending}
+            aria-describedby={signOutError ? signOutStatusId : undefined}
+            className={cn(ITEM_CLASS, "hover:text-bad focus-visible:text-bad data-[highlighted]:text-bad data-[disabled]:cursor-wait data-[disabled]:opacity-60")}
           >
-            <LogOut size={15} /> {t("auth.menu.signOut")}
+            {signOutPending ? (
+              <LoaderCircle size={15} className="animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : signOutError ? (
+              <RotateCcw size={15} aria-hidden />
+            ) : (
+              <LogOut size={15} aria-hidden />
+            )}
+            {signOutLabel}
           </DropdownMenu.Item>
+          {signOutError ? (
+            <p
+              id={signOutStatusId}
+              className="border-t border-line px-4 py-2 text-xs leading-relaxed text-bad"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {signOutError}
+            </p>
+          ) : null}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

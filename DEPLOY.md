@@ -193,7 +193,7 @@ workflow mode는 다음처럼 분리됩니다.
 - `adopt` + `ADOPT-TOONSPECTRUM-MIGRATION-HISTORY`: 기존 무원장 DB가 reviewed production
   baseline인 0019까지 실제 도달했는지 relation·constraint/index·0017 cutover marker로 먼저
   증명합니다. 증명된 0001~0019는 SQL을 재실행하지 않고 exact checksum과 `adopted` provenance를
-  기록하며, 0020~0022만 genuine pending으로 실행하고 0023 bootstrap을 기록합니다.
+  기록하며, 0020~0022와 0024를 genuine pending으로 실행하고 0023 bootstrap을 기록합니다.
 - `apply` + `APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS`: 원장 이후 새 pending migration만
   실행합니다. 과거 migration은 checksum만 확인하고 건너뜁니다.
 - `repair` + `REPAIR-TOONSPECTRUM-MIGRATION-STATE`: 원인을 확인한 운영자가 중단된

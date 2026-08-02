@@ -1,3 +1,17 @@
+import {
+  REALTIME_ACTOR_REVOKE_PATH,
+  REALTIME_INTERNAL_CONTROL_HEADER,
+  REALTIME_INTERNAL_CONTROL_VALUE,
+} from "./actor-directory";
+import {
+  REALTIME_CONTROL_CONTENT_TYPE,
+  REALTIME_CONTROL_MAX_BODY_BYTES,
+  REALTIME_CONTROL_NONCE_HEADER,
+  REALTIME_CONTROL_PATH,
+  REALTIME_CONTROL_SIGNATURE_HEADER,
+  REALTIME_CONTROL_TIMESTAMP_HEADER,
+  verifyRealtimeControlEvent,
+} from "./control";
 import { REALTIME_PROTOCOL_VERSION } from "./protocol";
 import {
   hasForbiddenCredentialQuery,
@@ -15,6 +29,7 @@ import {
 import type { RealtimeWorkerEnv } from "./runtime-types";
 
 export { RealtimeRoom } from "./room";
+export { RealtimeActorDirectory } from "./actor-directory";
 
 function jsonResponse(
   status: number,
@@ -35,16 +50,108 @@ async function handleFetch(
   env: RealtimeWorkerEnv,
 ): Promise<Response> {
   const url = new URL(request.url);
+  const controlConfigured =
+    typeof env.REALTIME_CONTROL_SECRET === "string" &&
+    new TextEncoder().encode(env.REALTIME_CONTROL_SECRET).byteLength >= 32 &&
+    env.REALTIME_CONTROL_SECRET !== env.REALTIME_TICKET_SECRET;
   if (
     request.method === "GET" &&
     url.pathname === "/health" &&
     url.search === ""
   ) {
-    return jsonResponse(200, {
+    return jsonResponse(controlConfigured ? 200 : 503, {
       version: REALTIME_PROTOCOL_VERSION,
-      status: "ok",
+      status: controlConfigured ? "ok" : "unavailable",
       service: "cloudflare-realtime-coordinator",
     });
+  }
+
+  if (!controlConfigured) {
+    return jsonResponse(503, {
+      version: REALTIME_PROTOCOL_VERSION,
+      ok: false,
+      code: "realtime-unavailable",
+    });
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === REALTIME_CONTROL_PATH
+  ) {
+    if (
+      url.search !== "" ||
+      request.headers.get("Content-Type") !==
+        REALTIME_CONTROL_CONTENT_TYPE
+    ) {
+      return jsonResponse(400, {
+        version: REALTIME_PROTOCOL_VERSION,
+        ok: false,
+        code: "invalid-control-request",
+      });
+    }
+    const declaredLength = request.headers.get("Content-Length");
+    if (
+      declaredLength !== null &&
+      (!/^(?:0|[1-9]\d*)$/u.test(declaredLength) ||
+        Number(declaredLength) > REALTIME_CONTROL_MAX_BODY_BYTES)
+    ) {
+      return jsonResponse(413, {
+        version: REALTIME_PROTOCOL_VERSION,
+        ok: false,
+        code: "control-request-too-large",
+      });
+    }
+    const body = new Uint8Array(await request.arrayBuffer());
+    if (
+      body.byteLength === 0 ||
+      body.byteLength > REALTIME_CONTROL_MAX_BODY_BYTES
+    ) {
+      return jsonResponse(413, {
+        version: REALTIME_PROTOCOL_VERSION,
+        ok: false,
+        code: "control-request-too-large",
+      });
+    }
+    const nonce = request.headers.get(REALTIME_CONTROL_NONCE_HEADER);
+    const timestamp = request.headers.get(
+      REALTIME_CONTROL_TIMESTAMP_HEADER,
+    );
+    const signature = request.headers.get(
+      REALTIME_CONTROL_SIGNATURE_HEADER,
+    );
+    if (nonce === null || timestamp === null || signature === null) {
+      return jsonResponse(401, {
+        version: REALTIME_PROTOCOL_VERSION,
+        ok: false,
+        code: "control-authentication-required",
+      });
+    }
+    const verified = await verifyRealtimeControlEvent(
+      body,
+      { nonce, timestamp, signature },
+      env.REALTIME_CONTROL_SECRET,
+      Date.now(),
+    );
+    if (!verified.ok) {
+      return jsonResponse(401, {
+        version: REALTIME_PROTOCOL_VERSION,
+        ok: false,
+        code: "control-authentication-rejected",
+      });
+    }
+    const actorDirectoryId = env.REALTIME_ACTORS.idFromName(
+      verified.event.actorId,
+    );
+    return await env.REALTIME_ACTORS.get(actorDirectoryId).fetch(
+      new Request(`https://internal.invalid${REALTIME_ACTOR_REVOKE_PATH}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          [REALTIME_INTERNAL_CONTROL_HEADER]:
+            REALTIME_INTERNAL_CONTROL_VALUE,
+        },
+        body,
+      }),
+    );
   }
 
   if (

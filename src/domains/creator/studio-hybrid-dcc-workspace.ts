@@ -106,6 +106,7 @@ import {
 /** OCCT result shape (lazy-loaded; browser fetch or Node loader). */
 export type StudioOcctSolidResult = {
   readonly ok: true;
+  readonly bodyKind: import("./studio-occt-wasm-facade").StudioOcctBodyKind;
   readonly mesh: StudioEditableMesh;
   readonly faceCount: number;
   readonly triangleCount: number;
@@ -961,19 +962,7 @@ export async function workspaceOcctBox(
 ): Promise<StudioHybridDccWorkspace> {
   const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
   const result = await runStudioOcctOperation({ kind: "box", size });
-  let session = ws.session;
-  if (!session.state.geometry.records[assetId]) {
-    session = hybridDccRegisterAsset(session, assetId, result.mesh, {
-      source: "occt-wasm",
-      creator: "studio",
-      license: "CC0-1.0",
-      useScope: "commercial",
-      derivative: "original",
-    });
-  } else {
-    session = hybridDccCommitGeometry(session, assetId, result.mesh);
-  }
-  return { ...ws, session, activeAssetId: assetId, lastOcct: result };
+  return commitOcctResult(ws, assetId, "occt-wasm", result);
 }
 
 /** Industrial OCCT boolean cut of two boxes. */
@@ -987,19 +976,7 @@ export async function workspaceOcctBooleanCut(
     a: { dx: 2, dy: 2, dz: 2 },
     b: { dx: 1, dy: 1, dz: 1, ox: 0.4, oy: 0.4, oz: 0.4 },
   });
-  let session = ws.session;
-  if (!session.state.geometry.records[assetId]) {
-    session = hybridDccRegisterAsset(session, assetId, result.mesh, {
-      source: "occt-wasm-boolean",
-      creator: "studio",
-      license: "CC0-1.0",
-      useScope: "commercial",
-      derivative: "original",
-    });
-  } else {
-    session = hybridDccCommitGeometry(session, assetId, result.mesh);
-  }
-  return { ...ws, session, activeAssetId: assetId, lastOcct: result };
+  return commitOcctResult(ws, assetId, "occt-wasm-boolean", result);
 }
 
 async function commitOcctResult(
@@ -1008,6 +985,29 @@ async function commitOcctResult(
   source: string,
   result: import("./studio-occt-wasm-facade").StudioOcctSolidResult,
 ): Promise<StudioHybridDccWorkspace> {
+  const {
+    studioOcctTopologyReceiptMatchesMesh,
+    validateStudioOcctBodyReceipt,
+  } = await import("./studio-occt-wasm-facade");
+  if (!studioOcctTopologyReceiptMatchesMesh(result.mesh, result.topology)) {
+    throw new Error(
+      `OCCT refused a mesh/receipt topology mismatch: ${result.operation}`,
+    );
+  }
+  const receiptFailure = validateStudioOcctBodyReceipt(
+    result.bodyKind,
+    result.topology,
+    result.massProperties,
+    result.operation,
+  );
+  if (receiptFailure) {
+    throw new Error(
+      `OCCT refused an invalid ${result.bodyKind} commit: ${receiptFailure.detail}`,
+    );
+  }
+  if (result.bodyKind === "surface" && result.operation !== "BRepAlgoAPI_Section") {
+    throw new Error(`OCCT refused an unsupported surface commit: ${result.operation}`);
+  }
   let session = ws.session;
   if (!session.state.geometry.records[assetId]) {
     session = hybridDccRegisterAsset(session, assetId, result.mesh, {

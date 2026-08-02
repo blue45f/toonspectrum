@@ -45,6 +45,7 @@ import {
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
 import { signSession } from "../../../../../lib/server/session";
+import { verifySessionToken } from "../../../../../lib/server/session";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
@@ -52,12 +53,14 @@ import {
   revokeUserSessions,
 } from "../../../../../lib/server/user-lifecycle";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
 } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import {
   AUTH_SESSION_COOKIE_NAME,
+  resolveSessionCookieValue,
   resolveSessionCookieClearOptions,
   resolveSessionCookieOptions,
 } from "../../session-cookie";
@@ -113,6 +116,9 @@ export class AuthController {
     clientIpPolicy: AuthClientIpPolicy,
     @Inject(UPSTASH_COORDINATION_PORT)
     coordination: UpstashCoordinationPort | null,
+    @Inject(StudioRealtimeRevocationService)
+    private readonly realtimeRevocation: StudioRealtimeRevocationService =
+      new StudioRealtimeRevocationService({ enabled: false }),
   ) {
     if (rateLimitConfig.distributed && !coordination) {
       throw new AuthRateLimitDependencyError();
@@ -400,11 +406,36 @@ export class AuthController {
   @Post("logout")
   async logout(
     @Headers("x-user-id") userId: string | undefined,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    if (userId) await revokeUserSessions(userId);
-    clearAuthSessionCookie(response);
-    return { ok: true };
+    const signedCookiePrincipal = verifySessionToken(
+      resolveSessionCookieValue(request.headers.cookie),
+    );
+    const actorId = userId ?? signedCookiePrincipal?.userId;
+    if (!actorId) {
+      clearAuthSessionCookie(response);
+      return { ok: true };
+    }
+    try {
+      const revoked = await revokeUserSessions(actorId);
+      if (!revoked.ok || revoked.sessionVersion === null) {
+        throw new Error("session revocation did not advance");
+      }
+      await this.realtimeRevocation.revokeSessionVersion(
+        actorId,
+        revoked.sessionVersion,
+      );
+      clearAuthSessionCookie(response);
+      return { ok: true };
+    } catch {
+      // Keep the signed cookie on a failed durable revocation. Even if its DB
+      // session version has already advanced, the next /logout request may
+      // safely recover its actor id solely to retry closing realtime sockets.
+      throw new ServiceUnavailableException({
+        error: "로그아웃 세션 정리를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      });
+    }
   }
 
   private async enforceRateLimit(

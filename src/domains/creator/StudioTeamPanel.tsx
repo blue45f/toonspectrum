@@ -1037,6 +1037,7 @@ export function StudioTeamPanelView({
                     <div
                       className="mt-2 rounded-xl border border-bad/35 bg-bad/10 p-2.5 pl-3"
                       data-team-remove-confirmation="true"
+                      aria-busy={isRemoving}
                     >
                       <p className="text-xs leading-relaxed text-fg">
                         <strong className="font-semibold">{member.name}</strong> 님을 팀에서 내보낼까요?
@@ -1069,7 +1070,11 @@ export function StudioTeamPanelView({
                           variant="outline"
                           onClick={() => onRemoveConfirm(member.userId)}
                         >
-                          팀에서 내보내기
+                          {isRemoving ? (
+                            "연결 권한 회수 중…"
+                          ) : (
+                            "팀에서 내보내기"
+                          )}
                         </Button>
                       </div>
                     </div>

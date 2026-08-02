@@ -115,6 +115,7 @@ describe("authentication boundary environment validation", () => {
       validateEnv(
         {
           NODE_ENV: "test",
+          AUTH_RATE_LIMIT_MODE: "single-instance-local",
           AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
           AUTH_TRUSTED_PROXY_ENABLED: "true",
           AUTH_TRUSTED_PROXY_IPS: "203.0.113.10,2001:db8::10",
@@ -125,6 +126,7 @@ describe("authentication boundary environment validation", () => {
       ),
     ).toMatchObject({
       AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
+      AUTH_RATE_LIMIT_MODE: "single-instance-local",
       AUTH_TRUSTED_PROXY_ENABLED: "true",
       AUTH_TRUSTED_PROXY_IPS: "203.0.113.10,2001:db8::10",
       AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
@@ -140,6 +142,7 @@ describe("authentication boundary environment validation", () => {
       validateEnv(
         {
           NODE_ENV: "test",
+          AUTH_RATE_LIMIT_MODE: "local",
           AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "TRUE",
           AUTH_TRUSTED_PROXY_ENABLED: "enabled",
           AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forward-for",

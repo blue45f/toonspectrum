@@ -2,20 +2,23 @@ import { z } from "zod";
 
 import { resolveUpstashCoordinationConfig } from "../../infrastructure/upstash-coordination/upstash-coordination.config";
 
-/**
- * Distributed enforcement is now the default whenever Upstash coordination is
- * enabled in the process environment.  This keeps auth request limiting aligned
- * with deployment-wide capacity controls while preserving an explicit local-mode
- * override for controlled single-instance fallback.
- */
 const DistributedRateLimitEnabledSchema = z.enum(["true", "false"]);
+const AuthRateLimitModeSchema = z.enum([
+  "distributed",
+  "single-instance-local",
+]);
 
 export interface AuthRateLimitConfig {
   readonly distributed: boolean;
 }
 
 export type AuthRateLimitEnvironment = Partial<
-  Record<"AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED", string | undefined>
+  Record<
+    | "NODE_ENV"
+    | "AUTH_RATE_LIMIT_MODE"
+    | "AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED",
+    string | undefined
+  >
   & Record<
     | "UPSTASH_COORDINATION_ENABLED"
     | "UPSTASH_COORDINATION_REST_URL"
@@ -47,27 +50,42 @@ export function resolveAuthRateLimitConfig(
   environment: AuthRateLimitEnvironment,
 ): AuthRateLimitConfig {
   const upstashEnabled = resolveUpstashCoordinationConfig(environment) !== null;
-
-  const enabled = environment.AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED;
-
-  if (enabled === undefined || enabled === "") {
-    return { distributed: upstashEnabled };
-  }
-
-  if (enabled === "false") {
-    return { distributed: false };
-  }
-
-  if (
-    DistributedRateLimitEnabledSchema.safeParse(enabled).success === false ||
-    enabled !== "true"
-  ) {
+  const configuredMode = environment.AUTH_RATE_LIMIT_MODE?.trim() || undefined;
+  const legacyEnabled =
+    environment.AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED?.trim() || undefined;
+  const parsedMode = configuredMode
+    ? AuthRateLimitModeSchema.safeParse(configuredMode)
+    : null;
+  const parsedLegacy = legacyEnabled
+    ? DistributedRateLimitEnabledSchema.safeParse(legacyEnabled)
+    : null;
+  if (parsedMode?.success === false || parsedLegacy?.success === false) {
     throw new AuthRateLimitConfigurationError();
   }
 
-  if (!upstashEnabled) {
+  const legacyMode = parsedLegacy?.success
+    ? parsedLegacy.data === "true"
+      ? "distributed"
+      : "single-instance-local"
+    : undefined;
+  if (parsedMode?.success && legacyMode && parsedMode.data !== legacyMode) {
     throw new AuthRateLimitConfigurationError();
   }
 
-  return { distributed: true };
+  // Production must make the topology/risk decision explicit. Merely omitting Upstash must never
+  // turn a horizontally-scaled authentication boundary into process-local counters.
+  const mode = parsedMode?.success
+    ? parsedMode.data
+    : environment.NODE_ENV === "production"
+      ? undefined
+      : legacyMode ?? (upstashEnabled ? "distributed" : "single-instance-local");
+  if (!mode) {
+    throw new AuthRateLimitConfigurationError();
+  }
+
+  if (mode === "distributed" && !upstashEnabled) {
+    throw new AuthRateLimitConfigurationError();
+  }
+
+  return { distributed: mode === "distributed" };
 }

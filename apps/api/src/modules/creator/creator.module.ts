@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
+import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import {
@@ -62,7 +63,10 @@ const supabaseObjectStorageModule =
   SupabaseObjectStorageModule.fromEnvironment(process.env);
 
 @Module({
-  imports: supabaseObjectStorageModule ? [supabaseObjectStorageModule] : [],
+  imports: [
+    StudioRealtimeRevocationModule,
+    ...(supabaseObjectStorageModule ? [supabaseObjectStorageModule] : []),
+  ],
   controllers: [
     CreatorController,
     StudioLiveAuthTicketController,

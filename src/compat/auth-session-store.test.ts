@@ -39,13 +39,21 @@ describe("auth session store", () => {
     persistSession(null);
   });
 
-  it("로그아웃은 readable 토큰이 없어도 쿠키 엔드포인트를 호출하고 로컬 세션을 정리한다", async () => {
+  it("로그아웃 네트워크 실패는 두 번만 재시도한 뒤 pending으로 남기고 세션을 유지한다", async () => {
     persistSession({ user: { id: "web-user" }, token: null });
     apiRaw.mockRejectedValue(new TypeError("network unavailable"));
+    const wait = vi.fn(async () => undefined);
 
-    await expect(signOut()).resolves.toBeUndefined();
+    await expect(signOut({ retryDelaysMs: [10, 20, 30], wait })).resolves.toEqual({
+      ok: false,
+      status: "pending",
+      attempts: 3,
+      httpStatus: 0,
+      error: "로그아웃 확인에 실패했어요. 연결을 확인한 뒤 다시 시도해 주세요.",
+    });
 
-    expect(apiRaw).toHaveBeenCalledWith(
+    expect(apiRaw).toHaveBeenCalledTimes(3);
+    expect(apiRaw).toHaveBeenLastCalledWith(
       "/api/auth/logout",
       expect.objectContaining({
         method: "POST",
@@ -53,7 +61,46 @@ describe("auth session store", () => {
         throwHttpErrors: false,
       }),
     );
+    expect(wait).toHaveBeenNthCalledWith(1, 10);
+    expect(wait).toHaveBeenNthCalledWith(2, 20);
     expect(getAuthToken()).toBeNull();
+    expect(getAuthSession()?.user.id).toBe("web-user");
+  });
+
+  it("로그아웃 재시도가 권위 응답을 받으면 그때만 로컬 세션을 정리한다", async () => {
+    persistSession({ user: { id: "web-user" }, token: null });
+    apiRaw
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(
+      signOut({ retryDelaysMs: [0], wait: async () => undefined }),
+    ).resolves.toEqual({
+      ok: true,
+      status: "signed-out",
+      attempts: 2,
+      httpStatus: 204,
+      error: null,
+    });
+    expect(apiRaw).toHaveBeenCalledTimes(2);
+    expect(getAuthSession()).toBeNull();
+  });
+
+  it("동시에 누른 로그아웃은 하나의 bounded 요청열만 공유한다", async () => {
+    persistSession({ user: { id: "web-user" }, token: null });
+    const response = deferred<Response>();
+    apiRaw.mockReturnValue(response.promise);
+
+    const first = signOut({ retryDelaysMs: [] });
+    const second = signOut({ retryDelaysMs: [] });
+    expect(first).toBe(second);
+    expect(apiRaw).toHaveBeenCalledOnce();
+
+    response.resolve(new Response(null, { status: 204 }));
+    await expect(first).resolves.toMatchObject({
+      ok: true,
+      attempts: 1,
+    });
     expect(getAuthSession()).toBeNull();
   });
 
@@ -261,7 +308,7 @@ describe("auth session store", () => {
     });
 
     const staleSynchronization = synchronizeServerSession("focus");
-    await signOut();
+    await signOut({ retryDelaysMs: [], wait: async () => undefined });
     oldSessionResponse.resolve(
       new Response(
         JSON.stringify({

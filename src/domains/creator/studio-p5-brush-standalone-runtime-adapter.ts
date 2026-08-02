@@ -18,7 +18,7 @@ import {
 } from "./studio-procedural-artistic-brush-provider";
 
 export const STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION =
-  "2.2.1-adapter.4" as const;
+  "2.2.1-adapter.5" as const;
 
 export const STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES = Object.freeze([
   "procedural:flow-field",
@@ -165,7 +165,9 @@ const REQUIRED_FUNCTION_EXPORTS = [
 ] as const;
 const COLOR_PATTERN =
   /^(?:#[0-9a-f]{3,8}|rgba?\([^)]{1,96}\)|[a-z]{1,48})$/iu;
+const P5_BRUSH_BOOTSTRAP_SEED = 0x7055_b205;
 
+let globalImportTail: Promise<void> = Promise.resolve();
 let globalRuntimeTail: Promise<void> = Promise.resolve();
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -211,6 +213,46 @@ const DEFAULT_ENVIRONMENT: StudioP5BrushStandaloneEnvironment = Object.freeze({
 
 async function importP5BrushStandalone(): Promise<unknown> {
   return import("p5.brush/standalone");
+}
+
+function deterministicBootstrapRandom(): () => number {
+  let state = P5_BRUSH_BOOTSTRAP_SEED >>> 0;
+  return () => {
+    state = (state + 0x6d2b_79f5) | 0;
+    let value = Math.imul(state ^ (state >>> 15), state | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
+  };
+}
+
+/**
+ * p5.brush initializes four module-global random/noise generators from
+ * Math.random() while its standalone module is evaluated. Request seeding
+ * happens later and cannot retroactively normalize any state derived during
+ * that evaluation. Dedicated Workers therefore import the module under a
+ * short, serialized deterministic entropy window, then restore the host
+ * function before returning control to product code.
+ */
+async function importWithDeterministicBootstrap(
+  operation: () => Promise<unknown>,
+): Promise<unknown> {
+  let release: (() => void) | undefined;
+  const previousImport = globalImportTail;
+  globalImportTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previousImport;
+  try {
+    const previousRandom = Math.random;
+    Math.random = deterministicBootstrapRandom();
+    try {
+      return await operation();
+    } finally {
+      Math.random = previousRandom;
+    }
+  } finally {
+    release?.();
+  }
 }
 
 function normalizeModule(input: unknown): P5BrushStandaloneModule | null {
@@ -690,6 +732,7 @@ function createAdapter(
 ): StudioProceduralArtisticBrushAdapter {
   let contextAuthority: object | null = null;
   let canvasAuthority: object | null = null;
+  let targetLoaded = false;
   return Object.freeze({
     descriptor: Object.freeze({
       id: "p5-brush-standalone-worker",
@@ -736,22 +779,20 @@ function createAdapter(
           );
         }
         try {
-          // The standalone package creates renderer-, fill- and Gaussian-pool
-          // state while load()/the first render() bind a WebGL target. Some of
-          // that initialization consumes the package RNG, so seeding only the
-          // two technique passes leaves fresh one-shot Workers with different
-          // cache bytes on software WebGL implementations. Seed before binding
-          // the private target as well; each production render owns a fresh
-          // Worker, therefore the request seed is the canonical initialization
-          // seed for both caches and retained artwork.
-          runtime.seed(input.seed);
-          runtime.noiseSeed(input.seed);
-          runtime.load(input.surface.canvas);
-          // p5.brush initializes renderer-, mask-, and framebuffer-owned state
-          // lazily. Prime the newly loaded target before clear() can touch
-          // those caches, then seed both retained drawing passes explicitly.
-          await runtime.render();
-          throwIfAborted(signal);
+          if (!targetLoaded) {
+            // Bind one verified canvas/context exactly once. Re-running load()
+            // replaces the renderer object while p5.brush keeps module-global
+            // fill masks and compositor resources, producing a mixed lifetime
+            // that is observably non-deterministic on Linux SwiftShader.
+            runtime.seed(input.seed);
+            runtime.noiseSeed(input.seed);
+            runtime.load(input.surface.canvas);
+            // Renderer-, mask-, and framebuffer-owned state is initialized
+            // lazily. Prime it before the first canonical reset.
+            await runtime.render();
+            targetLoaded = true;
+            throwIfAborted(signal);
+          }
           runtime.clear();
           resetStandaloneState(runtime);
 
@@ -810,7 +851,7 @@ export function createStudioP5BrushStandaloneAdapterLoader(
   return () => {
     if (adapterPromise) return adapterPromise;
     adapterPromise = Promise.resolve()
-      .then(() => importStandalone())
+      .then(() => importWithDeterministicBootstrap(importStandalone))
       .then((candidate) => {
         const runtime = normalizeModule(candidate);
         return runtime ? createAdapter(runtime, environment) : null;

@@ -106,6 +106,7 @@ The exact canonical claim object is:
   "issuer": "toonspectrum-api",
   "audience": "toonspectrum-realtime",
   "subject": "actor-id",
+  "sessionVersion": 1,
   "workId": "work-id",
   "roomId": "room-id",
   "clientId": "browser-client-id",
@@ -114,7 +115,7 @@ The exact canonical claim object is:
   "nonce": "at-least-16-base64url-characters",
   "issuedAtMs": 1700000000000,
   "expiresAtMs": 1700000060000,
-  "sessionExpiresAtMs": 1700003600000
+  "sessionExpiresAtMs": 1700000300000
 }
 ```
 

@@ -3,8 +3,6 @@ import "reflect-metadata";
 import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import {
-  json,
-  urlencoded,
   type Express,
   type NextFunction,
   type Request,
@@ -14,6 +12,7 @@ import { Logger } from "nestjs-pino";
 
 import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundary";
 import { rewriteQueryPathToUrl } from "./config/api-path-rewrite";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
@@ -23,7 +22,7 @@ import {
 } from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
-import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
+import { BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import { sessionAuth } from "./session-middleware";
 
 // Vercel 서버리스용 — 콜드 컨테이너당 1회 부팅 후 캐시(웜 인스턴스 재사용).
@@ -60,30 +59,14 @@ async function create(): Promise<Express> {
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(main.ts와 동일)
   app.use(createApiSecurityHeadersMiddleware(process.env));
   configureCors(app); // Vercel OPTIONS를 Nest가 204로 끝내고 Origin별 허용 헤더를 반환
-  app.use(createApiRuntimeRoleGuard(process.env));
-  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
-  app.use(createCsrfProtectionMiddleware(process.env));
-  const gatewayContentType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
-    .toLowerCase()
-    .split(";")[0]
-    .trim();
-  app.use(
-    json({
-      limit: "16mb",
-      type: (request) => {
-        const contentType = String(request.headers["content-type"] ?? "")
-          .toLowerCase()
-          .split(";")[0]
-          .trim();
-        return contentType === "application/json" || contentType === gatewayContentType;
-      },
-    })
-  );
-  app.use(urlencoded({ extended: true, limit: "16mb" }));
   app.use((req: Request, _res: Response, next: NextFunction) => {
     rewriteQueryPathToUrl(req);
     next();
   });
+  app.use(createApiRuntimeRoleGuard(process.env));
+  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
+  app.use(createCsrfProtectionMiddleware(process.env));
+  configureApiBodyParserBoundary(app, null);
   app.setGlobalPrefix("api", {
     exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
   });
