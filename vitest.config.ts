@@ -4,27 +4,33 @@ import path from "node:path";
 
 import { configDefaults, defineConfig } from "vitest/config";
 
+import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-tests.mjs";
+
 const root = fileURLToPath(new URL("./", import.meta.url));
 
-// Load DATABASE_URL from .env.local if present, without polluting other env vars
+// Read .env.local only as a last candidate. resolveVitestDatabaseTarget accepts
+// it only when it is loopback; a Neon/production URL is never inherited by the
+// root test suite. DB-backed tests opt in with TEST_DATABASE_URL.
 const envPath = path.resolve(root, ".env.local");
+let envFileDatabaseUrl: string | undefined;
 if (existsSync(envPath)) {
   try {
     const content = readFileSync(envPath, "utf-8");
     const match = content.match(/^DATABASE_URL=(.+)$/m);
     const dbUrl = match?.[1];
     if (dbUrl) {
-      process.env.DATABASE_URL = dbUrl.trim().replace(/^["']|["']$/g, "");
+      envFileDatabaseUrl = dbUrl.trim().replace(/^["']|["']$/g, "");
     }
   } catch {
     // Ignore
   }
 }
 
-// Fallback for tests if still undefined
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "postgres://webdex@localhost:5432/webdex";
-}
+const testDatabaseTarget = resolveVitestDatabaseTarget({
+  environment: process.env,
+  envFileDatabaseUrl,
+});
+process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
   resolve: {

@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   POSTGRES_INTEGRATION_SUITES,
+  VITEST_UNAVAILABLE_DATABASE_URL,
+  VITEST_VALIDATED_REMOTE_DATABASE_MARKER,
   createPostgresIntegrationEnvironment,
   createVitestArguments,
   parsePostgresIntegrationArguments,
   resolvePostgresIntegrationTarget,
+  resolveVitestDatabaseTarget,
   validatePostgresIntegrationUrl,
 } from "./run-postgres-integration-tests.mjs";
 
@@ -23,6 +26,68 @@ describe("PostgreSQL integration test runner", () => {
         environment: { DATABASE_URL: REMOTE_PRODUCTION_URL },
       }),
     ).toThrow(/dedicated test database/u);
+  });
+
+  it("keeps root Vitest away from production DATABASE_URL and .env.local fallbacks", () => {
+    const target = resolveVitestDatabaseTarget({
+      environment: { DATABASE_URL: REMOTE_PRODUCTION_URL },
+      envFileDatabaseUrl: REMOTE_PRODUCTION_URL,
+    });
+
+    expect(target).toMatchObject({
+      databaseUrl: VITEST_UNAVAILABLE_DATABASE_URL,
+      enabled: false,
+      source: "unavailable-loopback",
+    });
+  });
+
+  it("uses explicit test URL first and accepts only safe loopback fallbacks", () => {
+    expect(
+      resolveVitestDatabaseTarget({
+        environment: {
+          DATABASE_URL: LOCAL_URL.replace("webdex", "ignored"),
+          TEST_DATABASE_URL: LOCAL_URL,
+        },
+        envFileDatabaseUrl: LOCAL_URL.replace("webdex", "also_ignored"),
+      }),
+    ).toMatchObject({ databaseUrl: LOCAL_URL, enabled: true, source: "TEST_DATABASE_URL" });
+
+    expect(
+      resolveVitestDatabaseTarget({
+        environment: { DATABASE_URL: LOCAL_URL },
+        envFileDatabaseUrl: REMOTE_PRODUCTION_URL,
+      }),
+    ).toMatchObject({ databaseUrl: LOCAL_URL, enabled: true, source: "DATABASE_URL" });
+
+    expect(
+      resolveVitestDatabaseTarget({
+        environment: {},
+        envFileDatabaseUrl: LOCAL_URL,
+      }),
+    ).toMatchObject({ databaseUrl: LOCAL_URL, enabled: true, source: ".env.local" });
+  });
+
+  it("requires the validated runner boundary for remote disposable Vitest targets", () => {
+    expect(() =>
+      resolveVitestDatabaseTarget({
+        environment: { TEST_DATABASE_URL: REMOTE_TEST_URL, NODE_ENV: "test" },
+      }),
+    ).toThrow(/Remote PostgreSQL targets are blocked/u);
+
+    expect(
+      resolveVitestDatabaseTarget({
+        environment: {
+          TEST_DATABASE_URL: REMOTE_TEST_URL,
+          NODE_ENV: "test",
+          [VITEST_VALIDATED_REMOTE_DATABASE_MARKER]: "true",
+        },
+      }),
+    ).toMatchObject({
+      databaseUrl: REMOTE_TEST_URL,
+      enabled: true,
+      loopback: false,
+      source: "TEST_DATABASE_URL",
+    });
   });
 
   it("accepts one explicit CLI or environment test URL and rejects ambiguity", () => {
@@ -108,12 +173,19 @@ describe("PostgreSQL integration test runner", () => {
     expect(childEnvironment.NODE_ENV).toBe("test");
     expect(childEnvironment.DATABASE_URL).toBe(LOCAL_URL);
     expect(childEnvironment.TEST_DATABASE_URL).toBe(LOCAL_URL);
+    expect(childEnvironment[VITEST_VALIDATED_REMOTE_DATABASE_MARKER]).toBe("false");
     expect(childEnvironment.STUDIO_LIVE_POSTGRES_INTEGRATION_URL).toBe(
       LOCAL_URL,
     );
     expect(childEnvironment.STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL).toBe(
       LOCAL_URL,
     );
+
+    expect(
+      createPostgresIntegrationEnvironment(REMOTE_TEST_URL, {}, {
+        validatedRemoteDatabase: true,
+      })[VITEST_VALIDATED_REMOTE_DATABASE_MARKER],
+    ).toBe("true");
   });
 
   it("runs exactly the eight direct PostgreSQL suites without file parallelism", () => {

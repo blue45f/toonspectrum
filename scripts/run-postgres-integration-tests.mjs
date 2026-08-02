@@ -48,6 +48,16 @@ const ALLOWED_CONNECTION_PARAMETERS = new Set([
 const REMOTE_TEST_DATABASE_PATTERN =
   /(?:^|[_-])(?:ci|integration|preview|staging|test|testing)(?:$|[_-])/iu;
 
+// Root Vitest imports application modules which require DATABASE_URL even when a
+// DB-backed assertion is going to skip. Point the default at a deliberately
+// unreachable loopback endpoint instead of inheriting a developer's production
+// URL from .env.local. An explicit TEST_DATABASE_URL remains the only supported
+// way to opt the root suite into a remote disposable test database.
+export const VITEST_UNAVAILABLE_DATABASE_URL =
+  "postgresql://toonspectrum_test:unavailable@127.0.0.1:1/toonspectrum_test";
+export const VITEST_VALIDATED_REMOTE_DATABASE_MARKER =
+  "TOONSPECTRUM_VITEST_REMOTE_DATABASE_VALIDATED";
+
 export const POSTGRES_INTEGRATION_USAGE = [
   "Usage:",
   "  TEST_DATABASE_URL='postgresql://…' pnpm test:postgres:integration",
@@ -208,6 +218,79 @@ export function validatePostgresIntegrationUrl(
   return Object.freeze({ databaseName, loopback });
 }
 
+function validateOptionalLoopbackDatabaseUrl(rawDatabaseUrl, environment) {
+  if (typeof rawDatabaseUrl !== "string" || rawDatabaseUrl.trim().length === 0) {
+    return null;
+  }
+  try {
+    const target = validatePostgresIntegrationUrl(rawDatabaseUrl, {
+      environment,
+    });
+    if (!target.loopback) return null;
+    return rawDatabaseUrl.trim();
+  } catch {
+    // DATABASE_URL and .env.local are application runtime inputs, not explicit
+    // test opt-ins. Ignore unsafe/non-loopback values instead of connecting to
+    // them merely because the module graph contains DB-aware source files.
+    return null;
+  }
+}
+
+export function resolveVitestDatabaseTarget({
+  environment = process.env,
+  envFileDatabaseUrl,
+} = {}) {
+  const explicitTestUrl = environment.TEST_DATABASE_URL?.trim();
+  if (explicitTestUrl) {
+    const allowRemoteTestDatabase =
+      environment[VITEST_VALIDATED_REMOTE_DATABASE_MARKER] === "true";
+    const target = validatePostgresIntegrationUrl(explicitTestUrl, {
+      allowRemoteTestDatabase,
+      environment,
+    });
+    return Object.freeze({
+      databaseUrl: explicitTestUrl,
+      enabled: true,
+      source: "TEST_DATABASE_URL",
+      ...target,
+    });
+  }
+
+  const inheritedLoopbackUrl = validateOptionalLoopbackDatabaseUrl(
+    environment.DATABASE_URL,
+    environment,
+  );
+  if (inheritedLoopbackUrl) {
+    return Object.freeze({
+      databaseUrl: inheritedLoopbackUrl,
+      enabled: true,
+      source: "DATABASE_URL",
+      ...validatePostgresIntegrationUrl(inheritedLoopbackUrl, { environment }),
+    });
+  }
+
+  const envFileLoopbackUrl = validateOptionalLoopbackDatabaseUrl(
+    envFileDatabaseUrl,
+    environment,
+  );
+  if (envFileLoopbackUrl) {
+    return Object.freeze({
+      databaseUrl: envFileLoopbackUrl,
+      enabled: true,
+      source: ".env.local",
+      ...validatePostgresIntegrationUrl(envFileLoopbackUrl, { environment }),
+    });
+  }
+
+  return Object.freeze({
+    databaseName: "toonspectrum_test",
+    databaseUrl: VITEST_UNAVAILABLE_DATABASE_URL,
+    enabled: false,
+    loopback: true,
+    source: "unavailable-loopback",
+  });
+}
+
 export function resolvePostgresIntegrationTarget({
   arguments_: commandArguments = [],
   environment = process.env,
@@ -240,6 +323,7 @@ export function resolvePostgresIntegrationTarget({
 export function createPostgresIntegrationEnvironment(
   databaseUrl,
   environment = process.env,
+  { validatedRemoteDatabase = false } = {},
 ) {
   return {
     ...environment,
@@ -248,6 +332,9 @@ export function createPostgresIntegrationEnvironment(
     STUDIO_LIVE_POSTGRES_INTEGRATION_URL: databaseUrl,
     STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL: databaseUrl,
     TEST_DATABASE_URL: databaseUrl,
+    [VITEST_VALIDATED_REMOTE_DATABASE_MARKER]: validatedRemoteDatabase
+      ? "true"
+      : "false",
   };
 }
 
@@ -293,7 +380,7 @@ async function preflightPostgresIntegrationDatabase(databaseUrl, expectedDatabas
   }
 }
 
-function runVitest(databaseUrl) {
+function runVitest(databaseUrl, { validatedRemoteDatabase = false } = {}) {
   for (const suite of POSTGRES_INTEGRATION_SUITES) {
     if (!existsSync(resolve(REPOSITORY_ROOT, suite))) {
       fail("A required PostgreSQL integration suite is missing.");
@@ -302,7 +389,9 @@ function runVitest(databaseUrl) {
 
   const child = spawn(process.execPath, createVitestArguments(), {
     cwd: REPOSITORY_ROOT,
-    env: createPostgresIntegrationEnvironment(databaseUrl),
+    env: createPostgresIntegrationEnvironment(databaseUrl, process.env, {
+      validatedRemoteDatabase,
+    }),
     stdio: "inherit",
   });
   return new Promise((resolvePromise, rejectPromise) => {
@@ -352,7 +441,9 @@ export async function runPostgresIntegrationTests({
   console.log(
     `Running ${POSTGRES_INTEGRATION_SUITES.length} direct PostgreSQL suites without file parallelism.`,
   );
-  await runVitest(target.databaseUrl);
+  await runVitest(target.databaseUrl, {
+    validatedRemoteDatabase: !target.loopback,
+  });
 }
 
 function isDirectExecution() {
