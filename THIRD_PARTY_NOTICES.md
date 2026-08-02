@@ -19,6 +19,9 @@ obscure, or claim ownership of these libraries.
 | `@gltf-transform/extensions` | 4.4.2 | MIT | <https://github.com/donmccurdy/glTF-Transform> |
 | `@gltf-transform/functions` | 4.4.2 | MIT | <https://github.com/donmccurdy/glTF-Transform> |
 | `manifold-3d` | 3.5.1 | Apache-2.0 | <https://github.com/elalish/manifold> |
+| `opencascade.js` / OpenCascade WASM | 1.1.1 | LGPL-2.1-only | <https://github.com/donalffons/opencascade.js> |
+| `rhino3dm` / openNURBS WASM | 8.32.1 | MIT | <https://github.com/mcneel/rhino3dm> |
+| `web-ifc` WASM | 0.0.77 | MPL-2.0 | <https://github.com/ThatOpen/engine_web-ifc> |
 | `xatlasjs` | 0.2.0 | MIT | <https://github.com/repalash/xatlas.js> |
 | Comlink runtime embedded by `xatlasjs` | bundled in `xatlasjs` 0.2.0 | Apache-2.0 | <https://github.com/GoogleChromeLabs/comlink> |
 | `lazy-brush` | 2.0.2 | MIT | <https://github.com/dulnan/lazy-brush> |
@@ -60,6 +63,25 @@ manifest without requiring Rust. `pnpm run
 verify:studio-hokusai-wasm:rebuild` additionally requires the pinned Rust
 1.97.1, Cargo 1.97.1, and wasm-pack 0.15.0 toolchain and proves that a clean
 release rebuild is byte-identical to the checked-in JS, types and WASM.
+
+The OCCT integration loads `opencascade.js` as an independently emitted,
+lazy browser module and WASM asset. ToonSpectrum does not modify or statically
+link that package. Its exact corresponding source, license, replacement/rebuild
+procedure, and binary boundary are documented in
+`docs/third-party/opencascade-lgpl.md`. A recipient can replace the package with
+a compatible modified build and rebuild the application without changing the
+ToonSpectrum document format. The generated release notice includes the package's
+LGPL-2.1 text and resolved source metadata. Any future modification to OCCT or
+`opencascade.js` must add a dated modification notice and publish corresponding
+source before release.
+
+The reviewed `opencascade.js@1.1.1` artifact identifies OCCT commit
+`33d9a6fa21ca4fa711da7066655aa2ba854545ee`. Its pnpm/npm integrity is
+`sha512-lw6/vOl86+CkJ8d3V01mlbGAC0A49gc1HbwGcqGeKjk5SGRLiF15jyUuA8aYEvizcPNTu4Ta4A+Ut2DJgsa7AQ==`,
+and the independently emitted upstream WASM SHA-256 is
+`6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284`.
+The engineering evidence gate is complete for this exact unmodified artifact;
+final commercial legal suitability remains counsel-reviewed release approval.
 
 Every production build writes the resulting user-accessible artifact to
 `dist/legal/THIRD_PARTY_NOTICES.generated.md`. Run `pnpm run audit:licenses`

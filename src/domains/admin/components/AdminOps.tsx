@@ -5,7 +5,6 @@ import { adminFetch, formatNum, type AdminApiError } from "./admin-client";
 import { AdminNotice, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
-import { getAuthToken } from "@/src/compat/auth-session-store";
 import { api, getApiErrorMessage, httpStatus } from "@/src/infrastructure/api";
 
 interface AppConfig {
@@ -285,7 +284,7 @@ function ContentKillSwitches({ uid }: { uid: string }) {
   );
 }
 
-function ManualIngest({ uid, onSettled }: { uid: string; onSettled?: () => void }) {
+function ManualIngest({ onSettled }: { onSettled?: () => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<IngestRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -296,11 +295,10 @@ function ManualIngest({ uid, onSettled }: { uid: string; onSettled?: () => void 
     setError(null);
     setResult(null);
     try {
-      // 크롤은 수 분 걸릴 수 있다(공유 클라이언트 timeout:false). x-user-id 는 토큰 우선, 없으면 레거시 uid.
+      // 크롤은 수 분 걸릴 수 있다(공유 클라이언트 timeout:false). 인증은 HttpOnly 쿠키를 사용한다.
       const result = await api.post<IngestRunResult>(
         "/catalog/ingest/run",
         { requestedBy: "admin" },
-        { headers: { "x-user-id": getAuthToken() ?? uid } }
       );
       setResult(result);
     } catch (e) {
@@ -555,7 +553,7 @@ export function AdminOps({ uid }: { uid: string }) {
         title="수동 데이터 갱신 (크롤)"
         description="외부 소스에서 카탈로그를 즉시 다시 수집합니다. 변경이 없으면 중복으로 표시됩니다."
       >
-        <ManualIngest uid={uid} onSettled={() => setStatusReloadToken((token) => token + 1)} />
+        <ManualIngest onSettled={() => setStatusReloadToken((token) => token + 1)} />
       </Section>
 
       <Section icon={<Database size={15} />} title="수집 상태" description="현재 스냅샷·스케줄러·최근 실행 이력입니다.">

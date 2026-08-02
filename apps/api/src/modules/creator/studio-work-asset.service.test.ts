@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
   PayloadTooLargeException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { Image, encodePng } from "image-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +23,8 @@ import {
   StudioWorkAssetNotFoundError,
   StudioWorkAssetQuotaError,
   StudioWorkAssetReferencedError,
+  StudioWorkAssetStorageReferenceConflictError,
+  StudioWorkAssetStorageReferenceNotFoundError,
   StudioWorkAssetTypeConflictError,
 } from "./studio-work-asset.repository";
 import {
@@ -32,6 +35,7 @@ import {
 
 import type { DrizzleStudioCrdtTransaction } from "./studio-crdt.repository";
 import type { StudioWorkAssetRepository } from "./studio-work-asset.repository";
+import type { SupabaseObjectStoragePort } from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
 
 const manifest: StudioWorkAssetManifest = {
   version: 1,
@@ -57,6 +61,9 @@ const manifest: StudioWorkAssetManifest = {
 };
 
 const repository = {
+  assertCanEditWork: vi.fn(),
+  assertCanStoreGeneratedObject: vi.fn(),
+  findReusableStorageObject: vi.fn(),
   upsert: vi.fn(),
   upsertBatch: vi.fn(),
   getManifest: vi.fn(),
@@ -65,11 +72,28 @@ const repository = {
   getManifestsInTransaction: vi.fn(),
   getContentsInTransaction: vi.fn(),
   getContent: vi.fn(),
+  getStorageReference: vi.fn(),
+  registerGeneratedStorageReference: vi.fn(),
+  listGeneratedStorageReferencesForWorkDeletion: vi.fn(),
+  beginGeneratedStorageReferenceDelete: vi.fn(),
+  completeGeneratedStorageReferenceDelete: vi.fn(),
   deleteUnreferencedUpload: vi.fn(),
 };
 
-function service(): StudioWorkAssetService {
-  return new StudioWorkAssetService(repository as unknown as StudioWorkAssetRepository);
+const objectStorage = {
+  verifyPrivatePurposeBuckets: vi.fn(),
+  uploadImmutable: vi.fn(),
+  createSignedReadUrl: vi.fn(),
+  deleteGeneratedObject: vi.fn(),
+};
+
+function service(
+  storage: SupabaseObjectStoragePort = objectStorage as unknown as SupabaseObjectStoragePort,
+): StudioWorkAssetService {
+  return new StudioWorkAssetService(
+    repository as unknown as StudioWorkAssetRepository,
+    storage,
+  );
 }
 
 function pngBytes(width = 1, height = 1): Uint8Array {
@@ -99,6 +123,22 @@ function rgbaPng(
 
 function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function storageObject(
+  purpose: "source" | "derived" | "export",
+  bytes: Uint8Array,
+  contentType = "image/png",
+) {
+  const digest = sha256(bytes);
+  return {
+    contractVersion: "toonspectrum.supabase-object-storage.v1" as const,
+    purpose,
+    digest: `sha256:${digest}` as const,
+    objectPath: `sha256/${digest.slice(0, 2)}/${digest}` as const,
+    byteLength: bytes.byteLength,
+    contentType,
+  };
 }
 
 function apngBytes(): Uint8Array {
@@ -258,6 +298,9 @@ describe("StudioWorkAssetService", () => {
   beforeEach(() => {
     process.env.STUDIO_WORK_ASSET_ADMISSION =
       STUDIO_WORK_ASSET_ADMISSION_OPT_IN_TOKEN;
+    repository.assertCanEditWork.mockReset().mockResolvedValue(undefined);
+    repository.assertCanStoreGeneratedObject.mockReset().mockResolvedValue(undefined);
+    repository.findReusableStorageObject.mockReset().mockResolvedValue(null);
     repository.upsert.mockReset();
     repository.upsertBatch.mockReset();
     repository.getManifest.mockReset();
@@ -266,7 +309,29 @@ describe("StudioWorkAssetService", () => {
     repository.getManifestsInTransaction.mockReset();
     repository.getContentsInTransaction.mockReset();
     repository.getContent.mockReset();
+    repository.getStorageReference.mockReset();
+    repository.registerGeneratedStorageReference.mockReset();
+    repository.listGeneratedStorageReferencesForWorkDeletion
+      .mockReset()
+      .mockResolvedValue([]);
+    repository.beginGeneratedStorageReferenceDelete.mockReset();
+    repository.completeGeneratedStorageReferenceDelete.mockReset();
     repository.deleteUnreferencedUpload.mockReset();
+    objectStorage.verifyPrivatePurposeBuckets.mockReset().mockResolvedValue({
+      ready: true,
+      privatePurposeBuckets: 3,
+    });
+    objectStorage.uploadImmutable.mockReset().mockImplementation(
+      (input: { purpose: "source" | "derived" | "export"; bytes: Uint8Array; contentType: string }) =>
+        Promise.resolve(storageObject(input.purpose, input.bytes, input.contentType)),
+    );
+    objectStorage.createSignedReadUrl.mockReset().mockImplementation(
+      (input: { expiresInSeconds: number }) => Promise.resolve({
+        url: "https://project.supabase.co/storage/v1/object/sign/source/path?token=abcdefghijklmnop",
+        expiresAtEpochMs: Date.now() + input.expiresInSeconds * 1_000,
+      }),
+    );
+    objectStorage.deleteGeneratedObject.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -311,6 +376,18 @@ describe("StudioWorkAssetService", () => {
       elementType: "image",
       mimeType: "image/png",
       descriptor: manifest.descriptor,
+      storageObject: storageObject("source", bytes),
+    }));
+    expect(repository.assertCanEditWork).toHaveBeenCalledWith("editor", "work-1");
+    expect(objectStorage.verifyPrivatePurposeBuckets).toHaveBeenCalledOnce();
+    expect(objectStorage.uploadImmutable).toHaveBeenCalledWith(expect.objectContaining({
+      purpose: "source",
+      contentType: "image/png",
+      bytes: expect.any(Uint8Array),
+      controlMetadata: expect.objectContaining({
+        documentId: expect.stringMatching(/^work:[0-9a-f]{64}$/u),
+        operationId: expect.stringMatching(/^source-upload:[0-9a-f]{64}$/u),
+      }),
     }));
 
     await expect(service().upload(
@@ -325,6 +402,299 @@ describe("StudioWorkAssetService", () => {
       { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" }
     )).rejects.toBeInstanceOf(BadRequestException);
     expect(repository.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed before database persistence when private storage or upload integrity fails", async () => {
+    const bytes = Buffer.from(pngBytes());
+    objectStorage.verifyPrivatePurposeBuckets.mockRejectedValueOnce(new Error("bucket public"));
+    await expect(service().upload(
+      "editor",
+      "work-1",
+      "asset-1",
+      "image",
+      JSON.stringify(manifest.descriptor),
+      { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" },
+    )).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(objectStorage.uploadImmutable).not.toHaveBeenCalled();
+    expect(repository.upsert).not.toHaveBeenCalled();
+
+    objectStorage.uploadImmutable.mockResolvedValueOnce({
+      ...storageObject("source", bytes),
+      contentType: "image/jpeg",
+    });
+    await expect(service().upload(
+      "editor",
+      "work-1",
+      "asset-1",
+      "image",
+      JSON.stringify(manifest.descriptor),
+      { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" },
+    )).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(repository.upsert).not.toHaveBeenCalled();
+  });
+
+  it("reuses only an exact active immutable source object", async () => {
+    const bytes = Buffer.from(pngBytes());
+    const expected = storageObject("source", bytes);
+    repository.findReusableStorageObject.mockResolvedValueOnce(expected);
+    repository.upsert.mockResolvedValueOnce(manifest);
+
+    await service().upload(
+      "editor",
+      "work-1",
+      "asset-1",
+      "image",
+      JSON.stringify(manifest.descriptor),
+      { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" },
+    );
+
+    expect(objectStorage.uploadImmutable).not.toHaveBeenCalled();
+    expect(repository.upsert).toHaveBeenCalledWith(
+      "editor",
+      expect.objectContaining({ storageObject: expected }),
+    );
+  });
+
+  it("registers generated objects against an authorized source and forbids source purpose", async () => {
+    const bytes = Buffer.from(pngBytes());
+    const object = storageObject("derived", bytes);
+    const reference = {
+      workId: "work-1",
+      sourceAssetId: "asset-1",
+      referenceId: "preview-1",
+      object,
+    };
+    repository.registerGeneratedStorageReference.mockResolvedValueOnce(reference);
+
+    await expect(service().uploadGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "derived",
+      "preview-1",
+      "image",
+      { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" },
+    )).resolves.toEqual(reference);
+    expect(repository.assertCanStoreGeneratedObject).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      "asset-1",
+    );
+    expect(repository.registerGeneratedStorageReference).toHaveBeenCalledWith(
+      "editor",
+      reference,
+      true,
+    );
+
+    await expect(service().uploadGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "source" as never,
+      "preview-1",
+      "image",
+      { buffer: bytes, size: bytes.byteLength, mimetype: "image/png" },
+    )).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("authorizes signed reads from the active DB reference and caps them at five minutes", async () => {
+    const bytes = pngBytes();
+    const reference = {
+      workId: "work-1",
+      sourceAssetId: "asset-1",
+      referenceId: "asset-1",
+      object: storageObject("source", bytes),
+    };
+    repository.getStorageReference.mockResolvedValue(reference);
+
+    await expect(service().createSourceSignedReadUrl(
+      "viewer",
+      "work-1",
+      "asset-1",
+      "image",
+      300,
+    )).resolves.toMatchObject({ reference });
+    expect(repository.getStorageReference).toHaveBeenCalledWith(
+      "viewer",
+      "work-1",
+      "asset-1",
+      "source",
+      "asset-1",
+      "image",
+    );
+    expect(objectStorage.createSignedReadUrl).toHaveBeenCalledWith({
+      object: reference.object,
+      expiresInSeconds: 300,
+    });
+
+    repository.getStorageReference.mockClear();
+    await expect(service().createSourceSignedReadUrl(
+      "viewer",
+      "work-1",
+      "asset-1",
+      "image",
+      301,
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.getStorageReference).not.toHaveBeenCalled();
+
+    objectStorage.createSignedReadUrl.mockResolvedValueOnce({
+      url: "https://project.supabase.co/storage/v1/object/sign/source/path?token=abcdefghijklmnop",
+      expiresAtEpochMs: Date.now() + 600_000,
+    });
+    await expect(service().createSourceSignedReadUrl(
+      "viewer",
+      "work-1",
+      "asset-1",
+      "image",
+      60,
+    )).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it("keeps the optional Nest storage injection fail-closed when it is not configured", async () => {
+    const reference = {
+      workId: "work-1",
+      sourceAssetId: "asset-1",
+      referenceId: "asset-1",
+      object: storageObject("source", pngBytes()),
+    };
+    repository.getStorageReference.mockResolvedValueOnce(reference);
+    const withoutStorage = new StudioWorkAssetService(
+      repository as unknown as StudioWorkAssetRepository,
+    );
+
+    await expect(withoutStorage.getSourceStorageReference(
+      "viewer",
+      "work-1",
+      "asset-1",
+      "image",
+    )).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it("deletes only generated objects and finalizes the DB state after remote acknowledgement", async () => {
+    const reference = {
+      workId: "work-1",
+      sourceAssetId: "asset-1",
+      referenceId: "preview-1",
+      object: storageObject("derived", pngBytes()),
+    };
+    const plan = {
+      reference,
+      deleteToken: "11111111-1111-4111-8111-111111111111",
+      remoteDeleteRequired: true,
+    };
+    repository.beginGeneratedStorageReferenceDelete.mockResolvedValueOnce(plan);
+    repository.completeGeneratedStorageReferenceDelete.mockResolvedValueOnce(undefined);
+
+    await expect(service().deleteGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "derived",
+      "preview-1",
+      reference.object.digest,
+    )).resolves.toEqual({ deleted: true, remoteObjectDeleted: true });
+    expect(objectStorage.deleteGeneratedObject).toHaveBeenCalledWith({
+      object: reference.object,
+    });
+    expect(repository.completeGeneratedStorageReferenceDelete).toHaveBeenCalledWith(plan);
+
+    repository.beginGeneratedStorageReferenceDelete.mockResolvedValueOnce(plan);
+    repository.completeGeneratedStorageReferenceDelete.mockClear();
+    objectStorage.deleteGeneratedObject.mockRejectedValueOnce(new Error("timeout"));
+    await expect(service().deleteGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "derived",
+      "preview-1",
+      reference.object.digest,
+    )).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(repository.completeGeneratedStorageReferenceDelete).not.toHaveBeenCalled();
+
+    repository.beginGeneratedStorageReferenceDelete.mockClear();
+    await expect(service().deleteGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "source" as never,
+      "asset-1",
+      storageObject("source", pngBytes()).digest,
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.beginGeneratedStorageReferenceDelete).not.toHaveBeenCalled();
+  });
+
+  it("removes only the DB reference when another generated reference retains the object", async () => {
+    const reference = {
+      workId: "work-1",
+      sourceAssetId: "asset-1",
+      referenceId: "preview-1",
+      object: storageObject("export", pngBytes()),
+    };
+    repository.beginGeneratedStorageReferenceDelete.mockResolvedValueOnce({
+      reference,
+      deleteToken: null,
+      remoteDeleteRequired: false,
+    });
+
+    await expect(service().deleteGeneratedObject(
+      "editor",
+      "work-1",
+      "asset-1",
+      "export",
+      "preview-1",
+      reference.object.digest,
+    )).resolves.toEqual({ deleted: true, remoteObjectDeleted: false });
+    expect(objectStorage.deleteGeneratedObject).not.toHaveBeenCalled();
+    expect(repository.completeGeneratedStorageReferenceDelete).not.toHaveBeenCalled();
+  });
+
+  it("drains active and retryable generated references before work deletion", async () => {
+    const sharedObject = storageObject("derived", pngBytes());
+    const first = {
+      workId: "work-delete",
+      sourceAssetId: "asset-1",
+      referenceId: "preview-a",
+      object: sharedObject,
+    };
+    const last = { ...first, referenceId: "preview-b" };
+    repository.listGeneratedStorageReferencesForWorkDeletion
+      .mockResolvedValueOnce([first, last])
+      .mockResolvedValueOnce([]);
+    repository.beginGeneratedStorageReferenceDelete
+      .mockResolvedValueOnce({
+        reference: first,
+        deleteToken: null,
+        remoteDeleteRequired: false,
+      })
+      .mockResolvedValueOnce({
+        reference: last,
+        deleteToken: "22222222-2222-4222-8222-222222222222",
+        remoteDeleteRequired: true,
+      });
+    repository.completeGeneratedStorageReferenceDelete.mockResolvedValueOnce(undefined);
+
+    await expect(service().deleteGeneratedObjectsForWork(
+      "owner",
+      "work-delete",
+      false,
+    )).resolves.toBe(2);
+    expect(repository.listGeneratedStorageReferencesForWorkDeletion)
+      .toHaveBeenNthCalledWith(1, "owner", "work-delete", false);
+    expect(repository.beginGeneratedStorageReferenceDelete).toHaveBeenNthCalledWith(
+      2,
+      "owner",
+      {
+        workId: "work-delete",
+        sourceAssetId: "asset-1",
+        purpose: "derived",
+        referenceId: "preview-b",
+        expectedDigest: sharedObject.digest,
+      },
+      false,
+    );
+    expect(objectStorage.verifyPrivatePurposeBuckets).toHaveBeenCalledOnce();
+    expect(objectStorage.deleteGeneratedObject).toHaveBeenCalledOnce();
+    expect(repository.completeGeneratedStorageReferenceDelete).toHaveBeenCalledOnce();
   });
 
   it("validates both role-bound PNGs before one ordered atomic repository batch", async () => {
@@ -879,6 +1249,8 @@ describe("StudioWorkAssetService", () => {
     [new StudioWorkAssetImmutableConflictError(), ConflictException],
     [new StudioWorkAssetCleanupOwnershipError(), ForbiddenException],
     [new StudioWorkAssetReferencedError(), ConflictException],
+    [new StudioWorkAssetStorageReferenceNotFoundError(), NotFoundException],
+    [new StudioWorkAssetStorageReferenceConflictError(), ConflictException],
     [new StudioWorkAssetQuotaError("bytes"), PayloadTooLargeException],
   ] as const)("maps repository boundary %s to a public HTTP error", async (error, expected) => {
     repository.getManifest.mockRejectedValue(error);

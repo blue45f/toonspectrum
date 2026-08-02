@@ -67,13 +67,15 @@ export function CafeDetailPage() {
   }, [refreshTick, sessionToken, slug]);
 
   async function changeMembership(action: "join" | "leave") {
-    if (!sessionToken || membershipBusy) return;
+    if (!userId || membershipBusy) return;
     if (action === "leave" && !globalThis.confirm("이 카페에서 탈퇴할까요?")) return;
     setMembershipBusy(true);
     setMembershipError(null);
     const fallback = action === "join" ? "가입하지 못했습니다." : "탈퇴하지 못했습니다.";
     const path = `/community/cafes/${encodeURIComponent(slug)}/membership`;
-    const opts = { headers: { "x-user-id": sessionToken } };
+    const opts = {
+      headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
+    };
     try {
       const data =
         action === "join"

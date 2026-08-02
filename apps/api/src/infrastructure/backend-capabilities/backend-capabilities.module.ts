@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { Module } from "@nestjs/common";
+import { Module, type DynamicModule } from "@nestjs/common";
 
 import { SupabaseObjectStorageModule } from "../supabase-object-storage/supabase-object-storage.module";
 import { UpstashCoordinationModule } from "../upstash-coordination/upstash-coordination.module";
@@ -9,6 +9,10 @@ import {
   BACKEND_CAPABILITY_COORDINATION_RUNTIME,
   BackendCapabilityCoordinationGate,
 } from "./backend-capability-coordination-gate";
+import {
+  BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
+  type BackendCapabilityDurableQueuePort,
+} from "./backend-capability-durable-queue.port";
 import { BackendCapabilityGatewayController } from "./backend-capability-gateway-controller";
 import {
   BACKEND_CAPABILITY_GATEWAY_RUNTIME,
@@ -69,4 +73,24 @@ const optionalInfrastructureExports = [
     ...optionalInfrastructureExports,
   ],
 })
-export class BackendCapabilitiesModule {}
+export class BackendCapabilitiesModule {
+  /**
+   * Provider-facade registration seam. The default application intentionally installs no durable
+   * queue adapter. It may stay ready only while no queue role is enabled; enabling one without a
+   * real adapter fails health readiness and requests reject instead of claiming a queue receipt.
+   */
+  static registerDurableQueue(
+    durableQueue: BackendCapabilityDurableQueuePort
+  ): DynamicModule {
+    return {
+      module: BackendCapabilitiesModule,
+      providers: [
+        {
+          provide: BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
+          useValue: durableQueue,
+        },
+      ],
+      exports: [BACKEND_CAPABILITY_DURABLE_QUEUE_PORT],
+    };
+  }
+}

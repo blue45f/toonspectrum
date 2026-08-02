@@ -16,6 +16,7 @@ import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "@/lib/avatar";
+import { withCsrfProtection } from "@/lib/csrf";
 import { cn } from "@/lib/utils";
 import { signIn } from "@/src/compat/auth-session-store";
 import { apiPath } from "@/src/infrastructure/api";
@@ -176,11 +177,11 @@ export function AuthModal({
     setErr("");
     try {
       if (mode === "signup") {
-        const r = await fetch(apiPath("/auth/signup"), {
+        const r = await fetch(apiPath("/auth/signup"), withCsrfProtection({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name, avatar, image }),
-        });
+        }));
         if (!r.ok) {
           setErr((await r.json()).error ?? "가입 실패");
           return;

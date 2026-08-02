@@ -16,6 +16,7 @@ import {
   remapCollectionId,
   waitForCollectionMerge,
 } from "./collection-write-through";
+import { withCsrfProtection } from "./csrf";
 import { addRecentSearch, removeRecentSearch } from "./recent-searches";
 import { toast } from "./toast-store";
 import { deriveSavedTitleIds } from "./types";
@@ -33,7 +34,7 @@ function apiPost(path: string, body: unknown, method = "POST") {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = useApp.getState().sessionToken;
   if (token) headers["x-user-id"] = token; // 서명 세션 토큰(서버가 검증해 실제 userId로 치환)
-  fetch(path, { method, headers, body: JSON.stringify(body) }).catch(() => {});
+  fetch(path, withCsrfProtection({ method, headers, body: JSON.stringify(body) })).catch(() => {});
 }
 
 export interface HydratePayload {
@@ -108,7 +109,7 @@ function newClientCollectionId(): string {
 
 function currentCollectionAuthFence(): CollectionAuthFence | null {
   const { userId, sessionToken, authGeneration } = useApp.getState();
-  return userId && sessionToken
+  return userId
     ? { userId, sessionToken, generation: authGeneration }
     : null;
 }
@@ -158,15 +159,17 @@ async function sendCollectionCommand(
       }, COLLECTION_REQUEST_TIMEOUT_MS);
     });
     response = await Promise.race([
-      fetch("/api/me/collection", {
+      fetch("/api/me/collection", withCsrfProtection({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-id": fence.sessionToken,
+          ...(fence.sessionToken
+            ? { "x-user-id": fence.sessionToken }
+            : {}),
         },
         body: JSON.stringify(command),
         signal: controller.signal,
-      }),
+      })),
       timeoutRequest,
     ]);
   } catch (error) {
@@ -329,7 +332,7 @@ function currentCollectionFenceForOwner(
   ownerId: string
 ): CollectionAuthFence | null {
   const state = useApp.getState();
-  return state.userId === ownerId && state.sessionToken
+  return state.userId === ownerId
     ? {
         userId: ownerId,
         sessionToken: state.sessionToken,
@@ -647,7 +650,7 @@ interface AppState {
   clearRecentSearches: () => void;
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
-  sessionToken: string | null; // 서명 세션 토큰(x-user-id 헤더로 전송)
+  sessionToken: string | null; // 탭에 남은 레거시 헤더 토큰(null이면 HttpOnly 쿠키 인증)
   libraryOwnerId: string | null; // 서버 서재 snapshot 소유자(null이면 게스트 로컬 데이터)
   libraryMergeOwnerId: string | null; // 실패한 게스트 병합을 다른 계정으로 보내지 않는 durable claim
   authGeneration: number; // 계정 전환 뒤 늦은 응답이 새 계정 상태에 적용되지 않도록 하는 fence

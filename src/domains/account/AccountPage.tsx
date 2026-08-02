@@ -341,7 +341,7 @@ function ProfileTab() {
   useEffect(() => {
     if (!user?.id) return;
     let alive = true;
-    // x-user-id 는 공유 ky 훅이 세션 토큰으로 자동 주입한다. 베스트에포트라 실패는 무시.
+    // 공유 ky 클라이언트가 HttpOnly 세션 쿠키를 포함한다. 베스트에포트라 실패는 무시.
     api
       .get<{ profile?: { name?: string | null; bio?: string | null; image?: string | null } }>("/me")
       .then((data) => {
@@ -363,8 +363,6 @@ function ProfileTab() {
     try {
       await updateMyProfile({ name: name.trim(), bio: bio.trim(), image });
       setSaved(true);
-      // 사이트 헤더/메뉴 아바타 반영을 위해 페이지를 새로고침(세션 객체는 localStorage 기반이라 직접 갱신 불가).
-      setTimeout(() => globalThis.location.reload(), 600);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("account.profile.errorSave"));
     } finally {

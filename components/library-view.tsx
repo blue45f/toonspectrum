@@ -12,6 +12,7 @@ import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
 import type { ReadState, Title } from "@/lib/types";
 
 import { MAX_COLLECTION_NAME_LENGTH } from "@/lib/collection-contract";
+import { withCsrfProtection } from "@/lib/csrf";
 import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { useApp, useHydrated } from "@/lib/store";
@@ -134,13 +135,13 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
               signal: controller.signal,
             }).then((res) => (res.ok ? res.json() : { items: [] }))
           : Promise.resolve({ items: [] }),
-        fetch("/api/recommend", {
+        fetch("/api/recommend", withCsrfProtection({
           method: "POST",
           cache: "no-store",
           signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ratings, reads }),
-        }).then((res) => (res.ok ? res.json() : { profile: EMPTY_PROFILE, tasteRecs: [] })),
+        })).then((res) => (res.ok ? res.json() : { profile: EMPTY_PROFILE, tasteRecs: [] })),
       ]);
 
       const nextById: Record<string, Title> = {};

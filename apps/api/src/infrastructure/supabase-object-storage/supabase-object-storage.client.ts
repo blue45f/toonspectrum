@@ -7,6 +7,8 @@ import {
   CreateSupabaseSignedReadUrlSchema,
   DeleteSupabaseObjectSchema,
   SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+  SupabaseObjectControlMetadataSchema,
+  SupabaseObjectPurposeSchema,
   SupabaseObjectReferenceSchema,
   UploadSupabaseObjectSchema,
   type CreateSupabaseSignedReadUrl,
@@ -78,6 +80,27 @@ const DeletedObjectSchema = z
   .strip();
 
 const DeletedObjectsResponseSchema = z.array(DeletedObjectSchema).max(1_000);
+
+const StoredObjectControlMetadataSchema = z
+  .object({
+    contractVersion: z.literal(SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION),
+    purpose: SupabaseObjectPurposeSchema,
+    digest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    byteLength: z.number().int().min(1),
+    control: SupabaseObjectControlMetadataSchema,
+  })
+  .strict();
+
+const ObjectInfoResponseSchema = z
+  .object({
+    name: z.string().min(1).max(1_024),
+    bucket_id: z.string().min(1).max(128),
+    size: z.number().int().min(1),
+    content_type: z.string().min(3).max(160),
+    cache_control: z.string().min(1).max(512),
+    metadata: StoredObjectControlMetadataSchema,
+  })
+  .strip();
 
 const BucketResponseSchema = z
   .object({
@@ -309,26 +332,42 @@ export class SupabaseRestObjectStoragePort
     }
 
     const bucket = this.bucketFor(object.purpose);
-    const response = await this.requestJson(
-      {
-        method: "POST",
-        path: `/object/${encodeURIComponent(bucket)}/${encodedPath(
-          object.objectPath
-        )}`,
-        headers: {
-          "cache-control": "max-age=31536000, immutable",
-          "content-length": String(object.byteLength),
-          "content-type": object.contentType,
-          "x-metadata": Buffer.from(
-            controlMetadata,
-            "utf8"
-          ).toString("base64"),
-          "x-upsert": "false",
+    let response: unknown;
+    try {
+      response = await this.requestJson(
+        {
+          method: "POST",
+          path: `/object/${encodeURIComponent(bucket)}/${encodedPath(
+            object.objectPath
+          )}`,
+          headers: {
+            "cache-control": "max-age=31536000, immutable",
+            "content-length": String(object.byteLength),
+            "content-type": object.contentType,
+            "x-metadata": Buffer.from(
+              controlMetadata,
+              "utf8"
+            ).toString("base64"),
+            "x-upsert": "false",
+          },
+          body: admittedBytes,
         },
-        body: admittedBytes,
-      },
-      options
-    );
+        options
+      );
+    } catch (error) {
+      if (
+        !(error instanceof SupabaseObjectStorageError) ||
+        error.code !== "REMOTE_REJECTED"
+      ) {
+        throw error;
+      }
+      // Standard Upload deliberately rejects concurrent creates with "Asset Already Exists".
+      // A previous request may also have completed the remote write and failed before recording
+      // the database reference. Adopt only an exact content-addressed object whose immutable
+      // provider metadata proves the same digest, length, MIME type and cache policy.
+      await this.assertExactRemoteObject(object, options);
+      return SupabaseObjectReferenceSchema.parse(object);
+    }
     const remote = UploadResponseSchema.safeParse(response);
     if (
       !remote.success ||
@@ -418,8 +457,40 @@ export class SupabaseRestObjectStoragePort
     const remote = DeletedObjectsResponseSchema.safeParse(response);
     if (
       !remote.success ||
-      remote.data.length !== 1 ||
-      remote.data[0]?.name !== parsed.data.object.objectPath
+      remote.data.length > 1 ||
+      (remote.data.length === 1 &&
+        remote.data[0]?.name !== parsed.data.object.objectPath)
+    ) {
+      throw new SupabaseObjectStorageError("INVALID_RESPONSE");
+    }
+  }
+
+  private async assertExactRemoteObject(
+    object: SupabaseObjectReference,
+    options: SupabaseObjectStorageCallOptions
+  ): Promise<void> {
+    const bucket = this.bucketFor(object.purpose);
+    const response = await this.requestJson(
+      {
+        method: "GET",
+        path: `/object/info/authenticated/${encodeURIComponent(
+          bucket
+        )}/${encodedPath(object.objectPath)}`,
+      },
+      options
+    );
+    const remote = ObjectInfoResponseSchema.safeParse(response);
+    if (
+      !remote.success ||
+      remote.data.name !== object.objectPath ||
+      remote.data.bucket_id !== bucket ||
+      remote.data.size !== object.byteLength ||
+      remote.data.content_type !== object.contentType ||
+      remote.data.cache_control !== "max-age=31536000, immutable" ||
+      remote.data.metadata.contractVersion !== object.contractVersion ||
+      remote.data.metadata.purpose !== object.purpose ||
+      remote.data.metadata.digest !== object.digest ||
+      remote.data.metadata.byteLength !== object.byteLength
     ) {
       throw new SupabaseObjectStorageError("INVALID_RESPONSE");
     }

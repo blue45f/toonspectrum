@@ -5,6 +5,7 @@ import { TitleCard } from "./title-card";
 
 import type { Title } from "@/lib/types";
 
+import { withCsrfProtection } from "@/lib/csrf";
 import { useApp, useHydrated } from "@/lib/store";
 
 // 개인화 홈 섹션 — 스토어에 기록이 있을 때만 렌더(신규 방문자엔 영향 없음).
@@ -28,12 +29,12 @@ export function HomePersonal() {
     if (!hydrated || !hasEngagement) return;
     let alive = true;
     const controller = new AbortController();
-    fetch("/api/recommend", {
+    fetch("/api/recommend", withCsrfProtection({
       method: "POST",
       body: JSON.stringify({ picked: [], ratings, reads }),
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-    })
+    }))
       .then((res) => {
         if (!res.ok) throw new Error("recommend failed");
         return res.json() as Promise<{ reading: Title[]; tasteRecs: { title: Title }[] }>;

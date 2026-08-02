@@ -36,6 +36,13 @@ export class AuthRateLimitConfigurationError extends Error {
   }
 }
 
+export class AuthRateLimitDependencyError extends Error {
+  constructor() {
+    super("Auth distributed rate-limit coordination is unavailable.");
+    this.name = "AuthRateLimitDependencyError";
+  }
+}
+
 export function resolveAuthRateLimitConfig(
   environment: AuthRateLimitEnvironment,
 ): AuthRateLimitConfig {

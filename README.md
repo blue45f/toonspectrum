@@ -211,7 +211,7 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 
 ### DB 준비 (PostgreSQL / Neon)
 
-DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
+DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
 
 **A. 로컬 docker Postgres**
 
@@ -286,9 +286,11 @@ while IFS= read -r migration_path; do
 done < scripts/production-database-migrations.manifest
 
 # Drizzle push는 현재 최종 모델을 만들므로 빈 로컬 DB에서만 post-0019 객체를 제거해
-# genuine pending 0020~0022 경로를 검증합니다.
+# genuine pending 0020~0022와 0024 경로를 검증합니다(0023은 원장 bootstrap).
 psql "$STUDIO_LIVE_POSTGRES_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
 DROP TABLE IF EXISTS
+  "creator_work_asset_storage_reference",
+  "creator_asset_storage_object",
   "creator_marketplace_publish_gate",
   "creator_marketplace_resource",
   "creator_draft_collaboration_room"

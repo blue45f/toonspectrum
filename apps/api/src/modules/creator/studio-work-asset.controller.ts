@@ -23,10 +23,15 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
 import { StudioWorkAssetUploadGuard } from "./studio-asset-upload.guard";
 import {
+  DeleteStudioWorkAssetGeneratedObjectQueryDto,
   DeleteStudioWorkAssetQueryDto,
+  StudioWorkAssetGeneratedParamsDto,
   StudioWorkAssetParamsDto,
+  StudioWorkAssetSignedReadQueryDto,
+  StudioWorkAssetSourceSignedReadQueryDto,
   StudioWorkAssetTypeQueryDto,
   StudioWorkAssetWorkParamsDto,
+  UploadStudioWorkAssetGeneratedObjectDto,
   UploadStudioWorkAssetLayerLiftBatchDto,
   UploadStudioWorkAssetDto,
 } from "./studio-work-asset.dto";
@@ -109,6 +114,133 @@ export class StudioWorkAssetController {
       body.elementType,
       body.descriptor,
       file
+    );
+  }
+
+  @Put(
+    "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+  )
+  @UseGuards(StudioWorkAssetUploadGuard)
+  @UseInterceptors(FileInterceptor("file", {
+    limits: {
+      fileSize: MAX_MULTIPART_ASSET_BYTES,
+      files: 1,
+      fields: 1,
+      fieldNameSize: 64,
+      fieldSize: 4_096,
+      parts: 2,
+    },
+  }))
+  async uploadGeneratedObject(
+    @Param(new ZodValidationPipe(StudioWorkAssetGeneratedParamsDto))
+    params: StudioWorkAssetGeneratedParamsDto,
+    @Body(new ZodValidationPipe(UploadStudioWorkAssetGeneratedObjectDto))
+    body: UploadStudioWorkAssetGeneratedObjectDto,
+    @UploadedFile() file: StudioWorkAssetUploadFile | undefined,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.uploadGeneratedObject(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      params.purpose,
+      params.referenceId,
+      body.elementType,
+      file,
+    );
+  }
+
+  @Get("/creator/works/:id/assets/:assetId/storage-reference")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async sourceStorageReference(
+    @Param(new ZodValidationPipe(StudioWorkAssetParamsDto))
+    params: StudioWorkAssetParamsDto,
+    @Query(new ZodValidationPipe(StudioWorkAssetTypeQueryDto))
+    query: StudioWorkAssetTypeQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getSourceStorageReference(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      query.elementType,
+    );
+  }
+
+  @Get("/creator/works/:id/assets/:assetId/content-url")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async sourceSignedReadUrl(
+    @Param(new ZodValidationPipe(StudioWorkAssetParamsDto))
+    params: StudioWorkAssetParamsDto,
+    @Query(new ZodValidationPipe(StudioWorkAssetSourceSignedReadQueryDto))
+    query: StudioWorkAssetSourceSignedReadQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.createSourceSignedReadUrl(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      query.elementType,
+      query.expiresInSeconds,
+    );
+  }
+
+  @Get(
+    "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+  )
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async generatedStorageReference(
+    @Param(new ZodValidationPipe(StudioWorkAssetGeneratedParamsDto))
+    params: StudioWorkAssetGeneratedParamsDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.getGeneratedStorageReference(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      params.purpose,
+      params.referenceId,
+    );
+  }
+
+  @Get(
+    "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId/content-url",
+  )
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async generatedSignedReadUrl(
+    @Param(new ZodValidationPipe(StudioWorkAssetGeneratedParamsDto))
+    params: StudioWorkAssetGeneratedParamsDto,
+    @Query(new ZodValidationPipe(StudioWorkAssetSignedReadQueryDto))
+    query: StudioWorkAssetSignedReadQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.createGeneratedSignedReadUrl(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      params.purpose,
+      params.referenceId,
+      query.expiresInSeconds,
+    );
+  }
+
+  @Delete(
+    "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+  )
+  async deleteGeneratedObject(
+    @Param(new ZodValidationPipe(StudioWorkAssetGeneratedParamsDto))
+    params: StudioWorkAssetGeneratedParamsDto,
+    @Query(new ZodValidationPipe(DeleteStudioWorkAssetGeneratedObjectQueryDto))
+    query: DeleteStudioWorkAssetGeneratedObjectQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.service.deleteGeneratedObject(
+      authenticatedUserId(userId),
+      params.id,
+      params.assetId,
+      params.purpose,
+      params.referenceId,
+      query.expectedDigest,
     );
   }
 

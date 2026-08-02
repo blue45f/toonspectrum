@@ -43,39 +43,97 @@ cp .env.example .env && nano .env     # DOMAIN, POSTGRES_PASSWORD, AUTH_SECRET, 
                                       # ADMIN_EMAILS 등 — 현재 Vercel/.env.local 값 복사
 ```
 
-## 5. 스택 기동 + 스키마
+## 5. DB bootstrap/upgrade + 스택 기동
+
+운영 DB에는 `drizzle-kit push`, 개별 migration SQL 수동 실행, 앱 시작 시 DDL을 사용하지 않는다.
+정본은 `scripts/production-database-migrations.manifest`와
+`toonspectrum_ops.deployment_migration` checksum 원장이다. API/Caddy는 capability 검증이 끝난
+뒤에만 공개한다.
+
+먼저 DB와 API 이미지만 준비하되 writer는 시작하지 않는다.
+
 ```bash
 cd /opt/webdex/deploy/oci
 docker compose up -d db
 docker compose build api
-docker compose run --rm api pnpm exec drizzle-kit push --force
-docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < ../../lib/db/migrations/0013_creator_asset_marketplace.sql
-docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < ../../lib/db/migrations/0009_socket_io_postgres_adapter.sql
-docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < ../../lib/db/migrations/0017_creator_work_live_lock_revision.sql
-docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < ../../lib/db/migrations/0018_studio_ai_request_gate.sql
-docker compose exec -T db sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
-  < ../../lib/db/migrations/0019_studio_ai_request_receipt.sql
-docker compose up -d api caddy              # migration 완료 후에만 Studio API를 공개
-curl -s https://api.example.com/api/config # 200 확인
 ```
 
-기존 스택 업그레이드는 `api`를 먼저 중지하고 `0013`, `0017`, `0018`, `0019`를 순서대로 적용한 뒤 새
-이미지로 다시 시작해야 합니다. 세부 사후조건과 retry/rollback 절차는
-[`STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](./STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따릅니다.
+### 5-A. 완전히 빈 OCI DB 최초 bootstrap
+
+빈 DB의 base schema 구성은 기존 운영 DB upgrade와 별개의 승인 작업이다. DB가 외부에 공개되지
+않고 모든 Studio writer가 중지된 상태에서만 [README의 “선택한 완전한 빈 로컬 DB 최초
+provision”](../README.md#db-%EC%A4%80%EB%B9%84-postgresql--neon) 절차를 OCI의 direct URL에 대해
+수행한다. 그 절차는 reviewed historical baseline을 구성하고 `adopt` 모드로 checksum 원장을
+초기화한 뒤 실제 pending migration만 적용한다. 원장 초기화가 끝나기 전에는 API를 시작하지 않는다.
+
+Neon의 **전체 DB archive를 복제할 예정이면 이 bootstrap을 먼저 실행하지 않는다.** §6-A처럼
+완전히 빈 대상 DB에 full archive를 먼저 복원한 뒤, 복원된 원장 유무에 맞춰 `adopt` 또는 `apply`를
+실행한다. 이 bootstrap은 새 서비스 시작 또는 §6-B의 data-only 이관 경로에만 사용한다.
+
+### 5-B. 기존 OCI DB upgrade
+
+1. 모든 기존 Studio/API writer를 drain한다.
+2. GitHub `production-database` Environment에 direct migrator URL secret
+   `PRODUCTION_DATABASE_DIRECT_URL`과 최소 권한 runtime role variable
+   `PRODUCTION_RUNTIME_DATABASE_ROLE`을 설정한다.
+3. `.github/workflows/production-database-migrations.yml`을 배포할 정확한 40자리 main commit SHA로
+   실행한다. 최초 원장 도입만 `adopt`, 이후 배포는 `apply`, 중단 원장 복구만 `repair`를 사용한다.
+4. workflow의 exact checksum 원장 및 runtime capability 검증이 통과한 뒤 API/Caddy를 시작한다.
+
+```bash
+docker compose up -d api caddy
+curl --fail --silent --show-error https://api.example.com/api/health/ready
+curl --fail --silent --show-error https://api.example.com/api/config
+```
+
+`drizzle-kit push --force`와 numbered SQL 파일의 수동 재실행은 기존 DB upgrade 경로가 아니다.
+checksum drift, 중단된 `applying`/`failed` row, 번호 누락, runtime/migrator role 혼용은 모두
+fail-closed된다. writer drain, live-lock cutover, retry/rollback 절차는
+[`STUDIO-LIVE-LOCK-REVISION-MIGRATION.md`](./STUDIO-LIVE-LOCK-REVISION-MIGRATION.md)를 따른다.
 
 ## 6. DB 데이터 이전 (Neon → OCI) — 선택
-스키마는 §5의 drizzle push로 생성됨. 기존 데이터(리뷰·커뮤니티 등) 이관이 필요하면:
+
+writer를 중지한 maintenance window에서 아래 두 경로 중 **정확히 하나만** 선택한다. full archive를
+§5-A로 이미 bootstrap한 schema 위에 복원하면 relation 충돌 또는 부분 복원이 발생하므로 금지한다.
+
+### 6-A. 전체 DB 복제 — 빈 대상에 full restore 후 원장 검증
+
+대상 DB에는 application relation이 하나도 없어야 한다. §5-A를 실행하지 않은 새 DB임을 확인한 뒤
+full archive를 한 transaction으로 복원한다.
+
 ```bash
-# 로컬(또는 쿼터 여유 있을 때)에서 Neon 덤프 — ⚠️ Neon 전송 쿼터 초과 중이면 월 리셋 후/일시 업그레이드 후 실행
+# Neon 전송 쿼터가 충분할 때 실행
 pg_dump "$NEON_DATABASE_URL" --no-owner --no-privileges -Fc -f webdex-neon.dump
-# OCI Postgres로 복원(VM의 127.0.0.1:5432 로 SSH 터널 또는 VM에서 직접)
-pg_restore --no-owner --no-privileges -d "$OCI_DATABASE_URL" webdex-neon.dump
+
+# 결과가 null이어야 한다. relation이 있으면 중지하고 새 빈 DB를 준비한다.
+psql "$OCI_DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atc \
+  "SELECT to_regclass('public.creator_work')"
+
+pg_restore --exit-on-error --single-transaction \
+  --no-owner --no-privileges \
+  -d "$OCI_DATABASE_URL" webdex-neon.dump
 ```
-리뷰는 클라이언트 localStorage에도 남아 점진 복구되므로, 데이터 이관 없이 빈 DB로 시작해도 서비스는 동작한다.
+
+복원된 원장에 historical adoption marker가 없다면 정확한 release SHA로 workflow `adopt`를 한 번
+실행한다. 원장과 marker가 함께 복원되었다면 `adopt`를 재실행하지 않고 `apply`를 실행한다. 두 경우
+모두 capability verifier와 exact checksum 원장 검증을 통과한 뒤 writer를 재개한다.
+
+### 6-B. 이미 bootstrap한 대상 — application data-only restore
+
+§5-A와 capability verifier가 끝났고 application table이 비어 있는 대상에만 사용한다. migration
+원장과 lock은 대상의 정본이므로 source archive에서 제외한다.
+
+```bash
+pg_dump "$NEON_DATABASE_URL" --data-only --exclude-schema=toonspectrum_ops \
+  --no-owner --no-privileges -Fc -f webdex-neon-data.dump
+pg_restore --data-only --exit-on-error --single-transaction \
+  --no-owner --no-privileges \
+  -d "$OCI_DATABASE_URL" webdex-neon-data.dump
+```
+
+복원 후 workflow `apply`와 capability verifier를 다시 실행하고 writer를 재개한다. 충돌을 무시하는
+옵션, `--clean`, schema full restore를 이 경로에 추가하지 않는다. 클라이언트 저장소를 운영 데이터
+복구 수단으로 간주하지 않는다.
 
 ## 7. 크롤 + 백업 cron + git push 키
 ```bash

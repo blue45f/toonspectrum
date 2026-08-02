@@ -5,6 +5,7 @@ import {
 
 import type { StudioRealtimeTicketIssuer } from "./studio-realtime-provider-runtime";
 
+import { withCsrfHeader } from "@/lib/csrf";
 import { apiPath } from "@/src/infrastructure/api";
 
 const DEFAULT_TICKET_TIMEOUT_MS = 8_000;
@@ -132,10 +133,10 @@ implements StudioRealtimeTicketIssuer {
     try {
       const response = await this.fetchRequest(this.endpoint, {
         method: "POST",
-        headers: {
+        headers: withCsrfHeader({
           "Content-Type": "application/json",
           "x-user-id": this.sessionToken,
-        },
+        }),
         body: JSON.stringify(request.data),
         cache: "no-store",
         credentials: "same-origin",

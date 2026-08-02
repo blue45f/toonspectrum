@@ -8,6 +8,7 @@ import { TitleCard } from "./title-card";
 import type { PlatformId, Title } from "@/lib/types";
 
 import { TitleFilterPanel } from "@/components/title-filter-panel";
+import { withCsrfProtection } from "@/lib/csrf";
 import { genreColor, genreTextColor } from "@/lib/genre-color";
 import { useApp, useHydrated, useSavedTitleIds } from "@/lib/store";
 import { GENRES } from "@/lib/taxonomy";
@@ -64,12 +65,12 @@ export function RecommendView({ initialGenres = [] }: { initialGenres?: string[]
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch("/api/recommend", {
+    fetch("/api/recommend", withCsrfProtection({
       method: "POST",
       body: requestBody,
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-    })
+    }))
       .then((res) => {
         if (!res.ok) throw new Error("recommend failed");
         return res.json() as Promise<RecommendPayload>;

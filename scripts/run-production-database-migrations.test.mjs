@@ -4,6 +4,7 @@ import { expect, test } from "vitest";
 
 import {
   POST_BASELINE_RELATIONS,
+  buildCreatorAssetObjectStorageRuntimeAclSql,
   buildHistoricalAdoptionVerificationSql,
   buildRepairLockTakeoverSql,
   decideMigrationAction,
@@ -14,10 +15,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(23);
+  expect(manifest).toHaveLength(24);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0023_production_migration_ledger");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(23);
+  expect(manifest.at(-1).id).toBe("0024_creator_asset_object_storage");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(24);
 });
 
 test("manifest sequence continuity rejects a missing middle number", () => {
@@ -40,6 +41,49 @@ test("runtime database role is explicit and identifier-safe", () => {
   }
 });
 
+test("creator object storage runtime ACL is least-privilege and preserves immutable identity", () => {
+  const sql = buildCreatorAssetObjectStorageRuntimeAclSql(
+    "toonspectrum_runtime",
+  );
+
+  expect(sql).toContain(
+    'REVOKE ALL ON TABLE\n  public.creator_asset_storage_object,',
+  );
+  expect(sql).toContain(
+    'GRANT SELECT\n  ON TABLE public.creator_asset_storage_object',
+  );
+  expect(sql).toContain(
+    'GRANT INSERT (\n  "purpose",\n  "digest",\n  "contractVersion",',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("state", "deleteToken", "updatedAt", "deletedAt")',
+  );
+  expect(sql).toContain(
+    'GRANT SELECT, DELETE\n  ON TABLE public.creator_work_asset_storage_reference',
+  );
+  expect(sql).toContain(
+    'GRANT INSERT (\n  "workId",\n  "purpose",\n  "referenceId",',
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("state", "deleteToken", "updatedAt")',
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*UPDATE\s+ON TABLE/u);
+  expect(sql).not.toMatch(/GRANT[^;(]*INSERT\s+ON TABLE/u);
+  for (const immutableColumn of [
+    "purpose",
+    "digest",
+    "objectPath",
+    "byteLength",
+    "contentType",
+    "workId",
+    "referenceId",
+    "objectDigest",
+    "sourceAssetId",
+  ]) {
+    expect(sql).not.toContain(`UPDATE ("${immutableColumn}"`);
+  }
+});
+
 test("historical adoption requires structural evidence through 0019", () => {
   const sql = buildHistoricalAdoptionVerificationSql();
   for (const requiredFragment of [
@@ -58,9 +102,11 @@ test("historical adoption requires structural evidence through 0019", () => {
 
 test("post-baseline relation classification stays synchronized with the CI fixture reset", () => {
   expect(POST_BASELINE_RELATIONS).toEqual([
+    "creator_asset_storage_object",
     "creator_draft_collaboration_room",
     "creator_marketplace_publish_gate",
     "creator_marketplace_resource",
+    "creator_work_asset_storage_reference",
   ]);
   const workflow = readFileSync(
     new URL("../.github/workflows/ci.yml", import.meta.url),

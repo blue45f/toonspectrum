@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
+import { UPSTASH_COORDINATION_PORT } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 
 import { resolveAuthClientIpPolicy } from "./auth-client-ip";
 import {
@@ -23,6 +24,11 @@ const upstashCoordinationModule = authRateLimitConfig.distributed
 @Module({
   imports: upstashCoordinationModule ? [upstashCoordinationModule] : [],
   providers: [
+    ...(
+      upstashCoordinationModule
+        ? []
+        : [{ provide: UPSTASH_COORDINATION_PORT, useValue: null }]
+    ),
     {
       provide: AUTH_RATE_LIMIT_CONFIG,
       useFactory: () => resolveAuthRateLimitConfig(process.env),

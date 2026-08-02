@@ -5,7 +5,8 @@ This boundary is deliberately narrower than a general Redis repository. It may s
 - short-lived compare-and-set leases;
 - idempotency receipt state, immutable request fingerprints and outcome fingerprints;
 - provider circuit counters/cooldowns;
-- provider budget counters and per-operation decision receipts.
+- provider budget counters and per-operation decision receipts;
+- bounded authentication rate-limit counters keyed only by pre-hashed subjects.
 
 It cannot store creator content, prompts, document/CRDT authority, canonical save state, thumbnails,
 exports, or asset bytes. Every external identity and proof is HMAC-SHA-256 transformed before it

@@ -1,6 +1,6 @@
 // 창작 게시판(/api/creator) 전용 타입 + ky 헬퍼.
-// 인증은 기존 세션 스킴(localStorage "toonspectrum-auth-session" → x-user-id 헤더)을 그대로 재사용한다.
-// 공유 ky 클라이언트(api)의 beforeRequest 훅이 x-user-id 를 자동 주입하므로 호출부는 헤더를 안 넘긴다.
+// 인증은 공유 클라이언트의 HttpOnly 세션 쿠키만 사용하므로 호출부는
+// x-user-id나 브라우저 저장 토큰을 별도로 전달하지 않는다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
 import type {
   CreatorAssetCatalogSort,

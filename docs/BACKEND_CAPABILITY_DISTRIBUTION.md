@@ -150,10 +150,27 @@ contract must return a retryable rejection or an exact `accepted` queue acknowle
 same-role provider is available, the dispatcher returns unavailable/providers-exhausted so the
 authoritative outbox can wait; it never silently selects a degraded implementation.
 
-The 16 MiB JSON request/response ceiling is a control-plane safety boundary, not an artwork size or
-quality limit. Large source images, models and exports must be uploaded losslessly to object storage
-and referenced by immutable asset ID or presigned URL. The dispatcher rejects an oversized inline
-body without truncating, resampling or sending it.
+Cleanup and notification facades use the explicit durable-queue executor port. Their strict task
+payloads are `cleanup.dispatch` and `notification.dispatch`, with the envelope idempotency key
+repeated as `requestKey` and a server-declared `task.name` plus canonical JSON `task.body`. The port
+does not receive a URL, HTTP method, headers, credentials, or provider base URL, so a command cannot
+turn the facade into an arbitrary callback/SSRF relay. A facade must declare the exact provider IDs
+and workloads it serves, pass a bounded readiness probe, durably deduplicate the key, and return a
+strict accepted/completed/duplicate/rejected result. The default Nest application installs no such
+port: it remains ready as the authoritative API only while no cleanup/notification durable-queue
+provider role is enabled. Enabling Upstash QStash or Cloudflare for that role without registering a
+real adapter fails readiness before traffic is admitted; incoming execution also fails closed with a
+retryable rejection instead of fabricating a queue receipt. A process that explicitly registers the
+port must prove both workloads before its readiness check succeeds. The checked-in `AppModule` has
+no production QStash/Cloudflare queue adapter yet, so provider enablement is an operational blocker,
+not an implemented green path.
+
+The 16 MiB hard JSON request/response ceiling and each provider's smaller configured ceiling are
+control-plane safety boundaries, not artwork size or quality limits. They apply to both the request
+envelope and a durable adapter's synchronous `completed.result`. Large source images, models and
+exports must be uploaded losslessly to object storage and referenced by immutable asset ID or
+presigned URL. The dispatcher rejects an oversized inline body/result without truncating,
+resampling or sending it.
 
 The gateway token is present only in `x-toonspectrum-gateway-token`. The token never appears in the
 body, status snapshot or result. Base URLs are secure origins only; userinfo, paths, queries and

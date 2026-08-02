@@ -21,6 +21,7 @@ import {
   creatorChallenges,
   creatorFollows,
   creatorSeries,
+  creatorWorkAssetStorageReferences,
   creatorWorkComments,
   creatorWorkLikes,
   creatorWorkRevisions,
@@ -1333,15 +1334,43 @@ export async function restoreWorkRevision(
 
 // ── 삭제(작성자 또는 관리자) ─────────────────────────────────────────
 export async function deleteWork(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
-  const [existing] = await db
-    .select({ id: creatorWorks.id, ownerId: creatorWorks.userId })
-    .from(creatorWorks)
-    .where(eq(creatorWorks.id, id))
-    .limit(1);
-  if (!existing) return { deleted: false };
-  if (existing.ownerId !== userId && !isAdmin) throw new Error("작성자만 삭제할 수 있습니다.");
-  await db.delete(creatorWorks).where(eq(creatorWorks.id, id));
-  return { deleted: true };
+  return db.transaction(async (transaction) => {
+    const [existing] = await transaction
+      .select({ id: creatorWorks.id, ownerId: creatorWorks.userId })
+      .from(creatorWorks)
+      .where(eq(creatorWorks.id, id))
+      .limit(1)
+      .for("update");
+    if (!existing) return { deleted: false };
+    if (existing.ownerId !== userId && !isAdmin) {
+      throw new Error("작성자만 삭제할 수 있습니다.");
+    }
+
+    const [generatedReference] = await transaction
+      .select({ referenceId: creatorWorkAssetStorageReferences.referenceId })
+      .from(creatorWorkAssetStorageReferences)
+      .where(
+        and(
+          eq(creatorWorkAssetStorageReferences.workId, id),
+          or(
+            eq(creatorWorkAssetStorageReferences.purpose, "derived"),
+            eq(creatorWorkAssetStorageReferences.purpose, "export"),
+          ),
+        ),
+      )
+      .limit(1);
+    if (generatedReference) {
+      // The FK intentionally cascades source references, but generated objects require the remote
+      // last-reference state machine. Never let a racing admission bypass that cleanup boundary.
+      throw new Error("생성 에셋 정리가 완료된 뒤 작품을 삭제할 수 있습니다.");
+    }
+
+    const deleted = await transaction
+      .delete(creatorWorks)
+      .where(eq(creatorWorks.id, id))
+      .returning({ id: creatorWorks.id });
+    return { deleted: deleted.length === 1 };
+  });
 }
 
 async function assertPublicCreatorWork(workId: string): Promise<void> {

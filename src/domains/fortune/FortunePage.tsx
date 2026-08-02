@@ -34,6 +34,7 @@ import type { Title } from "@/lib/types";
 
 import { TitleCard } from "@/components/title-card";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
+import { withCsrfProtection } from "@/lib/csrf";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 
@@ -266,11 +267,11 @@ export function FortunePage() {
     setActiveTabResult(activeTab, null);
     retryRef.current = retry;
     try {
-      const response = await fetch(url, {
+      const response = await fetch(url, withCsrfProtection({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
+      }));
       if (!response.ok) {
         // 검증 실패(400) 등 — 서버 메시지를 그대로 보여준다
         let serverMsg = "";

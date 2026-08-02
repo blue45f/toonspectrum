@@ -32,6 +32,18 @@ const REPOSITORY_NOTICE_PATH = join(
   REPOSITORY_ROOT,
   "THIRD_PARTY_NOTICES.md",
 );
+const OCCT_BOUNDARY_DOCUMENT_PATH = join(
+  REPOSITORY_ROOT,
+  "docs",
+  "third-party",
+  "opencascade-lgpl.md",
+);
+const OCCT_PACKAGE_VERSION = "1.1.1";
+const OCCT_SOURCE_COMMIT = "33d9a6fa21ca4fa711da7066655aa2ba854545ee";
+const OCCT_NPM_INTEGRITY =
+  "sha512-lw6/vOl86+CkJ8d3V01mlbGAC0A49gc1HbwGcqGeKjk5SGRLiF15jyUuA8aYEvizcPNTu4Ta4A+Ut2DJgsa7AQ==";
+const OCCT_WASM_SHA256 =
+  "6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284";
 
 const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "0BSD",
@@ -68,11 +80,14 @@ const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
   harfbuzzjs: "1.4.0",
   "manifold-3d": "3.5.1",
   "onnxruntime-web": "1.27.0",
+  "opencascade.js": "1.1.1",
   "p5.brush": "2.2.1",
   paper: "0.12.18",
   "perfect-freehand": "1.2.3",
   rbush: "4.0.1",
+  rhino3dm: "8.32.1",
   "three-mesh-bvh": "0.9.13",
+  "web-ifc": "0.0.77",
   xatlasjs: "0.2.0",
 });
 
@@ -694,12 +709,76 @@ function validateRepositoryPolicy() {
     "pnpm run verify:studio-hokusai-wasm",
     "does not statically import the resolved `p5` peer",
     "Comlink runtime embedded by `xatlasjs`",
+    "opencascade.js@1.1.1",
+    OCCT_SOURCE_COMMIT,
+    OCCT_NPM_INTEGRITY,
+    OCCT_WASM_SHA256,
+    "docs/third-party/opencascade-lgpl.md",
     "pnpm run audit:licenses",
     "dist/legal/THIRD_PARTY_NOTICES.generated.md",
   ];
   for (const fragment of requiredFragments) {
     if (!notice.includes(fragment)) {
       throw new Error(`Repository notice is missing required text: ${fragment}`);
+    }
+  }
+}
+
+function validateOpenCascadeReleaseBoundary() {
+  const packageDirectory = join(REPOSITORY_ROOT, "node_modules", "opencascade.js");
+  const packageJsonPath = join(packageDirectory, "package.json");
+  const readmePath = join(packageDirectory, "README.md");
+  const wasmPath = join(packageDirectory, "dist", "opencascade.wasm.wasm");
+  for (const path of [
+    packageJsonPath,
+    readmePath,
+    wasmPath,
+    OCCT_BOUNDARY_DOCUMENT_PATH,
+  ]) {
+    if (!existsSync(path) || !statSync(path).isFile()) {
+      throw new Error(`OpenCascade release boundary input is missing: ${relative(REPOSITORY_ROOT, path)}`);
+    }
+  }
+
+  const metadata = readJson(packageJsonPath);
+  if (
+    metadata.name !== "opencascade.js"
+    || metadata.version !== OCCT_PACKAGE_VERSION
+    || metadata.license !== "LGPL-2.1-only"
+  ) {
+    throw new Error("The reviewed opencascade.js version/license boundary changed.");
+  }
+
+  const upstreamReadme = readFileSync(readmePath, "utf8");
+  if (!upstreamReadme.includes(OCCT_SOURCE_COMMIT)) {
+    throw new Error("The installed opencascade.js artifact no longer identifies the reviewed OCCT commit.");
+  }
+  const installedWasmDigest = sha256(readFileSync(wasmPath));
+  if (installedWasmDigest !== OCCT_WASM_SHA256) {
+    throw new Error(
+      `The reviewed OpenCascade WASM binary changed: expected ${OCCT_WASM_SHA256}, found ${installedWasmDigest}.`,
+    );
+  }
+
+  const lockfile = readFileSync(LOCKFILE_PATH, "utf8");
+  if (
+    !lockfile.includes(`opencascade.js@${OCCT_PACKAGE_VERSION}:`)
+    || !lockfile.includes(`integrity: ${OCCT_NPM_INTEGRITY}`)
+  ) {
+    throw new Error("The reviewed opencascade.js npm artifact integrity changed.");
+  }
+
+  const boundaryDocument = readFileSync(OCCT_BOUNDARY_DOCUMENT_PATH, "utf8");
+  for (const fragment of [
+    OCCT_SOURCE_COMMIT,
+    OCCT_NPM_INTEGRITY,
+    OCCT_WASM_SHA256,
+    "independently emitted",
+    "Legal review status",
+    "without source modifications",
+  ]) {
+    if (!boundaryDocument.includes(fragment)) {
+      throw new Error(`OpenCascade LGPL boundary is missing required evidence: ${fragment}`);
     }
   }
 }
@@ -807,6 +886,12 @@ explicitly; reviewed canonical/source notices are included below.
   <https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00>
 - Exact wasm-bindgen 0.2.123 source:
   <https://github.com/wasm-bindgen/wasm-bindgen/tree/0.2.123>
+- Exact OCCT source commit used by unmodified opencascade.js 1.1.1:
+  <https://git.dev.opencascade.org/gitweb/?p=occt.git;a=commit;h=${OCCT_SOURCE_COMMIT}>
+- opencascade.js 1.1.1 npm artifact integrity:
+  \`${OCCT_NPM_INTEGRITY}\`
+- Independently emitted OpenCascade WASM SHA-256:
+  \`${OCCT_WASM_SHA256}\`
 
 ## Resolved production inventory
 
@@ -874,6 +959,7 @@ export function main(argumentsList = process.argv.slice(2)) {
   verifyCheckedInHokusaiArtifacts();
   validateDirectDependencies(packageJson, inventory);
   validateRepositoryPolicy();
+  validateOpenCascadeReleaseBoundary();
   const { documents, missing } = collectLicenseDocuments(inventory);
   const generatedNotice = renderNotice(
     packageJson,

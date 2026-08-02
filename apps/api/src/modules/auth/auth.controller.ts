@@ -1,16 +1,14 @@
-import { createHash } from "node:crypto";
-
 import {
   BadRequestException,
   Body,
   Controller,
   ForbiddenException,
   Get,
+  Header,
   Headers,
   HttpException,
   HttpStatus,
   Inject,
-  Optional,
   Param,
   Post,
   Query,
@@ -65,10 +63,21 @@ import {
 
 import { AuthClientIpPolicy, resolveAuthClientIp } from "./auth-client-ip";
 import { isAllowedAuthRequestOrigin } from "./auth-origin";
-import { GoogleIdTokenDto } from "./auth.dto";
+import {
+  AUTH_RATE_LIMIT_POLICIES,
+  AUTH_RATE_LIMIT_WINDOW_MS,
+  createAuthRateLimitSubjectFingerprint,
+  LocalAuthRateLimiter,
+  type AuthRateLimitAction,
+} from "./auth-rate-limit";
+import {
+  AuthRateLimitDependencyError,
+  type AuthRateLimitConfig,
+} from "./auth-rate-limit.config";
+import { resolveAuthSessionUser } from "./auth-session-profile";
+import { GoogleIdTokenDto, type AuthSessionResponse } from "./auth.dto";
 import { AUTH_CLIENT_IP_POLICY, AUTH_RATE_LIMIT_CONFIG } from "./auth.tokens";
 
-import type { AuthRateLimitConfig } from "./auth-rate-limit.config";
 import type { Request, Response } from "express";
 
 interface AuthPayload {
@@ -80,30 +89,15 @@ interface AuthPayload {
 }
 
 type AuthRole = "admin" | "creator" | "operator" | "user";
-type AuthRateLimitAction =
-  | "oauth-google-idtoken"
-  | "oauth-demo"
-  | "signup"
-  | "login";
+type AuthResponseUser = ReturnType<typeof authResponseUser>;
+type AuthCompletionResponse = Readonly<{
+  ok: true;
+  user: AuthResponseUser;
+  demo?: true;
+}>;
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const AUTH_RATE_LIMIT_WINDOW_MS = 10 * 60_000;
-const AUTH_RATE_LIMIT_DISTRIBUTED_EXPIRY_GRACE_MS = 120_000;
-const AUTH_RATE_LIMIT_MAX_COST = 1_000_000;
-const UNKNOWN_AUTH_CLIENT_IP = "unknown";
-
-const AUTH_RATE_LIMIT_POLICIES: Record<
-  AuthRateLimitAction,
-  { readonly limit: number; readonly costUnits: number }
-> = {
-  "oauth-google-idtoken": { limit: 30, costUnits: 0 },
-  "oauth-demo": { limit: 20, costUnits: 0 },
-  signup: { limit: 5, costUnits: 0 },
-  login: { limit: 10, costUnits: 0 },
-};
-
-const AUTH_RATE_LIMIT_LOCAL_STORE: Record<string, number[]> = {};
-const AUTH_RATE_LIMIT_OPERATION_NONCE: { value: number } = { value: 0 };
+const AUTH_RATE_LIMIT_LOCAL_LIMITER = new LocalAuthRateLimiter();
 
 @Controller("auth")
 export class AuthController {
@@ -116,13 +110,15 @@ export class AuthController {
     rateLimitConfig: AuthRateLimitConfig,
     @Inject(AUTH_CLIENT_IP_POLICY)
     clientIpPolicy: AuthClientIpPolicy,
-    @Optional()
     @Inject(UPSTASH_COORDINATION_PORT)
-    coordination?: UpstashCoordinationPort | null,
+    coordination: UpstashCoordinationPort | null,
   ) {
+    if (rateLimitConfig.distributed && !coordination) {
+      throw new AuthRateLimitDependencyError();
+    }
     this.rateLimitDistributed = rateLimitConfig.distributed;
     this.clientIpPolicy = clientIpPolicy;
-    this.coordination = coordination ?? null;
+    this.coordination = coordination;
   }
 
   @Get("providers")
@@ -132,6 +128,31 @@ export class AuthController {
       kakao: config.authKakao,
       naver: config.authNaver,
     });
+  }
+
+  /**
+   * Browser session truth source. `sessionAuth` has already verified the
+   * HttpOnly cookie (or the temporary legacy header) and replaced x-user-id
+   * with the canonical user id before this controller runs.
+   */
+  @Get("session")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  @Header("Pragma", "no-cache")
+  async getSession(
+    @Headers("x-user-id") userId: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthSessionResponse> {
+    if (!userId) {
+      clearAuthSessionCookie(response);
+      return { authenticated: false, user: null };
+    }
+
+    const user = await resolveAuthSessionUser(userId);
+    if (!user) {
+      clearAuthSessionCookie(response);
+      return { authenticated: false, user: null };
+    }
+    return { authenticated: true, user };
   }
 
   // 실제 OAuth 시작 — 인가 URL로 리다이렉트(설정된 제공자만).
@@ -187,7 +208,7 @@ export class AuthController {
     @Headers("origin") origin: string | undefined,
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ): Promise<AuthCompletionResponse> {
     if (!isAllowedAuthRequestOrigin(origin)) {
       throw new ForbiddenException({
         error: "허용되지 않은 사이트에서 보낸 로그인 요청이에요.",
@@ -221,17 +242,16 @@ export class AuthController {
     applyAuthSessionCookie(response, token);
     return {
       ok: true,
-      user,
-      token,
+      user: authResponseUser(user),
     };
   }
 
-  // 핸드오프 토큰 → 사용자 객체(프론트가 세션 저장). 1회용.
+  // 핸드오프 토큰 → HttpOnly 쿠키 세션 + 공개 사용자 객체. 핸드오프는 1회용이다.
   @Post("oauth/exchange")
   oauthExchange(
     @Body() body: { token?: unknown },
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ): AuthCompletionResponse {
     const user = consumeHandoff(
       typeof body?.token === "string" ? body.token : undefined,
     );
@@ -244,8 +264,7 @@ export class AuthController {
     applyAuthSessionCookie(response, token);
     return {
       ok: true,
-      user,
-      token,
+      user: authResponseUser(user),
     };
   }
 
@@ -255,7 +274,7 @@ export class AuthController {
     @Param("provider") provider: string,
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ): Promise<AuthCompletionResponse> {
     if (!isOAuthProvider(provider))
       throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
     const mode = providerMode(provider);
@@ -276,9 +295,8 @@ export class AuthController {
     applyAuthSessionCookie(response, token);
     return {
       ok: true,
-      user,
+      user: authResponseUser(user),
       demo: true,
-      token,
     };
   }
 
@@ -334,7 +352,7 @@ export class AuthController {
     @Body() body: AuthPayload,
     @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
-  ) {
+  ): Promise<AuthCompletionResponse> {
     await this.enforceRateLimit("login", req);
     await ensureUserLifecycleSchema();
 
@@ -364,14 +382,7 @@ export class AuthController {
 
     return {
       ok: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        image: user.image,
-        role: normalizeRole(user.role),
-      },
-      token,
+      user: authResponseUser(user),
     };
   }
 
@@ -394,7 +405,17 @@ export class AuthController {
     const identity = `${action}:${sourceIp}`;
 
     if (!this.rateLimitDistributed) {
-      await enforceLocalRateLimit(identity, policy.limit, AUTH_RATE_LIMIT_WINDOW_MS);
+      const decision = AUTH_RATE_LIMIT_LOCAL_LIMITER.consume(
+        identity,
+        policy.limit,
+        AUTH_RATE_LIMIT_WINDOW_MS,
+      );
+      if (decision.status === "rate-limited") throw authRateLimitExceeded();
+      if (decision.status === "saturated") {
+        throw new ServiceUnavailableException({
+          error: "인증 요청 한도 검증 용량이 일시적으로 부족합니다.",
+        });
+      }
       return;
     }
 
@@ -405,12 +426,16 @@ export class AuthController {
     }
 
     try {
-      await enforceDistributedRateLimit(
-        this.coordination,
-        action,
-        sourceIp,
-        policy,
-      );
+      const decision = await this.coordination.consumeRateLimit({
+        scope: "auth",
+        subjectFingerprint: createAuthRateLimitSubjectFingerprint(
+          action,
+          sourceIp,
+        ),
+        maximumRequests: policy.limit,
+        windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+      });
+      if (!decision.accepted) throw authRateLimitExceeded();
     } catch (error: unknown) {
       if (error instanceof HttpException) throw error;
       throw new ServiceUnavailableException({
@@ -448,67 +473,25 @@ function normalizeRole(value: string | null | undefined): AuthRole {
   return "user";
 }
 
-function createAuthRateLimitProviderId(
-  action: AuthRateLimitAction,
-  sourceIp: string,
-  nowMs: number,
-): string {
-  const bucketId = Math.floor(nowMs / AUTH_RATE_LIMIT_WINDOW_MS);
-  const safeIp = sourceIp === UNKNOWN_AUTH_CLIENT_IP ? "unknown" : sourceIp;
-  const ipDigest = createHash("sha256")
-    .update(safeIp)
-    .digest("hex")
-    .slice(0, 8);
-  return `auth-${action}-${bucketId}-${ipDigest}`;
+export function authResponseUser(user: {
+  readonly id: string;
+  readonly name?: string | null;
+  readonly email?: string | null;
+  readonly image?: string | null;
+  readonly role?: string | null;
+}) {
+  return {
+    id: user.id,
+    name: user.name ?? null,
+    email: user.email ?? null,
+    image: user.image ?? null,
+    role: normalizeRole(user.role),
+  };
 }
 
-function nextAuthRateLimitOperationId(action: AuthRateLimitAction): string {
-  AUTH_RATE_LIMIT_OPERATION_NONCE.value += 1;
-  return `${action}-${Date.now().toString(36)}-${AUTH_RATE_LIMIT_OPERATION_NONCE.value.toString(36)}`;
-}
-
-async function enforceLocalRateLimit(
-  key: string,
-  limit: number,
-  windowMs: number,
-): Promise<void> {
-  const now = Date.now();
-  const recent = (AUTH_RATE_LIMIT_LOCAL_STORE[key] ?? []).filter(
-    (timestamp) => now - timestamp < windowMs,
+function authRateLimitExceeded(): HttpException {
+  return new HttpException(
+    { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
+    HttpStatus.TOO_MANY_REQUESTS,
   );
-  if (recent.length >= limit) {
-    AUTH_RATE_LIMIT_LOCAL_STORE[key] = recent;
-    throw new HttpException(
-      { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
-  }
-  recent.push(now);
-  AUTH_RATE_LIMIT_LOCAL_STORE[key] = recent;
-}
-
-async function enforceDistributedRateLimit(
-  coordination: UpstashCoordinationPort,
-  action: AuthRateLimitAction,
-  sourceIp: string,
-  policy: { readonly limit: number; readonly costUnits: number },
-): Promise<void> {
-  const nowMs = Date.now();
-  const providerId = createAuthRateLimitProviderId(action, sourceIp, nowMs);
-
-  const budget = await coordination.consumeProviderBudget({
-    providerId,
-    operationId: nextAuthRateLimitOperationId(action),
-    requestUnits: 1,
-    costUnits: policy.costUnits,
-    maximumRequestUnits: policy.limit,
-    maximumCostUnits: Math.max(policy.limit, AUTH_RATE_LIMIT_MAX_COST),
-    expiryGraceMs: AUTH_RATE_LIMIT_DISTRIBUTED_EXPIRY_GRACE_MS,
-  });
-  if (!budget.accepted) {
-    throw new HttpException(
-      { error: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요." },
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
-  }
 }

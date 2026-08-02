@@ -51,10 +51,10 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
     const [url, init] = fetch.mock.calls[0]!;
     expect(url).toBe("/api/studio-realtime/tickets");
     expect(String(url)).not.toContain(response.ticket);
-    expect(init?.headers).toEqual({
-      "Content-Type": "application/json",
-      "x-user-id": "signed-session-token",
-    });
+    const headers = new Headers(init?.headers);
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(headers.get("x-user-id")).toBe("signed-session-token");
+    expect(headers.get("x-toonspectrum-csrf")).toBe("1");
     expect(JSON.stringify(init)).not.toContain(response.ticket);
   });
 

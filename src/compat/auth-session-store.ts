@@ -1,6 +1,13 @@
 import { createContext, useContext } from "react";
 
-import { getAuthToken, persistSession, type Session } from "./auth-session-state";
+import {
+  getAuthSession,
+  getAuthSessionRevision,
+  persistSession,
+  type Session,
+  type SessionSyncReason,
+} from "./auth-session-state";
+import { normalizeClientSession } from "./auth-session-storage";
 
 import { api, apiPath } from "@/src/infrastructure/api";
 
@@ -11,6 +18,7 @@ export {
   getAuthToken,
   getAuthUserId,
   listeners,
+  mergeCurrentSessionProfile,
   persistSession,
   readStoredSession,
 } from "./auth-session-state";
@@ -20,12 +28,12 @@ export type SessionContextValue =
   | {
       data: NonNullable<Session>;
       status: "authenticated";
-      update: () => Promise<NonNullable<Session>>;
+      update: () => Promise<Session>;
     }
   | {
       data: null;
       status: "unauthenticated";
-      update: () => Promise<null>;
+      update: () => Promise<Session>;
     };
 
 export const SessionContext = createContext<SessionContextValue>({
@@ -36,6 +44,97 @@ export const SessionContext = createContext<SessionContextValue>({
 
 export function useSession(): SessionContextValue {
   return useContext(SessionContext);
+}
+
+type ServerSessionPayload =
+  | {
+      authenticated: true;
+      user: NonNullable<Session>["user"];
+    }
+  | {
+      authenticated: false;
+      user: null;
+    };
+
+let serverSessionRequest: Promise<Session> | null = null;
+const SERVER_SESSION_ROLES = new Set(["admin", "creator", "operator", "user"]);
+
+function isNullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function parseServerSessionPayload(value: unknown): ServerSessionPayload | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const payload = value as { authenticated?: unknown; user?: unknown };
+  if (payload.authenticated === false && payload.user === null) {
+    return { authenticated: false, user: null };
+  }
+  if (payload.authenticated !== true) return null;
+  if (typeof payload.user !== "object" || payload.user === null || Array.isArray(payload.user)) {
+    return null;
+  }
+  const user = payload.user as Record<string, unknown>;
+  if (
+    !isNullableString(user.name)
+    || !isNullableString(user.email)
+    || !isNullableString(user.image)
+    || typeof user.role !== "string"
+    || !SERVER_SESSION_ROLES.has(user.role)
+  ) {
+    return null;
+  }
+  const session = normalizeClientSession({ user: payload.user, token: null });
+  return session
+    ? { authenticated: true, user: session.user }
+    : null;
+}
+
+/**
+ * Reconciles the browser cache with the HttpOnly-cookie session. Transport or
+ * malformed-response failures retain the last known state; only an explicit
+ * logged-out response (or 401) clears it.
+ */
+export function synchronizeServerSession(
+  _reason: SessionSyncReason = "manual",
+): Promise<Session> {
+  if (serverSessionRequest) return serverSessionRequest;
+  const requestRevision = getAuthSessionRevision();
+  const requestIsCurrent = () => getAuthSessionRevision() === requestRevision;
+  serverSessionRequest = (async () => {
+    let response: Response;
+    try {
+      response = await api.raw(apiPath("/auth/session"), {
+        method: "GET",
+        cache: "no-store",
+        throwHttpErrors: false,
+      });
+    } catch {
+      return getAuthSession();
+    }
+
+    if (!requestIsCurrent()) return getAuthSession();
+    if (!response.ok) {
+      if (response.status === 401) persistSession(null);
+      return getAuthSession();
+    }
+
+    const payload = parseServerSessionPayload(
+      await response.json().catch(() => null),
+    );
+    if (!requestIsCurrent()) return getAuthSession();
+    if (!payload) return getAuthSession();
+    if (!payload.authenticated) {
+      persistSession(null);
+      return null;
+    }
+
+    const next = { user: payload.user, token: null };
+    persistSession(next);
+    return getAuthSession();
+  })().finally(() => {
+    serverSessionRequest = null;
+  });
+  return serverSessionRequest;
 }
 
 // GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을
@@ -67,7 +166,7 @@ export async function signInWithGoogleIdToken(
       signal: options?.signal,
     });
     const payload = (await response.json().catch(() => null)) as
-      | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
+      | { user?: NonNullable<Session>["user"]; error?: string }
       | null;
     if (!response.ok || !payload?.user) {
       return {
@@ -76,7 +175,7 @@ export async function signInWithGoogleIdToken(
         status: response.status,
       };
     }
-    persistSession({ user: payload.user, token: payload.token ?? null });
+    persistSession({ user: payload.user, token: null });
     return { ok: true, error: null, status: response.status };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -116,7 +215,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
     json: { email: options?.email, password: options?.password },
   });
   const payload = (await response.json().catch(() => null)) as
-    | { user?: NonNullable<Session>["user"]; token?: string; error?: string }
+    | { user?: NonNullable<Session>["user"]; error?: string }
     | null;
 
   if (!response.ok || !payload?.user) {
@@ -128,7 +227,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
     };
   }
 
-  persistSession({ user: payload.user, token: payload.token ?? null });
+  persistSession({ user: payload.user, token: null });
   return {
     ok: true,
     error: null,
@@ -138,22 +237,20 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 }
 
 export async function signOut() {
-  const token = getAuthToken();
-  if (token) {
-    await api
-      .raw(apiPath("/auth/logout"), {
-        method: "POST",
-        cache: "no-store",
-        throwHttpErrors: false,
-        headers: { "x-user-id": token },
-      })
-      .catch(() => {});
-  }
+  await api
+    .raw(apiPath("/auth/logout"), {
+      method: "POST",
+      cache: "no-store",
+      throwHttpErrors: false,
+    })
+    .catch(() => {});
   persistSession(null);
   return undefined;
 }
 
 // OAuth 콜백 페이지가 핸드오프/데모로 받은 사용자 객체로 세션을 확정할 때 사용.
-export function completeOAuthLogin(user: NonNullable<Session>["user"] | null, token?: string | null) {
-  persistSession(user?.id ? { user, token: token ?? null } : null);
+export function completeOAuthLogin(
+  user: NonNullable<Session>["user"] | null,
+) {
+  persistSession(user?.id ? { user, token: null } : null);
 }

@@ -1,10 +1,15 @@
 // 공유 HTTP 클라이언트 — ky 인스턴스 1개로 통일한다(이전엔 각 모듈이 fetch를 직접 호출).
-// 인증은 기존 세션 스킴을 그대로 재사용한다: 서명 세션 토큰(getAuthToken)을 x-user-id 헤더로 전송.
-// (offhours 의 Bearer 토큰 beforeRequest 훅과 같은 형태를, 이 레포의 x-user-id 스킴에 맞춰 옮긴 것)
+// 인증 진실원천은 same-origin HttpOnly 쿠키다. 브라우저 저장소의 bearer를 읽거나
+// x-user-id로 자동 전송하지 않는다.
 import ky, { HTTPError, type KyResponse, type Options } from "ky";
 
+import {
+  TOONSPECTRUM_CSRF_HEADER,
+  TOONSPECTRUM_CSRF_HEADER_VALUE,
+  isCsrfProtectedMethod,
+} from "@/lib/csrf";
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { getAuthToken } from "@/src/compat/auth-session-state";
+import { handleUnauthorizedSession } from "@/src/compat/auth-session-state";
 import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
 function apiBase() {
@@ -27,13 +32,24 @@ function resolveBaseUrl(): string {
   return "http://localhost";
 }
 
+function isCredentialAttemptPath(pathname: string): boolean {
+  return (
+    pathname.endsWith("/api/auth/login")
+    || pathname.endsWith("/api/auth/oauth/google/id-token")
+    || pathname.endsWith("/api/auth/oauth/exchange")
+    || /\/api\/auth\/oauth\/[^/]+\/demo$/u.test(pathname)
+  );
+}
+
 // 공유 ky 클라이언트. URL 은 호출부에서 apiPath() 로 만들고, 인증 헤더만 beforeRequest 훅에서 일괄 주입한다.
 const client = ky.create({
   baseUrl: resolveBaseUrl(),
   // 기존 fetch 호출은 모두 cache:"no-store" 였다 — 동작 보존을 위해 기본값으로 둔다(호출부에서 덮어쓰기 가능).
   cache: "no-store",
-  // 동일 출처 API 프록시라 쿠키는 불필요하지만 일관성/하위호환을 위해 명시한다.
-  credentials: "same-origin",
+  // HttpOnly auth cookie is the browser session credential. The API base is
+  // fixed by deployment configuration, and credentialed cross-origin access
+  // is still constrained by the server's exact CORS/CSRF Origin allowlist.
+  credentials: "include",
   // 타임아웃은 끈다 — 기존 fetch 는 무제한이었고, 수동 크롤(/catalog/ingest/run)은 수 분 걸릴 수 있어 동작을 보존한다.
   timeout: false,
   // 자동 재시도는 끈다 — 기존 fetch 호출은 재시도가 없었고, 크롤/수집 같은 멱등성 비보장 요청이 있어 동작을 보존한다.
@@ -41,10 +57,21 @@ const client = ky.create({
   hooks: {
     beforeRequest: [
       ({ request }) => {
-        // 서명 세션 토큰이 있으면 x-user-id 로 전송(서버 검증). 호출부가 직접 지정했으면 덮어쓰지 않는다.
-        if (!request.headers.has("x-user-id")) {
-          const token = getAuthToken();
-          if (token) request.headers.set("x-user-id", token);
+        if (isCsrfProtectedMethod(request.method)) {
+          request.headers.set(
+            TOONSPECTRUM_CSRF_HEADER,
+            TOONSPECTRUM_CSRF_HEADER_VALUE,
+          );
+        }
+      },
+    ],
+    afterResponse: [
+      ({ request, response }) => {
+        if (
+          response.status === 401
+          && !isCredentialAttemptPath(new URL(request.url).pathname)
+        ) {
+          handleUnauthorizedSession();
         }
       },
     ],

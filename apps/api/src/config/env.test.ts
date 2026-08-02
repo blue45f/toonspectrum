@@ -136,6 +136,21 @@ describe("authentication boundary environment validation", () => {
     ).toBeNull();
     expect(logger.warn).toHaveBeenCalledOnce();
   });
+
+  it("rejects forwarded-hop limits outside the runtime trust boundary", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(
+      validateEnv(
+        {
+          NODE_ENV: "test",
+          AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "33",
+        },
+        logger,
+      ),
+    ).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+  });
 });
 
 describe("Studio AI quota environment validation", () => {

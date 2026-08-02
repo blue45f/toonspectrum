@@ -73,14 +73,14 @@ export function CafesPage() {
   }, [genre, queryText, refreshTick, sort]);
 
   async function createCafe() {
-    if (!sessionToken || creating) return;
+    if (!userId || creating) return;
     setCreating(true);
     setCreateError(null);
     try {
       const created = await api.post<CommunityCafe>(
         "/community/cafes",
         { name, description, genre: composeGenre },
-        { headers: { "x-user-id": sessionToken } }
+        { headers: sessionToken ? { "x-user-id": sessionToken } : undefined }
       );
       if (!created?.slug) {
         setCreateError("카페 생성 응답이 유효하지 않습니다.");

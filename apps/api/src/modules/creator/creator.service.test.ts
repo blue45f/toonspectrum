@@ -31,6 +31,8 @@ import {
 } from "./creator-draft-collaboration.repository";
 import { CreatorService } from "./creator.service";
 
+import type { StudioWorkAssetService } from "./studio-work-asset.service";
+
 const INVITATION_ID = "5f6f6d5c-58f1-4e2c-a228-4b670f470e2b";
 const DRAFT_ID = "draft_11111111-1111-4111-8111-111111111111";
 const ROOM_ID = "draft-room_22222222-2222-4222-8222-222222222222";
@@ -46,6 +48,7 @@ const {
   updateWork,
   bumpViews,
   bumpAssetDownloads,
+  deleteWork,
   generateImageAsset,
   getSharedAssetContent,
   listSharedAssets,
@@ -58,6 +61,7 @@ const {
   updateWork: vi.fn(),
   bumpViews: vi.fn(),
   bumpAssetDownloads: vi.fn(),
+  deleteWork: vi.fn(),
   generateImageAsset: vi.fn(),
   getSharedAssetContent: vi.fn(),
   listSharedAssets: vi.fn(),
@@ -71,7 +75,7 @@ vi.mock("../../../../../lib/server/creator", () => ({
   createWork: vi.fn(),
   deleteSeries: vi.fn(),
   deleteSharedAsset: vi.fn(),
-  deleteWork: vi.fn(),
+  deleteWork,
   generateImageAsset,
   getSharedAssetContent,
   getChallenge: vi.fn(),
@@ -116,10 +120,15 @@ const draftCollaborationRepository = {
   promote: vi.fn(),
 };
 
+const studioWorkAssetService = {
+  deleteGeneratedObjectsForWork: vi.fn(),
+};
+
 function createService(): CreatorService {
   return new CreatorService(
     collaborationRepository as unknown as CreatorCollaborationRepository,
-    draftCollaborationRepository as unknown as CreatorDraftCollaborationRepository
+    draftCollaborationRepository as unknown as CreatorDraftCollaborationRepository,
+    studioWorkAssetService as unknown as StudioWorkAssetService,
   );
 }
 
@@ -150,6 +159,10 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.respondToInvitation.mockReset();
     draftCollaborationRepository.provision.mockReset();
     draftCollaborationRepository.promote.mockReset();
+    studioWorkAssetService.deleteGeneratedObjectsForWork
+      .mockReset()
+      .mockResolvedValue(0);
+    deleteWork.mockReset();
     delete process.env.CREATOR_IMAGE_AI_ENABLED;
   });
 
@@ -161,6 +174,35 @@ describe("CreatorService safety gates", () => {
     getWork.mockResolvedValue({ id: "work-owner", isOwner: true });
     await expect(createService().getWork("work-owner", "owner")).resolves.toMatchObject({ id: "work-owner" });
     expect(bumpViews).not.toHaveBeenCalled();
+  });
+
+  it("작품 삭제 전에 생성 오브젝트 참조를 모두 정리한다", async () => {
+    deleteWork.mockResolvedValueOnce({ deleted: true });
+
+    await expect(
+      createService().deleteWork("owner", "work-delete", false)
+    ).resolves.toEqual({ deleted: true });
+
+    expect(studioWorkAssetService.deleteGeneratedObjectsForWork)
+      .toHaveBeenCalledWith("owner", "work-delete", false);
+    expect(deleteWork).toHaveBeenCalledWith("owner", "work-delete", false);
+    expect(
+      studioWorkAssetService.deleteGeneratedObjectsForWork.mock.invocationCallOrder[0]
+    ).toBeLessThan(deleteWork.mock.invocationCallOrder[0]!);
+  });
+
+  it("작품 생성물 정리의 일시적 저장소 장애 상태를 보존한다", async () => {
+    const unavailable = new ServiceUnavailableException(
+      "비공개 오브젝트 저장소 요청을 완료할 수 없습니다.",
+    );
+    studioWorkAssetService.deleteGeneratedObjectsForWork.mockRejectedValueOnce(
+      unavailable,
+    );
+
+    await expect(
+      createService().deleteWork("owner", "work-delete", false),
+    ).rejects.toBe(unavailable);
+    expect(deleteWork).not.toHaveBeenCalled();
   });
 
   it("에셋 인기 집계는 인증 사용자·에셋 조합당 하루 한 번만 반영한다", async () => {

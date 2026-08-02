@@ -17,6 +17,7 @@ import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { createApiRuntimeRoleGuard } from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
+import { createCsrfProtectionMiddleware } from "./csrf-middleware";
 import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import {
   createStudioLivePostgresIoAdapter,
@@ -39,6 +40,8 @@ async function bootstrap() {
   app.use(createApiSecurityHeadersMiddleware(process.env));
   configureCors(app); // 구성된 웹 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   app.use(createApiRuntimeRoleGuard(process.env));
+  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
+  app.use(createCsrfProtectionMiddleware(process.env));
   app.use(
     json({
       limit: "16mb",
@@ -86,7 +89,6 @@ async function bootstrap() {
     }
     next();
   });
-  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api", {
     exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
   });

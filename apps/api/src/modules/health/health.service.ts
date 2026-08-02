@@ -1,5 +1,6 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 
+import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
 import {
   SUPABASE_OBJECT_STORAGE_PORT,
   type SupabaseObjectStoragePort,
@@ -10,6 +11,7 @@ import {
   type UpstashCoordinationPort,
 } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { resolveStudioLiveClusterAdapterConfig } from "../../realtime/studio-postgres-io.adapter";
+import { resolveAuthRateLimitConfig } from "../auth/auth-rate-limit.config";
 
 import {
   HEALTH_READINESS_REPOSITORY,
@@ -25,6 +27,7 @@ export const HEALTH_ENVIRONMENT = Symbol("HEALTH_ENVIRONMENT");
 export type HealthEnvironment = Partial<
   Record<
     | "NODE_ENV"
+    | "AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED"
     | "BACKEND_DISTRIBUTION_ENABLED"
     | "STUDIO_LIVE_CLUSTER_ADAPTER"
     | "STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED"
@@ -50,6 +53,7 @@ export interface HealthReadinessReport {
   readonly realtime: boolean;
   readonly objectStorage: boolean;
   readonly coordination: boolean;
+  readonly durableQueueExecutor: boolean;
 }
 
 @Injectable()
@@ -67,6 +71,9 @@ export class HealthService {
     @Optional()
     @Inject(UPSTASH_COORDINATION_PORT)
     private readonly coordination?: UpstashCoordinationPort,
+    @Optional()
+    @Inject(BackendCapabilityGatewayExecutor)
+    private readonly backendCapabilityExecutor?: BackendCapabilityGatewayExecutor,
   ) {}
 
   async checkReadiness(): Promise<HealthReadinessReport> {
@@ -79,18 +86,22 @@ export class HealthService {
     const realtime = this.isRealtimeReady();
     const objectStorage = await this.isObjectStorageReady();
     const coordination = await this.isCoordinationReady();
+    const durableQueueExecutor =
+      await this.isDurableQueueExecutorReady();
     return {
       ready:
         database &&
         schema &&
         realtime &&
         objectStorage &&
-        coordination,
+        coordination &&
+        durableQueueExecutor,
       database,
       schema,
       realtime,
       objectStorage,
       coordination,
+      durableQueueExecutor,
     };
   }
 
@@ -131,13 +142,19 @@ export class HealthService {
   }
 
   private async isCoordinationReady(): Promise<boolean> {
-    if (this.environment.BACKEND_DISTRIBUTION_ENABLED !== "true") {
-      return true;
-    }
     try {
+      const backendDistributionRequired =
+        this.environment.BACKEND_DISTRIBUTION_ENABLED === "true";
+      const authDistributionRequired = resolveAuthRateLimitConfig(
+        this.environment,
+      ).distributed;
+      if (!backendDistributionRequired && !authDistributionRequired) {
+        return true;
+      }
+
       // The module graph is built from this same canonical parser, but configuration validity is
-      // not reachability. A distributed deployment advertises readiness only after a bounded,
-      // authenticated Redis PING succeeds through the same port used for leases and receipts.
+      // not reachability. Any distributed backend or auth limiter advertises readiness only after
+      // a bounded, authenticated Redis PING succeeds through the shared coordination boundary.
       if (resolveUpstashCoordinationConfig(this.environment) === null) {
         return false;
       }
@@ -147,5 +164,16 @@ export class HealthService {
     } catch {
       return false;
     }
+  }
+
+  private async isDurableQueueExecutorReady(): Promise<boolean> {
+    const executor = this.backendCapabilityExecutor;
+    // The authoritative API may omit a queue adapter only while no durable-queue
+    // provider role is enabled. Enabling that role without wiring its port is a
+    // deployment error and must fail readiness rather than fail at first dispatch.
+    if (!executor) return true;
+    if (!executor.isDurableQueueExecutorRequired()) return true;
+    if (!executor.hasDurableQueueExecutor()) return false;
+    return this.safeCheck(() => executor.isDurableQueueReady());
   }
 }

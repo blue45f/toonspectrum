@@ -21,3 +21,4 @@ lib/db/migrations/0020_creator_draft_collaboration_room.sql
 lib/db/migrations/0021_creator_marketplace_resource.sql
 lib/db/migrations/0022_creator_marketplace_distributed_gate_search.sql
 lib/db/migrations/0023_production_migration_ledger.sql
+lib/db/migrations/0024_creator_asset_object_storage.sql

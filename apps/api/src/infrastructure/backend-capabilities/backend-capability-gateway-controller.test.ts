@@ -15,6 +15,7 @@ import {
 } from "vitest";
 
 
+import { BACKEND_CAPABILITY_DURABLE_QUEUE_PORT } from "./backend-capability-durable-queue.port";
 import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH, BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER, BACKEND_CAPABILITY_IDEMPOTENCY_HEADER, BackendCapabilityGatewayEnvelopeSchema } from "./backend-capability-gateway-contract";
 import { BackendCapabilityGatewayController } from "./backend-capability-gateway-controller";
 import { BackendCapabilityGatewayExecutor } from "./backend-capability-gateway-executor";
@@ -48,10 +49,26 @@ process.env.DEEPSEEK_API_KEY = policyEnv.DEEPSEEK_API_KEY;
 
 const cloudflareToken = policyEnv.BACKEND_CLOUDFLARE_AUTH_TOKEN;
 
+const durableQueuePort = {
+  verifyReadiness: vi.fn(async () => ({
+    ready: true as const,
+    providerIds: ["cloudflare"] as const,
+    workloads: ["cleanup", "notification"] as const,
+  })),
+  submit: vi.fn(async (command: { workload: "cleanup" | "notification" }) => ({
+    outcome: "accepted" as const,
+    jobId: `${command.workload}-job-001`,
+  })),
+};
+
 @Module({
   controllers: [BackendCapabilityGatewayController],
   providers: [
     { provide: BACKEND_CAPABILITY_POLICY, useValue: policy },
+    {
+      provide: BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
+      useValue: durableQueuePort,
+    },
     BackendCapabilityGatewayExecutor,
   ],
 })
@@ -143,6 +160,49 @@ function gatewayEnvelopeWithPayload(
   return parsed.data;
 }
 
+function durableQueueEnvelope(
+  workload: "cleanup" | "notification",
+  idempotencyKey: string,
+  payloadOverride: Record<string, unknown> = {}
+) {
+  return BackendCapabilityGatewayEnvelopeSchema.parse({
+    version: "toonspectrum.backend-capability.v1",
+    provider: "cloudflare",
+    tenantId: "tenant-001",
+    capability: "async-job",
+    workload,
+    idempotencyKey,
+    idempotent: true,
+    createdAt: "2026-07-31T00:00:00.000Z",
+    nonce: "00000000-0000-4000-8000-000000000001",
+    requirements: {
+      fidelity: "exact",
+      allowDegraded: false,
+      latency: "tolerant",
+    },
+    execution: {
+      estimatedCostUnits: 1,
+      estimatedDurationMs: 5_000,
+      durability: "durable",
+    },
+    payload: {
+      operation:
+        workload === "cleanup"
+          ? "cleanup.dispatch"
+          : "notification.dispatch",
+      requestKey: idempotencyKey,
+      task: {
+        name:
+          workload === "cleanup"
+            ? "assets.expire-orphans"
+            : "creator.publish-complete",
+        body: { workId: "work-001" },
+      },
+      ...payloadOverride,
+    },
+  });
+}
+
 describe("BackendCapabilityGatewayController", () => {
   let app: INestApplication;
   let baseUrl: string;
@@ -196,6 +256,17 @@ describe("BackendCapabilityGatewayController", () => {
       )
     );
     vi.stubGlobal("fetch", fetchMock);
+    durableQueuePort.verifyReadiness.mockReset();
+    durableQueuePort.verifyReadiness.mockResolvedValue({
+      ready: true,
+      providerIds: ["cloudflare"],
+      workloads: ["cleanup", "notification"],
+    });
+    durableQueuePort.submit.mockReset();
+    durableQueuePort.submit.mockImplementation(async (command) => ({
+      outcome: "accepted",
+      jobId: `${command.workload}-job-001`,
+    }));
   });
 
   afterEach(() => {
@@ -423,5 +494,80 @@ describe("BackendCapabilityGatewayController", () => {
       },
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["cleanup", "notification"] as const)(
+    "executes %s through the declared durable queue port and returns the exact acknowledgement",
+    async (workload) => {
+      const idempotencyKey = `${workload}-gateway-request-0001`;
+      const envelope = durableQueueEnvelope(workload, idempotencyKey);
+      const result = await requestFetch(
+        `${baseUrl}${BACKEND_CAPABILITY_GATEWAY_PATH}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE,
+            [BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER]: cloudflareToken,
+            [BACKEND_CAPABILITY_IDEMPOTENCY_HEADER]: idempotencyKey,
+          },
+          body: JSON.stringify(envelope),
+        }
+      );
+
+      expect(result.status).toBe(200);
+      await expect(result.json()).resolves.toMatchObject({
+        version: "toonspectrum.backend-capability.v1",
+        provider: "cloudflare",
+        idempotencyKey,
+        outcome: "accepted",
+        retryable: false,
+        fidelity: "exact",
+        result: {
+          requestType: workload,
+          status: "accepted",
+          jobId: `${workload}-job-001`,
+        },
+        errorCode: null,
+      });
+      expect(durableQueuePort.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerId: "cloudflare",
+          tenantId: "tenant-001",
+          workload,
+          idempotencyKey,
+        }),
+        { signal: expect.any(AbortSignal) }
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it("fails a durable queue gateway request closed when readiness is unavailable", async () => {
+    durableQueuePort.verifyReadiness.mockResolvedValueOnce({
+      ready: false,
+      reason: "unreachable",
+    } as never);
+    const idempotencyKey = "cleanup-gateway-unready-0001";
+    const envelope = durableQueueEnvelope("cleanup", idempotencyKey);
+    const result = await requestFetch(
+      `${baseUrl}${BACKEND_CAPABILITY_GATEWAY_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE,
+          [BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER]: cloudflareToken,
+          [BACKEND_CAPABILITY_IDEMPOTENCY_HEADER]: idempotencyKey,
+        },
+        body: JSON.stringify(envelope),
+      }
+    );
+
+    expect(result.status).toBe(200);
+    await expect(result.json()).resolves.toMatchObject({
+      outcome: "rejected",
+      retryable: true,
+      errorCode: "DURABLE_QUEUE_EXECUTOR_NOT_READY",
+    });
+    expect(durableQueuePort.submit).not.toHaveBeenCalled();
   });
 });

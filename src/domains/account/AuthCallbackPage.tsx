@@ -10,7 +10,7 @@ import { api, apiPath } from "@/src/infrastructure/api";
 
 type Phase = "working" | "done" | "error";
 
-type OAuthResult = { user?: { id?: string } | null; token?: string | null; error?: string } | null;
+type OAuthResult = { user?: { id?: string } | null; error?: string } | null;
 
 const ERROR_LABEL_KEYS: Record<string, string> = {
   bad_state: "auth.callback.error.badState",
@@ -40,7 +40,6 @@ export function AuthCallbackPage() {
 
     const finish = (
       user: { id?: string } | null | undefined,
-      token: string | null | undefined,
       isDemo: boolean
     ) => {
       if (!user?.id) {
@@ -48,7 +47,7 @@ export function AuthCallbackPage() {
         setMessageKey("auth.callback.error.noUser");
         return;
       }
-      completeOAuthLogin(user as never, token ?? null);
+      completeOAuthLogin(user as never);
       setDemo(isDemo);
       setPhase("done");
       setMessageKey(isDemo ? "auth.callback.message.doneDemo" : "auth.callback.message.done");
@@ -70,7 +69,7 @@ export function AuthCallbackPage() {
           });
           const data = await res.json<OAuthResult>().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "exchange-failed");
-          finish(data.user, data.token, false);
+          finish(data.user, false);
           return;
         }
         if (params.demo && (params.demo === "google" || params.demo === "kakao" || params.demo === "naver")) {
@@ -80,7 +79,7 @@ export function AuthCallbackPage() {
           });
           const data = await res.json<OAuthResult>().catch(() => null);
           if (!res.ok || !data?.user) throw new Error(data?.error ?? "demo-failed");
-          finish(data.user, data.token, true);
+          finish(data.user, true);
           return;
         }
         setPhase("error");

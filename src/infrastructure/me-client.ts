@@ -1,6 +1,6 @@
 // 내 정보(/api/me) 프로필 갱신 전용 ky 헬퍼.
-// 인증은 기존 세션 스킴(localStorage → x-user-id 헤더)을 재사용한다(creator-client 와 동일).
-// 공유 ky 클라이언트(api)의 beforeRequest 훅이 x-user-id 를 자동 주입한다.
+// 공유 클라이언트가 HttpOnly 세션 쿠키와 CSRF 헤더를 처리한다.
+import { mergeCurrentSessionProfile } from "@/src/compat/auth-session-state";
 import { api, toApiError } from "@/src/infrastructure/api";
 
 export interface MeProfile {
@@ -27,6 +27,7 @@ export async function updateMyProfile(payload: UpdateProfilePayload): Promise<Me
     throw await toApiError(err, "프로필을 저장하지 못했어요.");
   }
   if (!data?.profile) throw new Error("프로필을 저장하지 못했어요.");
+  mergeCurrentSessionProfile(data.profile);
   return data.profile;
 }
 

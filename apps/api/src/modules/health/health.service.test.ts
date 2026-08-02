@@ -2,19 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HealthService } from "./health.service";
 
+import type { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
 import type { SupabaseObjectStoragePort } from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
 import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 
 const DIRECT_POSTGRES_URL =
   "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=require";
-const VALID_DISTRIBUTED_COORDINATION_ENVIRONMENT = {
-  BACKEND_DISTRIBUTION_ENABLED: "true",
+const VALID_COORDINATION_ENVIRONMENT = {
   UPSTASH_COORDINATION_ENABLED: "true",
   UPSTASH_COORDINATION_REST_URL: "https://upstash.example",
   UPSTASH_COORDINATION_REST_TOKEN:
     "upstash-rest-token-at-least-sixteen-characters",
   UPSTASH_COORDINATION_KEY_HASH_SECRET:
     "coordination-key-hash-secret-at-least-thirty-two-characters",
+} as const;
+const VALID_DISTRIBUTED_COORDINATION_ENVIRONMENT = {
+  ...VALID_COORDINATION_ENVIRONMENT,
+  BACKEND_DISTRIBUTION_ENABLED: "true",
 } as const;
 
 function dependencies(
@@ -24,6 +28,8 @@ function dependencies(
     realtime?: boolean;
     objectStorage?: boolean;
     coordination?: boolean;
+    durableQueueExecutor?: boolean;
+    durableQueueRequired?: boolean;
     environment?: Record<string, string | undefined>;
   } = {},
 ) {
@@ -52,14 +58,34 @@ function dependencies(
       return true;
     }),
   } as unknown as UpstashCoordinationPort;
+  const backendCapabilityExecutor = {
+    isDurableQueueExecutorRequired: vi.fn(
+      () => overrides.durableQueueRequired
+        ?? overrides.durableQueueExecutor !== undefined,
+    ),
+    hasDurableQueueExecutor: vi.fn(
+      () => overrides.durableQueueExecutor !== undefined,
+    ),
+    isDurableQueueReady: vi.fn(
+      async () => overrides.durableQueueExecutor ?? true,
+    ),
+  } as unknown as BackendCapabilityGatewayExecutor;
   const service = new HealthService(
     repository,
     runtime,
     overrides.environment ?? {},
     objectStorage,
     coordination,
+    backendCapabilityExecutor,
   );
-  return { coordination, objectStorage, repository, runtime, service };
+  return {
+    backendCapabilityExecutor,
+    coordination,
+    objectStorage,
+    repository,
+    runtime,
+    service,
+  };
 }
 
 describe("HealthService", () => {
@@ -73,6 +99,7 @@ describe("HealthService", () => {
       realtime: true,
       objectStorage: true,
       coordination: true,
+      durableQueueExecutor: true,
     });
     expect(runtime.isStudioLivePostgresNamespaceReady).not.toHaveBeenCalled();
   });
@@ -94,6 +121,7 @@ describe("HealthService", () => {
       realtime: false,
       objectStorage: true,
       coordination: true,
+      durableQueueExecutor: true,
     });
     expect(runtime.isStudioLivePostgresNamespaceReady).toHaveBeenCalledOnce();
   });
@@ -113,6 +141,7 @@ describe("HealthService", () => {
       realtime: true,
       objectStorage: false,
       coordination: true,
+      durableQueueExecutor: true,
     });
     expect(
       unavailable.objectStorage.verifyPrivatePurposeBuckets,
@@ -130,6 +159,7 @@ describe("HealthService", () => {
       realtime: true,
       objectStorage: true,
       coordination: true,
+      durableQueueExecutor: true,
     });
   });
 
@@ -140,6 +170,53 @@ describe("HealthService", () => {
 
     expect(
       objectStorage.verifyPrivatePurposeBuckets,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("requires both durable queue workloads once a provider facade registers an executor", async () => {
+    const unavailable = dependencies({ durableQueueExecutor: false });
+
+    await expect(unavailable.service.checkReadiness()).resolves.toMatchObject({
+      ready: false,
+      durableQueueExecutor: false,
+    });
+    expect(
+      unavailable.backendCapabilityExecutor.isDurableQueueReady,
+    ).toHaveBeenCalledOnce();
+
+    const available = dependencies({ durableQueueExecutor: true });
+    await expect(available.service.checkReadiness()).resolves.toMatchObject({
+      ready: true,
+      durableQueueExecutor: true,
+    });
+  });
+
+  it("does not make the authoritative API depend on an unregistered queue facade", async () => {
+    const { backendCapabilityExecutor, service } = dependencies();
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: true,
+      durableQueueExecutor: true,
+    });
+    expect(
+      backendCapabilityExecutor.isDurableQueueReady,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("fails readiness when queue policy is enabled without a registered adapter", async () => {
+    const { backendCapabilityExecutor, service } = dependencies({
+      durableQueueRequired: true,
+    });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: false,
+      durableQueueExecutor: false,
+    });
+    expect(
+      backendCapabilityExecutor.hasDurableQueueExecutor,
+    ).toHaveBeenCalledOnce();
+    expect(
+      backendCapabilityExecutor.isDurableQueueReady,
     ).not.toHaveBeenCalled();
   });
 
@@ -168,6 +245,7 @@ describe("HealthService", () => {
       realtime: true,
       objectStorage: true,
       coordination: true,
+      durableQueueExecutor: true,
     });
     expect(repository.isSchemaReady).not.toHaveBeenCalled();
 
@@ -234,5 +312,33 @@ describe("HealthService", () => {
       coordination: false,
     });
     expect(coordination.ping).toHaveBeenCalledOnce();
+  });
+
+  it("requires reachable coordination when auth automatically enables distributed limiting", async () => {
+    const { coordination, service } = dependencies({
+      coordination: false,
+      environment: VALID_COORDINATION_ENVIRONMENT,
+    });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: false,
+      coordination: false,
+    });
+    expect(coordination.ping).toHaveBeenCalledOnce();
+  });
+
+  it("does not probe coordination when auth explicitly selects local fallback", async () => {
+    const { coordination, service } = dependencies({
+      environment: {
+        ...VALID_COORDINATION_ENVIRONMENT,
+        AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
+      },
+    });
+
+    await expect(service.checkReadiness()).resolves.toMatchObject({
+      ready: true,
+      coordination: true,
+    });
+    expect(coordination.ping).not.toHaveBeenCalled();
   });
 });

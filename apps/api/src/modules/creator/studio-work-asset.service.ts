@@ -7,7 +7,9 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   PayloadTooLargeException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 
 import {
@@ -29,6 +31,18 @@ import {
   StudioWorkAssetReferenceSchema,
   serializeStudioWorkAssetDescriptorCanonical,
 } from "../../../../../lib/studio-work-asset-contract";
+import {
+  SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+  SupabaseObjectReferenceSchema,
+  SupabaseSignedReadUrlSchema,
+  type SupabaseObjectPurpose,
+  type SupabaseObjectReference,
+  type SupabaseSignedReadUrl,
+} from "../../infrastructure/supabase-object-storage/supabase-object-storage.contract";
+import {
+  SUPABASE_OBJECT_STORAGE_PORT,
+  type SupabaseObjectStoragePort,
+} from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
 
 import {
   assertStudioR8GrainAdmissionContents,
@@ -43,13 +57,19 @@ import {
   StudioWorkAssetNotFoundError,
   StudioWorkAssetQuotaError,
   StudioWorkAssetReferencedError,
+  StudioWorkAssetStorageReferenceConflictError,
+  StudioWorkAssetStorageReferenceNotFoundError,
   StudioWorkAssetTypeConflictError,
+  isExactStudioWorkAssetStorageObject,
 } from "./studio-work-asset.repository";
 
 import type { DrizzleStudioCrdtTransaction } from "./studio-crdt.repository";
 import type {
   StudioWorkAssetContent,
+  StudioWorkAssetGeneratedObjectPurpose,
   StudioWorkAssetRepository,
+  StudioWorkAssetStorageReference,
+  StudioWorkAssetWrite,
 } from "./studio-work-asset.repository";
 import type { StudioBrushR8TextureGrainSource } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
 import type {
@@ -69,6 +89,7 @@ const GLB_VERSION = 2;
 const GLB_JSON_CHUNK = 0x4e4f534a;
 const GLB_BIN_CHUNK = 0x004e4942;
 const GLB_MAX_JSON_BYTES = 2 * 1024 * 1024;
+const STUDIO_WORK_ASSET_SIGNED_READ_MAX_SECONDS = 300;
 
 const IMAGE_MIME_TYPES = new Set([
   "image/png",
@@ -104,6 +125,21 @@ export interface AdmittedStudioWorkAssetPayload {
   payload: Uint8Array;
   sha256: string;
   intrinsicImage: StudioWorkAssetIntrinsicImage | null;
+}
+
+export interface StudioWorkAssetGeneratedDeleteResult {
+  readonly deleted: true;
+  readonly remoteObjectDeleted: boolean;
+}
+
+export interface StudioWorkAssetSignedRead {
+  readonly reference: StudioWorkAssetStorageReference;
+  readonly signedRead: SupabaseSignedReadUrl;
+}
+
+interface ResolvedStudioWorkAssetStorageObject {
+  readonly object: SupabaseObjectReference;
+  readonly uploaded: boolean;
 }
 
 function bytesEqual(bytes: Uint8Array, offset: number, expected: readonly number[]): boolean {
@@ -516,11 +552,44 @@ function exactLayerLiftUploadFiles(
   return [files.background[0]!, files.foreground[0]!];
 }
 
+function storageObjectFor(
+  purpose: SupabaseObjectPurpose,
+  admitted: AdmittedStudioWorkAssetPayload,
+): SupabaseObjectReference {
+  return SupabaseObjectReferenceSchema.parse({
+    contractVersion: SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+    purpose,
+    digest: `sha256:${admitted.sha256}`,
+    objectPath: `sha256/${admitted.sha256.slice(0, 2)}/${admitted.sha256}`,
+    byteLength: admitted.payload.byteLength,
+    contentType: admitted.mimeType,
+  });
+}
+
+function opaqueControlId(namespace: string, value: string): string {
+  return `${namespace}:${createHash("sha256").update(value).digest("hex")}`;
+}
+
+function assertShortSignedReadLifetime(expiresInSeconds: number): void {
+  if (
+    !Number.isInteger(expiresInSeconds)
+    || expiresInSeconds < 30
+    || expiresInSeconds > STUDIO_WORK_ASSET_SIGNED_READ_MAX_SECONDS
+  ) {
+    throw new BadRequestException(
+      `서명 URL 유효 시간은 30초에서 ${STUDIO_WORK_ASSET_SIGNED_READ_MAX_SECONDS}초 사이여야 합니다.`,
+    );
+  }
+}
+
 @Injectable()
 export class StudioWorkAssetService {
   constructor(
     @Inject(STUDIO_WORK_ASSET_REPOSITORY)
-    private readonly repository: StudioWorkAssetRepository
+    private readonly repository: StudioWorkAssetRepository,
+    @Optional()
+    @Inject(SUPABASE_OBJECT_STORAGE_PORT)
+    private readonly objectStorage?: SupabaseObjectStoragePort,
   ) {}
 
   async uploadLayerLiftBatch(
@@ -538,7 +607,7 @@ export class StudioWorkAssetService {
     }
     const metadata = parseLayerLiftBatchMetadata(metadataJson);
     const files = exactLayerLiftUploadFiles(filesValue);
-    const writes = metadata.assets.map((entry, index) => {
+    const admittedWrites = metadata.assets.map((entry, index) => {
       const file = files[index]!;
       if (
         !Buffer.isBuffer(file.buffer) ||
@@ -593,6 +662,22 @@ export class StudioWorkAssetService {
         ...admitted,
       };
     });
+
+    // Authorization is checked before any remote write, then checked again under the repository's
+    // work-row lock when the source/reference rows are committed atomically.
+    await this.run(() => this.repository.assertCanEditWork(actorUserId, workId));
+    const storage = await this.requirePrivateObjectStorage();
+    const writes: StudioWorkAssetWrite[] = [];
+    for (const admittedWrite of admittedWrites) {
+      const { object: storageObject } = await this.resolveStorageObject(
+        storage,
+        "source",
+        admittedWrite,
+        workId,
+        admittedWrite.assetId,
+      );
+      writes.push({ ...admittedWrite, storageObject });
+    }
 
     // No repository mutation begins until both role-bound files have passed every binary,
     // descriptor, digest and dimension check. The repository then persists the pair in one
@@ -654,13 +739,258 @@ export class StudioWorkAssetService {
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "에셋 파일이 올바르지 않습니다.");
     }
+    await this.run(() => this.repository.assertCanEditWork(actorUserId, workId));
+    const storage = await this.requirePrivateObjectStorage();
+    const { object: storageObject } = await this.resolveStorageObject(
+      storage,
+      "source",
+      admitted,
+      workId,
+      assetId,
+    );
     return this.run(() => this.repository.upsert(actorUserId, {
       workId,
       assetId,
       elementType,
       descriptor,
       ...admitted,
+      storageObject,
     }));
+  }
+
+  async uploadGeneratedObject(
+    actorUserId: string,
+    workId: string,
+    sourceAssetId: string,
+    purpose: StudioWorkAssetGeneratedObjectPurpose,
+    referenceId: string,
+    elementType: StudioWorkAssetType,
+    file: StudioWorkAssetUploadFile | undefined,
+  ): Promise<StudioWorkAssetStorageReference> {
+    if (!isStudioWorkAssetAdmissionOptedIn(
+      process.env.STUDIO_WORK_ASSET_ADMISSION
+    )) {
+      throw new ForbiddenException(
+        "협업 에셋 생성물 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다."
+      );
+    }
+    if (purpose !== "derived" && purpose !== "export") {
+      throw new BadRequestException("원본 에셋은 생성물 경로에서 저장할 수 없습니다.");
+    }
+    if (!file || !Buffer.isBuffer(file.buffer) || file.size !== file.buffer.byteLength) {
+      throw new BadRequestException("업로드할 생성물 파일이 필요합니다.");
+    }
+    await this.run(() => this.repository.assertCanStoreGeneratedObject(
+      actorUserId,
+      workId,
+      sourceAssetId,
+    ));
+
+    let admitted: AdmittedStudioWorkAssetPayload;
+    try {
+      admitted = admitStudioWorkAssetPayload(elementType, file.mimetype, file.buffer);
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "생성물 파일이 올바르지 않습니다.",
+      );
+    }
+    const storage = await this.requirePrivateObjectStorage();
+    const resolved = await this.resolveStorageObject(
+      storage,
+      purpose,
+      admitted,
+      workId,
+      referenceId,
+    );
+    return this.run(() => this.repository.registerGeneratedStorageReference(
+      actorUserId,
+      {
+        workId,
+        sourceAssetId,
+        referenceId,
+        object: resolved.object,
+      },
+      resolved.uploaded,
+    ));
+  }
+
+  async getSourceStorageReference(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType,
+  ): Promise<StudioWorkAssetStorageReference> {
+    const reference = await this.run(() => this.repository.getStorageReference(
+      actorUserId,
+      workId,
+      assetId,
+      "source",
+      assetId,
+      elementType,
+    ));
+    await this.requirePrivateObjectStorage();
+    return reference;
+  }
+
+  async getGeneratedStorageReference(
+    actorUserId: string,
+    workId: string,
+    sourceAssetId: string,
+    purpose: StudioWorkAssetGeneratedObjectPurpose,
+    referenceId: string,
+  ): Promise<StudioWorkAssetStorageReference> {
+    if (purpose !== "derived" && purpose !== "export") {
+      throw new BadRequestException("원본 에셋은 생성물 경로에서 조회할 수 없습니다.");
+    }
+    const reference = await this.run(() => this.repository.getStorageReference(
+      actorUserId,
+      workId,
+      sourceAssetId,
+      purpose,
+      referenceId,
+    ));
+    await this.requirePrivateObjectStorage();
+    return reference;
+  }
+
+  async createSourceSignedReadUrl(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType,
+    expiresInSeconds: number,
+  ): Promise<StudioWorkAssetSignedRead> {
+    assertShortSignedReadLifetime(expiresInSeconds);
+    const reference = await this.run(() => this.repository.getStorageReference(
+      actorUserId,
+      workId,
+      assetId,
+      "source",
+      assetId,
+      elementType,
+    ));
+    return this.createSignedRead(reference, expiresInSeconds);
+  }
+
+  async createGeneratedSignedReadUrl(
+    actorUserId: string,
+    workId: string,
+    sourceAssetId: string,
+    purpose: StudioWorkAssetGeneratedObjectPurpose,
+    referenceId: string,
+    expiresInSeconds: number,
+  ): Promise<StudioWorkAssetSignedRead> {
+    if (purpose !== "derived" && purpose !== "export") {
+      throw new BadRequestException("원본 에셋은 생성물 경로에서 조회할 수 없습니다.");
+    }
+    assertShortSignedReadLifetime(expiresInSeconds);
+    const reference = await this.run(() => this.repository.getStorageReference(
+      actorUserId,
+      workId,
+      sourceAssetId,
+      purpose,
+      referenceId,
+    ));
+    return this.createSignedRead(reference, expiresInSeconds);
+  }
+
+  async deleteGeneratedObject(
+    actorUserId: string,
+    workId: string,
+    sourceAssetId: string,
+    purpose: StudioWorkAssetGeneratedObjectPurpose,
+    referenceId: string,
+    expectedDigest: string,
+  ): Promise<StudioWorkAssetGeneratedDeleteResult> {
+    if (purpose !== "derived" && purpose !== "export") {
+      throw new BadRequestException("원본 에셋은 삭제할 수 없습니다.");
+    }
+    if (!/^sha256:[0-9a-f]{64}$/u.test(expectedDigest)) {
+      throw new BadRequestException("삭제할 생성물 digest가 올바르지 않습니다.");
+    }
+    // Do not transition the durable reference into `deleting` unless authorization and the
+    // private-bucket invariant both hold. A remote failure afterwards intentionally leaves the
+    // tokenized state fail-closed and retryable.
+    await this.run(() => this.repository.assertCanStoreGeneratedObject(
+      actorUserId,
+      workId,
+      sourceAssetId,
+    ));
+    const storage = await this.requirePrivateObjectStorage();
+    const plan = await this.run(() => this.repository.beginGeneratedStorageReferenceDelete(
+      actorUserId,
+      { workId, sourceAssetId, purpose, referenceId, expectedDigest },
+    ));
+    if (!plan.remoteDeleteRequired) {
+      return { deleted: true, remoteObjectDeleted: false };
+    }
+    if (!plan.deleteToken || plan.reference.object.purpose === "source") {
+      throw new ConflictException("생성물 삭제 상태가 일치하지 않습니다.");
+    }
+    await this.storageCall(() => storage.deleteGeneratedObject({
+      object: plan.reference.object,
+    }));
+    await this.run(() => this.repository.completeGeneratedStorageReferenceDelete(plan));
+    return { deleted: true, remoteObjectDeleted: true };
+  }
+
+  /**
+   * Drains generated/export references before a work row is removed. The repository returns a
+   * deterministic bounded page and preserves `deleting` rows, so a request can resume after either
+   * a provider timeout or a remote-success/database-acknowledgement split. The final work delete
+   * still rechecks for references under the work-row lock to close the last admission race.
+   */
+  async deleteGeneratedObjectsForWork(
+    actorUserId: string,
+    workId: string,
+    allowAdminOverride: boolean,
+  ): Promise<number> {
+    let deletedReferences = 0;
+    let storage: SupabaseObjectStoragePort | undefined;
+    while (true) {
+      const references = await this.run(() =>
+        this.repository.listGeneratedStorageReferencesForWorkDeletion(
+          actorUserId,
+          workId,
+          allowAdminOverride,
+        )
+      );
+      if (references.length === 0) return deletedReferences;
+      storage ??= await this.requirePrivateObjectStorage();
+      const privateStorage = storage;
+
+      for (const reference of references) {
+        const purpose = reference.object.purpose;
+        if (purpose === "source") {
+          throw new ConflictException("작품 삭제 정리 대상에 원본 에셋이 포함되었습니다.");
+        }
+        const plan = await this.run(() =>
+          this.repository.beginGeneratedStorageReferenceDelete(
+            actorUserId,
+            {
+              workId,
+              sourceAssetId: reference.sourceAssetId,
+              purpose,
+              referenceId: reference.referenceId,
+              expectedDigest: reference.object.digest,
+            },
+            allowAdminOverride,
+          )
+        );
+        if (plan.remoteDeleteRequired) {
+          if (!plan.deleteToken) {
+            throw new ConflictException("생성물 삭제 상태가 일치하지 않습니다.");
+          }
+          await this.storageCall(() => privateStorage.deleteGeneratedObject({
+            object: plan.reference.object,
+          }));
+          await this.run(() =>
+            this.repository.completeGeneratedStorageReferenceDelete(plan)
+          );
+        }
+        deletedReferences += 1;
+      }
+    }
   }
 
   getManifest(
@@ -900,6 +1230,98 @@ export class StudioWorkAssetService {
     }
   }
 
+  private async resolveStorageObject(
+    storage: SupabaseObjectStoragePort,
+    purpose: SupabaseObjectPurpose,
+    admitted: AdmittedStudioWorkAssetPayload,
+    workId: string,
+    referenceId: string,
+  ): Promise<ResolvedStudioWorkAssetStorageObject> {
+    const expected = storageObjectFor(purpose, admitted);
+    const reusable = await this.run(() =>
+      this.repository.findReusableStorageObject(expected)
+    );
+    if (reusable) {
+      if (!isExactStudioWorkAssetStorageObject(reusable, expected)) {
+        throw new ConflictException("저장된 오브젝트 메타데이터가 일치하지 않습니다.");
+      }
+      return { object: reusable, uploaded: false };
+    }
+
+    const uploaded = await this.storageCall(async () =>
+      SupabaseObjectReferenceSchema.parse(await storage.uploadImmutable({
+        purpose,
+        contentType: admitted.mimeType,
+        bytes: Uint8Array.from(admitted.payload),
+        controlMetadata: {
+          documentId: opaqueControlId("work", workId),
+          operationId: opaqueControlId(`${purpose}-upload`, expected.digest),
+          labels: {
+            purpose,
+            reference: opaqueControlId("ref", referenceId),
+          },
+        },
+      }))
+    );
+    if (!isExactStudioWorkAssetStorageObject(uploaded, expected)) {
+      throw new ServiceUnavailableException(
+        "오브젝트 저장소가 업로드 무결성 확인을 통과하지 못했습니다.",
+      );
+    }
+    return { object: uploaded, uploaded: true };
+  }
+
+  private async createSignedRead(
+    reference: StudioWorkAssetStorageReference,
+    expiresInSeconds: number,
+  ): Promise<StudioWorkAssetSignedRead> {
+    const storage = await this.requirePrivateObjectStorage();
+    const signedRead = await this.storageCall(async () =>
+      SupabaseSignedReadUrlSchema.parse(await storage.createSignedReadUrl({
+        object: reference.object,
+        expiresInSeconds,
+      }))
+    );
+    const completedAt = Date.now();
+    if (
+      signedRead.expiresAtEpochMs <= completedAt
+      || signedRead.expiresAtEpochMs > completedAt + expiresInSeconds * 1_000
+    ) {
+      throw new ServiceUnavailableException(
+        "오브젝트 저장소가 안전한 만료 시간을 반환하지 않았습니다.",
+      );
+    }
+    return { reference, signedRead };
+  }
+
+  private async requirePrivateObjectStorage(): Promise<SupabaseObjectStoragePort> {
+    const storage = this.objectStorage;
+    if (!storage) {
+      throw new ServiceUnavailableException(
+        "비공개 오브젝트 저장소가 구성되지 않았습니다.",
+      );
+    }
+    const readiness = await this.storageCall(() => storage.verifyPrivatePurposeBuckets());
+    if (readiness.ready !== true || readiness.privatePurposeBuckets !== 3) {
+      throw new ServiceUnavailableException(
+        "비공개 오브젝트 저장소 정책을 확인할 수 없습니다.",
+      );
+    }
+    return storage;
+  }
+
+  private async storageCall<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch {
+      // Provider URLs, bucket names, service-role material and response bodies stay inside the
+      // infrastructure adapter. Creator routes expose one generic fail-closed boundary.
+      throw new ServiceUnavailableException(
+        "비공개 오브젝트 저장소 요청을 완료할 수 없습니다.",
+      );
+    }
+  }
+
   private async run<T>(operation: () => Promise<T>): Promise<T> {
     try {
       const result = await operation();
@@ -925,6 +1347,12 @@ export class StudioWorkAssetService {
         throw new ConflictException(
           "이미 팀 문서에 기록된 작품 에셋은 자동 정리할 수 없습니다."
         );
+      }
+      if (error instanceof StudioWorkAssetStorageReferenceNotFoundError) {
+        throw new NotFoundException("작품 에셋 오브젝트 참조를 찾을 수 없습니다.");
+      }
+      if (error instanceof StudioWorkAssetStorageReferenceConflictError) {
+        throw new ConflictException("작품 에셋 오브젝트 참조 상태가 일치하지 않습니다.");
       }
       if (error instanceof StudioWorkAssetTypeConflictError) {
         throw new ConflictException("같은 ID의 다른 타입 에셋이 이미 존재합니다.");

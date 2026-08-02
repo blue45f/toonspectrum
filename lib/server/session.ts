@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-// 서명 세션 토큰 — 클라이언트가 보내는 신원(x-user-id)을 서버 비밀로 검증한다.
+// 서명 세션 토큰 — HttpOnly 쿠키(및 마이그레이션 기간의 x-user-id 헤더)를 서버 비밀로 검증한다.
 //
 // 형식(현재): 표준 HS256 JWT.  header.payload.signature (각 base64url).
 //   payload = { sub: userId, sv: sessionVersion, iss, aud, iat, exp }

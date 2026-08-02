@@ -145,6 +145,83 @@ describe("Supabase REST object storage port", () => {
     expect(result).not.toHaveProperty("projectUrl");
   });
 
+  it("adopts an exact existing immutable object after a concurrent create rejection", async () => {
+    const bytes = new Uint8Array([5, 4, 3, 2, 1]);
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    const path = `sha256/${hash.slice(0, 2)}/${hash}`;
+    const bucket = config.buckets.derived;
+    const { client, fetchMock } = createClient(async (_input, init) => {
+      if (init?.method === "POST") {
+        return jsonResponse(
+          { statusCode: "409", error: "Duplicate", message: "Asset Already Exists" },
+          { status: 409 },
+        );
+      }
+      return jsonResponse({
+        name: path,
+        bucket_id: bucket,
+        size: bytes.byteLength,
+        content_type: "image/png",
+        cache_control: "max-age=31536000, immutable",
+        metadata: {
+          contractVersion: SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+          purpose: "derived",
+          digest: `sha256:${hash}`,
+          byteLength: bytes.byteLength,
+          // The first uploader may belong to another work. Identity adoption validates the
+          // content contract while keeping request-control metadata opaque and well formed.
+          control: {
+            documentId: "work:other",
+            operationId: "derived-upload:other",
+          },
+        },
+      });
+    });
+
+    await expect(client.uploadImmutable({
+      purpose: "derived",
+      contentType: "image/png",
+      bytes,
+      controlMetadata,
+    })).resolves.toEqual({
+      contractVersion: SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+      purpose: "derived",
+      digest: `sha256:${hash}`,
+      objectPath: path,
+      byteLength: bytes.byteLength,
+      contentType: "image/png",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${config.projectUrl}/storage/v1/object/info/authenticated/${bucket}/${path}`,
+    );
+
+    const mismatched = createClient(async (_input, init) =>
+      init?.method === "POST"
+        ? jsonResponse({ message: "Asset Already Exists" }, { status: 400 })
+        : jsonResponse({
+            name: path,
+            bucket_id: bucket,
+            size: bytes.byteLength + 1,
+            content_type: "image/png",
+            cache_control: "max-age=31536000, immutable",
+            metadata: {
+              contractVersion: SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION,
+              purpose: "derived",
+              digest: `sha256:${hash}`,
+              byteLength: bytes.byteLength,
+              control: controlMetadata,
+            },
+          })
+    ).client;
+    await expect(mismatched.uploadImmutable({
+      purpose: "derived",
+      contentType: "image/png",
+      bytes,
+      controlMetadata,
+    })).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
   it("uses one stable snapshot when SharedArrayBuffer-backed caller bytes mutate", async () => {
     const sharedBuffer = new SharedArrayBuffer(4);
     const callerBytes = new Uint8Array(sharedBuffer);
@@ -321,6 +398,11 @@ describe("Supabase REST object storage port", () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       prefixes: [derived.objectPath],
     });
+
+    const alreadyAbsent = createClient(async () => jsonResponse([])).client;
+    await expect(
+      alreadyAbsent.deleteGeneratedObject({ object: derived })
+    ).resolves.toBeUndefined();
   });
 
   it("verifies that all purpose buckets are distinct, present, and private", async () => {

@@ -60,6 +60,7 @@ const CLEAN_SESSION_KEY = "toonspectrum-lifecycle-verifier-cleaned";
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;

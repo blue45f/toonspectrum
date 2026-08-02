@@ -1,7 +1,13 @@
+import { createHash } from "node:crypto";
+
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
+import {
+  creatorAssetStorageObjects,
+  creatorWorkAssetStorageReferences,
+} from "../../../../../lib/db/creator-asset-object-storage.schema";
 import {
   creatorWorkAssets,
   creatorWorkAssetTombstones,
@@ -14,6 +20,7 @@ import {
 
 import {
   assertStudioWorkAssetIdNotReserved,
+  assertStudioWorkAssetSourceStorageObject,
   DrizzleStudioWorkAssetRepository,
   isStudioWorkAssetIdempotentReplay,
   planStudioWorkAssetBatchUpsert,
@@ -27,6 +34,7 @@ import {
   StudioWorkAssetImmutableConflictError,
   StudioWorkAssetQuotaError,
   StudioWorkAssetReferencedError,
+  StudioWorkAssetStorageReferenceConflictError,
   StudioWorkAssetTypeConflictError,
   studioWorkAssetRepositoryProvider,
 } from "./studio-work-asset.repository";
@@ -42,6 +50,7 @@ function names(values: readonly { name?: string; config?: { name?: string } }[])
 
 function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
   const payload = Uint8Array.of(fill, fill + 1);
+  const sha256 = createHash("sha256").update(payload).digest("hex");
   return {
     workId: "work-1",
     assetId,
@@ -60,8 +69,16 @@ function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
       },
     },
     payload,
-    sha256: fill.toString(16).padStart(64, "0"),
+    sha256,
     intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
+    storageObject: {
+      contractVersion: "toonspectrum.supabase-object-storage.v1",
+      purpose: "source",
+      digest: `sha256:${sha256}`,
+      objectPath: `sha256/${sha256.slice(0, 2)}/${sha256}`,
+      byteLength: payload.byteLength,
+      contentType: "image/png",
+    },
   };
 }
 
@@ -97,6 +114,66 @@ describe("studio work-scoped asset persistence contract", () => {
     ]);
     expect(STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK).toBe(250);
     expect(STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK).toBe(256 * 1024 * 1024);
+  });
+
+  it("persists exact object identity and work-scoped references with source-retention constraints", () => {
+    const objectTable = getTableConfig(creatorAssetStorageObjects);
+    expect(objectTable.name).toBe("creator_asset_storage_object");
+    expect(objectTable.primaryKeys.map((key) => key.getName())).toEqual([
+      "creator_asset_storage_object_pkey",
+    ]);
+    expect(names(objectTable.indexes)).toEqual([
+      "creator_asset_storage_object_path_unique",
+    ]);
+    expect(names(objectTable.checks)).toEqual([
+      "creator_asset_storage_object_byte_length_check",
+      "creator_asset_storage_object_content_type_check",
+      "creator_asset_storage_object_contract_check",
+      "creator_asset_storage_object_digest_path_check",
+      "creator_asset_storage_object_lifecycle_check",
+      "creator_asset_storage_object_purpose_check",
+      "creator_asset_storage_object_source_retention_check",
+      "creator_asset_storage_object_state_check",
+    ]);
+
+    const referenceTable = getTableConfig(creatorWorkAssetStorageReferences);
+    expect(referenceTable.name).toBe("creator_work_asset_storage_reference");
+    expect(referenceTable.primaryKeys.map((key) => key.getName())).toEqual([
+      "creator_work_asset_storage_reference_pkey",
+    ]);
+    expect(referenceTable.foreignKeys.map((key) => key.getName()).sort()).toEqual([
+      "creator_work_asset_storage_reference_asset_fkey",
+      "creator_work_asset_storage_reference_created_by_fkey",
+      "creator_work_asset_storage_reference_object_fkey",
+    ]);
+    expect(names(referenceTable.indexes)).toEqual([
+      "idx_creator_work_asset_storage_reference_object",
+      "idx_creator_work_asset_storage_reference_source",
+    ]);
+    expect(names(referenceTable.checks)).toEqual([
+      "creator_work_asset_storage_reference_digest_check",
+      "creator_work_asset_storage_reference_id_check",
+      "creator_work_asset_storage_reference_lifecycle_check",
+      "creator_work_asset_storage_reference_purpose_check",
+      "creator_work_asset_storage_reference_source_binding_check",
+    ]);
+  });
+
+  it("binds every source reference to the exact immutable payload digest and metadata", () => {
+    const write = batchWrite("asset-1", 1);
+    expect(assertStudioWorkAssetSourceStorageObject(write)).toEqual(write.storageObject);
+    expect(() => assertStudioWorkAssetSourceStorageObject({
+      ...write,
+      payload: Uint8Array.of(9, 9),
+    })).toThrow(StudioWorkAssetStorageReferenceConflictError);
+    expect(() => assertStudioWorkAssetSourceStorageObject({
+      ...write,
+      storageObject: { ...write.storageObject, purpose: "derived" },
+    })).toThrow(StudioWorkAssetStorageReferenceConflictError);
+    expect(() => assertStudioWorkAssetSourceStorageObject({
+      ...write,
+      storageObject: { ...write.storageObject, contentType: "image/jpeg" },
+    })).toThrow(StudioWorkAssetStorageReferenceConflictError);
   });
 
   it("permanently reserves deleted IDs inside the work lifecycle", () => {

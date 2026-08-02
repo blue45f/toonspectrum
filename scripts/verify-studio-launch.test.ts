@@ -100,6 +100,12 @@ describe("Studio launch static-preview diagnostics", () => {
   it("allows only optional API failures from the active preview origin", () => {
     expect(
       isExpectedStaticPreviewApiError(
+        "502 http://127.0.0.1:51758/api/auth/session",
+        STUDIO_URL,
+      ),
+    ).toBe(true);
+    expect(
+      isExpectedStaticPreviewApiError(
         "500 http://127.0.0.1:51758/api/studio-ai/status",
         STUDIO_URL,
       ),

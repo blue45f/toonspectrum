@@ -217,6 +217,15 @@ describe("generated third-party notice inventory", () => {
       expect(notice).toContain("Copyright (c) 2014 Alex Crichton");
       expect(notice).toContain("UNICODE LICENSE V3");
       expect(notice).toContain("Copyright © 1991-2023 Unicode, Inc.");
+      expect(notice).toContain(
+        "33d9a6fa21ca4fa711da7066655aa2ba854545ee",
+      );
+      expect(notice).toContain(
+        "sha512-lw6/vOl86+CkJ8d3V01mlbGAC0A49gc1HbwGcqGeKjk5SGRLiF15jyUuA8aYEvizcPNTu4Ta4A+Ut2DJgsa7AQ==",
+      );
+      expect(notice).toContain(
+        "6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284",
+      );
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

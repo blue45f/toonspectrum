@@ -21,6 +21,7 @@ import {
   resolveApiRuntimeRole,
 } from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
+import { createCsrfProtectionMiddleware } from "./csrf-middleware";
 import { BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE, BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import { sessionAuth } from "./session-middleware";
 
@@ -95,6 +96,8 @@ async function create(): Promise<Express> {
   app.use(createApiSecurityHeadersMiddleware(process.env));
   configureCors(app); // Vercel OPTIONS를 Nest가 204로 끝내고 Origin별 허용 헤더를 반환
   app.use(createApiRuntimeRoleGuard(process.env));
+  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
+  app.use(createCsrfProtectionMiddleware(process.env));
   const gatewayContentType = BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE
     .toLowerCase()
     .split(";")[0]
@@ -116,7 +119,6 @@ async function create(): Promise<Express> {
     rewriteQueryPathToUrl(req);
     next();
   });
-  app.use(sessionAuth); // x-user-id 서명 토큰 검증 → 실제 userId로 치환(미인증이면 제거)
   app.setGlobalPrefix("api", {
     exclude: [{ path: BACKEND_CAPABILITY_GATEWAY_PATH, method: RequestMethod.ALL }],
   });

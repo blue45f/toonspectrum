@@ -1,6 +1,7 @@
 export interface CollectionAuthFence {
   userId: string;
-  sessionToken: string;
+  /** Legacy per-tab header credential. Null means authenticate with the HttpOnly cookie. */
+  sessionToken: string | null;
   generation: number;
 }
 

@@ -10,6 +10,7 @@ import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
+import { withCsrfProtection } from "@/lib/csrf";
 import { useUi } from "@/lib/ui-store";
 
 const BackToTop = lazy(() =>
@@ -89,11 +90,11 @@ function useKmasEntryMerge() {
   useEffect(() => {
     if (kmasEntryMergeStarted || import.meta.env.VITE_CATALOG_SOURCE === "static") return;
     kmasEntryMergeStarted = true;
-    fetch(apiPath("/api/kmas/merge-on-access"), {
+    fetch(apiPath("/api/kmas/merge-on-access"), withCsrfProtection({
       method: "POST",
       cache: "no-store",
       keepalive: true,
-    }).catch(() => {
+    })).catch(() => {
       kmasEntryMergeStarted = false;
     });
   }, []);

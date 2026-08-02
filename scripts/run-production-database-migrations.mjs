@@ -88,9 +88,11 @@ const HISTORICAL_BASELINE_RELATIONS = Object.freeze([
   "verificationToken",
 ]);
 export const POST_BASELINE_RELATIONS = Object.freeze([
+  "creator_asset_storage_object",
   "creator_draft_collaboration_room",
   "creator_marketplace_publish_gate",
   "creator_marketplace_resource",
+  "creator_work_asset_storage_reference",
 ]);
 
 const MODE_CONFIRMATIONS = Object.freeze({
@@ -137,6 +139,53 @@ export function validateRuntimeDatabaseRole(runtimeDatabaseRole) {
     );
   }
   return runtimeDatabaseRole;
+}
+
+export function buildCreatorAssetObjectStorageRuntimeAclSql(
+  runtimeDatabaseRole,
+) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public.creator_asset_storage_object,
+  public.creator_work_asset_storage_reference
+FROM ${quotedRole};
+
+GRANT SELECT
+  ON TABLE public.creator_asset_storage_object
+  TO ${quotedRole};
+GRANT INSERT (
+  "purpose",
+  "digest",
+  "contractVersion",
+  "objectPath",
+  "byteLength",
+  "contentType"
+)
+  ON TABLE public.creator_asset_storage_object
+  TO ${quotedRole};
+GRANT UPDATE ("state", "deleteToken", "updatedAt", "deletedAt")
+  ON TABLE public.creator_asset_storage_object
+  TO ${quotedRole};
+
+GRANT SELECT, DELETE
+  ON TABLE public.creator_work_asset_storage_reference
+  TO ${quotedRole};
+GRANT INSERT (
+  "workId",
+  "purpose",
+  "referenceId",
+  "objectDigest",
+  "sourceAssetId",
+  "createdBy"
+)
+  ON TABLE public.creator_work_asset_storage_reference
+  TO ${quotedRole};
+GRANT UPDATE ("state", "deleteToken", "updatedAt")
+  ON TABLE public.creator_work_asset_storage_reference
+  TO ${quotedRole};
+`;
 }
 
 function parseManifestLines(contents) {
@@ -1186,6 +1235,14 @@ export function runProductionDatabaseMigrations({
       applied += 1;
       ledger = readLedger(databaseUrl);
     }
+
+    // Normalize the two post-baseline object-storage relations to the minimum runtime surface on
+    // every run. This also repairs providers that do not preserve ALTER DEFAULT PRIVILEGES across
+    // independently owned migration and application roles.
+    psql(
+      databaseUrl,
+      buildCreatorAssetObjectStorageRuntimeAclSql(runtimeDatabaseRole),
+    );
 
     process.stdout.write(
       `Production migration manifest complete: ${adopted} adopted, ${applied} applied, ${skipped} checksum-verified skips\n`,

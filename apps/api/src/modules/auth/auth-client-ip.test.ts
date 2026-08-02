@@ -48,6 +48,13 @@ describe("AUTH_TRUSTED_PROXY_* 정합성", () => {
         AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
       }),
     ).toThrow(AuthClientIpConfigurationError);
+    expect(() =>
+      resolveAuthClientIpPolicy({
+        AUTH_TRUSTED_PROXY_ENABLED: "true",
+        AUTH_TRUSTED_PROXY_IPS: "203.0.113.0/24",
+        AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
+      }),
+    ).toThrow(AuthClientIpConfigurationError);
   });
 
   it("잘못된 헤더/홉 제한 값이 있으면 예외를 던진다", () => {
@@ -64,6 +71,14 @@ describe("AUTH_TRUSTED_PROXY_* 정합성", () => {
         AUTH_TRUSTED_PROXY_IPS: "203.0.113.1",
         AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
         AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "0",
+      }),
+    ).toThrow(AuthClientIpConfigurationError);
+    expect(() =>
+      resolveAuthClientIpPolicy({
+        AUTH_TRUSTED_PROXY_ENABLED: "true",
+        AUTH_TRUSTED_PROXY_IPS: "203.0.113.1",
+        AUTH_TRUSTED_CLIENT_IP_HEADER: "x-forwarded-for",
+        AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: "33",
       }),
     ).toThrow(AuthClientIpConfigurationError);
     expect(() =>

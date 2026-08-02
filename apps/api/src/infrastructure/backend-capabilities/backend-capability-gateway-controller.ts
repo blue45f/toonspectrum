@@ -54,6 +54,34 @@ function requireSingleHeader(
   return normalized;
 }
 
+interface GatewayRequestAbortScope {
+  readonly signal: AbortSignal;
+  readonly dispose: () => void;
+}
+
+function createGatewayRequestAbortScope(
+  request: ExpressRequest
+): GatewayRequestAbortScope {
+  const controller = new AbortController();
+  const abort = () => controller.abort(new Error("gateway caller disconnected"));
+  const response = request.res;
+  const onResponseClose = () => {
+    if (!response?.writableEnded) abort();
+  };
+
+  request.once("aborted", abort);
+  response?.once("close", onResponseClose);
+  if (request.aborted) abort();
+
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      request.off("aborted", abort);
+      response?.off("close", onResponseClose);
+    },
+  };
+}
+
 @Controller()
 export class BackendCapabilityGatewayController {
   constructor(
@@ -99,10 +127,15 @@ export class BackendCapabilityGatewayController {
       throw new UnauthorizedException("Invalid gateway token");
     }
 
-    const signal =
-      "signal" in request && request.signal instanceof AbortSignal
-        ? request.signal
-        : undefined;
-    return this.executor.execute(envelope, envelope.provider, signal);
+    const abortScope = createGatewayRequestAbortScope(request);
+    try {
+      return await this.executor.execute(
+        envelope,
+        envelope.provider,
+        abortScope.signal
+      );
+    } finally {
+      abortScope.dispose();
+    }
   }
 }

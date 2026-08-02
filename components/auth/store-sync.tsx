@@ -9,6 +9,7 @@ import {
   completeCollectionMerge,
   failCollectionMerge,
 } from "@/lib/collection-write-through";
+import { withCsrfProtection } from "@/lib/csrf";
 import {
   captureCollectionHydrationFence,
   claimGuestCollectionsForOwner,
@@ -72,10 +73,10 @@ export function StoreSync() {
           if (controller.signal.aborted) abortAttempt();
         });
         const request = (async (): Promise<SyncJsonResult<T>> => {
-          const response = await fetch(input, {
+          const response = await fetch(input, withCsrfProtection({
             ...init,
             signal: attemptController.signal,
-          });
+          }));
           if (!response.ok) return { ok: false, response, data: null };
           const data = await response.json() as T;
           return { ok: true, response, data };
@@ -145,7 +146,9 @@ export function StoreSync() {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "x-user-id": initialFence.sessionToken,
+                  ...(initialFence.sessionToken
+                    ? { "x-user-id": initialFence.sessionToken }
+                    : {}),
                 },
                 body: JSON.stringify({
                   ratings: local.ratings,
@@ -203,7 +206,9 @@ export function StoreSync() {
           if (!hydrationFence) return;
           try {
             const result = await fetchSyncJson<HydratePayload>("/api/me", {
-              headers: { "x-user-id": hydrationFence.sessionToken },
+              headers: hydrationFence.sessionToken
+                ? { "x-user-id": hydrationFence.sessionToken }
+                : undefined,
             });
             if (!result.ok) {
               scheduleRetry();

@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 
+import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
+
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import {
   CreatorCollaborationRepository,
@@ -54,7 +56,11 @@ import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import { studioWorkAssetRepositoryProvider } from "./studio-work-asset.repository";
 import { StudioWorkAssetService } from "./studio-work-asset.service";
 
+const supabaseObjectStorageModule =
+  SupabaseObjectStorageModule.fromEnvironment(process.env);
+
 @Module({
+  imports: supabaseObjectStorageModule ? [supabaseObjectStorageModule] : [],
   controllers: [
     CreatorController,
     StudioRasterAssetController,

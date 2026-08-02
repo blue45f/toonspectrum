@@ -26,10 +26,12 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 // 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 요청과
-// 정확히 일치하는 로컬 Socket.IO handshake 종료는 UI 부트에 필수가 아닌 best-effort 작업이고,
+// 정확히 일치하는 로컬 세션 재수화/API 요청과 Socket.IO handshake 종료는 UI 부트에 필수가 아닌
+// best-effort 작업이고,
 // API 부재가 Studio 렌더/상호작용 회귀처럼 strict gate를 막아서는 안 된다. 다른 console error는
 // 계속 실패 처리한다.
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;

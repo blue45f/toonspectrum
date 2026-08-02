@@ -74,8 +74,8 @@ const envSchema = z.object({
   NEST_API_PORT: z.string().regex(/^\d+$/, "NEST_API_PORT must be numeric").optional(),
   // 허용할 브라우저 Origin(쉼표 구분, 선택).
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
-  // 인증/요청 경계 토글: 분산 레이트리밋 및 신뢰 프록시(IP source-of-truth) 경계를
-  // 명시적으로 켜야 하며, 미설정은 보수적 로컬 동작으로 fallback 됩니다.
+  // 인증/요청 경계: Upstash가 유효하면 분산 레이트리밋은 기본 활성화되고, 명시적 false는
+  // controlled single-instance fallback입니다. 신뢰 프록시는 항상 명시적으로 켜야 합니다.
   AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: z.enum(["true", "false"]).optional(),
   AUTH_TRUSTED_PROXY_ENABLED: z.enum(["true", "false"]).optional(),
   AUTH_TRUSTED_PROXY_IPS: z.string().min(1).optional(),
@@ -87,10 +87,11 @@ const envSchema = z.object({
       "cf-connecting-ip",
     ])
     .optional(),
-  AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: z
-    .string()
-    .regex(/^[1-9][0-9]*$/u, "AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS must be an integer")
-    .optional(),
+  AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS: boundedPositiveInteger(
+    "AUTH_TRUSTED_PROXY_MAX_FORWARDED_HOPS",
+    1,
+    32,
+  ).optional(),
   // 정본 웹/OG/OAuth 도메인. CANONICAL_HOST는 scheme 없는 hostname만 사용한다.
   CANONICAL_HOST: z
     .string()
@@ -237,7 +238,7 @@ const envSchema = z.object({
       1_024,
       256 * 1_024
     ).optional(),
-  // Upstash는 공급자 lease·중복 방지 영수증·회로 차단기·비용 예약만 담당한다.
+  // Upstash는 공급자 lease·중복 방지 영수증·회로 차단기·비용 예약·인증 rate-limit만 담당한다.
   // 비활성 상태에서는 단일 프로세스 조정 경계를 유지하고, 잘못된 명시 설정은 factory에서 거부한다.
   UPSTASH_COORDINATION_ENABLED: z.enum(["true", "false"]).optional(),
   UPSTASH_COORDINATION_REST_URL: z

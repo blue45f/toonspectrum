@@ -86,13 +86,13 @@ export function CommunityPostPage() {
   const displayReplyCount = replyCount ?? post.replyCount;
 
   async function deletePost() {
-    if (!sessionToken || deleting || !post) return;
+    if (!userId || deleting || !post) return;
     if (!globalThis.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
     setDeleting(true);
     setDeleteError(null);
     try {
       await api.delete(`/community/posts/${encodeURIComponent(post.id)}`, {
-        headers: { "x-user-id": sessionToken },
+        headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
       });
       navigate(boardHref, { replace: true });
     } catch {

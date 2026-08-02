@@ -1,3 +1,5 @@
+import { TOONSPECTRUM_CSRF_HEADER } from "../../../../lib/csrf";
+
 import type { INestApplication } from "@nestjs/common";
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 
@@ -23,7 +25,12 @@ export const PRODUCTION_CORS_ORIGINS = [
 ] as const;
 
 export const API_CORS_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
-export const API_CORS_HEADERS = ["Content-Type", "x-user-id", "Idempotency-Key"] as const;
+export const API_CORS_HEADERS = [
+  "Content-Type",
+  "x-user-id",
+  "Idempotency-Key",
+  TOONSPECTRUM_CSRF_HEADER,
+] as const;
 
 function normalizeOrigin(value: string): string | null {
   try {
@@ -44,7 +51,10 @@ export function allowedCorsOrigins(env: NodeJS.ProcessEnv = process.env): string
   const configured = (env.API_CORS_ALLOWED_ORIGINS ?? "")
     .split(",")
     .map(normalizeOrigin)
-    .filter((origin): origin is string => origin !== null);
+    .filter((origin): origin is string =>
+      origin !== null
+      && (env.NODE_ENV !== "production" || origin.startsWith("https://")),
+    );
   const local = env.NODE_ENV === "production" ? [] : LOCAL_CORS_ORIGINS;
   return [...new Set([...PRODUCTION_CORS_ORIGINS, ...local, ...configured])];
 }
@@ -58,7 +68,9 @@ export function createCorsOptions(env: NodeJS.ProcessEnv = process.env): CorsOpt
     },
     methods: [...API_CORS_METHODS],
     allowedHeaders: [...API_CORS_HEADERS],
-    credentials: false,
+    // Cookie-authenticated API calls are allowed only from the exact Origin
+    // allowlist above. Never combine this with a wildcard Origin.
+    credentials: true,
     maxAge: 86_400,
     optionsSuccessStatus: 204,
   };

@@ -1,13 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
+  subscribeSessionSyncRequests,
+  type SessionSyncReason,
+} from "./auth-session-state";
+import {
   SessionContext,
-  emitSession,
   getAuthSession,
   listeners,
   persistSession,
-  readStoredSession,
-  SESSION_KEY,
+  synchronizeServerSession,
   type Session,
   type SessionContextValue,
 } from "./auth-session-store";
@@ -21,14 +23,26 @@ export function SessionProvider({ children, session = null }: { children: ReactN
 
   useEffect(() => {
     const listener = (next: Session) => setData(next);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === SESSION_KEY) emitSession(readStoredSession());
+    const requestSync = (reason: SessionSyncReason) => {
+      void synchronizeServerSession(reason);
     };
+    const onFocus = () => requestSync("focus");
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") requestSync("focus");
+    };
+
     listeners.add(listener);
-    globalThis.addEventListener("storage", onStorage);
+    const unsubscribeSyncRequests = subscribeSessionSyncRequests(requestSync);
+    globalThis.addEventListener("focus", onFocus, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange, {
+      passive: true,
+    });
+    requestSync("startup");
     return () => {
       listeners.delete(listener);
-      globalThis.removeEventListener("storage", onStorage);
+      unsubscribeSyncRequests();
+      globalThis.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
@@ -36,12 +50,12 @@ export function SessionProvider({ children, session = null }: { children: ReactN
     ? {
         data,
         status: "authenticated",
-        update: async () => data,
+        update: () => synchronizeServerSession("manual"),
       }
     : {
         data: null,
         status: "unauthenticated",
-        update: async () => null,
+        update: () => synchronizeServerSession("manual"),
       };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

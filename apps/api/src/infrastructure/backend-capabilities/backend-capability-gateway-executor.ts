@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { z } from "zod";
 
 import { parseStudioAiIdempotencyKey } from "../../modules/studio-ai/studio-ai-idempotency";
@@ -14,12 +14,30 @@ import { STUDIO_AI_BILLING_FAILOVER_REASON, studioAiProviderRequestId } from "..
 import { StudioAiTaskSchema, type StudioAiProviderPreference } from "../../modules/studio-ai/studio-ai.dto";
 
 import {
+  BACKEND_CAPABILITY_DURABLE_QUEUE_PORT,
+  BACKEND_CAPABILITY_DURABLE_QUEUE_WORKLOADS,
+  BackendCapabilityCleanupPayloadSchema,
+  BackendCapabilityDurableQueueCommandSchema,
+  BackendCapabilityDurableQueueProviderSchema,
+  BackendCapabilityDurableQueueReadinessSchema,
+  BackendCapabilityDurableQueueSubmissionSchema,
+  BackendCapabilityNotificationPayloadSchema,
+  type BackendCapabilityDurableQueuePort,
+  type BackendCapabilityDurableQueueReadiness,
+} from "./backend-capability-durable-queue.port";
+import {
   BACKEND_CAPABILITY_GATEWAY_VERSION,
   BackendCapabilityGatewayResponseSchema,
   canonicalJsonStringify,
   type BackendCapabilityGatewayEnvelope,
   type BackendCapabilityGatewayResponse,
 } from "./backend-capability-gateway-contract";
+import {
+  BACKEND_GATEWAY_HARD_MAX_BODY_BYTES,
+  type BackendCapabilityPolicy,
+  type BackendRemoteProviderId,
+} from "./backend-capability-policy";
+import { BACKEND_CAPABILITY_POLICY } from "./backend-capability-router";
 
 interface GatewayReceipt {
   commandFingerprint: string;
@@ -57,6 +75,76 @@ type StudioAiAttempt =
     };
 
 const IDEMPOTENCY_TTL_MS = 6 * 60 * 60 * 1000;
+const DURABLE_QUEUE_READINESS_TIMEOUT_MS = 2_500;
+
+class DurableQueueCallAbortedError extends Error {
+  constructor() {
+    super("durable queue call aborted");
+    this.name = "DurableQueueCallAbortedError";
+  }
+}
+
+interface DurableQueueAbortScope {
+  readonly signal: AbortSignal;
+  readonly callerAborted: () => boolean;
+  readonly timedOut: () => boolean;
+  readonly dispose: () => void;
+}
+
+function createDurableQueueAbortScope(
+  timeoutMs: number,
+  callerSignal: AbortSignal | undefined
+): DurableQueueAbortScope {
+  const controller = new AbortController();
+  let callerAborted = callerSignal?.aborted ?? false;
+  let timedOut = false;
+  const onCallerAbort = () => {
+    callerAborted = true;
+    controller.abort(callerSignal?.reason);
+  };
+  callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+  if (callerAborted) controller.abort(callerSignal?.reason);
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort(new Error("durable queue executor timeout"));
+  }, timeoutMs);
+  timer.unref?.();
+
+  return {
+    signal: controller.signal,
+    callerAborted: () => callerAborted,
+    timedOut: () => timedOut,
+    dispose: () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", onCallerAbort);
+    },
+  };
+}
+
+function awaitDurableQueueCall<T>(
+  operation: Promise<T>,
+  signal: AbortSignal
+): Promise<T> {
+  if (signal.aborted) return Promise.reject(new DurableQueueCallAbortedError());
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(new DurableQueueCallAbortedError());
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    operation.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      }
+    );
+  });
+}
 
 const StudioAiWebhookPayloadSchema = z
   .object({
@@ -109,10 +197,13 @@ const LongStudioAiPayloadSchema = z
 
 function commandFingerprint(command: BackendCapabilityGatewayEnvelope): string {
   const payload = canonicalJsonStringify({
+    domain: "toonspectrum.backend-capability-gateway-executor-request.v1",
     tenantId: command.tenantId,
     capability: command.capability,
     workload: command.workload,
     idempotencyKey: command.idempotencyKey,
+    idempotent: command.idempotent,
+    execution: command.execution,
     payload: command.payload,
   });
   return `sha256:${createHash("sha256").update(payload).digest("hex")}`;
@@ -167,13 +258,126 @@ function providerUsage(payload: Record<string, unknown>): {
 export class BackendCapabilityGatewayExecutor {
   private readonly receipts = new Map<string, GatewayReceipt>();
 
+  constructor(
+    @Inject(BACKEND_CAPABILITY_POLICY)
+    private readonly policy: BackendCapabilityPolicy,
+    @Optional()
+    @Inject(BACKEND_CAPABILITY_DURABLE_QUEUE_PORT)
+    private readonly durableQueue?: BackendCapabilityDurableQueuePort
+  ) {}
+
+  hasDurableQueueExecutor(): boolean {
+    return this.durableQueue !== undefined;
+  }
+
+  /**
+   * True only when local policy enables a cleanup/notification durable-queue
+   * provider. The authoritative API may omit the port while distribution is
+   * disabled, but an enabled queue role must never advertise green readiness
+   * without an installed adapter.
+   */
+  isDurableQueueExecutorRequired(): boolean {
+    return BACKEND_CAPABILITY_DURABLE_QUEUE_WORKLOADS.some((workload) =>
+      this.policy.workloadProviderOrder[workload].some((candidate) => {
+        const providerId = BackendCapabilityDurableQueueProviderSchema.safeParse(candidate);
+        return providerId.success
+          && this.isDurableQueueProviderAllowed(providerId.data, workload);
+      })
+    );
+  }
+
+  async isDurableQueueReady(
+    signal: AbortSignal | undefined = undefined
+  ): Promise<boolean> {
+    const durableQueue = this.durableQueue;
+    if (!durableQueue) return false;
+
+    const scope = createDurableQueueAbortScope(
+      DURABLE_QUEUE_READINESS_TIMEOUT_MS,
+      signal
+    );
+    try {
+      const rawReadiness = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          durableQueue.verifyReadiness({ signal: scope.signal })
+        ),
+        scope.signal
+      );
+      const readiness =
+        BackendCapabilityDurableQueueReadinessSchema.safeParse(rawReadiness);
+      if (!readiness.success || !readiness.data.ready) return false;
+      const ready = readiness.data;
+      return BACKEND_CAPABILITY_DURABLE_QUEUE_WORKLOADS.every((workload) =>
+        this.readinessSupportsWorkload(ready, workload)
+      );
+    } catch {
+      return false;
+    } finally {
+      scope.dispose();
+    }
+  }
+
   async execute(
     envelope: BackendCapabilityGatewayEnvelope,
-    providerId: string,
+    providerId: BackendRemoteProviderId,
     signal: AbortSignal | undefined = undefined
   ): Promise<BackendCapabilityGatewayResponse> {
     const now = Date.now();
     this.purgeExpired(now);
+
+    if (providerId !== envelope.provider) {
+      return this.parseGatewayResponse({
+        providerId,
+        idempotencyKey: envelope.idempotencyKey,
+        outcome: "rejected",
+        retryable: false,
+        result: null,
+        errorCode: "PROVIDER_ID_MISMATCH",
+      });
+    }
+
+    const provider = this.policy.providers[providerId];
+    if (!this.policy.enabled || !provider.enabled) {
+      return this.parseGatewayResponse({
+        providerId,
+        idempotencyKey: envelope.idempotencyKey,
+        outcome: "rejected",
+        retryable: false,
+        result: null,
+        errorCode: "PROVIDER_NOT_ENABLED",
+      });
+    }
+
+    let envelopeBytes: number;
+    try {
+      envelopeBytes = Buffer.byteLength(
+        canonicalJsonStringify(envelope),
+        "utf8"
+      );
+    } catch {
+      return this.parseGatewayResponse({
+        providerId,
+        idempotencyKey: envelope.idempotencyKey,
+        outcome: "rejected",
+        retryable: false,
+        result: null,
+        errorCode: "INVALID_GATEWAY_PAYLOAD",
+      });
+    }
+    if (
+      envelopeBytes > BACKEND_GATEWAY_HARD_MAX_BODY_BYTES ||
+      envelopeBytes > provider.maxPayloadBytes ||
+      envelope.execution.estimatedDurationMs > provider.maxExecutionMs
+    ) {
+      return this.parseGatewayResponse({
+        providerId,
+        idempotencyKey: envelope.idempotencyKey,
+        outcome: "rejected",
+        retryable: false,
+        result: null,
+        errorCode: "PROVIDER_LIMIT_EXCEEDED",
+      });
+    }
 
     const cacheKey = `${providerId}:${envelope.idempotencyKey}`;
     const hash = commandFingerprint(envelope);
@@ -200,7 +404,7 @@ export class BackendCapabilityGatewayExecutor {
     }
 
     const response = await this.executeByWorkload(envelope, signal);
-    if (response.outcome === "completed") {
+    if (response.outcome !== "rejected") {
       this.receipts.set(cacheKey, {
         commandFingerprint: hash,
         response,
@@ -226,14 +430,7 @@ export class BackendCapabilityGatewayExecutor {
         return this.executeThumbnailPayload(envelope);
       case "cleanup":
       case "notification":
-        return this.parseGatewayResponse({
-          providerId: envelope.provider,
-          idempotencyKey: envelope.idempotencyKey,
-          outcome: "rejected",
-          retryable: false,
-          result: null,
-          errorCode: "NOT_IMPLEMENTED",
-        });
+        return this.executeDurableQueuePayload(envelope, signal);
       default:
         return this.parseGatewayResponse({
           providerId: envelope.provider,
@@ -252,6 +449,281 @@ export class BackendCapabilityGatewayExecutor {
     if (!payload || typeof payload !== "object") return undefined;
     const candidate = payload as Record<string, unknown>;
     return typeof candidate.operation === "string" ? candidate.operation : undefined;
+  }
+
+  private async executeDurableQueuePayload(
+    envelope: BackendCapabilityGatewayEnvelope,
+    signal: AbortSignal | undefined
+  ): Promise<BackendCapabilityGatewayResponse> {
+    if (
+      envelope.workload !== "cleanup" &&
+      envelope.workload !== "notification"
+    ) {
+      return this.rejectDurableQueue(
+        envelope,
+        "DURABLE_QUEUE_WORKLOAD_UNSUPPORTED",
+        false
+      );
+    }
+    const providerId = BackendCapabilityDurableQueueProviderSchema.safeParse(
+      envelope.provider
+    );
+    if (
+      !providerId.success ||
+      !this.isDurableQueueProviderAllowed(
+        providerId.data,
+        envelope.workload
+      )
+    ) {
+      return this.rejectDurableQueue(
+        envelope,
+        "DURABLE_QUEUE_PROVIDER_UNSUPPORTED",
+        false
+      );
+    }
+
+    if (!envelope.idempotent || envelope.execution.durability !== "durable") {
+      return this.rejectDurableQueue(
+        envelope,
+        "DURABLE_QUEUE_REQUIRES_IDEMPOTENT_DURABLE_COMMAND",
+        false
+      );
+    }
+
+    const payloadSchema =
+      envelope.workload === "cleanup"
+        ? BackendCapabilityCleanupPayloadSchema
+        : BackendCapabilityNotificationPayloadSchema;
+    const payload = payloadSchema.safeParse(envelope.payload);
+    if (
+      !payload.success ||
+      payload.data.requestKey !== envelope.idempotencyKey
+    ) {
+      return this.rejectDurableQueue(
+        envelope,
+        "INVALID_DURABLE_QUEUE_PAYLOAD",
+        false
+      );
+    }
+
+    const durableQueue = this.durableQueue;
+    if (!durableQueue) {
+      return this.rejectDurableQueue(
+        envelope,
+        "DURABLE_QUEUE_EXECUTOR_UNAVAILABLE",
+        true
+      );
+    }
+
+    const provider = this.policy.providers[providerId.data];
+    const timeoutMs = Math.max(
+      1,
+      Math.min(
+        provider.maxExecutionMs,
+        envelope.execution.estimatedDurationMs
+      )
+    );
+    const scope = createDurableQueueAbortScope(timeoutMs, signal);
+    try {
+      const rawReadiness = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          durableQueue.verifyReadiness({ signal: scope.signal })
+        ),
+        scope.signal
+      );
+      const readiness =
+        BackendCapabilityDurableQueueReadinessSchema.safeParse(rawReadiness);
+      if (!readiness.success) {
+        return this.rejectDurableQueue(
+          envelope,
+          "DURABLE_QUEUE_INVALID_READINESS",
+          true
+        );
+      }
+      if (
+        !readiness.data.ready ||
+        !this.readinessSupports(
+          readiness.data,
+          providerId.data,
+          envelope.workload
+        )
+      ) {
+        return this.rejectDurableQueue(
+          envelope,
+          "DURABLE_QUEUE_EXECUTOR_NOT_READY",
+          true
+        );
+      }
+
+      const command = BackendCapabilityDurableQueueCommandSchema.safeParse({
+        providerId: providerId.data,
+        tenantId: envelope.tenantId,
+        workload: envelope.workload,
+        idempotencyKey: envelope.idempotencyKey,
+        createdAt: envelope.createdAt,
+        task: payload.data.task,
+      });
+      if (!command.success) {
+        return this.rejectDurableQueue(
+          envelope,
+          "INVALID_DURABLE_QUEUE_PAYLOAD",
+          false
+        );
+      }
+
+      const rawSubmission = await awaitDurableQueueCall(
+        Promise.resolve().then(() =>
+          durableQueue.submit(command.data, { signal: scope.signal })
+        ),
+        scope.signal
+      );
+      const submission =
+        BackendCapabilityDurableQueueSubmissionSchema.safeParse(rawSubmission);
+      if (!submission.success) {
+        return this.rejectDurableQueue(
+          envelope,
+          "DURABLE_QUEUE_INVALID_RESPONSE",
+          true
+        );
+      }
+
+      switch (submission.data.outcome) {
+        case "accepted":
+        case "duplicate":
+          return this.parseGatewayResponse({
+            providerId: envelope.provider,
+            idempotencyKey: envelope.idempotencyKey,
+            outcome: submission.data.outcome,
+            retryable: false,
+            result: {
+              requestType: envelope.workload,
+              status: "accepted",
+              jobId: submission.data.jobId,
+            },
+            errorCode: null,
+          });
+        case "completed":
+          if (
+            !this.isDurableQueueResultWithinProviderLimit(
+              providerId.data,
+              submission.data.result
+            )
+          ) {
+            return this.rejectDurableQueue(
+              envelope,
+              "PROVIDER_RESPONSE_LIMIT_EXCEEDED",
+              false
+            );
+          }
+          return this.parseGatewayResponse({
+            providerId: envelope.provider,
+            idempotencyKey: envelope.idempotencyKey,
+            outcome: "completed",
+            retryable: false,
+            result: submission.data.result,
+            errorCode: null,
+          });
+        case "rejected":
+          return this.rejectDurableQueue(
+            envelope,
+            submission.data.errorCode,
+            submission.data.retryable
+          );
+      }
+    } catch (error) {
+      if (scope.callerAborted()) {
+        return this.rejectDurableQueue(
+          envelope,
+          "DURABLE_QUEUE_EXECUTION_ABORTED",
+          true
+        );
+      }
+      if (
+        scope.timedOut() ||
+        error instanceof DurableQueueCallAbortedError
+      ) {
+        return this.rejectDurableQueue(
+          envelope,
+          "DURABLE_QUEUE_EXECUTION_TIMEOUT",
+          true
+        );
+      }
+      return this.rejectDurableQueue(
+        envelope,
+        "DURABLE_QUEUE_EXECUTION_FAILED",
+        true
+      );
+    } finally {
+      scope.dispose();
+    }
+  }
+
+  private readinessSupportsWorkload(
+    readiness: BackendCapabilityDurableQueueReadiness & { ready: true },
+    workload: "cleanup" | "notification"
+  ): boolean {
+    return (
+      readiness.workloads.includes(workload) &&
+      readiness.providerIds.some((providerId) =>
+        this.isDurableQueueProviderAllowed(providerId, workload)
+      )
+    );
+  }
+
+  private readinessSupports(
+    readiness: BackendCapabilityDurableQueueReadiness & { ready: true },
+    providerId: "upstash-qstash" | "cloudflare",
+    workload: "cleanup" | "notification"
+  ): boolean {
+    return (
+      readiness.providerIds.includes(providerId) &&
+      readiness.workloads.includes(workload) &&
+      this.isDurableQueueProviderAllowed(providerId, workload)
+    );
+  }
+
+  private isDurableQueueProviderAllowed(
+    providerId: "upstash-qstash" | "cloudflare",
+    workload: "cleanup" | "notification"
+  ): boolean {
+    const provider = this.policy.providers[providerId];
+    return (
+      this.policy.enabled &&
+      provider.enabled &&
+      provider.supportedCapabilities.has("async-job") &&
+      provider.placementRoles.has("durable-queue") &&
+      this.policy.workloadProviderOrder[workload].includes(providerId)
+    );
+  }
+
+  private isDurableQueueResultWithinProviderLimit(
+    providerId: "upstash-qstash" | "cloudflare",
+    result: unknown
+  ): boolean {
+    try {
+      const responseBytes = Buffer.byteLength(
+        canonicalJsonStringify(result),
+        "utf8"
+      );
+      return responseBytes <= this.policy.providers[providerId].maxResponseBytes;
+    } catch {
+      return false;
+    }
+  }
+
+  private rejectDurableQueue(
+    envelope: BackendCapabilityGatewayEnvelope,
+    errorCode: string,
+    retryable: boolean
+  ): BackendCapabilityGatewayResponse {
+    return this.parseGatewayResponse({
+      providerId: envelope.provider,
+      idempotencyKey: envelope.idempotencyKey,
+      outcome: "rejected",
+      retryable,
+      result: null,
+      errorCode,
+    });
   }
 
   private async executeThumbnailPayload(

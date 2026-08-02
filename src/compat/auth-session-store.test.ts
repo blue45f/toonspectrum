@@ -3,12 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getAuthSession,
   getAuthToken,
+  mergeCurrentSessionProfile,
   persistSession,
+  signIn,
   signInWithGoogleIdToken,
   signOut,
+  synchronizeServerSession,
 } from "./auth-session-store";
 
 const apiRaw = vi.hoisted(() => vi.fn());
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, reject, resolve };
+}
 
 vi.mock("@/src/infrastructure/api", () => ({
   api: { raw: apiRaw },
@@ -25,8 +38,8 @@ describe("auth session store", () => {
     persistSession(null);
   });
 
-  it("로그아웃은 현재 서명 토큰을 전송한 뒤 API 실패에도 로컬 세션을 정리한다", async () => {
-    persistSession({ user: { id: "web-user" }, token: "signed-session-token" });
+  it("로그아웃은 readable 토큰이 없어도 쿠키 엔드포인트를 호출하고 로컬 세션을 정리한다", async () => {
+    persistSession({ user: { id: "web-user" }, token: null });
     apiRaw.mockRejectedValue(new TypeError("network unavailable"));
 
     await expect(signOut()).resolves.toBeUndefined();
@@ -35,7 +48,8 @@ describe("auth session store", () => {
       "/api/auth/logout",
       expect.objectContaining({
         method: "POST",
-        headers: { "x-user-id": "signed-session-token" },
+        cache: "no-store",
+        throwHttpErrors: false,
       }),
     );
     expect(getAuthToken()).toBeNull();
@@ -51,7 +65,7 @@ describe("auth session store", () => {
     expect(apiRaw).not.toHaveBeenCalled();
   });
 
-  it("Google ID 토큰 로그인 성공 시 서명 세션을 저장한다", async () => {
+  it("Google ID 토큰 로그인 성공 시 공개 프로필만 저장한다", async () => {
     apiRaw.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -73,8 +87,9 @@ describe("auth session store", () => {
         throwHttpErrors: false,
       }),
     );
-    expect(getAuthToken()).toBe("signed-google-session");
+    expect(getAuthToken()).toBeNull();
     expect(getAuthSession()?.user.id).toBe("google-user");
+    expect(getAuthSession()?.token).toBeNull();
   });
 
   it("서버의 안전한 Google 로그인 오류를 표시하고 기존 세션은 만들지 않는다", async () => {
@@ -106,5 +121,181 @@ describe("auth session store", () => {
       status: 0,
     });
     expect(getAuthSession()).toBeNull();
+  });
+
+  it("HttpOnly 쿠키 세션의 공개 사용자 정보를 재수화한다", async () => {
+    apiRaw.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "cookie-user",
+            name: "쿠키 사용자",
+            email: "cookie@example.com",
+            image: null,
+            role: "user",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(synchronizeServerSession("startup")).resolves.toEqual({
+      user: {
+        id: "cookie-user",
+        name: "쿠키 사용자",
+        email: "cookie@example.com",
+        image: null,
+        role: "user",
+      },
+      token: null,
+    });
+    expect(apiRaw).toHaveBeenCalledWith(
+      "/api/auth/session",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store",
+        throwHttpErrors: false,
+      }),
+    );
+  });
+
+  it("서버의 명시적 미인증 상태만 stale 클라이언트 세션을 제거한다", async () => {
+    persistSession({ user: { id: "stale-user" }, token: "stale-token" });
+    apiRaw.mockResolvedValue(
+      new Response(
+        JSON.stringify({ authenticated: false, user: null }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(synchronizeServerSession("focus")).resolves.toBeNull();
+    expect(getAuthSession()).toBeNull();
+  });
+
+  it("로그인 도중 도착한 이전 세션 응답이 새 계정을 덮어쓰지 않는다", async () => {
+    const oldSessionResponse = deferred<Response>();
+    apiRaw.mockImplementation((path: string) => {
+      if (path === "/api/auth/session") return oldSessionResponse.promise;
+      if (path === "/api/auth/login") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              user: {
+                id: "new-account",
+                name: "새 계정",
+                email: "new@example.com",
+                image: null,
+                role: "creator",
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const staleSynchronization = synchronizeServerSession("startup");
+    await expect(
+      signIn("credentials", {
+        email: "new@example.com",
+        password: "correct horse battery staple",
+      }),
+    ).resolves.toMatchObject({ ok: true, status: 200 });
+
+    oldSessionResponse.resolve(
+      new Response(
+        JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "old-account",
+            name: "이전 계정",
+            email: "old@example.com",
+            image: null,
+            role: "user",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(staleSynchronization).resolves.toMatchObject({
+      user: { id: "new-account" },
+      token: null,
+    });
+    expect(getAuthSession()?.user.id).toBe("new-account");
+  });
+
+  it("로그아웃 도중 도착한 이전 인증 응답이 세션을 되살리지 않는다", async () => {
+    persistSession({ user: { id: "signed-in-user" }, token: null });
+    const oldSessionResponse = deferred<Response>();
+    apiRaw.mockImplementation((path: string) => {
+      if (path === "/api/auth/session") return oldSessionResponse.promise;
+      if (path === "/api/auth/logout") {
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const staleSynchronization = synchronizeServerSession("focus");
+    await signOut();
+    oldSessionResponse.resolve(
+      new Response(
+        JSON.stringify({
+          authenticated: true,
+          user: {
+            id: "signed-in-user",
+            name: null,
+            email: null,
+            image: null,
+            role: "user",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(staleSynchronization).resolves.toBeNull();
+    expect(getAuthSession()).toBeNull();
+  });
+
+  it("세션 동기화 네트워크 실패와 손상 응답에는 마지막 확인 상태를 유지한다", async () => {
+    const cached = { user: { id: "cached-user" }, token: null };
+    persistSession({ user: cached.user, token: "cached-token" });
+    apiRaw.mockRejectedValueOnce(new TypeError("offline"));
+    await expect(synchronizeServerSession("focus")).resolves.toEqual(cached);
+
+    apiRaw.mockResolvedValueOnce(
+      new Response(JSON.stringify({ authenticated: true, user: { id: "" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await expect(synchronizeServerSession("focus")).resolves.toEqual(cached);
+    expect(getAuthSession()).toEqual(cached);
+  });
+
+  it("같은 계정의 서버 프로필을 병합하면서 bearer를 저장하지 않는다", () => {
+    persistSession({
+      user: { id: "profile-user", name: "이전 이름", role: "creator" },
+      token: null,
+    });
+
+    expect(
+      mergeCurrentSessionProfile({
+        id: "profile-user",
+        name: "새 이름",
+        image: "https://images.example/avatar.webp",
+      }),
+    ).toEqual({
+      user: {
+        id: "profile-user",
+        name: "새 이름",
+        image: "https://images.example/avatar.webp",
+        role: "creator",
+      },
+      token: null,
+    });
   });
 });

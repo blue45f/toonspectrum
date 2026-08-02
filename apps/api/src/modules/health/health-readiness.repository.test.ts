@@ -154,6 +154,7 @@ describe("PostgresHealthReadinessRepository", () => {
   it("tracks every relation declared across the current Drizzle schema", () => {
     const schemaFiles = [
       "../../../../../lib/db/schema.ts",
+      "../../../../../lib/db/creator-asset-object-storage.schema.ts",
       "../../../../../lib/db/creator-marketplace-resource.schema.ts",
       "../../../../../lib/db/studio-crdt-raster-checkpoint.schema.ts",
       "../../../../../lib/db/studio-raster-asset.schema.ts",

@@ -51,7 +51,8 @@ describe("API CORS", () => {
       headers: {
         Origin: CONFIGURED_ORIGIN,
         "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "content-type,x-user-id,idempotency-key",
+        "Access-Control-Request-Headers":
+          "content-type,x-user-id,idempotency-key,x-toonspectrum-csrf",
       },
     });
 
@@ -61,6 +62,8 @@ describe("API CORS", () => {
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("content-type");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-user-id");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("idempotency-key");
+    expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-toonspectrum-csrf");
+    expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
   it("허용된 Origin의 실제 POST 응답에도 CORS 헤더를 넣는다", async () => {
@@ -88,7 +91,7 @@ describe("API CORS", () => {
       });
       expect(preflight.status).toBe(204);
       expect(preflight.headers.get("access-control-allow-origin")).toBe(origin);
-      expect(preflight.headers.get("access-control-allow-credentials")).toBeNull();
+      expect(preflight.headers.get("access-control-allow-credentials")).toBe("true");
 
       const response = await fetch(`${baseUrl}/api/cors-probe`, {
         method: "POST",
@@ -97,7 +100,7 @@ describe("API CORS", () => {
       });
       expect(response.status).toBe(201);
       expect(response.headers.get("access-control-allow-origin")).toBe(origin);
-      expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+      expect(response.headers.get("access-control-allow-credentials")).toBe("true");
     }
   );
 
@@ -117,12 +120,14 @@ describe("API CORS", () => {
   it("운영에서는 임의 Origin과 localhost를 허용하지 않는다", () => {
     const origins = allowedCorsOrigins({
       NODE_ENV: "production",
-      API_CORS_ALLOWED_ORIGINS: "https://preview.example.com/,not-a-url,ftp://invalid.example.com",
+      API_CORS_ALLOWED_ORIGINS:
+        "https://preview.example.com/,http://insecure.example.com,not-a-url,ftp://invalid.example.com",
     });
 
     expect(origins).toContain("https://preview.example.com");
     expect(origins).toEqual(expect.arrayContaining([...PRODUCTION_CORS_ORIGINS]));
     expect(origins).not.toContain("http://localhost:5181");
+    expect(origins).not.toContain("http://insecure.example.com");
     expect(origins).not.toContain("not-a-url");
   });
 });

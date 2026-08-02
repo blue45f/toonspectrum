@@ -139,12 +139,14 @@ jobs:
               -X -v ON_ERROR_STOP=1 \
               -f "$migration_path"
           done < scripts/production-database-migrations.manifest
-          # drizzle-kit push describes the current schema, so remove only the three post-0019
+          # drizzle-kit push describes the current schema, so remove only post-0019
           # relations from this fresh CI database. Adoption must recreate them through the actual
           # 0020/0021/0022 SQL path rather than exercising CREATE IF NOT EXISTS no-ops.
           psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
             -X -v ON_ERROR_STOP=1 <<'SQL'
           DROP TABLE IF EXISTS
+            "creator_work_asset_storage_reference",
+            "creator_asset_storage_object",
             "creator_marketplace_publish_gate",
             "creator_marketplace_resource",
             "creator_draft_collaboration_room"
@@ -165,7 +167,7 @@ jobs:
           )"
           printf '%s\n' "$adoption_output"
           grep -Fq \
-            '19 adopted, 3 applied, 20 checksum-verified skips' \
+            '19 adopted, 4 applied, 20 checksum-verified skips' \
             <<< "$adoption_output"
       - name: Prove pending-only migration rerun
         run: |
@@ -180,7 +182,7 @@ jobs:
                 --confirmation APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS
           )"
           printf '%s\n' "$rerun_output"
-          grep -Fq '0 applied, 23 checksum-verified skips' <<< "$rerun_output"
+          grep -Fq '0 applied, 24 checksum-verified skips' <<< "$rerun_output"
       - name: Verify full runtime readiness and exact migration ledger
         run: |
           MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \

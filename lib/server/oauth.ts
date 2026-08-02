@@ -13,7 +13,8 @@ import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } 
 //   하위 호환: 기존 인가-코드 콜백 경로(handleOAuthCallback)도 키 설정 시 그대로 동작한다.
 // Kakao·Naver: 실 앱키(REST API key / client secret) 가 없어 의도적으로 데모 고정(DEMO_ONLY_PROVIDERS).
 //   실연동 재개 시 외부 앱키 발급 후 이 집합에서 제거하면 인가-코드 흐름으로 동작한다.
-// 세션은 서명 JWT(lib/server/session.ts) 로 발급되고 x-user-id 헤더로 전송된다.
+// 세션은 서명 JWT(lib/server/session.ts)로 발급되어 HttpOnly 쿠키에 저장된다.
+// 마이그레이션 중인 탭 전용 클라이언트는 같은 JWT를 x-user-id 헤더로도 보낼 수 있다.
 
 export type OAuthProviderId = "google" | "kakao" | "naver";
 export type OAuthProviderMode = "oauth" | "demo" | "disabled";
@@ -503,7 +504,7 @@ export async function createDemoUser(id: OAuthProviderId): Promise<OAuthUser> {
     });
   } catch {
     // DB(Neon) 불가(쿼터/장애) 시에도 데모 체험은 가능해야 한다 — 영속화 없이 합성 데모 사용자 반환.
-    // 세션은 클라이언트(localStorage)라 DB 행 없이도 로그인 체험이 동작한다.
+    // 합성 id도 서명된 HttpOnly 세션 쿠키로 검증되므로 DB 행 없이 데모 체험이 동작한다.
     return { id: `demo-${id}`, name: c.demoName, email: c.demoEmail, image: null, role: "user", sessionVersion: 1 };
   }
 }

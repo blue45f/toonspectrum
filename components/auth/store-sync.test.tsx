@@ -11,7 +11,7 @@ const session = vi.hoisted(() => ({
   value: {
     data: {
       user: { id: "owner-store-sync" },
-      token: "session-store-sync",
+      token: "session-store-sync" as string | null,
     },
     status: "authenticated" as const,
   },
@@ -65,6 +65,7 @@ describe("StoreSync collection reconciliation", () => {
     localStorage.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    session.value.data.token = "session-store-sync";
     resetStore();
   });
 
@@ -442,5 +443,29 @@ describe("StoreSync collection reconciliation", () => {
     expect(useApp.getState().collections.map(({ id, name }) => ({ id, name }))).toEqual([
       { id: "remote-added", name: "서버 최신" },
     ]);
+  });
+
+  it("hydrates with the HttpOnly cookie when no readable session token exists", async () => {
+    session.value.data.token = null;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new Headers(init?.headers).has("x-user-id")).toBe(false);
+      return response({
+        ratings: {},
+        reads: {},
+        subscriptions: {},
+        reviews: {},
+        likedReviews: {},
+        collections: [],
+        collectionIdMap: {},
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<StoreSync />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(useApp.getState().libraryOwnerId).toBe("owner-store-sync"));
+    expect(useApp.getState().userId).toBe("owner-store-sync");
+    expect(useApp.getState().sessionToken).toBeNull();
   });
 });

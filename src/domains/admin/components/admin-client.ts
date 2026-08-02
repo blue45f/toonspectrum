@@ -1,5 +1,4 @@
-// 관리자 API(Nest /api/admin/*) 공용 클라이언트 — 서명 세션 토큰을 x-user-id 헤더로 전달(서버 검증).
-import { getAuthToken } from "@/src/compat/auth-session-store";
+// 관리자 API(Nest /api/admin/*) 공용 클라이언트 — HttpOnly 쿠키 인증을 공유한다.
 import { api, HTTPError } from "@/src/infrastructure/api";
 
 export interface AdminMe {
@@ -88,10 +87,8 @@ export class AdminApiError extends Error {
   }
 }
 
-export async function adminFetch<T>(path: string, uid: string, init?: RequestInit): Promise<T> {
-  // 서명 토큰 우선(없으면 레거시 uid → 서버가 거부). 헤더를 직접 지정하므로 공유 훅은 덮어쓰지 않는다.
+export async function adminFetch<T>(path: string, _uid: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
-    "x-user-id": getAuthToken() ?? uid,
     ...(init?.body ? { "Content-Type": "application/json" } : {}),
   };
   if (init?.headers) {

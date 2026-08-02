@@ -1,14 +1,24 @@
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  RequestMethod,
+} from "@nestjs/common";
+import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
 import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import {
+  DeleteStudioWorkAssetGeneratedObjectQueryDto,
   DeleteStudioWorkAssetQueryDto,
+  StudioWorkAssetGeneratedParamsDto,
   StudioWorkAssetParamsDto,
+  StudioWorkAssetSignedReadQueryDto,
+  StudioWorkAssetSourceSignedReadQueryDto,
   StudioWorkAssetTypeQueryDto,
   StudioWorkAssetWorkParamsDto,
+  UploadStudioWorkAssetGeneratedObjectDto,
   UploadStudioWorkAssetLayerLiftBatchDto,
   UploadStudioWorkAssetDto,
 } from "./studio-work-asset.dto";
@@ -16,9 +26,15 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
 
 const service = {
   upload: vi.fn(),
+  uploadGeneratedObject: vi.fn(),
   uploadLayerLiftBatch: vi.fn(),
   getManifest: vi.fn(),
   getContent: vi.fn(),
+  getSourceStorageReference: vi.fn(),
+  getGeneratedStorageReference: vi.fn(),
+  createSourceSignedReadUrl: vi.fn(),
+  createGeneratedSignedReadUrl: vi.fn(),
+  deleteGeneratedObject: vi.fn(),
   deleteUnreferencedUpload: vi.fn(),
 };
 
@@ -29,10 +45,57 @@ function controller(): StudioWorkAssetController {
 describe("StudioWorkAssetController", () => {
   beforeEach(() => {
     service.upload.mockReset();
+    service.uploadGeneratedObject.mockReset();
     service.uploadLayerLiftBatch.mockReset();
     service.getManifest.mockReset();
     service.getContent.mockReset();
+    service.getSourceStorageReference.mockReset();
+    service.getGeneratedStorageReference.mockReset();
+    service.createSourceSignedReadUrl.mockReset();
+    service.createGeneratedSignedReadUrl.mockReset();
+    service.deleteGeneratedObject.mockReset();
     service.deleteUnreferencedUpload.mockReset();
+  });
+
+  it("publishes the source and generated object routes with exact HTTP methods", () => {
+    const routes = [
+      [
+        "uploadGeneratedObject",
+        RequestMethod.PUT,
+        "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+      ],
+      [
+        "sourceStorageReference",
+        RequestMethod.GET,
+        "/creator/works/:id/assets/:assetId/storage-reference",
+      ],
+      [
+        "sourceSignedReadUrl",
+        RequestMethod.GET,
+        "/creator/works/:id/assets/:assetId/content-url",
+      ],
+      [
+        "generatedStorageReference",
+        RequestMethod.GET,
+        "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+      ],
+      [
+        "generatedSignedReadUrl",
+        RequestMethod.GET,
+        "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId/content-url",
+      ],
+      [
+        "deleteGeneratedObject",
+        RequestMethod.DELETE,
+        "/creator/works/:id/assets/:assetId/generated/:purpose/:referenceId",
+      ],
+    ] as const;
+
+    for (const [methodName, requestMethod, path] of routes) {
+      const handler = StudioWorkAssetController.prototype[methodName];
+      expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(requestMethod);
+      expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe(path);
+    }
   });
 
   it("validates strict path, type query, and multipart fields without decorator metadata", () => {
@@ -42,6 +105,13 @@ describe("StudioWorkAssetController", () => {
     const workParamsPipe = new ZodValidationPipe(StudioWorkAssetWorkParamsDto);
     const layerLiftBodyPipe = new ZodValidationPipe(UploadStudioWorkAssetLayerLiftBatchDto);
     const deletePipe = new ZodValidationPipe(DeleteStudioWorkAssetQueryDto);
+    const generatedParamsPipe = new ZodValidationPipe(StudioWorkAssetGeneratedParamsDto);
+    const generatedUploadPipe = new ZodValidationPipe(UploadStudioWorkAssetGeneratedObjectDto);
+    const signedReadPipe = new ZodValidationPipe(StudioWorkAssetSignedReadQueryDto);
+    const sourceSignedReadPipe = new ZodValidationPipe(StudioWorkAssetSourceSignedReadQueryDto);
+    const generatedDeletePipe = new ZodValidationPipe(
+      DeleteStudioWorkAssetGeneratedObjectQueryDto,
+    );
     expect(paramsPipe.transform(
       { id: " work-1 ", assetId: "asset-1" },
       { type: "param", metatype: undefined, data: undefined }
@@ -82,6 +152,53 @@ describe("StudioWorkAssetController", () => {
       { elementType: "svg", extra: true },
       { type: "query", metatype: undefined, data: undefined }
     )).toThrow(BadRequestException);
+    expect(generatedParamsPipe.transform(
+      {
+        id: " work-1 ",
+        assetId: "asset-1",
+        purpose: "derived",
+        referenceId: "preview-1",
+      },
+      { type: "param", metatype: undefined, data: undefined },
+    )).toEqual({
+      id: "work-1",
+      assetId: "asset-1",
+      purpose: "derived",
+      referenceId: "preview-1",
+    });
+    expect(() => generatedParamsPipe.transform(
+      {
+        id: "work-1",
+        assetId: "asset-1",
+        purpose: "source",
+        referenceId: "asset-1",
+      },
+      { type: "param", metatype: undefined, data: undefined },
+    )).toThrow(BadRequestException);
+    expect(generatedUploadPipe.transform(
+      { elementType: "background3d" },
+      { type: "body", metatype: undefined, data: undefined },
+    )).toEqual({ elementType: "background3d" });
+    expect(signedReadPipe.transform(
+      {},
+      { type: "query", metatype: undefined, data: undefined },
+    )).toEqual({ expiresInSeconds: 120 });
+    expect(sourceSignedReadPipe.transform(
+      { elementType: "image", expiresInSeconds: "300" },
+      { type: "query", metatype: undefined, data: undefined },
+    )).toEqual({ elementType: "image", expiresInSeconds: 300 });
+    expect(() => signedReadPipe.transform(
+      { expiresInSeconds: "301" },
+      { type: "query", metatype: undefined, data: undefined },
+    )).toThrow(BadRequestException);
+    expect(generatedDeletePipe.transform(
+      { expectedDigest: `sha256:${"a".repeat(64)}` },
+      { type: "query", metatype: undefined, data: undefined },
+    )).toEqual({ expectedDigest: `sha256:${"a".repeat(64)}` });
+    expect(() => generatedDeletePipe.transform(
+      { expectedDigest: "a".repeat(64) },
+      { type: "query", metatype: undefined, data: undefined },
+    )).toThrow(BadRequestException);
   });
 
   it("passes authenticated work scope and exact ID/type to the service", async () => {
@@ -96,6 +213,91 @@ describe("StudioWorkAssetController", () => {
     )).resolves.toBe(manifest);
     expect(service.upload).toHaveBeenCalledWith(
       "editor", "work-1", "asset-1", "image", "{}", file
+    );
+  });
+
+  it("passes generated upload, reference, signed-read, and delete identities unchanged", async () => {
+    const params = {
+      id: "work-1",
+      assetId: "asset-1",
+      purpose: "derived" as const,
+      referenceId: "preview-1",
+    };
+    const file = { buffer: Buffer.from([1]), size: 1, mimetype: "image/png" };
+    const reference = { referenceId: "preview-1" };
+    const signed = { signedRead: { url: "https://example.test/signed" } };
+    const deleted = { deleted: true, remoteObjectDeleted: true };
+    service.uploadGeneratedObject.mockResolvedValue(reference);
+    service.getSourceStorageReference.mockResolvedValue(reference);
+    service.getGeneratedStorageReference.mockResolvedValue(reference);
+    service.createSourceSignedReadUrl.mockResolvedValue(signed);
+    service.createGeneratedSignedReadUrl.mockResolvedValue(signed);
+    service.deleteGeneratedObject.mockResolvedValue(deleted);
+
+    await expect(controller().uploadGeneratedObject(
+      params,
+      { elementType: "image" },
+      file,
+      "editor",
+    )).resolves.toBe(reference);
+    expect(service.uploadGeneratedObject).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      "asset-1",
+      "derived",
+      "preview-1",
+      "image",
+      file,
+    );
+
+    await expect(controller().sourceStorageReference(
+      { id: "work-1", assetId: "asset-1" },
+      { elementType: "image" },
+      "viewer",
+    )).resolves.toBe(reference);
+    expect(service.getSourceStorageReference).toHaveBeenCalledWith(
+      "viewer", "work-1", "asset-1", "image",
+    );
+
+    await expect(controller().sourceSignedReadUrl(
+      { id: "work-1", assetId: "asset-1" },
+      { elementType: "image", expiresInSeconds: 120 },
+      "viewer",
+    )).resolves.toBe(signed);
+    expect(service.createSourceSignedReadUrl).toHaveBeenCalledWith(
+      "viewer", "work-1", "asset-1", "image", 120,
+    );
+
+    await expect(controller().generatedStorageReference(
+      params,
+      "viewer",
+    )).resolves.toBe(reference);
+    expect(service.getGeneratedStorageReference).toHaveBeenCalledWith(
+      "viewer", "work-1", "asset-1", "derived", "preview-1",
+    );
+
+    await expect(controller().generatedSignedReadUrl(
+      params,
+      { expiresInSeconds: 90 },
+      "viewer",
+    )).resolves.toBe(signed);
+    expect(service.createGeneratedSignedReadUrl).toHaveBeenCalledWith(
+      "viewer", "work-1", "asset-1", "derived", "preview-1", 90,
+    );
+
+    const expectedDigest = `sha256:${"a".repeat(64)}`;
+    await expect(controller().deleteGeneratedObject(
+      params,
+      { expectedDigest },
+      "editor",
+    )).resolves.toBe(deleted);
+    expect(service.deleteGeneratedObject).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      "asset-1",
+      "derived",
+      "preview-1",
+      expectedDigest,
     );
   });
 

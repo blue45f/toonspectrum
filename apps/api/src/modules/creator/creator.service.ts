@@ -88,6 +88,7 @@ import {
   ProvisionCreatorDraftCollaborationRoomSchema,
   UpdateCreatorSharedDocumentSchema,
 } from "./creator.dto";
+import { StudioWorkAssetService } from "./studio-work-asset.service";
 
 import type { CreatorCollaborationRole } from "./creator-collaboration.policy";
 import type {
@@ -123,7 +124,9 @@ export class CreatorService {
     @Inject(CreatorCollaborationRepository)
     private readonly creatorCollaborationRepository: CreatorCollaborationRepository,
     @Inject(CREATOR_DRAFT_COLLABORATION_REPOSITORY)
-    private readonly creatorDraftCollaborationRepository: CreatorDraftCollaborationRepository
+    private readonly creatorDraftCollaborationRepository: CreatorDraftCollaborationRepository,
+    @Inject(StudioWorkAssetService)
+    private readonly studioWorkAssetService: StudioWorkAssetService,
   ) {}
 
   async listWorks(q: ListQuery, viewerId?: string) {
@@ -415,8 +418,14 @@ export class CreatorService {
 
   async deleteWork(userId: string, id: string, isAdmin: boolean) {
     try {
+      await this.studioWorkAssetService.deleteGeneratedObjectsForWork(
+        userId,
+        id,
+        isAdmin,
+      );
       return await deleteWork(userId, id, isAdmin);
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 삭제할 수 없습니다.");
     }
   }

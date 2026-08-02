@@ -4,7 +4,10 @@ import { verifySessionToken } from "../../../lib/server/session";
 import { isSessionAllowed } from "../../../lib/server/user-lifecycle";
 
 import { AUTH_SESSION_COOKIE_NAME, resolveSessionCookieValue } from "./session-cookie";
-import { sessionAuth } from "./session-middleware";
+import {
+  getSessionAuthenticationSource,
+  sessionAuth,
+} from "./session-middleware";
 
 
 vi.mock("../../../lib/server/session", () => ({
@@ -40,6 +43,7 @@ describe("session middleware", () => {
     await nextTick();
 
     expect(req.headers["x-user-id"]).toBe("header-user");
+    expect(getSessionAuthenticationSource(req)).toBe("header");
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -59,6 +63,7 @@ describe("session middleware", () => {
     await nextTick();
 
     expect(req.headers["x-user-id"]).toBe("cookie-user");
+    expect(getSessionAuthenticationSource(req)).toBe("cookie");
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -72,6 +77,53 @@ describe("session middleware", () => {
     await nextTick();
 
     expect(req.headers).toEqual({});
+    expect(getSessionAuthenticationSource(req)).toBeNull();
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates lifecycle dependency failures instead of logging the user out", async () => {
+    const next = vi.fn();
+    const dependencyError = new Error("database unavailable");
+    vi.mocked(verifySessionToken).mockReturnValue({
+      userId: "existing-user",
+      sessionVersion: 1,
+      expiresAt: Date.now() + 1_000,
+    });
+    vi.mocked(isSessionAllowed).mockRejectedValue(dependencyError);
+
+    const req = { headers: { cookie: `${AUTH_SESSION_COOKIE_NAME}=cookie-token` } } as never;
+    sessionAuth(req, {} as never, next);
+    await nextTick();
+
+    expect(req.headers["x-user-id"]).toBeUndefined();
+    expect(getSessionAuthenticationSource(req)).toBeNull();
+    expect(next).toHaveBeenCalledWith(dependencyError);
+  });
+
+  it("falls back to a valid cookie and records cookie auth after an invalid header", async () => {
+    const next = vi.fn();
+    vi.mocked(verifySessionToken).mockImplementation((token: unknown) =>
+      token === "cookie-token"
+        ? {
+            userId: "cookie-user",
+            sessionVersion: 1,
+            expiresAt: Date.now() + 1_000,
+          }
+        : null,
+    );
+    vi.mocked(isSessionAllowed).mockResolvedValue(true);
+
+    const req = {
+      headers: {
+        "x-user-id": "invalid-header-token",
+        cookie: `${AUTH_SESSION_COOKIE_NAME}=cookie-token`,
+      },
+    } as never;
+    sessionAuth(req, {} as never, next);
+    await nextTick();
+
+    expect(req.headers["x-user-id"]).toBe("cookie-user");
+    expect(getSessionAuthenticationSource(req)).toBe("cookie");
     expect(next).toHaveBeenCalledTimes(1);
   });
 });

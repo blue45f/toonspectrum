@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { buildCreatorAssetObjectStorageRuntimeAclSql } from "../../../../../scripts/run-production-database-migrations.mjs";
+
 import { preflightCreatorAssetSchema } from "./creator-asset-schema-preflight";
 
 const INTEGRATION_URL = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
@@ -24,6 +26,7 @@ function forwardMigrationBody(source: string, migrationName: string): string {
 }
 
 describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
+  const runtimeRoles: string[] = [];
   const userIds: string[] = [];
   let pool: Pool;
 
@@ -33,6 +36,10 @@ describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
   });
 
   afterEach(async () => {
+    for (const role of runtimeRoles.splice(0)) {
+      await pool.query(`DROP OWNED BY "${role}"`);
+      await pool.query(`DROP ROLE "${role}"`);
+    }
     const ids = userIds.splice(0);
     if (ids.length > 0) {
       await pool.query('DELETE FROM "user" WHERE "id" = ANY($1::text[])', [ids]);
@@ -55,6 +62,130 @@ describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
 
   it("accepts the exact migrated constraints and index definitions", async () => {
     await expect(preflightCreatorAssetSchema(pool)).resolves.toBeUndefined();
+  });
+
+  it("grants the runtime role only object-storage lifecycle mutations", async () => {
+    const role = `creator_storage_runtime_${randomUUID().replaceAll("-", "")}`;
+    await pool.query(`CREATE ROLE "${role}" NOLOGIN`);
+    runtimeRoles.push(role);
+    await pool.query(`GRANT USAGE ON SCHEMA public TO "${role}"`);
+    await pool.query(buildCreatorAssetObjectStorageRuntimeAclSql(role));
+
+    const [privileges] = (await pool.query<{
+      objectDelete: boolean;
+      objectDigestUpdate: boolean;
+      objectInsert: boolean;
+      objectPurposeInsert: boolean;
+      objectSelect: boolean;
+      objectStateInsert: boolean;
+      objectStateUpdate: boolean;
+      objectUpdate: boolean;
+      referenceDelete: boolean;
+      referenceInsert: boolean;
+      referenceSelect: boolean;
+      referenceStateInsert: boolean;
+      referenceStateUpdate: boolean;
+      referenceUpdate: boolean;
+      referenceWorkInsert: boolean;
+      referenceWorkUpdate: boolean;
+    }>(`
+      SELECT
+        has_table_privilege($1, 'public.creator_asset_storage_object', 'DELETE')
+          AS "objectDelete",
+        has_column_privilege(
+          $1,
+          'public.creator_asset_storage_object',
+          'digest',
+          'UPDATE'
+        ) AS "objectDigestUpdate",
+        has_table_privilege($1, 'public.creator_asset_storage_object', 'INSERT')
+          AS "objectInsert",
+        has_column_privilege(
+          $1,
+          'public.creator_asset_storage_object',
+          'purpose',
+          'INSERT'
+        ) AS "objectPurposeInsert",
+        has_table_privilege($1, 'public.creator_asset_storage_object', 'SELECT')
+          AS "objectSelect",
+        has_column_privilege(
+          $1,
+          'public.creator_asset_storage_object',
+          'state',
+          'INSERT'
+        ) AS "objectStateInsert",
+        has_column_privilege(
+          $1,
+          'public.creator_asset_storage_object',
+          'state',
+          'UPDATE'
+        ) AS "objectStateUpdate",
+        has_table_privilege($1, 'public.creator_asset_storage_object', 'UPDATE')
+          AS "objectUpdate",
+        has_table_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'DELETE'
+        ) AS "referenceDelete",
+        has_table_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'INSERT'
+        ) AS "referenceInsert",
+        has_table_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'SELECT'
+        ) AS "referenceSelect",
+        has_column_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'state',
+          'INSERT'
+        ) AS "referenceStateInsert",
+        has_column_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'state',
+          'UPDATE'
+        ) AS "referenceStateUpdate",
+        has_table_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'UPDATE'
+        ) AS "referenceUpdate",
+        has_column_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'workId',
+          'INSERT'
+        ) AS "referenceWorkInsert",
+        has_column_privilege(
+          $1,
+          'public.creator_work_asset_storage_reference',
+          'workId',
+          'UPDATE'
+        ) AS "referenceWorkUpdate"
+    `, [role])).rows;
+
+    expect(privileges).toEqual({
+      objectDelete: false,
+      objectDigestUpdate: false,
+      objectInsert: false,
+      objectPurposeInsert: true,
+      objectSelect: true,
+      objectStateInsert: false,
+      objectStateUpdate: true,
+      objectUpdate: false,
+      referenceDelete: true,
+      referenceInsert: false,
+      referenceSelect: true,
+      referenceStateInsert: false,
+      referenceStateUpdate: true,
+      referenceUpdate: false,
+      referenceWorkInsert: true,
+      referenceWorkUpdate: false,
+    });
   });
 
   it("transactionally repairs a weak same-name CHECK and wrong-shape index on reapply", async () => {

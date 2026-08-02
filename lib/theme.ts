@@ -2,8 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 // 다크(기본)/주간(light) 테마. i18n 과 같은 패턴 — zustand persist + <html data-theme> 적용.
-// 토큰 오버라이드는 src/styles/globals.css 의 :root[data-theme="light"] 블록. FOUC 방지 인라인
-// 스크립트는 index.html 에 있어, 리액트 마운트 전에 data-theme 을 먼저 설정한다.
+// 토큰 오버라이드는 src/styles/globals.css 의 :root[data-theme="light"] 블록. CSP를 유지하는
+// `/bootstrap-theme.js`가 리액트 마운트 전에 data-theme을 먼저 설정해 FOUC를 막는다.
 export type Theme = "dark" | "light";
 
 function applyTheme(theme: Theme) {

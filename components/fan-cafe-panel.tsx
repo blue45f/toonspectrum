@@ -30,8 +30,13 @@ import {
   COMMUNITY_SCOPE_LABEL_WITH_ALL,
   FAN_CAFE_SCOPE_COPY,
 } from "@/lib/community-ui";
+import { withCsrfProtection } from "@/lib/csrf";
 import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { ATTACHMENT_MAX_COUNT, fileToAttachmentDataUrl } from "@/lib/image-attach";
+import {
+  ATTACHMENT_MAX_COUNT,
+  fileToAttachmentDataUrl,
+  isAllowedImageDataUrl,
+} from "@/lib/image-attach";
 import { useApp } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
@@ -379,7 +384,7 @@ export function FanCafePanel({
     setIsSubmittingPost(true);
     setError(null);
     try {
-      const res = await fetch("/api/community/posts", {
+      const res = await fetch("/api/community/posts", withCsrfProtection({
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json", ...(authHeaders ?? {}) },
@@ -396,7 +401,7 @@ export function FanCafePanel({
             .map((tag) => tag.trim().toLowerCase())
             .filter(Boolean),
         }),
-      });
+      }));
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {
         setError(resolveApiError(data, "팬카페 글을 저장하지 못했습니다."));
@@ -822,10 +827,10 @@ function FanPostCard({
     if (!globalThis.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, {
+      const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, withCsrfProtection({
         method: "DELETE",
-        headers: { "x-user-id": sessionToken ?? "" },
-      });
+        headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
+      }));
       if (res.ok) onDeleted?.(post.id);
       else setDeleting(false);
     } catch {
@@ -932,9 +937,9 @@ function FanPostCard({
   );
 }
 
-// 첨부 이미지 그리드 — 서버에서 webp/jpeg/png 데이터 URL만 통과하므로 그대로 <img>로 렌더(텍스트는 항상 텍스트 노드).
+// 첨부 이미지 그리드 — 서버 검증을 거치지만 레거시/손상 행도 방어적으로 다시 거른다.
 export function FanPostImages({ title, images }: { title: string; images?: string[] }) {
-  const list = images ?? [];
+  const list = (images ?? []).filter(isAllowedImageDataUrl);
   if (list.length === 0) return null;
   return (
     <div className={cn("mt-3 grid gap-2", list.length === 1 ? "grid-cols-1 sm:max-w-sm" : "grid-cols-2 sm:grid-cols-3")}>
@@ -1122,7 +1127,7 @@ export function FanPostReplySection({
     setError(null);
 
     try {
-      const res = await fetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, {
+      const res = await fetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, withCsrfProtection({
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json", ...(sessionToken ? { "x-user-id": sessionToken } : {}) },
@@ -1130,7 +1135,7 @@ export function FanPostReplySection({
           text: draft,
           ...(parentId ? { parentId } : {}),
         }),
-      });
+      }));
 
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {
@@ -1159,13 +1164,17 @@ export function FanPostReplySection({
 
   // 본인 답글 삭제 — 하위 답글이 있으면 서버가 소프트 삭제(자리 표시)로 남긴다.
   async function deleteReply(replyId: string) {
-    if (!userId || !sessionToken) return;
+    if (!userId) return;
     if (!globalThis.confirm("이 댓글을 삭제할까요?")) return;
     setError(null);
     try {
       const res = await fetch(
         `/api/community/posts/${encodeURIComponent(postId)}/replies/${encodeURIComponent(replyId)}`,
-        { method: "DELETE", cache: "no-store", headers: { "x-user-id": sessionToken } }
+        withCsrfProtection({
+          method: "DELETE",
+          cache: "no-store",
+          headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
+        })
       );
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {

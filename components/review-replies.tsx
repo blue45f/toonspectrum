@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { ReviewReply } from "@/lib/types";
 
+import { withCsrfProtection } from "@/lib/csrf";
 import { ensureArray, resolveApiError, safeParseJson } from "@/lib/http-safe";
 import { useApp } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
@@ -85,12 +86,15 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     };
 
     setError(null);
-    const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, {
+    const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, withCsrfProtection({
       method: "POST",
       cache: "no-store",
-      headers: { "Content-Type": "application/json", "x-user-id": sessionToken ?? "" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(sessionToken ? { "x-user-id": sessionToken } : {}),
+      },
       body: JSON.stringify(body),
-    });
+    }));
 
     const data = await safeParseJson<unknown>(res);
     if (!res.ok) {
@@ -129,13 +133,17 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
   }
 
   async function deleteReply(replyId: string) {
-    if (!userId || !sessionToken) return;
+    if (!userId) return;
     if (!globalThis.confirm("이 답글을 삭제할까요?")) return;
     setError(null);
     try {
       const res = await fetch(
         `/api/reviews/${encodeURIComponent(reviewId)}/replies/${encodeURIComponent(replyId)}`,
-        { method: "DELETE", cache: "no-store", headers: { "x-user-id": sessionToken } }
+        withCsrfProtection({
+          method: "DELETE",
+          cache: "no-store",
+          headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
+        })
       );
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {

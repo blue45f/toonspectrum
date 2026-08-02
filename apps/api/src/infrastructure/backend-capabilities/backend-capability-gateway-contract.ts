@@ -26,7 +26,7 @@ export type CanonicalJsonValue =
   | CanonicalJsonValue[]
   | { [key: string]: CanonicalJsonValue };
 
-const CanonicalJsonValueSchema: z.ZodType<CanonicalJsonValue> = z.lazy(() =>
+export const CanonicalJsonValueSchema: z.ZodType<CanonicalJsonValue> = z.lazy(() =>
   z.union([
     z.null(),
     z.boolean(),
