@@ -49,20 +49,29 @@ describe("industrial OCCT WASM CAD", () => {
       "utf8",
     );
     const operationSource = source.slice(source.indexOf("function makeOcctBoxShape"));
+    // Narrow allowlist: only named ctors used by STEP/ThickSolid no-delete paths.
+    // Arbitrary unowned `new oc` still fails. Never allow chained `new oc…().Shape(`.
+    const noDeleteCtorAllowlist: readonly RegExp[] = [
+      /new oc\.BRepPrimAPI_MakeBox_1\s*\(/u,
+      /new oc\.STEPControl_Writer_1\s*\(/u,
+      /new oc\.STEPControl_Reader_1\s*\(/u,
+      /new oc\.TopExp_Explorer_2\s*\(/u,
+      /new oc\.TopTools_ListOfShape_1\s*\(/u,
+      /new oc\.BRepOffsetAPI_MakeThickSolid_1\s*\(/u,
+    ];
     const unownedConstructors = operationSource
       .split(/\r?\n/u)
       .filter((line) => line.includes("new oc") && !line.includes("owner.own(new oc"))
-      // STEP/ThickSolid Embind .delete() corrupts opencascade.js WASM — intentional no-owner lines.
-      .filter((line) => !line.includes("STEP_EMBIND_NO_DELETE") && !line.includes("THICK_EMBIND_NO_DELETE"));
+      .filter((line) => !noDeleteCtorAllowlist.some((re) => re.test(line)));
     expect(unownedConstructors).toEqual([]);
     expect(source).toContain("return await operation(runtime, owner);");
     expect(source).toContain("owner.dispose();");
+    // AC4: zero chained Shape() theater — no exceptions.
     const chainedShape = operationSource
       .split(/\r?\n/u)
       .filter((line) =>
         /new oc(?:\[[^\]]+\]|\.[A-Za-z0-9_]+)\([^;\n]*\)\.Shape\(/u.test(line)
-      )
-      .filter((line) => !line.includes("STEP_EMBIND_NO_DELETE") && !line.includes("THICK_EMBIND_NO_DELETE"));
+      );
     expect(chainedShape).toEqual([]);
   });
 

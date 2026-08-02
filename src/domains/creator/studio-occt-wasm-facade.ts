@@ -822,14 +822,14 @@ export async function occtMakeThickShellBox(
   thickness: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
   // ThickSolid Embind handles corrupt the shared WASM table when .delete() is called.
-  // Mirror STEP policy: construct without owner.dispose (THICK_EMBIND_NO_DELETE).
+  // Construct without owner.dispose; still unchain .Shape() (AC4).
   try {
     const runtime = await loadStudioOcctRuntime();
     const oc = runtime.module;
-    const boxBuilder = /* THICK_EMBIND_NO_DELETE */ new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz);
+    const boxBuilder = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz);
     const box = boxBuilder.Shape();
     const faces: unknown[] = [];
-    const exp = /* THICK_EMBIND_NO_DELETE */ new oc.TopExp_Explorer_2(
+    const exp = new oc.TopExp_Explorer_2(
       box,
       oc.TopAbs_ShapeEnum.TopAbs_FACE,
       oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
@@ -841,13 +841,13 @@ export async function occtMakeThickShellBox(
     if (faces.length < 1) {
       return { ok: false, code: "no-faces", detail: "box has no faces to open" };
     }
-    const list = /* THICK_EMBIND_NO_DELETE */ new oc.TopTools_ListOfShape_1();
+    const list = new oc.TopTools_ListOfShape_1();
     if (isCallable(list.Append_1)) list.Append_1(faces[0]);
     else if (isCallable(list.Append)) list.Append(faces[0]);
     else {
       return { ok: false, code: "no-list-append", detail: "TopTools_ListOfShape.Append missing" };
     }
-    const thick = /* THICK_EMBIND_NO_DELETE */ new oc.BRepOffsetAPI_MakeThickSolid_1();
+    const thick = new oc.BRepOffsetAPI_MakeThickSolid_1();
     if (!isCallable(thick.MakeThickSolidByJoin)) {
       return { ok: false, code: "no-thick-join", detail: "MakeThickSolidByJoin missing" };
     }
@@ -921,10 +921,10 @@ export async function occtStepRoundTripBox(
     if (!oc.FS?.readFile) {
       return { ok: false, code: "no-fs", detail: "OCCT WASM FS unavailable for STEP I/O" };
     }
-    // STEP_EMBIND_NO_DELETE: do not owner.own / .delete() these handles.
-    // Match the proven probe path exactly (hardcoded short FS name + chained MakeBox).
-    const box = /* STEP_EMBIND_NO_DELETE */ new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
-    const writer = /* STEP_EMBIND_NO_DELETE */ new oc.STEPControl_Writer_1();
+    // No Embind .delete() on STEP handles (corrupts wasmTable). Still unchain .Shape().
+    const boxBuilder = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz);
+    const box = boxBuilder.Shape();
+    const writer = new oc.STEPControl_Writer_1();
     writer.Transfer(box, 0, true);
     const fileName = "qq.stp";
     writer.Write(fileName);
@@ -945,7 +945,7 @@ export async function occtStepRoundTripBox(
         detail: "written STEP missing ISO-10303-21 header",
       };
     }
-    const reader = /* STEP_EMBIND_NO_DELETE */ new oc.STEPControl_Reader_1();
+    const reader = new oc.STEPControl_Reader_1();
     reader.ReadFile(fileName);
     if (isCallable(reader.TransferRoots)) reader.TransferRoots();
     else if (isCallable(reader.TransferRoot)) reader.TransferRoot();
