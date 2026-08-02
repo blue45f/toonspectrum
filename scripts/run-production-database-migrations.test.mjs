@@ -19,10 +19,40 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(24);
+  expect(manifest).toHaveLength(25);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0024_creator_asset_object_storage");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(24);
+  expect(manifest.at(-1).id).toBe("0025_auth_lifecycle_contract");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(25);
+});
+
+test("auth lifecycle migration owns schema repair and a durable readiness marker", () => {
+  const migration = loadMigrationManifest().at(-1);
+  expect(migration?.id).toBe("0025_auth_lifecycle_contract");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ALTER TABLE "user"',
+    'ALTER TABLE "account"',
+    'CONSTRAINT "user_status_check"',
+    'CONSTRAINT "user_session_version_check"',
+    'CONSTRAINT "account_userId_user_id_fk"',
+    'CREATE INDEX "idx_user_status_created"',
+    'CREATE INDEX "idx_account_user"',
+    "0025_auth_lifecycle_contract",
+    'INSERT INTO "toonspectrum_schema_migration"',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toContain('ON DELETE CASCADE');
+  expect(sql).not.toMatch(/GRANT\s+CREATE|ALTER\s+ROLE/u);
+
+  const drizzleSchema = readFileSync(
+    new URL("../lib/db/schema.ts", import.meta.url),
+    "utf8",
+  );
+  expect(drizzleSchema).toContain(
+    'index("idx_user_status_created").on(u.status, u.createdAt)',
+  );
 });
 
 test("manifest sequence continuity rejects a missing middle number", () => {
@@ -266,8 +296,8 @@ test("a future missing migration is pending after historical adoption", () => {
   expect(
     decideMigrationAction({
       migration: {
-        id: "0024_future_contract",
-        sequence: 24,
+        id: "0026_future_contract",
+        sequence: 26,
         checksum: "c".repeat(64),
       },
       ledgerEntry: undefined,
@@ -320,8 +350,8 @@ test("repair never creates a missing historical or pending ledger row", () => {
       checksum: "e".repeat(64),
     },
     {
-      id: "0024_future_contract",
-      sequence: 24,
+      id: "0026_future_contract",
+      sequence: 26,
       checksum: "f".repeat(64),
     },
   ]) {

@@ -480,7 +480,6 @@ export function AuthModal({
                     <GoogleIdentityButton
                       clientId={providers.google.clientId}
                       onSuccess={onClose}
-                      onError={setErr}
                     />
                   ) : (
                     <div

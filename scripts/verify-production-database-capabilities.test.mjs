@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 
 import {
+  buildAuthRuntimeAclViolationSql,
+  buildAuthSchemaCapabilityViolationSql,
   buildProductionCapabilityVerificationSql,
   loadHealthReadinessContract,
   validateRuntimeDatabaseRole,
@@ -18,6 +20,7 @@ test("loads the runtime health readiness relation and cutover contract", () => {
   expect(contract.relationNames).toContain("creator_marketplace_resource");
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
+    "0025_auth_lifecycle_contract",
   ]);
 });
 
@@ -31,6 +34,10 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildRuntimeDatabaseRoleBoundaryStateSql("webdex_runtime"),
+  );
+  expect(sql).toContain(buildAuthSchemaCapabilityViolationSql());
+  expect(sql).toContain(
+    buildAuthRuntimeAclViolationSql("webdex_runtime"),
   );
   for (const requiredFragment of [
     "creator_work_team_comment_activity_action_check",
@@ -46,12 +53,19 @@ test("generated verification covers runtime capabilities and exact migration che
     "__managed_history_through_0019__",
     "0023_production_migration_ledger",
     "0024_creator_asset_object_storage",
+    "0025_auth_lifecycle_contract",
     "'adopted'",
     "'executed'",
     "'bootstrap'",
     "runtime and migration database roles are not safely separated",
     "runtime database role owns the migration ledger",
     "runtime role lacks the exact creator object-storage privileges",
+    "authentication lifecycle schema capability is incomplete",
+    "runtime role lacks the exact authentication lifecycle privileges",
+    "idx_user_status_created",
+    "idx_account_user",
+    "user_status_check",
+    "user_session_version_check",
     "runtime-has-memberships",
     "runtime-can-create-database-objects",
     "runtime-can-create-public-objects",

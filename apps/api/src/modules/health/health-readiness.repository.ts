@@ -87,6 +87,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
  */
 export const REQUIRED_DATABASE_MIGRATIONS = [
   "0017_creator_work_live_lock_revision",
+  "0025_auth_lifecycle_contract",
 ] as const;
 
 interface DatabasePingRow {
@@ -95,6 +96,13 @@ interface DatabasePingRow {
 
 interface SchemaCatalogRow {
   relationNames: string[] | null;
+  authUserColumnsReady: boolean;
+  authUserConstraintsReady: boolean;
+  authUserStatusIndexReady: boolean;
+  authAccountColumnsReady: boolean;
+  authAccountConstraintsReady: boolean;
+  authAccountUserIndexReady: boolean;
+  authRuntimeDmlReady: boolean;
   marketplaceSearchGenerated: boolean;
   marketplaceSearchIndexReady: boolean;
   marketplaceTagIndexReady: boolean;
@@ -164,6 +172,227 @@ export class PostgresHealthReadinessRepository
                 FILTER (WHERE relation.relname IS NOT NULL),
               ARRAY[]::text[]
             ) AS "relationNames",
+            NOT EXISTS (
+              SELECT 1
+              FROM (VALUES
+                ('id', 'text', true),
+                ('name', 'text', false),
+                ('email', 'text', false),
+                ('emailVerified', 'timestamp without time zone', false),
+                ('image', 'text', false),
+                ('role', 'text', true),
+                ('status', 'text', true),
+                ('sessionVersion', 'integer', true),
+                ('suspendedAt', 'timestamp without time zone', false),
+                ('suspensionReason', 'text', false),
+                ('deletedAt', 'timestamp without time zone', false),
+                ('passwordHash', 'text', false),
+                ('avatar', 'text', false),
+                ('bio', 'text', false),
+                ('createdAt', 'timestamp without time zone', false)
+              ) AS expected_column("name", "type", "notNull")
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS attribute
+                WHERE attribute.attrelid = to_regclass('public."user"')
+                  AND attribute.attname = expected_column."name"
+                  AND pg_catalog.format_type(
+                    attribute.atttypid,
+                    attribute.atttypmod
+                  ) = expected_column."type"
+                  AND attribute.attnotnull = expected_column."notNull"
+                  AND attribute.attnum > 0
+                  AND NOT attribute.attisdropped
+              )
+            )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS attribute
+                JOIN pg_catalog.pg_attrdef AS default_record
+                  ON default_record.adrelid = attribute.attrelid
+                  AND default_record.adnum = attribute.attnum
+                WHERE attribute.attrelid = to_regclass('public."user"')
+                  AND attribute.attname = 'role'
+                  AND pg_catalog.pg_get_expr(
+                    default_record.adbin,
+                    default_record.adrelid
+                  ) = '''user''::text'
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS attribute
+                JOIN pg_catalog.pg_attrdef AS default_record
+                  ON default_record.adrelid = attribute.attrelid
+                  AND default_record.adnum = attribute.attnum
+                WHERE attribute.attrelid = to_regclass('public."user"')
+                  AND attribute.attname = 'status'
+                  AND pg_catalog.pg_get_expr(
+                    default_record.adbin,
+                    default_record.adrelid
+                  ) = '''active''::text'
+              )
+              AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS attribute
+                JOIN pg_catalog.pg_attrdef AS default_record
+                  ON default_record.adrelid = attribute.attrelid
+                  AND default_record.adnum = attribute.attnum
+                WHERE attribute.attrelid = to_regclass('public."user"')
+                  AND attribute.attname = 'sessionVersion'
+                  AND pg_catalog.pg_get_expr(
+                    default_record.adbin,
+                    default_record.adrelid
+                  ) = '1'
+              ) AS "authUserColumnsReady",
+            (
+              SELECT count(*) = 4
+              FROM pg_catalog.pg_constraint AS constraint_record
+              WHERE constraint_record.conrelid = to_regclass('public."user"')
+                AND constraint_record.convalidated
+                AND (
+                  (
+                    constraint_record.contype = 'p'
+                    AND pg_catalog.pg_get_constraintdef(
+                      constraint_record.oid,
+                      true
+                    ) = 'PRIMARY KEY (id)'
+                  )
+                  OR (
+                    constraint_record.contype = 'u'
+                    AND pg_catalog.pg_get_constraintdef(
+                      constraint_record.oid,
+                      true
+                    ) = 'UNIQUE (email)'
+                  )
+                  OR (
+                    constraint_record.contype = 'c'
+                    AND constraint_record.conname = 'user_status_check'
+                  )
+                  OR (
+                    constraint_record.contype = 'c'
+                    AND constraint_record.conname = 'user_session_version_check'
+                  )
+                )
+            ) AS "authUserConstraintsReady",
+            EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_class AS index_record
+              JOIN pg_catalog.pg_namespace AS index_namespace
+                ON index_namespace.oid = index_record.relnamespace
+              JOIN pg_catalog.pg_index AS index_state
+                ON index_state.indexrelid = index_record.oid
+              JOIN pg_catalog.pg_attribute AS status_attribute
+                ON status_attribute.attrelid = index_state.indrelid
+                AND status_attribute.attnum = index_state.indkey[0]
+              JOIN pg_catalog.pg_attribute AS created_attribute
+                ON created_attribute.attrelid = index_state.indrelid
+                AND created_attribute.attnum = index_state.indkey[1]
+              WHERE index_namespace.nspname = 'public'
+                AND index_record.relname = 'idx_user_status_created'
+                AND index_record.relkind = 'i'
+                AND index_state.indrelid = to_regclass('public."user"')
+                AND index_state.indisvalid
+                AND index_state.indisready
+                AND index_state.indislive
+                AND NOT index_state.indisunique
+                AND NOT index_state.indisprimary
+                AND NOT index_state.indisexclusion
+                AND index_state.indnkeyatts = 2
+                AND index_state.indnatts = 2
+                AND index_state.indexprs IS NULL
+                AND index_state.indpred IS NULL
+                AND status_attribute.attname = 'status'
+                AND created_attribute.attname = 'createdAt'
+            ) AS "authUserStatusIndexReady",
+            NOT EXISTS (
+              SELECT 1
+              FROM (VALUES
+                ('userId', 'text', true),
+                ('type', 'text', true),
+                ('provider', 'text', true),
+                ('providerAccountId', 'text', true),
+                ('refresh_token', 'text', false),
+                ('access_token', 'text', false),
+                ('expires_at', 'integer', false),
+                ('token_type', 'text', false),
+                ('scope', 'text', false),
+                ('id_token', 'text', false),
+                ('session_state', 'text', false)
+              ) AS expected_column("name", "type", "notNull")
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_attribute AS attribute
+                WHERE attribute.attrelid = to_regclass('public.account')
+                  AND attribute.attname = expected_column."name"
+                  AND pg_catalog.format_type(
+                    attribute.atttypid,
+                    attribute.atttypmod
+                  ) = expected_column."type"
+                  AND attribute.attnotnull = expected_column."notNull"
+                  AND attribute.attnum > 0
+                  AND NOT attribute.attisdropped
+              )
+            ) AS "authAccountColumnsReady",
+            (
+              SELECT count(*) = 2
+              FROM pg_catalog.pg_constraint AS constraint_record
+              WHERE constraint_record.conrelid = to_regclass('public.account')
+                AND constraint_record.convalidated
+                AND (
+                  (
+                    constraint_record.contype = 'p'
+                    AND pg_catalog.pg_get_constraintdef(
+                      constraint_record.oid,
+                      true
+                    ) = 'PRIMARY KEY (provider, "providerAccountId")'
+                  )
+                  OR (
+                    constraint_record.contype = 'f'
+                    AND constraint_record.confrelid = to_regclass('public."user"')
+                    AND constraint_record.confdeltype = 'c'
+                    AND pg_catalog.pg_get_constraintdef(
+                      constraint_record.oid,
+                      true
+                    ) = 'FOREIGN KEY ("userId") REFERENCES "user"(id) ON DELETE CASCADE'
+                  )
+                )
+            ) AS "authAccountConstraintsReady",
+            EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_class AS index_record
+              JOIN pg_catalog.pg_namespace AS index_namespace
+                ON index_namespace.oid = index_record.relnamespace
+              JOIN pg_catalog.pg_index AS index_state
+                ON index_state.indexrelid = index_record.oid
+              JOIN pg_catalog.pg_attribute AS user_attribute
+                ON user_attribute.attrelid = index_state.indrelid
+                AND user_attribute.attnum = index_state.indkey[0]
+              WHERE index_namespace.nspname = 'public'
+                AND index_record.relname = 'idx_account_user'
+                AND index_record.relkind = 'i'
+                AND index_state.indrelid = to_regclass('public.account')
+                AND index_state.indisvalid
+                AND index_state.indisready
+                AND index_state.indislive
+                AND NOT index_state.indisunique
+                AND NOT index_state.indisprimary
+                AND NOT index_state.indisexclusion
+                AND index_state.indnkeyatts = 1
+                AND index_state.indnatts = 1
+                AND index_state.indexprs IS NULL
+                AND index_state.indpred IS NULL
+                AND user_attribute.attname = 'userId'
+            ) AS "authAccountUserIndexReady",
+            pg_catalog.has_table_privilege(
+              current_user,
+              'public."user"',
+              'SELECT, INSERT, UPDATE, DELETE'
+            )
+              AND pg_catalog.has_table_privilege(
+                current_user,
+                'public.account',
+                'SELECT, INSERT, UPDATE, DELETE'
+              ) AS "authRuntimeDmlReady",
             EXISTS (
               SELECT 1
               FROM pg_catalog.pg_attribute AS attribute
@@ -340,6 +569,13 @@ export class PostgresHealthReadinessRepository
     if (
       !state ||
       !containsEvery(state.relationNames, REQUIRED_DATABASE_RELATIONS) ||
+      state.authUserColumnsReady !== true ||
+      state.authUserConstraintsReady !== true ||
+      state.authUserStatusIndexReady !== true ||
+      state.authAccountColumnsReady !== true ||
+      state.authAccountConstraintsReady !== true ||
+      state.authAccountUserIndexReady !== true ||
+      state.authRuntimeDmlReady !== true ||
       state.marketplaceSearchGenerated !== true ||
       state.marketplaceSearchIndexReady !== true ||
       state.marketplaceTagIndexReady !== true ||

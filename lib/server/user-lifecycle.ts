@@ -17,30 +17,39 @@ export interface UserLifecycleRow {
 
 let lifecycleSchemaReady: Promise<void> | null = null;
 
+async function assertUserLifecycleSchema(): Promise<void> {
+  // Runtime connections intentionally have DML-only privileges. Resolve every
+  // authentication/lifecycle column without reading user data so a missing or
+  // stale schema fails closed, while all DDL remains owned by migrations.
+  await dbClient.execute(`
+    SELECT
+      "id",
+      "name",
+      "email",
+      "emailVerified",
+      "image",
+      "role",
+      "status",
+      "sessionVersion",
+      "suspendedAt",
+      "suspensionReason",
+      "deletedAt",
+      "passwordHash",
+      "avatar",
+      "bio",
+      "createdAt"
+    FROM "user"
+    WHERE FALSE
+  `);
+}
+
 export async function ensureUserLifecycleSchema(): Promise<void> {
-  lifecycleSchemaReady ??= (async () => {
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'`);
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "sessionVersion" integer NOT NULL DEFAULT 1`);
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "suspendedAt" timestamp`);
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "suspensionReason" text`);
-    await dbClient.execute(`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "deletedAt" timestamp`);
-    await dbClient.execute(`
-      UPDATE "user"
-      SET status = 'active'
-      WHERE status IS NULL OR status NOT IN ('active', 'suspended', 'deleted')
-    `);
-    await dbClient.execute(`
-      UPDATE "user"
-      SET "sessionVersion" = 1
-      WHERE "sessionVersion" IS NULL OR "sessionVersion" < 1
-    `);
-    await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_user_status_created ON "user"(status, "createdAt")`);
-  })();
+  const pending = lifecycleSchemaReady ??= assertUserLifecycleSchema();
 
   try {
-    await lifecycleSchemaReady;
+    await pending;
   } catch (error) {
-    lifecycleSchemaReady = null;
+    if (lifecycleSchemaReady === pending) lifecycleSchemaReady = null;
     throw error;
   }
 }

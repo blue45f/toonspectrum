@@ -168,6 +168,47 @@ describe("auth session store", () => {
     expect(getAuthSession()).toBeNull();
   });
 
+  it("Google 로그인 내부 장애의 안전한 503 문구와 상태를 그대로 전달한다", async () => {
+    const error = "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.";
+    apiRaw.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      signInWithGoogleIdToken("header.payload.signature"),
+    ).resolves.toEqual({
+      ok: false,
+      error,
+      status: 503,
+    });
+    expect(getAuthSession()).toBeNull();
+  });
+
+  it.each([
+    { error: { message: "internal detail" } },
+    { error: ["internal detail"] },
+    { error: "   " },
+  ])("문자열이 아닌 Google 오류 응답은 안전한 문구로 대체한다: %j", async (payload) => {
+    apiRaw.mockResolvedValue(
+      new Response(
+        JSON.stringify(payload),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(
+      signInWithGoogleIdToken("header.payload.signature"),
+    ).resolves.toEqual({
+      ok: false,
+      error: "Google 로그인에 실패했어요. 다시 시도해 주세요.",
+      status: 502,
+    });
+    expect(getAuthSession()).toBeNull();
+  });
+
   it("네트워크 실패를 예외로 전파하지 않고 재시도 가능한 결과로 반환한다", async () => {
     apiRaw.mockRejectedValue(new TypeError("network unavailable"));
 

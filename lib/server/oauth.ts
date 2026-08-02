@@ -3,7 +3,7 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { and, eq } from "drizzle-orm";
 import { OAuth2Client } from "google-auth-library";
 
-import { accounts, db, users } from "../db";
+import { accounts, db, dbClient, users } from "../db";
 
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
@@ -340,28 +340,39 @@ async function fetchProfile(id: OAuthProviderId, accessToken: string): Promise<N
   };
 }
 
-// account/user 테이블 보장 — drizzle-kit 미적용 환경에서도 첫 OAuth 시 생성.
+// Runtime role은 DML 권한만 가진다. OAuth 핫패스에서는 필요한 컬럼을
+// 데이터 조회 없이 확인하고, 스키마 생성·변경은 migration에만 맡긴다.
 let oauthTablesReady: Promise<void> | null = null;
-export function ensureOAuthTables(): Promise<void> {
-  oauthTablesReady ??= (async () => {
-    await ensureUserLifecycleSchema();
-    const { dbClient } = await import("../db");
-    await dbClient.execute(`CREATE TABLE IF NOT EXISTS "account" (
-      "userId" text NOT NULL,
-      "type" text NOT NULL,
-      "provider" text NOT NULL,
-      "providerAccountId" text NOT NULL,
-      "refresh_token" text,
-      "access_token" text,
-      "expires_at" integer,
-      "token_type" text,
-      "scope" text,
-      "id_token" text,
-      "session_state" text,
-      PRIMARY KEY ("provider", "providerAccountId")
-    )`);
-  })();
-  return oauthTablesReady;
+
+async function assertOAuthTables(): Promise<void> {
+  await ensureUserLifecycleSchema();
+  await dbClient.execute(`
+    SELECT
+      "userId",
+      "type",
+      "provider",
+      "providerAccountId",
+      "refresh_token",
+      "access_token",
+      "expires_at",
+      "token_type",
+      "scope",
+      "id_token",
+      "session_state"
+    FROM "account"
+    WHERE FALSE
+  `);
+}
+
+export async function ensureOAuthTables(): Promise<void> {
+  const pending = oauthTablesReady ??= assertOAuthTables();
+
+  try {
+    await pending;
+  } catch (error) {
+    if (oauthTablesReady === pending) oauthTablesReady = null;
+    throw error;
+  }
 }
 
 const AVATAR_COLORS = ["#ff5a36", "#9b7bff", "#5a8cff", "#22b8a6", "#ff6b9d", "#f4a52a"];
@@ -391,32 +402,79 @@ async function upsertOAuthUser(
   if (!userId) {
     const mayLinkByEmail = id !== "google" || profile.emailVerified === true;
     const [byEmail] = mayLinkByEmail
-      ? await db.select().from(users).where(eq(users.email, email)).limit(1)
+      ? await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1)
       : [];
     if (byEmail) {
       userId = byEmail.id;
     } else {
-      userId = randomUUID();
-      await db.insert(users).values({
-        id: userId,
-        email,
-        name,
-        image: profile.image ?? null,
-        avatar: avatarFor(email),
-        role: "user",
-      });
+      const candidateUserId = randomUUID();
+      const [insertedUser] = await db
+        .insert(users)
+        .values({
+          id: candidateUserId,
+          email,
+          name,
+          image: profile.image ?? null,
+          avatar: avatarFor(email),
+          role: "user",
+        })
+        .onConflictDoNothing({ target: users.email })
+        .returning({ id: users.id });
+      if (insertedUser) {
+        userId = insertedUser.id;
+      } else {
+        // A concurrent first login may have inserted the same unique email.
+        // Only the existing verified-link policy may adopt that authoritative row.
+        const [authoritativeUser] = mayLinkByEmail
+          ? await db
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.email, email))
+              .limit(1)
+          : [];
+        if (!authoritativeUser) {
+          throw new Error("oauth user conflict could not be resolved");
+        }
+        userId = authoritativeUser.id;
+      }
     }
-    await db.insert(accounts).values({
-      userId,
-      type: "oauth",
-      provider: id,
-      providerAccountId: profile.providerAccountId,
-      access_token: (tokens?.access_token as string) ?? null,
-      refresh_token: (tokens?.refresh_token as string) ?? null,
-      token_type: (tokens?.token_type as string) ?? null,
-      scope: (tokens?.scope as string) ?? null,
-      id_token: (tokens?.id_token as string) ?? null,
-    });
+    await db
+      .insert(accounts)
+      .values({
+        userId,
+        type: "oauth",
+        provider: id,
+        providerAccountId: profile.providerAccountId,
+        access_token: (tokens?.access_token as string) ?? null,
+        refresh_token: (tokens?.refresh_token as string) ?? null,
+        token_type: (tokens?.token_type as string) ?? null,
+        scope: (tokens?.scope as string) ?? null,
+        id_token: (tokens?.id_token as string) ?? null,
+      })
+      .onConflictDoNothing({
+        target: [accounts.provider, accounts.providerAccountId],
+      });
+
+    // The composite provider key, not this request's candidate user, owns the
+    // final linkage when concurrent valid callbacks race.
+    const [authoritativeAccount] = await db
+      .select({ userId: accounts.userId })
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.provider, id),
+          eq(accounts.providerAccountId, profile.providerAccountId),
+        ),
+      )
+      .limit(1);
+    if (!authoritativeAccount) {
+      throw new Error("oauth account conflict could not be resolved");
+    }
+    userId = authoritativeAccount.userId;
   }
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

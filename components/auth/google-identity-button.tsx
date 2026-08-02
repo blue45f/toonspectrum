@@ -110,18 +110,23 @@ function initializeGoogleIdentity(clientId: string): void {
 type GoogleIdentityButtonProps = {
   clientId: string;
   onSuccess: () => void;
-  onError: (message: string) => void;
 };
+
+type GoogleIdentityState =
+  | { status: "loading" | "ready" | "submitting" }
+  | {
+      status: "error";
+      phase: "load" | "signin";
+      message: string;
+    };
 
 export function GoogleIdentityButton({
   clientId,
   onSuccess,
-  onError,
 }: GoogleIdentityButtonProps) {
   const holderRef = useRef<HTMLDivElement | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "error">("loading");
-  const [localError, setLocalError] = useState("");
+  const [state, setState] = useState<GoogleIdentityState>({ status: "loading" });
 
   useEffect(() => {
     let active = true;
@@ -130,26 +135,21 @@ export function GoogleIdentityButton({
     let observer: ResizeObserver | null = null;
     const requestController = new AbortController();
 
-    setStatus("loading");
-    setLocalError("");
-    onError("");
+    setState({ status: "loading" });
 
-    const fail = (message: string) => {
+    const fail = (phase: "load" | "signin", message: string) => {
       if (!active) return;
-      setStatus("error");
-      setLocalError(message);
-      onError(message);
+      setState({ status: "error", phase, message });
     };
 
     const handleCredential = async (credential?: string) => {
       if (!active || inFlight) return;
       if (!credential) {
-        fail("Google 로그인 응답이 비어 있어요. 다시 시도해 주세요.");
+        fail("signin", "Google 로그인 응답이 비어 있어요. 다시 시도해 주세요.");
         return;
       }
       inFlight = true;
-      setStatus("submitting");
-      setLocalError("");
+      setState({ status: "submitting" });
       const result = await signInWithGoogleIdToken(credential, {
         signal: requestController.signal,
       });
@@ -159,7 +159,7 @@ export function GoogleIdentityButton({
         onSuccess();
         return;
       }
-      fail(result.error);
+      fail("signin", result.error);
     };
 
     const renderButton = () => {
@@ -190,14 +190,14 @@ export function GoogleIdentityButton({
           observer = new ResizeObserver(renderButton);
           observer.observe(holderRef.current.parentElement);
         }
-        setStatus("ready");
+        setState({ status: "ready" });
       })
       .catch((error: unknown) => {
         const message =
           error instanceof Error
             ? error.message
             : "Google 로그인을 불러오지 못했어요. 다시 시도해 주세요.";
-        fail(message);
+        fail("load", message);
       });
 
     return () => {
@@ -206,18 +206,21 @@ export function GoogleIdentityButton({
       observer?.disconnect();
       if (activeCredentialHandler === handleCredential) activeCredentialHandler = null;
     };
-  }, [attempt, clientId, onError, onSuccess]);
+  }, [attempt, clientId, onSuccess]);
+
+  const buttonVisible = state.status === "ready" || state.status === "submitting";
 
   return (
     <div
       className="relative min-h-11 w-full overflow-hidden rounded-xl"
-      aria-busy={status === "loading" || status === "submitting"}
+      aria-busy={state.status === "loading" || state.status === "submitting"}
     >
       <div
         ref={holderRef}
-        className={status === "submitting" ? "pointer-events-none flex justify-center opacity-45" : "flex justify-center"}
+        hidden={!buttonVisible}
+        className={state.status === "submitting" ? "pointer-events-none flex justify-center opacity-45" : "flex justify-center"}
       />
-      {status === "loading" && (
+      {state.status === "loading" && (
         <div
           className="flex h-11 w-full animate-pulse items-center justify-center rounded-xl border border-line bg-card text-xs text-fg-3"
           role="status"
@@ -225,7 +228,7 @@ export function GoogleIdentityButton({
           Google 로그인 준비 중…
         </div>
       )}
-      {status === "submitting" && (
+      {state.status === "submitting" && (
         <div
           className="absolute inset-0 flex items-center justify-center rounded-xl bg-card/80 text-xs font-semibold text-fg-2 backdrop-blur-[1px]"
           role="status"
@@ -233,17 +236,19 @@ export function GoogleIdentityButton({
           Google 계정 확인 중…
         </div>
       )}
-      {status === "error" && (
+      {state.status === "error" && (
         <div className="rounded-xl border border-bad/35 bg-bad/5 p-3 text-center">
           <p className="text-xs leading-relaxed text-bad" role="alert">
-            {localError}
+            {state.message}
           </p>
           <button
             type="button"
             onClick={() => setAttempt((value) => value + 1)}
             className="mt-2 min-h-9 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
-            다시 불러오기
+            {state.phase === "load"
+              ? "Google 로그인 모듈 다시 불러오기"
+              : "Google로 다시 시도"}
           </button>
         </div>
       )}
