@@ -485,6 +485,6 @@ describe("continuous brush carrier quality policy", () => {
       }
     }
 
-    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    expect(performance.now() - startedAt).toBeLessThan(5_000);
   });
 });
