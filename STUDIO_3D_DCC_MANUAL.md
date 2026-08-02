@@ -91,4 +91,24 @@ ToonSpectrum Studio의 3D DCC 엔진은 단순히 외부 3D 파일을 불러와 
 - **Grade C (브리지 연동 필요)**: SketchUp (.skp), Blender (.blend)
 
 ---
+
+## 8. 3D Toon Multi-Pass 렌더링 파이프라인 & 레이어 분리
+
+웹툰 컷 렌더링 시 5가지 비주얼 채널을 독립 레이어로 분리 획득하여 PSD 파일로 내보냅니다:
+
+1. **Beauty Pass (RGB Color)**: PBR 텍스처 및 카툰 툰셰이딩 색상 레이어.
+2. **Line Ink Layer**: 3D 메쉬의 엣지와 실루엣에서 추출된 2D 만화 선화.
+3. **Toon Shadow & AO**: 카툰 섀도우 단수(Bands) 및 앰비언트 오클루전 레이어.
+4. **Linear Depth Map**: 원근감 표현 및 안개(Fog)/블러 연출용 뎁스 지도.
+5. **Object Mask ID**: 컷 내 인물, 배경, 소품을 픽셀 단위로 쉽게 선택하는 마스크 ID.
+
+---
+
+## 9. 파라메트릭 룸 & 빌딩 키트 (Room & Building Kit)
+
+- **벽·바닥 자동 배치**: 평면도 치수 입력(예: 5m x 4m)으로 사각형 방 세트 자동 구축.
+- **문 / 창문 개구부**: 문, 창문 소품을 벽 레이어에 드래그하여 불리언 개구부 자동 생성.
+- **카메라 벽 자동 투명화 (Wall Cutaway)**: 카메라 시점이 벽 뒤에 위치할 때 작가의 피사체 시야를 가리는 벽을 자동 감지하여 투명화/숨김 처리.
+
+---
 *ToonSpectrum Studio Hybrid 3D DCC Documentation v1.0*
