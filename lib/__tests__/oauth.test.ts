@@ -1,6 +1,14 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 
-import { issueState, verifyState, isOAuthProvider, providerMode, listAuthProviders } from "../server/oauth";
+import {
+  buildAuthorizeUrl,
+  isAuthorizationCodeFlowConfigured,
+  issueState,
+  verifyState,
+  isOAuthProvider,
+  providerMode,
+  listAuthProviders,
+} from "../server/oauth";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -59,10 +67,11 @@ describe("OAuth signed state (CSRF 방어)", () => {
 });
 
 describe("OAuth provider 유틸", () => {
-  it("isOAuthProvider는 google/kakao/naver 허용", () => {
+  it("isOAuthProvider는 google/kakao/naver만 허용하고 폐기된 Toss 인증은 거부", () => {
     expect(isOAuthProvider("google")).toBe(true);
     expect(isOAuthProvider("kakao")).toBe(true);
     expect(isOAuthProvider("naver")).toBe(true);
+    expect(isOAuthProvider("toss")).toBe(false);
     expect(isOAuthProvider("")).toBe(false);
   });
 
@@ -79,5 +88,28 @@ describe("OAuth provider 유틸", () => {
     const enabled = listAuthProviders({ kakao: true, naver: true });
     expect(enabled.kakao?.mode).toBe("demo");
     expect(enabled.naver?.mode).toBe("demo");
+  });
+
+  it("GIS client ID만 있는 Google 구성은 redirect code-flow로 오인하지 않는다", () => {
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "123-client.apps.googleusercontent.com");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "");
+
+    expect(providerMode("google")).toBe("oauth");
+    expect(isAuthorizationCodeFlowConfigured("google")).toBe(false);
+    expect(buildAuthorizeUrl("google", "unused-state")).toBeNull();
+  });
+
+  it("Google redirect code-flow는 client ID와 secret이 모두 있을 때만 URL을 만든다", () => {
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "123-client.apps.googleusercontent.com");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "configured-secret");
+    vi.stubEnv("OAUTH_REDIRECT_BASE_URL", "https://www.toonstudio.cloud");
+
+    expect(isAuthorizationCodeFlowConfigured("google")).toBe(true);
+    const url = new URL(buildAuthorizeUrl("google", "signed-state")!);
+    expect(url.origin).toBe("https://accounts.google.com");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://www.toonstudio.cloud/api/auth/oauth/google/callback",
+    );
+    expect(url.searchParams.get("state")).toBe("signed-state");
   });
 });

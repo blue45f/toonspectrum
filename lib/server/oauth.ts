@@ -141,6 +141,23 @@ export function providerMode(id: OAuthProviderId): OAuthProviderMode {
   return c.clientId && c.clientSecret ? "oauth" : "demo";
 }
 
+/**
+ * Redirect-based authorization-code flow availability is intentionally
+ * separate from `providerMode()`. Google GIS only needs a public client ID,
+ * while the legacy redirect flow also needs the client secret and signed
+ * state. Callers must check this before issuing or verifying OAuth state so a
+ * valid GIS-only production configuration cannot fall into a state-secret
+ * error path.
+ */
+export function isAuthorizationCodeFlowConfigured(
+  id: OAuthProviderId,
+): boolean {
+  if (DEMO_ONLY_PROVIDERS.has(id)) return false;
+  const c = providerConfig(id);
+  if (id === "kakao") return Boolean(c.clientId);
+  return Boolean(c.clientId && c.clientSecret);
+}
+
 export interface AuthProviderInfo {
   label: string;
   mode: OAuthProviderMode;
@@ -233,15 +250,12 @@ export function verifyState(id: OAuthProviderId, state: string | undefined, maxA
 
 // ── authorize URL ──
 export function buildAuthorizeUrl(id: OAuthProviderId, state: string): string | null {
-  if (DEMO_ONLY_PROVIDERS.has(id)) return null;
+  if (!isAuthorizationCodeFlowConfigured(id)) return null;
   const c = providerConfig(id);
-  if (id === "kakao") {
-    if (!c.clientId) return null;
-  } else if (!c.clientId || !c.clientSecret) {
-    return null;
-  }
+  const clientId = c.clientId;
+  if (!clientId) return null;
   const u = new URL(c.authorizeUrl);
-  u.searchParams.set("client_id", c.clientId);
+  u.searchParams.set("client_id", clientId);
   u.searchParams.set("redirect_uri", redirectUri(id));
   u.searchParams.set("response_type", "code");
   if (c.scope) u.searchParams.set("scope", c.scope); // 네이버는 scope 없음

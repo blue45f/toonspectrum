@@ -65,6 +65,16 @@ describe("auth session store", () => {
     expect(apiRaw).not.toHaveBeenCalled();
   });
 
+  it("폐기된 Toss 인증 provider는 리다이렉트나 API 요청 없이 거부한다", async () => {
+    await expect(signIn("toss")).resolves.toEqual({
+      ok: false,
+      error: "provider-unavailable-in-vite-spa",
+      status: 501,
+      url: null,
+    });
+    expect(apiRaw).not.toHaveBeenCalled();
+  });
+
   it("Google ID 토큰 로그인 성공 시 공개 프로필만 저장한다", async () => {
     apiRaw.mockResolvedValue(
       new Response(

@@ -7,6 +7,10 @@ import { z } from "zod";
 
 import { ToonSpectrumMark } from "../visual-marks";
 
+import {
+  parseAuthProviderDiscovery,
+  type AuthProviderDiscovery,
+} from "./auth-provider-discovery";
 import { GoogleIdentityButton } from "./google-identity-button";
 
 import {
@@ -20,13 +24,6 @@ import { withCsrfProtection } from "@/lib/csrf";
 import { cn } from "@/lib/utils";
 import { signIn } from "@/src/compat/auth-session-store";
 import { apiPath } from "@/src/infrastructure/api";
-
-type ProviderInfo = {
-  label?: string;
-  mode?: "oauth" | "demo" | "disabled";
-  clientId?: string;
-  reason?: "missing-client-id";
-};
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -69,7 +66,7 @@ export function AuthModal({
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [providers, setProviders] = useState<Record<string, ProviderInfo>>({});
+  const [providers, setProviders] = useState<AuthProviderDiscovery>({});
   const [providerStatus, setProviderStatus] = useState<"loading" | "ready" | "error">("loading");
   const [providerAttempt, setProviderAttempt] = useState(0);
   const [err, setErr] = useState("");
@@ -109,11 +106,7 @@ export function AuthModal({
         return response.json() as Promise<unknown>;
       })
       .then((payload) => {
-        setProviders(
-          payload && typeof payload === "object"
-            ? (payload as Record<string, ProviderInfo>)
-            : {},
-        );
+        setProviders(parseAuthProviderDiscovery(payload));
         setProviderStatus("ready");
       })
       .catch((error: unknown) => {
@@ -489,7 +482,7 @@ export function AuthModal({
                       onSuccess={onClose}
                       onError={setErr}
                     />
-                  ) : providers.google.mode === "disabled" ? (
+                  ) : (
                     <div
                       className="rounded-xl border border-line bg-card px-3.5 py-3"
                       role="status"
@@ -505,16 +498,6 @@ export function AuthModal({
                         Google 로그인 설정이 아직 완료되지 않았어요. 지금은 이메일 로그인을 이용해 주세요.
                       </p>
                     </div>
-                  ) : (
-                    // Google 데모는 제공하지 않지만, 오래된 서버 응답과의 점진 배포 호환을 유지한다.
-                    <button
-                      type="button"
-                      onClick={() => signIn("google")}
-                      className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card text-sm font-semibold text-fg transition-colors hover:bg-raised"
-                    >
-                      Google로 계속하기
-                      {providers.google.mode === "demo" && <DemoTag />}
-                    </button>
                   ))}
                 {providers.naver && (
                   <button

@@ -16,6 +16,7 @@ const ERROR_LABEL_KEYS: Record<string, string> = {
   bad_state: "auth.callback.error.badState",
   no_code: "auth.callback.error.noCode",
   oauth_failed: "auth.callback.error.oauthFailed",
+  oauth_unavailable: "auth.callback.error.oauthFailed",
   unsupported: "auth.callback.error.unsupported",
   access_denied: "auth.callback.error.accessDenied",
 };

@@ -34,6 +34,7 @@ import {
   GoogleAuthCredentialError,
   handleGoogleIdToken,
   handleOAuthCallback,
+  isAuthorizationCodeFlowConfigured,
   isOAuthProvider,
   issueHandoff,
   issueState,
@@ -160,15 +161,22 @@ export class AuthController {
   oauthStart(@Param("provider") provider: string, @Res() res: Response) {
     if (!isOAuthProvider(provider))
       throw new BadRequestException({ error: "지원하지 않는 제공자예요." });
-    const url = buildAuthorizeUrl(provider, issueState(provider));
-    if (!url) {
-      if (providerMode(provider) !== "demo") {
-        throw new ServiceUnavailableException({
-          error: "이 로그인 제공자의 서버 설정이 완료되지 않았어요.",
-        });
-      }
+    if (providerMode(provider) === "demo") {
       // 카카오·네이버의 명시적 데모 제공자만 체험 흐름으로 보낸다.
       return res.redirect(`${webAppBaseUrl()}/auth/callback#demo=${provider}`);
+    }
+    // Google의 기본 GIS 흐름은 client ID만 사용한다. 레거시 redirect 경로가
+    // 설정되지 않은 경우 state secret을 읽기 전에 안전하게 거부한다.
+    if (!isAuthorizationCodeFlowConfigured(provider)) {
+      throw new ServiceUnavailableException({
+        error: "이 로그인 제공자의 리다이렉트 로그인이 설정되지 않았어요.",
+      });
+    }
+    const url = buildAuthorizeUrl(provider, issueState(provider));
+    if (!url) {
+      throw new ServiceUnavailableException({
+        error: "이 로그인 제공자의 리다이렉트 로그인이 설정되지 않았어요.",
+      });
     }
     return res.redirect(url);
   }
@@ -189,6 +197,9 @@ export class AuthController {
       return res.redirect(
         `${web}/auth/callback#error=${encodeURIComponent(error)}`,
       );
+    if (!isAuthorizationCodeFlowConfigured(provider)) {
+      return res.redirect(`${web}/auth/callback#error=oauth_unavailable`);
+    }
     if (!verifyState(provider, state))
       return res.redirect(`${web}/auth/callback#error=bad_state`);
     if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
