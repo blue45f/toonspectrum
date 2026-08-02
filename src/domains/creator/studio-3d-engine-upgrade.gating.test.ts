@@ -19,20 +19,30 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctDraftPrism,
+  workspaceOcctFillet2dExtrude,
+  workspaceOcctLinearPattern,
   workspaceOcctOffsetShape,
+  workspaceOcctPipeShell,
+  workspaceOcctSection,
   workspaceOcctStepRoundTrip,
   workspaceOcctThickShell,
   workspaceOcctWedge,
 } from "./studio-hybrid-dcc-workspace";
 import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
 import {
+  occtDraftPrismOnBox,
+  occtFillet2dExtrudeSolid,
+  occtLinearPatternBox,
   occtLoftedTower,
+  occtMakePipeShellSolid,
   occtMakePipeSolid,
   occtMakeThickShellBox,
   occtMakeTorusSolid,
   occtMakeWedgeSolid,
   occtMirrorBox,
   occtOffsetShapeBox,
+  occtSectionBoxByPlane,
   occtSolidWorksGradeSuite,
   occtStepRoundTripBox,
   STUDIO_OCCT_WASM_FACADE_REVISION,
@@ -201,6 +211,81 @@ describe("3D engine upgrades", () => {
     expect(ws.lastOcct?.operation).toBe("BRepOffsetAPI_MakeOffsetShape");
     expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThan(100);
     expect(ws.session.state.geometry.records["o1"]).toBeTruthy();
+  }, 180_000);
+
+  it("OCCT fillet2d extrude, pipe shell, and section produce geometry", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(8);
+    const f2d = await occtFillet2dExtrudeSolid(1, 1, 0.4, 0.12);
+    expect(f2d.ok).toBe(true);
+    if (!f2d.ok) return;
+    expect(f2d.operation).toBe("BRepFilletAPI_MakeFillet2d+Prism");
+    expect(f2d.triangleCount).toBeGreaterThan(20);
+
+    const shell = await occtMakePipeShellSolid(2, 0.15);
+    expect(shell.ok).toBe(true);
+    if (!shell.ok) return;
+    expect(shell.operation).toBe("BRepOffsetAPI_MakePipeShell");
+    expect(shell.triangleCount).toBeGreaterThan(20);
+
+    const section = await occtSectionBoxByPlane(1, 1, 1);
+    expect(section.ok).toBe(true);
+    if (!section.ok) return;
+    expect(section.operation).toBe("BRepAlgoAPI_Section");
+    expect(section.triangleCount).toBeGreaterThanOrEqual(2);
+  }, 120_000);
+
+  it("SolidWorks suite reports realFillet2dExtrude realPipeShell realSection", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realFillet2dExtrude).toBe(true);
+    expect(suite.realPipeShell).toBe(true);
+    expect(suite.realSection).toBe(true);
+  }, 180_000);
+
+  it("workspace fillet2d + pipe shell + section register assets", async () => {
+    let ws = createStudioHybridDccWorkspace("f2d-shell-sec-ws");
+    ws = await workspaceOcctFillet2dExtrude(ws, "f2d1");
+    expect(ws.lastOcct?.operation).toBe("BRepFilletAPI_MakeFillet2d+Prism");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThan(20);
+
+    ws = await workspaceOcctPipeShell(ws, "ps1");
+    expect(ws.lastOcct?.operation).toBe("BRepOffsetAPI_MakePipeShell");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThan(20);
+
+    ws = await workspaceOcctSection(ws, "sec1");
+    expect(ws.lastOcct?.operation).toBe("BRepAlgoAPI_Section");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(2);
+  }, 180_000);
+
+  it("OCCT draft prism and linear pattern produce solids", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(9);
+    const dprism = await occtDraftPrismOnBox(2, 0.5, 1.0, 0.1);
+    expect(dprism.ok).toBe(true);
+    if (!dprism.ok) return;
+    expect(dprism.operation).toBe("BRepFeat_MakeDPrism");
+    expect(dprism.triangleCount).toBeGreaterThanOrEqual(12);
+
+    const pattern = await occtLinearPatternBox(0.8, 0.5, 0.4, 1.2, 2);
+    expect(pattern.ok).toBe(true);
+    if (!pattern.ok) return;
+    expect(pattern.operation).toMatch(/linear-pattern/u);
+    expect(pattern.triangleCount).toBeGreaterThanOrEqual(12);
+  }, 120_000);
+
+  it("SolidWorks suite reports realDraftPrism and realLinearPattern", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realDraftPrism).toBe(true);
+    expect(suite.realLinearPattern).toBe(true);
+  }, 180_000);
+
+  it("workspace draft prism + linear pattern register assets", async () => {
+    let ws = createStudioHybridDccWorkspace("dprism-pattern-ws");
+    ws = await workspaceOcctDraftPrism(ws, "dp1");
+    expect(ws.lastOcct?.operation).toBe("BRepFeat_MakeDPrism");
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
+
+    ws = await workspaceOcctLinearPattern(ws, "pat1");
+    expect(ws.lastOcct?.operation).toMatch(/linear-pattern/u);
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
   }, 180_000);
 
   it("orientStudioMeshOutward flips inverted cube faces for CSG readiness", () => {

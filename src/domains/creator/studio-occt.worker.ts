@@ -6,6 +6,10 @@ import {
   occtLoftedTower,
   occtMakeBoxSolid,
   occtMakeSphereSolid,
+  occtDraftPrismOnBox,
+  occtFillet2dExtrudeSolid,
+  occtLinearPatternBox,
+  occtMakePipeShellSolid,
   occtMakePipeSolid,
   occtMakeThickShellBox,
   occtMakeTorusSolid,
@@ -13,6 +17,7 @@ import {
   occtMirrorBox,
   occtOffsetShapeBox,
   occtRevolveCylinderLike,
+  occtSectionBoxByPlane,
   occtStepRoundTripBox,
 } from "./studio-occt-wasm-facade";
 
@@ -57,6 +62,32 @@ async function runOperation(
         operation.size[1],
         operation.size[2],
         operation.offset,
+      );
+    case "fillet2d-extrude":
+      return occtFillet2dExtrudeSolid(
+        operation.width,
+        operation.height,
+        operation.depth,
+        operation.filletRadius,
+      );
+    case "pipe-shell":
+      return occtMakePipeShellSolid(operation.length, operation.radius);
+    case "section-box":
+      return occtSectionBoxByPlane(operation.size[0], operation.size[1], operation.size[2]);
+    case "draft-prism":
+      return occtDraftPrismOnBox(
+        operation.baseSize,
+        operation.profileInset,
+        operation.height,
+        operation.angle,
+      );
+    case "linear-pattern-box":
+      return occtLinearPatternBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.offsetX,
+        operation.count,
       );
     case "step-roundtrip-box": {
       const step = await occtStepRoundTripBox(

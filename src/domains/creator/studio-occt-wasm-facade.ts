@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 7 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 9 as const;
 
 export type StudioOcctStepIoResult = {
   readonly ok: true;
@@ -1144,6 +1144,456 @@ export async function occtOffsetShapeBox(
 }
 
 /**
+ * 2D fillet on a rectangular face then prism extrude (SolidWorks sketch fillet + extrude).
+ * Uses BRepFilletAPI_MakeFillet2d + BRepPrimAPI_MakePrism.
+ *
+ * NOTE: Fillet2d Embind handles corrupt when .delete() runs on intermediate TopoDS
+ * casts during owner.dispose — construct without owner (same discipline as ThickSolid).
+ * Still unchain .Shape() (AC4).
+ */
+export async function occtFillet2dExtrudeSolid(
+  width: number,
+  height: number,
+  depth: number,
+  filletRadius: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const p1 = new oc.gp_Pnt_3(0, 0, 0);
+    const p2 = new oc.gp_Pnt_3(width, 0, 0);
+    const p3 = new oc.gp_Pnt_3(width, height, 0);
+    const p4 = new oc.gp_Pnt_3(0, height, 0);
+    const poly = new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true);
+    const wire = poly.Wire();
+    const faceMaker = new oc.BRepBuilderAPI_MakeFace_15(wire, true);
+    const face = isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape();
+
+    if (!isCallable(oc.BRepFilletAPI_MakeFillet2d_2)) {
+      return { ok: false, code: "no-fillet2d", detail: "MakeFillet2d_2 unavailable" };
+    }
+    const fil = new oc.BRepFilletAPI_MakeFillet2d_2(face);
+    const exp = new oc.TopExp_Explorer_2(
+      face,
+      oc.TopAbs_ShapeEnum.TopAbs_VERTEX,
+      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+    );
+    // Rectangle wire exposes each corner twice under TopExp; fillet only 4 unique corners.
+    let added = 0;
+    while (exp.More() && added < 4) {
+      try {
+        const vertex = oc.TopoDS.Vertex_1(exp.Current());
+        if (isCallable(fil.AddFillet)) fil.AddFillet(vertex, filletRadius);
+        else if (isCallable(fil.AddFillet_1)) fil.AddFillet_1(vertex, filletRadius);
+        else break;
+        added += 1;
+      } catch {
+        // skip vertex
+      }
+      exp.Next();
+    }
+    if (added < 1) {
+      return { ok: false, code: "no-fillet2d", detail: "MakeFillet2d AddFillet failed" };
+    }
+    if (isCallable(fil.Build)) fil.Build();
+    const filleted = fil.Shape();
+
+    let shape: unknown = null;
+    const vec = new oc.gp_Vec_4(0, 0, depth);
+    if (!isCallable(oc.BRepPrimAPI_MakePrism_1)) {
+      return { ok: false, code: "no-prism", detail: "MakePrism_1 unavailable" };
+    }
+    try {
+      const mk = new oc.BRepPrimAPI_MakePrism_1(filleted, vec, false, true);
+      shape = mk.Shape();
+    } catch {
+      try {
+        const mk = new oc.BRepPrimAPI_MakePrism_1(filleted, vec);
+        shape = mk.Shape();
+      } catch (error) {
+        return {
+          ok: false,
+          code: "no-prism",
+          detail: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-prism", detail: "fillet2d extrude prism failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.12);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "fillet2d extrude produced no triangles" };
+    }
+    return packResult(
+      "BRepFilletAPI_MakeFillet2d+Prism",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.max(0.01, (width * height - 4 * (1 - Math.PI / 4) * filletRadius * filletRadius) * depth),
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Pipe shell solid: profile wire swept along spine with MakeSolid
+ * (BRepOffsetAPI_MakePipeShell) — multi-profile sweep path.
+ */
+export async function occtMakePipeShellSolid(
+  length: number,
+  radius: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const p0 = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+    const p1 = owner.own(new oc.gp_Pnt_3(0, 0, length));
+    const edgeMaker = owner.own(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1));
+    const edge = owner.own(edgeMaker.Edge());
+    const spineMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
+    if (isCallable(spineMaker.Add_1)) spineMaker.Add_1(edge);
+    else if (isCallable(spineMaker.Add)) spineMaker.Add(edge);
+    const spine = owner.own(spineMaker.Wire());
+
+    const dir = owner.own(new oc.gp_Dir_4(0, 0, 1));
+    const ax = owner.own(new oc.gp_Ax2_3(p0, dir));
+    const circ = owner.own(new oc.gp_Circ_2(ax, radius));
+    let profileEdge: unknown = null;
+    for (const key of [
+      "BRepBuilderAPI_MakeEdge_8",
+      "BRepBuilderAPI_MakeEdge_9",
+      "BRepBuilderAPI_MakeEdge",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const profileEdgeMaker = owner.own(new oc[key](circ));
+        profileEdge = owner.own(profileEdgeMaker.Edge());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!profileEdge) {
+      return { ok: false, code: "no-profile-edge", detail: "circle profile edge failed" };
+    }
+    const profileMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
+    if (isCallable(profileMaker.Add_1)) profileMaker.Add_1(profileEdge);
+    else if (isCallable(profileMaker.Add)) profileMaker.Add(profileEdge);
+    const profile = owner.own(profileMaker.Wire());
+
+    if (!isCallable(oc.BRepOffsetAPI_MakePipeShell)) {
+      return { ok: false, code: "no-pipeshell", detail: "MakePipeShell unavailable" };
+    }
+    let shape: unknown;
+    try {
+      const shell = owner.own(new oc.BRepOffsetAPI_MakePipeShell(spine));
+      if (isCallable(shell.Add_1)) {
+        try {
+          shell.Add_1(profile, false, false);
+        } catch {
+          shell.Add_1(profile);
+        }
+      } else if (isCallable(shell.Add)) {
+        try {
+          shell.Add(profile, false, false);
+        } catch {
+          shell.Add(profile);
+        }
+      } else {
+        return { ok: false, code: "no-pipeshell-add", detail: "MakePipeShell.Add missing" };
+      }
+      if (isCallable(shell.Build)) shell.Build();
+      if (isCallable(shell.MakeSolid)) shell.MakeSolid();
+      shape = owner.own(shell.Shape());
+    } catch (error) {
+      return {
+        ok: false,
+        code: "pipeshell-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (!shape) {
+      return { ok: false, code: "no-pipeshell-shape", detail: "MakePipeShell produced no shape" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "pipe shell produced no triangles" };
+    }
+    return packResult(
+      "BRepOffsetAPI_MakePipeShell",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.PI * radius * radius * length,
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
+/**
+ * Planar section of a box solid (BRepAlgoAPI_Section + face from closed wire).
+ * SolidWorks section view analogue — returns the section face mesh.
+ */
+export async function occtSectionBoxByPlane(
+  dx: number,
+  dy: number,
+  dz: number,
+  planeZ?: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const boxBuilder = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz));
+    const box = owner.own(boxBuilder.Shape());
+    const z = planeZ ?? dz / 2;
+    const origin = owner.own(new oc.gp_Pnt_3(dx / 2, dy / 2, z));
+    const normal = owner.own(new oc.gp_Dir_4(0, 0, 1));
+    const pln = owner.own(new oc.gp_Pln_3(origin, normal));
+
+    let secShape: unknown = null;
+    for (const key of [
+      "BRepAlgoAPI_Section_5",
+      "BRepAlgoAPI_Section_6",
+      "BRepAlgoAPI_Section_1",
+      "BRepAlgoAPI_Section",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const sec = owner.own(new oc[key](box, pln, false));
+        if (isCallable(sec.Build)) sec.Build();
+        secShape = owner.own(sec.Shape());
+        break;
+      } catch {
+        try {
+          const sec = owner.own(new oc[key](box, pln));
+          if (isCallable(sec.Build)) sec.Build();
+          secShape = owner.own(sec.Shape());
+          break;
+        } catch {
+          // next
+        }
+      }
+    }
+    if (!secShape) {
+      return { ok: false, code: "no-section", detail: "BRepAlgoAPI_Section failed" };
+    }
+
+    const wireMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
+    const exp = owner.own(new oc.TopExp_Explorer_2(
+      secShape,
+      oc.TopAbs_ShapeEnum.TopAbs_EDGE,
+      oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+    ));
+    let edgeCount = 0;
+    while (exp.More()) {
+      const current = owner.own(exp.Current());
+      const edge = owner.own(oc.TopoDS.Edge_1(current));
+      try {
+        if (isCallable(wireMaker.Add_1)) wireMaker.Add_1(edge);
+        else if (isCallable(wireMaker.Add)) wireMaker.Add(edge);
+        edgeCount += 1;
+      } catch {
+        // skip non-connectable edge
+      }
+      exp.Next();
+    }
+    if (edgeCount < 1) {
+      return { ok: false, code: "no-section-edges", detail: "section produced no edges" };
+    }
+    let sectionWire: unknown;
+    try {
+      sectionWire = owner.own(wireMaker.Wire());
+    } catch (error) {
+      return {
+        ok: false,
+        code: "section-wire-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    let faceShape: unknown = null;
+    for (const key of [
+      "BRepBuilderAPI_MakeFace_15",
+      "BRepBuilderAPI_MakeFace_16",
+      "BRepBuilderAPI_MakeFace",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const fm = owner.own(new oc[key](sectionWire, true));
+        faceShape = owner.own(isCallable(fm.Face) ? fm.Face() : fm.Shape());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!faceShape) {
+      return { ok: false, code: "section-face-failed", detail: "could not build face from section wire" };
+    }
+    const tess = tessellateStudioOcctShape(oc, faceShape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "section face produced no triangles" };
+    }
+    return packResult(
+      "BRepAlgoAPI_Section",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      0,
+      runtime.loadPath,
+      oc,
+      faceShape,
+    );
+  });
+}
+
+/**
+ * Draft prism feature (BRepFeat_MakeDPrism): draft-angled pad from a profile face
+ * on a base solid. SolidWorks draft/extrude-with-draft analogue.
+ */
+export async function occtDraftPrismOnBox(
+  baseSize: number,
+  profileInset: number,
+  height: number,
+  angle: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const baseBuilder = owner.own(new oc.BRepPrimAPI_MakeBox_1(baseSize, baseSize, baseSize));
+    const base = owner.own(baseBuilder.Shape());
+    const lo = profileInset;
+    const hi = baseSize - profileInset;
+    const z = baseSize;
+    const p1 = owner.own(new oc.gp_Pnt_3(lo, lo, z));
+    const p2 = owner.own(new oc.gp_Pnt_3(hi, lo, z));
+    const p3 = owner.own(new oc.gp_Pnt_3(hi, hi, z));
+    const p4 = owner.own(new oc.gp_Pnt_3(lo, hi, z));
+    const poly = owner.own(new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true));
+    const wire = owner.own(poly.Wire());
+    const faceMaker = owner.own(new oc.BRepBuilderAPI_MakeFace_15(wire, true));
+    const profileFace = owner.own(
+      isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape(),
+    );
+
+    if (!isCallable(oc.BRepFeat_MakeDPrism_1)) {
+      return { ok: false, code: "no-dprism", detail: "BRepFeat_MakeDPrism_1 unavailable" };
+    }
+    let shape: unknown;
+    try {
+      // (Sbase, Pbase, Skface, Angle, Fuse, Modify) — Fuse=0 cut/add per OCCT; 0=fuse add
+      const dp = owner.own(new oc.BRepFeat_MakeDPrism_1(base, profileFace, profileFace, angle, 0, true));
+      if (isCallable(dp.Perform_1)) dp.Perform_1(height);
+      else if (isCallable(dp.Perform)) dp.Perform(height);
+      else {
+        return { ok: false, code: "no-dprism-perform", detail: "MakeDPrism.Perform missing" };
+      }
+      if (isCallable(dp.Build)) dp.Build();
+      shape = owner.own(dp.Shape());
+    } catch (error) {
+      return {
+        ok: false,
+        code: "dprism-failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (!shape) {
+      return { ok: false, code: "no-dprism-shape", detail: "MakeDPrism produced no shape" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "draft prism produced no triangles" };
+    }
+    return packResult(
+      "BRepFeat_MakeDPrism",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(baseSize, baseSize, baseSize)
+        + Math.max(0, (hi - lo) * (hi - lo) * height * 0.5),
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
+/**
+ * Linear pattern: translate a box and fuse with the original (assembly linear array).
+ * SolidWorks linear pattern analogue via gp_Trsf + BRepBuilderAPI_Transform + Fuse.
+ */
+export async function occtLinearPatternBox(
+  dx: number,
+  dy: number,
+  dz: number,
+  offsetX: number,
+  count = 2,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const n = Math.max(2, Math.min(8, count));
+    let acc: unknown = makeOcctBoxShape(oc, owner, dx, dy, dz);
+    for (let i = 1; i < n; i += 1) {
+      const trsf = owner.own(new oc.gp_Trsf_1());
+      const vec = owner.own(new oc.gp_Vec_4(offsetX * i, 0, 0));
+      if (isCallable(trsf.SetTranslation_1)) trsf.SetTranslation_1(vec);
+      else if (isCallable(trsf.SetTranslation)) trsf.SetTranslation(vec);
+      else {
+        return { ok: false, code: "no-translation", detail: "gp_Trsf.SetTranslation missing" };
+      }
+      let moved: unknown = null;
+      const src = makeOcctBoxShape(oc, owner, dx, dy, dz);
+      for (const key of [
+        "BRepBuilderAPI_Transform_2",
+        "BRepBuilderAPI_Transform_1",
+        "BRepBuilderAPI_Transform",
+      ]) {
+        if (!isCallable(oc[key])) continue;
+        try {
+          const xf = owner.own(new oc[key](src, trsf, true));
+          if (isCallable(xf.Build)) xf.Build();
+          moved = owner.own(xf.Shape());
+          break;
+        } catch {
+          // next
+        }
+      }
+      if (!moved) {
+        return { ok: false, code: "transform-failed", detail: "linear pattern transform failed" };
+      }
+      acc = runOcctBinaryShapeOperation(
+        oc,
+        owner,
+        ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
+        acc,
+        moved,
+      ) ?? moved;
+    }
+    const tess = tessellateStudioOcctShape(oc, acc, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "linear pattern produced no triangles" };
+    }
+    return packResult(
+      "BRepBuilderAPI_Transform+Fuse(linear-pattern)",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(dx, dy, dz) * n,
+      runtime.loadPath,
+      oc,
+      acc,
+    );
+  });
+}
+
+/**
  * Sweep / pipe solid: circular profile along a linear spine (BRepOffsetAPI_MakePipe).
  * SolidWorks-style sweep along path.
  */
@@ -1750,6 +2200,11 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly realStepIo: boolean;
   readonly realWedge: boolean;
   readonly realOffsetShape: boolean;
+  readonly realFillet2dExtrude: boolean;
+  readonly realPipeShell: boolean;
+  readonly realSection: boolean;
+  readonly realDraftPrism: boolean;
+  readonly realLinearPattern: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -1764,6 +2219,11 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let realStepIo = false;
   let realWedge = false;
   let realOffsetShape = false;
+  let realFillet2dExtrude = false;
+  let realPipeShell = false;
+  let realSection = false;
+  let realDraftPrism = false;
+  let realLinearPattern = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -1778,10 +2238,17 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       if (r.operation === "BRepPrimAPI_MakePrism") realPrism = true;
       if (r.operation === "BRepOffsetAPI_ThruSections") realThruSections = true;
       if (r.operation === "BRepOffsetAPI_MakePipe") realPipe = true;
-      if (r.operation.includes("mirror") || r.operation.includes("Transform")) realMirror = true;
+      if (r.operation.includes("mirror") || r.operation.includes("Transform")) {
+        realMirror = true;
+      }
+      if (r.operation.includes("linear-pattern")) realLinearPattern = true;
       if (r.operation === "BRepOffsetAPI_MakeThickSolid") realThickShell = true;
       if (r.operation === "BRepPrimAPI_MakeWedge") realWedge = true;
       if (r.operation === "BRepOffsetAPI_MakeOffsetShape") realOffsetShape = true;
+      if (r.operation === "BRepFilletAPI_MakeFillet2d+Prism") realFillet2dExtrude = true;
+      if (r.operation === "BRepOffsetAPI_MakePipeShell") realPipeShell = true;
+      if (r.operation === "BRepAlgoAPI_Section") realSection = true;
+      if (r.operation === "BRepFeat_MakeDPrism") realDraftPrism = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
@@ -1793,6 +2260,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("cone", () => occtMakeConeSolid(0.5, 0.1, 1.2));
   await run("wedge", () => occtMakeWedgeSolid(1, 1, 1, 0.3));
   await run("pipe", () => occtMakePipeSolid(1.5, 0.12));
+  await run("pipeshell", () => occtMakePipeShellSolid(2, 0.15));
   await run("prism", () => occtExtrudeRectangle(1.2, 0.8, 0.6));
   await run("revolve", () => occtRevolveCylinderLike(0.5, 1.0));
   await run("cut", () =>
@@ -1808,10 +2276,14 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     ),
   );
   await run("fillet", () => occtFilletBox(1, 1, 1, 0.08));
+  await run("fillet2d", () => occtFillet2dExtrudeSolid(1, 1, 0.4, 0.12));
   await run("chamfer", () => occtChamferBox(1, 1, 1, 0.05));
   await run("mirror", () => occtMirrorBox(0.8, 0.5, 0.4));
   await run("thick", () => occtMakeThickShellBox(1, 1, 0.5, 0.05));
   await run("offset", () => occtOffsetShapeBox(1, 1, 1, 0.08));
+  await run("section", () => occtSectionBoxByPlane(1, 1, 1));
+  await run("dprism", () => occtDraftPrismOnBox(2, 0.5, 1.0, 0.1));
+  await run("pattern", () => occtLinearPatternBox(0.8, 0.5, 0.4, 1.2, 2));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -1853,5 +2325,10 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     realStepIo,
     realWedge,
     realOffsetShape,
+    realFillet2dExtrude,
+    realPipeShell,
+    realSection,
+    realDraftPrism,
+    realLinearPattern,
   };
 }

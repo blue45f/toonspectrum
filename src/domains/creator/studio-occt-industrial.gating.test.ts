@@ -58,6 +58,13 @@ describe("industrial OCCT WASM CAD", () => {
       /new oc\.TopExp_Explorer_2\s*\(/u,
       /new oc\.TopTools_ListOfShape_1\s*\(/u,
       /new oc\.BRepOffsetAPI_MakeThickSolid_1\s*\(/u,
+      // Fillet2d+Prism no-delete path (Embind dispose corrupts intermediate TopoDS)
+      /new oc\.gp_Pnt_3\s*\(/u,
+      /new oc\.BRepBuilderAPI_MakePolygon_4\s*\(/u,
+      /new oc\.BRepBuilderAPI_MakeFace_15\s*\(/u,
+      /new oc\.BRepFilletAPI_MakeFillet2d_2\s*\(/u,
+      /new oc\.gp_Vec_4\s*\(/u,
+      /new oc\.BRepPrimAPI_MakePrism_1\s*\(/u,
     ];
     const unownedConstructors = operationSource
       .split(/\r?\n/u)

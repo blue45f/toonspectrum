@@ -165,6 +165,36 @@ async function runOnNode(
           operation.size[2],
           operation.offset,
         );
+      case "fillet2d-extrude":
+        return facade.occtFillet2dExtrudeSolid(
+          operation.width,
+          operation.height,
+          operation.depth,
+          operation.filletRadius,
+        );
+      case "pipe-shell":
+        return facade.occtMakePipeShellSolid(operation.length, operation.radius);
+      case "section-box":
+        return facade.occtSectionBoxByPlane(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+        );
+      case "draft-prism":
+        return facade.occtDraftPrismOnBox(
+          operation.baseSize,
+          operation.profileInset,
+          operation.height,
+          operation.angle,
+        );
+      case "linear-pattern-box":
+        return facade.occtLinearPatternBox(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+          operation.offsetX,
+          operation.count,
+        );
       case "step-roundtrip-box": {
         const step = await facade.occtStepRoundTripBox(
           operation.size[0],

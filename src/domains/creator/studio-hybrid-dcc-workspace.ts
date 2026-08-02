@@ -1131,6 +1131,78 @@ export async function workspaceOcctOffsetShape(
   return commitOcctResult(ws, assetId, "occt-wasm-offset", result);
 }
 
+/** Industrial OCCT 2D-fillet + extrude solid → workspace. */
+export async function workspaceOcctFillet2dExtrude(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-fillet2d",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "fillet2d-extrude",
+    width: 1,
+    height: 1,
+    depth: 0.4,
+    filletRadius: 0.12,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-fillet2d", result);
+}
+
+/** Industrial OCCT pipe shell solid → workspace. */
+export async function workspaceOcctPipeShell(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-pipeshell",
+  length = 2,
+  radius = 0.15,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({ kind: "pipe-shell", length, radius });
+  return commitOcctResult(ws, assetId, "occt-wasm-pipeshell", result);
+}
+
+/** Industrial OCCT planar section face → workspace. */
+export async function workspaceOcctSection(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-section",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "section-box",
+    size: [1, 1, 1],
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-section", result);
+}
+
+/** Industrial OCCT draft prism (MakeDPrism) → workspace. */
+export async function workspaceOcctDraftPrism(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-dprism",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "draft-prism",
+    baseSize: 2,
+    profileInset: 0.5,
+    height: 1.0,
+    angle: 0.1,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-dprism", result);
+}
+
+/** Industrial OCCT linear pattern fuse → workspace. */
+export async function workspaceOcctLinearPattern(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-pattern",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "linear-pattern-box",
+    size: [0.8, 0.5, 0.4],
+    offsetX: 1.2,
+    count: 2,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-pattern", result);
+}
+
 /** Industrial STEP write+read round-trip box → workspace. */
 export async function workspaceOcctStepRoundTrip(
   ws: StudioHybridDccWorkspace,

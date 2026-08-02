@@ -39,9 +39,14 @@ import {
   workspaceOcctRevolve,
   workspaceOcctSphere,
   workspaceBooleanBetweenAssets,
+  workspaceOcctDraftPrism,
+  workspaceOcctFillet2dExtrude,
+  workspaceOcctLinearPattern,
   workspaceOcctMirror,
   workspaceOcctOffsetShape,
   workspaceOcctPipe,
+  workspaceOcctPipeShell,
+  workspaceOcctSection,
   workspaceOcctStepRoundTrip,
   workspaceOcctThickShell,
   workspaceOcctTorus,
@@ -265,6 +270,51 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT offset", () => workspaceOcctOffsetShape(ws))}
         >
           OCCT offset
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-fillet2d"
+          onClick={() => run("OCCT fillet2d extrude", () => workspaceOcctFillet2dExtrude(ws))}
+        >
+          OCCT fillet2d
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-pipeshell"
+          onClick={() => run("OCCT pipe shell", () => workspaceOcctPipeShell(ws))}
+        >
+          OCCT pipe shell
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-section"
+          onClick={() => run("OCCT section", () => workspaceOcctSection(ws))}
+        >
+          OCCT section
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-dprism"
+          onClick={() => run("OCCT draft prism", () => workspaceOcctDraftPrism(ws))}
+        >
+          OCCT draft prism
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-pattern"
+          onClick={() => run("OCCT linear pattern", () => workspaceOcctLinearPattern(ws))}
+        >
+          OCCT pattern
         </button>
         <button
           type="button"

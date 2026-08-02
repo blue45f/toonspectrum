@@ -42,6 +42,35 @@ export type StudioOcctWorkerOperation =
       readonly offset: number;
     }
   | {
+      readonly kind: "fillet2d-extrude";
+      readonly width: number;
+      readonly height: number;
+      readonly depth: number;
+      readonly filletRadius: number;
+    }
+  | {
+      readonly kind: "pipe-shell";
+      readonly length: number;
+      readonly radius: number;
+    }
+  | {
+      readonly kind: "section-box";
+      readonly size: readonly [number, number, number];
+    }
+  | {
+      readonly kind: "draft-prism";
+      readonly baseSize: number;
+      readonly profileInset: number;
+      readonly height: number;
+      readonly angle: number;
+    }
+  | {
+      readonly kind: "linear-pattern-box";
+      readonly size: readonly [number, number, number];
+      readonly offsetX: number;
+      readonly count: number;
+    }
+  | {
       readonly kind: "step-roundtrip-box";
       readonly size: readonly [number, number, number];
     }
