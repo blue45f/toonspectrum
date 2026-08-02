@@ -120,6 +120,15 @@ export function smudgeStroke(
   if (resampled.length < 2) return data; // 리샘플 후 점이 하나뿐(정지 탭 등)이면 문지를 방향이 없다.
 
   const rCeil = Math.ceil(safeRadius);
+  // 긴 획에서 dab마다 수천 개의 임시 TypedArray를 만들면 Worker에서도 GC 정지가 누적된다.
+  // 가장 큰 발자국 하나를 스트로크 동안 재사용하고, 각 dab의 실제 boxW*boxH 구간은 아래
+  // snapshot 루프가 전부 덮어쓴다. 픽셀 연산/결과는 기존과 동일하고 할당만 O(dabs)→O(1)이다.
+  // Fractional dab centres can make floor(left)..ceil(right) one pixel wider than 2r+1.
+  const maximumSnapshotWidth = Math.min(w, rCeil * 2 + 2);
+  const maximumSnapshotHeight = Math.min(h, rCeil * 2 + 2);
+  const snapshot = new Uint8ClampedArray(
+    maximumSnapshotWidth * maximumSnapshotHeight * 4,
+  );
 
   for (let i = 1; i < resampled.length; i++) {
     const prev = resampled[i - 1]!;
@@ -139,7 +148,6 @@ export function smudgeStroke(
     const boxH = maxY - minY + 1;
 
     // 1) 이번 스텝이 읽을 소스 영역을 먼저 통째로 스냅샷(쓰기 전에!) — 스캔 방향 줄무늬 방지.
-    const snapshot = new Uint8ClampedArray(boxW * boxH * 4);
     for (let sy = 0; sy < boxH; sy++) {
       const destY = minY + sy;
       for (let sx = 0; sx < boxW; sx++) {

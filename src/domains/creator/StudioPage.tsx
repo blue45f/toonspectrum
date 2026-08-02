@@ -1056,6 +1056,15 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
+import {
+  appendStudioPendingRasterRetouchGesturePoint,
+  beginStudioPendingRasterRetouchGesture,
+  canApplyStudioPendingRasterRetouchGesture,
+  endStudioPendingRasterRetouchGesture,
+  normalizeStudioPendingRasterRetouchGesture,
+  type StudioPendingRasterRetouchGesture,
+  type StudioRasterRetouchGestureTool,
+} from "./studio-retouch-raster-gesture";
 import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
@@ -6342,6 +6351,34 @@ function StudioCuttoonEditor() {
   };
   const pendingPixelSelectionRasterGestureRef =
     useRef<PendingPixelSelectionRasterGesture | null>(null);
+  const studioRasterRetouchPreparationRef = useRef<{
+    runId: number;
+    tool: StudioRasterRetouchGestureTool;
+  } | null>(null);
+  const pendingRasterRetouchGestureRef =
+    useRef<StudioPendingRasterRetouchGesture | null>(null);
+  const pendingRasterRetouchCaptureTargetRef = useRef<Element | null>(null);
+  const pendingRasterRetouchTargetRef = useRef<{
+    frame: SelectionFrame;
+    id: string;
+  } | null>(null);
+  const queuedRasterRetouchReplayRef = useRef<{
+    liquifyMode: StudioLiquifyMode;
+    pageId: string;
+    points: readonly SelPoint[];
+    targetId: string;
+    tool: StudioRasterRetouchGestureTool;
+  } | null>(null);
+  const [rasterRetouchReplayEpoch, requestRasterRetouchReplay] = useReducer(
+    (epoch: number) => epoch + 1,
+    0,
+  );
+  const applyQueuedRasterRetouchReplayRef = useRef<(input: {
+    liquifyMode: StudioLiquifyMode;
+    points: readonly SelPoint[];
+    targetId: string;
+    tool: StudioRasterRetouchGestureTool;
+  }) => void>(() => undefined);
   const studioFilterApplyBusyRef = useRef(false);
   useEffect(() => () => {
     studioFilterPreparationRunIdRef.current += 1;
@@ -6351,6 +6388,25 @@ function StudioCuttoonEditor() {
     pixelMarqueeRasterPreparationAbortRef.current?.abort();
     pixelMarqueeRasterPreparationAbortRef.current = null;
     setPixelBusy(false);
+    studioRasterRetouchPreparationRef.current = null;
+    const retouchPending = pendingRasterRetouchGestureRef.current;
+    pendingRasterRetouchGestureRef.current = null;
+    pendingRasterRetouchTargetRef.current = null;
+    queuedRasterRetouchReplayRef.current = null;
+    const retouchCaptureTarget = pendingRasterRetouchCaptureTargetRef.current;
+    pendingRasterRetouchCaptureTargetRef.current = null;
+    if (retouchCaptureTarget) {
+      // Pointer capture is automatically released by most browsers, but route teardown can happen
+      // between pointerdown and pointerup while the raster copy is still rendering.
+      try {
+        const pointerId = (retouchPending as { pointerId?: number } | null)?.pointerId;
+        if (pointerId !== undefined && retouchCaptureTarget.hasPointerCapture(pointerId)) {
+          retouchCaptureTarget.releasePointerCapture(pointerId);
+        }
+      } catch {
+        // The browser may already have released capture during route teardown.
+      }
+    }
     const pending = pendingPixelSelectionRasterGestureRef.current;
     pendingPixelSelectionRasterGestureRef.current = null;
     if (pending?.captureTarget) {
@@ -6363,6 +6419,22 @@ function StudioCuttoonEditor() {
       }
     }
   }, []);
+  useEffect(() => {
+    void rasterRetouchReplayEpoch;
+    const queued = queuedRasterRetouchReplayRef.current;
+    queuedRasterRetouchReplayRef.current = null;
+    if (!queued) return;
+    if (
+      queued.pageId !== currentPageIdRef.current
+      || !activeElementsRef.current.some(
+        (element) => element.id === queued.targetId && element.type === "image",
+      )
+    ) {
+      setError("편집용 래스터 복사본이 바뀌어 첫 리터치 제스처를 적용하지 않았습니다.");
+      return;
+    }
+    applyQueuedRasterRetouchReplayRef.current(queued);
+  }, [rasterRetouchReplayEpoch]);
   const [lastStudioFilterDraft, setLastStudioFilterDraft] = useState<StudioFilterDraft | null>(null);
   const [editing, setEditing] = useState<{ id: string } | null>(null);
   const [pendingLetteringEdit, setPendingLetteringEdit] = useState<{
@@ -12304,6 +12376,67 @@ function StudioCuttoonEditor() {
       releasePendingPixelSelectionRasterGesture(pending);
     }
   }, [releasePendingPixelSelectionRasterGesture]);
+  function releasePendingRasterRetouchGestureCapture(
+    gesture = pendingRasterRetouchGestureRef.current,
+  ): void {
+    const target = pendingRasterRetouchCaptureTargetRef.current;
+    pendingRasterRetouchCaptureTargetRef.current = null;
+    if (!gesture || !target) return;
+    try {
+      if (target.hasPointerCapture(gesture.pointerId)) {
+        target.releasePointerCapture(gesture.pointerId);
+      }
+    } catch {
+      // Pointer capture can already be released after an outside pointerup/cancel.
+    }
+  }
+  function clearPendingRasterRetouchGesture(): void {
+    const pending = pendingRasterRetouchGestureRef.current;
+    pendingRasterRetouchGestureRef.current = null;
+    pendingRasterRetouchTargetRef.current = null;
+    releasePendingRasterRetouchGestureCapture(pending);
+  }
+  function queuePendingRasterRetouchGesture(
+    gesture: StudioPendingRasterRetouchGesture,
+    target: { frame: SelectionFrame; id: string },
+  ): void {
+    const points = normalizeStudioPendingRasterRetouchGesture(gesture, target.frame);
+    pendingRasterRetouchGestureRef.current = null;
+    pendingRasterRetouchTargetRef.current = null;
+    releasePendingRasterRetouchGestureCapture(gesture);
+    if (!canApplyStudioPendingRasterRetouchGesture(gesture, points)) {
+      announceDrawingShortcut(
+        gesture.cancelled
+          ? "편집용 복사본은 준비했지만 취소한 리터치 제스처는 적용하지 않았어요"
+          : "리터치 횟을 적용하려면 캔버스 위를 조금 더 드래그해 주세요",
+      );
+      return;
+    }
+    queuedRasterRetouchReplayRef.current = {
+      liquifyMode: gesture.liquifyMode,
+      pageId: gesture.pageId,
+      points,
+      targetId: target.id,
+      tool: gesture.tool,
+    };
+    requestRasterRetouchReplay();
+  }
+  function attachPendingRasterRetouchTarget(
+    runId: number,
+    target: { frame: SelectionFrame; id: string },
+  ): void {
+    const gesture = pendingRasterRetouchGestureRef.current;
+    if (!gesture || gesture.runId !== runId || gesture.cancelled) {
+      if (gesture?.runId === runId) clearPendingRasterRetouchGesture();
+      return;
+    }
+    pendingRasterRetouchTargetRef.current = target;
+    if (gesture.released) {
+      queuePendingRasterRetouchGesture(gesture, target);
+    } else {
+      announceDrawingShortcut("편집용 복사본을 준비했어요 · 진행 중인 첫 리터치 횟을 계속 이어갑니다");
+    }
+  }
   const cancelPixelSelectionPointerSession = useCallback(() => {
     const session = pixelDragRef.current;
     pixelDragRef.current = null;
@@ -24659,7 +24792,8 @@ const puppetWarpArmed =
         }
       );
       if (!out) return;
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      const { encodeStudioRetouchCanvasPng } = await loadStudioPixelEditBrushRuntime();
+      const src = await encodeStudioRetouchCanvasPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
@@ -24734,6 +24868,40 @@ const puppetWarpArmed =
     return true;
   }
 
+  function finishPendingRasterRetouchGesture(
+    pointerEvent: PointerEvent,
+    cancelled: boolean,
+    stage = stageRef.current,
+  ): boolean {
+    const pending = pendingRasterRetouchGestureRef.current;
+    const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+    if (!pending || pending.pointerId !== pointerId) return false;
+    let releasePoint: { x: number; y: number } | undefined;
+    if (!cancelled && stage) {
+      try {
+        stage.setPointersPositions(pointerEvent);
+        const position = stage.getRelativePointerPosition();
+        if (position) releasePoint = { x: position.x, y: position.y };
+      } catch {
+        // Preserve the last captured sample if Stage teardown races the outside pointer release.
+      }
+    }
+    const finished = endStudioPendingRasterRetouchGesture(
+      pending,
+      pointerEvent,
+      { cancelled, ...(releasePoint ? { releasePoint } : {}) },
+    );
+    pendingRasterRetouchGestureRef.current = finished;
+    releasePendingRasterRetouchGestureCapture(finished);
+    if (cancelled) {
+      clearPendingRasterRetouchGesture();
+      return true;
+    }
+    const target = pendingRasterRetouchTargetRef.current;
+    if (target) queuePendingRasterRetouchGesture(finished, target);
+    return true;
+  }
+
   function finishPixelSelectionPointerSession(
     pointerEvent: PointerEvent,
     cancelled: boolean,
@@ -24787,7 +24955,8 @@ const puppetWarpArmed =
     return true;
   }
   pixelSelectionPointerGlobalEndRef.current = (event, cancelled) =>
-    finishPendingPixelSelectionRasterGesture(event, cancelled)
+    finishPendingRasterRetouchGesture(event, cancelled)
+    || finishPendingPixelSelectionRasterGesture(event, cancelled)
     || finishPixelSelectionPointerSession(event, cancelled);
 
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
@@ -24835,7 +25004,10 @@ const puppetWarpArmed =
     const mutationTicket = captureStudioMutationTicket();
     setDodgeBurnBusy(true);
     try {
-      const { dodgeBurnStroke } = await import("./studio-dodge-burn");
+      const {
+        encodeStudioRetouchCanvasPng,
+        runStudioDodgeBurnRetouch,
+      } = await loadStudioPixelEditBrushRuntime();
       const img = await loadStudioPixelEditImage(target.src);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
@@ -24850,7 +25022,7 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (dodgeBurnRadius / Math.max(1, target.width)) * w);
-      dodgeBurnStroke(imageData.data, w, h, pixelPoints, {
+      const pixels = await runStudioDodgeBurnRetouch(imageData.data, w, h, pixelPoints, {
         radiusPx,
         hardness: dodgeBurnHardness,
         exposure: dodgeBurnExposure,
@@ -24858,8 +25030,10 @@ const puppetWarpArmed =
         range: dodgeBurnRange,
         sponge: dodgeBurnSponge,
       });
-      made.ctx.putImageData(imageData, 0, 0);
-      const src = made.canvas.toDataURL("image/png");
+      const output = made.ctx.createImageData(w, h);
+      output.data.set(pixels);
+      made.ctx.putImageData(output, 0, 0);
+      const src = await encodeStudioRetouchCanvasPng(made.canvas);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
@@ -24947,7 +25121,10 @@ const puppetWarpArmed =
     const mutationTicket = captureStudioMutationTicket();
     setWetMixBusy(true);
     try {
-      const { wetMixStroke } = await import("./studio-wet-mix");
+      const {
+        encodeStudioRetouchCanvasPng,
+        runStudioWetMixRetouch,
+      } = await loadStudioPixelEditBrushRuntime();
       const img = await loadStudioPixelEditImage(target.src);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
@@ -24962,7 +25139,7 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (wetMixRadius / Math.max(1, target.width)) * w);
-      wetMixStroke(imageData.data, w, h, pixelPoints, {
+      const pixels = await runStudioWetMixRetouch(imageData.data, w, h, pixelPoints, {
         radiusPx,
         hardness: wetMixHardness,
         strength: wetMixStrength / 100,
@@ -24970,8 +25147,10 @@ const puppetWarpArmed =
         pickup: wetMixPickup / 100,
         paintColor: hexToRgb(color),
       });
-      made.ctx.putImageData(imageData, 0, 0);
-      const src = made.canvas.toDataURL("image/png");
+      const output = made.ctx.createImageData(w, h);
+      output.data.set(pixels);
+      made.ctx.putImageData(output, 0, 0);
+      const src = await encodeStudioRetouchCanvasPng(made.canvas);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
         patchEl(target.id, { src } as Partial<El>);
@@ -26608,6 +26787,36 @@ const puppetWarpArmed =
     return true;
   }
 
+  function journalPendingRasterRetouchGesture(input: {
+    captureFallback: Element | null;
+    event: PointerEvent;
+    position: { x: number; y: number };
+  }): boolean {
+    const preparation = studioRasterRetouchPreparationRef.current;
+    if (!preparation || pendingRasterRetouchGestureRef.current) return false;
+    const gesture = beginStudioPendingRasterRetouchGesture({
+      liquifyMode,
+      pageId: currentPageIdRef.current,
+      point: input.position,
+      pointer: input.event,
+      runId: preparation.runId,
+      tool: preparation.tool,
+    });
+    if (!gesture) return false;
+    const captureTarget = input.event.target instanceof Element
+      ? input.event.target
+      : input.captureFallback;
+    pendingRasterRetouchGestureRef.current = gesture;
+    pendingRasterRetouchCaptureTargetRef.current = captureTarget;
+    try {
+      captureTarget?.setPointerCapture(gesture.pointerId);
+    } catch {
+      // The global capture-phase pointerup listener remains the safety net without capture.
+    }
+    announceDrawingShortcut("편집용 복사본을 준비하는 동안 첫 리터치 횟을 안전하게 이어갈게요");
+    return true;
+  }
+
   /** One-shot CSP erase-to-intersection. Returns true when the pointer event is consumed. */
   function applyVectorEraseToIntersectionAt(x: number, y: number): boolean {
     const planned = planStudioVectorEraseToIntersectionApply({
@@ -26649,10 +26858,27 @@ const puppetWarpArmed =
     // Raster preparation journals the first vector-only selection contact with the same ownership
     // rule; a second touch/palm cannot replace its start point or release owner.
     if (pendingPixelSelectionRasterGestureRef.current) return;
+    // The same one-contact rule protects the first smudge/dodge/wet-mix/liquify gesture while a
+    // vector-only page is being rendered into its non-destructive editable raster copy.
+    if (pendingRasterRetouchGestureRef.current) return;
     // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
     if (bubbleShapeDragRef.current) return;
     if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
     if (canvasInteractionBlocked && !commentPinArmed) return;
+    const pendingRetouchPreparation = studioRasterRetouchPreparationRef.current;
+    if (pendingRetouchPreparation && !isSpacePressed) {
+      const position = e.target.getStage()?.getRelativePointerPosition();
+      if (position) {
+        journalPendingRasterRetouchGesture({
+          captureFallback: e.target.getStage()?.container() ?? null,
+          event: stagePointerEvent,
+          position,
+        });
+      }
+      // During preparation, never let the same contact select/move the source vectors behind the
+      // pending editable copy, even when a secondary contact was deliberately rejected.
+      return;
+    }
     // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
     // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
     // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
@@ -28154,6 +28380,23 @@ const puppetWarpArmed =
         pendingRasterGesture.current = { x: position.x, y: position.y };
         pendingRasterGesture.shift = stagePointerEvent.shiftKey;
         pendingRasterGesture.alt = stagePointerEvent.altKey;
+      }
+      return;
+    }
+    const pendingRetouchGesture = pendingRasterRetouchGestureRef.current;
+    if (pendingRetouchGesture) {
+      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+        ? stagePointerEvent.pointerId
+        : 1;
+      if (pendingRetouchGesture.pointerId !== pointerId) return;
+      const position = e.target.getStage()?.getRelativePointerPosition();
+      if (position) {
+        pendingRasterRetouchGestureRef.current =
+          appendStudioPendingRasterRetouchGesturePoint(
+            pendingRetouchGesture,
+            stagePointerEvent,
+            position,
+          );
       }
       return;
     }
@@ -32593,6 +32836,10 @@ function clearSelectionForEdit() {
     disarmAllPixelTools();
     setTool("select");
     setSmudgeActive(true);
+    openInspectorRoute(
+      { primary: "properties", image: "retouch" },
+      isMobile ? "props" : null,
+    );
     announceDrawingShortcut("혼합(스머지) · 이미지 위를 드래그하세요");
   }
   function toggleLiquifyTool() {
@@ -32605,6 +32852,10 @@ function clearSelectionForEdit() {
     disarmAllPixelTools();
     setTool("select");
     setLiquifyActive(true);
+    openInspectorRoute(
+      { primary: "properties", image: "retouch" },
+      isMobile ? "props" : null,
+    );
     announceDrawingShortcut("리퀴파이 · 이미지 위를 밀어 보세요");
   }
   function toggleDodgeBurnTool() {
@@ -32617,6 +32868,10 @@ function clearSelectionForEdit() {
     disarmAllPixelTools();
     setTool("select");
     setDodgeBurnActive(true);
+    openInspectorRoute(
+      { primary: "properties", image: "retouch" },
+      isMobile ? "props" : null,
+    );
     announceDrawingShortcut("닷지/번 · 이미지 위를 드래그하세요");
   }
   function toggleWetMixTool() {
@@ -32629,6 +32884,10 @@ function clearSelectionForEdit() {
     disarmAllPixelTools();
     setTool("select");
     setWetMixActive(true);
+    openInspectorRoute(
+      { primary: "properties", image: "retouch" },
+      isMobile ? "props" : null,
+    );
     announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
   }
   function openPixelSelectionTransform() {

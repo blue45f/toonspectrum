@@ -9,10 +9,13 @@
  * 실시간 픽셀 미리보기는 없다 — 브러시 반경 커서만 드래그 중 표시되고, 실제 블렌드는 드래그(한
  * 스트로크) 종료 시 한 번에 적용된다(crop/픽셀 조정과 동일한 "제스처 1회 = 커밋 1회" 관례).
  */
-import { Blend, Loader2 } from "lucide-react";
+import { Blend } from "lucide-react";
+import { useId } from "react";
 
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import { SMUDGE_RADIUS_RANGE, SMUDGE_STRENGTH_RANGE } from "./studio-smudge";
+import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";
 
@@ -25,6 +28,8 @@ export type StudioSmudgePanelProps = {
   strength: number;
   /** 스트로크 커밋(픽셀 재인코딩) 진행 중 — 다른 픽셀 도구와 동일 관례로 잠그지 않고 표시만. */
   busy?: boolean;
+  /** 문서 잠금 등 상위 게이트 — 제공되면 패널 전체를 잠그고 복구 안내를 표시한다. */
+  disabled?: boolean;
   onToggleActive: () => void;
   onRadiusChange: (value: number) => void;
   onStrengthChange: (value: number) => void;
@@ -35,33 +40,45 @@ export function StudioSmudgePanel({
   radius,
   strength,
   busy = false,
+  disabled = false,
   onToggleActive,
   onRadiusChange,
   onStrengthChange,
 }: StudioSmudgePanelProps): ReactElement {
+  const titleId = useId();
+  const help = studioRetouchToolHelp("smudge");
+  const locked = busy || disabled;
+
   return (
-    <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
+    <section
+      className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
+      aria-labelledby={titleId}
+    >
+      <div className="min-w-0">
+        <h3 id={titleId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2">
           <Blend size={12} aria-hidden />
-          문지르기 브러시
+          {help.actionName}
+          <span className="text-[0.66rem] font-medium text-fg-3">{help.technicalName}</span>
+        </h3>
+        <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
+          {help.summary}
         </p>
-        {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
       <StudioToggleChip
         active={active}
-        disabled={busy}
+        disabled={locked}
         onClick={onToggleActive}
+        aria-label={`${help.actionName} ${active ? "끄기" : "켜기"}`}
         title={
           busy
-            ? "현재 문지르기 스트로크를 반영하는 중입니다."
-            : "켜고 이미지를 드래그하면 지나간 자리의 색이 옆으로 번지듯 섞입니다."
+            ? help.busyMessage
+            : `${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`
         }
       >
         <span className="inline-flex items-center gap-1">
           <Blend className="size-3" aria-hidden />
-          문지르기로 칠하기
+          {active ? "색 밀기 끝내기" : "색 밀기 시작"}
         </span>
       </StudioToggleChip>
 
@@ -71,29 +88,28 @@ export function StudioSmudgePanel({
         max={SMUDGE_RADIUS_RANGE.max}
         step={SMUDGE_RADIUS_RANGE.step}
         value={radius}
-        disabled={busy}
+        disabled={locked}
         onChange={onRadiusChange}
         readout={`${radius}px`}
       />
 
       <StudioSliderRow
-        label="강도"
+        label="밀기 강도"
         min={SMUDGE_STRENGTH_RANGE.min}
         max={SMUDGE_STRENGTH_RANGE.max}
         step={SMUDGE_STRENGTH_RANGE.step}
         value={strength}
-        disabled={busy}
+        disabled={locked}
         onChange={onStrengthChange}
         readout={`${strength}%`}
       />
 
-      <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-        {busy
-          ? "번짐을 적용하는 중..."
-          : active
-            ? "이미지 위를 드래그하면 지나간 자리의 색이 진행 방향으로 부드럽게 번집니다. 짧게 탭만 하면 변화가 없어요 — 문지르려면 드래그가 필요합니다."
-            : "켜고 이미지 위를 드래그하면 손가락으로 문지르듯 색이 섞입니다."}
-      </p>
-    </div>
+      <StudioRetouchQuickGuide
+        toolId="smudge"
+        active={active}
+        busy={busy}
+        disabled={disabled}
+      />
+    </section>
   );
 }

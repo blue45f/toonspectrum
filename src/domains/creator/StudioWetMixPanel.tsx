@@ -16,8 +16,10 @@
  * 완전히 controlled — 내부 비즈니스 상태 없음(StudioSmudgePanel/StudioDodgeBurnPanel 과 동일
  * 관례). busy/disabled 잠금은 StudioDodgeBurnPanel 의 locked 규약을 따른다.
  */
-import { Droplets, Loader2 } from "lucide-react";
+import { Droplets } from "lucide-react";
+import { useId } from "react";
 
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import {
   WET_MIX_HARDNESS_RANGE,
@@ -26,6 +28,7 @@ import {
   WET_MIX_STRENGTH_RANGE,
   WET_MIX_WETNESS_RANGE,
 } from "./studio-wet-mix";
+import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";
 
@@ -73,26 +76,30 @@ export function StudioWetMixPanel({
   onPickupChange,
   onHardnessChange,
 }: StudioWetMixPanelProps): ReactElement {
+  const titleId = useId();
+  const help = studioRetouchToolHelp("wet-mix");
   const locked = disabled || busy;
-  const statusText = busy
-    ? "혼색을 적용하는 중..."
-    : disabled
-      ? "이미지 레이어를 선택하면 혼색 브러시를 쓸 수 있습니다."
-      : active
-        ? "이미지 위를 드래그하면 현재 색이 칠해지며 지나간 자리의 색과 섞입니다. 혼색율을 높이면 바닥색이 더 많이 섞이고, 묻힘율을 높이면 붓이 새 색을 더 빨리 머금어요."
-        : "켜고 이미지 위를 드래그하면 물감을 얹으며 바닥색과 섞는 혼색 브러시로 칠합니다.";
 
   return (
-    <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
+    <section
+      className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
+      aria-labelledby={titleId}
+    >
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
-          <Droplets size={12} aria-hidden />
-          혼색 브러시
-        </p>
-        <span className="flex items-center gap-1.5">
-          {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
+        <div className="min-w-0">
+          <h3 id={titleId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2">
+            <Droplets size={12} aria-hidden />
+            {help.actionName}
+            <span className="text-[0.66rem] font-medium text-fg-3">{help.technicalName}</span>
+          </h3>
+          <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
+            {help.summary}
+          </p>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5">
           <span
-            aria-hidden
+            role="img"
+            aria-label="현재 칠할 색"
             title="현재 그리기 색 — 이 색이 안료로 섞입니다."
             data-testid="wet-mix-paint-swatch"
             className="size-3.5 shrink-0 rounded-md border border-line/50 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.25),0_1px_2px_oklch(0.1_0.01_70/0.25)] ring-1 ring-black/10"
@@ -105,12 +112,12 @@ export function StudioWetMixPanel({
         active={active}
         disabled={locked}
         onClick={onToggleActive}
-        aria-label={active ? "혼색 브러시 끄기" : "혼색 브러시 켜기"}
-        title="켜고 이미지를 드래그하면 현재 색을 칠하면서 지나간 자리의 색과 섞습니다."
+        aria-label={`${help.actionName} ${active ? "끄기" : "켜기"}`}
+        title={`${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`}
       >
         <span className="inline-flex items-center gap-1">
           <Droplets className="size-3" aria-hidden />
-          혼색 브러시로 칠하기
+          {active ? "섞어 칠하기 끝내기" : "섞어 칠하기 시작"}
         </span>
       </StudioToggleChip>
 
@@ -126,7 +133,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="도포량"
+        label="칠하는 양"
         min={WET_MIX_STRENGTH_RANGE.min}
         max={WET_MIX_STRENGTH_RANGE.max}
         step={WET_MIX_STRENGTH_RANGE.step}
@@ -137,7 +144,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="혼색율"
+        label="바닥색 섞기"
         min={WET_MIX_WETNESS_RANGE.min}
         max={WET_MIX_WETNESS_RANGE.max}
         step={WET_MIX_WETNESS_RANGE.step}
@@ -148,7 +155,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="묻힘율"
+        label="색 줍기"
         min={WET_MIX_PICKUP_RANGE.min}
         max={WET_MIX_PICKUP_RANGE.max}
         step={WET_MIX_PICKUP_RANGE.step}
@@ -159,7 +166,7 @@ export function StudioWetMixPanel({
       />
 
       <StudioSliderRow
-        label="경도"
+        label="가장자리 단단함"
         min={WET_MIX_HARDNESS_RANGE.min}
         max={WET_MIX_HARDNESS_RANGE.max}
         step={WET_MIX_HARDNESS_RANGE.step}
@@ -169,9 +176,12 @@ export function StudioWetMixPanel({
         readout={`${Math.round(hardness * 100)}%`}
       />
 
-      <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-        {statusText}
-      </p>
-    </div>
+      <StudioRetouchQuickGuide
+        toolId="wet-mix"
+        active={active}
+        busy={busy}
+        disabled={disabled}
+      />
+    </section>
   );
 }

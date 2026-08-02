@@ -7,4 +7,9 @@
  */
 export { bakeHealCloneStrokeToCanvas } from "./studio-heal-clone-browser";
 export { magicWandScanFromImage, sampleImageLuminanceField } from "./studio-magic-wand-browser";
+export {
+  encodeStudioRetouchCanvasPng,
+  runStudioDodgeBurnRetouch,
+  runStudioWetMixRetouch,
+} from "./studio-retouch-browser";
 export { smudgeStrokeImage } from "./studio-smudge-browser";

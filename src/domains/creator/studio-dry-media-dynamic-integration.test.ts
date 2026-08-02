@@ -86,7 +86,7 @@ describe("dynamic dry-media product integration", () => {
   it("makes core crayon, chalk and charcoal visually distinct with material lane coverage", () => {
     const plans = ([
       ["crayon", 5],
-      ["chalk", 3],
+      ["chalk", 5],
       ["charcoal", 5],
     ] as const).map(([brushId, laneCount]) => {
       const plan = coverage(identity(brushId));

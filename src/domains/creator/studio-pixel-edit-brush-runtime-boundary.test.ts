@@ -71,6 +71,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 const BROWSER_ORCHESTRATORS = [
   "./studio-heal-clone-browser",
   "./studio-magic-wand-browser",
+  "./studio-retouch-browser",
   "./studio-smudge-browser",
 ] as const;
 
@@ -93,7 +94,7 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     );
   });
 
-  it("awaits the shared runtime inside all three existing async mutation guards", () => {
+  it("awaits the shared runtime inside every async pixel mutation guard", () => {
     const { source } = moduleEdges("./StudioPage.tsx");
 
     expect(source).toContain(
@@ -105,5 +106,10 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     expect(source).toContain(
       "const { bakeHealCloneStrokeToCanvas } = await loadStudioPixelEditBrushRuntime();"
     );
+    expect(source).toContain("runStudioDodgeBurnRetouch");
+    expect(source).toContain("runStudioWetMixRetouch");
+    expect(source).toContain("encodeStudioRetouchCanvasPng");
+    expect(source).not.toContain('await import("./studio-dodge-burn")');
+    expect(source).not.toContain('await import("./studio-wet-mix")');
   });
 });

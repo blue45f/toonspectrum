@@ -150,13 +150,15 @@ const POINT_EPSILON = 1e-8;
 /**
  * Product lane counts are deliberately bounded below the full simulation's most expensive
  * presets, but never collapse a selected-width nib to one representative fibre. Five lanes keep
- * wax, carbon and soft pigment visibly broad; three more separated mineral flakes retain chalk
- * tooth. This is still O(source dabs) with a small material constant and remains prefix-stable.
+ * wax, carbon and soft pigment visibly broad. Chalk also uses five connected lanes: three wide
+ * mineral footprints produced conspicuous square flakes, while fine subtractive grain inside a
+ * continuous five-lane bed retains tooth without revealing the transport primitive. This is still
+ * O(source dabs) with a small material constant and remains prefix-stable.
  */
 const PRODUCT_LANE_COUNT = Object.freeze({
   crayon: 5,
   charcoal: 5,
-  chalk: 3,
+  chalk: 5,
   pastel: 5,
 } as const satisfies Readonly<
   Record<StudioDryMediaAnisotropicPresetIdV1, 3 | 5>

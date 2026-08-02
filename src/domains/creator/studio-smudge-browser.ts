@@ -1,6 +1,7 @@
 /** Browser orchestration for the pure Smudge engine. */
 import { loadFloodFillSourceImage } from "./studio-flood-fill";
 import { flipNormalizedPoint } from "./studio-magic-wand";
+import { encodeStudioRetouchCanvasPng } from "./studio-retouch-browser";
 import { type SmudgePixelPoint } from "./studio-smudge";
 import { runStudioSmudgeWorker } from "./studio-smudge-worker-client";
 
@@ -25,7 +26,7 @@ export async function smudgeStrokeImage(
   strokePoints: readonly SelPoint[],
   radiusNorm: number,
   strength: number,
-  opts?: { flipX?: boolean; flipY?: boolean },
+  opts?: { flipX?: boolean; flipY?: boolean; signal?: AbortSignal },
 ): Promise<string> {
   if (strokePoints.length < 2 || strength <= 0) return src;
 
@@ -57,11 +58,11 @@ export async function smudgeStrokeImage(
     points: pixelPoints,
     radiusPx,
     strength,
-  });
+  }, { signal: opts?.signal });
 
   // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
   // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
   // 로 넓어져 있어 새 뷰로 감싸 좁힌다(studio-image-filter-worker-client 관례와 동일).
   ctx.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
-  return canvas.toDataURL("image/png");
+  return encodeStudioRetouchCanvasPng(canvas, { signal: opts?.signal });
 }

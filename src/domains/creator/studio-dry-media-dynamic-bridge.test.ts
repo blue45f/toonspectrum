@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1,
   STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1,
 } from "./studio-dry-media-anisotropic-grain-v1";
 import {
@@ -145,6 +146,113 @@ describe("dry-media dynamic bridge v1", () => {
       source.slice(2_971),
     ].flatMap((chunk) => requireBridge("pastel", chunk).adjustedDabs);
     expect(chunked).toEqual(complete.adjustedDabs);
+  });
+
+  it("keeps every product lane continuous and suppresses exposed confetti-sized gaps", () => {
+    for (const brushId of [
+      "crayon",
+      "charcoal",
+      "chalk",
+      "pastel",
+    ] as const) {
+      const source = dynamicDabs(384, 1.8);
+      const receipt = requireBridge(brushId, source);
+      expect(receipt.laneCount).toBe(5);
+
+      let maximumLaneJumpRatio = 0;
+      let maximumBandGapRatio = 0;
+      for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
+        const sourceDab = source[sourceIndex]!;
+        const station = receipt.marks
+          .filter((mark) => mark.sourceDabIndex === sourceIndex)
+          .toSorted((left, right) => left.y - right.y);
+        expect(station).toHaveLength(5);
+        for (let laneIndex = 1; laneIndex < station.length; laneIndex += 1) {
+          const previous = station[laneIndex - 1]!;
+          const current = station[laneIndex]!;
+          const gap = current.y - current.radiusY
+            - (previous.y + previous.radiusY);
+          maximumBandGapRatio = Math.max(
+            maximumBandGapRatio,
+            gap / sourceDab.size,
+          );
+        }
+      }
+      for (let laneIndex = 0; laneIndex < receipt.laneCount; laneIndex += 1) {
+        const lane = receipt.marks.filter((mark) => mark.laneIndex === laneIndex);
+        for (let index = 1; index < lane.length; index += 1) {
+          const previous = lane[index - 1]!;
+          const current = lane[index]!;
+          const sourceDab = source[current.sourceDabIndex]!;
+          const sourcePrevious = source[previous.sourceDabIndex]!;
+          const expectedDeltaY = sourceDab.y - sourcePrevious.y;
+          maximumLaneJumpRatio = Math.max(
+            maximumLaneJumpRatio,
+            Math.abs((current.y - previous.y) - expectedDeltaY)
+              / sourceDab.size,
+          );
+        }
+      }
+
+      // Large independent flakes required roughly 0.25-0.5 nib widths of station-local travel.
+      // Product lanes now stay within fine paper-tooth scale and leave no macroscopic gap between
+      // neighbouring pigment supports before the carrier applies deterministic negative grain.
+      expect(maximumLaneJumpRatio, brushId).toBeLessThan(0.09);
+      expect(maximumBandGapRatio, brushId).toBeLessThan(0.055);
+    }
+  });
+
+  it("applies the same fine-grain continuity gate to every mapped catalogue dry medium", () => {
+    const source = dynamicDabs(72, 1.8);
+    for (const [catalogId, expectedPresetId] of Object.entries(
+      STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1,
+    )) {
+      const result = bridgeStudioDynamicDabsToDryMediaV1({
+        brushId: "dry-media",
+        brushCatalogId: catalogId,
+        seed: 0x5eed_cafe,
+        dabs: source,
+      });
+      expect(result.ok, catalogId).toBe(true);
+      if (!result.ok) continue;
+      expect(result.receipt.presetId, catalogId).toBe(expectedPresetId);
+      expect(result.receipt.laneCount, catalogId).toBe(5);
+
+      let maximumLaneJumpRatio = 0;
+      let maximumBandGapRatio = 0;
+      for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
+        const sourceDab = source[sourceIndex]!;
+        const station = result.receipt.marks
+          .slice(sourceIndex * 5, sourceIndex * 5 + 5)
+          .toSorted((left, right) => left.y - right.y);
+        for (let laneIndex = 1; laneIndex < station.length; laneIndex += 1) {
+          const previous = station[laneIndex - 1]!;
+          const current = station[laneIndex]!;
+          maximumBandGapRatio = Math.max(
+            maximumBandGapRatio,
+            (
+              current.y - current.radiusY
+              - (previous.y + previous.radiusY)
+            ) / sourceDab.size,
+          );
+        }
+      }
+      for (let laneIndex = 0; laneIndex < 5; laneIndex += 1) {
+        for (let sourceIndex = 1; sourceIndex < source.length; sourceIndex += 1) {
+          const previous = result.receipt.marks[(sourceIndex - 1) * 5 + laneIndex]!;
+          const current = result.receipt.marks[sourceIndex * 5 + laneIndex]!;
+          const expectedDeltaY = source[sourceIndex]!.y - source[sourceIndex - 1]!.y;
+          maximumLaneJumpRatio = Math.max(
+            maximumLaneJumpRatio,
+            Math.abs((current.y - previous.y) - expectedDeltaY)
+              / source[sourceIndex]!.size,
+          );
+        }
+      }
+
+      expect(maximumLaneJumpRatio, catalogId).toBeLessThan(0.09);
+      expect(maximumBandGapRatio, catalogId).toBeLessThan(0.055);
+    }
   });
 
   it("preserves a visible multi-lane width for a tapered 7px coloured-pencil flick", () => {

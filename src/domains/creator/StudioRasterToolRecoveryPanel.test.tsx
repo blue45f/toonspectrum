@@ -57,9 +57,9 @@ describe("StudioRasterToolRecoveryPanel", () => {
 
   it("deduplicates one shared recovery action across related retouch tools", () => {
     const onRecover = vi.fn();
-    const entries = ["pixel-marquee", "crop", "heal"].map((toolId) =>
+    const entries = ["pixel-marquee", "pixel-lasso", "magic-wand"].map((toolId) =>
       resolveStudioRasterToolAvailability(
-        toolId as "pixel-marquee" | "crop" | "heal",
+        toolId as "pixel-marquee" | "pixel-lasso" | "magic-wand",
         {
           selectedType: "draw",
           visibleVectorDrawCount: 1,

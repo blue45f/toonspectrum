@@ -612,10 +612,11 @@ async function runInOneShotNodeProcess(
   }
 
   const sourceModule = import.meta.url.endsWith(".ts");
-  const moduleUrl = new URL(
-    `./studio-occt-worker-client.${sourceModule ? "ts" : "js"}`,
-    import.meta.url,
-  ).href;
+  // The child imports the exact module that owns this operation. Building a templated sibling
+  // URL here makes Vite expand every matching `studio-occt-worker-client.*` file, which can ship
+  // test sources as production assets. `import.meta.url` is already the correct `.ts` URL under
+  // the tsx test/runtime path and the emitted chunk URL in a production build.
+  const moduleUrl = import.meta.url;
   const commandArguments = sourceModule
     ? [createRequire(import.meta.url).resolve("tsx/cli"), "--eval", NODE_ISOLATED_CHILD_SOURCE]
     : ["--eval", NODE_ISOLATED_CHILD_SOURCE];

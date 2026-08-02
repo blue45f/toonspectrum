@@ -15,6 +15,22 @@ import {
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
 
+type ResvgWasmModule = typeof import("@resvg/resvg-wasm");
+
+let resvgWasmModulePromise: Promise<ResvgWasmModule> | null = null;
+
+function loadResvgWasmModule(): Promise<ResvgWasmModule> {
+  resvgWasmModulePromise ??= (async () => {
+    const module = await import("@resvg/resvg-wasm");
+    const require = createRequire(import.meta.url);
+    await module.initWasm(
+      await readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")),
+    );
+    return module;
+  })();
+  return resvgWasmModulePromise;
+}
+
 function plannedMark(
   brushId: "crayon" | "chalk" | "charcoal" | "pastel" | "oil-pastel",
   points: readonly number[],
@@ -63,6 +79,16 @@ function pathFor(mark: StudioDynamicBrushCoverageMark): string {
   }).join("");
 }
 
+function polygonSignedArea(points: readonly number[]): number {
+  let area = 0;
+  for (let index = 0; index < points.length; index += 2) {
+    const next = (index + 2) % points.length;
+    area += points[index]! * points[next + 1]!
+      - points[next]! * points[index + 1]!;
+  }
+  return area / 2;
+}
+
 function minimumLuminance(
   pixels: Uint8Array,
   width: number,
@@ -85,13 +111,136 @@ function minimumLuminance(
   return minimum;
 }
 
+function pigmentConnectedComponentSizes(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): number[] {
+  const occupied = new Uint8Array(width * height);
+  for (let index = 0; index < occupied.length; index += 1) {
+    const offset = index * 4;
+    const luminance = (pixels[offset] ?? 255) * 0.2126
+      + (pixels[offset + 1] ?? 255) * 0.7152
+      + (pixels[offset + 2] ?? 255) * 0.0722;
+    if ((pixels[offset + 3] ?? 0) > 0 && luminance < 242) occupied[index] = 1;
+  }
+
+  const visited = new Uint8Array(occupied.length);
+  const queue = new Int32Array(occupied.length);
+  const sizes: number[] = [];
+  for (let origin = 0; origin < occupied.length; origin += 1) {
+    if (occupied[origin] === 0 || visited[origin] === 1) continue;
+    let head = 0;
+    let tail = 0;
+    let size = 0;
+    queue[tail++] = origin;
+    visited[origin] = 1;
+    while (head < tail) {
+      const current = queue[head++]!;
+      size += 1;
+      const x = current % width;
+      const y = Math.floor(current / width);
+      for (let deltaY = -1; deltaY <= 1; deltaY += 1) {
+        for (let deltaX = -1; deltaX <= 1; deltaX += 1) {
+          if (deltaX === 0 && deltaY === 0) continue;
+          const nextX = x + deltaX;
+          const nextY = y + deltaY;
+          if (
+            nextX < 0
+            || nextX >= width
+            || nextY < 0
+            || nextY >= height
+          ) continue;
+          const next = nextY * width + nextX;
+          if (occupied[next] === 0 || visited[next] === 1) continue;
+          visited[next] = 1;
+          queue[tail++] = next;
+        }
+      }
+    }
+    if (size >= 4) sizes.push(size);
+  }
+  return sizes.sort((left, right) => right - left);
+}
+
+function horizontalPigmentGapRuns(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  fromX: number,
+  toX: number,
+): number[] {
+  const runs: number[] = [];
+  let currentRun = 0;
+  for (let x = fromX; x <= toX; x += 1) {
+    let occupied = false;
+    for (let y = 0; y < height; y += 1) {
+      const offset = (y * width + x) * 4;
+      const luminance = (pixels[offset] ?? 255) * 0.2126
+        + (pixels[offset + 1] ?? 255) * 0.7152
+        + (pixels[offset + 2] ?? 255) * 0.0722;
+      if ((pixels[offset + 3] ?? 0) > 0 && luminance < 242) {
+        occupied = true;
+        break;
+      }
+    }
+    if (occupied) {
+      if (currentRun > 0) runs.push(currentRun);
+      currentRun = 0;
+    } else {
+      currentRun += 1;
+    }
+  }
+  if (currentRun > 0) runs.push(currentRun);
+  return runs;
+}
+
 describe("dry-media one-fill crossing raster quality", () => {
+  it("embeds only fine opposite-winding paper grain inside one continuous pigment bed", () => {
+    const points = Array.from({ length: 97 }, (_, index) => [
+      12 + index * 3.8,
+      70 + Math.sin(index / 11) * 16,
+    ]).flat();
+    const signatures: string[] = [];
+
+    for (const brushId of [
+      "crayon",
+      "chalk",
+      "charcoal",
+      "pastel",
+      "oil-pastel",
+    ] as const) {
+      const mark = plannedMark(brushId, points);
+      const polygons = mark.ribbon?.polygons ?? [];
+      const positiveAreas = polygons
+        .map(polygonSignedArea)
+        .filter((area) => area > 0);
+      const negativeAreas = polygons
+        .map(polygonSignedArea)
+        .filter((area) => area < 0)
+        .map(Math.abs);
+      const totalBodyArea = positiveAreas.reduce((sum, area) => sum + area, 0);
+      const totalGrainArea = negativeAreas.reduce((sum, area) => sum + area, 0);
+
+      expect(positiveAreas.length, brushId).toBeGreaterThan(200);
+      expect(negativeAreas.length, brushId).toBeGreaterThan(20);
+      expect(Math.max(...negativeAreas), brushId).toBeLessThan(1.5);
+      expect(totalGrainArea / totalBodyArea, brushId).toBeGreaterThan(0.001);
+      expect(totalGrainArea / totalBodyArea, brushId).toBeLessThan(0.12);
+      signatures.push([
+        negativeAreas.length,
+        (totalGrainArea / totalBodyArea).toFixed(5),
+        Math.max(...negativeAreas).toFixed(5),
+      ].join(":"));
+    }
+
+    // Material policies are not opacity aliases: wax, carbon, mineral, powder and oil-wax expose
+    // measurably different pore density/geometry while using the same continuous transport.
+    expect(new Set(signatures).size).toBe(5);
+  });
+
   it("keeps every core dry medium at one stroke-local crossing alpha", async () => {
-    const module = await import("@resvg/resvg-wasm");
-    const require = createRequire(import.meta.url);
-    await module.initWasm(
-      await readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")),
-    );
+    const module = await loadResvgWasmModule();
     for (const brushId of [
       "crayon",
       "chalk",
@@ -137,6 +286,57 @@ describe("dry-media one-fill crossing raster quality", () => {
           rendered.free();
           renderer.free();
         }
+      }
+    }
+  });
+
+  it("keeps long pressure-varying fibres connected without periodic stamp gaps", async () => {
+    const module = await loadResvgWasmModule();
+    const points = Array.from({ length: 81 }, (_, index) => [
+      20 + index * 7,
+      90 + Math.sin(index * 0.34) * 24 + Math.sin(index * 0.91) * 5,
+    ]).flat();
+
+    for (const brushId of [
+      "crayon",
+      "chalk",
+      "charcoal",
+      "pastel",
+      "oil-pastel",
+    ] as const) {
+      const mark = plannedMark(brushId, points);
+      const renderer = new module.Resvg(
+        [
+          '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="180">',
+          '<rect width="600" height="180" fill="#fff"/>',
+          `<path d="${pathFor(mark)}" fill="${mark.color}" fill-rule="nonzero" opacity=".82"/>`,
+          "</svg>",
+        ].join(""),
+        { shapeRendering: 2, font: { loadSystemFonts: false } },
+      );
+      const rendered = renderer.render();
+      try {
+        const components = pigmentConnectedComponentSizes(
+          rendered.pixels,
+          rendered.width,
+          rendered.height,
+        );
+        const gapRuns = horizontalPigmentGapRuns(
+          rendered.pixels,
+          rendered.width,
+          rendered.height,
+          20,
+          580,
+        );
+        // Three or five material lanes may remain visually independent, but a station may never
+        // create another isolated square/diamond component. This bound catches the old behaviour,
+        // which produced hundreds of components as seeded offsets changed along a long stroke.
+        expect(components.length, `${brushId}: ${components.slice(0, 16)}`).toBeLessThanOrEqual(8);
+        expect(Math.max(0, ...gapRuns), `${brushId}: ${gapRuns}`).toBeLessThanOrEqual(1);
+        expect(gapRuns.length, `${brushId}: ${gapRuns}`).toBeLessThanOrEqual(2);
+      } finally {
+        rendered.free();
+        renderer.free();
       }
     }
   });

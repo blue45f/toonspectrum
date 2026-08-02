@@ -94,11 +94,13 @@ function fakeModule(): FakeModule {
 function fakeGl() {
   const readbackDestinations: Uint8Array[] = [];
   return {
+    DITHER: 0x0bd0,
     FRAMEBUFFER: 0x8d40,
     PACK_ALIGNMENT: 0x0d05,
     RGBA: 0x1908,
     UNSIGNED_BYTE: 0x1401,
     bindFramebuffer: vi.fn(),
+    disable: vi.fn(),
     pixelStorei: vi.fn(),
     finish: vi.fn(),
     readPixels: vi.fn((
@@ -221,9 +223,9 @@ function createHarness(runtime: FakeModule) {
 }
 
 describe("Studio p5.brush standalone concrete adapter", () => {
-  it("advertises the five proven artistic techniques at adapter revision 5", async () => {
+  it("advertises the five proven artistic techniques at adapter revision 6", async () => {
     expect(STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION).toBe(
-      "2.2.1-adapter.5",
+      "2.2.1-adapter.6",
     );
     expect(STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES).toEqual([
       "procedural:flow-field",
@@ -348,6 +350,8 @@ describe("Studio p5.brush standalone concrete adapter", () => {
     expect(runtime.noiseSeed).toHaveBeenCalledBefore(runtime.load);
     expect(runtime.seed).toHaveBeenCalledWith(0x1234_abcd);
     expect(runtime.noiseSeed).toHaveBeenCalledWith(0x1234_abcd);
+    expect(target.gl.disable).toHaveBeenCalledWith(target.gl.DITHER);
+    expect(target.gl.disable).toHaveBeenCalledBefore(runtime.load);
     expect(runtime.translate).toHaveBeenCalledWith(-1, -1);
     expect(runtime.set).toHaveBeenCalledWith("HB", "#334455", 2);
     expect(runtime.field).toHaveBeenCalledWith("seabed");

@@ -124,6 +124,7 @@ describe("Studio realtime ticket deployment configuration", () => {
           manageMembers: false,
         },
       },
+      authorizationEpoch: "2026-08-02T00:00:00.000Z",
     });
     const creatorAuthorization =
       new CreatorStudioRealtimeTicketAuthorization(

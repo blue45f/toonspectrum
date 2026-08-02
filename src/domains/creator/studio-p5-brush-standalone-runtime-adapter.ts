@@ -18,7 +18,7 @@ import {
 } from "./studio-procedural-artistic-brush-provider";
 
 export const STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION =
-  "2.2.1-adapter.5" as const;
+  "2.2.1-adapter.6" as const;
 
 export const STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES = Object.freeze([
   "procedural:flow-field",
@@ -102,11 +102,13 @@ interface P5BrushStandaloneModule {
 }
 
 interface WebGl2Readback {
+  readonly DITHER: number;
   readonly FRAMEBUFFER: number;
   readonly PACK_ALIGNMENT: number;
   readonly RGBA: number;
   readonly UNSIGNED_BYTE: number;
   bindFramebuffer(target: number, framebuffer: null): void;
+  disable(capability: number): void;
   pixelStorei(parameter: number, value: number): void;
   readPixels(
     x: number,
@@ -408,6 +410,20 @@ function readTopLeftRgbaInPlace(
   return pixels;
 }
 
+/**
+ * WebGL enables dithering by default. That is useful for display surfaces, but
+ * its sub-LSB perturbation is implementation-defined and feeds back through
+ * p5.brush's repeated spectral fill passes. Linux SwiftShader can consequently
+ * produce different canonical RGBA bytes for an otherwise identical seeded
+ * watercolor render. The private settled-output surface is an export target,
+ * not a display target, so disable dithering before p5.brush allocates or draws
+ * any renderer-owned resources.
+ */
+function enforceCanonicalWebGlState(gl: WebGl2Readback): void {
+  gl.disable(gl.DITHER);
+  gl.pixelStorei(gl.PACK_ALIGNMENT, 1);
+}
+
 function resetStandaloneState(runtime: P5BrushStandaloneModule): void {
   runtime.noClip();
   runtime.noField();
@@ -660,12 +676,14 @@ function readbackContext(
   if (
     ![
       "bindFramebuffer",
+      "disable",
       "pixelStorei",
       "readPixels",
       "finish",
     ].every((name) => typeof context[name] === "function")
     || ![
       "FRAMEBUFFER",
+      "DITHER",
       "PACK_ALIGNMENT",
       "RGBA",
       "UNSIGNED_BYTE",
@@ -766,6 +784,7 @@ function createAdapter(
       return withGlobalRuntimeLock(signal, async () => {
         throwIfAborted(signal);
         const gl = verifySurfaceContext(input, environment);
+        enforceCanonicalWebGlState(gl);
         if (contextAuthority === null && canvasAuthority === null) {
           contextAuthority = input.surface.context;
           canvasAuthority = input.surface.canvas;

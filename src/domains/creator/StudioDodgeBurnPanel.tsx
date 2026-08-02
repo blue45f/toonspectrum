@@ -12,7 +12,8 @@
  * 완전히 controlled — 내부 비즈니스 상태 없음(StudioSmudgePanel/StudioHealClonePanel 과 동일
  * 관례). 톤 범위 칩은 닷지/번 모드에서만, 스펀지 방향 칩은 스펀지 모드에서만 노출된다.
  */
-import { Contrast, Loader2 } from "lucide-react";
+import { Contrast } from "lucide-react";
+import { useId } from "react";
 
 import {
   DODGE_BURN_EXPOSURE_RANGE,
@@ -25,9 +26,17 @@ import {
   type DodgeBurnRange,
   type DodgeBurnSpongeMode,
 } from "./studio-dodge-burn";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { ReactElement } from "react";
+
+const DODGE_BURN_ACTION_LABELS: Readonly<Record<DodgeBurnMode, string>> = {
+  dodge: "밝게 · 닷지",
+  burn: "어둡게 · 번",
+  sponge: "채도 · 스펀지",
+};
 
 export type StudioDodgeBurnPanelProps = {
   /** 닷지/번 브러시가 무장(켜짐) 상태인지. */
@@ -75,41 +84,36 @@ export function StudioDodgeBurnPanel({
   onHardnessChange,
   onExposureChange,
 }: StudioDodgeBurnPanelProps): ReactElement {
+  const titleId = useId();
+  const help = studioRetouchToolHelp("dodge-burn");
   const locked = disabled || busy;
-  const statusText = busy
-    ? "톤 보정을 적용하는 중..."
-    : disabled
-      ? "이미지 레이어를 선택하면 닷지/번 브러시를 쓸 수 있습니다."
-      : active
-        ? mode === "sponge"
-          ? sponge === "saturate"
-            ? "이미지 위를 드래그하면 지나간 자리의 색이 더 선명해집니다."
-            : "이미지 위를 드래그하면 지나간 자리의 색이 회색 쪽으로 빠집니다."
-          : mode === "dodge"
-            ? "이미지 위를 드래그하면 지나간 자리의 선택한 톤이 밝아집니다. 같은 자리를 여러 번 지나면 점점 더 진하게 적용돼요."
-            : "이미지 위를 드래그하면 지나간 자리의 선택한 톤이 어두워집니다. 같은 자리를 여러 번 지나면 점점 더 진하게 적용돼요."
-        : "켜고 이미지 위를 드래그하면 지나간 자리가 밝아지거나(닷지) 어두워지고(번), 채도를 조절할 수 있습니다(스펀지).";
 
   return (
-    <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
+    <section
+      className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
+      aria-labelledby={titleId}
+    >
+      <div className="min-w-0">
+        <h3 id={titleId} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold tracking-tight text-fg-2">
           <Contrast size={12} aria-hidden />
-          닷지 / 번 / 스펀지
+          {help.actionName}
+          <span className="text-[0.66rem] font-medium text-fg-3">{help.technicalName}</span>
+        </h3>
+        <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
+          {help.summary}
         </p>
-        {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
       <StudioToggleChip
         active={active}
         disabled={locked}
         onClick={onToggleActive}
-        aria-label={active ? "닷지/번 브러시 끄기" : "닷지/번 브러시 켜기"}
-        title="켜고 이미지를 드래그하면 지나간 자리의 톤·채도가 보정됩니다."
+        aria-label={`${help.actionName} ${active ? "끄기" : "켜기"}`}
+        title={`${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`}
       >
         <span className="inline-flex items-center gap-1">
           <Contrast className="size-3" aria-hidden />
-          닷지/번으로 보정하기
+          {active ? "밝기·채도 보정 끝내기" : "밝기·채도 보정 시작"}
         </span>
       </StudioToggleChip>
 
@@ -122,7 +126,7 @@ export function StudioDodgeBurnPanel({
             onClick={() => onModeChange(m.id)}
             title={m.tip}
           >
-            {m.label}
+            {DODGE_BURN_ACTION_LABELS[m.id]}
           </StudioToggleChip>
         ))}
       </div>
@@ -169,7 +173,7 @@ export function StudioDodgeBurnPanel({
       />
 
       <StudioSliderRow
-        label="경도"
+        label="가장자리 단단함"
         min={DODGE_BURN_HARDNESS_RANGE.min}
         max={DODGE_BURN_HARDNESS_RANGE.max}
         step={DODGE_BURN_HARDNESS_RANGE.step}
@@ -180,7 +184,7 @@ export function StudioDodgeBurnPanel({
       />
 
       <StudioSliderRow
-        label="노출"
+        label="효과 강도 · 노출"
         min={DODGE_BURN_EXPOSURE_RANGE.min}
         max={DODGE_BURN_EXPOSURE_RANGE.max}
         step={DODGE_BURN_EXPOSURE_RANGE.step}
@@ -190,9 +194,12 @@ export function StudioDodgeBurnPanel({
         readout={`${exposure}%`}
       />
 
-      <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-        {statusText}
-      </p>
-    </div>
+      <StudioRetouchQuickGuide
+        toolId="dodge-burn"
+        active={active}
+        busy={busy}
+        disabled={disabled}
+      />
+    </section>
   );
 }

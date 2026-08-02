@@ -19,6 +19,11 @@ import {
 } from "./studio-advanced-fill-raster-safety";
 import { loadStudioSvgExportWorkerClientModule } from "./studio-document-export-loaders";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
+import {
+  createStudioOffscreenRasterSession,
+  type StudioOffscreenRasterSession,
+} from "./studio-offscreen-raster-worker-client";
+import { adoptStudioOffscreenBitmap } from "./studio-offscreen-raster-worker-protocol";
 
 import type { El } from "./studio-element-model";
 import type { SelectionFrame } from "./studio-selection-tools";
@@ -83,6 +88,13 @@ export interface StudioVectorReferenceRenderOptions {
   readonly workerFactory?: StudioSvgExportWorkerFactory | null;
   /** Test/platform seam. Production defaults to SVG Blob -> transparent Canvas2D -> PNG Blob. */
   readonly rasterize?: StudioVectorReferenceRasterizer;
+}
+
+export interface StudioVectorReferenceOffscreenOptions {
+  /** Test/platform seam. Production uses the browser's asynchronous SVG ImageBitmap decoder. */
+  readonly createBitmap?: (source: Blob) => Promise<ImageBitmap>;
+  /** Test/platform seam. Production creates one isolated one-shot OffscreenCanvas session. */
+  readonly createSession?: () => StudioOffscreenRasterSession;
 }
 
 export interface StudioVectorReferenceResult {
@@ -467,6 +479,106 @@ export const rasterizeStudioVectorReferenceInBrowser: StudioVectorReferenceRaste
 };
 
 /**
+ * Moves the expensive page-sized SVG draw and PNG encode off the interaction thread.
+ *
+ * Directly drawn Studio strokes reach smudge/mix/dodge/liquify through an editable raster copy.
+ * SVG serialization was already Worker-backed, but the final full-page draw + PNG encode still
+ * happened on the main thread and could look like a frozen canvas on long webtoon pages. Chrome's
+ * ImageBitmap decoder is asynchronous; the decoded bitmap is then transferred once to the shared
+ * OffscreenCanvas runtime for drawing and `convertToBlob()` encoding. Unsupported/startup/worker
+ * failures return `null` so the exact legacy renderer can retry from the original SVG string.
+ */
+export async function rasterizeStudioVectorReferenceOffscreen(
+  request: StudioVectorReferenceRasterRequest,
+  options: StudioVectorReferenceOffscreenOptions = {},
+): Promise<StudioVectorReferenceRasterResult | null> {
+  throwIfAborted(request.signal);
+  const createBitmap = options.createBitmap
+    ?? (typeof globalThis.createImageBitmap === "function"
+      ? (source: Blob) => globalThis.createImageBitmap(source)
+      : null);
+  if (!createBitmap || typeof Worker !== "function") return null;
+
+  let bitmap: ImageBitmap | null = null;
+  let session: StudioOffscreenRasterSession | null = null;
+  try {
+    bitmap = await createBitmap(new Blob([request.svg], { type: SVG_EXPORT_MIME }));
+    throwIfAborted(request.signal);
+    if (bitmap.width <= 0 || bitmap.height <= 0) return null;
+
+    session = (options.createSession ?? createStudioOffscreenRasterSession)();
+    const result = await session.run(
+      `vector-reference:${request.width}x${request.height}`,
+      {
+        target: {
+          width: request.width,
+          height: request.height,
+          background: null,
+        },
+        sources: [{
+          kind: "bitmap",
+          bitmap: adoptStudioOffscreenBitmap(bitmap),
+          placement: {
+            dx: 0,
+            dy: 0,
+            dw: request.width,
+            dh: request.height,
+            opacity: 1,
+            rotation: 0,
+            flipX: false,
+            flipY: false,
+          },
+        }],
+        output: { kind: "encoded", mime: "image/png" },
+      },
+      { signal: request.signal },
+    );
+    throwIfAborted(request.signal);
+    if (
+      !result.ok
+      || result.width !== request.width
+      || result.height !== request.height
+      || result.payload.kind !== "encoded"
+      || result.payload.mime !== "image/png"
+    ) return null;
+    if (result.payload.blob.size > request.maxOutputBytes) {
+      throw new StudioVectorReferenceError(
+        "png-budget-exceeded",
+        "벡터 선화 PNG가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 해상도를 낮춰 주세요.",
+      );
+    }
+    return {
+      dataUrl: await blobToDataUrl(result.payload.blob, request.signal),
+      width: request.width,
+      height: request.height,
+    };
+  } catch (error) {
+    if (request.signal?.aborted || (error instanceof Error && error.name === "AbortError")) {
+      throw vectorReferenceAbortError();
+    }
+    if (error instanceof StudioVectorReferenceError && error.code === "png-budget-exceeded") {
+      throw error;
+    }
+    return null;
+  } finally {
+    session?.dispose();
+    try {
+      bitmap?.close();
+    } catch {
+      // A successfully posted ImageBitmap is already detached in the main realm.
+    }
+  }
+}
+
+/** OffscreenCanvas first; exact Canvas2D renderer remains the compatibility/failure fallback. */
+export const rasterizeStudioVectorReferenceHybrid: StudioVectorReferenceRasterizer = async (
+  request,
+) => (
+  await rasterizeStudioVectorReferenceOffscreen(request)
+  ?? rasterizeStudioVectorReferenceInBrowser(request)
+);
+
+/**
  * Generic SVG-export -> transparent PNG seam. Advanced Fill filters to DrawEl before calling it;
  * future attachment-less vector filters can pass their own explicit document-vector selection.
  */
@@ -500,7 +612,7 @@ export async function renderStudioVectorReference(
     exported.result.svg,
     input.fingerprintNamespace ?? "vector-reference-v1",
   );
-  const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceInBrowser)({
+  const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceHybrid)({
     svg: exported.result.svg,
     width: dimensions.width,
     height: dimensions.height,

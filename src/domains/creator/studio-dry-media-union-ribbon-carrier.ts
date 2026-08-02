@@ -29,7 +29,11 @@ export interface StudioDryMediaUnionRibbonPolygon {
   readonly kind: "dry-media-union-ribbon-polygon";
   readonly version: typeof STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION;
   readonly role: "stroke-union";
-  /** Same-winding contours rendered by one non-zero fill. */
+  /**
+   * Positive-winding pigment contours followed by deterministic opposite-winding micro pores.
+   * One non-zero fill therefore deposits a continuous bed while revealing paper tooth without
+   * painting the background colour or source-over stacking transparent stamps.
+   */
   readonly polygons: readonly (readonly number[])[];
 }
 
@@ -89,6 +93,73 @@ const COORDINATE_LIMIT = 1_000_000_000;
 const QUANTIZATION = 10_000;
 const EPSILON = 1e-6;
 const TAU = Math.PI * 2;
+
+type CoreDryMediaId =
+  | "crayon"
+  | "chalk"
+  | "charcoal"
+  | "pastel"
+  | "oil-pastel";
+
+interface DryMediaNegativeGrainPolicy {
+  /** Probability that one causal lane segment exposes a paper-tooth slit. */
+  readonly density: number;
+  /** Slit length as a fraction of the causal segment, before the absolute fine-grain bound. */
+  readonly lengthRatio: number;
+  /** Slit width as a fraction of the narrowest connected pigment half-width. */
+  readonly widthRatio: number;
+  readonly maximumHalfLength: number;
+  readonly maximumHalfWidth: number;
+  readonly lateralWander: number;
+}
+
+const DRY_MEDIA_NEGATIVE_GRAIN_POLICY = Object.freeze({
+  // Sparse, long wax scratches over a dense body.
+  crayon: Object.freeze({
+    density: 0.34,
+    lengthRatio: 0.42,
+    widthRatio: 0.12,
+    maximumHalfLength: 0.72,
+    maximumHalfWidth: 0.24,
+    lateralWander: 0.42,
+  }),
+  // Many hairline carbon gaps preserve a fibrous stick texture.
+  charcoal: Object.freeze({
+    density: 0.68,
+    lengthRatio: 0.58,
+    widthRatio: 0.09,
+    maximumHalfLength: 0.82,
+    maximumHalfWidth: 0.2,
+    lateralWander: 0.56,
+  }),
+  // Shorter mineral pores read as chalk tooth rather than square pigment flakes.
+  chalk: Object.freeze({
+    density: 0.6,
+    lengthRatio: 0.3,
+    widthRatio: 0.18,
+    maximumHalfLength: 0.48,
+    maximumHalfWidth: 0.34,
+    lateralWander: 0.62,
+  }),
+  // Fine, moderately dense paper tooth under soft powder.
+  pastel: Object.freeze({
+    density: 0.5,
+    lengthRatio: 0.34,
+    widthRatio: 0.14,
+    maximumHalfLength: 0.56,
+    maximumHalfWidth: 0.3,
+    lateralWander: 0.52,
+  }),
+  // Oil pastel is smoother and more occlusive, with only occasional wax grooves.
+  "oil-pastel": Object.freeze({
+    density: 0.24,
+    lengthRatio: 0.5,
+    widthRatio: 0.08,
+    maximumHalfLength: 0.7,
+    maximumHalfWidth: 0.18,
+    lateralWander: 0.34,
+  }),
+} as const satisfies Readonly<Record<CoreDryMediaId, DryMediaNegativeGrainPolicy>>);
 
 function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -185,6 +256,35 @@ function sameWinding(points: readonly number[]): readonly number[] {
   return Object.freeze(reversed);
 }
 
+function oppositeWinding(points: readonly number[]): readonly number[] {
+  const positive = sameWinding(points);
+  const reversed: number[] = [];
+  for (let index = positive.length - 2; index >= 0; index -= 2) {
+    reversed.push(positive[index]!, positive[index + 1]!);
+  }
+  return Object.freeze(reversed);
+}
+
+function deterministicUnit(
+  seed: number,
+  stationIndex: number,
+  laneIndex: number,
+  channel: number,
+): number {
+  let value = (
+    (seed >>> 0)
+    ^ Math.imul((stationIndex + 1) >>> 0, 0x9e37_79b1)
+    ^ Math.imul((laneIndex + 1) >>> 0, 0x85eb_ca77)
+    ^ Math.imul((channel + 1) >>> 0, 0xc2b2_ae3d)
+  ) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb_352d) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846c_a68b) >>> 0;
+  value ^= value >>> 16;
+  return (value >>> 0) / 0x1_0000_0000;
+}
+
 function ellipsePolygon(
   centerX: number,
   centerY: number,
@@ -238,6 +338,47 @@ function previousFiberCenter(
   });
 }
 
+function actualPreviousFiberCenter(
+  dabs: readonly StudioDynamicBrushDab[],
+  marks: readonly StudioDryMediaUnionRibbonSourceMark[],
+  index: number,
+  laneCount: number,
+  frame: StudioDynamicBrushSegmentStartFrame,
+): Readonly<{ x: number; y: number; halfWidth: number }> | null {
+  const previousIndex = index - laneCount;
+  if (previousIndex < 0) return null;
+  const previousDab = dabs[previousIndex];
+  const previousMark = marks[previousIndex];
+  if (!previousDab || !previousMark || !validPair(previousDab, previousMark)) {
+    return null;
+  }
+
+  // The bridge emits every physical lane in a stable station-major order. A full-prefix replay
+  // therefore has the exact previous footprint at `index - laneCount`; use that authored geometry
+  // instead of rotating the current station's freshly seeded offset backwards. The reconstruction
+  // remains the causal-suffix fallback when the preceding station is intentionally not supplied.
+  if (
+    Math.abs(previousDab.sourceX - frame.sourceX) > EPSILON
+    || Math.abs(previousDab.sourceY - frame.sourceY) > EPSILON
+  ) {
+    return null;
+  }
+  if (
+    Number.isFinite(previousDab.distanceFromStrokeStart)
+    && Number.isFinite(frame.distanceFromStrokeStart)
+    && Math.abs(
+      previousDab.distanceFromStrokeStart! - frame.distanceFromStrokeStart!,
+    ) > EPSILON
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    x: previousMark.x,
+    y: previousMark.y,
+    halfWidth: coverageHalfWidth(previousMark),
+  });
+}
+
 function segmentPolygon(
   startX: number,
   startY: number,
@@ -261,6 +402,102 @@ function segmentPolygon(
     endY + normalY * endHalfWidth,
     startX + normalX * startHalfWidth,
     startY + normalY * startHalfWidth,
+  ]);
+}
+
+function negativeGrainSlitPolygon(
+  input: Readonly<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    startHalfWidth: number;
+    endHalfWidth: number;
+    seed: number;
+    stationIndex: number;
+    laneIndex: number;
+    policy: DryMediaNegativeGrainPolicy;
+  }>,
+): readonly number[] | null {
+  if (
+    deterministicUnit(
+      input.seed,
+      input.stationIndex,
+      input.laneIndex,
+      0,
+    ) >= input.policy.density
+  ) return null;
+  const deltaX = input.endX - input.startX;
+  const deltaY = input.endY - input.startY;
+  const length = Math.hypot(deltaX, deltaY);
+  const minimumHalfWidth = Math.min(
+    input.startHalfWidth,
+    input.endHalfWidth,
+  );
+  if (length <= 0.45 || minimumHalfWidth <= 0.18) return null;
+
+  const tangentX = deltaX / length;
+  const tangentY = deltaY / length;
+  const normalX = -tangentY;
+  const normalY = tangentX;
+  const along = 0.24 + deterministicUnit(
+    input.seed,
+    input.stationIndex,
+    input.laneIndex,
+    1,
+  ) * 0.52;
+  const lateral = (
+    deterministicUnit(
+      input.seed,
+      input.stationIndex,
+      input.laneIndex,
+      2,
+    ) * 2 - 1
+  ) * minimumHalfWidth * input.policy.lateralWander;
+  const centerX = input.startX + deltaX * along + normalX * lateral;
+  const centerY = input.startY + deltaY * along + normalY * lateral;
+  const halfLength = Math.max(
+    0.12,
+    Math.min(
+      length * 0.31,
+      input.policy.maximumHalfLength,
+      length * input.policy.lengthRatio * (
+        0.72 + deterministicUnit(
+          input.seed,
+          input.stationIndex,
+          input.laneIndex,
+          3,
+        ) * 0.4
+      ),
+    ),
+  );
+  const halfWidth = Math.max(
+    0.055,
+    Math.min(
+      minimumHalfWidth * 0.32,
+      input.policy.maximumHalfWidth,
+      minimumHalfWidth * input.policy.widthRatio * (
+        0.78 + deterministicUnit(
+          input.seed,
+          input.stationIndex,
+          input.laneIndex,
+          4,
+        ) * 0.38
+      ),
+    ),
+  );
+  if (halfLength * 2 >= length * 0.68 || halfWidth >= minimumHalfWidth * 0.4) {
+    return null;
+  }
+  return oppositeWinding([
+    centerX - tangentX * halfLength - normalX * halfWidth,
+    centerY - tangentY * halfLength - normalY * halfWidth,
+    centerX + tangentX * halfLength - normalX * halfWidth,
+    centerY + tangentY * halfLength - normalY * halfWidth,
+    centerX + tangentX * halfLength + normalX * halfWidth,
+    centerY + tangentY * halfLength + normalY * halfWidth,
+    centerX - tangentX * halfLength + normalX * halfWidth,
+    centerY - tangentY * halfLength + normalY * halfWidth,
   ]);
 }
 
@@ -359,6 +596,9 @@ export function planStudioDryMediaUnionRibbonCarrier(
   }
 
   const polygons: Array<readonly number[]> = [];
+  const brushId = input.materialIdentity?.brushId as CoreDryMediaId;
+  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[brushId];
+  const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
   for (let index = 0; index < input.dabs.length; index += 1) {
     const dab = input.dabs[index]!;
     const mark = input.marks[index]!;
@@ -372,7 +612,13 @@ export function planStudioDryMediaUnionRibbonCarrier(
           marks: input.marks,
         });
       }
-      const start = previousFiberCenter(dab, mark, frame);
+      const start = actualPreviousFiberCenter(
+        input.dabs,
+        input.marks,
+        index,
+        laneCount,
+        frame,
+      ) ?? previousFiberCenter(dab, mark, frame);
       const segment = segmentPolygon(
         start.x,
         start.y,
@@ -389,11 +635,27 @@ export function planStudioDryMediaUnionRibbonCarrier(
         });
       }
       polygons.push(segment);
+      const grain = negativeGrainSlitPolygon({
+        startX: start.x,
+        startY: start.y,
+        endX: mark.x,
+        endY: mark.y,
+        startHalfWidth: start.halfWidth,
+        endHalfWidth: coverageHalfWidth(mark),
+        seed: grainSeed,
+        stationIndex: Math.floor(index / laneCount),
+        laneIndex: index % laneCount,
+        policy: grainPolicy,
+      });
+      if (grain) polygons.push(grain);
     } else {
       polygons.push(ellipsePolygon(
         mark.x,
         mark.y,
-        Math.max(0.25, mark.radiusX * 0.58),
+        Math.max(
+          0.25,
+          Math.min(mark.radiusX * 0.28, coverageHalfWidth(mark) * 1.8),
+        ),
         coverageHalfWidth(mark),
         mark.angleRadians,
       ));
@@ -405,7 +667,10 @@ export function planStudioDryMediaUnionRibbonCarrier(
       polygons.push(ellipsePolygon(
         mark.x,
         mark.y,
-        Math.max(0.25, mark.radiusX * 0.46),
+        Math.max(
+          0.25,
+          Math.min(mark.radiusX * 0.24, coverageHalfWidth(mark) * 1.65),
+        ),
         coverageHalfWidth(mark),
         mark.angleRadians,
       ));

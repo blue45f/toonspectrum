@@ -5,7 +5,6 @@
  */
 import {
   Expand,
-  Loader2,
   Move,
   RotateCcw,
   RotateCw,
@@ -25,7 +24,9 @@ import {
   normalizeStudioLiquifyMode,
   type StudioLiquifyMode,
 } from "./studio-liquify-contract";
+import { studioRetouchToolHelp } from "./studio-retouch-help";
 import { StudioPanelChip, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { StudioRetouchQuickGuide } from "./StudioRetouchQuickGuide";
 
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
@@ -87,6 +88,8 @@ export type StudioLiquifyPanelProps = {
   mode?: StudioLiquifyMode;
   /** 스트로크 커밋(변위 필드 렌더) 진행 중. */
   busy?: boolean;
+  /** 문서 잠금 등 상위 게이트 — 제공되면 패널 전체를 잠그고 복구 안내를 표시한다. */
+  disabled?: boolean;
   onToggleActive: () => void;
   onRadiusChange: (value: number) => void;
   onStrengthChange: (value: number) => void;
@@ -114,6 +117,7 @@ export function StudioLiquifyPanel({
   strength,
   mode = "push",
   busy = false,
+  disabled = false,
   onToggleActive,
   onRadiusChange,
   onStrengthChange,
@@ -132,6 +136,8 @@ export function StudioLiquifyPanel({
   onSmooth,
 }: StudioLiquifyPanelProps): ReactElement {
   const titleId = useId();
+  const help = studioRetouchToolHelp("liquify");
+  const locked = busy || disabled;
   const safeMode = normalizeStudioLiquifyMode(mode);
   const current =
     LIQUIFY_MODE_PRESENTATIONS.find((presentation) => presentation.mode === safeMode) ??
@@ -159,22 +165,19 @@ export function StudioLiquifyPanel({
             className="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-fg-2"
           >
             <CurrentIcon size={13} aria-hidden />
-            리퀴파이 · {current.label}
+            {help.actionName}
+            <span className="text-[0.66rem] font-medium text-fg-3">
+              {help.technicalName} · {current.label}
+            </span>
           </h3>
           <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty">
-            {current.description}
+            {help.summary} 현재 방식은 {current.description}
           </p>
         </div>
-        {busy ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[0.68rem] text-accent" role="status">
-            <Loader2 size={13} className="motion-safe:animate-spin" aria-hidden />
-            적용 중
-          </span>
-        ) : null}
       </div>
 
       {onModeChange ? (
-        <fieldset disabled={busy} className="min-w-0">
+        <fieldset disabled={locked} className="min-w-0">
           <legend className="mb-1.5 text-[0.68rem] font-medium text-fg-3">왜곡 방식</legend>
           <div className="flex flex-wrap gap-1.5">
             {LIQUIFY_MODE_PRESENTATIONS.map((presentation) => {
@@ -183,7 +186,7 @@ export function StudioLiquifyPanel({
                 <StudioPanelChip
                   key={presentation.mode}
                   active={safeMode === presentation.mode}
-                  disabled={busy}
+                  disabled={locked}
                   onClick={() => onModeChange(presentation.mode)}
                   title={presentation.description}
                 >
@@ -200,7 +203,7 @@ export function StudioLiquifyPanel({
 
       <StudioToggleChip
         active={active}
-        disabled={busy}
+        disabled={locked}
         onClick={onToggleActive}
         aria-label={`${current.action} ${active ? "끄기" : "켜기"}`}
         title={`${current.description} 결과는 손을 뗄 때 한 번에 반영됩니다.`}
@@ -218,18 +221,18 @@ export function StudioLiquifyPanel({
         step={LIQUIFY_RADIUS_RANGE.step}
         value={radius}
         onChange={onRadiusChange}
-        disabled={busy}
+        disabled={locked}
         readout={`${radius}px`}
       />
 
       <StudioSliderRow
-        label="늘림 강도"
+        label="변형 강도"
         min={LIQUIFY_STRENGTH_RANGE.min}
         max={LIQUIFY_STRENGTH_RANGE.max}
         step={LIQUIFY_STRENGTH_RANGE.step}
         value={strength}
         onChange={onStrengthChange}
-        disabled={busy}
+        disabled={locked}
         readout={`${strength}%`}
       />
 
@@ -244,7 +247,7 @@ export function StudioLiquifyPanel({
             <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">접기</span>
           </summary>
 
-          <fieldset disabled={busy} className="mt-1.5 space-y-2.5 px-1 pb-0.5">
+          <fieldset disabled={locked} className="mt-1.5 space-y-2.5 px-1 pb-0.5">
             <legend className="sr-only">리퀴파이 세부 조절</legend>
             {onHardnessChange ? (
               <StudioSliderRow
@@ -254,7 +257,7 @@ export function StudioLiquifyPanel({
                 step={LIQUIFY_HARDNESS_RANGE.step}
                 value={hardness}
                 onChange={onHardnessChange}
-                disabled={busy}
+                disabled={locked}
                 readout={`${hardness}%`}
               />
             ) : null}
@@ -267,7 +270,7 @@ export function StudioLiquifyPanel({
                 step={LIQUIFY_STABILIZER_RANGE.step}
                 value={stabilizer}
                 onChange={onStabilizerChange}
-                disabled={busy}
+                disabled={locked}
                 readout={`${stabilizer}%`}
               />
             ) : null}
@@ -279,7 +282,7 @@ export function StudioLiquifyPanel({
                   {onTogglePressureRadius ? (
                     <StudioToggleChip
                       active={pressureAffectsRadius}
-                      disabled={busy}
+                      disabled={locked}
                       onClick={onTogglePressureRadius}
                       aria-label={`필압으로 크기 조절 ${pressureAffectsRadius ? "끄기" : "켜기"}`}
                       title="펜을 세게 누를수록 브러시 반경이 커집니다."
@@ -290,7 +293,7 @@ export function StudioLiquifyPanel({
                   {onTogglePressureStrength ? (
                     <StudioToggleChip
                       active={pressureAffectsStrength}
-                      disabled={busy}
+                      disabled={locked}
                       onClick={onTogglePressureStrength}
                       aria-label={`필압으로 강도 조절 ${pressureAffectsStrength ? "끄기" : "켜기"}`}
                       title="펜을 세게 누를수록 왜곡 강도가 커집니다."
@@ -310,7 +313,7 @@ export function StudioLiquifyPanel({
                 step={LIQUIFY_MIN_RADIUS_RANGE.step}
                 value={minimumRadius}
                 onChange={onMinimumRadiusChange}
-                disabled={busy || !pressureAffectsRadius}
+                disabled={locked || !pressureAffectsRadius}
                 readout={`${minimumRadius}%`}
               />
             ) : null}
@@ -321,7 +324,7 @@ export function StudioLiquifyPanel({
                 <div className="flex flex-wrap gap-1.5">
                   {onReconstruct ? (
                     <StudioPanelChip
-                      disabled={busy}
+                      disabled={locked}
                       onClick={onReconstruct}
                       title="브러시가 닿은 누적 변위를 원래 형태 쪽으로 되돌립니다."
                     >
@@ -331,7 +334,7 @@ export function StudioLiquifyPanel({
                   ) : null}
                   {onSmooth ? (
                     <StudioPanelChip
-                      disabled={busy}
+                      disabled={locked}
                       onClick={onSmooth}
                       title="주변 변위 벡터를 평균내 울퉁불퉁한 왜곡을 부드럽게 합니다."
                     >
@@ -346,13 +349,12 @@ export function StudioLiquifyPanel({
         </details>
       ) : null}
 
-      <p className="text-[0.72rem] leading-relaxed text-fg-3 text-pretty" role="status">
-        {busy
-          ? `${current.label} 왜곡을 적용하는 중입니다.`
-          : active
-            ? `${current.description} 같은 자리를 여러 번 지나면 효과가 누적되고, 결과는 손을 뗀 시점에 한 번 반영됩니다. ⌘Z로 되돌릴 수 있습니다.`
-            : `${current.action}를 켠 뒤 선택한 이미지 위를 드래그하세요.`}
-      </p>
+      <StudioRetouchQuickGuide
+        toolId="liquify"
+        active={active}
+        busy={busy}
+        disabled={disabled}
+      />
     </section>
   );
 }
