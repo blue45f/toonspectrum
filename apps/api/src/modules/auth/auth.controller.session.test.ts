@@ -1,15 +1,17 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { signSession } from "../../../../../lib/server/session";
 import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { resolveAuthSessionUser } from "./auth-session-profile";
 import { AuthController, authResponseUser } from "./auth.controller";
 import { AuthSessionResponseSchema } from "./auth.dto";
 
-import type { Response } from "express";
+import type { Request, Response } from "express";
 
 const revokeUserSessions = vi.hoisted(() => vi.fn());
+const revokeRealtimeSession = vi.fn();
 
 vi.mock("../../../../../lib/server/user-lifecycle", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../../../lib/server/user-lifecycle")>()),
@@ -25,7 +27,16 @@ function controller(): AuthController {
     { distributed: false },
     { mode: "direct" },
     null,
+    {
+      revokeSessionVersion: revokeRealtimeSession,
+    } as never,
   );
+}
+
+function request(cookie?: string): Request {
+  return {
+    headers: cookie === undefined ? {} : { cookie },
+  } as Request;
 }
 
 function response(): Response {
@@ -39,6 +50,12 @@ describe("AuthController session truth source", () => {
     vi.mocked(resolveAuthSessionUser).mockReset();
     revokeUserSessions.mockReset();
     revokeUserSessions.mockResolvedValue({ ok: true, sessionVersion: 2 });
+    revokeRealtimeSession.mockReset();
+    revokeRealtimeSession.mockResolvedValue({
+      enabled: true,
+      roomsRevoked: 0,
+      connectionsRevoked: 0,
+    });
   });
 
   it("returns an explicit logged-out response and expires a stale cookie", async () => {
@@ -99,26 +116,19 @@ describe("AuthController session truth source", () => {
     expect(res.clearCookie).toHaveBeenCalledOnce();
   });
 
-  it("expires the HttpOnly cookie while preserving a 503 when durable revocation fails", async () => {
+  it("preserves the HttpOnly cookie and a 503 when durable revocation fails", async () => {
     const res = response();
     revokeUserSessions.mockRejectedValueOnce(
       new Error("postgresql://user:secret@example.invalid/database"),
     );
 
     const error = await controller()
-      .logout("verified-user", res)
+      .logout("verified-user", request(), res)
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ServiceUnavailableException);
     expect(revokeUserSessions).toHaveBeenCalledWith("verified-user");
-    expect(res.clearCookie).toHaveBeenCalledWith(
-      AUTH_SESSION_COOKIE_NAME,
-      expect.objectContaining({
-        httpOnly: true,
-        path: "/",
-        sameSite: "lax",
-        maxAge: 0,
-      }),
-    );
+    expect(revokeRealtimeSession).not.toHaveBeenCalled();
+    expect(res.clearCookie).not.toHaveBeenCalled();
     expect(JSON.stringify((error as ServiceUnavailableException).getResponse()))
       .not.toContain("postgresql");
   });
@@ -126,8 +136,51 @@ describe("AuthController session truth source", () => {
   it("also expires an already-anonymous browser cookie", async () => {
     const res = response();
 
-    await expect(controller().logout(undefined, res)).resolves.toEqual({ ok: true });
+    await expect(
+      controller().logout(undefined, request(), res),
+    ).resolves.toEqual({ ok: true });
     expect(revokeUserSessions).not.toHaveBeenCalled();
+    expect(res.clearCookie).toHaveBeenCalledOnce();
+  });
+
+  it("recovers the actor from the retained signed cookie after an edge 503 retry", async () => {
+    const res = response();
+    const token = signSession("retry-user", 1);
+    const cookieRequest = request(
+      `${AUTH_SESSION_COOKIE_NAME}=${token}`,
+    );
+    revokeUserSessions
+      .mockResolvedValueOnce({ ok: true, sessionVersion: 2 })
+      .mockResolvedValueOnce({ ok: true, sessionVersion: 3 });
+    revokeRealtimeSession
+      .mockRejectedValueOnce(new Error("edge unavailable"))
+      .mockResolvedValueOnce({
+        enabled: true,
+        roomsRevoked: 2,
+        connectionsRevoked: 3,
+      });
+    const subject = controller();
+
+    await expect(
+      subject.logout("retry-user", cookieRequest, res),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(res.clearCookie).not.toHaveBeenCalled();
+
+    await expect(
+      subject.logout(undefined, cookieRequest, res),
+    ).resolves.toEqual({ ok: true });
+    expect(revokeUserSessions).toHaveBeenNthCalledWith(1, "retry-user");
+    expect(revokeUserSessions).toHaveBeenNthCalledWith(2, "retry-user");
+    expect(revokeRealtimeSession).toHaveBeenNthCalledWith(
+      1,
+      "retry-user",
+      2,
+    );
+    expect(revokeRealtimeSession).toHaveBeenNthCalledWith(
+      2,
+      "retry-user",
+      3,
+    );
     expect(res.clearCookie).toHaveBeenCalledOnce();
   });
 
