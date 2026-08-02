@@ -105,9 +105,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-29): 시작 플랜의 계열별 필압 설정 전달을 명시(1_120 → 1_130).
     // 의도적 변경(2026-07-29): 사용자 선택 precision 획의 mutable lazy-brush authority와
     // specialty native overlay가 generic live tap을 즉시 지우는 권위 전환 경계를
-    // pointerdown에 함께 고정했다. 이 블록을 다시 키우기 전에 별도 lifecycle 함수 추출을
-    // 우선 검토해야 한다.
-    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_190);
+    // pointerdown에 함께 고정했다. 편집용 래스터 리터치 제스처 이어가기 경계를 포함한 현재
+    // 기준선은 1_210이며, 이 블록을 다시 키우기 전에 별도 lifecycle 함수 추출을 우선 검토한다.
+    expect(onStageDown.split("\n").length).toBeLessThanOrEqual(1_210);
 
     expectTokenOrder(pointCommentHandler, [
       "if (pointCommentComposer) return true",

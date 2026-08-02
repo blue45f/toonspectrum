@@ -67,13 +67,13 @@ describe("StudioSmudgePanel busy contract", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "문지르기로 칠하기" }).hasAttribute("disabled")
+      screen.getByRole("button", { name: "색 밀어 섞기 끄기" }).hasAttribute("disabled")
     ).toBe(true);
     for (const slider of screen.getAllByRole("slider")) {
       expect(slider.hasAttribute("disabled")).toBe(true);
       fireEvent.change(slider, { target: { value: "40" } });
     }
-    fireEvent.click(screen.getByRole("button", { name: "문지르기로 칠하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "색 밀어 섞기 끄기" }));
 
     expect(onToggleActive).not.toHaveBeenCalled();
     expect(onRadiusChange).not.toHaveBeenCalled();
