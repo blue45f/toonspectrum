@@ -65,6 +65,9 @@ describe("Vercel static security headers", () => {
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
     );
     expect(connections).not.toContain("https://*.supabase.co");
+    expect(connections).toContain(
+      "wss://toonspectrum-realtime.toonstudio-realtime.workers.dev",
+    );
     expect(connections).toContain("wss://realtime.toonstudio.cloud");
   });
 

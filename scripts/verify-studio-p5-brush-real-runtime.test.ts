@@ -11,7 +11,7 @@ function source(path: string): string {
 }
 
 describe("Studio p5.brush permanent real-runtime gate", () => {
-  it("uses the exact production provider and standalone adapter inside a module Worker", () => {
+  it("uses the exact production one-shot Worker client sequentially", () => {
     const browser = source(
       "scripts/studio-p5-brush-real-runtime-browser.ts",
     );
@@ -20,38 +20,34 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     );
 
     expect(browser).toContain(
+      "renderStudioProceduralArtisticBrushInWorker(",
+    );
+    expect(browser).toContain("probeStudioProceduralArtisticBrushWorker({");
+    expect(browser).toContain("for (const technique of");
+    expect(browser).toContain("const first = await");
+    expect(browser).toContain("const replay = await");
+    expect(browser).not.toContain("Promise.all([");
+    expect(browser).toContain(
       'new URL("./studio-p5-brush-real-runtime-worker.ts", import.meta.url)',
     );
     expect(browser).toContain('type: "module"');
-    expect(browser).toContain("async function runSequentialWorkerReplay()");
-    expect(browser).toContain(
-      'const workerResult = await runWorker(\n    "studio-p5-brush-real-runtime-primary",',
-    );
-    expect(browser).toContain(
-      'const freshWorkerReplay = await runWorker(\n    "studio-p5-brush-real-runtime-fresh-replay",',
-    );
-    expect(browser).not.toContain("Promise.all([");
     expect(worker).toContain(
       'from "../src/domains/creator/studio-p5-brush-standalone-runtime-adapter"',
     );
     expect(worker).toContain(
-      'from "../src/domains/creator/studio-procedural-artistic-brush-provider"',
-    );
-    expect(worker).toContain(
       "createStudioP5BrushStandaloneAdapterLoader()",
     );
-    expect(worker).toContain(
-      "createStudioProceduralArtisticBrushProvider({",
-    );
+    expect(worker).toContain("adapter.renderSettled(");
     expect(worker).toContain('new OffscreenCanvas(width, height)');
     expect(worker).toContain('canvas.getContext("webgl2"');
-    expect(worker).toContain('gl.getExtension("WEBGL_lose_context")');
+    expect(worker).toContain('context.getExtension("WEBGL_lose_context")');
     expect(worker).toContain("gl.isContextLost()");
     expect(worker).toContain("const code = gl.getError()");
     expect(worker).toContain("canvas.width = 1");
     expect(worker).toContain("canvas.height = 1");
-    expect(worker).toContain("surfaceDisposeCount !== surfaceCount");
-    expect(worker).toContain("assertNoWebGlLifecycleFailures(");
+    expect(worker).toContain("surfaceDisposeCount !== 2");
+    expect(worker).toContain("sameContextExactPixelReplay: true");
+    expect(worker).toContain("crossContextRejected: true");
   });
 
   it("gates all supported techniques, non-empty pixels and exact seeded replay", () => {
@@ -76,29 +72,30 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
       'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.3"',
     );
     expect(verifier).toContain("const EXPECTED_SURFACE_COUNT = 10");
+    expect(verifier).toContain("const EXPECTED_RENDER_WORKER_COUNT = 10");
     expect(verifier).toContain("MIN_PAINTED_PIXELS");
     expect(verifier).toContain("exactPixelReplay");
     expect(verifier).toContain("first?.pixelHash !== evidence.replay?.pixelHash");
-    expect(verifier).toContain("validateFreshWorkerReplay");
     expect(verifier).toContain(
-      "two fresh Workers did not produce identical bytes",
+      "two production one-shot Workers did not produce identical bytes",
     );
+    expect(verifier).toContain("contextAffinityStress.crossContextRejected");
     expect(packageJson.scripts?.["verify:studio-p5-brush-real-runtime"]).toBe(
       "node scripts/verify-studio-p5-brush-real-runtime.mjs",
     );
   });
 
   it("permits an environment skip only after a failed real WebGL2 context probe", () => {
-    const worker = source(
-      "scripts/studio-p5-brush-real-runtime-worker.ts",
+    const browser = source(
+      "scripts/studio-p5-brush-real-runtime-browser.ts",
     );
     const verifier = source(
       "scripts/verify-studio-p5-brush-real-runtime.mjs",
     );
 
-    expect(worker).toContain('reason: "webgl2-unavailable"');
-    expect(worker).toContain(
-      "probeCanvas.getContext(\"webgl2\", CONTEXT_ATTRIBUTES)",
+    expect(browser).toContain("capability.reason === \"webgl2-unavailable\"");
+    expect(browser).toContain(
+      "webgl2ContextAttempted: capability.reason === \"webgl2-unavailable\"",
     );
     expect(verifier).toContain(
       'result.reason === "webgl2-unavailable"',
