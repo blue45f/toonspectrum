@@ -160,6 +160,7 @@ describe("creator draft collaboration client", () => {
   });
 
   it("uses the shared authenticated API transport with credentials and no implicit retry", async () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(NOW);
     apiRawPost.mockResolvedValueOnce(jsonResponse(activeRoom()));
 
     await expect(provisionCreatorDraftCollaborationRoom(provisionRequest({
@@ -189,6 +190,8 @@ describe("creator draft collaboration client", () => {
         signal: expect.any(AbortSignal),
       })
     );
+
+    nowSpy.mockRestore();
   });
 
   it("promotes through the room path without sending local-only contract fields", async () => {

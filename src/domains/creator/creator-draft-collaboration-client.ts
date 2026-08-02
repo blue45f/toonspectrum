@@ -514,7 +514,7 @@ export function createCreatorDraftCollaborationClient(
   dependencies: CreatorDraftCollaborationClientDependencies = {}
 ): CreatorDraftCollaborationClient {
   const transport = dependencies.transport ?? defaultTransport;
-  const now = dependencies.now ?? Date.now;
+  const now = dependencies.now ?? (() => Date.now());
   const mutationFingerprints = new Map<string, string>();
 
   const assertMutationFingerprint = (
