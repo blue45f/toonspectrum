@@ -1046,6 +1046,31 @@ export async function workspaceOcctTorus(
   return commitOcctResult(ws, assetId, "occt-wasm-torus", result);
 }
 
+/** Industrial OCCT pipe/sweep solid → workspace. */
+export async function workspaceOcctPipe(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-pipe",
+  length = 1.5,
+  radius = 0.12,
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({ kind: "pipe", length, radius });
+  return commitOcctResult(ws, assetId, "occt-wasm-pipe", result);
+}
+
+/** Industrial OCCT mirrored box assembly → workspace. */
+export async function workspaceOcctMirror(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-mirror",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "mirror-box",
+    size: [0.8, 0.5, 0.4],
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-mirror", result);
+}
+
 /** Industrial OCCT fillet box → workspace. */
 export async function workspaceOcctFillet(
   ws: StudioHybridDccWorkspace,

@@ -37,6 +37,8 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctMirror,
+  workspaceOcctPipe,
   workspaceOcctTorus,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
@@ -212,6 +214,24 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT torus", () => workspaceOcctTorus(ws))}
         >
           OCCT torus
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-pipe"
+          onClick={() => run("OCCT pipe", () => workspaceOcctPipe(ws))}
+        >
+          OCCT pipe
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-mirror"
+          onClick={() => run("OCCT mirror", () => workspaceOcctMirror(ws))}
+        >
+          OCCT mirror
         </button>
         <button
           type="button"

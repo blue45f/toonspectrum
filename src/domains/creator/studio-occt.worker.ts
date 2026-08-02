@@ -6,7 +6,9 @@ import {
   occtLoftedTower,
   occtMakeBoxSolid,
   occtMakeSphereSolid,
+  occtMakePipeSolid,
   occtMakeTorusSolid,
+  occtMirrorBox,
   occtRevolveCylinderLike,
 } from "./studio-occt-wasm-facade";
 
@@ -27,6 +29,10 @@ async function runOperation(
       return occtMakeSphereSolid(operation.radius);
     case "torus":
       return occtMakeTorusSolid(operation.majorRadius, operation.minorRadius);
+    case "pipe":
+      return occtMakePipeSolid(operation.length, operation.radius);
+    case "mirror-box":
+      return occtMirrorBox(operation.size[0], operation.size[1], operation.size[2]);
     case "revolve":
       return occtRevolveCylinderLike(operation.radius, operation.height);
     case "fillet-box":

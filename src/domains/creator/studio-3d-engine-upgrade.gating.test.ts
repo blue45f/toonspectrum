@@ -19,7 +19,9 @@ import {
 } from "./studio-hybrid-dcc-workspace";
 import {
   occtLoftedTower,
+  occtMakePipeSolid,
   occtMakeTorusSolid,
+  occtMirrorBox,
   occtSolidWorksGradeSuite,
   STUDIO_OCCT_WASM_FACADE_REVISION,
 } from "./studio-occt-wasm-facade";
@@ -91,6 +93,27 @@ describe("3D engine upgrades", () => {
     expect(torus.operation).toBe("BRepPrimAPI_MakeTorus");
     expect(torus.triangleCount).toBeGreaterThan(100);
   }, 60_000);
+
+  it("OCCT pipe sweep and mirror transform produce solids", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(5);
+    const pipe = await occtMakePipeSolid(1.5, 0.12);
+    expect(pipe.ok).toBe(true);
+    if (!pipe.ok) return;
+    expect(pipe.operation).toBe("BRepOffsetAPI_MakePipe");
+    expect(pipe.triangleCount).toBeGreaterThan(20);
+
+    const mirror = await occtMirrorBox(0.8, 0.5, 0.4);
+    expect(mirror.ok).toBe(true);
+    if (!mirror.ok) return;
+    expect(mirror.operation).toMatch(/Transform|mirror/u);
+    expect(mirror.triangleCount).toBeGreaterThanOrEqual(12);
+  }, 120_000);
+
+  it("SolidWorks suite reports realPipe and realMirror", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realPipe).toBe(true);
+    expect(suite.realMirror).toBe(true);
+  }, 180_000);
 
   it("workspace Manifold boolean on unit cube is non-degenerate", async () => {
     let ws = createStudioHybridDccWorkspace("bool-ws");

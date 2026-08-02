@@ -136,6 +136,14 @@ async function runOnNode(
         return facade.occtMakeSphereSolid(operation.radius);
       case "torus":
         return facade.occtMakeTorusSolid(operation.majorRadius, operation.minorRadius);
+      case "pipe":
+        return facade.occtMakePipeSolid(operation.length, operation.radius);
+      case "mirror-box":
+        return facade.occtMirrorBox(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+        );
       case "revolve":
         return facade.occtRevolveCylinderLike(operation.radius, operation.height);
       case "fillet-box":

@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 4 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 5 as const;
 
 export type StudioOcctRuntime = {
   readonly backend: "opencascade-wasm";
@@ -841,6 +841,147 @@ export async function occtMakeTorusSolid(
   });
 }
 
+/**
+ * Sweep / pipe solid: circular profile along a linear spine (BRepOffsetAPI_MakePipe).
+ * SolidWorks-style sweep along path.
+ */
+export async function occtMakePipeSolid(
+  length: number,
+  radius: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const p0 = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+    const p1 = owner.own(new oc.gp_Pnt_3(0, 0, length));
+    const edge = owner.own(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1).Edge());
+    const spineMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
+    if (isCallable(spineMaker.Add_1)) spineMaker.Add_1(edge);
+    else if (isCallable(spineMaker.Add)) spineMaker.Add(edge);
+    const spine = owner.own(spineMaker.Wire());
+
+    const dir = owner.own(new oc.gp_Dir_4(0, 0, 1));
+    const ax = owner.own(new oc.gp_Ax2_3(p0, dir));
+    const circ = owner.own(new oc.gp_Circ_2(ax, radius));
+    let profileEdge: unknown = null;
+    for (const key of [
+      "BRepBuilderAPI_MakeEdge_8",
+      "BRepBuilderAPI_MakeEdge_9",
+      "BRepBuilderAPI_MakeEdge",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        profileEdge = owner.own(new oc[key](circ).Edge());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!profileEdge) {
+      return { ok: false, code: "no-profile-edge", detail: "circle profile edge failed" };
+    }
+    const profileMaker = owner.own(new oc.BRepBuilderAPI_MakeWire_1());
+    if (isCallable(profileMaker.Add_1)) profileMaker.Add_1(profileEdge);
+    else if (isCallable(profileMaker.Add)) profileMaker.Add(profileEdge);
+    const profile = owner.own(profileMaker.Wire());
+
+    let shape: unknown = null;
+    for (const key of ["BRepOffsetAPI_MakePipe_1", "BRepOffsetAPI_MakePipe"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const pipe = owner.own(new oc[key](spine, profile));
+        if (isCallable(pipe.Build)) pipe.Build();
+        shape = owner.own(pipe.Shape());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-pipe-ctor", detail: "MakePipe overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "pipe produced no triangles" };
+    }
+    return packResult(
+      "BRepOffsetAPI_MakePipe",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.PI * radius * radius * length,
+      runtime.loadPath,
+      oc,
+      shape,
+    );
+  });
+}
+
+/**
+ * Mirror a box solid across the Y axis (gp_Trsf SetMirror + BRepBuilderAPI_Transform).
+ * SolidWorks-style mirror feature analogue for assembly layout.
+ */
+export async function occtMirrorBox(
+  dx: number,
+  dy: number,
+  dz: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const box = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape());
+    const origin = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+    const yDir = owner.own(new oc.gp_Dir_4(0, 1, 0));
+    const ax1 = owner.own(new oc.gp_Ax1_2(origin, yDir));
+    const trsf = owner.own(new oc.gp_Trsf_1());
+    if (isCallable(trsf.SetMirror_2)) trsf.SetMirror_2(ax1);
+    else if (isCallable(trsf.SetMirror)) trsf.SetMirror(ax1);
+    else {
+      return { ok: false, code: "no-mirror", detail: "gp_Trsf.SetMirror unavailable" };
+    }
+    let shape: unknown = null;
+    for (const key of [
+      "BRepBuilderAPI_Transform_2",
+      "BRepBuilderAPI_Transform_1",
+      "BRepBuilderAPI_Transform",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const xf = owner.own(new oc[key](box, trsf, true));
+        if (isCallable(xf.Build)) xf.Build();
+        shape = owner.own(xf.Shape());
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "transform-failed", detail: "BRepBuilderAPI_Transform failed" };
+    }
+    // Fuse original + mirror for a measurable multi-body result when possible
+    const fused = runOcctBinaryShapeOperation(
+      oc,
+      owner,
+      ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
+      box,
+      shape,
+    );
+    const outShape = fused ?? shape;
+    const tess = tessellateStudioOcctShape(oc, outShape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "mirror produced no triangles" };
+    }
+    return packResult(
+      fused ? "BRepBuilderAPI_Transform+Fuse(mirror)" : "BRepBuilderAPI_Transform(mirror)",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(dx, dy, dz) * (fused ? 2 : 1),
+      runtime.loadPath,
+      oc,
+      outShape,
+    );
+  });
+}
+
 /** Cone solid — BRepPrimAPI_MakeCone. */
 export async function occtMakeConeSolid(
   radius1: number,
@@ -1298,6 +1439,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly realRevolve: boolean;
   readonly realPrism: boolean;
   readonly realThruSections: boolean;
+  readonly realPipe: boolean;
+  readonly realMirror: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -1306,6 +1449,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let realRevolve = false;
   let realPrism = false;
   let realThruSections = false;
+  let realPipe = false;
+  let realMirror = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -1319,6 +1464,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       if (r.operation === "BRepPrimAPI_MakeRevol") realRevolve = true;
       if (r.operation === "BRepPrimAPI_MakePrism") realPrism = true;
       if (r.operation === "BRepOffsetAPI_ThruSections") realThruSections = true;
+      if (r.operation === "BRepOffsetAPI_MakePipe") realPipe = true;
+      if (r.operation.includes("mirror") || r.operation.includes("Transform")) realMirror = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
@@ -1328,6 +1475,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("sphere", () => occtMakeSphereSolid(0.6));
   await run("torus", () => occtMakeTorusSolid(0.8, 0.2));
   await run("cone", () => occtMakeConeSolid(0.5, 0.1, 1.2));
+  await run("pipe", () => occtMakePipeSolid(1.5, 0.12));
   await run("prism", () => occtExtrudeRectangle(1.2, 0.8, 0.6));
   await run("revolve", () => occtRevolveCylinderLike(0.5, 1.0));
   await run("cut", () =>
@@ -1344,6 +1492,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   );
   await run("fillet", () => occtFilletBox(1, 1, 1, 0.08));
   await run("chamfer", () => occtChamferBox(1, 1, 1, 0.05));
+  await run("mirror", () => occtMirrorBox(0.8, 0.5, 0.4));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -1369,5 +1518,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     realRevolve,
     realPrism,
     realThruSections,
+    realPipe,
+    realMirror,
   };
 }

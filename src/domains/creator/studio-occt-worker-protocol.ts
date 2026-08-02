@@ -18,6 +18,15 @@ export type StudioOcctWorkerOperation =
       readonly minorRadius: number;
     }
   | {
+      readonly kind: "pipe";
+      readonly length: number;
+      readonly radius: number;
+    }
+  | {
+      readonly kind: "mirror-box";
+      readonly size: readonly [number, number, number];
+    }
+  | {
       readonly kind: "revolve";
       readonly radius: number;
       readonly height: number;
