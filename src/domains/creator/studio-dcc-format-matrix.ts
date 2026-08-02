@@ -50,10 +50,10 @@ export const STUDIO_DCC_FORMAT_MATRIX: readonly StudioFormatEntry[] = [
   { id: "step", extensions: [".step", ".stp"], category: "cad", grade: "B", path: "studio-mesh-format-adapters/step shell + occt-import-js optional", priority: "P3", notes: "cartesian/product shell" },
   { id: "iges", extensions: [".iges", ".igs"], category: "cad", grade: "B", path: "studio-mesh-format-adapters/step shell + occt-import-js optional", priority: "P3", notes: "shell path shared" },
   { id: "brep", extensions: [".brep"], category: "cad", grade: "B", path: "OCCT module", priority: "P3", notes: "LGPL" },
-  { id: "3dm", extensions: [".3dm"], category: "cad", grade: "B", path: "rhino3dm.js", priority: "P3", notes: "NURBS subset" },
+  { id: "3dm", extensions: [".3dm"], category: "cad", grade: "A", path: "rhino3dm openNURBS WASM full NURBS eval", priority: "P2", notes: "curve point/tangent/deriv + surface normal + File3dm" },
   { id: "dxf", extensions: [".dxf"], category: "cad", grade: "B", path: "dxf-parser", priority: "P2", notes: "plan import" },
   { id: "dwg", extensions: [".dwg"], category: "cad", grade: "X", path: "LibreDWG GPL converter only", priority: "P4", notes: "not in browser core" },
-  { id: "ifc", extensions: [".ifc"], category: "bim", grade: "B", path: "studio-mesh-format-adapters/ifc shell + web-ifc optional", priority: "P3", notes: "point/space/wall shell" },
+  { id: "ifc", extensions: [".ifc"], category: "bim", grade: "A", path: "web-ifc city StreamAllMeshes + IFC shell lite", priority: "P2", notes: "multi-building city body geometry grade A" },
   // Documents / images
   { id: "psd", extensions: [".psd", ".psb"], category: "document", grade: "A", path: "ag-psd / @webtoon/psd", priority: "P0", notes: "export report" },
   { id: "png", extensions: [".png"], category: "image", grade: "A", path: "browser codecs", priority: "P0", notes: "source master" },
@@ -73,7 +73,7 @@ export const STUDIO_DCC_FORMAT_MATRIX: readonly StudioFormatEntry[] = [
   { id: "clip", extensions: [".clip"], category: "document", grade: "X", path: "not reverse-engineered", priority: "P5", notes: "export via CSP" },
   { id: "ztl", extensions: [".ztl"], category: "mesh", grade: "X", path: "ZBrush bridge", priority: "P4", notes: "" },
   { id: "hip", extensions: [".hip"], category: "mesh", grade: "X", path: "Houdini bridge", priority: "P4", notes: "" },
-  { id: "sldprt", extensions: [".sldprt", ".sldasm"], category: "cad", grade: "X", path: "SolidWorks bridge", priority: "P4", notes: "" },
+  { id: "sldprt", extensions: [".sldprt", ".sldasm"], category: "cad", grade: "C", path: "OCCT SolidWorks-grade feature parity (not proprietary binary)", priority: "P3", notes: "extrude/revolve/boolean/fillet/chamfer/loft via opencascade.js; .sldprt binary still native bridge" },
   // Package
   { id: "toon3d", extensions: [".toon3d"], category: "package", grade: "N", path: "native Studio package", priority: "P0", notes: "authoring SSOT" },
 ];

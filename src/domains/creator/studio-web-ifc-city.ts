@@ -1,6 +1,6 @@
 /**
- * Industrial IFC city / building body geometry via ThatOpen web-ifc WASM.
- * Streams tessellated meshes for walls/slabs/spaces — not header-only lite.
+ * Industrial IFC city / multi-building body geometry via ThatOpen web-ifc WASM.
+ * Streams tessellated meshes for walls/slabs/spaces/columns — city-scale, not header-only.
  */
 
 import { createRequire } from "node:module";
@@ -12,7 +12,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_WEB_IFC_CITY_REVISION = 1 as const;
+export const STUDIO_WEB_IFC_CITY_REVISION = 2 as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WebIfcApi = any;
@@ -53,7 +53,6 @@ export async function loadStudioWebIfcApi(): Promise<WebIfcApi> {
   cachedPromise = (async () => {
     if (isNodeHost()) {
       const require = createRequire(import.meta.url);
-       
       const WebIFC = require("web-ifc");
       const api = new WebIFC.IfcAPI();
       const wasmDir = path.dirname(require.resolve("web-ifc"));
@@ -85,13 +84,6 @@ export async function loadStudioWebIfcApi(): Promise<WebIfcApi> {
 }
 
 export function resetStudioWebIfcForTests(): void {
-  if (cachedApi) {
-    try {
-      // no global dispose
-    } catch {
-      // ignore
-    }
-  }
   cachedApi = null;
   cachedPromise = null;
 }
@@ -108,13 +100,19 @@ export type StudioWebIfcCityResult = {
   readonly spaceCount: number;
   readonly storeyCount: number;
   readonly buildingCount: number;
+  readonly columnCount: number;
+  readonly siteCount: number;
   readonly meshes: readonly StudioEditableMesh[];
   readonly geometryGrade: "A";
+  readonly cityScale: true;
+  readonly bbox: readonly [number, number, number, number, number, number];
+  readonly footprintAreaApprox: number;
 };
 
 /**
  * Import IFC bytes with full body tessellation (city/building scale).
  * Uses StreamAllMeshes — not cartesian-point AABB proxy.
+ * Applies flat transform matrix when web-ifc provides one.
  */
 export async function importStudioIfcCity(
   source: string | Uint8Array,
@@ -128,9 +126,36 @@ export async function importStudioIfcCity(
     let vertexCount = 0;
     let triangleCount = 0;
     let meshCount = 0;
+    let minX = Infinity;
+    let minY = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let maxZ = -Infinity;
+
+    const applyFlatMatrix = (
+      x: number,
+      y: number,
+      z: number,
+      m: ArrayLike<number> | null,
+    ): [number, number, number] => {
+      if (!m || m.length < 16) return [x, y, z];
+      // column-major 4x4
+      const nx = m[0]! * x + m[4]! * y + m[8]! * z + m[12]!;
+      const ny = m[1]! * x + m[5]! * y + m[9]! * z + m[13]!;
+      const nz = m[2]! * x + m[6]! * y + m[10]! * z + m[14]!;
+      return [nx, ny, nz];
+    };
 
     api.StreamAllMeshes(modelId, (mesh: {
-      geometries: { size: () => number; get: (i: number) => { geometryExpressID: number } };
+      geometries: {
+        size: () => number;
+        get: (i: number) => {
+          geometryExpressID: number;
+          flatTransformation?: ArrayLike<number>;
+          color?: { x: number; y: number; z: number; w: number };
+        };
+      };
     }) => {
       meshCount += 1;
       const geoms = mesh.geometries;
@@ -148,12 +173,20 @@ export async function importStudioIfcCity(
             geom.GetIndexDataSize(),
           ) as Uint32Array | number[];
           const pos: number[] = [];
-          // web-ifc vertex array is xyz (float) packed; may include normals
           const arr = verts instanceof Float32Array ? verts : Float32Array.from(verts);
-          // Stride: if length divisible by 6, treat as pos+normal interleaved
           const stride = arr.length % 6 === 0 && arr.length % 3 === 0 && arr.length / 6 >= 3 ? 6 : 3;
+          const flat = placed.flatTransformation
+            ?? (placed as { transformation?: ArrayLike<number> }).transformation
+            ?? null;
           for (let k = 0; k + 2 < arr.length; k += stride) {
-            pos.push(arr[k]!, arr[k + 1]!, arr[k + 2]!);
+            const [x, y, z] = applyFlatMatrix(arr[k]!, arr[k + 1]!, arr[k + 2]!, flat as ArrayLike<number> | null);
+            pos.push(x, y, z);
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (z < minZ) minZ = z;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+            if (z > maxZ) maxZ = z;
           }
           const idx = indices instanceof Uint32Array ? Array.from(indices) : [...indices];
           if (pos.length >= 9 && idx.length >= 3) {
@@ -191,6 +224,8 @@ export async function importStudioIfcCity(
     const spaceCount = countType(WebIFC.IFCSPACE ?? 0);
     const storeyCount = countType(WebIFC.IFCBUILDINGSTOREY ?? 0);
     const buildingCount = countType(WebIFC.IFCBUILDING ?? 0);
+    const columnCount = countType(WebIFC.IFCCOLUMN ?? 0);
+    const siteCount = countType(WebIFC.IFCSITE ?? 0);
 
     api.CloseModel(modelId);
 
@@ -201,6 +236,12 @@ export async function importStudioIfcCity(
         detail: "web-ifc StreamAllMeshes produced no triangles",
       };
     }
+
+    if (!Number.isFinite(minX)) {
+      minX = minY = minZ = 0;
+      maxX = maxY = maxZ = 0;
+    }
+    const footprintAreaApprox = Math.max(0, maxX - minX) * Math.max(0, maxY - minY);
 
     return {
       ok: true,
@@ -214,8 +255,13 @@ export async function importStudioIfcCity(
       spaceCount,
       storeyCount,
       buildingCount,
+      columnCount,
+      siteCount,
       meshes,
       geometryGrade: "A",
+      cityScale: true,
+      bbox: [minX, minY, minZ, maxX, maxY, maxZ],
+      footprintAreaApprox,
     };
   } catch (error) {
     return {
@@ -226,18 +272,16 @@ export async function importStudioIfcCity(
   }
 }
 
-/** City-scale fixture: multi-storey extruded walls + slabs (valid IFC4). */
-export function createStudioIfcCityFixture(): string {
-  const walls: string[] = [];
-  const rels: string[] = [];
-  let id = 100;
-  const storeys = 3;
-  const storeyIds: number[] = [];
-  for (let s = 0; s < storeys; s += 1) {
-    const sid = id++;
-    storeyIds.push(sid);
-  }
-  // Rebuild with proper sequential IDs
+/**
+ * City-scale fixture: multi-building campus with storeys, walls, slabs, columns, street slab.
+ * Valid IFC4 CoordinationView-style DATA section.
+ */
+export function createStudioIfcCityFixture(options?: {
+  readonly buildings?: number;
+  readonly storeysPerBuilding?: number;
+}): string {
+  const buildingCount = Math.max(1, Math.min(6, options?.buildings ?? 2));
+  const storeys = Math.max(1, Math.min(8, options?.storeysPerBuilding ?? 3));
   const lines: string[] = [
     "ISO-10303-21;",
     "HEADER;",
@@ -258,86 +302,162 @@ export function createStudioIfcCityFixture(): string {
     "#11=IFCUNITASSIGNMENT((#10));",
     "#12=IFCPROJECT('2O2Fr$t4X7Zf8NOew3FPRJ',#5,'CityProject',$,$,$,$,(#6),#11);",
     "#13=IFCLOCALPLACEMENT($,#7);",
-    "#14=IFCSITE('2O2Fr$t4X7Zf8NOew3FSIT',#5,'Site',$,$,#13,$,$,.ELEMENT.,$,$,$,$,$);",
+    "#14=IFCSITE('2O2Fr$t4X7Zf8NOew3FSIT',#5,'CitySite',$,$,#13,$,$,.ELEMENT.,$,$,$,$,$);",
     "#15=IFCRELAGGREGATES('2O2Fr$t4X7Zf8NOew3FRA1',#5,$,$,#12,(#14));",
-    "#16=IFCBUILDING('2O2Fr$t4X7Zf8NOew3FBLD',#5,'Tower',$,$,#13,$,$,.ELEMENT.,$,$,$);",
-    "#17=IFCRELAGGREGATES('2O2Fr$t4X7Zf8NOew3FRA2',#5,$,$,#14,(#16));",
   ];
   let next = 20;
-  const storeyEntityIds: number[] = [];
-  const elementIds: number[] = [];
-  for (let s = 0; s < storeys; s += 1) {
-    const elev = s * 3;
-    const placeId = next++;
-    const axisId = next++;
-    const ptId = next++;
-    const storeyId = next++;
-    lines.push(`#${ptId}=IFCCARTESIANPOINT((0.,0.,${elev}.));`);
-    lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${ptId},$,$);`);
-    lines.push(`#${placeId}=IFCLOCALPLACEMENT(#13,#${axisId});`);
-    lines.push(
-      `#${storeyId}=IFCBUILDINGSTOREY('2O2Fr$t4X7Zf8NOew3FS${s}',#5,'L${s}',$,$,#${placeId},$,$,.ELEMENT.,${elev}.);`,
-    );
-    storeyEntityIds.push(storeyId);
+  const buildingIds: number[] = [];
 
-    // Wall extruded solid per storey
-    const profId = next++;
-    const profPlId = next++;
-    const profPtId = next++;
-    const dirId = next++;
-    const solidId = next++;
-    const shapeId = next++;
-    const pdsId = next++;
-    const wallId = next++;
-    lines.push(`#${profPtId}=IFCCARTESIANPOINT((0.,0.));`);
-    lines.push(`#${profPlId}=IFCAXIS2PLACEMENT2D(#${profPtId},$);`);
-    lines.push(`#${profId}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},${8 + s}.,0.3);`);
-    lines.push(`#${dirId}=IFCDIRECTION((0.,0.,1.));`);
-    lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profId},#${axisId},#${dirId},2.8);`);
-    lines.push(`#${shapeId}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${solidId}));`);
-    lines.push(`#${pdsId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeId}));`);
+  for (let b = 0; b < buildingCount; b += 1) {
+    const ox = b * 25;
+    const oy = (b % 2) * 18;
+    const bPt = next++;
+    const bAxis = next++;
+    const bPlace = next++;
+    const buildingId = next++;
+    lines.push(`#${bPt}=IFCCARTESIANPOINT((${ox}.,${oy}.,0.));`);
+    lines.push(`#${bAxis}=IFCAXIS2PLACEMENT3D(#${bPt},$,$);`);
+    lines.push(`#${bPlace}=IFCLOCALPLACEMENT(#13,#${bAxis});`);
     lines.push(
-      `#${wallId}=IFCWALL('2O2Fr$t4X7Zf8NOew3FW${s}',#5,'Wall${s}',$,$,#${placeId},#${pdsId},$,$);`,
+      `#${buildingId}=IFCBUILDING('2O2Fr$t4X7Zf8NOew3FB${b}',#5,'Tower${b}',$,$,#${bPlace},$,$,.ELEMENT.,$,$,$);`,
     );
-    elementIds.push(wallId);
-    walls.push(String(wallId));
+    buildingIds.push(buildingId);
 
-    // Slab
-    const slabProf = next++;
-    const slabSolid = next++;
-    const slabShape = next++;
-    const slabPds = next++;
-    const slabId = next++;
-    const slabDir = next++;
-    lines.push(`#${slabProf}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},10.,10.);`);
-    lines.push(`#${slabDir}=IFCDIRECTION((0.,0.,1.));`);
-    lines.push(`#${slabSolid}=IFCEXTRUDEDAREASOLID(#${slabProf},#${axisId},#${slabDir},0.25);`);
-    lines.push(`#${slabShape}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${slabSolid}));`);
-    lines.push(`#${slabPds}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${slabShape}));`);
-    lines.push(
-      `#${slabId}=IFCSLAB('2O2Fr$t4X7Zf8NOew3FL${s}',#5,'Slab${s}',$,$,#${placeId},#${slabPds},$,.FLOOR.);`,
-    );
-    elementIds.push(slabId);
+    const storeyEntityIds: number[] = [];
+    for (let s = 0; s < storeys; s += 1) {
+      const elev = s * 3;
+      const placeId = next++;
+      const axisId = next++;
+      const ptId = next++;
+      const storeyId = next++;
+      lines.push(`#${ptId}=IFCCARTESIANPOINT((${ox}.,${oy}.,${elev}.));`);
+      lines.push(`#${axisId}=IFCAXIS2PLACEMENT3D(#${ptId},$,$);`);
+      lines.push(`#${placeId}=IFCLOCALPLACEMENT(#${bPlace},#${axisId});`);
+      lines.push(
+        `#${storeyId}=IFCBUILDINGSTOREY('2O2Fr$t4X7Zf8NOew3FS${b}${s}',#5,'B${b}L${s}',$,$,#${placeId},$,$,.ELEMENT.,${elev}.);`,
+      );
+      storeyEntityIds.push(storeyId);
 
-    // Space
-    const spaceId = next++;
-    lines.push(
-      `#${spaceId}=IFCSPACE('2O2Fr$t4X7Zf8NOew3FP${s}',#5,'Room${s}',$,$,#${placeId},$,$,.ELEMENT.,.INTERNAL.,$);`,
-    );
+      // Wall extruded solid
+      const profId = next++;
+      const profPlId = next++;
+      const profPtId = next++;
+      const dirId = next++;
+      const solidId = next++;
+      const shapeId = next++;
+      const pdsId = next++;
+      const wallId = next++;
+      lines.push(`#${profPtId}=IFCCARTESIANPOINT((0.,0.));`);
+      lines.push(`#${profPlId}=IFCAXIS2PLACEMENT2D(#${profPtId},$);`);
+      lines.push(`#${profId}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},${10 + s}.,0.3);`);
+      lines.push(`#${dirId}=IFCDIRECTION((0.,0.,1.));`);
+      lines.push(`#${solidId}=IFCEXTRUDEDAREASOLID(#${profId},#${axisId},#${dirId},2.8);`);
+      lines.push(`#${shapeId}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${solidId}));`);
+      lines.push(`#${pdsId}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${shapeId}));`);
+      lines.push(
+        `#${wallId}=IFCWALL('2O2Fr$t4X7Zf8NOew3FW${b}${s}',#5,'Wall${b}_${s}',$,$,#${placeId},#${pdsId},$,$);`,
+      );
 
-    const contId = next++;
+      // Cross wall for city block volume
+      const wall2Prof = next++;
+      const wall2Solid = next++;
+      const wall2Shape = next++;
+      const wall2Pds = next++;
+      const wall2Id = next++;
+      const wall2Dir = next++;
+      lines.push(`#${wall2Prof}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},0.3,${8 + s}.);`);
+      lines.push(`#${wall2Dir}=IFCDIRECTION((0.,0.,1.));`);
+      lines.push(`#${wall2Solid}=IFCEXTRUDEDAREASOLID(#${wall2Prof},#${axisId},#${wall2Dir},2.8);`);
+      lines.push(`#${wall2Shape}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${wall2Solid}));`);
+      lines.push(`#${wall2Pds}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${wall2Shape}));`);
+      lines.push(
+        `#${wall2Id}=IFCWALL('2O2Fr$t4X7Zf8NOew3FX${b}${s}',#5,'WallX${b}_${s}',$,$,#${placeId},#${wall2Pds},$,$);`,
+      );
+
+      // Slab
+      const slabProf = next++;
+      const slabSolid = next++;
+      const slabShape = next++;
+      const slabPds = next++;
+      const slabId = next++;
+      const slabDir = next++;
+      lines.push(`#${slabProf}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},12.,12.);`);
+      lines.push(`#${slabDir}=IFCDIRECTION((0.,0.,1.));`);
+      lines.push(`#${slabSolid}=IFCEXTRUDEDAREASOLID(#${slabProf},#${axisId},#${slabDir},0.25);`);
+      lines.push(`#${slabShape}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${slabSolid}));`);
+      lines.push(`#${slabPds}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${slabShape}));`);
+      lines.push(
+        `#${slabId}=IFCSLAB('2O2Fr$t4X7Zf8NOew3FL${b}${s}',#5,'Slab${b}_${s}',$,$,#${placeId},#${slabPds},$,.FLOOR.);`,
+      );
+
+      // Column
+      const colProf = next++;
+      const colSolid = next++;
+      const colShape = next++;
+      const colPds = next++;
+      const colId = next++;
+      const colDir = next++;
+      lines.push(`#${colProf}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${profPlId},0.4,0.4);`);
+      lines.push(`#${colDir}=IFCDIRECTION((0.,0.,1.));`);
+      lines.push(`#${colSolid}=IFCEXTRUDEDAREASOLID(#${colProf},#${axisId},#${colDir},2.8);`);
+      lines.push(`#${colShape}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${colSolid}));`);
+      lines.push(`#${colPds}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${colShape}));`);
+      lines.push(
+        `#${colId}=IFCCOLUMN('2O2Fr$t4X7Zf8NOew3FC${b}${s}',#5,'Col${b}_${s}',$,$,#${placeId},#${colPds},$,$);`,
+      );
+
+      // Space
+      const spaceId = next++;
+      lines.push(
+        `#${spaceId}=IFCSPACE('2O2Fr$t4X7Zf8NOew3FP${b}${s}',#5,'Room${b}_${s}',$,$,#${placeId},$,$,.ELEMENT.,.INTERNAL.,$);`,
+      );
+
+      const contId = next++;
+      lines.push(
+        `#${contId}=IFCRELCONTAINEDINSPATIALSTRUCTURE('2O2Fr$t4X7Zf8NOew3FR${b}${s}',#5,$,$,(#${wallId},#${wall2Id},#${slabId},#${colId}),#${storeyId});`,
+      );
+    }
+    const aggStoreys = next++;
     lines.push(
-      `#${contId}=IFCRELCONTAINEDINSPATIALSTRUCTURE('2O2Fr$t4X7Zf8NOew3FC${s}',#5,$,$,(#${wallId},#${slabId}),#${storeyId});`,
+      `#${aggStoreys}=IFCRELAGGREGATES('2O2Fr$t4X7Zf8NOew3FAS${b}',#5,$,$,#${buildingId},(${storeyEntityIds.map((x) => `#${x}`).join(",")}));`,
     );
-    rels.push(String(contId));
   }
+
+  // Street / plaza slab connecting buildings (city public realm)
+  const streetPt = next++;
+  const streetAxis = next++;
+  const streetPlace = next++;
+  const streetProf = next++;
+  const streetProfPl = next++;
+  const streetProfPt = next++;
+  const streetDir = next++;
+  const streetSolid = next++;
+  const streetShape = next++;
+  const streetPds = next++;
+  const streetId = next++;
+  lines.push(`#${streetPt}=IFCCARTESIANPOINT((0.,-5.,0.));`);
+  lines.push(`#${streetAxis}=IFCAXIS2PLACEMENT3D(#${streetPt},$,$);`);
+  lines.push(`#${streetPlace}=IFCLOCALPLACEMENT(#13,#${streetAxis});`);
+  lines.push(`#${streetProfPt}=IFCCARTESIANPOINT((0.,0.));`);
+  lines.push(`#${streetProfPl}=IFCAXIS2PLACEMENT2D(#${streetProfPt},$);`);
+  lines.push(`#${streetProf}=IFCRECTANGLEPROFILEDEF(.AREA.,$,#${streetProfPl},${buildingCount * 25 + 10}.,6.);`);
+  lines.push(`#${streetDir}=IFCDIRECTION((0.,0.,1.));`);
+  lines.push(`#${streetSolid}=IFCEXTRUDEDAREASOLID(#${streetProf},#${streetAxis},#${streetDir},0.15);`);
+  lines.push(`#${streetShape}=IFCSHAPEREPRESENTATION(#6,'Body','SweptSolid',(#${streetSolid}));`);
+  lines.push(`#${streetPds}=IFCPRODUCTDEFINITIONSHAPE($,$,(#${streetShape}));`);
   lines.push(
-    `#${next}=IFCRELAGGREGATES('2O2Fr$t4X7Zf8NOew3FRA3',#5,$,$,#16,(${storeyEntityIds.map((x) => `#${x}`).join(",")}));`,
+    `#${streetId}=IFCSLAB('2O2Fr$t4X7Zf8NOew3FST0',#5,'Street',$,$,#${streetPlace},#${streetPds},$,.BASESLAB.);`,
+  );
+
+  // Site contains buildings + street
+  const siteCont = next++;
+  lines.push(
+    `#${siteCont}=IFCRELCONTAINEDINSPATIALSTRUCTURE('2O2Fr$t4X7Zf8NOew3FSC0',#5,$,$,(#${streetId}),#14);`,
+  );
+  lines.push(
+    `#${next}=IFCRELAGGREGATES('2O2Fr$t4X7Zf8NOew3FRA2',#5,$,$,#14,(${buildingIds.map((x) => `#${x}`).join(",")}));`,
   );
   lines.push("ENDSEC;");
   lines.push("END-ISO-10303-21;");
-  void walls;
-  void elementIds;
-  void rels;
   return lines.join("\n");
 }

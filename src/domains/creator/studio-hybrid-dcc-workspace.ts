@@ -913,7 +913,9 @@ export async function workspaceImportIfcCity(
   ifcText?: string,
 ): Promise<StudioHybridDccWorkspace> {
   const { createStudioIfcCityFixture, importStudioIfcCity } = await import("./studio-web-ifc-city");
-  const city = await importStudioIfcCity(ifcText ?? createStudioIfcCityFixture());
+  const city = await importStudioIfcCity(
+    ifcText ?? createStudioIfcCityFixture({ buildings: 2, storeysPerBuilding: 3 }),
+  );
   if (!city.ok) throw new Error(`IFC city: ${city.detail}`);
   let session = ws.session;
   let active: string | null = ws.activeAssetId;

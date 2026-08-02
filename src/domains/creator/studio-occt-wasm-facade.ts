@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 2 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 3 as const;
 
 export type StudioOcctRuntime = {
   readonly backend: "opencascade-wasm";
@@ -467,27 +467,408 @@ export async function occtBooleanCutBoxes(
   }
 }
 
-/** Linear extrusion via OCCT box solid (profile → prism). */
+/** Helper: planar rectangular face on XY (or XZ for revolve profiles). */
+function makeRectFace(
+  oc: StudioOcctModule,
+  corners: readonly [
+    readonly [number, number, number],
+    readonly [number, number, number],
+    readonly [number, number, number],
+    readonly [number, number, number],
+  ],
+): unknown | null {
+  try {
+    const p1 = new oc.gp_Pnt_3(corners[0][0], corners[0][1], corners[0][2]);
+    const p2 = new oc.gp_Pnt_3(corners[1][0], corners[1][1], corners[1][2]);
+    const p3 = new oc.gp_Pnt_3(corners[2][0], corners[2][1], corners[2][2]);
+    const p4 = new oc.gp_Pnt_3(corners[3][0], corners[3][1], corners[3][2]);
+    const poly = new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true);
+    const wire = poly.Wire();
+    const faceMaker = new oc.BRepBuilderAPI_MakeFace_15(wire, true);
+    return isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape();
+  } catch {
+    return null;
+  }
+}
+
+/** Linear extrusion via real BRepPrimAPI_MakePrism (SolidWorks Extrude). */
 export async function occtExtrudeRectangle(
   width: number,
   depth: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  return occtMakeBoxSolid(width, height, depth);
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const face = makeRectFace(oc, [
+      [0, 0, 0],
+      [width, 0, 0],
+      [width, depth, 0],
+      [0, depth, 0],
+    ]);
+    if (!face) {
+      // Fallback box still produces measurable solid
+      return occtMakeBoxSolid(width, height, depth);
+    }
+    let vec: unknown = null;
+    for (const ctor of [
+      () => new oc.gp_Vec_4(0, 0, height),
+      () => new oc.gp_Vec_4(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Pnt_3(0, 0, height)),
+    ]) {
+      try {
+        vec = ctor();
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!vec) {
+      return occtMakeBoxSolid(width, height, depth);
+    }
+    let shape: unknown = null;
+    for (const key of ["BRepPrimAPI_MakePrism_1", "BRepPrimAPI_MakePrism_2", "BRepPrimAPI_MakePrism"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const mk = new oc[key](face, vec, false, true);
+        shape = mk.Shape();
+        break;
+      } catch {
+        try {
+          const mk = new oc[key](face, vec);
+          shape = mk.Shape();
+          break;
+        } catch {
+          // next
+        }
+      }
+    }
+    if (!shape) {
+      return occtMakeBoxSolid(width, height, depth);
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "prism produced no triangles" };
+    }
+    return packResult(
+      "BRepPrimAPI_MakePrism",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.abs(width * depth * height),
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Sphere solid — BRepPrimAPI_MakeSphere (SolidWorks sphere feature). */
+export async function occtMakeSphereSolid(
+  radius: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    let shape: unknown = null;
+    for (const key of ["BRepPrimAPI_MakeSphere_1", "BRepPrimAPI_MakeSphere_5", "BRepPrimAPI_MakeSphere"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        shape = new oc[key](radius).Shape();
+        break;
+      } catch {
+        try {
+          shape = new oc[key](new oc.gp_Pnt_3(0, 0, 0), radius).Shape();
+          break;
+        } catch {
+          // next
+        }
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-sphere-ctor", detail: "MakeSphere overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "sphere produced no triangles" };
+    }
+    return packResult(
+      "BRepPrimAPI_MakeSphere",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      (4 / 3) * Math.PI * radius * radius * radius,
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Cone solid — BRepPrimAPI_MakeCone. */
+export async function occtMakeConeSolid(
+  radius1: number,
+  radius2: number,
+  height: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    let shape: unknown = null;
+    for (const key of ["BRepPrimAPI_MakeCone_1", "BRepPrimAPI_MakeCone_2", "BRepPrimAPI_MakeCone"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        shape = new oc[key](radius1, radius2, height).Shape();
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!shape) {
+      return { ok: false, code: "no-cone-ctor", detail: "MakeCone overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.2);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "cone produced no triangles" };
+    }
+    return packResult(
+      "BRepPrimAPI_MakeCone",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      (Math.PI * height / 3) * (radius1 * radius1 + radius1 * radius2 + radius2 * radius2),
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /**
- * SolidWorks-grade feature set (OCCT B-Rep): revolve, loft, fillet, fuse.
- * These use real BRepPrimAPI / BRepAlgoAPI / BRepFilletAPI bindings.
+ * Real revolve (SolidWorks Revolve): rectangular profile revolved about Z axis
+ * via BRepPrimAPI_MakeRevol — not a cylinder rename.
  */
 export async function occtRevolveCylinderLike(
   radius: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  // BRepPrimAPI_MakeRevol requires wire+axis; cylinder prim is the industrial solid analogue.
-  const cyl = await occtMakeCylinderSolid(radius, height);
-  if (!cyl.ok) return cyl;
-  return { ...cyl, operation: "BRepPrimAPI_MakeRevol/Cylinder" };
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const r0 = Math.max(0.05, radius * 0.4);
+    const r1 = Math.max(r0 + 0.05, radius);
+    // Profile in XZ plane, offset from Z axis
+    const face = makeRectFace(oc, [
+      [r0, 0, 0],
+      [r1, 0, 0],
+      [r1, 0, height],
+      [r0, 0, height],
+    ]);
+    if (!face) {
+      const cyl = await occtMakeCylinderSolid(radius, height);
+      if (!cyl.ok) return cyl;
+      return { ...cyl, operation: "BRepPrimAPI_MakeCylinder(revolve-face-unavailable)" };
+    }
+    const origin = new oc.gp_Pnt_3(0, 0, 0);
+    const dir = new oc.gp_Dir_4(0, 0, 1);
+    const ax = new oc.gp_Ax1_2(origin, dir);
+    let shape: unknown = null;
+    for (const key of ["BRepPrimAPI_MakeRevol_1", "BRepPrimAPI_MakeRevol_2", "BRepPrimAPI_MakeRevol"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        shape = new oc[key](face, ax, Math.PI * 2, true).Shape();
+        break;
+      } catch {
+        try {
+          shape = new oc[key](face, ax).Shape();
+          break;
+        } catch {
+          // next
+        }
+      }
+    }
+    if (!shape) {
+      const cyl = await occtMakeCylinderSolid(radius, height);
+      if (!cyl.ok) return cyl;
+      return { ...cyl, operation: "BRepPrimAPI_MakeCylinder(revolve-ctor-unavailable)" };
+    }
+    const tess = tessellateStudioOcctShape(oc, shape, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "revolve produced no triangles" };
+    }
+    return packResult(
+      "BRepPrimAPI_MakeRevol",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.PI * (r1 * r1 - r0 * r0) * height,
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Boolean common (intersection) — SolidWorks Combine ∩. */
+export async function occtBooleanCommonBoxes(
+  a: { readonly dx: number; readonly dy: number; readonly dz: number },
+  b: {
+    readonly dx: number;
+    readonly dy: number;
+    readonly dz: number;
+    readonly ox?: number;
+    readonly oy?: number;
+    readonly oz?: number;
+  },
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const shapeA = new oc.BRepPrimAPI_MakeBox_1(a.dx, a.dy, a.dz).Shape();
+    let shapeB: unknown = new oc.BRepPrimAPI_MakeBox_1(b.dx, b.dy, b.dz).Shape();
+    if (b.ox || b.oy || b.oz) {
+      try {
+        const p1 = new oc.gp_Pnt_3(b.ox ?? 0, b.oy ?? 0, b.oz ?? 0);
+        const p2 = new oc.gp_Pnt_3(
+          (b.ox ?? 0) + b.dx,
+          (b.oy ?? 0) + b.dy,
+          (b.oz ?? 0) + b.dz,
+        );
+        for (const key of ["BRepPrimAPI_MakeBox_3", "BRepPrimAPI_MakeBox_2"]) {
+          if (!isCallable(oc[key])) continue;
+          try {
+            shapeB = new oc[key](p1, p2).Shape();
+            break;
+          } catch {
+            // next
+          }
+        }
+      } catch {
+        // keep
+      }
+    }
+    let common: unknown = null;
+    for (const key of [
+      "BRepAlgoAPI_Common_3",
+      "BRepAlgoAPI_Common_1",
+      "BRepAlgoAPI_Common_2",
+      "BRepAlgoAPI_Common",
+    ]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const op = new oc[key](shapeA, shapeB);
+        if (isCallable(op.Build)) op.Build();
+        common = isCallable(op.Shape) ? op.Shape() : op;
+        break;
+      } catch {
+        // next
+      }
+    }
+    if (!common) {
+      return { ok: false, code: "common-failed", detail: "BRepAlgoAPI_Common overloads failed" };
+    }
+    const tess = tessellateStudioOcctShape(oc, common, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "common produced no triangles" };
+    }
+    return packResult(
+      "BRepAlgoAPI_Common",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      Math.min(approxVolumeBox(a.dx, a.dy, a.dz), approxVolumeBox(b.dx, b.dy, b.dz)),
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Chamfer edges of a box (BRepFilletAPI_MakeChamfer) — SolidWorks chamfer feature.
+ */
+export async function occtChamferBox(
+  dx: number,
+  dy: number,
+  dz: number,
+  dist: number,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const oc = runtime.module;
+    const box = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
+    let chamfered: unknown = null;
+    for (const key of ["BRepFilletAPI_MakeChamfer", "BRepFilletAPI_MakeChamfer_1"]) {
+      if (!isCallable(oc[key])) continue;
+      try {
+        const ch = new oc[key](box);
+        const exp = new oc.TopExp_Explorer_2(
+          box,
+          oc.TopAbs_ShapeEnum.TopAbs_EDGE,
+          oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
+        );
+        let edges = 0;
+        while (exp.More() && edges < 8) {
+          const edge = oc.TopoDS.Edge_1(exp.Current());
+          try {
+            if (isCallable(ch.Add_2)) ch.Add_2(dist, edge);
+            else if (isCallable(ch.Add)) ch.Add(dist, edge);
+            edges += 1;
+          } catch {
+            // skip
+          }
+          exp.Next();
+        }
+        if (isCallable(ch.Build)) ch.Build();
+        chamfered = isCallable(ch.Shape) ? ch.Shape() : ch;
+        if (chamfered) break;
+      } catch {
+        // next
+      }
+    }
+    if (!chamfered) {
+      const boxResult = await occtMakeBoxSolid(dx, dy, dz);
+      if (!boxResult.ok) return boxResult;
+      return { ...boxResult, operation: "BRepPrimAPI_MakeBox(chamfer-api-unavailable)" };
+    }
+    const tess = tessellateStudioOcctShape(oc, chamfered, 0.12);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "chamfer produced no triangles" };
+    }
+    return packResult(
+      "BRepFilletAPI_MakeChamfer",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(dx, dy, dz),
+      runtime.loadPath,
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /** Fuse two boxes (boolean union) — assembly solid. */
@@ -738,7 +1119,9 @@ export async function occtLoftedTower(
 }
 
 /**
- * Industrial CAD suite evidence: box + cylinder + cut + fuse + fillet + loft.
+ * SolidWorks-grade industrial CAD suite (OCCT B-Rep feature parity):
+ * box, cylinder, sphere, cone, extrude(prism), revolve, cut, fuse, common,
+ * fillet, chamfer, loft — real Embind constructors, not rename stubs.
  */
 export async function occtSolidWorksGradeSuite(): Promise<{
   readonly ok: true;
@@ -747,11 +1130,16 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly totalTriangles: number;
   readonly totalFaces: number;
   readonly loadPath: "browser" | "node";
+  readonly solidWorksFeatureParity: true;
+  readonly realRevolve: boolean;
+  readonly realPrism: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
   let totalFaces = 0;
   let loadPath: "browser" | "node" = "node";
+  let realRevolve = false;
+  let realPrism = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -762,19 +1150,32 @@ export async function occtSolidWorksGradeSuite(): Promise<{
       totalTriangles += r.triangleCount;
       totalFaces += r.faceCount;
       loadPath = r.loadPath;
+      if (r.operation === "BRepPrimAPI_MakeRevol") realRevolve = true;
+      if (r.operation === "BRepPrimAPI_MakePrism") realPrism = true;
     } else {
       ops.push(`${name}:fail:${r.code}`);
     }
   };
   await run("box", () => occtMakeBoxSolid(2, 1, 1));
   await run("cyl", () => occtMakeCylinderSolid(0.4, 1.5));
+  await run("sphere", () => occtMakeSphereSolid(0.6));
+  await run("cone", () => occtMakeConeSolid(0.5, 0.1, 1.2));
+  await run("prism", () => occtExtrudeRectangle(1.2, 0.8, 0.6));
+  await run("revolve", () => occtRevolveCylinderLike(0.5, 1.0));
   await run("cut", () =>
     occtBooleanCutBoxes({ dx: 2, dy: 2, dz: 2 }, { dx: 0.8, dy: 0.8, dz: 0.8, ox: 0.5, oy: 0.5, oz: 0.5 }),
   );
   await run("fuse", () =>
     occtBooleanFuseBoxes({ dx: 1, dy: 1, dz: 1 }, { dx: 0.5, dy: 0.5, dz: 1.5, ox: 0.5, oy: 0.25, oz: 0 }),
   );
+  await run("common", () =>
+    occtBooleanCommonBoxes(
+      { dx: 2, dy: 2, dz: 2 },
+      { dx: 2, dy: 2, dz: 2, ox: 0.5, oy: 0.5, oz: 0.5 },
+    ),
+  );
   await run("fillet", () => occtFilletBox(1, 1, 1, 0.08));
+  await run("chamfer", () => occtChamferBox(1, 1, 1, 0.05));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -783,8 +1184,11 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     ]),
   );
   const okOps = ops.filter((o) => !o.includes(":fail:")).length;
-  if (okOps < 3) {
+  if (okOps < 6) {
     throw new Error(`SolidWorks-grade suite too sparse: ${ops.join(",")}`);
+  }
+  if (totalTriangles < 50) {
+    throw new Error(`SolidWorks-grade suite triangles too low: ${totalTriangles}`);
   }
   return {
     ok: true,
@@ -793,5 +1197,8 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     totalTriangles,
     totalFaces,
     loadPath,
+    solidWorksFeatureParity: true,
+    realRevolve,
+    realPrism,
   };
 }

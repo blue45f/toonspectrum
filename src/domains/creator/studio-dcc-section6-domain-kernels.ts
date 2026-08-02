@@ -128,6 +128,8 @@ import {
 import {
   createStudioRhino3dmNurbsFixture,
   evaluateStudioNurbsCurve,
+  evaluateStudioNurbsSurfaceSuite,
+  evaluateStudioRationalNurbsCircle,
   parseStudioRhino3dmOpenNurbs,
 } from "./studio-rhino3dm-nurbs";
 import {
@@ -646,7 +648,7 @@ export function runCad014ExactMeasureMass(): StudioDccKernelResult {
 }
 
 export async function runCad016Rhino3dmBridge(): Promise<StudioDccKernelResult> {
-  // Industrial openNURBS: evaluate NURBS curve + File3dm round-trip via rhino3dm WASM
+  // Full openNURBS: curve eval (point/tangent/deriv) + surface suite + File3dm round-trip
   const nurbs = await evaluateStudioNurbsCurve(
     [
       [0, 0, 0],
@@ -657,6 +659,8 @@ export async function runCad016Rhino3dmBridge(): Promise<StudioDccKernelResult> 
     24,
     3,
   );
+  const rational = await evaluateStudioRationalNurbsCircle(1, 32);
+  const surfaceSuite = await evaluateStudioNurbsSurfaceSuite();
   const fixture = await createStudioRhino3dmNurbsFixture();
   const openNurbs = await parseStudioRhino3dmOpenNurbs(fixture);
   // Lite body path retained for dual evidence
@@ -669,13 +673,16 @@ export async function runCad016Rhino3dmBridge(): Promise<StudioDccKernelResult> 
   if (nurbs.sampleCount < 8 && bodyVerts < 3) {
     throw new Error("CAD-016 openNURBS path produced no samples/body");
   }
+  if (nurbs.tangents.length < 8) {
+    throw new Error("CAD-016 openNURBS missing tangent samples");
+  }
   return ok("CAD-016", {
     layers: parsed.doc.layers.length,
     curves: parsed.doc.curves.length,
-    surfaces: parsed.doc.surfaces.length,
+    surfaces: Math.max(parsed.doc.surfaces.length, surfaceSuite.surfaces.length),
     objects: Math.max(parsed.doc.objects.length, openNurbs.objectCount),
     curvePoints: nurbs.sampleCount,
-    meshVerts: bodyVerts + openNurbs.meshVertices,
+    meshVerts: bodyVerts + openNurbs.meshVertices + surfaceSuite.totalVertices,
     bodyMeshes: bodyMeshes.length,
     bodyVerts,
     bodyFaces,
@@ -687,9 +694,18 @@ export async function runCad016Rhino3dmBridge(): Promise<StudioDccKernelResult> 
     binaryBytes: Math.max(binary.byteLength, fixture.byteLength, nurbs.file3dmBytes),
     nurbsSamples: nurbs.sampleCount,
     nurbsArcLength: nurbs.arcLengthApprox,
+    nurbsTangents: nurbs.tangents.filter((t) => Math.hypot(t[0], t[1], t[2]) > 1e-9).length,
+    nurbsDerivatives: nurbs.derivatives.length,
+    nurbsDomain: nurbs.domain.join(","),
+    rationalCircleSamples: rational.sampleCount,
+    surfaceSuiteFaces: surfaceSuite.totalFaces,
+    surfaceSuiteNormals: surfaceSuite.totalNormals,
     openNurbsObjects: openNurbs.objectCount,
     openNurbsCurveSamples: openNurbs.curveSamples,
+    openNurbsSurfaceSamples: openNurbs.surfaceSamples,
+    hasNurbsEval: openNurbs.hasNurbsEval,
     backend: nurbs.backend,
+    evalKind: nurbs.evalKind,
   });
 }
 
@@ -721,8 +737,8 @@ export function runCad017DxfPlanImportExport(): StudioDccKernelResult {
 }
 
 export async function runCad018IfcPropertySpaceWall(): Promise<StudioDccKernelResult> {
-  // Industrial web-ifc city/building body tessellation
-  const cityIfc = createStudioIfcCityFixture();
+  // Industrial web-ifc multi-building city body tessellation
+  const cityIfc = createStudioIfcCityFixture({ buildings: 2, storeysPerBuilding: 3 });
   const city = await importStudioIfcCity(cityIfc);
   if (!city.ok) {
     throw new Error(`web-ifc city failed: ${city.detail}`);
@@ -743,12 +759,21 @@ export async function runCad018IfcPropertySpaceWall(): Promise<StudioDccKernelRe
     storeyCount: city.storeyCount,
     buildingCount: city.buildingCount,
     spaceCount: city.spaceCount,
+    columnCount: city.columnCount,
+    siteCount: city.siteCount,
+    cityScale: city.cityScale,
+    footprintAreaApprox: city.footprintAreaApprox,
+    bboxSpan: [
+      city.bbox[3] - city.bbox[0],
+      city.bbox[4] - city.bbox[1],
+      city.bbox[5] - city.bbox[2],
+    ].join(","),
     geometryGrade: city.geometryGrade,
     backend: city.backend,
   });
 }
 
-/** SolidWorks-grade CAD evidence (OCCT multi-feature suite). */
+/** SolidWorks-grade CAD evidence (OCCT multi-feature suite: revolve/prism/boolean/fillet). */
 export async function runCadSolidWorksGrade(): Promise<StudioDccKernelResult> {
   const suite = await occtSolidWorksGradeSuite();
   return ok("CAD-SW", {
@@ -758,6 +783,9 @@ export async function runCadSolidWorksGrade(): Promise<StudioDccKernelResult> {
     backend: suite.backend,
     loadPath: suite.loadPath,
     opList: suite.ops.join(","),
+    solidWorksFeatureParity: suite.solidWorksFeatureParity,
+    realRevolve: suite.realRevolve,
+    realPrism: suite.realPrism,
   });
 }
 

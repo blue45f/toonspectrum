@@ -176,6 +176,9 @@ describe("§6 full catalog SSOT", () => {
         "bodyMeshes",
         "bodyVerts",
         "bodyFaces",
+        "nurbsSamples",
+        "nurbsTangents",
+        "backend",
       ],
       "CAD-018": [
         "wallCount",
@@ -184,6 +187,10 @@ describe("§6 full catalog SSOT", () => {
         "bodyTriangleCount",
         "meshTriangleCount",
         "polyloopCount",
+        "webIfcVertices",
+        "buildingCount",
+        "cityScale",
+        "backend",
       ],
       "CAD-019": [
         "parts",
@@ -360,23 +367,20 @@ describe("§6 full catalog SSOT", () => {
           expect(Number(r.evidence.bodyMeshes)).toBeGreaterThan(0);
           expect(Number(r.evidence.bodyVerts)).toBeGreaterThanOrEqual(3);
           expect(Number(r.evidence.bodyFaces)).toBeGreaterThan(0);
-          // openNURBS (rhino3dm) NURBS samples
-          if ("nurbsSamples" in r.evidence) {
-            expect(Number(r.evidence.nurbsSamples)).toBeGreaterThan(4);
-            expect(r.evidence.backend).toBe("rhino3dm-opennurbs");
-          }
+          // Full openNURBS: samples + tangents + surface suite
+          expect(Number(r.evidence.nurbsSamples)).toBeGreaterThan(4);
+          expect(Number(r.evidence.nurbsTangents)).toBeGreaterThan(4);
+          expect(r.evidence.backend).toBe("rhino3dm-opennurbs");
+          expect(Number(r.evidence.surfaceSuiteFaces ?? 0) + Number(r.evidence.rationalCircleSamples ?? 0)).toBeGreaterThan(8);
         }
         if (entry.id === "CAD-018") {
           expect(Number(r.evidence.meshTriangleCount) + Number(r.evidence.bodyTriangleCount)).toBeGreaterThan(0);
-          // Industrial web-ifc city path: triangles + storeys/walls (polyloop optional)
-          expect(
-            Number(r.evidence.webIfcVertices ?? 0)
-              + Number(r.evidence.pointCount ?? 0)
-              + Number(r.evidence.wallCount ?? 0),
-          ).toBeGreaterThan(0);
-          expect(r.evidence.backend === "web-ifc" || Number(r.evidence.polyloopCount) > 0).toBe(
-            true,
-          );
+          // Industrial web-ifc multi-building city path
+          expect(Number(r.evidence.webIfcVertices ?? 0)).toBeGreaterThan(0);
+          expect(Number(r.evidence.buildingCount ?? 0)).toBeGreaterThanOrEqual(1);
+          expect(r.evidence.backend).toBe("web-ifc");
+          expect(r.evidence.cityScale).toBe(true);
+          expect(r.evidence.geometryGrade === "A" || r.evidence.geometryGrade === "B").toBe(true);
         }
         if (entry.id === "CAD-019") {
           expect(Number(r.evidence.totalWallLength)).toBeGreaterThan(1);
