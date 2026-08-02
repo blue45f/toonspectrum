@@ -1,0 +1,34 @@
+# Product documentation is not served by the Vite application. Keep the
+# reviewed OpenCascade LGPL boundary because the postbuild notice generator
+# validates and embeds it in the deployed legal notices.
+docs/*
+!docs/third-party
+docs/third-party/*
+!docs/third-party/opencascade-lgpl.md
+/README.md
+/PRODUCT.md
+/DESIGN.md
+
+# Local QA captures and repository automation metadata.
+artifacts/
+.github/
+
+# These stacks are deployed independently from the Vercel application.
+# The shared realtime protocol/ticket sources remain build inputs for the
+# browser adapter and NestJS API, so preserve the Worker's source directory.
+deploy/cloudflare-realtime/*
+!deploy/cloudflare-realtime/src
+!deploy/cloudflare-realtime/src/**
+deploy/coturn/
+deploy/oci/
+
+# Test-only sources are verified in CI and are not production build inputs.
+# Keep this block last so it also removes tests from preserved source trees.
+**/*.test.*
+**/*.spec.*
+**/__tests__/
+**/test/
+**/tests/
+**/spec/
+**/specs/
+e2e/
