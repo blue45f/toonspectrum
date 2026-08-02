@@ -171,7 +171,6 @@ import {
   type StudioAutosavePayload,
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
-import { type StudioAutosaveOpfsSession } from "./studio-autosave-opfs-session";
 import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
@@ -1561,6 +1560,10 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+type StudioAutosaveOpfsSession = NonNullable<
+  Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
+>;
 
 type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
