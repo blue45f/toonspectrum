@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 
+import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
 import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
 import { UPSTASH_COORDINATION_PORT } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
-import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
 
 import { resolveAuthClientIpPolicy } from "./auth-client-ip";
 import {

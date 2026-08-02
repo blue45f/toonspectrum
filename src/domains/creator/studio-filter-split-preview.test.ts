@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { StudioFilterSplitPreview } from "./studio-filter-split-preview";
 
 describe("StudioFilterSplitPreview", () => {

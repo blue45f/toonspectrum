@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 
-import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
 import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
+import { SupabaseObjectStorageModule } from "../../infrastructure/supabase-object-storage/supabase-object-storage.module";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import {

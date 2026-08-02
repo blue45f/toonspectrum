@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+
 import { StudioPixelSelectionTransformEngine } from "./studio-pixel-selection-transform";
+
 import type { PixelSelection } from "./studio-selection-tools";
 
 describe("StudioPixelSelectionTransformEngine", () => {
