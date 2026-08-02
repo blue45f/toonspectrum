@@ -16,7 +16,8 @@ import {
 
 const SCRATCH =
   process.env.GROK_SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-0681ff1b1864/implementer";
+  ?? process.env.SCRATCH
+  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-a86442421192/implementer";
 
 function domainOpsEntries(): readonly StudioSection6CatalogEntry[] {
   return STUDIO_DCC_SECTION6_CATALOG.filter(

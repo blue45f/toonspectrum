@@ -11,7 +11,8 @@ import { STUDIO_DCC_SECTION6_CATALOG } from "./studio-dcc-section6-full-catalog"
 
 const SCRATCH =
   process.env.GROK_SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-0681ff1b1864/implementer";
+  ?? process.env.SCRATCH
+  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-a86442421192/implementer";
 
 describe("section6 full coverage matrix", () => {
   it("writes full SSOT matrix with exercise evidence keys for all IDs", async () => {
