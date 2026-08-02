@@ -811,6 +811,7 @@ describe("CreatorCollaborationRepository", () => {
 
     await expect(repository.getAuthorization("owner", "work-1")).resolves.toEqual({
       workId: "work-1",
+      authorizationEpoch: DEFAULT_NOW.toISOString(),
       viewer: {
         userId: "owner",
         role: "owner",

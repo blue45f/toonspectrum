@@ -156,7 +156,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   heal: {
     id: "heal",
     label: "복구 브러시",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "clone-source",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,
@@ -164,7 +164,7 @@ export const STUDIO_RASTER_TOOL_SPECS: Readonly<Record<StudioRasterToolId, Studi
   "clone-stamp": {
     id: "clone-stamp",
     label: "복제 도장",
-    preparation: "raster-or-explicit-copy",
+    preparation: "raster-or-auto-merged-copy",
     applyRequirement: "clone-source",
     acceptsAnimatedTarget: false,
     requiresStoppedTimeline: true,

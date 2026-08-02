@@ -73,8 +73,6 @@ describe("Studio raster tool availability matrix", () => {
     "pixel-transform",
     "content-aware-fill",
     "crop",
-    "heal",
-    "clone-stamp",
     "history-brush",
     "puppet-warp",
     "layer-mask",
@@ -93,7 +91,7 @@ describe("Studio raster tool availability matrix", () => {
     });
   });
 
-  it.each(["smudge", "dodge-burn", "wet-mix", "liquify"] as const)(
+  it.each(["smudge", "dodge-burn", "wet-mix", "liquify", "heal", "clone-stamp"] as const)(
     "lets %s prepare and enter from faithful vector-only page content",
     (tool) => {
       const availability = resolveStudioRasterToolAvailability(tool, {
@@ -109,7 +107,11 @@ describe("Studio raster tool availability matrix", () => {
           safety: "non-destructive-copy",
         },
       });
-      expect(availability.apply.enabled).toBe(true);
+      if (tool === "heal" || tool === "clone-stamp") {
+        expect(availability.apply.action?.id).toBe("pick-clone-source");
+      } else {
+        expect(availability.apply.enabled).toBe(true);
+      }
     },
   );
 

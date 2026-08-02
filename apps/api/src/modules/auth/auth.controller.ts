@@ -44,8 +44,10 @@ import {
   verifyState,
   webAppBaseUrl,
 } from "../../../../../lib/server/oauth";
-import { signSession } from "../../../../../lib/server/session";
-import { verifySessionToken } from "../../../../../lib/server/session";
+import {
+  signSession,
+  verifySessionToken,
+} from "../../../../../lib/server/session";
 import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,

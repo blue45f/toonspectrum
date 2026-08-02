@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
 
+import { StudioRealtimeRevocationService } from "./studio-realtime-revocation.client";
 import {
   STUDIO_REALTIME_REVOCATION_CONFIGURATION,
   resolveStudioRealtimeRevocationConfiguration,
 } from "./studio-realtime-revocation.configuration";
-import { StudioRealtimeRevocationService } from "./studio-realtime-revocation.client";
 
 @Module({
   providers: [

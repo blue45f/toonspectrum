@@ -15,7 +15,6 @@ import {
   CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
 } from "../../../../../lib/creator-asset-contract";
 import { rateLimit } from "../../../../../lib/rate-limit";
-import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   addComment,
   bumpAssetDownloads,
@@ -56,6 +55,7 @@ import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
 } from "../../../../../lib/server/creator-work-revisions";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 
 import {
   CreatorCollaborationCrdtSequenceConflictError,

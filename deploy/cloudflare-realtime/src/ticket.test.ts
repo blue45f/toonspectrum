@@ -110,6 +110,7 @@ describe("realtime HMAC ticket", () => {
   it("rejects expired and not-yet-valid tickets", async () => {
     const expired = await signRealtimeTicket(
       claims({
+        authorizationEpochMs: NOW - 121_000,
         issuedAtMs: NOW - 120_000,
         expiresAtMs: NOW - 1,
         sessionExpiresAtMs: NOW + 60_000,
