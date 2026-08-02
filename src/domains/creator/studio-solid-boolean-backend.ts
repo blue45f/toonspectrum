@@ -48,6 +48,34 @@ async function loadManifoldRuntimeForHost(): Promise<StudioManifoldRuntime> {
   return cachedRuntimePromise;
 }
 
+function flipTriangleIndices(indices: Uint32Array): Uint32Array {
+  const out = new Uint32Array(indices.length);
+  for (let i = 0; i + 2 < indices.length; i += 3) {
+    out[i] = indices[i]!;
+    out[i + 1] = indices[i + 2]!;
+    out[i + 2] = indices[i + 1]!;
+  }
+  return out;
+}
+
+/**
+ * True when a solid boolean result is non-degenerate.
+ * Rejects classic pure-convex 2-tri garbage on inverted cubes; allows small solids
+ * (e.g. tetra difference ≈4 tris). Unit-cube product path enforces a higher bar in MOD-014.
+ */
+export function isStudioSolidBooleanResultViable(
+  result: StudioSolidBooleanResult,
+  _operation: StudioMeshBooleanOp,
+): boolean {
+  const tris = result.indices.length / 3;
+  const verts = result.positions.length / 3;
+  if (!Number.isFinite(tris) || tris < 4) return false;
+  if (!Number.isFinite(verts) || verts < 4) return false;
+  // 2-tri / 3-tri soups are not closed solids
+  if (tris < 4) return false;
+  return true;
+}
+
 /** Production / default: Manifold triangle solid CSG. */
 export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBackend {
   return {
@@ -57,15 +85,19 @@ export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBac
         epoch: 0,
         runtimeLoader: () => runtime,
       });
-      try {
+      const run = async (
+        leftIdx: Uint32Array,
+        rightIdx: Uint32Array,
+        note: string,
+      ): Promise<StudioSolidBooleanResult> => {
         const receipt = await provider.boolean({
           left: {
             positions: input.left.positions,
-            triangleIndices: input.left.indices,
+            triangleIndices: leftIdx,
           },
           right: {
             positions: input.right.positions,
-            triangleIndices: input.right.indices,
+            triangleIndices: rightIdx,
           },
           operation: input.operation,
           epoch: 0,
@@ -73,8 +105,27 @@ export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBac
         return {
           positions: receipt.output.mesh.positions,
           indices: receipt.output.mesh.triangleIndices,
-          diagnostic: `manifold:${receipt.runtimeVersion}:${receipt.operation}`,
+          diagnostic: `manifold:${receipt.runtimeVersion}:${receipt.operation}${note}`,
         };
+      };
+      try {
+        try {
+          const primary = await run(input.left.indices, input.right.indices, "");
+          if (isStudioSolidBooleanResultViable(primary, input.operation)) return primary;
+        } catch {
+          // retry flipped winding (common when authoring mesh has inverted normals)
+        }
+        const flipped = await run(
+          flipTriangleIndices(input.left.indices),
+          flipTriangleIndices(input.right.indices),
+          ":winding-flipped",
+        );
+        if (!isStudioSolidBooleanResultViable(flipped, input.operation)) {
+          throw new Error(
+            `Manifold boolean produced degenerate solid (tris=${flipped.indices.length / 3})`,
+          );
+        }
+        return flipped;
       } finally {
         await provider.destroy();
       }
@@ -89,13 +140,19 @@ export function createStudioManifoldSolidBooleanBackend(): StudioSolidBooleanBac
 export function createStudioPureConvexSolidBooleanBackend(): StudioSolidBooleanBackend {
   return {
     async boolean(input) {
-      return pureConvexMeshBoolean(
+      const result = pureConvexMeshBoolean(
         input.left.positions,
         input.left.indices,
         input.right.positions,
         input.right.indices,
         input.operation,
       );
+      if (!isStudioSolidBooleanResultViable(result, input.operation)) {
+        throw new Error(
+          `pure-convex boolean degenerate (tris=${result.indices.length / 3}, verts=${result.positions.length / 3})`,
+        );
+      }
+      return result;
     },
   };
 }
@@ -271,23 +328,28 @@ function meshFromTriangles(
   };
 }
 
-/** Default commit backend: Manifold first, pure convex CSG fallback. */
+/** Default commit backend: Manifold first, pure convex CSG fallback (viable solids only). */
 export function createStudioDefaultSolidBooleanBackend(): StudioSolidBooleanBackend {
   const manifold = createStudioManifoldSolidBooleanBackend();
   const pure = createStudioPureConvexSolidBooleanBackend();
   return {
     async boolean(input) {
       try {
-        return await manifold.boolean(input);
+        const primary = await manifold.boolean(input);
+        if (isStudioSolidBooleanResultViable(primary, input.operation)) return primary;
+        throw new Error(
+          `manifold solid not viable (tris=${primary.indices.length / 3})`,
+        );
       } catch (error) {
         try {
           const fallback = await pure.boolean(input);
+          // pure backend already rejects non-viable results
           return {
             ...fallback,
             diagnostic: `${fallback.diagnostic};manifold-fallback:${error instanceof Error ? error.message : "failed"}`,
           };
         } catch {
-          throw error;
+          throw error instanceof Error ? error : new Error(String(error));
         }
       }
     },

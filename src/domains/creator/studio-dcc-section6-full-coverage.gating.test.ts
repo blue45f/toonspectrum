@@ -152,7 +152,7 @@ describe("§6 full catalog SSOT", () => {
     /** Doc 구현·완료 기준 → required evidence keys (skeptic residual set). */
     const DOC_CRITERIA_EVIDENCE: Readonly<Record<string, readonly string[]>> = {
       "DOC-009": ["mergedHash", "parentCount", "mergeStrategy", "mergeRev", "conflict"],
-      "MOD-014": ["ok", "faces", "facesBefore", "backend"],
+      "MOD-014": ["ok", "faces", "facesBefore", "backend", "tris", "solidViable"],
       "CHR-012": ["ok", "missing", "mapped", "scale", "source", "target"],
       "CAD-006": ["sweepTris", "loftTris", "pathSamples", "failedSections"],
       "CAD-008": [
@@ -318,8 +318,13 @@ describe("§6 full catalog SSOT", () => {
         // Ban pure extrude-proxy theater for CAD-006 (must have sweep path samples)
         if (entry.id === "MOD-014") {
           expect(r.evidence.ok).toBe(true);
-          expect(Number(r.evidence.faces)).toBeGreaterThan(0);
+          expect(r.evidence.solidViable).toBe(true);
+          // Non-degenerate solid: unit-cube difference is a closed shell (≥8 faces / ≥12 tris)
+          expect(Number(r.evidence.faces)).toBeGreaterThanOrEqual(8);
+          expect(Number(r.evidence.tris)).toBeGreaterThanOrEqual(12);
           expect(Number(r.evidence.facesBefore)).toBeGreaterThan(0);
+          expect(Number(r.evidence.faces)).toBeGreaterThan(Number(r.evidence.facesBefore) / 2);
+          expect(String(r.evidence.backend)).toMatch(/manifold|default|pure-convex/u);
         }
         if (entry.id === "CHR-012") {
           expect(r.evidence.ok).toBe(true);

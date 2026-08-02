@@ -7,7 +7,7 @@ import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-di
 const SCRATCH =
   process.env.GROK_SCRATCH
   ?? process.env.SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-7fec64561cc6/implementer";
+  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-0f3581dcd4da/implementer";
 
 const HIGH = [
   "MOD-014",
@@ -31,7 +31,12 @@ describe("goal high-risk spotcheck", () => {
       expect(r.ok).toBe(true);
       expect(r.evidence.ok).not.toBe(false);
       if (id === "MOD-014") {
-        expect(Number(r.evidence.faces)).toBeGreaterThan(0);
+        // Real unit-cube Manifold (or viable solid) difference — not 2-face pure-convex garbage.
+        expect(r.evidence.solidViable).toBe(true);
+        expect(Number(r.evidence.faces)).toBeGreaterThanOrEqual(8);
+        expect(Number(r.evidence.tris)).toBeGreaterThanOrEqual(12);
+        expect(Number(r.evidence.faces)).toBeGreaterThan(Number(r.evidence.facesBefore) / 2);
+        expect(String(r.evidence.backend)).toMatch(/manifold|default/u);
       }
       if (id === "CHR-012") {
         expect(r.evidence.ok).toBe(true);
@@ -41,7 +46,7 @@ describe("goal high-risk spotcheck", () => {
         expect(Number(r.evidence.boundaryAfterRefine)).toBe(0);
       }
       lines.push(
-        `${id} ok faces=${r.evidence.faces ?? r.evidence.facesAfter ?? r.evidence.bodyFaces ?? r.evidence.meshTriangleCount} missing=${r.evidence.missing ?? "-"}`,
+        `${id} ok faces=${r.evidence.faces ?? r.evidence.facesAfter ?? r.evidence.bodyFaces ?? r.evidence.meshTriangleCount} tris=${r.evidence.tris ?? "-"} backend=${r.evidence.backend ?? "-"} missing=${r.evidence.missing ?? "-"}`,
       );
     }
     writeFileSync(`${SCRATCH}/high-risk-spotcheck.log`, lines.join("\n") + "\n");

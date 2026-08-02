@@ -501,10 +501,22 @@ export async function evaluateStudioMeshModifierStack(
             right: mod.operand,
             operation: mod.operation,
           });
-          if (out.indices.length === 0) {
-            return fail("boolean-empty", "boolean produced empty mesh", [
+          const tris = out.indices.length / 3;
+          const leftTris = left.indices.length / 3;
+          // Reject empty or degenerate solids (e.g. pure-convex 2-tri garbage on inverted cubes).
+          if (out.indices.length === 0 || tris < 4) {
+            return fail("boolean-empty", "boolean produced empty/degenerate mesh", [
               out.diagnostic ?? "empty",
+              `tris=${tris}`,
             ]);
+          }
+          // Unit-cube / closed solid inputs (≥12 tris) must yield a real shell after difference.
+          if (mod.operation === "difference" && leftTris >= 12 && tris < 8) {
+            return fail(
+              "boolean-failed",
+              `boolean difference degenerate solid (tris=${tris}, need ≥8 for closed input)`,
+              [out.diagnostic ?? "degenerate", `tris=${tris}`],
+            );
           }
           current = soupToMesh(out.positions, out.indices);
         } catch (error) {

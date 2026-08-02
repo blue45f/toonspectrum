@@ -173,13 +173,15 @@ export function createStudioUnitCubeMesh(): StudioEditableMesh {
     vec(0.5, 0.5, 0.5),
     vec(-0.5, 0.5, 0.5),
   ];
+  // Outward-facing CCW quads (right-hand rule). Required for Manifold solid CSG
+  // and pure-convex plane half-spaces — inverted soup yields invalid topology.
   const quads: readonly (readonly [number, number, number, number])[] = [
-    [0, 1, 2, 3], // -Z
-    [4, 7, 6, 5], // +Z
-    [0, 4, 5, 1], // -Y
-    [3, 2, 6, 7], // +Y
-    [0, 3, 7, 4], // -X
-    [1, 5, 6, 2], // +X
+    [0, 3, 2, 1], // -Z
+    [4, 5, 6, 7], // +Z
+    [0, 1, 5, 4], // -Y
+    [3, 7, 6, 2], // +Y
+    [0, 4, 7, 3], // -X
+    [1, 2, 6, 5], // +X
   ];
   return createStudioEditableMeshFromPolygons(positions, quads);
 }

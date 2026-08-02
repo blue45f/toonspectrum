@@ -435,7 +435,7 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
     const mesh = cube();
     const soup = (await import("./studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(mesh);
     let stack = createStudioMeshModifierStack(mesh);
-    // Offset + scale (same proven pattern as v1 solid-boolean gate) for real difference volume.
+    // Offset + scale for real difference volume (unit-cube cut by offset cube).
     const op = new Float32Array(soup.positions);
     for (let i = 0; i < op.length; i += 3) op[i]! += 0.4;
     for (let i = 0; i < op.length; i += 1) op[i]! *= 0.7;
@@ -446,31 +446,46 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
       operation: "difference",
       operand: { positions: op, indices: soup.indices },
     });
-    // Pure-convex is the unit-testable solid path; Manifold when available via default fallback.
-    const { createStudioPureConvexSolidBooleanBackend } = await import(
-      "./studio-solid-boolean-backend"
-    );
-    const pure = createStudioPureConvexSolidBooleanBackend();
-    let e = await evaluateStudioMeshModifierStack(stack, { booleanBackend: pure });
-    let backendName = "pure-convex";
+    // Prefer Manifold (product path); default only as last resort — both reject degenerate solids.
+    let backendName = "manifold";
+    let e = await evaluateStudioMeshModifierStack(stack, {
+      booleanBackend: createStudioManifoldSolidBooleanBackend(),
+    });
     if (!e.ok) {
-      const manifold = createStudioManifoldSolidBooleanBackend();
-      e = await evaluateStudioMeshModifierStack(stack, { booleanBackend: manifold });
-      backendName = "manifold";
+      backendName = "default";
+      e = await evaluateStudioMeshModifierStack(stack, {
+        booleanBackend: createStudioDefaultSolidBooleanBackend(),
+      });
     }
     if (!e.ok) {
       throw new Error(`MOD-014 boolean failed: ${e.detail}`);
     }
     const faces = e.value.mesh.faces.length;
-    if (faces < 1) {
-      throw new Error("MOD-014 boolean produced empty mesh (faces=0)");
+    const facesBefore = mesh.faces.length;
+    const soupOut = (await import("./studio-editable-half-edge-mesh")).studioEditableMeshToTriangleSoup(
+      e.value.mesh,
+    );
+    const tris = soupOut.indices.length / 3;
+    // Non-degenerate solid: not 2-face garbage; cube difference is a closed shell.
+    if (faces < 8 || tris < 12) {
+      throw new Error(
+        `MOD-014 boolean degenerate solid faces=${faces} tris=${tris} (need faces≥8 tris≥12)`,
+      );
+    }
+    if (faces <= facesBefore / 2) {
+      throw new Error(
+        `MOD-014 boolean collapsed topology faces=${faces} facesBefore=${facesBefore}`,
+      );
     }
     return ok("MOD-014", {
       ok: true,
       faces,
-      facesBefore: mesh.faces.length,
+      facesBefore,
+      tris,
+      verts: soupOut.positions.length / 3,
       backend: backendName,
       backendReady: true,
+      solidViable: true,
     });
   },
   "MOD-015": async () => {
