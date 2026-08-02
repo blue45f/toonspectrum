@@ -3,7 +3,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { occtSolidWorksGradeSuite } from "./studio-occt-wasm-facade";
+import {
+  occtSolidWorksGradeSuite,
+  STUDIO_OCCT_WASM_FACADE_REVISION,
+} from "./studio-occt-wasm-facade";
 import {
   createStudioRhino3dmNurbsFixture,
   evaluateStudioNurbsCurve,
@@ -18,7 +21,6 @@ import {
   importStudioIfcCity,
   STUDIO_WEB_IFC_CITY_REVISION,
 } from "./studio-web-ifc-city";
-import { STUDIO_OCCT_WASM_FACADE_REVISION } from "./studio-occt-wasm-facade";
 
 describe("openNURBS full NURBS eval (rhino3dm WASM)", () => {
   it("evaluates NURBS curve with tangents, derivatives, domain, knots", async () => {
