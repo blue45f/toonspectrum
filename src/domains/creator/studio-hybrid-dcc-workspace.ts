@@ -943,9 +943,8 @@ export async function workspaceOcctBox(
   assetId = "occt-box",
   size: readonly [number, number, number] = [1, 1, 1],
 ): Promise<StudioHybridDccWorkspace> {
-  const { occtMakeBoxSolid } = await import("./studio-occt-wasm-facade");
-  const result = await occtMakeBoxSolid(size[0], size[1], size[2]);
-  if (!result.ok) throw new Error(`OCCT box failed: ${result.detail}`);
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({ kind: "box", size });
   let session = ws.session;
   if (!session.state.geometry.records[assetId]) {
     session = hybridDccRegisterAsset(session, assetId, result.mesh, {
@@ -966,12 +965,12 @@ export async function workspaceOcctBooleanCut(
   ws: StudioHybridDccWorkspace,
   assetId = "occt-cut",
 ): Promise<StudioHybridDccWorkspace> {
-  const { occtBooleanCutBoxes } = await import("./studio-occt-wasm-facade");
-  const result = await occtBooleanCutBoxes(
-    { dx: 2, dy: 2, dz: 2 },
-    { dx: 1, dy: 1, dz: 1, ox: 0.4, oy: 0.4, oz: 0.4 },
-  );
-  if (!result.ok) throw new Error(`OCCT cut failed: ${result.detail}`);
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "cut-boxes",
+    a: { dx: 2, dy: 2, dz: 2 },
+    b: { dx: 1, dy: 1, dz: 1, ox: 0.4, oy: 0.4, oz: 0.4 },
+  });
   let session = ws.session;
   if (!session.state.geometry.records[assetId]) {
     session = hybridDccRegisterAsset(session, assetId, result.mesh, {

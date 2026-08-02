@@ -1,23 +1,27 @@
 /**
  * Full §6 SSOT coverage matrix (all catalog IDs) for verification evidence.
  */
-import { writeFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-dispatch";
 import { STUDIO_DCC_SECTION6_CATALOG } from "./studio-dcc-section6-full-catalog";
 
-const SCRATCH =
-  process.env.GROK_SCRATCH
-  ?? process.env.SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-a86442421192/implementer";
+const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
+const SCRATCH = CONFIGURED_SCRATCH
+  ?? mkdtempSync(join(tmpdir(), "toonspectrum-section6-matrix-"));
+
+afterAll(() => {
+  if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });
+});
 
 describe("section6 full coverage matrix", () => {
   it("writes full SSOT matrix with exercise evidence keys for all IDs", async () => {
     mkdirSync(SCRATCH, { recursive: true });
-    const lines = ["id\tstatus\tmodule\tapis\tpriority\tevidenceKeys\tnumericCount\tok"];
+    const lines = ["id\tkernelStatus\tmodule\tapis\tpriority\tevidenceKeys\tnumericCount\tok"];
     let fails = 0;
     for (const entry of STUDIO_DCC_SECTION6_CATALOG) {
       const r = await exerciseStudioDccCatalogFeature(entry.id);
@@ -30,7 +34,7 @@ describe("section6 full coverage matrix", () => {
       lines.push(
         [
           entry.id,
-          entry.status,
+          entry.kernelStatus,
           entry.module,
           entry.apis.join("|"),
           entry.priority,

@@ -3,10 +3,11 @@
  * and exercises with multi-field domain metrics (not count-echo).
  */
 // @vitest-environment node
-import { writeFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-dispatch";
 import {
@@ -14,10 +15,13 @@ import {
   type StudioSection6CatalogEntry,
 } from "./studio-dcc-section6-full-catalog";
 
-const SCRATCH =
-  process.env.GROK_SCRATCH
-  ?? process.env.SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-a86442421192/implementer";
+const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
+const SCRATCH = CONFIGURED_SCRATCH
+  ?? mkdtempSync(join(tmpdir(), "toonspectrum-domain-ops-upgrade-"));
+
+afterAll(() => {
+  if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });
+});
 
 function domainOpsEntries(): readonly StudioSection6CatalogEntry[] {
   return STUDIO_DCC_SECTION6_CATALOG.filter(
@@ -32,14 +36,14 @@ describe("domain-ops 44 upgrade verification", () => {
     for (const row of rows) {
       expect(row.module).toContain("domain-ops");
       expect(row.apis.length).toBeGreaterThan(0);
-      expect(row.status).toBe("shipped");
+      expect(row.kernelStatus).toBe("kernel-shipped");
     }
   });
 
   it("exercises every domain-ops ID with multi-field evidence and writes matrix", async () => {
     mkdirSync(SCRATCH, { recursive: true });
     const rows = domainOpsEntries();
-    const matrix: string[] = ["id\tstatus\tmodule\tapis\tpriority\tevidenceKeys\tnumericCount\tstringCount\tok"];
+    const matrix: string[] = ["id\tkernelStatus\tmodule\tapis\tpriority\tevidenceKeys\tnumericCount\tstringCount\tok"];
     const logLines: string[] = [
       "# lite-ops-upgrade.log",
       `# generated ${new Date().toISOString()}`,
@@ -88,7 +92,7 @@ describe("domain-ops 44 upgrade verification", () => {
       matrix.push(
         [
           entry.id,
-          entry.status,
+          entry.kernelStatus,
           entry.module,
           entry.apis.join("|"),
           entry.priority,

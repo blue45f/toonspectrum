@@ -3,7 +3,7 @@
  * Pure workspace kernels drive state; this panel is the React shell only.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   createStudioHybridDccWorkspace,
@@ -50,6 +50,12 @@ export function StudioHybridDccPanel() {
   const [log, setLog] = useState<string>("Ready.");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => () => {
+    void import("./studio-occt-worker-client").then(({ disposeStudioOcctWorker }) => {
+      disposeStudioOcctWorker();
+    });
+  }, []);
 
   const run = async (
     label: string,

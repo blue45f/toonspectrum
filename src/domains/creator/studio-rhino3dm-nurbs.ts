@@ -4,9 +4,6 @@
  * rational curves, multi-surface fixtures, and File3dm round-trips.
  */
 
-import { createRequire } from "node:module";
-import path from "node:path";
-
 import {
   createStudioEditableMeshFromPolygons,
   type StudioEditableMesh,
@@ -20,6 +17,91 @@ type RhinoModule = any;
 
 let cachedRhino: RhinoModule | null = null;
 let cachedPromise: Promise<RhinoModule> | null = null;
+
+type RhinoEmbindObject = {
+  readonly constructor?: { readonly name?: string };
+  readonly isDeleted?: () => boolean;
+};
+
+type RhinoDisposalObserver = (
+  object: RhinoEmbindObject,
+  constructorName: string,
+) => void;
+
+let rhinoDisposalObserverForTests: RhinoDisposalObserver | null = null;
+
+/** Test-only observer for proving that real Embind destructors ran. */
+export function observeStudioRhino3dmDisposalsForTests(
+  observer: RhinoDisposalObserver,
+): () => void {
+  const previous = rhinoDisposalObserverForTests;
+  rhinoDisposalObserverForTests = observer;
+  return () => {
+    if (rhinoDisposalObserverForTests === observer) {
+      rhinoDisposalObserverForTests = previous;
+    }
+  };
+}
+
+function findRhinoEmbindDestructor(object: RhinoEmbindObject): (() => void) | null {
+  // File3dm tables bind a domain `delete(id)` method that shadows Embind's
+  // zero-argument destructor. Select the prototype that owns both `delete`
+  // and `isDeleted` so cleanup cannot accidentally delete a document row.
+  let prototype: object | null = object;
+  while (prototype) {
+    const ownDelete = Object.getOwnPropertyDescriptor(prototype, "delete")?.value;
+    const ownIsDeleted = Object.getOwnPropertyDescriptor(prototype, "isDeleted")?.value;
+    if (typeof ownDelete === "function" && typeof ownIsDeleted === "function") {
+      return ownDelete as () => void;
+    }
+    prototype = Object.getPrototypeOf(prototype) as object | null;
+  }
+  return null;
+}
+
+function disposeRhinoEmbindObject(candidate: unknown): void {
+  if ((typeof candidate !== "object" && typeof candidate !== "function") || !candidate) {
+    return;
+  }
+  const object = candidate as RhinoEmbindObject;
+  try {
+    if (object.isDeleted?.()) return;
+  } catch {
+    // Continue to the actual Embind destructor lookup.
+  }
+  const destructor = findRhinoEmbindDestructor(object);
+  if (!destructor) return;
+  try {
+    destructor.call(object);
+  } catch {
+    // Cleanup must not hide the operation's result or original exception.
+    return;
+  }
+  rhinoDisposalObserverForTests?.(
+    object,
+    object.constructor?.name ?? "unknown-rhino-embind-object",
+  );
+}
+
+class RhinoEmbindScope {
+  readonly #owned: unknown[] = [];
+
+  own<T>(object: T): T {
+    if (object) this.#owned.push(object);
+    return object;
+  }
+
+  dispose(): void {
+    const disposed = new Set<unknown>();
+    for (let i = this.#owned.length - 1; i >= 0; i -= 1) {
+      const object = this.#owned[i];
+      if (!object || disposed.has(object)) continue;
+      disposed.add(object);
+      disposeRhinoEmbindObject(object);
+    }
+    this.#owned.length = 0;
+  }
+}
 
 function isNodeHost(): boolean {
   try {
@@ -37,22 +119,20 @@ export async function loadStudioRhino3dm(): Promise<RhinoModule> {
   if (cachedPromise) return cachedPromise;
   cachedPromise = (async () => {
     if (isNodeHost()) {
-      const require = createRequire(import.meta.url);
-      const factory = require("rhino3dm");
-      const wasmDir = path.dirname(require.resolve("rhino3dm"));
-      const rhino = await factory({
-        locateFile: (p: string) =>
-          p.endsWith(".wasm") ? path.join(wasmDir, p) : p,
-      });
+      const nodeLoaderModuleId = "./studio-rhino3dm-node-loader";
+      const { loadStudioRhino3dmFromNode } = await import(
+        /* @vite-ignore */ nodeLoaderModuleId
+      ) as typeof import("./studio-rhino3dm-node-loader");
+      const rhino = await loadStudioRhino3dmFromNode();
       cachedRhino = rhino;
       return rhino;
     }
-    const factoryMod = await import(/* @vite-ignore */ "rhino3dm/rhino3dm.module.js");
+    const factoryMod = await import("rhino3dm/rhino3dm.module.js");
     const factory = (factoryMod as { default?: (cfg?: object) => Promise<RhinoModule> }).default
       ?? factoryMod;
     let wasmUrl = "/node_modules/rhino3dm/rhino3dm.wasm";
     try {
-      const urlMod = await import(/* @vite-ignore */ "rhino3dm/rhino3dm.wasm?url");
+      const urlMod = await import("rhino3dm/rhino3dm.wasm?url");
       if ((urlMod as { default?: string }).default) {
         wasmUrl = (urlMod as { default: string }).default;
       }
@@ -66,7 +146,12 @@ export async function loadStudioRhino3dm(): Promise<RhinoModule> {
     cachedRhino = rhino;
     return rhino;
   })();
-  return cachedPromise;
+  try {
+    return await cachedPromise;
+  } catch (error) {
+    cachedPromise = null;
+    throw error;
+  }
 }
 
 export function resetStudioRhino3dmForTests(): void {
@@ -137,76 +222,81 @@ export async function evaluateStudioNurbsCurve(
   if (controlPoints.length < 2) {
     throw new Error("need ≥2 control points");
   }
-  const pts = new rhino.Point3dList();
-  for (const p of controlPoints) pts.add(p[0], p[1], p[2]);
-  const deg = Math.min(degree, controlPoints.length - 1);
-  const curve = rhino.NurbsCurve.create(false, deg, pts);
-  if (!curve) throw new Error("NurbsCurve.create failed");
+  const scope = new RhinoEmbindScope();
+  try {
+    const pts = scope.own(new rhino.Point3dList());
+    for (const p of controlPoints) pts.add(p[0], p[1], p[2]);
+    const deg = Math.min(degree, controlPoints.length - 1);
+    const curve = scope.own(rhino.NurbsCurve.create(false, deg, pts));
+    if (!curve) throw new Error("NurbsCurve.create failed");
 
-  const [t0, t1] = domainOf(curve);
-  const out: [number, number, number][] = [];
-  const tangents: [number, number, number][] = [];
-  const derivatives: [number, number, number][] = [];
-  let arc = 0;
-  let prev: [number, number, number] | null = null;
-  const n = Math.max(2, Math.trunc(samples));
-  for (let i = 0; i < n; i += 1) {
-    const u = i / (n - 1);
-    const t = t0 + (t1 - t0) * u;
-    const pt = asVec3(curve.pointAt(t));
-    out.push(pt);
-    try {
-      tangents.push(asVec3(curve.tangentAt(t)));
-    } catch {
-      tangents.push([0, 0, 0]);
-    }
-    try {
-      const derivs = curve.derivativeAt(t, 1) as unknown;
-      if (Array.isArray(derivs) && derivs.length >= 2) {
-        derivatives.push(asVec3(derivs[1]));
-      } else {
-        derivatives.push(tangents[tangents.length - 1]!);
+    const [t0, t1] = domainOf(curve);
+    const out: [number, number, number][] = [];
+    const tangents: [number, number, number][] = [];
+    const derivatives: [number, number, number][] = [];
+    let arc = 0;
+    let prev: [number, number, number] | null = null;
+    const n = Math.max(2, Math.trunc(samples));
+    for (let i = 0; i < n; i += 1) {
+      const u = i / (n - 1);
+      const t = t0 + (t1 - t0) * u;
+      const pt = asVec3(curve.pointAt(t));
+      out.push(pt);
+      try {
+        tangents.push(asVec3(curve.tangentAt(t)));
+      } catch {
+        tangents.push([0, 0, 0]);
       }
-    } catch {
-      derivatives.push(tangents[tangents.length - 1] ?? [0, 0, 0]);
+      try {
+        const derivs = curve.derivativeAt(t, 1) as unknown;
+        if (Array.isArray(derivs) && derivs.length >= 2) {
+          derivatives.push(asVec3(derivs[1]));
+        } else {
+          derivatives.push(tangents[tangents.length - 1]!);
+        }
+      } catch {
+        derivatives.push(tangents[tangents.length - 1] ?? [0, 0, 0]);
+      }
+      if (prev) {
+        arc += Math.hypot(pt[0] - prev[0], pt[1] - prev[1], pt[2] - prev[2]);
+      }
+      prev = pt;
     }
-    if (prev) {
-      arc += Math.hypot(pt[0] - prev[0], pt[1] - prev[1], pt[2] - prev[2]);
-    }
-    prev = pt;
-  }
 
-  const knotCount = (() => {
+    let knotCount = 0;
     try {
-      const knots = curve.knots?.() ?? curve.knots;
-      return Number(knots?.count ?? knots?.length ?? 0);
+      const knots = scope.own(curve.knots?.() ?? curve.knots);
+      knotCount = Number(knots?.count ?? knots?.length ?? 0);
     } catch {
-      return 0;
+      knotCount = 0;
     }
-  })();
 
-  const doc = new rhino.File3dm();
-  doc.objects().add(curve, null);
-  const bytes = doc.toByteArray() as Uint8Array;
+    const doc = scope.own(new rhino.File3dm());
+    const objects = scope.own(doc.objects());
+    objects.add(curve, null);
+    const bytes = doc.toByteArray() as Uint8Array;
 
-  return {
-    ok: true,
-    sampleCount: out.length,
-    degree: Number(curve.degree ?? deg),
-    controlCount: controlPoints.length,
-    samples: out,
-    tangents,
-    derivatives,
-    arcLengthApprox: arc,
-    domain: [t0, t1],
-    isClosed: Boolean(curve.isClosed),
-    isRational: Boolean(curve.isRational),
-    isPeriodic: Boolean(curve.isPeriodic),
-    knotCount,
-    backend: "rhino3dm-opennurbs",
-    file3dmBytes: bytes.byteLength,
-    evalKind: "nurbs-curve-full",
-  };
+    return {
+      ok: true,
+      sampleCount: out.length,
+      degree: Number(curve.degree ?? deg),
+      controlCount: controlPoints.length,
+      samples: out,
+      tangents,
+      derivatives,
+      arcLengthApprox: arc,
+      domain: [t0, t1],
+      isClosed: Boolean(curve.isClosed),
+      isRational: Boolean(curve.isRational),
+      isPeriodic: Boolean(curve.isPeriodic),
+      knotCount,
+      backend: "rhino3dm-opennurbs",
+      file3dmBytes: bytes.byteLength,
+      evalKind: "nurbs-curve-full",
+    };
+  } finally {
+    scope.dispose();
+  }
 }
 
 /**
@@ -228,42 +318,48 @@ export async function evaluateStudioRationalNurbsCircle(
   readonly evalKind: "rational-nurbs-circle";
 }> {
   const rhino = await loadStudioRhino3dm();
-  const circle = new rhino.Circle([0, 0, 0], radius);
-  const curve =
-    (typeof circle.toNurbsCurve === "function" ? circle.toNurbsCurve() : null)
-    ?? rhino.NurbsCurve.createFromCircle?.(circle);
-  if (!curve) throw new Error("rational NurbsCurve from circle failed");
-  if (!curve.isRational) {
-    // Still openNURBS circle path — some builds mark after createFromCircle
+  const scope = new RhinoEmbindScope();
+  try {
+    const circle = scope.own(new rhino.Circle([0, 0, 0], radius));
+    const curve = scope.own(
+      (typeof circle.toNurbsCurve === "function" ? circle.toNurbsCurve() : null)
+      ?? rhino.NurbsCurve.createFromCircle?.(circle),
+    );
+    if (!curve) throw new Error("rational NurbsCurve from circle failed");
+    if (!curve.isRational) {
+      // Still openNURBS circle path — some builds mark after createFromCircle
+    }
+    const [t0, t1] = domainOf(curve);
+    const out: [number, number, number][] = [];
+    let arc = 0;
+    let prev: [number, number, number] | null = null;
+    const n = Math.max(8, Math.trunc(samples));
+    for (let i = 0; i < n; i += 1) {
+      const t = t0 + (t1 - t0) * (i / (n - 1));
+      const pt = asVec3(curve.pointAt(t));
+      out.push(pt);
+      if (prev) arc += Math.hypot(pt[0] - prev[0], pt[1] - prev[1], pt[2] - prev[2]);
+      prev = pt;
+    }
+    // Closed circle arc length should be ~2πr
+    if (arc < radius * 4) {
+      throw new Error(`rational circle arc too short: ${arc}`);
+    }
+    return {
+      ok: true,
+      sampleCount: out.length,
+      degree: Number(curve.degree ?? 2),
+      isRational: true,
+      isClosed: Boolean(curve.isClosed ?? true),
+      radius,
+      arcLengthApprox: arc,
+      samples: out,
+      backend: "rhino3dm-opennurbs",
+      evalKind: "rational-nurbs-circle",
+    };
+  } finally {
+    scope.dispose();
   }
-  const [t0, t1] = domainOf(curve);
-  const out: [number, number, number][] = [];
-  let arc = 0;
-  let prev: [number, number, number] | null = null;
-  const n = Math.max(8, Math.trunc(samples));
-  for (let i = 0; i < n; i += 1) {
-    const t = t0 + (t1 - t0) * (i / (n - 1));
-    const pt = asVec3(curve.pointAt(t));
-    out.push(pt);
-    if (prev) arc += Math.hypot(pt[0] - prev[0], pt[1] - prev[1], pt[2] - prev[2]);
-    prev = pt;
-  }
-  // Closed circle arc length should be ~2πr
-  if (arc < radius * 4) {
-    throw new Error(`rational circle arc too short: ${arc}`);
-  }
-  return {
-    ok: true,
-    sampleCount: out.length,
-    degree: Number(curve.degree ?? 2),
-    isRational: true,
-    isClosed: Boolean(curve.isClosed ?? true),
-    radius,
-    arcLengthApprox: arc,
-    samples: out,
-    backend: "rhino3dm-opennurbs",
-    evalKind: "rational-nurbs-circle",
-  };
 }
 
 function tessellateNurbsSurface(
@@ -380,33 +476,38 @@ export async function evaluateStudioNurbsSurfaceSphere(
   readonly domainV: readonly [number, number];
 }> {
   const rhino = await loadStudioRhino3dm();
-  const sphere = new rhino.Sphere([0, 0, 0], radius);
-  const surface = rhino.NurbsSurface.createFromSphere(sphere);
-  if (!surface || typeof surface.pointAt !== "function") {
-    throw new Error("NurbsSurface.createFromSphere failed (openNURBS)");
+  const scope = new RhinoEmbindScope();
+  try {
+    const sphere = scope.own(new rhino.Sphere([0, 0, 0], radius));
+    const surface = scope.own(rhino.NurbsSurface.createFromSphere(sphere));
+    if (!surface || typeof surface.pointAt !== "function") {
+      throw new Error("NurbsSurface.createFromSphere failed (openNURBS)");
+    }
+    const domainU = surfaceDomain(surface, 0, [0, Math.PI * 2]);
+    const domainV = surfaceDomain(surface, 1, [0, Math.PI]);
+    // If V domain collapsed (some builds expose only U), use spherical param defaults
+    const dU: [number, number] = domainU[1] > domainU[0] ? domainU : [0, Math.PI * 2];
+    let dV: [number, number] = domainV[1] > domainV[0] ? domainV : [0, Math.PI];
+    // rhino sphere often returns only U domain via domain property — V from degree probe
+    if (dV[1] - dV[0] < 1e-6) dV = [0, Math.PI];
+    const tess = tessellateNurbsSurface(surface, uCount, vCount, dU, dV);
+    return {
+      ok: true,
+      mesh: tess.mesh,
+      vertexCount: tess.mesh.vertices.length,
+      faceCount: tess.mesh.faces.length,
+      radius,
+      backend: "rhino3dm-opennurbs",
+      surfaceKind: "nurbs-sphere",
+      degreeU: tess.degreeU,
+      degreeV: tess.degreeV,
+      normalCount: tess.normals.length,
+      domainU: dU,
+      domainV: dV,
+    };
+  } finally {
+    scope.dispose();
   }
-  const domainU = surfaceDomain(surface, 0, [0, Math.PI * 2]);
-  const domainV = surfaceDomain(surface, 1, [0, Math.PI]);
-  // If V domain collapsed (some builds expose only U), use spherical param defaults
-  const dU: [number, number] = domainU[1] > domainU[0] ? domainU : [0, Math.PI * 2];
-  let dV: [number, number] = domainV[1] > domainV[0] ? domainV : [0, Math.PI];
-  // rhino sphere often returns only U domain via domain property — V from degree probe
-  if (dV[1] - dV[0] < 1e-6) dV = [0, Math.PI];
-  const tess = tessellateNurbsSurface(surface, uCount, vCount, dU, dV);
-  return {
-    ok: true,
-    mesh: tess.mesh,
-    vertexCount: tess.mesh.vertices.length,
-    faceCount: tess.mesh.faces.length,
-    radius,
-    backend: "rhino3dm-opennurbs",
-    surfaceKind: "nurbs-sphere",
-    degreeU: tess.degreeU,
-    degreeV: tess.degreeV,
-    normalCount: tess.normals.length,
-    domainU: dU,
-    domainV: dV,
-  };
 }
 
 /**
@@ -423,102 +524,115 @@ export async function evaluateStudioNurbsSurfaceSuite(): Promise<{
   readonly curveTangents: number;
 }> {
   const rhino = await loadStudioRhino3dm();
-  const surfaces: string[] = [];
-  let totalVertices = 0;
-  let totalFaces = 0;
-  let totalNormals = 0;
-
-  const sphere = await evaluateStudioNurbsSurfaceSphere(1, 14, 10);
-  surfaces.push("sphere");
-  totalVertices += sphere.vertexCount;
-  totalFaces += sphere.faceCount;
-  totalNormals += sphere.normalCount;
-
-  // Cylinder NURBS surface
+  const scope = new RhinoEmbindScope();
   try {
-    const cylCtor = rhino.Cylinder;
-    let surface: { pointAt: (u: number, v: number) => unknown; normalAt?: (u: number, v: number) => unknown; degree?: (d: number) => number } | null = null;
-    if (cylCtor) {
-      try {
-        const plane = rhino.Plane?.worldXY?.() ?? null;
-        const cyl = plane
-          ? new cylCtor(plane, 0.5, 2)
-          : new cylCtor(0.5, 2);
-        surface = rhino.NurbsSurface.createFromCylinder(cyl);
-      } catch {
-        surface = null;
+    const surfaces: string[] = [];
+    let totalVertices = 0;
+    let totalFaces = 0;
+    let totalNormals = 0;
+
+    const sphere = await evaluateStudioNurbsSurfaceSphere(1, 14, 10);
+    surfaces.push("sphere");
+    totalVertices += sphere.vertexCount;
+    totalFaces += sphere.faceCount;
+    totalNormals += sphere.normalCount;
+
+    // Cylinder NURBS surface
+    try {
+      const cylCtor = rhino.Cylinder;
+      let surface: {
+        pointAt: (u: number, v: number) => unknown;
+        normalAt?: (u: number, v: number) => unknown;
+        degree?: (d: number) => number;
+      } | null = null;
+      if (cylCtor) {
+        try {
+          const plane = scope.own(rhino.Plane?.worldXY?.() ?? null);
+          const cyl = scope.own(plane
+            ? new cylCtor(plane, 0.5, 2)
+            : new cylCtor(0.5, 2));
+          surface = scope.own(rhino.NurbsSurface.createFromCylinder(cyl));
+        } catch {
+          surface = null;
+        }
       }
+      if (!surface) {
+        // Ruled surface between two circles (openNURBS createRuledSurface)
+        const circle0 = scope.own(new rhino.Circle([0, 0, 0], 0.5));
+        const circle1 = scope.own(new rhino.Circle([0, 0, 2], 0.5));
+        const c0 = scope.own(circle0.toNurbsCurve());
+        const c1 = scope.own(circle1.toNurbsCurve());
+        surface = scope.own(rhino.NurbsSurface.createRuledSurface(c0, c1));
+      }
+      if (surface && typeof surface.pointAt === "function") {
+        const tess = tessellateNurbsSurface(surface, 12, 8, [0, Math.PI * 2], [0, 1]);
+        surfaces.push("cylinder-or-ruled");
+        totalVertices += tess.mesh.vertices.length;
+        totalFaces += tess.mesh.faces.length;
+        totalNormals += tess.normals.length;
+      }
+    } catch {
+      // sphere alone is still valid; suite reports what succeeded
     }
-    if (!surface) {
-      // Ruled surface between two circles (openNURBS createRuledSurface)
-      const c0 = new rhino.Circle([0, 0, 0], 0.5).toNurbsCurve();
-      const c1 = new rhino.Circle([0, 0, 2], 0.5).toNurbsCurve();
-      surface = rhino.NurbsSurface.createRuledSurface(c0, c1);
+
+    // Explicit ruled surface from two NURBS curves
+    try {
+      const a = scope.own(new rhino.Point3dList());
+      const b = scope.own(new rhino.Point3dList());
+      a.add(-1, 0, 0);
+      a.add(0, 1, 0);
+      a.add(1, 0, 0);
+      b.add(-1, 0, 2);
+      b.add(0, -1, 2);
+      b.add(1, 0, 2);
+      const c0 = scope.own(rhino.NurbsCurve.create(false, 2, a));
+      const c1 = scope.own(rhino.NurbsCurve.create(false, 2, b));
+      const ruled = scope.own(rhino.NurbsSurface.createRuledSurface(c0, c1));
+      if (ruled && typeof ruled.pointAt === "function") {
+        const tess = tessellateNurbsSurface(ruled, 10, 6, [0, 1], [0, 1]);
+        surfaces.push("ruled");
+        totalVertices += tess.mesh.vertices.length;
+        totalFaces += tess.mesh.faces.length;
+        totalNormals += tess.normals.length;
+      }
+    } catch {
+      // optional
     }
-    if (surface && typeof surface.pointAt === "function") {
-      const tess = tessellateNurbsSurface(surface, 12, 8, [0, Math.PI * 2], [0, 1]);
-      surfaces.push("cylinder-or-ruled");
-      totalVertices += tess.mesh.vertices.length;
-      totalFaces += tess.mesh.faces.length;
-      totalNormals += tess.normals.length;
+
+    const rational = await evaluateStudioRationalNurbsCircle(1, 32);
+    const curve = await evaluateStudioNurbsCurve(
+      [
+        [0, 0, 0],
+        [1, 2, 0],
+        [2, 0, 1],
+        [3, 1, 0],
+      ],
+      16,
+      3,
+    );
+
+    if (surfaces.length < 1) {
+      throw new Error("openNURBS surface suite produced no surfaces");
     }
-  } catch {
-    // sphere alone is still valid; suite reports what succeeded
-  }
-
-  // Explicit ruled surface from two NURBS curves
-  try {
-    const a = new rhino.Point3dList();
-    const b = new rhino.Point3dList();
-    a.add(-1, 0, 0);
-    a.add(0, 1, 0);
-    a.add(1, 0, 0);
-    b.add(-1, 0, 2);
-    b.add(0, -1, 2);
-    b.add(1, 0, 2);
-    const c0 = rhino.NurbsCurve.create(false, 2, a);
-    const c1 = rhino.NurbsCurve.create(false, 2, b);
-    const ruled = rhino.NurbsSurface.createRuledSurface(c0, c1);
-    if (ruled && typeof ruled.pointAt === "function") {
-      const tess = tessellateNurbsSurface(ruled, 10, 6, [0, 1], [0, 1]);
-      surfaces.push("ruled");
-      totalVertices += tess.mesh.vertices.length;
-      totalFaces += tess.mesh.faces.length;
-      totalNormals += tess.normals.length;
+    if (totalFaces < 20) {
+      throw new Error(`openNURBS surface suite too sparse faces=${totalFaces}`);
     }
-  } catch {
-    // optional
-  }
 
-  const rational = await evaluateStudioRationalNurbsCircle(1, 32);
-  const curve = await evaluateStudioNurbsCurve(
-    [
-      [0, 0, 0],
-      [1, 2, 0],
-      [2, 0, 1],
-      [3, 1, 0],
-    ],
-    16,
-    3,
-  );
-
-  if (surfaces.length < 1) {
-    throw new Error("openNURBS surface suite produced no surfaces");
+    return {
+      ok: true,
+      backend: "rhino3dm-opennurbs",
+      surfaces,
+      totalVertices,
+      totalFaces,
+      totalNormals,
+      rationalCircleSamples: rational.sampleCount,
+      curveTangents: curve.tangents.filter((t) =>
+        Math.hypot(t[0], t[1], t[2]) > 1e-9
+      ).length,
+    };
+  } finally {
+    scope.dispose();
   }
-  if (totalFaces < 20) {
-    throw new Error(`openNURBS surface suite too sparse faces=${totalFaces}`);
-  }
-
-  return {
-    ok: true,
-    backend: "rhino3dm-opennurbs",
-    surfaces,
-    totalVertices,
-    totalFaces,
-    totalNormals,
-    rationalCircleSamples: rational.sampleCount,
-    curveTangents: curve.tangents.filter((t) => Math.hypot(t[0], t[1], t[2]) > 1e-9).length,
-  };
 }
 
 /**
@@ -540,162 +654,188 @@ export async function parseStudioRhino3dmOpenNurbs(
   readonly hasNurbsEval: boolean;
 }> {
   const rhino = await loadStudioRhino3dm();
-  const losses: string[] = [];
-  const opened = (() => {
-    try {
-      return { doc: rhino.File3dm.fromByteArray(bytes), error: null as string | null };
-    } catch (error) {
+  const scope = new RhinoEmbindScope();
+  try {
+    const losses: string[] = [];
+    const opened = (() => {
+      try {
+        return {
+          doc: scope.own(rhino.File3dm.fromByteArray(bytes)),
+          error: null as string | null,
+        };
+      } catch (error) {
+        return {
+          doc: null,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    })();
+    if (opened.error || !opened.doc) {
       return {
-        doc: null,
-        error: error instanceof Error ? error.message : String(error),
+        ok: false,
+        backend: "rhino3dm-opennurbs",
+        objectCount: 0,
+        curveSamples: 0,
+        surfaceSamples: 0,
+        meshVertices: 0,
+        meshFaces: 0,
+        layerCount: 0,
+        meshes: [],
+        losses: [opened.error ? `fromByteArray-failed:${opened.error}` : "null-file3dm"],
+        hasNurbsEval: false,
       };
     }
-  })();
-  if (opened.error || !opened.doc) {
-    return {
-      ok: false,
-      backend: "rhino3dm-opennurbs",
-      objectCount: 0,
-      curveSamples: 0,
-      surfaceSamples: 0,
-      meshVertices: 0,
-      meshFaces: 0,
-      layerCount: 0,
-      meshes: [],
-      losses: [opened.error ? `fromByteArray-failed:${opened.error}` : "null-file3dm"],
-      hasNurbsEval: false,
-    };
-  }
-  const doc = opened.doc;
-  const objects = doc.objects();
-  const count = objects.count as number;
-  let curveSamples = 0;
-  let surfaceSamples = 0;
-  let meshVertices = 0;
-  let meshFaces = 0;
-  const meshes: StudioEditableMesh[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const obj = objects.get(i);
-    const geom = obj?.geometry?.() ?? obj?.geometry;
-    if (!geom) continue;
-    // Curve path — openNURBS pointAt
-    if (typeof geom.pointAt === "function" && typeof geom.tangentAt === "function") {
-      for (let t = 0; t <= 1.0001; t += 0.1) {
-        try {
-          const p = geom.pointAt(Math.min(1, t));
-          if (p) curveSamples += 1;
-        } catch {
-          // skip
-        }
-      }
-    } else if (typeof geom.pointAt === "function") {
-      // Surface: pointAt(u,v)
-      for (let u = 0; u <= 1.0001; u += 0.25) {
-        for (let vv = 0; vv <= 1.0001; vv += 0.25) {
-          try {
-            const p = geom.pointAt(Math.min(1, u), Math.min(1, vv));
-            if (p) surfaceSamples += 1;
-          } catch {
+    const doc = opened.doc;
+    const objects = scope.own(doc.objects());
+    const count = objects.count as number;
+    let curveSamples = 0;
+    let surfaceSamples = 0;
+    let meshVertices = 0;
+    let meshFaces = 0;
+    const meshes: StudioEditableMesh[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const objectScope = new RhinoEmbindScope();
+      try {
+        const obj = objectScope.own(objects.get(i));
+        const geom = objectScope.own(obj?.geometry?.() ?? obj?.geometry);
+        if (!geom) continue;
+        // Curve path — openNURBS pointAt
+        if (typeof geom.pointAt === "function" && typeof geom.tangentAt === "function") {
+          for (let t = 0; t <= 1.0001; t += 0.1) {
             try {
-              const p = geom.pointAt(Math.min(1, u));
+              const p = geom.pointAt(Math.min(1, t));
               if (p) curveSamples += 1;
             } catch {
               // skip
             }
           }
+        } else if (typeof geom.pointAt === "function") {
+          // Surface: pointAt(u,v)
+          for (let u = 0; u <= 1.0001; u += 0.25) {
+            for (let vv = 0; vv <= 1.0001; vv += 0.25) {
+              try {
+                const p = geom.pointAt(Math.min(1, u), Math.min(1, vv));
+                if (p) surfaceSamples += 1;
+              } catch {
+                try {
+                  const p = geom.pointAt(Math.min(1, u));
+                  if (p) curveSamples += 1;
+                } catch {
+                  // skip
+                }
+              }
+            }
+          }
         }
+        // Mesh path
+        if (typeof geom.vertices === "function" || geom.vertices) {
+          try {
+            const verts = objectScope.own(
+              typeof geom.vertices === "function" ? geom.vertices() : geom.vertices,
+            );
+            const faces = objectScope.own(
+              typeof geom.faces === "function" ? geom.faces() : geom.faces,
+            );
+            const vCount = verts?.count ?? verts?.length ?? 0;
+            const fCount = faces?.count ?? faces?.length ?? 0;
+            meshVertices += vCount;
+            meshFaces += fCount;
+            if (vCount >= 3 && fCount >= 1) {
+              const positions: number[] = [];
+              const faceIdx: number[][] = [];
+              for (let vi = 0; vi < vCount; vi += 1) {
+                const p = verts.get(vi);
+                positions.push(p[0] ?? p.X ?? 0, p[1] ?? p.Y ?? 0, p[2] ?? p.Z ?? 0);
+              }
+              for (let fi = 0; fi < fCount; fi += 1) {
+                const f = faces.get(fi);
+                const a = f[0] ?? f.A ?? 0;
+                const b = f[1] ?? f.B ?? 0;
+                const c = f[2] ?? f.C ?? 0;
+                faceIdx.push([a, b, c]);
+              }
+              meshes.push(soupToMesh(positions, faceIdx));
+            }
+          } catch {
+            losses.push(`mesh-extract-fail-${i}`);
+          }
+        }
+      } finally {
+        objectScope.dispose();
       }
     }
-    // Mesh path
-    if (typeof geom.vertices === "function" || geom.vertices) {
-      try {
-        const verts = typeof geom.vertices === "function" ? geom.vertices() : geom.vertices;
-        const faces = typeof geom.faces === "function" ? geom.faces() : geom.faces;
-        const vCount = verts?.count ?? verts?.length ?? 0;
-        const fCount = faces?.count ?? faces?.length ?? 0;
-        meshVertices += vCount;
-        meshFaces += fCount;
-        if (vCount >= 3 && fCount >= 1) {
-          const positions: number[] = [];
-          const faceIdx: number[][] = [];
-          for (let vi = 0; vi < vCount; vi += 1) {
-            const p = verts.get(vi);
-            positions.push(p[0] ?? p.X ?? 0, p[1] ?? p.Y ?? 0, p[2] ?? p.Z ?? 0);
-          }
-          for (let fi = 0; fi < fCount; fi += 1) {
-            const f = faces.get(fi);
-            const a = f[0] ?? f.A ?? 0;
-            const b = f[1] ?? f.B ?? 0;
-            const c = f[2] ?? f.C ?? 0;
-            faceIdx.push([a, b, c]);
-          }
-          meshes.push(soupToMesh(positions, faceIdx));
-        }
-      } catch {
-        losses.push(`mesh-extract-fail-${i}`);
-      }
-    }
-  }
-  const layerCount = (() => {
+    let layerCount = 0;
     try {
-      return (doc.layers?.()?.count ?? doc.layers?.count ?? 0) as number;
+      const layers = scope.own(
+        typeof doc.layers === "function" ? doc.layers() : doc.layers,
+      );
+      layerCount = Number(layers?.count ?? layers?.length ?? 0);
     } catch {
-      return 0;
+      layerCount = 0;
     }
-  })();
-  return {
-    ok: count > 0 || curveSamples > 0 || surfaceSamples > 0 || meshVertices > 0,
-    backend: "rhino3dm-opennurbs",
-    objectCount: count,
-    curveSamples,
-    surfaceSamples,
-    meshVertices,
-    meshFaces,
-    layerCount,
-    meshes,
-    losses,
-    hasNurbsEval: curveSamples > 0 || surfaceSamples > 0,
-  };
+    return {
+      ok: count > 0 || curveSamples > 0 || surfaceSamples > 0 || meshVertices > 0,
+      backend: "rhino3dm-opennurbs",
+      objectCount: count,
+      curveSamples,
+      surfaceSamples,
+      meshVertices,
+      meshFaces,
+      layerCount,
+      meshes,
+      losses,
+      hasNurbsEval: curveSamples > 0 || surfaceSamples > 0,
+    };
+  } finally {
+    scope.dispose();
+  }
 }
 
 /** Build a binary 3DM fixture with NURBS curve + sphere surface via openNURBS. */
 export async function createStudioRhino3dmNurbsFixture(): Promise<Uint8Array> {
   const rhino = await loadStudioRhino3dm();
-  const pts = new rhino.Point3dList();
-  pts.add(0, 0, 0);
-  pts.add(1, 1, 0);
-  pts.add(2, 0, 0);
-  pts.add(3, 1, 0);
-  const curve = rhino.NurbsCurve.create(false, 3, pts);
-  const doc = new rhino.File3dm();
-  doc.objects().add(curve, null);
-  // Rational circle
+  const scope = new RhinoEmbindScope();
   try {
-    const circ = new rhino.Circle([0, 0, 0], 0.75).toNurbsCurve();
-    if (circ) doc.objects().add(circ, null);
-  } catch {
-    // optional
-  }
-  // Sphere surface
-  try {
-    const sphere = new rhino.Sphere([0, 0, 0], 0.5);
-    const surf = rhino.NurbsSurface.createFromSphere(sphere);
-    if (surf) doc.objects().add(surf, null);
-  } catch {
-    // optional
-  }
-  // Mesh from tessellated sphere
-  try {
-    const sphereMesh = await evaluateStudioNurbsSurfaceSphere(0.5, 8, 6);
-    const mesh = new rhino.Mesh();
-    const verts = mesh.vertices();
-    for (const vtx of sphereMesh.mesh.vertices) {
-      verts.add(vtx.position.x, vtx.position.y, vtx.position.z);
+    const pts = scope.own(new rhino.Point3dList());
+    pts.add(0, 0, 0);
+    pts.add(1, 1, 0);
+    pts.add(2, 0, 0);
+    pts.add(3, 1, 0);
+    const curve = scope.own(rhino.NurbsCurve.create(false, 3, pts));
+    const doc = scope.own(new rhino.File3dm());
+    const objects = scope.own(doc.objects());
+    objects.add(curve, null);
+    // Rational circle
+    try {
+      const circle = scope.own(new rhino.Circle([0, 0, 0], 0.75));
+      const circ = scope.own(circle.toNurbsCurve());
+      if (circ) objects.add(circ, null);
+    } catch {
+      // optional
     }
-    doc.objects().add(mesh, null);
-  } catch {
-    // curve-only fixture is still valid openNURBS
+    // Sphere surface
+    try {
+      const sphere = scope.own(new rhino.Sphere([0, 0, 0], 0.5));
+      const surf = scope.own(rhino.NurbsSurface.createFromSphere(sphere));
+      if (surf) objects.add(surf, null);
+    } catch {
+      // optional
+    }
+    // Mesh from tessellated sphere
+    try {
+      const sphereMesh = await evaluateStudioNurbsSurfaceSphere(0.5, 8, 6);
+      const mesh = scope.own(new rhino.Mesh());
+      const verts = scope.own(mesh.vertices());
+      for (const vtx of sphereMesh.mesh.vertices) {
+        verts.add(vtx.position.x, vtx.position.y, vtx.position.z);
+      }
+      objects.add(mesh, null);
+    } catch {
+      // curve-only fixture is still valid openNURBS
+    }
+    const bytes = doc.toByteArray() as Uint8Array;
+    return new Uint8Array(bytes);
+  } finally {
+    scope.dispose();
   }
-  const bytes = doc.toByteArray() as Uint8Array;
-  return new Uint8Array(bytes);
 }

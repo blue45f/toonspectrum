@@ -3,22 +3,25 @@
  * Streams tessellated meshes for walls/slabs/spaces/columns — city-scale, not header-only.
  */
 
-import { createRequire } from "node:module";
-import path from "node:path";
-
 import {
   createStudioEditableMeshFromPolygons,
   type StudioEditableMesh,
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_WEB_IFC_CITY_REVISION = 2 as const;
+export const STUDIO_WEB_IFC_CITY_REVISION = 3 as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type WebIfcApi = any;
 
-let cachedApi: WebIfcApi | null = null;
-let cachedPromise: Promise<WebIfcApi> | null = null;
+type StudioWebIfcRuntime = {
+  readonly api: WebIfcApi;
+  readonly module: Record<string, unknown>;
+  readonly loadPath: "browser" | "node";
+};
+
+let cachedRuntime: StudioWebIfcRuntime | null = null;
+let cachedPromise: Promise<StudioWebIfcRuntime> | null = null;
 
 function isNodeHost(): boolean {
   try {
@@ -27,6 +30,16 @@ function isNodeHost(): boolean {
     return typeof v === "string" && v.length > 0;
   } catch {
     return false;
+  }
+}
+
+function disposeWebIfcObject(candidate: unknown): void {
+  const disposer = (candidate as { delete?: unknown } | null)?.delete;
+  if (typeof disposer !== "function") return;
+  try {
+    disposer.call(candidate);
+  } catch {
+    // Best effort for generated WASM wrappers.
   }
 }
 
@@ -46,46 +59,79 @@ function soupToMesh(positions: number[], indices: number[]): StudioEditableMesh 
   return createStudioEditableMeshFromPolygons(verts, faces);
 }
 
-/** Load web-ifc API (Node uses web-ifc-node.wasm; browser uses web-ifc.wasm). */
-export async function loadStudioWebIfcApi(): Promise<WebIfcApi> {
-  if (cachedApi) return cachedApi;
+/** Load web-ifc runtime (Node uses web-ifc-node.wasm; browser uses web-ifc.wasm). */
+async function loadStudioWebIfcRuntime(): Promise<StudioWebIfcRuntime> {
+  if (cachedRuntime) return cachedRuntime;
   if (cachedPromise) return cachedPromise;
   cachedPromise = (async () => {
     if (isNodeHost()) {
-      const require = createRequire(import.meta.url);
-      const WebIFC = require("web-ifc");
-      const api = new WebIFC.IfcAPI();
-      const wasmDir = path.dirname(require.resolve("web-ifc"));
-      api.SetWasmPath(`${wasmDir}${path.sep}`, true);
-      await api.Init();
-      cachedApi = api;
-      return api;
+      // Keep node:* and the node WASM resolver completely outside Vite's browser graph.
+      const nodeLoaderModuleId = "./studio-web-ifc-node-loader";
+      const { loadStudioWebIfcRuntimeFromNode } = await import(
+        /* @vite-ignore */ nodeLoaderModuleId
+      ) as typeof import("./studio-web-ifc-node-loader");
+      const loaded = await loadStudioWebIfcRuntimeFromNode();
+      cachedRuntime = loaded;
+      return loaded;
     }
-    const WebIFC = await import(/* @vite-ignore */ "web-ifc");
+    const WebIFC = await import("web-ifc");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const api = new (WebIFC as any).IfcAPI();
-    let wasmPath = "/node_modules/web-ifc/";
+    let wasmUrl = "/node_modules/web-ifc/web-ifc.wasm";
     try {
-      const urlMod = await import(/* @vite-ignore */ "web-ifc/web-ifc.wasm?url");
+      const urlMod = await import("web-ifc/web-ifc.wasm?url");
       const url = (urlMod as { default?: string }).default;
       if (url) {
-        const slash = url.lastIndexOf("/");
-        wasmPath = slash >= 0 ? url.slice(0, slash + 1) : wasmPath;
+        wasmUrl = url;
       }
     } catch {
       // keep fallback
     }
+    const slash = wasmUrl.lastIndexOf("/");
+    const wasmPath = slash >= 0 ? wasmUrl.slice(0, slash + 1) : "/";
     api.SetWasmPath(wasmPath, true);
-    await api.Init();
-    cachedApi = api;
-    return api;
+    await api.Init(
+      (file: string) => (file.endsWith("web-ifc.wasm") ? wasmUrl : file),
+      true,
+    );
+    const runtime: StudioWebIfcRuntime = {
+      api,
+      module: WebIFC as unknown as Record<string, unknown>,
+      loadPath: "browser",
+    };
+    cachedRuntime = runtime;
+    return runtime;
   })();
-  return cachedPromise;
+  try {
+    return await cachedPromise;
+  } catch (error) {
+    cachedPromise = null;
+    throw error;
+  }
+}
+
+/** Backward-compatible API-only accessor for existing importers and tests. */
+export async function loadStudioWebIfcApi(): Promise<WebIfcApi> {
+  return (await loadStudioWebIfcRuntime()).api;
 }
 
 export function resetStudioWebIfcForTests(): void {
-  cachedApi = null;
+  try {
+    cachedRuntime?.api?.Dispose?.();
+  } catch {
+    // The runtime may already have been disposed by the host.
+  }
+  cachedRuntime = null;
   cachedPromise = null;
+}
+
+/** Install a deterministic runtime for unit tests without loading the WASM binary. */
+export function installStudioWebIfcRuntimeForTests(
+  api: WebIfcApi,
+  module: Record<string, unknown> = {},
+): void {
+  resetStudioWebIfcForTests();
+  cachedRuntime = { api, module, loadPath: "node" };
 }
 
 export type StudioWebIfcCityResult = {
@@ -117,11 +163,16 @@ export type StudioWebIfcCityResult = {
 export async function importStudioIfcCity(
   source: string | Uint8Array,
 ): Promise<StudioWebIfcCityResult | { readonly ok: false; readonly code: string; readonly detail: string }> {
+  let api: WebIfcApi | null = null;
+  let openedModelId: number | null = null;
   try {
-    const api = await loadStudioWebIfcApi();
+    const runtime = await loadStudioWebIfcRuntime();
+    const webIfcApi = runtime.api;
+    api = webIfcApi;
     const bytes =
       typeof source === "string" ? new TextEncoder().encode(source) : source;
-    const modelId = api.OpenModel(bytes) as number;
+    const modelId = webIfcApi.OpenModel(bytes) as number;
+    openedModelId = modelId;
     const meshes: StudioEditableMesh[] = [];
     let vertexCount = 0;
     let triangleCount = 0;
@@ -147,7 +198,7 @@ export async function importStudioIfcCity(
       return [nx, ny, nz];
     };
 
-    api.StreamAllMeshes(modelId, (mesh: {
+    webIfcApi.StreamAllMeshes(modelId, (mesh: {
       geometries: {
         size: () => number;
         get: (i: number) => {
@@ -159,61 +210,72 @@ export async function importStudioIfcCity(
     }) => {
       meshCount += 1;
       const geoms = mesh.geometries;
-      const n = geoms.size();
-      for (let i = 0; i < n; i += 1) {
-        const placed = geoms.get(i);
-        const geom = api.GetGeometry(modelId, placed.geometryExpressID);
-        try {
-          const verts = api.GetVertexArray(
-            geom.GetVertexData(),
-            geom.GetVertexDataSize(),
-          ) as Float32Array | number[];
-          const indices = api.GetIndexArray(
-            geom.GetIndexData(),
-            geom.GetIndexDataSize(),
-          ) as Uint32Array | number[];
-          const pos: number[] = [];
-          const arr = verts instanceof Float32Array ? verts : Float32Array.from(verts);
-          const stride = arr.length % 6 === 0 && arr.length % 3 === 0 && arr.length / 6 >= 3 ? 6 : 3;
-          const flat = placed.flatTransformation
-            ?? (placed as { transformation?: ArrayLike<number> }).transformation
-            ?? null;
-          for (let k = 0; k + 2 < arr.length; k += stride) {
-            const [x, y, z] = applyFlatMatrix(arr[k]!, arr[k + 1]!, arr[k + 2]!, flat as ArrayLike<number> | null);
-            pos.push(x, y, z);
-            if (x < minX) minX = x;
-            if (y < minY) minY = y;
-            if (z < minZ) minZ = z;
-            if (x > maxX) maxX = x;
-            if (y > maxY) maxY = y;
-            if (z > maxZ) maxZ = z;
-          }
-          const idx = indices instanceof Uint32Array ? Array.from(indices) : [...indices];
-          if (pos.length >= 9 && idx.length >= 3) {
-            const m = soupToMesh(pos, idx);
-            meshes.push(m);
-            vertexCount += m.vertices.length;
-            triangleCount += m.faces.length;
-          }
-        } finally {
+      try {
+        const n = geoms.size();
+        for (let i = 0; i < n; i += 1) {
+          const placed = geoms.get(i);
+          const geom = webIfcApi.GetGeometry(modelId, placed.geometryExpressID);
           try {
-            geom.delete();
-          } catch {
-            // ignore
+            const verts = webIfcApi.GetVertexArray(
+              geom.GetVertexData(),
+              geom.GetVertexDataSize(),
+            ) as Float32Array | number[];
+            const indices = webIfcApi.GetIndexArray(
+              geom.GetIndexData(),
+              geom.GetIndexDataSize(),
+            ) as Uint32Array | number[];
+            const pos: number[] = [];
+            const arr = verts instanceof Float32Array ? verts : Float32Array.from(verts);
+            const stride = arr.length % 6 === 0
+              && arr.length % 3 === 0
+              && arr.length / 6 >= 3
+              ? 6
+              : 3;
+            const flat = placed.flatTransformation
+              ?? (placed as { transformation?: ArrayLike<number> }).transformation
+              ?? null;
+            for (let k = 0; k + 2 < arr.length; k += stride) {
+              const [x, y, z] = applyFlatMatrix(
+                arr[k]!,
+                arr[k + 1]!,
+                arr[k + 2]!,
+                flat as ArrayLike<number> | null,
+              );
+              pos.push(x, y, z);
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (z < minZ) minZ = z;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+              if (z > maxZ) maxZ = z;
+            }
+            const idx = indices instanceof Uint32Array ? Array.from(indices) : [...indices];
+            if (pos.length >= 9 && idx.length >= 3) {
+              const m = soupToMesh(pos, idx);
+              meshes.push(m);
+              vertexCount += m.vertices.length;
+              triangleCount += m.faces.length;
+            }
+          } finally {
+            disposeWebIfcObject(geom);
+            disposeWebIfcObject(placed);
           }
         }
+      } finally {
+        disposeWebIfcObject(geoms);
       }
     });
 
     // Semantic counts
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const WebIFC: any = isNodeHost()
-      ? createRequire(import.meta.url)("web-ifc")
-      : await import(/* @vite-ignore */ "web-ifc");
+    const WebIFC = runtime.module as Record<string, number>;
     const countType = (typeConst: number): number => {
       try {
-        const lines = api.GetLineIDsWithType(modelId, typeConst);
-        return typeof lines.size === "function" ? lines.size() : 0;
+        const lines = webIfcApi.GetLineIDsWithType(modelId, typeConst);
+        try {
+          return typeof lines.size === "function" ? lines.size() : 0;
+        } finally {
+          disposeWebIfcObject(lines);
+        }
       } catch {
         return 0;
       }
@@ -227,9 +289,9 @@ export async function importStudioIfcCity(
     const columnCount = countType(WebIFC.IFCCOLUMN ?? 0);
     const siteCount = countType(WebIFC.IFCSITE ?? 0);
 
-    api.CloseModel(modelId);
-
-    if (meshCount < 1 && triangleCount < 1) {
+    // A StreamAllMeshes callback is only an envelope. It is not body-geometry
+    // evidence until at least one valid triangle survives decoding.
+    if (triangleCount < 1) {
       return {
         ok: false,
         code: "no-body-geometry",
@@ -269,6 +331,14 @@ export async function importStudioIfcCity(
       code: "web-ifc-unavailable",
       detail: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    if (api && openedModelId !== null) {
+      try {
+        api.CloseModel(openedModelId);
+      } catch {
+        // Model may have failed during OpenModel or already been closed by WASM.
+      }
+    }
   }
 }
 

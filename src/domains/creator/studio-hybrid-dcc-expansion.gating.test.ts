@@ -7,10 +7,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  assertWebtoonObjectCreatorV1Coverage,
-  studioCatalogByPriority,
-  STUDIO_DCC_CATALOG_REGISTRY,
-  STUDIO_WEBTOON_OBJECT_CREATOR_V1_REQUIRED_IDS,
+  assertWebtoonObjectCreatorV1KernelCoverage,
+  studioKernelCatalogByPriority,
+  STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
+  STUDIO_WEBTOON_OBJECT_CREATOR_V1_KERNEL_REQUIRED_IDS,
 } from "./studio-dcc-catalog-registry";
 import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
@@ -39,14 +39,14 @@ import {
   unwrapStudioMeshPlanar,
 } from "./studio-uv-unwrap-lite";
 
-describe("catalog SSOT §12.1 coverage", () => {
-  it("every required v1 id is shipped or partial with apis", () => {
-    const { ok, missing } = assertWebtoonObjectCreatorV1Coverage();
+describe("§12.1 callable-kernel compatibility coverage", () => {
+  it("every required v1 id exposes a kernel or an explicit partial with apis", () => {
+    const { ok, missing } = assertWebtoonObjectCreatorV1KernelCoverage();
     expect(missing).toEqual([]);
     expect(ok).toBe(true);
-    expect(STUDIO_WEBTOON_OBJECT_CREATOR_V1_REQUIRED_IDS.length).toBeGreaterThan(20);
-    expect(studioCatalogByPriority("P0").length).toBeGreaterThan(0);
-    expect(STUDIO_DCC_CATALOG_REGISTRY.every((e) => e.apis.length > 0)).toBe(true);
+    expect(STUDIO_WEBTOON_OBJECT_CREATOR_V1_KERNEL_REQUIRED_IDS.length).toBeGreaterThan(20);
+    expect(studioKernelCatalogByPriority("P0").length).toBeGreaterThan(0);
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.every((entry) => entry.apis.length > 0)).toBe(true);
   });
 });
 

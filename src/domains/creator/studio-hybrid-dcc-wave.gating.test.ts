@@ -10,10 +10,10 @@ import {
   snapStudioCadSketchAxes,
 } from "./studio-cad-kernel-lite";
 import {
-  STUDIO_DCC_CATALOG_REGISTRY,
-  STUDIO_DCC_CATALOG_REGISTRY_REVISION,
-  assertPartialCeilingNotes,
-  assertWebtoonObjectCreatorV1Coverage,
+  STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
+  STUDIO_DCC_KERNEL_COVERAGE_REVISION,
+  assertKernelPartialCeilingNotes,
+  assertWebtoonObjectCreatorV1KernelCoverage,
 } from "./studio-dcc-catalog-registry";
 import {
   collabAppendOp,
@@ -375,23 +375,23 @@ describe("wave multi-step product loop", () => {
   });
 });
 
-describe("catalog SSOT wave revision", () => {
-  it("keeps §12.1 coverage; residual partials are shipped (Yjs/CAD/FBX/IFC/STEP)", () => {
-    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(7);
-    expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "WS-WAVE-LOOP")).toBe(true);
-    const doc008 = STUDIO_DCC_CATALOG_REGISTRY.find((e) => e.id === "DOC-008");
-    expect(doc008?.status).toBe("shipped");
+describe("callable-kernel compatibility registry revision", () => {
+  it("keeps §12.1 kernel coverage without claiming product delivery", () => {
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REVISION).toBeGreaterThanOrEqual(8);
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.some((entry) => entry.id === "WS-WAVE-LOOP")).toBe(true);
+    const doc008 = STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.find((entry) => entry.id === "DOC-008");
+    expect(doc008?.kernelStatus).toBe("kernel-shipped");
     expect(doc008?.apis).toContain("exerciseStudioDccYjsSceneMetadataConvergence");
     expect(doc008?.apis).toContain("collabCanEdit");
     for (const id of ["CAD-001", "FMT-FBX", "FMT-IFC", "FMT-STEP"] as const) {
-      const e = STUDIO_DCC_CATALOG_REGISTRY.find((x) => x.id === id);
-      expect(e?.status).toBe("shipped");
-      expect(e?.ceilingNote).toBeUndefined();
+      const entry = STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.find((candidate) => candidate.id === id);
+      expect(entry?.kernelStatus).toBe("kernel-shipped");
+      expect(entry?.ceilingNote).toBeUndefined();
     }
-    const { ok, missing } = assertWebtoonObjectCreatorV1Coverage();
+    const { ok, missing } = assertWebtoonObjectCreatorV1KernelCoverage();
     expect(missing).toEqual([]);
     expect(ok).toBe(true);
-    const ceiling = assertPartialCeilingNotes();
+    const ceiling = assertKernelPartialCeilingNotes();
     expect(ceiling.missing).toEqual([]);
     expect(ceiling.ok).toBe(true);
   });

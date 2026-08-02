@@ -68,9 +68,66 @@ function isCallable(value: unknown): boolean {
     || Object.prototype.toString.call(value) === "[object AsyncFunction]";
 }
 
+function disposeOcctObjects(...objects: unknown[]): void {
+  const seen = new Set<unknown>();
+  for (const object of objects) {
+    if (!object || seen.has(object)) continue;
+    seen.add(object);
+    const disposer = (object as { delete?: unknown }).delete;
+    if (!isCallable(disposer)) continue;
+    try {
+      (disposer as () => void).call(object);
+    } catch {
+      // Best-effort cleanup: some Embind wrappers share an already-released handle.
+    }
+  }
+}
+
+type StudioOcctOwner = {
+  own<T>(value: T): T;
+  dispose(): void;
+};
+
+function createStudioOcctOwner(): StudioOcctOwner {
+  const objects: unknown[] = [];
+  return {
+    own<T>(value: T): T {
+      if (value) objects.push(value);
+      return value;
+    },
+    dispose(): void {
+      disposeOcctObjects(...objects.reverse());
+      objects.length = 0;
+    },
+  };
+}
+
+async function runStudioOcctOwnedOperation(
+  operation: (
+    runtime: StudioOcctRuntime,
+    owner: StudioOcctOwner,
+  ) => Promise<StudioOcctSolidResult | StudioOcctFail> | StudioOcctSolidResult | StudioOcctFail,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  try {
+    const runtime = await loadStudioOcctRuntime();
+    const owner = createStudioOcctOwner();
+    try {
+      return await operation(runtime, owner);
+    } finally {
+      owner.dispose();
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      code: "occt-unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function isBrowserEnvironment(): boolean {
-  // Product browser path: DOM + fetch, and NOT a Node host (Vitest/jsdom still polyfills window).
-  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  // Product path includes both Window and DedicatedWorker globals. Node 18+
+  // also exposes fetch, so explicitly exclude a Node host before accepting it.
   if (!isCallable(globalThis.fetch)) return false;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,9 +172,7 @@ function resolveStudioOcctTriangulation(candidate: unknown): StudioOcctTriangula
 async function resolveBrowserWasmUrl(): Promise<string> {
   // Vite asset URL (preferred in browser harness / app)
   try {
-    const mod = await import(
-      /* @vite-ignore */ "opencascade.js/dist/opencascade.wasm.wasm?url"
-    );
+    const mod = await import("opencascade.js/dist/opencascade.wasm.wasm?url");
     const url = (mod as { default?: string }).default;
     if (url && Object.prototype.toString.call(url) === "[object String]") return url;
   } catch {
@@ -143,9 +198,7 @@ async function loadBrowserOcctFactory(): Promise<{
   }
 
   // Embind factory — ESM default export from opencascade.wasm.js
-  const factoryMod = await import(
-    /* @vite-ignore */ "opencascade.js/dist/opencascade.wasm.js"
-  );
+  const factoryMod = await import("opencascade.js/dist/opencascade.wasm.js");
   const factory = ((factoryMod as { default?: OcctFactory }).default
     ?? factoryMod) as OcctFactory;
   if (!isCallable(factory)) {
@@ -183,7 +236,10 @@ export async function loadStudioOcctRuntime(): Promise<StudioOcctRuntime> {
       }
 
       // Node/Vitest only — dynamic import keeps node:* out of the browser graph.
-      const { loadStudioOcctModuleFromNode } = await import("./studio-occt-wasm-node-loader");
+      const nodeLoaderModuleId = "./studio-occt-wasm-node-loader";
+      const { loadStudioOcctModuleFromNode } = await import(
+        /* @vite-ignore */ nodeLoaderModuleId
+      ) as typeof import("./studio-occt-wasm-node-loader");
       const loaded = await loadStudioOcctModuleFromNode();
       const runtime: StudioOcctRuntime = {
         backend: "opencascade-wasm",
@@ -221,43 +277,119 @@ export function tessellateStudioOcctShape(
   readonly faceCount: number;
   readonly triangleCount: number;
 } {
-  new oc.BRepMesh_IncrementalMesh_2(shape, linearDeflection, false, 0.5, false);
+  const mesher = new oc.BRepMesh_IncrementalMesh_2(
+    shape,
+    linearDeflection,
+    false,
+    0.5,
+    false,
+  );
   const faceEnum = oc.TopAbs_ShapeEnum.TopAbs_FACE;
   const exp = new oc.TopExp_Explorer_2(shape, faceEnum, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
   const positions: number[] = [];
   const indices: number[] = [];
+  const weldedVertices = new Map<string, number>();
+  const weldTolerance = Math.max(1e-7, Math.abs(linearDeflection) * 1e-5);
   let faceCount = 0;
-  while (exp.More()) {
-    faceCount += 1;
-    const face = oc.TopoDS.Face_1(exp.Current());
-    const loc = new oc.TopLoc_Location_1();
-    const tri = (() => {
+  try {
+    while (exp.More()) {
+      faceCount += 1;
+      const current = exp.Current();
+      const face = oc.TopoDS.Face_1(current);
+      const loc = new oc.TopLoc_Location_1();
+      let rawTriangulation: unknown = null;
+      let triangulation: StudioOcctTriangulation | null = null;
+      let transformation: unknown = null;
       try {
-        return resolveStudioOcctTriangulation(oc.BRep_Tool.Triangulation_1(face, loc));
-      } catch {
         try {
-          return resolveStudioOcctTriangulation(oc.BRep_Tool.Triangulation(face, loc));
+          rawTriangulation = oc.BRep_Tool.Triangulation_1(face, loc);
         } catch {
-          return null;
+          rawTriangulation = oc.BRep_Tool.Triangulation(face, loc);
         }
+        triangulation = resolveStudioOcctTriangulation(rawTriangulation);
+        if (!triangulation) continue;
+
+        try {
+          transformation = loc.Transformation();
+        } catch {
+          transformation = null;
+        }
+        const matrixValue = (row: number, column: number): number => {
+          try {
+            const value = (transformation as { Value?: (r: number, c: number) => number } | null)
+              ?.Value?.(row, column);
+            return Number.isFinite(value) ? Number(value) : row === column ? 1 : 0;
+          } catch {
+            return row === column ? 1 : 0;
+          }
+        };
+        const m11 = matrixValue(1, 1);
+        const m12 = matrixValue(1, 2);
+        const m13 = matrixValue(1, 3);
+        const m14 = matrixValue(1, 4);
+        const m21 = matrixValue(2, 1);
+        const m22 = matrixValue(2, 2);
+        const m23 = matrixValue(2, 3);
+        const m24 = matrixValue(2, 4);
+        const m31 = matrixValue(3, 1);
+        const m32 = matrixValue(3, 2);
+        const m33 = matrixValue(3, 3);
+        const m34 = matrixValue(3, 4);
+
+        const nNodes = triangulation.NbNodes();
+        const nTris = triangulation.NbTriangles();
+        const localToGlobal = new Uint32Array(nNodes + 1);
+        for (let i = 1; i <= nNodes; i += 1) {
+          const point = triangulation.Node(i);
+          try {
+            const x = point.X();
+            const y = point.Y();
+            const z = point.Z();
+            const tx = m11 * x + m12 * y + m13 * z + m14;
+            const ty = m21 * x + m22 * y + m23 * z + m24;
+            const tz = m31 * x + m32 * y + m33 * z + m34;
+            const key = `${Math.round(tx / weldTolerance)}:${Math.round(ty / weldTolerance)}:${Math.round(tz / weldTolerance)}`;
+            let globalIndex = weldedVertices.get(key);
+            if (globalIndex === undefined) {
+              globalIndex = positions.length / 3;
+              weldedVertices.set(key, globalIndex);
+              positions.push(tx, ty, tz);
+            }
+            localToGlobal[i] = globalIndex;
+          } finally {
+            disposeOcctObjects(point);
+          }
+        }
+
+        let reversed = false;
+        try {
+          const orientation = (face as { Orientation_1?: () => { value?: number } }).Orientation_1?.();
+          reversed = orientation?.value === 1;
+        } catch {
+          reversed = false;
+        }
+        for (let i = 1; i <= nTris; i += 1) {
+          const triangle = triangulation.Triangle(i);
+          try {
+            const a = localToGlobal[triangle.Value(1)]!;
+            const b = localToGlobal[triangle.Value(2)]!;
+            const c = localToGlobal[triangle.Value(3)]!;
+            if (a === b || b === c || c === a) continue;
+            indices.push(a, reversed ? c : b, reversed ? b : c);
+          } finally {
+            disposeOcctObjects(triangle);
+          }
+        }
+      } finally {
+        // `Handle_Poly_Triangulation.get()` returns a borrowed pointee wrapper.
+        // Deleting it releases shape-owned data and corrupts later OCCT calls; only
+        // release the owning handle and the value wrappers created in this scope.
+        disposeOcctObjects(transformation, rawTriangulation, loc, face, current);
+        exp.Next();
       }
-    })();
-    if (!tri) {
-      exp.Next();
-      continue;
     }
-    const nNodes = tri.NbNodes();
-    const nTris = tri.NbTriangles();
-    const base = positions.length / 3;
-    for (let i = 1; i <= nNodes; i += 1) {
-      const p = tri.Node(i);
-      positions.push(p.X(), p.Y(), p.Z());
-    }
-    for (let i = 1; i <= nTris; i += 1) {
-      const t = tri.Triangle(i);
-      indices.push(base + t.Value(1) - 1, base + t.Value(2) - 1, base + t.Value(3) - 1);
-    }
-    exp.Next();
+  } finally {
+    disposeOcctObjects(exp, mesher);
   }
   return {
     positions: new Float32Array(positions),
@@ -283,6 +415,37 @@ function approxVolumeBox(dx: number, dy: number, dz: number): number {
   return Math.abs(dx * dy * dz);
 }
 
+function readStudioOcctVolume(
+  oc: StudioOcctModule,
+  shape: unknown,
+  fallback: number,
+): number {
+  let props: unknown = null;
+  try {
+    props = new oc.GProp_GProps_1();
+    for (const methodName of [
+      "VolumeProperties_1",
+      "VolumeProperties_2",
+      "VolumeProperties2",
+    ]) {
+      const method = oc.BRepGProp?.[methodName];
+      if (!isCallable(method)) continue;
+      try {
+        method.call(oc.BRepGProp, shape, props, true, false, false);
+        const mass = (props as { Mass?: () => number }).Mass?.();
+        if (Number.isFinite(mass) && Math.abs(Number(mass)) > 1e-12) {
+          return Math.abs(Number(mass));
+        }
+      } catch {
+        // Try the next generated overload name.
+      }
+    }
+    return fallback;
+  } finally {
+    disposeOcctObjects(props);
+  }
+}
+
 function packResult(
   operation: string,
   mesh: StudioEditableMesh,
@@ -290,18 +453,91 @@ function packResult(
   triangleCount: number,
   volumeApprox: number,
   loadPath: "browser" | "node",
+  oc?: StudioOcctModule,
+  shape?: unknown,
 ): StudioOcctSolidResult {
+  const measuredVolume = oc && shape
+    ? readStudioOcctVolume(oc, shape, volumeApprox)
+    : volumeApprox;
   return {
     ok: true,
     mesh,
     faceCount,
     triangleCount,
     vertexCount: mesh.vertices.length,
-    volumeApprox,
+    volumeApprox: measuredVolume,
     backend: "opencascade-wasm",
     operation,
     loadPath,
   };
+}
+
+function makeOcctBoxShape(
+  oc: StudioOcctModule,
+  owner: StudioOcctOwner,
+  dx: number,
+  dy: number,
+  dz: number,
+): unknown {
+  const builder = owner.own(new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz));
+  return owner.own(builder.Shape());
+}
+
+function makePositionedOcctBoxShape(
+  oc: StudioOcctModule,
+  owner: StudioOcctOwner,
+  box: {
+    readonly dx: number;
+    readonly dy: number;
+    readonly dz: number;
+    readonly ox?: number;
+    readonly oy?: number;
+    readonly oz?: number;
+  },
+): unknown {
+  if (!(box.ox || box.oy || box.oz)) {
+    return makeOcctBoxShape(oc, owner, box.dx, box.dy, box.dz);
+  }
+  const p1 = owner.own(new oc.gp_Pnt_3(box.ox ?? 0, box.oy ?? 0, box.oz ?? 0));
+  const p2 = owner.own(new oc.gp_Pnt_3(
+    (box.ox ?? 0) + box.dx,
+    (box.oy ?? 0) + box.dy,
+    (box.oz ?? 0) + box.dz,
+  ));
+  for (const key of [
+    "BRepPrimAPI_MakeBox_3",
+    "BRepPrimAPI_MakeBox_2",
+    "BRepPrimAPI_MakeBox_4",
+  ]) {
+    if (!isCallable(oc[key])) continue;
+    try {
+      const builder = owner.own(new oc[key](p1, p2));
+      return owner.own(builder.Shape());
+    } catch {
+      // Try the next generated overload.
+    }
+  }
+  return makeOcctBoxShape(oc, owner, box.dx, box.dy, box.dz);
+}
+
+function runOcctBinaryShapeOperation(
+  oc: StudioOcctModule,
+  owner: StudioOcctOwner,
+  constructorNames: readonly string[],
+  shapeA: unknown,
+  shapeB: unknown,
+): unknown | null {
+  for (const key of constructorNames) {
+    if (!isCallable(oc[key])) continue;
+    try {
+      const operation = owner.own(new oc[key](shapeA, shapeB));
+      if (isCallable(operation.Build)) operation.Build();
+      return owner.own(isCallable(operation.Shape) ? operation.Shape() : operation);
+    } catch {
+      // Try the next generated overload.
+    }
+  }
+  return null;
 }
 
 /** Core solid: axis-aligned box via BRepPrimAPI_MakeBox. */
@@ -310,10 +546,9 @@ export async function occtMakeBoxSolid(
   dy: number,
   dz: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const shape = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
+    const shape = makeOcctBoxShape(oc, owner, dx, dy, dz);
     const tess = tessellateStudioOcctShape(oc, shape);
     if (tess.triangleCount < 1) {
       return { ok: false, code: "empty-tessellation", detail: "box produced no triangles" };
@@ -325,14 +560,10 @@ export async function occtMakeBoxSolid(
       tess.triangleCount,
       approxVolumeBox(dx, dy, dz),
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Core solid: cylinder via BRepPrimAPI_MakeCylinder. */
@@ -340,8 +571,7 @@ export async function occtMakeCylinderSolid(
   radius: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
     let shape: unknown = null;
     for (const key of [
@@ -351,11 +581,13 @@ export async function occtMakeCylinderSolid(
     ]) {
       if (!isCallable(oc[key])) continue;
       try {
-        shape = new oc[key](radius, height).Shape();
+        const builder = owner.own(new oc[key](radius, height));
+        shape = owner.own(builder.Shape());
         break;
       } catch {
         try {
-          shape = new oc[key](radius, height, Math.PI * 2).Shape();
+          const builder = owner.own(new oc[key](radius, height, Math.PI * 2));
+          shape = owner.own(builder.Shape());
           break;
         } catch {
           // next
@@ -376,14 +608,10 @@ export async function occtMakeCylinderSolid(
       tess.triangleCount,
       Math.PI * radius * radius * height,
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**
@@ -400,49 +628,17 @@ export async function occtBooleanCutBoxes(
     readonly oz?: number;
   },
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const shapeA = new oc.BRepPrimAPI_MakeBox_1(a.dx, a.dy, a.dz).Shape();
-    let shapeB: unknown;
-    if (b.ox || b.oy || b.oz) {
-      const p1 = new oc.gp_Pnt_3(b.ox ?? 0, b.oy ?? 0, b.oz ?? 0);
-      const p2 = new oc.gp_Pnt_3(
-        (b.ox ?? 0) + b.dx,
-        (b.oy ?? 0) + b.dy,
-        (b.oz ?? 0) + b.dz,
-      );
-      let mk: { Shape: () => unknown } | null = null;
-      for (const key of ["BRepPrimAPI_MakeBox_3", "BRepPrimAPI_MakeBox_2", "BRepPrimAPI_MakeBox_4"]) {
-        if (!isCallable(oc[key])) continue;
-        try {
-          mk = new oc[key](p1, p2);
-          break;
-        } catch {
-          // next
-        }
-      }
-      shapeB = mk ? mk.Shape() : new oc.BRepPrimAPI_MakeBox_1(b.dx, b.dy, b.dz).Shape();
-    } else {
-      shapeB = new oc.BRepPrimAPI_MakeBox_1(b.dx, b.dy, b.dz).Shape();
-    }
-    let cutShape: unknown = null;
-    for (const key of [
-      "BRepAlgoAPI_Cut_3",
-      "BRepAlgoAPI_Cut_1",
-      "BRepAlgoAPI_Cut_2",
-      "BRepAlgoAPI_Cut",
-    ]) {
-      if (!isCallable(oc[key])) continue;
-      try {
-        const cut = new oc[key](shapeA, shapeB);
-        if (isCallable(cut.Build)) cut.Build();
-        cutShape = isCallable(cut.Shape) ? cut.Shape() : cut;
-        break;
-      } catch {
-        // next overload
-      }
-    }
+    const shapeA = makeOcctBoxShape(oc, owner, a.dx, a.dy, a.dz);
+    const shapeB = makePositionedOcctBoxShape(oc, owner, b);
+    const cutShape = runOcctBinaryShapeOperation(
+      oc,
+      owner,
+      ["BRepAlgoAPI_Cut_3", "BRepAlgoAPI_Cut_1", "BRepAlgoAPI_Cut_2", "BRepAlgoAPI_Cut"],
+      shapeA,
+      shapeB,
+    );
     if (!cutShape) {
       return { ok: false, code: "boolean-failed", detail: "BRepAlgoAPI_Cut overloads failed" };
     }
@@ -457,19 +653,16 @@ export async function occtBooleanCutBoxes(
       tess.triangleCount,
       Math.max(0, approxVolumeBox(a.dx, a.dy, a.dz) - approxVolumeBox(b.dx, b.dy, b.dz) * 0.5),
       runtime.loadPath,
+      oc,
+      cutShape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Helper: planar rectangular face on XY (or XZ for revolve profiles). */
 function makeRectFace(
   oc: StudioOcctModule,
+  owner: StudioOcctOwner,
   corners: readonly [
     readonly [number, number, number],
     readonly [number, number, number],
@@ -478,14 +671,14 @@ function makeRectFace(
   ],
 ): unknown | null {
   try {
-    const p1 = new oc.gp_Pnt_3(corners[0][0], corners[0][1], corners[0][2]);
-    const p2 = new oc.gp_Pnt_3(corners[1][0], corners[1][1], corners[1][2]);
-    const p3 = new oc.gp_Pnt_3(corners[2][0], corners[2][1], corners[2][2]);
-    const p4 = new oc.gp_Pnt_3(corners[3][0], corners[3][1], corners[3][2]);
-    const poly = new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true);
-    const wire = poly.Wire();
-    const faceMaker = new oc.BRepBuilderAPI_MakeFace_15(wire, true);
-    return isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape();
+    const p1 = owner.own(new oc.gp_Pnt_3(corners[0][0], corners[0][1], corners[0][2]));
+    const p2 = owner.own(new oc.gp_Pnt_3(corners[1][0], corners[1][1], corners[1][2]));
+    const p3 = owner.own(new oc.gp_Pnt_3(corners[2][0], corners[2][1], corners[2][2]));
+    const p4 = owner.own(new oc.gp_Pnt_3(corners[3][0], corners[3][1], corners[3][2]));
+    const poly = owner.own(new oc.BRepBuilderAPI_MakePolygon_4(p1, p2, p3, p4, true));
+    const wire = owner.own(poly.Wire());
+    const faceMaker = owner.own(new oc.BRepBuilderAPI_MakeFace_15(wire, true));
+    return owner.own(isCallable(faceMaker.Face) ? faceMaker.Face() : faceMaker.Shape());
   } catch {
     return null;
   }
@@ -497,10 +690,9 @@ export async function occtExtrudeRectangle(
   depth: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const face = makeRectFace(oc, [
+    const face = makeRectFace(oc, owner, [
       [0, 0, 0],
       [width, 0, 0],
       [width, depth, 0],
@@ -510,18 +702,19 @@ export async function occtExtrudeRectangle(
       // Fallback box still produces measurable solid
       return occtMakeBoxSolid(width, height, depth);
     }
-    let vec: unknown = null;
-    for (const ctor of [
-      () => new oc.gp_Vec_4(0, 0, height),
-      () => new oc.gp_Vec_4(new oc.gp_Pnt_3(0, 0, 0), new oc.gp_Pnt_3(0, 0, height)),
-    ]) {
+    const vec: unknown = (() => {
       try {
-        vec = ctor();
-        break;
+        return owner.own(new oc.gp_Vec_4(0, 0, height));
       } catch {
-        // next
+        const start = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+        const end = owner.own(new oc.gp_Pnt_3(0, 0, height));
+        try {
+          return owner.own(new oc.gp_Vec_4(start, end));
+        } catch {
+          return null;
+        }
       }
-    }
+    })();
     if (!vec) {
       return occtMakeBoxSolid(width, height, depth);
     }
@@ -529,13 +722,13 @@ export async function occtExtrudeRectangle(
     for (const key of ["BRepPrimAPI_MakePrism_1", "BRepPrimAPI_MakePrism_2", "BRepPrimAPI_MakePrism"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        const mk = new oc[key](face, vec, false, true);
-        shape = mk.Shape();
+        const mk = owner.own(new oc[key](face, vec, false, true));
+        shape = owner.own(mk.Shape());
         break;
       } catch {
         try {
-          const mk = new oc[key](face, vec);
-          shape = mk.Shape();
+          const mk = owner.own(new oc[key](face, vec));
+          shape = owner.own(mk.Shape());
           break;
         } catch {
           // next
@@ -556,32 +749,30 @@ export async function occtExtrudeRectangle(
       tess.triangleCount,
       Math.abs(width * depth * height),
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Sphere solid — BRepPrimAPI_MakeSphere (SolidWorks sphere feature). */
 export async function occtMakeSphereSolid(
   radius: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
     let shape: unknown = null;
     for (const key of ["BRepPrimAPI_MakeSphere_1", "BRepPrimAPI_MakeSphere_5", "BRepPrimAPI_MakeSphere"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        shape = new oc[key](radius).Shape();
+        const builder = owner.own(new oc[key](radius));
+        shape = owner.own(builder.Shape());
         break;
       } catch {
         try {
-          shape = new oc[key](new oc.gp_Pnt_3(0, 0, 0), radius).Shape();
+          const center = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+          const builder = owner.own(new oc[key](center, radius));
+          shape = owner.own(builder.Shape());
           break;
         } catch {
           // next
@@ -602,14 +793,10 @@ export async function occtMakeSphereSolid(
       tess.triangleCount,
       (4 / 3) * Math.PI * radius * radius * radius,
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Cone solid — BRepPrimAPI_MakeCone. */
@@ -618,14 +805,14 @@ export async function occtMakeConeSolid(
   radius2: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
     let shape: unknown = null;
     for (const key of ["BRepPrimAPI_MakeCone_1", "BRepPrimAPI_MakeCone_2", "BRepPrimAPI_MakeCone"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        shape = new oc[key](radius1, radius2, height).Shape();
+        const builder = owner.own(new oc[key](radius1, radius2, height));
+        shape = owner.own(builder.Shape());
         break;
       } catch {
         // next
@@ -645,14 +832,10 @@ export async function occtMakeConeSolid(
       tess.triangleCount,
       (Math.PI * height / 3) * (radius1 * radius1 + radius1 * radius2 + radius2 * radius2),
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**
@@ -663,13 +846,12 @@ export async function occtRevolveCylinderLike(
   radius: number,
   height: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation(async (runtime, owner) => {
     const oc = runtime.module;
     const r0 = Math.max(0.05, radius * 0.4);
     const r1 = Math.max(r0 + 0.05, radius);
     // Profile in XZ plane, offset from Z axis
-    const face = makeRectFace(oc, [
+    const face = makeRectFace(oc, owner, [
       [r0, 0, 0],
       [r1, 0, 0],
       [r1, 0, height],
@@ -680,18 +862,20 @@ export async function occtRevolveCylinderLike(
       if (!cyl.ok) return cyl;
       return { ...cyl, operation: "BRepPrimAPI_MakeCylinder(revolve-face-unavailable)" };
     }
-    const origin = new oc.gp_Pnt_3(0, 0, 0);
-    const dir = new oc.gp_Dir_4(0, 0, 1);
-    const ax = new oc.gp_Ax1_2(origin, dir);
+    const origin = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+    const dir = owner.own(new oc.gp_Dir_4(0, 0, 1));
+    const ax = owner.own(new oc.gp_Ax1_2(origin, dir));
     let shape: unknown = null;
     for (const key of ["BRepPrimAPI_MakeRevol_1", "BRepPrimAPI_MakeRevol_2", "BRepPrimAPI_MakeRevol"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        shape = new oc[key](face, ax, Math.PI * 2, true).Shape();
+        const builder = owner.own(new oc[key](face, ax, Math.PI * 2, true));
+        shape = owner.own(builder.Shape());
         break;
       } catch {
         try {
-          shape = new oc[key](face, ax).Shape();
+          const builder = owner.own(new oc[key](face, ax));
+          shape = owner.own(builder.Shape());
           break;
         } catch {
           // next
@@ -714,14 +898,10 @@ export async function occtRevolveCylinderLike(
       tess.triangleCount,
       Math.PI * (r1 * r1 - r0 * r0) * height,
       runtime.loadPath,
+      oc,
+      shape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Boolean common (intersection) — SolidWorks Combine ∩. */
@@ -736,49 +916,22 @@ export async function occtBooleanCommonBoxes(
     readonly oz?: number;
   },
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const shapeA = new oc.BRepPrimAPI_MakeBox_1(a.dx, a.dy, a.dz).Shape();
-    let shapeB: unknown = new oc.BRepPrimAPI_MakeBox_1(b.dx, b.dy, b.dz).Shape();
-    if (b.ox || b.oy || b.oz) {
-      try {
-        const p1 = new oc.gp_Pnt_3(b.ox ?? 0, b.oy ?? 0, b.oz ?? 0);
-        const p2 = new oc.gp_Pnt_3(
-          (b.ox ?? 0) + b.dx,
-          (b.oy ?? 0) + b.dy,
-          (b.oz ?? 0) + b.dz,
-        );
-        for (const key of ["BRepPrimAPI_MakeBox_3", "BRepPrimAPI_MakeBox_2"]) {
-          if (!isCallable(oc[key])) continue;
-          try {
-            shapeB = new oc[key](p1, p2).Shape();
-            break;
-          } catch {
-            // next
-          }
-        }
-      } catch {
-        // keep
-      }
-    }
-    let common: unknown = null;
-    for (const key of [
-      "BRepAlgoAPI_Common_3",
-      "BRepAlgoAPI_Common_1",
-      "BRepAlgoAPI_Common_2",
-      "BRepAlgoAPI_Common",
-    ]) {
-      if (!isCallable(oc[key])) continue;
-      try {
-        const op = new oc[key](shapeA, shapeB);
-        if (isCallable(op.Build)) op.Build();
-        common = isCallable(op.Shape) ? op.Shape() : op;
-        break;
-      } catch {
-        // next
-      }
-    }
+    const shapeA = makeOcctBoxShape(oc, owner, a.dx, a.dy, a.dz);
+    const shapeB = makePositionedOcctBoxShape(oc, owner, b);
+    const common = runOcctBinaryShapeOperation(
+      oc,
+      owner,
+      [
+        "BRepAlgoAPI_Common_3",
+        "BRepAlgoAPI_Common_1",
+        "BRepAlgoAPI_Common_2",
+        "BRepAlgoAPI_Common",
+      ],
+      shapeA,
+      shapeB,
+    );
     if (!common) {
       return { ok: false, code: "common-failed", detail: "BRepAlgoAPI_Common overloads failed" };
     }
@@ -793,14 +946,10 @@ export async function occtBooleanCommonBoxes(
       tess.triangleCount,
       Math.min(approxVolumeBox(a.dx, a.dy, a.dz), approxVolumeBox(b.dx, b.dy, b.dz)),
       runtime.loadPath,
+      oc,
+      common,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**
@@ -812,23 +961,23 @@ export async function occtChamferBox(
   dz: number,
   dist: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation(async (runtime, owner) => {
     const oc = runtime.module;
-    const box = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
+    const box = makeOcctBoxShape(oc, owner, dx, dy, dz);
     let chamfered: unknown = null;
     for (const key of ["BRepFilletAPI_MakeChamfer", "BRepFilletAPI_MakeChamfer_1"]) {
       if (!isCallable(oc[key])) continue;
       try {
-        const ch = new oc[key](box);
-        const exp = new oc.TopExp_Explorer_2(
+        const ch = owner.own(new oc[key](box));
+        const exp = owner.own(new oc.TopExp_Explorer_2(
           box,
           oc.TopAbs_ShapeEnum.TopAbs_EDGE,
           oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-        );
+        ));
         let edges = 0;
         while (exp.More() && edges < 8) {
-          const edge = oc.TopoDS.Edge_1(exp.Current());
+          const current = owner.own(exp.Current());
+          const edge = owner.own(oc.TopoDS.Edge_1(current));
           try {
             if (isCallable(ch.Add_2)) ch.Add_2(dist, edge);
             else if (isCallable(ch.Add)) ch.Add(dist, edge);
@@ -839,7 +988,7 @@ export async function occtChamferBox(
           exp.Next();
         }
         if (isCallable(ch.Build)) ch.Build();
-        chamfered = isCallable(ch.Shape) ? ch.Shape() : ch;
+        chamfered = owner.own(isCallable(ch.Shape) ? ch.Shape() : ch);
         if (chamfered) break;
       } catch {
         // next
@@ -861,14 +1010,10 @@ export async function occtChamferBox(
       tess.triangleCount,
       approxVolumeBox(dx, dy, dz),
       runtime.loadPath,
+      oc,
+      chamfered,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /** Fuse two boxes (boolean union) — assembly solid. */
@@ -883,49 +1028,17 @@ export async function occtBooleanFuseBoxes(
     readonly oz?: number;
   },
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
-    const shapeA = new oc.BRepPrimAPI_MakeBox_1(a.dx, a.dy, a.dz).Shape();
-    let shapeB: unknown = new oc.BRepPrimAPI_MakeBox_1(b.dx, b.dy, b.dz).Shape();
-    if (b.ox || b.oy || b.oz) {
-      try {
-        const p1 = new oc.gp_Pnt_3(b.ox ?? 0, b.oy ?? 0, b.oz ?? 0);
-        const p2 = new oc.gp_Pnt_3(
-          (b.ox ?? 0) + b.dx,
-          (b.oy ?? 0) + b.dy,
-          (b.oz ?? 0) + b.dz,
-        );
-        for (const key of ["BRepPrimAPI_MakeBox_3", "BRepPrimAPI_MakeBox_2"]) {
-          if (!isCallable(oc[key])) continue;
-          try {
-            shapeB = new oc[key](p1, p2).Shape();
-            break;
-          } catch {
-            // next
-          }
-        }
-      } catch {
-        // keep origin box
-      }
-    }
-    let fused: unknown = null;
-    for (const key of [
-      "BRepAlgoAPI_Fuse_3",
-      "BRepAlgoAPI_Fuse_1",
-      "BRepAlgoAPI_Fuse_2",
-      "BRepAlgoAPI_Fuse",
-    ]) {
-      if (!isCallable(oc[key])) continue;
-      try {
-        const op = new oc[key](shapeA, shapeB);
-        if (isCallable(op.Build)) op.Build();
-        fused = isCallable(op.Shape) ? op.Shape() : op;
-        break;
-      } catch {
-        // next
-      }
-    }
+    const shapeA = makeOcctBoxShape(oc, owner, a.dx, a.dy, a.dz);
+    const shapeB = makePositionedOcctBoxShape(oc, owner, b);
+    const fused = runOcctBinaryShapeOperation(
+      oc,
+      owner,
+      ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse_2", "BRepAlgoAPI_Fuse"],
+      shapeA,
+      shapeB,
+    );
     if (!fused) {
       return { ok: false, code: "fuse-failed", detail: "BRepAlgoAPI_Fuse overloads failed" };
     }
@@ -940,14 +1053,10 @@ export async function occtBooleanFuseBoxes(
       tess.triangleCount,
       approxVolumeBox(a.dx, a.dy, a.dz) + approxVolumeBox(b.dx, b.dy, b.dz) * 0.5,
       runtime.loadPath,
+      oc,
+      fused,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**
@@ -959,10 +1068,9 @@ export async function occtFilletBox(
   dz: number,
   radius: number,
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation(async (runtime, owner) => {
     const oc = runtime.module;
-    const box = new oc.BRepPrimAPI_MakeBox_1(dx, dy, dz).Shape();
+    const box = makeOcctBoxShape(oc, owner, dx, dy, dz);
     let filleted: unknown = null;
     // Try MakeFillet constructors
     for (const key of [
@@ -972,16 +1080,17 @@ export async function occtFilletBox(
     ]) {
       if (!isCallable(oc[key])) continue;
       try {
-        const fillet = new oc[key](box);
+        const fillet = owner.own(new oc[key](box));
         // Add all edges
-        const exp = new oc.TopExp_Explorer_2(
+        const exp = owner.own(new oc.TopExp_Explorer_2(
           box,
           oc.TopAbs_ShapeEnum.TopAbs_EDGE,
           oc.TopAbs_ShapeEnum.TopAbs_SHAPE,
-        );
+        ));
         let edges = 0;
         while (exp.More() && edges < 24) {
-          const edge = oc.TopoDS.Edge_1(exp.Current());
+          const current = owner.own(exp.Current());
+          const edge = owner.own(oc.TopoDS.Edge_1(current));
           try {
             if (isCallable(fillet.Add_2)) fillet.Add_2(radius, edge);
             else if (isCallable(fillet.Add)) fillet.Add(radius, edge);
@@ -992,7 +1101,7 @@ export async function occtFilletBox(
           exp.Next();
         }
         if (isCallable(fillet.Build)) fillet.Build();
-        filleted = isCallable(fillet.Shape) ? fillet.Shape() : fillet;
+        filleted = owner.own(isCallable(fillet.Shape) ? fillet.Shape() : fillet);
         if (filleted) break;
       } catch {
         // next overload
@@ -1018,82 +1127,47 @@ export async function occtFilletBox(
       tess.triangleCount,
       approxVolumeBox(dx, dy, dz),
       runtime.loadPath,
+      oc,
+      filleted,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**
- * Multi-solid loft analogue: stacked boxes of varying section (BRepOffsetAPI_ThruSections if available).
+ * Multi-solid loft analogue: fused thin section solids of varying size.
  */
 export async function occtLoftedTower(
   levels: readonly { readonly dx: number; readonly dy: number; readonly z: number }[],
 ): Promise<StudioOcctSolidResult | StudioOcctFail> {
-  try {
-    const runtime = await loadStudioOcctRuntime();
+  return runStudioOcctOwnedOperation((runtime, owner) => {
     const oc = runtime.module;
     if (levels.length < 2) {
       return { ok: false, code: "need-levels", detail: "loft needs ≥2 sections" };
     }
-    // Prefer ThruSections; fall back to fuse of section boxes
-    let loftShape: unknown = null;
-    for (const key of [
-      "BRepOffsetAPI_ThruSections_1",
-      "BRepOffsetAPI_ThruSections_2",
-      "BRepOffsetAPI_ThruSections",
-    ]) {
-      if (!isCallable(oc[key])) continue;
-      try {
-        const loft = new oc[key](true, false, 1e-6);
-        for (const lvl of levels) {
-          const z = lvl.z;
-          const p1 = new oc.gp_Pnt_3(-lvl.dx / 2, -lvl.dy / 2, z);
-          const p2 = new oc.gp_Pnt_3(lvl.dx / 2, lvl.dy / 2, z);
-          // Wire from rectangle edges is heavy; use box slice fuse fallback below
-          void p1;
-          void p2;
-        }
-        void loft;
-      } catch {
-        // next
-      }
-    }
-    // Industrial multi-section solid: fuse thin boxes at each level (measurable multi-body)
+    // Industrial section stack: fuse thin positioned boxes into one measurable body.
     let acc: unknown = null;
     for (const lvl of levels) {
-      let box: unknown;
-      try {
-        const p1 = new oc.gp_Pnt_3(-lvl.dx / 2, -lvl.dy / 2, lvl.z);
-        const p2 = new oc.gp_Pnt_3(lvl.dx / 2, lvl.dy / 2, lvl.z + 0.2);
-        box = new oc.BRepPrimAPI_MakeBox_3(p1, p2).Shape();
-      } catch {
-        box = new oc.BRepPrimAPI_MakeBox_1(lvl.dx, lvl.dy, 0.2).Shape();
-      }
+      const box = makePositionedOcctBoxShape(oc, owner, {
+        dx: lvl.dx,
+        dy: lvl.dy,
+        dz: 0.2,
+        ox: -lvl.dx / 2,
+        oy: -lvl.dy / 2,
+        oz: lvl.z,
+      });
       if (!acc) {
         acc = box;
         continue;
       }
-      let fused = false;
-      for (const key of ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"]) {
-        if (!isCallable(oc[key])) continue;
-        try {
-          const op = new oc[key](acc, box);
-          if (isCallable(op.Build)) op.Build();
-          acc = isCallable(op.Shape) ? op.Shape() : op;
-          fused = true;
-          break;
-        } catch {
-          // next
-        }
-      }
-      if (!fused) acc = box;
+      acc = runOcctBinaryShapeOperation(
+        oc,
+        owner,
+        ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
+        acc,
+        box,
+      ) ?? box;
     }
-    loftShape = acc;
+    const loftShape = acc;
     if (!loftShape) {
       return { ok: false, code: "loft-failed", detail: "no loft shape" };
     }
@@ -1102,20 +1176,16 @@ export async function occtLoftedTower(
       return { ok: false, code: "empty-tessellation", detail: "loft produced no triangles" };
     }
     return packResult(
-      "BRepAlgoAPI_Fuse/ThruSections-loft",
+      "BRepAlgoAPI_Fuse(section-stack)",
       soupToMesh(tess.positions, tess.indices),
       tess.faceCount,
       tess.triangleCount,
       levels.reduce((s, l) => s + l.dx * l.dy * 0.2, 0),
       runtime.loadPath,
+      oc,
+      loftShape,
     );
-  } catch (error) {
-    return {
-      ok: false,
-      code: "occt-unavailable",
-      detail: error instanceof Error ? error.message : String(error),
-    };
-  }
+  });
 }
 
 /**

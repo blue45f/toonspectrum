@@ -1,12 +1,16 @@
 /**
- * SSOT registry: doc §6 catalog ID → shipped module + status.
- * Used by gating tests to assert every §12.1 / P0–P1 ID has a concrete API.
+ * Compatibility registry for callable §12.1 / P0–P1 kernel surfaces.
+ *
+ * This is deliberately not the product-delivery SSOT. Product delivery evidence
+ * (UI, document, persistence, collaboration, browser, and production stages)
+ * lives in `studio-dcc-section6-full-catalog.ts`. A row in this registry proves
+ * only that a kernel/bridge API exists at the documented ceiling.
  */
 
-export const STUDIO_DCC_CATALOG_REGISTRY_REVISION = 7 as const;
+export const STUDIO_DCC_KERNEL_COVERAGE_REVISION = 8 as const;
 
-export type StudioCatalogStatus =
-  | "shipped"
+export type StudioCatalogKernelStatus =
+  | "kernel-shipped"
   | "partial"
   | "deferred-p2"
   | "deferred-p3"
@@ -14,34 +18,40 @@ export type StudioCatalogStatus =
   | "deferred-p5"
   | "bridge-only";
 
-export interface StudioCatalogEntry {
+export interface StudioCatalogKernelEntry {
   readonly id: string;
   readonly priority: "P0" | "P1" | "P2" | "P3" | "P4" | "P5";
-  readonly status: StudioCatalogStatus;
+  readonly kernelStatus: StudioCatalogKernelStatus;
   readonly apis: readonly string[];
   readonly module: string;
-  /** When status is partial/bridge-only: pure-TS ceiling note (further depth needs WASM/native). */
+  /** When kernelStatus is partial/bridge-only: the explicit implementation ceiling. */
   readonly ceilingNote?: string;
 }
 
 /**
- * Historical partial policy notes (all five §6 residual IDs are now shipped at
- * the pure-TS / grade-B bar). Kept for audit trail only — registry rows no longer use ceilingNote.
+ * Historical kernel-boundary notes. "kernel-ready" here is not product-delivery
+ * evidence; the delivery assessment remains authoritative for later stages.
  */
-export const STUDIO_DCC_PARTIAL_PURE_TS_POLICY = {
+export const STUDIO_DCC_KERNEL_BOUNDARY_POLICY = {
   "DOC-008":
-    "shipped: Yjs scene/layer metadata CRDT + collab shell presence/locks",
+    "kernel-ready: Yjs scene/layer metadata CRDT + collab shell presence/locks",
   "FMT-FBX":
-    "shipped: ASCII mesh + binary uncompressed Vertices/PolygonVertexIndex lite; skin/anim grade note only",
+    "kernel-ready: ASCII mesh + binary uncompressed Vertices/PolygonVertexIndex lite; skin/anim grade note only",
   "FMT-IFC":
-    "shipped: semantic entities + AABB/point-fan mesh (grade B)",
+    "kernel-ready: semantic entities + AABB/point-fan mesh (grade B)",
   "FMT-STEP":
-    "shipped: cartesian/product + AABB/point-fan mesh (grade B)",
+    "kernel-ready: cartesian/product + AABB/point-fan mesh (grade B)",
   "CAD-001":
-    "shipped: line/arc/circle/ellipse/spline + units + construction + trim/extend",
+    "kernel-ready: line/arc/circle/ellipse/spline + units + construction + trim/extend",
 } as const;
 
-export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
+type LegacyKernelCoverageStatus = "shipped" | Exclude<StudioCatalogKernelStatus, "kernel-shipped">;
+type LegacyKernelCoverageEntry = Omit<StudioCatalogKernelEntry, "kernelStatus"> & {
+  /** Private migration encoding: "shipped" means callable kernel only. */
+  readonly status: LegacyKernelCoverageStatus;
+};
+
+const STUDIO_DCC_LEGACY_KERNEL_ROWS: readonly LegacyKernelCoverageEntry[] = [
   // DOC
   { id: "DOC-001", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["createStudioHybridDccSession"] },
   { id: "DOC-002", priority: "P0", status: "shipped", module: "studio-hybrid-dcc-document.ts", apis: ["hybridDccUndo", "hybridDccRedo"] },
@@ -195,20 +205,32 @@ export const STUDIO_DCC_CATALOG_REGISTRY: readonly StudioCatalogEntry[] = [
   { id: "CHR-SPRING-WS", priority: "P2", status: "shipped", module: "studio-hybrid-dcc-workspace.ts", apis: ["workspaceStepSpring", "workspaceSampleIdleClip"] },
 ];
 
-export function studioCatalogByPriority(
-  priority: StudioCatalogEntry["priority"],
-): readonly StudioCatalogEntry[] {
-  return STUDIO_DCC_CATALOG_REGISTRY.filter((e) => e.priority === priority);
+/**
+ * Callable-kernel compatibility view. Consumers must use
+ * `STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS` for product-delivery claims.
+ */
+export const STUDIO_DCC_KERNEL_COVERAGE_REGISTRY: readonly StudioCatalogKernelEntry[] =
+  STUDIO_DCC_LEGACY_KERNEL_ROWS.map(({ status, ...entry }) => ({
+    ...entry,
+    kernelStatus: status === "shipped" ? "kernel-shipped" : status,
+  }));
+
+export function studioKernelCatalogByPriority(
+  priority: StudioCatalogKernelEntry["priority"],
+): readonly StudioCatalogKernelEntry[] {
+  return STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.filter((entry) => entry.priority === priority);
 }
 
-export function studioCatalogShippedIds(): readonly string[] {
-  return STUDIO_DCC_CATALOG_REGISTRY.filter((e) => e.status === "shipped" || e.status === "partial").map(
-    (e) => e.id,
+export function studioCatalogKernelReadyIds(): readonly string[] {
+  return STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.filter(
+    (entry) => entry.kernelStatus === "kernel-shipped" || entry.kernelStatus === "partial",
+  ).map(
+    (entry) => entry.id,
   );
 }
 
-/** §12.1 required bullets mapped to registry IDs that must be shipped/partial. */
-export const STUDIO_WEBTOON_OBJECT_CREATOR_V1_REQUIRED_IDS = [
+/** §12.1 required bullets mapped to IDs that must expose a callable kernel. */
+export const STUDIO_WEBTOON_OBJECT_CREATOR_V1_KERNEL_REQUIRED_IDS = [
   "MOD-001", "MOD-004", "MOD-005", "MOD-006", "MOD-007", "MOD-008", "MOD-009",
   "MOD-012", "MOD-013", "MOD-014", "MOD-015",
   "BLD-001", "BLD-003", "BLD-006", "BLD-009", "BLD-010", "BLD-011",
@@ -217,25 +239,26 @@ export const STUDIO_WEBTOON_OBJECT_CREATOR_V1_REQUIRED_IDS = [
   "DOC-004", "DOC-012", "V1-VERTICAL",
 ] as const;
 
-export function assertWebtoonObjectCreatorV1Coverage(): {
+export function assertWebtoonObjectCreatorV1KernelCoverage(): {
   readonly missing: readonly string[];
   readonly ok: boolean;
 } {
-  const byId = new Map(STUDIO_DCC_CATALOG_REGISTRY.map((e) => [e.id, e]));
-  const missing = STUDIO_WEBTOON_OBJECT_CREATOR_V1_REQUIRED_IDS.filter((id) => {
-    const e = byId.get(id);
-    return !e || (e.status !== "shipped" && e.status !== "partial");
+  const byId = new Map(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.map((entry) => [entry.id, entry]));
+  const missing = STUDIO_WEBTOON_OBJECT_CREATOR_V1_KERNEL_REQUIRED_IDS.filter((id) => {
+    const entry = byId.get(id);
+    return !entry
+      || (entry.kernelStatus !== "kernel-shipped" && entry.kernelStatus !== "partial");
   });
   return { missing, ok: missing.length === 0 };
 }
 
-/** Every registry partial must declare a pure-TS ceiling note (sealed audit). */
-export function assertPartialCeilingNotes(): {
+/** Every partial kernel row must declare its implementation ceiling. */
+export function assertKernelPartialCeilingNotes(): {
   readonly missing: readonly string[];
   readonly ok: boolean;
 } {
-  const missing = STUDIO_DCC_CATALOG_REGISTRY
-    .filter((e) => e.status === "partial" && !e.ceilingNote)
-    .map((e) => e.id);
+  const missing = STUDIO_DCC_KERNEL_COVERAGE_REGISTRY
+    .filter((entry) => entry.kernelStatus === "partial" && !entry.ceilingNote)
+    .map((entry) => entry.id);
   return { missing, ok: missing.length === 0 };
 }

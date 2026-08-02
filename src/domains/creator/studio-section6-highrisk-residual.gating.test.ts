@@ -1,13 +1,18 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { exerciseStudioDccCatalogFeature } from "./studio-dcc-catalog-feature-dispatch";
 
-const SCRATCH =
-  process.env.GROK_SCRATCH
-  ?? process.env.SCRATCH
-  ?? "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/grok-goal-0f3581dcd4da/implementer";
+const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
+const SCRATCH = CONFIGURED_SCRATCH
+  ?? mkdtempSync(join(tmpdir(), "toonspectrum-section6-highrisk-"));
+
+afterAll(() => {
+  if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });
+});
 
 const HIGH = [
   "MOD-014",
@@ -49,6 +54,6 @@ describe("goal high-risk spotcheck", () => {
         `${id} ok faces=${r.evidence.faces ?? r.evidence.facesAfter ?? r.evidence.bodyFaces ?? r.evidence.meshTriangleCount} tris=${r.evidence.tris ?? "-"} backend=${r.evidence.backend ?? "-"} missing=${r.evidence.missing ?? "-"}`,
       );
     }
-    writeFileSync(`${SCRATCH}/high-risk-spotcheck.log`, lines.join("\n") + "\n");
+    writeFileSync(join(SCRATCH, "high-risk-spotcheck.log"), lines.join("\n") + "\n");
   }, 180_000);
 });

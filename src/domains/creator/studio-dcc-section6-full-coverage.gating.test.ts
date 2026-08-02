@@ -34,6 +34,7 @@ import {
 import {
   assertStudioSection6FullCoverage,
   STUDIO_DCC_SECTION6_CATALOG,
+  STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS,
   STUDIO_DCC_SECTION6_IDS,
   studioSection6ById,
   studioSection6CoverageStats,
@@ -41,7 +42,8 @@ import {
 import { getStudioPublishPlatformPreset } from "./studio-publish-package";
 
 const ARCH_DOC = resolve(
-  "/Users/hjunkim/Downloads/ToonSpectrum_하이브리드_3D_DCC_엔진_라이브러리_포맷_아키텍처_2026-08-01.md",
+  __dirname,
+  "../../../docs/reference/studio-hybrid-dcc-section6-ids.md",
 );
 
 function extractDocSection6Ids(markdown: string): string[] {
@@ -71,13 +73,35 @@ describe("§6 full catalog SSOT", () => {
     expect(coverage.ok).toBe(true);
     const stats = studioSection6CoverageStats();
     expect(stats.total).toBeGreaterThanOrEqual(docIds.length);
-    expect(stats.shipped + stats.partial + stats.bridgeOnly).toBe(stats.total);
+    expect(stats.kernelShipped + stats.partial + stats.bridgeOnly).toBe(stats.total);
+    expect(stats.productionActivated).toBe(0);
     // partials must declare ceilings
     for (const e of STUDIO_DCC_SECTION6_CATALOG) {
-      if (e.status === "partial") {
+      if (e.kernelStatus === "partial") {
         expect(e.ceilingNote && e.ceilingNote.length > 0).toBe(true);
       }
       expect(e.apis.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("does not promote kernel fixtures into unverified product delivery stages", () => {
+    expect(STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS).toHaveLength(
+      STUDIO_DCC_SECTION6_CATALOG.length,
+    );
+    for (const assessment of STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS) {
+      const catalogEntry = studioSection6ById(assessment.id);
+      expect(catalogEntry).not.toBeNull();
+      expect(assessment.unverifiedStages).toEqual([
+        "ui-wired",
+        "document-integrated",
+        "persistence-verified",
+        "collaboration-verified",
+        "browser-verified",
+        "production-activated",
+      ]);
+      expect(assessment.verifiedStages).toEqual(
+        catalogEntry?.kernelStatus === "kernel-shipped" ? ["kernel-shipped"] : [],
+      );
     }
   });
 

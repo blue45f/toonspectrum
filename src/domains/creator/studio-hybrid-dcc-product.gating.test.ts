@@ -7,9 +7,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
-  STUDIO_DCC_CATALOG_REGISTRY,
-  STUDIO_DCC_CATALOG_REGISTRY_REVISION,
-  assertWebtoonObjectCreatorV1Coverage,
+  STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
+  STUDIO_DCC_KERNEL_COVERAGE_REVISION,
+  assertWebtoonObjectCreatorV1KernelCoverage,
 } from "./studio-dcc-catalog-registry";
 import {
   collabActivePeerIds,
@@ -290,11 +290,11 @@ describe("collab shell + catalog revision", () => {
     });
     expect(collabActivePeerIds(room).includes("a")).toBe(true);
     expect(STUDIO_DCC_COLLAB_SHELL_REVISION).toBeGreaterThanOrEqual(4);
-    expect(STUDIO_DCC_CATALOG_REGISTRY_REVISION).toBeGreaterThanOrEqual(6);
-    expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "WS-FULL-ENGINE")).toBe(true);
-    expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "FMT-OFF")).toBe(true);
-    expect(STUDIO_DCC_CATALOG_REGISTRY.some((e) => e.id === "UI-HYBRID-PANEL")).toBe(true);
-    const { ok, missing } = assertWebtoonObjectCreatorV1Coverage();
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REVISION).toBeGreaterThanOrEqual(8);
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.some((entry) => entry.id === "WS-FULL-ENGINE")).toBe(true);
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.some((entry) => entry.id === "FMT-OFF")).toBe(true);
+    expect(STUDIO_DCC_KERNEL_COVERAGE_REGISTRY.some((entry) => entry.id === "UI-HYBRID-PANEL")).toBe(true);
+    const { ok, missing } = assertWebtoonObjectCreatorV1KernelCoverage();
     expect(missing).toEqual([]);
     expect(ok).toBe(true);
   });
