@@ -39,6 +39,7 @@ import {
   workspaceOcctRevolve,
   workspaceOcctSphere,
   workspaceBooleanBetweenAssets,
+  workspaceOcctCircularPattern,
   workspaceOcctDraftPrism,
   workspaceOcctFillet2dExtrude,
   workspaceOcctLinearPattern,
@@ -315,6 +316,15 @@ export function StudioHybridDccPanel() {
           onClick={() => run("OCCT linear pattern", () => workspaceOcctLinearPattern(ws))}
         >
           OCCT pattern
+        </button>
+        <button
+          type="button"
+          className="rounded border px-2 py-1"
+          disabled={busy}
+          data-studio-hybrid-dcc-action="occt-circular"
+          onClick={() => run("OCCT circular pattern", () => workspaceOcctCircularPattern(ws))}
+        >
+          OCCT circular
         </button>
         <button
           type="button"

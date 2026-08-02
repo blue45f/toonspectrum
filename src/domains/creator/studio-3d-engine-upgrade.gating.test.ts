@@ -19,6 +19,7 @@ import {
   workspaceOcctLoft,
   workspaceOcctRevolve,
   workspaceOcctSphere,
+  workspaceOcctCircularPattern,
   workspaceOcctDraftPrism,
   workspaceOcctFillet2dExtrude,
   workspaceOcctLinearPattern,
@@ -31,6 +32,7 @@ import {
 } from "./studio-hybrid-dcc-workspace";
 import { orientStudioMeshOutward } from "./studio-mesh-ops-advanced";
 import {
+  occtCircularPatternBox,
   occtDraftPrismOnBox,
   occtFillet2dExtrudeSolid,
   occtLinearPatternBox,
@@ -287,6 +289,27 @@ describe("3D engine upgrades", () => {
     expect(ws.lastOcct?.operation).toMatch(/linear-pattern/u);
     expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(12);
   }, 180_000);
+
+  it("OCCT circular pattern produces multi-body solid", async () => {
+    expect(STUDIO_OCCT_WASM_FACADE_REVISION).toBeGreaterThanOrEqual(10);
+    const circ = await occtCircularPatternBox(0.4, 0.3, 0.2, 1.2, 4);
+    expect(circ.ok).toBe(true);
+    if (!circ.ok) return;
+    expect(circ.operation).toMatch(/circular-pattern/u);
+    expect(circ.triangleCount).toBeGreaterThanOrEqual(24);
+  }, 120_000);
+
+  it("SolidWorks suite reports realCircularPattern", async () => {
+    const suite = await occtSolidWorksGradeSuite();
+    expect(suite.realCircularPattern).toBe(true);
+  }, 180_000);
+
+  it("workspace circular pattern registers asset", async () => {
+    let ws = createStudioHybridDccWorkspace("circular-ws");
+    ws = await workspaceOcctCircularPattern(ws, "c1");
+    expect(ws.lastOcct?.operation).toMatch(/circular-pattern/u);
+    expect(ws.lastOcct?.triangleCount ?? 0).toBeGreaterThanOrEqual(24);
+  }, 120_000);
 
   it("orientStudioMeshOutward flips inverted cube faces for CSG readiness", () => {
     // Build inverted winding cube via reverse quads

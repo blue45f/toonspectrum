@@ -6,6 +6,7 @@ import {
   occtLoftedTower,
   occtMakeBoxSolid,
   occtMakeSphereSolid,
+  occtCircularPatternBox,
   occtDraftPrismOnBox,
   occtFillet2dExtrudeSolid,
   occtLinearPatternBox,
@@ -87,6 +88,14 @@ async function runOperation(
         operation.size[1],
         operation.size[2],
         operation.offsetX,
+        operation.count,
+      );
+    case "circular-pattern-box":
+      return occtCircularPatternBox(
+        operation.size[0],
+        operation.size[1],
+        operation.size[2],
+        operation.radius,
         operation.count,
       );
     case "step-roundtrip-box": {

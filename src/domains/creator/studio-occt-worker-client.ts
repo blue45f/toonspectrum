@@ -195,6 +195,14 @@ async function runOnNode(
           operation.offsetX,
           operation.count,
         );
+      case "circular-pattern-box":
+        return facade.occtCircularPatternBox(
+          operation.size[0],
+          operation.size[1],
+          operation.size[2],
+          operation.radius,
+          operation.count,
+        );
       case "step-roundtrip-box": {
         const step = await facade.occtStepRoundTripBox(
           operation.size[0],

@@ -1203,6 +1203,21 @@ export async function workspaceOcctLinearPattern(
   return commitOcctResult(ws, assetId, "occt-wasm-pattern", result);
 }
 
+/** Industrial OCCT circular pattern fuse → workspace. */
+export async function workspaceOcctCircularPattern(
+  ws: StudioHybridDccWorkspace,
+  assetId = "occt-circular",
+): Promise<StudioHybridDccWorkspace> {
+  const { runStudioOcctOperation } = await import("./studio-occt-worker-client");
+  const result = await runStudioOcctOperation({
+    kind: "circular-pattern-box",
+    size: [0.4, 0.3, 0.2],
+    radius: 1.2,
+    count: 4,
+  });
+  return commitOcctResult(ws, assetId, "occt-wasm-circular", result);
+}
+
 /** Industrial STEP write+read round-trip box → workspace. */
 export async function workspaceOcctStepRoundTrip(
   ws: StudioHybridDccWorkspace,

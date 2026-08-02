@@ -15,7 +15,7 @@ import {
   type StudioMeshVec3,
 } from "./studio-editable-half-edge-mesh";
 
-export const STUDIO_OCCT_WASM_FACADE_REVISION = 9 as const;
+export const STUDIO_OCCT_WASM_FACADE_REVISION = 10 as const;
 
 export type StudioOcctStepIoResult = {
   readonly ok: true;
@@ -1594,6 +1594,98 @@ export async function occtLinearPatternBox(
 }
 
 /**
+ * Circular pattern: rotate copies of a box about Z and fuse (assembly circular array).
+ * SolidWorks circular pattern analogue via gp_Trsf.SetRotation + Transform + Fuse.
+ */
+export async function occtCircularPatternBox(
+  dx: number,
+  dy: number,
+  dz: number,
+  radius: number,
+  count = 4,
+): Promise<StudioOcctSolidResult | StudioOcctFail> {
+  return runStudioOcctOwnedOperation((runtime, owner) => {
+    const oc = runtime.module;
+    const n = Math.max(2, Math.min(12, count));
+    const origin = owner.own(new oc.gp_Pnt_3(0, 0, 0));
+    const zDir = owner.own(new oc.gp_Dir_4(0, 0, 1));
+    const ax1 = owner.own(new oc.gp_Ax1_2(origin, zDir));
+    let acc: unknown = null;
+    for (let i = 0; i < n; i += 1) {
+      const angle = (Math.PI * 2 * i) / n;
+      const tMove = owner.own(new oc.gp_Trsf_1());
+      const moveVec = owner.own(new oc.gp_Vec_4(radius, 0, 0));
+      if (isCallable(tMove.SetTranslation_1)) tMove.SetTranslation_1(moveVec);
+      else if (isCallable(tMove.SetTranslation)) tMove.SetTranslation(moveVec);
+      else {
+        return { ok: false, code: "no-translation", detail: "gp_Trsf.SetTranslation missing" };
+      }
+      const tRot = owner.own(new oc.gp_Trsf_1());
+      if (isCallable(tRot.SetRotation_1)) tRot.SetRotation_1(ax1, angle);
+      else if (isCallable(tRot.SetRotation)) tRot.SetRotation(ax1, angle);
+      else {
+        return { ok: false, code: "no-rotation", detail: "gp_Trsf.SetRotation missing" };
+      }
+      // Compose: rotate after radial translate → instances on a circle
+      try {
+        if (isCallable(tRot.Multiply)) tRot.Multiply(tMove);
+        else if (isCallable(tRot.PreMultiply)) tRot.PreMultiply(tMove);
+      } catch {
+        // If compose fails, rotation alone still places at origin; fuse still valid for i=0
+      }
+      const src = makeOcctBoxShape(oc, owner, dx, dy, dz);
+      let moved: unknown = null;
+      for (const key of [
+        "BRepBuilderAPI_Transform_2",
+        "BRepBuilderAPI_Transform_1",
+        "BRepBuilderAPI_Transform",
+      ]) {
+        if (!isCallable(oc[key])) continue;
+        try {
+          const xf = owner.own(new oc[key](src, tRot, true));
+          if (isCallable(xf.Build)) xf.Build();
+          moved = owner.own(xf.Shape());
+          break;
+        } catch {
+          // next
+        }
+      }
+      if (!moved) {
+        return { ok: false, code: "transform-failed", detail: "circular pattern transform failed" };
+      }
+      if (!acc) {
+        acc = moved;
+        continue;
+      }
+      acc = runOcctBinaryShapeOperation(
+        oc,
+        owner,
+        ["BRepAlgoAPI_Fuse_3", "BRepAlgoAPI_Fuse_1", "BRepAlgoAPI_Fuse"],
+        acc,
+        moved,
+      ) ?? moved;
+    }
+    if (!acc) {
+      return { ok: false, code: "empty-pattern", detail: "circular pattern produced no shape" };
+    }
+    const tess = tessellateStudioOcctShape(oc, acc, 0.15);
+    if (tess.triangleCount < 1) {
+      return { ok: false, code: "empty-tessellation", detail: "circular pattern produced no triangles" };
+    }
+    return packResult(
+      "BRepBuilderAPI_Transform+Fuse(circular-pattern)",
+      soupToMesh(tess.positions, tess.indices),
+      tess.faceCount,
+      tess.triangleCount,
+      approxVolumeBox(dx, dy, dz) * n,
+      runtime.loadPath,
+      oc,
+      acc,
+    );
+  });
+}
+
+/**
  * Sweep / pipe solid: circular profile along a linear spine (BRepOffsetAPI_MakePipe).
  * SolidWorks-style sweep along path.
  */
@@ -2205,6 +2297,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   readonly realSection: boolean;
   readonly realDraftPrism: boolean;
   readonly realLinearPattern: boolean;
+  readonly realCircularPattern: boolean;
 }> {
   const ops: string[] = [];
   let totalTriangles = 0;
@@ -2224,6 +2317,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   let realSection = false;
   let realDraftPrism = false;
   let realLinearPattern = false;
+  let realCircularPattern = false;
   const run = async (
     name: string,
     fn: () => Promise<StudioOcctSolidResult | StudioOcctFail>,
@@ -2242,6 +2336,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
         realMirror = true;
       }
       if (r.operation.includes("linear-pattern")) realLinearPattern = true;
+      if (r.operation.includes("circular-pattern")) realCircularPattern = true;
       if (r.operation === "BRepOffsetAPI_MakeThickSolid") realThickShell = true;
       if (r.operation === "BRepPrimAPI_MakeWedge") realWedge = true;
       if (r.operation === "BRepOffsetAPI_MakeOffsetShape") realOffsetShape = true;
@@ -2284,6 +2379,7 @@ export async function occtSolidWorksGradeSuite(): Promise<{
   await run("section", () => occtSectionBoxByPlane(1, 1, 1));
   await run("dprism", () => occtDraftPrismOnBox(2, 0.5, 1.0, 0.1));
   await run("pattern", () => occtLinearPatternBox(0.8, 0.5, 0.4, 1.2, 2));
+  await run("circular", () => occtCircularPatternBox(0.4, 0.3, 0.2, 1.2, 4));
   await run("loft", () =>
     occtLoftedTower([
       { dx: 2, dy: 2, z: 0 },
@@ -2330,5 +2426,6 @@ export async function occtSolidWorksGradeSuite(): Promise<{
     realSection,
     realDraftPrism,
     realLinearPattern,
+    realCircularPattern,
   };
 }

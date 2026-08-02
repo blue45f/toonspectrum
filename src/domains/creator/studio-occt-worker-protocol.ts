@@ -71,6 +71,12 @@ export type StudioOcctWorkerOperation =
       readonly count: number;
     }
   | {
+      readonly kind: "circular-pattern-box";
+      readonly size: readonly [number, number, number];
+      readonly radius: number;
+      readonly count: number;
+    }
+  | {
       readonly kind: "step-roundtrip-box";
       readonly size: readonly [number, number, number];
     }
