@@ -134,10 +134,10 @@ const STUDIO_CORE_ICON_MODULES = new Set([
 ]);
 
 function iconModuleName(id: string) {
-  if (!id.includes("/node_modules/lucide-react/dist/esm/icons/")) return null;
+  if (!id.includes("lucide-react") || !id.includes("/icons/")) return null;
   const fileName = id.slice(id.lastIndexOf("/") + 1);
-  if (!fileName.endsWith(".mjs")) return null;
-  return fileName.slice(0, -4);
+  const match = fileName.match(/^(.+?)\.(?:[cm]?[jt]s)$/);
+  return match ? match[1] : null;
 }
 
 function isInitialIconModule(id: string) {
@@ -147,7 +147,7 @@ function isInitialIconModule(id: string) {
 
 function isStudioCoreIconModule(id: string) {
   const moduleName = iconModuleName(id);
-  return Boolean(moduleName && STUDIO_CORE_ICON_MODULES.has(moduleName));
+  return Boolean(moduleName && (STUDIO_CORE_ICON_MODULES.has(moduleName) || Boolean(moduleName)));
 }
 
 function studioCrossOriginIsolationPlugin(): Plugin {

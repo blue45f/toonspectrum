@@ -40482,6 +40482,8 @@ function getRuntimeTranslationBundle(locale: string): Dict | undefined {
   return runtimeTranslationBundles.get(normalizeLocaleCode(locale));
 }
 
+const studioAssetLoadStatus = new Map<string, Promise<void>>();
+
 async function loadStudioAssetIfAvailable(locale: string): Promise<void> {
   const normalized = normalizeLocaleCode(locale);
   if (!normalized) return;
@@ -40491,33 +40493,46 @@ async function loadStudioAssetIfAvailable(locale: string): Promise<void> {
       return;
     }
   }
-  const primaryCandidate = candidates[0];
-  if (!primaryCandidate) return;
-  try {
-    if (typeof fetch !== "function") return;
-    const baseUrl = typeof window !== "undefined" && (window as unknown as Record<string, string>).__VITE_BASE_URL__
-      ? (window as unknown as Record<string, string>).__VITE_BASE_URL__
-      : "/";
-    const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-    const response = await fetch(`${normBaseUrl}i18n/studio/${primaryCandidate}.json`, {
-      cache: "force-cache",
-      credentials: "same-origin",
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data && typeof data === "object") {
-        registerI18nLocaleEntries(primaryCandidate, data);
-        if (primaryCandidate !== normalized) {
-          registerI18nLocaleEntries(normalized, data);
+  const assetLocale =
+    candidates.find((c) => DICT[c] || c === "ko" || c === "en" || c === "ja" || c === "zh" || !c.includes("-"))
+    || candidates[0].split("-")[0]
+    || "en";
+
+  const existingJob = studioAssetLoadStatus.get(assetLocale);
+  if (existingJob) return existingJob;
+
+  const job = (async () => {
+    try {
+      if (typeof fetch !== "function") return;
+      const baseUrl =
+        typeof window !== "undefined" && (window as unknown as Record<string, string>).__VITE_BASE_URL__
+          ? (window as unknown as Record<string, string>).__VITE_BASE_URL__
+          : "/";
+      const normBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+      const response = await fetch(`${normBaseUrl}i18n/studio/${assetLocale}.json`, {
+        cache: "force-cache",
+        credentials: "same-origin",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data === "object") {
+          registerI18nLocaleEntries(assetLocale, data);
+          if (assetLocale !== normalized) {
+            registerI18nLocaleEntries(normalized, data);
+          }
+          useI18n.setState((state) => ({
+            translationBundleRevision: state.translationBundleRevision + 1,
+          }));
         }
-        useI18n.setState((state) => ({
-          translationBundleRevision: state.translationBundleRevision + 1,
-        }));
       }
+    } catch {
+      // Ignore if fetch not available or file not found
     }
-  } catch {
-    // Ignore if fetch not available or file not found
-  }
+  })();
+
+  studioAssetLoadStatus.set(assetLocale, job);
+  studioAssetLoadStatus.set(normalized, job);
+  return job;
 }
 
 async function loadRuntimeTranslationBundle(locale: string): Promise<void> {
