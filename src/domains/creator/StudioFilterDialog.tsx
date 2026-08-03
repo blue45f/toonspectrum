@@ -397,7 +397,13 @@ export function StudioFilterDialog({
   });
 
   useEffect(() => {
-    reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
+    let frameId: number | null = null;
+    frameId = requestAnimationFrame(() => {
+      reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
+    });
+    return () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, [draft, previewEnabled]);
 
   useEffect(() => {

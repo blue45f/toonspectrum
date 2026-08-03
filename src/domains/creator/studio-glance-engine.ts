@@ -45,8 +45,12 @@ export class StudioGlanceEngine {
     width: number,
     height: number
   ): Uint8ClampedArray {
-    const output = new Uint8ClampedArray(rgba.length);
+    if (rgba.length === 0) return rgba;
     const { wetEdgeGloss, paperBumpDepth, contrast, saturation } = this.params;
+    if (contrast === 1.0 && saturation === 1.0 && wetEdgeGloss === 0 && paperBumpDepth === 0) {
+      return rgba;
+    }
+    const output = new Uint8ClampedArray(rgba.length);
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
