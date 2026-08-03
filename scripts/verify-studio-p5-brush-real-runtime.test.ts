@@ -106,6 +106,19 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(verifier).toContain("process.exitCode = 2");
   });
 
+  it("isolates the graphics gate from application-wide Vite transforms and dependency scans", () => {
+    const verifier = source(
+      "scripts/verify-studio-p5-brush-real-runtime.mjs",
+    );
+
+    expect(verifier).toContain("configFile: false");
+    expect(verifier).toContain("envFile: false");
+    expect(verifier).toContain("entries: [HARNESS_ENTRY.slice(1)]");
+    expect(verifier).not.toContain(
+      'configFile: join(process.cwd(), "vite.config.ts")',
+    );
+  });
+
   it("keeps standalone runtime and resolved-peer license roles explicit", () => {
     const notice = source("THIRD_PARTY_NOTICES.md");
     const generator = source("scripts/generate-third-party-notices.mjs");

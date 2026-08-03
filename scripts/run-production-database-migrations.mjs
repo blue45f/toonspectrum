@@ -141,6 +141,66 @@ export function validateRuntimeDatabaseRole(runtimeDatabaseRole) {
   return runtimeDatabaseRole;
 }
 
+export function buildAuthRuntimeAclSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  const quotedRole = `"${role}"`;
+  return `
+REVOKE ALL ON TABLE
+  public."user",
+  public.account
+FROM PUBLIC;
+
+REVOKE ALL ON TABLE
+  public."user",
+  public.account
+FROM ${quotedRole};
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON TABLE public."user", public.account
+  TO ${quotedRole};
+`;
+}
+
+/**
+ * A true result means the runtime role is missing one of the authentication
+ * lifecycle DML capabilities or has gained a privilege outside that contract.
+ * Keep this condition beside the GRANT builder so migration normalization and
+ * the production verifier cannot drift apart.
+ */
+export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
+  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
+  return `(
+    NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public."user"',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.account',
+      'SELECT, INSERT, UPDATE, DELETE'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'TRUNCATE',
+        'REFERENCES',
+        'TRIGGER'
+      ]::text[]) AS elevated_privilege
+      WHERE pg_catalog.has_table_privilege(
+        ${sqlLiteral(role)},
+        'public."user"',
+        elevated_privilege
+      )
+      OR pg_catalog.has_table_privilege(
+        ${sqlLiteral(role)},
+        'public.account',
+        elevated_privilege
+      )
+    )
+  )`;
+}
+
 export function buildCreatorAssetObjectStorageRuntimeAclSql(
   runtimeDatabaseRole,
 ) {
@@ -1493,9 +1553,9 @@ export function runProductionDatabaseMigrations({
       ledger = readLedger(databaseUrl);
     }
 
-    // Normalize the two post-baseline object-storage relations to the minimum runtime surface on
-    // every run. This also repairs providers that do not preserve ALTER DEFAULT PRIVILEGES across
-    // independently owned migration and application roles.
+    // Normalize dynamic-role ACLs on every run. This also repairs providers that do not preserve
+    // ALTER DEFAULT PRIVILEGES across independently owned migration and application roles.
+    psql(databaseUrl, buildAuthRuntimeAclSql(runtimeDatabaseRole));
     psql(
       databaseUrl,
       buildCreatorAssetObjectStorageRuntimeAclSql(runtimeDatabaseRole),

@@ -210,7 +210,15 @@ async function main() {
   const origin = `http://127.0.0.1:${port}`;
   const viteServer = await createViteServer({
     root: process.cwd(),
-    configFile: join(process.cwd(), "vite.config.ts"),
+    // This harness imports only the isolated production Worker graph. Loading
+    // the application-wide React/compiler/catalog configuration needlessly
+    // expands the verifier's memory footprint and can perturb software-WebGL
+    // scheduling on small Linux runners.
+    configFile: false,
+    envFile: false,
+    optimizeDeps: {
+      entries: [HARNESS_ENTRY.slice(1)],
+    },
     logLevel: "warn",
     appType: "custom",
     server: { port, strictPort: true, host: "127.0.0.1" },

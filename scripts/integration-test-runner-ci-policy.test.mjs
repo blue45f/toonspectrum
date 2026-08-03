@@ -42,4 +42,34 @@ describe("database integration runner CI policy", () => {
       commands.filter((command) => command === "pnpm run test:redis:integration"),
     ).toHaveLength(1);
   });
+
+  it("derives migration summary expectations from the canonical manifest", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    const steps = workflow.jobs?.verify?.steps ?? [];
+    const adoptionStep = steps.find(
+      (step) => step.name === "Adopt verified history and apply genuine pending migrations",
+    );
+    const rerunStep = steps.find(
+      (step) => step.name === "Prove pending-only migration rerun",
+    );
+
+    expect(adoptionStep?.run).toContain(
+      "manifest_count=\"$(grep -cve '^[[:space:]]*$' \"$manifest_path\")\"",
+    );
+    expect(adoptionStep?.run).toContain(
+      "expected_applied=$((manifest_count - adoption_baseline - bootstrap_count))",
+    );
+    expect(adoptionStep?.run).toContain(
+      "expected_verified=$((adoption_baseline + bootstrap_count))",
+    );
+    expect(adoptionStep?.run).not.toMatch(
+      /19 adopted, [0-9]+ applied, [0-9]+ checksum-verified skips/u,
+    );
+    expect(rerunStep?.run).toContain(
+      "0 applied, ${manifest_count} checksum-verified skips",
+    );
+    expect(rerunStep?.run).not.toMatch(
+      /0 applied, [0-9]+ checksum-verified skips/u,
+    );
+  });
 });

@@ -10,7 +10,7 @@
 | 목적 | 현재 권위 | 상태 |
 | --- | --- | --- |
 | SPA와 bounded HTTP API | Vercel | production |
-| 관계형 데이터·migration 원장 | Neon/호환 PostgreSQL | `0001`~`0024` checksum 원장·capability 검증 완료 |
+| 관계형 데이터·migration 원장 | Neon/호환 PostgreSQL | `0001`~`0025` checksum 원장·capability 검증 완료 |
 | Studio ephemeral realtime | Cloudflare Durable Objects | `workers.dev` origin 활성, custom hostname/DNS/TLS는 별도 대기 |
 | 분산 제한·coordination | Upstash | production 활성 |
 | 비공개 원본·파생·export object | Supabase private Storage | production 활성 |
@@ -114,9 +114,9 @@ unset BOOTSTRAP_RUNTIME_DATABASE_PASSWORD MIGRATION_DATABASE_URL
 명령은 reviewed historical baseline을 구성하고 `adopt` 모드로 checksum 원장을 초기화한 뒤 실제
 pending migration을 적용하며, apply 재실행과 production capability verifier까지 성공해야 완료로
 판정한다. verifier는 runtime role의 role membership, DB/public DDL 권한, DB·extension·public
-relation 소유권을 거부하고, migration ledger의 PUBLIC/runtime 접근 차단 및 0024 object-storage
-컬럼 단위 권한을 migration runner와 같은 계약으로 확인한다. 대상이 비어 있지 않으면 자동
-삭제하지 않고 중단한다. 백업을 확인한 폐기 가능 DB만
+relation 소유권을 거부하고, migration ledger의 PUBLIC/runtime 접근 차단, 0024 object-storage
+컬럼 단위 권한 및 0025 인증 lifecycle 계약을 migration runner와 같은 기준으로 확인한다. 대상이
+비어 있지 않으면 자동 삭제하지 않고 중단한다. 백업을 확인한 폐기 가능 DB만
 계획에 표시되는 `RESET-AND-BOOTSTRAP-TOONSPECTRUM-DATABASE:<정확한 DB명>` 토큰을 별도
 `--reset-confirmation`으로 제공할 수 있다. 이 토큰은 `public`과 `toonspectrum_ops`의 데이터 및
 객체를 삭제하므로 기존 운영 DB upgrade에는 사용하지 않는다. 원장 초기화가 끝나기 전에는 API를

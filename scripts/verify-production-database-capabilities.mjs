@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import {
+  buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildRuntimeDatabaseRoleBoundaryStateSql,
@@ -16,6 +17,8 @@ import {
   createPsqlEnvironment,
   validateProductionDatabaseUrl,
 } from "./validate-production-database-url.mjs";
+
+export { buildAuthRuntimeAclViolationSql } from "./run-production-database-migrations.mjs";
 
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIRECTORY, "..");
@@ -62,40 +65,6 @@ export function validateRuntimeDatabaseRole(runtimeDatabaseRole) {
     );
   }
   return runtimeDatabaseRole;
-}
-
-export function buildAuthRuntimeAclViolationSql(runtimeDatabaseRole) {
-  const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
-  return `(
-    NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
-      'public."user"',
-      'SELECT, INSERT, UPDATE, DELETE'
-    )
-    OR NOT pg_catalog.has_table_privilege(
-      ${sqlLiteral(role)},
-      'public.account',
-      'SELECT, INSERT, UPDATE, DELETE'
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM unnest(ARRAY[
-        'TRUNCATE',
-        'REFERENCES',
-        'TRIGGER'
-      ]::text[]) AS elevated_privilege
-      WHERE pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
-        'public."user"',
-        elevated_privilege
-      )
-      OR pg_catalog.has_table_privilege(
-        ${sqlLiteral(role)},
-        'public.account',
-        elevated_privilege
-      )
-    )
-  )`;
 }
 
 export function buildAuthSchemaCapabilityViolationSql() {

@@ -127,7 +127,8 @@ jobs:
           SQL
       # Production의 실제 무원장 baseline(0019까지 적용)을 재현한다. 이 setup은 빈 CI DB에서만
       # historical SQL을 한 번 실행한다. runner의 adopt는 이 구조/0017 marker를 검증해 0001~0019
-      # checksum을 재실행 없이 기록하고, genuine pending인 0020~0022만 실행해야 한다.
+      # checksum을 재실행 없이 기록하고, 0023 ledger bootstrap을 제외한 post-baseline
+      # migration을 실제 SQL 경로로 실행해야 한다.
       - name: Reproduce reviewed historical baseline through 0019
         run: |
           set -euo pipefail
@@ -156,6 +157,13 @@ jobs:
       - name: Adopt verified history and apply genuine pending migrations
         run: |
           set -euo pipefail
+          manifest_path='scripts/production-database-migrations.manifest'
+          adoption_baseline=19
+          manifest_count="$(grep -cve '^[[:space:]]*$' "$manifest_path")"
+          bootstrap_count="$(grep -c '/0023_production_migration_ledger.sql$' "$manifest_path")"
+          test "$bootstrap_count" -eq 1
+          expected_applied=$((manifest_count - adoption_baseline - bootstrap_count))
+          expected_verified=$((adoption_baseline + bootstrap_count))
           adoption_output="$(
             MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
               node scripts/run-production-database-migrations.mjs \
@@ -166,12 +174,12 @@ jobs:
               --confirmation ADOPT-TOONSPECTRUM-MIGRATION-HISTORY
           )"
           printf '%s\n' "$adoption_output"
-          grep -Fq \
-            '19 adopted, 4 applied, 20 checksum-verified skips' \
-            <<< "$adoption_output"
+          expected_summary="${adoption_baseline} adopted, ${expected_applied} applied, ${expected_verified} checksum-verified skips"
+          grep -Fq "$expected_summary" <<< "$adoption_output"
       - name: Prove pending-only migration rerun
         run: |
           set -euo pipefail
+          manifest_count="$(grep -cve '^[[:space:]]*$' scripts/production-database-migrations.manifest)"
           rerun_output="$(
             MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \
               node scripts/run-production-database-migrations.mjs \
@@ -182,7 +190,7 @@ jobs:
                 --confirmation APPLY-TOONSPECTRUM-PRODUCTION-MIGRATIONS
           )"
           printf '%s\n' "$rerun_output"
-          grep -Fq '0 applied, 24 checksum-verified skips' <<< "$rerun_output"
+          grep -Fq "0 applied, ${manifest_count} checksum-verified skips" <<< "$rerun_output"
       - name: Verify full runtime readiness and exact migration ledger
         run: |
           MIGRATION_DATABASE_URL="$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" \

@@ -23,7 +23,7 @@ on:
         required: false
         type: string
       migration_mode:
-        description: "apply=대기 migration만, adopt=0019 구조 증명·과거 checksum 채택·0020~22·0024 적용, repair=기존 중단 row만 복구"
+        description: "apply=대기 migration만, adopt=0019 구조 증명·과거 checksum 채택·0020~22·0024~25 적용, repair=기존 중단 row만 복구"
         required: true
         default: apply
         type: choice

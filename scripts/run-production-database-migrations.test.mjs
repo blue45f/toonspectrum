@@ -4,6 +4,8 @@ import { expect, test } from "vitest";
 
 import {
   POST_BASELINE_RELATIONS,
+  buildAuthRuntimeAclSql,
+  buildAuthRuntimeAclViolationSql,
   buildCreatorAssetObjectStorageRuntimeAclSql,
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildHistoricalAdoptionVerificationSql,
@@ -72,6 +74,22 @@ test("runtime database role is explicit and identifier-safe", () => {
     expect(() => validateRuntimeDatabaseRole(invalidRole)).toThrow(
       /explicit lowercase PostgreSQL role/u,
     );
+  }
+});
+
+test("auth runtime ACL is normalized to the exact DML contract", () => {
+  const sql = buildAuthRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildAuthRuntimeAclViolationSql("toonspectrum_runtime");
+
+  expect(sql).toContain('public."user",\n  public.account\nFROM PUBLIC;');
+  expect(sql).toContain('public."user",\n  public.account\nFROM "toonspectrum_runtime";');
+  expect(sql).toContain(
+    'GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public."user", public.account',
+  );
+  expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
+  expect(violation).toContain("'SELECT, INSERT, UPDATE, DELETE'");
+  for (const elevatedPrivilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
+    expect(violation).toContain(`'${elevatedPrivilege}'`);
   }
 });
 
