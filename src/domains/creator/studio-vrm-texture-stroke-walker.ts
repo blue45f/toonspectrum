@@ -38,6 +38,8 @@ const STAMP_SPACING_RATIO: Readonly<Record<StudioStampBrushKind, number>> = Obje
   pencil: 0.24,
   ink: 0.32,
   watercolor: 0.11,
+  mypaint: 0.2,
+  "krita-auto": 0.15,
 });
 
 export interface StudioVrmTextureStrokeWalkerSnapshot {

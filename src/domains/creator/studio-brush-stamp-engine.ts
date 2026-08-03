@@ -10,7 +10,13 @@
  * 이 계약 덕에 뷰포트 리플레이·커밋 핸드오프에서 획의 모양이 변하지 않는다.
  */
 
-export type StudioStampBrushKind = "airbrush" | "pencil" | "ink" | "watercolor";
+export type StudioStampBrushKind =
+  | "airbrush"
+  | "pencil"
+  | "ink"
+  | "watercolor"
+  | "mypaint"
+  | "krita-auto";
 
 /**
  * One logical stamp stroke may be replayed from an imported/collaborative document. A finite cap
@@ -25,13 +31,22 @@ export function resolveStudioStampBrushKind(
 ): StudioStampBrushKind | null {
   switch (brushId) {
     case "ink-brush":
+    case "inkwash-pen":
       return "ink";
     case "airbrush-fine":
       return "airbrush";
     case "pencil-grain":
       return "pencil";
     case "wash-brush":
+    case "inkwash-water-brush":
+    case "inkwash-bleed-wash":
       return "watercolor";
+    case "mypaint-smudge-oil":
+    case "mypaint-watercolor-expressive":
+      return "mypaint";
+    case "krita-auto-soft":
+    case "krita-dual-pattern":
+      return "krita-auto";
     default:
       return null;
   }
@@ -59,6 +74,8 @@ const STAMP_SPACING_RATIO: Record<StudioStampBrushKind, number> = {
   ink: 0.32,
   // 수채는 dab 이 겹치며 링이 연속된 젖은 경계로 읽히도록 촘촘하게 찍는다.
   watercolor: 0.11,
+  mypaint: 0.2,
+  "krita-auto": 0.15,
 };
 
 /** 종류별 기본 파라미터 — UI 슬라이더의 초기값이자 스타일 미지정 필드의 폴백. */
@@ -70,6 +87,8 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   pencil: { flow: 0.62, hardness: 0.85, minSizeRatio: 0.35 },
   ink: { flow: 1, hardness: 1, minSizeRatio: 0.08 },
   watercolor: { flow: 0.3, hardness: 0.35, minSizeRatio: 0.6 },
+  mypaint: { flow: 0.75, hardness: 0.6, minSizeRatio: 0.25 },
+  "krita-auto": { flow: 0.85, hardness: 0.75, minSizeRatio: 0.3 },
 };
 
 /** 사용자 조절 가능한 스탬프 파라미터(부분 지정) — DrawEl.stamp 로 획에 영속화된다. */
@@ -245,6 +264,31 @@ function drawDab(
       context.arc(gx, gy, radius * 0.2, 0, Math.PI * 2);
       context.fill();
     }
+    return;
+  }
+  if (kind === "mypaint") {
+    const hardness = clamp01(style.hardness);
+    const gradient = context.createRadialGradient(x, y, radius * hardness * 0.5, x, y, radius);
+    gradient.addColorStop(0, style.color);
+    gradient.addColorStop(0.8, style.color);
+    gradient.addColorStop(1, "transparent");
+    context.globalAlpha = alpha * 0.9;
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+    return;
+  }
+  if (kind === "krita-auto") {
+    const hardness = clamp01(style.hardness);
+    const gradient = context.createRadialGradient(x, y, radius * hardness * 0.7, x, y, radius);
+    gradient.addColorStop(0, style.color);
+    gradient.addColorStop(1, "transparent");
+    context.globalAlpha = alpha * 0.95;
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
     return;
   }
   // ink: 경계가 선명한 원 dab — 속도·필압 반응 폭이 질감의 전부라 형태는 단순하게 유지한다.
