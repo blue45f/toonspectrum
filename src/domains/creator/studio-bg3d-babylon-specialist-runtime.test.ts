@@ -224,6 +224,60 @@ describe("Studio Babylon isolated specialist runtime", () => {
     await runtime.dispose();
   });
 
+  it("bounds an explicit engine initialization budget and disposes a result that arrives late", async () => {
+    const harness = bindingHarness();
+    const initialization = deferred<StudioBg3dBabylonEngineHandle>();
+    harness.webGpu.mockImplementationOnce(() => initialization.promise);
+
+    expect(() => createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      engineInitializationTimeoutMs: 999,
+      loadBindings: async () => harness.bindings,
+    })).toThrow(RangeError);
+    expect(() => createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      engineInitializationTimeoutMs: 60_001,
+      loadBindings: async () => harness.bindings,
+    })).toThrow(RangeError);
+
+    vi.useFakeTimers();
+    try {
+      const runtime = createStudioBg3dBabylonSpecialistRuntime({
+        backend: "webgpu",
+        canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+        engineInitializationTimeoutMs: 1_000,
+        loadBindings: async () => harness.bindings,
+      });
+      const pending = runtime.runIsolated(job("bounded-webgpu-initialization"));
+      await vi.advanceTimersByTimeAsync(999);
+      expect(harness.webGpu).toHaveBeenCalledOnce();
+
+      const rejection = expect(pending).rejects.toMatchObject({
+        code: "engine-init-failed",
+        cause: {
+          message: "Babylon engine initialization exceeded 1000 milliseconds.",
+          name: "TimeoutError",
+        },
+      });
+      await vi.advanceTimersByTimeAsync(1);
+      await rejection;
+      expect(runtime.getState()).toMatchObject({
+        engineInitialized: false,
+        status: "idle",
+      });
+
+      const lateEngine = new FakeEngine();
+      initialization.resolve(lateEngine);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(lateEngine.dispose).toHaveBeenCalledOnce();
+      await runtime.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("serializes direct adapter calls and gives each fresh scene a monotonic epoch", async () => {
     const harness = bindingHarness();
     const firstRelease = deferred<void>();

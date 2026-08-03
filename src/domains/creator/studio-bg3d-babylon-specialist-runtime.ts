@@ -98,6 +98,12 @@ export interface StudioBg3dBabylonSpecialistRuntimeOptions {
    */
   readonly backend?: StudioBg3dBabylonBackend;
   readonly capabilities?: readonly StudioBg3dRuntimeCapability[];
+  /**
+   * Keeps production initialization fail-closed at 20 seconds while allowing an explicit
+   * conformance harness to budget for a slower software WebGPU adapter. The value is bounded so a
+   * wedged adapter can never hold the serialized specialist queue indefinitely.
+   */
+  readonly engineInitializationTimeoutMs?: number;
   readonly execute?: StudioBg3dBabylonSpecialistExecutor;
   readonly loadBindings: () => Promise<StudioBg3dBabylonRuntimeBindings>;
   readonly settings?: Partial<StudioBg3dBabylonEngineSettings>;
@@ -128,6 +134,8 @@ const MAX_TRANSFORM_NODE_ID_LENGTH = 128;
 const MAX_TRANSFORM_POSITION = 1_000_000;
 const MIN_QUATERNION_LENGTH = 1e-8;
 const BABYLON_ENGINE_INIT_TIMEOUT_MS = 20_000;
+const MIN_BABYLON_ENGINE_INIT_TIMEOUT_MS = 1_000;
+const MAX_BABYLON_ENGINE_INIT_TIMEOUT_MS = 60_000;
 
 const DEFAULT_SETTINGS: StudioBg3dBabylonEngineSettings = Object.freeze({
   antialias: true,
@@ -199,6 +207,22 @@ function sanitizeSettings(
     premultipliedAlpha: value?.premultipliedAlpha ?? DEFAULT_SETTINGS.premultipliedAlpha,
     stencil: value?.stencil ?? DEFAULT_SETTINGS.stencil,
   });
+}
+
+function sanitizeEngineInitializationTimeoutMs(value: number | undefined): number {
+  const timeoutMs = value ?? BABYLON_ENGINE_INIT_TIMEOUT_MS;
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs < MIN_BABYLON_ENGINE_INIT_TIMEOUT_MS ||
+    timeoutMs > MAX_BABYLON_ENGINE_INIT_TIMEOUT_MS
+  ) {
+    throw new RangeError(
+      `Babylon engine initialization timeout must be an integer between ` +
+        `${MIN_BABYLON_ENGINE_INIT_TIMEOUT_MS} and ` +
+        `${MAX_BABYLON_ENGINE_INIT_TIMEOUT_MS} milliseconds.`,
+    );
+  }
+  return timeoutMs;
 }
 
 function sanitizeCapabilities(
@@ -429,9 +453,18 @@ function safeDispose(resource: { dispose(): void } | null): void {
   }
 }
 
+function engineInitializationTimeoutCause(timeoutMs: number): Error {
+  const error = new Error(
+    `Babylon engine initialization exceeded ${timeoutMs} milliseconds.`,
+  );
+  error.name = "TimeoutError";
+  return error;
+}
+
 function awaitBabylonEngineInitialization(
   operation: Promise<StudioBg3dBabylonEngineHandle>,
   signal: AbortSignal,
+  timeoutMs: number,
 ): Promise<StudioBg3dBabylonEngineHandle> {
   return new Promise((resolve, reject) => {
     let acceptingResult = true;
@@ -444,8 +477,11 @@ function awaitBabylonEngineInitialization(
     };
     const onAbort = () => finish(() => reject(specialistError("aborted")));
     const timeout = setTimeout(
-      () => finish(() => reject(specialistError("engine-init-failed"))),
-      BABYLON_ENGINE_INIT_TIMEOUT_MS,
+      () => finish(() => reject(specialistError(
+        "engine-init-failed",
+        engineInitializationTimeoutCause(timeoutMs),
+      ))),
+      timeoutMs,
     );
     signal.addEventListener("abort", onAbort, { once: true });
     operation.then(
@@ -476,6 +512,7 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
   readonly #backend: StudioBg3dBabylonBackend;
   readonly #canvas: HTMLCanvasElement | OffscreenCanvas;
   readonly #execute: StudioBg3dBabylonSpecialistExecutor;
+  readonly #engineInitializationTimeoutMs: number;
   readonly #loadBindings: () => Promise<StudioBg3dBabylonRuntimeBindings>;
   readonly #settings: StudioBg3dBabylonEngineSettings;
   readonly #canvasTarget: EventTarget;
@@ -502,6 +539,9 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
     this.#canvas = options.canvas;
     this.#canvasTarget = options.canvas as unknown as EventTarget;
     this.#execute = options.execute ?? defaultExecutor;
+    this.#engineInitializationTimeoutMs = sanitizeEngineInitializationTimeoutMs(
+      options.engineInitializationTimeoutMs,
+    );
     this.#loadBindings = options.loadBindings;
     this.#settings = sanitizeSettings(options.settings);
     this.#canvasTarget.addEventListener("webglcontextlost", this.#onCanvasContextLost);
@@ -587,6 +627,7 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
           ? bindings.createWebGpuEngine(this.#canvas, this.#settings)
           : bindings.createWebGlEngine(this.#canvas, this.#settings)),
         signal,
+        this.#engineInitializationTimeoutMs,
       );
     } catch (error) {
       if (error instanceof StudioBg3dBabylonSpecialistError) throw error;

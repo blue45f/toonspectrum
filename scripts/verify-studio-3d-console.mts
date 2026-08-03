@@ -76,6 +76,7 @@ const STUDIO_BG3D_LT_RENDER_WORKER_FILE_PATTERN =
   /^studio-bg3d-lt-render\.worker-[A-Za-z0-9_-]+\.js$/u;
 const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
+const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
 const MAGIC_ALIGNMENT_VIEWPORT = Object.freeze({ width: 320, height: 180 });
 const MAGIC_ALIGNMENT_SELECTED_NODE_ID = "magic-alignment-asymmetric-box";
 const MAGIC_ALIGNMENT_SELECTED_STABLE_ID =
@@ -853,17 +854,20 @@ async function runBabylonStableIdOrientationParityProof(
     entryUrl: specialistEntryUrl,
     height,
     profiles,
+    webGpuEngineInitializationTimeoutMs,
     widths,
   }) => {
     const entry = await import(specialistEntryUrl) as {
       readonly createStudioBg3dBabylonSpecialist?: (options: {
         readonly backend: "webgl2" | "webgpu";
         readonly canvas: HTMLCanvasElement;
+        readonly engineInitializationTimeoutMs?: number;
         readonly settings: {
           readonly failIfMajorPerformanceCaveat: boolean;
         };
       }) => {
         readonly dispose: () => void | Promise<void>;
+        readonly getState?: () => unknown;
         readonly runIsolated: (job: {
           readonly id: string;
           readonly request: {
@@ -933,6 +937,9 @@ async function runBabylonStableIdOrientationParityProof(
       const runtime = entry.createStudioBg3dBabylonSpecialist!({
         backend,
         canvas,
+        engineInitializationTimeoutMs: backend === "webgpu"
+          ? webGpuEngineInitializationTimeoutMs
+          : undefined,
         // This is a conformance proof, not a production quality-policy admission check. Keep the
         // same software/headless allowance as the visible diagnostic so CI can exercise packing.
         settings: { failIfMajorPerformanceCaveat: false },
@@ -961,8 +968,40 @@ async function runBabylonStableIdOrientationParityProof(
               snapshot,
             });
           } catch (cause) {
+            const seen = new Set<unknown>();
+            const errorChain: string[] = [];
+            let current: unknown = cause;
+            for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
+              if (seen.has(current)) {
+                errorChain.push("[circular cause]");
+                break;
+              }
+              seen.add(current);
+              if (typeof current !== "object" || current === null) {
+                errorChain.push(String(current));
+                break;
+              }
+              const record = current as {
+                readonly cause?: unknown;
+                readonly code?: unknown;
+                readonly message?: unknown;
+                readonly name?: unknown;
+              };
+              const name = typeof record.name === "string" ? record.name : "Error";
+              const code = typeof record.code === "string" ? `[${record.code}]` : "";
+              const message = typeof record.message === "string"
+                ? record.message
+                : Object.prototype.toString.call(current);
+              errorChain.push(`${name}${code}: ${message}`);
+              if (!("cause" in record)) break;
+              current = record.cause;
+            }
+            const runtimeState = typeof runtime.getState === "function"
+              ? runtime.getState()
+              : null;
             throw new Error(
-              `${backend} ${width}x${height} stable-ID parity capture failed`,
+              `${backend} ${width}x${height} stable-ID parity capture failed: ` +
+                `${errorChain.join(" <- ")}; runtimeState=${JSON.stringify(runtimeState)}`,
               { cause },
             );
           }
@@ -1283,6 +1322,7 @@ async function runBabylonStableIdOrientationParityProof(
       normal: STUDIO_BG3D_NORMAL_PROFILE,
       stableId: STUDIO_BG3D_STABLE_ID_PROFILE,
     },
+    webGpuEngineInitializationTimeoutMs: BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS,
     widths: BABYLON_STABLE_ID_PARITY_WIDTHS,
   });
 
