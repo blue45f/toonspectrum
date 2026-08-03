@@ -152,6 +152,13 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     expect(insert).toContain("camera: captureFrameCameraSettings");
     expect(insert).toContain("width: rendered.width");
     expect(insert).toContain("height: rendered.height");
+    expect(insert).toContain(
+      "createRuntime: ({ backend, canvas, capabilities, settings }) =>",
+    );
+    expect(insert).toContain(
+      "capabilities !== STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES",
+    );
+    expect(insert).toContain("capabilities,");
     expect(insert).toContain("bg3dScene: adapted.document");
     expect(insert).toContain("...(magicFilterMask ? { magicFilterMask } : {})");
     expect(insert).toContain(

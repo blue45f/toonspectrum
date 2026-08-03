@@ -11,3 +11,9 @@ export {
 export {
   encodeStudioBg3dLtLayers,
 } from "./studio-bg3d-lt-layer-encoder";
+export {
+  captureStudioBg3dMagicObjectIds,
+} from "./studio-bg3d-magic-object-id-capture";
+export {
+  createStudioBg3dRuntimeSnapshot,
+} from "./studio-bg3d-runtime-adapter";

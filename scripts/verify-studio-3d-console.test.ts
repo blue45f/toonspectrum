@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +25,25 @@ const EXPECTED_HANDSHAKE_CLOSE = [
   "'ws://127.0.0.1:51758/socket.io/?EIO=4&transport=websocket' failed: ",
   "Connection closed before receiving a handshake response",
 ].join("");
+const verifierSource = readFileSync(
+  new URL("./verify-studio-3d-console.mts", import.meta.url),
+  "utf8",
+);
+const magicProductionProofSource = readFileSync(
+  new URL(
+    "../src/domains/creator/studio-bg3d-magic-production-proof.ts",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
+function sourceBetween(startMarker: string, endMarker: string): string {
+  const start = verifierSource.indexOf(startMarker);
+  const end = verifierSource.indexOf(endMarker, start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return verifierSource.slice(start, end);
+}
 
 describe("3D static-preview Socket.IO diagnostics", () => {
   it("allows only the exact handshake close from the active 127.0.0.1 preview", () => {
@@ -128,5 +149,47 @@ describe("3D WebGPU conformance browser boundary", () => {
       { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
       { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
     ]);
+  });
+});
+
+describe("3D Magic production-preview product boundary", () => {
+  it("re-exports and exercises the shipped registry coordinator instead of a runtime shortcut", () => {
+    const alignmentProof = sourceBetween(
+      "async function runMagicLayerProductionAlignmentProof(",
+      "async function main(): Promise<void>",
+    );
+    const snapshot = alignmentProof.indexOf(
+      "productionProofEntry.createStudioBg3dRuntimeSnapshot(",
+    );
+    const capture = alignmentProof.indexOf(
+      "productionProofEntry.captureStudioBg3dMagicObjectIds({",
+    );
+
+    expect(magicProductionProofSource).toContain(
+      "captureStudioBg3dMagicObjectIds,",
+    );
+    expect(magicProductionProofSource).toContain(
+      'from "./studio-bg3d-magic-object-id-capture"',
+    );
+    expect(magicProductionProofSource).toContain(
+      "createStudioBg3dRuntimeSnapshot,",
+    );
+    expect(magicProductionProofSource).not.toContain(
+      "function captureStudioBg3dMagicObjectIds(",
+    );
+    expect(snapshot).toBeGreaterThanOrEqual(0);
+    expect(capture).toBeGreaterThan(snapshot);
+    expect(alignmentProof).toContain('backends: ["webgpu", "webgl2"]');
+    expect(alignmentProof).toContain(
+      "createRuntime: ({ backend, canvas, capabilities, settings }) =>",
+    );
+    expect(alignmentProof).toContain("capabilities,");
+    expect(alignmentProof).toContain('objectIdCapture.backend !== "webgpu"');
+    expect(alignmentProof).toContain("objectIdCapture.fallbackUsed");
+    expect(alignmentProof).toContain(
+      'objectIdCapture.attempts[0]?.outcome !== "succeeded"',
+    );
+    expect(alignmentProof).not.toContain(".runIsolated(");
+    expect(alignmentProof).not.toContain('kind: "artifact-capture-v2"');
   });
 });

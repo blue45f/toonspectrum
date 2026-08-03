@@ -1544,13 +1544,11 @@ async function runMagicLayerProductionAlignmentProof(
   await page.evaluate("globalThis.__name ??= (target) => target");
   const result = await page.evaluate(async ({
     babylonEntryUrl,
-    beautyProfile,
     expectedStableId,
     ltWorkerProtocolVersion,
     ltWorkerUrl,
     productionProofEntryUrl,
     scenarios,
-    stableIdProfile,
     threeCaptureUrl,
     threeModuleUrl,
     viewport,
@@ -1596,6 +1594,12 @@ async function runMagicLayerProductionAlignmentProof(
           readonly width: number;
         }[];
       };
+      readonly captureStudioBg3dMagicObjectIds?: typeof import(
+        "../src/domains/creator/studio-bg3d-magic-object-id-capture"
+      ).captureStudioBg3dMagicObjectIds;
+      readonly createStudioBg3dRuntimeSnapshot?: typeof import(
+        "../src/domains/creator/studio-bg3d-runtime-adapter"
+      ).createStudioBg3dRuntimeSnapshot;
     };
 
     const threeModule = await import(threeModuleUrl) as Record<string, unknown>;
@@ -1605,45 +1609,16 @@ async function runMagicLayerProductionAlignmentProof(
     >;
     const productionProofEntry =
       await import(productionProofEntryUrl) as ProductionProofEntry;
-    const babylonEntry = await import(babylonEntryUrl) as {
-      readonly createStudioBg3dBabylonSpecialist?: (options: {
-        readonly backend: "webgl2";
-        readonly canvas: HTMLCanvasElement;
-        readonly settings: {
-          readonly failIfMajorPerformanceCaveat: boolean;
-        };
-      }) => {
-        readonly dispose: () => void | Promise<void>;
-          readonly runIsolated: (job: {
-          readonly id: string;
-          readonly request: {
-            readonly artifacts: readonly [
-              {
-                readonly kind: "beauty";
-                readonly profile: string;
-              },
-              {
-                readonly kind: "object-id";
-                readonly profile: string;
-              },
-            ];
-            readonly height: number;
-            readonly kind: "artifact-capture-v2";
-            readonly width: number;
-          };
-          readonly signal: AbortSignal;
-          readonly snapshot: {
-            readonly assets: readonly [];
-            readonly canonicalDocumentJson: string;
-            readonly totalAssetBytes: 0;
-          };
-        }) => Promise<unknown>;
-      };
-    };
+    const babylonEntry = await import(babylonEntryUrl) as Pick<
+      typeof import("../src/domains/creator/studio-bg3d-babylon-specialist-entry"),
+      "createStudioBg3dBabylonSpecialist"
+    >;
     if (
       typeof threeCaptureModule.createStudioBg3dThreeWebglCaptureAdapter !== "function" ||
       typeof productionProofEntry.applyStudioBg3dCaptureFrameViewOffset !== "function" ||
       typeof productionProofEntry.encodeStudioBg3dLtLayers !== "function" ||
+      typeof productionProofEntry.captureStudioBg3dMagicObjectIds !== "function" ||
+      typeof productionProofEntry.createStudioBg3dRuntimeSnapshot !== "function" ||
       typeof babylonEntry.createStudioBg3dBabylonSpecialist !== "function"
     ) {
       throw new Error("Magic alignment production entries are malformed");
@@ -2178,95 +2153,77 @@ async function runMagicLayerProductionAlignmentProof(
         }
 
         const controller = new AbortController();
-        // `captureStudioBg3dMagicObjectIds` owns a fresh exact-size canvas/runtime for every
-        // backend attempt. Reusing the exact-scenario engine here would retain Babylon projection
-        // cache state and would not exercise the product lifetime.
-        const babylonCanvas = document.createElement("canvas");
-        babylonCanvas.width = scenario.width;
-        babylonCanvas.height = scenario.height;
-        const babylonRuntime = babylonEntry.createStudioBg3dBabylonSpecialist({
-          backend: "webgl2",
-          canvas: babylonCanvas,
-          settings: { failIfMajorPerformanceCaveat: false },
-        });
-        let raw: unknown;
+        // Exercise the shipped Magic coordinator, not a specialist runtime shortcut. This path
+        // proves trusted snapshot admission, capability-gated registry dispatch, atomic backend
+        // selection, result normalization, defensive copies, and owned runtime disposal.
+        const ownedBabylonCanvases: HTMLCanvasElement[] = [];
+        let objectIdCapture: import(
+          "../src/domains/creator/studio-bg3d-magic-object-id-capture"
+        ).StudioBg3dMagicObjectIdCaptureResult;
         try {
-          raw = await babylonRuntime.runIsolated({
-            id: `magic-production-alignment-${scenario.id}`,
-            request: {
-              artifacts: [
-                {
-                  kind: "beauty",
-                  profile: beautyProfile,
-                },
-                {
-                  kind: "object-id",
-                  profile: stableIdProfile,
-                },
-              ],
-              height: scenario.height,
-              kind: "artifact-capture-v2",
-              width: scenario.width,
+          const canonicalDocument = JSON.parse(
+            scenario.babylonCanonicalDocumentJson,
+          ) as import(
+            "../src/domains/creator/studio-bg3d-scene-document"
+          ).StudioBg3dSceneDocument;
+          const trustedSnapshot = productionProofEntry.createStudioBg3dRuntimeSnapshot(
+            canonicalDocument,
+            new Map(),
+          );
+          objectIdCapture = await productionProofEntry.captureStudioBg3dMagicObjectIds({
+            snapshot: trustedSnapshot,
+            width: scenario.width,
+            height: scenario.height,
+            jobId: `magic-production-alignment-${scenario.id}`,
+            backends: ["webgpu", "webgl2"],
+            createCanvas: () => {
+              const canvas = document.createElement("canvas");
+              ownedBabylonCanvases.push(canvas);
+              return canvas;
+            },
+            createRuntime: ({ backend, canvas, capabilities, settings }) => {
+              if (!(canvas instanceof HTMLCanvasElement)) {
+                throw new Error("Magic proof received a non-DOM canvas");
+              }
+              return babylonEntry.createStudioBg3dBabylonSpecialist({
+                backend,
+                canvas,
+                capabilities,
+                settings,
+              });
             },
             signal: controller.signal,
-            snapshot: Object.freeze({
-              assets: Object.freeze([]) as readonly [],
-              canonicalDocumentJson: scenario.babylonCanonicalDocumentJson,
-              totalAssetBytes: 0 as const,
-            }),
           });
         } catch (cause) {
-          throw new Error(`[${scenario.id}] Babylon object-ID capture failed`, { cause });
+          throw new Error(`[${scenario.id}] product Magic object-ID capture failed`, { cause });
         } finally {
-          await babylonRuntime.dispose();
-          babylonCanvas.remove();
+          for (const canvas of ownedBabylonCanvases) canvas.remove();
         }
         if (
-          typeof raw !== "object" ||
-          raw === null ||
-          (raw as { readonly kind?: unknown }).kind !== "studio-bg3d-artifact-capture"
+          objectIdCapture.backend !== "webgpu" ||
+          objectIdCapture.fallbackUsed ||
+          objectIdCapture.attempts.length !== 1 ||
+          objectIdCapture.attempts[0]?.runtimeId !== "babylon-webgpu-lab" ||
+          objectIdCapture.attempts[0]?.outcome !== "succeeded" ||
+          objectIdCapture.width !== scenario.width ||
+          objectIdCapture.height !== scenario.height ||
+          objectIdCapture.objectIds.length !== scenario.width * scenario.height
         ) {
-          throw new Error(`[${scenario.id}] unexpected Babylon object-ID envelope`);
+          throw new Error(`[${scenario.id}] malformed product Magic capture receipt`);
         }
-        const artifacts = (raw as {
-          readonly artifacts?: readonly {
-            readonly data?: unknown;
-            readonly kind?: unknown;
-            readonly legend?: unknown;
-          }[];
-        }).artifacts;
-        const beautyArtifact = artifacts?.find((artifact) => artifact.kind === "beauty");
-        const objectArtifact = artifacts?.find((artifact) => artifact.kind === "object-id");
-        if (
-          !(beautyArtifact?.data instanceof Uint8Array) ||
-          beautyArtifact.data.length !== scenario.width * scenario.height * 4 ||
-          !(objectArtifact?.data instanceof Uint32Array) ||
-          !Array.isArray(objectArtifact.legend) ||
-          objectArtifact.data.length !== scenario.width * scenario.height
-        ) {
-          throw new Error(`[${scenario.id}] malformed Babylon object-ID artifact`);
-        }
-        const legendEntry = (objectArtifact.legend as readonly {
-          readonly id?: unknown;
-          readonly stableId?: unknown;
-        }[]).find((entry) => entry.stableId === expectedStableId);
-        if (!legendEntry || !Number.isSafeInteger(legendEntry.id)) {
+        const legendEntry = objectIdCapture.legend.find(
+          (entry) => entry.stableId === expectedStableId,
+        );
+        if (!legendEntry) {
           throw new Error(
             `[${scenario.id}] selected stable ID is absent from the Babylon legend`,
           );
         }
-        const selectedObjectId = legendEntry.id as number;
+        const selectedObjectId = legendEntry.id;
         const babylonMask = Uint8Array.from(
-          objectArtifact.data,
+          objectIdCapture.objectIds,
           (value) => value === selectedObjectId ? 1 : 0,
         );
-        const babylonBeautyMask = new Uint8Array(
-          scenario.width * scenario.height,
-        );
-        for (let pixel = 0; pixel < babylonBeautyMask.length; pixel += 1) {
-          babylonBeautyMask[pixel] =
-            beautyArtifact.data[pixel * 4 + 3]! >= 32 ? 1 : 0;
-        }
         const three = statsForMask(
           threeMask,
           scenario.width,
@@ -2278,19 +2235,6 @@ async function runMagicLayerProductionAlignmentProof(
           scenario.width,
           scenario.height,
           `[${scenario.id}] Babylon object-ID`,
-        );
-        const babylonBeauty = statsForMask(
-          babylonBeautyMask,
-          scenario.width,
-          scenario.height,
-          `[${scenario.id}] Babylon beauty alpha`,
-        );
-        const babylonBeautyIdIou = intersectionOverUnion(
-          babylonBeautyMask,
-          babylonMask,
-          scenario.width,
-          scenario.height,
-          "direct",
         );
         const iou = {
           direct: intersectionOverUnion(
@@ -2377,8 +2321,6 @@ async function runMagicLayerProductionAlignmentProof(
         const diagnostics = {
           areaRatio,
           babylon,
-          babylonBeauty,
-          babylonBeautyIdIou,
           bestMirroredIou,
           bboxDelta,
           centroidDelta,
@@ -2416,7 +2358,6 @@ async function runMagicLayerProductionAlignmentProof(
     return summaries;
   }, {
     babylonEntryUrl: assetUrl(findBabylonSpecialistEntryFile()),
-    beautyProfile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
     expectedStableId: MAGIC_ALIGNMENT_SELECTED_STABLE_ID,
     ltWorkerProtocolVersion: STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION,
     ltWorkerUrl: assetUrl(findProductionAssetFile(
@@ -2428,7 +2369,6 @@ async function runMagicLayerProductionAlignmentProof(
       "Studio Magic production proof entry",
     )),
     scenarios: createMagicLayerAlignmentProofScenarios(),
-    stableIdProfile: STUDIO_BG3D_STABLE_ID_PROFILE,
     threeCaptureUrl: assetUrl(findProductionAssetFile(
       THREE_WEBGL_CAPTURE_FILE_PATTERN,
       "Three WebGL capture entry",

@@ -107,7 +107,7 @@ function namedReExports(file: ts.SourceFile): readonly NamedReExport[] {
 }
 
 describe("Studio BG3D Magic production proof boundary", () => {
-  it("re-exports only the exact shipped capture-frame and LT encode helpers", () => {
+  it("re-exports only the exact shipped Magic product helpers", () => {
     const { file } = parseModule(PROOF_ENTRY_FILE_NAME);
 
     expect(namedReExports(file)).toEqual([
@@ -118,6 +118,14 @@ describe("Studio BG3D Magic production proof boundary", () => {
       {
         names: ["encodeStudioBg3dLtLayers"],
         specifier: "./studio-bg3d-lt-layer-encoder",
+      },
+      {
+        names: ["captureStudioBg3dMagicObjectIds"],
+        specifier: "./studio-bg3d-magic-object-id-capture",
+      },
+      {
+        names: ["createStudioBg3dRuntimeSnapshot"],
+        specifier: "./studio-bg3d-runtime-adapter",
       },
     ]);
     expect(dynamicImports(file)).toEqual([]);

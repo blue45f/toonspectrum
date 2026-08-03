@@ -1678,7 +1678,6 @@ interface StudioHybridDccPersistenceUiState {
 }
 
 const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
-const STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS = 12_000;
 
 type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
@@ -4855,20 +4854,14 @@ function StudioCuttoonEditor() {
     });
     if (!authGate.shouldAttemptRecovery) {
       hybridDccPersistenceRef.current = null;
-      const authScopeTimeoutId = window.setTimeout(() => {
-        if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) return;
-        // Authentication is indeterminate, so user-scoped durable storage remains closed. The
-        // editor itself may proceed in memory; a later authoritative auth result transfers this
-        // exact workspace once and checkpoints it without discarding an older durable recovery.
-        hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope;
-        setHybridDccPersistenceUiState({
-          scope: hybridDccWorkspaceScope,
-          status: "session-only",
-        });
-      }, STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS);
+      // Session-only editing is available immediately, so transfer eligibility must become
+      // authoritative in the same effect. Delaying this marker allowed an auth response to cancel
+      // the old timeout and remount the DCC before its in-memory workspace moved to the new scope.
+      // Without an authored pending workspace the render-time handoff remains empty, so an older
+      // durable recovery can still load without being overwritten.
+      hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope;
       return () => {
         cancelled = true;
-        window.clearTimeout(authScopeTimeoutId);
       };
     }
     const persistenceSaveQueue = hybridDccPersistenceSaveQueueRef.current;

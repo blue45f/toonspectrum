@@ -8,8 +8,10 @@ import {
 } from "./studio-bg3d-artifact-capture-v2";
 import {
   captureStudioBg3dMagicObjectIds,
+  STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES,
   StudioBg3dMagicObjectIdCaptureError,
   type StudioBg3dMagicBabylonBackend,
+  type StudioBg3dMagicObjectIdRuntimeFactoryInput,
 } from "./studio-bg3d-magic-object-id-capture";
 import {
   createStudioBg3dRuntimeSnapshot,
@@ -78,7 +80,7 @@ function input(
     jobId: "magic-object-id",
     backends,
     createCanvas: vi.fn(() => ({ width: 0, height: 0 })),
-    createRuntime: vi.fn(({ backend }: { backend: StudioBg3dMagicBabylonBackend }) =>
+    createRuntime: vi.fn(({ backend }: StudioBg3dMagicObjectIdRuntimeFactoryInput) =>
       createRuntime(backend)
     ),
   };
@@ -87,12 +89,16 @@ function input(
 describe("captureStudioBg3dMagicObjectIds", () => {
   it("returns a defensive canonical object-ID receipt from the preferred backend", async () => {
     const webGpuResult = successResult(3, 2);
+    const jobs: StudioBg3dRuntimeAdapterJob[] = [];
     const disposeWebGpu = vi.fn();
     const disposeWebGl = vi.fn();
     const request = input((backend) =>
       adapter(
         backend,
-        async () => backend === "webgpu" ? webGpuResult : successResult(3, 2),
+        async (job) => {
+          jobs.push(job);
+          return backend === "webgpu" ? webGpuResult : successResult(3, 2);
+        },
         backend === "webgpu" ? disposeWebGpu : disposeWebGl,
       )
     );
@@ -108,6 +114,29 @@ describe("captureStudioBg3dMagicObjectIds", () => {
       attempts: [{ runtimeId: "babylon-webgpu-lab", outcome: "succeeded" }],
     });
     expect([...result.objectIds]).toEqual([0, 0, 0, 1, 0, 0]);
+    expect(request.createRuntime).toHaveBeenCalledTimes(2);
+    for (const [factoryInput] of request.createRuntime.mock.calls) {
+      expect(factoryInput.capabilities)
+        .toBe(STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES);
+    }
+    expect(jobs).toHaveLength(1);
+    const capturedJob = jobs[0];
+    expect(capturedJob?.request).toEqual({
+      kind: "artifact-capture-v2",
+      version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+      width: 3,
+      height: 2,
+      artifacts: [{
+        kind: "object-id",
+        profile: STUDIO_BG3D_STABLE_ID_PROFILE,
+      }],
+    });
+    expect(Object.isFrozen(capturedJob?.request)).toBe(true);
+    if (!capturedJob || capturedJob.request.kind !== "artifact-capture-v2") {
+      throw new Error("expected canonical artifact capture request");
+    }
+    expect(Object.isFrozen(capturedJob.request.artifacts)).toBe(true);
+    expect(Object.isFrozen(capturedJob.request.artifacts[0])).toBe(true);
     const source = webGpuResult.kind === STUDIO_BG3D_ARTIFACT_CAPTURE_KIND
       ? webGpuResult.artifacts[0]
       : null;

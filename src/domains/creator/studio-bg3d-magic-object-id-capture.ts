@@ -17,6 +17,12 @@ import {
 
 export type StudioBg3dMagicBabylonBackend = "webgpu" | "webgl2";
 
+/** Capabilities every Magic object-ID runtime must advertise at the registry boundary. */
+export const STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES = Object.freeze([
+  "capture-rgba-depth",
+  "multi-artifact-capture",
+] as const);
+
 export interface StudioBg3dMagicObjectIdCanvas {
   width: number;
   height: number;
@@ -25,6 +31,7 @@ export interface StudioBg3dMagicObjectIdCanvas {
 export interface StudioBg3dMagicObjectIdRuntimeFactoryInput {
   readonly backend: StudioBg3dMagicBabylonBackend;
   readonly canvas: StudioBg3dMagicObjectIdCanvas;
+  readonly capabilities: typeof STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES;
   readonly settings: {
     readonly failIfMajorPerformanceCaveat: boolean;
   };
@@ -154,6 +161,7 @@ export async function captureStudioBg3dMagicObjectIds(
       registry.register(input.createRuntime({
         backend,
         canvas,
+        capabilities: STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES,
         settings: { failIfMajorPerformanceCaveat: false },
       }));
     }

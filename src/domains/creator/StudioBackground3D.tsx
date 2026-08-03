@@ -276,6 +276,7 @@ import {
 } from "./studio-bg3d-magic-mask-png";
 import {
   captureStudioBg3dMagicObjectIds,
+  STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES,
   type StudioBg3dMagicBabylonBackend,
 } from "./studio-bg3d-magic-object-id-capture";
 import {
@@ -575,6 +576,7 @@ import type { StudioBg3dModelThumbnailThreeCaptureHandle } from "./studio-bg3d-m
 import type {
   StudioBg3dPhysicsTimelineWorkerSession,
 } from "./studio-bg3d-physics-worker-client";
+import type { StudioBg3dRuntimeCapability } from "./studio-bg3d-runtime-topology";
 import type {
   StudioBg3dShotBatchBuildOptions,
   StudioBg3dShotBatchContactSheet,
@@ -1527,6 +1529,7 @@ interface StudioBg3dBabylonSpecialistEntry {
   readonly createStudioBg3dBabylonSpecialist: (options: {
     readonly canvas: HTMLCanvasElement;
     readonly backend: StudioBg3dBabylonDiagnosticBackend;
+    readonly capabilities?: readonly StudioBg3dRuntimeCapability[];
     readonly settings?: {
       readonly failIfMajorPerformanceCaveat?: boolean;
     };
@@ -7615,13 +7618,17 @@ export function StudioBackground3D({
           jobId: `magic-${insertSceneEpoch}-${ltMagicCaptureGenerationRef.current}`,
           backends: magicBackends,
           createCanvas: () => document.createElement("canvas"),
-          createRuntime: ({ backend, canvas, settings }) => {
+          createRuntime: ({ backend, canvas, capabilities, settings }) => {
             if (!(canvas instanceof HTMLCanvasElement)) {
               throw new Error("Magic Layer canvas owner is unavailable.");
+            }
+            if (capabilities !== STUDIO_BG3D_MAGIC_OBJECT_ID_RUNTIME_CAPABILITIES) {
+              throw new Error("Magic Layer runtime capabilities changed unexpectedly.");
             }
             return babylonEntry.createStudioBg3dBabylonSpecialist({
               canvas,
               backend,
+              capabilities,
               settings,
             });
           },

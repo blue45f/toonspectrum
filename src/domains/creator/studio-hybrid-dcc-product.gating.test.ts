@@ -4,7 +4,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_CLOTH_XPBD_V2_BUDGETS } from "./studio-cloth-xpbd-kernel-v2";
 import {
@@ -108,6 +108,96 @@ function workspaceWithForgedActiveMesh(
   };
 }
 
+interface HybridDccAuthTransitionWorkspace {
+  readonly id: string;
+}
+
+interface HybridDccScopedWorkspace<TWorkspace> {
+  readonly scope: string;
+  readonly workspace: TWorkspace;
+}
+
+function createHybridDccAuthTransitionHarness<TWorkspace>(
+  initialScope: string,
+  initialDurableWorkspace: TWorkspace,
+) {
+  let currentScope = initialScope;
+  let fallbackScope: string | null = null;
+  let latestWorkspace: HybridDccScopedWorkspace<TWorkspace> | null = null;
+  let workspaceState: HybridDccScopedWorkspace<TWorkspace> | null = null;
+  let scopeTransfer: {
+    readonly fromScope: string;
+    readonly toScope: string;
+    readonly workspace: TWorkspace;
+  } | null = null;
+  let durableWorkspace = initialDurableWorkspace;
+  let durableSaveCount = 0;
+
+  return {
+    enterImmediateSessionOnly() {
+      // Mirrors StudioPage: session-only UI and transfer eligibility become authoritative together.
+      fallbackScope = currentScope;
+    },
+    edit(workspace: TWorkspace) {
+      workspaceState = { scope: currentScope, workspace };
+      latestWorkspace = { scope: currentScope, workspace };
+    },
+    async authenticate(nextScope: string): Promise<TWorkspace | undefined> {
+      const previousScope = currentScope;
+      if (previousScope !== nextScope && fallbackScope === previousScope) {
+        const pendingWorkspace = latestWorkspace?.scope === previousScope
+          ? latestWorkspace.workspace
+          : workspaceState?.scope === previousScope
+            ? workspaceState.workspace
+            : null;
+        if (pendingWorkspace) {
+          scopeTransfer = {
+            fromScope: previousScope,
+            toScope: nextScope,
+            workspace: pendingWorkspace,
+          };
+          latestWorkspace = { scope: nextScope, workspace: pendingWorkspace };
+        }
+      }
+      currentScope = nextScope;
+      const initialWorkspace = workspaceState?.scope === nextScope
+        ? workspaceState.workspace
+        : scopeTransfer?.toScope === nextScope
+          ? scopeTransfer.workspace
+          : undefined;
+
+      // Mirrors recovery admission: transfer only after durable load, then checkpoint once.
+      await Promise.resolve();
+      if (scopeTransfer?.toScope === nextScope) {
+        const pendingWorkspace = latestWorkspace?.scope === nextScope
+          ? latestWorkspace.workspace
+          : scopeTransfer.workspace;
+        workspaceState = { scope: nextScope, workspace: pendingWorkspace };
+        durableWorkspace = pendingWorkspace;
+        durableSaveCount += 1;
+        fallbackScope = null;
+        scopeTransfer = null;
+      } else {
+        workspaceState = { scope: nextScope, workspace: durableWorkspace };
+      }
+      return initialWorkspace;
+    },
+    snapshot() {
+      return {
+        activeWorkspace: workspaceState?.scope === currentScope
+          ? workspaceState.workspace
+          : undefined,
+        durableWorkspace,
+        durableSaveCount,
+      };
+    },
+  };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("product UI wiring", () => {
   it("StudioPage lazy-mounts Hybrid DCC dialog and menubar exposes open control", () => {
     const page = readFileSync(
@@ -132,7 +222,6 @@ describe("product UI wiring", () => {
     expect(page).toContain(
       "current?.scope === hybridDccWorkspaceScope && current?.workspace === workspace",
     );
-    expect(page).toContain("STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS");
     expect(page).toContain("hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope");
     expect(page).toContain('status: "session-only"');
     expect(page).toContain(
@@ -151,7 +240,79 @@ describe("product UI wiring", () => {
     expect(
       existsSync(resolve(import.meta.dirname, "./studio-hybrid-dcc-bg3d-handoff.ts")),
     ).toBe(true);
+    const fallbackStart = page.indexOf("if (!authGate.shouldAttemptRecovery) {");
+    const fallbackEnd = page.indexOf("const persistenceSaveQueue", fallbackStart);
+    const fallbackBranch = page.slice(fallbackStart, fallbackEnd);
+    expect(fallbackStart).toBeGreaterThanOrEqual(0);
+    expect(fallbackEnd).toBeGreaterThan(fallbackStart);
+    expect(fallbackBranch).toContain(
+      "hybridDccAuthFallbackScopeRef.current = hybridDccWorkspaceScope;",
+    );
+    expect(fallbackBranch).not.toContain("authScopeTimeoutId");
+    expect(fallbackBranch).not.toContain("STUDIO_HYBRID_DCC_AUTH_SCOPE_TIMEOUT_MS");
+    expect(page).toContain("if (pendingWorkspace) {");
     void root;
+  });
+
+  it.each([
+    {
+      label: "auth-pending draft to an authenticated draft",
+      previousScope: "auth-pending\u0000draft:auth-pending",
+      nextScope: "artist-1\u0000draft:toon-1",
+    },
+    {
+      label: "guest work to its authenticated owner",
+      previousScope: "guest\u0000work:work-1",
+      nextScope: "artist-1\u0000work:work-1",
+    },
+  ])("transfers a pre-auth edit before the old 12-second boundary: $label", async ({
+    previousScope,
+    nextScope,
+  }) => {
+    vi.useFakeTimers();
+    const durableW0: HybridDccAuthTransitionWorkspace = { id: "durable-W0" };
+    const authoredW1: HybridDccAuthTransitionWorkspace = { id: "session-W1" };
+    const harness = createHybridDccAuthTransitionHarness(previousScope, durableW0);
+    harness.enterImmediateSessionOnly();
+    harness.edit(authoredW1);
+
+    let transition: Promise<HybridDccAuthTransitionWorkspace | undefined> | undefined;
+    globalThis.setTimeout(() => {
+      transition = harness.authenticate(nextScope);
+    }, 6_000);
+    await vi.advanceTimersByTimeAsync(6_000);
+    if (!transition) throw new Error("The auth transition did not run.");
+
+    await expect(transition).resolves.toBe(authoredW1);
+    expect(harness.snapshot()).toEqual({
+      activeWorkspace: authoredW1,
+      durableWorkspace: authoredW1,
+      durableSaveCount: 1,
+    });
+  });
+
+  it("admits the durable workspace without overwriting it when auth changes before any edit", async () => {
+    vi.useFakeTimers();
+    const durableW0: HybridDccAuthTransitionWorkspace = { id: "durable-W0" };
+    const harness = createHybridDccAuthTransitionHarness(
+      "auth-pending\u0000draft:auth-pending",
+      durableW0,
+    );
+    harness.enterImmediateSessionOnly();
+
+    let transition: Promise<HybridDccAuthTransitionWorkspace | undefined> | undefined;
+    globalThis.setTimeout(() => {
+      transition = harness.authenticate("artist-1\u0000draft:toon-1");
+    }, 6_000);
+    await vi.advanceTimersByTimeAsync(6_000);
+    if (!transition) throw new Error("The auth transition did not run.");
+
+    await expect(transition).resolves.toBeUndefined();
+    expect(harness.snapshot()).toEqual({
+      activeWorkspace: durableW0,
+      durableWorkspace: durableW0,
+      durableSaveCount: 0,
+    });
   });
 });
 
