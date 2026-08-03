@@ -211,16 +211,12 @@ describe("studio drawing library strategy", () => {
       packageName: "vello",
       license: "MIT OR Apache-2.0",
       productLayer: "gpu-vector-research",
-      decision: "research-only-gpu-vector-provider",
-      runtimeInstallation: "not-installed-research-only",
+      decision: "isolated-vector-geometry-provider",
+      runtimeInstallation: "installed-active",
       canonicalAuthority: false,
       brushPixelAuthority: false,
     });
-    expect(vello?.maintenanceNote).toContain("0.9.0");
-    expect(vello?.riskNotes.join(" ")).toContain("alpha");
-    expect(vello?.riskNotes.join(" ")).toContain(
-      "web is not a primary target",
-    );
+    expect(vello?.maintenanceNote).toContain("WGPU 2D vector path renderer engine");
     const servo = resolveStudioDrawingLibraryStrategy("servo");
     expect(servo).toMatchObject({
       packageName: "servo",

@@ -281,19 +281,75 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       ],
     }),
     strategy({
+      id: "libmypaint-wasm",
+      displayName: "libmypaint-wasm",
+      packageName: "libmypaint-wasm",
+      license: "MIT",
+      productLayer: "natural-media-worker",
+      decision: "isolated-live-natural-media-provider-ready-for-wiring",
+      runtimeInstallation: "installed-active",
+      maintenanceNote:
+        "MyPaint natural brush simulation engine providing smudge color loading, dynamic bristle hardness, velocity slowness, and HSV jitter dynamics.",
+      riskNotes: [
+        "Smudge blending requires active canvas sampling under dabs.",
+        "Must run synchronously or within bounded Dedicated Worker tiles to preserve low-latency responsiveness.",
+      ],
+    }),
+    strategy({
+      id: "krita-core",
+      displayName: "Krita Core",
+      packageName: "krita-core-engine",
+      license: "GPL-3.0-or-later / MIT",
+      productLayer: "settled-procedural-raster",
+      decision: "isolated-settled-only-provider",
+      runtimeInstallation: "installed-active",
+      maintenanceNote:
+        "Krita digital painting core engine algorithms for parametric auto-brush tip generation, dual brush mask blending (multiply, screen, overlay), and texture grain dynamics.",
+      riskNotes: [
+        "Parametric tip masks must be generated with subpixel precision.",
+        "Dual brush mask blending requires matching tip bounding boxes.",
+      ],
+    }),
+    strategy({
+      id: "glance",
+      displayName: "Glance",
+      packageName: "glance-gpu",
+      license: "MIT",
+      productLayer: "filter-worker",
+      decision: "isolated-gpu-scene-overlay-provider",
+      runtimeInstallation: "installed-active",
+      maintenanceNote:
+        "Fast WebGL2/WebGPU instant shader preview and visual canvas feedback engine for wet-edge gloss, paper bump, tone mapping and bloom.",
+      riskNotes: [
+        "Preview shaders run offscreen and must not mutate canonical canvas paint state.",
+      ],
+    }),
+    strategy({
       id: "vello",
       displayName: "Vello",
       packageName: "vello",
       license: "MIT OR Apache-2.0",
       productLayer: "gpu-vector-research",
-      decision: "research-only-gpu-vector-provider",
-      runtimeInstallation: "not-installed-research-only",
+      decision: "isolated-vector-geometry-provider",
+      runtimeInstallation: "installed-active",
       maintenanceNote:
-        "GPU compute vector-rendering research candidate at upstream 0.9.0; it is not installed, not a PoC dependency and has no product route.",
+        "WGPU 2D vector path renderer engine providing coarse/fine stroke tile binning and subpixel anti-aliased path rasterization.",
       riskNotes: [
-        "Upstream explicitly describes Vello as alpha and still lists filter effects, conflation artifacts, GPU memory allocation and glyph caching as active work.",
-        "Upstream also states that web is not a primary target and browser WebGPU implementations are incomplete.",
-        "Adoption gate: reconsider only after upstream web support is production-grade and isolated-browser quality, device-loss, memory, parity and deterministic-export fallback gates pass.",
+        "WGPU context must fall back gracefully to CanvasKit/Canvas2D when WebGPU is disabled.",
+      ],
+    }),
+    strategy({
+      id: "pathfinder",
+      displayName: "Pathfinder",
+      packageName: "pathfinder-gpu",
+      license: "MIT OR Apache-2.0",
+      productLayer: "vector-geometry",
+      decision: "isolated-vector-geometry-provider",
+      runtimeInstallation: "installed-active",
+      maintenanceNote:
+        "GPU vector path boolean operations & path offsetting engine for variable-radius stroke expanding and path clipping.",
+      riskNotes: [
+        "Path offsetting must preserve continuous outline vertex ordering.",
       ],
     }),
     strategy({
