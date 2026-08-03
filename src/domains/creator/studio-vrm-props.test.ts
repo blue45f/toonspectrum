@@ -136,6 +136,7 @@ describe("부착 인스턴스 생성·직렬화", () => {
       anchorId: "primary",
       autoScale: true,
       autoFingerPose: true,
+      gripFit: 1,
       deltaPosition: [0, 0, 0],
       deltaRotationDeg: [0, 0, 0],
       deltaScale: 1,
@@ -302,6 +303,7 @@ describe("부착 인스턴스 생성·직렬화", () => {
           anchorId: "missing",
           autoScale: "yes",
           autoFingerPose: null,
+          gripFit: 99,
           deltaPosition: [99, -99, Number.NaN],
           deltaRotationDeg: [999, -999, Number.POSITIVE_INFINITY],
           deltaScale: 99,
@@ -322,6 +324,7 @@ describe("부착 인스턴스 생성·직렬화", () => {
       anchorId: "primary",
       autoScale: true,
       autoFingerPose: true,
+      gripFit: 1.3,
       deltaPosition: [1, -1, 0],
       deltaRotationDeg: [180, -180, 0],
       deltaScale: 4,
@@ -333,6 +336,19 @@ describe("부착 인스턴스 생성·직렬화", () => {
         elbowHint: [1, -1, 0],
       },
     });
+  });
+
+  it("gripFit이 없던 기존 V2 문서는 기본 100%로 마이그레이션한다", () => {
+    const legacy = createPropInstance("mug", "legacy-v2-grip")!;
+    const legacyRig = { ...legacy.rig } as Record<string, unknown>;
+    delete legacyRig.gripFit;
+
+    const parsed = parseVrmProps({
+      version: 2,
+      items: [{ ...legacy, rig: legacyRig }],
+    });
+
+    expect(parsed.items[0].rig?.gripFit).toBe(1);
   });
 
   it("양손 소품의 누락된 영향도와 스마트 회전을 소품별 안전 기본값으로 복구한다", () => {

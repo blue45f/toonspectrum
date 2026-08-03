@@ -8,6 +8,7 @@ import {
   type StudioHybridDccBg3dPersistRequest,
 } from "./studio-hybrid-dcc-bg3d-handoff";
 import { hybridDccCommitGeometry } from "./studio-hybrid-dcc-document";
+import { workspaceAddActiveModifier } from "./studio-hybrid-dcc-modifier-workspace";
 import {
   createStudioHybridDccWorkspace,
   workspaceAddArtistInk,
@@ -16,7 +17,10 @@ import {
   workspaceEnsureShots,
   workspaceLoadRoomPreset,
 } from "./studio-hybrid-dcc-workspace";
-import { applyStudioShotOverride } from "./studio-live-2d3d-bridge";
+import {
+  applyStudioShotOverride,
+  mutateStudioSharedObjectGeometry,
+} from "./studio-live-2d3d-bridge";
 
 function testPorts(
   transform?: (request: StudioHybridDccBg3dPersistRequest) => StudioHybridDccBg3dPersistRequest,
@@ -117,6 +121,53 @@ describe("Hybrid DCC → shipping BG3D handoff", () => {
       productionActivated: false,
     });
     expect(JSON.stringify(result.scene)).not.toMatch(/BufferGeometry|Object3D|WebGL|Babylon/iu);
+  });
+
+  it("exports the validated non-destructive result visible in the viewport, not its source cage", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("modifier-handoff"),
+      "array-prop",
+    );
+    workspace = await workspaceAddActiveModifier(workspace, "array");
+    const record = workspace.session.state.geometry.records["array-prop"]!;
+    const cache = record.renderCache!;
+    const ports = testPorts();
+
+    const result = await handoffStudioHybridDccWorkspaceToBg3d(workspace, { ports });
+
+    expect(cache.indices.length / 3).toBeGreaterThan(12);
+    expect(result.assets[0]).toMatchObject({
+      sourceAssetId: "array-prop",
+      sourceAuthorityMeshHash: record.meshHash,
+      sourceMeshHash: cache.derivedFromHash,
+      sourceGeometryKind: "evaluated-modifier-stack",
+      triangles: cache.indices.length / 3,
+    });
+    expect(ports.persistAttachments).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed before persistence when modifier preview provenance is not the visible bridge", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("modifier-handoff-gate"),
+      "array-prop",
+    );
+    workspace = await workspaceAddActiveModifier(workspace, "array");
+    const record = workspace.session.state.geometry.records["array-prop"]!;
+    workspace = {
+      ...workspace,
+      bridge: mutateStudioSharedObjectGeometry(
+        workspace.bridge,
+        record.assetId,
+        record.meshHash,
+      ),
+    };
+    const ports = testPorts();
+
+    await expect(handoffStudioHybridDccWorkspaceToBg3d(workspace, { ports }))
+      .rejects.toMatchObject({
+        code: "modifier-preview-invalid",
+      } satisfies Partial<StudioHybridDccBg3dHandoffError>);
+    expect(ports.persistAttachments).not.toHaveBeenCalled();
   });
 
   it("preflights invalid Shot cameras before the atomic persistence transaction", async () => {

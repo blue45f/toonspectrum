@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import controlFieldsSource from "./studio-bg3d-control-fields.tsx?raw";
+import returnFocusSource from "./studio-bg3d-return-focus.ts?raw";
 import background3dEditorSource from "./StudioBackground3D.tsx?raw";
 import ltPanelSource from "./StudioBg3dLtPanel.tsx?raw";
 import {
@@ -17,6 +18,7 @@ const background3dSource = [
   shapesPanelSource,
   viewPanelSource,
   ltPanelSource,
+  returnFocusSource,
 ].join("\n");
 
 function renderTransport(phase: "loading" | "paused" | "complete"): string {

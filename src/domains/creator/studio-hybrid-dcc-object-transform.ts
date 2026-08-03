@@ -108,6 +108,37 @@ export function transformStudioHybridDccPoint(
   ];
 }
 
+/** Applies the exact inverse of canonical intrinsic XYZ TRS to a world-space point. */
+export function inverseTransformStudioHybridDccPoint(
+  point: StudioHybridDccVec3Tuple,
+  transform: StudioHybridDccObjectTransform,
+): StudioHybridDccVec3Tuple {
+  const [rx, ry, rz] = transform.rotationEulerRad;
+  const cx = Math.cos(rx);
+  const sx = Math.sin(rx);
+  const cy = Math.cos(ry);
+  const sy = Math.sin(ry);
+  const cz = Math.cos(rz);
+  const sz = Math.sin(rz);
+  const worldX = point[0] - transform.position[0];
+  const worldY = point[1] - transform.position[1];
+  const worldZ = point[2] - transform.position[2];
+
+  // Forward rotation is Rz * Ry * Rx, so the inverse is its transpose.
+  const scaledX = cz * cy * worldX + sz * cy * worldY - sy * worldZ;
+  const scaledY = (cz * sy * sx - sz * cx) * worldX
+    + (sz * sy * sx + cz * cx) * worldY
+    + cy * sx * worldZ;
+  const scaledZ = (cz * sy * cx + sz * sx) * worldX
+    + (sz * sy * cx - cz * sx) * worldY
+    + cy * cx * worldZ;
+  return [
+    scaledX / transform.scale[0],
+    scaledY / transform.scale[1],
+    scaledZ / transform.scale[2],
+  ];
+}
+
 export function hashStudioHybridDccObjectTransform(
   transform: StudioHybridDccObjectTransform,
 ): string {

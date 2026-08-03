@@ -16,10 +16,17 @@ import {
 } from "react";
 
 import {
+  inspectAutoGripReadiness,
+  type AutoGripReadiness,
+  type VrmPropRigMetrics,
+} from "./studio-vrm-prop-rig";
+import {
   PROP_ATTACH_BONES,
   PROP_BONE_LABELS,
   PROP_CATEGORY_LABELS,
   VRM_PROPS,
+  VRM_PROP_GRIP_FIT_MAX,
+  VRM_PROP_GRIP_FIT_MIN,
   VRM_PROPS_VERSION,
   propDefById,
   type PropAttachBone,
@@ -38,6 +45,7 @@ import { cn } from "@/lib/utils";
 
 export interface StudioVrmPropPanelProps {
   readonly vrmReady: boolean;
+  readonly rigMetrics: VrmPropRigMetrics;
   readonly items: PropInstance[];
   readonly selectedUid: string | null;
   readonly onSelect: (uid: string | null) => void;
@@ -136,6 +144,7 @@ function createSmartRig(definition: PropDef): PropRigV2 | null {
     anchorId,
     autoScale: true,
     autoFingerPose: Boolean(definition.grip),
+    gripFit: 1,
     deltaPosition: [0, 0, 0],
     deltaRotationDeg: [0, 0, 0],
     deltaScale: 1,
@@ -172,6 +181,31 @@ function fitReferenceLabel(definition: PropDef): string {
       return "골반 너비";
     case "none":
       return "제작 기준";
+  }
+}
+
+function autoGripDescription(
+  definition: PropDef | null,
+  item: PropInstance,
+  readiness: AutoGripReadiness,
+): string {
+  if (!definition?.grip || !isHandBone(item.bone)) {
+    return "손 부착과 그립 프로필이 모두 있는 소품에서 사용할 수 있습니다.";
+  }
+  if (readiness.kind === "ready") {
+    return `${GRIP_KIND_LABELS[definition.grip.kind]} 접촉점과 이 캐릭터의 손가락 길이를 실측합니다. 켜면 이 손에서는 소품 그립이 현재 포즈보다 우선합니다.`;
+  }
+  switch (readiness.reason) {
+    case "incomplete-rig":
+      return "이 캐릭터에서 필요한 손가락 관절을 모두 찾지 못해 자동 그립을 적용할 수 없습니다. 현재 손 포즈는 그대로 유지됩니다.";
+    case "contact-conflict":
+      return "같은 손에 자동 그립 소품이 둘 이상 연결되어 있습니다. 한 소품만 켜면 손가락이 다시 맞춰집니다.";
+    case "invalid-contact":
+      return "소품 접촉점이나 자동 크기 값을 안전하게 계산하지 못했습니다. 스마트 소켓 맞춤을 초기화해 보세요.";
+    case "not-hand":
+      return "부착 부위를 왼손 또는 오른손으로 선택하면 사용할 수 있습니다.";
+    case "unsupported":
+      return "이 소품은 손가락 자동 그립을 지원하지 않습니다.";
   }
 }
 
@@ -438,21 +472,25 @@ function CatalogButton({ definition, disabled, onAdd }: CatalogButtonProps) {
 }
 
 interface SelectedEditorProps {
+  readonly allItems: readonly PropInstance[];
   readonly definition: PropDef | null;
   readonly disabled: boolean;
   readonly editorHeadingRef: RefObject<HTMLHeadingElement | null>;
   readonly editorId: string;
   readonly item: PropInstance;
+  readonly rigMetrics: VrmPropRigMetrics;
   readonly onUpdate: (uid: string, patch: Partial<PropInstance>) => void;
   readonly onStatus: (message: string) => void;
 }
 
 function SelectedEditor({
+  allItems,
   definition,
   disabled,
   editorHeadingRef,
   editorId,
   item,
+  rigMetrics,
   onUpdate,
   onStatus,
 }: SelectedEditorProps) {
@@ -469,6 +507,13 @@ function SelectedEditor({
   const rotation = rig?.deltaRotationDeg ?? item.rotationDeg;
   const scale = rig?.deltaScale ?? item.scale;
   const smartAvailable = Boolean(definition && primaryAnchorId(definition));
+  const gripReadiness = inspectAutoGripReadiness(
+    item,
+    allItems,
+    propDefById,
+    rigMetrics,
+  );
+  const gripAvailable = gripReadiness.kind === "ready";
 
   function updateRig(patch: Partial<PropRigV2>): void {
     const base = item.rig ?? (definition ? createSmartRig(definition) : null);
@@ -668,15 +713,37 @@ function SelectedEditor({
           />
           <ToggleRow
             checked={rig.autoFingerPose}
-            disabled={disabled || !definition.grip || !isHandBone(item.bone)}
+            disabled={disabled || (!rig.autoFingerPose && !gripAvailable)}
             label="손가락 자동 그립"
-            description={
-              definition.grip && isHandBone(item.bone)
-                ? `${GRIP_KIND_LABELS[definition.grip.kind]} 그립으로 손가락을 소품 두께에 맞춥니다.`
-                : "손 부착과 그립 프로필이 모두 있는 소품에서 사용할 수 있습니다."
-            }
+            description={autoGripDescription(definition, item, gripReadiness)}
             onChange={(autoFingerPose) => updateRig({ autoFingerPose })}
           />
+          {rig.autoFingerPose && definition.grip && isHandBone(item.bone) ? (
+            <div className="border-t border-line/60 py-2">
+              <ScalarField
+                disabled={disabled || !gripAvailable}
+                label="손가락 맞춤 강도"
+                min={VRM_PROP_GRIP_FIT_MIN * 100}
+                max={VRM_PROP_GRIP_FIT_MAX * 100}
+                step={5}
+                precision={0}
+                suffix="%"
+                value={Math.round(rig.gripFit * 100)}
+                onChange={(percent) => updateRig({ gripFit: percent / 100 })}
+              />
+              <div
+                aria-hidden
+                className="mt-0.5 flex items-center justify-between text-[0.6rem] font-semibold text-fg-3"
+              >
+                <span>느슨하게</span>
+                <span>기본 100%</span>
+                <span>단단하게</span>
+              </div>
+              <p className="mt-1 text-[0.64rem] leading-relaxed text-fg-3">
+                손가락이 소품을 뚫으면 낮추고, 소품에서 떠 보이면 높이세요. 직접 손가락을 편집하려면 자동 그립을 끄면 됩니다.
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -909,6 +976,7 @@ function SelectedEditor({
 
 export function StudioVrmPropPanel({
   vrmReady,
+  rigMetrics,
   items,
   selectedUid,
   onSelect,
@@ -1199,9 +1267,11 @@ export function StudioVrmPropPanel({
                   </div>
                   {selected ? (
                     <SelectedEditor
+                      allItems={items}
                       item={item}
                       definition={definition}
                       disabled={!vrmReady}
+                      rigMetrics={rigMetrics}
                       editorHeadingRef={selectedEditorHeadingRef}
                       editorId={selectedEditorId}
                       onUpdate={onUpdate}

@@ -1,3 +1,6 @@
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+
 import type { StudioProjectSnapshot } from "./studio-project-snapshot";
 import type { UpdateStudioSharedDocumentInput } from "./studio-shared-document-client";
 import type { StudioTeamRole } from "./studio-team-client";
@@ -64,6 +67,18 @@ export function buildStudioSavePayload(
   input: BuildStudioSavePayloadInput,
 ): StudioSavePayload {
   const { document } = input;
+  const pagesList = document.pagesList.some((page) => page.shared3dStage !== undefined)
+    ? document.pagesList.map((page) => {
+        if (page.shared3dStage === undefined) return page;
+        const shared3dStage = migrateStudioShared3dStageCollectionDocument(
+          page.shared3dStage,
+        );
+        if (!shared3dStage) {
+          throw new Error("페이지 공유 3D 장면 연결이 손상되어 저장하지 않았어요.");
+        }
+        return { ...page, shared3dStage };
+      })
+    : document.pagesList;
   return {
     title: input.title.trim(),
     description: input.description.trim(),
@@ -75,7 +90,7 @@ export function buildStudioSavePayload(
     doc: {
       ...(document.extensionBase ?? {}),
       width: document.width,
-      pagesList: document.pagesList,
+      pagesList,
       master: document.master,
       characterBible: document.characterBible,
       writerRoom: document.writerRoom,

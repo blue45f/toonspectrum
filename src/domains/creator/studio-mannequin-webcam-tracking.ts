@@ -6,6 +6,10 @@
  * 3D 데생 인형(StudioMannequinJointId) 관절 회전(Euler radians)으로 전사한다.
  */
 
+import {
+  resolveStudioMediaPipeVisionWasmFileset,
+  type StudioMediaPipeVisionWasmSelection,
+} from "./studio-mediapipe-vision-assets";
 import { solvePoseToVrmBones, type PoseLandmark } from "./studio-vrm-pose-solver";
 
 import type { StudioMannequinJointId } from "./studio-mannequin-model";
@@ -39,6 +43,7 @@ export const STUDIO_MANNEQUIN_POSE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
 
 const STUDIO_MANNEQUIN_POSE_MODEL_TIMEOUT_MS = 20_000;
+export const STUDIO_MANNEQUIN_CAMERA_REQUEST_TIMEOUT_MS = 30_000;
 
 export interface StudioMannequinPoseDetection {
   readonly landmarks?: readonly (readonly PoseLandmark[])[];
@@ -61,12 +66,12 @@ export interface StudioMannequinPoseLandmarkerInitOptions {
   readonly factory?: StudioMannequinPoseLandmarkerFactory;
 }
 
-export type StudioMannequinWebcamErrorStage = "camera" | "engine" | "tracking";
-
-interface StudioMannequinVisionWasmFileset {
-  readonly wasmLoaderPath: string;
-  readonly wasmBinaryPath: string;
+export interface StudioMannequinCameraRequestOptions {
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
 }
+
+export type StudioMannequinWebcamErrorStage = "camera" | "engine" | "tracking";
 
 function createNamedError(name: string, message: string, cause?: unknown): Error {
   const error = new Error(message);
@@ -89,6 +94,20 @@ function safelyClosePoseLandmarker(landmarker: StudioMannequinPoseLandmarker): v
     landmarker.close();
   } catch {
     // Cleanup is best-effort. A MediaPipe close failure must never leave the camera stream running.
+  }
+}
+
+export function stopStudioMannequinMediaStream(stream: MediaStream): void {
+  try {
+    stream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        // One faulty track must not prevent the remaining camera tracks from stopping.
+      }
+    });
+  } catch {
+    // A partially constructed browser stream can fail while enumerating tracks.
   }
 }
 
@@ -120,6 +139,9 @@ export function getStudioMannequinWebcamErrorMessage(
     if (name === "StudioMannequinCameraUnavailableError") {
       return "이 브라우저에서는 웹캠을 사용할 수 없습니다. 최신 브라우저에서 다시 시도해 주세요.";
     }
+    if (name === "StudioMannequinCameraPermissionTimeoutError") {
+      return "동작 인식 엔진은 준비됐지만 카메라 권한 응답이 없습니다. 주소창의 카메라 권한을 확인한 뒤 다시 시도해 주세요.";
+    }
     if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
       return "카메라 권한이 차단되었습니다. 브라우저 주소창의 카메라 권한을 허용한 뒤 다시 시도해 주세요.";
     }
@@ -148,28 +170,79 @@ export function getStudioMannequinWebcamErrorMessage(
   if (name === "StudioMannequinVisionWasmLoadError") {
     return "브라우저가 동작 인식 엔진 파일을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
   }
+  if (name === "StudioMannequinPoseEngineCreationError") {
+    return "그래픽 가속·CPU·호환 모드에서 동작 인식 엔진을 준비하지 못했습니다. 다른 탭을 닫고 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+  }
   return "실시간 동작 인식 엔진을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+/**
+ * Bounds the browser permission wait and releases a stream that arrives after timeout/cancel.
+ * `getUserMedia()` itself has no AbortSignal, so the late-result cleanup is required to avoid
+ * leaving a camera indicator or hardware device active after the panel has already stopped.
+ */
+export async function requestStudioMannequinCameraStream(
+  requestStream: () => Promise<MediaStream>,
+  options: StudioMannequinCameraRequestOptions = {},
+): Promise<MediaStream> {
+  if (options.signal?.aborted) throw createDisposedError();
+
+  const requestedTimeoutMs = options.timeoutMs ?? STUDIO_MANNEQUIN_CAMERA_REQUEST_TIMEOUT_MS;
+  const timeoutMs = Number.isFinite(requestedTimeoutMs)
+    ? Math.max(1, requestedTimeoutMs)
+    : STUDIO_MANNEQUIN_CAMERA_REQUEST_TIMEOUT_MS;
+  let accepted = false;
+  let settled = false;
+  let resolvedStream: MediaStream | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let handleAbort: (() => void) | null = null;
+
+  const streamPromise = Promise.resolve().then(requestStream);
+
+  void streamPromise.then(
+    (stream) => {
+      resolvedStream = stream;
+      if (settled && !accepted) stopStudioMannequinMediaStream(stream);
+    },
+    () => undefined,
+  );
+
+  const guardPromise = new Promise<never>((_resolve, reject) => {
+    handleAbort = () => reject(createDisposedError());
+    options.signal?.addEventListener("abort", handleAbort, { once: true });
+    timeoutId = globalThis.setTimeout(() => {
+      reject(
+        createNamedError(
+          "StudioMannequinCameraPermissionTimeoutError",
+          "Timed out while waiting for the browser camera permission response.",
+        ),
+      );
+    }, timeoutMs);
+  });
+
+  try {
+    const stream = await Promise.race([streamPromise, guardPromise]);
+    resolvedStream = stream;
+    if (options.signal?.aborted) {
+      stopStudioMannequinMediaStream(stream);
+      resolvedStream = null;
+      throw createDisposedError();
+    }
+    accepted = true;
+    return stream;
+  } finally {
+    settled = true;
+    if (!accepted && resolvedStream) stopStudioMannequinMediaStream(resolvedStream);
+    if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    if (handleAbort) options.signal?.removeEventListener("abort", handleAbort);
+  }
 }
 
 async function resolveLocalVisionWasmFileset(
   isSimdSupported: () => Promise<boolean>,
-): Promise<StudioMannequinVisionWasmFileset> {
+): Promise<StudioMediaPipeVisionWasmSelection> {
   try {
-    const simdSupported = await isSimdSupported();
-    const [loaderModule, binaryModule] = simdSupported
-      ? await Promise.all([
-          import("@mediapipe/tasks-vision/vision_wasm_internal.js?url"),
-          import("@mediapipe/tasks-vision/vision_wasm_internal.wasm?url"),
-        ])
-      : await Promise.all([
-          import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.js?url"),
-          import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.wasm?url"),
-        ]);
-
-    return {
-      wasmLoaderPath: loaderModule.default,
-      wasmBinaryPath: binaryModule.default,
-    };
+    return await resolveStudioMediaPipeVisionWasmFileset({ isSimdSupported });
   } catch (cause) {
     throw createNamedError(
       "StudioMannequinVisionWasmLoadError",
@@ -226,7 +299,7 @@ async function createStudioMannequinPoseLandmarker(
   if (signal?.aborted) throw createDisposedError();
 
   const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
-  const [vision, modelAssetBuffer] = await Promise.all([
+  const [visionSelection, modelAssetBuffer] = await Promise.all([
     resolveLocalVisionWasmFileset(() => FilesetResolver.isSimdSupported(false)),
     fetchPoseModelBuffer(signal),
   ]);
@@ -241,34 +314,59 @@ async function createStudioMannequinPoseLandmarker(
     minTrackingConfidence: 0.5,
   } as const;
 
+  const failures: unknown[] = [];
   try {
-    return await PoseLandmarker.createFromOptions(vision, {
+    return await PoseLandmarker.createFromOptions(visionSelection.fileset, {
       baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "GPU" },
       ...poseOptions,
     });
   } catch (gpuError) {
+    failures.push(gpuError);
     if (signal?.aborted) throw createDisposedError();
     console.warn(
       "Studio mannequin PoseLandmarker GPU delegate failed, falling back to CPU:",
       gpuError,
     );
     try {
-      return await PoseLandmarker.createFromOptions(vision, {
+      return await PoseLandmarker.createFromOptions(visionSelection.fileset, {
         baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
         ...poseOptions,
       });
-    } catch (cause) {
-      throw createNamedError(
-        "StudioMannequinPoseEngineCreationError",
-        "Failed to create the mannequin PoseLandmarker.",
-        cause,
-      );
+    } catch (cpuError) {
+      failures.push(cpuError);
     }
   }
+
+  // SIMD loader/compile 단계는 createFromOptions 내부에서 실행된다. GPU와 CPU가 모두
+  // 실패한 SIMD 환경은 package-matched non-SIMD+CPU를 딱 한 번 시도해 실제 WASM
+  // 호환 실패까지 복구한다. 모델·권한 실패여도 시도 횟수는 이 경계로 제한된다.
+  if (visionSelection.variant === "simd") {
+    try {
+      const compatibilityVision = await resolveLocalVisionWasmFileset(async () => false);
+      return await PoseLandmarker.createFromOptions(compatibilityVision.fileset, {
+        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
+        ...poseOptions,
+      });
+    } catch (compatibilityError) {
+      failures.push(compatibilityError);
+    }
+  }
+
+  const cause = new AggregateError(
+    failures,
+    "GPU, CPU, non-SIMD 호환 경로에서 PoseLandmarker를 만들지 못했습니다.",
+    { cause: failures.at(-1) },
+  );
+  throw createNamedError(
+    "StudioMannequinPoseEngineCreationError",
+    "Failed to create the mannequin PoseLandmarker.",
+    cause,
+  );
 }
 
 let cachedPoseLandmarker: StudioMannequinPoseLandmarker | null = null;
 let initPoseLandmarkerPromise: Promise<StudioMannequinPoseLandmarker> | null = null;
+let initPoseLandmarkerPromiseGeneration: number | null = null;
 let poseLandmarkerGeneration = 0;
 
 /**
@@ -280,7 +378,21 @@ export async function initStudioMannequinPoseLandmarker(
 ): Promise<StudioMannequinPoseLandmarker> {
   if (options.signal?.aborted) throw createDisposedError();
   if (cachedPoseLandmarker) return cachedPoseLandmarker;
-  if (initPoseLandmarkerPromise) return initPoseLandmarkerPromise;
+  if (initPoseLandmarkerPromise) {
+    if (initPoseLandmarkerPromiseGeneration === poseLandmarkerGeneration) {
+      return initPoseLandmarkerPromise;
+    }
+    // dispose 직후 재시도가 이전 MediaPipe ModuleFactory 초기화와 겹치면 전역 WASM
+    // loader 상태가 경쟁한다. 이전 세대가 정리될 때까지 직렬화한 뒤 새 factory를 시작한다.
+    try {
+      await initPoseLandmarkerPromise;
+    } catch {
+      // Stale generation is expected to reject with AbortError.
+    }
+    if (options.signal?.aborted) throw createDisposedError();
+    if (cachedPoseLandmarker) return cachedPoseLandmarker;
+    return initStudioMannequinPoseLandmarker(options);
+  }
 
   const generation = poseLandmarkerGeneration;
   const factory = options.factory ?? createStudioMannequinPoseLandmarker;
@@ -294,11 +406,15 @@ export async function initStudioMannequinPoseLandmarker(
     return landmarker;
   })();
   initPoseLandmarkerPromise = pending;
+  initPoseLandmarkerPromiseGeneration = generation;
 
   try {
     return await pending;
   } finally {
-    if (initPoseLandmarkerPromise === pending) initPoseLandmarkerPromise = null;
+    if (initPoseLandmarkerPromise === pending) {
+      initPoseLandmarkerPromise = null;
+      initPoseLandmarkerPromiseGeneration = null;
+    }
   }
 }
 
@@ -307,7 +423,8 @@ export function disposeStudioMannequinPoseLandmarker(): void {
   poseLandmarkerGeneration += 1;
   const landmarker = cachedPoseLandmarker;
   cachedPoseLandmarker = null;
-  initPoseLandmarkerPromise = null;
+  // 진행 중 factory는 실제 취소할 수 없으므로 promise 권위를 유지한다. 다음 retry는 위
+  // init 경로에서 settlement까지 기다려 global MediaPipe 초기화를 절대 중첩하지 않는다.
   if (landmarker) safelyClosePoseLandmarker(landmarker);
 }
 

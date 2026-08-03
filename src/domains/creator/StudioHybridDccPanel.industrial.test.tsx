@@ -244,10 +244,10 @@ describe("StudioHybridDccPanel industrial wiring", () => {
         /Sculpt 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "Cloth step" }));
+    fireEvent.click(screen.getByRole("button", { name: "천 시뮬레이션 1스텝" }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
-        /Cloth 완료/u,
+        /천 시뮬레이션 완료/u,
       );
     });
     fireEvent.click(screen.getByRole("button", { name: "8 shots" }));

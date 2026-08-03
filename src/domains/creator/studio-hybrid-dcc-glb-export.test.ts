@@ -16,6 +16,7 @@ import {
 import {
   registerStudioGeometryAuthority,
   createStudioGeometryAuthorityRegistry,
+  setStudioGeometryAuthorityModifierStack,
 } from "./studio-geometry-authority";
 import {
   exportStudioHybridDccAuthorityRecordGlb,
@@ -29,6 +30,10 @@ import {
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_ISSUE_IDS,
   STUDIO_HYBRID_DCC_GLB_EXPORT_MAX_REPORT_ISSUES,
 } from "./studio-hybrid-dcc-glb-export-diagnostic-limits";
+import {
+  createStudioMeshModifierStack,
+  withStudioMeshModifier,
+} from "./studio-mesh-modifier-stack";
 import { sha256HexPortable } from "./studio-sha256";
 import {
   readStudioVrmExportGlb,
@@ -352,7 +357,7 @@ describe("Hybrid DCC editable-half-edge GLB exporter", () => {
     });
   });
 
-  it("accepts the actual workspace geometry-authority record and never consults its render cache", () => {
+  it("accepts the actual workspace geometry-authority record when its stack is empty", () => {
     const mesh = createStudioUnitCubeMesh();
     const registered = registerStudioGeometryAuthority(
       createStudioGeometryAuthorityRegistry(),
@@ -370,6 +375,42 @@ describe("Hybrid DCC editable-half-edge GLB exporter", () => {
       sourceRevision: record.revision,
       sourceHash: record.meshHash,
     });
+  });
+
+  it("fails closed instead of silently exporting the cage under a non-empty modifier stack", () => {
+    const mesh = createStudioUnitCubeMesh();
+    const registered = registerStudioGeometryAuthority(
+      createStudioGeometryAuthorityRegistry(),
+      "modified-cube",
+      mesh,
+    );
+    if (!registered.ok) throw new Error(registered.detail);
+    const stack = withStudioMeshModifier(createStudioMeshModifierStack(mesh), {
+      kind: "array",
+      id: "array-three",
+      enabled: true,
+      count: 3,
+      offset: { x: 1.25, y: 0, z: 0 },
+      mode: "linear",
+      radialAngleRad: Math.PI * 2,
+      realizeInstances: true,
+    });
+    const updated = setStudioGeometryAuthorityModifierStack(
+      registered.value,
+      "modified-cube",
+      stack,
+    );
+    if (!updated.ok) throw new Error(updated.detail);
+
+    const result = exportStudioHybridDccAuthorityRecordGlb(
+      updated.value.records["modified-cube"]!,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("modifier export gate did not run");
+    expect(result.report.errors).toContainEqual(expect.objectContaining({
+      code: "modifier-stack-unapplied",
+    }));
   });
 
   it("reports metadata-only material loss without hiding it", () => {

@@ -38,6 +38,28 @@ const {
   applyStudioBg3dLinkedCharacterState,
   loadStudioBg3dLinkedVrm,
 } = await import("./studio-bg3d-shared-vrm-runtime");
+const { raycastStudioBg3dSharedCharacterGroundSurface } = await import(
+  "./StudioBg3dSharedVrmCharacter"
+);
+
+function groundPlane(
+  entityId: string,
+  y: number,
+  material: THREE.Material | THREE.Material[],
+  materialIndex = 0,
+): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  if (Array.isArray(material)) {
+    geometry.clearGroups();
+    geometry.addGroup(0, geometry.index?.count ?? 0, materialIndex);
+  }
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = entityId;
+  mesh.position.y = y;
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.userData.studioBg3dEntityId = entityId;
+  return mesh;
+}
 
 describe("Studio BG3D linked VRM runtime", () => {
   beforeEach(() => {
@@ -78,7 +100,7 @@ describe("Studio BG3D linked VRM runtime", () => {
     revoke.mockRestore();
   });
 
-  it("applies the canonical pose/expression/material subset and makes the projection read-only", () => {
+  it("applies the canonical subset while internal meshes stay pass-through for the root proxy", () => {
     const scene = normalizeStudioVrmSceneDocument({
       ...createStudioVrmSceneDocument(),
       pose: {
@@ -117,6 +139,177 @@ describe("Studio BG3D linked VRM runtime", () => {
     expect(root.rotation.y).toBeCloseTo(0.5, 10);
     expect(mesh.castShadow).toBe(true);
     expect(mesh.receiveShadow).toBe(true);
-    expect(mesh.raycast(new THREE.Raycaster(), [])).toBeUndefined();
+    const intersects: THREE.Intersection[] = [];
+    mesh.raycast(new THREE.Raycaster(), intersects);
+    expect(intersects).toHaveLength(0);
+    expect(mesh.raycast).not.toBe(THREE.Mesh.prototype.raycast);
+  });
+
+  it("applies Stage placement last while retaining source pose, expression and model state", () => {
+    const scene = normalizeStudioVrmSceneDocument({
+      ...createStudioVrmSceneDocument(),
+      pose: {
+        ...createStudioVrmSceneDocument().pose,
+        bodyRotationY: 0.25,
+        yOffset: 0.1,
+        translations: {
+          ...createStudioVrmSceneDocument().pose.translations,
+          root: [1, 0, -2],
+        },
+        bones: { head: { rotation: [0.1, 0.2, 0.3] } },
+      },
+      expressions: { happy: 0.7 },
+    });
+    const source = createStudioShared3dSceneSession([{
+      elementId: "character-a",
+      scene,
+      stageId: "stage-a",
+      stageTransform: { position: [-4, 1.25, 3], rotationY: -0.75 },
+    }]).characters[0]!;
+    const root = new THREE.Group();
+    root.userData.studioVrmBaseRotationY = 0.1;
+    const vrm = { scene: root, update: vi.fn() } as never;
+
+    expect(applyStudioBg3dLinkedCharacterState(vrm, source)).toBe(true);
+    expect(applyPoseToVrm).toHaveBeenLastCalledWith(
+      vrm,
+      scene.pose.bones,
+      1.25,
+      {
+        ...scene.pose.translations,
+        root: [-4, 0, 3],
+      },
+    );
+    expect(applyExpressionWeightsToVrm).toHaveBeenLastCalledWith(vrm, { happy: 0.7 });
+    expect(root.rotation.y).toBeCloseTo(-0.65, 10);
+    expect(scene.pose.translations.root).toEqual([1, 0, -2]);
+    expect(scene.pose.yOffset).toBe(0.1);
+    expect(scene.pose.bodyRotationY).toBe(0.25);
+  });
+});
+
+describe("Studio BG3D shared character surface raycast", () => {
+  it("skips a hidden single material and selects the next visible surface", () => {
+    const scene = new THREE.Scene();
+    scene.add(
+      groundPlane("hidden-top", 0.1, new THREE.MeshBasicMaterial({ visible: false })),
+      groundPlane("visible-floor", -0.05, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "visible-floor",
+      point: [0, -0.05, 0],
+    });
+  });
+
+  it("skips a fully transparent single material and selects the next visible surface", () => {
+    const scene = new THREE.Scene();
+    scene.add(
+      groundPlane(
+        "transparent-top",
+        0.1,
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
+      ),
+      groundPlane("visible-floor", -0.08, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "visible-floor",
+      point: [0, -0.08, 0],
+    });
+  });
+
+  it("uses face.materialIndex for material arrays before accepting a hit", () => {
+    const scene = new THREE.Scene();
+    scene.add(
+      groundPlane(
+        "hidden-array-slot",
+        0.1,
+        [
+          new THREE.MeshBasicMaterial(),
+          new THREE.MeshBasicMaterial({ visible: false }),
+        ],
+        1,
+      ),
+      groundPlane("visible-floor", -0.1, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "visible-floor",
+      point: [0, -0.1, 0],
+    });
+  });
+
+  it("accepts the visible indexed slot even when another array material is hidden", () => {
+    const scene = new THREE.Scene();
+    scene.add(
+      groundPlane(
+        "visible-array-slot",
+        0.1,
+        [
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
+          new THREE.MeshBasicMaterial(),
+        ],
+        1,
+      ),
+      groundPlane("lower-floor", -0.1, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "visible-array-slot",
+      point: [0, 0.1, 0],
+    });
+  });
+
+  it("continues to reject a surface hidden by an ancestor", () => {
+    const scene = new THREE.Scene();
+    const hiddenLayer = new THREE.Group();
+    hiddenLayer.visible = false;
+    hiddenLayer.add(groundPlane("hidden-by-parent", 0.1, new THREE.MeshBasicMaterial()));
+    scene.add(
+      hiddenLayer,
+      groundPlane("visible-floor", -0.06, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "visible-floor",
+    });
+  });
+
+  it("preserves instanced surface identity resolution", () => {
+    const scene = new THREE.Scene();
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    geometry.rotateX(-Math.PI / 2);
+    const surface = new THREE.InstancedMesh(
+      geometry,
+      new THREE.MeshBasicMaterial(),
+      1,
+    );
+    surface.setMatrixAt(0, new THREE.Matrix4().makeTranslation(0, 0.1, 0));
+    surface.userData.studioBg3dResolveInstanceId = (instanceId: number) =>
+      `instance-${instanceId}`;
+    scene.add(surface);
+
+    const hit = raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]);
+    expect(hit).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "instance-0",
+    });
+    expect(hit.point[1]).toBeCloseTo(0.1, 7);
   });
 });

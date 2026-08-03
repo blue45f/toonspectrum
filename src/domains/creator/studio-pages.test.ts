@@ -21,6 +21,10 @@ import {
   reorderPages,
   type PageLike,
 } from "./studio-pages";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from
+  "./studio-shared-3d-stage-test-fixture";
 
 const CANVAS_W = 720;
 let idCounter = 0;
@@ -67,6 +71,193 @@ describe("studio-pages (pure, real exports)", () => {
     expect(orig.elements[0]!.id).toBe("eA");
   });
 
+  it("remaps Shared Stage character links while retaining the page-local LT bundle", () => {
+    const sourceHash = `sha256:${"a".repeat(64)}`;
+    const stage = {
+      kind: "toonspectrum.studio-shared-3d-stage",
+      version: 1,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: { bundleId: "bundle-1", sourceHash },
+      characters: [{
+        elementId: "character",
+        modelRuntimeKey: `character:sha256:${"b".repeat(64)}`,
+        sourceHash,
+        hiddenByStage: true,
+      }],
+    };
+    const source = samplePage({
+      id: "source-page",
+      elements: [
+        { id: "background", type: "image", x: 0, width: 100 },
+        { id: "character", type: "image", x: 200, width: 100 },
+      ],
+      shared3dStage: stage,
+    });
+
+    resetIds();
+    const duplicate = duplicatePageState(source, makeId);
+    expect(duplicate.shared3dStage).toMatchObject({
+      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      version: 3,
+      stages: [{
+        background: { bundleId: "bundle-1", sourceHash },
+        characters: [{
+          elementId: "p3",
+          modelRuntimeKey: `p3:sha256:${"b".repeat(64)}`,
+          sourceHash,
+        }],
+      }],
+      visibilityReceipts: [{
+        elementId: "p3",
+        modelRuntimeKey: `p3:sha256:${"b".repeat(64)}`,
+      }],
+    });
+
+    resetIds();
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+    expect(mirrored.shared3dStage).toMatchObject({
+      stages: [{
+        background: { bundleId: "bundle-1", sourceHash },
+        characters: [{
+          elementId: "p2",
+          modelRuntimeKey: `p2:sha256:${"b".repeat(64)}`,
+          sourceHash,
+        }],
+      }],
+      visibilityReceipts: [{ elementId: "p2" }],
+    });
+    expect(source.shared3dStage).toBe(stage);
+  });
+
+  it("remaps one shared character once while preserving two independent Stage placements", () => {
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const source = samplePage({
+      id: "source-page",
+      elements: [
+        { id: "background-a", type: "image", x: 0 },
+        { id: "background-b", type: "image", x: 100 },
+        { id: "character-native-shared", type: "image", x: 200 },
+      ],
+      shared3dStage,
+    });
+
+    resetIds();
+    const duplicate = duplicatePageState(source, makeId);
+    const duplicateCollection = migrateStudioShared3dStageCollectionDocument(
+      duplicate.shared3dStage,
+    )!;
+    const duplicateStages = duplicateCollection.stages;
+    expect(duplicateStages).toHaveLength(2);
+    expect(duplicateStages[0]?.characters[0]?.elementId).toBe("p4");
+    expect(duplicateStages[1]?.characters[0]?.elementId).toBe("p4");
+    expect(duplicateStages.map((stage) => stage.characters[0]?.placement)).toEqual([
+      { position: [1, 0.25, -2], rotationY: 0.5 },
+      { position: [-4, 1, 3], rotationY: -1.2 },
+    ]);
+    expect(duplicateCollection.visibilityReceipts).toHaveLength(1);
+
+    resetIds();
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+    const mirroredStages = migrateStudioShared3dStageCollectionDocument(
+      mirrored.shared3dStage,
+    )!.stages;
+    expect(mirroredStages[0]?.characters[0]?.elementId).toBe("p3");
+    expect(mirroredStages[1]?.characters[0]?.elementId).toBe("p3");
+    expect(mirroredStages.map((stage) => stage.characters[0]?.placement)).toEqual(
+      duplicateStages.map((stage) => stage.characters[0]?.placement),
+    );
+    expect(source.shared3dStage).toBe(shared3dStage);
+  });
+
+  it("gives a missing Shared Stage character tombstone a fresh page-local id", () => {
+    const sourceHash = `sha256:${"a".repeat(64)}`;
+    const missingId = "missing-character";
+    const stage = {
+      kind: "toonspectrum.studio-shared-3d-stage",
+      version: 1,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: { bundleId: "bundle-1", sourceHash },
+      characters: [{
+        elementId: missingId,
+        modelRuntimeKey: `${missingId}:sha256:${"b".repeat(64)}`,
+        sourceHash,
+        hiddenByStage: true,
+      }],
+    };
+    const source = samplePage({
+      id: "source-page",
+      elements: [{ id: "background", type: "image", x: 0, width: 100 }],
+      shared3dStage: stage,
+    });
+
+    resetIds();
+    const duplicate = duplicatePageState(source, makeId);
+    expect(duplicate.shared3dStage).toMatchObject({
+      stages: [{ characters: [{
+        elementId: "p3",
+        modelRuntimeKey: `p3:sha256:${"b".repeat(64)}`,
+      }] }],
+      visibilityReceipts: [{
+        elementId: "p3",
+        modelRuntimeKey: `p3:sha256:${"b".repeat(64)}`,
+      }],
+    });
+    expect(JSON.stringify(duplicate.shared3dStage)).not.toContain(missingId);
+
+    resetIds();
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+    expect(mirrored.shared3dStage).toMatchObject({
+      stages: [{ characters: [{ elementId: "p3" }] }],
+      visibilityReceipts: [{ elementId: "p3" }],
+    });
+    expect(JSON.stringify(mirrored.shared3dStage)).not.toContain(missingId);
+  });
+
+  it("keeps an ambiguous duplicate character link as a fresh missing tombstone", () => {
+    const sourceHash = `sha256:${"a".repeat(64)}`;
+    const stage = {
+      kind: "toonspectrum.studio-shared-3d-stage",
+      version: 1,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: { bundleId: "bundle-1", sourceHash },
+      characters: [{
+        elementId: "character-a",
+        modelRuntimeKey: `character-a:sha256:${"b".repeat(64)}`,
+        sourceHash,
+        hiddenByStage: true,
+      }],
+    };
+    const source = samplePage({
+      id: "source-page",
+      elements: [
+        { id: "character-a", type: "image", x: 10 },
+        { id: "character-a", type: "image", x: 20 },
+      ],
+      shared3dStage: stage,
+    });
+
+    resetIds();
+    const duplicate = duplicatePageState(source, makeId);
+    expect(duplicate.elements.map(({ id }) => id)).toEqual(["p2", "p3"]);
+    expect(duplicate.shared3dStage).toMatchObject({
+      stages: [{ characters: [{ elementId: "p4" }] }],
+      visibilityReceipts: [{ elementId: "p4" }],
+    });
+
+    resetIds();
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+    expect(mirrored.elements.map(({ id }) => id)).toEqual(["p1", "p2"]);
+    expect(mirrored.shared3dStage).toMatchObject({
+      stages: [{ characters: [{ elementId: "p4" }] }],
+      visibilityReceipts: [{ elementId: "p4" }],
+    });
+    expect(source.elements[0]?.id).toBe("character-a");
+    expect(source.elements[1]?.id).toBe("character-a");
+  });
+
   it("insertBlankPageAt inserts at clamped index and preserves order of others", () => {
     resetIds();
     const p0 = samplePage({ id: "a" });
@@ -105,11 +296,16 @@ describe("studio-pages (pure, real exports)", () => {
     expect(movePage([a, b, c], "c", -1).map((p) => p.id)).toEqual(["a", "c", "b"]);
   });
 
-  it("clearPage zeros elements on target only; keeps other fields", () => {
-    const a = samplePage({ id: "a", elements: [{ id: "e" }] });
+  it("clearPage removes elements and their Shared Stage while keeping unrelated page fields", () => {
+    const a = samplePage({
+      id: "a",
+      elements: [{ id: "e" }],
+      shared3dStage: { sentinel: true },
+    });
     const b = samplePage({ id: "b", elements: [{ id: "f" }] });
     const res = clearPage([a, b], "a");
     expect(res[0].elements).toEqual([]);
+    expect(res[0].shared3dStage).toBeUndefined();
     expect(res[1].elements.length).toBe(1);
     expect(res[0].bg).toBe(a.bg);
   });

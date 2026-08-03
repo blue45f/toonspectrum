@@ -185,7 +185,8 @@ describe("Studio lazy panel stack boundary", () => {
     expect(page).toContain("setCurrentPageId,");
     expect(stackUse).not.toContain("setCurrentPageId={setCurrentPageId}");
     expect(page).toContain("insertVrmResult: (result) => applyStudioVrmInsertResult({");
-    expect(page).toContain("insertBg3dResult: (result) => applyStudioBg3dInsertResult({");
+    expect(page).toContain("insertBg3dResult: (result) => {");
+    expect(page).toContain("return applyStudioBg3dInsertResult({");
     expect(stack).toContain("capture: StudioBg3dAiMethodReferenceCapture");
     expect(stack).toContain("<StudioThreeDPreviewPanelStack");
     expect(stack).toContain("validateRecoveryAccess={validateRecoveryAccess}");

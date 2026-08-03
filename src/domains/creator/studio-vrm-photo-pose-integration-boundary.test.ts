@@ -23,7 +23,8 @@ describe("studio VRM photo pose + hand integration boundary", () => {
     expect(poserSource).toContain("commitStudioVrmFullStateHistoryTransaction(");
     expect(poserSource).toContain("setCustomBones(plan.bones)");
     expect(poserSource).toContain("setFingerEdits(plan.fingerEdits)");
-    expect(poserSource).toContain("...plan.fingerEdits");
+    expect(poserSource).toContain("resolveStudioVrmFingerAuthority(");
+    expect(poserSource).toContain("fingerEdits: nextEffectiveFingers");
   });
 
   it("routes locked persistent IK through the existing deferred authoritative command", () => {

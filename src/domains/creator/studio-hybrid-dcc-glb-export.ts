@@ -65,6 +65,7 @@ export type StudioHybridDccGlbIssueCode =
   | "invalid-source-hash"
   | "source-hash-mismatch"
   | "authority-not-editable-mesh"
+  | "modifier-stack-unapplied"
   | "mesh-revision-unsupported"
   | "mesh-budget-exceeded"
   | "empty-mesh"
@@ -1545,9 +1546,15 @@ export function exportStudioHybridDccMeshGlb(
   }
 }
 
-/** Workspace convenience: consumes the real Geometry Authority record and ignores renderCache. */
+/**
+ * Synchronous authority convenience. Non-empty modifier stacks fail closed because this API cannot
+ * evaluate asynchronous Boolean backends; callers must apply the stack or use the BG3D handoff.
+ */
 export function exportStudioHybridDccAuthorityRecordGlb(
-  record: Pick<StudioGeometryAuthorityRecord, "assetId" | "kernel" | "mesh" | "meshHash" | "revision">,
+  record: Pick<
+    StudioGeometryAuthorityRecord,
+    "assetId" | "kernel" | "mesh" | "meshHash" | "modifierStack" | "revision"
+  >,
 ): StudioHybridDccMeshGlbExportResult {
   if (record.kernel !== "half-edge") {
     const input = {
@@ -1559,6 +1566,22 @@ export function exportStudioHybridDccAuthorityRecordGlb(
     return blockedReport(
       input,
       issue("error", "authority-not-editable-mesh", "Only the editable half-edge authority can be exported"),
+    );
+  }
+  if (record.modifierStack.modifiers.length > 0) {
+    const input = {
+      assetId: record.assetId,
+      mesh: record.mesh,
+      sourceRevision: record.revision,
+      sourceHash: record.meshHash,
+    };
+    return blockedReport(
+      input,
+      issue(
+        "error",
+        "modifier-stack-unapplied",
+        "Non-empty modifier stacks require evaluation or explicit application before synchronous export",
+      ),
     );
   }
   return exportStudioHybridDccMeshGlb({

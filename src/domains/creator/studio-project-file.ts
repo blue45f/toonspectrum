@@ -13,6 +13,8 @@ import {
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   migrateStudioVrmSceneDocument,
@@ -40,6 +42,7 @@ const ProjectPageSchema = z
     bg: z.string(),
     bgGrad: z.array(z.string()).nullable(),
     canvasH: z.number().finite().positive().max(STUDIO_PROJECT_MAX_CANVAS_HEIGHT),
+    shared3dStage: z.unknown().optional(),
   })
   .passthrough();
 
@@ -150,11 +153,18 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.drawingAssist !== undefined && !drawingAssist) {
       throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
     }
+    const shared3dStage = page.shared3dStage === undefined
+      ? undefined
+      : migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
+    if (page.shared3dStage !== undefined && !shared3dStage) {
+      throw new Error("페이지 공유 3D Stage 연결이 손상되었거나 지원하지 않는 버전입니다.");
+    }
     return {
       ...page,
       ...(review === undefined ? {} : { review }),
       elements: page.elements.map(canonicalizeStudio3dSceneElement),
       ...(drawingAssist ? { drawingAssist } : {}),
+      ...(shared3dStage ? { shared3dStage } : {}),
     };
   });
   const master = isRecord(project.master) && Array.isArray(project.master.elements)

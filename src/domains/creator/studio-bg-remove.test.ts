@@ -23,12 +23,12 @@ import {
 
 const mediaPipeMocks = vi.hoisted(() => ({
   createFromOptions: vi.fn(),
-  forVisionTasks: vi.fn(),
+  isSimdSupported: vi.fn(),
 }));
 
 vi.mock("@mediapipe/tasks-vision", () => ({
   FilesetResolver: {
-    forVisionTasks: mediaPipeMocks.forVisionTasks,
+    isSimdSupported: mediaPipeMocks.isSimdSupported,
   },
   ImageSegmenter: {
     createFromOptions: mediaPipeMocks.createFromOptions,
@@ -389,7 +389,7 @@ describe("MediaPipe adapter and legacy wrapper", () => {
     const foreground = maskResource(1, 1, foregroundValues);
     const result = segmentationResult([foreground]);
     defaultSegmenter.segment.mockReturnValue(result);
-    mediaPipeMocks.forVisionTasks.mockResolvedValue({ wasm: true });
+    mediaPipeMocks.isSimdSupported.mockResolvedValue(false);
     mediaPipeMocks.createFromOptions.mockImplementation(
       async (_vision: unknown, options: unknown) => {
         const delegate = (

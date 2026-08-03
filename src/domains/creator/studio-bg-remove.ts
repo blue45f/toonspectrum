@@ -1,7 +1,7 @@
 // AI 배경 제거 — 이미지 픽셀은 브라우저 안에서만 MediaPipe에 전달한다.
-// 모델·WASM 자체는 CDN에서 지연 로드하지만, 원본 이미지를 추론 서버로 업로드하지 않는다.
-const MEDIAPIPE_VISION_CDN =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
+// 모델은 지연 로드하고 WASM은 Studio와 같은 출처의 Vite hashed 자산을 사용한다.
+import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
+
 const SELFIE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
 
@@ -237,7 +237,9 @@ function modelReceipt(
 async function loadMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
   const { FilesetResolver, ImageSegmenter } =
     await import("@mediapipe/tasks-vision");
-  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+    isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+  });
   const create = (delegate: StudioLocalForegroundDelegate) =>
     ImageSegmenter.createFromOptions(vision, {
       baseOptions: {

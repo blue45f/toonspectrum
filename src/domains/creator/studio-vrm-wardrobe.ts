@@ -10,7 +10,8 @@
 
 import type { CostumeSlot, CostumeState } from "./studio-vrm-costume";
 
-export const VRM_WARDROBE_VERSION = 1 as const;
+export const VRM_WARDROBE_VERSION = 2 as const;
+export const LEGACY_VRM_WARDROBE_VERSION = 1 as const;
 
 /* ── 슬롯 ────────────────────────────────────────────────────────────── */
 
@@ -24,6 +25,121 @@ export const WARDROBE_SLOT_LABELS: Record<WardrobeSlot, string> = {
   bottom: "하의",
   shoes: "신발",
 };
+
+export type WardrobeFabricId =
+  | "cotton"
+  | "jersey"
+  | "knit"
+  | "wool"
+  | "denim"
+  | "satin"
+  | "leather"
+  | "steel";
+
+export interface WardrobeFabricPreset {
+  id: WardrobeFabricId;
+  label: string;
+  hint: string;
+  roughness: number;
+  metalness: number;
+  sheen: number;
+  sheenRoughness: number;
+  clearcoat: number;
+  clearcoatRoughness: number;
+  /** Procedural micro-weave height. Zero disables the weave texture. */
+  weaveStrength: number;
+  /** Number of warp/weft repeats across the generated tile. */
+  weaveFrequency: number;
+}
+
+export const WARDROBE_FABRICS: readonly WardrobeFabricPreset[] = [
+  { id: "cotton", label: "코튼", hint: "셔츠처럼 보송하고 균형 잡힌 기본 직물", roughness: 0.78, metalness: 0, sheen: 0.22, sheenRoughness: 0.78, clearcoat: 0.01, clearcoatRoughness: 0.95, weaveStrength: 0.018, weaveFrequency: 10 },
+  { id: "jersey", label: "저지", hint: "티셔츠·후드처럼 부드러운 편직물", roughness: 0.86, metalness: 0, sheen: 0.32, sheenRoughness: 0.84, clearcoat: 0, clearcoatRoughness: 1, weaveStrength: 0.024, weaveFrequency: 13 },
+  { id: "knit", label: "니트", hint: "스웨터처럼 굵고 포근한 짜임", roughness: 0.94, metalness: 0, sheen: 0.42, sheenRoughness: 0.9, clearcoat: 0, clearcoatRoughness: 1, weaveStrength: 0.042, weaveFrequency: 7 },
+  { id: "wool", label: "울", hint: "코트·로브처럼 묵직하고 잔광이 적은 직물", roughness: 0.9, metalness: 0, sheen: 0.34, sheenRoughness: 0.88, clearcoat: 0, clearcoatRoughness: 1, weaveStrength: 0.03, weaveFrequency: 9 },
+  { id: "denim", label: "데님", hint: "사선 결이 읽히는 단단한 청바지 직물", roughness: 0.88, metalness: 0, sheen: 0.18, sheenRoughness: 0.82, clearcoat: 0.005, clearcoatRoughness: 0.96, weaveStrength: 0.035, weaveFrequency: 15 },
+  { id: "satin", label: "새틴", hint: "드레스처럼 매끈하고 방향성 하이라이트가 선명한 직물", roughness: 0.34, metalness: 0, sheen: 0.78, sheenRoughness: 0.38, clearcoat: 0.08, clearcoatRoughness: 0.45, weaveStrength: 0.012, weaveFrequency: 18 },
+  { id: "leather", label: "가죽", hint: "부츠·로퍼처럼 단단하고 은은한 코팅이 있는 표면", roughness: 0.48, metalness: 0.02, sheen: 0.08, sheenRoughness: 0.62, clearcoat: 0.22, clearcoatRoughness: 0.42, weaveStrength: 0.014, weaveFrequency: 20 },
+  { id: "steel", label: "금속", hint: "플레이트 아머용 단단한 금속 표면", roughness: 0.28, metalness: 0.88, sheen: 0, sheenRoughness: 1, clearcoat: 0.26, clearcoatRoughness: 0.28, weaveStrength: 0, weaveFrequency: 1 },
+] as const;
+
+export function wardrobeFabricById(id: string): WardrobeFabricPreset | undefined {
+  return WARDROBE_FABRICS.find((fabric) => fabric.id === id);
+}
+
+export type WardrobeGarmentRegion = "torso" | "arms" | "hips" | "legs" | "feet";
+
+export interface WardrobeFitProfile {
+  version: 1;
+  layer: "base" | "outer" | "shoe";
+  layerRank: number;
+  regions: readonly WardrobeGarmentRegion[];
+  /** Clearance already built into the procedural silhouette at fit=1. */
+  baseBodyClearanceM: number;
+  /** Minimum room reserved for ordinary joint motion. */
+  motionAllowanceM: number;
+  /** Extra room required over an intersecting inner layer. */
+  layerClearanceM: number;
+}
+
+function defaultWardrobeFabric(itemId: string, slot: WardrobeSlot): WardrobeFabricId {
+  if (itemId === "armor") return "steel";
+  if (["boots", "longboots", "heels", "loafers"].includes(itemId)) return "leather";
+  if (["jeans", "pants", "wide", "shorts"].includes(itemId)) return "denim";
+  if (["sweater", "cardigan"].includes(itemId)) return "knit";
+  if (["coat", "robe", "blazer"].includes(itemId)) return "wool";
+  if (["dress", "sailor", "longskirt", "pleated"].includes(itemId)) return "satin";
+  if (["hoodie", "tshirt", "tank"].includes(itemId)) return "jersey";
+  if (slot === "shoes") return "leather";
+  return "cotton";
+}
+
+function wardrobeFitProfile(itemId: string, slot: WardrobeSlot): WardrobeFitProfile {
+  if (slot === "outer") {
+    const long = ["coat", "robe", "labcoat"].includes(itemId);
+    return {
+      version: 1,
+      layer: "outer",
+      layerRank: 30,
+      regions: long ? ["torso", "arms", "hips", "legs"] : ["torso", "arms"],
+      baseBodyClearanceM: itemId === "armor" ? 0.026 : 0.022,
+      motionAllowanceM: itemId === "armor" ? 0.014 : 0.012,
+      layerClearanceM: itemId === "armor" ? 0.011 : 0.008,
+    };
+  }
+  if (slot === "top") {
+    return {
+      version: 1,
+      layer: "base",
+      layerRank: 10,
+      regions: ["torso", "arms"],
+      baseBodyClearanceM: itemId === "sweater" ? 0.019 : 0.015,
+      motionAllowanceM: itemId === "sweater" ? 0.012 : 0.009,
+      layerClearanceM: 0.004,
+    };
+  }
+  if (slot === "bottom") {
+    const skirt = ["pleated", "longskirt", "dress"].includes(itemId);
+    return {
+      version: 1,
+      layer: "base",
+      layerRank: 12,
+      regions: ["hips", "legs"],
+      baseBodyClearanceM: skirt ? 0.024 : 0.015,
+      motionAllowanceM: skirt ? 0.014 : 0.01,
+      layerClearanceM: 0.004,
+    };
+  }
+  return {
+    version: 1,
+    layer: "shoe",
+    layerRank: 20,
+    regions: ["feet"],
+    baseBodyClearanceM: 0.014,
+    motionAllowanceM: 0.009,
+    layerClearanceM: 0.004,
+  };
+}
 
 /** 장착 슬롯 → 자동 숨김 대상이 되는 기존(베이크드) 의상 슬롯 매핑. */
 export const WARDROBE_HIDE_COSTUME_SLOTS: Record<WardrobeSlot, CostumeSlot[]> = {
@@ -88,6 +204,8 @@ export interface SideMetric {
  * 모든 방향 벡터는 해당 부착 본의 로컬 공간 기준 단위 벡터.
  */
 export interface WardrobeMetrics {
+  /** Whether the dimensions came from the loaded raw/skinned rig or the guarded fallback. */
+  source: "raw-rig" | "partial-rig" | "fallback";
   /** 어깨 폭(좌우 upperArm 관절 거리). */
   shoulderW: number;
   /** 골반 폭(좌우 upperLeg 관절 거리). */
@@ -110,6 +228,7 @@ export interface WardrobeMetrics {
 
 /** VRoid 표준 성인 체형 근사값 — 측정 실패 시(또는 테스트) 폴백. */
 export const FALLBACK_WARDROBE_METRICS: WardrobeMetrics = {
+  source: "fallback",
   shoulderW: 0.32,
   hipW: 0.17,
   hipsToSpine: 0.09,
@@ -159,6 +278,7 @@ export function sanitizeWardrobeMetrics(raw: Partial<WardrobeMetrics> | null | u
   const f = FALLBACK_WARDROBE_METRICS;
   if (!raw) return f;
   return {
+    source: raw.source === "raw-rig" || raw.source === "partial-rig" ? raw.source : "fallback",
     shoulderW: clampLen(raw.shoulderW ?? f.shoulderW, f.shoulderW),
     hipW: clampLen(raw.hipW ?? f.hipW, f.hipW),
     hipsToSpine: clampLen(raw.hipsToSpine ?? f.hipsToSpine, f.hipsToSpine),
@@ -193,11 +313,15 @@ export interface WardrobeItemDef {
   catalogStatus: "selectable" | "legacy-only";
   /** 신규 선택 시 제안할 같은 슬롯의 대체 아이템. */
   replacementId: string | null;
+  /** Runtime deformation authority. Shoes stay rigid; body garments share the avatar skeleton. */
+  geometrySource: "skinned-procedural-v1" | "rigid-procedural";
+  defaultFabricId: WardrobeFabricId;
+  fitProfile: WardrobeFitProfile;
 }
 
 type WardrobeItemBase = Omit<
   WardrobeItemDef,
-  "quality" | "catalogStatus" | "replacementId"
+  "quality" | "catalogStatus" | "replacementId" | "geometrySource" | "defaultFabricId" | "fitProfile"
 >;
 
 const WARDROBE_ITEM_BASES: readonly WardrobeItemBase[] = [
@@ -265,6 +389,9 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = WARDROBE_ITEM_BASES.ma
         : "standard-procedural",
       catalogStatus: replacementId ? "legacy-only" : "selectable",
       replacementId,
+      geometrySource: item.slot === "shoes" ? "rigid-procedural" : "skinned-procedural-v1",
+      defaultFabricId: defaultWardrobeFabric(item.id, item.slot),
+      fitProfile: wardrobeFitProfile(item.id, item.slot),
     };
   },
 );
@@ -314,12 +441,25 @@ export function resolveWardrobeItemForNewSelection(
 
 export const WARDROBE_FIT_MIN = 0.8;
 export const WARDROBE_FIT_MAX = 1.4;
+export type WardrobeFitMode = "auto" | "manual";
+
+export interface WardrobeOptions {
+  /** Hide only the baked VRM materials covered by the currently equipped wardrobe. */
+  autoHideOriginal: boolean;
+}
+
+export const DEFAULT_WARDROBE_OPTIONS: Readonly<WardrobeOptions> = Object.freeze({
+  autoHideOriginal: true,
+});
 
 export interface WardrobeEquip {
   itemId: string;
   color: string;
   /** 품(반경) 배율 — 몸에 붙게/헐렁하게. */
   fit: number;
+  /** Auto keeps the rendered shell outside the body and lower garment layers without mutating fit. */
+  fitMode: WardrobeFitMode;
+  fabricId: WardrobeFabricId;
 }
 
 export type WardrobeState = Partial<Record<WardrobeSlot, WardrobeEquip>>;
@@ -327,6 +467,15 @@ export type WardrobeState = Partial<Record<WardrobeSlot, WardrobeEquip>>;
 export interface SerializedWardrobe {
   version: typeof VRM_WARDROBE_VERSION;
   slots: WardrobeState;
+  options: WardrobeOptions;
+}
+
+export interface ParsedWardrobeDocument {
+  version: typeof VRM_WARDROBE_VERSION;
+  slots: WardrobeState;
+  options: WardrobeOptions;
+  sourceVersion: 0 | typeof LEGACY_VRM_WARDROBE_VERSION | typeof VRM_WARDROBE_VERSION;
+  supported: boolean;
 }
 
 function normalizeHex(value: unknown, fallback: string): string {
@@ -338,46 +487,101 @@ function clampFit(value: unknown): number {
   return Math.min(WARDROBE_FIT_MAX, Math.max(WARDROBE_FIT_MIN, n));
 }
 
-/** 임의 입력(저장 문서)을 안전한 장착 상태로 정규화한다. 슬롯-아이템 불일치·미지의 아이템은 버린다. */
-export function parseWardrobe(raw: unknown): WardrobeState {
-  if (!raw || typeof raw !== "object") return {};
-  const slotsRaw = (raw as { slots?: unknown }).slots ?? raw;
-  if (!slotsRaw || typeof slotsRaw !== "object") return {};
-
-  const state: WardrobeState = {};
-  for (const slot of WARDROBE_SLOTS) {
-    const entry = (slotsRaw as Record<string, unknown>)[slot];
-    if (!entry || typeof entry !== "object") continue;
-    const e = entry as Partial<Record<keyof WardrobeEquip, unknown>>;
-    const def = wardrobeItemById(String(e.itemId ?? ""));
-    if (!def || def.slot !== slot) continue;
-    state[slot] = {
-      itemId: def.id,
-      color: normalizeHex(e.color, def.defaultColor),
-      fit: clampFit(e.fit),
-    };
-  }
-  return state;
+function normalizeWardrobeEquip(slot: WardrobeSlot, raw: unknown): WardrobeEquip | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as Partial<Record<keyof WardrobeEquip, unknown>>;
+  const def = wardrobeItemById(String(entry.itemId ?? ""));
+  if (!def || def.slot !== slot) return null;
+  return {
+    itemId: def.id,
+    color: normalizeHex(entry.color, def.defaultColor),
+    fit: clampFit(entry.fit),
+    fitMode: entry.fitMode === "manual" ? "manual" : "auto",
+    fabricId: typeof entry.fabricId === "string" && wardrobeFabricById(entry.fabricId)
+      ? entry.fabricId as WardrobeFabricId
+      : def.defaultFabricId,
+  };
 }
 
-export function serializeWardrobe(state: WardrobeState): SerializedWardrobe | undefined {
+/**
+ * Parses both the old v1 slot-only payload and the authored v2 document. Runtime diagnostics,
+ * measured body data, and derived visibility never enter this document.
+ */
+export function parseWardrobeDocument(raw: unknown): ParsedWardrobeDocument {
+  const empty = (sourceVersion: ParsedWardrobeDocument["sourceVersion"], supported = true): ParsedWardrobeDocument => ({
+    version: VRM_WARDROBE_VERSION,
+    slots: {},
+    options: { ...DEFAULT_WARDROBE_OPTIONS },
+    sourceVersion,
+    supported,
+  });
+  if (!raw || typeof raw !== "object") return empty(0);
+
+  const root = raw as { version?: unknown; slots?: unknown; options?: unknown };
+  const explicitVersion = typeof root.version === "number" ? root.version : null;
+  if (explicitVersion !== null && explicitVersion !== LEGACY_VRM_WARDROBE_VERSION && explicitVersion !== VRM_WARDROBE_VERSION) {
+    return empty(0, false);
+  }
+  const sourceVersion = explicitVersion === VRM_WARDROBE_VERSION
+    ? VRM_WARDROBE_VERSION
+    : LEGACY_VRM_WARDROBE_VERSION;
+  const slotsRaw = root.slots ?? raw;
+  if (!slotsRaw || typeof slotsRaw !== "object") return empty(sourceVersion);
+
+  const slots: WardrobeState = {};
+  for (const slot of WARDROBE_SLOTS) {
+    const equip = normalizeWardrobeEquip(slot, (slotsRaw as Record<string, unknown>)[slot]);
+    if (equip) slots[slot] = equip;
+  }
+
+  const optionsRaw = root.options && typeof root.options === "object"
+    ? root.options as { autoHideOriginal?: unknown }
+    : null;
+  const options: WardrobeOptions = {
+    autoHideOriginal: sourceVersion === VRM_WARDROBE_VERSION && typeof optionsRaw?.autoHideOriginal === "boolean"
+      ? optionsRaw.autoHideOriginal
+      : DEFAULT_WARDROBE_OPTIONS.autoHideOriginal,
+  };
+  return { version: VRM_WARDROBE_VERSION, slots, options, sourceVersion, supported: true };
+}
+
+/** 임의 입력(저장 문서)을 안전한 장착 상태로 정규화한다. 슬롯-아이템 불일치·미지의 아이템은 버린다. */
+export function parseWardrobe(raw: unknown): WardrobeState {
+  return parseWardrobeDocument(raw).slots;
+}
+
+export function serializeWardrobe(
+  state: WardrobeState,
+  options: WardrobeOptions = DEFAULT_WARDROBE_OPTIONS,
+): SerializedWardrobe | undefined {
   const slots: WardrobeState = {};
   let count = 0;
   for (const slot of WARDROBE_SLOTS) {
-    const equip = state[slot];
+    const equip = normalizeWardrobeEquip(slot, state[slot]);
     if (!equip) continue;
     slots[slot] = { ...equip };
     count += 1;
   }
-  if (count === 0) return undefined; // 빈 경우 문서에 키를 남기지 않음(하위호환)
-  return { version: VRM_WARDROBE_VERSION, slots };
+  const normalizedOptions: WardrobeOptions = {
+    autoHideOriginal: options.autoHideOriginal !== false,
+  };
+  if (count === 0 && normalizedOptions.autoHideOriginal === DEFAULT_WARDROBE_OPTIONS.autoHideOriginal) {
+    return undefined;
+  }
+  return { version: VRM_WARDROBE_VERSION, slots, options: normalizedOptions };
 }
 
 /** 카탈로그 기본값으로 슬롯 장착을 생성한다. */
 export function createWardrobeEquip(itemId: string): WardrobeEquip | null {
   const def = wardrobeItemById(itemId);
   if (!def) return null;
-  return { itemId: def.id, color: def.defaultColor, fit: 1 };
+  return {
+    itemId: def.id,
+    color: def.defaultColor,
+    fit: 1,
+    fitMode: "auto",
+    fabricId: def.defaultFabricId,
+  };
 }
 
 /* ── 테마 세트(원클릭 코디) ──────────────────────────────────────────── */
@@ -458,7 +662,9 @@ export function applyWardrobeSet(set: WardrobeSet): WardrobeState {
     if (!pick) continue;
     const def = wardrobeItemById(pick.itemId);
     if (!def || def.slot !== slot) continue;
-    state[slot] = { itemId: def.id, color: normalizeHex(pick.color, def.defaultColor), fit: 1 };
+    const equip = createWardrobeEquip(def.id);
+    if (!equip) continue;
+    state[slot] = { ...equip, color: normalizeHex(pick.color, def.defaultColor) };
   }
   return state;
 }

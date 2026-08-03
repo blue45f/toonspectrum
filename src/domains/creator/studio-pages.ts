@@ -11,6 +11,10 @@ import {
   mirrorStudioDrawingAssistDocument,
   parseStudioDrawingAssistDocument,
 } from "./studio-drawing-assist-document";
+import {
+  remapStudioShared3dStageCollectionElementIds,
+  studioShared3dStageLinkedCharacterElementIds,
+} from "./studio-shared-3d-stage-collection";
 
 export interface PageElementLike {
   id: string;
@@ -36,6 +40,7 @@ export interface PageLike {
   grade?: unknown;
   groups?: Array<{ id: string }>;
   drawingAssist?: unknown;
+  shared3dStage?: unknown;
 }
 
 export const DEFAULT_CANVAS_H = 1080;
@@ -54,11 +59,41 @@ export function createBlankPage(makeId: () => string, canvasH: number = DEFAULT_
 
 /** 페이지 복제 — 새 id + elements의 각 id도 새로 부여. 원본 불변. */
 export function duplicatePageState<P extends PageLike>(page: P, makeId: () => string): P {
-  return {
+  const nextPageId = makeId();
+  const copiedElements = page.elements.map((element) => ({
+    source: element,
+    nextId: makeId(),
+  }));
+  const sourceIdCounts = new Map<string, number>();
+  for (const { source } of copiedElements) {
+    sourceIdCounts.set(source.id, (sourceIdCounts.get(source.id) ?? 0) + 1);
+  }
+  const elementIdMap = new Map(
+    copiedElements.flatMap(({ source, nextId }) =>
+      sourceIdCounts.get(source.id) === 1
+        ? [[source.id, nextId] as const]
+        : []),
+  );
+  const duplicated = {
     ...page,
-    id: makeId(),
-    elements: page.elements.map((el) => ({ ...el, id: makeId() })),
+    id: nextPageId,
+    elements: copiedElements.map(({ source, nextId }) => ({ ...source, id: nextId })),
   } as P;
+  if (page.shared3dStage !== undefined) {
+    const linkedIds = studioShared3dStageLinkedCharacterElementIds(page.shared3dStage);
+    for (const elementId of linkedIds ?? []) {
+      // Preserve missing-character tombstones on the copied page without cross-linking the source
+      // page. Allocate after every live element so existing deterministic ID call order is stable.
+      if (!elementIdMap.has(elementId)) elementIdMap.set(elementId, makeId());
+    }
+    const remapped = remapStudioShared3dStageCollectionElementIds(
+      page.shared3dStage,
+      elementIdMap,
+    );
+    if (remapped) duplicated.shared3dStage = remapped;
+    else delete duplicated.shared3dStage;
+  }
+  return duplicated;
 }
 
 /** 지정 인덱스에 빈 페이지 삽입 (0..length 범위 클램프). */
@@ -116,7 +151,7 @@ export function movePage<P extends PageLike>(pages: readonly P[], pageId: string
 export function clearPage<P extends PageLike>(pages: readonly P[], pageId: string): P[] {
   return pages.map((p) =>
     p.id === pageId
-      ? ({ ...p, elements: [] } as P)
+      ? ({ ...p, elements: [], shared3dStage: undefined } as P)
       : p
   );
 }
@@ -144,12 +179,19 @@ export function duplicateMirroredPage<P extends PageLike>(
   canvasW: number
 ): P {
   const drawingAssist = parseStudioDrawingAssistDocument(page.drawingAssist);
+  const elementIdMap = new Map<string, string>();
+  const sourceIdCounts = new Map<string, number>();
+  for (const element of page.elements) {
+    sourceIdCounts.set(element.id, (sourceIdCounts.get(element.id) ?? 0) + 1);
+  }
   const mirroredEls = page.elements.map((el) => {
     const w = typeof el.width === "number" ? el.width : 0;
     const x = typeof el.x === "number" ? el.x : 0;
     const newX = canvasW - x - w;
     const rot = typeof el.rotation === "number" ? el.rotation : 0;
-    const newEl: PageElementLike = { ...el, id: makeId(), x: newX, rotation: -rot };
+    const nextId = makeId();
+    if (sourceIdCounts.get(el.id) === 1) elementIdMap.set(el.id, nextId);
+    const newEl: PageElementLike = { ...el, id: nextId, x: newX, rotation: -rot };
 
     // draw freehand/shape points: x좌표만 반전
     if (Array.isArray(el.points) && el.points.length > 0) {
@@ -185,7 +227,7 @@ export function duplicateMirroredPage<P extends PageLike>(
     return newEl;
   });
 
-  return {
+  const mirrored = {
     ...page,
     id: makeId(),
     elements: mirroredEls,
@@ -193,6 +235,19 @@ export function duplicateMirroredPage<P extends PageLike>(
       ? { drawingAssist: mirrorStudioDrawingAssistDocument(drawingAssist, canvasW) }
       : {}),
   } as P;
+  if (page.shared3dStage !== undefined) {
+    const linkedIds = studioShared3dStageLinkedCharacterElementIds(page.shared3dStage);
+    for (const elementId of linkedIds ?? []) {
+      if (!elementIdMap.has(elementId)) elementIdMap.set(elementId, makeId());
+    }
+    const remapped = remapStudioShared3dStageCollectionElementIds(
+      page.shared3dStage,
+      elementIdMap,
+    );
+    if (remapped) mirrored.shared3dStage = remapped;
+    else delete mirrored.shared3dStage;
+  }
+  return mirrored;
 }
 
 /** 유틸: id로 페이지 인덱스 찾기. */

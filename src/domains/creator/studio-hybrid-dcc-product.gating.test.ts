@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_CLOTH_XPBD_V2_BUDGETS } from "./studio-cloth-xpbd-kernel-v2";
 import {
   STUDIO_DCC_KERNEL_COVERAGE_REGISTRY,
   STUDIO_DCC_KERNEL_COVERAGE_REVISION,
@@ -18,7 +19,11 @@ import {
   createStudioDccCollabRoom,
   STUDIO_DCC_COLLAB_SHELL_REVISION,
 } from "./studio-dcc-collab-shell";
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
+import {
+  createStudioEditableMeshFromPolygons,
+  createStudioUnitCubeMesh,
+  type StudioEditableMesh,
+} from "./studio-editable-half-edge-mesh";
 import {
   importStudioFbxDocument,
   isStudioFbxBinary,
@@ -27,9 +32,13 @@ import {
   buildStudioGeoNodesPrimitive,
   evaluateStudioGeoNodesStarterGraph,
 } from "./studio-geometry-nodes-workspace-bridge";
+import { hybridDccCommitGeometry } from "./studio-hybrid-dcc-document";
+import { transformStudioHybridDccPoint } from "./studio-hybrid-dcc-object-transform";
 import {
   createStudioHybridDccWorkspace,
   runStudioHybridDccFullEngineSuite,
+  STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES,
+  type StudioHybridDccWorkspace,
   workspaceAddGeoNodesPrimitive,
   workspaceAddGeoNodesStarter,
   workspaceAddUnitCube,
@@ -38,13 +47,16 @@ import {
   workspaceCadRevolve,
   workspaceClothStep,
   workspaceCollabJoin,
+  workspaceCommitObjectTransform,
   workspaceDecimateActive,
+  workspaceDeleteActive,
   workspaceExportActiveMesh,
   workspaceExportToon3d,
   workspaceMirrorActive,
   workspaceRebuildBom,
   workspaceRetargetFromBvhExtras,
   workspaceSculptActive,
+  workspaceSelectAsset,
   workspaceSubdivideActive,
   workspaceUvUnwrapActive,
   workspaceVoxelRemeshActive,
@@ -68,6 +80,34 @@ import {
 
 const root = resolve(import.meta.dirname, "../..");
 
+function clothCache(workspace: StudioHybridDccWorkspace, assetId: string) {
+  return workspace.clothRuntimeCache?.entries.get(assetId);
+}
+
+function workspaceWithForgedActiveMesh(
+  workspace: StudioHybridDccWorkspace,
+  mesh: StudioEditableMesh,
+): StudioHybridDccWorkspace {
+  const assetId = workspace.activeAssetId!;
+  const record = workspace.session.state.geometry.records[assetId]!;
+  return {
+    ...workspace,
+    session: {
+      ...workspace.session,
+      state: {
+        ...workspace.session.state,
+        geometry: {
+          ...workspace.session.state.geometry,
+          records: {
+            ...workspace.session.state.geometry.records,
+            [assetId]: { ...record, mesh },
+          },
+        },
+      },
+    },
+  };
+}
+
 describe("product UI wiring", () => {
   it("StudioPage lazy-mounts Hybrid DCC dialog and menubar exposes open control", () => {
     const page = readFileSync(
@@ -88,6 +128,7 @@ describe("product UI wiring", () => {
     expect(page).toContain("onOpenInBackground3D");
     expect(page).toContain("setBg3dInitialScene(result.scene)");
     expect(page).toContain("key={hybridDccWorkspaceScope}");
+    expect(page).toContain("resolveStudioHybridDccPersistenceAuthGate(studioAuthReady)");
     expect(page).toContain(
       "current?.scope === hybridDccWorkspaceScope && current?.workspace === workspace",
     );
@@ -192,6 +233,448 @@ describe("expanded format adapters OFF/3MF/BVH/IFC", () => {
 });
 
 describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
+  it("continues XPBD state and commits each admitted cloth step to canonical geometry", () => {
+    const initial = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-continuation"),
+      "cloth-cube",
+    );
+    const beforeHash = initial.session.state.geometry.records["cloth-cube"]!.meshHash;
+
+    const first = workspaceClothStep(initial);
+    const firstCache = clothCache(first, "cloth-cube");
+    const firstHash = first.session.state.geometry.records["cloth-cube"]!.meshHash;
+    const firstMesh = first.session.state.geometry.records["cloth-cube"]!.mesh;
+    expect(firstCache?.stepIndex).toBe(1);
+    expect(firstHash).not.toBe(beforeHash);
+    expect(firstMesh.faces).toHaveLength(firstCache!.triangleIndices.length / 3);
+    expect(firstMesh.faces.every((face) => {
+      const firstHalfEdge = firstMesh.halfEdges[face.he]!;
+      return firstMesh.halfEdges[firstHalfEdge.next]!.next === firstHalfEdge.prev;
+    })).toBe(true);
+    expect(first.bridge.set.objects.find(({ id }) => id === "cloth-cube")?.geometryHash)
+      .toBe(firstHash);
+
+    const second = workspaceClothStep(first);
+    const secondCache = clothCache(second, "cloth-cube");
+    const secondHash = second.session.state.geometry.records["cloth-cube"]!.meshHash;
+    expect(second.clothStep).toBe(2);
+    expect(secondCache?.stepIndex).toBe(2);
+    expect(secondHash).not.toBe(firstHash);
+    expect(Array.from(secondCache?.positions ?? []))
+      .not.toEqual(Array.from(firstCache?.positions ?? []));
+    expect(Array.from(secondCache?.velocities ?? []).some((value) => value !== 0)).toBe(true);
+
+    for (const particle of secondCache?.fixedParticleIndices ?? []) {
+      const offset = particle * 3;
+      expect(Array.from(secondCache!.positions.slice(offset, offset + 3))).toEqual(
+        Array.from(secondCache!.restPositions.slice(offset, offset + 3)),
+      );
+    }
+
+    const record = second.session.state.geometry.records["cloth-cube"]!;
+    const microEdited = {
+      ...record.mesh,
+      vertices: record.mesh.vertices.map((vertex, index) => index === 0
+        ? {
+            ...vertex,
+            position: { ...vertex.position, x: vertex.position.x + 1e-7 },
+          }
+        : vertex),
+    };
+    const microSession = hybridDccCommitGeometry(second.session, "cloth-cube", microEdited);
+    // Legacy renderer hash rounds positions to five decimals; the exact SHA-256 cache identity
+    // must still notice this edit and restart instead of overwriting it with stale solver state.
+    expect(microSession.state.geometry.records["cloth-cube"]!.meshHash).toBe(secondHash);
+    const restarted = workspaceClothStep({ ...second, session: microSession });
+    expect(clothCache(restarted, "cloth-cube")?.stepIndex).toBe(1);
+  });
+
+  it("solves gravity in world space and invalidates continuation after object TRS changes", () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-world-gravity"),
+      "rotated-cloth",
+    );
+    const firstTransform = {
+      revision: 1 as const,
+      position: [2, 3, -1] as const,
+      rotationEulerRad: [0, 0, Math.PI / 2] as const,
+      scale: [2, 0.5, 1] as const,
+    };
+    workspace = workspaceCommitObjectTransform(workspace, "rotated-cloth", firstTransform);
+    const beforeWorldY = workspace.session.state.geometry.records["rotated-cloth"]!.mesh.vertices
+      .map(({ position }) => transformStudioHybridDccPoint(
+        [position.x, position.y, position.z],
+        firstTransform,
+      )[1])
+      .reduce((sum, value) => sum + value, 0);
+
+    workspace = workspaceClothStep(workspace);
+    const afterWorldY = workspace.session.state.geometry.records["rotated-cloth"]!.mesh.vertices
+      .map(({ position }) => transformStudioHybridDccPoint(
+        [position.x, position.y, position.z],
+        firstTransform,
+      )[1])
+      .reduce((sum, value) => sum + value, 0);
+    expect(afterWorldY).toBeLessThan(beforeWorldY);
+    expect(clothCache(workspace, "rotated-cloth")?.stepIndex).toBe(1);
+
+    workspace = workspaceCommitObjectTransform(workspace, "rotated-cloth", {
+      ...firstTransform,
+      rotationEulerRad: [0, Math.PI / 4, Math.PI / 2],
+    });
+    workspace = workspaceClothStep(workspace);
+    expect(clothCache(workspace, "rotated-cloth")?.stepIndex).toBe(1);
+  });
+
+  it("keeps independent XPBD continuation across A → B → A asset switching", () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-multi-asset"),
+      "cloth-a",
+    );
+    workspace = workspaceClothStep(workspace);
+    const firstA = clothCache(workspace, "cloth-a")!;
+
+    workspace = workspaceAddUnitCube(workspace, "cloth-b");
+    workspace = workspaceClothStep(workspace);
+    const firstB = clothCache(workspace, "cloth-b")!;
+    expect(workspace.clothRuntimeCache?.entries.size).toBe(2);
+
+    workspace = workspaceSelectAsset(workspace, "cloth-a");
+    workspace = workspaceClothStep(workspace);
+    const secondA = clothCache(workspace, "cloth-a")!;
+    expect(secondA.stepIndex).toBe(2);
+    expect(Array.from(secondA.positions)).not.toEqual(Array.from(firstA.positions));
+    expect(clothCache(workspace, "cloth-b")).toBe(firstB);
+    expect(clothCache(workspace, "cloth-b")?.stepIndex).toBe(1);
+  });
+
+  it("invalidates only the edited asset while moving collider frames preserve XPBD continuity", () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-targeted-invalidation"),
+      "cloth-a",
+    );
+    workspace = workspaceClothStep(workspace);
+    workspace = workspaceAddUnitCube(workspace, "cloth-b");
+    workspace = workspaceClothStep(workspace);
+    const originalB = clothCache(workspace, "cloth-b")!;
+
+    workspace = workspaceSelectAsset(workspace, "cloth-a");
+    workspace = workspaceClothStep(workspace, { solverIterations: 7 });
+    expect(clothCache(workspace, "cloth-a")?.stepIndex).toBe(1);
+    expect(clothCache(workspace, "cloth-b")).toBe(originalB);
+
+    workspace = workspaceClothStep(workspace, {
+      solverIterations: 7,
+      capsules: [{
+        id: "body",
+        previousHead: [100, 100, 100],
+        previousTail: [100, 101, 100],
+        currentHead: [100, 100, 100],
+        currentTail: [100, 101, 100],
+        radius: 0.25,
+      }],
+    });
+    expect(clothCache(workspace, "cloth-a")?.stepIndex).toBe(1);
+    expect(clothCache(workspace, "cloth-b")).toBe(originalB);
+    const firstColliderConfig = clothCache(workspace, "cloth-a")!.simulationConfigSha256;
+
+    workspace = workspaceClothStep(workspace, {
+      solverIterations: 7,
+      capsules: [{
+        id: "body",
+        previousHead: [100, 100, 100],
+        previousTail: [100, 101, 100],
+        currentHead: [100.25, 100, 100],
+        currentTail: [100.25, 101, 100],
+        radius: 0.25,
+        friction: 0,
+        compliance: 0,
+      }],
+    });
+    expect(clothCache(workspace, "cloth-a")?.stepIndex).toBe(2);
+    expect(clothCache(workspace, "cloth-a")?.simulationConfigSha256).toBe(firstColliderConfig);
+
+    workspace = workspaceClothStep(workspace, {
+      solverIterations: 7,
+      capsules: [{
+        id: "body",
+        previousHead: [100.25, 100, 100],
+        previousTail: [100.25, 101, 100],
+        currentHead: [100.5, 100, 100],
+        currentTail: [100.5, 101, 100],
+        radius: 0.3,
+      }],
+    });
+    expect(clothCache(workspace, "cloth-a")?.stepIndex).toBe(1);
+
+    const transformB = workspace.session.state.objectTransforms["cloth-b"]!;
+    workspace = workspaceCommitObjectTransform(workspace, "cloth-b", {
+      ...transformB,
+      position: [3, 2, 1],
+    });
+    expect(clothCache(workspace, "cloth-b")).toBeUndefined();
+    const aAfterColliderChange = clothCache(workspace, "cloth-a")!;
+    workspace = workspaceSelectAsset(workspace, "cloth-b");
+    workspace = workspaceClothStep(workspace);
+    expect(clothCache(workspace, "cloth-b")?.stepIndex).toBe(1);
+    expect(clothCache(workspace, "cloth-a")).toBe(aAfterColliderChange);
+
+    workspace = workspaceSelectAsset(workspace, "cloth-a");
+    workspace = workspaceSubdivideActive(workspace, 1);
+    const bAfterTransform = clothCache(workspace, "cloth-b")!;
+    workspace = workspaceClothStep(workspace);
+    expect(clothCache(workspace, "cloth-a")?.stepIndex).toBe(1);
+    expect(clothCache(workspace, "cloth-b")).toBe(bAfterTransform);
+  });
+
+  it("canonicalizes capsule order without losing continuation", () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-capsule-order"),
+      "cloth",
+    );
+    const capsule = (
+      id: string,
+      offset: number,
+      movement: number,
+    ) => ({
+      id,
+      previousHead: [100 + offset, 100, 100] as const,
+      previousTail: [100 + offset, 101, 100] as const,
+      currentHead: [100 + offset + movement, 100, 100] as const,
+      currentTail: [100 + offset + movement, 101, 100] as const,
+      radius: 0.2,
+      friction: 0.25,
+      compliance: 0.001,
+    });
+
+    workspace = workspaceClothStep(workspace, {
+      capsules: [capsule("z-body", 2, 0), capsule("a-hand", 0, 0)],
+    });
+    const first = clothCache(workspace, "cloth")!;
+    workspace = workspaceClothStep(workspace, {
+      capsules: [capsule("a-hand", 0, 0.2), capsule("z-body", 2, -0.1)],
+    });
+    const second = clothCache(workspace, "cloth")!;
+    expect(second.stepIndex).toBe(2);
+    expect(second.simulationConfigSha256).toBe(first.simulationConfigSha256);
+  });
+
+  it("enforces LRU capacity, discards oversized stores, and prunes deleted assets", () => {
+    let workspace = createStudioHybridDccWorkspace("ws-cloth-cache-budget");
+    for (let index = 0; index < STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES; index += 1) {
+      workspace = workspaceAddUnitCube(workspace, `cloth-${index}`);
+      workspace = workspaceClothStep(workspace);
+    }
+    workspace = workspaceSelectAsset(workspace, "cloth-0");
+    workspace = workspaceClothStep(workspace);
+    workspace = workspaceAddUnitCube(workspace, "cloth-overflow");
+    workspace = workspaceClothStep(workspace);
+    expect(workspace.clothRuntimeCache?.entries.size)
+      .toBe(STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES);
+    expect(clothCache(workspace, "cloth-0")?.stepIndex).toBe(2);
+    expect(clothCache(workspace, "cloth-1")).toBeUndefined();
+
+    workspace = workspaceDeleteActive(workspace);
+    expect(clothCache(workspace, "cloth-overflow")).toBeUndefined();
+    expect(workspace.clothRuntimeCache?.entries.size)
+      .toBe(STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES - 1);
+
+    workspace = workspaceSelectAsset(workspace, "cloth-0");
+    const seed = clothCache(workspace, "cloth-0")!;
+    const oversized = new Map<string, typeof seed>();
+    for (let index = 0; index < 10_000; index += 1) {
+      oversized.set(`forged-${index}`, seed);
+    }
+    workspace = workspaceClothStep({
+      ...workspace,
+      clothRuntimeCache: {
+        kind: "studio-hybrid-dcc-cloth-runtime-cache-store",
+        version: 1,
+        maxEntries: STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES,
+        entries: oversized,
+      },
+    });
+    expect(workspace.clothRuntimeCache?.entries.size).toBe(1);
+    expect(clothCache(workspace, "cloth-0")?.stepIndex).toBe(1);
+  });
+
+  it("discards malformed cache arrays before copying and cold-starts from authority", () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-cache-array-bounds"),
+      "cloth",
+    );
+    workspace = workspaceClothStep(workspace);
+    const seed = clothCache(workspace, "cloth")!;
+    const forged = {
+      ...seed,
+      positions: new Float32Array(STUDIO_CLOTH_XPBD_V2_BUDGETS.maxParticles * 3 + 3),
+      velocities: new Float32Array(0),
+      triangleIndices: new Uint32Array(STUDIO_CLOTH_XPBD_V2_BUDGETS.maxTriangles * 3 + 3),
+    };
+    workspace = workspaceClothStep({
+      ...workspace,
+      clothRuntimeCache: {
+        kind: "studio-hybrid-dcc-cloth-runtime-cache-store",
+        version: 1,
+        maxEntries: STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES,
+        entries: new Map([["cloth", forged]]),
+      },
+    });
+    expect(clothCache(workspace, "cloth")?.stepIndex).toBe(1);
+    expect(clothCache(workspace, "cloth")?.positions).toHaveLength(8 * 3);
+    expect(clothCache(workspace, "cloth")?.triangleIndices).toHaveLength(12 * 3);
+  });
+
+  it("rejects vertex, face, and n-gon budgets before exact mesh hashing", () => {
+    const workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-prehash-budget"),
+      "hostile-cloth",
+    );
+    const base = workspace.session.state.geometry.records["hostile-cloth"]!.mesh;
+
+    const oversizedVertices = new Array(STUDIO_CLOTH_XPBD_V2_BUDGETS.maxParticles + 1);
+    Object.defineProperty(oversizedVertices, 0, {
+      get: () => { throw new Error("exact hash touched oversized vertices"); },
+    });
+    expect(() => workspaceClothStep(workspaceWithForgedActiveMesh(workspace, {
+      ...base,
+      vertices: oversizedVertices as StudioEditableMesh["vertices"],
+    }))).toThrow(/budget-exceeded:vertices/u);
+
+    const oversizedFaces = new Array(STUDIO_CLOTH_XPBD_V2_BUDGETS.maxTriangles + 1);
+    Object.defineProperty(oversizedFaces, 0, {
+      get: () => { throw new Error("exact hash touched oversized faces"); },
+    });
+    expect(() => workspaceClothStep(workspaceWithForgedActiveMesh(workspace, {
+      ...base,
+      faces: oversizedFaces as StudioEditableMesh["faces"],
+    }))).toThrow(/budget-exceeded:faces/u);
+
+    const nGonCornerCount = STUDIO_CLOTH_XPBD_V2_BUDGETS.maxTriangles + 3;
+    const guardedVertices = base.vertices.map((vertex) => ({ ...vertex }));
+    Object.defineProperty(guardedVertices[0]!, "position", {
+      get: () => { throw new Error("exact hash touched over-budget n-gon vertices"); },
+    });
+    const nGon: StudioEditableMesh = {
+      ...base,
+      vertices: guardedVertices,
+      faces: [{ id: 0, he: 0, materialSlot: 0, smooth: false }],
+      halfEdges: Array.from({ length: nGonCornerCount }, (_, index) => ({
+        id: index,
+        vertex: index % guardedVertices.length,
+        face: 0,
+        next: (index + 1) % nGonCornerCount,
+        prev: (index + nGonCornerCount - 1) % nGonCornerCount,
+        twin: -1,
+        crease: 0,
+      })),
+      nextHalfEdgeId: nGonCornerCount,
+      nextFaceId: 1,
+    };
+    expect(() => workspaceClothStep(workspaceWithForgedActiveMesh(workspace, nGon)))
+      .toThrow(/budget-exceeded:triangles/u);
+  });
+
+  it("rejects unsafe fan polygons before they can become triangle authority", () => {
+    const baseWorkspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-safe-fan"),
+      "cloth",
+    );
+    const cases = [
+      createStudioEditableMeshFromPolygons(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 2, y: 0, z: 0 },
+          { x: 1, y: 0, z: 1 },
+          { x: 2, y: 0, z: 2 },
+          { x: 0, y: 0, z: 2 },
+        ],
+        [[0, 1, 2, 3, 4]],
+      ),
+      createStudioEditableMeshFromPolygons(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 2, y: 0, z: 2 },
+          { x: 0, y: 0, z: 2 },
+          { x: 2, y: 0, z: 0 },
+        ],
+        [[0, 1, 2, 3]],
+      ),
+      createStudioEditableMeshFromPolygons(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+          { x: 2, y: 0, z: 0 },
+          { x: 2, y: 0, z: 1 },
+          { x: 0, y: 0, z: 1 },
+        ],
+        [[0, 1, 2, 3, 4]],
+      ),
+      createStudioEditableMeshFromPolygons(
+        [
+          { x: 0, y: 0, z: 0 },
+          { x: 1, y: 0, z: 0 },
+          { x: 1, y: 0.2, z: 1 },
+          { x: 0, y: 0, z: 1 },
+        ],
+        [[0, 1, 2, 3]],
+      ),
+    ];
+
+    for (const mesh of cases) {
+      const hostile = workspaceWithForgedActiveMesh(baseWorkspace, mesh);
+      const beforeRecord = hostile.session.state.geometry.records.cloth;
+      expect(() => workspaceClothStep(hostile)).toThrow(/cloth-v2-compile:invalid-input/u);
+      expect(hostile.session.state.geometry.records.cloth).toBe(beforeRecord);
+      expect(hostile.clothRuntimeCache).toBeNull();
+    }
+  });
+
+  it("rejects malformed half-edge authority instead of coercing missing vertex ids to zero", () => {
+    const workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("ws-cloth-structural-preflight"),
+      "cloth",
+    );
+    const triangle = createStudioEditableMeshFromPolygons(
+      [
+        { x: 0, y: 0, z: 0 },
+        { x: 1, y: 0, z: 0 },
+        { x: 0, y: 0, z: 1 },
+      ],
+      [[0, 1, 2]],
+    );
+    const malformed: StudioEditableMesh[] = [
+      {
+        ...triangle,
+        halfEdges: triangle.halfEdges.map((halfEdge, index) => (
+          index === 0 ? { ...halfEdge, vertex: 999 } : halfEdge
+        )),
+      },
+      {
+        ...triangle,
+        vertices: triangle.vertices.map((vertex, index) => (
+          index === 1 ? { ...vertex, id: 0 } : vertex
+        )),
+      },
+      {
+        ...triangle,
+        halfEdges: triangle.halfEdges.map((halfEdge, index) => (
+          index === 0 ? { ...halfEdge, next: 2 } : halfEdge
+        )),
+      },
+      {
+        ...triangle,
+        halfEdges: triangle.halfEdges.map((halfEdge, index) => (
+          index === 0 ? { ...halfEdge, face: 99 } : halfEdge
+        )),
+      },
+    ];
+    for (const mesh of malformed) {
+      expect(() => workspaceClothStep(workspaceWithForgedActiveMesh(workspace, mesh)))
+        .toThrow(/cloth-v2-compile:invalid-input/u);
+    }
+  });
+
   it("runs expanded workspace ops and packs toon3d", async () => {
     let ws = createStudioHybridDccWorkspace("ws-product");
     expect(ws.revision).toBeGreaterThanOrEqual(3);

@@ -11,6 +11,7 @@ import {
   createStudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
 import {
+  inverseTransformStudioHybridDccPoint,
   normalizeStudioHybridDccObjectTransform,
   transformStudioHybridDccPoint,
 } from "./studio-hybrid-dcc-object-transform";
@@ -73,7 +74,7 @@ describe("Hybrid DCC canonical object transforms", () => {
       JSON.parse(JSON.stringify(snapshot)) as typeof snapshot,
     );
 
-    expect(snapshot.version).toBe(2);
+    expect(snapshot.version).toBe(3);
     expect(restored.objectTransforms.cube).toEqual(TRANSFORM);
     expect(restored.stateHash).toBe(session.state.stateHash);
   });
@@ -89,7 +90,7 @@ describe("Hybrid DCC canonical object transforms", () => {
     } as unknown as Parameters<typeof restoreStudioHybridDccStateFromSnapshot>[0];
 
     const migrated = restoreStudioHybridDccStateFromSnapshot(legacy);
-    expect(migrated.version).toBe(2);
+    expect(migrated.version).toBe(3);
     expect(migrated.objectTransforms.cube).toMatchObject({
       position: [0, 0, 0],
       rotationEulerRad: [0, 0, 0],
@@ -118,6 +119,12 @@ describe("Hybrid DCC canonical object transforms", () => {
 
   it("matches intrinsic XYZ/Three transform math and rejects corrupt or singular values", () => {
     expect(transformStudioHybridDccPoint([1, 0, 0], TRANSFORM)).toEqual([4, 2, -5]);
+    const local = [0.125, -0.75, 1.5] as const;
+    const world = transformStudioHybridDccPoint(local, TRANSFORM);
+    const roundTrip = inverseTransformStudioHybridDccPoint(world, TRANSFORM);
+    expect(roundTrip[0]).toBeCloseTo(local[0], 12);
+    expect(roundTrip[1]).toBeCloseTo(local[1], 12);
+    expect(roundTrip[2]).toBeCloseTo(local[2], 12);
     expect(() => normalizeStudioHybridDccObjectTransform({
       ...TRANSFORM,
       position: [Number.NaN, 0, 0],

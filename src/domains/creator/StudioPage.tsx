@@ -176,6 +176,9 @@ import {
 } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import {
+  planStudioBg3dEditableCompositeDetach,
+} from "./studio-bg3d-editable-composite-detach-plan";
+import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
 } from "./studio-bg3d-lt-layer-plan";
@@ -602,6 +605,7 @@ import {
   studioHokusaiSourceRevision,
 } from "./studio-hokusai-natural-media-contract";
 import { createStudioHybridDccLatestTaskQueue } from "./studio-hybrid-dcc-latest-task-queue";
+import { resolveStudioHybridDccPersistenceAuthGate } from "./studio-hybrid-dcc-persistence-auth-gate";
 import { uid } from "./studio-id";
 import {
   cascadeCanvasPlacementAnchor,
@@ -1203,7 +1207,23 @@ import {
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
-import { planStudioShared3dCapturedSourceLayerVisibility } from "./studio-shared-3d-scene-bridge";
+import {
+  planStudioShared3dCapturedSourceLayerVisibility,
+} from "./studio-shared-3d-scene-bridge";
+import {
+  migrateStudioShared3dStageCollectionDocument,
+  planStudioShared3dStageCollectionRemoval,
+  planStudioShared3dStageCollectionUpsert,
+  reconcileStudioShared3dStageVisibilityReceiptsAfterElementMutation,
+  studioShared3dStageCollectionEntries,
+  studioShared3dStageEntryAsDocument,
+  studioShared3dStageReusableHiddenCharacterElementIds,
+} from "./studio-shared-3d-stage-collection";
+import {
+  createStudioShared3dStageDocument,
+  resolveStudioShared3dStageBundleIdForElement,
+  type StudioShared3dStageDccSource,
+} from "./studio-shared-3d-stage-document";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
@@ -4815,7 +4835,7 @@ function StudioCuttoonEditor() {
   const [hybridDccPersistenceUiState, setHybridDccPersistenceUiState] =
     useState<StudioHybridDccPersistenceUiState>(() => ({
       scope: hybridDccWorkspaceScope,
-      status: "checking",
+      status: resolveStudioHybridDccPersistenceAuthGate(studioAuthReady).status,
     }));
   const hybridDccPersistenceStatus =
     hybridDccPersistenceUiState.scope === hybridDccWorkspaceScope
@@ -4828,11 +4848,12 @@ function StudioCuttoonEditor() {
     let cancelled = false;
     let recoveryTimedOut = false;
     const scopeGeneration = ++hybridDccPersistenceScopeGenerationRef.current;
+    const authGate = resolveStudioHybridDccPersistenceAuthGate(studioAuthReady);
     setHybridDccPersistenceUiState({
       scope: hybridDccWorkspaceScope,
-      status: "checking",
+      status: authGate.status,
     });
-    if (!studioAuthReady) {
+    if (!authGate.shouldAttemptRecovery) {
       hybridDccPersistenceRef.current = null;
       const authScopeTimeoutId = window.setTimeout(() => {
         if (cancelled || scopeGeneration !== hybridDccPersistenceScopeGenerationRef.current) return;
@@ -7922,11 +7943,24 @@ function StudioCuttoonEditor() {
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  const bg3dDccSourceRef = useRef<StudioShared3dStageDccSource | null>(null);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialScene, setBg3dInitialScene] = useState<StudioBg3dSceneDocument | undefined>(
     undefined
   );
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!bg3dOpen) bg3dDccSourceRef.current = null;
+  }, [bg3dOpen]);
+  const bg3dTargetBundleId = useMemo(
+    () => masterEditMode
+      ? null
+      : resolveStudioShared3dStageBundleIdForElement(
+          activePage.elements,
+          bg3dInitialElementId,
+        ),
+    [activePage.elements, bg3dInitialElementId, masterEditMode],
+  );
   const bg3dMemoryRecoveryPartitionRef = useRef(
     globalThis.crypto?.randomUUID?.() ?? `bg3d-memory-${uid()}`
   );
@@ -8090,6 +8124,7 @@ function StudioCuttoonEditor() {
   }, []);
   const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
+  const bg3dMutationPageIdRef = useRef<string | null>(null);
   useEffect(() => {
     poserMutationTicketRef.current = poserVrmOpen ? captureStudioMutationTicket() : null;
   }, [poserVrmOpen]);
@@ -8099,6 +8134,7 @@ function StudioCuttoonEditor() {
   }, [mannequinPoserOpen]);
   useEffect(() => {
     bg3dMutationTicketRef.current = bg3dOpen ? captureStudioMutationTicket() : null;
+    bg3dMutationPageIdRef.current = bg3dOpen ? currentPageIdRef.current : null;
   }, [bg3dOpen]);
 
   // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 localStorage에 분리하고,
@@ -18648,9 +18684,31 @@ const puppetWarpArmed =
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
+    // Generic mutations preserve Stage entries and missing/ambiguous tombstones. Revealing an
+    // exact source does consume Studio's visibility receipt in the same undo step, so a later
+    // user-authored hide can never be mistaken for visibility still owned by the Stage.
+    const hasExplicitSharedStagePatch = Object.prototype.hasOwnProperty.call(
+      extraPatch ?? {},
+      "shared3dStage",
+    );
+    const visibilityReceiptReconciliation = !hasExplicitSharedStagePatch
+      && commitTargetPage?.shared3dStage !== undefined
+      ? reconcileStudioShared3dStageVisibilityReceiptsAfterElementMutation({
+          value: commitTargetPage.shared3dStage,
+          beforeElements: commitBaseElements,
+          nextElements: resolved,
+        })
+      : null;
+    const resolvedExtraPatch = visibilityReceiptReconciliation
+      && visibilityReceiptReconciliation.consumedElementIds.length > 0
+      ? {
+          ...(extraPatch ?? {}),
+          shared3dStage: visibilityReceiptReconciliation.nextState,
+        }
+      : extraPatch;
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const localNextPages = commitBasePages.map((p) =>
-      p.id === commitPageId ? { ...p, ...extraPatch, elements: resolved } : p
+      p.id === commitPageId ? { ...p, ...resolvedExtraPatch, elements: resolved } : p
     );
     if (!publishStudioCrdtSceneTransition(commitBasePages, localNextPages)) return false;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
@@ -20363,6 +20421,33 @@ const puppetWarpArmed =
     });
   }
 
+  function shared3dStageMergeConflictReason(removeIds: readonly string[]): string | null {
+    if (removeIds.length === 0 || activePage.shared3dStage === undefined) return null;
+    const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
+    if (!sharedStages) {
+      return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았어요. 먼저 3D 배경 연결을 확인해 주세요.";
+    }
+    const removedIds = new Set(removeIds);
+    const linkedCharacterIds = new Set(sharedStages.flatMap((stage) =>
+      stage.characters.map((character) => character.elementId)));
+    const linkedBundleIds = new Set(sharedStages.map((stage) =>
+      stage.background.bundleId));
+    const removesStageAuthority = elements.some((element) =>
+      removedIds.has(element.id)
+      && (
+        (
+          element.type === "image"
+          && element.bg3dLtBundleId !== undefined
+          && linkedBundleIds.has(element.bg3dLtBundleId)
+        )
+        || linkedCharacterIds.has(element.id)
+      ),
+    );
+    return removesStageAuthority
+      ? "공유 3D 장면은 일반 병합으로 일부만 지우지 않아요. 3D 배경에서 ‘3D 원본 유지 · 한 장으로 정리’를 사용하거나, 배경을 삭제해 원본 캐릭터를 복원해 주세요."
+      : null;
+  }
+
   function patchLayerItems(
     ids: readonly string[],
     resolvePatch: (element: El) => Partial<El>
@@ -20398,6 +20483,11 @@ const puppetWarpArmed =
       return;
     }
     if (layerMergeBusy) return;
+    const sharedStageConflict = shared3dStageMergeConflictReason(result.plan.removeIds);
+    if (sharedStageConflict) {
+      setError(sharedStageConflict);
+      return;
+    }
     if (!(await beginLiveResourceEditAsync(result.plan.removeIds))) return;
     setLayerMergeBusy(true);
     try {
@@ -20480,6 +20570,11 @@ const puppetWarpArmed =
       return;
     }
     if (layerMergeBusy) return;
+    const sharedStageConflict = shared3dStageMergeConflictReason(result.plan.removeIds);
+    if (sharedStageConflict) {
+      setError(sharedStageConflict);
+      return;
+    }
     if (!(await beginLiveResourceEditAsync(result.plan.removeIds))) return;
     setLayerMergeBusy(true);
     try {
@@ -21438,27 +21533,92 @@ const puppetWarpArmed =
       setError(plan.message);
       return false;
     }
-    const magicAttachment = attachStudioBg3dMagicFilterMaskToLtPlan({
-      plan,
-      insertResult: result,
-    });
+    const detachEditableComposite =
+      result.materialization?.kind === "detached-editable-composite";
+    if (
+      detachEditableComposite
+      && (
+        !targetElementId
+        || result.sharedStageMutation?.kind !== "unlink"
+        || result.linkedCharacterCapture !== undefined
+        || result.magicFilterMask !== undefined
+      )
+    ) {
+      setError("3D 원본을 유지한 한 장 정리는 기존 배경의 캐릭터 연결을 안전하게 해제할 때만 사용할 수 있어요.");
+      return false;
+    }
+    const detachPlan = detachEditableComposite
+      ? planStudioBg3dEditableCompositeDetach<El, StudioBg3dSceneDocument>({
+          plan,
+          compositePngDataUrl: result.compositePngDataUrl,
+          pageLocked: pageEditLocked,
+          expected: {
+            bundleId: plan.bundleId,
+            groupId: plan.groupId,
+            anchorElementId: plan.anchorElementId,
+          },
+        })
+      : null;
+    if (detachPlan && !detachPlan.ok) {
+      setError(detachPlan.message);
+      return false;
+    }
+    const magicAttachment = detachPlan?.ok
+      ? {
+          ok: true as const,
+          applied: false as const,
+          targetElementId: null,
+          nextElements: detachPlan.nextElements,
+        }
+      : attachStudioBg3dMagicFilterMaskToLtPlan({
+          plan,
+          insertResult: result,
+        });
     if (!magicAttachment.ok) {
       setError(magicAttachment.message);
       return false;
     }
+    const materializedGroups = detachPlan?.ok ? detachPlan.nextGroups : plan.nextGroups;
+    const capturedCharacterElementIds =
+      result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
+        ? result.linkedCharacterCapture.elementIds
+        : [];
+    const capturedCharacterPlacements =
+      result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
+        ? result.linkedCharacterCapture.stagePlacements
+        : [];
+    if (
+      capturedCharacterPlacements.length !== capturedCharacterElementIds.length
+      || new Set(capturedCharacterPlacements.map(({ elementId }) => elementId)).size
+        !== capturedCharacterPlacements.length
+      || capturedCharacterElementIds.some((elementId) =>
+        !capturedCharacterPlacements.some((placement) => placement.elementId === elementId))
+    ) {
+      setError("이 배경의 캐릭터 배치 확인 정보가 일치하지 않아 원본과 다른 배경은 바꾸지 않았어요.");
+      return false;
+    }
+    const currentStageCollection = activePage.shared3dStage === undefined
+      ? undefined
+      : migrateStudioShared3dStageCollectionDocument(activePage.shared3dStage);
+    if (activePage.shared3dStage !== undefined && !currentStageCollection) {
+      setError("공유 3D 장면 연결 정보가 손상되어 기존 연결을 덮어쓰지 않았어요. 연결 상태를 확인해 주세요.");
+      return false;
+    }
+    const reusableHiddenCharacterIds = studioShared3dStageReusableHiddenCharacterElementIds(
+      currentStageCollection,
+      magicAttachment.nextElements,
+    );
     const sharedCharacterVisibility = planStudioShared3dCapturedSourceLayerVisibility({
       elements: magicAttachment.nextElements,
-      capturedElementIds:
-        result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
-          ? result.linkedCharacterCapture.elementIds
-          : [],
+      capturedElementIds: capturedCharacterElementIds,
       isLocked: (element) => isEffectivelyLocked(element, groups),
+      reusableHiddenElementIds: reusableHiddenCharacterIds,
     });
     if (!sharedCharacterVisibility.ok) {
       setError(sharedCharacterVisibility.message);
       return false;
     }
-    const nextElements = [...sharedCharacterVisibility.nextElements];
+    let nextElements = [...sharedCharacterVisibility.nextElements];
     const anchor = nextElements.find((element) => element.id === plan.anchorElementId);
     const mappedGuides = anchor?.type === "image"
       ? mapStudioBg3dPerspectiveGuidesToAnchor(result.perspectiveGuides, anchor)
@@ -21484,11 +21644,82 @@ const puppetWarpArmed =
           canvasHeight: drawingAssistState.page.canvasH,
         })
       : undefined;
-    // LT layers, their editable group, and the camera-derived perspective ruler are one document
-    // transition. The optional Magic Layer mask is attached to that same next-elements snapshot,
-    // so undo can never leave only half of either a 3D insertion or its object selection behind.
+    const priorTargetStage = studioShared3dStageEntryAsDocument(
+      currentStageCollection,
+      plan.bundleId,
+    );
+    const sharedStageMutationKind = result.sharedStageMutation?.kind
+      ?? (priorTargetStage ? "refresh" : "connect");
+    const stageMutation = sharedStageMutationKind === "unlink"
+      ? priorTargetStage
+        ? planStudioShared3dStageCollectionRemoval({
+            value: currentStageCollection,
+            bundleIds: [plan.bundleId],
+            elements: nextElements,
+          })
+        : null
+      : (() => {
+          const provisionalStage = createStudioShared3dStageDocument({
+            backgroundBundleId: plan.bundleId,
+            elements: nextElements,
+            characterElementIds: capturedCharacterElementIds,
+            hiddenByStageElementIds: [],
+            dccSource: priorTargetStage?.dccSource ?? bg3dDccSourceRef.current ?? undefined,
+            capturePolicy: sharedStageMutationKind === "background-only"
+              || capturedCharacterElementIds.length === 0
+              ? "background-only"
+              : "require-all-linked",
+          });
+          if (!provisionalStage) return null;
+          const priorReceiptsById = new Map(
+            currentStageCollection?.visibilityReceipts.map((receipt) =>
+              [receipt.elementId, receipt.modelRuntimeKey] as const) ?? [],
+          );
+          const currentRuntimeKeysById = new Map(
+            provisionalStage.characters.map((character) =>
+              [character.elementId, character.modelRuntimeKey] as const),
+          );
+          const transferredVisibilityReceiptIds = capturedCharacterElementIds.filter(
+            (elementId) =>
+              sharedCharacterVisibility.hiddenElementIds.includes(elementId)
+              || (
+                sharedStageMutationKind === "relink"
+                && priorReceiptsById.get(elementId)
+                  === currentRuntimeKeysById.get(elementId)
+                && nextElements.some((element) =>
+                  element.id === elementId && element.hidden === true)
+              ),
+          );
+          const stage = transferredVisibilityReceiptIds.length === 0
+            ? provisionalStage
+            : createStudioShared3dStageDocument({
+                backgroundBundleId: plan.bundleId,
+                elements: nextElements,
+                characterElementIds: capturedCharacterElementIds,
+                hiddenByStageElementIds: transferredVisibilityReceiptIds,
+                dccSource: provisionalStage.dccSource,
+                capturePolicy: provisionalStage.capturePolicy,
+              });
+          return stage
+            ? planStudioShared3dStageCollectionUpsert({
+                value: currentStageCollection,
+                stage,
+                elements: nextElements,
+                placementCaptures: capturedCharacterPlacements,
+              })
+            : null;
+        })();
+    if (!stageMutation || (sharedStageMutationKind !== "unlink" && !stageMutation.nextState)) {
+      setError("이 배경과 캐릭터 원본의 공유 연결을 안전하게 검증하지 못해 적용하지 않았어요.");
+      return false;
+    }
+    nextElements = [...stageMutation.nextElements];
+    // The editable LT bundle or its explicitly detached composite, Stage relationship, visibility
+    // receipts and camera-derived ruler are one transition. Undo can never leave a half-detached
+    // background, duplicate character source, or orphaned Magic Layer sidecar behind.
     if (!commit(nextElements, {
-      groups: plan.nextGroups,
+      groups: materializedGroups,
+      shared3dStage: stageMutation.nextState,
       ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
     })) return false;
     const magicMask = result.magicFilterMask;
@@ -21534,7 +21765,11 @@ const puppetWarpArmed =
     }
     setSelectedId(plan.anchorElementId);
     setTool("select");
-    if (sharedCharacterVisibility.hiddenElementIds.length > 0) {
+    if (detachEditableComposite) {
+      announceDrawingShortcut(
+        `3D 배경을 한 장으로 정리했어요 · 3D 원본 유지 · 캐릭터 원본 ${stageMutation.restoredElementIds.length}명 복원`,
+      );
+    } else if (sharedCharacterVisibility.hiddenElementIds.length > 0) {
       announceDrawingShortcut(
         `공유 캐릭터 ${sharedCharacterVisibility.hiddenElementIds.length}명 합성 · 원본 레이어는 숨김 상태로 보존`,
       );
@@ -22023,10 +22258,36 @@ const puppetWarpArmed =
       (document, id) => removeTrack(document, id),
       animTimeline
     );
-    const nextItems = preserveStudioBg3dLtSceneAnchorAfterRemoval<El, StudioBg3dSceneDocument>(
+    const nextItemsBeforeVisibilityRelease = preserveStudioBg3dLtSceneAnchorAfterRemoval<El, StudioBg3dSceneDocument>(
       elements,
       removal.items
     );
+    const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
+    const survivingBundleIds = new Set(nextItemsBeforeVisibilityRelease.flatMap((element) =>
+      element.type === "image" && element.bg3dLtBundleId
+        ? [element.bg3dLtBundleId]
+        : []));
+    const removedSharedStageBundleIds = sharedStages?.flatMap((stage) =>
+      survivingBundleIds.has(stage.background.bundleId)
+        ? []
+        : [stage.background.bundleId]) ?? [];
+    const stageRemoval = removedSharedStageBundleIds.length > 0
+      ? planStudioShared3dStageCollectionRemoval({
+          value: activePage.shared3dStage,
+          bundleIds: removedSharedStageBundleIds,
+          elements: nextItemsBeforeVisibilityRelease,
+        })
+      : null;
+    if (removedSharedStageBundleIds.length > 0 && !stageRemoval) {
+      setError("삭제할 3D 배경의 원본 연결을 안전하게 정리하지 못했어요. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
+      return false;
+    }
+    const visibilityRelease = stageRemoval ?? {
+      nextState: activePage.shared3dStage,
+      nextElements: nextItemsBeforeVisibilityRelease,
+      restoredElementIds: [] as readonly string[],
+    };
+    const nextItems = [...visibilityRelease.nextElements];
     const removedGroupIds = new Set(
       elements
         .filter((element) => idSet.has(element.id) && element.groupId)
@@ -22040,12 +22301,20 @@ const puppetWarpArmed =
       nextItems,
       {
         ...(trackedDeleted.length > 0 ? { animTimeline: nextTimeline } : {}),
+        ...(removedSharedStageBundleIds.length > 0
+          ? { shared3dStage: visibilityRelease.nextState }
+          : {}),
         ...(groupsEmptiedByRemoval.size > 0
           ? { groups: groups.filter((group) => !groupsEmptiedByRemoval.has(group.id)) }
           : {}),
       }
     );
     if (!committed) return false;
+    if (visibilityRelease.restoredElementIds.length > 0) {
+      announceDrawingShortcut(
+        `공유 3D 배경을 삭제하고 캐릭터 원본 ${visibilityRelease.restoredElementIds.length}개를 다시 표시했어요`,
+      );
+    }
     if (
       activeGroupIdRef.current &&
       groupsEmptiedByRemoval.has(activeGroupIdRef.current)
@@ -37922,13 +38191,22 @@ function clearSelectionForEdit() {
         return false;
       }
     },
-    insertBg3dResult: (result) => applyStudioBg3dInsertResult({
-      result,
-      mutationTicket: bg3dMutationTicketRef.current,
-      admitMutation: canApplyStudioMutation,
-      targetElementId: bg3dInitialElementId,
-      applyRenderedImage: applyBg3dRenderedImage,
-    }),
+    insertBg3dResult: (result) => {
+      const editorPageId = bg3dMutationPageIdRef.current;
+      if (!editorPageId || editorPageId !== currentPageIdRef.current) {
+        setError(
+          "3D 편집기를 연 페이지가 바뀌어 결과를 적용하지 않았어요. 적용할 페이지에서 3D 편집기를 다시 열어 주세요.",
+        );
+        return false;
+      }
+      return applyStudioBg3dInsertResult({
+        result,
+        mutationTicket: bg3dMutationTicketRef.current,
+        admitMutation: canApplyStudioMutation,
+        targetElementId: bg3dInitialElementId,
+        applyRenderedImage: applyBg3dRenderedImage,
+      });
+    },
     insertVrmResult: (result) => applyStudioVrmInsertResult({
       result,
       mutationTicket: poserMutationTicketRef.current,
@@ -38965,6 +39243,14 @@ function clearSelectionForEdit() {
                 : `3D 장면을 열었습니다 · ${result.assets.length}개 메시, ${result.shots.length}개 Shot`,
             );
             flushHybridDccWorkspacePersistence();
+            bg3dDccSourceRef.current = {
+              sourceDocumentId: result.sourceDocumentId,
+              sourceStateHash: result.sourceStateHash,
+              sourceWorkspaceHash: result.sourceWorkspaceHash,
+              sourceBridgeSetHash: result.sourceBridgeSetHash,
+              sourceCommandCount: result.sourceCommandCount,
+              sourceBridgeCommandSequence: result.sourceBridgeCommandSequence,
+            };
             setHybridDccOpen(false);
             setBg3dInitialDataUrl(undefined);
             setBg3dInitialElementId(undefined);
@@ -40696,6 +40982,7 @@ function clearSelectionForEdit() {
           bg3dInitialDataUrl={bg3dInitialDataUrl}
           bg3dInitialScene={bg3dInitialScene}
           bg3dOperation={bg3dInitialElementId ? "update" : "insert"}
+          bg3dTargetBundleId={bg3dTargetBundleId}
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
           bg3dOpen={bg3dOpen}

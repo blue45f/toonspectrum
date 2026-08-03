@@ -25,6 +25,12 @@ import {
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
+  STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
+  migrateStudioShared3dStageCollectionDocument,
+} from "./studio-shared-3d-stage-collection";
+import { STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND } from
+  "./studio-shared-3d-stage-document";
+import {
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
   migrateStudioVrmSceneDocument,
@@ -2533,11 +2539,11 @@ function parseCanonicalJson<T>(
 }
 
 /**
- * Projects strict historical VRM scene v1/v2/v3/v4 values to the current scene version for
- * archive-writer compatibility checks. Current documents pass through unchanged.
- * No other project defaults, redactions, or schema changes are introduced here.
+ * Projects strict historical VRM scenes and singular Shared Stage v1 values to the current
+ * schemas for archive-writer compatibility checks. The projections are deliberately composed in
+ * one pass so an archive containing both historical forms remains importable.
  */
-function promoteStrictHistoricalVrmScenes(
+function promoteStrictHistoricalProjectSchema(
   project: Record<string, unknown>,
 ): Record<string, unknown> | null {
   let changed = false;
@@ -2570,9 +2576,33 @@ function promoteStrictHistoricalVrmScenes(
   };
 
   const pages = Array.isArray(project.pagesList)
-    ? project.pagesList.map((page) => isRecord(page)
-      ? { ...page, elements: visitElements(page.elements) }
-      : page)
+    ? project.pagesList.map((page) => {
+        if (!isRecord(page)) return page;
+        const nextPage: Record<string, unknown> = {
+          ...page,
+          elements: visitElements(page.elements),
+        };
+        const historicalSharedStage = isRecord(page.shared3dStage)
+          && (
+            (
+              page.shared3dStage.kind === STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND
+              && page.shared3dStage.version === 1
+            )
+            || (
+              page.shared3dStage.kind === STUDIO_SHARED_3D_STAGE_COLLECTION_KIND
+              && page.shared3dStage.version === 2
+            )
+          );
+        if (historicalSharedStage) {
+          const migrated = migrateStudioShared3dStageCollectionDocument(page.shared3dStage);
+          if (!migrated) invalid = true;
+          else {
+            changed = true;
+            nextPage.shared3dStage = migrated;
+          }
+        }
+        return nextPage;
+      })
     : project.pagesList;
   const master = isRecord(project.master)
     ? { ...project.master, elements: visitElements(project.master.elements) }
@@ -2629,20 +2659,20 @@ function parseCanonicalProject(
     limits,
     nodes: 0,
   });
-  const legacyVrmProjection = manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
-    ? promoteStrictHistoricalVrmScenes(sanitized)
+  const historicalProjection = manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
+    ? promoteStrictHistoricalProjectSchema(sanitized)
     : null;
   const writerMatchesStored = isRecord(writerCanonical)
     && canonicalJson(writerCanonical) === text;
-  const writerMatchesVrmV1Projection = isRecord(writerCanonical)
-    && legacyVrmProjection !== null
-    && canonicalJson(writerCanonical) === canonicalJson(legacyVrmProjection);
+  const writerMatchesHistoricalProjection = isRecord(writerCanonical)
+    && historicalProjection !== null
+    && canonicalJson(writerCanonical) === canonicalJson(historicalProjection);
   if (
     !isRecord(writerCanonical)
     || (
       manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
       && !writerMatchesStored
-      && !writerMatchesVrmV1Projection
+      && !writerMatchesHistoricalProjection
     )
   ) {
     fail(

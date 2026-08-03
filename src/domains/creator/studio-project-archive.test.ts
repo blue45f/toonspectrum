@@ -24,6 +24,10 @@ import {
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveManifest,
 } from "./studio-project-archive";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from
+  "./studio-shared-3d-stage-test-fixture";
 import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
@@ -395,6 +399,78 @@ function retainedProvenance() {
 }
 
 describe("studio-project-archive", () => {
+  it("Shared Stage v1을 v2로 승격하고 attachment로 오인하지 않으며 deterministic 왕복한다", async () => {
+    const shared3dStage = {
+      kind: "toonspectrum.studio-shared-3d-stage" as const,
+      version: 1 as const,
+      authority: "page-background-with-linked-character-sources" as const,
+      capturePolicy: "require-all-linked" as const,
+      background: {
+        bundleId: "bundle-archive-1",
+        sourceHash: `sha256:${"a".repeat(64)}` as const,
+      },
+      characters: [{
+        elementId: "character-archive-1",
+        modelRuntimeKey: `character-archive-1:sha256:${"b".repeat(64)}`,
+        sourceHash: `sha256:${"c".repeat(64)}` as const,
+        hiddenByStage: true as const,
+      }],
+      dccSource: {
+        sourceDocumentId: "dcc-document-archive-1",
+        sourceStateHash: "state:archive-1",
+        sourceWorkspaceHash: `sha256:${"d".repeat(64)}` as const,
+        sourceBridgeSetHash: "bridge:archive-1",
+        sourceCommandCount: 14,
+        sourceBridgeCommandSequence: 9,
+      },
+    };
+    const migrated = migrateStudioShared3dStageCollectionDocument(shared3dStage)!;
+    const project = projectWith([], {
+      pagesList: [{ ...minimalPage(), shared3dStage }],
+    });
+
+    const first = await buildStudioProjectArchive({ project });
+    const second = await buildStudioProjectArchive({ project });
+    expect(new Uint8Array(await first.blob.arrayBuffer()))
+      .toEqual(new Uint8Array(await second.blob.arrayBuffer()));
+    expect(first.manifest.attachments).toHaveLength(0);
+
+    const imported = await importStudioProjectArchive(first.blob);
+    expect(imported.canonicalProject.pagesList[0]?.shared3dStage).toEqual(migrated);
+    expect(imported.project.pagesList[0]?.shared3dStage).toEqual(migrated);
+    expect(imported.attachments).toHaveLength(0);
+  });
+
+  it("native v3 형제 장면·receipt·DCC 출처를 attachment 없이 정확히 왕복한다", async () => {
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const project = projectWith([], {
+      pagesList: [{ ...minimalPage(), shared3dStage }],
+    });
+
+    const archive = await buildStudioProjectArchive({ project });
+    expect(archive.manifest.attachments).toHaveLength(0);
+    const imported = await importStudioProjectArchive(archive.blob);
+    expect(imported.canonicalProject.pagesList[0]?.shared3dStage).toEqual(shared3dStage);
+    expect(imported.project.pagesList[0]?.shared3dStage).toEqual(shared3dStage);
+    expect(imported.attachments).toHaveLength(0);
+  });
+
+  it("historical plural v2 Shared Stage archive를 canonical v3로 승격한다", async () => {
+    const current = createNativePluralShared3dStageFixture();
+    const historical = { ...current, version: 2 as const };
+    const migrated = migrateStudioShared3dStageCollectionDocument(historical)!;
+    const project = projectWith([], {
+      pagesList: [{ ...minimalPage(), shared3dStage: historical }],
+    });
+
+    const archive = await buildStudioProjectArchive({ project });
+    const imported = await importStudioProjectArchive(archive.blob);
+
+    expect(imported.canonicalProject.pagesList[0]?.shared3dStage).toEqual(migrated);
+    expect(imported.project.pagesList[0]?.shared3dStage).toEqual(migrated);
+    expect(imported.attachments).toHaveLength(0);
+  });
+
   it("canonical project.json에서 래스터·마스크·참고 data URL을 한 해시로 중복 제거하고 안전하게 왕복한다", async () => {
     const image = pngBytes(7);
     const embedded = dataUrl("image/png", image);

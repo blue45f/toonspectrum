@@ -225,6 +225,87 @@ describe("StudioMannequinPoserPanel", () => {
     expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();
   });
 
+  it("엔진 준비와 카메라 권한 대기를 구분해서 안내하고 권한 대기를 취소한다", async () => {
+    const getUserMedia = vi.fn(
+      () => new Promise<MediaStream>(() => undefined),
+    );
+    installWebcamBrowserStubs(getUserMedia);
+    webcamRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("엔진 준비 완료");
+    });
+    expect(screen.getByRole("button", { name: "카메라 연결 취소" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "카메라 연결 취소" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();
+    });
+    expect(webcamRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("카메라 트랙 하나의 종료 실패가 나머지 트랙과 인식 엔진 정리를 막지 않는다", async () => {
+    const stopBrokenTrack = vi.fn(() => {
+      throw new Error("track already closed");
+    });
+    const stopHealthyTrack = vi.fn();
+    const stream = {
+      getTracks: () => [
+        { stop: stopBrokenTrack },
+        { stop: stopHealthyTrack },
+      ],
+    } as unknown as MediaStream;
+    installWebcamBrowserStubs(vi.fn().mockResolvedValue(stream));
+    webcamRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "실시간 동작 인식 중지" }));
+    expect(stopBrokenTrack).toHaveBeenCalledTimes(1);
+    expect(stopHealthyTrack).toHaveBeenCalledTimes(1);
+    expect(webcamRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();
+  });
+
+  it("웹캠 활성 상태에서 언마운트하면 프레임·스트림·인식 엔진을 모두 정리한다", async () => {
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    installWebcamBrowserStubs(vi.fn().mockResolvedValue(stream));
+    webcamRuntimeMocks.init.mockResolvedValue({
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    });
+
+    const { unmount } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    fireEvent.click(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "실시간 동작 인식 중지" })).toBeTruthy();
+    });
+
+    unmount();
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
+    expect(webcamRuntimeMocks.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("엔진 자산 로드 실패를 카메라 권한 오류와 구분하고 즉시 재시도 버튼을 제공한다", async () => {
     const getUserMedia = vi.fn();
     installWebcamBrowserStubs(getUserMedia);
@@ -281,8 +362,8 @@ describe("StudioMannequinPoserPanel", () => {
         }),
     );
     fireEvent.click(screen.getByRole("button", { name: "웹캠 동작 인식 다시 시도" }));
-    expect(screen.getByRole("button", { name: "동작 인식 준비 취소" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "동작 인식 준비 취소" }));
+    expect(screen.getByRole("button", { name: "엔진 준비 취소" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "엔진 준비 취소" }));
 
     expect(receivedSignal?.aborted).toBe(true);
     expect(screen.getByRole("button", { name: "웹캠 실시간 동작 인식 시작" })).toBeTruthy();

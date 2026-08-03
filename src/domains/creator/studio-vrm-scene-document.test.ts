@@ -305,6 +305,27 @@ describe("studio-vrm-scene-document", () => {
     unsafeUrl.props = { runtimeUrl: "blob:hostile" };
     expect(parseStudioVrmSceneDocument(JSON.stringify(unsafeUrl))).toBeNull();
 
+    const avatarForgeCurl = canonicalScene({
+      appearance: {
+        ...createDefaultStudioVrmSceneDocument().appearance,
+        avatarForge: { hair: { style: "bob", curl: 0.48 } },
+      },
+    });
+    expect(avatarForgeCurl.appearance.avatarForge).toEqual({
+      hair: { curl: 0.48, style: "bob" },
+    });
+    const serializedAvatarForgeCurl = serializeStudioVrmSceneDocument(avatarForgeCurl);
+    expect(serializedAvatarForgeCurl).not.toBeNull();
+    expect(parseStudioVrmSceneDocument(
+      serializedAvatarForgeCurl!,
+    )?.appearance.avatarForge).toEqual({
+      hair: { curl: 0.48, style: "bob" },
+    });
+
+    const unsafeCurlValue = mutableDefault();
+    unsafeCurlValue.props = { curl: "https://hostile.example/model" };
+    expect(serializeStudioVrmSceneDocument(unsafeCurlValue)).toBeNull();
+
     const dataUrl = mutableDefault();
     dataUrl.sceneProps = { texture: "data:image/png;base64,AAAA" };
     expect(serializeStudioVrmSceneDocument(dataUrl)).toBeNull();

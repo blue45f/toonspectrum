@@ -18,6 +18,10 @@ import {
 import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
 import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import { createStudioReferenceBoardDocument } from "./studio-reference-board";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from
+  "./studio-shared-3d-stage-test-fixture";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
 
@@ -58,6 +62,52 @@ describe("studio autosave", () => {
     );
     expect(parsed).toMatchObject({ version: 2, currentPageId: undefined, title: "작품" });
     expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
+  });
+
+  it("공유 3D Stage는 엄격하게 보존하고 손상된 링크만 제거해 원고 복구를 지킨다", () => {
+    const shared3dStage = {
+      kind: "toonspectrum.studio-shared-3d-stage",
+      version: 1,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: {
+        bundleId: "bundle-1",
+        sourceHash: `sha256:${"a".repeat(64)}`,
+      },
+      characters: [{
+        elementId: "character-1",
+        modelRuntimeKey: `character-1:sha256:${"b".repeat(64)}`,
+        sourceHash: `sha256:${"c".repeat(64)}`,
+        hiddenByStage: true,
+      }],
+    };
+    const valid = parseStudioAutosave(JSON.stringify({
+      pagesList: [{ id: "p1", elements: [{ id: "art-1" }], shared3dStage }],
+    }));
+    expect(valid?.pagesList[0]?.shared3dStage).toEqual(
+      migrateStudioShared3dStageCollectionDocument(shared3dStage),
+    );
+
+    const recovered = parseStudioAutosave(JSON.stringify({
+      pagesList: [{
+        id: "p1",
+        elements: [{ id: "art-1" }],
+        shared3dStage: { ...shared3dStage, version: 999 },
+      }],
+    }));
+    expect(recovered?.pagesList[0]?.elements).toEqual([{ id: "art-1" }]);
+    expect(recovered?.pagesList[0]).not.toHaveProperty("shared3dStage");
+  });
+
+  it("native v2 다중 장면과 DCC 출처를 자동저장 왕복에서 그대로 보존한다", () => {
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const parsed = parseStudioAutosave(serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-08-03T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [], shared3dStage }],
+    }));
+
+    expect(parsed?.pagesList[0]?.shared3dStage).toEqual(shared3dStage);
   });
 
   it("Publish Pack 설정을 자동저장 페이로드에서 보존한다", () => {

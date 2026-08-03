@@ -21,9 +21,12 @@ import {
 } from "./studio-editable-half-edge-mesh";
 import {
   STUDIO_HYBRID_DCC_DOCUMENT_VERSION,
+  STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION,
+  STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION,
   restoreStudioHybridDccStateFromSnapshot,
   snapshotStudioHybridDccState,
   type StudioHybridDccPersistedSnapshot,
+  type StudioHybridDccRestorableSnapshot,
   type StudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
 import {
@@ -173,7 +176,10 @@ interface StudioHybridDccWorkspacePersistenceEnvelopeV1 {
   readonly scopeKey: `sha256:${string}`;
   readonly savedAt: number;
   readonly workspaceRevision: typeof STUDIO_HYBRID_DCC_WORKSPACE_REVISION;
-  readonly documentVersion: typeof STUDIO_HYBRID_DCC_DOCUMENT_VERSION;
+  readonly documentVersion:
+    | typeof STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+    | typeof STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION
+    | typeof STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION;
   readonly bridgeRevision: typeof STUDIO_LIVE_2D3D_BRIDGE_REVISION;
   readonly documentStateHash: string | null;
   readonly payloadByteLength: number;
@@ -510,14 +516,18 @@ function validateSnapshot(
   readonly snapshot: StudioHybridDccPersistedSnapshot;
   readonly state: ReturnType<typeof restoreStudioHybridDccStateFromSnapshot>;
 } {
-  const snapshot = value as StudioHybridDccPersistedSnapshot;
+  const snapshot = value as StudioHybridDccRestorableSnapshot;
   let state;
   try {
     state = restoreStudioHybridDccStateFromSnapshot(snapshot);
   } catch (error) {
     persistenceError("CORRUPT_PAYLOAD", `${path} 문서 스냅샷을 복구할 수 없습니다.`, error);
   }
-  if (state.stateHash !== snapshot.stateHash) {
+  if (typeof snapshot.stateHash !== "string" || !SHA256_PATTERN.test(snapshot.stateHash)) {
+    persistenceError("CORRUPT_PAYLOAD", `${path} 문서 stateHash 형식이 올바르지 않습니다.`);
+  }
+  if (snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+    && state.stateHash !== snapshot.stateHash) {
     persistenceError("INTEGRITY_FAILED", `${path} 문서 stateHash가 일치하지 않습니다.`);
   }
   if (expectedDocumentId !== null && state.documentId !== expectedDocumentId) {
@@ -533,7 +543,10 @@ function validateSnapshot(
     ]),
   );
   return {
-    snapshot,
+    snapshot: snapshotStudioHybridDccState({
+      ...state,
+      geometry: { ...state.geometry, records },
+    }),
     state: {
       ...state,
       geometry: { ...state.geometry, records },
@@ -814,6 +827,9 @@ function restoreWorkspace(value: unknown): StudioHybridDccWorkspace {
     bom,
     collab,
     clothStep,
+    // The canonical stepped mesh is persisted in the document. Velocity/rest continuation is an
+    // explicitly transient solver cache and starts fresh after a cold restore.
+    clothRuntimeCache: null,
     animSampleTime,
   };
 }
@@ -955,10 +971,15 @@ function decodeEnvelope(input: {
   }
   if (
     record.workspaceRevision !== STUDIO_HYBRID_DCC_WORKSPACE_REVISION
-    || record.documentVersion !== STUDIO_HYBRID_DCC_DOCUMENT_VERSION
     || record.bridgeRevision !== STUDIO_LIVE_2D3D_BRIDGE_REVISION
   ) {
     persistenceError("UNSUPPORTED_VERSION", "3D 엔진 구성 버전이 현재 앱과 호환되지 않습니다.");
+  }
+  const documentVersion = assertSafeInteger(record.documentVersion, "$.documentVersion");
+  if (documentVersion !== STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+    && documentVersion !== STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION
+    && documentVersion !== STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION) {
+    persistenceError("UNSUPPORTED_VERSION", "지원하지 않는 Hybrid DCC 문서 버전입니다.");
   }
   const savedAt = assertSafeInteger(record.savedAt, "$.savedAt");
   const payloadByteLength = assertSafeInteger(record.payloadByteLength, "$.payloadByteLength");
@@ -1001,7 +1022,21 @@ function decodeEnvelope(input: {
     persistenceError("CORRUPT_PAYLOAD", "3D 문서 stateHash 형식이 올바르지 않습니다.");
   }
   const workspace = restoreWorkspace(record.payload);
-  if (workspace.session.state.stateHash !== record.documentStateHash) {
+  const payloadRecord = assertRecord(record.payload, "$.payload");
+  const sessionRecord = assertRecord(payloadRecord.session, "$.payload.session");
+  const stateRecord = assertRecord(sessionRecord.state, "$.payload.session.state");
+  if (stateRecord.version !== documentVersion) {
+    persistenceError("CORRUPT_PAYLOAD", "envelope와 문서 스냅샷 버전이 일치하지 않습니다.");
+  }
+  const persistedStateHash = assertString(
+    stateRecord.stateHash,
+    "$.payload.session.state.stateHash",
+    256,
+  );
+  const expectedEnvelopeStateHash = documentVersion === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+    ? workspace.session.state.stateHash
+    : persistedStateHash;
+  if (expectedEnvelopeStateHash !== record.documentStateHash) {
     persistenceError("INTEGRITY_FAILED", "복구한 3D 문서 stateHash가 envelope와 일치하지 않습니다.");
   }
   return {
