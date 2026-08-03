@@ -28,6 +28,9 @@ export type StudioBg3dBabylonSpecialistEntryOptions = Omit<
   "loadBindings"
 >;
 
+/** ToonSpectrum owns loss recovery by disposing and recreating the whole specialist runtime. */
+export const STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME = true;
+
 const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze({
   createWebGlEngine(
     canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -37,7 +40,7 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       adaptToDeviceRatio: settings.adaptToDeviceRatio,
       audioEngine: false,
       deterministicLockstep: settings.deterministicLockstep,
-      doNotHandleContextLost: false,
+      doNotHandleContextLost: STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME,
       failIfMajorPerformanceCaveat: settings.failIfMajorPerformanceCaveat,
       lockstepMaxSteps: settings.lockstepMaxSteps,
       loseContextOnDispose: true,
@@ -57,7 +60,7 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       adaptToDeviceRatio: settings.adaptToDeviceRatio,
       audioEngine: false,
       deterministicLockstep: settings.deterministicLockstep,
-      doNotHandleContextLost: false,
+      doNotHandleContextLost: STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME,
       lockstepMaxSteps: settings.lockstepMaxSteps,
       powerPreference: settings.powerPreference,
       premultipliedAlpha: settings.premultipliedAlpha,

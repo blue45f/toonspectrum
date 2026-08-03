@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+  STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+  STUDIO_BG3D_NORMAL_PROFILE,
+  STUDIO_BG3D_STABLE_ID_PROFILE,
+} from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
+
+import {
+  BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
+  BABYLON_STABLE_ID_PARITY_HEIGHT,
+  BABYLON_STABLE_ID_PARITY_WIDTHS,
+  createBabylonAlignedRasterSmokeRequest,
+  createBabylonStableIdParityRequests,
   isExpectedStaticPreviewSocketIoHandshakeClose,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
 } from "./verify-studio-3d-console.mts";
@@ -84,6 +96,37 @@ describe("3D WebGPU conformance browser boundary", () => {
       "--use-gl=angle",
       "--use-angle=swiftshader",
       "--enable-unsafe-swiftshader",
+    ]);
+  });
+
+  it("keeps unaligned parity captures limited to compact stable-ID planes", () => {
+    const requests = createBabylonStableIdParityRequests();
+
+    expect(Object.isFrozen(requests)).toBe(true);
+    expect(requests.map(({ width }) => width)).toEqual([
+      ...BABYLON_STABLE_ID_PARITY_WIDTHS,
+    ]);
+    expect(requests.every(({ width }) => width % 64 !== 0)).toBe(true);
+    for (const request of requests) {
+      expect(request.height).toBe(BABYLON_STABLE_ID_PARITY_HEIGHT);
+      expect(request.artifacts).toEqual([
+        { kind: "object-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+        { kind: "material-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+      ]);
+    }
+  });
+
+  it("keeps beauty, depth, and normal smoke capture on a row-aligned target", () => {
+    const request = createBabylonAlignedRasterSmokeRequest();
+
+    expect(Object.isFrozen(request)).toBe(true);
+    expect(request.width).toBe(BABYLON_ALIGNED_RASTER_SMOKE_SIZE);
+    expect(request.height).toBe(BABYLON_ALIGNED_RASTER_SMOKE_SIZE);
+    expect(request.width % 64).toBe(0);
+    expect(request.artifacts).toEqual([
+      { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+      { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
+      { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
     ]);
   });
 });

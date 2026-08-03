@@ -218,6 +218,7 @@ export interface StudioBg3dBabylonCapturePlan {
   readonly backend: StudioBg3dBabylonSpecialistExecutionContext["backend"];
   readonly document: StudioBg3dSceneDocument;
   readonly height: number;
+  readonly includeBeauty: boolean;
   readonly includeDepth: boolean;
   readonly includeMaterialId: boolean;
   readonly includeNormal: boolean;
@@ -232,7 +233,7 @@ export interface StudioBg3dBabylonStableIdFrame {
 
 export interface StudioBg3dBabylonCaptureFrame {
   /** Straight-alpha sRGB RGBA8 in top-down row order. */
-  readonly rgba: Uint8Array;
+  readonly rgba?: Uint8Array;
   /** Linear normalized view depth in top-down row order. */
   readonly depth?: Float32Array;
   /** Stable logical material IDs in top-down row order; zero is background. */
@@ -836,8 +837,9 @@ function validateFrame(
   const pixels = request.width * request.height;
   if (
     !frame ||
-    !(frame.rgba instanceof Uint8Array) ||
-    frame.rgba.byteLength !== pixels * 4 ||
+    (request.includeBeauty && !(frame.rgba instanceof Uint8Array)) ||
+    (frame.rgba !== undefined &&
+      (!(frame.rgba instanceof Uint8Array) || frame.rgba.byteLength !== pixels * 4)) ||
     (request.includeDepth &&
       (!(frame.depth instanceof Float32Array) || frame.depth.length !== pixels)) ||
     (request.includeNormal &&
@@ -859,7 +861,7 @@ function validateFrame(
     throw captureError("capture-failed");
   }
   return {
-    rgba: Uint8Array.from(frame.rgba),
+    ...(frame.rgba ? { rgba: Uint8Array.from(frame.rgba) } : {}),
     ...(frame.depth ? { depth: Float32Array.from(frame.depth) } : {}),
     ...(frame.materialId
       ? {
@@ -895,6 +897,7 @@ function toArtifactResult(
   }
   const artifacts = job.request.artifacts.map((artifact) => {
     if (artifact.kind === "beauty") {
+      if (!frame.rgba) throw captureError("capture-failed");
       return Object.freeze({
         kind: "beauty" as const,
         width: request.width,
@@ -992,6 +995,7 @@ function createCapturePlan(
     backend: context.backend,
     document,
     height: request.height,
+    includeBeauty: request.includeBeauty,
     includeDepth: request.includeDepth,
     includeMaterialId: request.includeMaterialId,
     includeNormal: request.includeNormal,
@@ -2604,7 +2608,7 @@ async function renderStudioBg3dBabylonCapture(
   const scene = context.scene as Scene;
   if (
     typeof engine.setSize !== "function" ||
-    typeof engine.readPixels !== "function" ||
+    (plan.includeBeauty && typeof engine.readPixels !== "function") ||
     typeof scene.render !== "function" ||
     typeof scene.whenReadyAsync !== "function"
   ) {
@@ -2613,12 +2617,12 @@ async function renderStudioBg3dBabylonCapture(
   const transparent =
     plan.document.output.transparentBackground ||
     plan.document.background.mode === "transparent";
-  if (transparent && plan.backend === "webgpu") {
+  if (plan.includeBeauty && transparent && plan.backend === "webgpu") {
     // Babylon configures a non-premultiplied WebGPU canvas as `alphaMode: opaque`; until capture
     // uses a dedicated RGBA render target, returning alpha from the swap chain would be misleading.
     throw captureError("unsupported-scene-feature");
   }
-  const swapRedBlue = webGpuReadbackUsesBgra(engine, plan.backend);
+  const swapRedBlue = plan.includeBeauty && webGpuReadbackUsesBgra(engine, plan.backend);
   throwIfAborted(context.signal);
   engine.setHardwareScalingLevel(1);
   engine.setSize(plan.width, plan.height, true);
@@ -2664,17 +2668,19 @@ async function renderStudioBg3dBabylonCapture(
     scene.render(true, true);
     scene.render(true, true);
     const flipY = plan.backend === "webgl2";
-    const rgbaPromise = withAbortAndDeadline(
-      engine.readPixels(0, 0, plan.width, plan.height, true, true),
-      context.signal,
-    ).then((pixels) => rgbaRowsTopDown(
-      pixels,
-      plan.width,
-      plan.height,
-      flipY,
-      swapRedBlue,
-      transparent,
-    ));
+    const rgbaPromise = plan.includeBeauty
+      ? withAbortAndDeadline(
+        engine.readPixels(0, 0, plan.width, plan.height, true, true),
+        context.signal,
+      ).then((pixels) => rgbaRowsTopDown(
+        pixels,
+        plan.width,
+        plan.height,
+        flipY,
+        swapRedBlue,
+        transparent,
+      ))
+      : Promise.resolve(undefined);
     const depthPromise = depthRenderer
       ? withAbortAndDeadline(
         depthRenderer.getDepthMap().readPixels(
@@ -2722,7 +2728,7 @@ async function renderStudioBg3dBabylonCapture(
       )
       : undefined;
     return {
-      rgba,
+      ...(rgba ? { rgba } : {}),
       ...(depth ? { depth } : {}),
       ...(materialId ? { materialId } : {}),
       ...(normal ? { normal } : {}),
@@ -2759,6 +2765,7 @@ export function createStudioBg3dBabylonCaptureExecutor(
     if (requested.format === "artifact-v2") {
       return toArtifactResult(context.job, requested, frame);
     }
+    if (!frame.rgba) throw captureError("capture-failed");
     return {
       kind: "capture",
       width: requested.width,

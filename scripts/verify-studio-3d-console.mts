@@ -19,10 +19,12 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Locator, type Page } from "playwright";
 
 import {
+  STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
   STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
   STUDIO_BG3D_NORMAL_PROFILE,
   STUDIO_BG3D_STABLE_ID_PROFILE,
+  type StudioBg3dArtifactCaptureRequestV2,
 } from "../src/domains/creator/studio-bg3d-artifact-capture-v2";
 import {
   resolveStudioBg3dCaptureFrame,
@@ -74,8 +76,9 @@ const STUDIO_BG3D_MAGIC_PROOF_ENTRY_FILE_PATTERN =
   /^studio-bg3d-magic-production-proof-[A-Za-z0-9_-]+\.js$/u;
 const STUDIO_BG3D_LT_RENDER_WORKER_FILE_PATTERN =
   /^studio-bg3d-lt-render\.worker-[A-Za-z0-9_-]+\.js$/u;
-const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
-const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
+export const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
+export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
+export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--no-sandbox",
@@ -86,6 +89,35 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ]);
+
+export function createBabylonStableIdParityRequests():
+readonly StudioBg3dArtifactCaptureRequestV2[] {
+  return Object.freeze(BABYLON_STABLE_ID_PARITY_WIDTHS.map((width) => Object.freeze({
+    artifacts: Object.freeze([
+      Object.freeze({ kind: "object-id" as const, profile: STUDIO_BG3D_STABLE_ID_PROFILE }),
+      Object.freeze({ kind: "material-id" as const, profile: STUDIO_BG3D_STABLE_ID_PROFILE }),
+    ]),
+    height: BABYLON_STABLE_ID_PARITY_HEIGHT,
+    kind: "artifact-capture-v2" as const,
+    version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+    width,
+  })));
+}
+
+export function createBabylonAlignedRasterSmokeRequest():
+StudioBg3dArtifactCaptureRequestV2 {
+  return Object.freeze({
+    artifacts: Object.freeze([
+      Object.freeze({ kind: "beauty" as const, profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE }),
+      Object.freeze({ kind: "depth" as const, profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE }),
+      Object.freeze({ kind: "normal" as const, profile: STUDIO_BG3D_NORMAL_PROFILE }),
+    ]),
+    height: BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
+    kind: "artifact-capture-v2" as const,
+    version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
+    width: BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
+  });
+}
 const MAGIC_ALIGNMENT_VIEWPORT = Object.freeze({ width: 320, height: 180 });
 const MAGIC_ALIGNMENT_SELECTED_NODE_ID = "magic-alignment-asymmetric-box";
 const MAGIC_ALIGNMENT_SELECTED_STABLE_ID =
@@ -837,9 +869,9 @@ async function run(page: Page, studioUrl: string): Promise<void> {
 }
 
 /**
- * Runs the actual minified production specialist on WebGPU and WebGL2 at intentionally
- * row-unaligned widths. Both backends must return compact canonical top-down object/material ID
- * planes with exact pixel parity, and the upper proof object must remain above the lower one.
+ * Runs the actual minified production specialist on both backends. The raster smoke stays on a
+ * row-aligned 64px target, while only object/material ID planes use the intentionally unaligned
+ * 63/65px widths needed to prove compact WebGPU row packing and canonical top-down parity.
  */
 async function runBabylonStableIdOrientationParityProof(
   page: Page,
@@ -858,14 +890,57 @@ async function runBabylonStableIdOrientationParityProof(
     rootUrl,
   ).href;
   const canonicalDocumentJson = createBabylonStableIdProofDocumentJson();
+  const alignedRasterRequest = createBabylonAlignedRasterSmokeRequest();
+  const stableIdRequests = createBabylonStableIdParityRequests();
+  // `tsx` may retain local helper names through esbuild's verifier-only
+  // `__name` shim. Playwright serializes only the callback, so provide the
+  // no-op shim in this isolated proof page before evaluating it.
+  await page.evaluate("globalThis.__name ??= (target) => target");
   const result = await page.evaluate(async ({
+    alignedRasterRequest: rasterRequest,
     canonicalDocumentJson: documentJson,
     entryUrl: specialistEntryUrl,
-    height,
-    profiles,
+    stableIdRequests: idRequests,
     webGpuEngineInitializationTimeoutMs,
-    widths,
   }) => {
+    type CaptureRequest = {
+      readonly artifacts: readonly {
+        readonly kind: string;
+        readonly profile: string;
+      }[];
+      readonly height: number;
+      readonly kind: "artifact-capture-v2";
+      readonly version: number;
+      readonly width: number;
+    };
+    type RawArtifact = {
+      readonly data: unknown;
+      readonly height: unknown;
+      readonly kind: unknown;
+      readonly legend?: unknown;
+      readonly profile: unknown;
+      readonly width: unknown;
+    };
+    type RawCapture = {
+      readonly artifacts: readonly RawArtifact[];
+      readonly height: unknown;
+      readonly profile: unknown;
+      readonly width: unknown;
+    };
+    type Runtime = {
+      readonly dispose: () => void | Promise<void>;
+      readonly getState?: () => unknown;
+      readonly runIsolated: (job: {
+        readonly id: string;
+        readonly request: CaptureRequest;
+        readonly signal: AbortSignal;
+        readonly snapshot: {
+          readonly assets: readonly [];
+          readonly canonicalDocumentJson: string;
+          readonly totalAssetBytes: 0;
+        };
+      }) => Promise<unknown>;
+    };
     const entry = await import(specialistEntryUrl) as {
       readonly createStudioBg3dBabylonSpecialist?: (options: {
         readonly backend: "webgl2" | "webgpu";
@@ -874,28 +949,7 @@ async function runBabylonStableIdOrientationParityProof(
         readonly settings: {
           readonly failIfMajorPerformanceCaveat: boolean;
         };
-      }) => {
-        readonly dispose: () => void | Promise<void>;
-        readonly getState?: () => unknown;
-        readonly runIsolated: (job: {
-          readonly id: string;
-          readonly request: {
-            readonly artifacts: readonly {
-              readonly kind: string;
-              readonly profile: string;
-            }[];
-            readonly height: number;
-            readonly kind: "artifact-capture-v2";
-            readonly width: number;
-          };
-          readonly signal: AbortSignal;
-          readonly snapshot: {
-            readonly assets: readonly [];
-            readonly canonicalDocumentJson: string;
-            readonly totalAssetBytes: 0;
-          };
-        }) => Promise<unknown>;
-      };
+      }) => Runtime;
     };
     if (typeof entry.createStudioBg3dBabylonSpecialist !== "function") {
       throw new Error("production Babylon specialist entry is malformed");
@@ -907,39 +961,216 @@ async function runBabylonStableIdOrientationParityProof(
       canonicalDocumentJson: documentJson,
       totalAssetBytes: 0 as const,
     });
+    const errorChain = (cause: unknown): string => {
+      const seen = new Set<unknown>();
+      const entries: string[] = [];
+      let current: unknown = cause;
+      for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
+        if (seen.has(current)) {
+          entries.push("[circular cause]");
+          break;
+        }
+        seen.add(current);
+        if (typeof current !== "object" || current === null) {
+          entries.push(String(current));
+          break;
+        }
+        const record = current as {
+          readonly cause?: unknown;
+          readonly code?: unknown;
+          readonly message?: unknown;
+          readonly name?: unknown;
+        };
+        const name = typeof record.name === "string" ? record.name : "Error";
+        const code = typeof record.code === "string" ? `[${record.code}]` : "";
+        const message = typeof record.message === "string"
+          ? record.message
+          : Object.prototype.toString.call(current);
+        entries.push(`${name}${code}: ${message}`);
+        if (!("cause" in record)) break;
+        current = record.cause;
+      }
+      return entries.join(" <- ");
+    };
+    const runCapture = async (
+      runtime: Runtime,
+      backend: "webgl2" | "webgpu",
+      request: CaptureRequest,
+      label: string,
+    ): Promise<RawCapture> => {
+      let raw: unknown;
+      try {
+        raw = await runtime.runIsolated({
+          id: `${backend}-${label}-${request.width}x${request.height}`,
+          request,
+          signal: new AbortController().signal,
+          snapshot,
+        });
+      } catch (cause) {
+        const runtimeState = typeof runtime.getState === "function"
+          ? runtime.getState()
+          : null;
+        throw new Error(
+          `${backend} ${request.width}x${request.height} ${label} failed: ` +
+            `${errorChain(cause)}; runtimeState=${JSON.stringify(runtimeState)}`,
+          { cause },
+        );
+      }
+      if (
+        typeof raw !== "object" ||
+        raw === null ||
+        (raw as { readonly kind?: unknown }).kind !== "studio-bg3d-artifact-capture" ||
+        !Array.isArray((raw as { readonly artifacts?: unknown }).artifacts)
+      ) {
+        throw new Error(
+          `unexpected ${backend} ${request.width}x${request.height} ${label} envelope`,
+        );
+      }
+      return raw as RawCapture;
+    };
+    const summarizeRasterCapture = (capture: RawCapture, backend: string) => {
+      const beauty = capture.artifacts.find((artifact) => artifact.kind === "beauty");
+      const depth = capture.artifacts.find((artifact) => artifact.kind === "depth");
+      const normal = capture.artifacts.find((artifact) => artifact.kind === "normal");
+      if (
+        !(beauty?.data instanceof Uint8Array) ||
+        !(depth?.data instanceof Float32Array) ||
+        !(normal?.data instanceof Uint8Array)
+      ) {
+        throw new Error(`unexpected ${backend} aligned beauty/depth/normal data`);
+      }
+      let beautyReferencePixel = -1;
+      let beautyVariation = false;
+      for (let pixel = 0; pixel < beauty.data.length / 4; pixel += 1) {
+        if (beauty.data[pixel * 4 + 3]! > 0) {
+          beautyReferencePixel = pixel;
+          break;
+        }
+      }
+      if (beautyReferencePixel >= 0) {
+        const referenceOffset = beautyReferencePixel * 4;
+        for (
+          let pixel = beautyReferencePixel + 1;
+          pixel < beauty.data.length / 4;
+          pixel += 1
+        ) {
+          const offset = pixel * 4;
+          if (beauty.data[offset + 3]! <= 0) continue;
+          const difference =
+            Math.abs(beauty.data[offset]! - beauty.data[referenceOffset]!) +
+            Math.abs(beauty.data[offset + 1]! - beauty.data[referenceOffset + 1]!) +
+            Math.abs(beauty.data[offset + 2]! - beauty.data[referenceOffset + 2]!);
+          if (difference >= 12) {
+            beautyVariation = true;
+            break;
+          }
+        }
+      }
+      let minimumDepth = 1;
+      let maximumDepth = 0;
+      let depthValuesValid = true;
+      for (const value of depth.data) {
+        if (!Number.isFinite(value) || value < 0 || value > 1) {
+          depthValuesValid = false;
+          break;
+        }
+        minimumDepth = Math.min(minimumDepth, value);
+        maximumDepth = Math.max(maximumDepth, value);
+      }
+      const depthVariation =
+        depthValuesValid &&
+        minimumDepth < 0.999 &&
+        maximumDepth >= 0.999 &&
+        maximumDepth - minimumDepth >= 0.01;
+      let minimumNormalRed = 255;
+      let maximumNormalRed = 0;
+      let minimumNormalGreen = 255;
+      let maximumNormalGreen = 0;
+      let normalGeometryPixels = 0;
+      if (normal.data.length === depth.data.length * 2) {
+        for (let pixel = 0; pixel < depth.data.length; pixel += 1) {
+          if (depth.data[pixel]! >= 0.999) continue;
+          normalGeometryPixels += 1;
+          const offset = pixel * 2;
+          minimumNormalRed = Math.min(minimumNormalRed, normal.data[offset]!);
+          maximumNormalRed = Math.max(maximumNormalRed, normal.data[offset]!);
+          minimumNormalGreen = Math.min(minimumNormalGreen, normal.data[offset + 1]!);
+          maximumNormalGreen = Math.max(maximumNormalGreen, normal.data[offset + 1]!);
+        }
+      }
+      const normalVariation =
+        normalGeometryPixels > 0 &&
+        Math.max(
+          maximumNormalRed - minimumNormalRed,
+          maximumNormalGreen - minimumNormalGreen,
+        ) >= 8;
+      return {
+        artifacts: [
+          {
+            byteLength: beauty.data.byteLength,
+            dataLength: beauty.data.length,
+            height: beauty.height,
+            kind: beauty.kind,
+            profile: beauty.profile,
+            variation: beautyVariation,
+            width: beauty.width,
+          },
+          {
+            byteLength: depth.data.byteLength,
+            dataLength: depth.data.length,
+            height: depth.height,
+            kind: depth.kind,
+            profile: depth.profile,
+            variation: depthVariation,
+            width: depth.width,
+          },
+          {
+            byteLength: normal.data.byteLength,
+            dataLength: normal.data.length,
+            height: normal.height,
+            kind: normal.kind,
+            profile: normal.profile,
+            variation: normalVariation,
+            width: normal.width,
+          },
+        ],
+        height: capture.height,
+        profile: capture.profile,
+        width: capture.width,
+      };
+    };
+    const summarizeStableIdCapture = (capture: RawCapture, backend: string) => ({
+      artifacts: capture.artifacts.map((artifact) => {
+        if (
+          (artifact.kind !== "object-id" && artifact.kind !== "material-id") ||
+          !(artifact.data instanceof Uint32Array)
+        ) {
+          throw new Error(
+            `unexpected ${backend} ${String(capture.width)}x${String(capture.height)} ` +
+              `stable-ID data`,
+          );
+        }
+        return {
+          byteLength: artifact.data.byteLength,
+          data: Uint32Array.from(artifact.data),
+          height: artifact.height,
+          kind: artifact.kind,
+          legend: artifact.legend,
+          profile: artifact.profile,
+          width: artifact.width,
+        };
+      }),
+      height: capture.height,
+      profile: capture.profile,
+      width: capture.width,
+    });
 
-    type CapturedStableIdArtifact = {
-      readonly byteLength: number;
-      readonly data: Uint32Array;
-      readonly height: unknown;
-      readonly kind: unknown;
-      readonly legend: unknown;
-      readonly profile: unknown;
-      readonly width: unknown;
-    };
-    type CapturedRasterArtifact = {
-      readonly byteLength: number;
-      readonly dataLength: number;
-      readonly height: unknown;
-      readonly kind: unknown;
-      readonly profile: unknown;
-      readonly variation: boolean;
-      readonly width: unknown;
-    };
-    type CapturedBundle = {
-      readonly artifacts: readonly CapturedStableIdArtifact[];
-      readonly height: unknown;
-      readonly profile: unknown;
-      readonly rasterArtifacts: readonly CapturedRasterArtifact[];
-      readonly width: unknown;
-    };
-    const capturesByBackend: CapturedBundle[][] = [];
+    const rasterByBackend = [];
+    const stableByBackend = [];
     for (const backend of ["webgpu", "webgl2"] as const) {
       const canvas = document.createElement("canvas");
-      // Keep both engines at the visible diagnostic's square aspect. Only their offscreen targets
-      // use the intentionally row-unaligned 63/65px widths.
-      canvas.width = 64;
-      canvas.height = 64;
+      canvas.width = rasterRequest.width;
+      canvas.height = rasterRequest.height;
       canvas.style.cssText =
         "position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;pointer-events:none";
       document.body.append(canvas);
@@ -949,248 +1180,57 @@ async function runBabylonStableIdOrientationParityProof(
         engineInitializationTimeoutMs: backend === "webgpu"
           ? webGpuEngineInitializationTimeoutMs
           : undefined,
-        // This is a conformance proof, not a production quality-policy admission check. Keep the
-        // same software/headless allowance as the visible diagnostic so CI can exercise packing.
         settings: { failIfMajorPerformanceCaveat: false },
       });
-      const summaries = [];
+      const stableSummaries = [];
       try {
-        for (const width of widths) {
-          const controller = new AbortController();
-          let raw: unknown;
-          try {
-            raw = await runtime.runIsolated({
-              id: `${backend}-stable-id-orientation-parity-${width}x${height}`,
-              request: {
-                artifacts: [
-                  { kind: "beauty", profile: profiles.beauty },
-                  { kind: "depth", profile: profiles.depth },
-                  { kind: "normal", profile: profiles.normal },
-                  { kind: "object-id", profile: profiles.stableId },
-                  { kind: "material-id", profile: profiles.stableId },
-                ],
-                height,
-                kind: "artifact-capture-v2",
-                width,
-              },
-              signal: controller.signal,
-              snapshot,
-            });
-          } catch (cause) {
-            const seen = new Set<unknown>();
-            const errorChain: string[] = [];
-            let current: unknown = cause;
-            for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
-              if (seen.has(current)) {
-                errorChain.push("[circular cause]");
-                break;
-              }
-              seen.add(current);
-              if (typeof current !== "object" || current === null) {
-                errorChain.push(String(current));
-                break;
-              }
-              const record = current as {
-                readonly cause?: unknown;
-                readonly code?: unknown;
-                readonly message?: unknown;
-                readonly name?: unknown;
-              };
-              const name = typeof record.name === "string" ? record.name : "Error";
-              const code = typeof record.code === "string" ? `[${record.code}]` : "";
-              const message = typeof record.message === "string"
-                ? record.message
-                : Object.prototype.toString.call(current);
-              errorChain.push(`${name}${code}: ${message}`);
-              if (!("cause" in record)) break;
-              current = record.cause;
-            }
-            const runtimeState = typeof runtime.getState === "function"
-              ? runtime.getState()
-              : null;
-            throw new Error(
-              `${backend} ${width}x${height} stable-ID parity capture failed: ` +
-                `${errorChain.join(" <- ")}; runtimeState=${JSON.stringify(runtimeState)}`,
-              { cause },
-            );
-          }
-          if (
-            typeof raw !== "object" ||
-            raw === null ||
-            (raw as { readonly kind?: unknown }).kind !==
-              "studio-bg3d-artifact-capture" ||
-            !Array.isArray((raw as { readonly artifacts?: unknown }).artifacts)
-          ) {
-            throw new Error(`unexpected ${backend} ${width}x${height} stable-ID envelope`);
-          }
-          const capture = raw as {
-            readonly artifacts: readonly {
-              readonly data: unknown;
-              readonly height: unknown;
-              readonly kind: unknown;
-              readonly legend: unknown;
-              readonly profile: unknown;
-              readonly width: unknown;
-            }[];
-            readonly height: unknown;
-            readonly profile: unknown;
-            readonly width: unknown;
-          };
-          const idArtifacts = capture.artifacts.filter((artifact) =>
-            artifact.kind === "object-id" || artifact.kind === "material-id"
+        const rasterRaw = await runCapture(
+          runtime,
+          backend,
+          rasterRequest,
+          "aligned-raster-smoke",
+        );
+        rasterByBackend.push(summarizeRasterCapture(rasterRaw, backend));
+        for (const request of idRequests) {
+          const stableRaw = await runCapture(
+            runtime,
+            backend,
+            request,
+            "stable-ID-parity",
           );
-          const beauty = capture.artifacts.find((artifact) => artifact.kind === "beauty");
-          const depth = capture.artifacts.find((artifact) => artifact.kind === "depth");
-          const normal = capture.artifacts.find((artifact) => artifact.kind === "normal");
-          if (
-            !(beauty?.data instanceof Uint8Array) ||
-            !(depth?.data instanceof Float32Array) ||
-            !(normal?.data instanceof Uint8Array)
-          ) {
-            throw new Error(
-              `unexpected ${backend} ${width}x${height} beauty/depth/normal data`,
-            );
-          }
-          let beautyReferencePixel = -1;
-          let beautyVariation = false;
-          for (let pixel = 0; pixel < beauty.data.length / 4; pixel += 1) {
-            if (beauty.data[pixel * 4 + 3]! > 0) {
-              beautyReferencePixel = pixel;
-              break;
-            }
-          }
-          if (beautyReferencePixel >= 0) {
-            const referenceOffset = beautyReferencePixel * 4;
-            for (
-              let pixel = beautyReferencePixel + 1;
-              pixel < beauty.data.length / 4;
-              pixel += 1
-            ) {
-              const offset = pixel * 4;
-              if (beauty.data[offset + 3]! <= 0) continue;
-              const difference =
-                Math.abs(beauty.data[offset]! - beauty.data[referenceOffset]!) +
-                Math.abs(beauty.data[offset + 1]! - beauty.data[referenceOffset + 1]!) +
-                Math.abs(beauty.data[offset + 2]! - beauty.data[referenceOffset + 2]!);
-              if (difference >= 12) {
-                beautyVariation = true;
-                break;
-              }
-            }
-          }
-          let minimumDepth = 1;
-          let maximumDepth = 0;
-          let depthValuesValid = true;
-          for (const value of depth.data) {
-            if (!Number.isFinite(value) || value < 0 || value > 1) {
-              depthValuesValid = false;
-              break;
-            }
-            minimumDepth = Math.min(minimumDepth, value);
-            maximumDepth = Math.max(maximumDepth, value);
-          }
-          const depthVariation =
-            depthValuesValid &&
-            minimumDepth < 0.999 &&
-            maximumDepth >= 0.999 &&
-            maximumDepth - minimumDepth >= 0.01;
-          let minimumNormalRed = 255;
-          let maximumNormalRed = 0;
-          let minimumNormalGreen = 255;
-          let maximumNormalGreen = 0;
-          let normalGeometryPixels = 0;
-          if (normal.data.length === depth.data.length * 2) {
-            for (let pixel = 0; pixel < depth.data.length; pixel += 1) {
-              if (depth.data[pixel]! >= 0.999) continue;
-              normalGeometryPixels += 1;
-              const offset = pixel * 2;
-              minimumNormalRed = Math.min(minimumNormalRed, normal.data[offset]!);
-              maximumNormalRed = Math.max(maximumNormalRed, normal.data[offset]!);
-              minimumNormalGreen = Math.min(
-                minimumNormalGreen,
-                normal.data[offset + 1]!,
-              );
-              maximumNormalGreen = Math.max(
-                maximumNormalGreen,
-                normal.data[offset + 1]!,
-              );
-            }
-          }
-          const normalVariation =
-            normalGeometryPixels > 0 &&
-            Math.max(
-              maximumNormalRed - minimumNormalRed,
-              maximumNormalGreen - minimumNormalGreen,
-            ) >= 8;
-          summaries.push({
-            artifacts: idArtifacts.map((artifact) => {
-              if (!(artifact.data instanceof Uint32Array)) {
-                throw new Error(
-                  `unexpected ${backend} ${width}x${height} stable-ID data`,
-                );
-              }
-              return {
-                byteLength: artifact.data.byteLength,
-                data: Uint32Array.from(artifact.data),
-                height: artifact.height,
-                kind: artifact.kind,
-                legend: artifact.legend,
-                profile: artifact.profile,
-                width: artifact.width,
-              };
-            }),
-            height: capture.height,
-            profile: capture.profile,
-            rasterArtifacts: [
-              {
-                byteLength: beauty.data.byteLength,
-                dataLength: beauty.data.length,
-                height: beauty.height,
-                kind: beauty.kind,
-                profile: beauty.profile,
-                variation: beautyVariation,
-                width: beauty.width,
-              },
-              {
-                byteLength: depth.data.byteLength,
-                dataLength: depth.data.length,
-                height: depth.height,
-                kind: depth.kind,
-                profile: depth.profile,
-                variation: depthVariation,
-                width: depth.width,
-              },
-              {
-                byteLength: normal.data.byteLength,
-                dataLength: normal.data.length,
-                height: normal.height,
-                kind: normal.kind,
-                profile: normal.profile,
-                variation: normalVariation,
-                width: normal.width,
-              },
-            ],
-            width: capture.width,
-          });
+          stableSummaries.push(summarizeStableIdCapture(stableRaw, backend));
         }
       } finally {
         await runtime.dispose();
         canvas.remove();
       }
-      capturesByBackend.push(summaries);
+      stableByBackend.push(stableSummaries);
     }
 
-    const webGpuCaptures = capturesByBackend[0]!;
-    const webGlCaptures = capturesByBackend[1]!;
-    return webGpuCaptures.map((capture, captureIndex) => {
+    const webGpuRaster = rasterByBackend[0]!;
+    const webGlRaster = rasterByBackend[1]!;
+    if (webGpuRaster.artifacts.length !== webGlRaster.artifacts.length) {
+      throw new Error("missing aligned WebGL2 beauty/depth/normal oracle");
+    }
+    const raster = {
+      artifacts: webGpuRaster.artifacts.map((artifact, artifactIndex) => {
+        const oracle = webGlRaster.artifacts[artifactIndex];
+        if (!oracle || oracle.kind !== artifact.kind) {
+          throw new Error(`invalid aligned WebGL2 ${String(artifact.kind)} oracle`);
+        }
+        return { ...artifact, webGlVariation: oracle.variation };
+      }),
+      height: webGpuRaster.height,
+      profile: webGpuRaster.profile,
+      width: webGpuRaster.width,
+    };
+
+    const webGpuCaptures = stableByBackend[0]!;
+    const webGlCaptures = stableByBackend[1]!;
+    const stableCaptures = webGpuCaptures.map((capture, captureIndex) => {
       const webGlCapture = webGlCaptures[captureIndex];
       if (!webGlCapture || webGlCapture.artifacts.length !== capture.artifacts.length) {
         throw new Error(`missing WebGL2 oracle for ${String(capture.width)}px capture`);
-      }
-      if (webGlCapture.rasterArtifacts.length !== capture.rasterArtifacts.length) {
-        throw new Error(
-          `missing WebGL2 beauty/depth/normal oracle for ${String(capture.width)}px capture`,
-        );
       }
       if (capture.artifacts.length !== 2) {
         throw new Error(`missing WebGPU stable-ID artifacts for ${String(capture.width)}px`);
@@ -1205,7 +1245,7 @@ async function runBabylonStableIdOrientationParityProof(
           `WebGPU object/material masks diverged for ${String(capture.width)}px`,
         );
       }
-
+      const request = idRequests[captureIndex]!;
       return {
         artifacts: capture.artifacts.map((artifact, artifactIndex) => {
           const oracle = webGlCapture.artifacts[artifactIndex];
@@ -1223,17 +1263,14 @@ async function runBabylonStableIdOrientationParityProof(
           let flipXDifferencePixels = 0;
           let flipYDifferencePixels = 0;
           let rotate180DifferencePixels = 0;
-          const rasterWidth = widths[captureIndex]!;
-          for (let y = 0; y < height; y += 1) {
-            for (let x = 0; x < rasterWidth; x += 1) {
-              const pixel = y * rasterWidth + x;
-              const flipXPixel = y * rasterWidth + (rasterWidth - x - 1);
-              const flipYPixel = (height - y - 1) * rasterWidth + x;
+          for (let y = 0; y < request.height; y += 1) {
+            for (let x = 0; x < request.width; x += 1) {
+              const pixel = y * request.width + x;
+              const flipXPixel = y * request.width + (request.width - x - 1);
+              const flipYPixel = (request.height - y - 1) * request.width + x;
               const rotate180Pixel =
-                (height - y - 1) * rasterWidth + (rasterWidth - x - 1);
-              if (artifact.data[pixel] !== oracle.data[pixel]) {
-                parityDifferencePixels += 1;
-              }
+                (request.height - y - 1) * request.width + (request.width - x - 1);
+              if (artifact.data[pixel] !== oracle.data[pixel]) parityDifferencePixels += 1;
               if (artifact.data[pixel] !== oracle.data[flipXPixel]) {
                 flipXDifferencePixels += 1;
               }
@@ -1248,9 +1285,9 @@ async function runBabylonStableIdOrientationParityProof(
           if (parityDifferencePixels !== 0) {
             throw new Error(
               `WebGPU/WebGL2 ${String(artifact.kind)} spatial parity failed for ` +
-                `${String(capture.width)}px: direct=${parityDifferencePixels}, ` +
+                `${request.width}px: direct=${parityDifferencePixels}, ` +
                 `flipX=${flipXDifferencePixels}, flipY=${flipYDifferencePixels}, ` +
-              `rotate180=${rotate180DifferencePixels}`,
+                `rotate180=${rotate180DifferencePixels}`,
             );
           }
           const foregroundStats = [...new Set(artifact.data)]
@@ -1258,14 +1295,14 @@ async function runBabylonStableIdOrientationParityProof(
             .sort((left, right) => left - right)
             .map((id) => {
               let count = 0;
-              let minX: number = rasterWidth;
-              let maxX: number = -1;
-              let minY: number = height;
-              let maxY: number = -1;
+              let minX = request.width;
+              let maxX = -1;
+              let minY = request.height;
+              let maxY = -1;
               let sumY = 0;
-              for (let y = 0; y < height; y += 1) {
-                for (let x = 0; x < rasterWidth; x += 1) {
-                  if (artifact.data[y * rasterWidth + x] !== id) continue;
+              for (let y = 0; y < request.height; y += 1) {
+                for (let x = 0; x < request.width; x += 1) {
+                  if (artifact.data[y * request.width + x] !== id) continue;
                   count += 1;
                   minX = Math.min(minX, x);
                   maxX = Math.max(maxX, x);
@@ -1276,8 +1313,7 @@ async function runBabylonStableIdOrientationParityProof(
               }
               if (count === 0) {
                 throw new Error(
-                  `empty ${String(artifact.kind)} foreground ID ${id} for ` +
-                    `${String(capture.width)}px`,
+                  `empty ${String(artifact.kind)} foreground ID ${id} for ${request.width}px`,
                 );
               }
               return {
@@ -1305,38 +1341,78 @@ async function runBabylonStableIdOrientationParityProof(
         }),
         height: capture.height,
         profile: capture.profile,
-        rasterArtifacts: capture.rasterArtifacts.map((artifact, artifactIndex) => {
-          const oracle = webGlCapture.rasterArtifacts[artifactIndex];
-          if (!oracle || oracle.kind !== artifact.kind) {
-            throw new Error(
-              `invalid WebGL2 ${String(artifact.kind)} oracle for ` +
-                `${String(capture.width)}px`,
-            );
-          }
-          return {
-            ...artifact,
-            webGlVariation: oracle.variation,
-          };
-        }),
         width: capture.width,
       };
     });
+    return { raster, stableCaptures };
   }, {
+    alignedRasterRequest,
     canonicalDocumentJson,
     entryUrl,
-    height: BABYLON_STABLE_ID_PARITY_HEIGHT,
-    profiles: {
-      beauty: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
-      depth: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
-      normal: STUDIO_BG3D_NORMAL_PROFILE,
-      stableId: STUDIO_BG3D_STABLE_ID_PROFILE,
-    },
+    stableIdRequests,
     webGpuEngineInitializationTimeoutMs: BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS,
-    widths: BABYLON_STABLE_ID_PARITY_WIDTHS,
   });
 
+  const expectedRasterArtifacts = [
+    {
+      bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
+      channels: 4,
+      kind: "beauty",
+      profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+    },
+    {
+      bytesPerElement: Float32Array.BYTES_PER_ELEMENT,
+      channels: 1,
+      kind: "depth",
+      profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
+    },
+    {
+      bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
+      channels: 2,
+      kind: "normal",
+      profile: STUDIO_BG3D_NORMAL_PROFILE,
+    },
+  ] as const;
+  assertCondition(
+    result.raster.width === BABYLON_ALIGNED_RASTER_SMOKE_SIZE &&
+      result.raster.height === BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
+    "unexpected aligned Babylon beauty/depth/normal dimensions",
+  );
+  assertCondition(
+    result.raster.profile === "studio-bg3d-multi-artifact-v2",
+    "unexpected aligned Babylon beauty/depth/normal profile",
+  );
+  assertCondition(
+    result.raster.artifacts.length === expectedRasterArtifacts.length,
+    "missing aligned Babylon beauty/depth/normal artifacts",
+  );
+  for (const [artifactIndex, expectedArtifact] of expectedRasterArtifacts.entries()) {
+    const artifact = result.raster.artifacts[artifactIndex];
+    const expectedValues =
+      BABYLON_ALIGNED_RASTER_SMOKE_SIZE ** 2 * expectedArtifact.channels;
+    assertCondition(
+      artifact?.kind === expectedArtifact.kind &&
+        artifact.profile === expectedArtifact.profile,
+      `unexpected aligned ${expectedArtifact.kind} artifact`,
+    );
+    assertCondition(
+      artifact.width === BABYLON_ALIGNED_RASTER_SMOKE_SIZE &&
+        artifact.height === BABYLON_ALIGNED_RASTER_SMOKE_SIZE,
+      `unexpected aligned ${expectedArtifact.kind} dimensions`,
+    );
+    assertCondition(
+      artifact.dataLength === expectedValues &&
+        artifact.byteLength === expectedValues * expectedArtifact.bytesPerElement,
+      `unexpected aligned ${expectedArtifact.kind} readback length`,
+    );
+    assertCondition(
+      artifact.variation && artifact.webGlVariation,
+      `missing aligned ${expectedArtifact.kind} variation on WebGPU or WebGL2`,
+    );
+  }
+
   for (const [index, width] of BABYLON_STABLE_ID_PARITY_WIDTHS.entries()) {
-    const capture = result[index];
+    const capture = result.stableCaptures[index];
     assertCondition(
       capture,
       `missing ${width}px WebGPU/WebGL2 canonical stable-ID parity proof`,
@@ -1350,54 +1426,6 @@ async function runBabylonStableIdOrientationParityProof(
       capture.profile === "studio-bg3d-multi-artifact-v2",
       `unexpected ${width}px artifact bundle profile`,
     );
-    assertCondition(
-      capture.rasterArtifacts.length === 3,
-      `missing ${width}px beauty/depth/normal artifacts`,
-    );
-    const expectedRasterArtifacts = [
-      {
-        bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
-        channels: 4,
-        kind: "beauty",
-        profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
-      },
-      {
-        bytesPerElement: Float32Array.BYTES_PER_ELEMENT,
-        channels: 1,
-        kind: "depth",
-        profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
-      },
-      {
-        bytesPerElement: Uint8Array.BYTES_PER_ELEMENT,
-        channels: 2,
-        kind: "normal",
-        profile: STUDIO_BG3D_NORMAL_PROFILE,
-      },
-    ] as const;
-    for (const [artifactIndex, expectedArtifact] of expectedRasterArtifacts.entries()) {
-      const artifact = capture.rasterArtifacts[artifactIndex];
-      const expectedValues =
-        width * BABYLON_STABLE_ID_PARITY_HEIGHT * expectedArtifact.channels;
-      assertCondition(
-        artifact?.kind === expectedArtifact.kind &&
-          artifact.profile === expectedArtifact.profile,
-        `unexpected ${width}px ${expectedArtifact.kind} artifact`,
-      );
-      assertCondition(
-        artifact.width === width &&
-          artifact.height === BABYLON_STABLE_ID_PARITY_HEIGHT,
-        `unexpected ${width}px ${expectedArtifact.kind} dimensions`,
-      );
-      assertCondition(
-        artifact.dataLength === expectedValues &&
-          artifact.byteLength === expectedValues * expectedArtifact.bytesPerElement,
-        `unexpected ${width}px ${expectedArtifact.kind} compact readback length`,
-      );
-      assertCondition(
-        artifact.variation && artifact.webGlVariation,
-        `missing ${width}px ${expectedArtifact.kind} variation on WebGPU or WebGL2`,
-      );
-    }
     assertCondition(capture.artifacts.length === 2, `missing ${width}px stable-ID artifacts`);
 
     const expected = [
@@ -1481,6 +1509,11 @@ async function runBabylonStableIdOrientationParityProof(
     }
   }
 
+  console.log(
+    `[verify-studio-3d-console] Babylon WebGPU/WebGL2 aligned ` +
+      `beauty/depth/normal PASS ${BABYLON_ALIGNED_RASTER_SMOKE_SIZE}x` +
+      `${BABYLON_ALIGNED_RASTER_SMOKE_SIZE}`,
+  );
   console.log(
     `[verify-studio-3d-console] Babylon WebGPU/WebGL2 canonical top-down ` +
       `stable-ID parity PASS ${BABYLON_STABLE_ID_PARITY_WIDTHS.join("/")}x` +

@@ -523,6 +523,7 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       backend: "webgl2",
       width: 2,
       height: 2,
+      includeBeauty: true,
       includeDepth: true,
       includeMaterialId: false,
       includeNormal: false,
@@ -610,7 +611,6 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
     const execute = createStudioBg3dBabylonCaptureExecutor(async (_context, plan) => {
       received = plan;
       return {
-        rgba: new Uint8Array(16),
         objectId: { data: objectData, legend: objectLegend },
         materialId: { data: materialData, legend: materialLegend },
       };
@@ -622,6 +622,7 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
     ]))) as StudioBg3dSpecialistResult;
 
     expect(received).toMatchObject({
+      includeBeauty: false,
       includeMaterialId: true,
       includeObjectId: true,
       includeDepth: false,
@@ -654,6 +655,26 @@ describe("Studio Babylon beauty/depth/normal capture executor", () => {
       result.kind === "studio-bg3d-artifact-capture" &&
       result.artifacts[1]?.data[1],
     ).toBe(1);
+  });
+
+  it("requires RGBA only when beauty is part of the requested artifact set", async () => {
+    const withoutBeauty = createStudioBg3dBabylonCaptureExecutor(async () => ({
+      objectId: {
+        data: Uint32Array.from([0, 1, 1, 0]),
+        legend: [{ id: 1, stableId: "obj/line", label: "Line" }],
+      },
+    }));
+    await expect(withoutBeauty(context(artifactRequest([
+      { kind: "object-id", profile: STUDIO_BG3D_STABLE_ID_PROFILE },
+    ])))).resolves.toMatchObject({
+      kind: "studio-bg3d-artifact-capture",
+      artifacts: [{ kind: "object-id" }],
+    });
+
+    const missingBeauty = createStudioBg3dBabylonCaptureExecutor(async () => ({}));
+    await expect(missingBeauty(context(artifactRequest([
+      { kind: "beauty", profile: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE },
+    ])))).rejects.toMatchObject({ code: "capture-failed" });
   });
 
   it("loads only defensive copies of exact verified GLB snapshots", async () => {
