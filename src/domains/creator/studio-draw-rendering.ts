@@ -36,6 +36,35 @@ import type { StudioLiveInkStrokeStyle } from "./studio-live-ink-overlay";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type Konva from "konva";
 
+export type StudioDraftPreviewActiveLane = "normal" | "fixed-fx" | "dynamic" | null;
+
+/**
+ * Chooses the smallest preview surface that preserves the brush's accepted pixel semantics.
+ *
+ * Only source-over luminous freehand brushes are safe to composite on an independent transparent
+ * layer. Multiply/material brushes (highlighter, oil, and similar media) deliberately stay beside
+ * the settled FIFO so their interaction with earlier paint remains unchanged.
+ */
+export function resolveStudioDraftPreviewActiveLane(
+  active: DrawEl | null,
+): StudioDraftPreviewActiveLane {
+  if (!active || active.mode === "eraser") return null;
+  if (
+    active.mode === "pen"
+    && resolveStudioBrushDynamicsPresetId(active.brush) !== null
+  ) return "dynamic";
+
+  const brushFamily = resolveStudioBrushRenderFamily(active.brush);
+  if (
+    active.mode === "pen"
+    && (active.kind ?? "freehand") === "freehand"
+    && !active.fill
+    && (brushFamily === "neon" || brushFamily === "glow" || brushFamily === "glitter")
+  ) return "fixed-fx";
+
+  return "normal";
+}
+
 export function drawBounds(points: number[]) {
   const [x1 = 0, y1 = 0, x2 = x1, y2 = y1] = points;
   return {

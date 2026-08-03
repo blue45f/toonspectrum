@@ -441,6 +441,7 @@ import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  resolveStudioDraftPreviewActiveLane,
   resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
   studioLiveBrushPressure,
@@ -13181,13 +13182,12 @@ function StudioCuttoonEditor() {
         } finally {
           KonvaRuntime.autoDrawEnabled = autoDrawEnabled;
         }
-        const dynamicDraft = pending.mode === "pen"
-          && resolveStudioBrushDynamicsPresetId(pending.brush) !== null;
-        (
-          dynamicDraft
-            ? draftPreviewDynamicLayerRef.current
-            : draftPreviewNormalLayerRef.current
-        )?.drawScene();
+        const activeLane = resolveStudioDraftPreviewActiveLane(pending);
+        if (activeLane === "dynamic") {
+          draftPreviewDynamicLayerRef.current?.drawScene();
+        } else if (activeLane === "normal") {
+          draftPreviewNormalLayerRef.current?.drawScene();
+        }
       } else {
         draftPreviewStoreRef.current.setActive(pending);
       }

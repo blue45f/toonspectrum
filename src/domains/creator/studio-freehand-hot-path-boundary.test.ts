@@ -177,9 +177,11 @@ describe("Studio freehand hot-path boundary", () => {
     expect(schedule).toContain("flushSync(() => {");
     expect(schedule).toContain("draftPreviewStoreRef.current.setActive(pending)");
     expect(schedule).toContain("KonvaRuntime.autoDrawEnabled = autoDrawEnabled");
-    expect(schedule).toContain("draftPreviewDynamicLayerRef.current");
-    expect(schedule).toContain("draftPreviewNormalLayerRef.current");
-    expect(schedule).toContain(")?.drawScene()");
+    expect(schedule).toContain("resolveStudioDraftPreviewActiveLane(pending)");
+    expect(schedule).toMatch(
+      /if \(activeLane === "dynamic"\) \{\s*draftPreviewDynamicLayerRef\.current\?\.drawScene\(\);\s*\} else if \(activeLane === "normal"\) \{\s*draftPreviewNormalLayerRef\.current\?\.drawScene\(\);\s*\}/u,
+    );
+    expect(schedule).not.toContain("const dynamicDraft");
   });
 
   it("presents local ink and schedules CRDT encoding behind a paint opportunity", () => {

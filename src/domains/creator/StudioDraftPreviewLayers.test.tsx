@@ -4,20 +4,41 @@ import { act, cleanup, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
+import { resolveStudioDraftPreviewActiveLane } from "./studio-draw-rendering";
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 
 import type { StudioDraftPreviewSource } from "./studio-draft-preview-store";
 import type { DrawEl } from "./studio-element-model";
 import type { ReactNode } from "react";
 
+const layerHarness = vi.hoisted(() => ({
+  drawSceneByName: new Map<string, () => void>(),
+}));
+
 vi.mock("react-konva/lib/ReactKonvaCore", async () => {
-  const { createElement } = await import("react");
-  return {
-    Layer: ({ children, listening }: { children?: ReactNode; listening?: boolean }) => createElement(
+  const { createElement, forwardRef, useImperativeHandle } = await import("react");
+  const Layer = forwardRef<
+    { drawScene: () => void },
+    { children?: ReactNode; listening?: boolean; name?: string }
+  >(function MockLayer({ children, listening, name = "unnamed" }, ref) {
+    let drawScene = layerHarness.drawSceneByName.get(name);
+    if (!drawScene) {
+      drawScene = vi.fn();
+      layerHarness.drawSceneByName.set(name, drawScene);
+    }
+    useImperativeHandle(ref, () => ({ drawScene }), [drawScene]);
+    return createElement(
       "section",
-      { "data-listening": String(listening), "data-testid": "draft-layer" },
+      {
+        "data-layer-role": name,
+        "data-listening": String(listening),
+        "data-testid": "draft-layer",
+      },
       children,
-    ),
+    );
+  });
+  return {
+    Layer,
   };
 });
 
@@ -47,7 +68,10 @@ function draw(id: string, overrides: Partial<DrawEl> = {}): DrawEl {
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  layerHarness.drawSceneByName.clear();
+});
 
 describe("StudioDraftPreviewLayers", () => {
   it("renders neither a layer nor a node for empty and eraser-only previews", () => {
@@ -114,6 +138,84 @@ describe("StudioDraftPreviewLayers", () => {
       activeDraft: "true",
       id: "dynamic",
     });
+  });
+
+  it("keeps settled pixels idle while a source-over fixed FX draft advances", () => {
+    const store = new StudioDraftPreviewStore();
+    store.settle(draw("first"));
+    store.settle(draw("second"));
+    const view = render(<StudioDraftPreviewLayers store={store} />);
+    const normalDrawScene = layerHarness.drawSceneByName.get(
+      "studio-draft-preview-normal",
+    );
+
+    expect(normalDrawScene).toBeDefined();
+    expect(normalDrawScene).not.toHaveBeenCalled();
+
+    for (const sampleCount of [4, 10, 20, 40]) {
+      const points = Array.from({ length: sampleCount }, (_, index) => [index, index % 7]).flat();
+      act(() => {
+        store.setActive(draw("active-soft-glow", {
+          brush: "soft-glow",
+          points,
+        }));
+      });
+    }
+
+    const layers = view.getAllByTestId("draft-layer");
+    const fixedFxDrawScene = layerHarness.drawSceneByName.get(
+      "studio-draft-preview-fixed-fx",
+    );
+    expect(layers.map((layer) => layer.dataset.layerRole)).toEqual([
+      "studio-draft-preview-normal",
+      "studio-draft-preview-fixed-fx",
+    ]);
+    expect(layers.every((layer) => layer.dataset.listening === "false")).toBe(true);
+    expect(within(layers[0]!).getAllByTestId("draw-node").map((node) => node.dataset.id)).toEqual([
+      "first",
+      "second",
+    ]);
+    expect(within(layers[1]!).getByTestId("draw-node").dataset).toMatchObject({
+      activeDraft: "true",
+      id: "active-soft-glow",
+    });
+    expect(normalDrawScene).not.toHaveBeenCalled();
+    expect(fixedFxDrawScene).toHaveBeenCalledTimes(4);
+    expect(layerHarness.drawSceneByName.get("studio-draft-preview-dynamic")).toBeUndefined();
+
+    act(() => {
+      store.settle(draw("active-soft-glow", { brush: "soft-glow" }));
+    });
+
+    expect(view.getAllByTestId("draft-layer")).toHaveLength(1);
+    expect(view.getAllByTestId("draw-node").map((node) => ({
+      activeDraft: node.dataset.activeDraft,
+      id: node.dataset.id,
+    }))).toEqual([
+      { activeDraft: "false", id: "first" },
+      { activeDraft: "false", id: "second" },
+      { activeDraft: "false", id: "active-soft-glow" },
+    ]);
+  });
+
+  it("routes only source-over luminous freehand FX away from the settled layer", () => {
+    for (const brush of ["neon", "glow", "soft-glow", "glitter", "star-dust"]) {
+      expect(resolveStudioDraftPreviewActiveLane(draw(brush, { brush }))).toBe("fixed-fx");
+    }
+    expect(resolveStudioDraftPreviewActiveLane(draw("highlighter", {
+      brush: "highlighter",
+    }))).toBe("normal");
+    expect(resolveStudioDraftPreviewActiveLane(draw("oil", { brush: "oil" }))).toBe("normal");
+    expect(resolveStudioDraftPreviewActiveLane(draw("dynamic", {
+      brush: "ink-particle",
+    }))).toBe("dynamic");
+    expect(resolveStudioDraftPreviewActiveLane(draw("eraser", {
+      mode: "eraser",
+    }))).toBeNull();
+    expect(resolveStudioDraftPreviewActiveLane(draw("filled-glow", {
+      brush: "glow",
+      fill: "#ffffff",
+    }))).toBe("normal");
   });
 
   it("reacts through the narrow external-store source and unsubscribes on unmount", () => {
