@@ -52,6 +52,8 @@ import {
 export const STUDIO_COMPETITIVE_BRUSH_QUALITY_SCHEMA_VERSION = 1 as const;
 export const STUDIO_COMPETITIVE_BRUSH_INPUT_RATES_HZ = [60, 120, 240] as const;
 export const STUDIO_COMPETITIVE_BRUSH_LONG_SAMPLE_FLOOR = 5_001 as const;
+export const STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT = 97 as const;
+export const STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX = 192 as const;
 
 const LONG_STROKE_DURATION_MS = (STUDIO_COMPETITIVE_BRUSH_LONG_SAMPLE_FLOOR - 1)
   / 240 * 1_000;
@@ -69,9 +71,9 @@ const PRESSURE_RESPONSE_RATIO_FLOOR = 1.03;
 const PRESSURE_RENDERER_PROBE_LOW = 0.15;
 const PRESSURE_RENDERER_PROBE_HIGH = 0.9;
 const PRESSURE_RENDERER_PROBE_START_X = 32;
-const PRESSURE_RENDERER_PROBE_END_X = 224;
+const PRESSURE_RENDERER_PROBE_END_X = PRESSURE_RENDERER_PROBE_START_X
+  + STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX;
 const PRESSURE_RENDERER_PROBE_Y = 96;
-const PRESSURE_RENDERER_PROBE_POINT_COUNT = 97;
 const FOUR_K_WIDTH = 3_840;
 const FOUR_K_HEIGHT = 2_160;
 const RGBA_BYTES_PER_PIXEL = 4;
@@ -303,6 +305,19 @@ interface PlannedMarks {
   readonly failure: string | null;
 }
 
+function freezeLongRoute(route: LongRoute): LongRoute {
+  for (const sample of route.samples) Object.freeze(sample);
+  Object.freeze(route.points);
+  Object.freeze(route.pressures);
+  Object.freeze(route.tangentialPressures);
+  Object.freeze(route.speeds);
+  Object.freeze(route.tiltXs);
+  Object.freeze(route.tiltYs);
+  Object.freeze(route.twists);
+  Object.freeze(route.samples);
+  return Object.freeze(route);
+}
+
 function finite(value: number, fallback = 0): number {
   return Number.isFinite(value) ? value : fallback;
 }
@@ -398,7 +413,7 @@ function buildLongRoute(
     previousX = x;
     previousY = y;
   }
-  return {
+  return freezeLongRoute({
     points,
     pressures,
     tangentialPressures,
@@ -408,7 +423,7 @@ function buildLongRoute(
     twists,
     samples,
     pathLengthPx,
-  };
+  });
 }
 
 function dynamicMarks(dabs: readonly StudioDynamicBrushDab[]): GenericMark[] {
@@ -752,9 +767,10 @@ interface StudioRendererPressureSample {
 
 function pressureProbePoints(): number[] {
   return Array.from(
-    { length: PRESSURE_RENDERER_PROBE_POINT_COUNT },
+    { length: STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT },
     (_, pointIndex) => {
-      const progress = pointIndex / (PRESSURE_RENDERER_PROBE_POINT_COUNT - 1);
+      const progress = pointIndex
+        / (STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT - 1);
       return [
         PRESSURE_RENDERER_PROBE_START_X
           + (PRESSURE_RENDERER_PROBE_END_X - PRESSURE_RENDERER_PROBE_START_X) * progress,
@@ -766,9 +782,55 @@ function pressureProbePoints(): number[] {
 
 function constantPressureSamples(value: number): number[] {
   return Array.from(
-    { length: PRESSURE_RENDERER_PROBE_POINT_COUNT },
+    { length: STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT },
     () => value,
   );
+}
+
+/**
+ * Pressure response is an orthogonal renderer probe, not another long-stroke cadence run.
+ *
+ * The previous benchmark replayed two additional 3,200 px routes per representative. That did
+ * not add pressure evidence: constant-pressure planners produce the same response on this dense
+ * 192 px route, while the extra thousands of dabs repeatedly decoded custom tips and amplified GC
+ * contention in the four-worker CI suite. Keep the production planner and all low/high assertions,
+ * but use the same 97-point physical probe already used by the outline and calligraphy oracles.
+ */
+function buildPlannerPressureProbeRoute(pressure: number): LongRoute {
+  const points = pressureProbePoints();
+  const pressures = constantPressureSamples(pressure);
+  const sampleCount = STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT;
+  const tangentialPressures = Array.from({ length: sampleCount }, () => 0);
+  const tiltXs = Array.from({ length: sampleCount }, () => 0);
+  const tiltYs = Array.from({ length: sampleCount }, () => 0);
+  const twists = Array.from({ length: sampleCount }, () => 0);
+  const speeds = Array.from({ length: sampleCount }, (_, index) => (
+    index === 0
+      ? 0
+      : (STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX / (sampleCount - 1))
+        / (1_000 / 240)
+  ));
+  const samples = Array.from({ length: sampleCount }, (_, index) => ({
+    x: points[index * 2]!,
+    y: points[index * 2 + 1]!,
+    pressure: pressures[index]!,
+    tangentialPressure: 0,
+    speed: speeds[index]!,
+    tiltX: 0,
+    tiltY: 0,
+    twist: 0,
+  }));
+  return freezeLongRoute({
+    points,
+    pressures,
+    tangentialPressures,
+    speeds,
+    tiltXs,
+    tiltYs,
+    twists,
+    samples,
+    pathLengthPx: STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX,
+  });
 }
 
 function symmetricResponseRatio(low: number, high: number): number {
@@ -912,7 +974,7 @@ function calligraphyRendererPressureSample(
   const pressures = mapStudioBrushAliasPressureSamples(
     candidate.runtimeBrushId,
     constantPressureSamples(pressure),
-    PRESSURE_RENDERER_PROBE_POINT_COUNT,
+    STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT,
     0.5,
   );
   const diameter = studioBrushAliasEffectiveDiameter(
@@ -989,18 +1051,8 @@ function rendererPressureSamples(
 function pressureMetrics(
   candidate: StudioCompetitiveBrushQualityCandidate,
   classification: StudioCompetitiveBrushQualityClassification,
+  pressureProbeRoutes: Readonly<{ low: LongRoute; high: LongRoute }>,
 ): StudioCompetitiveBrushPressureMetrics {
-  const rate = 60;
-  const lowPlan = planCandidateMarks(
-    candidate,
-    classification,
-    buildLongRoute(rate, PRESSURE_RENDERER_PROBE_LOW),
-  );
-  const highPlan = planCandidateMarks(
-    candidate,
-    classification,
-    buildLongRoute(rate, PRESSURE_RENDERER_PROBE_HIGH),
-  );
   const renderer = rendererPressureSamples(candidate, classification);
   if (renderer) {
     return {
@@ -1037,6 +1089,16 @@ function pressureMetrics(
         && renderer.high.liveCommitGeometryExact,
     };
   }
+  const lowPlan = planCandidateMarks(
+    candidate,
+    classification,
+    pressureProbeRoutes.low,
+  );
+  const highPlan = planCandidateMarks(
+    candidate,
+    classification,
+    pressureProbeRoutes.high,
+  );
   const lowMeanDiameter = mean(lowPlan.marks.map((mark) => mark.diameter));
   const highMeanDiameter = mean(highPlan.marks.map((mark) => mark.diameter));
   const lowMeanDeposition = mean(lowPlan.marks.map((mark) => mark.alpha));
@@ -1387,16 +1449,29 @@ export function benchmarkStudioCompetitiveBrushQuality(
     classification: classificationFor(candidate, supplied),
   }));
   const representativeIds = new Set<string>();
+  const representedGroups = new Set<string>();
   for (const { candidate, classification } of classified) {
     const group = representativeGroup(candidate, classification);
-    if (![...representativeIds].some((id) => {
-      const match = classified.find((entry) => entry.candidate.catalogId === id);
-      return match ? representativeGroup(match.candidate, match.classification) === group : false;
-    })) representativeIds.add(candidate.catalogId);
+    if (!representedGroups.has(group)) {
+      representedGroups.add(group);
+      representativeIds.add(candidate.catalogId);
+    }
   }
   const measured = tier === "deep"
     ? classified
     : classified.filter(({ candidate }) => representativeIds.has(candidate.catalogId));
+  // Every representative exercises the exact same immutable physical input routes. Build them
+  // once per report instead of manufacturing and collecting identical 5,001-sample object graphs.
+  const cadenceRoutes = new Map(
+    STUDIO_COMPETITIVE_BRUSH_INPUT_RATES_HZ.map((rateHz) => [
+      rateHz,
+      buildLongRoute(rateHz),
+    ]),
+  );
+  const pressureProbeRoutes = {
+    low: buildPlannerPressureProbeRoute(PRESSURE_RENDERER_PROBE_LOW),
+    high: buildPlannerPressureProbeRoute(PRESSURE_RENDERER_PROBE_HIGH),
+  } as const;
   const results: StudioCompetitiveBrushQualityResult[] = [];
   for (const { candidate, classification } of measured) {
     const cadence: StudioCompetitiveBrushCadenceMetrics[] = [];
@@ -1404,7 +1479,7 @@ export function benchmarkStudioCompetitiveBrushQuality(
     let longestRoute: LongRoute | null = null;
     let longestMarks: readonly GenericMark[] = [];
     for (const rateHz of STUDIO_COMPETITIVE_BRUSH_INPUT_RATES_HZ) {
-      const route = buildLongRoute(rateHz);
+      const route = cadenceRoutes.get(rateHz)!;
       const started = performance.now();
       const plan = planCandidateMarks(candidate, classification, route);
       const runtimeMs = performance.now() - started;
@@ -1427,7 +1502,7 @@ export function benchmarkStudioCompetitiveBrushQuality(
     const rateDensitySpan = densities.length === 0
       ? 0
       : safeRatio(Math.max(...densities), Math.min(...densities), 1);
-    const pressure = pressureMetrics(candidate, classification);
+    const pressure = pressureMetrics(candidate, classification, pressureProbeRoutes);
     const crossing = crossingMetrics(candidate);
     const route = longestRoute ?? buildLongRoute(240);
     const dpr1 = resourceProxy(route, longestMarks, 1);

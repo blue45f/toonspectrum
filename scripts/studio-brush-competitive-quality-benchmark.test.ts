@@ -12,6 +12,8 @@ import {
   benchmarkStudioCompetitiveBrushQuality,
   STUDIO_COMPETITIVE_BRUSH_INPUT_RATES_HZ,
   STUDIO_COMPETITIVE_BRUSH_LONG_SAMPLE_FLOOR,
+  STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX,
+  STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT,
   STUDIO_COMPETITIVE_BRUSH_QUALITY_SCHEMA_VERSION,
   type StudioCompetitiveBrushQualityCandidate,
   type StudioCompetitiveBrushQualityReport,
@@ -107,6 +109,16 @@ describe("Studio competitive brush quality benchmark", () => {
   });
 
   it("reports pressure, crossing, DPR/4K and allocation proxies as finite values", () => {
+    // Pressure remains a dense production-planner probe, but it is deliberately independent of
+    // the 5,001-sample cadence route measured above. This guards against restoring the redundant
+    // pair of long-stroke replays that made this quality gate load-dependent in CI.
+    expect(STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT).toBe(97);
+    expect(STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX).toBe(192);
+    expect(
+      STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_PATH_LENGTH_PX
+        / (STUDIO_COMPETITIVE_BRUSH_PRESSURE_PROBE_SAMPLE_COUNT - 1),
+    ).toBe(2);
+
     for (const result of report.results) {
       expect(result.pressure).not.toBeNull();
       expect(Number.isFinite(result.pressure!.diameterResponseRatio)).toBe(true);
@@ -124,6 +136,15 @@ describe("Studio competitive brush quality benchmark", () => {
       if (result.crossing?.available) {
         expect(result.crossing.alphaLossRatio).not.toBeNull();
         expect(Number.isFinite(result.crossing.alphaLossRatio!)).toBe(true);
+      }
+      if (result.pressure!.expected) {
+        expect(Math.max(
+          result.pressure!.diameterResponseRatio,
+          result.pressure!.depositionResponseRatio,
+          result.pressure!.inkMassResponseRatio,
+          result.pressure!.terminalDiameterResponseRatio,
+        )).toBeGreaterThanOrEqual(report.policy.pressureResponseRatioFloor);
+        expect(result.pressure!.liveCommitGeometryExact).toBe(true);
       }
     }
   });

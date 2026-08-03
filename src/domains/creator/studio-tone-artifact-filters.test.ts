@@ -186,16 +186,24 @@ describe("studio tone-artifact product adapters", () => {
     const width = Math.floor(
       STUDIO_TONE_ARTIFACT_DIRECT_MAX_NEIGHBORHOOD_SAMPLES / 9,
     ) + 1;
-    const source = fixture(width, 1);
-    const before = new Uint8ClampedArray(source.data);
-    edgeAwareDenoiseKonvaFilter.call({
+    let dataReads = 0;
+    const source = {
+      width,
+      height: 1,
+      get data(): Uint8ClampedArray {
+        dataReads += 1;
+        throw new Error("The direct preflight must refuse before reading RGBA data.");
+      },
+    } satisfies StudioImageDataLike;
+
+    expect(() => edgeAwareDenoiseKonvaFilter.call({
       attrs: {
         edgeDenoiseRadius: 1,
         edgeDenoiseStrength: 1,
         edgeDenoiseRangeThreshold: 72,
         toneArtifactExecution: "direct",
       },
-    }, source);
-    expect(source.data).toEqual(before);
+    }, source)).not.toThrow();
+    expect(dataReads).toBe(0);
   });
 });
