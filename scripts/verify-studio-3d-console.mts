@@ -80,6 +80,7 @@ export const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
+export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 2;
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
@@ -89,6 +90,117 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ]);
+
+export type Studio3dWebGpuRetryReason =
+  | "context-or-device-lost"
+  | "external-instance-map-readback";
+
+type Studio3dWebGpuRetryErrorEntry = Readonly<{
+  code: string | null;
+  message: string;
+  name: string;
+}>;
+
+function collectStudio3dWebGpuRetryErrorEntries(
+  cause: unknown,
+): readonly Studio3dWebGpuRetryErrorEntry[] {
+  const entries: Studio3dWebGpuRetryErrorEntry[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = cause;
+  for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
+    if (typeof current !== "object" || current === null || seen.has(current)) {
+      if (current !== undefined && !seen.has(current)) {
+        entries.push({ code: null, message: String(current), name: "Error" });
+      }
+      break;
+    }
+    seen.add(current);
+    const record = current as {
+      readonly cause?: unknown;
+      readonly code?: unknown;
+      readonly message?: unknown;
+      readonly name?: unknown;
+    };
+    entries.push({
+      code: typeof record.code === "string" ? record.code : null,
+      message: typeof record.message === "string"
+        ? record.message
+        : Object.prototype.toString.call(current),
+      name: typeof record.name === "string" ? record.name : "Error",
+    });
+    if (!("cause" in record)) break;
+    current = record.cause;
+  }
+  return entries;
+}
+
+/**
+ * Classifies only transient GPU-process/device lifetime failures. Semantic capture, parity,
+ * assertion, and timeout failures deliberately return null so CI cannot turn a product
+ * regression into a green retry.
+ */
+export function classifyStudio3dWebGpuRetryableFailure(
+  cause: unknown,
+): Studio3dWebGpuRetryReason | null {
+  const entries = collectStudio3dWebGpuRetryErrorEntries(cause);
+  // A deadline remains authoritative even when cleanup subsequently rejects an in-flight
+  // mapAsync. Retrying that chain would hide a real verifier timeout behind a disposal symptom.
+  if (entries.some((entry) =>
+    entry.name === "TimeoutError" ||
+    entry.code === "timeout" ||
+    /\b(?:timed out|timeout)\b/iu.test(entry.message)
+  )) {
+    return null;
+  }
+  for (const entry of entries) {
+    if (entry.code === "context-lost" || entry.code === "device-lost") {
+      return "context-or-device-lost";
+    }
+    if (/\[(?:context|device)-lost\]/u.test(entry.message)) {
+      return "context-or-device-lost";
+    }
+    if (
+      /\b(?:WebGPU\s+|GPU\s+)?(?:device|context)(?:\s+(?:is|was))?\s+lost(?:[.:;]|$)/iu.test(
+        entry.message,
+      )
+    ) {
+      return "context-or-device-lost";
+    }
+  }
+  for (const entry of entries) {
+    const abortError = entry.name === "AbortError" || /\bAbortError\b/u.test(entry.message);
+    if (
+      abortError &&
+      /\bmapAsync\b/u.test(entry.message) &&
+      entry.message.includes("A valid external Instance reference no longer exists")
+    ) {
+      return "external-instance-map-readback";
+    }
+  }
+  return null;
+}
+
+export async function runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+  runAttempt: (attempt: number) => Promise<void>,
+  onRetry?: (details: Readonly<{
+    attempt: number;
+    cause: unknown;
+    reason: Studio3dWebGpuRetryReason;
+  }>) => void | Promise<void>,
+): Promise<void> {
+  for (let attempt = 1; attempt <= STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS; attempt += 1) {
+    try {
+      await runAttempt(attempt);
+      return;
+    } catch (cause) {
+      const reason = classifyStudio3dWebGpuRetryableFailure(cause);
+      if (reason === null || attempt === STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS) {
+        throw cause;
+      }
+      await onRetry?.({ attempt, cause, reason });
+    }
+  }
+}
 
 export function createBabylonStableIdParityRequests():
 readonly StudioBg3dArtifactCaptureRequestV2[] {
@@ -878,10 +990,16 @@ async function runBabylonStableIdOrientationParityProof(
   rootUrl: string,
 ): Promise<void> {
   await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  const graphicsSupport = await page.evaluate(() => ({
-    gpu: "gpu" in navigator && Boolean(navigator.gpu),
-    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
-  }));
+  const graphicsSupport = await page.evaluate(() => {
+    const probeCanvas = document.createElement("canvas");
+    const webgl2 = probeCanvas.getContext("webgl2");
+    const supported = Boolean(webgl2);
+    webgl2?.getExtension("WEBGL_lose_context")?.loseContext();
+    return {
+      gpu: "gpu" in navigator && Boolean(navigator.gpu),
+      webgl2: supported,
+    };
+  });
   assertCondition(graphicsSupport.gpu, "WebGPU is unavailable for the stable-ID alignment proof");
   assertCondition(graphicsSupport.webgl2, "WebGL2 is unavailable beside the WebGPU proof");
 
@@ -1531,9 +1649,13 @@ async function runMagicLayerProductionAlignmentProof(
   page: Page,
   rootUrl: string,
 ): Promise<void> {
-  const graphicsSupport = await page.evaluate(() => ({
-    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
-  }));
+  const graphicsSupport = await page.evaluate(() => {
+    const probeCanvas = document.createElement("canvas");
+    const webgl2 = probeCanvas.getContext("webgl2");
+    const supported = Boolean(webgl2);
+    webgl2?.getExtension("WEBGL_lose_context")?.loseContext();
+    return { webgl2: supported };
+  });
   assertCondition(
     graphicsSupport.webgl2,
     "WebGL2 is unavailable for the Magic Layer production alignment proof",
@@ -2420,6 +2542,32 @@ async function runMagicLayerProductionAlignmentProof(
   );
 }
 
+async function runStudio3dWebGpuConformanceBrowserAttempt(
+  rootUrl: string,
+): Promise<void> {
+  // Keep the conformance browser process exclusive. Chromium/Dawn SwiftShader has a materially
+  // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
+  const webGpuBrowser = await chromium.launch({
+    headless: true,
+    args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
+  });
+  try {
+    const webGpuContext = await webGpuBrowser.newContext({
+      locale: "ko-KR",
+      viewport: { width: 1_440, height: 1_000 },
+    });
+    try {
+      const webGpuPage = await webGpuContext.newPage();
+      await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+      await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
+    } finally {
+      await webGpuContext.close().catch(() => undefined);
+    }
+  } finally {
+    await webGpuBrowser.close().catch(() => undefined);
+  }
+}
+
 async function main(): Promise<void> {
   verifyPatchedThreeRuntime();
   assertCondition(
@@ -2444,26 +2592,22 @@ async function main(): Promise<void> {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
     await waitForServer(rootUrl);
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
     // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
     // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
-    const webGpuBrowser = await chromium.launch({
-      headless: true,
-      args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
-    });
-    try {
-      const webGpuContext = await webGpuBrowser.newContext({
-        locale: "ko-KR",
-        viewport: { width: 1_440, height: 1_000 },
-      });
-      const webGpuPage = await webGpuContext.newPage();
-      await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
-      await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
-      await webGpuContext.close();
-    } finally {
-      await webGpuBrowser.close();
-    }
+    // No normal Chromium process exists until this browser has closed. A single full-process retry
+    // is permitted only for classified device/context lifetime failures; semantic and parity
+    // failures remain immediate hard failures.
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      () => runStudio3dWebGpuConformanceBrowserAttempt(rootUrl),
+      ({ attempt, reason }) => {
+        console.warn(
+          `[verify-studio-3d-console] transient WebGPU ${reason}; ` +
+            `closed attempt ${String(attempt)} and starting one fresh browser retry`,
+        );
+      },
+    );
+    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
     // locale so a developer machine or CI runner whose default locale is English does not turn a
     // healthy 3D runtime check into a menu-locator failure before either editor is opened.

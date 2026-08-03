@@ -38,7 +38,13 @@ export interface StudioBg3dBabylonObservableLike {
   remove(observer: unknown): unknown;
 }
 
+/** Direct WebGPU device-loss signal installed by the production Babylon binding. */
+export const STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL: unique symbol = Symbol(
+  "studio-bg3d-babylon-device-loss-signal",
+);
+
 export interface StudioBg3dBabylonEngineHandle {
+  readonly [STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL]?: PromiseLike<unknown>;
   readonly onContextLostObservable?: StudioBg3dBabylonObservableLike;
   readonly onContextRestoredObservable?: StudioBg3dBabylonObservableLike;
   dispose(): void;
@@ -160,8 +166,11 @@ interface ActiveJob {
 
 interface EngineRecord {
   readonly engine: StudioBg3dBabylonEngineHandle;
-  readonly lostObserver?: unknown;
-  readonly restoredObserver?: unknown;
+  disposed: boolean;
+  lostObserver?: unknown;
+  observersDetached: boolean;
+  restoredObserver?: unknown;
+  stopDeviceLossObservation?: () => void;
 }
 
 function specialistError(
@@ -527,6 +536,8 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
   #epoch = 0;
   #queuedJobs = 0;
   #queue: Promise<void> = Promise.resolve();
+  readonly #retiredEngineRecords = new Set<EngineRecord>();
+  #requiresCanvasContextRestore = false;
   #status: StudioBg3dBabylonSpecialistRuntimeState["status"] = "idle";
 
   constructor(options: StudioBg3dBabylonSpecialistRuntimeOptions) {
@@ -555,35 +566,68 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
 
   readonly #onCanvasContextRestored = (): void => {
     if (this.#disposed) return;
+    this.#requiresCanvasContextRestore = false;
     this.#contextLost = false;
     if (!this.#active) this.#status = "idle";
   };
 
-  #handleContextLost(blockUntilRestore: boolean): void {
+  #handleContextLost(
+    blockUntilRestore: boolean,
+    expectedRecord: EngineRecord | null = null,
+  ): void {
     if (this.#disposed) return;
-    if (blockUntilRestore) this.#contextLost = true;
+    if (expectedRecord && this.#engineRecord !== expectedRecord) return;
+    if (blockUntilRestore) this.#requiresCanvasContextRestore = true;
+    this.#contextLost = true;
     this.#epoch += 1;
     this.#status = "context-lost";
+    const activeAtLoss = this.#active;
     if (this.#active && !this.#active.controller.signal.aborted) {
       this.#active.reason = "context-lost";
       this.#active.controller.abort();
     }
     const engineRecord = this.#engineRecord;
     this.#engineRecord = null;
-    this.#disposeEngineRecord(engineRecord);
+    this.#retireEngineRecord(engineRecord, activeAtLoss !== null);
+    if (!activeAtLoss && !this.#requiresCanvasContextRestore) {
+      this.#contextLost = false;
+      this.#status = "idle";
+    }
+  }
+
+  #detachEngineObservers(record: EngineRecord): void {
+    if (record.observersDetached) return;
+    record.observersDetached = true;
+    record.stopDeviceLossObservation?.();
+    if (record.lostObserver !== undefined) {
+      record.engine.onContextLostObservable?.remove(record.lostObserver);
+    }
+    if (record.restoredObserver !== undefined) {
+      record.engine.onContextRestoredObservable?.remove(record.restoredObserver);
+    }
   }
 
   #disposeEngineRecord(record: EngineRecord | null): void {
-    if (!record) return;
-    try {
-      if (record.lostObserver !== undefined) {
-        record.engine.onContextLostObservable?.remove(record.lostObserver);
-      }
-      if (record.restoredObserver !== undefined) {
-        record.engine.onContextRestoredObservable?.remove(record.restoredObserver);
-      }
-    } finally {
-      safeDispose(record.engine);
+    if (!record || record.disposed) return;
+    record.disposed = true;
+    this.#retiredEngineRecords.delete(record);
+    this.#detachEngineObservers(record);
+    safeDispose(record.engine);
+  }
+
+  #retireEngineRecord(record: EngineRecord | null, deferDisposal: boolean): void {
+    if (!record || record.disposed) return;
+    this.#detachEngineObservers(record);
+    if (deferDisposal) {
+      this.#retiredEngineRecords.add(record);
+      return;
+    }
+    this.#disposeEngineRecord(record);
+  }
+
+  #flushRetiredEngineRecords(): void {
+    for (const record of [...this.#retiredEngineRecords]) {
+      this.#disposeEngineRecord(record);
     }
   }
 
@@ -637,17 +681,44 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
       safeDispose(engine);
       throw specialistError(this.#disposed ? "disposed" : "context-lost");
     }
-    const lostObserver = engine.onContextLostObservable?.add(() => {
+    const deviceLossSignal = engine[STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL];
+    if (
+      this.#backend === "webgpu" &&
+      (!deviceLossSignal || typeof deviceLossSignal.then !== "function")
+    ) {
+      safeDispose(engine);
+      throw specialistError(
+        "engine-init-failed",
+        new Error("Babylon WebGPU binding did not expose GPUDevice.lost."),
+      );
+    }
+    const record: EngineRecord = {
+      disposed: false,
+      engine,
+      observersDetached: false,
+    };
+    record.lostObserver = engine.onContextLostObservable?.add(() => {
       // WebGPU device loss has no DOM restoration event. It invalidates this engine, but the next
       // queued job may create a fresh device. WebGL is blocked by the canvas event until restored.
-      this.#handleContextLost(false);
+      this.#handleContextLost(this.#backend === "webgl2", record);
     });
-    const restoredObserver = engine.onContextRestoredObservable?.add(() => {
+    record.restoredObserver = engine.onContextRestoredObservable?.add(() => {
       if (this.#disposed) return;
+      this.#requiresCanvasContextRestore = false;
       this.#contextLost = false;
       if (!this.#active) this.#status = "idle";
     });
-    this.#engineRecord = { engine, lostObserver, restoredObserver };
+    this.#engineRecord = record;
+    if (deviceLossSignal) {
+      let observing = true;
+      record.stopDeviceLossObservation = () => {
+        observing = false;
+      };
+      const handleDeviceLoss = () => {
+        if (observing) this.#handleContextLost(false, record);
+      };
+      void Promise.resolve(deviceLossSignal).then(handleDeviceLoss, handleDeviceLoss);
+    }
     return engine;
   }
 
@@ -703,6 +774,10 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
       job.signal.removeEventListener("abort", abortFromCaller);
       safeDispose(scene);
       if (this.#active === active) this.#active = null;
+      this.#flushRetiredEngineRecords();
+      if (this.#contextLost && !this.#requiresCanvasContextRestore) {
+        this.#contextLost = false;
+      }
       if (!this.#disposed) {
         this.#status = this.#contextLost ? "context-lost" : "idle";
       }
@@ -750,6 +825,7 @@ class StudioBg3dBabylonSpecialistRuntimeImpl
         const engineRecord = this.#engineRecord;
         this.#engineRecord = null;
         this.#disposeEngineRecord(engineRecord);
+        this.#flushRetiredEngineRecords();
         this.#bindings = null;
         this.#bindingsPromise = null;
       });

@@ -157,14 +157,33 @@ export type StudioBg3dBabylonCaptureErrorCode =
   | "unsupported-artifact"
   | "unsupported-scene-feature";
 
+export type StudioBg3dBabylonReadbackStage = "beauty" | "depth";
+
 export class StudioBg3dBabylonCaptureError extends Error {
   constructor(
     readonly code: StudioBg3dBabylonCaptureErrorCode,
     cause?: unknown,
+    readonly stage?: StudioBg3dBabylonReadbackStage,
   ) {
-    super(`Studio Babylon capture failed: ${code}`, cause === undefined ? undefined : { cause });
+    super(
+      `Studio Babylon capture failed: ${code}${stage ? ` (${stage} readback)` : ""}`,
+      cause === undefined ? undefined : { cause },
+    );
     this.name = "StudioBg3dBabylonCaptureError";
   }
+}
+
+export interface StudioBg3dBabylonSerializedReadbackOptions<TBeauty, TDepth> {
+  readonly beauty?: () => Promise<TBeauty>;
+  readonly deadlineMs?: number;
+  readonly depth?: () => Promise<TDepth>;
+  readonly release: () => void;
+  readonly signal: AbortSignal;
+}
+
+export interface StudioBg3dBabylonSerializedReadbackResult<TBeauty, TDepth> {
+  readonly beauty?: TBeauty;
+  readonly depth?: TDepth;
 }
 
 interface StudioBg3dBabylonCaptureAsset {
@@ -1007,6 +1026,7 @@ function createCapturePlan(
 function withAbortAndDeadline<T>(
   operation: Promise<T>,
   signal: AbortSignal,
+  deadlineMs = MAX_CAPTURE_WAIT_MS,
 ): Promise<T> {
   throwIfAborted(signal);
   return new Promise<T>((resolve, reject) => {
@@ -1021,7 +1041,7 @@ function withAbortAndDeadline<T>(
     const onAbort = () => finish(() => reject(captureError("aborted")));
     const timeout = setTimeout(
       () => finish(() => reject(captureError("timeout"))),
-      MAX_CAPTURE_WAIT_MS,
+      deadlineMs,
     );
     signal.addEventListener("abort", onAbort, { once: true });
     operation.then(
@@ -1029,6 +1049,82 @@ function withAbortAndDeadline<T>(
       (error: unknown) => finish(() => reject(error)),
     );
   });
+}
+
+function readbackStageError(
+  stage: StudioBg3dBabylonReadbackStage,
+  error: unknown,
+): StudioBg3dBabylonCaptureError {
+  return new StudioBg3dBabylonCaptureError(
+    error instanceof StudioBg3dBabylonCaptureError
+      ? error.code
+      : "capture-failed",
+    error,
+    stage,
+  );
+}
+
+/**
+ * Babylon WebGPU readbacks share one device queue. Starting swap-chain beauty and depth RTT
+ * mappings together can invalidate Dawn's external instance on headless SwiftShader. Keep the
+ * mappings strictly serial and retain a lease on renderer-owned resources until every operation
+ * actually settles, even when the public abort/deadline wins the race first.
+ */
+export async function runStudioBg3dBabylonSerializedReadbacks<TBeauty, TDepth>(
+  options: StudioBg3dBabylonSerializedReadbackOptions<TBeauty, TDepth>,
+): Promise<StudioBg3dBabylonSerializedReadbackResult<TBeauty, TDepth>> {
+  const pending = new Set<Promise<void>>();
+
+  const runStage = async <T>(
+    stage: StudioBg3dBabylonReadbackStage,
+    start: () => Promise<T>,
+  ): Promise<T> => {
+    try {
+      throwIfAborted(options.signal);
+      const operation = start();
+      const drained = operation.then(
+        () => undefined,
+        () => undefined,
+      );
+      pending.add(drained);
+      void drained.then(() => pending.delete(drained));
+      return await withAbortAndDeadline(
+        operation,
+        options.signal,
+        options.deadlineMs,
+      );
+    } catch (error) {
+      throw readbackStageError(stage, error);
+    }
+  };
+
+  try {
+    const beauty = options.beauty
+      ? await runStage("beauty", options.beauty)
+      : undefined;
+    const depth = options.depth
+      ? await runStage("depth", options.depth)
+      : undefined;
+    return {
+      ...(beauty === undefined ? {} : { beauty }),
+      ...(depth === undefined ? {} : { depth }),
+    };
+  } finally {
+    const inFlight = [...pending];
+    if (inFlight.length === 0) {
+      options.release();
+    } else {
+      // The public call remains cancellable/bounded, while the GPU-owned resource stays alive
+      // until mapAsync settles. Late disposal errors cannot be reported to an already-settled job.
+      void Promise.all(inFlight).then(() => {
+        try {
+          options.release();
+        } catch {
+          // Best-effort late cleanup. Synchronous cleanup still preserves existing error behavior.
+        }
+      });
+    }
+  }
 }
 
 interface StudioBg3dBabylonSceneResourceSnapshot {
@@ -2646,6 +2742,21 @@ async function renderStudioBg3dBabylonCapture(
   );
   const requiresDepth = plan.includeDepth || plan.includeNormal;
   let depthRenderer: DepthRenderer | null = null;
+  let readbacksOwnDepthRenderer = false;
+  let readbacksDrained = false;
+  let depthRendererDisposeRequested = false;
+  let depthRendererDisposed = false;
+  const disposeDepthRendererIfReady = () => {
+    if (
+      depthRendererDisposed ||
+      !depthRendererDisposeRequested ||
+      !readbacksDrained
+    ) {
+      return;
+    }
+    depthRendererDisposed = true;
+    depthRenderer?.dispose();
+  };
   try {
     if (requiresDepth && hasDepthGeometry) {
       depthRenderer = scene.enableDepthRenderer(
@@ -2668,40 +2779,58 @@ async function renderStudioBg3dBabylonCapture(
     scene.render(true, true);
     scene.render(true, true);
     const flipY = plan.backend === "webgl2";
-    const rgbaPromise = plan.includeBeauty
-      ? withAbortAndDeadline(
-        engine.readPixels(0, 0, plan.width, plan.height, true, true),
-        context.signal,
-      ).then((pixels) => rgbaRowsTopDown(
-        pixels,
-        plan.width,
-        plan.height,
-        flipY,
-        swapRedBlue,
-        transparent,
-      ))
-      : Promise.resolve(undefined);
-    const depthPromise = depthRenderer
-      ? withAbortAndDeadline(
-        depthRenderer.getDepthMap().readPixels(
-          0,
-          0,
-          null,
-          true,
-          false,
-          0,
-          0,
-          plan.width,
-          plan.height,
-        ) ?? Promise.reject(captureError("renderer-unavailable")),
-        context.signal,
-      ).then((pixels) => depthRowsTopDown(pixels, plan.width, plan.height, flipY))
-      : Promise.resolve(
-        requiresDepth
-          ? new Float32Array(plan.width * plan.height).fill(1)
-          : undefined,
-      );
-    const [rgba, depth] = await Promise.all([rgbaPromise, depthPromise]);
+    const activeDepthRenderer = depthRenderer;
+    readbacksOwnDepthRenderer = true;
+    const readbacks = await runStudioBg3dBabylonSerializedReadbacks<
+      Uint8Array,
+      Float32Array
+    >({
+      ...(plan.includeBeauty
+        ? {
+          beauty: async () => rgbaRowsTopDown(
+            await engine.readPixels(0, 0, plan.width, plan.height, true, true),
+            plan.width,
+            plan.height,
+            flipY,
+            swapRedBlue,
+            transparent,
+          ),
+        }
+        : {}),
+      ...(activeDepthRenderer
+        ? {
+          depth: async () => depthRowsTopDown(
+            await (
+              activeDepthRenderer.getDepthMap().readPixels(
+                0,
+                0,
+                null,
+                true,
+                false,
+                0,
+                0,
+                plan.width,
+                plan.height,
+              ) ?? Promise.reject(captureError("renderer-unavailable"))
+            ),
+            plan.width,
+            plan.height,
+            flipY,
+          ),
+        }
+        : {}),
+      release: () => {
+        readbacksDrained = true;
+        disposeDepthRendererIfReady();
+      },
+      signal: context.signal,
+    });
+    const rgba = readbacks.beauty;
+    const depth = readbacks.depth ?? (
+      requiresDepth
+        ? new Float32Array(plan.width * plan.height).fill(1)
+        : undefined
+    );
     const normal = plan.includeNormal && depth
       ? await captureStudioBg3dBabylonNormalsWithDeadline(
         context,
@@ -2743,7 +2872,12 @@ async function renderStudioBg3dBabylonCapture(
     }
     throw captureError("capture-failed", error);
   } finally {
-    depthRenderer?.dispose();
+    if (!readbacksOwnDepthRenderer) {
+      depthRenderer?.dispose();
+    } else {
+      depthRendererDisposeRequested = true;
+      disposeDepthRendererIfReady();
+    }
   }
 }
 

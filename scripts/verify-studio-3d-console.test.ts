@@ -15,7 +15,10 @@ import {
   BABYLON_STABLE_ID_PARITY_WIDTHS,
   createBabylonAlignedRasterSmokeRequest,
   createBabylonStableIdParityRequests,
+  classifyStudio3dWebGpuRetryableFailure,
   isExpectedStaticPreviewSocketIoHandshakeClose,
+  runStudio3dWebGpuConformanceWithFreshBrowserRetry,
+  STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
 } from "./verify-studio-3d-console.mts";
 
@@ -149,6 +152,158 @@ describe("3D WebGPU conformance browser boundary", () => {
       { kind: "depth", profile: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE },
       { kind: "normal", profile: STUDIO_BG3D_NORMAL_PROFILE },
     ]);
+  });
+
+  it.each([
+    [
+      "structured context-loss code",
+      Object.assign(new Error("capture stopped"), { code: "context-lost" }),
+      "context-or-device-lost",
+    ],
+    [
+      "serialized specialist context-loss code",
+      new Error("StudioBg3dBabylonSpecialistError[context-lost]: context unavailable"),
+      "context-or-device-lost",
+    ],
+    [
+      "explicit WebGPU device loss",
+      new Error("WebGPU device was lost."),
+      "context-or-device-lost",
+    ],
+    [
+      "exact Chromium external-instance readback abort",
+      new DOMException(
+        "Failed to execute 'mapAsync' on 'GPUBuffer': " +
+          "A valid external Instance reference no longer exists.",
+        "AbortError",
+      ),
+      "external-instance-map-readback",
+    ],
+    [
+      "serialized Chromium external-instance readback abort",
+      new Error(
+        "page.evaluate: AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': " +
+          "A valid external Instance reference no longer exists.",
+      ),
+      "external-instance-map-readback",
+    ],
+  ] as const)("classifies only retryable GPU lifetime failure: %s", (_label, error, reason) => {
+    expect(classifyStudio3dWebGpuRetryableFailure(error)).toBe(reason);
+  });
+
+  it.each([
+    ["semantic parity", new Error("WebGPU/WebGL2 object-id spatial parity failed")],
+    ["timeout", new Error("TimeoutError: aligned raster exceeded 60000ms")],
+    [
+      "generic map abort",
+      new DOMException("Failed to execute 'mapAsync': operation aborted.", "AbortError"),
+    ],
+    [
+      "external-instance without readback abort",
+      new Error("A valid external Instance reference no longer exists."),
+    ],
+    [
+      "assertion mentioning diagnostics",
+      new Error("context lost diagnostics should remain zero"),
+    ],
+    [
+      "timeout followed by disposal map abort",
+      new Error("WebGPU capture timed out after 60000ms", {
+        cause: new DOMException(
+          "Failed to execute 'mapAsync' on 'GPUBuffer': " +
+            "A valid external Instance reference no longer exists.",
+          "AbortError",
+        ),
+      }),
+    ],
+  ] as const)("hard-fails non-lifetime verifier error: %s", (_label, error) => {
+    expect(classifyStudio3dWebGpuRetryableFailure(error)).toBeNull();
+  });
+
+  it("restarts exactly one fresh attempt after a classified loss", async () => {
+    const attempts: number[] = [];
+    const retryReasons: string[] = [];
+
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      async (attempt) => {
+        attempts.push(attempt);
+        if (attempt === 1) {
+          throw Object.assign(new Error("lost during map readback"), {
+            code: "device-lost",
+          });
+        }
+      },
+      ({ reason }) => {
+        retryReasons.push(reason);
+      },
+    );
+
+    expect(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS).toBe(2);
+    expect(attempts).toEqual([1, 2]);
+    expect(retryReasons).toEqual(["context-or-device-lost"]);
+  });
+
+  it("does not retry semantic, parity, or timeout failures", async () => {
+    const failure = new Error("WebGPU/WebGL2 normal spatial parity failed");
+    const attempts: number[] = [];
+
+    await expect(
+      runStudio3dWebGpuConformanceWithFreshBrowserRetry(async (attempt) => {
+        attempts.push(attempt);
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+    expect(attempts).toEqual([1]);
+  });
+
+  it("hard-fails the second classified loss without a third attempt", async () => {
+    const failure = Object.assign(new Error("WebGPU context was lost."), {
+      code: "context-lost",
+    });
+    const attempts: number[] = [];
+    const retries: number[] = [];
+
+    await expect(
+      runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+        async (attempt) => {
+          attempts.push(attempt);
+          throw failure;
+        },
+        ({ attempt }) => {
+          retries.push(attempt);
+        },
+      ),
+    ).rejects.toBe(failure);
+    expect(attempts).toEqual([1, 2]);
+    expect(retries).toEqual([1]);
+  });
+
+  it("closes the exclusive WebGPU browser before launching normal Chromium", () => {
+    const webGpuAttempt = sourceBetween(
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+      "async function main(): Promise<void>",
+    );
+    const main = sourceBetween(
+      "async function main(): Promise<void>",
+      "if (process.argv[1]",
+    );
+    const webGpuProof = main.indexOf(
+      "await runStudio3dWebGpuConformanceWithFreshBrowserRetry(",
+    );
+    const normalBrowser = main.indexOf(
+      'browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });',
+    );
+
+    expect(webGpuAttempt).toContain("await webGpuContext.close().catch(() => undefined)");
+    expect(webGpuAttempt).toContain("await webGpuBrowser.close().catch(() => undefined)");
+    expect(webGpuProof).toBeGreaterThanOrEqual(0);
+    expect(normalBrowser).toBeGreaterThan(webGpuProof);
+  });
+
+  it("explicitly releases both temporary WebGL2 capability probes", () => {
+    expect(
+      verifierSource.match(/getExtension\("WEBGL_lose_context"\)\?\.loseContext\(\)/gu),
+    ).toHaveLength(2);
   });
 });
 
