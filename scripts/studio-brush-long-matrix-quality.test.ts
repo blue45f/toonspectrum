@@ -104,11 +104,11 @@ describe("Studio exhaustive long-brush quality policy", () => {
         }).kind,
       };
     });
-    expect(policies).toHaveLength(226);
-    expect(policies.filter(({ kind }) => kind === "strict-continuous")).toHaveLength(114);
+    expect(policies).toHaveLength(230);
+    expect(policies.filter(({ kind }) => kind === "strict-continuous")).toHaveLength(118);
     expect(policies.filter(({ kind }) => kind === "soft-wet-continuous")).toHaveLength(36);
     expect(policies.filter(({ kind }) => kind === "record-only-discrete")).toHaveLength(76);
-    expect(policies.filter(({ source }) => source === "core")).toHaveLength(66);
+    expect(policies.filter(({ source }) => source === "core")).toHaveLength(70);
     expect(policies.filter(({ source }) => source === "pro")).toHaveLength(160);
   });
 

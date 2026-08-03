@@ -151,9 +151,9 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         runtimeBrushId: selection.runtimeBrushId,
       })),
     ];
-    expect(identities).toHaveLength(226);
+    expect(identities).toHaveLength(230);
     expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(professional.length);
-    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(226);
+    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(230);
 
     const admitted = identities.filter(({ catalogId, runtimeBrushId }) => (
       resolveStudioHokusaiLiveAutoRouteDecision(runtimeBrushId, catalogId).status
