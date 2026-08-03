@@ -3749,7 +3749,7 @@ function StudioCuttoonEditor() {
       serverRevisionAbortRef.current = null;
     };
   }, []);
-  useLayoutEffect(() => {
+  useEffect(() => {
     studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
     studioLayerLiftProviderRef.current ??=
       createStudioLayerLiftLocalForegroundProvider({
@@ -3799,9 +3799,7 @@ function StudioCuttoonEditor() {
   const pagesHistoryCommandJournalRef = useRef<ReturnType<
     typeof createStudioPagesHistoryCommandJournalClient
   > | null>(null);
-  pagesHistoryCommandJournalRef.current ??=
-    createStudioPageHistoryCommandJournalClient();
-  useLayoutEffect(() => {
+  useEffect(() => {
     // React Strict Mode replays effect setup/cleanup without a render between them. Recreate a
     // client during setup if the simulated cleanup disposed the render-created instance.
     pagesHistoryCommandJournalRef.current ??=
