@@ -37,7 +37,6 @@ import {
   handleOAuthCallback,
   isAuthorizationCodeFlowConfigured,
   isOAuthProvider,
-  issueHandoff,
   issueState,
   listAuthProviders,
   OAuthAccountBlockedError,
@@ -191,7 +190,9 @@ export class AuthController {
     return res.redirect(url);
   }
 
-  // 제공자 콜백 — code 교환 → 사용자 upsert → 1회용 핸드오프 토큰으로 프론트 복귀.
+  // 제공자 콜백 — code 교환 → 사용자 upsert → HttpOnly 세션 쿠키 발급 후 프론트 복귀.
+  // Vercel serverless 인스턴스 사이에는 프로세스 로컬 Map이 공유되지 않으므로, 이 경로는
+  // 핸드오프 토큰을 사용하지 않는다. URL fragment에는 PII나 세션 자격 증명을 넣지 않는다.
   @Get("oauth/:provider/callback")
   async oauthCallback(
     @Param("provider") provider: string,
@@ -215,7 +216,12 @@ export class AuthController {
     if (!code) return res.redirect(`${web}/auth/callback#error=no_code`);
     try {
       const user = await handleOAuthCallback(provider, code);
-      return res.redirect(`${web}/auth/callback#t=${issueHandoff(user)}`);
+      const token = signSession(
+        user.id,
+        normalizeSessionVersion(user.sessionVersion),
+      );
+      applyAuthSessionCookie(res, token);
+      return res.redirect(`${web}/auth/callback#session=1`);
     } catch {
       this.logOAuthFailure(
         "authorization-code",

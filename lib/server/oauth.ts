@@ -161,6 +161,8 @@ export function isAuthorizationCodeFlowConfigured(
 export interface AuthProviderInfo {
   label: string;
   mode: OAuthProviderMode;
+  /** Whether the signed-state authorization-code redirect flow is fully configured. */
+  redirectAvailable: boolean;
   // GIS 버튼 렌더용 — google 실연동(oauth) 시에만 client id 를 노출(공개해도 안전한 값).
   clientId?: string;
   reason?: "missing-client-id";
@@ -175,13 +177,26 @@ export function listAuthProviders(opts?: { kakao?: boolean; naver?: boolean }) {
     google: {
       label: "Google",
       mode: googleMode,
+      redirectAvailable: isAuthorizationCodeFlowConfigured("google"),
       // GIS 흐름: 실연동일 때만 client id 를 프론트로 노출한다. client secret 은 절대 노출하지 않는다.
       ...(googleMode === "oauth" ? { clientId: googleClientId() } : {}),
       ...(googleMode === "disabled" ? { reason: "missing-client-id" as const } : {}),
     },
   };
-  if (opts?.kakao || kakaoMode === "oauth") out.kakao = { label: "카카오", mode: kakaoMode };
-  if (opts?.naver || naverMode === "oauth") out.naver = { label: "네이버", mode: naverMode };
+  if (opts?.kakao || kakaoMode === "oauth") {
+    out.kakao = {
+      label: "카카오",
+      mode: kakaoMode,
+      redirectAvailable: isAuthorizationCodeFlowConfigured("kakao"),
+    };
+  }
+  if (opts?.naver || naverMode === "oauth") {
+    out.naver = {
+      label: "네이버",
+      mode: naverMode,
+      redirectAvailable: isAuthorizationCodeFlowConfigured("naver"),
+    };
+  }
   return out;
 }
 

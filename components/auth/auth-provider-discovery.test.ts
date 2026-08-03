@@ -10,6 +10,7 @@ describe("auth provider discovery", () => {
           label: "Google",
           mode: "oauth",
           clientId: " 123-client.apps.googleusercontent.com ",
+          redirectAvailable: true,
         },
       }),
     ).toEqual({
@@ -17,6 +18,7 @@ describe("auth provider discovery", () => {
         label: "Google",
         mode: "oauth",
         clientId: "123-client.apps.googleusercontent.com",
+        redirectAvailable: true,
       },
     });
   });
@@ -30,6 +32,7 @@ describe("auth provider discovery", () => {
       google: {
         label: "Google",
         mode: "disabled",
+        redirectAvailable: false,
         reason: "invalid-provider-response",
       },
     });
@@ -46,7 +49,27 @@ describe("auth provider discovery", () => {
       google: {
         label: "Google",
         mode: "disabled",
+        redirectAvailable: false,
         reason: "missing-client-id",
+      },
+    });
+  });
+
+  it("keeps GIS usable but hides redirect fallback unless capability is explicitly true", () => {
+    expect(
+      parseAuthProviderDiscovery({
+        google: {
+          label: "Google",
+          mode: "oauth",
+          clientId: "123-client.apps.googleusercontent.com",
+        },
+      }),
+    ).toEqual({
+      google: {
+        label: "Google",
+        mode: "oauth",
+        clientId: "123-client.apps.googleusercontent.com",
+        redirectAvailable: false,
       },
     });
   });

@@ -110,6 +110,8 @@ function initializeGoogleIdentity(clientId: string): void {
 type GoogleIdentityButtonProps = {
   clientId: string;
   onSuccess: () => void;
+  /** Signed-state authorization-code fallback, supplied only from verified discovery. */
+  onRedirectFallback?: () => void;
 };
 
 type GoogleIdentityState =
@@ -123,6 +125,7 @@ type GoogleIdentityState =
 export function GoogleIdentityButton({
   clientId,
   onSuccess,
+  onRedirectFallback,
 }: GoogleIdentityButtonProps) {
   const holderRef = useRef<HTMLDivElement | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -250,6 +253,15 @@ export function GoogleIdentityButton({
               ? "Google 로그인 모듈 다시 불러오기"
               : "Google로 다시 시도"}
           </button>
+          {onRedirectFallback && (
+            <button
+              type="button"
+              onClick={onRedirectFallback}
+              className="mt-2 block min-h-8 w-full text-xs font-semibold text-fg-2 underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            >
+              다른 방식으로 Google 로그인
+            </button>
+          )}
         </div>
       )}
     </div>

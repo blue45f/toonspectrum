@@ -480,6 +480,11 @@ export function AuthModal({
                     <GoogleIdentityButton
                       clientId={providers.google.clientId}
                       onSuccess={onClose}
+                      onRedirectFallback={
+                        providers.google.redirectAvailable
+                          ? () => { void signIn("google"); }
+                          : undefined
+                      }
                     />
                   ) : (
                     <div

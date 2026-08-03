@@ -3,6 +3,7 @@ export type AuthProviderMode = "oauth" | "demo" | "disabled";
 export type AuthProviderInfo = {
   label: string;
   mode: AuthProviderMode;
+  redirectAvailable: boolean;
   clientId?: string;
   reason?: "missing-client-id" | "invalid-provider-response";
 };
@@ -61,11 +62,15 @@ export function parseAuthProviderDiscovery(
           label,
           mode: "oauth",
           clientId: raw.clientId.trim(),
+          // Rolling deployments and malformed responses default to false. A
+          // redirect fallback is actionable only when the server says true.
+          redirectAvailable: raw.redirectAvailable === true,
         };
       } else {
         result.google = {
           label,
           mode: "disabled",
+          redirectAvailable: false,
           reason:
             raw.mode === "disabled" && raw.reason === "missing-client-id"
               ? "missing-client-id"
@@ -78,7 +83,11 @@ export function parseAuthProviderDiscovery(
     // Disabled non-Google providers are omitted rather than rendered as an
     // actionable redirect button.
     if (raw.mode !== "disabled") {
-      result[id] = { label, mode: raw.mode };
+      result[id] = {
+        label,
+        mode: raw.mode,
+        redirectAvailable: raw.redirectAvailable === true,
+      };
     }
   }
 

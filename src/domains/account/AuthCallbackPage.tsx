@@ -11,6 +11,11 @@ import { api, apiPath } from "@/src/infrastructure/api";
 type Phase = "working" | "done" | "error";
 
 type OAuthResult = { user?: { id?: string } | null; error?: string } | null;
+type OAuthSessionResult = {
+  authenticated?: boolean;
+  user?: { id?: string } | null;
+  error?: string;
+} | null;
 
 const ERROR_LABEL_KEYS: Record<string, string> = {
   bad_state: "auth.callback.error.badState",
@@ -31,7 +36,7 @@ export function AuthCallbackPage() {
   const [phase, setPhase] = useState<Phase>("working");
   const [messageKey, setMessageKey] = useState("auth.callback.message.working");
   const [demo, setDemo] = useState(false);
-  const ran = useRef(false); // 핸드오프 토큰은 1회용 — StrictMode 이중 실행 방지
+  const ran = useRef(false); // 콜백 완료 요청은 한 번만 실행 — StrictMode 이중 실행 방지
   const t = useT();
 
   useEffect(() => {
@@ -62,6 +67,19 @@ export function AuthCallbackPage() {
         return;
       }
       try {
+        if (params.session === "1") {
+          const res = await api.raw(apiPath("/auth/session"), {
+            method: "GET",
+            cache: "no-store",
+            throwHttpErrors: false,
+          });
+          const data = await res.json<OAuthSessionResult>().catch(() => null);
+          if (!res.ok || data?.authenticated !== true || !data.user) {
+            throw new Error(data?.error ?? "session-failed");
+          }
+          finish(data.user, false);
+          return;
+        }
         if (params.t) {
           const res = await api.raw(apiPath("/auth/oauth/exchange"), {
             method: "POST",

@@ -6,6 +6,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { issueState } from "../../../../../lib/server/oauth";
+import { verifySessionToken } from "../../../../../lib/server/session";
+import { AUTH_SESSION_COOKIE_NAME } from "../../session-cookie";
 
 import { AuthController } from "./auth.controller";
 
@@ -30,6 +32,7 @@ function controller(): AuthController {
 
 function response(): Response {
   return {
+    cookie: vi.fn(),
     redirect: vi.fn((url: string) => url),
   } as unknown as Response;
 }
@@ -115,6 +118,62 @@ describe("AuthController Google GIS/code-flow boundary", () => {
     expect(res.redirect).toHaveBeenCalledWith(
       "https://www.toonstudio.cloud/auth/callback#error=oauth_unavailable",
     );
+  });
+
+  it("issues the signed HttpOnly session in the callback response without a process-local handoff token", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "123-client.apps.googleusercontent.com");
+    vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "configured-code-flow-secret");
+    vi.stubEnv(
+      "AUTH_STATE_SECRET",
+      "0123456789abcdef0123456789abcdef",
+    );
+    vi.stubEnv(
+      "AUTH_SESSION_SECRET",
+      "abcdef0123456789abcdef0123456789",
+    );
+    vi.stubEnv("WEB_APP_BASE_URL", "https://www.toonstudio.cloud");
+    const state = issueState("google");
+    handleOAuthCallback.mockResolvedValueOnce({
+      id: "google-user-1",
+      name: "Google User",
+      email: "artist@example.test",
+      image: null,
+      role: "user",
+      sessionVersion: 7,
+    });
+    const res = response();
+
+    await controller().oauthCallback(
+      "google",
+      "valid-authorization-code",
+      state,
+      undefined,
+      res,
+    );
+
+    expect(res.cookie).toHaveBeenCalledWith(
+      AUTH_SESSION_COOKIE_NAME,
+      expect.any(String),
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+      }),
+    );
+    const sessionToken = vi.mocked(res.cookie).mock.calls[0]?.[1];
+    expect(verifySessionToken(String(sessionToken))).toMatchObject({
+      userId: "google-user-1",
+      sessionVersion: 7,
+    });
+    expect(res.redirect).toHaveBeenCalledWith(
+      "https://www.toonstudio.cloud/auth/callback#session=1",
+    );
+    const redirectUrl = String(vi.mocked(res.redirect).mock.calls[0]?.[0]);
+    expect(redirectUrl).not.toContain("artist@example.test");
+    expect(redirectUrl).not.toContain(String(sessionToken));
+    expect(redirectUrl).not.toContain("#t=");
   });
 
   it("logs a stable redirect failure reason without the OAuth code, state, PII, or upstream message", async () => {

@@ -138,6 +138,7 @@ describe("Google providerMode/clientId 노출(GIS는 client secret 불필요)", 
     const list = listAuthProviders();
     expect(list.google.mode).toBe("oauth");
     expect(list.google.clientId).toBe("cid.apps.googleusercontent.com");
+    expect(list.google.redirectAvailable).toBe(false);
   });
 
   it("client id 미설정이면 google 은 안전하게 비활성화되고 client id 를 노출하지 않는다", async () => {
@@ -147,5 +148,6 @@ describe("Google providerMode/clientId 노출(GIS는 client secret 불필요)", 
     expect(list.google.mode).toBe("disabled");
     expect(list.google.reason).toBe("missing-client-id");
     expect(list.google.clientId).toBeUndefined();
+    expect(list.google.redirectAvailable).toBe(false);
   });
 });

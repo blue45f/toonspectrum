@@ -129,6 +129,9 @@ describe("Google Identity Services 로그인 버튼", () => {
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Google로 다시 시도" })).toBeTruthy();
     expect(
+      screen.queryByRole("button", { name: "다른 방식으로 Google 로그인" }),
+    ).toBeNull();
+    expect(
       screen.queryByRole("button", { name: "Continue with Google" }),
     ).toBeNull();
 
@@ -139,5 +142,34 @@ describe("Google Identity Services 로그인 버튼", () => {
     expect(
       screen.getByRole("button", { name: "Continue with Google" }),
     ).toBeTruthy();
+  });
+
+  it("discloses the redirect fallback only after GIS failure when discovery authorized it", async () => {
+    const onRedirectFallback = vi.fn();
+    signInWithGoogleIdToken.mockResolvedValue({
+      ok: false,
+      error: "Google 로그인 응답을 처리하지 못했어요.",
+      status: 503,
+    });
+
+    render(
+      <GoogleIdentityButton
+        clientId="client.apps.googleusercontent.com"
+        onSuccess={vi.fn()}
+        onRedirectFallback={onRedirectFallback}
+      />,
+    );
+    await waitFor(() => expect(renderButton).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      credentialCallback?.({ credential: "header.payload.signature" });
+    });
+
+    const fallback = await screen.findByRole("button", {
+      name: "다른 방식으로 Google 로그인",
+    });
+    expect(onRedirectFallback).not.toHaveBeenCalled();
+    fireEvent.click(fallback);
+    expect(onRedirectFallback).toHaveBeenCalledTimes(1);
   });
 });

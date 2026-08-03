@@ -96,6 +96,7 @@ describe("OAuth provider 유틸", () => {
 
     expect(providerMode("google")).toBe("oauth");
     expect(isAuthorizationCodeFlowConfigured("google")).toBe(false);
+    expect(listAuthProviders().google.redirectAvailable).toBe(false);
     expect(buildAuthorizeUrl("google", "unused-state")).toBeNull();
   });
 
@@ -105,6 +106,7 @@ describe("OAuth provider 유틸", () => {
     vi.stubEnv("OAUTH_REDIRECT_BASE_URL", "https://www.toonstudio.cloud");
 
     expect(isAuthorizationCodeFlowConfigured("google")).toBe(true);
+    expect(listAuthProviders().google.redirectAvailable).toBe(true);
     const url = new URL(buildAuthorizeUrl("google", "signed-state")!);
     expect(url.origin).toBe("https://accounts.google.com");
     expect(url.searchParams.get("redirect_uri")).toBe(
