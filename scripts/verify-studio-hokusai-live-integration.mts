@@ -363,6 +363,11 @@ export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): 
     const quality = record(complete) && record(complete.quality)
       ? complete.quality
       : null;
+    // Graphite is intentionally porous: a single sampled centerline pixel can
+    // land in paper grain even when the canonical stroke is visually
+    // continuous. Charcoal and oil remain gap-free, and the separate sparse
+    // figure-eight gate proves both lobes and their alpha mass survive.
+    const maximumMaterialCenterlineGaps = expected.presetId === "pencil" ? 1 : 0;
     if (
       !quality
       || !integer(quality.nonZeroPixels, 128)
@@ -381,7 +386,8 @@ export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): 
       || quality.circleCarrierExposure > 0.48
       || !finite(quality.startBackMassRatio)
       || quality.startBackMassRatio > 0.35
-      || quality.centerlineGapsAfterStart !== 0
+      || !integer(quality.centerlineGapsAfterStart, 0)
+      || quality.centerlineGapsAfterStart > maximumMaterialCenterlineGaps
       || !finite(quality.directionalAnisotropy)
       || quality.directionalAnisotropy < 1.01
     ) {

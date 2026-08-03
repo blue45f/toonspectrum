@@ -11,6 +11,11 @@ import {
 export const STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE = 6 as const;
 export const STUDIO_HOKUSAI_LIVE_MAX_BATCH_SAMPLES = 4_096 as const;
+// Hokusai's spatial slow-tracking filter becomes geometry-destructive when a
+// mouse/legacy path has no sensor clock (or reports sub-millisecond batches).
+// A deterministic 100 Hz floor preserves sparse authored curves while staying
+// within the Studio pointer sampler's professional 120 Hz response class.
+export const STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS = 10 as const;
 export const STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION =
   "0.3.0-packed-dirty-live-adapter.2" as const;
 
@@ -364,24 +369,44 @@ export function snapshotStudioHokusaiLiveInboundMessage(
   return null;
 }
 
+export interface StudioHokusaiLivePackedSamples {
+  readonly buffer: ArrayBuffer;
+  readonly lastTimeMilliseconds: number;
+}
+
 export function packStudioHokusaiLiveSamples(
   samples: readonly StudioHokusaiLiveSampleLike[],
-): ArrayBuffer {
+  previousBatchTimeMilliseconds: number | null = null,
+): StudioHokusaiLivePackedSamples {
   if (
     samples.length === 0
     || samples.length > STUDIO_HOKUSAI_LIVE_MAX_BATCH_SAMPLES
   ) throw new Error("Hokusai live sample batch is empty or over budget.");
+  if (
+    previousBatchTimeMilliseconds !== null
+    && (
+      !Number.isFinite(previousBatchTimeMilliseconds)
+      || previousBatchTimeMilliseconds < 0
+    )
+  ) throw new Error("Hokusai live sample clock is invalid.");
   const packed = new Float32Array(samples.length * STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE);
-  let previousTime = 0;
+  let previousTime = previousBatchTimeMilliseconds
+    ?? -STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS;
   for (let index = 0; index < samples.length; index += 1) {
     const sample = samples[index]!;
+    const minimumTime = previousTime + STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS;
+    const time = Math.max(
+      0,
+      minimumTime,
+      sample.timeMilliseconds ?? minimumTime,
+    );
     const values = [
       sample.x,
       sample.y,
       sample.pressure ?? 0.5,
       sample.tiltX ?? 0,
       sample.tiltY ?? 0,
-      sample.timeMilliseconds ?? previousTime,
+      time,
     ];
     if (!values.every(Number.isFinite)) throw new Error("Hokusai live sample is not finite.");
     const offset = index * STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE;
@@ -390,11 +415,13 @@ export function packStudioHokusaiLiveSamples(
     packed[offset + 2] = Math.min(1, Math.max(0, sample.pressure ?? 0.5));
     packed[offset + 3] = Math.min(1, Math.max(-1, (sample.tiltX ?? 0) / 90));
     packed[offset + 4] = Math.min(1, Math.max(-1, (sample.tiltY ?? 0) / 90));
-    const time = Math.max(previousTime, sample.timeMilliseconds ?? previousTime);
     packed[offset + 5] = time;
     previousTime = time;
   }
-  return packed.buffer;
+  return Object.freeze({
+    buffer: packed.buffer,
+    lastTimeMilliseconds: previousTime,
+  });
 }
 
 export function studioHokusaiLiveInboundTransfers(

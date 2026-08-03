@@ -208,60 +208,6 @@ function applyOpacity(pixels: Uint8Array, opacity: number): void {
   }
 }
 
-function smoothstep(value: number): number {
-  const normalized = Math.max(0, Math.min(1, value));
-  return normalized * normalized * (3 - 2 * normalized);
-}
-
-/**
- * Suppress the exposed circular first dab without introducing a hard clip.
- *
- * The taper is evaluated in stroke-local geometry and therefore remains exact
- * when an overlapping dirty tile is regenerated. It only reduces alpha in the
- * short start carrier; RGB, the selected colour and the user's opacity remain
- * untouched and are never applied a second time.
- */
-function applyTaperedStart(
-  pixels: Uint8Array,
-  bounds: readonly [number, number, number, number],
-  stroke: ActiveStroke,
-): void {
-  if (
-    stroke.config.presetId !== "pencil"
-    && stroke.config.presetId !== "charcoal"
-    && stroke.config.presetId !== "oil"
-  ) return;
-  const start = stroke.samples[0];
-  if (!start) return;
-  const next = stroke.samples.find((sample) => (
-    Math.hypot(sample.x - start.x, sample.y - start.y) >= 0.5
-  ));
-  if (!next) return;
-  const deltaX = next.x - start.x;
-  const deltaY = next.y - start.y;
-  const distance = Math.hypot(deltaX, deltaY);
-  if (distance <= 0) return;
-  const tangentX = deltaX / distance;
-  const tangentY = deltaY / distance;
-  const radius = Math.max(1, stroke.config.radiusPixels);
-  const taperLength = radius * (stroke.config.presetId === "oil" ? 1.45 : 1.1);
-  const backLength = Math.max(0.75, radius * 0.22);
-  const [boundsX, boundsY, width, height] = bounds;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4 + 3;
-      const alpha = pixels[index] ?? 0;
-      if (alpha <= 0) continue;
-      const localX = boundsX + x + 0.5 - start.x;
-      const localY = boundsY + y + 0.5 - start.y;
-      const along = localX * tangentX + localY * tangentY;
-      if (along >= taperLength) continue;
-      const taper = smoothstep((along + backLength) / (taperLength + backLength));
-      pixels[index] = Math.round(alpha * taper);
-    }
-  }
-}
-
 function materialPlan(stroke: ActiveStroke) {
   return {
     kind: "studio-hokusai-natural-media/render-plan" as const,
@@ -397,7 +343,6 @@ async function takePackedDirtyFrame(stroke: ActiveStroke): Promise<PackedDirtyFr
     frameBounds: bounds,
     dirtyBounds: bounds,
   });
-  applyTaperedStart(owned, bounds, stroke);
   writePackedPatch(stroke.retainedPixels, stroke.config.surfaceWidth, bounds, owned);
   stroke.compositeBounds = unionBounds(stroke.compositeBounds, bounds);
   return { bounds, pixels: owned, pixelHash: await sha256(owned) };

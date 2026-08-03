@@ -32499,7 +32499,7 @@ const puppetWarpArmed =
       if (currentPageIdRef.current === state.pageId) {
         setSelectedId(transaction.transaction.selectionId);
       }
-      announceDrawingShortcut("Hokusai 자연매체 획 · 라이브와 저장 결과 일치");
+      announceDrawingShortcut("Hokusai 자연매체 획 저장 완료");
       // StudioKonvaImageNode will release the material overlay only after the exact PNG is decoded
       // and synchronously painted into the main layer. Until then the receipted live pixels stay
       // visible; there is deliberately no requestAnimationFrame timeout handoff here.

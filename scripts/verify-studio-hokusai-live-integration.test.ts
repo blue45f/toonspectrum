@@ -209,6 +209,37 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     ]));
   });
 
+  it("allows one paper-grain centerline void only for the graphite preset", () => {
+    const result = successfulResult();
+    const pencil = result.families[0]!;
+    result.families[0] = {
+      ...pencil,
+      completeReceipt: {
+        ...pencil.completeReceipt!,
+        quality: {
+          ...pencil.completeReceipt!.quality!,
+          centerlineGapsAfterStart: 1,
+        },
+      },
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(result)).toEqual([]);
+
+    const charcoal = result.families[1]!;
+    result.families[1] = {
+      ...charcoal,
+      completeReceipt: {
+        ...charcoal.completeReceipt!,
+        quality: {
+          ...charcoal.completeReceipt!.quality!,
+          centerlineGapsAfterStart: 1,
+        },
+      },
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(result)).toContain(
+      "charcoal: actual canonical pixels failed material quality gates",
+    );
+  });
+
   it("rejects three nominally passing families when their texture fingerprints collapse", () => {
     const result = successfulResult();
     const sharedQuality = {

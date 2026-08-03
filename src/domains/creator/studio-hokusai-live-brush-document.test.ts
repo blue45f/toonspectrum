@@ -188,6 +188,24 @@ describe("Studio Hokusai live document transaction", () => {
     });
   });
 
+  it("rejects a canonical receipt that did not consume every source sample", () => {
+    const original = source();
+    const partial = canonicalResult();
+    expect(createStudioHokusaiLiveCanonicalTransaction({
+      elements: [original],
+      sourceElementId: original.id,
+      expectedSourceRevision: studioHokusaiSourceRevision(original),
+      canonicalImageId: "hokusai-png-partial",
+      result: {
+        ...partial,
+        receipt: { ...partial.receipt, sampleCount: 1 },
+      },
+    })).toMatchObject({
+      ok: false,
+      code: "canonical-result-invalid",
+    });
+  });
+
   it("rejects a result when the source changed after the finalized revision", () => {
     const original = source();
     const expectedSourceRevision = studioHokusaiSourceRevision(original);

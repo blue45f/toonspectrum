@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
   STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+  STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS,
   STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE,
   packStudioHokusaiLiveSamples,
   snapshotStudioHokusaiLiveInboundMessage,
@@ -369,10 +370,11 @@ describe("Studio Hokusai live brush vertical slice", () => {
   });
 
   it("packs coalesced input into one transferable Float32 batch", () => {
-    const samples = packStudioHokusaiLiveSamples([
-      { x: 10, y: 20, pressure: 0.2, tiltX: -45, tiltY: 90, timeMilliseconds: 4 },
-      { x: 12, y: 23, pressure: 0.8, tiltX: 45, tiltY: -90, timeMilliseconds: 8 },
+    const packedBatch = packStudioHokusaiLiveSamples([
+      { x: 10, y: 20, pressure: 0.2, tiltX: -45, tiltY: 90, timeMilliseconds: 10 },
+      { x: 12, y: 23, pressure: 0.8, tiltX: 45, tiltY: -90, timeMilliseconds: 20 },
     ]);
+    const samples = packedBatch.buffer;
     const message = snapshotStudioHokusaiLiveInboundMessage({
       type: "studio-hokusai-live/append",
       version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
@@ -391,9 +393,82 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(packed).toHaveLength(12);
     expect(packed.slice(0, 2)).toEqual([10, 20]);
     expect(packed[2]).toBeCloseTo(0.2);
-    expect(packed.slice(3, 8)).toEqual([-0.5, 1, 4, 12, 23]);
+    expect(packed.slice(3, 8)).toEqual([-0.5, 1, 10, 12, 23]);
     expect(packed[8]).toBeCloseTo(0.8);
-    expect(packed.slice(9)).toEqual([0.5, -1, 8]);
+    expect(packed.slice(9)).toEqual([0.5, -1, 20]);
+    expect(packedBatch.lastTimeMilliseconds).toBe(20);
+  });
+
+  it("owns one monotonic fallback clock across missing-time append batches", async () => {
+    const worker = new FakeHokusaiLiveWorker();
+    const provider = new StudioHokusaiLiveBrushProvider({
+      workerFactory: () => worker,
+      startupTimeoutMs: 1_000,
+      finishTimeoutMs: 1_000,
+    });
+    const warming = provider.prewarm();
+    worker.ready();
+    await warming;
+    const route = provider.admitStroke(routeInput());
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    const session = await provider.beginStroke(route, {
+      strokeId: "missing-time-clock",
+      signal: new AbortController().signal,
+      onFrame: () => undefined,
+    });
+    session.append([
+      { x: 720, y: 40_000, pressure: 0.4 },
+      { x: 722, y: 40_002, pressure: 0.5 },
+    ]);
+    session.append([
+      { x: 724, y: 40_004, pressure: 0.6 },
+      { x: 726, y: 40_006, pressure: 0.7 },
+    ]);
+    const appendTimes = worker.sent
+      .map(({ message }) => message as Partial<{
+        type: string;
+        samples: ArrayBuffer;
+      }>)
+      .filter((message) => message.type === "studio-hokusai-live/append")
+      .map((message) => {
+        const values = new Float32Array(message.samples!);
+        return Array.from(
+          { length: values.length / STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE },
+          (_, index) => values[index * STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE + 5],
+        );
+      });
+    expect(appendTimes).toEqual([
+      [0, STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS],
+      [20, 30],
+    ]);
+    const firstAppend = worker.sent
+      .map(({ message }) => message as Partial<{ type: string; samples: ArrayBuffer }>)
+      .find((message) => message.type === "studio-hokusai-live/append");
+    expect(new Float32Array(firstAppend!.samples!)[2]).toBe(0);
+    provider.close();
+  });
+
+  it("repairs explicit duplicate and sub-tick timestamps without resetting between batches", () => {
+    const first = packStudioHokusaiLiveSamples([
+      { x: 10, y: 20, timeMilliseconds: 100 },
+      { x: 12, y: 22, timeMilliseconds: 100 },
+    ]);
+    const second = packStudioHokusaiLiveSamples([
+      { x: 14, y: 24, timeMilliseconds: 99 },
+      { x: 16, y: 26 },
+      { x: 18, y: 28, timeMilliseconds: 116 },
+    ], first.lastTimeMilliseconds);
+    const times = (batch: ArrayBuffer): number[] => {
+      const values = new Float32Array(batch);
+      return Array.from(
+        { length: values.length / STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE },
+        (_, index) => values[index * STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE + 5]!,
+      );
+    };
+    expect(times(first.buffer)).toEqual([100, 110]);
+    expect(times(second.buffer)).toEqual([120, 130, 140]);
+    expect(second.lastTimeMilliseconds).toBe(140);
   });
 
   it("prewarms before admission, transfers live dirty pixels and validates canonical parity", async () => {
@@ -503,7 +578,7 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(source).toContain("writePackedPatch(stroke.retainedPixels");
     expect(source).toContain("writePackedPatch(\n    stroke.rawRetainedPixels");
     expect(source).toContain("applyStudioHokusaiNaturalMediaTextureV2");
-    expect(source).toContain("applyTaperedStart");
+    expect(source).not.toContain("applyTaperedStart");
     expect(source.match(/stroke\.canvas\.fullFrame\(\)/gu)).toHaveLength(1);
     expect(source).toContain("raw acknowledged patch composition differs");
     expect(source).toContain('"settle-tail"');

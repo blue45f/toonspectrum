@@ -123,6 +123,11 @@ function abortError(): Error {
   return error;
 }
 
+function smoothstep(value: number): number {
+  const normalized = Math.max(0, Math.min(1, value));
+  return normalized * normalized * (3 - 2 * normalized);
+}
+
 function defaultWorkerFactory(): StudioHokusaiLiveWorkerLike {
   if (typeof Worker !== "function") {
     throw new Error("Dedicated Worker is unavailable.");
@@ -374,6 +379,10 @@ export class StudioHokusaiLiveStrokeSession {
   readonly #onFrame: (frame: StudioHokusaiLiveFrame) => void;
   readonly #finishTimeoutMs: number;
   #sequence = 0;
+  #lastInputTimeMilliseconds: number | null = null;
+  #startTaperTravelPixels = 0;
+  #startTaperLastPoint: Readonly<{ x: number; y: number }> | null = null;
+  #startTaperComplete = false;
   #lastPresentedSequence = 0;
   #settleTailPresented = false;
   #begun = false;
@@ -435,7 +444,36 @@ export class StudioHokusaiLiveStrokeSession {
       this.fail(error);
       throw error;
     }
-    const packed = packStudioHokusaiLiveSamples(samples);
+    // Taper the physical carrier through pressure provenance rather than a
+    // post-render spatial mask. A mask cannot distinguish a later crossing
+    // from the first dab and used to punch holes in figure-eight strokes.
+    const taperLength = Math.max(
+      1,
+      this.#config.radiusPixels * (this.#config.presetId === "oil" ? 1.45 : 1.1),
+    );
+    const rendererSamples = samples.map((sample) => {
+      if (this.#startTaperComplete) return sample;
+      if (this.#startTaperLastPoint) {
+        this.#startTaperTravelPixels += Math.hypot(
+          sample.x - this.#startTaperLastPoint.x,
+          sample.y - this.#startTaperLastPoint.y,
+        );
+      }
+      this.#startTaperLastPoint = { x: sample.x, y: sample.y };
+      const progress = this.#startTaperTravelPixels / taperLength;
+      if (progress >= 1) {
+        this.#startTaperComplete = true;
+        return sample;
+      }
+      return {
+        ...sample,
+        pressure: (sample.pressure ?? 0.5) * smoothstep(progress),
+      };
+    });
+    const packed = packStudioHokusaiLiveSamples(
+      rendererSamples,
+      this.#lastInputTimeMilliseconds,
+    );
     this.#sequence += 1;
     this.#post({
       type: "studio-hokusai-live/append",
@@ -446,8 +484,9 @@ export class StudioHokusaiLiveStrokeSession {
       sequence: this.#sequence,
       sampleCount: samples.length,
       sampleStride: 6,
-      samples: packed,
+      samples: packed.buffer,
     });
+    this.#lastInputTimeMilliseconds = packed.lastTimeMilliseconds;
     return this.#sequence;
   }
 

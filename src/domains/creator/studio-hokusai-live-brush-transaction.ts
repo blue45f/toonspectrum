@@ -152,6 +152,7 @@ export function createStudioHokusaiLiveCanonicalTransaction(input: Readonly<{
   const pngSrc = studioHokusaiLiveCanonicalPngDataUrl(input.result.pngBytes);
   if (
     receipt.strokeId !== source.id
+    || receipt.sampleCount !== source.points.length / 2
     || receipt.segmentCount !== 1
     || !segment
     || segment.segmentIndex !== finalFrame.segmentIndex

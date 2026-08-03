@@ -6,6 +6,10 @@ import {
   type StudioHokusaiLiveFrame,
 } from "../src/domains/creator/studio-hokusai-live-brush-runtime";
 
+import type {
+  StudioHokusaiLiveSampleLike,
+} from "../src/domains/creator/studio-hokusai-live-brush-protocol";
+
 declare global {
   interface Window {
     __studioHokusaiLiveQualityResult?: unknown;
@@ -142,6 +146,22 @@ function qualityStrokeSamples(): ReturnType<typeof longStrokeSamples> {
       tiltX: Math.sin(progress * Math.PI * 2) * 35,
       tiltY: Math.cos(progress * Math.PI * 2) * 26,
       timeMilliseconds: index * 3,
+    };
+  });
+}
+
+function sparseFigureEightSamples(): StudioHokusaiLiveSampleLike[] {
+  return Array.from({ length: 24 }, (_, index) => {
+    const angle = Math.PI * 2 * index / 23;
+    return {
+      x: 512 + 270 * Math.sin(angle),
+      y: 160 + 72 * Math.sin(angle * 2),
+      pressure: 0.72,
+      tiltX: 0,
+      tiltY: 0,
+      // Deliberately omit timeMilliseconds. Mouse and legacy input do not
+      // persist the v2 sensor clock, but a sparse curve must still retain its
+      // complete geometry across multiple incremental append batches.
     };
   });
 }
@@ -523,6 +543,115 @@ async function renderQualityFamily(
   };
 }
 
+async function renderSparseFigureEightCoverage(
+  provider: StudioHokusaiLiveBrushProvider,
+): Promise<Readonly<{
+  sampleCount: number;
+  receiptSampleCount: number;
+  leftCoverage: number;
+  rightCoverage: number;
+  leftAlphaMassRatio: number;
+  rightAlphaMassRatio: number;
+  sourceBounds: readonly [number, number, number, number];
+  canonicalBounds: readonly [number, number, number, number];
+  browserComposedExactCanonical: boolean;
+}>> {
+  const samples = sparseFigureEightSamples();
+  const route = provider.admitStroke({
+    brushId: "crayon",
+    catalogId: "crayon",
+    documentWidth: QUALITY_WIDTH,
+    documentHeight: QUALITY_HEIGHT,
+    firstX: samples[0]!.x,
+    firstY: samples[0]!.y,
+    radiusPixels: 14,
+    color: "#7455a8",
+    opacity: 0.88,
+    seed: 0x51a7_8e11,
+  });
+  if (route.status !== "ready") throw new Error("Sparse figure-eight route was not ready.");
+  const composed = new Uint8Array(
+    route.config.surfaceWidth * route.config.surfaceHeight * 4,
+  );
+  const session = await provider.beginStroke(route, {
+    strokeId: "quality-sparse-figure-eight",
+    signal: new AbortController().signal,
+    onFrame: (frame) => writePatch(composed, route.config.surfaceWidth, frame),
+  });
+  session.append(samples.slice(0, 1));
+  for (let offset = 1; offset < samples.length; offset += 4) {
+    session.append(samples.slice(offset, offset + 4));
+  }
+  const canonical = await session.finish();
+  const [, , dirtyWidth, dirtyHeight] = canonical.finalFrame.dirtyBounds;
+  const placement = canonical.finalFrame.logicalPlacement;
+  const composedCrop = crop(
+    composed,
+    route.config.surfaceWidth,
+    canonical.finalFrame.dirtyBounds,
+  );
+  const coverage = (side: "left" | "right"): number => {
+    const candidates = samples.filter(({ x }) => (
+      side === "left" ? x < 492 : x > 532
+    ));
+    const covered = candidates.filter(({ x, y }) => (
+      alphaAt(
+        canonical.finalFrame.pixels,
+        dirtyWidth,
+        dirtyHeight,
+        x - placement.x,
+        y - placement.y,
+        24,
+      ) > 0
+    ));
+    return covered.length / Math.max(1, candidates.length);
+  };
+  const xs = samples.map(({ x }) => x);
+  const ys = samples.map(({ y }) => y);
+  let totalAlphaMass = 0;
+  let leftAlphaMass = 0;
+  let rightAlphaMass = 0;
+  for (let y = 0; y < dirtyHeight; y += 1) {
+    for (let x = 0; x < dirtyWidth; x += 1) {
+      const alpha = canonical.finalFrame.pixels[(y * dirtyWidth + x) * 4 + 3] ?? 0;
+      totalAlphaMass += alpha;
+      const documentX = placement.x + x;
+      if (documentX < 492) leftAlphaMass += alpha;
+      if (documentX > 532) rightAlphaMass += alpha;
+    }
+  }
+  await drawCanonicalPng(
+    canvas("quality-sparse-figure-eight"),
+    canonical.pngBytes,
+    placement,
+    1,
+  );
+  return {
+    sampleCount: samples.length,
+    receiptSampleCount: canonical.receipt.sampleCount,
+    leftCoverage: coverage("left"),
+    rightCoverage: coverage("right"),
+    leftAlphaMassRatio: leftAlphaMass / Math.max(1, totalAlphaMass),
+    rightAlphaMassRatio: rightAlphaMass / Math.max(1, totalAlphaMass),
+    sourceBounds: [
+      Math.min(...xs),
+      Math.min(...ys),
+      Math.max(...xs),
+      Math.max(...ys),
+    ],
+    canonicalBounds: [
+      placement.x,
+      placement.y,
+      placement.x + dirtyWidth,
+      placement.y + dirtyHeight,
+    ],
+    browserComposedExactCanonical: equalBytes(
+      composedCrop,
+      canonical.finalFrame.pixels,
+    ),
+  };
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
@@ -730,6 +859,7 @@ async function main(): Promise<void> {
     for (const presetId of ["pencil", "charcoal", "oil"] as const) {
       materialFamilies.push(await renderQualityFamily(provider, presetId));
     }
+    const sparseFigureEightCoverage = await renderSparseFigureEightCoverage(provider);
 
     const liveFrames = frameMetrics.filter(({ phase }) => phase === "live");
     const tailFrames = frameMetrics.filter(({ phase }) => phase === "settle-tail");
@@ -789,6 +919,7 @@ async function main(): Promise<void> {
         recoveryEngineEpoch: recoveryResult.receipt.engineEpoch,
       },
       materialFamilies,
+      sparseFigureEightCoverage,
     };
   } finally {
     mainThreadDelayTracker.stop();

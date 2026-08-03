@@ -52,6 +52,8 @@ canvas{display:block;width:100%;height:auto}
 <div class="frame"><canvas id="quality-pencil" width="1024" height="320"></canvas></div>
 <div class="frame"><canvas id="quality-charcoal" width="1024" height="320"></canvas></div>
 <div class="frame"><canvas id="quality-oil" width="1024" height="320"></canvas></div></section>
+<section class="card" id="sparse-card"><h2>시간 채널 없는 희소 8자 획 · canonical</h2>
+<div class="frame"><canvas id="quality-sparse-figure-eight" width="1024" height="320"></canvas></div></section>
 </div><script type="module" src="${ENTRY}"></script></body></html>`;
 }
 
@@ -181,6 +183,24 @@ function validate(result, diagnostics) {
     ) failures.push(`${presetId} material quality/continuity gate failed`);
   }
   if (hashes.size !== 3) failures.push("pencil/charcoal/oil material outputs are not distinct");
+  const sparse = result.sparseFigureEightCoverage;
+  if (
+    sparse?.sampleCount !== 24
+    || sparse.receiptSampleCount !== sparse.sampleCount
+    || sparse.browserComposedExactCanonical !== true
+    || !Number.isFinite(sparse.leftCoverage)
+    || sparse.leftCoverage < 0.75
+    || !Number.isFinite(sparse.rightCoverage)
+    || sparse.rightCoverage < 0.75
+    || !Number.isFinite(sparse.leftAlphaMassRatio)
+    || sparse.leftAlphaMassRatio < 0.15
+    || !Number.isFinite(sparse.rightAlphaMassRatio)
+    || sparse.rightAlphaMassRatio < 0.15
+    || !Array.isArray(sparse.sourceBounds)
+    || !Array.isArray(sparse.canonicalBounds)
+    || sparse.canonicalBounds[0] > sparse.sourceBounds[0] + 14
+    || sparse.canonicalBounds[2] < sparse.sourceBounds[2] - 14
+  ) failures.push("sparse mouse figure-eight lost authored geometry at canonical commit");
   const oil = families.find((candidate) => candidate?.presetId === "oil")?.metrics;
   const charcoal = families.find((candidate) => candidate?.presetId === "charcoal")?.metrics;
   if (
@@ -253,6 +273,7 @@ async function main() {
     await page.locator("#live-card").screenshot({ path: join(EVIDENCE_ROOT, "final-live-composition.png") });
     await page.locator("#canonical-card").screenshot({ path: join(EVIDENCE_ROOT, "final-canonical-png.png") });
     await page.locator("#material-card").screenshot({ path: join(EVIDENCE_ROOT, "material-family-canonical.png") });
+    await page.locator("#sparse-card").screenshot({ path: join(EVIDENCE_ROOT, "sparse-figure-eight-canonical.png") });
     await page.screenshot({ path: join(EVIDENCE_ROOT, "live-quality-full.png"), fullPage: true });
     const failures = validate(result, diagnostics);
     const summary = {
