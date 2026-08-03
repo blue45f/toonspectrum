@@ -15,8 +15,8 @@ overrides:
   '@fastify/middie': '>=9.3.2'
   fastify: '>=5.7.2'
   fast-uri@>=3.0.0 <3.1.4: 3.1.4
-  minimatch@3.1.5>brace-expansion: 5.0.8
-  brace-expansion@>=3.0.0 <5.0.8: 5.0.8
+  minimatch@3.1.5>brace-expansion: 5.0.9
+  brace-expansion@>=3.0.0 <5.0.9: 5.0.9
   js-yaml@>=4.0.0 <4.3.0: 4.3.0
   postcss@<=8.5.17: 8.5.18
   sharp@<0.35.0: 0.35.2
@@ -3471,6 +3471,11 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  acorn@8.18.0:
+    resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
   ag-psd@31.0.1:
     resolution: {integrity: sha512-/byWVGIrKv0Jqq3lleaRji2QdrCsAhbG4Ansc9nWkH1ghOBbujnhdlRXMfK2A750mInXbPLsgpHhrtfq9lLWkA==}
 
@@ -3626,8 +3631,8 @@ packages:
     resolution: {integrity: sha512-oP5VkATKlNwcgvxi0vM0p/D3n2C3EReYVX+DNYs5TjZFn/oQt2j+4sVJtSMr18pdRr8wjTcBl6LoV+FUwzPmNA==}
     engines: {node: '>=18'}
 
-  brace-expansion@5.0.8:
-    resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
+  brace-expansion@5.0.9:
+    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
   braces@3.0.3:
@@ -5577,6 +5582,9 @@ packages:
 
   pako@2.1.0:
     resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
   paper@0.12.18:
     resolution: {integrity: sha512-ZSLIEejQTJZuYHhSSqAf4jXOnii0kPhCJGAnYAANtdS72aNwXJ9cP95tZHgq1tnNpvEwgQhggy+4OarviqTCGw==}
@@ -9542,9 +9550,11 @@ snapshots:
 
   acorn-walk@8.3.5:
     dependencies:
-      acorn: 8.16.0
+      acorn: 8.18.0
 
   acorn@8.16.0: {}
+
+  acorn@8.18.0: {}
 
   ag-psd@31.0.1:
     dependencies:
@@ -9716,7 +9726,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  brace-expansion@5.0.8:
+  brace-expansion@5.0.9:
     dependencies:
       balanced-match: 4.0.4
 
@@ -11565,11 +11575,11 @@ snapshots:
 
   minimatch@10.2.5:
     dependencies:
-      brace-expansion: 5.0.8
+      brace-expansion: 5.0.9
 
   minimatch@3.1.5(patch_hash=fe761a9f2ee67f36ecef95437aff71cccde54f98d08053c41eb3f815a907be71):
     dependencies:
-      brace-expansion: 5.0.8
+      brace-expansion: 5.0.9
 
   minimist@1.2.8: {}
 
@@ -11831,7 +11841,7 @@ snapshots:
     dependencies:
       '@davepagurek/bezier-path': 0.0.7
       '@japont/unicode-range': 1.0.0
-      acorn: 8.16.0
+      acorn: 8.18.0
       acorn-walk: 8.3.5
       colorjs.io: 0.6.1
       escodegen: 2.1.0
@@ -11840,10 +11850,12 @@ snapshots:
       i18next-browser-languagedetector: 4.3.1
       libtess: 1.2.2
       omggif: 1.0.10
-      pako: 2.1.0
+      pako: 2.2.0
       zod: 4.4.3
 
   pako@2.1.0: {}
+
+  pako@2.2.0: {}
 
   paper@0.12.18: {}
 
