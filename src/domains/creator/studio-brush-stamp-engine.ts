@@ -31,15 +31,12 @@ export function resolveStudioStampBrushKind(
 ): StudioStampBrushKind | null {
   switch (brushId) {
     case "ink-brush":
-    case "inkwash-pen":
       return "ink";
     case "airbrush-fine":
       return "airbrush";
     case "pencil-grain":
       return "pencil";
     case "wash-brush":
-    case "inkwash-water-brush":
-    case "inkwash-bleed-wash":
       return "watercolor";
     case "mypaint-smudge-oil":
     case "mypaint-watercolor-expressive":
