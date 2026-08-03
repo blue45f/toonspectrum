@@ -27,6 +27,7 @@ describe("database integration runner CI policy", () => {
 
   it("runs disposable Redis integration after root tests and before the build", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
+    const verifyJob = workflow.jobs?.verify;
     const steps = workflow.jobs?.verify?.steps ?? [];
     const commands = steps
       .map((step) => step.run)
@@ -41,6 +42,14 @@ describe("database integration runner CI policy", () => {
     expect(
       commands.filter((command) => command === "pnpm run test:redis:integration"),
     ).toHaveLength(1);
+
+    const rootTestStep = steps.find((step) => step.run === "pnpm run test");
+    expect(verifyJob?.["timeout-minutes"]).toBe(75);
+    expect(rootTestStep).toMatchObject({
+      name: "Run the complete root Vitest suite with per-file progress",
+      "timeout-minutes": 40,
+      run: "pnpm run test",
+    });
   });
 
   it("derives migration summary expectations from the canonical manifest", () => {

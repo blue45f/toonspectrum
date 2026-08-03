@@ -223,9 +223,9 @@ function createHarness(runtime: FakeModule) {
 }
 
 describe("Studio p5.brush standalone concrete adapter", () => {
-  it("advertises the five proven artistic techniques at adapter revision 6", async () => {
+  it("advertises the five proven artistic techniques at adapter revision 7", async () => {
     expect(STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION).toBe(
-      "2.2.1-adapter.6",
+      "2.2.1-adapter.7",
     );
     expect(STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES).toEqual([
       "procedural:flow-field",

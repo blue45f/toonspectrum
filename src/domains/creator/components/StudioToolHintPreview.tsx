@@ -6,10 +6,8 @@ import {
 } from "react";
 
 import { STUDIO_PALETTES } from "../studio-color-palettes";
-import {
-  STUDIO_COLOR_VISION_COACH_GRAYSCALE_SATURATION,
-  STUDIO_COLOR_VISION_COACH_MATRIX,
-} from "../studio-color-vision-coach";
+
+import { StudioColorVisionHintPreview } from "./StudioColorVisionHintPreview";
 
 import type {
   StudioToolHintPreviewKind,
@@ -3256,95 +3254,6 @@ function FlipViewPreview({
   );
 }
 
-type ColorVisionPreviewMode =
-  | "original"
-  | "grayscale"
-  | "protanopia"
-  | "deuteranopia"
-  | "tritanopia";
-
-const COLOR_VISION_ORIGINAL = [
-  "oklch(0.72 0.185 42)",
-  "oklch(0.8 0.15 150)",
-  "oklch(0.76 0.13 245)",
-  "oklch(0.84 0.14 90)",
-] as const;
-
-function colorVisionModeFromVariant(variant: string): ColorVisionPreviewMode {
-  if (previewVariantMatches(variant, "grayscale")) return "grayscale";
-  if (previewVariantMatches(variant, "protanopia")) return "protanopia";
-  if (previewVariantMatches(variant, "deuteranopia")) return "deuteranopia";
-  if (previewVariantMatches(variant, "tritanopia")) return "tritanopia";
-  return "original";
-}
-
-function ColorVisionScene({
-  x,
-  palette,
-  filterId,
-}: {
-  x: number;
-  palette: readonly string[];
-  filterId?: string;
-}): ReactElement {
-  return (
-    <g transform={`translate(${x} 18)`} filter={filterId ? `url(#${filterId})` : undefined}>
-      <rect width="68" height="68" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
-      <circle cx="20" cy="20" r="8" fill={palette[0]} />
-      <path d="M9 53 27 34l13 12 9-8 11 15" fill={palette[2]} fillOpacity=".3" stroke={palette[2]} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      <rect x="8" y="57" width="12" height="5" rx="2" fill={palette[0]} />
-      <rect x="22" y="57" width="12" height="5" rx="2" fill={palette[1]} />
-      <rect x="36" y="57" width="12" height="5" rx="2" fill={palette[2]} />
-      <rect x="50" y="57" width="10" height="5" rx="2" fill={palette[3]} />
-    </g>
-  );
-}
-
-function ColorVisionPreview({
-  animate,
-  variant,
-  filterId,
-}: {
-  animate: boolean;
-  variant: string;
-  filterId: string;
-}): ReactElement {
-  const mode = colorVisionModeFromVariant(variant);
-  const restoreOriginal = mode === "original";
-  const matrixMode = mode === "protanopia" || mode === "deuteranopia" || mode === "tritanopia"
-    ? mode
-    : null;
-  const sourceFilterId = restoreOriginal ? filterId : undefined;
-  const resultFilterId = restoreOriginal ? undefined : filterId;
-  return (
-    <g data-preview-operation={`color-vision-${mode}`}>
-      {sourceFilterId || resultFilterId ? (
-        <defs>
-          <filter id={filterId} colorInterpolationFilters="linearRGB">
-            {mode === "grayscale" || restoreOriginal ? (
-              <feColorMatrix type="saturate" values={STUDIO_COLOR_VISION_COACH_GRAYSCALE_SATURATION} />
-            ) : matrixMode ? (
-              <feColorMatrix type="matrix" values={STUDIO_COLOR_VISION_COACH_MATRIX[matrixMode]} />
-            ) : null}
-          </filter>
-        </defs>
-      ) : null}
-      <ColorVisionScene x={25} palette={COLOR_VISION_ORIGINAL} filterId={sourceFilterId} />
-      <path d="M98 52h19m-6-6 6 6-6 6" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">
-        {animate ? <animate attributeName="opacity" dur="2.6s" values=".28;1;1;.28" keyTimes="0;.35;.72;1" repeatCount="indefinite" /> : null}
-      </path>
-      <g opacity={animate ? ".28" : "1"}>
-        <ColorVisionScene x={123} palette={COLOR_VISION_ORIGINAL} filterId={resultFilterId} />
-        {animate ? <animate attributeName="opacity" dur="2.6s" values=".28;.28;1;1;.28" keyTimes="0;.22;.48;.78;1" repeatCount="indefinite" /> : null}
-      </g>
-      <rect x="137" y="8" width="40" height="17" rx="7" fill={COLOR.raised} stroke={mode === "original" ? COLOR.accent : COLOR.fg2} strokeWidth="1.2" />
-      <text x="157" y="19.5" fill={mode === "original" ? COLOR.accent : COLOR.fg2} fontSize="8" fontWeight="800" textAnchor="middle">
-        {mode === "original" ? "ORIGINAL" : mode === "grayscale" ? "VALUE" : `CVD ${mode === "protanopia" ? "P" : mode === "deuteranopia" ? "D" : "T"}`}
-      </text>
-    </g>
-  );
-}
-
 function DismissPreview({ animate }: { animate: boolean }): ReactElement {
   return (
     <g data-preview-operation="dismiss">
@@ -4771,7 +4680,7 @@ function renderPreview(
     case "view-hud":
       return <ViewHudPreview animate={animate} variant={variant} />;
     case "color-vision":
-      return <ColorVisionPreview animate={animate} variant={variant} filterId={`${id}-color-vision`} />;
+      return <StudioColorVisionHintPreview animate={animate} variant={variant} filterId={`${id}-color-vision`} />;
     case "dismiss":
       return <DismissPreview animate={animate} />;
     case "history":

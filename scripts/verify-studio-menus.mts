@@ -3,7 +3,7 @@
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
  * Desktop IA (Magma-style):
- * - Visible: app menubar + MainMenu (파일/편집/삽입/보기/필터/그리기/AI) + left tool rail
+ * - Visible: app menubar + MainMenu (파일/편집/삽입/보기/필터/그리기/AI/도움말) + left tool rail
  * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
@@ -60,7 +60,6 @@ const MAIN_MENU: Record<string, string[]> = {
     "실제 픽셀 (100%)",
     "전체화면",
     "캔버스만",
-    "단축키 도움말",
   ],
   필터: [
     "가우시안 블러",
@@ -71,6 +70,7 @@ const MAIN_MENU: Record<string, string[]> = {
   ],
   그리기: ["펜", "지우개", "채우기", "스마트 도형", "배경 · 톤", "팔레트 · 브랜드"],
   AI: ["AI 어시스트", "스톡 이미지", "연동 설정"],
+  도움말: ["사용법 · 기능 튜토리얼", "단축키 · 기본 조작"],
 };
 
 /** Left vertical rail — primary tool surface on desktop. */

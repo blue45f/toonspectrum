@@ -27,7 +27,7 @@ const SCRATCH =
 const HARNESS_PATH = "/__studio_p5_brush_real_runtime__";
 const HARNESS_ENTRY = "/scripts/studio-p5-brush-real-runtime-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;
-const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.6";
+const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.7";
 const EXPECTED_CASE_IDS = [
   "flow-field",
   "hatch",

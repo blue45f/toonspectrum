@@ -3,6 +3,7 @@ import {
   Suspense,
   lazy,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -17,6 +18,8 @@ import {
 } from "../studio-tool-hint-position";
 import { studioToolHintPreviewSpecFromRuntime } from "../studio-tool-hint-preview-kind";
 import { studioToolHintPreview } from "../studio-tool-hint-preview-routing";
+
+import { StudioColorVisionHintPreview } from "./StudioColorVisionHintPreview";
 
 import type { StudioToolHintSpec } from "../studio-tool-hints";
 
@@ -67,6 +70,8 @@ function StudioToolHintPreviewFallback({
   preview: string;
   variant: string;
 }): ReactElement {
+  const fallbackId = `studio-tool-preview-fallback-${useId().replaceAll(":", "")}`;
+  const colorVisionPreview = preview === "color-vision";
   return (
     <svg
       data-studio-tool-hint-preview={preview}
@@ -88,15 +93,25 @@ function StudioToolHintPreviewFallback({
         fill="var(--color-card)"
         stroke="var(--color-line)"
       />
-      <path
-        d="M28 77c28-39 49 5 75-19 24-22 48-20 84-5"
-        fill="none"
-        stroke="var(--color-line-strong)"
-        strokeLinecap="round"
-        strokeWidth="3"
-        opacity=".55"
-      />
-      <circle cx="28" cy="77" r="3" fill="var(--color-accent)" opacity=".72" />
+      {colorVisionPreview ? (
+        <StudioColorVisionHintPreview
+          animate={false}
+          variant={variant}
+          filterId={`${fallbackId}-color-vision`}
+        />
+      ) : (
+        <>
+          <path
+            d="M28 77c28-39 49 5 75-19 24-22 48-20 84-5"
+            fill="none"
+            stroke="var(--color-line-strong)"
+            strokeLinecap="round"
+            strokeWidth="3"
+            opacity=".55"
+          />
+          <circle cx="28" cy="77" r="3" fill="var(--color-accent)" opacity=".72" />
+        </>
+      )}
     </svg>
   );
 }

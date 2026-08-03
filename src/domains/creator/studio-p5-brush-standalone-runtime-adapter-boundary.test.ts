@@ -47,7 +47,7 @@ describe("Studio p5.brush standalone adapter bundle boundary", () => {
   });
 
   it("keeps the runtime settled-only, Worker-isolated and non-authoritative", () => {
-    expect(source).toContain('"2.2.1-adapter.6"');
+    expect(source).toContain('"2.2.1-adapter.7"');
     expect(source).toContain('"execution:settled-only"');
     expect(source).toContain('"surface:offscreen-canvas"');
     expect(source).toContain('"gpu:webgl2"');

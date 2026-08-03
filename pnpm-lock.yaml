@@ -34,6 +34,7 @@ overrides:
 patchedDependencies:
   '@react-three/fiber@9.6.1': 68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222
   minimatch@3.1.5: fe761a9f2ee67f36ecef95437aff71cccde54f98d08053c41eb3f815a907be71
+  p5.brush@2.2.1: 6b307bc36f52c10edfb448c81f93799eeba30e77015abf4031960ce9907a78cb
 
 importers:
 
@@ -179,7 +180,7 @@ importers:
         version: 1.1.1
       p5.brush:
         specifier: 2.2.1
-        version: 2.2.1(p5@2.3.1)
+        version: 2.2.1(patch_hash=6b307bc36f52c10edfb448c81f93799eeba30e77015abf4031960ce9907a78cb)(p5@2.3.1)
       paper:
         specifier: 0.12.18
         version: 0.12.18
@@ -11821,7 +11822,7 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
-  p5.brush@2.2.1(p5@2.3.1):
+  p5.brush@2.2.1(patch_hash=6b307bc36f52c10edfb448c81f93799eeba30e77015abf4031960ce9907a78cb)(p5@2.3.1):
     dependencies:
       p5: 2.3.1
       simplex-noise: 4.0.3

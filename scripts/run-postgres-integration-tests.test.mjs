@@ -188,11 +188,14 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs exactly the nine direct PostgreSQL suites without file parallelism", () => {
-    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(9);
-    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 9);
+  it("runs exactly the ten direct PostgreSQL suites without file parallelism", () => {
+    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(10);
+    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 10);
     expect(POSTGRES_INTEGRATION_SUITES).toContain(
       "scripts/bootstrap-runtime-login-gate.integration.test.mjs",
+    );
+    expect(POSTGRES_INTEGRATION_SUITES).toContain(
+      "lib/__tests__/oauth-runtime.integration.test.ts",
     );
     expect(
       POSTGRES_INTEGRATION_SUITES.every((suite) =>

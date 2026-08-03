@@ -28,7 +28,12 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The complete root suite contains broad Studio/browser and disposable-DB gates. On the
+    # GitHub runner, checkout/install/lint/typecheck consume about 9 minutes before Vitest starts,
+    # so the old 25-minute job limit cancelled Vitest mid-run and hid its final failure summary.
+    # Keep a bounded per-step budget for Vitest while leaving enough time for the post-test runtime
+    # and production-build gates. Raising this ceiling does not skip or weaken any check.
+    timeout-minutes: 75
     # DB-backed 테스트(community 등)는 PostgreSQL을 사용한다(libSQL 파일 → Postgres 마이그레이션).
     services:
       postgres:
@@ -197,7 +202,9 @@ jobs:
             node scripts/verify-production-database-capabilities.mjs \
               --runtime-database-role webdex_runtime \
               --allow-loopback
-      - run: pnpm run test
+      - name: Run the complete root Vitest suite with per-file progress
+        timeout-minutes: 40
+        run: pnpm run test
       # The root Vitest run intentionally skips Redis without a disposable target.
       # This runner owns a password-protected loopback container and always removes it.
       - name: Verify distributed Redis coordination against a disposable instance

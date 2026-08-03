@@ -48,7 +48,10 @@ inventory nevertheless includes pnpm's automatically resolved `p5` peer and
 its `libtess` dependency, so their upstream LGPL-2.1 and SGI-B-2.0 notices
 remain in the generated artifact. This records dependency resolution without
 claiming that the `p5` application entry or `libtess` is bundled into the
-Studio standalone-brush chunk.
+Studio standalone-brush chunk. The MIT-licensed `p5.brush` archive carries a
+local deterministic finite-difference fill-compositor patch: it replaces an
+undefined fragment-quad derivative at translucent fill edges while retaining
+the upstream spectral pigment blend, public API, attribution, and license.
 
 The checked-in `studio-hokusai-wasm` wrapper uses a Cargo v4 lockfile and exact
 manifest pins: `hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem` are

@@ -85,3 +85,4 @@ peerDependencyRules:
 patchedDependencies:
   '@react-three/fiber@9.6.1': patches/@react-three__fiber@9.6.1.patch
   'minimatch@3.1.5': patches/minimatch@3.1.5.patch
+  p5.brush@2.2.1: patches/p5.brush@2.2.1.patch

@@ -9,6 +9,7 @@ import {
   HttpException,
   HttpStatus,
   Inject,
+  Logger,
   Param,
   Post,
   Query,
@@ -107,6 +108,7 @@ const AUTH_RATE_LIMIT_LOCAL_LIMITER = new LocalAuthRateLimiter();
 
 @Controller("auth")
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
   private readonly rateLimitDistributed: boolean;
   private readonly clientIpPolicy: AuthClientIpPolicy;
   private readonly coordination: UpstashCoordinationPort | null;
@@ -215,6 +217,11 @@ export class AuthController {
       const user = await handleOAuthCallback(provider, code);
       return res.redirect(`${web}/auth/callback#t=${issueHandoff(user)}`);
     } catch {
+      this.logOAuthFailure(
+        "authorization-code",
+        provider,
+        "authorization-code-processing-failed",
+      );
       return res.redirect(`${web}/auth/callback#error=oauth_failed`);
     }
   }
@@ -253,6 +260,11 @@ export class AuthController {
         throw new ForbiddenException({ error: err.publicMessage });
       }
       // DB·외부 라이브러리의 내부 오류 메시지나 자격 증명 세부정보는 응답에 노출하지 않는다.
+      this.logOAuthFailure(
+        "google-id-token",
+        "google",
+        "google-id-token-persistence-failed",
+      );
       throw new ServiceUnavailableException({
         error: "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
       });
@@ -263,6 +275,25 @@ export class AuthController {
       ok: true,
       user: authResponseUser(user),
     };
+  }
+
+  /**
+   * Keep production OAuth failures diagnosable without logging authorization
+   * codes, ID tokens, provider payloads, email addresses, or database details.
+   */
+  private logOAuthFailure(
+    flow: "authorization-code" | "google-id-token",
+    provider: string,
+    reasonCode:
+      | "authorization-code-processing-failed"
+      | "google-id-token-persistence-failed",
+  ): void {
+    this.logger.error({
+      event: "auth.oauth.failure",
+      flow,
+      provider: provider.slice(0, 24),
+      reasonCode,
+    });
   }
 
   // 핸드오프 토큰 → HttpOnly 쿠키 세션 + 공개 사용자 객체. 핸드오프는 1회용이다.

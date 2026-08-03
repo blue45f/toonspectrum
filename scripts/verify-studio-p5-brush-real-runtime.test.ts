@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
@@ -69,7 +70,7 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(protocol).toContain('"watercolor-fill"');
     expect(protocol).toContain('"flat-wash"');
     expect(verifier).toContain(
-      'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.6"',
+      'const EXPECTED_ADAPTER_VERSION = "2.2.1-adapter.7"',
     );
     expect(verifier).toContain("const EXPECTED_SURFACE_COUNT = 10");
     expect(verifier).toContain("const EXPECTED_RENDER_WORKER_COUNT = 10");
@@ -119,6 +120,25 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     );
   });
 
+  it("ships the deterministic finite-difference fill compositor in the resolved standalone bundle", () => {
+    const standaloneBundle = readFileSync(
+      fileURLToPath(import.meta.resolve("p5.brush/standalone")),
+      "utf8",
+    );
+    const dependencyPatch = source("patches/p5.brush@2.2.1.patch");
+    const workspace = source("pnpm-workspace.yaml");
+
+    expect(workspace).toContain(
+      "p5.brush@2.2.1: patches/p5.brush@2.2.1.patch",
+    );
+    expect(dependencyPatch).toContain("finiteMaskGradient");
+    expect(dependencyPatch).toContain("textureLod(u_mask");
+    expect(standaloneBundle).toContain("finiteMaskGradient");
+    expect(standaloneBundle).toContain("textureLod(u_mask");
+    expect(standaloneBundle).not.toContain("dFdx(");
+    expect(standaloneBundle).not.toContain("dFdy(");
+  });
+
   it("keeps standalone runtime and resolved-peer license roles explicit", () => {
     const notice = source("THIRD_PARTY_NOTICES.md");
     const generator = source("scripts/generate-third-party-notices.mjs");
@@ -133,6 +153,9 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     );
     expect(notice).toContain(
       "does not statically import the resolved `p5` peer",
+    );
+    expect(notice).toContain(
+      "deterministic finite-difference fill-compositor patch",
     );
     expect(generator).toContain(
       '"https://github.com/dulnan/lazy-brush"',

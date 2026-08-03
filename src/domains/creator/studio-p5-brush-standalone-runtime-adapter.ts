@@ -18,7 +18,7 @@ import {
 } from "./studio-procedural-artistic-brush-provider";
 
 export const STUDIO_P5_BRUSH_STANDALONE_ADAPTER_VERSION =
-  "2.2.1-adapter.6" as const;
+  "2.2.1-adapter.7" as const;
 
 export const STUDIO_P5_BRUSH_STANDALONE_CAPABILITIES = Object.freeze([
   "procedural:flow-field",

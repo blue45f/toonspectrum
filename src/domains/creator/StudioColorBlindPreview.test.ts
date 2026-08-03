@@ -129,4 +129,31 @@ describe("colorBlindFilterStyle", () => {
       expect(document.querySelector('[data-preview-operation="color-vision-original"]')).toBeNull();
     });
   });
+
+  it("does not let an older lazy color preview reclaim the exclusive tooltip lane", async () => {
+    render(createElement(StudioColorBlindPreviewToggle, {
+      value: "none",
+      onChange: vi.fn(),
+    }));
+
+    const original = screen.getByRole("radio", {
+      name: "색각 미리보기 끄기 · 원본 색상",
+    });
+    const tritanopia = screen.getByRole("radio", {
+      name: "3형 청황 색각 시뮬레이션 · 근사치",
+    });
+
+    original.focus();
+    tritanopia.focus();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+      expect(
+        document.querySelector('[data-preview-operation="color-vision-tritanopia"]')
+      ).not.toBeNull();
+      expect(
+        document.querySelector('[data-preview-operation="color-vision-original"]')
+      ).toBeNull();
+    });
+  });
 });
