@@ -19,9 +19,13 @@ import {
   type StudioSpringBone,
 } from "./studio-character-animation-p2";
 import {
-  createStudioClothGrid,
-  stepStudioClothXpbd,
-} from "./studio-cloth-pattern-kernel";
+  compileStudioClothXpbdModelV2,
+  createStudioClothXpbdRuntimeV2,
+  STUDIO_CLOTH_XPBD_V2_BUDGETS,
+  stepStudioClothXpbdV2,
+  type StudioClothXpbdCapsuleFrameV2,
+  type StudioClothXpbdVec3V2,
+} from "./studio-cloth-xpbd-kernel-v2";
 import {
   collabAppendOp,
   collabJoin,
@@ -45,6 +49,7 @@ import {
   weldStudioEditableMesh,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
+import { assertRenderCacheIsNotAuthority } from "./studio-geometry-authority";
 import {
   buildStudioGeoNodesPrimitive,
   evaluateStudioGeoNodesStarterGraph,
@@ -68,8 +73,13 @@ import {
 } from "./studio-hybrid-dcc-document";
 import {
   createStudioHybridDccIdentityTransform,
+  hashStudioHybridDccObjectTransform,
+  inverseTransformStudioHybridDccPoint,
+  transformStudioHybridDccPoint,
   type StudioHybridDccObjectTransform,
 } from "./studio-hybrid-dcc-object-transform";
+import { validateStudioHybridDccFanPolygon } from "./studio-hybrid-dcc-polygon-validation";
+import { parseStudioHybridDccRoomPartMetadata } from "./studio-hybrid-dcc-room-authority";
 import {
   applyStudioSculptStroke,
   voxelRemeshStudioMesh,
@@ -110,6 +120,7 @@ import {
   shrinkwrapStudioMesh,
   subdivideStudioMeshCatmullLite,
 } from "./studio-mesh-ops-advanced";
+import { sha256HexPortable } from "./studio-sha256";
 import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 import { packStudioToon3dPackage, type StudioToon3dPackage } from "./studio-toon3d-package";
 import {
@@ -135,6 +146,47 @@ export type StudioOcctSolidResult = {
 };
 
 export const STUDIO_HYBRID_DCC_WORKSPACE_REVISION = 4 as const;
+
+/** A deliberately small runtime-only LRU so asset switching cannot grow solver memory without bound. */
+export const STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES = 4 as const;
+
+/**
+ * Transient solver cache. Canonical geometry is committed after every admitted step and persists;
+ * velocity/rest state intentionally restarts after a cold load unless a future bake-cache format
+ * explicitly versions it.
+ */
+export interface StudioHybridDccClothRuntimeCache {
+  readonly kind: "studio-hybrid-dcc-cloth-runtime-cache";
+  readonly version: 1;
+  readonly assetId: string;
+  readonly meshHash: string;
+  readonly sourceMeshSha256: `sha256:${string}`;
+  readonly objectTransformHash: string;
+  readonly topologySha256: string;
+  readonly restPositions: Float32Array;
+  readonly triangleIndices: Uint32Array;
+  readonly fixedParticleIndices: Uint32Array;
+  readonly positions: Float32Array;
+  readonly velocities: Float32Array;
+  readonly stepIndex: number;
+  readonly lastReceiptSha256: string;
+  readonly simulationConfigSha256: `sha256:${string}`;
+}
+
+export interface StudioHybridDccClothRuntimeCacheStore {
+  readonly kind: "studio-hybrid-dcc-cloth-runtime-cache-store";
+  readonly version: 1;
+  readonly maxEntries: typeof STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES;
+  /** Oldest entry first, newest entry last (Map insertion order). */
+  readonly entries: ReadonlyMap<string, StudioHybridDccClothRuntimeCache>;
+}
+
+export interface StudioHybridDccClothStepOptions {
+  readonly gravity?: StudioClothXpbdVec3V2;
+  readonly selfCollisionEnabled?: boolean;
+  readonly solverIterations?: number;
+  readonly capsules?: readonly StudioClothXpbdCapsuleFrameV2[];
+}
 
 export interface StudioHybridDccWorkspace {
   readonly revision: typeof STUDIO_HYBRID_DCC_WORKSPACE_REVISION;
@@ -162,6 +214,8 @@ export interface StudioHybridDccWorkspace {
   bom: StudioManufacturingBom;
   collab: StudioDccCollabRoom;
   clothStep: number;
+  /** Runtime-only continuation state; authoritative stepped positions live in session geometry. */
+  clothRuntimeCache: StudioHybridDccClothRuntimeCacheStore | null;
   animSampleTime: number;
 }
 
@@ -187,6 +241,7 @@ export function createStudioHybridDccWorkspace(
     bom: bomFromAssetParts(documentId, []),
     collab: createStudioDccCollabRoom(`${documentId}-collab`),
     clothStep: 0,
+    clothRuntimeCache: null,
     animSampleTime: 0,
   };
 }
@@ -267,24 +322,52 @@ export function workspaceDeleteActive(ws: StudioHybridDccWorkspace): StudioHybri
   };
 }
 
-function synchronizeWorkspaceGeometryAuthority(
+function canonicalBridgeMaterialId(
+  session: StudioHybridDccSession,
+  assetId: string,
+): string | null {
+  const rights = session.state.rightsBom.find((entry) => entry.assetId === assetId);
+  if (!rights) return null;
+  const metadata = parseStudioHybridDccRoomPartMetadata(rights.derivative);
+  if (!metadata) return null;
+  const instanceId = metadata.groupId.slice("room:".length);
+  return assetId.startsWith(`room-${instanceId}-part-`)
+    ? metadata.materialId
+    : null;
+}
+
+/**
+ * Rebuilds the renderer-neutral shared set from canonical document state. A validated modifier
+ * cache remains the current presentation hash, while room material identity is recoverable from
+ * the persisted Rights BOM after undo/redo and cold restore.
+ */
+export function synchronizeWorkspaceGeometryAuthority(
   ws: StudioHybridDccWorkspace,
   session: StudioHybridDccSession,
 ): StudioHybridDccWorkspace {
   const previousAuthorityIds = new Set(Object.keys(ws.session.state.geometry.records));
   const nextRecords = session.state.geometry.records;
+  const previousObjectById = new Map(
+    ws.bridge.set.objects.map((object) => [object.id, object] as const),
+  );
   const retained = ws.bridge.set.objects.filter((object) => (
     !previousAuthorityIds.has(object.id) && !Object.hasOwn(nextRecords, object.id)
   ));
   const canonicalObjects = Object.values(nextRecords)
     .toSorted((left, right) => left.assetId < right.assetId ? -1 : left.assetId > right.assetId ? 1 : 0)
     .map((record) => {
-      const previous = ws.bridge.set.objects.find((object) => object.id === record.assetId);
+      const previous = previousObjectById.get(record.assetId);
+      const validPresentationCache = record.renderCache
+        && assertRenderCacheIsNotAuthority(record)
+        ? record.renderCache
+        : null;
       return {
         id: record.assetId,
-        geometryHash: record.meshHash,
+        geometryHash: validPresentationCache?.derivedFromHash ?? record.meshHash,
         visible: previous?.visible ?? true,
-        materialId: previous?.materialId ?? "default",
+        materialId: previous?.materialId
+          ?? canonicalBridgeMaterialId(session, record.assetId)
+          ?? "default",
         transform: session.state.objectTransforms[record.assetId]!,
       };
     });
@@ -298,7 +381,12 @@ function synchronizeWorkspaceGeometryAuthority(
     })),
     commandSequence: ws.bridge.commandSequence + 1,
   };
-  return { ...ws, session, bridge };
+  return {
+    ...ws,
+    session,
+    bridge,
+    clothRuntimeCache: pruneClothRuntimeCacheStore(ws.clothRuntimeCache, nextRecords),
+  };
 }
 
 export function workspaceAddUnitCube(
@@ -351,7 +439,11 @@ export function workspaceCommitObjectTransform(
   transform: StudioHybridDccObjectTransform,
 ): StudioHybridDccWorkspace {
   const session = hybridDccCommitObjectTransform(ws.session, assetId, transform);
-  return session === ws.session ? ws : synchronizeWorkspaceGeometryAuthority(ws, session);
+  if (session === ws.session) return ws;
+  return {
+    ...synchronizeWorkspaceGeometryAuthority(ws, session),
+    clothRuntimeCache: removeClothRuntimeCacheEntry(ws.clothRuntimeCache, assetId),
+  };
 }
 
 export function workspaceExtrudeActive(
@@ -814,11 +906,725 @@ export function workspaceSculptActive(
   return { ...ws, session, bridge };
 }
 
-export function workspaceClothStep(ws: StudioHybridDccWorkspace): StudioHybridDccWorkspace {
-  const grid = createStudioClothGrid(1, 1, 4, 4);
-  const stepped = stepStudioClothXpbd(grid, 1 / 60, 4);
-  void stepped;
-  return { ...ws, clothStep: ws.clothStep + 1 };
+function selectClothAnchorParticles(positions: Float32Array): Uint32Array {
+  const particleCount = positions.length / 3;
+  if (particleCount === 0) return new Uint32Array();
+  let highestY = Number.NEGATIVE_INFINITY;
+  for (let particle = 0; particle < particleCount; particle += 1) {
+    highestY = Math.max(highestY, positions[particle * 3 + 1]!);
+  }
+  const heightTolerance = Math.max(1e-6, Math.abs(highestY) * 1e-6);
+  const top = Array.from({ length: particleCount }, (_, particle) => particle)
+    .filter((particle) => highestY - positions[particle * 3 + 1]! <= heightTolerance)
+    .sort((left, right) => (
+      positions[left * 3]! - positions[right * 3]!
+      || positions[left * 3 + 2]! - positions[right * 3 + 2]!
+      || left - right
+    ));
+  if (top.length === 1) return Uint32Array.of(top[0]!);
+  return Uint32Array.of(top[0]!, top.at(-1)!);
+}
+
+const STUDIO_HYBRID_DCC_CLOTH_MAX_FACE_CORNERS = 128 as const;
+const STUDIO_HYBRID_DCC_CLOTH_MAX_POLYGON_PAIR_WORK = 2_000_000 as const;
+
+interface StudioHybridDccClothMeshPreflight {
+  readonly positions: Float32Array;
+  readonly triangleIndices: Uint32Array;
+  readonly sourceFaceByTriangle: readonly StudioEditableMesh["faces"][number][];
+}
+
+function preflightClothMeshBeforeHash(
+  mesh: StudioEditableMesh,
+): StudioHybridDccClothMeshPreflight {
+  const { maxParticles, maxTriangles } = STUDIO_CLOTH_XPBD_V2_BUDGETS;
+  if (mesh.vertices.length > maxParticles) {
+    throw new Error(
+      `cloth-v2-compile:budget-exceeded:vertices ${mesh.vertices.length} exceed ${maxParticles}`,
+    );
+  }
+  if (mesh.faces.length > maxTriangles) {
+    throw new Error(
+      `cloth-v2-compile:budget-exceeded:faces ${mesh.faces.length} exceed ${maxTriangles}`,
+    );
+  }
+  const maxFaceCorners = maxTriangles * 3;
+  if (mesh.halfEdges.length > maxFaceCorners) {
+    throw new Error(
+      `cloth-v2-compile:budget-exceeded:half-edges ${mesh.halfEdges.length} exceed ${maxFaceCorners}`,
+    );
+  }
+
+  const faceIds = new Set<number>();
+  const globallyVisitedHalfEdges = new Set<number>();
+  const faceLoops: Array<{
+    readonly face: StudioEditableMesh["faces"][number];
+    readonly vertexIds: readonly number[];
+  }> = [];
+  let triangleCount = 0;
+  let polygonPairWork = 0;
+  for (const face of mesh.faces) {
+    if (!Number.isSafeInteger(face.id) || face.id < 0 || faceIds.has(face.id)) {
+      throw new Error("cloth-v2-compile:invalid-input:face ids must be unique safe integers");
+    }
+    faceIds.add(face.id);
+    const start = face.he;
+    let halfEdgeIndex = start;
+    let cornerCount = 0;
+    const visited = new Set<number>();
+    const vertexIds: number[] = [];
+    const vertexIdSet = new Set<number>();
+    let repeatedVertexId: number | null = null;
+    while (true) {
+      if (
+        !Number.isSafeInteger(halfEdgeIndex)
+        || halfEdgeIndex < 0
+        || halfEdgeIndex >= mesh.halfEdges.length
+      ) {
+        throw new Error(`cloth-v2-compile:invalid-input:face ${face.id} has an invalid loop`);
+      }
+      if (visited.has(halfEdgeIndex)) {
+        if (halfEdgeIndex !== start) {
+          throw new Error(`cloth-v2-compile:invalid-input:face ${face.id} loop does not close`);
+        }
+        break;
+      }
+      visited.add(halfEdgeIndex);
+      if (globallyVisitedHalfEdges.has(halfEdgeIndex)) {
+        throw new Error(
+          `cloth-v2-compile:invalid-input:half-edge ${halfEdgeIndex} belongs to multiple faces`,
+        );
+      }
+      globallyVisitedHalfEdges.add(halfEdgeIndex);
+      cornerCount += 1;
+      if (cornerCount - 2 + triangleCount > maxTriangles) {
+        throw new Error(
+          `cloth-v2-compile:budget-exceeded:triangles exceed ${maxTriangles}`,
+        );
+      }
+      const halfEdge = mesh.halfEdges[halfEdgeIndex]!;
+      const previous = mesh.halfEdges[halfEdge.prev];
+      const next = mesh.halfEdges[halfEdge.next];
+      if (
+        halfEdge.id !== halfEdgeIndex
+        || halfEdge.face !== face.id
+        || !previous
+        || !next
+        || previous.next !== halfEdgeIndex
+        || next.prev !== halfEdgeIndex
+      ) {
+        throw new Error(
+          `cloth-v2-compile:invalid-input:face ${face.id} has inconsistent half-edge links`,
+        );
+      }
+      if (vertexIdSet.has(previous.vertex)) {
+        repeatedVertexId ??= previous.vertex;
+      }
+      vertexIdSet.add(previous.vertex);
+      vertexIds.push(previous.vertex);
+      halfEdgeIndex = halfEdge.next;
+    }
+    if (cornerCount < 3) {
+      throw new Error(`cloth-v2-compile:invalid-input:face ${face.id} needs at least 3 corners`);
+    }
+    if (cornerCount > STUDIO_HYBRID_DCC_CLOTH_MAX_FACE_CORNERS) {
+      throw new Error(
+        `cloth-v2-compile:budget-exceeded:face ${face.id} corners ${cornerCount} exceed `
+          + STUDIO_HYBRID_DCC_CLOTH_MAX_FACE_CORNERS,
+      );
+    }
+    polygonPairWork += cornerCount * cornerCount;
+    if (polygonPairWork > STUDIO_HYBRID_DCC_CLOTH_MAX_POLYGON_PAIR_WORK) {
+      throw new Error(
+        "cloth-v2-compile:budget-exceeded:polygon-pair validation work exceeds "
+          + STUDIO_HYBRID_DCC_CLOTH_MAX_POLYGON_PAIR_WORK,
+      );
+    }
+    if (repeatedVertexId !== null) {
+      throw new Error(
+        `cloth-v2-compile:invalid-input:face ${face.id} repeats vertex ${repeatedVertexId}`,
+      );
+    }
+    triangleCount += cornerCount - 2;
+    faceLoops.push({ face, vertexIds });
+  }
+  if (triangleCount === 0) {
+    throw new Error("cloth-v2-compile:invalid-input:mesh needs at least one face");
+  }
+  if (globallyVisitedHalfEdges.size !== mesh.halfEdges.length) {
+    throw new Error("cloth-v2-compile:invalid-input:mesh contains unattached half-edges");
+  }
+
+  const vertexIndexById = new Map<number, number>();
+  const positions = new Float32Array(mesh.vertices.length * 3);
+  for (let index = 0; index < mesh.vertices.length; index += 1) {
+    const vertex = mesh.vertices[index]!;
+    if (
+      !Number.isSafeInteger(vertex.id)
+      || vertex.id < 0
+      || vertexIndexById.has(vertex.id)
+      || !Number.isFinite(vertex.position.x)
+      || !Number.isFinite(vertex.position.y)
+      || !Number.isFinite(vertex.position.z)
+      || !Number.isFinite(vertex.crease)
+    ) {
+      throw new Error("cloth-v2-compile:invalid-input:vertices must have unique ids and finite data");
+    }
+    vertexIndexById.set(vertex.id, index);
+    positions[index * 3] = vertex.position.x;
+    positions[index * 3 + 1] = vertex.position.y;
+    positions[index * 3 + 2] = vertex.position.z;
+  }
+
+  // A broken twin is not used by the fan itself, but keeping it would commit corrupt canonical
+  // authority when the input is already triangular.
+  for (const halfEdge of mesh.halfEdges) {
+    if (halfEdge.twin === -1) continue;
+    const twin = mesh.halfEdges[halfEdge.twin];
+    const previous = mesh.halfEdges[halfEdge.prev];
+    const twinPrevious = twin ? mesh.halfEdges[twin.prev] : undefined;
+    if (
+      !twin
+      || twin.twin !== halfEdge.id
+      || !previous
+      || !twinPrevious
+      || previous.vertex !== twin.vertex
+      || halfEdge.vertex !== twinPrevious.vertex
+    ) {
+      throw new Error(`cloth-v2-compile:invalid-input:half-edge ${halfEdge.id} has an invalid twin`);
+    }
+  }
+
+  const triangleIndices: number[] = [];
+  const sourceFaceByTriangle: StudioEditableMesh["faces"][number][] = [];
+  for (const { face, vertexIds } of faceLoops) {
+    const points = vertexIds.map((vertexId) => {
+      const vertexIndex = vertexIndexById.get(vertexId);
+      if (vertexIndex === undefined) {
+        throw new Error(
+          `cloth-v2-compile:invalid-input:face ${face.id} references missing vertex ${vertexId}`,
+        );
+      }
+      const vertex = mesh.vertices[vertexIndex]!;
+      return [
+        vertex.position.x,
+        vertex.position.y,
+        vertex.position.z,
+      ] as const;
+    });
+    try {
+      validateStudioHybridDccFanPolygon(points, face.id);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "polygon validation failed";
+      throw new Error(`cloth-v2-compile:invalid-input:${detail}`, { cause: error });
+    }
+    const first = vertexIndexById.get(vertexIds[0]!)!;
+    for (let index = 1; index + 1 < vertexIds.length; index += 1) {
+      triangleIndices.push(
+        first,
+        vertexIndexById.get(vertexIds[index]!)!,
+        vertexIndexById.get(vertexIds[index + 1]!)!,
+      );
+      sourceFaceByTriangle.push(face);
+    }
+  }
+
+  return {
+    positions,
+    triangleIndices: new Uint32Array(triangleIndices),
+    sourceFaceByTriangle,
+  };
+}
+
+function exactClothMeshSha256(mesh: StudioEditableMesh): `sha256:${string}` {
+  const fields: string[] = [
+    `revision=${mesh.revision}`,
+    `next=${mesh.nextVertexId}:${mesh.nextHalfEdgeId}:${mesh.nextFaceId}`,
+  ];
+  for (const vertex of mesh.vertices) {
+    fields.push([
+      "v",
+      vertex.id,
+      vertex.position.x.toPrecision(17),
+      vertex.position.y.toPrecision(17),
+      vertex.position.z.toPrecision(17),
+      vertex.crease.toPrecision(17),
+      vertex.he,
+    ].join(":"));
+  }
+  for (const halfEdge of mesh.halfEdges) {
+    fields.push([
+      "h",
+      halfEdge.id,
+      halfEdge.vertex,
+      halfEdge.face,
+      halfEdge.next,
+      halfEdge.prev,
+      halfEdge.twin,
+      halfEdge.crease.toPrecision(17),
+    ].join(":"));
+  }
+  for (const face of mesh.faces) {
+    fields.push([
+      "f",
+      face.id,
+      face.he,
+      face.materialSlot,
+      face.smooth ? 1 : 0,
+    ].join(":"));
+  }
+  return `sha256:${sha256HexPortable(new TextEncoder().encode(fields.join("|")))}`;
+}
+
+function isBoundedClothRuntimeCacheStore(
+  store: StudioHybridDccClothRuntimeCacheStore | null,
+): store is StudioHybridDccClothRuntimeCacheStore {
+  return store?.kind === "studio-hybrid-dcc-cloth-runtime-cache-store"
+    && store.version === 1
+    && store.maxEntries === STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES
+    && store.entries instanceof Map
+    && store.entries.size <= STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES;
+}
+
+function isUsableClothRuntimeCache(
+  cache: StudioHybridDccClothRuntimeCache | undefined,
+  assetId: string,
+  expectedParticleCount: number,
+): cache is StudioHybridDccClothRuntimeCache {
+  const expectedScalarCount = expectedParticleCount * 3;
+  return cache?.kind === "studio-hybrid-dcc-cloth-runtime-cache"
+    && cache.version === 1
+    && cache.assetId === assetId
+    && cache.restPositions instanceof Float32Array
+    && cache.triangleIndices instanceof Uint32Array
+    && cache.fixedParticleIndices instanceof Uint32Array
+    && cache.positions instanceof Float32Array
+    && cache.velocities instanceof Float32Array
+    && cache.restPositions.length === expectedScalarCount
+    && cache.positions.length === expectedScalarCount
+    && cache.velocities.length === expectedScalarCount
+    && cache.triangleIndices.length >= 3
+    && cache.triangleIndices.length % 3 === 0
+    && cache.triangleIndices.length <= STUDIO_CLOTH_XPBD_V2_BUDGETS.maxTriangles * 3
+    && cache.fixedParticleIndices.length <= Math.min(
+      expectedParticleCount,
+      STUDIO_CLOTH_XPBD_V2_BUDGETS.maxPins,
+    )
+    && Number.isSafeInteger(cache.stepIndex)
+    && cache.stepIndex >= 0;
+}
+
+function readClothRuntimeCacheEntry(
+  store: StudioHybridDccClothRuntimeCacheStore | null,
+  assetId: string,
+  expectedParticleCount: number,
+): StudioHybridDccClothRuntimeCache | null {
+  if (!isBoundedClothRuntimeCacheStore(store)) return null;
+  const cache = store.entries.get(assetId);
+  return isUsableClothRuntimeCache(cache, assetId, expectedParticleCount) ? cache : null;
+}
+
+function upsertClothRuntimeCacheEntry(
+  store: StudioHybridDccClothRuntimeCacheStore | null,
+  cache: StudioHybridDccClothRuntimeCache,
+): StudioHybridDccClothRuntimeCacheStore {
+  // An oversized or forged store is discarded in O(1); never copy attacker-sized runtime state.
+  const entries = isBoundedClothRuntimeCacheStore(store)
+    ? new Map(store.entries)
+    : new Map<string, StudioHybridDccClothRuntimeCache>();
+  entries.delete(cache.assetId);
+  entries.set(cache.assetId, cache);
+  while (entries.size > STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES) {
+    const oldestAssetId = entries.keys().next().value;
+    if (typeof oldestAssetId !== "string") break;
+    entries.delete(oldestAssetId);
+  }
+  return {
+    kind: "studio-hybrid-dcc-cloth-runtime-cache-store",
+    version: 1,
+    maxEntries: STUDIO_HYBRID_DCC_CLOTH_CACHE_MAX_ENTRIES,
+    entries,
+  };
+}
+
+function removeClothRuntimeCacheEntry(
+  store: StudioHybridDccClothRuntimeCacheStore | null,
+  assetId: string,
+): StudioHybridDccClothRuntimeCacheStore | null {
+  if (!isBoundedClothRuntimeCacheStore(store)) return null;
+  if (!store.entries.has(assetId)) return store;
+  const entries = new Map(store.entries);
+  entries.delete(assetId);
+  return entries.size === 0 ? null : { ...store, entries };
+}
+
+function pruneClothRuntimeCacheStore(
+  store: StudioHybridDccClothRuntimeCacheStore | null,
+  records: Readonly<Record<string, unknown>>,
+): StudioHybridDccClothRuntimeCacheStore | null {
+  if (!isBoundedClothRuntimeCacheStore(store)) return null;
+  let entries: Map<string, StudioHybridDccClothRuntimeCache> | null = null;
+  for (const assetId of store.entries.keys()) {
+    if (Object.hasOwn(records, assetId)) continue;
+    entries ??= new Map(store.entries);
+    entries.delete(assetId);
+  }
+  if (!entries) return store;
+  return entries.size === 0 ? null : { ...store, entries };
+}
+
+function assertBoundedClothVec3(
+  value: unknown,
+  label: string,
+  magnitude: number,
+): asserts value is StudioClothXpbdVec3V2 {
+  if (!Array.isArray(value) || value.length !== 3) {
+    throw new Error(`cloth-v2-step:invalid-input:${label} must be a three-number tuple`);
+  }
+  for (let axis = 0; axis < 3; axis += 1) {
+    const coordinate = value[axis];
+    if (!Number.isFinite(coordinate) || Math.abs(coordinate) > magnitude) {
+      throw new Error(
+        `cloth-v2-step:invalid-input:${label}[${axis}] must be finite and within +/-${magnitude}`,
+      );
+    }
+  }
+}
+
+function preflightClothStepConfiguration(
+  gravity: StudioClothXpbdVec3V2,
+  selfCollisionEnabled: boolean,
+  solverIterations: number,
+  capsules: readonly StudioClothXpbdCapsuleFrameV2[],
+): readonly StudioClothXpbdCapsuleFrameV2[] {
+  assertBoundedClothVec3(
+    gravity,
+    "gravity",
+    STUDIO_CLOTH_XPBD_V2_BUDGETS.maxGravityMagnitude,
+  );
+  if (typeof selfCollisionEnabled !== "boolean") {
+    throw new Error("cloth-v2-step:invalid-input:selfCollisionEnabled must be boolean");
+  }
+  if (
+    !Number.isInteger(solverIterations)
+    || solverIterations < 1
+    || solverIterations > STUDIO_CLOTH_XPBD_V2_BUDGETS.maxSolverIterations
+  ) {
+    throw new Error(
+      "cloth-v2-step:invalid-input:solverIterations must be an integer in [1, "
+        + `${STUDIO_CLOTH_XPBD_V2_BUDGETS.maxSolverIterations}]`,
+    );
+  }
+  if (!Array.isArray(capsules)) {
+    throw new Error("cloth-v2-step:invalid-input:capsules must be an array");
+  }
+  if (capsules.length > STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCapsules) {
+    throw new Error(
+      `cloth-v2-step:budget-exceeded:capsules exceed ${STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCapsules}`,
+    );
+  }
+
+  for (const capsule of capsules) {
+    if (
+      typeof capsule !== "object"
+      || capsule === null
+      || typeof capsule.id !== "string"
+      || capsule.id.length === 0
+      || capsule.id.length > STUDIO_CLOTH_XPBD_V2_BUDGETS.maxIdentifierLength
+    ) {
+      throw new Error("cloth-v2-step:invalid-input:capsule ids must be non-empty bounded strings");
+    }
+  }
+  const normalized = [...capsules].sort((left, right) => (
+    left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+  ));
+  let previousId: string | undefined;
+  for (const capsule of normalized) {
+    if (capsule.id === previousId) {
+      throw new Error(`cloth-v2-step:invalid-input:duplicate capsule id ${capsule.id}`);
+    }
+    assertBoundedClothVec3(
+      capsule.previousHead,
+      `capsule ${capsule.id} previousHead`,
+      STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCoordinateMagnitude,
+    );
+    assertBoundedClothVec3(
+      capsule.previousTail,
+      `capsule ${capsule.id} previousTail`,
+      STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCoordinateMagnitude,
+    );
+    assertBoundedClothVec3(
+      capsule.currentHead,
+      `capsule ${capsule.id} currentHead`,
+      STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCoordinateMagnitude,
+    );
+    assertBoundedClothVec3(
+      capsule.currentTail,
+      `capsule ${capsule.id} currentTail`,
+      STUDIO_CLOTH_XPBD_V2_BUDGETS.maxCoordinateMagnitude,
+    );
+    if (
+      !Number.isFinite(capsule.radius)
+      || capsule.radius < STUDIO_CLOTH_XPBD_V2_BUDGETS.minParticleRadius
+      || capsule.radius > STUDIO_CLOTH_XPBD_V2_BUDGETS.maxParticleRadius
+    ) {
+      throw new Error(`cloth-v2-step:invalid-input:capsule ${capsule.id} radius is invalid`);
+    }
+    const friction = capsule.friction ?? 0;
+    if (!Number.isFinite(friction) || friction < 0 || friction > 1) {
+      throw new Error(`cloth-v2-step:invalid-input:capsule ${capsule.id} friction is invalid`);
+    }
+    const compliance = capsule.compliance ?? 0;
+    if (!Number.isFinite(compliance) || compliance < 0 || compliance > 1) {
+      throw new Error(`cloth-v2-step:invalid-input:capsule ${capsule.id} compliance is invalid`);
+    }
+    previousId = capsule.id;
+  }
+  return normalized;
+}
+
+function exactClothSimulationConfigSha256(
+  gravity: StudioClothXpbdVec3V2,
+  selfCollisionEnabled: boolean,
+  solverIterations: number,
+  capsules: readonly StudioClothXpbdCapsuleFrameV2[],
+): `sha256:${string}` {
+  const fields: readonly unknown[] = [
+    ["gravity", ...gravity.map((value) => value.toPrecision(17))],
+    ["self", selfCollisionEnabled ? 1 : 0],
+    ["iterations", solverIterations],
+    ...capsules.map((capsule) => [
+      "capsule-static",
+      capsule.id,
+      capsule.radius.toPrecision(17),
+      (capsule.friction ?? 0).toPrecision(17),
+      (capsule.compliance ?? 0).toPrecision(17),
+    ]),
+  ];
+  return `sha256:${sha256HexPortable(new TextEncoder().encode(JSON.stringify(fields)))}`;
+}
+
+function clothWorldPositions(
+  localPositions: Float32Array,
+  transform: StudioHybridDccObjectTransform,
+): Float32Array {
+  const world = new Float32Array(localPositions.length);
+  for (let offset = 0; offset < localPositions.length; offset += 3) {
+    const point = transformStudioHybridDccPoint([
+      localPositions[offset]!,
+      localPositions[offset + 1]!,
+      localPositions[offset + 2]!,
+    ], transform);
+    world[offset] = point[0];
+    world[offset + 1] = point[1];
+    world[offset + 2] = point[2];
+  }
+  return world;
+}
+
+function clothMeshWithWorldPositions(
+  mesh: StudioEditableMesh,
+  worldPositions: Float32Array,
+  transform: StudioHybridDccObjectTransform,
+): StudioEditableMesh {
+  if (worldPositions.length !== mesh.vertices.length * 3) {
+    throw new Error("cloth-v2-output:vertex-count-mismatch");
+  }
+  return {
+    ...mesh,
+    vertices: mesh.vertices.map((vertex, index) => {
+      const local = inverseTransformStudioHybridDccPoint([
+        worldPositions[index * 3]!,
+        worldPositions[index * 3 + 1]!,
+        worldPositions[index * 3 + 2]!,
+      ], transform);
+      return {
+        ...vertex,
+        position: { x: local[0], y: local[1], z: local[2] },
+      };
+    }),
+  };
+}
+
+function clothTriangleAuthorityMesh(
+  mesh: StudioEditableMesh,
+  triangleIndices: Uint32Array,
+  sourceFaceByTriangle: readonly StudioEditableMesh["faces"][number][],
+): StudioEditableMesh {
+  const triangleCount = triangleIndices.length / 3;
+  // Once cloth authority is triangular, retain its stable IDs and edge metadata on every step.
+  if (mesh.faces.length === triangleCount) return mesh;
+  if (!Number.isInteger(triangleCount) || triangleCount <= 0) {
+    throw new Error("cloth-v2-output:invalid-triangle-topology");
+  }
+
+  const polygons: Array<readonly [number, number, number]> = [];
+  for (let offset = 0; offset < triangleIndices.length; offset += 3) {
+    const a = triangleIndices[offset]!;
+    const b = triangleIndices[offset + 1]!;
+    const c = triangleIndices[offset + 2]!;
+    if (a >= mesh.vertices.length || b >= mesh.vertices.length || c >= mesh.vertices.length) {
+      throw new Error("cloth-v2-output:triangle-index-out-of-range");
+    }
+    polygons.push([a, b, c]);
+  }
+
+  // Provenance comes from the same bounded preflight that emitted triangleIndices, so metadata
+  // cannot silently drift from a separately re-walked face loop.
+  if (sourceFaceByTriangle.length !== triangleCount) {
+    throw new Error("cloth-v2-output:triangle-provenance-mismatch");
+  }
+
+  const triangulated = createStudioEditableMeshFromPolygons(
+    mesh.vertices.map(({ position }) => ({ ...position })),
+    polygons,
+  );
+  const vertexIndexById = new Map(mesh.vertices.map((vertex, index) => [vertex.id, index]));
+  const sourceCreaseByDirectedEdge = new Map<string, number>();
+  for (const halfEdge of mesh.halfEdges) {
+    const previous = mesh.halfEdges[halfEdge.prev];
+    const origin = previous ? vertexIndexById.get(previous.vertex) : undefined;
+    const destination = vertexIndexById.get(halfEdge.vertex);
+    if (origin !== undefined && destination !== undefined) {
+      sourceCreaseByDirectedEdge.set(`${origin}:${destination}`, halfEdge.crease);
+    }
+  }
+
+  return {
+    ...triangulated,
+    vertices: triangulated.vertices.map((vertex, index) => ({
+      ...vertex,
+      crease: mesh.vertices[index]!.crease,
+    })),
+    halfEdges: triangulated.halfEdges.map((halfEdge) => {
+      const origin = triangulated.halfEdges[halfEdge.prev]!.vertex;
+      return {
+        ...halfEdge,
+        crease: sourceCreaseByDirectedEdge.get(`${origin}:${halfEdge.vertex}`) ?? 0,
+      };
+    }),
+    faces: triangulated.faces.map((face, index) => ({
+      ...face,
+      materialSlot: sourceFaceByTriangle[index]!.materialSlot,
+      smooth: sourceFaceByTriangle[index]!.smooth,
+    })),
+  };
+}
+
+export function workspaceClothStep(
+  ws: StudioHybridDccWorkspace,
+  options: StudioHybridDccClothStepOptions = {},
+): StudioHybridDccWorkspace {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  const objectTransform = ws.session.state.objectTransforms[assetId];
+  if (!objectTransform) throw new Error(`missing transform ${assetId}`);
+  const clothMeshPreflight = preflightClothMeshBeforeHash(record.mesh);
+  const sourceMeshSha256 = exactClothMeshSha256(record.mesh);
+  const objectTransformHash = hashStudioHybridDccObjectTransform(objectTransform);
+  const gravity = options.gravity ?? [0, -9.81, 0];
+  const selfCollisionEnabled = options.selfCollisionEnabled ?? true;
+  const solverIterations = options.solverIterations ?? 8;
+  const capsules = preflightClothStepConfiguration(
+    gravity,
+    selfCollisionEnabled,
+    solverIterations,
+    options.capsules ?? [],
+  );
+  const simulationConfigSha256 = exactClothSimulationConfigSha256(
+    gravity,
+    selfCollisionEnabled,
+    solverIterations,
+    capsules,
+  );
+  const cached = readClothRuntimeCacheEntry(
+    ws.clothRuntimeCache,
+    assetId,
+    record.mesh.vertices.length,
+  );
+  const resumable = cached?.sourceMeshSha256 === sourceMeshSha256
+    && cached.objectTransformHash === objectTransformHash
+    && cached.simulationConfigSha256 === simulationConfigSha256
+    && cached.triangleIndices.length === clothMeshPreflight.triangleIndices.length
+    && cached.triangleIndices.every((value, index) => (
+      value === clothMeshPreflight.triangleIndices[index]
+    ))
+    ? cached
+    : null;
+  const restPositions = resumable
+    ? new Float32Array(resumable.restPositions)
+    : clothWorldPositions(clothMeshPreflight.positions, objectTransform);
+  const triangleIndices = resumable
+    ? new Uint32Array(resumable.triangleIndices)
+    : new Uint32Array(clothMeshPreflight.triangleIndices);
+  const fixedParticleIndices = resumable
+    ? new Uint32Array(resumable.fixedParticleIndices)
+    : selectClothAnchorParticles(restPositions);
+  const compiled = compileStudioClothXpbdModelV2({
+    restPositions,
+    triangleIndices,
+    fixedParticleIndices,
+    gravity,
+    selfCollisionEnabled,
+    solverIterations,
+  });
+  if (!compiled.ok) throw new Error(`cloth-v2-compile:${compiled.code}:${compiled.detail}`);
+  if (resumable && compiled.model.topologySha256 !== resumable.topologySha256) {
+    throw new Error("cloth-v2-compile:topology-mismatch:cached topology changed");
+  }
+  const runtime = createStudioClothXpbdRuntimeV2(compiled.model, resumable ? {
+    positions: resumable.positions,
+    velocities: resumable.velocities,
+  } : undefined);
+  if (!runtime.ok) throw new Error(`cloth-v2-runtime:${runtime.code}:${runtime.detail}`);
+  if (resumable) runtime.runtime.stepIndex = resumable.stepIndex;
+  const stepped = stepStudioClothXpbdV2(runtime.runtime, {
+    expectedStepIndex: runtime.runtime.stepIndex,
+    expectedTopologySha256: compiled.model.topologySha256,
+    capsules,
+    solverIterations,
+  });
+  if (!stepped.ok) throw new Error(`cloth-v2-step:${stepped.code}:${stepped.detail}`);
+  const authorityMesh = clothTriangleAuthorityMesh(
+    record.mesh,
+    compiled.model.triangleIndices,
+    clothMeshPreflight.sourceFaceByTriangle,
+  );
+  const mesh = clothMeshWithWorldPositions(
+    authorityMesh,
+    runtime.runtime.positions,
+    objectTransform,
+  );
+  const session = hybridDccCommitGeometry(ws.session, assetId, mesh);
+  const meshHash = session.state.geometry.records[assetId]!.meshHash;
+  const bridge = mutateStudioSharedObjectGeometry(ws.bridge, assetId, meshHash);
+  const clothRuntimeCache: StudioHybridDccClothRuntimeCache = {
+    kind: "studio-hybrid-dcc-cloth-runtime-cache",
+    version: 1,
+    assetId,
+    meshHash,
+    sourceMeshSha256: exactClothMeshSha256(mesh),
+    objectTransformHash,
+    topologySha256: compiled.model.topologySha256,
+    restPositions: new Float32Array(compiled.model.restPositions),
+    triangleIndices: new Uint32Array(compiled.model.triangleIndices),
+    fixedParticleIndices: new Uint32Array(fixedParticleIndices),
+    positions: new Float32Array(runtime.runtime.positions),
+    velocities: new Float32Array(runtime.runtime.velocities),
+    stepIndex: runtime.runtime.stepIndex,
+    lastReceiptSha256: stepped.receipt.receiptSha256,
+    simulationConfigSha256,
+  };
+  return {
+    ...ws,
+    session,
+    bridge,
+    activeAssetId: assetId,
+    clothStep: ws.clothStep + 1,
+    clothRuntimeCache: upsertClothRuntimeCacheEntry(ws.clothRuntimeCache, clothRuntimeCache),
+  };
 }
 
 export function workspaceCollabJoin(
@@ -1178,9 +1984,16 @@ export function workspaceExportActiveMesh(
   ws: StudioHybridDccWorkspace,
   format: StudioMeshExportFormat = "obj",
 ): StudioHybridDccWorkspace {
-  const mesh = workspaceActiveMesh(ws);
-  if (!mesh) throw new Error("no active asset");
-  const lastExport = exportStudioMeshByFormat(mesh, format);
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  if (record.modifierStack.modifiers.length > 0) {
+    throw new Error(
+      "비파괴 변형이 화면에 적용되어 있습니다. 원본 케이지를 조용히 내보내지 않도록 변형 적용 후 다시 내보내 주세요.",
+    );
+  }
+  const lastExport = exportStudioMeshByFormat(record.mesh, format);
   return { ...ws, lastExport };
 }
 
@@ -1760,7 +2573,7 @@ export async function runStudioHybridDccFullEngineSuite(
     }
   }
   ws = workspaceClothStep(ws);
-  engines.push("cloth-xpbd");
+  engines.push("cloth-xpbd-v2");
   ws = workspaceStepSpring(ws);
   engines.push("spring-bone");
   ws = workspaceSampleIdleClip(ws, 0.5);

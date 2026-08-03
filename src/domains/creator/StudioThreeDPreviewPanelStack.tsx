@@ -14,12 +14,26 @@ import {
   StudioVrmPoser,
 } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
-import { createStudioShared3dSceneSessionFromElements } from "./studio-shared-3d-scene-bridge";
+import {
+  createStudioShared3dSceneSessionFromElements,
+  selectStudioShared3dVisibleSceneElements,
+} from "./studio-shared-3d-scene-bridge";
+import {
+  createStudioShared3dSceneSessionForStage,
+  findStudioShared3dStageEntryByBundleId,
+  migrateStudioShared3dStageCollectionDocument,
+  resolveStudioShared3dStageCollectionForBundle,
+  studioShared3dStageOwnedCharacterElementIds,
+  studioShared3dStageReusableHiddenCharacterElementIds,
+} from "./studio-shared-3d-stage-collection";
 
 import type {
   StudioLazyPanelStackHandlers,
   StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
+
+const EMPTY_STUDIO_PAGE_ELEMENTS: never[] = [];
+const EMPTY_STUDIO_PAGE_GROUPS: never[] = [];
 
 type StudioThreeDPreviewPanelStackHandlers = Pick<
   StudioLazyPanelStackHandlers,
@@ -45,6 +59,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "bg3dInitialDataUrl"
   | "bg3dInitialScene"
   | "bg3dOperation"
+  | "bg3dTargetBundleId"
   | "bg3dBatchRecoveryScope"
   | "validateRecoveryAccess"
   | "bg3dOpen"
@@ -212,6 +227,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   activePage,
   bg3dInitialDataUrl,
   bg3dInitialScene,
+  bg3dTargetBundleId,
   bg3dOperation,
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
@@ -274,12 +290,113 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   const poserInitialScene = poserInitialElement?.type === "image"
     ? poserInitialElement.vrmScene
     : undefined;
-  const shared3dSceneSession = useMemo(
-    () => createStudioShared3dSceneSessionFromElements(
-      masterEditMode ? [] : (activePage?.elements ?? []),
-    ),
-    [activePage?.elements, masterEditMode],
+  // Recovery/tests may briefly render the lazy shell before its page snapshot is available. Keep
+  // 3D panels fail-soft instead of turning that transient boundary into a whole-Studio crash.
+  const activePageElements = activePage?.elements ?? EMPTY_STUDIO_PAGE_ELEMENTS;
+  const activePageGroups = activePage?.groups ?? EMPTY_STUDIO_PAGE_GROUPS;
+  const activePageShared3dStage = activePage?.shared3dStage;
+  const activePageId = activePage?.id ?? currentPageId;
+  const sharedStageCollection = useMemo(
+    () => masterEditMode || activePageShared3dStage === undefined
+      ? undefined
+      : migrateStudioShared3dStageCollectionDocument(activePageShared3dStage),
+    [activePageShared3dStage, masterEditMode],
   );
+  const sharedStageCollectionInvalid = !masterEditMode
+    && activePageShared3dStage !== undefined
+    && !sharedStageCollection;
+  const shared3dStageResolution = useMemo(
+    () => !bg3dOpen || masterEditMode
+      ? resolveStudioShared3dStageCollectionForBundle(undefined, [], null)
+      : resolveStudioShared3dStageCollectionForBundle(
+          activePageShared3dStage,
+          activePageElements,
+          bg3dTargetBundleId,
+        ),
+    [
+      activePageElements,
+      activePageShared3dStage,
+      bg3dOpen,
+      bg3dTargetBundleId,
+      masterEditMode,
+    ],
+  );
+  const targetSharedStageEntry = findStudioShared3dStageEntryByBundleId(
+    sharedStageCollection,
+    bg3dTargetBundleId,
+  );
+  const targetHasPersistentSharedStage = Boolean(targetSharedStageEntry);
+  const sharedCharactersLinkedToOtherBackgroundCount = useMemo(() => {
+    if (!bg3dOpen || masterEditMode || sharedStageCollectionInvalid) return 0;
+    const linkedToAnotherBackground = studioShared3dStageOwnedCharacterElementIds(
+      sharedStageCollection,
+      bg3dTargetBundleId,
+    );
+    const reusableHiddenIds = studioShared3dStageReusableHiddenCharacterElementIds(
+      sharedStageCollection,
+      activePageElements,
+    );
+    const visibleIds = new Set(selectStudioShared3dVisibleSceneElements(
+      activePageElements,
+      activePageGroups,
+    ).map(({ id }) => id));
+    return activePageElements.filter((element) =>
+      linkedToAnotherBackground.has(element.id)
+      && (visibleIds.has(element.id) || reusableHiddenIds.has(element.id))
+      && element.type === "image"
+      && element.vrmScene !== undefined).length;
+  }, [
+    activePageElements,
+    activePageGroups,
+    bg3dOpen,
+    bg3dTargetBundleId,
+    masterEditMode,
+    sharedStageCollection,
+    sharedStageCollectionInvalid,
+  ]);
+  const shared3dSceneSession = useMemo(() => {
+    if (!bg3dOpen) return createStudioShared3dSceneSessionFromElements([]);
+    const sourceElements = masterEditMode ? [] : activePageElements;
+    if (sharedStageCollectionInvalid) {
+      return createStudioShared3dSceneSessionFromElements([]);
+    }
+    if (!targetHasPersistentSharedStage || targetSharedStageEntry?.characters.length === 0) {
+      const reusableHiddenIds = studioShared3dStageReusableHiddenCharacterElementIds(
+        sharedStageCollection,
+        sourceElements,
+      );
+      const visibleIds = new Set(selectStudioShared3dVisibleSceneElements(
+        sourceElements,
+        activePageGroups,
+      ).map(({ id }) => id));
+      // Exact receipt-owned hidden sources are reusable instances. Their Stage-local placement is
+      // captured independently, while the single VRM model/pose/wardrobe authority stays shared.
+      return createStudioShared3dSceneSessionFromElements(
+        sourceElements.filter((element) =>
+          visibleIds.has(element.id) || reusableHiddenIds.has(element.id)),
+      );
+    }
+    return createStudioShared3dSceneSessionForStage(
+      sharedStageCollection,
+      sourceElements,
+      bg3dTargetBundleId,
+    );
+  }, [
+    activePageElements,
+    activePageGroups,
+    bg3dTargetBundleId,
+    bg3dOpen,
+    masterEditMode,
+    sharedStageCollection,
+    sharedStageCollectionInvalid,
+    targetHasPersistentSharedStage,
+    targetSharedStageEntry?.characters.length,
+  ]);
+  const sharedStageSessionScopeKey = JSON.stringify({
+    pageId: activePageId,
+    backgroundBundleId: bg3dTargetBundleId ?? null,
+    operation: bg3dOperation,
+  });
 
   return (
     <>
@@ -330,6 +447,11 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             initialDataUrl={bg3dInitialDataUrl}
             initialScene={bg3dInitialScene}
             sharedSceneSession={shared3dSceneSession}
+            sharedStageResolution={masterEditMode ? undefined : shared3dStageResolution}
+            sharedStageSessionScopeKey={sharedStageSessionScopeKey}
+            sharedCharactersLinkedToOtherBackgroundCount={
+              sharedCharactersLinkedToOtherBackgroundCount
+            }
             operation={bg3dOperation}
             recoveryScope={bg3dBatchRecoveryScope}
             validateRecoveryAccess={validateRecoveryAccess}
@@ -350,7 +472,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
           <StudioTimelapsePanel
             open
             onClose={() => setTimelapseOpen(false)}
-            pageId={activePage.id}
+            pageId={activePageId}
             history={pagesHistory.slice(0, pagesHi + 1)}
             title={title}
             masterEditMode={masterEditMode}

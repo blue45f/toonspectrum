@@ -5,6 +5,8 @@ import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
 import type { PageGrade } from "./studio-page-grade";
 import type { PageReviewState } from "./studio-page-review";
+import type { StudioShared3dStagePersistedState } from
+  "./studio-shared-3d-stage-collection";
 
 export interface PageState {
   id: string;
@@ -24,4 +26,6 @@ export interface PageState {
   review?: PageReviewState; // 페이지 검토 상태·담당·메모·로컬 편집 잠금.
   /** 페이지 소유 원근자·아이소메트릭 가이드. 미설정 레거시는 비활성 기본값으로 정규화. */
   drawingAssist?: StudioDrawingAssistDocument;
+  /** 여러 BG3D 원본과 각 장면의 canonical VRM 원본을 잇는 엄격한 참조 컬렉션. */
+  shared3dStage?: StudioShared3dStagePersistedState;
 }

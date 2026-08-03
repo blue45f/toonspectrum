@@ -17,6 +17,12 @@ import {
   STUDIO_PROJECT_MAX_PAGES,
 } from "./studio-project-file";
 import { createStudioReferenceBoardDocument } from "./studio-reference-board";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+import {
+  STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND,
+  STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION,
+} from "./studio-shared-3d-stage-document";
 import {
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   createStudioVrmSceneDocument,
@@ -77,6 +83,92 @@ function retainedAiProvenance() {
 }
 
 describe("studio project file", () => {
+  it("페이지 Shared Stage v1을 v3 컬렉션으로 승격하고 손상·미래 버전을 전체 거부한다", () => {
+    const shared3dStage = {
+      kind: STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND,
+      version: STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: {
+        bundleId: "bundle-1",
+        sourceHash: `sha256:${"a".repeat(64)}`,
+      },
+      characters: [{
+        elementId: "character-1",
+        modelRuntimeKey: `character-1:sha256:${"c".repeat(64)}`,
+        sourceHash: `sha256:${"b".repeat(64)}`,
+        hiddenByStage: true,
+      }],
+    };
+    const migrated = migrateStudioShared3dStageCollectionDocument(shared3dStage)!;
+    const project = {
+      version: 2,
+      pagesList: [{ ...page, shared3dStage }],
+    };
+
+    const parsed = parseStudioProjectFile(project);
+    expect(parsed.pagesList[0]?.shared3dStage).toEqual(migrated);
+    expect(parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(project))))
+      .toMatchObject({ pagesList: [{ shared3dStage: migrated }] });
+
+    expect(() => parseStudioProjectFile({
+      ...project,
+      pagesList: [{
+        ...page,
+        shared3dStage: { ...shared3dStage, version: 2 },
+      }],
+    })).toThrow("공유 3D Stage");
+    expect(() => parseStudioProjectFile({
+      ...project,
+      pagesList: [{
+        ...page,
+        shared3dStage: { ...shared3dStage, unknownRuntimeKey: true },
+      }],
+    })).toThrow("공유 3D Stage");
+  });
+
+  it("두 배경을 가진 native v3 공유 3D 장면을 직렬화 왕복해도 정확히 보존한다", () => {
+    const createLegacyStage = (bundleId: string, characterId: string, seed: string) => ({
+      kind: STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND,
+      version: STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION,
+      authority: "page-background-with-linked-character-sources",
+      capturePolicy: "require-all-linked",
+      background: {
+        bundleId,
+        sourceHash: `sha256:${seed.repeat(64)}`,
+      },
+      characters: [{
+        elementId: characterId,
+        modelRuntimeKey: `${characterId}:sha256:${seed.repeat(64)}`,
+        sourceHash: `sha256:${seed.repeat(64)}`,
+        hiddenByStage: true,
+      }],
+    });
+    const first = migrateStudioShared3dStageCollectionDocument(
+      createLegacyStage("bundle-a", "character-a", "a"),
+    )!;
+    const second = migrateStudioShared3dStageCollectionDocument(
+      createLegacyStage("bundle-b", "character-b", "b"),
+    )!;
+    const collection = {
+      ...first,
+      stages: [...first.stages, ...second.stages],
+      visibilityReceipts: [
+        ...first.visibilityReceipts,
+        ...second.visibilityReceipts,
+      ],
+    };
+    const project = {
+      version: 2,
+      pagesList: [{ ...page, shared3dStage: collection }],
+    };
+
+    const parsed = parseStudioProjectFile(project);
+    expect(parsed.pagesList[0]?.shared3dStage).toEqual(collection);
+    expect(parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(parsed))))
+      .toMatchObject({ pagesList: [{ shared3dStage: collection }] });
+  });
+
   it("v2 문서의 게시·편집 메타데이터를 함께 보존한다", () => {
     expect(
       parseStudioProjectFile({

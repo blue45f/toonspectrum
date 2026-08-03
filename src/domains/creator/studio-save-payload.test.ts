@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
 import { createEmptyStudioCharacterBible } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
+import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import { createEmptyStudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import { DEFAULT_STUDIO_PUBLISH_COMPLIANCE } from "./studio-publish-compliance";
 import { DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS } from "./studio-publish-package";
@@ -15,6 +16,10 @@ import {
   normalizeStudioSaveTags,
   type BuildStudioSavePayloadInput,
 } from "./studio-save-payload";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
+import { createNativePluralShared3dStageFixture } from
+  "./studio-shared-3d-stage-test-fixture";
 import { createEmptyStudioWriterRoomDocument } from "./studio-writer-room";
 
 function saveInput(
@@ -158,6 +163,56 @@ describe("buildStudioSavePayload", () => {
       challengeId: "",
     });
     expect(updated.remixFromId).toBeUndefined();
+  });
+
+  it("round-trips the canonical Shared Stage through save-payload to creator-work projection", () => {
+    const shared3dStage = {
+      kind: "toonspectrum.studio-shared-3d-stage" as const,
+      version: 1 as const,
+      authority: "page-background-with-linked-character-sources" as const,
+      capturePolicy: "require-all-linked" as const,
+      background: {
+        bundleId: "bundle-1",
+        sourceHash: `sha256:${"a".repeat(64)}` as const,
+      },
+      characters: [{
+        elementId: "character-1",
+        modelRuntimeKey: `character-1:sha256:${"b".repeat(64)}`,
+        sourceHash: `sha256:${"c".repeat(64)}` as const,
+        hiddenByStage: true as const,
+      }],
+    };
+    const migrated = migrateStudioShared3dStageCollectionDocument(shared3dStage)!;
+    const base = saveInput();
+    const pagesList = base.document.pagesList.map((page, index) =>
+      index === 0 ? { ...page, shared3dStage } : page);
+    const payload = buildStudioSavePayload({
+      ...base,
+      document: { ...base.document, pagesList },
+    });
+    const hydrated = creatorWorkSnapshotToStudioProject(payload);
+    const savedPages = (payload.doc as { pagesList?: unknown[] }).pagesList;
+
+    expect(savedPages?.[0]).toMatchObject({ shared3dStage: migrated });
+    expect(hydrated.pagesList[0]?.shared3dStage).toEqual(migrated);
+  });
+
+  it("round-trips two native v2 Stages and DCC provenance through the server payload", () => {
+    const shared3dStage = createNativePluralShared3dStageFixture();
+    const base = saveInput();
+    const payload = buildStudioSavePayload({
+      ...base,
+      document: {
+        ...base.document,
+        pagesList: base.document.pagesList.map((page, index) =>
+          index === 0 ? { ...page, shared3dStage } : page),
+      },
+    });
+    const hydrated = creatorWorkSnapshotToStudioProject(payload);
+
+    expect((payload.doc as { pagesList?: Array<{ shared3dStage?: unknown }> })
+      .pagesList?.[0]?.shared3dStage).toEqual(shared3dStage);
+    expect(hydrated.pagesList[0]?.shared3dStage).toEqual(shared3dStage);
   });
 });
 

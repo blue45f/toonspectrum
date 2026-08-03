@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
+  studioEditableMeshToTriangleSoup,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
 import {
@@ -18,20 +19,27 @@ import {
 } from "./studio-hybrid-dcc-asset-layout";
 import {
   createStudioHybridDccComponentSelection,
+  mapStudioHybridDccRayFaceIndex,
   mutateStudioHybridDccComponentSelection,
 } from "./studio-hybrid-dcc-component-selection";
 import { hybridDccRegisterAsset } from "./studio-hybrid-dcc-document";
+import { workspaceAddActiveModifier } from "./studio-hybrid-dcc-modifier-workspace";
+import { workspaceLoadEditableRoomPreset } from "./studio-hybrid-dcc-room-workspace";
 import { resolveStudioHybridDccScreenComponentCandidate } from "./studio-hybrid-dcc-screen-selection";
 import {
   createStudioHybridDccWorkspace,
   workspaceAddUnitCube,
+  workspaceClothStep,
   workspaceSetAssetVisibility,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
+import { createStudioSharedSet } from "./studio-live-2d3d-bridge";
 import {
+  deriveStudioHybridDccViewportSnapshot,
   StudioHybridDccViewport,
 } from "./StudioHybridDccViewport";
 
+import type { StudioRenderMeshCache } from "./studio-geometry-authority";
 import type { ReactNode } from "react";
 
 const fiberHarness = vi.hoisted(() => ({
@@ -88,6 +96,31 @@ function workspaceWithMeshes(
     });
   }
   return { ...workspace, session, activeAssetId: assets.at(-1)!.assetId };
+}
+
+function workspaceWithRenderCache(
+  workspace: StudioHybridDccWorkspace,
+  assetId: string,
+  renderCache: StudioRenderMeshCache,
+): StudioHybridDccWorkspace {
+  const record = workspace.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing render-cache fixture asset ${assetId}`);
+  return {
+    ...workspace,
+    session: {
+      ...workspace.session,
+      state: {
+        ...workspace.session.state,
+        geometry: {
+          ...workspace.session.state.geometry,
+          records: {
+            ...workspace.session.state.geometry.records,
+            [assetId]: { ...record, renderCache },
+          },
+        },
+      },
+    },
+  };
 }
 
 function createDisconnectedRegularPolygonMesh(
@@ -209,6 +242,250 @@ describe("StudioHybridDccViewport", () => {
     expect(onSelectAsset).toHaveBeenLastCalledWith("hero-cube");
     fireEvent.click(screen.getByTestId("r3f-canvas"));
     expect(onSelectAsset).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps the canonical mesh renderable after an XPBD cloth step triangulates deforming n-gons", () => {
+    const workspace = workspaceClothStep(workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("cloth-viewport"),
+      "cloth-cube",
+    ));
+    const snapshot = deriveStudioHybridDccViewportSnapshot(workspace);
+
+    expect(snapshot.errors).toEqual([]);
+    expect(snapshot.assets).toHaveLength(1);
+    expect(snapshot.assets[0]).toMatchObject({
+      assetId: "cloth-cube",
+      triangleCount: 12,
+      vertexCount: 8,
+    });
+  });
+
+  it("uses the verified modifier cache for object presentation and the source cage for stable component editing", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("modifier-cache-viewport"),
+      "array-cube",
+    );
+    workspace = await workspaceAddActiveModifier(workspace, "array");
+    const record = workspace.session.state.geometry.records["array-cube"]!;
+    const cache = record.renderCache!;
+    const objectSnapshot = deriveStudioHybridDccViewportSnapshot(workspace, "object");
+    const objectAsset = objectSnapshot.assets[0]!;
+    const sourceSnapshot = deriveStudioHybridDccViewportSnapshot(workspace, "face");
+    const sourceAsset = sourceSnapshot.assets[0]!;
+    const sourceSoup = studioEditableMeshToTriangleSoup(record.mesh);
+
+    expect(objectAsset.renderSource).toBe("modifier-cache");
+    expect(objectAsset.positions).toBe(cache.positions);
+    expect(objectAsset.indices).toBe(cache.indices);
+    expect(objectAsset.renderHash).toBe(cache.derivedFromHash);
+    expect(objectAsset.triangleCount).toBe(cache.indices.length / 3);
+    expect(objectSnapshot.signature).toContain(cache.derivedFromHash);
+    expect(objectSnapshot.radius).toBeGreaterThan(sourceSnapshot.radius);
+    expect(objectAsset.worldMax[0]).toBeGreaterThan(sourceAsset.worldMax[0]);
+
+    expect(sourceAsset.renderSource).toBe("authority-edit-cage");
+    expect(sourceAsset.renderHash).toBe(record.meshHash);
+    expect(sourceAsset.positions).toEqual(sourceSoup.positions);
+    expect(sourceAsset.indices).toEqual(sourceSoup.indices);
+    expect(sourceAsset.triangleCount).toBe(12);
+    expect(record.mesh).toBe(record.modifierStack.source);
+    const mappedFace = mapStudioHybridDccRayFaceIndex({
+      assetId: sourceAsset.assetId,
+      mesh: sourceAsset.mesh,
+      meshRevision: sourceAsset.meshRevision,
+      sourceHash: sourceAsset.meshHash,
+    }, 0);
+    expect(mappedFace.ok).toBe(true);
+    if (!mappedFace.ok) throw new Error("source-cage face mapping failed");
+    expect(mappedFace.value.faceId).toBe(record.mesh.faces[0]!.id);
+
+    const selected = mutateStudioHybridDccComponentSelection(
+      createStudioHybridDccComponentSelection(),
+      {
+        mode: "face",
+        operation: "replace",
+        ids: [record.mesh.faces[0]!.id],
+        activeId: record.mesh.faces[0]!.id,
+        source: {
+          assetId: record.assetId,
+          mesh: record.mesh,
+          meshRevision: record.revision,
+          sourceHash: record.meshHash,
+        },
+      },
+    );
+    if (!selected.ok) throw new Error("component selection fixture failed");
+
+    const view = render(
+      <StudioHybridDccViewport
+        workspace={workspace}
+        onSelectAsset={vi.fn()}
+        webglAvailable
+      />,
+    );
+    const root = screen.getByLabelText("Hybrid DCC 3D 작업 뷰포트");
+    expect(root.getAttribute("data-render-source")).toBe("modifier-cache");
+    expect(root.getAttribute("data-render-signature")).toContain(cache.derivedFromHash);
+    expect(screen.getByText(
+      `V ${objectSnapshot.totalVertices.toLocaleString("ko-KR")} · △ ${objectSnapshot.totalTriangles.toLocaleString("ko-KR")}`,
+    )).toBeTruthy();
+    expect(screen.getByText("검증된 변형 결과 표시")).toBeTruthy();
+    const objectButton = screen.getByText("array-cube").closest("button");
+    expect(objectButton?.getAttribute("data-render-hash")).toBe(cache.derivedFromHash);
+    expect(objectButton?.getAttribute("data-render-source")).toBe("modifier-cache");
+
+    view.rerender(
+      <StudioHybridDccViewport
+        workspace={workspace}
+        componentSelection={selected.value}
+        onSelectAsset={vi.fn()}
+        webglAvailable
+      />,
+    );
+    expect(root.getAttribute("data-render-source")).toBe("authority-edit-cage");
+    expect(root.getAttribute("data-render-signature")).toContain(record.meshHash);
+    expect(screen.getByText("V 8 · △ 12")).toBeTruthy();
+    expect(screen.getByText("안정 ID 원본 케이지")).toBeTruthy();
+    const cageButton = screen.getByText("array-cube").closest("button");
+    expect(cageButton?.getAttribute("data-render-hash")).toBe(record.meshHash);
+    expect(cageButton?.getAttribute("data-render-source")).toBe("authority-edit-cage");
+  });
+
+  it("fails closed to immutable source geometry for stale, non-finite, oversized, or invalid caches", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("invalid-cache-viewport"),
+      "safe-cube",
+    );
+    workspace = await workspaceAddActiveModifier(workspace, "array");
+    const record = workspace.session.state.geometry.records["safe-cube"]!;
+    const cache = record.renderCache!;
+    const sourceMesh = record.mesh;
+    const sourceSoup = studioEditableMeshToTriangleSoup(sourceMesh);
+    const originalCachePositions = new Float32Array(cache.positions);
+    const cases: readonly {
+      readonly label: string;
+      readonly expected: RegExp;
+      readonly corrupt: () => StudioRenderMeshCache;
+    }[] = [
+      {
+        label: "stale derived hash",
+        expected: /파생 해시/u,
+        corrupt: () => ({ ...cache, derivedFromHash: "mesh:deadbeef" }),
+      },
+      {
+        label: "non-finite coordinate",
+        expected: /유한하지 않은 좌표/u,
+        corrupt: () => {
+          const positions = new Float32Array(cache.positions);
+          positions[0] = Number.NaN;
+          return { ...cache, positions };
+        },
+      },
+      {
+        label: "oversized coordinate",
+        expected: /안전 범위/u,
+        corrupt: () => {
+          const positions = new Float32Array(cache.positions);
+          positions[0] = 1_000_001;
+          return { ...cache, positions };
+        },
+      },
+      {
+        label: "out-of-range index",
+        expected: /인덱스가 정점 범위/u,
+        corrupt: () => {
+          const indices = new Uint32Array(cache.indices);
+          indices[0] = cache.positions.length / 3;
+          return { ...cache, indices };
+        },
+      },
+      {
+        label: "tampered content address",
+        expected: /내용 해시/u,
+        corrupt: () => ({
+          ...cache,
+          contentHash: `sha256:${"0".repeat(64)}`,
+        }),
+      },
+    ];
+
+    for (const fixture of cases) {
+      const invalidWorkspace = workspaceWithRenderCache(
+        workspace,
+        "safe-cube",
+        fixture.corrupt(),
+      );
+      const snapshot = deriveStudioHybridDccViewportSnapshot(invalidWorkspace, "object");
+      const asset = snapshot.assets[0]!;
+      expect(asset.renderSource, fixture.label).toBe("authority-cache-fallback");
+      expect(asset.renderHash, fixture.label).toBe(record.meshHash);
+      expect(asset.positions, fixture.label).toEqual(sourceSoup.positions);
+      expect(asset.indices, fixture.label).toEqual(sourceSoup.indices);
+      expect(snapshot.warnings[0]?.message, fixture.label).toMatch(fixture.expected);
+      expect(invalidWorkspace.session.state.geometry.records["safe-cube"]!.mesh).toBe(sourceMesh);
+    }
+    expect(cache.positions).toEqual(originalCachePositions);
+
+    const staleWorkspace = workspaceWithRenderCache(workspace, "safe-cube", {
+      ...cache,
+      derivedFromHash: "mesh:deadbeef",
+    });
+    render(
+      <StudioHybridDccViewport
+        workspace={staleWorkspace}
+        onSelectAsset={vi.fn()}
+        webglAvailable
+      />,
+    );
+    expect(screen.getByLabelText("Hybrid DCC 3D 작업 뷰포트")
+      .getAttribute("data-render-source")).toBe("authority-cache-fallback");
+    expect(screen.getByText("1개 변형 미리보기를 원본으로 대체했습니다.")).toBeTruthy();
+    expect(screen.getByText(/파생 해시가 현재 장면과 달라/u)).toBeTruthy();
+  });
+
+  it("uses only strictly validated room-color material IDs and preserves other material defaults", () => {
+    const room = workspaceLoadEditableRoomPreset(
+      createStudioHybridDccWorkspace("real-room-material-viewport"),
+      "classroom",
+    );
+    const roomSnapshot = deriveStudioHybridDccViewportSnapshot(room, "object");
+    expect(roomSnapshot.assets.length).toBeGreaterThan(1);
+    expect(roomSnapshot.assets.every(({ materialColor, materialId }) => (
+      materialId.startsWith("room-color:#") && materialColor !== null
+    ))).toBe(true);
+
+    const base = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("room-material-viewport"),
+      "room-part",
+    );
+    const withMaterial = (materialId: string): StudioHybridDccWorkspace => ({
+      ...base,
+      bridge: {
+        ...base.bridge,
+        set: createStudioSharedSet(
+          base.bridge.set.id,
+          base.bridge.set.objects.map((object) => object.id === "room-part"
+            ? { ...object, materialId }
+            : object),
+        ),
+      },
+    });
+
+    const safe = deriveStudioHybridDccViewportSnapshot(
+      withMaterial("room-color:#2FA0C4"),
+      "object",
+    ).assets[0]!;
+    expect(safe.materialId).toBe("room-color:#2FA0C4");
+    expect(safe.materialColor).toBe("#2fa0c4");
+    expect(deriveStudioHybridDccViewportSnapshot(
+      withMaterial("room-color:#2fa0c4<script>"),
+      "object",
+    ).assets[0]!.materialColor).toBeNull();
+    expect(deriveStudioHybridDccViewportSnapshot(
+      withMaterial("mat-wood"),
+      "object",
+    ).assets[0]!.materialColor).toBeNull();
+    expect(VIEWPORT_SOURCE).toContain("color={asset.materialColor");
   });
 
   it("honors bridge visibility without deleting the canonical object", () => {
@@ -595,6 +872,40 @@ describe("StudioHybridDccViewport", () => {
 });
 
 describe("deriveStudioHybridDccAssetLayout", () => {
+  it("rejects oversized authority and Float32 presentation coordinates", () => {
+    const cube = createStudioUnitCubeMesh();
+    const oversized = {
+      ...cube,
+      vertices: cube.vertices.map((vertex, index) => index === 0
+        ? { ...vertex, position: { ...vertex.position, x: 1e100 } }
+        : vertex),
+    };
+    const presentation = studioEditableMeshToTriangleSoup(cube).positions;
+    presentation[0] = 1_000_001;
+
+    const layout = deriveStudioHybridDccAssetLayout([
+      { assetId: "oversized-authority", meshHash: "authority", mesh: oversized },
+      {
+        assetId: "oversized-presentation",
+        meshHash: "presentation",
+        mesh: cube,
+        presentation: { positions: presentation, derivedFromHash: "mesh:deadbeef" },
+      },
+    ]);
+
+    expect(layout.items).toEqual([]);
+    expect(layout.errors).toEqual([
+      {
+        assetId: "oversized-authority",
+        message: "메시 좌표가 안전 범위 ±1,000,000을 벗어났습니다.",
+      },
+      {
+        assetId: "oversized-presentation",
+        message: "화면용 메시 좌표가 안전 범위 ±1,000,000을 벗어났습니다.",
+      },
+    ]);
+  });
+
   it("uses canonical TRS authority and rotated world bounds instead of an inspection grid", () => {
     const cube = createStudioUnitCubeMesh();
     const layout = deriveStudioHybridDccAssetLayout([{

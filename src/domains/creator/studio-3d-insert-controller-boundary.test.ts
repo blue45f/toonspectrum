@@ -93,6 +93,7 @@ describe("Studio 3D insert controller boundary", () => {
 
     expect(contract.allImports).toEqual([
       "./studio-bg3d-scene-document",
+      "./studio-shared-3d-insert-contract",
       "./studio-vrm-scene-document",
     ]);
     expect(contract.wholeClauseTypeImports).toEqual(contract.allImports);
@@ -188,6 +189,16 @@ describe("Studio 3D insert controller boundary", () => {
     expect(previewStack).not.toContain("applyBg3dRenderedImage");
     expect(previewStack).not.toContain("addRenderedImage");
     expect(previewStack).not.toContain("patchEl");
+    const page = moduleShape("./StudioPage.tsx").source;
+    const insertHandlerStart = page.indexOf("insertBg3dResult: (result) => {");
+    const insertHandlerEnd = page.indexOf("insertVrmResult:", insertHandlerStart);
+    const insertHandler = page.slice(insertHandlerStart, insertHandlerEnd);
+    expect(insertHandlerStart).toBeGreaterThanOrEqual(0);
+    expect(insertHandler).toContain("const editorPageId = bg3dMutationPageIdRef.current;");
+    expect(insertHandler).toContain("editorPageId !== currentPageIdRef.current");
+    expect(insertHandler.indexOf("return false;")).toBeLessThan(
+      insertHandler.indexOf("applyStudioBg3dInsertResult({"),
+    );
   });
 
   it("wires fail-closed commit results before selection, tool, and guide side effects", () => {
@@ -217,9 +228,8 @@ describe("Studio 3D insert controller boundary", () => {
     )).toBeLessThan(backgroundInsert.indexOf(
       "const plan = planStudioBg3dLtLayers"
     ));
-    expect(backgroundInsert).toContain(
-      "const magicAttachment = attachStudioBg3dMagicFilterMaskToLtPlan({"
-    );
+    expect(backgroundInsert).toContain("const magicAttachment = detachPlan?.ok");
+    expect(backgroundInsert).toContain(": attachStudioBg3dMagicFilterMaskToLtPlan({");
     expect(backgroundInsert).toContain(
       "if (!commit(nextElements, {"
     );

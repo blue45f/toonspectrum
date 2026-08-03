@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const runtimeHintsSource = readFileSync(
+  new URL("./studio-generic-3d-runtime-hints.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);
@@ -59,19 +63,19 @@ describe("Studio BG3D generic model mode integration boundary", () => {
   });
 
   it("profiles renderer structure once while keeping unsupported child transforms read-only", () => {
-    const inspect = sourceBetween(
-      "function inspectStudioGeneric3dRuntimeHints(",
-      "interface ModelThumbnailGpuLease",
-    );
     const admission = sourceBetween(
       "async function admitAndCacheModel(",
       "function disposeModelCache(",
     );
 
-    expect(inspect).toContain("partTransformsSupported: false");
-    expect(inspect).toContain("renderable.isSkinnedMesh === true");
-    expect(inspect).toContain("mapped.normalMap?.isTexture");
-    expect(inspect).toContain("new Set(joints.map((joint) => joint.canonicalKey)).size");
+    expect(source).toContain('from "./studio-generic-3d-runtime-hints"');
+    expect(runtimeHintsSource).toContain("function inspectStudioGeneric3dRuntimeHints(");
+    expect(runtimeHintsSource).toContain("partTransformsSupported: false");
+    expect(runtimeHintsSource).toContain("renderable.isSkinnedMesh === true");
+    expect(runtimeHintsSource).toContain("mapped.normalMap?.isTexture");
+    expect(runtimeHintsSource).toContain(
+      "new Set(joints.map((joint) => joint.canonicalKey)).size",
+    );
     expectInOrder(admission, [
       "loadVerifiedStudioBg3dGlbWithThree",
       "assertStudioBg3dModelPlacementAdmission({",

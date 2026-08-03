@@ -8,6 +8,7 @@ import {
   createAutoGripFingerOverrides,
   createDefaultSecondaryRig,
   getPropFitStatus,
+  inspectAutoGripReadiness,
   measureVrmPropRigMetrics,
   resolvePropAttachment,
   resolveSecondaryHandConstraint,
@@ -368,6 +369,68 @@ describe("자동 손 그립과 양손 보조 target", () => {
     expect(Math.abs(largeGrip.rightMiddleIntermediate[2])).toBeLessThan(
       Math.abs(normalGrip.rightMiddleIntermediate[2])
     );
+  });
+
+  it("저장되는 그립 맞춤값으로 관통과 뜸을 연속적으로 보정한다", () => {
+    const relaxed = createPropInstance("sword", "relaxed-grip")!;
+    const firm = createPropInstance("sword", "firm-grip")!;
+    relaxed.rig = { ...relaxed.rig!, gripFit: 0.7 };
+    firm.rig = { ...firm.rig!, gripFit: 1.3 };
+    const metrics = createCompleteGripMetrics();
+
+    const relaxedGrip = createAutoGripFingerOverrides([relaxed], propDefById, metrics);
+    const firmGrip = createAutoGripFingerOverrides([firm], propDefById, metrics);
+
+    expect(Math.abs(firmGrip.rightMiddleIntermediate[2])).toBeGreaterThan(
+      Math.abs(relaxedGrip.rightMiddleIntermediate[2])
+    );
+    expect(Math.abs(firmGrip.rightThumbProximal[1])).toBeGreaterThan(
+      Math.abs(relaxedGrip.rightThumbProximal[1])
+    );
+  });
+
+  it("모델별 손가락 마디 길이를 실측해 짧은 손가락을 더 감고 긴 손가락은 이완한다", () => {
+    const item = createPropInstance("sword", "anatomy-aware")!;
+    const regularMetrics = createCompleteGripMetrics();
+    const longLittleMetrics = {
+      ...regularMetrics,
+      boneWorldPositions: {
+        ...regularMetrics.boneWorldPositions,
+        rightLittleIntermediate: [-0.585, 1.2, 0.14] as Vec3,
+        rightLittleDistal: [-0.585, 1.2, 0.205] as Vec3,
+      },
+    };
+
+    const regular = createAutoGripFingerOverrides([item], propDefById, regularMetrics);
+    const longLittle = createAutoGripFingerOverrides([item], propDefById, longLittleMetrics);
+
+    expect(Math.abs(regular.rightLittleIntermediate[2])).toBeGreaterThan(
+      Math.abs(longLittle.rightLittleIntermediate[2])
+    );
+  });
+
+  it("UI가 실제 엔진과 같은 준비·불완전 리그·접촉 충돌 상태를 진단한다", () => {
+    const first = createPropInstance("mug", "readiness-a")!;
+    const second = createPropInstance("sword", "readiness-b")!;
+    const metrics = createCompleteGripMetrics();
+
+    expect(inspectAutoGripReadiness(first, [first], propDefById, metrics)).toEqual({
+      kind: "ready",
+      hand: "rightHand",
+    });
+    expect(
+      inspectAutoGripReadiness(first, [first], propDefById, DEFAULT_VRM_PROP_RIG_METRICS)
+    ).toMatchObject({ kind: "unavailable", reason: "incomplete-rig" });
+    expect(inspectAutoGripReadiness(first, [first, second], propDefById, metrics)).toMatchObject({
+      kind: "unavailable",
+      reason: "contact-conflict",
+    });
+
+    second.rig = { ...second.rig!, autoFingerPose: false };
+    expect(inspectAutoGripReadiness(first, [first, second], propDefById, metrics)).toEqual({
+      kind: "ready",
+      hand: "rightHand",
+    });
   });
 
   it("PIP 중심으로 굽힘을 분배하고 DIP를 작게 결합해 갈고리 모양을 막는다", () => {

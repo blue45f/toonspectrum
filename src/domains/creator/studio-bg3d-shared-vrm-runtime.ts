@@ -47,11 +47,15 @@ export function applyStudioBg3dLinkedCharacterState(
   source: StudioShared3dCharacterSource,
 ): boolean {
   const { scene } = source;
+  const [stageX, stageY, stageZ] = source.stageTransform.position;
   const poseApplied = applyPoseToVrm(
     vrm,
     scene.pose.bones as PoseBoneMap,
-    scene.pose.yOffset,
-    scene.pose.translations,
+    stageY,
+    {
+      ...scene.pose.translations,
+      root: [stageX, 0, stageZ],
+    },
   );
   if (!poseApplied) return false;
 
@@ -64,7 +68,7 @@ export function applyStudioBg3dLinkedCharacterState(
   const baseRotationY = vrm.scene.userData[STUDIO_VRM_BASE_ROTATION_Y_KEY];
   vrm.scene.rotation.y =
     (typeof baseRotationY === "number" && Number.isFinite(baseRotationY) ? baseRotationY : 0) +
-    scene.pose.bodyRotationY;
+    source.stageTransform.rotationY;
   vrm.scene.name = `ToonSpectrumSharedCharacter:${source.elementId}`;
   vrm.scene.userData.studioShared3dCharacterElementId = source.elementId;
   vrm.scene.traverse((object) => {
@@ -72,8 +76,8 @@ export function applyStudioBg3dLinkedCharacterState(
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    // Linked characters are read-only in the background stage. Pointer hits pass through to
-    // editable BG3D nodes until a shared transform transaction is introduced.
+    // One bounded root proxy owns character selection. Internal face, hair and garment meshes stay
+    // pass-through so transparent or oversized geometry cannot steal picks from the background.
     mesh.raycast = () => undefined;
   });
   vrm.update(0);

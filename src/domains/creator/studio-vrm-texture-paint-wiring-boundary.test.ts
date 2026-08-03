@@ -227,7 +227,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     expect(revisionGate).toBeLessThan(lock);
     expect(lock).toBeLessThan(persistence);
     expect(persistence).toBeLessThan(screenshot);
-    expect(insertHandler).toContain("releaseTexturePaintCaptureLock();");
+    expect(insertHandler).toContain("releaseCaptureMutationLocks();");
 
     const undo = sourceBetween(
       poserSource,

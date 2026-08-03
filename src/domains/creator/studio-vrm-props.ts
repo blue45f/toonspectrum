@@ -7,6 +7,8 @@
 //  - 직렬화는 옵셔널·버전 필드 → 기존 스튜디오 문서 하위호환.
 
 export const VRM_PROPS_VERSION = 2 as const;
+export const VRM_PROP_GRIP_FIT_MIN = 0.7;
+export const VRM_PROP_GRIP_FIT_MAX = 1.3;
 
 /** 부착 가능한 humanoid 본(three-vrm humanoid 표준 이름). */
 export type PropAttachBone =
@@ -447,6 +449,11 @@ export interface PropRigV2 {
   anchorId: string;
   autoScale: boolean;
   autoFingerPose: boolean;
+  /**
+   * 자동 그립의 아트 디렉션 배율. 1은 실측 결과, 1보다 작으면 이완,
+   * 크면 더 단단히 감는다. 기존 V2 문서는 파서에서 1로 복구한다.
+   */
+  gripFit: number;
   deltaPosition: Vec3;
   deltaRotationDeg: Vec3;
   deltaScale: number;
@@ -530,6 +537,7 @@ export function createPropInstance(propId: string, uid?: string): PropInstance |
       anchorId: primaryAnchor.id,
       autoScale: true,
       autoFingerPose: Boolean(def.grip),
+      gripFit: 1,
       deltaPosition: [0, 0, 0],
       deltaRotationDeg: [0, 0, 0],
       deltaScale: 1,
@@ -614,6 +622,7 @@ function parseV2Rig(raw: unknown, def: PropDef, primaryBone: PropAttachBone): Pr
     anchorId: (requestedAnchor ?? fallbackAnchor).id,
     autoScale: bool(value.autoScale, true),
     autoFingerPose: bool(value.autoFingerPose, Boolean(def.grip)),
+    gripFit: clamp(value.gripFit, 1, VRM_PROP_GRIP_FIT_MIN, VRM_PROP_GRIP_FIT_MAX),
     deltaPosition: vec3(value.deltaPosition, [0, 0, 0], POS_LIMIT),
     deltaRotationDeg: vec3(value.deltaRotationDeg, [0, 0, 0], ROT_LIMIT),
     deltaScale: clamp(value.deltaScale, 1, SCALE_MIN, SCALE_MAX),

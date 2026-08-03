@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   FALLBACK_WARDROBE_METRICS,
+  DEFAULT_WARDROBE_OPTIONS,
+  VRM_WARDROBE_VERSION,
   WARDROBE_BONES,
+  WARDROBE_FABRICS,
   WARDROBE_FIT_MAX,
   WARDROBE_FIT_MIN,
   WARDROBE_HIDE_COSTUME_SLOTS,
@@ -16,11 +19,13 @@ import {
   createWardrobeEquip,
   mergeWardrobeCostumeVisibility,
   parseWardrobe,
+  parseWardrobeDocument,
   sanitizeWardrobeMetrics,
   selectableWardrobeItemsBySlot,
   selectableWardrobeSetById,
   serializeWardrobe,
   wardrobeItemById,
+  wardrobeFabricById,
   wardrobeItemsBySlot,
   resolveWardrobeItemForNewSelection,
   type GarmentPart,
@@ -56,6 +61,25 @@ describe("워드로브 카탈로그", () => {
       expect(item.label.length).toBeGreaterThan(0);
       expect(item.hint.length).toBeGreaterThan(0);
       expect(item.defaultColor).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(wardrobeFabricById(item.defaultFabricId)).toBeDefined();
+      expect(item.fitProfile.version).toBe(1);
+      expect(item.fitProfile.regions.length).toBeGreaterThan(0);
+      expect(item.geometrySource).toBe(
+        item.slot === "shoes" ? "rigid-procedural" : "skinned-procedural-v1",
+      );
+    }
+  });
+
+  it("직물 프리셋은 유효한 물성과 쉬운 설명을 제공한다", () => {
+    expect(WARDROBE_FABRICS.length).toBeGreaterThanOrEqual(8);
+    for (const fabric of WARDROBE_FABRICS) {
+      expect(fabric.label.length).toBeGreaterThan(0);
+      expect(fabric.hint.length).toBeGreaterThan(0);
+      expect(fabric.roughness).toBeGreaterThanOrEqual(0);
+      expect(fabric.roughness).toBeLessThanOrEqual(1);
+      expect(fabric.metalness).toBeGreaterThanOrEqual(0);
+      expect(fabric.metalness).toBeLessThanOrEqual(1);
+      expect(fabric.weaveStrength).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -175,6 +199,37 @@ describe("베이크드 의상 자동 숨김", () => {
       meshes,
       true,
     )).toEqual({ hidden: ["shirt-mesh"], recolor: {} });
+  });
+
+  it("equip→unequip 뒤에도 사용자가 직접 숨긴 원본 의상은 그대로 숨긴다", () => {
+    const authored = { hidden: ["shirt-mesh"], recolor: {} };
+    const equipped = { top: createWardrobeEquip("shirt")! };
+    expect(mergeWardrobeCostumeVisibility(authored, equipped, meshes, true).hidden)
+      .toContain("shirt-mesh");
+    expect(mergeWardrobeCostumeVisibility(authored, {}, meshes, true).hidden)
+      .toEqual(["shirt-mesh"]);
+    expect(authored.hidden).toEqual(["shirt-mesh"]);
+  });
+
+  it("top과 bottom 중 하나를 해제해도 남은 슬롯이 onepiece 숨김 소유권을 유지한다", () => {
+    const both: WardrobeState = {
+      top: createWardrobeEquip("shirt")!,
+      bottom: createWardrobeEquip("jeans")!,
+    };
+    const bottomOnly: WardrobeState = { bottom: both.bottom };
+    expect(mergeWardrobeCostumeVisibility({ hidden: [], recolor: {} }, both, meshes, true).hidden)
+      .toContain("dress-mesh");
+    expect(mergeWardrobeCostumeVisibility({ hidden: [], recolor: {} }, bottomOnly, meshes, true).hidden)
+      .toContain("dress-mesh");
+  });
+
+  it("세트 교체는 현재 전체 슬롯에서 다시 파생해 이전 자동 숨김을 남기지 않는다", () => {
+    const full = applyWardrobeSet(WARDROBE_SETS.find((set) => set.id === "school")!);
+    const shoesOnly: WardrobeState = { shoes: createWardrobeEquip("heels")! };
+    expect(mergeWardrobeCostumeVisibility({ hidden: [], recolor: {} }, full, meshes, true).hidden)
+      .toEqual(expect.arrayContaining(["shirt-mesh", "coat-mesh", "pants-mesh", "shoes-mesh"]));
+    expect(mergeWardrobeCostumeVisibility({ hidden: [], recolor: {} }, shoesOnly, meshes, true).hidden)
+      .toEqual(["shoes-mesh"]);
   });
 });
 
@@ -314,11 +369,12 @@ describe("측정값 정규화", () => {
 describe("장착 상태 직렬화", () => {
   it("정상 상태를 왕복 직렬화한다", () => {
     const state: WardrobeState = {
-      outer: { itemId: "blazer", color: "#123456", fit: 1.2 },
-      shoes: { itemId: "sneakers", color: "#ffffff", fit: 0.9 },
+      outer: { itemId: "blazer", color: "#123456", fit: 1.2, fitMode: "manual", fabricId: "wool" },
+      shoes: { itemId: "sneakers", color: "#ffffff", fit: 0.9, fitMode: "auto", fabricId: "jersey" },
     };
-    const serialized = serializeWardrobe(state);
-    expect(serialized?.version).toBe(1);
+    const serialized = serializeWardrobe(state, { autoHideOriginal: false });
+    expect(serialized?.version).toBe(VRM_WARDROBE_VERSION);
+    expect(serialized?.options.autoHideOriginal).toBe(false);
     const parsed = parseWardrobe(serialized);
     expect(parsed).toEqual(state);
   });
@@ -334,9 +390,9 @@ describe("장착 상태 직렬화", () => {
     });
 
     expect(parsed).toEqual({
-      outer: { itemId: "cardigan", color: "#112233", fit: 1.1 },
-      top: { itemId: "tshirt", color: "#445566", fit: 1 },
-      bottom: { itemId: "pants", color: "#778899", fit: 0.95 },
+      outer: { itemId: "cardigan", color: "#112233", fit: 1.1, fitMode: "auto", fabricId: "knit" },
+      top: { itemId: "tshirt", color: "#445566", fit: 1, fitMode: "auto", fabricId: "jersey" },
+      bottom: { itemId: "pants", color: "#778899", fit: 0.95, fitMode: "auto", fabricId: "denim" },
     });
     expect(buildGarmentParts("cardigan", FALLBACK_WARDROBE_METRICS)).not.toEqual(
       [],
@@ -346,6 +402,42 @@ describe("장착 상태 직렬화", () => {
 
   it("빈 상태는 undefined로 직렬화된다(문서 하위호환)", () => {
     expect(serializeWardrobe({})).toBeUndefined();
+  });
+
+  it("v1 문서는 v2 기본 옵션·핏 방식·직물로 결정론적으로 마이그레이션한다", () => {
+    const parsed = parseWardrobeDocument({
+      version: 1,
+      slots: { top: { itemId: "shirt", color: "#ABCDEF", fit: 1.05 } },
+    });
+    expect(parsed.sourceVersion).toBe(1);
+    expect(parsed.supported).toBe(true);
+    expect(parsed.options).toEqual(DEFAULT_WARDROBE_OPTIONS);
+    expect(parsed.slots.top).toEqual({
+      itemId: "shirt",
+      color: "#abcdef",
+      fit: 1.05,
+      fitMode: "auto",
+      fabricId: "cotton",
+    });
+  });
+
+  it("빈 워드로브라도 auto-hide OFF는 v2 문서로 보존한다", () => {
+    const serialized = serializeWardrobe({}, { autoHideOriginal: false });
+    expect(serialized).toEqual({
+      version: VRM_WARDROBE_VERSION,
+      slots: {},
+      options: { autoHideOriginal: false },
+    });
+    expect(parseWardrobeDocument(serialized).options.autoHideOriginal).toBe(false);
+  });
+
+  it("알 수 없는 미래 버전은 v1처럼 추측하지 않고 fail-closed 한다", () => {
+    const parsed = parseWardrobeDocument({
+      version: 999,
+      slots: { top: { itemId: "shirt", color: "#ffffff", fit: 1 } },
+    });
+    expect(parsed.supported).toBe(false);
+    expect(parsed.slots).toEqual({});
   });
 
   it("미지의 아이템·슬롯 불일치 장착은 버린다", () => {
@@ -380,7 +472,13 @@ describe("장착 상태 직렬화", () => {
 
   it("createWardrobeEquip은 카탈로그 기본값을 쓴다", () => {
     const equip = createWardrobeEquip("heels");
-    expect(equip).toEqual({ itemId: "heels", color: wardrobeItemById("heels")?.defaultColor, fit: 1 });
+    expect(equip).toEqual({
+      itemId: "heels",
+      color: wardrobeItemById("heels")?.defaultColor,
+      fit: 1,
+      fitMode: "auto",
+      fabricId: "leather",
+    });
     expect(createWardrobeEquip("no-such")).toBeNull();
   });
 });

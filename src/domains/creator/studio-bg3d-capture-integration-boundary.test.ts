@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const actionFooterSource = readFileSync(
+  new URL("./StudioBg3dActionFooter.tsx", import.meta.url),
+  "utf8",
+);
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
   new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
@@ -89,7 +93,10 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     expect(closeGuard).toContain("if (captureInFlightRef.current) return;");
     expect(closeGuard).toContain("onClose();");
     expect(background3dSource.match(/disabled=\{isCapturing\}[\s\S]{0,120}onClick=\{requestUserClose\}/gu))
-      .toHaveLength(2);
+      .toHaveLength(1);
+    expect(actionFooterSource).toMatch(
+      /disabled=\{isCapturing\}[\s\S]{0,120}onClick=\{onClose\}/u,
+    );
   });
 
   it("keeps document settings in the same debounced scene undo timeline", () => {
@@ -117,9 +124,8 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
 
     expect(modalStart).toBeGreaterThanOrEqual(0);
     expect(modalEnd).toBeGreaterThan(modalStart);
-    expect(studioPageSource).toContain(
-      "insertBg3dResult: (result) => applyStudioBg3dInsertResult({"
-    );
+    expect(studioPageSource).toContain("insertBg3dResult: (result) => {");
+    expect(studioPageSource).toContain("return applyStudioBg3dInsertResult({");
     expect(modal).toContain("onInsert={insertBg3dResult}");
 
     const handleStart = background3dSource.indexOf("async function handleInsert()");

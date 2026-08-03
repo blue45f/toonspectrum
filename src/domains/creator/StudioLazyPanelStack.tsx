@@ -230,6 +230,8 @@ export interface StudioLazyPanelStackProps {
   bg3dInitialDataUrl: string | undefined;
   bg3dInitialScene: StudioBg3dSceneDocument | undefined;
   bg3dOperation: "insert" | "update";
+  /** View-only LT identity used to resolve the page-owned Shared Stage without exposing a raw target. */
+  bg3dTargetBundleId: string | null;
   bg3dBatchRecoveryScope: StudioBg3dShotBatchRecoveryScope | null;
   validateRecoveryAccess: (
     scope: StudioBg3dShotBatchRecoveryScope,
@@ -409,6 +411,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   bg3dInitialDataUrl,
   bg3dInitialScene,
   bg3dOperation,
+  bg3dTargetBundleId,
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
@@ -616,6 +619,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         bg3dInitialDataUrl={bg3dInitialDataUrl}
         bg3dInitialScene={bg3dInitialScene}
         bg3dOperation={bg3dOperation}
+        bg3dTargetBundleId={bg3dTargetBundleId}
         bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
         validateRecoveryAccess={validateRecoveryAccess}
         bg3dOpen={bg3dOpen}

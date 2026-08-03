@@ -2,6 +2,8 @@ import * as THREE from "three";
 
 import { clampStudioVrmJointRotation } from "./studio-vrm-joint-limits";
 import {
+  VRM_PROP_GRIP_FIT_MAX,
+  VRM_PROP_GRIP_FIT_MIN,
   propDefById,
   type PropAnchorDef,
   type PropAttachBone,
@@ -1116,19 +1118,105 @@ function clampedFingerRotation(boneName: string, value: Vec3): Vec3 {
   return clampStudioVrmJointRotation(boneName, value);
 }
 
+interface AutoGripHandAnatomy {
+  readonly fingerCurlFactors: Record<AutoGripFinger, number>;
+  readonly thumbOppositionFactor: number;
+}
+
+function measuredFingerReach(
+  side: PropHandBone,
+  finger: AutoGripFinger,
+  metrics: VrmPropRigMetrics,
+): number | null {
+  const prefix = side === "leftHand" ? "left" : "right";
+  const proximal = metrics.boneWorldPositions[
+    `${prefix}${finger}Proximal` as VrmPropMetricBone
+  ];
+  const intermediate = metrics.boneWorldPositions[
+    `${prefix}${finger}Intermediate` as VrmPropMetricBone
+  ];
+  const distal = metrics.boneWorldPositions[
+    `${prefix}${finger}Distal` as VrmPropMetricBone
+  ];
+  const proximalLength = distance(proximal, intermediate);
+  const intermediateLength = distance(intermediate, distal);
+  if (proximalLength === null || intermediateLength === null) return null;
+
+  // VRM humanoid에는 fingertip 본이 없으므로 마지막 마디는 바로 앞 마디의 안정적인
+  // 비율로 추정한다. 절대 기본값 대신 모델 자체 비율을 써 SD·장신형 손에서도 적응한다.
+  const distalTipEstimate = intermediateLength * 0.72;
+  const reach = proximalLength + intermediateLength + distalTipEstimate;
+  return Number.isFinite(reach) && reach > 1e-5 ? reach : null;
+}
+
+function measuredThumbReach(
+  side: PropHandBone,
+  metrics: VrmPropRigMetrics,
+): number | null {
+  const prefix = side === "leftHand" ? "left" : "right";
+  const metacarpal = metrics.boneWorldPositions[
+    `${prefix}ThumbMetacarpal` as VrmPropMetricBone
+  ];
+  const proximal = metrics.boneWorldPositions[
+    `${prefix}ThumbProximal` as VrmPropMetricBone
+  ];
+  const distal = metrics.boneWorldPositions[
+    `${prefix}ThumbDistal` as VrmPropMetricBone
+  ];
+  const metacarpalLength = distance(metacarpal, proximal);
+  const proximalLength = distance(proximal, distal);
+  if (metacarpalLength === null || proximalLength === null) return null;
+  const reach = metacarpalLength + proximalLength + proximalLength * 0.68;
+  return Number.isFinite(reach) && reach > 1e-5 ? reach : null;
+}
+
+function measureAutoGripHandAnatomy(
+  side: PropHandBone,
+  metrics: VrmPropRigMetrics,
+): AutoGripHandAnatomy | null {
+  const reaches = {} as Record<AutoGripFinger, number>;
+  for (const finger of FINGERS) {
+    const reach = measuredFingerReach(side, finger, metrics);
+    if (reach === null) return null;
+    reaches[finger] = reach;
+  }
+  const referenceReach = FINGERS.reduce((sum, finger) => sum + reaches[finger], 0)
+    / FINGERS.length;
+  const thumbReach = measuredThumbReach(side, metrics);
+  if (!Number.isFinite(referenceReach) || referenceReach <= 1e-5 || thumbReach === null) {
+    return null;
+  }
+
+  return {
+    fingerCurlFactors: Object.fromEntries(FINGERS.map((finger) => [
+      finger,
+      // 짧은 약지·소지는 조금 더 감고 긴 중지는 과도하게 접히지 않도록 한다.
+      // 제한 폭은 모델의 비정상 bone origin에도 포즈가 급변하지 않는 해부학적 가드다.
+      clamp(referenceReach / reaches[finger], 0.84, 1.18),
+    ])) as Record<AutoGripFinger, number>,
+    thumbOppositionFactor: clamp(referenceReach / thumbReach, 0.88, 1.14),
+  };
+}
+
 function fingerPoseForGrip(
   side: PropHandBone,
   grip: PropGripProfile,
-  strength = 1
+  anatomy: AutoGripHandAnatomy,
+  strength = 1,
 ): AutoGripFingerOverrides {
   if (grip.kind === "wear") return {};
   const prefix = side === "leftHand" ? "left" : "right";
   const sign = side === "leftHand" ? -1 : 1;
-  const poseStrength = clamp(finite(strength) ?? 1, 0, 1.25);
+  const poseStrength = clamp(finite(strength) ?? 1, 0, 1.35);
   const result: AutoGripFingerOverrides = {};
   for (const finger of FINGERS) {
+    const fingerStrength = clamp(
+      poseStrength * anatomy.fingerCurlFactors[finger],
+      0,
+      1.35,
+    );
     const curl = THREE.MathUtils.degToRad(
-      grip.fingerCurlDeg * AUTO_GRIP_FINGER_WEIGHTS[grip.kind][finger] * poseStrength
+      grip.fingerCurlDeg * AUTO_GRIP_FINGER_WEIGHTS[grip.kind][finger] * fingerStrength
     );
     for (const segment of FINGER_SEGMENTS) {
       const boneName = `${prefix}${finger}${segment}`;
@@ -1139,7 +1227,10 @@ function fingerPoseForGrip(
     }
   }
 
-  const thumb = THREE.MathUtils.degToRad(grip.thumbOppositionDeg * poseStrength);
+  const thumb = THREE.MathUtils.degToRad(
+    grip.thumbOppositionDeg
+      * clamp(poseStrength * anatomy.thumbOppositionFactor, 0, 1.35),
+  );
   const thumbWeights = AUTO_GRIP_THUMB_WEIGHTS[grip.kind];
   const thumbRotations = [
     ["Metacarpal", thumbWeights.metacarpal],
@@ -1223,14 +1314,141 @@ function autoGripPoseForContact(
 ): AutoGripFingerOverrides | null {
   if (!definition.grip || definition.grip.kind === "wear") return null;
   const strength = gripStrengthForHand(definition, item, hand, metrics, anchor);
+  const anatomy = measureAutoGripHandAnatomy(hand, metrics);
   const safeInfluence = finite(influence);
-  if (strength === null || safeInfluence === null || safeInfluence <= 0) return null;
-  return fingerPoseForGrip(hand, definition.grip, strength * clamp(safeInfluence, 0, 1));
+  if (
+    strength === null
+    || !anatomy
+    || safeInfluence === null
+    || safeInfluence <= 0
+  ) return null;
+  const gripFit = clamp(
+    finite(item.rig?.gripFit) ?? 1,
+    VRM_PROP_GRIP_FIT_MIN,
+    VRM_PROP_GRIP_FIT_MAX,
+  );
+  return fingerPoseForGrip(
+    hand,
+    definition.grip,
+    anatomy,
+    strength * gripFit * clamp(safeInfluence, 0, 1),
+  );
+}
+
+export type AutoGripReadiness =
+  | { readonly kind: "ready"; readonly hand: PropHandBone }
+  | {
+      readonly kind: "unavailable";
+      readonly hand: PropHandBone | null;
+      readonly reason:
+        | "not-hand"
+        | "unsupported"
+        | "incomplete-rig"
+        | "invalid-contact"
+        | "contact-conflict";
+    };
+
+function countValidAutoGripContactsForHand(
+  items: readonly PropInstance[],
+  hand: PropHandBone,
+  resolveDefinition: PropDefinitionResolver,
+  metrics: VrmPropRigMetrics,
+): number {
+  let count = 0;
+  for (const candidate of items) {
+    if (candidate.rig?.autoFingerPose !== true) continue;
+    const definition = resolveDefinition(candidate.propId);
+    if (!definition?.grip) continue;
+    const primaryHand = handSide(candidate.bone);
+    const primaryAnchor = primaryGripAnchor(definition, candidate);
+    if (
+      primaryHand === hand
+      && primaryAnchor
+      && autoGripPoseForContact(
+        definition,
+        candidate,
+        hand,
+        metrics,
+        primaryAnchor,
+      )
+    ) {
+      count += 1;
+    }
+    const secondary = candidate.rig?.secondary;
+    const secondaryAnchor = secondary?.enabled
+      ? definition.anchors.find((anchor) => (
+          anchor.id === secondary.anchorId && anchor.role === "secondary"
+        ))
+      : null;
+    if (
+      secondary?.enabled
+      && secondary.bone === hand
+      && secondaryAnchor
+      && autoGripPoseForContact(
+        definition,
+        candidate,
+        hand,
+        metrics,
+        secondaryAnchor,
+        secondary.influence,
+      )
+    ) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** UI가 켜진 척하지 않도록 실제 런타임과 같은 조건으로 선택 소품의 그립 상태를 진단한다. */
+export function inspectAutoGripReadiness(
+  item: PropInstance,
+  allItems: readonly PropInstance[] = [item],
+  resolveDefinition: PropDefinitionResolver = propDefById,
+  rawMetrics: VrmPropRigMetrics = DEFAULT_VRM_PROP_RIG_METRICS,
+): AutoGripReadiness {
+  const hand = handSide(item.bone);
+  if (!hand) return { kind: "unavailable", hand: null, reason: "not-hand" };
+  const definition = resolveDefinition(item.propId);
+  if (!definition?.grip || definition.grip.kind === "wear") {
+    return { kind: "unavailable", hand, reason: "unsupported" };
+  }
+  const anchor = primaryGripAnchor(definition, item);
+  if (
+    !anchor
+    || !isValidGripProfile(definition.grip)
+    || !hasValidGripAnchorBasis(anchor)
+  ) {
+    return { kind: "unavailable", hand, reason: "invalid-contact" };
+  }
+  const metrics = sanitizeVrmPropRigMetrics(rawMetrics);
+  if (!hasCompleteAutoGripRig(hand, metrics) || !measureAutoGripHandAnatomy(hand, metrics)) {
+    return { kind: "unavailable", hand, reason: "incomplete-rig" };
+  }
+  const enabledItem: PropInstance = item.rig
+    ? { ...item, rig: { ...item.rig, autoFingerPose: true } }
+    : item;
+  if (!autoGripPoseForContact(definition, enabledItem, hand, metrics, anchor)) {
+    return { kind: "unavailable", hand, reason: "invalid-contact" };
+  }
+  const prospectiveItems = allItems.map((candidate) => (
+    candidate.uid === item.uid ? enabledItem : candidate
+  ));
+  if (
+    countValidAutoGripContactsForHand(
+      prospectiveItems,
+      hand,
+      resolveDefinition,
+      metrics,
+    ) > 1
+  ) {
+    return { kind: "unavailable", hand, reason: "contact-conflict" };
+  }
+  return { kind: "ready", hand };
 }
 
 /**
  * 자동 그립이 켜진 손 소품을 FingerRotationMap 호환 레코드로 변환한다.
- * 사용자 수동 손가락 편집은 호출자가 이 결과 뒤에 merge해 우선권을 주어야 한다.
+ * 호출자는 저작 손가락 값 뒤에 이 결과를 merge해 활성 손의 접촉을 최종 권위로 둔다.
  */
 export function createAutoGripFingerOverrides(
   items: readonly PropInstance[],

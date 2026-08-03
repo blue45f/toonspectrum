@@ -33,11 +33,16 @@ import {
   type StudioBg3dSceneNode,
 } from "./studio-bg3d-scene-document";
 import { attachStudioGeneric3dWorkflowMetadata } from "./studio-generic-3d-workflow-metadata";
+import {
+  assertRenderCacheIsNotAuthority,
+  type StudioGeometryAuthorityRecord,
+} from "./studio-geometry-authority";
 import { deriveStudioHybridDccAssetLayout } from "./studio-hybrid-dcc-asset-layout";
 import { exportStudioHybridDccGlbBatch } from "./studio-hybrid-dcc-glb-export-worker-client";
+import { evaluateStudioMeshModifierStack } from "./studio-mesh-modifier-stack";
 import { sha256HexPortable } from "./studio-sha256";
+import { createStudioDefaultSolidBooleanBackend } from "./studio-solid-boolean-backend";
 
-import type { StudioGeometryAuthorityRecord } from "./studio-geometry-authority";
 import type {
   StudioHybridDccGlbIssue,
   StudioHybridDccMeshGlbExportResult,
@@ -60,6 +65,7 @@ export type StudioHybridDccBg3dHandoffErrorCode =
   | "empty-workspace"
   | "asset-budget-exceeded"
   | "export-byte-budget-exceeded"
+  | "modifier-preview-invalid"
   | "glb-export-failed"
   | "model-persistence-failed"
   | "attachment-mismatch"
@@ -100,7 +106,11 @@ export interface StudioHybridDccBg3dLossEntry {
 export interface StudioHybridDccBg3dAssetMapping {
   readonly sourceAssetId: string;
   readonly sourceRevision: number;
+  /** Canonical edit-cage hash retained by the DCC document. */
+  readonly sourceAuthorityMeshHash: string;
+  /** Hash of the exact mesh supplied to the GLB exporter. */
   readonly sourceMeshHash: string;
+  readonly sourceGeometryKind: "authority" | "evaluated-modifier-stack";
   readonly sceneNodeId: string;
   readonly attachmentId: string;
   readonly glbHash: `sha256:${string}`;
@@ -108,6 +118,11 @@ export interface StudioHybridDccBg3dAssetMapping {
   readonly triangles: number;
   readonly vertices: number;
   readonly exportIssueCount: number;
+}
+
+interface StudioHybridDccBg3dDeliveryRecord extends StudioGeometryAuthorityRecord {
+  readonly sourceAuthorityMeshHash: string;
+  readonly sourceGeometryKind: StudioHybridDccBg3dAssetMapping["sourceGeometryKind"];
 }
 
 export interface StudioHybridDccBg3dShotMapping {
@@ -337,6 +352,67 @@ function throwIfHandoffAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw new StudioHybridDccBg3dHandoffError("aborted", "DCC handoff was cancelled");
   }
+}
+
+async function resolveStudioHybridDccDeliveryRecords(
+  workspace: StudioHybridDccWorkspace,
+  records: readonly StudioGeometryAuthorityRecord[],
+  signal?: AbortSignal,
+): Promise<readonly StudioHybridDccBg3dDeliveryRecord[]> {
+  const backend = createStudioDefaultSolidBooleanBackend();
+  const bridgeObjectById = new Map(
+    workspace.bridge.set.objects.map((object) => [object.id, object] as const),
+  );
+  const resolved: StudioHybridDccBg3dDeliveryRecord[] = [];
+  for (const record of records) {
+    throwIfHandoffAborted(signal);
+    if (record.modifierStack.modifiers.length === 0) {
+      resolved.push({
+        ...record,
+        sourceAuthorityMeshHash: record.meshHash,
+        sourceGeometryKind: "authority",
+      });
+      continue;
+    }
+
+    const cache = record.renderCache;
+    const bridgeHash = bridgeObjectById.get(record.assetId)?.geometryHash;
+    if (!cache
+      || !assertRenderCacheIsNotAuthority(record)
+      || bridgeHash !== cache.derivedFromHash) {
+      throw new StudioHybridDccBg3dHandoffError(
+        "modifier-preview-invalid",
+        `${record.assetId}: 화면에 검증된 비파괴 변형 결과가 없습니다. 미리보기를 다시 계산하거나 변형을 적용한 뒤 전달해 주세요.`,
+      );
+    }
+
+    let evaluated: Awaited<ReturnType<typeof evaluateStudioMeshModifierStack>>;
+    try {
+      evaluated = await evaluateStudioMeshModifierStack(record.modifierStack, {
+        booleanBackend: backend,
+      });
+    } catch (error) {
+      throw new StudioHybridDccBg3dHandoffError(
+        "modifier-preview-invalid",
+        `${record.assetId}: ${error instanceof Error ? error.message : "비파괴 변형을 평가하지 못했습니다."}`,
+      );
+    }
+    throwIfHandoffAborted(signal);
+    if (!evaluated.ok || evaluated.value.resultHash !== cache.derivedFromHash) {
+      throw new StudioHybridDccBg3dHandoffError(
+        "modifier-preview-invalid",
+        `${record.assetId}: 화면용 변형 결과와 내보내기 재평가 결과가 일치하지 않습니다.`,
+      );
+    }
+    resolved.push({
+      ...record,
+      mesh: evaluated.value.mesh,
+      meshHash: evaluated.value.resultHash,
+      sourceAuthorityMeshHash: record.meshHash,
+      sourceGeometryKind: "evaluated-modifier-stack",
+    });
+  }
+  return Object.freeze(resolved);
 }
 
 async function digestGlbBytes(
@@ -657,19 +733,19 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
     readonly ports?: StudioHybridDccBg3dHandoffPorts;
   } = {},
 ): Promise<StudioHybridDccBg3dHandoffResult> {
-  const records = Object.values(workspace.session.state.geometry.records)
+  const authorityRecords = Object.values(workspace.session.state.geometry.records)
     .sort((left, right) => compareCodeUnits(left.assetId, right.assetId));
   const procedural = materializeProceduralBridgeObjects(workspace);
-  if (records.length === 0 && procedural.nodes.length === 0) {
+  if (authorityRecords.length === 0 && procedural.nodes.length === 0) {
     throw new StudioHybridDccBg3dHandoffError(
       "empty-workspace",
       "3D 배경 편집기로 보낼 DCC 오브젝트가 없습니다.",
     );
   }
-  if (records.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) {
+  if (authorityRecords.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) {
     throw new StudioHybridDccBg3dHandoffError(
       "asset-budget-exceeded",
-      `DCC asset count ${records.length} exceeds ${STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS}`,
+      `DCC asset count ${authorityRecords.length} exceeds ${STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS}`,
     );
   }
   if (workspace.bridge.shots.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS) {
@@ -678,9 +754,14 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
       `DCC Shot count ${workspace.bridge.shots.length} exceeds ${STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS}`,
     );
   }
+  const records = await resolveStudioHybridDccDeliveryRecords(
+    workspace,
+    authorityRecords,
+    options.signal,
+  );
 
   const exported: Array<{
-    readonly record: StudioGeometryAuthorityRecord;
+    readonly record: StudioHybridDccBg3dDeliveryRecord;
     readonly result: Extract<StudioHybridDccMeshGlbExportResult, { readonly ok: true }>;
     readonly expectedSha256: `sha256:${string}`;
   }> = [];
@@ -805,7 +886,9 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
     mappings.push({
       sourceAssetId: record.assetId,
       sourceRevision: record.revision,
+      sourceAuthorityMeshHash: record.sourceAuthorityMeshHash,
       sourceMeshHash: record.meshHash,
+      sourceGeometryKind: record.sourceGeometryKind,
       sceneNodeId,
       attachmentId: attachment.id,
       glbHash: expectedSha256,

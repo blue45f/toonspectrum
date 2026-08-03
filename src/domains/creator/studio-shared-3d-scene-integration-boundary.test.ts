@@ -30,7 +30,7 @@ const pageSource = readFileSync(
 describe("shared character/background 3D scene integration boundary", () => {
   it("derives a bounded session from live page elements and hands it to the BG3D stage", () => {
     expect(stackSource).toContain("createStudioShared3dSceneSessionFromElements(");
-    expect(stackSource).toContain("masterEditMode ? [] : (activePage?.elements ?? [])");
+    expect(stackSource).toContain("const sourceElements = masterEditMode ? [] : activePageElements");
     expect(stackSource).toContain("sharedSceneSession={shared3dSceneSession}");
   });
 
@@ -72,7 +72,7 @@ describe("shared character/background 3D scene integration boundary", () => {
 
   it("hides only receipt-confirmed sources in the same Studio document transition", () => {
     expect(pageSource).toContain("planStudioShared3dCapturedSourceLayerVisibility({");
-    expect(pageSource).toContain("const nextElements = [...sharedCharacterVisibility.nextElements]");
+    expect(pageSource).toContain("let nextElements = [...sharedCharacterVisibility.nextElements]");
     expect(pageSource).toContain("hiddenElementIds.length > 0");
   });
 });

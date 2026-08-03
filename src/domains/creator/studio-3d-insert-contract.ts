@@ -6,6 +6,8 @@
  */
 
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import type { StudioBg3dSharedStageInsertProjection } from
+  "./studio-shared-3d-insert-contract";
 import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 export type StudioBg3dLtRasterLayerRole =
@@ -26,7 +28,7 @@ export interface StudioBackground3DMagicFilterMask {
   readonly selectedObjectStableId: string;
 }
 
-export interface StudioBackground3DInsertResult {
+export interface StudioBackground3DInsertResult extends StudioBg3dSharedStageInsertProjection {
   readonly kind: "separated";
   readonly width: number;
   readonly height: number;
@@ -42,11 +44,6 @@ export interface StudioBackground3DInsertResult {
   }[];
   /** Optional single-object Magic Layer mask captured in the same frame as every LT raster. */
   readonly magicFilterMask?: StudioBackground3DMagicFilterMask;
-  /** Full-fidelity VRM sources baked in this capture; Studio may hide, but never delete, them. */
-  readonly linkedCharacterCapture?: {
-    readonly kind: "full-fidelity-linked-vrm-capture";
-    readonly elementIds: readonly string[];
-  };
   readonly bg3dScene: StudioBg3dSceneDocument;
 }
 

@@ -18,13 +18,22 @@ import {
   type StudioHybridDccSelectionResult,
 } from "./studio-hybrid-dcc-component-selection";
 import {
+  workspaceAddActiveModifier,
+  workspaceApplyActiveModifierStack,
+  workspaceMoveActiveModifier,
+  workspacePatchActiveModifier,
+  workspaceRefreshModifierPreviews,
+  workspaceRemoveActiveModifier,
+  workspaceToggleActiveModifier,
+} from "./studio-hybrid-dcc-modifier-workspace";
+import { workspaceLoadEditableRoomPreset } from "./studio-hybrid-dcc-room-workspace";
+import {
   createStudioHybridDccWorkspace,
   runStudioHybridDccFullEngineSuite,
   workspaceAddArtistInk,
   workspaceAddGeoNodesPrimitive,
   workspaceAddGeoNodesStarter,
   workspaceAddUnitCube,
-  workspaceArrayActive,
   workspaceBevelEdgesActive,
   workspaceBendActive,
   workspaceBooleanDifference,
@@ -45,9 +54,7 @@ import {
   workspaceImportBytes,
   workspaceInsetActive,
   workspaceKnifeActive,
-  workspaceLoadRoomPreset,
   workspaceLoopCutActive,
-  workspaceMirrorActive,
   workspaceOrientOutwardActive,
   workspaceImportIfcCity,
   workspaceManifoldBooleanActive,
@@ -80,7 +87,6 @@ import {
   workspaceSetAssetVisibility,
   workspaceShadeActive,
   workspaceSculptActive,
-  workspaceSolidifyActive,
   workspaceSubdivideActive,
   workspaceUndo,
   workspaceUvUnwrapActive,
@@ -88,8 +94,12 @@ import {
   workspaceWeldActive,
   type StudioHybridDccWorkspace,
 } from "./studio-hybrid-dcc-workspace";
+import {
+  StudioHybridDccModifierInspector,
+  type StudioHybridDccModifierStackView,
+  type StudioHybridDccModifierView,
+} from "./StudioHybridDccModifierInspector";
 import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
-import { StudioThreeDStatePill } from "./StudioThreeDToggle";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
 
@@ -104,6 +114,13 @@ const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [
 
 type StudioHybridDccWorkbenchMode =
   (typeof STUDIO_HYBRID_DCC_WORKBENCH_MODES)[number]["id"];
+
+function friendlyHybridDccAssetName(assetId: string, index: number): string {
+  if (/^(?:asset-)?cube(?:-|$)/iu.test(assetId)) return "큐브";
+  const roomPart = /-part-(\d+)$/u.exec(assetId);
+  if (roomPart) return `방 구성품 ${Number(roomPart[1])}`;
+  return `오브젝트 ${index + 1}`;
+}
 
 const STUDIO_HYBRID_DCC_MODE_GUIDE: Record<
   StudioHybridDccWorkbenchMode,
@@ -131,7 +148,7 @@ const STUDIO_HYBRID_DCC_MODE_GUIDE: Record<
   },
   shot: {
     title: "카메라 컷과 웹툰용 선화 전달",
-    description: "여러 컷을 만들고 작가 선을 보존한 채 3D 배경·Shot 편집기로 안전하게 넘깁니다.",
+    description: "여러 컷을 만들고 작가 선을 보존한 채 3D 배경·컷 편집기로 안전하게 넘깁니다.",
   },
 };
 
@@ -245,10 +262,18 @@ export function StudioHybridDccPanel({
   const [busy, setBusy] = useState(false);
   const [workbenchMode, setWorkbenchMode] =
     useState<StudioHybridDccWorkbenchMode>("model");
+  const [modifierError, setModifierError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
   const runGenerationRef = useRef(0);
   const handoffAbortRef = useRef<AbortController | null>(null);
+  const previewRestoreLeaseRef = useRef<{
+    readonly workspace: StudioHybridDccWorkspace;
+    promise: Promise<StudioHybridDccWorkspace> | null;
+  } | null>(null);
+  if (!previewRestoreLeaseRef.current) {
+    previewRestoreLeaseRef.current = { workspace: ws, promise: null };
+  }
   const lastEmittedWorkspaceRef = useRef(ws);
   const emitWorkspaceChange = useEffectEvent((workspace: StudioHybridDccWorkspace) => {
     onWorkspaceChange?.(workspace);
@@ -270,6 +295,26 @@ export function StudioHybridDccPanel({
     emitWorkspaceChange(ws);
   }, [ws]);
 
+  useEffect(() => {
+    const lease = previewRestoreLeaseRef.current!;
+    lease.promise ??= workspaceRefreshModifierPreviews(lease.workspace);
+    let cancelled = false;
+    void lease.promise
+      .then((next) => {
+        if (cancelled || next === lease.workspace) return;
+        setWs((current) => current === lease.workspace ? next : current);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setModifierError(message);
+        setLog(`비파괴 변형 미리보기 복구 실패 · ${message}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const run = async (
     label: string,
     fn: () => StudioHybridDccWorkspace | Promise<StudioHybridDccWorkspace>,
@@ -277,7 +322,8 @@ export function StudioHybridDccPanel({
     const generation = ++runGenerationRef.current;
     setBusy(true);
     try {
-      const next = await fn();
+      const raw = await fn();
+      const next = await workspaceRefreshModifierPreviews(raw);
       if (!mountedRef.current || generation !== runGenerationRef.current) return;
       setWs(next);
       setComponentSelection((current) => alignHybridDccSelectionToWorkspace(current, next));
@@ -290,6 +336,22 @@ export function StudioHybridDccPanel({
     } finally {
       if (mountedRef.current && generation === runGenerationRef.current) setBusy(false);
     }
+  };
+
+  const runModifier = (
+    label: string,
+    fn: () => StudioHybridDccWorkspace | Promise<StudioHybridDccWorkspace>,
+  ) => {
+    setModifierError(null);
+    void run(label, async () => {
+      try {
+        return await fn();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setModifierError(message);
+        throw error;
+      }
+    });
   };
 
   const diag = workspaceDiagnostics(ws);
@@ -305,6 +367,69 @@ export function StudioHybridDccPanel({
   const activeTransform = ws.activeAssetId
     ? ws.session.state.objectTransforms[ws.activeAssetId] ?? null
     : null;
+  const modifierStackView: StudioHybridDccModifierStackView = {
+    modifiers: activeRecord
+      ? activeRecord.modifierStack.modifiers.map((modifier): StudioHybridDccModifierView => {
+          switch (modifier.kind) {
+            case "mirror":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                axis: modifier.axis,
+                merge: modifier.merge,
+                mergeThreshold: modifier.mergeThreshold,
+                bisect: modifier.bisect,
+                clip: modifier.clip,
+              };
+            case "array":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                count: modifier.count,
+                offset: modifier.offset,
+                mode: modifier.mode,
+                radialAngleRad: modifier.radialAngleRad,
+                realizeInstances: modifier.realizeInstances,
+              };
+            case "boolean":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                operation: modifier.operation,
+                operandId: modifier.operandAssetId ?? null,
+                operandOptions: authorityRecords
+                  .filter(({ assetId }) => assetId !== activeRecord.assetId)
+                  .map(({ assetId }, index) => ({
+                    id: assetId,
+                    label: `${friendlyHybridDccAssetName(assetId, index)} · ${assetId}`,
+                  })),
+              };
+            case "solidify":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                thickness: modifier.thickness,
+                evenThickness: modifier.evenThickness,
+                rim: modifier.rim,
+              };
+            case "bevel":
+              return {
+                id: modifier.id,
+                kind: modifier.kind,
+                enabled: modifier.enabled,
+                amount: modifier.amount,
+                segments: modifier.segments,
+                angleLimitRad: modifier.angleLimitRad,
+                weightInfluence: modifier.weightInfluence,
+              };
+          }
+        })
+      : [],
+  };
 
   const resolveSelectedFaces = (): readonly number[] => {
     const source = hybridDccSelectionSource(ws);
@@ -527,17 +652,17 @@ export function StudioHybridDccPanel({
     },
     {
       label: "좌우 대칭",
-      technical: "Mirror",
-      description: "한쪽 형태를 X축 반대편에 복제해 대칭 소품을 만듭니다.",
+      technical: "Mirror · non-destructive",
+      description: "원본을 바꾸지 않고 X축 반대편 결과를 미리 보며, 아래 변형 스택에서 축과 합치기 값을 조절합니다.",
       requiresAsset: true,
-      onClick: () => { void run("좌우 대칭", () => workspaceMirrorActive(ws)); },
+      onClick: () => runModifier("비파괴 좌우 대칭", () => workspaceAddActiveModifier(ws, "mirror")),
     },
     {
       label: "두께 만들기",
-      technical: "Solidify",
-      description: "얇은 표면에 실제 두께와 가장자리 면을 추가합니다.",
+      technical: "Solidify · non-destructive",
+      description: "얇은 표면의 두께를 미리 조절하고, 만족할 때만 원본 메시로 확정합니다.",
       requiresAsset: true,
-      onClick: () => { void run("두께 만들기", () => workspaceSolidifyActive(ws)); },
+      onClick: () => runModifier("비파괴 두께", () => workspaceAddActiveModifier(ws, "solidify")),
     },
     {
       label: "메시 자동 정리",
@@ -563,8 +688,8 @@ export function StudioHybridDccPanel({
     {
       label: "교실 세트 만들기",
       technical: "Room preset",
-      description: "벽·바닥·천장과 주요 구조가 분리된 편집 가능한 교실을 만듭니다.",
-      onClick: () => { void run("교실 세트", () => workspaceLoadRoomPreset(ws, "classroom")); },
+      description: "벽·바닥·천장·창문·가구가 각각 선택되고 움직이는 실제 편집 오브젝트로 교실을 만듭니다.",
+      onClick: () => { void run("편집 가능한 교실 세트", () => workspaceLoadEditableRoomPreset(ws, "classroom")); },
     },
     {
       label: "IFC 건물 불러오기",
@@ -594,7 +719,7 @@ export function StudioHybridDccPanel({
     {
       label: "정밀 박스",
       technical: "OCCT Box",
-      description: "치수 기반 B-Rep 박스를 만들고 표시용 메시를 함께 생성합니다.",
+      description: "치수가 정확한 솔리드 박스를 만들고 화면용 메시를 함께 생성합니다.",
       onClick: () => { void run("정밀 박스", () => workspaceOcctBox(ws)); },
     },
     {
@@ -735,14 +860,14 @@ export function StudioHybridDccPanel({
     {
       label: "작가 선 보존 테스트",
       technical: "Artist delta",
-      description: "3D가 바뀌어도 수작업 선 보정이 남는 linked-ink 데이터를 추가합니다.",
+      description: "3D가 바뀌어도 작가가 손으로 고친 선화 정보가 남도록 연결합니다.",
       requiresAsset: true,
       onClick: () => { void run("작가 선 보존", () => workspaceAddArtistInk(ws, "shot-1")); },
     },
     {
-      label: "3D 배경·Shot 편집기로 열기",
+      label: "3D 배경·컷 편집기로 열기",
       technical: "Verified GLB handoff",
-      description: "권위 메시를 Worker에서 검증된 GLB로 만들고 실제 배경 편집기에 엽니다.",
+      description: "현재 편집 원본을 별도 작업 프로세스에서 검증된 GLB로 만든 뒤 실제 배경 편집기에 엽니다.",
       requiresAsset: true,
       primary: true,
       disabled: !onOpenInBackground3D,
@@ -781,7 +906,7 @@ export function StudioHybridDccPanel({
 
   return (
     <section
-      className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto bg-canvas/35 p-3 text-sm sm:p-4"
+      className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto bg-canvas/35 p-3 text-sm [&>*]:shrink-0 sm:p-4"
       data-studio-hybrid-dcc-panel="true"
       data-workbench-mode={workbenchMode}
       aria-label="전문 3D 제작 작업 공간"
@@ -809,7 +934,7 @@ export function StudioHybridDccPanel({
           ) : null}
           <button
             type="button"
-            className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+            className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.undoStack.length === 0}
             aria-label="마지막 3D 편집 되돌리기"
             onClick={() => { void run("되돌리기", () => workspaceUndo(ws)); }}
@@ -818,7 +943,7 @@ export function StudioHybridDccPanel({
           </button>
           <button
             type="button"
-            className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+            className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.redoStack.length === 0}
             aria-label="되돌린 3D 편집 다시 실행"
             onClick={() => { void run("다시 실행", () => workspaceRedo(ws)); }}
@@ -848,8 +973,8 @@ export function StudioHybridDccPanel({
             aria-pressed={workbenchMode === mode.id}
             className={
               workbenchMode === mode.id
-                ? "min-h-11 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent shadow-sm sm:min-h-9"
-                : "min-h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-fg-2 hover:bg-raised hover:text-fg sm:min-h-9"
+                ? "min-h-11 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                : "min-h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             }
             onClick={() => setWorkbenchMode(mode.id)}
           >
@@ -890,7 +1015,10 @@ export function StudioHybridDccPanel({
             {quickTools.length}개 추천 도구
           </span>
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          className="mt-3 grid gap-2 max-sm:-mx-1 max-sm:flex max-sm:snap-x max-sm:overflow-x-auto max-sm:px-1 max-sm:pb-1 sm:grid-cols-2 xl:grid-cols-4"
+          aria-label="추천 3D 도구"
+        >
           {quickTools.map((tool) => {
             const disabled = busy || tool.disabled || (tool.requiresAsset && !ws.activeAssetId);
             return (
@@ -900,8 +1028,8 @@ export function StudioHybridDccPanel({
                 disabled={disabled}
                 onClick={tool.onClick}
                 className={tool.primary
-                  ? "group min-h-28 rounded-xl border border-accent/55 bg-accent-soft p-3 text-left shadow-sm transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none"
-                  : "group min-h-28 rounded-xl border border-line bg-card p-3 text-left transition-colors hover:border-accent/40 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none"}
+                  ? "group min-h-28 rounded-xl border border-accent/55 bg-accent-soft p-3 text-left shadow-sm transition-colors hover:bg-accent/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start"
+                  : "group min-h-28 rounded-xl border border-line bg-card p-3 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none max-sm:min-w-[82%] max-sm:snap-start"}
               >
                 <span className="flex items-start justify-between gap-2">
                   <span className={tool.primary ? "font-semibold text-accent" : "font-semibold text-fg"}>
@@ -930,8 +1058,8 @@ export function StudioHybridDccPanel({
             <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-2">장면 오브젝트</h4>
             <span className="text-[10px] tabular-nums text-fg-3">{authorityRecords.length}</span>
           </div>
-          <div className="max-h-52 space-y-1 overflow-y-auto xl:max-h-[31rem]">
-            {authorityRecords.length > 0 ? authorityRecords.map((record) => {
+          <div className="max-h-none space-y-1 overflow-visible xl:max-h-[31rem] xl:overflow-y-auto">
+            {authorityRecords.length > 0 ? authorityRecords.map((record, recordIndex) => {
               const selected = record.assetId === ws.activeAssetId;
               const sharedObject = ws.bridge.set.objects.find(({ id }) => id === record.assetId);
               const visible = sharedObject?.visible !== false;
@@ -946,12 +1074,14 @@ export function StudioHybridDccPanel({
                     type="button"
                     aria-pressed={selected}
                     disabled={busy}
-                    className="min-h-11 min-w-0 flex-1 px-2.5 text-left disabled:cursor-not-allowed disabled:opacity-45"
+                    className="min-h-11 min-w-0 flex-1 px-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={() => selectWorkspaceAsset(record.assetId)}
                   >
-                    <span className="block truncate text-xs font-medium">{record.assetId}</span>
-                    <span className="block text-[10px] opacity-70">
-                      {record.kernel} · 버전 {record.revision}
+                    <span className="block truncate text-xs font-medium">
+                      {friendlyHybridDccAssetName(record.assetId, recordIndex)}
+                    </span>
+                    <span className="block truncate text-[10px] opacity-70">
+                      {record.assetId} · 버전 {record.revision}
                     </span>
                   </button>
                   <button
@@ -1098,7 +1228,7 @@ export function StudioHybridDccPanel({
                                 type="number"
                                 step={row.step}
                                 defaultValue={Number(shown.toFixed(4))}
-                                className="h-9 w-full rounded-md border border-line bg-canvas pl-6 pr-1 text-right font-mono text-[10px] tabular-nums text-fg focus:border-accent focus:outline-none"
+                                className="min-h-11 w-full rounded-md border border-line bg-canvas pl-6 pr-1 text-right font-mono text-[10px] tabular-nums text-fg focus:border-accent focus:outline-none"
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter") event.currentTarget.blur();
                                 }}
@@ -1116,28 +1246,10 @@ export function StudioHybridDccPanel({
                   ))}
                 </fieldset>
               ) : null}
-              <div>
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-3">변형 기록</p>
-                {activeRecord.modifierStack.modifiers.length > 0 ? (
-                  <ul className="space-y-1">
-                    {activeRecord.modifierStack.modifiers.map((modifier) => (
-                      <li key={modifier.id} className="flex items-center justify-between rounded-lg border border-line px-2 py-1.5 text-xs">
-                        <span className="truncate text-fg-2">{modifier.kind}</span>
-                        <StudioThreeDStatePill
-                          active={modifier.enabled}
-                          accessibleLabel={`${modifier.kind} 변형 ${modifier.enabled ? "켜짐" : "꺼짐"}`}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="rounded-lg border border-dashed border-line px-2 py-2 text-xs text-fg-3">원본 메시 · 추가 변형 없음</p>
-                )}
-              </div>
               <div className="rounded-lg border border-line p-2 text-[11px] leading-relaxed text-fg-2">
                 <p>권리: {activeRights ? `${activeRights.license} · ${activeRights.creator}` : "미확인"}</p>
                 <p>UV: {ws.lastUvMap?.mode ?? "미생성"}</p>
-                <p>화면용 메시: {activeRecord.renderCache ? "생성됨" : "필요할 때 생성"}</p>
+                <p>화면용 메시: {activeRecord.renderCache ? "비파괴 결과 표시 중" : "원본 직접 표시"}</p>
               </div>
             </div>
           ) : (
@@ -1150,11 +1262,43 @@ export function StudioHybridDccPanel({
         </aside>
       </div>
 
+      {activeRecord ? (
+        <StudioHybridDccModifierInspector
+          stack={modifierStackView}
+          busy={busy}
+          error={modifierError}
+          onAdd={(kind) => runModifier(
+            `${kind} 변형 추가`,
+            () => workspaceAddActiveModifier(ws, kind),
+          )}
+          onToggle={(modifierId) => runModifier(
+            "변형 켜기·끄기",
+            () => workspaceToggleActiveModifier(ws, modifierId),
+          )}
+          onMove={(modifierId, direction) => runModifier(
+            "변형 순서 변경",
+            () => workspaceMoveActiveModifier(ws, modifierId, direction),
+          )}
+          onRemove={(modifierId) => runModifier(
+            "변형 삭제",
+            () => workspaceRemoveActiveModifier(ws, modifierId),
+          )}
+          onPatch={(modifierId, patch) => runModifier(
+            "변형 값 변경",
+            () => workspacePatchActiveModifier(ws, modifierId, patch),
+          )}
+          onApply={() => runModifier(
+            "변형을 원본 메시로 확정",
+            () => workspaceApplyActiveModifierStack(ws),
+          )}
+        />
+      ) : null}
+
       <details className="rounded-2xl border border-line bg-panel">
-        <summary className="cursor-pointer select-none px-3 py-2.5 text-xs font-semibold text-fg-2 marker:text-accent">
+        <summary className="flex min-h-11 cursor-pointer select-none items-center px-3 py-2.5 text-xs font-semibold text-fg-2 marker:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
           전문가용 전체 엔진 도구 · 이름과 동작을 알고 있을 때 펼치기
         </summary>
-        <div className="flex flex-wrap gap-2 border-t border-line p-3 [&>button]:min-h-11 [&>button]:border-line [&>button]:bg-card [&>button]:text-fg-2 [&>button]:hover:bg-raised [&>button]:hover:text-fg sm:[&>button]:min-h-9">
+        <div className="flex flex-wrap gap-2 border-t border-line p-3 [&>button]:min-h-11 [&>button]:border-line [&>button]:bg-card [&>button]:text-fg-2 [&>button]:hover:bg-raised [&>button]:hover:text-fg [&>button]:focus-visible:outline [&>button]:focus-visible:outline-2 [&>button]:focus-visible:outline-offset-2 [&>button]:focus-visible:outline-accent">
         <button
           type="button"
           className="rounded border px-2 py-1"
@@ -1183,7 +1327,7 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          onClick={() => run("Solidify", () => workspaceSolidifyActive(ws))}
+          onClick={() => runModifier("Solidify 변형 추가", () => workspaceAddActiveModifier(ws, "solidify"))}
         >
           Solidify
         </button>
@@ -1497,7 +1641,7 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          onClick={() => run("Mirror", () => workspaceMirrorActive(ws))}
+          onClick={() => runModifier("Mirror 변형 추가", () => workspaceAddActiveModifier(ws, "mirror"))}
         >
           Mirror
         </button>
@@ -1513,7 +1657,7 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          onClick={() => run("Array", () => workspaceArrayActive(ws, 3))}
+          onClick={() => runModifier("Array 변형 추가", () => workspaceAddActiveModifier(ws, "array"))}
         >
           Array
         </button>
@@ -1552,10 +1696,11 @@ export function StudioHybridDccPanel({
         <button
           type="button"
           className="rounded border px-2 py-1"
-          disabled={busy}
-          onClick={() => run("Cloth", () => workspaceClothStep(ws))}
+          disabled={busy || !ws.activeAssetId}
+          title="1/120초 고정 스텝 · 구조/굽힘/봉제/충돌을 계산하는 XPBD v2"
+          onClick={() => run("천 시뮬레이션", () => workspaceClothStep(ws))}
         >
-          Cloth step
+          천 시뮬레이션 1스텝
         </button>
         <button
           type="button"
@@ -1585,7 +1730,7 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy}
-          onClick={() => run("Room", () => workspaceLoadRoomPreset(ws, "classroom"))}
+          onClick={() => run("Room", () => workspaceLoadEditableRoomPreset(ws, "classroom"))}
         >
           Room
         </button>
@@ -1633,16 +1778,16 @@ export function StudioHybridDccPanel({
           data-studio-hybrid-dcc-action="open-bg3d"
           onClick={() => void openInBackground3d()}
         >
-          3D 배경 · Shot 편집기로 열기
+          3D 배경 · 컷 편집기로 열기
         </button>
       </div>
       </details>
-      <footer className="sticky bottom-0 z-10 rounded-xl border border-line bg-panel/95 px-3 py-2 shadow-lg backdrop-blur">
-        <p className="text-xs text-fg" data-studio-hybrid-dcc-log="true" aria-live="polite">
+      <footer className="sticky bottom-0 z-10 min-w-0 rounded-xl border border-line bg-panel/95 px-3 py-2 shadow-lg backdrop-blur [overflow-wrap:anywhere]">
+        <p className="min-w-0 break-words text-xs text-fg [overflow-wrap:anywhere]" data-studio-hybrid-dcc-log="true" aria-live="polite">
           {busy ? "작업 처리 중… " : ""}{log}
         </p>
         <p
-          className="mt-1 text-[10px] text-fg-3"
+          className="mt-1 min-w-0 break-words text-[10px] text-fg-3 [overflow-wrap:anywhere]"
           data-studio-hybrid-dcc-stats="true"
           data-assets={Object.keys(ws.session.state.geometry.records).length}
           data-active={ws.activeAssetId ?? "none"}

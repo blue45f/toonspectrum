@@ -5,8 +5,11 @@
  */
 
 import {
+  canonicalStudioCommandJson,
   createStudioCommandEnvelope,
   createStudioCommandJournal,
+  restoreStudioCommandJournal,
+  serializeStudioCommandJournal,
   type StudioCommandJournal,
   type StudioCommandJsonValue,
 } from "./studio-command-journal";
@@ -18,9 +21,11 @@ import {
   type StudioEditableMeshSnapshot,
 } from "./studio-editable-half-edge-mesh";
 import {
+  applyStudioGeometryAuthorityModifierStack,
   commitStudioGeometryAuthorityMesh,
   createStudioGeometryAuthorityRegistry,
   registerStudioGeometryAuthority,
+  setStudioGeometryAuthorityModifierStack,
   type StudioGeometryAuthorityRegistry,
 } from "./studio-geometry-authority";
 import {
@@ -30,6 +35,15 @@ import {
   type StudioHybridDccObjectTransform,
 } from "./studio-hybrid-dcc-object-transform";
 import {
+  createStudioMeshModifierStack,
+  deserializeStudioMeshModifierStack,
+  hashStudioMeshModifierStack,
+  serializeStudioMeshModifierStack,
+  type StudioMeshModifier,
+  type StudioMeshModifierStack,
+  type StudioMeshModifierStackDto,
+} from "./studio-mesh-modifier-stack";
+import {
   createStudioOpfsRecoveryJournal,
   type StudioOpfsRecoveryJournal,
   type StudioOpfsRecoveryJournalAdapter,
@@ -37,7 +51,8 @@ import {
 } from "./studio-opfs-recovery-journal";
 import { sha256HexPortable } from "./studio-sha256";
 
-export const STUDIO_HYBRID_DCC_DOCUMENT_VERSION = 2 as const;
+export const STUDIO_HYBRID_DCC_DOCUMENT_VERSION = 3 as const;
+export const STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION = 2 as const;
 export const STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_HYBRID_DCC_DOCUMENT_FORMAT =
   "toonspectrum.hybrid-dcc-document" as const;
@@ -51,6 +66,46 @@ export interface StudioRightsBomRecord {
   readonly useScope: string;
   readonly derivative: string;
   readonly contentHash?: `sha256:${string}`;
+  /** Immutable lineage copied from Boolean cutters before their stack is baked away. */
+  readonly provenance?: readonly StudioRightsBomProvenanceRecord[];
+}
+
+export interface StudioRightsBomProvenanceRecord {
+  readonly role: "boolean-operand";
+  readonly assetId: string;
+  readonly modifierId: string;
+  readonly operation: "union" | "difference" | "intersection";
+  readonly source: string;
+  readonly creator: string;
+  readonly license: string;
+  readonly useScope: string;
+  readonly derivative: string;
+  readonly contentHash?: `sha256:${string}`;
+  readonly sourceMeshHash: string;
+  readonly modifierStackHash: string;
+  readonly evaluatedMeshHash: string;
+  readonly objectTransformHash: string;
+  readonly resolvedOperandHash: `sha256:${string}`;
+}
+
+export interface StudioHybridDccBooleanOperandEvaluationReceipt {
+  readonly modifierId: string;
+  readonly operation: "union" | "difference" | "intersection";
+  readonly operandAssetId: string;
+  readonly sourceMeshHash: string;
+  readonly modifierStackHash: string;
+  readonly evaluatedMeshHash: string;
+  readonly objectTransformHash: string;
+  readonly resolvedOperandHash: `sha256:${string}`;
+}
+
+/** Hash-bound result passed from async modifier evaluation into the synchronous commit boundary. */
+export interface StudioHybridDccModifierStackEvaluationReceipt {
+  readonly mesh: StudioEditableMesh;
+  readonly sourceHash: string;
+  readonly stackHash: string;
+  readonly resultHash: string;
+  readonly booleanOperands?: readonly StudioHybridDccBooleanOperandEvaluationReceipt[];
 }
 
 export interface StudioHybridDccDependencyEdge {
@@ -91,7 +146,29 @@ export interface StudioHybridDccPersistedSnapshot {
     readonly meshHash: string;
     readonly revision: number;
     readonly mesh: StudioEditableMeshSnapshot;
+    readonly modifierStack: StudioMeshModifierStackDto;
   }[];
+}
+
+interface StudioHybridDccLegacyPersistedAsset {
+  readonly assetId: string;
+  readonly meshHash: string;
+  readonly revision: number;
+  readonly mesh: StudioEditableMeshSnapshot;
+}
+
+interface StudioHybridDccLegacyPersistedSnapshotV2 {
+  readonly format: typeof STUDIO_HYBRID_DCC_DOCUMENT_FORMAT;
+  readonly version: typeof STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION;
+  readonly documentId: string;
+  readonly commandCount: number;
+  readonly stateHash: string;
+  readonly milestoneLabel: string | null;
+  readonly dirtyNodeIds: readonly string[];
+  readonly rightsBom: readonly StudioRightsBomRecord[];
+  readonly dependencies: readonly StudioHybridDccDependencyEdge[];
+  readonly objectTransforms: Readonly<Record<string, StudioHybridDccObjectTransform>>;
+  readonly assets: readonly StudioHybridDccLegacyPersistedAsset[];
 }
 
 interface StudioHybridDccLegacyPersistedSnapshotV1 {
@@ -104,8 +181,13 @@ interface StudioHybridDccLegacyPersistedSnapshotV1 {
   readonly dirtyNodeIds: readonly string[];
   readonly rightsBom: readonly StudioRightsBomRecord[];
   readonly dependencies: readonly StudioHybridDccDependencyEdge[];
-  readonly assets: StudioHybridDccPersistedSnapshot["assets"];
+  readonly assets: readonly StudioHybridDccLegacyPersistedAsset[];
 }
+
+export type StudioHybridDccRestorableSnapshot =
+  | StudioHybridDccPersistedSnapshot
+  | StudioHybridDccLegacyPersistedSnapshotV2
+  | StudioHybridDccLegacyPersistedSnapshotV1;
 
 export interface StudioHybridDccSession {
   readonly state: StudioHybridDccDocumentState;
@@ -139,15 +221,31 @@ function computeStateHash(
       .sort()
       .map((id) => `${id}:${hashStudioHybridDccObjectTransform(state.objectTransforms[id]!)}`),
     ...state.dirtyNodeIds,
-    ...state.rightsBom.map((r) => `${r.assetId}:${r.license}:${r.contentHash ?? ""}`),
+    ...state.rightsBom
+      .map((record) => canonicalStudioCommandJson(record))
+      .sort(),
+    ...state.dependencies
+      .map((dependency) => canonicalStudioCommandJson(dependency))
+      .sort(),
     state.milestoneLabel ?? "",
   ]);
+}
+
+function forkStudioCommandJournal(journal: StudioCommandJournal): StudioCommandJournal {
+  return restoreStudioCommandJournal(serializeStudioCommandJournal(journal));
+}
+
+function contentHashForMeshHash(meshHash: string): `sha256:${string}` {
+  return `sha256:${sha256HexPortable(new TextEncoder().encode(meshHash))}`;
 }
 
 function meshFingerprints(geometry: StudioGeometryAuthorityRegistry): string[] {
   return Object.keys(geometry.records)
     .sort()
-    .map((id) => `${id}:${geometry.records[id]!.meshHash}`);
+    .map((id) => {
+      const record = geometry.records[id]!;
+      return `${id}:${record.meshHash}:${hashStudioMeshModifierStack(record.modifierStack)}`;
+    });
 }
 
 function finalizeState(
@@ -174,6 +272,7 @@ export function snapshotStudioHybridDccState(
       meshHash: record.meshHash,
       revision: record.revision,
       mesh: serializeStudioEditableMesh(record.mesh),
+      modifierStack: serializeStudioMeshModifierStack(record.modifierStack),
     }))
     .sort((a, b) => a.assetId.localeCompare(b.assetId));
   return {
@@ -199,20 +298,34 @@ export function snapshotStudioHybridDccState(
 }
 
 export function restoreStudioHybridDccStateFromSnapshot(
-  snapshot: StudioHybridDccPersistedSnapshot | StudioHybridDccLegacyPersistedSnapshotV1,
+  snapshot: StudioHybridDccRestorableSnapshot,
 ): StudioHybridDccDocumentState {
   if (snapshot.format !== STUDIO_HYBRID_DCC_DOCUMENT_FORMAT
     || (snapshot.version !== STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+      && snapshot.version !== STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION
       && snapshot.version !== STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION)) {
     throw new Error("unsupported Hybrid DCC document snapshot");
   }
   let geometry = createStudioGeometryAuthorityRegistry();
   for (const asset of snapshot.assets) {
     const mesh = deserializeStudioEditableMesh(asset.mesh);
-    const registered = registerStudioGeometryAuthority(geometry, asset.assetId, mesh);
+    let modifierStack = createStudioMeshModifierStack(mesh);
+    if (snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION) {
+      if (!("modifierStack" in asset)) {
+        throw new Error(`invalid modifier stack for ${asset.assetId}: v3 field is missing`);
+      }
+      const decoded = deserializeStudioMeshModifierStack(asset.modifierStack, mesh);
+      if (!decoded.ok) {
+        throw new Error(`invalid modifier stack for ${asset.assetId}: ${decoded.detail}`);
+      }
+      modifierStack = decoded.value;
+    }
+    const registered = registerStudioGeometryAuthority(geometry, asset.assetId, mesh, {
+      modifierStack,
+      recordRevision: asset.revision,
+    });
     if (!registered.ok) throw new Error(registered.detail);
     geometry = registered.value;
-    // Preserve revision/hash from snapshot via recommit if needed
     const current = geometry.records[asset.assetId]!;
     if (current.meshHash !== asset.meshHash) {
       // hash is derived from mesh content; mismatch means serialize round-trip bug
@@ -221,18 +334,18 @@ export function restoreStudioHybridDccStateFromSnapshot(
       );
     }
   }
-  const storedTransforms = snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+  const storedTransforms = snapshot.version !== STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION
     ? snapshot.objectTransforms
     : {};
   const objectTransforms = Object.fromEntries(
     Object.keys(geometry.records).sort().map((assetId) => [
       assetId,
-      snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+      snapshot.version !== STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION
         ? normalizeStudioHybridDccObjectTransform(storedTransforms[assetId])
         : createStudioHybridDccIdentityTransform(),
     ]),
   );
-  if (snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+  if (snapshot.version !== STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION
     && Object.keys(storedTransforms).some((assetId) => !Object.hasOwn(geometry.records, assetId))) {
     throw new Error("object transform registry contains an unknown asset");
   }
@@ -302,8 +415,8 @@ function appendCommand(
     command: { kind, payload },
     inverse: { kind: `${kind}.undo`, payload: inversePayload },
   });
-  session.journal.appendCommand(envelope);
-
+  // Finalize and validate the candidate state before touching any journal. Sessions can be used as
+  // immutable async branch roots, so every successful branch owns a forked journal as well.
   const state = finalizeState({
     format: STUDIO_HYBRID_DCC_DOCUMENT_FORMAT,
     version: STUDIO_HYBRID_DCC_DOCUMENT_VERSION,
@@ -316,10 +429,12 @@ function appendCommand(
     milestoneLabel: nextPartial.milestoneLabel,
     commandCount,
   });
+  const journal = forkStudioCommandJournal(session.journal);
+  journal.appendCommand(envelope);
 
   return {
     state,
-    journal: session.journal,
+    journal,
     undoStack: [...session.undoStack, priorSnapshot],
     redoStack: [],
     lastGroupId: groupId,
@@ -344,7 +459,7 @@ export function hybridDccRegisterAsset(
     {
       assetId,
       ...rights,
-      contentHash: `sha256:${sha256HexPortable(new TextEncoder().encode(meshHash))}`,
+      contentHash: contentHashForMeshHash(meshHash),
     },
   ];
   const dependencies = [
@@ -371,6 +486,93 @@ export function hybridDccRegisterAsset(
   );
 }
 
+/** Register a set/room atomically: all assets preflight before one command and one undo frame. */
+export function hybridDccRegisterAssets(
+  session: StudioHybridDccSession,
+  assets: readonly {
+    readonly assetId: string;
+    readonly mesh: StudioEditableMesh;
+    readonly rights: Omit<StudioRightsBomRecord, "assetId" | "contentHash">;
+    readonly initialTransform: StudioHybridDccObjectTransform;
+  }[],
+): StudioHybridDccSession {
+  if (assets.length === 0) return session;
+  if (assets.length > 256) throw new Error("asset registration batch exceeds 256 objects");
+  const newBatchIds = new Set(
+    assets
+      .map(({ assetId }) => assetId)
+      .filter((assetId) => !Object.hasOwn(session.state.geometry.records, assetId)),
+  );
+  if (Object.keys(session.state.geometry.records).length + newBatchIds.size > 256) {
+    throw new Error("document asset budget exceeds 256 objects");
+  }
+
+  const batchIds = new Set<string>();
+  let geometry = session.state.geometry;
+  const prepared = assets.map((asset) => {
+    if (batchIds.has(asset.assetId)) throw new Error(`duplicate batch asset ${asset.assetId}`);
+    if (Object.hasOwn(session.state.geometry.records, asset.assetId)) {
+      throw new Error(`asset ${asset.assetId} exists`);
+    }
+    batchIds.add(asset.assetId);
+    const rights = {
+      source: asset.rights.source,
+      creator: asset.rights.creator,
+      license: asset.rights.license,
+      useScope: asset.rights.useScope,
+      derivative: asset.rights.derivative,
+    };
+    for (const [field, value] of Object.entries(rights)) {
+      if (typeof value !== "string" || value.length === 0 || value.length > 2_048) {
+        throw new Error(`asset ${asset.assetId} rights.${field} is invalid`);
+      }
+    }
+    const transform = normalizeStudioHybridDccObjectTransform(asset.initialTransform);
+    const registered = registerStudioGeometryAuthority(geometry, asset.assetId, asset.mesh);
+    if (!registered.ok) throw new Error(registered.detail);
+    geometry = registered.value;
+    const meshHash = hashStudioEditableMesh(asset.mesh);
+    return { ...asset, rights, transform, meshHash };
+  });
+
+  const objectTransforms = { ...session.state.objectTransforms };
+  const rightsBom: StudioRightsBomRecord[] = [...session.state.rightsBom];
+  const dependencies: StudioHybridDccDependencyEdge[] = [...session.state.dependencies];
+  for (const asset of prepared) {
+    objectTransforms[asset.assetId] = asset.transform;
+    rightsBom.push({
+      assetId: asset.assetId,
+      ...asset.rights,
+      contentHash: contentHashForMeshHash(asset.meshHash),
+    });
+    dependencies.push({ fromId: asset.assetId, toId: "shot:*", kind: "geometry" });
+  }
+
+  const forwardPayload = JSON.parse(JSON.stringify({
+    assets: prepared.map(({ assetId, meshHash }) => ({ assetId, meshHash })),
+  })) as StudioCommandJsonValue;
+  const inversePayload = {
+    assetIds: prepared.map(({ assetId }) => assetId),
+  } as StudioCommandJsonValue;
+  return appendCommand(
+    session,
+    "geometry.register-batch",
+    forwardPayload,
+    inversePayload,
+    {
+      geometry,
+      objectTransforms,
+      rightsBom,
+      dependencies,
+      dirtyNodeIds: [...new Set([
+        ...session.state.dirtyNodeIds,
+        ...prepared.map(({ assetId }) => assetId),
+      ])],
+      milestoneLabel: session.state.milestoneLabel,
+    },
+  );
+}
+
 /** Duplicates one authority object as a single undoable document command. */
 export function hybridDccDuplicateAsset(
   session: StudioHybridDccSession,
@@ -390,6 +592,7 @@ export function hybridDccDuplicateAsset(
     session.state.geometry,
     duplicateAssetId,
     source.mesh,
+    { modifierStack: source.modifierStack },
   );
   if (!registered.ok) throw new Error(registered.detail);
   const sourceTransform = session.state.objectTransforms[sourceAssetId];
@@ -464,6 +667,7 @@ export function hybridDccRemoveAsset(
     assetId,
     meshHash: record.meshHash,
     mesh: serializeStudioEditableMesh(record.mesh),
+    modifierStack: serializeStudioMeshModifierStack(record.modifierStack),
     transform,
     rights: session.state.rightsBom.find((entry) => entry.assetId === assetId) ?? null,
   })) as StudioCommandJsonValue;
@@ -529,6 +733,228 @@ export function hybridDccCommitGeometry(
       rightsBom: session.state.rightsBom,
       dependencies: session.state.dependencies,
       dirtyNodeIds,
+      milestoneLabel: session.state.milestoneLabel,
+    },
+  );
+}
+
+/** Replace one asset's non-destructive stack as one undoable canonical command. */
+export function hybridDccSetModifierStack(
+  session: StudioHybridDccSession,
+  assetId: string,
+  nextValue: StudioMeshModifierStack | readonly StudioMeshModifier[],
+): StudioHybridDccSession {
+  const previousRecord = session.state.geometry.records[assetId];
+  if (!previousRecord) throw new Error(`asset ${assetId} not found`);
+  const requested = Array.isArray(nextValue)
+    ? createStudioMeshModifierStack(
+        previousRecord.mesh,
+        nextValue as readonly StudioMeshModifier[],
+      )
+    : nextValue as StudioMeshModifierStack;
+  const previousHash = hashStudioMeshModifierStack(previousRecord.modifierStack);
+  const nextHash = hashStudioMeshModifierStack(requested);
+  if (previousHash === nextHash) return session;
+  const updated = setStudioGeometryAuthorityModifierStack(
+    session.state.geometry,
+    assetId,
+    requested,
+  );
+  if (!updated.ok) throw new Error(updated.detail);
+  const stored = updated.value.records[assetId]!.modifierStack;
+  const dependents = session.state.dependencies
+    .filter((dependency) => dependency.fromId === assetId)
+    .map((dependency) => dependency.toId);
+  const payload = JSON.parse(JSON.stringify({
+    assetId,
+    stackHash: hashStudioMeshModifierStack(stored),
+    modifierStack: serializeStudioMeshModifierStack(stored),
+  })) as StudioCommandJsonValue;
+  const inversePayload = JSON.parse(JSON.stringify({
+    assetId,
+    stackHash: previousHash,
+    modifierStack: serializeStudioMeshModifierStack(previousRecord.modifierStack),
+  })) as StudioCommandJsonValue;
+  return appendCommand(
+    session,
+    "geometry.modifier-stack.set",
+    payload,
+    inversePayload,
+    {
+      geometry: updated.value,
+      objectTransforms: session.state.objectTransforms,
+      rightsBom: session.state.rightsBom,
+      dependencies: session.state.dependencies,
+      dirtyNodeIds: [...new Set([
+        ...session.state.dirtyNodeIds,
+        assetId,
+        ...dependents,
+      ])],
+      milestoneLabel: session.state.milestoneLabel,
+    },
+  );
+}
+
+/**
+ * Apply an evaluated result and clear its stack in one command. Undo restores both source and stack;
+ * callers evaluate outside this boundary so async backends never leave a half-committed document.
+ */
+export function hybridDccApplyModifierStack(
+  session: StudioHybridDccSession,
+  assetId: string,
+  evaluation: StudioHybridDccModifierStackEvaluationReceipt,
+): StudioHybridDccSession {
+  const previousRecord = session.state.geometry.records[assetId];
+  if (!previousRecord) throw new Error(`asset ${assetId} not found`);
+  const previousSourceHash = hashStudioEditableMesh(previousRecord.mesh);
+  const previousStackHash = hashStudioMeshModifierStack(previousRecord.modifierStack);
+  if (evaluation.sourceHash !== previousSourceHash) {
+    throw new Error("stale modifier evaluation: sourceHash no longer matches authority");
+  }
+  if (evaluation.stackHash !== previousStackHash) {
+    throw new Error("stale modifier evaluation: stackHash no longer matches authority");
+  }
+  const evaluatedResultHash = hashStudioEditableMesh(evaluation.mesh);
+  if (evaluation.resultHash !== evaluatedResultHash) {
+    throw new Error("invalid modifier evaluation: resultHash does not identify the supplied mesh");
+  }
+
+  const expectedBooleans = previousRecord.modifierStack.modifiers.filter((modifier) => (
+    modifier.enabled && modifier.kind === "boolean" && modifier.operandAssetId !== undefined
+  ));
+  const operandReceipts = evaluation.booleanOperands ?? [];
+  if (operandReceipts.length !== expectedBooleans.length) {
+    throw new Error("modifier evaluation Boolean provenance is incomplete");
+  }
+  const seenModifierIds = new Set<string>();
+  const directProvenance: StudioRightsBomProvenanceRecord[] = [];
+  const inheritedProvenance: StudioRightsBomProvenanceRecord[] = [];
+  for (const modifier of expectedBooleans) {
+    if (modifier.kind !== "boolean" || !modifier.operandAssetId) continue;
+    const receipt = operandReceipts.find(({ modifierId }) => modifierId === modifier.id);
+    if (!receipt || seenModifierIds.has(receipt.modifierId)) {
+      throw new Error(`modifier evaluation Boolean provenance is invalid for ${modifier.id}`);
+    }
+    seenModifierIds.add(receipt.modifierId);
+    if (receipt.operation !== modifier.operation
+      || receipt.operandAssetId !== modifier.operandAssetId) {
+      throw new Error(`modifier evaluation Boolean provenance is stale for ${modifier.id}`);
+    }
+    const cutterRecord = session.state.geometry.records[receipt.operandAssetId];
+    const cutterRights = session.state.rightsBom.find(
+      (record) => record.assetId === receipt.operandAssetId,
+    );
+    const cutterTransform = session.state.objectTransforms[receipt.operandAssetId];
+    if (!cutterRecord || !cutterRights || !cutterTransform) {
+      throw new Error(`Boolean operand ${receipt.operandAssetId} is no longer available`);
+    }
+    if (receipt.sourceMeshHash !== cutterRecord.meshHash
+      || receipt.modifierStackHash !== hashStudioMeshModifierStack(cutterRecord.modifierStack)
+      || receipt.objectTransformHash !== hashStudioHybridDccObjectTransform(cutterTransform)) {
+      throw new Error(`modifier evaluation Boolean operand is stale for ${modifier.id}`);
+    }
+    if (!/^mesh:[0-9a-f]{8}$/u.test(receipt.evaluatedMeshHash)
+      || !/^sha256:[0-9a-f]{64}$/u.test(receipt.resolvedOperandHash)) {
+      throw new Error(`modifier evaluation Boolean hashes are invalid for ${modifier.id}`);
+    }
+    inheritedProvenance.push(...(cutterRights.provenance ?? []));
+    directProvenance.push({
+      role: "boolean-operand",
+      assetId: receipt.operandAssetId,
+      modifierId: receipt.modifierId,
+      operation: receipt.operation,
+      source: cutterRights.source,
+      creator: cutterRights.creator,
+      license: cutterRights.license,
+      useScope: cutterRights.useScope,
+      derivative: cutterRights.derivative,
+      ...(cutterRights.contentHash ? { contentHash: cutterRights.contentHash } : {}),
+      sourceMeshHash: receipt.sourceMeshHash,
+      modifierStackHash: receipt.modifierStackHash,
+      evaluatedMeshHash: receipt.evaluatedMeshHash,
+      objectTransformHash: receipt.objectTransformHash,
+      resolvedOperandHash: receipt.resolvedOperandHash,
+    });
+  }
+  if (seenModifierIds.size !== operandReceipts.length) {
+    throw new Error("modifier evaluation contains unexpected Boolean provenance");
+  }
+
+  const updated = applyStudioGeometryAuthorityModifierStack(
+    session.state.geometry,
+    assetId,
+    evaluation.mesh,
+  );
+  if (!updated.ok) throw new Error(updated.detail);
+  const appliedRecord = updated.value.records[assetId]!;
+  const dependents = session.state.dependencies
+    .filter((dependency) => dependency.fromId === assetId)
+    .map((dependency) => dependency.toId);
+  const previousRights = session.state.rightsBom.find((record) => record.assetId === assetId);
+  if (!previousRights) throw new Error(`rights BOM record ${assetId} not found`);
+  const provenanceByFingerprint = new Map<string, StudioRightsBomProvenanceRecord>();
+  for (const provenance of [
+    ...(previousRights.provenance ?? []),
+    ...inheritedProvenance,
+    ...directProvenance,
+  ]) {
+    provenanceByFingerprint.set(canonicalStudioCommandJson(provenance), provenance);
+  }
+  const provenance = [...provenanceByFingerprint.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, record]) => record);
+  const rightsBom = session.state.rightsBom.map((record) => record.assetId === assetId
+    ? {
+        ...record,
+        contentHash: contentHashForMeshHash(appliedRecord.meshHash),
+        ...(provenance.length > 0 ? { provenance } : {}),
+      }
+    : record);
+  const dependencyByFingerprint = new Map<string, StudioHybridDccDependencyEdge>();
+  for (const dependency of [
+    ...session.state.dependencies,
+    ...directProvenance.map((record) => ({
+      fromId: record.assetId,
+      toId: assetId,
+      kind: "geometry" as const,
+    })),
+  ]) {
+    dependencyByFingerprint.set(canonicalStudioCommandJson(dependency), dependency);
+  }
+  const dependencies = [...dependencyByFingerprint.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, dependency]) => dependency);
+  const payload = JSON.parse(JSON.stringify({
+    assetId,
+    sourceMeshHash: previousSourceHash,
+    appliedStackHash: previousStackHash,
+    meshHash: appliedRecord.meshHash,
+    mesh: serializeStudioEditableMesh(evaluation.mesh),
+    modifierStack: serializeStudioMeshModifierStack(appliedRecord.modifierStack),
+    booleanOperands: directProvenance,
+  })) as StudioCommandJsonValue;
+  const inversePayload = JSON.parse(JSON.stringify({
+    assetId,
+    meshHash: previousRecord.meshHash,
+    mesh: serializeStudioEditableMesh(previousRecord.mesh),
+    modifierStack: serializeStudioMeshModifierStack(previousRecord.modifierStack),
+    rights: previousRights,
+  })) as StudioCommandJsonValue;
+  return appendCommand(
+    session,
+    "geometry.modifier-stack.apply",
+    payload,
+    inversePayload,
+    {
+      geometry: updated.value,
+      objectTransforms: session.state.objectTransforms,
+      rightsBom,
+      dependencies,
+      dirtyNodeIds: [...new Set([
+        ...session.state.dirtyNodeIds,
+        assetId,
+        ...dependents,
+      ])],
       milestoneLabel: session.state.milestoneLabel,
     },
   );
@@ -631,8 +1057,9 @@ export function hybridDccUndo(session: StudioHybridDccSession): StudioHybridDccS
   const currentSnap = snapshotStudioHybridDccState(session.state);
   const groupId = session.undoGroupStack[session.undoGroupStack.length - 1];
   const lamport = session.lamport + 1;
+  const journal = forkStudioCommandJournal(session.journal);
   if (groupId) {
-    session.journal.undo({
+    journal.undo({
       id: `undo:${lamport}`,
       actorId: "local",
       lamport,
@@ -642,7 +1069,7 @@ export function hybridDccUndo(session: StudioHybridDccSession): StudioHybridDccS
   const state = restoreStudioHybridDccStateFromSnapshot(prior);
   return {
     state,
-    journal: session.journal,
+    journal,
     undoStack: session.undoStack.slice(0, -1),
     redoStack: [...session.redoStack, currentSnap],
     lastGroupId: session.undoGroupStack[session.undoGroupStack.length - 2] ?? null,
@@ -663,8 +1090,9 @@ export function hybridDccRedo(session: StudioHybridDccSession): StudioHybridDccS
   const currentSnap = snapshotStudioHybridDccState(session.state);
   const groupId = session.redoGroupStack[session.redoGroupStack.length - 1];
   const lamport = session.lamport + 1;
+  const journal = forkStudioCommandJournal(session.journal);
   if (groupId) {
-    session.journal.redo({
+    journal.redo({
       id: `redo:${lamport}`,
       actorId: "local",
       lamport,
@@ -674,7 +1102,7 @@ export function hybridDccRedo(session: StudioHybridDccSession): StudioHybridDccS
   const state = restoreStudioHybridDccStateFromSnapshot(next);
   return {
     state,
-    journal: session.journal,
+    journal,
     undoStack: [...session.undoStack, currentSnap],
     redoStack: session.redoStack.slice(0, -1),
     lastGroupId: groupId ?? session.lastGroupId,
@@ -719,10 +1147,8 @@ function encodeSnapshot(snapshot: StudioHybridDccPersistedSnapshot): Uint8Array 
 
 function decodeSnapshot(
   bytes: Uint8Array,
-): StudioHybridDccPersistedSnapshot | StudioHybridDccLegacyPersistedSnapshotV1 {
-  return JSON.parse(new TextDecoder().decode(bytes)) as
-    | StudioHybridDccPersistedSnapshot
-    | StudioHybridDccLegacyPersistedSnapshotV1;
+): StudioHybridDccRestorableSnapshot {
+  return JSON.parse(new TextDecoder().decode(bytes)) as StudioHybridDccRestorableSnapshot;
 }
 
 async function readEntryPayload(

@@ -76,7 +76,9 @@ import {
   getStudioMannequinWebcamErrorMessage,
   initStudioMannequinPoseLandmarker,
   isStudioMannequinWebcamAbortError,
+  requestStudioMannequinCameraStream,
   solvePoseToMannequinJoints,
+  stopStudioMannequinMediaStream,
   smoothMannequinJointRotations,
   type StudioMannequinPoseLandmarker,
   type StudioMannequinWebcamErrorStage,
@@ -103,6 +105,7 @@ export interface StudioMannequinPoserPanelProps {
 }
 
 type MannequinTabId = "body" | "pose" | "joint" | "camera";
+type StudioMannequinWebcamLoadingStage = "engine" | "camera" | null;
 
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
@@ -394,7 +397,7 @@ export function StudioMannequinCameraSection({
   onCapture,
   capturing,
   webcamActive,
-  webcamLoading,
+  webcamLoadingStage,
   webcamError,
   onToggleWebcam,
   poseFrozen = false,
@@ -415,7 +418,7 @@ export function StudioMannequinCameraSection({
   onCapture: () => void;
   capturing: boolean;
   webcamActive: boolean;
-  webcamLoading: boolean;
+  webcamLoadingStage: StudioMannequinWebcamLoadingStage;
   webcamError: string | null;
   onToggleWebcam: () => void;
   poseFrozen?: boolean;
@@ -427,6 +430,8 @@ export function StudioMannequinCameraSection({
   facialTracking?: boolean;
   onToggleFacialTracking?: () => void;
 }): ReactElement {
+  const webcamLoading = webcamLoadingStage !== null;
+
   return (
     <div className="space-y-3">
       <StudioSectionHeader
@@ -462,7 +467,9 @@ export function StudioMannequinCameraSection({
             <Video size={13} aria-hidden />
           )}
           {webcamLoading
-            ? "동작 인식 준비 취소"
+            ? webcamLoadingStage === "engine"
+              ? "엔진 준비 취소"
+              : "카메라 연결 취소"
             : webcamActive
               ? "실시간 동작 인식 중지"
               : webcamError
@@ -470,9 +477,13 @@ export function StudioMannequinCameraSection({
                 : "웹캠 실시간 동작 인식 시작"}
         </button>
 
-        {webcamLoading ? (
+        {webcamLoadingStage === "engine" ? (
           <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
-            동작 인식 엔진과 카메라를 준비하고 있습니다. 처음에는 잠시 걸릴 수 있습니다.
+            동작 인식 엔진을 준비하고 있습니다. 처음 실행할 때는 모델을 내려받아 잠시 걸릴 수 있습니다.
+          </p>
+        ) : webcamLoadingStage === "camera" ? (
+          <p role="status" className="mt-1 text-[0.7rem] leading-relaxed text-fg-3">
+            엔진 준비 완료. 브라우저의 카메라 권한을 허용해 주세요. 권한 창이 보이지 않으면 주소창의 카메라 아이콘을 확인하세요.
           </p>
         ) : null}
 
@@ -625,7 +636,8 @@ export function StudioMannequinPoserPanel({
   const [sceneError, setSceneError] = useState<string | null>(null);
 
   const [webcamActive, setWebcamActive] = useState(false);
-  const [webcamLoading, setWebcamLoading] = useState(false);
+  const [webcamLoadingStage, setWebcamLoadingStage] =
+    useState<StudioMannequinWebcamLoadingStage>(null);
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [poseFrozen, setPoseFrozen] = useState(false);
   const [mirrorMode, setMirrorMode] = useState(true);
@@ -642,6 +654,7 @@ export function StudioMannequinPoserPanel({
   const webcamLoadingRef = useRef(false);
   const poseFrozenRef = useRef(false);
   const mirrorModeRef = useRef(true);
+  const webcamLoading = webcamLoadingStage !== null;
   webcamActiveRef.current = webcamActive;
   webcamLoadingRef.current = webcamLoading;
   poseFrozenRef.current = poseFrozen;
@@ -672,7 +685,7 @@ export function StudioMannequinPoserPanel({
 
     const stream = webcamStreamRef.current;
     webcamStreamRef.current = null;
-    stream?.getTracks().forEach((track) => track.stop());
+    if (stream) stopStudioMannequinMediaStream(stream);
 
     webcamLandmarkerRef.current = null;
     disposeStudioMannequinPoseLandmarker();
@@ -681,7 +694,7 @@ export function StudioMannequinPoserPanel({
   const stopWebcam = useCallback(() => {
     releaseWebcamResources();
     setWebcamActive(false);
-    setWebcamLoading(false);
+    setWebcamLoadingStage(null);
     setWebcamError(null);
   }, [releaseWebcamResources]);
 
@@ -699,7 +712,7 @@ export function StudioMannequinPoserPanel({
     let failureStage: StudioMannequinWebcamErrorStage = "camera";
 
     try {
-      setWebcamLoading(true);
+      setWebcamLoadingStage("engine");
       setWebcamError(null);
 
       if (window.isSecureContext === false) {
@@ -722,16 +735,20 @@ export function StudioMannequinPoserPanel({
       if (webcamSessionRef.current !== session || abortController.signal.aborted) return;
 
       failureStage = "camera";
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: { ideal: "user" },
-        },
-      });
+      setWebcamLoadingStage("camera");
+      const stream = await requestStudioMannequinCameraStream(
+        () => navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: { ideal: "user" },
+          },
+        }),
+        { signal: abortController.signal },
+      );
       if (webcamSessionRef.current !== session || abortController.signal.aborted) {
-        stream.getTracks().forEach((track) => track.stop());
+        stopStudioMannequinMediaStream(stream);
         return;
       }
 
@@ -747,7 +764,7 @@ export function StudioMannequinPoserPanel({
       video.srcObject = stream;
       await video.play();
       if (webcamSessionRef.current !== session || abortController.signal.aborted) {
-        stream.getTracks().forEach((track) => track.stop());
+        stopStudioMannequinMediaStream(stream);
         video.srcObject = null;
         return;
       }
@@ -755,6 +772,7 @@ export function StudioMannequinPoserPanel({
       webcamLandmarkerRef.current = landmarker;
       webcamActiveRef.current = true;
       webcamLoadingRef.current = false;
+      setWebcamLoadingStage(null);
       setWebcamActive(true);
     } catch (cause) {
       if (
@@ -768,12 +786,12 @@ export function StudioMannequinPoserPanel({
       console.warn(`Studio mannequin webcam ${failureStage} initialization failed:`, cause);
       releaseWebcamResources();
       setWebcamActive(false);
-      setWebcamLoading(false);
+      setWebcamLoadingStage(null);
       setWebcamError(getStudioMannequinWebcamErrorMessage(failureStage, cause));
     } finally {
       if (webcamSessionRef.current === session) {
         webcamLoadingRef.current = false;
-        setWebcamLoading(false);
+        setWebcamLoadingStage(null);
       }
     }
   }, [releaseWebcamResources, stopWebcam]);
@@ -835,7 +853,7 @@ export function StudioMannequinPoserPanel({
         console.warn("Studio mannequin webcam frame analysis failed:", cause);
         releaseWebcamResources();
         setWebcamActive(false);
-        setWebcamLoading(false);
+        setWebcamLoadingStage(null);
         setWebcamError(getStudioMannequinWebcamErrorMessage("tracking", cause));
         return;
       }
@@ -1225,7 +1243,7 @@ export function StudioMannequinPoserPanel({
                   onCapture={handleCapture}
                   capturing={capturing}
                   webcamActive={webcamActive}
-                  webcamLoading={webcamLoading}
+                  webcamLoadingStage={webcamLoadingStage}
                   webcamError={webcamError}
                   onToggleWebcam={handleToggleWebcam}
                   poseFrozen={poseFrozen}

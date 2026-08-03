@@ -74,7 +74,10 @@ const SCENE_PATH_MATERIAL_LOCATOR_PATTERN =
 const SAFE_DATA_KEY_PATTERN = /^[\p{L}\p{N}_. -]{1,64}$/u;
 const CSS_HEX_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const UNSAFE_REFERENCE_PATTERN = /^(?:data|blob|https?|file|javascript|vbscript):|^\/\//i;
-const UNSAFE_REFERENCE_KEY_PATTERN = /(?:^|_)(?:url|uri|href|src)$|(?:url|uri)$/i;
+// `curl` is an Avatar Forge numeric hair control, not a URL reference. Keep the broad
+// suffix guard for keys such as `runtimeUrl` while exempting that exact canonical field.
+const UNSAFE_REFERENCE_KEY_PATTERN =
+  /(?:^|_)(?:url|uri|href|src)$|^(?!curl$).*(?:url|uri)$/i;
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 export type StudioVrmVec3 = readonly [number, number, number];

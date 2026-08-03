@@ -11,6 +11,8 @@ import {
   studioReferenceBoardHasContent,
   type StudioReferenceBoardDocument,
 } from "./studio-reference-board";
+import { migrateStudioShared3dStageCollectionDocument } from
+  "./studio-shared-3d-stage-collection";
 
 export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
 const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v2";
@@ -59,6 +61,7 @@ export type StudioAutosavePayload = {
     elements?: unknown[];
     canvasH?: unknown;
     drawingAssist?: unknown;
+    shared3dStage?: unknown;
   }>;
   master?: { elements?: unknown[] } | unknown;
   characterBible?: unknown;
@@ -226,10 +229,20 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
     if (!value || typeof value !== "object") return null;
     const record = value as Record<string, unknown>;
     if (!Array.isArray(record.pagesList) || record.pagesList.length === 0) return null;
+    const pagesList = record.pagesList.map((page) => {
+      if (!page || typeof page !== "object" || Array.isArray(page)) return page;
+      const pageRecord = page as Record<string, unknown>;
+      if (!Object.hasOwn(pageRecord, "shared3dStage")) return pageRecord;
+      const { shared3dStage: rawSharedStage, ...rest } = pageRecord;
+      const shared3dStage = migrateStudioShared3dStageCollectionDocument(rawSharedStage);
+      // Autosave is a recovery surface: preserve the artwork even when only the optional link is
+      // corrupt. Project import remains fail-closed for the same malformed document.
+      return shared3dStage ? { ...rest, shared3dStage } : rest;
+    }) as StudioAutosavePayload["pagesList"];
     return {
       version: 2,
       savedAt: typeof record.savedAt === "string" ? record.savedAt : new Date(0).toISOString(),
-      pagesList: record.pagesList as StudioAutosavePayload["pagesList"],
+      pagesList,
       master: record.master,
       characterBible: record.characterBible,
       writerRoom: record.writerRoom,
@@ -295,8 +308,17 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
  * its canonical hash-only representation.
  */
 export function serializeStudioAutosave(payload: StudioAutosavePayload): string {
+  const pagesList = payload.pagesList.map((page) => {
+    if (!page || typeof page !== "object" || Array.isArray(page)) return page;
+    const pageRecord = page as Record<string, unknown>;
+    if (!Object.hasOwn(pageRecord, "shared3dStage")) return page;
+    const { shared3dStage: rawSharedStage, ...rest } = pageRecord;
+    const shared3dStage = migrateStudioShared3dStageCollectionDocument(rawSharedStage);
+    return shared3dStage ? { ...rest, shared3dStage } : rest;
+  });
   return JSON.stringify({
     ...payload,
+    pagesList,
     ...(payload.referenceBoard === undefined
       ? {}
       : { referenceBoard: normalizeStudioReferenceBoardDocument(payload.referenceBoard) }),

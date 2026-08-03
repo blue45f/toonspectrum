@@ -9,6 +9,7 @@
 //  - TrackingChannels는 "카메라 좌표계"(미러 전)이고,
 //    convertChannelsToVrmData에서 mirrorMode·gazeLock·sensitivity를 반영한다.
 
+import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
 import { TrackingChannelFilterBank } from "./studio-vrm-one-euro";
 import { solvePoseToVrmBones } from "./studio-vrm-pose-solver";
 
@@ -97,14 +98,6 @@ export const DEFAULT_TRACKING_OPTIONS: Readonly<TrackingOptions> = {
   fingerTracking: true,
 };
 
-/**
- * CDN 에셋 경로 — MediaPipe Vision WASM.
- * package.json 의 @mediapipe/tasks-vision 버전과 함께 올릴 것.
- * @latest 금지 — 런타임(JS)과 WASM 버전이 어긋나면 조용히 깨진다(0.10.16 wasm 누락 전례).
- */
-const MEDIAPIPE_VISION_CDN =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm";
-
 /** 얼굴 미검출 시 복귀 기준이 되는 중립 채널(전부 0). */
 export const NEUTRAL_CHANNELS: Readonly<TrackingChannels> = {
   headPitch: 0,
@@ -170,7 +163,9 @@ export async function initFaceLandmarker(): Promise<FaceLandmarker> {
       "@mediapipe/tasks-vision"
     );
 
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+    const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+      isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+    });
 
     // Try GPU first, fallback to CPU (some GPUs / environments fail on GPU delegate)
     // 신뢰도 0.5→0.6: 저품질 프레임의 랜드마크 튐 컷.
@@ -241,7 +236,9 @@ export async function initPoseLandmarker(): Promise<PoseLandmarker> {
     const { FilesetResolver, PoseLandmarker: PLM } = await import(
       "@mediapipe/tasks-vision"
     );
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+    const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+      isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+    });
 
     let landmarker: PoseLandmarker;
     try {
@@ -296,7 +293,9 @@ export type PhotoPoseLandmarkerFactory = () => Promise<PoseLandmarker>;
 
 async function createPhotoPoseLandmarker(): Promise<PoseLandmarker> {
   const { FilesetResolver, PoseLandmarker: PLM } = await import("@mediapipe/tasks-vision");
-  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+    isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+  });
   const modelAssetPath =
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
   const options = {
@@ -386,7 +385,9 @@ export type PhotoHandLandmarkerFactory = () => Promise<HandLandmarker>;
 
 async function createPhotoHandLandmarker(): Promise<HandLandmarker> {
   const { FilesetResolver, HandLandmarker: HLM } = await import("@mediapipe/tasks-vision");
-  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+    isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+  });
   const modelAssetPath =
     "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
   const options = {
@@ -477,7 +478,9 @@ export async function initHandLandmarker(): Promise<HandLandmarker> {
 
   initHandPromise = (async () => {
     const { FilesetResolver, HandLandmarker: HLM } = await import("@mediapipe/tasks-vision");
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+    const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
+      isSimdSupported: () => FilesetResolver.isSimdSupported(false),
+    });
     const model =
       "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 

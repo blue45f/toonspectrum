@@ -6,6 +6,7 @@ import {
   disposeStudioMannequinPoseLandmarker,
   getStudioMannequinWebcamErrorMessage,
   initStudioMannequinPoseLandmarker,
+  requestStudioMannequinCameraStream,
   solvePoseToMannequinJoints,
   smoothMannequinJointRotations,
   type PoseLandmark,
@@ -14,6 +15,7 @@ import {
 
 afterEach(() => {
   disposeStudioMannequinPoseLandmarker();
+  vi.useRealTimers();
 });
 
 describe("studio-mannequin-webcam-tracking", () => {
@@ -55,11 +57,44 @@ describe("studio-mannequin-webcam-tracking", () => {
       new URL("./studio-mannequin-webcam-tracking.ts", import.meta.url),
       "utf8",
     );
+    const assetSource = readFileSync(
+      new URL("./studio-mediapipe-vision-assets.ts", import.meta.url),
+      "utf8",
+    );
 
-    expect(runtimeSource).toContain("vision_wasm_internal.js?url");
-    expect(runtimeSource).toContain("vision_wasm_nosimd_internal.js?url");
+    expect(runtimeSource).toContain("resolveStudioMediaPipeVisionWasmFileset");
+    expect(assetSource).toContain("vision_wasm_internal.js?url");
+    expect(assetSource).toContain("vision_wasm_nosimd_internal.js?url");
     expect(runtimeSource).toContain("modelAssetBuffer");
-    expect(runtimeSource).not.toMatch(/cdn\.jsdelivr\.net|unpkg\.com/i);
+    expect(`${runtimeSource}\n${assetSource}`).not.toMatch(/cdn\.jsdelivr\.net|unpkg\.com/i);
+  });
+
+  it("dispose 직후 retry도 이전 MediaPipe 초기화가 끝나기 전에는 factory를 중첩하지 않는다", async () => {
+    const stale: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    };
+    const fresh: StudioMannequinPoseLandmarker = {
+      detectForVideo: vi.fn(() => ({ landmarks: [] })),
+      close: vi.fn(),
+    };
+    let resolveStale: ((value: StudioMannequinPoseLandmarker) => void) | undefined;
+    const staleFactory = vi.fn(() => new Promise<StudioMannequinPoseLandmarker>((resolve) => {
+      resolveStale = resolve;
+    }));
+    const freshFactory = vi.fn(async () => fresh);
+
+    const stalePending = initStudioMannequinPoseLandmarker({ factory: staleFactory });
+    disposeStudioMannequinPoseLandmarker();
+    const retryPending = initStudioMannequinPoseLandmarker({ factory: freshFactory });
+
+    await Promise.resolve();
+    expect(freshFactory).not.toHaveBeenCalled();
+    resolveStale?.(stale);
+    await expect(stalePending).rejects.toMatchObject({ name: "AbortError" });
+    await expect(retryPending).resolves.toBe(fresh);
+    expect(stale.close).toHaveBeenCalledTimes(1);
+    expect(freshFactory).toHaveBeenCalledTimes(1);
   });
 
   it("deduplicates concurrent VIDEO runtime initialization and closes the cached task", async () => {
@@ -118,6 +153,55 @@ describe("studio-mannequin-webcam-tracking", () => {
     ).resolves.toBe(retryLandmarker);
   });
 
+  it("bounds camera permission waiting and stops a stream that resolves after timeout", async () => {
+    vi.useFakeTimers();
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    let resolveCamera: ((value: MediaStream) => void) | undefined;
+    const pending = requestStudioMannequinCameraStream(
+      () => new Promise<MediaStream>((resolve) => {
+        resolveCamera = resolve;
+      }),
+      { timeoutMs: 250 },
+    );
+    const failure = pending.catch((cause: unknown) => cause);
+
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(failure).resolves.toMatchObject({
+      name: "StudioMannequinCameraPermissionTimeoutError",
+    });
+
+    resolveCamera?.(stream);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops a camera stream that resolves after the permission wait was cancelled", async () => {
+    const stopTrack = vi.fn();
+    const stream = {
+      getTracks: () => [{ stop: stopTrack }],
+    } as unknown as MediaStream;
+    const controller = new AbortController();
+    let resolveCamera: ((value: MediaStream) => void) | undefined;
+    const pending = requestStudioMannequinCameraStream(
+      () => new Promise<MediaStream>((resolve) => {
+        resolveCamera = resolve;
+      }),
+      { signal: controller.signal },
+    );
+
+    await Promise.resolve();
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+
+    resolveCamera?.(stream);
+    await vi.waitFor(() => {
+      expect(stopTrack).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("distinguishes permission, busy-camera, model timeout, and runtime file failures", () => {
     expect(
       getStudioMannequinWebcamErrorMessage(
@@ -133,6 +217,12 @@ describe("studio-mannequin-webcam-tracking", () => {
     ).toContain("다른 앱");
     expect(
       getStudioMannequinWebcamErrorMessage(
+        "camera",
+        Object.assign(new Error(), { name: "StudioMannequinCameraPermissionTimeoutError" }),
+      ),
+    ).toContain("엔진은 준비");
+    expect(
+      getStudioMannequinWebcamErrorMessage(
         "engine",
         Object.assign(new Error(), { name: "StudioMannequinPoseModelTimeoutError" }),
       ),
@@ -143,5 +233,11 @@ describe("studio-mannequin-webcam-tracking", () => {
         Object.assign(new Error(), { name: "StudioMannequinVisionWasmLoadError" }),
       ),
     ).toContain("엔진 파일");
+    expect(
+      getStudioMannequinWebcamErrorMessage(
+        "engine",
+        Object.assign(new Error(), { name: "StudioMannequinPoseEngineCreationError" }),
+      ),
+    ).toContain("그래픽 가속·CPU·호환 모드");
   });
 });
