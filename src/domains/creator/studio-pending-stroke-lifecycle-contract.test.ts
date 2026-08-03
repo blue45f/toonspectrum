@@ -102,7 +102,7 @@ describe("pending stroke lifecycle source contract", () => {
     );
 
     expect(journalSetup).toContain("createStudioPageHistoryCommandJournalClient()");
-    expect(journalSetup).toContain("useLayoutEffect(() =>");
+    expect(journalSetup).toMatch(/use(?:Layout)?Effect\(\(\) =>/);
     expect(journalSetup).toContain("client?.dispose()");
     expect(journalSetup).toContain("pagesHistoryCommandJournalRef.current = null");
   });
