@@ -115,6 +115,7 @@ export function projectStudioLiveSyncSnapshot({
   const message = transportMessage?.trim() || telemetry?.message || INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT.message;
   const editsDurablyProtected = canEdit
     ? operationSyncReady && (
+        mode === "local" ||
         serverDurable({ mode, transportReady, operationSyncReady }) ||
         browserDurable(persistenceDurability)
       )
