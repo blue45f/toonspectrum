@@ -156,7 +156,15 @@ test("maps the CI localhost contract to a non-TLS libpq environment", () => {
   expect(
     createPsqlEnvironment(
       "postgres://webdex:webdex@localhost:5432/webdex",
-      { allowLoopback: true, baseEnvironment: { PATH: "/usr/bin" } },
+      {
+        allowLoopback: true,
+        baseEnvironment: {
+          PATH: "/usr/bin",
+          PGSSLROOTCERT: "/tmp/untrusted-root.crt",
+          SSL_CERT_DIR: "/tmp/untrusted-ca-directory",
+          SSL_CERT_FILE: "/tmp/untrusted-ca-bundle.crt",
+        },
+      },
     ),
   ).toEqual({
     PATH: "/usr/bin",
@@ -197,6 +205,9 @@ test("builds an override-resistant libpq environment without putting the URL in 
       PGHOSTADDR: "192.0.2.20",
       PGSERVICE: "attacker",
       PGOPTIONS: "-csearch_path=attacker",
+      PGSSLROOTCERT: "/tmp/untrusted-root.crt",
+      SSL_CERT_DIR: "/tmp/untrusted-ca-directory",
+      SSL_CERT_FILE: "/tmp/untrusted-ca-bundle.crt",
     },
   });
   expect(environment).toEqual({
@@ -208,5 +219,6 @@ test("builds an override-resistant libpq environment without putting the URL in 
     PGDATABASE: "toonspectrum",
     PGSSLMODE: "verify-full",
     PGCHANNELBINDING: "require",
+    PGSSLROOTCERT: "system",
   });
 });

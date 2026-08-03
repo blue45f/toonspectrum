@@ -276,6 +276,14 @@ export interface StudioFxPressurePathPlan {
 
 export type StudioFxLuminousBrushId = "neon" | "glow" | "soft-glow";
 
+/**
+ * Luminous colour is accumulated with premultiplied source-over rather than raw additive RGB.
+ * `lighter` (and repeated `screen`) drives unequal colour channels towards white at crossings,
+ * while source-over increases coverage without changing the selected straight-alpha hue. It also
+ * keeps coloured halos visible on white, dark and transparent document backgrounds.
+ */
+export const STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION = "source-over" as const;
+
 export type StudioFxLuminousRibbonRole =
   | "body"
   | "join"
@@ -301,10 +309,10 @@ export interface StudioFxLuminousRibbonPassPlan {
    */
   readonly coverageOperation: "stroke-local-single-fill";
   /**
-   * This is applied outside the local mask. Separate DrawEls still add light naturally, while
-   * a self-crossing inside one DrawEl cannot over-brighten.
+   * This is applied outside the local mask. Separate DrawEls build opacity without adding RGB
+   * energy, while a self-crossing inside one DrawEl cannot over-brighten or lose chroma.
    */
-  readonly compositeOperation: "lighter";
+  readonly compositeOperation: typeof STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION;
   readonly fillRule: "nonzero";
   readonly cap: "round";
   readonly sourceSegmentCount: number;
@@ -1073,8 +1081,8 @@ function fxLuminousWeightedOpacity(
  *
  * The returned polygons must be appended to one compound path and filled once. Bodies, joins and
  * round caps deliberately overlap inside that one fill; non-zero winding turns those overlaps,
- * exact retraces and figure-eight crossings into a union instead of repeatedly applying `lighter`.
- * Render separate DrawEls with the advertised `lighter` composite to retain normal light build-up.
+ * exact retraces and figure-eight crossings into a union. The advertised premultiplied
+ * source-over composite then builds coverage across separate DrawEls without additive whitening.
  */
 export function planStudioFxLuminousRibbonPass(input: {
   readonly brushId: StudioFxLuminousBrushId;
@@ -1107,7 +1115,7 @@ export function planStudioFxLuminousRibbonPass(input: {
     version: FX_LUMINOUS_RIBBON_VERSION,
     brushId: input.brushId,
     coverageOperation: "stroke-local-single-fill",
-    compositeOperation: "lighter",
+    compositeOperation: STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
     fillRule: "nonzero",
     cap: "round",
     sourceSegmentCount: input.pressurePath.segments.length,

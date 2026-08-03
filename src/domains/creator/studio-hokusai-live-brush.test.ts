@@ -76,6 +76,11 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
   #lastIdentity: { requestId: number; engineEpoch: number; strokeId: string } | null = null;
   #lastSequence = 0;
   #config: Record<string, unknown> | null = null;
+  #appendCount = 0;
+
+  constructor(
+    readonly options: Readonly<{ acceptFirstAppendWithoutFrame?: boolean }> = {},
+  ) {}
 
   addEventListener(
     type: "error" | "message" | "messageerror",
@@ -124,7 +129,18 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
       }));
     } else if (candidate.type === "studio-hokusai-live/append") {
       this.#lastSequence = candidate.sequence as number;
-      queueMicrotask(() => void this.#emitFrame());
+      this.#appendCount += 1;
+      if (this.options.acceptFirstAppendWithoutFrame && this.#appendCount === 1) {
+        queueMicrotask(() => this.emit({
+          type: "studio-hokusai-live/accepted",
+          version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+          ...this.#lastIdentity,
+          sequence: this.#lastSequence,
+          presentation: "no-dirty-pixels",
+        }));
+      } else {
+        queueMicrotask(() => void this.#emitFrame());
+      }
     } else if (candidate.type === "studio-hokusai-live/finish") {
       queueMicrotask(() => void this.#emitComplete());
     } else if (candidate.type === "studio-hokusai-live/cancel") {
@@ -431,6 +447,43 @@ describe("Studio Hokusai live brush vertical slice", () => {
     provider.close();
   });
 
+  it("finishes a single-contact stroke after an accepted no-dirty prefix", async () => {
+    const worker = new FakeHokusaiLiveWorker({
+      acceptFirstAppendWithoutFrame: true,
+    });
+    const provider = new StudioHokusaiLiveBrushProvider({
+      workerFactory: () => worker,
+      startupTimeoutMs: 1_000,
+      finishTimeoutMs: 50,
+    });
+    const warming = provider.prewarm();
+    worker.ready();
+    await warming;
+    const route = provider.admitStroke(routeInput());
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    const session = await provider.beginStroke(route, {
+      strokeId: "single-contact",
+      signal: new AbortController().signal,
+      onFrame: () => undefined,
+    });
+    expect(session.append([
+      { x: 720, y: 40_000, pressure: 0.4, timeMilliseconds: 1 },
+    ])).toBe(1);
+
+    const completed = await session.finish();
+
+    expect(completed.receipt).toMatchObject({
+      finalSequence: 1,
+      sampleCount: 2,
+      exactLiveCommitParity: true,
+    });
+    expect(worker.sent.some(({ message }) => (
+      (message as { type?: string }).type === "studio-hokusai-live/finish"
+    ))).toBe(true);
+    provider.close();
+  });
+
   it("streams incremental dirty deltas and reads one full frame only at canonical finish", () => {
     const source = readFileSync(
       new URL("./studio-hokusai-live-brush.worker.ts", import.meta.url),
@@ -439,6 +492,10 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(source).toContain("frameInFlight");
     expect(source).toContain("pendingPresentationSequence");
     expect(source).toContain("Input is never dropped");
+    expect(source).toContain('presentation: "no-dirty-pixels"');
+    expect(source).not.toContain(
+      'throw new Error("Hokusai produced no dirty pixels for the accepted input batch.")',
+    );
     expect(source).toContain("await emitLiveFrame(stroke, pending)");
     expect(source).toContain("pixels.slice()");
     expect(source).toContain("canvas.dirtyFrame()");

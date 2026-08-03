@@ -77,6 +77,56 @@ function ribbon(alpha: number): Uint8Array {
   return pixels;
 }
 
+function periodicDabStroke(alpha: number): Uint8Array {
+  const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+  const centers = Array.from({ length: 10 }, (_, index) => 8 + index * 8);
+  const radius = 5.5;
+  for (let y = 0; y < HEIGHT; y += 1) {
+    for (let x = 0; x < WIDTH; x += 1) {
+      let coverage = 0;
+      for (const centerX of centers) {
+        const distance = Math.hypot(x - centerX, y - 24);
+        if (distance >= radius) continue;
+        coverage = Math.max(coverage, Math.sqrt(1 - distance / radius));
+      }
+      if (coverage <= 0) continue;
+      const index = (y * WIDTH + x) * 4;
+      pixels[index] = 112;
+      pixels[index + 1] = 88;
+      pixels[index + 2] = 72;
+      pixels[index + 3] = Math.round(alpha * coverage);
+    }
+  }
+  return pixels;
+}
+
+function crossedStroke(alpha: number): Uint8Array {
+  const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+  for (let y = 4; y < 44; y += 1) {
+    for (let x = 16; x < 80; x += 1) {
+      const station = (x - 16) / 64;
+      const upperY = 8 + station * 32;
+      const lowerY = 40 - station * 32;
+      const distance = Math.min(Math.abs(y - upperY), Math.abs(y - lowerY));
+      if (distance > 4) continue;
+      const index = (y * WIDTH + x) * 4;
+      pixels[index] = 112;
+      pixels[index + 1] = 88;
+      pixels[index + 2] = 72;
+      pixels[index + 3] = Math.round(alpha * Math.sqrt(1 - distance / 4));
+    }
+  }
+  return pixels;
+}
+
+function centrelineAlpha(pixels: Uint8Array): number[] {
+  const values = [];
+  for (let x = 8; x <= 80; x += 1) {
+    values.push(pixels[(24 * WIDTH + x) * 4 + 3] ?? 0);
+  }
+  return values;
+}
+
 function packedFrame(
   source: Uint8Array,
   bounds: readonly [number, number, number, number],
@@ -209,6 +259,48 @@ describe("Studio Hokusai natural-media texture v2", () => {
     }
   });
 
+  it("does not expose periodic dab joints across a long charcoal carrier", () => {
+    const source = periodicDabStroke(210);
+    const before = centrelineAlpha(source);
+    const textured = source.slice();
+    applyStudioHokusaiNaturalMediaTextureV2(
+      textured,
+      plan("charcoal"),
+      {
+        frameBounds: [0, 0, WIDTH, HEIGHT],
+        dirtyBounds: [0, 0, WIDTH, HEIGHT],
+      },
+    );
+    const after = centrelineAlpha(textured);
+
+    expect(Math.min(...before)).toBeGreaterThan(0);
+    expect(Math.min(...after)).toBeGreaterThanOrEqual(48);
+    expect(standardDeviation(after)).toBeLessThan(
+      standardDeviation(before) * 1.3,
+    );
+    expect(after.every((alpha) => alpha > 0)).toBe(true);
+  });
+
+  it("keeps crossed charcoal retraces monotonic without erasing pigment", () => {
+    const firstPass = crossedStroke(112);
+    const retraced = crossedStroke(224);
+    applyStudioHokusaiNaturalMediaTextureV2(
+      firstPass,
+      plan("charcoal"),
+      fullLayout([0, 0, WIDTH, HEIGHT]),
+    );
+    applyStudioHokusaiNaturalMediaTextureV2(
+      retraced,
+      plan("charcoal"),
+      fullLayout([0, 0, WIDTH, HEIGHT]),
+    );
+    for (let index = 3; index < firstPass.length; index += 4) {
+      if ((firstPass[index] ?? 0) <= 0) continue;
+      expect(retraced[index]).toBeGreaterThanOrEqual(firstPass[index] ?? 0);
+    }
+    expect(retraced[(24 * WIDTH + 48) * 4 + 3]).toBeGreaterThan(96);
+  });
+
   it("keeps antialiased small-radius graphite visibly legible", () => {
     const pixels = ribbon(24);
     const before = channelValues(pixels, 3);
@@ -285,6 +377,32 @@ describe("Studio Hokusai natural-media texture v2", () => {
       }
       expect(composed).toEqual(full);
     }
+  });
+
+  it("keeps a long dabbed charcoal stroke byte-identical across live dirty patches", () => {
+    const partition = [
+      [0, 0, 31, HEIGHT],
+      [31, 0, 33, HEIGHT],
+      [64, 0, WIDTH - 64, HEIGHT],
+    ] as const;
+    const source = periodicDabStroke(210);
+    const canonical = source.slice();
+    const live = source.slice();
+    applyStudioHokusaiNaturalMediaTextureV2(
+      canonical,
+      plan("charcoal"),
+      fullLayout([0, 0, WIDTH, HEIGHT]),
+    );
+    for (const bounds of partition) {
+      const patch = packedFrame(source, bounds);
+      applyStudioHokusaiNaturalMediaTextureV2(
+        patch,
+        plan("charcoal"),
+        { frameBounds: bounds, dirtyBounds: bounds },
+      );
+      compositePackedFrame(live, patch, bounds);
+    }
+    expect(live).toEqual(canonical);
   });
 
   it("rejects malformed, overflowing and mismatched packed layouts", () => {

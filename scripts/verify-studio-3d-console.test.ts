@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isExpectedStaticPreviewSocketIoHandshakeClose } from "./verify-studio-3d-console.mts";
+import {
+  isExpectedStaticPreviewSocketIoHandshakeClose,
+  STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
+} from "./verify-studio-3d-console.mts";
 
 const PREVIEW_URL = "http://127.0.0.1:51758/studio";
 const EXPECTED_HANDSHAKE_CLOSE = [
@@ -67,5 +70,20 @@ describe("3D static-preview Socket.IO diagnostics", () => {
     expect(
       isExpectedStaticPreviewSocketIoHandshakeClose(message, studioUrl),
     ).toBe(false);
+  });
+});
+
+describe("3D WebGPU conformance browser boundary", () => {
+  it("pins both Dawn WebGPU and ANGLE WebGL to SwiftShader", () => {
+    expect(Object.isFrozen(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS)).toBe(true);
+    expect(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS).toEqual([
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--use-webgpu-adapter=swiftshader",
+      "--use-gpu-in-tests",
+      "--use-gl=angle",
+      "--use-angle=swiftshader",
+      "--enable-unsafe-swiftshader",
+    ]);
   });
 });

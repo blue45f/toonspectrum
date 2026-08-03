@@ -291,12 +291,13 @@ function ellipsePolygon(
   radiusX: number,
   radiusY: number,
   angle: number,
+  vertexCount = 12,
 ): readonly number[] {
   const cosine = Math.cos(angle);
   const sine = Math.sin(angle);
   const points: number[] = [];
-  for (let index = 0; index < 12; index += 1) {
-    const theta = index / 12 * TAU;
+  for (let index = 0; index < vertexCount; index += 1) {
+    const theta = index / vertexCount * TAU;
     const localX = Math.cos(theta) * radiusX;
     const localY = Math.sin(theta) * radiusY;
     points.push(
@@ -471,8 +472,8 @@ function negativeGrainSlitPolygon(
       ),
     ),
   );
-  const halfWidth = Math.max(
-    0.055,
+  const sampledHalfWidth = Math.max(
+    0.04,
     Math.min(
       minimumHalfWidth * 0.32,
       input.policy.maximumHalfWidth,
@@ -486,19 +487,22 @@ function negativeGrainSlitPolygon(
       ),
     ),
   );
+  // A four-corner subtractive slit remained clearly rectangular at 200%+
+  // zoom, especially in chalk and crayon. Keep every pore materially
+  // elongated and round its ends so paper tooth never reads as a tiled square
+  // particle. The bound is deterministic and independent from live chunking.
+  const halfWidth = Math.min(sampledHalfWidth, halfLength / 2.8);
   if (halfLength * 2 >= length * 0.68 || halfWidth >= minimumHalfWidth * 0.4) {
     return null;
   }
-  return oppositeWinding([
-    centerX - tangentX * halfLength - normalX * halfWidth,
-    centerY - tangentY * halfLength - normalY * halfWidth,
-    centerX + tangentX * halfLength - normalX * halfWidth,
-    centerY + tangentY * halfLength - normalY * halfWidth,
-    centerX + tangentX * halfLength + normalX * halfWidth,
-    centerY + tangentY * halfLength + normalY * halfWidth,
-    centerX - tangentX * halfLength + normalX * halfWidth,
-    centerY - tangentY * halfLength + normalY * halfWidth,
-  ]);
+  return oppositeWinding(ellipsePolygon(
+    centerX,
+    centerY,
+    halfLength,
+    halfWidth,
+    Math.atan2(tangentY, tangentX),
+    10,
+  ));
 }
 
 function polygonBounds(

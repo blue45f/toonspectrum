@@ -1209,7 +1209,8 @@ describe("도형 직렬화", () => {
 
       expect(first).toBe(exportPageToSvg(input).svg);
       expect((first.match(/<circle cx="25" cy="35"/g) ?? []).length).toBeGreaterThan(1);
-      expect(first).toContain("mix-blend-mode:screen");
+      expect(first).toContain("mix-blend-mode:normal");
+      expect(first).not.toContain("mix-blend-mode:screen");
       expect(first).not.toContain('<path d="M 25 35');
     }
   });
@@ -1402,6 +1403,11 @@ describe("도형 직렬화", () => {
     halfOpacities.forEach((value, index) => {
       expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
     });
+    if (brush === "glitter") {
+      expect(half).toContain('data-luminous-composite="source-over"');
+      expect(half).toContain("mix-blend-mode:normal");
+      expect(half).not.toContain("mix-blend-mode:screen");
+    }
   });
 
   it("아크릴 장획은 반복 타원 대신 Canvas와 같은 연속 body와 강모 lane을 직렬화한다", () => {
@@ -2506,7 +2512,14 @@ describe("도형 직렬화", () => {
     });
     const { svg } = exportPageToSvg(page([neon]));
     expect(svg).toContain('data-brush-engine="neon-halo"');
-    expect((svg.match(/mix-blend-mode:screen/g) ?? [])).toHaveLength(3);
+    expect((svg.match(/mix-blend-mode:normal/g) ?? [])).toHaveLength(3);
+    expect((svg.match(
+      /data-luminous-ribbon="single-fill"[^>]*data-luminous-composite="source-over"/g,
+    ) ?? []))
+      .toHaveLength(3);
+    expect((svg.match(/<g[^>]*data-luminous-composite="source-over"/g) ?? []))
+      .toHaveLength(1);
+    expect(svg).not.toContain("mix-blend-mode:screen");
     expect((svg.match(/fill="#39ff14"/g) ?? [])).toHaveLength(2);
     expect(svg).toContain('fill="#fff"');
     expect(svg.match(/data-luminous-ribbon="single-fill"/g)).toHaveLength(3);
@@ -2525,6 +2538,8 @@ describe("도형 직렬화", () => {
     const { svg } = exportPageToSvg(page([neonTap]));
     expect(svg).toContain('data-brush-engine="neon-halo"');
     expect((svg.match(/<circle /g) ?? []).length).toBe(3);
+    expect((svg.match(/mix-blend-mode:normal/g) ?? [])).toHaveLength(3);
+    expect(svg).not.toContain("mix-blend-mode:screen");
   });
 
   it("캘리그래피 — 포인트별 필압·틸트·회전을 겹침 없는 단일 리본으로 보존한다", () => {

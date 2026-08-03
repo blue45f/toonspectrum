@@ -32,6 +32,7 @@ describe("Hokusai live real-browser quality gate", () => {
     expect(browserEntry).toContain("browserComposedExactCanonical");
     expect(browserEntry).toContain("liveMaterialQualityMetrics");
     expect(browserEntry).toContain("materialFamilies");
+    expect(browserEntry).toContain("session.append(samples.slice(0, 1))");
     expect(browserEntry).toContain('cancelled.cancel("user-cancelled")');
     expect(runner).toContain("stalePresentationsCoalesced");
     expect(runner).toContain("totalTransferredBytes > 32 * 1024 * 1024");

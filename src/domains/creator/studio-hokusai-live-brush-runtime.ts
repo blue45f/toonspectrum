@@ -508,6 +508,23 @@ export class StudioHokusaiLiveStrokeSession {
       this.#beginReject = null;
       return;
     }
+    if (candidate.type === "studio-hokusai-live/accepted") {
+      if (
+        !integer(candidate.sequence)
+        || candidate.presentation !== "no-dirty-pixels"
+        || candidate.sequence <= this.#lastPresentedSequence
+        || candidate.sequence > this.#sequence
+      ) {
+        this.fail(new Error("Hokusai no-dirty input acknowledgement is invalid or stale."));
+        return;
+      }
+      // A slow-tracking first contact can consume input without producing a
+      // transferable dirty patch. It still advances the exact input prefix so
+      // finish can flush the pointer-up tail instead of timing out.
+      this.#lastPresentedSequence = candidate.sequence;
+      this.#postFinishWhenPresented();
+      return;
+    }
     if (candidate.type === "studio-hokusai-live/frame") {
       const frame = this.#snapshotFrame(candidate);
       const liveFrameIsOrdered = frame?.phase === "live"

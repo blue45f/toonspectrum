@@ -195,7 +195,10 @@ describe("studio draw rendering ownership boundary", () => {
     expect(drawNode.source).toContain('el.watercolorPipeline === "causal-walker-v2"');
     expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)");
     expect(drawNode.source).toContain('globalCompositeOperation="multiply"');
-    expect(drawNode.source).toContain('globalCompositeOperation="lighter"');
+    expect(drawNode.source).toContain(
+      "globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}",
+    );
+    expect(drawNode.source).not.toContain('globalCompositeOperation="lighter"');
   });
 
   it("keeps dynamic live drafts on the single-normalization bounded-compositor path", () => {

@@ -1129,6 +1129,9 @@ describe("StudioDrawNode orchestration", () => {
       const legacy = render(<StudioDrawNode el={drawEl(base)} />);
 
       expect(captured("Line").length).toBeGreaterThan(0);
+      expect(captured("Line").every(
+        (line) => line.props.globalCompositeOperation === "source-over",
+      )).toBe(true);
       expect(captured("Shape")).toHaveLength(0);
       legacy.unmount();
       konvaCapture.nodes.length = 0;
@@ -1143,8 +1146,63 @@ describe("StudioDrawNode orchestration", () => {
         />,
       );
       expect(captured("Shape").length).toBeGreaterThan(0);
+      expect(captured("Shape").every(
+        (shape) => shape.props.globalCompositeOperation === "source-over",
+      )).toBe(true);
     },
   );
+
+  it.each(["neon", "glow", "soft-glow"] as const)(
+    "keeps %s taps colour-preserving in legacy and canonical documents",
+    (brush) => {
+      for (const canonical of [false, true]) {
+        const view = render(
+          <StudioDrawNode
+            el={drawEl({
+              brush,
+              mode: "pen",
+              points: [24, 28],
+              pressures: [0.82],
+              stroke: "#2a7bd6",
+              strokeWidth: 18,
+              ...(canonical
+                ? {
+                    materialPressureModel:
+                      STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+                  }
+                : {}),
+            })}
+          />,
+        );
+        const circles = captured("Circle");
+        expect(circles).toHaveLength(brush === "soft-glow" ? 4 : 3);
+        expect(circles.every(
+          (circle) => circle.props.globalCompositeOperation === "source-over",
+        )).toBe(true);
+        view.unmount();
+        konvaCapture.nodes.length = 0;
+      }
+    },
+  );
+
+  it("keeps overlapping glitter particles on the colour-preserving composite", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "glitter",
+          mode: "pen",
+          points: [0, 0, 30, 18, 60, 0],
+          pressures: [0.5, 0.9, 0.7],
+          stroke: "#55ccff",
+          strokeWidth: 20,
+        })}
+      />,
+    );
+
+    expect(captured("Shape")).toHaveLength(1);
+    expect(captured("Shape")[0]!.props.globalCompositeOperation)
+      .toBe("source-over");
+  });
 
   it("uses the one-wash highlighter Shape for both legacy and canonical pressure documents", () => {
     const renderWash = (pressureModel: boolean) => {
@@ -1245,8 +1303,8 @@ describe("StudioDrawNode orchestration", () => {
           fillAlphas: [...context.fillAlphas],
           fillCount: context.fillCompoundPaths.length,
           geometrySpans,
-          lighterShapeCount: captured("Shape").filter(
-            (shape) => shape.props.globalCompositeOperation === "lighter",
+          colorPreservingShapeCount: captured("Shape").filter(
+            (shape) => shape.props.globalCompositeOperation === "source-over",
           ).length,
           strokeCount: context.strokeWidths.length,
         };
@@ -1266,7 +1324,7 @@ describe("StudioDrawNode orchestration", () => {
         Math.max(...light.fillAlphas),
       );
       expect(heavy.fillCount).toBe(brush === "soft-glow" ? 4 : 3);
-      expect(heavy.lighterShapeCount).toBe(heavy.fillCount);
+      expect(heavy.colorPreservingShapeCount).toBe(heavy.fillCount);
       expect(heavy.strokeCount).toBe(0);
       expect(heavy.capCount).toBe(0);
       expect(liveHeavy).toEqual(heavy);
@@ -1311,9 +1369,14 @@ describe("StudioDrawNode orchestration", () => {
           context.globalAlpha = 1;
           sceneFunc(context as unknown as CanvasRenderingContext2D);
         }
+        const groupOpacity = Number(
+          captured("Group").find(
+            (group) => typeof group.props.opacity === "number",
+          )?.props.opacity ?? 1,
+        );
         const result = {
           alphas: context.fillAlphas.map(
-            (alpha) => Math.round(alpha * 1_000_000) / 1_000_000,
+            (alpha) => Math.round(alpha * groupOpacity * 1_000_000) / 1_000_000,
           ),
           paths: context.fillCompoundPaths.map(roundCoordinates),
         };
@@ -1349,6 +1412,14 @@ describe("StudioDrawNode orchestration", () => {
       expect(svgPaths).toEqual(active.paths);
       expect(svgAlphas).toEqual(active.alphas);
       expect(active.paths).toHaveLength(brush === "soft-glow" ? 4 : 3);
+      expect(exported.match(
+        /data-luminous-ribbon="single-fill"[^>]*data-luminous-composite="source-over"/gu,
+      ))
+        .toHaveLength(active.paths.length);
+      expect(exported.match(
+        /<g[^>]*data-luminous-composite="source-over"/gu,
+      )).toHaveLength(1);
+      expect(exported).not.toContain("mix-blend-mode:screen");
       expect(exported).not.toContain('stroke-linecap="butt"');
       expect(exported).not.toContain("data-pressure-endcap=");
     },

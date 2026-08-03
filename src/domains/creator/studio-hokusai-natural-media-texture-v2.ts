@@ -366,32 +366,49 @@ function charcoalTexture(
   y: number,
   seed: number,
 ): Readonly<{ alpha: number; color: number; lift: number }> {
-  // Coarse, crossed continuous fields form fractured charcoal facets rather
-  // than independent particles. A fine field preserves paper tooth at 200%+
-  // zoom without introducing a repeating grid.
+  // Warp the paper domain before sampling the pigment fields. Sampling a
+  // coarse value-noise lattice directly made its square interpolation cells
+  // readable at high zoom and amplified Hokusai's circular dab joints on long
+  // strokes. The oblique, independently warped fields below remain continuous
+  // in document coordinates, but no longer expose an axis-aligned cell grid.
+  const domainWarp = valueNoise2d(
+    x * 0.014 + y * 0.005,
+    x * -0.005 + y * 0.014,
+    19,
+    seed ^ 0x4dc8_72a1,
+  );
+  const warpOffset = domainWarp - 0.5;
+  // One shared low-frequency sample is deliberately projected on two
+  // different axes. That keeps the live Worker pass bounded at four noise
+  // samples per visible pixel while still breaking the square source lattice.
+  const warpedX = x + warpOffset * 7.4;
+  const warpedY = y - warpOffset * 5.6;
   const coarseA = valueNoise2d(
-    x * 0.1,
-    y * 0.1,
+    warpedX * 0.077 + warpedY * 0.051,
+    warpedX * -0.035 + warpedY * 0.083,
     21,
     seed ^ 0x1c35_7d9b,
   );
   const coarseB = valueNoise2d(
-    x * -0.064 + y * 0.048,
-    x * 0.048 + y * 0.064,
+    warpedX * -0.049 + warpedY * 0.071,
+    warpedX * 0.063 + warpedY * 0.044,
     22,
     seed ^ 0xa46f_28c7,
   );
   const fine = valueNoise2d(
-    x * 0.32,
-    y * 0.32,
+    warpedX * 0.29 + warpedY * 0.17,
+    warpedX * -0.14 + warpedY * 0.31,
     23,
     seed ^ 0x73bd_14e5,
   );
-  const fracture = Math.abs(coarseA - coarseB);
-  const grain = 0.4 * coarseA + 0.32 * coarseB + 0.28 * fine;
+  const broadPigment = 0.56 * coarseA + 0.44 * coarseB;
+  const carbonGrain = broadPigment * 0.78 + fine * 0.22;
   return {
-    alpha: 0.18 + grain * 0.68 + fracture * 0.14,
-    color: 0.56 + grain * 0.46,
+    // Keep the material floor high enough that continuous source coverage is
+    // never broken into a train of isolated circular stamps. Fine paper tooth
+    // remains visible through colour variation instead of destructive holes.
+    alpha: 0.38 + carbonGrain * 0.56,
+    color: 0.61 + carbonGrain * 0.43,
     lift: 0,
   };
 }
@@ -446,7 +463,12 @@ function materialCoverage(
       // the canonical crop. Larger pencils still saturate naturally.
       return Math.min(1, normalized ** 0.72 * 1.35);
     case "charcoal":
-      return Math.min(1, normalized ** 1.35 * 1.65);
+      // The previous super-linear curve suppressed antialiased overlap between
+      // neighbouring Hokusai dabs much more than their centres. That converted
+      // a continuous carrier into visible beads during a long stroke. A
+      // monotonic sub-linear transfer lifts legitimate overlap coverage while
+      // preserving pressure order and never painting transparent pixels.
+      return Math.min(1, normalized ** 0.86 * 1.28);
     case "oil":
       return Math.min(1, normalized ** 1.18 * 1.28);
   }
@@ -556,7 +578,7 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
             );
       const coverage = materialCoverage(alpha, plan.presetId);
       const materialAlpha = plan.presetId === "charcoal"
-        ? texture.alpha ** (1 + (1 - coverage) * 1.4)
+        ? texture.alpha ** (1 + (1 - coverage) * 0.55)
         : texture.alpha;
       const texturedAlpha = Math.max(
         1,

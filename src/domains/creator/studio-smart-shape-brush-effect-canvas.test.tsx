@@ -80,7 +80,7 @@ describe("smart-shape selected brush Canvas route", () => {
     expect(capture.nodes.some((entry) => entry.kind === "Group")).toBe(true);
     expect(lines.length).toBeGreaterThanOrEqual(3);
     for (const line of lines) {
-      expect(line.props.globalCompositeOperation).toBe("lighter");
+      expect(line.props.globalCompositeOperation).toBe("source-over");
       expect(line.props.points).toEqual(result.stroke.points);
     }
     expect(new Set(lines.map((line) => line.props.strokeWidth)).size).toBeGreaterThan(1);

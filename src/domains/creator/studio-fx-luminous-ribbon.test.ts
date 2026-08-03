@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
   traceStudioFxLuminousRibbonPass,
@@ -14,6 +15,50 @@ const LUMINOUS_BRUSHES: readonly StudioFxLuminousBrushId[] = [
   "glow",
   "soft-glow",
 ];
+
+type StraightRgba = readonly [number, number, number, number];
+
+function sourceOver(source: StraightRgba, destination: StraightRgba): StraightRgba {
+  const sourceAlpha = source[3];
+  const destinationAlpha = destination[3];
+  const outputAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+  const channel = (index: 0 | 1 | 2) => outputAlpha <= Number.EPSILON
+    ? 0
+    : (
+        source[index] * sourceAlpha
+        + destination[index] * destinationAlpha * (1 - sourceAlpha)
+      ) / outputAlpha;
+  return [channel(0), channel(1), channel(2), outputAlpha];
+}
+
+function additiveLighter(source: StraightRgba, destination: StraightRgba): StraightRgba {
+  const outputAlpha = Math.min(1, source[3] + destination[3]);
+  const channel = (index: 0 | 1 | 2) => outputAlpha <= Number.EPSILON
+    ? 0
+    : Math.min(
+        1,
+        source[index] * source[3] + destination[index] * destination[3],
+      ) / outputAlpha;
+  return [channel(0), channel(1), channel(2), outputAlpha];
+}
+
+function repeatComposite(
+  operation: (source: StraightRgba, destination: StraightRgba) => StraightRgba,
+  source: StraightRgba,
+  destination: StraightRgba,
+  count: number,
+): StraightRgba {
+  let output = destination;
+  for (let index = 0; index < count; index += 1) {
+    output = operation(source, output);
+  }
+  return output;
+}
+
+function rgbChroma(pixel: StraightRgba): number {
+  return Math.max(pixel[0], pixel[1], pixel[2])
+    - Math.min(pixel[0], pixel[1], pixel[2]);
+}
 
 function signedArea(points: readonly number[]): number {
   let area = 0;
@@ -90,6 +135,35 @@ function planFor(
 }
 
 describe("studio FX luminous pressure ribbon", () => {
+  it.each([
+    ["transparent", [0, 0, 0, 0]],
+    ["dark", [0.03, 0.03, 0.03, 1]],
+    ["white", [1, 1, 1, 1]],
+  ] as const)(
+    "keeps the selected hue under repeated crossings on a %s background",
+    (_backgroundName, background) => {
+      const ink: StraightRgba = [0.18, 0.62, 0.94, 0.22];
+      const premultiplied = repeatComposite(sourceOver, ink, background, 32);
+      const additive = repeatComposite(additiveLighter, ink, background, 32);
+
+      expect(STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION).toBe("source-over");
+      expect(premultiplied.slice(0, 3)).toEqual(
+        expect.arrayContaining([
+          expect.closeTo(ink[0], 2),
+          expect.closeTo(ink[1], 2),
+          expect.closeTo(ink[2], 2),
+        ]),
+      );
+      expect(rgbChroma(premultiplied)).toBeGreaterThan(0.7);
+      expect(rgbChroma(additive)).toBeLessThan(0.001);
+      expect(additive.slice(0, 3)).toEqual([
+        expect.closeTo(1, 6),
+        expect.closeTo(1, 6),
+        expect.closeTo(1, 6),
+      ]);
+    },
+  );
+
   it.each(LUMINOUS_BRUSHES)(
     "%s plans deterministic, same-winding single-fill coverage",
     (brushId) => {
@@ -102,7 +176,7 @@ describe("studio FX luminous pressure ribbon", () => {
       expect(first).toMatchObject({
         brushId,
         coverageOperation: "stroke-local-single-fill",
-        compositeOperation: "lighter",
+        compositeOperation: "source-over",
         fillRule: "nonzero",
         cap: "round",
       });
@@ -180,7 +254,7 @@ describe("studio FX luminous pressure ribbon", () => {
       probe: [30, 0] as const,
     },
   ])(
-    "caps same-stroke $name brightness at one pass while separate strokes still add",
+    "caps same-stroke $name brightness at one pass while separate strokes build coverage",
     ({ points, pressures, probe }) => {
       const plan = planFor("soft-glow", points, pressures);
       const [probeX, probeY] = probe;
@@ -200,7 +274,7 @@ describe("studio FX luminous pressure ribbon", () => {
       }
       expect(maximumSameStrokeAlpha).toBeCloseTo(plan.opacity, 10);
 
-      const separateStrokeAlpha = Math.min(1, plan.opacity + plan.opacity);
+      const separateStrokeAlpha = plan.opacity + plan.opacity * (1 - plan.opacity);
       expect(separateStrokeAlpha).toBeGreaterThan(maximumSameStrokeAlpha);
     },
   );

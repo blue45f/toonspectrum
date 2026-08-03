@@ -141,6 +141,7 @@ import {
 import {
   FX_OIL_DAB_CAP,
   FX_PASTEL_DAB_CAP,
+  STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
@@ -2668,15 +2669,15 @@ function serializeFreehand(
     ) {
       const layers = renderPath.points.length === 2
         ? passes.map((pass) => (
-            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
           )).join("")
         : (() => {
             const pathD = tensionPathD(renderPath.points, renderPath.tension);
             return passes.map((pass) => (
-              `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+              `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
             )).join("");
           })();
-      return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
+      return `<g data-brush-engine="neon-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
     }
     const pressurePath = planStudioFxBrushPressurePath({
       brushId: "neon",
@@ -2699,7 +2700,7 @@ function serializeFreehand(
             pass.widthScale,
             pass.tone === "white-core",
           );
-          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale) * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("")
       : passes.map((pass) => {
           const luminousCore = pass.tone === "white-core";
@@ -2711,9 +2712,9 @@ function serializeFreehand(
             passOpacity: pass.opacity,
             luminousCore,
           });
-          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity)}" style="mix-blend-mode:screen"/>`;
+          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" data-luminous-composite="${ribbonPlan.compositeOperation}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("");
-    return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
+    return `<g data-brush-engine="neon-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
   }
 
   if (brushFamily === "glow") {
@@ -2731,15 +2732,15 @@ function serializeFreehand(
     ) {
       const layers = renderPath.points.length === 2
         ? passes.map((pass) => (
-            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+            `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
           )).join("")
         : (() => {
             const pathD = tensionPathD(renderPath.points, renderPath.tension);
             return passes.map((pass) => (
-              `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
+              `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`
             )).join("");
           })();
-      return `<g${opacityAttr}>${layers}</g>`;
+      return `<g data-brush-engine="glow-pressure-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
     }
     const pressureBrush = soft ? "soft-glow" : "glow";
     const pressurePath = planStudioFxBrushPressurePath({
@@ -2763,7 +2764,7 @@ function serializeFreehand(
             pass.widthScale,
             passIndex === passes.length - 1,
           );
-          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale))}" style="mix-blend-mode:screen"/>`;
+          return `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale * response.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(Math.min(1, pass.opacity * response.opacityScale) * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("")
       : passes.map((pass, passIndex) => {
           const luminousCore = passIndex === passes.length - 1;
@@ -2775,9 +2776,9 @@ function serializeFreehand(
             passOpacity: pass.opacity,
             luminousCore,
           });
-          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity)}" style="mix-blend-mode:screen"/>`;
+          return `<path data-luminous-ribbon="single-fill" data-luminous-cap="${ribbonPlan.cap}" data-luminous-composite="${ribbonPlan.compositeOperation}" d="${studioFxLuminousRibbonPathD(ribbonPlan)}" fill="${escapeXml(stroke)}" fill-rule="${ribbonPlan.fillRule}" stroke="none" opacity="${fmtDabOpacity(ribbonPlan.opacity * strokeOpacity)}" style="mix-blend-mode:normal"/>`;
         }).join("");
-    return `<g data-brush-engine="glow-pressure-halo"${opacityAttr}>${layers}</g>`;
+    return `<g data-brush-engine="glow-pressure-halo" data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}">${layers}</g>`;
   }
 
   if (brushFamily === "glitter") {
@@ -2801,7 +2802,7 @@ function serializeFreehand(
       }
       return `<circle cx="${fmt(p.x)}" cy="${fmt(p.y)}" r="${fmt(p.radius)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(p.opacity * strokeOpacity)}"/>`;
     }).join("");
-    return `<g style="mix-blend-mode:screen">${marks}</g>`;
+    return `<g data-luminous-composite="${STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}" style="mix-blend-mode:normal">${marks}</g>`;
   }
 
   if (brushFamily === "oil") {

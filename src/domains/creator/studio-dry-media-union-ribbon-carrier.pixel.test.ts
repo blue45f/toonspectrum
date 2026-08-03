@@ -219,11 +219,20 @@ describe("dry-media one-fill crossing raster quality", () => {
         .map(polygonSignedArea)
         .filter((area) => area < 0)
         .map(Math.abs);
+      const negativePolygons = polygons.filter(
+        (polygon) => polygonSignedArea(polygon) < 0,
+      );
       const totalBodyArea = positiveAreas.reduce((sum, area) => sum + area, 0);
       const totalGrainArea = negativeAreas.reduce((sum, area) => sum + area, 0);
 
       expect(positiveAreas.length, brushId).toBeGreaterThan(200);
       expect(negativeAreas.length, brushId).toBeGreaterThan(20);
+      // Paper tooth is a rounded, elongated pore. Four-corner rectangles were
+      // visible as square tiles in crayon/chalk/pastel at high zoom.
+      expect(
+        negativePolygons.every((polygon) => polygon.length >= 20),
+        brushId,
+      ).toBe(true);
       expect(Math.max(...negativeAreas), brushId).toBeLessThan(1.5);
       expect(totalGrainArea / totalBodyArea, brushId).toBeGreaterThan(0.001);
       expect(totalGrainArea / totalBodyArea, brushId).toBeLessThan(0.12);

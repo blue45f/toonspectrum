@@ -60,6 +60,7 @@ import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan
 import {
   FX_OIL_DAB_CAP,
   FX_PASTEL_DAB_CAP,
+  STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION,
   fxBrushSeedFromKey,
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
@@ -1733,7 +1734,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         radius={Math.max(0.25, passWidth / 2)}
                         fill={passColor}
                         opacity={pass.opacity}
-                        globalCompositeOperation="lighter"
+                        globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                         listening={false}
                       />
                     ) : (
@@ -1746,7 +1747,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         lineCap="round"
                         lineJoin="round"
                         tension={renderPath.tension}
-                        globalCompositeOperation="lighter"
+                        globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                         listening={false}
                       />
                     );
@@ -1793,7 +1794,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         1,
                         pass.opacity * tapPassPressure.opacityScale,
                       )}
-                      globalCompositeOperation="lighter"
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
                   ) : (() => {
@@ -1856,7 +1857,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         )}
                         fill={stroke}
                         opacity={pass.opacity}
-                        globalCompositeOperation="lighter"
+                        globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                         listening={false}
                       />
                     ) : (
@@ -1872,7 +1873,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         lineCap="round"
                         lineJoin="round"
                         tension={renderPath.tension}
-                        globalCompositeOperation="lighter"
+                        globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                         listening={false}
                       />
                     )
@@ -1921,7 +1922,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                         1,
                         pass.opacity * tapPassPressure.opacityScale,
                       )}
-                      globalCompositeOperation="lighter"
+                      globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                       listening={false}
                     />
                   ) : (() => {
@@ -1998,7 +1999,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   }
                   context.restore();
                 }}
-                globalCompositeOperation="lighter"
+                globalCompositeOperation={STUDIO_FX_LUMINOUS_COMPOSITE_OPERATION}
                 listening={false}
               />
             );

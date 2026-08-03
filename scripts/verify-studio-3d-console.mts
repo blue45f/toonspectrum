@@ -77,6 +77,15 @@ const STUDIO_BG3D_LT_RENDER_WORKER_FILE_PATTERN =
 const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
+export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
+  "--no-sandbox",
+  "--enable-unsafe-webgpu",
+  "--use-webgpu-adapter=swiftshader",
+  "--use-gpu-in-tests",
+  "--use-gl=angle",
+  "--use-angle=swiftshader",
+  "--enable-unsafe-swiftshader",
+]);
 const MAGIC_ALIGNMENT_VIEWPORT = Object.freeze({ width: 320, height: 180 });
 const MAGIC_ALIGNMENT_SELECTED_NODE_ID = "magic-alignment-asymmetric-box";
 const MAGIC_ALIGNMENT_SELECTED_STABLE_ID =
@@ -2463,15 +2472,12 @@ async function main(): Promise<void> {
   try {
     await waitForServer(rootUrl);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. SwiftShader
-    // makes the WebGPU conformance gate reproducible on GPU-less Linux CI and local headless runs.
+    // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
+    // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
+    // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
     const webGpuBrowser = await chromium.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--enable-unsafe-webgpu",
-        "--use-angle=swiftshader",
-      ],
+      args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
     });
     try {
       const webGpuContext = await webGpuBrowser.newContext({

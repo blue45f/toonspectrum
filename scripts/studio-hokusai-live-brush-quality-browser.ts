@@ -465,7 +465,11 @@ async function renderQualityFamily(
   });
   const beginMilliseconds = performance.now() - beginStarted;
   const appendStarted = performance.now();
-  for (let offset = 0; offset < samples.length; offset += 32) {
+  // Match Studio's real pointer lifecycle: pointer-down is forwarded as a
+  // one-sample prefix before coalesced move batches arrive. Slow-tracking
+  // media may accept that contact without producing dirty pixels yet.
+  session.append(samples.slice(0, 1));
+  for (let offset = 1; offset < samples.length; offset += 32) {
     session.append(samples.slice(offset, offset + 32));
   }
   const appendDispatchMilliseconds = performance.now() - appendStarted;

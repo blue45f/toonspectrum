@@ -208,10 +208,16 @@ export function createPsqlEnvironment(
     "PGREQUIRESSL",
     "PGSERVICE",
     "PGSERVICEFILE",
+    "PGSSLROOTCERT",
     "PGSSLMODE",
     "PGTARGETSESSIONATTRS",
     "PGUSER",
     "PGCHANNELBINDING",
+    // PGSSLROOTCERT=system delegates trust discovery to libpq/OpenSSL. Do not
+    // let an inherited OpenSSL override silently replace the platform trust
+    // store selected by this release gate.
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
   ]) {
     delete environment[key];
   }
@@ -224,6 +230,7 @@ export function createPsqlEnvironment(
     PGDATABASE: decodedPathname(url).slice(1),
     PGSSLMODE: contract.tlsVerified ? "verify-full" : "disable",
     PGCHANNELBINDING: contract.tlsVerified ? "require" : "disable",
+    ...(contract.tlsVerified ? { PGSSLROOTCERT: "system" } : {}),
   };
 }
 

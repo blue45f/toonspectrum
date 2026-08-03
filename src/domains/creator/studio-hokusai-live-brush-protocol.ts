@@ -134,6 +134,18 @@ export interface StudioHokusaiLiveFrameMessage
   readonly pixelHash: `sha256:${string}`;
 }
 
+/**
+ * The input prefix was consumed but the slow-tracking brush has not produced
+ * a dirty pixel yet. Pointer-down commonly takes this path; it is successful
+ * backpressure progress, not a blank-frame failure.
+ */
+export interface StudioHokusaiLiveAcceptedMessage
+  extends StudioHokusaiLiveMessageIdentity {
+  readonly type: "studio-hokusai-live/accepted";
+  readonly sequence: number;
+  readonly presentation: "no-dirty-pixels";
+}
+
 export interface StudioHokusaiLiveCanonicalReceipt {
   readonly kind: "studio-hokusai-live/canonical-receipt";
   readonly version: typeof STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION;
@@ -218,6 +230,7 @@ export interface StudioHokusaiLiveFailureMessage {
 export type StudioHokusaiLiveWorkerOutboundMessage =
   | StudioHokusaiLiveReadyMessage
   | StudioHokusaiLiveBegunMessage
+  | StudioHokusaiLiveAcceptedMessage
   | StudioHokusaiLiveFrameMessage
   | StudioHokusaiLiveCompleteMessage
   | StudioHokusaiLiveCancelledMessage

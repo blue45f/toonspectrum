@@ -531,7 +531,27 @@ async function emitLiveFrame(
   preparedFrame?: PackedDirtyFrame,
 ): Promise<void> {
   const frame = preparedFrame ?? await takePackedDirtyFrame(stroke);
-  if (!frame) throw new Error("Hokusai produced no dirty pixels for the accepted input batch.");
+  if (!frame) {
+    if (phase !== "live") {
+      throw new Error("Hokusai settle tail did not contain a prepared dirty frame.");
+    }
+    // Slow tracking intentionally delays its first dab until enough motion or
+    // pointer-up time has accumulated. Acknowledge that exact accepted prefix
+    // without fabricating transparent pixels; the next dirty frame or finish
+    // tail remains the sole visual authority.
+    stroke.lastTransmittedSequence = sequence;
+    stroke.pendingPresentationSequence = null;
+    post({
+      type: "studio-hokusai-live/accepted",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      requestId: stroke.requestId,
+      engineEpoch: stroke.engineEpoch,
+      strokeId: stroke.strokeId,
+      sequence,
+      presentation: "no-dirty-pixels",
+    });
+    return;
+  }
   stroke.frameInFlight = true;
   stroke.lastTransmittedSequence = sequence;
   stroke.pendingPresentationSequence = null;
