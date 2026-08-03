@@ -764,7 +764,8 @@ export function getPoseBoneRotation(poseBone: PoseBone | undefined) {
 function applyEulerRotation(humanoid: NonNullable<VRM["humanoid"]>, boneName: VRMHumanBoneName, rotation: Vec3) {
   const bone = humanoid.getNormalizedBoneNode(boneName);
   if (!bone) return;
-  bone.rotation.set(rotation[0], rotation[1], rotation[2]);
+  const order = boneName.includes("Hand") || boneName.includes("Arm") || boneName.includes("Finger") ? "YXZ" : "XYZ";
+  bone.rotation.set(rotation[0], rotation[1], rotation[2], order);
   bone.updateMatrixWorld(true);
 }
 

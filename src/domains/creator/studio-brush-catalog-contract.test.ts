@@ -73,12 +73,12 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps all 226 identities behind one searchable quick/full catalogue source", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 66, pro: 160, total: 226 });
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(226);
+  it("keeps all 230 identities behind one searchable quick/full catalogue source", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 70, pro: 160, total: 230 });
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(230);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      226
+      230
     );
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {

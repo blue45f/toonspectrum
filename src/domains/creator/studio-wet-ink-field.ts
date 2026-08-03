@@ -1226,11 +1226,17 @@ function renderTileRgba(
 ): Uint8ClampedArray {
   const rgba = new Uint8ClampedArray(tile.width * tile.height * 4);
   const color = field.config.inkColor;
+  const paperRoughness = field.config.paperRoughness ?? 0.72;
+  const edgeDarkening = field.config.edgeDarkening ?? 0.68;
   for (let index = 0; index < tile.width * tile.height; index += 1) {
     const paper = tile.paper[index]!;
-    const mobile = tile.pigment[index]! * (0.62 + tile.wetness[index]! * 0.2);
+    const wetness = tile.wetness[index]!;
+    const mobile = tile.pigment[index]! * (0.62 + wetness * 0.2);
     const fixed = tile.stain[index]!;
-    const density = Math.max(0, mobile + fixed) * (0.92 + (paper - 0.5) * 0.12);
+    // inkwash uGrain (0.55) & uEdge (1.35) wet-edge contrast filter
+    const grainBump = (paper - 0.5) * paperRoughness * 0.55;
+    const wetEdgeContrast = Math.pow(Math.max(0, wetness), 1.35) * edgeDarkening * 0.35;
+    const density = Math.max(0, mobile + fixed + wetEdgeContrast) * (0.92 + grainBump);
     const alpha = clamp01(1 - Math.exp(-density * 1.7));
     const offset = index * 4;
     rgba[offset] = color.r;

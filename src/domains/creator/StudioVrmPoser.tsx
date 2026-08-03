@@ -2208,8 +2208,11 @@ function StudioVrmMannequinMaterial({
         material.needsUpdate = true;
       }
     });
-    enforce();
-    return restore;
+    return () => {
+      restore();
+      applyVrmCustomColors(vrm, customColors);
+      applyVrmMaterialFx(vrm, materialFx);
+    };
   }, [customColors, enabled, materialFx, vrm]);
 
   useFrame(() => {
@@ -8301,6 +8304,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   frameloop={vrmFrameLoop}
                   gl={{ alpha: true, antialias: true }}
                   onCreated={({ gl }) => {
+                    gl.outputColorSpace = THREE.SRGBColorSpace;
+                    gl.toneMapping = THREE.ACESFilmicToneMapping;
+                    gl.toneMappingExposure = 1.0;
                     gl.setClearColor(0x000000, 0);
                     gl.setClearAlpha(0);
                   }}

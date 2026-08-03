@@ -161,7 +161,7 @@ describe("studio brush backend quality classification", () => {
     const routeIds = Object.keys(STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES).sort();
     const runtimeIds = STUDIO_BRUSH_RUNTIME_CONTRACT.map(({ id }) => id).sort();
 
-    expect(presetIds).toHaveLength(66);
+    expect(presetIds).toHaveLength(70);
     expect(routeIds).toEqual(presetIds);
     expect(runtimeIds).toEqual(presetIds);
 
@@ -228,9 +228,9 @@ describe("studio brush backend quality classification", () => {
     }
   });
 
-  it("covers the complete 226-brush shelf without duplicate or unclassified ids", () => {
+  it("covers the complete 230-brush shelf without duplicate or unclassified ids", () => {
     const ids = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id);
-    expect(ids).toHaveLength(226);
+    expect(ids).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const { id, source } of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {

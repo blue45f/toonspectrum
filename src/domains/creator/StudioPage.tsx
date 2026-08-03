@@ -3585,8 +3585,9 @@ function StudioCuttoonEditor() {
     studioCrdtSceneRuntimeRef.current &&
     studioCrdtReconciledDocument === studioCrdtDocument
   );
+  const isRealtimeTeamSession = Boolean(liveRoomQueryParam);
   const collaborationOperationSyncRequired = Boolean(
-    expectsSharedDocument && studioLiveParticipant && !collaborationReadOnly
+    expectsSharedDocument && isRealtimeTeamSession && studioLiveParticipant && !collaborationReadOnly
   );
   // A reconciled Y.Doc alone is insufficient: collaborative editing is exposed only while the
   // authoritative server or the browser-durable outbox can retain the next operation.

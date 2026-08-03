@@ -203,9 +203,9 @@ function drawDab(
     if (kind === "watercolor") {
       // 웻엣지: 가장자리에 살짝 진한 링을 얹어 수채 특유의 경계 침전을 흉내낸다.
       // 링은 은은해야 한다 — 강하면 dab 이 구슬처럼 분리돼 보인다(촘촘한 간격과 세트).
-      context.globalAlpha = alpha * 0.22;
+      context.globalAlpha = alpha * 0.12;
       context.strokeStyle = style.color;
-      context.lineWidth = Math.max(0.35, radius * 0.1);
+      context.lineWidth = Math.max(0.25, radius * 0.06);
       context.beginPath();
       context.arc(x, y, radius * 0.94, 0, Math.PI * 2);
       context.stroke();
@@ -216,10 +216,26 @@ function drawDab(
     // 종이 그레인: 결정적 지터로 위치·도포량을 흔들고, 미세 점 2개를 곁들여 톱니를 만든다.
     const jx = (stampJitter(index, 11) - 0.5) * radius * 0.5;
     const jy = (stampJitter(index, 23) - 0.5) * radius * 0.5;
+    const dabRadius = radius * (0.82 + 0.18 * stampJitter(index, 41));
+    let fillStyle: string | CanvasGradient = style.color;
+    if (typeof context.createRadialGradient === "function") {
+      const gradient = context.createRadialGradient(
+        x + jx,
+        y + jy,
+        dabRadius * 0.25,
+        x + jx,
+        y + jy,
+        dabRadius
+      );
+      gradient.addColorStop(0, style.color);
+      gradient.addColorStop(0.72, style.color);
+      gradient.addColorStop(1, "transparent");
+      fillStyle = gradient;
+    }
     context.globalAlpha = alpha * (0.7 + 0.3 * stampJitter(index, 37));
-    context.fillStyle = style.color;
+    context.fillStyle = fillStyle;
     context.beginPath();
-    context.arc(x + jx, y + jy, radius * (0.82 + 0.18 * stampJitter(index, 41)), 0, Math.PI * 2);
+    context.arc(x + jx, y + jy, dabRadius, 0, Math.PI * 2);
     context.fill();
     context.globalAlpha = alpha * 0.45;
     for (let grain = 0; grain < 2; grain += 1) {
