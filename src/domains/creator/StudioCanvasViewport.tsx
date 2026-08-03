@@ -527,7 +527,6 @@ export interface StudioCanvasViewportProps {
   frameAnimTargetId: string | null;
   gpuCanvasShadowVisibleRef: import("react").RefObject<boolean>;
   gpuLiveInkPinnedRef: import("react").RefObject<boolean>;
-  hokusaiLiveOverlayVisibleRef: import("react").RefObject<boolean>;
   livingInkOverlayVisibleRef: import("react").RefObject<boolean>;
   gridSize: number;
   groups: LayerGroup[];
@@ -825,7 +824,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   frameAnimTargetId,
   gpuCanvasShadowVisibleRef,
   gpuLiveInkPinnedRef,
-  hokusaiLiveOverlayVisibleRef,
   livingInkOverlayVisibleRef,
   gridSize,
   groups,
@@ -2233,7 +2231,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               hardCanvasInteractionBlock && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
-            style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
+            style={{
+              height: stageViewLayout.height,
+              isolation: "isolate",
+              width: stageViewLayout.width,
+            }}
           >
           <div
             data-studio-post-processing-scope=""
@@ -2248,7 +2250,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             // Drawing owns the contact stream; browser panning would otherwise cancel a fast
             // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
             // touch events, and a second touch cancels an unfinished finger stroke above.
-            style={{ touchAction: tool === "draw" || liquifyArmed ? "none" : "auto" }}
+            style={{
+              touchAction: tool === "draw" || liquifyArmed ? "none" : "auto",
+            }}
             scaleX={stageViewLayout.scaleX}
             scaleY={stageViewLayout.scaleY}
             x={stageViewLayout.x}
@@ -3257,7 +3261,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         gpuLiveInkPinnedRef.current
                         && !gpuCanvasShadowVisibleRef.current
                       )
-                      || hokusaiLiveOverlayVisibleRef.current
                       || livingInkOverlayVisibleRef.current
                       || liveInkOverlayRendererRef.current.isActive
                       || liveStampOverlayRenderer.isActive

@@ -6,6 +6,7 @@ import {
 import {
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
   STUDIO_HOKUSAI_RUNTIME_VERSION,
+  type StudioHokusaiMaterialProfileId,
   type StudioHokusaiNaturalMediaPresetId,
 } from "./studio-hokusai-natural-media-contract";
 import {
@@ -19,6 +20,25 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION =
 export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE =
   "real-wasm-core-natural-media-output-contract-v2" as const;
 
+export type StudioHokusaiLiveAutoRoutePresetId = Extract<
+  StudioHokusaiNaturalMediaPresetId,
+  "pencil" | "charcoal" | "oil"
+>;
+
+interface CoreMaterialRoute {
+  readonly brushId: string;
+  readonly presetId: StudioHokusaiLiveAutoRoutePresetId;
+  readonly materialProfileId: StudioHokusaiMaterialProfileId;
+}
+
+function coreMaterialRoute(
+  brushId: string,
+  presetId: StudioHokusaiLiveAutoRoutePresetId,
+  materialProfileId: StudioHokusaiMaterialProfileId,
+): CoreMaterialRoute {
+  return Object.freeze({ brushId, presetId, materialProfileId });
+}
+
 const PENCIL_IDS = [
   "pencil",
   "pencil-2b",
@@ -27,22 +47,6 @@ const PENCIL_IDS = [
   "colored-pencil",
   "erodible-pencil",
   "pencil-grain",
-] as const;
-const CHARCOAL_IDS = [
-  "charcoal",
-  "chalk",
-  "crayon",
-  "dry-media",
-  "pastel",
-  "oil-pastel",
-] as const;
-const OIL_IDS = [
-  "oil",
-  "acrylic",
-  "paint-tube",
-  "gouache",
-  "brush",
-  "flat-brush",
 ] as const;
 const CALLIGRAPHY_IDS = [
   "calligraphy",
@@ -60,11 +64,6 @@ const MARKER_IDS = [
   "pastel-highlighter",
 ] as const;
 
-export type StudioHokusaiLiveAutoRoutePresetId = Extract<
-  StudioHokusaiNaturalMediaPresetId,
-  "pencil" | "charcoal" | "oil"
->;
-
 export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
   version: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
   qualityGate: Object.freeze({
@@ -80,12 +79,27 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
       "pressure-response",
       "exact-live-commit-receipt",
       "catalog-default-config-snapshot",
+      "identity-specific-material-profile",
     ] as const),
   }),
   eligibleCoreIdentities: Object.freeze([
-    ...PENCIL_IDS.map((brushId) => Object.freeze({ brushId, presetId: "pencil" as const })),
-    ...CHARCOAL_IDS.map((brushId) => Object.freeze({ brushId, presetId: "charcoal" as const })),
-    ...OIL_IDS.map((brushId) => Object.freeze({ brushId, presetId: "oil" as const })),
+    ...PENCIL_IDS.map((brushId) => coreMaterialRoute(
+      brushId,
+      "pencil",
+      "pencil",
+    )),
+    coreMaterialRoute("charcoal", "charcoal", "charcoal"),
+    coreMaterialRoute("chalk", "charcoal", "chalk"),
+    coreMaterialRoute("crayon", "charcoal", "crayon"),
+    coreMaterialRoute("dry-media", "charcoal", "charcoal"),
+    coreMaterialRoute("pastel", "charcoal", "pastel"),
+    coreMaterialRoute("oil-pastel", "charcoal", "oil-pastel"),
+    coreMaterialRoute("oil", "oil", "oil"),
+    coreMaterialRoute("acrylic", "oil", "acrylic"),
+    coreMaterialRoute("paint-tube", "oil", "painterly"),
+    coreMaterialRoute("gouache", "oil", "gouache"),
+    coreMaterialRoute("brush", "oil", "painterly"),
+    coreMaterialRoute("flat-brush", "oil", "painterly"),
   ]),
   withheldSpecialistIdentities: Object.freeze([
     ...CALLIGRAPHY_IDS.map((brushId) => Object.freeze({
@@ -101,13 +115,10 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
   ]),
 });
 
-const AUTO_ROUTE_PRESET_BY_CORE_IDENTITY: ReadonlyMap<
-  string,
-  StudioHokusaiLiveAutoRoutePresetId
-> = new Map(
+const AUTO_ROUTE_BY_CORE_IDENTITY: ReadonlyMap<string, CoreMaterialRoute> = new Map(
   STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.eligibleCoreIdentities.map((entry) => [
     entry.brushId,
-    entry.presetId,
+    entry,
   ]),
 );
 
@@ -117,6 +128,7 @@ export type StudioHokusaiLiveAutoRouteDecision =
       readonly identity: string;
       readonly identityAuthority: "brush-id" | "catalog-id";
       readonly presetId: StudioHokusaiLiveAutoRoutePresetId;
+      readonly materialProfileId: StudioHokusaiMaterialProfileId;
       readonly policyVersion: typeof STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION;
       readonly qualityGate: typeof STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE;
     }>
@@ -154,6 +166,7 @@ export type StudioHokusaiLiveRouteResult =
       readonly status: "ready";
       readonly backendId: "hokusai-myb-worker";
       readonly presetId: StudioHokusaiNaturalMediaPresetId;
+      readonly materialProfileId: StudioHokusaiMaterialProfileId;
       readonly semanticContract: "hokusai-live-canonical-v1";
       readonly autoRoutePolicy: Readonly<{
         readonly version: typeof STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION;
@@ -204,6 +217,14 @@ export function resolveStudioHokusaiLivePreset(
   return decision.status === "admitted" ? decision.presetId : null;
 }
 
+export function resolveStudioHokusaiLiveMaterialProfile(
+  brushId: string,
+  catalogId?: string | null,
+): StudioHokusaiMaterialProfileId | null {
+  const decision = resolveStudioHokusaiLiveAutoRouteDecision(brushId, catalogId);
+  return decision.status === "admitted" ? decision.materialProfileId : null;
+}
+
 /**
  * Auto-route is deliberately catalog-authoritative and fail-closed.
  *
@@ -220,8 +241,8 @@ export function resolveStudioHokusaiLiveAutoRouteDecision(
 ): StudioHokusaiLiveAutoRouteDecision {
   const hasCatalogIdentity = typeof catalogId === "string" && catalogId.length > 0;
   if (hasCatalogIdentity) {
-    const presetId = AUTO_ROUTE_PRESET_BY_CORE_IDENTITY.get(catalogId);
-    if (!presetId) return { status: "rejected", reason: "catalog-identity-not-quality-gated" };
+    const route = AUTO_ROUTE_BY_CORE_IDENTITY.get(catalogId);
+    if (!route) return { status: "rejected", reason: "catalog-identity-not-quality-gated" };
     if (catalogId !== brushId) {
       return { status: "rejected", reason: "catalog-runtime-identity-mismatch" };
     }
@@ -229,18 +250,20 @@ export function resolveStudioHokusaiLiveAutoRouteDecision(
       status: "admitted",
       identity: catalogId,
       identityAuthority: "catalog-id",
-      presetId,
+      presetId: route.presetId,
+      materialProfileId: route.materialProfileId,
       policyVersion: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
       qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
     };
   }
-  const presetId = AUTO_ROUTE_PRESET_BY_CORE_IDENTITY.get(brushId);
-  return presetId
+  const route = AUTO_ROUTE_BY_CORE_IDENTITY.get(brushId);
+  return route
     ? {
         status: "admitted",
         identity: brushId,
         identityAuthority: "brush-id",
-        presetId,
+        presetId: route.presetId,
+        materialProfileId: route.materialProfileId,
         policyVersion: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
         qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
       }
@@ -262,6 +285,7 @@ export function studioHokusaiLiveCapabilitiesAreAdmissible(
     && capabilities.canonicalPng === true
     && capabilities.liveCommitParityReceipt === true
     && capabilities.materialTexture === "studio-hokusai-material-texture-v2"
+    && capabilities.materialProfileRouting === "identity-profile-v1"
     && capabilities.endpointPolicy === "tapered-start-no-dab-carrier-v1"
     && capabilities.mainThreadFullFrameCopy === false;
 }
@@ -390,6 +414,7 @@ export function resolveStudioHokusaiLiveRoute(
     return { status: "not-applicable", reason: "brush-not-natural-media" };
   }
   const presetId = autoRoute.presetId;
+  const materialProfileId = autoRoute.materialProfileId;
   const segment = planStudioHokusaiLiveSegment({
     documentWidth: input.documentWidth,
     documentHeight: input.documentHeight,
@@ -437,6 +462,7 @@ export function resolveStudioHokusaiLiveRoute(
     status: "ready",
     backendId: "hokusai-myb-worker",
     presetId,
+    materialProfileId,
     semanticContract: "hokusai-live-canonical-v1",
     autoRoutePolicy: {
       version: autoRoute.policyVersion,
@@ -447,6 +473,7 @@ export function resolveStudioHokusaiLiveRoute(
     config: {
       ...segment,
       presetId,
+      materialProfileId,
       color: input.color,
       opacity: input.opacity,
       radiusPixels: input.radiusPixels,

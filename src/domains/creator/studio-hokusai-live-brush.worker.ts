@@ -12,6 +12,7 @@ import {
   type StudioHokusaiLiveWorkerOutboundMessage,
 } from "./studio-hokusai-live-brush-protocol";
 import {
+  STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
 } from "./studio-hokusai-natural-media-contract";
 import {
@@ -211,7 +212,7 @@ function applyOpacity(pixels: Uint8Array, opacity: number): void {
 function materialPlan(stroke: ActiveStroke) {
   return {
     kind: "studio-hokusai-natural-media/render-plan" as const,
-    version: "studio-hokusai-natural-media-v1" as const,
+    version: STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
     engine: {
       id: "reearth-hokusai" as const,
       version: "0.3.0" as const,
@@ -226,6 +227,7 @@ function materialPlan(stroke: ActiveStroke) {
       revision: "hokusai-source-v1:0000000000000000" as const,
     },
     presetId: stroke.config.presetId,
+    materialProfileId: stroke.config.materialProfileId,
     color: stroke.config.color,
     opacity: stroke.config.opacity,
     seed: stroke.config.seed,
@@ -593,6 +595,7 @@ async function completeCanonicalStroke(stroke: ActiveStroke): Promise<void> {
       engineEpoch: stroke.engineEpoch,
       strokeId: stroke.strokeId,
       presetId: stroke.config.presetId,
+      materialProfileId: stroke.config.materialProfileId,
       seed: stroke.config.seed,
       sampleCount: stroke.sampleCount,
       finalSequence: stroke.lastSequence,
@@ -685,6 +688,7 @@ async function main(): Promise<void> {
       canonicalPng: true,
       liveCommitParityReceipt: true,
       materialTexture: "studio-hokusai-material-texture-v2",
+      materialProfileRouting: "identity-profile-v1",
       endpointPolicy: "tapered-start-no-dab-carrier-v1",
       mainThreadFullFrameCopy: false,
     },

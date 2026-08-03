@@ -161,11 +161,52 @@ describe("studio draw rendering ownership boundary", () => {
     expect(previewLayers.valueImports).toContain("./StudioDrawNode");
     expect(previewLayers.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(previewLayers.allImports).not.toContain("./StudioPage");
+    expect(previewLayers.source).toContain('canvas.style.mixBlendMode = mode === "backdrop-multiply"');
+    expect(previewLayers.source).toContain("getNativeCanvasElement()");
+    expect(previewLayers.source).not.toContain("._canvas");
+    expect(viewport.source).toContain('isolation: "isolate"');
 
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDrawNode\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
     expect(rendering.allImports.some((specifier) => specifier.startsWith("react-konva"))).toBe(false);
+  });
+
+  it("synchronizes retained DOM ink before admitting the next backdrop sample and bounds canvases", () => {
+    const page = moduleEdges("./StudioPage.tsx");
+    const viewport = moduleEdges("./StudioCanvasViewport.tsx");
+    const previewLayers = moduleEdges("./StudioDraftPreviewLayers.tsx");
+    const onStageDownStart = page.source.indexOf("function onStageDown(");
+    const drawBranchStart = page.source.indexOf('if (tool === "draw")', onStageDownStart);
+    const drawBranchEnd = page.source.indexOf("// 선택 모드:", drawBranchStart);
+    const drawBranch = page.source.slice(drawBranchStart, drawBranchEnd);
+
+    const boundaryPlanIndex = drawBranch.indexOf("planStudioDraftPreviewBackdropBoundary({");
+    const boundaryExecutionIndex = drawBranch.indexOf("executeStudioDraftPreviewBackdropBoundary({");
+    const pointerSessionIndex = drawBranch.indexOf("beginStudioStrokePointerSession(pointerSample)");
+    const firstPositionIndex = drawBranch.indexOf("stageRef.current?.getRelativePointerPosition()");
+    const crdtBeginIndex = drawBranch.indexOf("drawingCrdtPublisherRef.current.begin(");
+
+    expect(boundaryPlanIndex).toBeGreaterThanOrEqual(0);
+    expect(boundaryExecutionIndex).toBeGreaterThan(boundaryPlanIndex);
+    expect(drawBranch).toContain("flushSynchronously: flushSync");
+    expect(drawBranch).toContain(
+      "restorePointerPosition: () => stageRef.current?.setPointersPositions(pointerSample)",
+    );
+    expect(pointerSessionIndex).toBeGreaterThan(boundaryExecutionIndex);
+    expect(firstPositionIndex).toBeGreaterThan(pointerSessionIndex);
+    expect(crdtBeginIndex).toBeGreaterThan(firstPositionIndex);
+
+    expect(previewLayers.source).toContain("const settledRun0 = settledRuns[0] ?? null;");
+    expect(previewLayers.source).toContain("const settledRun1 = settledRuns[1] ?? null;");
+    expect(previewLayers.source).not.toContain("settledRuns.map(");
+    expect(previewLayers.source).toContain("STUDIO_DRAFT_PREVIEW_ACTIVE_CANVAS_Z");
+
+    const zoomHostStart = viewport.source.indexOf("ref={zoomHostRef}");
+    const stageStart = viewport.source.indexOf("<Stage", zoomHostStart);
+    const stageEnd = viewport.source.indexOf(">", stageStart);
+    expect(viewport.source.slice(zoomHostStart, stageStart)).toContain('isolation: "isolate"');
+    expect(viewport.source.slice(stageStart, stageEnd)).not.toContain("isolation");
   });
 
   it("keeps editor lifecycle, collaboration, routing, and GPU ownership out of StudioDrawNode", () => {

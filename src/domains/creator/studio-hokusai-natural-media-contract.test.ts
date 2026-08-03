@@ -62,6 +62,7 @@ describe("Studio Hokusai natural-media render contract", () => {
         revision: expect.stringMatching(/^hokusai-source-v1:[a-f0-9]{16}$/u),
       },
       presetId: "charcoal",
+      materialProfileId: "charcoal",
       color: "#aabbcc",
       opacity: 0.8,
       seed: 42,
@@ -197,6 +198,18 @@ describe("Studio Hokusai natural-media render contract", () => {
       stroke(),
       {
         presetId: "unknown" as "pencil",
+        color: "#000000",
+        sizeScale: 1,
+        opacity: 1,
+        seed: 1,
+      },
+      { width: 800, height: 1_200 },
+    )).toMatchObject({ ok: false, reason: "invalid-settings" });
+    expect(planStudioHokusaiNaturalMediaRender(
+      stroke(),
+      {
+        presetId: "charcoal",
+        materialProfileId: "acrylic",
         color: "#000000",
         sizeScale: 1,
         opacity: 1,

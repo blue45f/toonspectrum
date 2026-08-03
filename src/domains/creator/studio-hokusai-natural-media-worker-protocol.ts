@@ -3,12 +3,13 @@ import {
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
   STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS,
   STUDIO_HOKUSAI_RUNTIME_VERSION,
+  studioHokusaiMaterialProfileIsCompatible,
   type StudioHokusaiNaturalMediaRenderPlan,
 } from "./studio-hokusai-natural-media-contract";
 
-export const STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION = 2 as const;
+export const STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION = 3 as const;
 export const STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION =
-  "0.3.0-packed-dirty-frame-adapter.2" as const;
+  "0.3.0-packed-dirty-frame-adapter.3-profile-routing" as const;
 
 export interface StudioHokusaiWorkerRenderMessage {
   readonly type: "studio-hokusai/render";
@@ -41,6 +42,7 @@ export interface StudioHokusaiWorkerReceipt {
   readonly engineEpoch: number;
   readonly sourceElementId: string;
   readonly presetId: StudioHokusaiNaturalMediaRenderPlan["presetId"];
+  readonly materialProfileId: StudioHokusaiNaturalMediaRenderPlan["materialProfileId"];
   readonly seed: number;
   readonly rasterWidth: number;
   readonly rasterHeight: number;
@@ -128,6 +130,7 @@ function snapshotPlan(
       "engine",
       "source",
       "presetId",
+      "materialProfileId",
       "color",
       "opacity",
       "seed",
@@ -138,6 +141,10 @@ function snapshotPlan(
     || candidate.kind !== "studio-hokusai-natural-media/render-plan"
     || candidate.version !== STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION
     || !PRESET_IDS.has(String(candidate.presetId))
+    || !studioHokusaiMaterialProfileIsCompatible(
+      candidate.presetId as StudioHokusaiNaturalMediaRenderPlan["presetId"],
+      candidate.materialProfileId,
+    )
     || typeof candidate.color !== "string"
     || !COLOR_PATTERN.test(candidate.color)
     || !finite(candidate.opacity)
@@ -267,6 +274,7 @@ function snapshotPlan(
     }),
     presetId:
       candidate.presetId as StudioHokusaiNaturalMediaRenderPlan["presetId"],
+    materialProfileId: candidate.materialProfileId,
     color: candidate.color as `#${string}`,
     opacity: candidate.opacity,
     seed: candidate.seed,
@@ -321,6 +329,7 @@ export interface StudioHokusaiWorkerResultExpectation {
   readonly engineEpoch: number;
   readonly sourceElementId: string;
   readonly presetId: StudioHokusaiNaturalMediaRenderPlan["presetId"];
+  readonly materialProfileId: StudioHokusaiNaturalMediaRenderPlan["materialProfileId"];
   readonly seed: number;
   readonly rasterWidth: number;
   readonly rasterHeight: number;
@@ -414,6 +423,7 @@ export function snapshotStudioHokusaiWorkerResultMessage(
       "engineEpoch",
       "sourceElementId",
       "presetId",
+      "materialProfileId",
       "seed",
       "rasterWidth",
       "rasterHeight",
@@ -434,6 +444,7 @@ export function snapshotStudioHokusaiWorkerResultMessage(
     || receipt.engineEpoch !== expected.engineEpoch
     || receipt.sourceElementId !== expected.sourceElementId
     || receipt.presetId !== expected.presetId
+    || receipt.materialProfileId !== expected.materialProfileId
     || receipt.seed !== expected.seed
     || receipt.rasterWidth !== expected.rasterWidth
     || receipt.rasterHeight !== expected.rasterHeight

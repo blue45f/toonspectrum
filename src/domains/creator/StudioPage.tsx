@@ -442,8 +442,10 @@ import { isCompleteStudioDrawOp } from "./studio-draw-completion";
 import { planStudioDrawPointerRelease } from "./studio-draw-pointer-release-plan";
 import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
+  executeStudioDraftPreviewBackdropBoundary,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  planStudioDraftPreviewBackdropBoundary,
   resolveStudioDraftPreviewActiveLane,
   resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
@@ -1717,6 +1719,14 @@ type StudioHokusaiPinnedLiveStroke = {
   session: StudioHokusaiLiveStrokeSession | null;
   queuedSamples: StudioHokusaiLiveSampleLike[];
   forwardedSampleCount: number;
+  lastAppendedSequence: number;
+  lastMaterialFrameSequence: number;
+  materialCompositeBounds: Readonly<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
   overlayPresented: boolean;
   failed: boolean;
   finishing: boolean;
@@ -10435,6 +10445,83 @@ function StudioCuttoonEditor() {
   const hokusaiLiveOverlayVisibleRef = useRef(false);
   const hokusaiLiveFinalizingRef = useRef(false);
 
+  function clearStudioHokusaiVectorShadow(
+    state: StudioHokusaiPinnedLiveStroke,
+  ): void {
+    if (liveDraftVisualRef.current?.id === state.strokeId) {
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+    }
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function studioHokusaiVectorTailShadow(
+    element: DrawEl,
+    state: StudioHokusaiPinnedLiveStroke,
+  ): DrawEl | null {
+    const sampleCount = Math.floor(element.points.length / 2);
+    const bounds = state.materialCompositeBounds;
+    if (!bounds) return null;
+    const margin = Math.max(1, state.route.config.radiusPixels * 1.5);
+    let presentedSampleCount = 0;
+    for (let index = 0; index < sampleCount; index += 1) {
+      const x = element.points[index * 2] ?? Number.NaN;
+      const y = element.points[index * 2 + 1] ?? Number.NaN;
+      const covered = Number.isFinite(x)
+        && Number.isFinite(y)
+        && x >= bounds.x - margin
+        && x <= bounds.x + bounds.width + margin
+        && y >= bounds.y - margin
+        && y <= bounds.y + bounds.height + margin;
+      if (!covered && presentedSampleCount > 0) break;
+      if (covered) presentedSampleCount = index + 1;
+    }
+    if (presentedSampleCount <= 0 || presentedSampleCount >= sampleCount) return null;
+    // Retain one overlap sample so the transient suffix joins the material prefix without a gap.
+    // A 0.6 alpha bridge approximates the current natural-media energy while the Worker catches
+    // up; unlike a full-vector shadow it cannot darken the already receipted material prefix.
+    const start = Math.max(0, Math.min(sampleCount - 1, presentedSampleCount - 1));
+    const slice = (values: number[] | undefined): number[] | undefined => values?.slice(start);
+    return {
+      ...element,
+      points: element.points.slice(start * 2),
+      pressures: slice(element.pressures),
+      tiltXs: slice(element.tiltXs),
+      tiltYs: slice(element.tiltYs),
+      twists: slice(element.twists),
+      speeds: slice(element.speeds),
+      tangentialPressures: slice(element.tangentialPressures),
+      altitudeAngles: slice(element.altitudeAngles),
+      azimuthAngles: slice(element.azimuthAngles),
+      contactWidths: slice(element.contactWidths),
+      contactHeights: slice(element.contactHeights),
+      sampleTimeOffsets: slice(element.sampleTimeOffsets),
+      opacity: Math.max(0.01, Math.min(1, (element.opacity ?? 1) * 0.6)),
+    };
+  }
+
+  function refreshStudioHokusaiVectorTailShadow(
+    state: StudioHokusaiPinnedLiveStroke,
+    element: DrawEl,
+  ): void {
+    if (state.strokeId !== element.id || state.failed || !state.overlayPresented) return;
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
+    }
+    const tail = studioHokusaiVectorTailShadow(element, state);
+    liveDraftVisualRef.current = tail;
+    liveDraftDirectRef.current = tail !== null;
+    liveDraftLayerRef.current?.drawScene();
+  }
+
   function showStudioHokusaiVectorShadow(
     element?: DrawEl | null,
     pageId = currentPageIdRef.current,
@@ -10473,6 +10560,7 @@ function StudioCuttoonEditor() {
   ): void {
     if (hokusaiLiveStrokeRef.current !== state) return;
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioHokusaiVectorShadow(state);
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
@@ -10500,6 +10588,7 @@ function StudioCuttoonEditor() {
     if (!state || (strokeId && state.strokeId !== strokeId)) return;
     state.abortController.abort();
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioHokusaiVectorShadow(state);
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
@@ -10554,7 +10643,7 @@ function StudioCuttoonEditor() {
       return;
     }
     try {
-      state.session.append(samples);
+      state.lastAppendedSequence = state.session.append(samples);
     } catch (cause) {
       failStudioHokusaiLiveStroke(
         state,
@@ -10610,6 +10699,9 @@ function StudioCuttoonEditor() {
       session: null,
       queuedSamples: [],
       forwardedSampleCount: 0,
+      lastAppendedSequence: 0,
+      lastMaterialFrameSequence: 0,
+      materialCompositeBounds: null,
       overlayPresented: false,
       failed: false,
       finishing: false,
@@ -10638,12 +10730,37 @@ function StudioCuttoonEditor() {
           failStudioHokusaiLiveStroke(state, "질감 프레임을 캔버스에 표시하지 못했습니다.");
           return;
         }
+        const frameBounds = frame.logicalPlacement;
+        const previousBounds = state.materialCompositeBounds;
+        state.materialCompositeBounds = previousBounds
+          ? {
+              x: Math.min(previousBounds.x, frameBounds.x),
+              y: Math.min(previousBounds.y, frameBounds.y),
+              width:
+                Math.max(previousBounds.x + previousBounds.width, frameBounds.x + frameBounds.width)
+                - Math.min(previousBounds.x, frameBounds.x),
+              height:
+                Math.max(previousBounds.y + previousBounds.height, frameBounds.y + frameBounds.height)
+                - Math.min(previousBounds.y, frameBounds.y),
+            }
+          : { ...frameBounds };
+        if (frame.phase === "live") {
+          state.lastMaterialFrameSequence = Math.max(
+            state.lastMaterialFrameSequence,
+            frame.sequence,
+          );
+        }
         if (!state.overlayPresented) {
           state.overlayPresented = true;
           hokusaiLiveOverlayVisibleRef.current = true;
-          // The exact DrawEl remains retained but ceases presentation only after the first valid
-          // material frame has been composed. This handshake prevents a blank first contact.
-          liveDraftLayerRef.current?.drawScene();
+          clearStudioHokusaiVectorShadow(state);
+          // The exact DrawEl relinquishes presentation only after the first valid material frame
+          // has been composed. The clear helper repaints immediately, preventing a stale or blank
+          // handoff while the Hokusai overlay becomes the visible authority.
+        }
+        const retained = drawingRef.current;
+        if (retained?.id === state.strokeId) {
+          refreshStudioHokusaiVectorTailShadow(state, retained);
         }
       },
     });
@@ -10657,7 +10774,7 @@ function StudioCuttoonEditor() {
         const queued = state.queuedSamples;
         state.queuedSamples = [];
         try {
-          session.append(queued);
+          state.lastAppendedSequence = session.append(queued);
         } catch (cause) {
           failStudioHokusaiLiveStroke(
             state,
@@ -12991,9 +13108,14 @@ function StudioCuttoonEditor() {
       && !hokusaiStroke.failed
       && hokusaiStroke.strokeId === next.id
     ) {
+      if (hokusaiStroke.overlayPresented) {
+        // Present only the input suffix not yet covered by a receipted material frame. This keeps
+        // a high-Hz pen responsive without double-painting the already-owned Hokusai prefix.
+        refreshStudioHokusaiVectorTailShadow(hokusaiStroke, next);
+        return;
+      }
       liveDraftVisualRef.current = next;
-      // Before the first valid material frame the retained vector is deliberately visible. Once
-      // receipted pixels arrive, the viewport Shape reads the visibility ref and stops painting it.
+      // Before the first valid material frame the exact retained vector is deliberately visible.
       liveDraftLayerRef.current?.drawScene();
       return;
     }
@@ -13136,6 +13258,27 @@ function StudioCuttoonEditor() {
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (
+      next
+      && hokusaiStroke
+      && !hokusaiStroke.failed
+      && hokusaiStroke.strokeId === next.id
+    ) {
+      // Hokusai owns this one stroke even after its first material frame switches the retained
+      // vector layer off. Keep later pointer samples in the imperative lane so a subsequent rAF
+      // cannot republish the same DrawEl through StudioDraftPreviewLayers and double the live ink.
+      // The id guard deliberately does not suppress the next ordinary stroke while a canonical
+      // image from the prior Hokusai transaction is still decoding.
+      liveDraftPendingRef.current = next;
+      if (liveDraftRafRef.current === null) {
+        liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+          liveDraftRafRef.current = null;
+          flushDirectLiveDraft();
+        });
+      }
+      return;
+    }
     if (next && liveWetInkDraftDirectRef.current) {
       if (studioLiveWetInkOverlaySupportsElement(next)) {
         liveDraftPendingRef.current = next;
@@ -29835,6 +29978,42 @@ const puppetWarpArmed =
         );
         return;
       }
+      const backdropPendingBatch = pendingStrokeCommitsRef.current;
+      const backdropBoundary = planStudioDraftPreviewBackdropBoundary({
+        incoming: {
+          brush: drawMode === "pen" ? brush : undefined,
+          fill:
+            drawMode === "lasso-fill"
+              ? color
+              : drawMode === "shape" && shapeFill && drawShape !== "line"
+                ? color
+                : undefined,
+          kind: drawMode === "shape" ? drawShape : "freehand",
+          mode: drawMode === "eraser" ? "eraser" : "pen",
+        },
+        pending: backdropPendingBatch?.pageId === activePage.id
+          ? backdropPendingBatch.strokes
+          : [],
+        hasRetainedDomBackdrop: backdropPendingBatch !== null && (
+          liveInkOverlayRendererRef.current.hasSettledStrokes
+          || liveStampOverlayRendererRef.current.hasSettledStrokes
+          || liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes
+          || liveWetInkOverlayRendererRef.current.hasSettledStrokes
+          || pendingGpuStrokesRef.current.length > 0
+        ),
+      });
+      const backdropBoundaryExecution = executeStudioDraftPreviewBackdropBoundary({
+        plan: backdropBoundary,
+        flushSynchronously: flushSync,
+        flushPending: () => flushPendingStrokeCommitsRef.current(),
+        restorePointerPosition: () => stageRef.current?.setPointersPositions(pointerSample),
+      });
+      if (!backdropBoundaryExecution.ready) {
+        setError(
+          "앞선 획의 합성 순서를 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+        );
+        return;
+      }
       // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
@@ -29846,7 +30025,8 @@ const puppetWarpArmed =
         endLiveResourceEdit();
         return;
       }
-      const pos = e.target.getStage()?.getRelativePointerPosition();
+      const pos = stageRef.current?.getRelativePointerPosition()
+        ?? e.target.getStage()?.getRelativePointerPosition();
       // Every early exit after a successful begin must release — stranded claimLock is collab-unsafe.
       if (!pos) {
         endLiveResourceEdit();
@@ -32495,6 +32675,7 @@ const puppetWarpArmed =
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
+    clearStudioHokusaiVectorShadow(state);
     if (committed) {
       if (currentPage) {
         setSelectedId(finished.id);
@@ -32723,7 +32904,7 @@ const puppetWarpArmed =
       if (state.queuedSamples.length > 0) {
         const queued = state.queuedSamples;
         state.queuedSamples = [];
-        session.append(queued);
+        state.lastAppendedSequence = session.append(queued);
       }
       const result: StudioHokusaiLiveCanonicalResult = await session.finish();
       if (state.failed || hokusaiLiveStrokeRef.current !== state) {
@@ -32759,7 +32940,11 @@ const puppetWarpArmed =
         throw new Error("문서가 저장 중이거나 잠겨 있어 단일 Hokusai 트랜잭션을 확정하지 못했습니다.");
       }
       if (currentPageIdRef.current === state.pageId) {
-        setSelectedId(transaction.transaction.selectionId);
+        // Automatic brush materialization must not switch the editor into image-selection chrome.
+        // That contextual row changes the viewport's DOM offset while the pointer-up frame is
+        // being handed to the canonical PNG, making a stationary stroke appear to jump. Keep the
+        // drawing context stable; artists can explicitly select the materialized image afterward.
+        setSelectedId(null);
       }
       announceDrawingShortcut("Hokusai 자연매체 획 저장 완료");
       // StudioKonvaImageNode will release the material overlay only after the exact PNG is decoded
@@ -32920,8 +33105,9 @@ const puppetWarpArmed =
         hokusaiStroke.finalDrawing = finished;
         hokusaiStroke.finishing = true;
         hokusaiLiveFinalizingRef.current = true;
-        // The receipted material canvas remains visible while the Worker settles and hashes
-        // its canonical PNG. No provisional vector is committed, so undo receives one entry.
+        // session.finish() waits for the latest appended sequence to be presented and acknowledged
+        // before it posts the canonical finish. The bounded vector tail remains fail-visible during
+        // that async handshake, including a stabilizer endpoint appended on pointer-up.
         void finishStudioHokusaiLiveStroke(hokusaiStroke, finished);
         return "handled-preserve-ink";
       }
@@ -33225,6 +33411,26 @@ const puppetWarpArmed =
         completedLiveStrokeBackendAudit && deferInkCleanup
       );
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
+      const finishingHokusai = hokusaiLiveStrokeRef.current;
+      if (
+        deferInkCleanup
+        && finishingHokusai?.finishing
+        && finishingHokusai.finalDrawing
+      ) {
+        if (!finishingHokusai.overlayPresented) {
+          // A fast pointer-up can outrun Hokusai's first dirty frame. Restore the exact retained
+          // vector synchronously, then relinquish it only when a real material frame owns pixels.
+          showStudioHokusaiVectorShadow(
+            finishingHokusai.finalDrawing,
+            finishingHokusai.pageId,
+          );
+        } else {
+          refreshStudioHokusaiVectorTailShadow(
+            finishingHokusai,
+            finishingHokusai.finalDrawing,
+          );
+        }
+      }
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
       // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
       // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is
@@ -40132,7 +40338,6 @@ function clearSelectionForEdit() {
           frameAnimTargetId={frameAnimTargetId}
           gpuCanvasShadowVisibleRef={gpuCanvasShadowVisibleRef}
           gpuLiveInkPinnedRef={gpuLiveInkPinnedRef}
-          hokusaiLiveOverlayVisibleRef={hokusaiLiveOverlayVisibleRef}
           livingInkOverlayVisibleRef={livingInkOverlayVisibleRef}
           gridSize={gridSize}
           groups={groups}

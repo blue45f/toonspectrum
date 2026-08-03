@@ -18,7 +18,10 @@ import {
   classifyStudio3dWebGpuRetryableFailure,
   isExpectedStaticPreviewSocketIoHandshakeClose,
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
+  runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
+  runStudio3dWebGpuShardWithCleanup,
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
+  STUDIO_3D_WEBGPU_PROOF_SHARDS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
 } from "./verify-studio-3d-console.mts";
 
@@ -278,7 +281,136 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(retries).toEqual([1]);
   });
 
-  it("closes the exclusive WebGPU browser before launching normal Chromium", () => {
+  it("isolates heavyweight proofs in ordered fresh-browser shards", async () => {
+    const attempts: string[] = [];
+    const retries: string[] = [];
+
+    await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+      async (shard, attempt) => {
+        attempts.push(`${shard}:${String(attempt)}`);
+        if (shard === "magic-layer-alignment" && attempt === 1) {
+          throw Object.assign(new Error("lost during Magic capture"), {
+            code: "device-lost",
+          });
+        }
+      },
+      ({ attempt, reason, shard }) => {
+        retries.push(`${shard}:${String(attempt)}:${reason}`);
+      },
+    );
+
+    expect(Object.isFrozen(STUDIO_3D_WEBGPU_PROOF_SHARDS)).toBe(true);
+    expect(STUDIO_3D_WEBGPU_PROOF_SHARDS).toEqual([
+      "babylon-artifact-parity",
+      "magic-layer-alignment",
+    ]);
+    expect(attempts).toEqual([
+      "babylon-artifact-parity:1",
+      "magic-layer-alignment:1",
+      "magic-layer-alignment:2",
+    ]);
+    expect(retries).toEqual([
+      "magic-layer-alignment:1:context-or-device-lost",
+    ]);
+  });
+
+  it("does not retry or continue after a semantic shard failure", async () => {
+    const failure = new Error("WebGPU/WebGL2 object-id spatial parity failed");
+    const attempts: string[] = [];
+
+    await expect(
+      runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+        async (shard, attempt) => {
+          attempts.push(`${shard}:${String(attempt)}`);
+          if (shard === "magic-layer-alignment") throw failure;
+        },
+      ),
+    ).rejects.toBe(failure);
+    expect(attempts).toEqual([
+      "babylon-artifact-parity:1",
+      "magic-layer-alignment:1",
+    ]);
+  });
+
+  it("surfaces cleanup failure after a successful proof and still closes every boundary", async () => {
+    const cleanupFailure = new Error("browser context did not close");
+    const events: string[] = [];
+
+    await expect(
+      runStudio3dWebGpuShardWithCleanup(
+        async () => {
+          events.push("proof");
+        },
+        [
+          {
+            close: () => {
+              events.push("context-close");
+              throw cleanupFailure;
+            },
+            label: "browser context",
+          },
+          {
+            close: () => {
+              events.push("browser-close");
+            },
+            label: "browser",
+          },
+        ],
+      ),
+    ).rejects.toBe(cleanupFailure);
+    expect(events).toEqual(["proof", "context-close", "browser-close"]);
+  });
+
+  it("preserves the original proof failure when every cleanup boundary also fails", async () => {
+    const proofFailure = new Error("stable-ID parity failed");
+    const events: string[] = [];
+
+    await expect(
+      runStudio3dWebGpuShardWithCleanup(
+        async () => {
+          events.push("proof");
+          throw proofFailure;
+        },
+        [
+          {
+            close: () => {
+              events.push("context-close");
+              throw new Error("context close failed");
+            },
+            label: "browser context",
+          },
+          {
+            close: () => {
+              events.push("browser-close");
+              throw new Error("browser close failed");
+            },
+            label: "browser",
+          },
+        ],
+      ),
+    ).rejects.toBe(proofFailure);
+    expect(events).toEqual(["proof", "context-close", "browser-close"]);
+  });
+
+  it("aggregates multiple cleanup failures after a successful proof", async () => {
+    const contextFailure = new Error("context close failed");
+    const browserFailure = new Error("browser close failed");
+
+    await expect(
+      runStudio3dWebGpuShardWithCleanup(
+        async () => undefined,
+        [
+          { close: () => { throw contextFailure; }, label: "browser context" },
+          { close: () => { throw browserFailure; }, label: "browser" },
+        ],
+      ),
+    ).rejects.toMatchObject({
+      errors: [contextFailure, browserFailure],
+      message: "WebGPU shard cleanup failed at browser context, browser",
+    });
+  });
+
+  it("closes every exclusive WebGPU shard browser before launching normal Chromium", () => {
     const webGpuAttempt = sourceBetween(
       "async function runStudio3dWebGpuConformanceBrowserAttempt(",
       "async function main(): Promise<void>",
@@ -288,14 +420,18 @@ describe("3D WebGPU conformance browser boundary", () => {
       "if (process.argv[1]",
     );
     const webGpuProof = main.indexOf(
-      "await runStudio3dWebGpuConformanceWithFreshBrowserRetry(",
+      "await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(",
     );
     const normalBrowser = main.indexOf(
       'browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });',
     );
 
-    expect(webGpuAttempt).toContain("await webGpuContext.close().catch(() => undefined)");
-    expect(webGpuAttempt).toContain("await webGpuBrowser.close().catch(() => undefined)");
+    expect(webGpuAttempt).toContain("await runStudio3dWebGpuShardWithCleanup(");
+    expect(webGpuAttempt).toContain("await webGpuContext?.close()");
+    expect(webGpuAttempt).toContain("close: () => webGpuBrowser.close()");
+    expect(webGpuAttempt).not.toContain(".close().catch(() => undefined)");
+    expect(webGpuAttempt).toContain('case "babylon-artifact-parity"');
+    expect(webGpuAttempt).toContain('case "magic-layer-alignment"');
     expect(webGpuProof).toBeGreaterThanOrEqual(0);
     expect(normalBrowser).toBeGreaterThan(webGpuProof);
   });
@@ -312,6 +448,9 @@ describe("3D Magic production-preview product boundary", () => {
     const alignmentProof = sourceBetween(
       "async function runMagicLayerProductionAlignmentProof(",
       "async function main(): Promise<void>",
+    );
+    const sameOriginNavigation = alignmentProof.indexOf(
+      'await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });',
     );
     const snapshot = alignmentProof.indexOf(
       "productionProofEntry.createStudioBg3dRuntimeSnapshot(",
@@ -332,6 +471,8 @@ describe("3D Magic production-preview product boundary", () => {
     expect(magicProductionProofSource).not.toContain(
       "function captureStudioBg3dMagicObjectIds(",
     );
+    expect(sameOriginNavigation).toBeGreaterThanOrEqual(0);
+    expect(snapshot).toBeGreaterThan(sameOriginNavigation);
     expect(snapshot).toBeGreaterThanOrEqual(0);
     expect(capture).toBeGreaterThan(snapshot);
     expect(alignmentProof).toContain('backends: ["webgpu", "webgl2"]');

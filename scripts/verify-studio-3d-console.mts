@@ -16,7 +16,7 @@ import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { chromium, type Locator, type Page } from "playwright";
+import { chromium, type BrowserContext, type Locator, type Page } from "playwright";
 
 import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
@@ -81,6 +81,12 @@ export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
 export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 2;
+export const STUDIO_3D_WEBGPU_PROOF_SHARDS = Object.freeze([
+  "babylon-artifact-parity",
+  "magic-layer-alignment",
+] as const);
+export type Studio3dWebGpuProofShard =
+  (typeof STUDIO_3D_WEBGPU_PROOF_SHARDS)[number];
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
@@ -199,6 +205,78 @@ export async function runStudio3dWebGpuConformanceWithFreshBrowserRetry(
       }
       await onRetry?.({ attempt, cause, reason });
     }
+  }
+}
+
+/**
+ * Gives each heavyweight proof phase its own Chromium process and retry budget. A device loss in
+ * the later Magic proof therefore cannot force an already-passed Babylon artifact proof to replay
+ * on the replacement device. The inner retry classifier remains the only recovery gate, so
+ * semantic, parity, assertion, and timeout failures still stop the suite immediately.
+ */
+export async function runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+  runShardAttempt: (
+    shard: Studio3dWebGpuProofShard,
+    attempt: number,
+  ) => Promise<void>,
+  onRetry?: (details: Readonly<{
+    attempt: number;
+    cause: unknown;
+    reason: Studio3dWebGpuRetryReason;
+    shard: Studio3dWebGpuProofShard;
+  }>) => void | Promise<void>,
+): Promise<void> {
+  for (const shard of STUDIO_3D_WEBGPU_PROOF_SHARDS) {
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      (attempt) => runShardAttempt(shard, attempt),
+      async (details) => {
+        await onRetry?.({ ...details, shard });
+      },
+    );
+  }
+}
+
+type Studio3dWebGpuShardCloseBoundary = Readonly<{
+  close: () => Promise<void> | void;
+  label: string;
+}>;
+
+/**
+ * Runs one proof and always attempts every close boundary in order. The proof error remains the
+ * authoritative failure when cleanup also fails, while cleanup failures after a successful proof
+ * are surfaced so the next shard cannot start under a false fresh-process assumption.
+ */
+export async function runStudio3dWebGpuShardWithCleanup(
+  runProof: () => Promise<void>,
+  closeBoundaries: readonly Studio3dWebGpuShardCloseBoundary[],
+): Promise<void> {
+  let proofFailed = false;
+  let proofFailure: unknown;
+  try {
+    await runProof();
+  } catch (cause) {
+    proofFailed = true;
+    proofFailure = cause;
+  }
+
+  const cleanupFailures: { cause: unknown; label: string }[] = [];
+  for (const boundary of closeBoundaries) {
+    try {
+      await boundary.close();
+    } catch (cause) {
+      cleanupFailures.push({ cause, label: boundary.label });
+    }
+  }
+
+  if (proofFailed) throw proofFailure;
+  if (cleanupFailures.length === 1) throw cleanupFailures[0]!.cause;
+  if (cleanupFailures.length > 1) {
+    throw new AggregateError(
+      cleanupFailures.map(({ cause }) => cause),
+      `WebGPU shard cleanup failed at ${cleanupFailures
+        .map(({ label }) => label)
+        .join(", ")}`,
+    );
   }
 }
 
@@ -1649,6 +1727,9 @@ async function runMagicLayerProductionAlignmentProof(
   page: Page,
   rootUrl: string,
 ): Promise<void> {
+  // This proof runs in a fresh Chromium process instead of inheriting navigation and GPU state
+  // from the Babylon artifact proof. Establish a same-origin document before dynamic imports.
+  await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   const graphicsSupport = await page.evaluate(() => {
     const probeCanvas = document.createElement("canvas");
     const webgl2 = probeCanvas.getContext("webgl2");
@@ -2544,6 +2625,7 @@ async function runMagicLayerProductionAlignmentProof(
 
 async function runStudio3dWebGpuConformanceBrowserAttempt(
   rootUrl: string,
+  shard: Studio3dWebGpuProofShard,
 ): Promise<void> {
   // Keep the conformance browser process exclusive. Chromium/Dawn SwiftShader has a materially
   // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
@@ -2551,21 +2633,33 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
     headless: true,
     args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
   });
-  try {
-    const webGpuContext = await webGpuBrowser.newContext({
-      locale: "ko-KR",
-      viewport: { width: 1_440, height: 1_000 },
-    });
-    try {
+  let webGpuContext: BrowserContext | null = null;
+  await runStudio3dWebGpuShardWithCleanup(
+    async () => {
+      webGpuContext = await webGpuBrowser.newContext({
+        locale: "ko-KR",
+        viewport: { width: 1_440, height: 1_000 },
+      });
       const webGpuPage = await webGpuContext.newPage();
-      await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
-      await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
-    } finally {
-      await webGpuContext.close().catch(() => undefined);
-    }
-  } finally {
-    await webGpuBrowser.close().catch(() => undefined);
-  }
+      switch (shard) {
+        case "babylon-artifact-parity":
+          await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+          break;
+        case "magic-layer-alignment":
+          await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
+          break;
+      }
+    },
+    [
+      {
+        close: async () => {
+          await webGpuContext?.close();
+        },
+        label: "browser context",
+      },
+      { close: () => webGpuBrowser.close(), label: "browser" },
+    ],
+  );
 }
 
 async function main(): Promise<void> {
@@ -2595,14 +2689,17 @@ async function main(): Promise<void> {
     // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
     // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
     // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
-    // No normal Chromium process exists until this browser has closed. A single full-process retry
-    // is permitted only for classified device/context lifetime failures; semantic and parity
-    // failures remain immediate hard failures.
-    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
-      () => runStudio3dWebGpuConformanceBrowserAttempt(rootUrl),
-      ({ attempt, reason }) => {
+    // No normal Chromium process exists until every proof shard has closed. Each shard gets at
+    // most one fresh-process retry only for classified device/context lifetime failures; semantic
+    // and parity failures remain immediate hard failures and completed shards are never replayed.
+    await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+      async (shard) => {
+        await runStudio3dWebGpuConformanceBrowserAttempt(rootUrl, shard);
+        console.log(`[verify-studio-3d-console] WebGPU shard PASS ${shard}`);
+      },
+      ({ attempt, reason, shard }) => {
         console.warn(
-          `[verify-studio-3d-console] transient WebGPU ${reason}; ` +
+          `[verify-studio-3d-console] transient WebGPU ${reason} in ${shard}; ` +
             `closed attempt ${String(attempt)} and starting one fresh browser retry`,
         );
       },

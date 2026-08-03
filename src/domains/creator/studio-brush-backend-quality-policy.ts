@@ -23,6 +23,9 @@ import {
   STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
 } from "./studio-hokusai-live-brush-protocol";
 import { resolveStudioHokusaiLivePreset } from "./studio-hokusai-live-brush-router";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 7 as const;
@@ -96,7 +99,7 @@ export interface StudioBrushBackendIntegrationAudit {
   readonly evidence: string;
 }
 
-export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 5 as const;
+export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 6 as const;
 
 /**
  * Admission policy for the installed Hokusai/libmypaint natural-media provider.
@@ -118,7 +121,7 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   license: "MIT OR Apache-2.0" as const,
   brushFormat: ".myb/libmypaint-v3" as const,
   execution: "dedicated-worker-wasm-packed-dirty-frame" as const,
-  adapterVersion: "0.3.0-packed-dirty-frame-adapter.2" as const,
+  adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
   customBinding: "toonspectrum-packed-dirty-frame" as const,
   eligibleFamilies: Object.freeze([
     "continuous-ink",
@@ -165,7 +168,7 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
 interface StudioHokusaiMybProviderOptInBase {
   readonly backendId: "hokusai-myb-worker";
   readonly engineVersion: "0.3.0";
-  readonly adapterVersion: "0.3.0-packed-dirty-frame-adapter.2";
+  readonly adapterVersion: typeof STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION;
   readonly customBinding: "toonspectrum-packed-dirty-frame";
   readonly surfaceContract: "packed-dirty-rgba8";
 }

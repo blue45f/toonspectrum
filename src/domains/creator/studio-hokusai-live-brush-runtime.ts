@@ -16,6 +16,9 @@ import {
   type StudioHokusaiLiveRouteInput,
   type StudioHokusaiLiveRouteResult,
 } from "./studio-hokusai-live-brush-router";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
 
 export const STUDIO_HOKUSAI_LIVE_STARTUP_TIMEOUT_MS = 30_000 as const;
 export const STUDIO_HOKUSAI_LIVE_FINISH_TIMEOUT_MS = 60_000 as const;
@@ -159,7 +162,7 @@ function readyCapabilities(value: unknown): StudioHokusaiLiveBrushCapabilities |
   const candidate = capabilities as Partial<StudioHokusaiLiveBrushCapabilities>;
   return candidate.engine === "reearth-hokusai"
     && candidate.engineVersion === "0.3.0"
-    && candidate.surfaceAdapterVersion === "0.3.0-packed-dirty-frame-adapter.2"
+    && candidate.surfaceAdapterVersion === STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION
     && candidate.liveAdapterVersion === STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION
     && candidate.wasm === true
     && candidate.dedicatedWorker === true
@@ -169,6 +172,7 @@ function readyCapabilities(value: unknown): StudioHokusaiLiveBrushCapabilities |
     && candidate.canonicalPng === true
     && candidate.liveCommitParityReceipt === true
     && candidate.materialTexture === "studio-hokusai-material-texture-v2"
+    && candidate.materialProfileRouting === "identity-profile-v1"
     && candidate.endpointPolicy === "tapered-start-no-dab-carrier-v1"
     && candidate.mainThreadFullFrameCopy === false
     ? candidate as StudioHokusaiLiveBrushCapabilities
@@ -689,9 +693,12 @@ export class StudioHokusaiLiveStrokeSession {
     if (
       !frame
       || receipt.kind !== "studio-hokusai-live/canonical-receipt"
+      || receipt.version !== STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION
       || receipt.requestId !== this.#requestId
       || receipt.engineEpoch !== this.#engineEpoch
       || receipt.strokeId !== this.#strokeId
+      || receipt.presetId !== this.#config.presetId
+      || receipt.materialProfileId !== this.#config.materialProfileId
       || receipt.finalSequence !== this.#sequence
       || receipt.exactLiveCommitParity !== true
       || receipt.lastLivePixelHash !== receipt.settledPixelHash

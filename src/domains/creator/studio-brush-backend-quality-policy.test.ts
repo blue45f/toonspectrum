@@ -23,6 +23,13 @@ import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   resolveStudioBrushRuntimeContract,
 } from "./studio-brush-runtime-contract";
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "./studio-hokusai-live-brush-protocol";
+import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
 
 function availabilitySnapshot(
   availability: StudioBrushBackendAvailability,
@@ -48,7 +55,7 @@ function hokusaiOptIn(): StudioHokusaiMybProviderOptIn {
     backendId: "hokusai-myb-worker",
     mode: "settled",
     engineVersion: "0.3.0",
-    adapterVersion: "0.3.0-packed-dirty-frame-adapter.2",
+    adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
     customBinding: "toonspectrum-packed-dirty-frame",
     surfaceContract: "packed-dirty-rgba8",
   };
@@ -58,8 +65,8 @@ function hokusaiLiveOptIn(): StudioHokusaiMybProviderOptIn {
   return {
     ...hokusaiOptIn(),
     mode: "live",
-    liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.2",
-    protocolVersion: 1,
+    liveAdapterVersion: STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+    protocolVersion: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
     admission: {
       prewarmedAtStrokeStart: true,
       packedDirtyTransfer: true,
@@ -319,11 +326,11 @@ describe("studio brush material backend policy", () => {
 });
 
 describe("Hokusai .myb provider admission", () => {
-  it("pins the v2 packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
+  it("pins the profile-routed packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
     expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(7);
-    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(5);
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(6);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY).toMatchObject({
-      policyVersion: 5,
+      policyVersion: 6,
       backendId: "hokusai-myb-worker",
       crate: "hokusai-wasm",
       exactVersion: "0.3.0",
@@ -331,7 +338,7 @@ describe("Hokusai .myb provider admission", () => {
       license: "MIT OR Apache-2.0",
       brushFormat: ".myb/libmypaint-v3",
       execution: "dedicated-worker-wasm-packed-dirty-frame",
-      adapterVersion: "0.3.0-packed-dirty-frame-adapter.2",
+      adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
       customBinding: "toonspectrum-packed-dirty-frame",
       surface: {
         internalTileSize: 64,

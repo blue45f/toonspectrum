@@ -17,6 +17,10 @@ import {
 } from "vitest";
 
 import {
+  STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION,
+} from "./studio-hokusai-natural-media-worker-protocol";
+import {
   StudioHokusaiNaturalMediaInspectorSection,
 } from "./StudioHokusaiNaturalMediaInspectorSection";
 
@@ -29,7 +33,7 @@ const probeProduct = vi.fn(async () => ({
   runtime: {
     engine: "reearth-hokusai" as const,
     version: "0.3.0" as const,
-    adapterVersion: "0.3.0-packed-dirty-frame-adapter.2" as const,
+    adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
     wasm: true as const,
     dedicatedWorker: true as const,
     transparentRgba: true as const,
@@ -86,11 +90,12 @@ function productResult(): StudioHokusaiNaturalMediaProductResult {
     message: "Hokusai 자연매체 변환 완료",
     receipt: {
       kind: "studio-hokusai/receipt",
-      version: 2,
+      version: STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION,
       requestId: 1,
       engineEpoch: 1,
       sourceElementId: selected.id,
       presetId: "pencil",
+      materialProfileId: "pencil",
       seed: 0x48_4f_4b_55,
       rasterWidth: 32,
       rasterHeight: 24,
@@ -101,7 +106,7 @@ function productResult(): StudioHokusaiNaturalMediaProductResult {
       inputHash: `sha256:${"1".repeat(64)}`,
       pixelHash: `sha256:${"2".repeat(64)}`,
       pngHash: `sha256:${"3".repeat(64)}`,
-      adapterVersion: "0.3.0-packed-dirty-frame-adapter.2",
+      adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
       execution: "dedicated-worker-wasm-packed-dirty-frame",
       complete: true,
     },

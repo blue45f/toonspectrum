@@ -3,6 +3,13 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
+} from "./studio-hokusai-live-brush-document-receipt";
+import {
+  STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "./studio-hokusai-live-brush-protocol";
 import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import { sha256HexPortable } from "./studio-sha256";
@@ -199,17 +206,18 @@ function hokusaiImageEl(): ImageEl {
   return imageEl({
     hokusaiLiveReceipt: {
       kind: "studio-hokusai-live/document-receipt",
-      version: 1,
-      liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.2",
+      version: STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
+      liveAdapterVersion: STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
       sourceElementId: "source-stroke-1",
       sourceRevision: `hokusai-source-v1:${"d".repeat(16)}`,
       canonical: {
         kind: "studio-hokusai-live/canonical-receipt",
-        version: 1,
+        version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
         requestId: 1,
         engineEpoch: 1,
         strokeId: "source-stroke-1",
         presetId: "charcoal",
+        materialProfileId: "charcoal",
         seed: 17,
         sampleCount: 2,
         finalSequence: 2,

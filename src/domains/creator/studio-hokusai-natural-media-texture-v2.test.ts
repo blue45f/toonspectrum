@@ -1,19 +1,49 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
+  studioHokusaiDefaultMaterialProfileId,
+  type StudioHokusaiMaterialProfileId,
+  type StudioHokusaiNaturalMediaPresetId,
+  type StudioHokusaiNaturalMediaRenderPlan,
+} from "./studio-hokusai-natural-media-contract";
+import {
   applyStudioHokusaiNaturalMediaTextureV2,
   STUDIO_HOKUSAI_LOCAL_DIRECTION_INDEX_LIMITS,
   STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION,
+  studioHokusaiMaterialProfileNoiseEvaluationCount,
 } from "./studio-hokusai-natural-media-texture-v2";
-
-import type {
-  StudioHokusaiNaturalMediaPresetId,
-  StudioHokusaiNaturalMediaRenderPlan,
-} from "./studio-hokusai-natural-media-contract";
 
 const WIDTH = 96;
 const HEIGHT = 48;
 const DIRTY = [4, 4, 88, 40] as const;
+const MATERIAL_PROFILE_CARRIERS = new Map<
+  StudioHokusaiMaterialProfileId,
+  StudioHokusaiNaturalMediaPresetId
+>([
+  ["pencil", "pencil"],
+  ["charcoal", "charcoal"],
+  ["chalk", "charcoal"],
+  ["crayon", "charcoal"],
+  ["pastel", "charcoal"],
+  ["oil-pastel", "charcoal"],
+  ["oil", "oil"],
+  ["acrylic", "oil"],
+  ["gouache", "oil"],
+  ["painterly", "oil"],
+]);
+const TEXTURED_MATERIAL_PROFILES = [...MATERIAL_PROFILE_CARRIERS.keys()];
+
+function materialPlan(
+  materialProfileId: StudioHokusaiMaterialProfileId,
+  seed = 0x1234_5678,
+): StudioHokusaiNaturalMediaRenderPlan {
+  return plan(
+    MATERIAL_PROFILE_CARRIERS.get(materialProfileId)!,
+    seed,
+    materialProfileId,
+  );
+}
 
 function fullLayout(
   dirtyBounds: readonly [number, number, number, number] = DIRTY,
@@ -27,10 +57,12 @@ function fullLayout(
 function plan(
   presetId: StudioHokusaiNaturalMediaPresetId,
   seed = 0x1234_5678,
+  materialProfileId: StudioHokusaiMaterialProfileId =
+    studioHokusaiDefaultMaterialProfileId(presetId),
 ): StudioHokusaiNaturalMediaRenderPlan {
   return {
     kind: "studio-hokusai-natural-media/render-plan",
-    version: "studio-hokusai-natural-media-v1",
+    version: STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
     engine: {
       id: "reearth-hokusai",
       version: "0.3.0",
@@ -45,6 +77,7 @@ function plan(
       revision: "hokusai-source-v1:0123456789abcdef",
     },
     presetId,
+    materialProfileId,
     color: "#705848",
     opacity: 1,
     seed,
@@ -181,6 +214,35 @@ function standardDeviation(values: readonly number[]): number {
   );
 }
 
+function periodicSeamEnergy(
+  pixels: Uint8Array,
+  period: number,
+): Readonly<{ seam: number; interior: number }> {
+  let seam = 0;
+  let seamCount = 0;
+  let interior = 0;
+  let interiorCount = 0;
+  for (let y = 11; y < 37; y += 1) {
+    for (let x = 5; x < 91; x += 1) {
+      const alpha = pixels[(y * WIDTH + x) * 4 + 3] ?? 0;
+      const previousX = pixels[(y * WIDTH + x - 1) * 4 + 3] ?? 0;
+      const previousY = pixels[((y - 1) * WIDTH + x) * 4 + 3] ?? 0;
+      const difference = (Math.abs(alpha - previousX) + Math.abs(alpha - previousY)) / 2;
+      if (x % period === 0 || y % period === 0) {
+        seam += difference;
+        seamCount += 1;
+      } else {
+        interior += difference;
+        interiorCount += 1;
+      }
+    }
+  }
+  return {
+    seam: seam / seamCount,
+    interior: interior / interiorCount,
+  };
+}
+
 function meanNeighbourDifference(
   pixels: Uint8Array,
   deltaX: number,
@@ -203,7 +265,150 @@ function meanNeighbourDifference(
   return difference / count;
 }
 
+function rectangularRibbon(width: number, height: number, alpha: number): Uint8Array {
+  const pixels = new Uint8Array(width * height * 4);
+  for (let y = 6; y < height - 6; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      pixels[index] = 112;
+      pixels[index + 1] = 88;
+      pixels[index + 2] = 72;
+      pixels[index + 3] = alpha;
+    }
+  }
+  return pixels;
+}
+
+function packedRectangularFrame(
+  source: Uint8Array,
+  surfaceWidth: number,
+  bounds: readonly [number, number, number, number],
+): Uint8Array {
+  const [x, y, width, height] = bounds;
+  const patch = new Uint8Array(width * height * 4);
+  for (let row = 0; row < height; row += 1) {
+    const sourceStart = ((y + row) * surfaceWidth + x) * 4;
+    patch.set(source.subarray(sourceStart, sourceStart + width * 4), row * width * 4);
+  }
+  return patch;
+}
+
+function compositeRectangularFrame(
+  destination: Uint8Array,
+  surfaceWidth: number,
+  patch: Uint8Array,
+  bounds: readonly [number, number, number, number],
+): void {
+  const [x, y, width, height] = bounds;
+  for (let row = 0; row < height; row += 1) {
+    const sourceStart = row * width * 4;
+    const destinationStart = ((y + row) * surfaceWidth + x) * 4;
+    destination.set(
+      patch.subarray(sourceStart, sourceStart + width * 4),
+      destinationStart,
+    );
+  }
+}
+
 describe("Studio Hokusai natural-media texture v2", () => {
+  it("keeps every profile inside a deterministic per-pixel noise budget", () => {
+    const counts = new Map(TEXTURED_MATERIAL_PROFILES.map((profile) => [
+      profile,
+      studioHokusaiMaterialProfileNoiseEvaluationCount(profile),
+    ]));
+    expect(Object.fromEntries(counts)).toEqual({
+      pencil: 5,
+      charcoal: 4,
+      chalk: 4,
+      crayon: 4,
+      pastel: 4,
+      "oil-pastel": 4,
+      oil: 2,
+      acrylic: 4,
+      gouache: 4,
+      painterly: 4,
+    });
+    expect(counts.get("acrylic"))
+      .toBeLessThanOrEqual((counts.get("oil") ?? 0) * 2);
+    expect(counts.get("painterly"))
+      .toBeLessThanOrEqual((counts.get("oil") ?? 0) * 2);
+  });
+
+  it("keeps one carrier preset while producing distinct deterministic material profiles", () => {
+    const hashes = new Set<string>();
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
+      const first = ribbon(220);
+      const second = ribbon(220);
+      const renderPlan = materialPlan(materialProfileId);
+      const firstMetrics = applyStudioHokusaiNaturalMediaTextureV2(
+        first,
+        renderPlan,
+        fullLayout(),
+      );
+      const secondMetrics = applyStudioHokusaiNaturalMediaTextureV2(
+        second,
+        renderPlan,
+        fullLayout(),
+      );
+      expect(first).toEqual(second);
+      expect(firstMetrics).toEqual(secondMetrics);
+      expect(firstMetrics).toMatchObject({
+        presetId: MATERIAL_PROFILE_CARRIERS.get(materialProfileId),
+        materialProfileId,
+        visiblePixels: 88 * 28,
+      });
+      hashes.add(Array.from(first).join(","));
+    }
+    expect(hashes.size).toBe(TEXTURED_MATERIAL_PROFILES.length);
+    expect(MATERIAL_PROFILE_CARRIERS.get("charcoal")).toBe("charcoal");
+    expect(MATERIAL_PROFILE_CARRIERS.get("chalk")).toBe("charcoal");
+    expect(MATERIAL_PROFILE_CARRIERS.get("crayon")).toBe("charcoal");
+    expect(MATERIAL_PROFILE_CARRIERS.get("pastel")).toBe("charcoal");
+    expect(MATERIAL_PROFILE_CARRIERS.get("oil-pastel")).toBe("charcoal");
+    expect(MATERIAL_PROFILE_CARRIERS.get("oil")).toBe("oil");
+    expect(MATERIAL_PROFILE_CARRIERS.get("acrylic")).toBe("oil");
+    expect(MATERIAL_PROFILE_CARRIERS.get("gouache")).toBe("oil");
+    expect(MATERIAL_PROFILE_CARRIERS.get("painterly")).toBe("oil");
+  });
+
+  it("keeps every material continuous, retrace-monotonic and free of square lattice seams", () => {
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
+      const onePass = periodicDabStroke(104);
+      const retraced = periodicDabStroke(216);
+      const renderPlan = materialPlan(materialProfileId);
+      applyStudioHokusaiNaturalMediaTextureV2(
+        onePass,
+        renderPlan,
+        fullLayout([0, 0, WIDTH, HEIGHT]),
+      );
+      applyStudioHokusaiNaturalMediaTextureV2(
+        retraced,
+        renderPlan,
+        fullLayout([0, 0, WIDTH, HEIGHT]),
+      );
+      const centreline = centrelineAlpha(onePass);
+      expect(Math.min(...centreline), materialProfileId).toBeGreaterThan(0);
+      expect(centreline.every((alpha) => alpha > 0), materialProfileId).toBe(true);
+      for (let index = 3; index < onePass.length; index += 4) {
+        if ((onePass[index] ?? 0) <= 0) continue;
+        expect(retraced[index], `${materialProfileId}:${index}`)
+          .toBeGreaterThanOrEqual(onePass[index] ?? 0);
+      }
+
+      const filled = ribbon(196);
+      applyStudioHokusaiNaturalMediaTextureV2(
+        filled,
+        renderPlan,
+        fullLayout(),
+      );
+      for (const period of [4, 8, 16]) {
+        const energy = periodicSeamEnergy(filled, period);
+        expect(energy.seam, `${materialProfileId}:${period}`)
+          .toBeLessThan(energy.interior * 1.85 + 0.35);
+      }
+    }
+  });
+
   it("is exact for the same seed and visibly separates the three media", () => {
     const hashes = new Set<string>();
     for (const presetId of ["pencil", "charcoal", "oil"] as const) {
@@ -326,17 +531,17 @@ describe("Studio Hokusai natural-media texture v2", () => {
   });
 
   it("renders a packed dirty frame byte-identically to the same full-frame region", () => {
-    for (const presetId of ["pencil", "charcoal", "oil"] as const) {
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
       const full = ribbon(196);
       const packed = packedFrame(full, DIRTY);
       const fullMetrics = applyStudioHokusaiNaturalMediaTextureV2(
         full,
-        plan(presetId),
+        materialPlan(materialProfileId),
         fullLayout(),
       );
       const packedMetrics = applyStudioHokusaiNaturalMediaTextureV2(
         packed,
-        plan(presetId),
+        materialPlan(materialProfileId),
         {
           frameBounds: DIRTY,
           dirtyBounds: DIRTY,
@@ -354,20 +559,20 @@ describe("Studio Hokusai natural-media texture v2", () => {
       [4, 20, 34, 24],
       [38, 20, 54, 24],
     ] as const;
-    for (const presetId of ["pencil", "charcoal", "oil"] as const) {
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
       const source = ribbon(196);
       const full = source.slice();
       const composed = source.slice();
       applyStudioHokusaiNaturalMediaTextureV2(
         full,
-        plan(presetId),
+        materialPlan(materialProfileId),
         fullLayout(),
       );
       for (const bounds of partition) {
         const patch = packedFrame(source, bounds);
         applyStudioHokusaiNaturalMediaTextureV2(
           patch,
-          plan(presetId),
+          materialPlan(materialProfileId),
           {
             frameBounds: bounds,
             dirtyBounds: bounds,
@@ -379,30 +584,90 @@ describe("Studio Hokusai natural-media texture v2", () => {
     }
   });
 
-  it("keeps a long dabbed charcoal stroke byte-identical across live dirty patches", () => {
+  it("keeps every long dabbed material byte-identical across live dirty patches", () => {
     const partition = [
       [0, 0, 31, HEIGHT],
       [31, 0, 33, HEIGHT],
       [64, 0, WIDTH - 64, HEIGHT],
     ] as const;
-    const source = periodicDabStroke(210);
-    const canonical = source.slice();
-    const live = source.slice();
-    applyStudioHokusaiNaturalMediaTextureV2(
-      canonical,
-      plan("charcoal"),
-      fullLayout([0, 0, WIDTH, HEIGHT]),
-    );
-    for (const bounds of partition) {
-      const patch = packedFrame(source, bounds);
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
+      const source = periodicDabStroke(210);
+      const canonical = source.slice();
+      const live = source.slice();
       applyStudioHokusaiNaturalMediaTextureV2(
-        patch,
-        plan("charcoal"),
-        { frameBounds: bounds, dirtyBounds: bounds },
+        canonical,
+        materialPlan(materialProfileId),
+        fullLayout([0, 0, WIDTH, HEIGHT]),
       );
-      compositePackedFrame(live, patch, bounds);
+      for (const bounds of partition) {
+        const patch = packedFrame(source, bounds);
+        applyStudioHokusaiNaturalMediaTextureV2(
+          patch,
+          materialPlan(materialProfileId),
+          { frameBounds: bounds, dirtyBounds: bounds },
+        );
+        compositePackedFrame(live, patch, bounds);
+      }
+      expect(live, materialProfileId).toEqual(canonical);
     }
-    expect(live).toEqual(canonical);
+  });
+
+  it("keeps a large 512px dirty frame partition invariant for every material profile", () => {
+    const width = 512;
+    const height = 64;
+    const whole = [0, 0, width, height] as const;
+    const partition = [
+      [0, 0, 127, 31],
+      [127, 0, 193, 31],
+      [320, 0, 192, 31],
+      [0, 31, 211, 33],
+      [211, 31, 301, 33],
+    ] as const;
+    for (const materialProfileId of TEXTURED_MATERIAL_PROFILES) {
+      const source = rectangularRibbon(width, height, 196);
+      const canonical = source.slice();
+      const partitioned = source.slice();
+      const renderPlan: StudioHokusaiNaturalMediaRenderPlan = {
+        ...materialPlan(materialProfileId),
+        logicalBounds: { x: 0, y: 0, width, height },
+        raster: { width, height, scale: 1, radiusPixels: 14 },
+        samples: [
+          {
+            x: 0,
+            y: height / 2,
+            pressure: 0.6,
+            tiltX: 0,
+            tiltY: 0,
+            timeMilliseconds: 0,
+          },
+          {
+            x: width - 1,
+            y: height / 2,
+            pressure: 0.6,
+            tiltX: 0,
+            tiltY: 0,
+            timeMilliseconds: 100,
+          },
+        ],
+      };
+      const canonicalMetrics = applyStudioHokusaiNaturalMediaTextureV2(
+        canonical,
+        renderPlan,
+        { frameBounds: whole, dirtyBounds: whole },
+      );
+      for (const bounds of partition) {
+        const patch = packedRectangularFrame(source, width, bounds);
+        applyStudioHokusaiNaturalMediaTextureV2(
+          patch,
+          renderPlan,
+          { frameBounds: bounds, dirtyBounds: bounds },
+        );
+        compositeRectangularFrame(partitioned, width, patch, bounds);
+      }
+      expect(canonicalMetrics.visiblePixels, materialProfileId)
+        .toBe(width * (height - 12));
+      expect(partitioned, materialProfileId).toEqual(canonical);
+    }
   });
 
   it("rejects malformed, overflowing and mismatched packed layouts", () => {

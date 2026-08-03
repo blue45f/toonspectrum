@@ -416,6 +416,7 @@ async function main(): Promise<void> {
             engineEpoch: message.engineEpoch,
             sourceElementId: message.plan.source.elementId,
             presetId: message.plan.presetId,
+            materialProfileId: message.plan.materialProfileId,
             seed: message.plan.seed,
             rasterWidth: message.plan.raster.width,
             rasterHeight: message.plan.raster.height,

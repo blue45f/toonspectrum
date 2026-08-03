@@ -2,13 +2,15 @@ import {
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
   STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS,
   STUDIO_HOKUSAI_RUNTIME_VERSION,
+  studioHokusaiMaterialProfileIsCompatible,
+  type StudioHokusaiMaterialProfileId,
   type StudioHokusaiNaturalMediaPresetId,
 } from "./studio-hokusai-natural-media-contract";
 import {
   STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
 } from "./studio-hokusai-natural-media-worker-protocol";
 
-export const STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION = 1 as const;
+export const STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE = 6 as const;
 export const STUDIO_HOKUSAI_LIVE_MAX_BATCH_SAMPLES = 4_096 as const;
 // Hokusai's spatial slow-tracking filter becomes geometry-destructive when a
@@ -17,7 +19,7 @@ export const STUDIO_HOKUSAI_LIVE_MAX_BATCH_SAMPLES = 4_096 as const;
 // within the Studio pointer sampler's professional 120 Hz response class.
 export const STUDIO_HOKUSAI_LIVE_MIN_SAMPLE_INTERVAL_MS = 10 as const;
 export const STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION =
-  "0.3.0-packed-dirty-live-adapter.2" as const;
+  "0.3.0-packed-dirty-live-adapter.3-profile-routing" as const;
 
 export interface StudioHokusaiLiveBrushCapabilities {
   readonly engine: "reearth-hokusai";
@@ -32,6 +34,7 @@ export interface StudioHokusaiLiveBrushCapabilities {
   readonly canonicalPng: true;
   readonly liveCommitParityReceipt: true;
   readonly materialTexture: "studio-hokusai-material-texture-v2";
+  readonly materialProfileRouting: "identity-profile-v1";
   readonly endpointPolicy: "tapered-start-no-dab-carrier-v1";
   readonly mainThreadFullFrameCopy: false;
 }
@@ -47,6 +50,7 @@ export interface StudioHokusaiLiveBrushConfig {
   readonly logicalOriginY: number;
   readonly segmentIndex: number;
   readonly presetId: StudioHokusaiNaturalMediaPresetId;
+  readonly materialProfileId: StudioHokusaiMaterialProfileId;
   readonly color: `#${string}`;
   readonly opacity: number;
   readonly radiusPixels: number;
@@ -158,6 +162,7 @@ export interface StudioHokusaiLiveCanonicalReceipt {
   readonly engineEpoch: number;
   readonly strokeId: string;
   readonly presetId: StudioHokusaiNaturalMediaPresetId;
+  readonly materialProfileId: StudioHokusaiMaterialProfileId;
   readonly seed: number;
   readonly sampleCount: number;
   readonly finalSequence: number;
@@ -297,6 +302,10 @@ export function snapshotStudioHokusaiLiveConfig(
     || !finite(candidate.logicalOriginY)
     || !integer(candidate.segmentIndex, 0)
     || !PRESET_IDS.has(String(candidate.presetId))
+    || !studioHokusaiMaterialProfileIsCompatible(
+      candidate.presetId as StudioHokusaiNaturalMediaPresetId,
+      candidate.materialProfileId,
+    )
     || typeof candidate.color !== "string"
     || !COLOR_PATTERN.test(candidate.color)
     || !finite(candidate.opacity)
@@ -317,6 +326,7 @@ export function snapshotStudioHokusaiLiveConfig(
     logicalOriginY: candidate.logicalOriginY,
     segmentIndex: candidate.segmentIndex,
     presetId: candidate.presetId as StudioHokusaiNaturalMediaPresetId,
+    materialProfileId: candidate.materialProfileId,
     color: candidate.color as `#${string}`,
     opacity: candidate.opacity,
     radiusPixels: candidate.radiusPixels,
