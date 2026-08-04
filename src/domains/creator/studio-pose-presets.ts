@@ -155,25 +155,33 @@ function basePose(core: PoseBoneMapSpec = {}): PoseBoneMapSpec {
 // 결정적으로 선택·적용된다(같은 캐릭터 = 항상 같은 포즈, Math.random 금지).
 // 설계 원칙: "편안한 차렷" — 팔·다리 거의 내림, 체중 이동은 수 도만,
 // 팔꿈치 10~14° 이완, 어깨 내림 3~4°, 손목 1~2°(꺾임·스핀 금지),
-// 손가락은 살짝 펴진 이완, 머리 2~3° 기울임, 좌우 미세 비대칭.
+// 손가락은 손바닥 쪽으로 살짝 말아 쉼(바깥 휘어짐·활짝 폄 금지), 머리 2~3° 기울임.
 
-// 손가락 릴랙스 범위(도) — 차렷에 가까운 열린 손(과굽힘·주먹 금지).
-export const RELAXED_FINGER_CURL_MIN_DEG = 10;
-export const RELAXED_FINGER_CURL_MAX_DEG = 18;
+// 손가락 릴랙스 범위(도) — 손바닥 안쪽으로 자연스럽게 쉬는 정도(주먹·과펴짐 금지).
+export const RELAXED_FINGER_CURL_MIN_DEG = 14;
+export const RELAXED_FINGER_CURL_MAX_DEG = 24;
 
 const FINGER_SEGMENTS = ["Proximal", "Intermediate", "Distal"] as const;
 const FINGER_NAMES = ["Index", "Middle", "Ring", "Little"] as const;
-// 검지→새끼로 아주 살짝만 더 말림 — 새끼가 과하게 꺾이지 않게.
+// 검지→새끼로 살짝만 더 말림. 새끼 과 cascade 는 바깥으로 휘어 보이게 하니 억제.
 const FINGER_CURL_PROFILE: Record<(typeof FINGER_NAMES)[number], number> = {
-  Index: 0.96,
-  Middle: 1,
-  Ring: 1.03,
-  Little: 1.06,
+  Index: 1,
+  Middle: 1.04,
+  Ring: 1.06,
+  Little: 1.08,
 };
 const SEGMENT_CURL_PROFILE: Record<(typeof FINGER_SEGMENTS)[number], number> = {
-  Proximal: 1,
-  Intermediate: 1.08,
-  Distal: 0.88,
+  Proximal: 1.05,
+  Intermediate: 1.16,
+  Distal: 0.92,
+};
+// 손 가운데로 모으는 미세 내전(°). 검지·새끼가 부채처럼 벌어지지 않게.
+// (부호는 VRoid 정규화 본에서 span 이 줄어드는 쪽으로 검증됨 — 반대 부호는 오히려 벌림.)
+const FINGER_ADDUCT_DEG: Record<(typeof FINGER_NAMES)[number], number> = {
+  Index: -4.5,
+  Middle: -1,
+  Ring: 1.5,
+  Little: 4,
 };
 
 function clampDeg(value: number, min: number, max: number) {
@@ -183,6 +191,7 @@ function clampDeg(value: number, min: number, max: number) {
 // VRM 정규화 손가락 본: 다수 VRoid/샘플은 좌우 모두 local +Z 가 손바닥 쪽 굽힘이다.
 // (예전 좌 -Z / 우 +Z 규약은 하린·세라 등 대부분에서 왼손을 손등 쪽으로 꺾었다.)
 // sample.vrm(루미)처럼 축이 뒤집힌 모델은 applyFingerRotations 의 극성 정렬이 보정한다.
+// Y 는 손 가운데로 살짝 모음(내전) — 펼쳐진 “바깥 휨” 실루엣을 줄인다.
 export function relaxedFingers(leftCurlDeg: number, rightCurlDeg: number): PoseBoneMapSpec {
   const bones: PoseBoneMapSpec = {};
 
@@ -196,14 +205,20 @@ export function relaxedFingers(leftCurlDeg: number, rightCurlDeg: number): PoseB
           RELAXED_FINGER_CURL_MIN_DEG,
           RELAXED_FINGER_CURL_MAX_DEG,
         );
-        bones[`${side}${finger}${segment}` as VRMHumanBoneName] = rotate([0, 0, d(curlDeg)]);
+        // Proximal 에만 내전을 실어 손끝 부채 벌어짐을 줄인다.
+        const adductDeg = segment === "Proximal" ? FINGER_ADDUCT_DEG[finger] : FINGER_ADDUCT_DEG[finger] * 0.35;
+        bones[`${side}${finger}${segment}` as VRMHumanBoneName] = rotate([
+          0,
+          d(adductDeg),
+          d(curlDeg),
+        ]);
       });
     });
 
-    // 엄지: 손 옆에 자연스럽게 붙임 (과외전·과굽힘 금지 — 차렷 손 느낌)
-    bones[`${side}ThumbMetacarpal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.28), d(baseDeg * 0.12)]);
-    bones[`${side}ThumbProximal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.22), d(baseDeg * 0.16)]);
-    bones[`${side}ThumbDistal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.14), 0]);
+    // 엄지: 손바닥 쪽으로 살짝 모아 쉼 (과외전 금지)
+    bones[`${side}ThumbMetacarpal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.42), d(baseDeg * 0.22)]);
+    bones[`${side}ThumbProximal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.32), d(baseDeg * 0.24)]);
+    bones[`${side}ThumbDistal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.2), d(baseDeg * 0.08)]);
   });
 
   return bones;
@@ -239,8 +254,8 @@ export const NATURAL_IDLE_POSES: StudioPosePreset[] = [
         leftFoot: rotate([0, d(-1), 0]),
         rightFoot: rotate([d(1), d(4), 0]),
       },
-      13,
-      14,
+      17,
+      18,
     ),
   },
   {
@@ -268,8 +283,8 @@ export const NATURAL_IDLE_POSES: StudioPosePreset[] = [
         leftFoot: rotate([d(1), d(4), 0]),
         rightFoot: rotate([0, d(-1), 0]),
       },
-      14,
-      13,
+      18,
+      17,
     ),
   },
   {
@@ -297,8 +312,8 @@ export const NATURAL_IDLE_POSES: StudioPosePreset[] = [
         leftFoot: rotate([0, d(2), 0]),
         rightFoot: rotate([0, d(-3), 0]),
       },
-      14,
-      14,
+      18,
+      18,
     ),
   },
   {
@@ -326,8 +341,8 @@ export const NATURAL_IDLE_POSES: StudioPosePreset[] = [
         leftFoot: rotate([0, d(3), 0]),
         rightFoot: rotate([0, d(-1), 0]),
       },
-      12,
-      13,
+      16,
+      17,
     ),
   },
 ];
