@@ -222,6 +222,6 @@ describe("studio chrome IA map", () => {
       kind: "selection",
       selectedType: "draw",
     });
-    expect(stroke.requiredControlLabels).toEqual(expect.arrayContaining(["선 굵기", "불투명도"]));
+    expect(stroke.requiredControlLabels).toEqual(expect.arrayContaining(["선 두께", "불투명도"]));
   });
 });

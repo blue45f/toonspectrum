@@ -319,7 +319,8 @@ export function resolveStudioChromeInspectorPropertySurface(
         surfaceId: "selection-stroke",
         ariaLabel: "선택 속성",
         testId: "studio-inspector-context-selection",
-        requiredControlLabels: ["선 굵기", "불투명도"],
+        // Live copy in StudioInspectorAside selection panel.
+        requiredControlLabels: ["선 두께", "불투명도"],
         primarySection: "properties",
       };
     }

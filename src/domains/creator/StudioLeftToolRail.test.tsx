@@ -17,6 +17,7 @@ interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
   readonly "aria-keyshortcuts"?: string;
+  readonly "data-studio-rail-tool-id"?: string;
   readonly active?: boolean;
   readonly className?: string;
   readonly description?: string;
@@ -31,11 +32,14 @@ interface MockRailButtonProps {
 }
 
 vi.mock("./studio-chrome-ui", () => ({
-  StudioRailDivider: () => <hr />,
+  StudioRailDivider: (props: Record<string, string | undefined>) => (
+    <hr data-studio-rail-group-divider={props["data-studio-rail-group-divider"]} />
+  ),
   StudioRailToolButton: ({
     "aria-controls": ariaControls,
     "aria-expanded": ariaExpanded,
     "aria-keyshortcuts": ariaKeyShortcuts,
+    "data-studio-rail-tool-id": railToolId,
     active,
     className,
     description,
@@ -60,6 +64,7 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-description={description}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
+      data-studio-rail-tool-id={railToolId}
       data-unavailable-reason={unavailableReason}
       disabled={disabled}
       onClick={onClick}
@@ -774,5 +779,21 @@ describe("StudioLeftToolRail", () => {
     fireEvent.pointerDown(document.body);
 
     expect(outsideProps.setRailMoreOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("renders the live tool belt in STUDIO_CHROME_RAIL_TOOL_GROUPS order", async () => {
+    const { STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER } = await import("./studio-chrome-ia-map");
+    render(<StudioLeftToolRail {...createProps()} />);
+    const rail = screen.getByRole("toolbar", { name: "그리기 도구" });
+    const scroll = rail.querySelector('[data-studio-tool-rail-scroll="true"]');
+    expect(scroll).not.toBeNull();
+    const liveIds = Array.from(
+      scroll!.querySelectorAll<HTMLElement>("[data-studio-rail-tool-id]"),
+    ).map((node) => node.getAttribute("data-studio-rail-tool-id"));
+    expect(liveIds).toEqual([...STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER]);
+    // Draw tools before marquee/transform; view tools after 3D/reference.
+    expect(liveIds.indexOf("pen")).toBeLessThan(liveIds.indexOf("marquee-rect"));
+    expect(liveIds.indexOf("marquee-rect")).toBeLessThan(liveIds.indexOf("transform"));
+    expect(liveIds.indexOf("vrm3d")).toBeLessThan(liveIds.indexOf("zoom"));
   });
 });

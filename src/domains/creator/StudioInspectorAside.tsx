@@ -210,6 +210,7 @@ import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeContro
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorFreehandPathControls } from "./StudioInspectorFreehandPathControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
+import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
 import {
   StudioInspectorBrushCatalogButton,
   StudioInspectorCurrentBrushSummary,
@@ -1726,45 +1727,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
               {selected.type === "draw" && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    선 색상
-                    <input
-                      type="color"
-                      value={selected.stroke || "#16100c"}
-                      aria-label="선 색상"
-                      onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
-                      className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                    />
-                  </div>
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    선 두께
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={1}
-                        max={48}
-                        value={selected.strokeWidth ?? 3}
-                        onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.strokeWidth ?? 3}px</span>
-                    </span>
-                  </label>
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    불투명도
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={1}
-                        step={0.05}
-                        value={selected.opacity ?? 1}
-                        onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
-                    </span>
-                  </label>
+                  <StudioInspectorSelectionStrokeControls
+                    selected={selected}
+                    patchEl={patchEl}
+                  />
                   {(selected.kind === "rect" ||
                     selected.kind === "ellipse" ||
                     selected.kind === "star" ||

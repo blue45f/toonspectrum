@@ -866,12 +866,16 @@ export function StudioRailToolButton({
 }
 
 /** Thin hairline inside the vertical tool rail. */
-export function StudioRailDivider({ className }: { className?: string }): ReactElement {
+export function StudioRailDivider({
+  className,
+  ...rest
+}: { className?: string } & Record<string, string | undefined>): ReactElement {
   return (
     <span
       role="separator"
       aria-hidden
       className={cn("my-1 h-px w-6 shrink-0 bg-line/80", className)}
+      {...rest}
     />
   );
 }
