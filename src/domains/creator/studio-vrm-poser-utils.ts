@@ -953,30 +953,37 @@ export function applyExpressionWeightsToVrm(vrm: VRM, weights: Record<string, nu
 
 export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, string>) {
   vrm.scene.traverse((obj) => {
-    if ((obj as Partial<THREE.Mesh>).isMesh) {
-      const mesh = obj as THREE.Mesh;
-      const name = mesh.name.toLowerCase();
+    if (!(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const name = mesh.name.toLowerCase();
 
-      let part: string | null = null;
-      if (name.includes("tops") || name.includes("top") || name.includes("clothes") || name.includes("shirt")) part = "tops";
-      else if (name.includes("bottoms") || name.includes("bottom") || name.includes("pants") || name.includes("skirt") || name.includes("shoes") || name.includes("acc")) part = "bottoms";
-      else if (name.includes("hair")) part = "hair";
-      else if (name.includes("body") || name.includes("skin") || name.includes("hand") || name.includes("leg") || name.includes("arm") || name.includes("head") || name.includes("foot")) part = "body";
-      else if (name.includes("face") || name.includes("eye") || name.includes("mouth") || name.includes("brow")) part = "face";
+    let part: string | null = null;
+    if (name.includes("tops") || name.includes("top") || name.includes("clothes") || name.includes("shirt")) part = "tops";
+    else if (name.includes("bottoms") || name.includes("bottom") || name.includes("pants") || name.includes("skirt") || name.includes("shoes") || name.includes("acc")) part = "bottoms";
+    else if (name.includes("hair")) part = "hair";
+    else if (name.includes("body") || name.includes("skin") || name.includes("hand") || name.includes("leg") || name.includes("arm") || name.includes("head") || name.includes("foot")) part = "body";
+    else if (name.includes("face") || name.includes("eye") || name.includes("mouth") || name.includes("brow")) part = "face";
 
-      if (part && customColors[part]) {
-        const hex = customColors[part]!;
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 
-        materials.forEach((mat) => {
-          const colored = mat as THREE.Material & { color?: THREE.Color };
-          if (colored.color) {
-            colored.color.set(hex);
-            colored.needsUpdate = true;
-          }
-        });
+    materials.forEach((mat) => {
+      const colored = mat as THREE.Material & { color?: THREE.Color; userData: Record<string, unknown> };
+      if (!colored.color) return;
+
+      let original = colored.userData.__vrmCustomColorOriginal as THREE.Color | undefined;
+      if (!original) {
+        original = colored.color.clone();
+        colored.userData.__vrmCustomColorOriginal = original;
       }
-    }
+
+      const customHex = part ? customColors[part] : undefined;
+      if (customHex && customHex.toLowerCase() !== "#ffffff") {
+        colored.color.set(customHex);
+      } else {
+        colored.color.copy(original);
+      }
+      colored.needsUpdate = true;
+    });
   });
 }
 

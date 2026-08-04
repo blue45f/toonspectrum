@@ -17,6 +17,7 @@ import {
   buildVrmPoseDataUrlMetadata,
   createFullStateLoadHandlers,
   applyVrmMaterialFx,
+  applyVrmCustomColors,
   hasVrmMToonMaterial,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
@@ -666,5 +667,33 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     expect(() => applyVrmMaterialFx(vrm, DEFAULT_VRM_MATERIAL_FX)).not.toThrow();
     expect(`#${mat.shadeColorFactor.getHexString()}`).toBe("#ffffff");
     expect(`#${mat.outlineColorFactor.getHexString()}`).toBe("#000000");
+  });
+
+  it("applyVrmCustomColors preserves native VRM material color when customColors is empty or #ffffff", () => {
+    const { vrm } = createMinimalVrm();
+    const hairMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#4a2e12") });
+    addMesh(vrm.scene, "F00_Hair_00", hairMat);
+
+    // Initial call with empty customColors should keep original native hair color (#4a2e12)
+    applyVrmCustomColors(vrm, {});
+    expect(`#${hairMat.color.getHexString()}`).toBe("#4a2e12");
+
+    // Call with #ffffff should also preserve native hair color
+    applyVrmCustomColors(vrm, { hair: "#ffffff" });
+    expect(`#${hairMat.color.getHexString()}`).toBe("#4a2e12");
+  });
+
+  it("applyVrmCustomColors applies custom color and restores original native color on reset", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#1a2b3c") });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    // Apply custom color #ff0000
+    applyVrmCustomColors(vrm, { tops: "#ff0000" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ff0000");
+
+    // Resetting custom colors to empty or #ffffff restores original #1a2b3c
+    applyVrmCustomColors(vrm, { tops: "#ffffff" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#1a2b3c");
   });
 });

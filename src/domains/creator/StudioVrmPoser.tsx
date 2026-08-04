@@ -628,13 +628,7 @@ const COSTUME_PRESETS: CostumePreset[] = [
 const EXPORT_HEIGHT = 520;
 const STUDIO_VRM_CAPTURE_PNG_TIMEOUT_MS = 20_000;
 const STUDIO_VRM_SHARE_TIMEOUT_MS = 30_000;
-const DEFAULT_VRM_CUSTOM_COLORS: Record<string, string> = {
-  tops: "#ffffff",
-  bottoms: "#ffffff",
-  hair: "#ffffff",
-  body: "#ffffff",
-  face: "#ffffff",
-};
+const DEFAULT_VRM_CUSTOM_COLORS: Record<string, string> = {};
 // 웹캠 트래킹에서 quaternion 슬러프 스무딩을 적용할 본(팔/다리/발/손 + 척추/가슴).
 // 머리·목은 이미 얼굴 채널에서 EMA 스무딩되므로 제외.
 const LIMB_BONE_RE = /Arm|Leg|Foot|Hand|[Ss]pine|[Cc]hest/;
