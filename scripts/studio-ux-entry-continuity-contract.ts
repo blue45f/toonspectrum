@@ -280,8 +280,9 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
         clauses: [{
           file: "src/domains/creator/StudioLeftToolRail.tsx",
           allOf: [
-            "변형할 이미지 레이어를 먼저 고르세요.",
-            "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요.",
+            "변형할 레이어를 고르거나",
+            "사각 선택으로 잡은 뒤 다시 누르세요",
+            "objectFreeTransformReady",
           ],
         }],
       },
