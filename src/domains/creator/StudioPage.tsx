@@ -17255,9 +17255,9 @@ const puppetWarpArmed =
     [selected, resolveBg3dEditSource]
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
-  const showQuickStart = !canvasOnlyMode && !menu && !quickComicOpen && (
+  const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
-    (workHydrated && !hasAutosave && elements.length === 0 && !quickStartDismissed)
+    (workHydrated && autosaveChecked && !hasAutosave && !quickStartDismissed && !menu)
   );
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
