@@ -711,6 +711,7 @@ const FINGER_ROTATION_BONE_ORDER = [
   "rightLittleIntermediate",
   "rightLittleDistal",
 ] as const satisfies readonly VRMHumanBoneName[];
+const FINGER_ROTATION_BONE_SET = new Set<VRMHumanBoneName>(FINGER_ROTATION_BONE_ORDER);
 /**
  * Runtime pose application is deliberately derived from the same semantic allowlist used by the
  * portable pose-material boundary. Arbitrary object keys can therefore never address scene nodes,
@@ -1092,6 +1093,8 @@ export function applyPoseToVrm(
   });
 
   POST_DIRECTION_ROTATION_BONE_ORDER.forEach((boneName) => {
+    // Finger curls always go through applyFingerRotations so model-axis polarity can be fixed.
+    if (FINGER_ROTATION_BONE_SET.has(boneName)) return;
     const rotation = bones[boneName]?.rotation;
     if (rotation) {
       applyEulerRotation(humanoid, boneName, rotation);
@@ -1100,6 +1103,16 @@ export function applyPoseToVrm(
 
   // After limb aims + wrist eulers: fix hanging-arm palm twist (Harin / VRoid outward palms).
   correctVrmHangingHandPalmTwist(vrm);
+
+  // Optional finger eulers carried in the pose map (natural idle, extras) — polarity-aware.
+  const fingerEdits: Partial<Record<VRMHumanBoneName, Vec3>> = {};
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    const rotation = bones[boneName]?.rotation;
+    if (rotation) fingerEdits[boneName] = rotation;
+  }
+  if (Object.keys(fingerEdits).length > 0) {
+    applyFingerRotations(vrm, fingerEdits);
+  }
 
   humanoid.update();
   if (!applyPoseTranslations(vrm, translations)) return false;
@@ -1467,13 +1480,101 @@ export function applyVrmMaterialFx(vrm: VRM, fx: VrmMaterialFx) {
 
 export type FingerRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
 
+function middleTipPalmDot(vrm: VRM, side: "left" | "right"): number | null {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return null;
+  const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+  const tip =
+    humanoid.getNormalizedBoneNode(`${side}MiddleDistal`)
+    ?? humanoid.getNormalizedBoneNode(`${side}MiddleProximal`);
+  if (!hand || !tip) return null;
+  const palm = estimateVrmPalmNormal(vrm, side);
+  if (!palm) return null;
+  const tipDir = tip.getWorldPosition(new THREE.Vector3())
+    .sub(hand.getWorldPosition(new THREE.Vector3()));
+  if (!normalizeDirection(tipDir)) return null;
+  return tipDir.dot(palm);
+}
+
+function zeroFingerSide(
+  humanoid: NonNullable<VRM["humanoid"]>,
+  side: "left" | "right",
+): void {
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    if (!String(boneName).startsWith(side)) continue;
+    const node = humanoid.getNormalizedBoneNode(boneName);
+    if (node) node.rotation.set(0, 0, 0);
+  }
+}
+
+function applyFingerSide(
+  humanoid: NonNullable<VRM["humanoid"]>,
+  fingers: FingerRotationMap,
+  side: "left" | "right",
+  polarity: 1 | -1,
+): void {
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    if (!String(boneName).startsWith(side)) continue;
+    const rot = fingers[boneName];
+    if (!rot) continue;
+    applyEulerRotation(humanoid, boneName, [
+      polarity * rot[0],
+      polarity * rot[1],
+      polarity * rot[2],
+    ]);
+  }
+}
+
+/**
+ * Some bundled VRM rest axes (notably sample.vrm / 루미) mirror finger local Z relative to
+ * typical VRoid samples. After the body/palm pose is live, pick the curl polarity that moves
+ * the middle fingertip toward the palm (−palm normal), not into hyperextension.
+ */
+export function resolveFingerCurlPolarity(
+  vrm: VRM,
+  fingers: FingerRotationMap,
+  side: "left" | "right",
+): 1 | -1 {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return 1;
+  const hasSide = FINGER_ROTATION_BONE_ORDER.some(
+    (boneName) => String(boneName).startsWith(side) && fingers[boneName],
+  );
+  if (!hasSide) return 1;
+
+  zeroFingerSide(humanoid, side);
+  humanoid.update();
+  vrm.scene.updateMatrixWorld(true);
+  const baseline = middleTipPalmDot(vrm, side);
+  if (baseline === null) return 1;
+
+  applyFingerSide(humanoid, fingers, side, 1);
+  humanoid.update();
+  vrm.scene.updateMatrixWorld(true);
+  const positive = middleTipPalmDot(vrm, side);
+  if (positive === null) return 1;
+
+  // Prefer the polarity that decreases tip·palm (curl into the palm surface).
+  // If +1 makes the tip more palm-normal-aligned, the axes are inverted → use -1.
+  return positive - baseline > 0.04 ? -1 : 1;
+}
+
 export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return;
-  FINGER_ROTATION_BONE_ORDER.forEach((boneName) => {
-    const rot = fingers[boneName];
-    if (rot) applyEulerRotation(humanoid, boneName, rot);
-  });
+  if (Object.keys(fingers).length === 0) return;
+
+  // Body/palm pose must already be on the skeleton (applyPoseToVrm first).
+  vrm.scene.updateMatrixWorld(true);
+  const leftPolarity = resolveFingerCurlPolarity(vrm, fingers, "left");
+  const rightPolarity = resolveFingerCurlPolarity(vrm, fingers, "right");
+
+  // resolve* leaves each side at its trial pose; re-apply both with chosen polarities.
+  zeroFingerSide(humanoid, "left");
+  zeroFingerSide(humanoid, "right");
+  applyFingerSide(humanoid, fingers, "left", leftPolarity);
+  applyFingerSide(humanoid, fingers, "right", rightPolarity);
+  humanoid.update();
   vrm.scene.updateMatrixWorld(true);
 }
 

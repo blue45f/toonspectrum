@@ -159,24 +159,26 @@ function clampDeg(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-// 정규화 본 규약: 손바닥 쪽 굽힘은 왼손 -z / 오른손 +z 회전. 엄지는 과굽힘 없이 안쪽으로만 살짝.
+// VRM 정규화 손가락 본: 다수 VRoid/샘플은 좌우 모두 local +Z 가 손바닥 쪽 굽힘이다.
+// (예전 좌 -Z / 우 +Z 규약은 하린·세라 등 대부분에서 왼손을 손등 쪽으로 꺾었다.)
+// sample.vrm(루미)처럼 축이 뒤집힌 모델은 applyFingerRotations 의 극성 정렬이 보정한다.
 export function relaxedFingers(leftCurlDeg: number, rightCurlDeg: number): PoseBoneMapSpec {
   const bones: PoseBoneMapSpec = {};
 
   (["left", "right"] as const).forEach((side) => {
     const baseDeg = side === "left" ? leftCurlDeg : rightCurlDeg;
-    const sign = side === "left" ? -1 : 1;
 
     FINGER_NAMES.forEach((finger) => {
       FINGER_SEGMENTS.forEach((segment) => {
         const curlDeg = clampDeg(baseDeg * FINGER_CURL_PROFILE[finger] * SEGMENT_CURL_PROFILE[segment], RELAXED_FINGER_CURL_MIN_DEG, RELAXED_FINGER_CURL_MAX_DEG);
-        bones[`${side}${finger}${segment}` as VRMHumanBoneName] = rotate([0, 0, sign * d(curlDeg)]);
+        bones[`${side}${finger}${segment}` as VRMHumanBoneName] = rotate([0, 0, d(curlDeg)]);
       });
     });
 
-    bones[`${side}ThumbMetacarpal` as VRMHumanBoneName] = rotate([0, sign * d(baseDeg * 0.35), sign * d(baseDeg * 0.2)]);
-    bones[`${side}ThumbProximal` as VRMHumanBoneName] = rotate([0, sign * d(baseDeg * 0.3), sign * d(baseDeg * 0.25)]);
-    bones[`${side}ThumbDistal` as VRMHumanBoneName] = rotate([0, sign * d(baseDeg * 0.25), 0]);
+    // 엄지: 손바닥 안쪽으로만 살짝 (과굽힘·외전 금지)
+    bones[`${side}ThumbMetacarpal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.35), d(baseDeg * 0.2)]);
+    bones[`${side}ThumbProximal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.3), d(baseDeg * 0.25)]);
+    bones[`${side}ThumbDistal` as VRMHumanBoneName] = rotate([0, d(baseDeg * 0.25), 0]);
   });
 
   return bones;
