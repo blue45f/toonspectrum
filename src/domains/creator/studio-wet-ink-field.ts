@@ -1240,7 +1240,6 @@ function renderTileRgba(
   tile: StudioWetInkTile,
 ): Uint8ClampedArray {
   const bytes = new Uint8Array(tile.width * tile.height * 4);
-  const u32 = new Uint32Array(bytes.buffer);
   const color = field.config.inkColor;
   const spec = field.config.spectralAbsorption ?? { r: 1.0, g: 0.96, b: 0.88 };
   const paperRoughness = field.config.paperRoughness ?? 0.72;
@@ -1283,7 +1282,11 @@ function renderTileRgba(
       a = Math.round(alphaExtinction * 255);
     }
 
-    u32[index] = (a << 24) | (b << 16) | (g << 8) | r;
+    const offset = index * 4;
+    bytes[offset] = r;
+    bytes[offset + 1] = g;
+    bytes[offset + 2] = b;
+    bytes[offset + 3] = a;
   }
 
   return new Uint8ClampedArray(bytes.buffer);
