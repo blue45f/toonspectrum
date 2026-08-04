@@ -107,12 +107,18 @@ export const STUDIO_INKWASH_SPECTRA_PRESETS: Readonly<Record<string, StudioInkwa
   "vermilion-red": { name: "주홍 연지 (Vermilion Red)", r: 1.0, g: 0.25, b: 0.15 },
   "cobalt-blue": { name: "코발트 블루 (Cobalt Blue)", r: 0.1, g: 0.45, b: 0.95 },
   "forest-green": { name: "녹송 수묵 (Forest Green)", r: 0.2, g: 0.75, b: 0.35 },
+  "plum-blossom": { name: "매화 자홍 (Plum Blossom Ink)", r: 0.85, g: 0.2, b: 0.55 },
+  "pine-smoke": { name: "송묵 연묵 (Pine Smoke Ink)", r: 0.98, g: 0.95, b: 0.90 },
+  "bamboo-green": { name: "청죽 먹빛 (Bamboo Ink)", r: 0.25, g: 0.72, b: 0.45 },
+  "autumn-gold": { name: "추황 묵빛 (Autumn Gold Ink)", r: 0.88, g: 0.65, b: 0.18 },
+  "mineral-azurite": { name: "석청 藍 (Mineral Azurite)", r: 0.15, g: 0.38, b: 0.88 },
   "white-highlight": { name: "화이트 하이라이트 (White Ink)", r: -1.0, g: -1.0, b: -1.0 },
 });
 
 export interface StudioWetInkBrushPhysicalMaterial {
   readonly absorption: number;
   readonly bleed: number;
+  readonly chromatography?: number;
   readonly dryingRate: number;
   readonly edgeDarkening: number;
   readonly fixationRate: number;
@@ -597,12 +603,14 @@ export function planStudioWetInkBrushReplay(
     maxUploadBytes: STUDIO_WET_INK_BRUSH_MAX_UPLOAD_BYTES,
     absorption: material.absorption,
     bleed: material.bleed,
+    chromatography: material.chromatography,
     dryingRate: material.dryingRate,
     edgeDarkening: material.edgeDarkening,
     fixationRate: material.fixationRate,
     granulation: material.granulation,
     paperRoughness: material.paperRoughness,
     inkColor: recipe.inkColor,
+    spectralAbsorption: material.spectralAbsorption,
   });
   if (!field.ok) return planFailure("field-budget", field.reason);
 

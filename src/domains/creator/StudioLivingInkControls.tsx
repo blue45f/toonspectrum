@@ -213,6 +213,8 @@ export function StudioLivingInkControls({
             ["flow", "안료 흐름"],
             ["bleed", "번짐"],
             ["dryRate", "건조 속도"],
+            ["chromaticSeparation", "색상 분리"],
+            ["dryingEdgeDeposition", "테두리 응집"],
             ["paperFiber", "종이 섬유"],
             ["granulation", "과립"],
           ] as const).map(([key, label]) => (
