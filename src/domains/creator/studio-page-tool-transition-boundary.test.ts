@@ -306,7 +306,7 @@ describe("StudioPage tool transition boundary", () => {
     expect(optionsStart).toBeGreaterThanOrEqual(0);
     expect(optionsEnd).toBeGreaterThan(optionsStart);
     expect(options).toMatch(
-      /setDrawMode: \(mode\) => \{\s+activatePrimaryCanvasTool\("draw", mode\);/u,
+      /setDrawMode: \(mode\) => \{\s+activateDrawToolWithProperties\(mode\);/u,
     );
     const brushSettingsStart = options.indexOf("openBrushStudio: () => {");
     const brushSettingsEnd = options.indexOf("recallBrushSlot:", brushSettingsStart);
@@ -333,8 +333,10 @@ describe("StudioPage tool transition boundary", () => {
     const transitionStart = studioPageSource.indexOf(
       "function activatePrimaryCanvasTool(",
     );
+    // Keep the pure stroke-safe transition free of inspector side effects; the
+    // CSP properties reveal lives in activateDrawToolWithProperties immediately after.
     const transitionEnd = studioPageSource.indexOf(
-      "function readActiveStrokeLifecycleRecovery()",
+      "function activateDrawToolWithProperties(",
       transitionStart,
     );
     const transition = studioPageSource.slice(transitionStart, transitionEnd);

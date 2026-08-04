@@ -22920,10 +22920,10 @@ const puppetWarpArmed =
       activatePrimaryCanvasTool("select");
       setMobileSheet(null);
     } else if (action === "pen") {
-      activatePrimaryCanvasTool("draw", "pen");
+      activateDrawToolWithProperties("pen");
       setMobileSheet(null);
     } else if (action === "eraser") {
-      activatePrimaryCanvasTool("draw", "eraser");
+      activateDrawToolWithProperties("eraser");
       setMobileSheet(null);
     } else if (action === "eyedropper") {
       setEyedropperActive(true);
