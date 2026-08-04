@@ -814,7 +814,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("lasso-fill") ? (
             <StudioRailToolButton
               icon={Paintbrush}
-              label="라쏘 필"
+              label="올가미 채우기"
               description="닫힌 궤적을 그려 현재 색으로 채웁니다."
               active={tool === "draw" && drawMode === "lasso-fill"}
               disabled={activeSurfaceReviewLocked}

@@ -201,16 +201,16 @@ describe("buildStudioMainMenuGroups", () => {
     ]);
     expect(groups.map((group) => group.items.map((item) => item.id))).toEqual([
       [
-        "export",
-        "copy-image",
         "save-draft",
         "publish",
-        "export-json",
-        "export-archive",
         "import-json",
         "import-psd",
         "import-ora-cbz",
         "project",
+        "export",
+        "copy-image",
+        "export-json",
+        "export-archive",
       ],
       [
         "undo",

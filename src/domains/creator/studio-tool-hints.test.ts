@@ -154,7 +154,7 @@ describe("studio tool hints (rich hover copy)", () => {
     ["리퀴파이 (J)", "liquify"],
     ["채우기 (G)", "fill"],
     ["스포이드 (I / Alt+클릭)", "sample"],
-    ["라쏘 필", "lasso-fill"],
+    ["올가미 채우기", "lasso-fill"],
     ["올가미 선택", "lasso"],
     ["댓글 핀 배치", "comment"],
     ["투시도", "perspective"],

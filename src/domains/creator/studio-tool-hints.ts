@@ -177,6 +177,7 @@ const REGISTERED_HINT_ID_BY_LABEL: Readonly<Record<string, string>> = {
   채우기: "fill",
   스포이드: "eyedropper",
   "라쏘 필": "lasso-fill",
+  "올가미 채우기": "lasso-fill",
   도형: "smart-shape",
   "스마트 도형": "smart-shape",
   "사각형 도형": "shape-rect",

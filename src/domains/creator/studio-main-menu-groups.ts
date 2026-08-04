@@ -226,26 +226,10 @@ export function buildStudioMainMenuGroups({
 
   const groups = [
     {
+      // CSP / PowerPoint: save & open first, then export/share (not export-first).
       id: "file",
       label: "파일",
       items: [
-        {
-          id: "export",
-          label: "내보내기 / 다운로드",
-          icon: Download,
-          onSelect: () => {
-            ui.openExportDownload();
-          },
-        },
-        {
-          id: "copy-image",
-          label: "이미지를 클립보드로",
-          icon: Copy,
-          onSelect: () => {
-            void editor.copyImageToClipboard();
-          },
-          separatorAfter: true,
-        },
         {
           id: "save-draft",
           label: state.sharedNonOwnerSave ? "공동 저장" : "임시저장",
@@ -267,23 +251,6 @@ export function buildStudioMainMenuGroups({
           separatorAfter: true,
           onSelect: () => {
             void editor.save("published");
-          },
-        },
-        {
-          id: "export-json",
-          label: "백업 (.json)",
-          icon: Download,
-          onSelect: () => {
-            editor.exportProject();
-          },
-        },
-        {
-          id: "export-archive",
-          label: "아카이브 백업",
-          icon: Package,
-          disabled: state.projectArchiveBusy,
-          onSelect: () => {
-            void editor.exportProjectArchive();
           },
         },
         {
@@ -318,8 +285,43 @@ export function buildStudioMainMenuGroups({
           id: "project",
           label: "프로젝트 도구…",
           icon: Folder,
+          separatorAfter: true,
           onSelect: () => {
             ui.openProjectTools();
+          },
+        },
+        {
+          id: "export",
+          label: "내보내기 / 다운로드",
+          icon: Download,
+          onSelect: () => {
+            ui.openExportDownload();
+          },
+        },
+        {
+          id: "copy-image",
+          label: "이미지를 클립보드로",
+          icon: Copy,
+          onSelect: () => {
+            void editor.copyImageToClipboard();
+          },
+          separatorAfter: true,
+        },
+        {
+          id: "export-json",
+          label: "백업 (.json)",
+          icon: Download,
+          onSelect: () => {
+            editor.exportProject();
+          },
+        },
+        {
+          id: "export-archive",
+          label: "아카이브 백업",
+          icon: Package,
+          disabled: state.projectArchiveBusy,
+          onSelect: () => {
+            void editor.exportProjectArchive();
           },
         },
       ],

@@ -18,15 +18,16 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     id: "file",
     label: "파일",
     items: [
-      { id: "export", label: "내보내기 / 다운로드", onSelect: vi.fn() },
-      { id: "copy-image", label: "이미지를 클립보드로", onSelect: vi.fn(), separatorAfter: true },
       { id: "save-draft", label: "임시저장", shortcut: "⌘S", onSelect: vi.fn() },
       { id: "publish", label: "게시", onSelect: vi.fn(), separatorAfter: true },
+      { id: "import-json", label: "프로젝트 가져오기…", onSelect: vi.fn() },
+      { id: "import-psd", label: "PSD 가져오기…", onSelect: vi.fn() },
+      { id: "import-ora-cbz", label: "ORA · CBZ · WILL 가져오기…", onSelect: vi.fn(), separatorAfter: true },
+      { id: "project", label: "프로젝트 도구…", onSelect: vi.fn(), separatorAfter: true },
+      { id: "export", label: "내보내기 / 다운로드", onSelect: vi.fn() },
+      { id: "copy-image", label: "이미지를 클립보드로", onSelect: vi.fn(), separatorAfter: true },
       { id: "export-json", label: "백업 (.json)", onSelect: vi.fn() },
       { id: "export-archive", label: "아카이브 백업", onSelect: vi.fn() },
-      { id: "import-json", label: "프로젝트 가져오기…", onSelect: vi.fn() },
-      { id: "import-psd", label: "PSD 가져오기…", onSelect: vi.fn(), separatorAfter: true },
-      { id: "project", label: "프로젝트 도구…", onSelect: vi.fn() },
     ],
   },
   {
@@ -251,6 +252,8 @@ describe("StudioMainMenu", () => {
     ]);
     const itemLabels = PRODUCTION_MENU_CATALOG.flatMap((g) => g.items.map((i) => i.label));
     for (const required of [
+      "임시저장",
+      "게시",
       "내보내기 / 다운로드",
       "프로젝트 가져오기…",
       "PSD 가져오기…",

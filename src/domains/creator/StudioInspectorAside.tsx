@@ -1689,6 +1689,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             <div
               role="tabpanel"
               aria-label="선택 요소 속성"
+              data-testid="studio-inspector-context-selection"
               hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
@@ -3309,6 +3310,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             <div
               role="tabpanel"
               aria-label="그리기 도구 설정"
+              data-testid="studio-inspector-context-drawing-panel"
               hidden={inspectorLayout.primary !== "properties"}
               className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
             >
