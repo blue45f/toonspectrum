@@ -70,10 +70,10 @@ describe("studio creative ux", () => {
       "pen",
       "marker",
       "gpen",
-      "school-pen",
-      "fountain-pen",
-      "gel-pen",
+      "watercolor",
+      "airbrush",
       "fineliner",
+      "pencil",
     ]);
     expect(quick.map((item) => item.quickSource)).toEqual([
       "favorite",
@@ -89,9 +89,11 @@ describe("studio creative ux", () => {
   });
 
   it("uses the beginner kit when quick brush history is empty and respects zero limit", () => {
-    expect(listStudioQuickBrushTrayItems().map((item) => item.id)).toEqual([
-      ...STUDIO_BEGINNER_BRUSH_IDS.slice(0, 8),
-    ]);
+    const quickIds = listStudioQuickBrushTrayItems().map((item) => item.id);
+    expect(quickIds).toEqual([...STUDIO_BEGINNER_BRUSH_IDS.slice(0, 8)]);
+    // Wash + air must stay on the empty-history shelf so bleed brushes are one tap away.
+    expect(quickIds).toContain("watercolor");
+    expect(quickIds).toContain("airbrush");
     expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
 

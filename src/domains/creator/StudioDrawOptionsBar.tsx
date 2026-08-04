@@ -753,6 +753,25 @@ export function StudioDrawOptionsBar({
           </div>
         ) : null}
 
+        {/*
+          Quick starter shelf stays on the primary strip so wash/air (and favorites)
+          are one tap away — not buried under “세부 옵션”.
+        */}
+        {drawMode === "pen" ? (
+          <StudioBrushTray
+            activeBrushId={catalogBrushId}
+            brushCatalogItems={brushCatalogItems}
+            recentBrushIds={recentBrushIds}
+            favoriteBrushIds={favoriteBrushIds}
+            onSelect={onSelectBrush}
+            onOpenLibrary={toggleBrushCatalog}
+            libraryOpen={brushCatalogOpen}
+            // Prefer tray width so starter wash/air chips stay clickable without outer scroll.
+            className="min-w-[12.5rem] max-w-[min(26rem,48vw)] shrink-0"
+            aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
+          />
+        ) : null}
+
         {drawMode === "pen" && livingInk ? (
           <StudioLivingInkControls {...livingInk} />
         ) : null}
@@ -1109,20 +1128,6 @@ export function StudioDrawOptionsBar({
             docked && "mt-1 rounded-lg border shadow-[0_14px_36px_oklch(0.06_0.01_70/0.52)]"
           )}
         >
-          {drawMode === "pen" ? (
-            <StudioBrushTray
-              activeBrushId={catalogBrushId}
-              brushCatalogItems={brushCatalogItems}
-              recentBrushIds={recentBrushIds}
-              favoriteBrushIds={favoriteBrushIds}
-              onSelect={onSelectBrush}
-              onOpenLibrary={toggleBrushCatalog}
-              libraryOpen={brushCatalogOpen}
-              className="w-[24rem] shrink-0"
-              aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
-            />
-          ) : null}
-
           <div className="studio-opt-cluster shrink-0" role="group" aria-label="브러시 크기 프리셋">
             {STUDIO_BRUSH_SIZE_CHIPS.map((chip) => {
               const active = nearestStudioBrushSizeChip(strokeWidth) === chip.id;

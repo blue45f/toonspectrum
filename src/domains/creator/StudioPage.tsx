@@ -17322,9 +17322,18 @@ const puppetWarpArmed =
     [selected, resolveBg3dEditSource]
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
+  // Auto-coach only while the page is still idle. Late work/autosave hydration must not
+  // cover the canvas after the artist already opened Draw or placed content (backdrop was
+  // intercepting the primary brush tray in live tests).
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
-    (workHydrated && autosaveChecked && !hasAutosave && !quickStartDismissed && !menu)
+    (workHydrated
+      && autosaveChecked
+      && !hasAutosave
+      && !quickStartDismissed
+      && !menu
+      && elements.length === 0
+      && tool !== "draw")
   );
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
@@ -32832,15 +32841,15 @@ const puppetWarpArmed =
         setSelectedId(finished.id);
         queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
       }
-      announceDrawingShortcut("Living Ink 복구 · 원본 벡터 획 저장");
-      setError(`Living Ink 결과를 원본 벡터로 저장했습니다. ${reason}`);
+      announceDrawingShortcut("수채 번짐 복구 · 원본 벡터 획 저장");
+      setError(`수채 번짐 결과를 원본 벡터로 저장했습니다. ${reason}`);
     } else {
       restorePendingStrokeCommits({
         pageId: state.pageId,
         strokes: [finished],
         retryCount: 0,
       });
-      setError(`Living Ink 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
+      setError(`수채 번짐 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
     }
     liveDraftLayerRef.current?.drawScene();
   }
@@ -32947,7 +32956,7 @@ const puppetWarpArmed =
         livingInkAcceptedAuthorityRef.current = null;
         livingInkRejectedAuthorityRef.current = committedAuthority;
         const message =
-          "Living Ink PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
+          "수채 번짐 PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
         setError(message);
         void livingInkCoordinatorRef.current.failClosed(message);
       } else {
@@ -32957,7 +32966,7 @@ const puppetWarpArmed =
       if (currentPageIdRef.current === state.pageId) {
         setSelectedId(transaction.transaction.selectionId);
       }
-      announceDrawingShortcut("Living Ink · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
+      announceDrawingShortcut("수채 번짐 · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
       // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
       // PNG hash into the main layer. No guessed requestAnimationFrame handoff is allowed.
     } catch (cause) {
@@ -38679,7 +38688,7 @@ function clearSelectionForEdit() {
     );
     if (hasPersistedLayer) {
       setError(
-        "기존 Living Ink 획의 물리 결과를 바꾸지 않도록 재질을 잠갔습니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
+        "기존 수채 번짐 획의 물리 결과를 바꾸지 않도록 재질을 잠갔습니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
       );
       return;
     }
@@ -38709,7 +38718,7 @@ function clearSelectionForEdit() {
         && element.livingInkReceipt?.pageId === currentPageIdRef.current
       )
     ) {
-      setError("먼저 Living Ink 잉크나 물 획을 저장한 뒤 정착해 주세요.");
+      setError("먼저 수채 번짐 잉크나 물 획을 저장한 뒤 정착해 주세요.");
       return;
     }
     const surface = livingInkOverlaySurfaceRef.current;
@@ -38719,7 +38728,7 @@ function clearSelectionForEdit() {
       ? livingInkSelectionSnapshot(config)
       : null;
     if (livingInkScope === "selection" && !selection) {
-      setError("현재 Living Ink 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
+      setError("현재 수채 번짐 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
       return;
     }
     const routeKey = `studio-living-ink-action:${activePage.id}:${kind}:${uid()}`;
@@ -38812,7 +38821,7 @@ function clearSelectionForEdit() {
       }
       setSelectedId(transaction.transaction.selectionId);
       announceDrawingShortcut(
-        `Living Ink · ${livingInkScope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
+        `수채 번짐 · ${livingInkScope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
       );
     } catch (cause) {
       if (work && !transactionCommitted) {
@@ -38825,7 +38834,7 @@ function clearSelectionForEdit() {
       setError(
         cause instanceof Error
           ? cause.message
-          : `Living Ink ${kind === "fix" ? "정착" : "지우기"}를 완료하지 못했습니다.`,
+          : `수채 번짐 ${kind === "fix" ? "정착" : "지우기"}를 완료하지 못했습니다.`,
       );
     } finally {
       // A committed action remains input-exclusive until StudioKonvaImageNode proves that the
@@ -39033,7 +39042,7 @@ function clearSelectionForEdit() {
           livingInkStateMessage
           ?? (livingInkPersistedLayer
             ? "수채 번짐 상태를 복원한 뒤 정착할 수 있습니다."
-            : "먼저 Living Ink 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
+            : "먼저 수채 번짐 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
         material: livingInkMaterial,
         materialLocked: livingInkPersistedLayer,
         materialLockedReason:

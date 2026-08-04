@@ -368,21 +368,41 @@ describe("StudioLeftToolRail", () => {
       );
     }
 
-    const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
-      name: "선택 시작하기",
+    // No raster target: transform arms object select ("선택 후 변형"), not pixel marquee.
+    const transformPickRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "선택 후 변형",
     });
     const imageRecovery = screen.getByRole<HTMLButtonElement>("button", {
       name: "이미지 선택하기",
     });
-    expect(selectionRecovery.disabled).toBe(false);
-    expect(selectionRecovery.className).toContain("size-11");
+    expect(transformPickRecovery.disabled).toBe(false);
+    expect(transformPickRecovery.className).toContain("size-11");
     expect(imageRecovery.disabled).toBe(false);
     expect(imageRecovery.className).toContain("size-11");
 
-    fireEvent.click(selectionRecovery);
+    fireEvent.click(transformPickRecovery);
     fireEvent.click(imageRecovery);
-    expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
+    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
     expect(props.stableHandlers.onRequestSelectImage).toHaveBeenCalledOnce();
+  });
+
+  it("starts pixel marquee recovery when a raster target exists but nothing is free-transformable", () => {
+    const props = createProps({
+      pixelSel: null,
+      pixelToolTargetAvailable: true,
+      rasterRetouchTargetAvailable: true,
+      selected: null,
+    });
+    render(<StudioLeftToolRail {...props} />);
+
+    const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "선택 시작하기",
+    });
+    expect(selectionRecovery.disabled).toBe(false);
+    fireEvent.click(selectionRecovery);
+    expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
+    expect(props.setTool).not.toHaveBeenCalledWith("select");
   });
 
   it("disables only inactive raster-retouch tools when neither image nor page target is available", () => {
@@ -850,5 +870,20 @@ describe("StudioLeftToolRail", () => {
     fireEvent.click(transform);
     expect(props.stableHandlers.openPixelSelectionTransform).toHaveBeenCalledOnce();
     expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
+  });
+
+  it("arms select tool instead of pixel marquee when nothing is selected on a vector page", () => {
+    const props = createProps({
+      selected: null,
+      pixelToolTargetAvailable: false,
+      rasterRetouchTargetAvailable: false,
+    });
+    render(<StudioLeftToolRail {...props} />);
+    const transform = screen.getByRole("button", { name: "선택 후 변형" });
+    fireEvent.click(transform);
+    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalled();
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
+    expect(props.stableHandlers.openPixelSelectionTransform).not.toHaveBeenCalled();
   });
 });

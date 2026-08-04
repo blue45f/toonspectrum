@@ -23,16 +23,19 @@ import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 export const STUDIO_BEGINNER_BRUSH_IDS = [
   "pen",
   "gpen",
-  "school-pen",
-  "fountain-pen",
-  "gel-pen",
+  // Wash/air early so the primary options strip shows them without horizontal scroll.
+  "watercolor",
+  "airbrush",
   "fineliner",
   "pencil",
+  "marker",
+  "brush",
+  "highlighter",
+  "fountain-pen",
+  "gel-pen",
   "ballpoint",
   "felt-tip",
-  "marker",
-  "highlighter",
-  "brush",
+  "school-pen",
   "kneaded-eraser",
 ] as const;
 
@@ -320,10 +323,15 @@ export function listStudioBrushTrayItems(
   // Any future presets not listed fall into expressive tail (Picsart depth).
   const known = new Set<string>([...STUDIO_BEGINNER_BRUSH_IDS, ...STUDIO_EXPRESSIVE_BRUSH_IDS]);
   const extras = BRUSH_PRESETS.filter((preset) => !known.has(preset.id)).map(studioBrushTrayItem);
-  const all = [...beginner, ...expressive, ...extras];
+  // Wash/air (and any other id listed in both kits) must appear once in "all" so the core
+  // catalogue stays 1:1 with BRUSH_PRESETS and quick-shelf injection does not inflate counts.
+  const beginnerIds = new Set<string>(STUDIO_BEGINNER_BRUSH_IDS);
+  const expressiveUnique = expressive.filter((item) => !beginnerIds.has(item.id));
+  const all = [...beginner, ...expressiveUnique, ...extras];
 
   if (category === "beginner") return beginner;
   if (category === "pro") return [];
+  // Expressive kit still surfaces wash/air for discovery even when they are beginner-primary.
   if (category === "expressive") return [...expressive, ...extras];
   if (
     category === "line"

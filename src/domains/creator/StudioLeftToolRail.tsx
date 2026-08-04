@@ -416,15 +416,25 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     && !(selected.type === "image" && selectedImageMutationLocked);
   const pixelContentTransformReady =
     pixelToolTargetAvailable && isSelectionUsable(pixelSel);
-  /** Only fall back to “start marquee” when no object is free-transformable. */
-  const pixelTransformNeedsSelection =
+  /**
+   * Image-only content-transform recovery: start a marquee on a raster target.
+   * Vector-first pages should NOT fall through here — that used to label the tool
+   * "선택 시작하기" and open pixel marquee, which felt broken vs free-transform.
+   */
+  const pixelTransformRecoveryAvailable =
     !objectFreeTransformReady
     && !pixelContentTransformReady
-    && !pixelToolTargetAvailable;
+    && pixelToolTargetAvailable
+    && !activeSurfaceReviewLocked
+    && !selectedImageLocked;
+  /** No selection yet: arm select tool so the next click free-transforms. */
+  const objectTransformPickRecoveryAvailable =
+    !objectFreeTransformReady
+    && !pixelContentTransformReady
+    && !pixelToolTargetAvailable
+    && !activeSurfaceReviewLocked;
   const frameAnimationNeedsImage =
     selected?.type !== "image" || !pixelToolTargetAvailable;
-  const pixelTransformRecoveryAvailable =
-    pixelTransformNeedsSelection && !activeSurfaceReviewLocked && !selectedImageLocked;
   const frameAnimationRecoveryAvailable =
     frameAnimationNeedsImage && !activeSurfaceReviewLocked && !selectedImageLocked;
 
@@ -881,17 +891,25 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             <StudioRailToolButton
               data-studio-rail-tool-id="transform"
               icon={Maximize2}
-              label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
+              label={
+                pixelTransformRecoveryAvailable
+                  ? "선택 시작하기"
+                  : objectTransformPickRecoveryAvailable
+                    ? "선택 후 변형"
+                    : "변형 (⇧T)"
+              }
               description={
                 pixelTransformRecoveryAvailable
-                  ? "변형할 레이어를 고르거나, 이미지 안 픽셀 영역을 사각 선택으로 잡은 뒤 다시 누르세요. 지금 사각 선택을 시작할 수 있어요."
-                  : objectFreeTransformReady
-                    ? selected?.type === "draw"
-                      ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
-                      : selected?.type === "image" && !isSelectionUsable(pixelSel)
-                        ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
-                        : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
-                    : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+                  ? "이미지 픽셀 내용 변형을 위해 사각 선택을 시작합니다. 선택 뒤 다시 누르면 스케일·회전·뒤집기 패널이 열려요."
+                  : objectTransformPickRecoveryAvailable
+                    ? "변형할 선·도형·이미지를 캔버스에서 먼저 고르세요. 선택 도구로 전환합니다."
+                    : objectFreeTransformReady
+                      ? selected?.type === "draw"
+                        ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
+                        : selected?.type === "image" && !isSelectionUsable(pixelSel)
+                          ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
+                          : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
+                      : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
               }
               active={false}
               disabled={activeSurfaceReviewLocked || selectedImageLocked}
@@ -902,12 +920,27 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
-              className={pixelTransformRecoveryAvailable ? "size-11" : undefined}
-              onClick={
-                pixelTransformRecoveryAvailable
-                  ? onRequestPixelSelection
-                  : openPixelSelectionTransform
+              className={
+                pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable
+                  ? "size-11"
+                  : undefined
               }
+              onClick={() => {
+                if (pixelTransformRecoveryAvailable) {
+                  onRequestPixelSelection();
+                  return;
+                }
+                if (objectTransformPickRecoveryAvailable) {
+                  disarmAllPixelTools();
+                  setTool("select");
+                  setMenu(null);
+                  announceDrawingShortcut(
+                    "변형할 요소를 클릭해 선택하세요 · 모서리 핸들로 크기 조절",
+                  );
+                  return;
+                }
+                openPixelSelectionTransform();
+              }}
             />
             ) : null}
 {isRailToolVisible("crop") ? (
