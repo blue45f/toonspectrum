@@ -3578,7 +3578,10 @@ function StudioCuttoonEditor() {
     setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
     setStudioWorkAssetLimitExceeded(false);
   }, [authorizedWorkAssetScopeId, studioWorkAssetHydrator]);
-  const collaborationDocumentUnavailable = expectsSharedDocument && !sharedDocument;
+  const collaborationDocumentUnavailable =
+    expectsSharedDocument &&
+    !sharedDocument &&
+    draftCollaboration?.status !== "provisioning";
   const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
   const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
   const studioCrdtDocumentReady = Boolean(
