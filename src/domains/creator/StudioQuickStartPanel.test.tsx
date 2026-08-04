@@ -33,6 +33,18 @@ function createHandlers() {
 }
 
 describe("StudioQuickStartPanel", () => {
+  it("dismisses on Escape and backdrop click for low-friction first paint", () => {
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+
+    handlers.onDismiss.mockClear();
+    fireEvent.click(document.querySelector('[data-studio-quickstart-backdrop="true"]')!);
+    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+  });
+
   it("presents the familiar four-step workflow in order and opens immediate actions", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);
@@ -42,7 +54,9 @@ describe("StudioQuickStartPanel", () => {
     });
 
     expect(within(dialog).getByText("기능을 열면 바로 작업")).toBeTruthy();
-    expect(within(dialog).getByText(/도구를 열면 바로 캔버스에서 작업해요/u)).toBeTruthy();
+    expect(
+      within(dialog).getByText(/도구를 열면 바로 캔버스에서 작업해요|Esc 또는 바깥 클릭/u),
+    ).toBeTruthy();
     expect(
       Array.from(dialog.querySelectorAll<HTMLElement>("[data-studio-quickstart-step]"), (step) =>
         step.getAttribute("data-studio-quickstart-step"),
@@ -124,7 +138,7 @@ describe("StudioQuickStartPanel", () => {
       ).toBe(true);
     }
 
-    const close = within(dialog).getByRole("button", { name: "빠른 시작 닫기" });
+    const close = within(dialog).getByRole("button", { name: /빠른 시작 닫기/u });
     expect(close.getAttribute("data-studio-quickstart-dismiss")).toBe("true");
     fireEvent.click(close);
     expect(handlers.onDismiss).toHaveBeenCalledOnce();

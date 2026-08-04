@@ -23879,6 +23879,7 @@ const puppetWarpArmed =
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
+        // Quick Start dismisses itself via capture-phase Esc on StudioQuickStartPanel.
         if (groupResizeRef.current) {
           e.preventDefault();
           cancelCanvasSelectionResize();
@@ -28505,6 +28506,7 @@ const puppetWarpArmed =
   }
   /** CSP/PPT: surface properties after a draw tool pick (rail, shortcuts, companion). */
   function activateDrawToolWithProperties(nextDrawMode?: DrawMode) {
+    if (showQuickStart) dismissQuickStart();
     activatePrimaryCanvasTool("draw", nextDrawMode);
     openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
   }
@@ -38306,6 +38308,7 @@ function clearSelectionForEdit() {
     },
     onPickImage,
     revealDrawToolProperties: () => {
+      if (showQuickStart) dismissQuickStart();
       openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
     },
     toggleAdvancedFill,

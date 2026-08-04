@@ -406,6 +406,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     if (shape !== undefined) setDrawShape(shape);
     setEyedropperActive(false);
     setMenu(null);
+    // First tool click should clear first-use chrome so the canvas stays the focus.
     revealDrawToolProperties();
   };
   /** Object free-transform path (stroke handles / Konva) — no pixel marquee needed. */

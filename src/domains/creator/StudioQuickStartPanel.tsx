@@ -16,6 +16,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { useEffect } from "react";
 
 import {
   formatStudioShortcutChord,
@@ -144,6 +145,18 @@ export function StudioQuickStartPanel({
     copy.unassigned,
   );
   const undoShortcut = displayQuickStartShortcut(shortcuts, "undo", "Mod+Z", copy.unassigned);
+
+  // Esc is the universal "get this overlay out of my way" for drawing apps.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      onDismiss();
+    };
+    globalThis.addEventListener("keydown", onKeyDown, true);
+    return () => globalThis.removeEventListener("keydown", onKeyDown, true);
+  }, [onDismiss]);
+
   const quickTools: {
     id: "smart-shape" | "brush-kit" | "template" | "character" | "background-3d" | "collab-focus";
     label: string;
@@ -198,10 +211,20 @@ export function StudioQuickStartPanel({
   return (
     <div
       data-studio-creative-starter="true"
-      className="pointer-events-none absolute inset-x-2 top-16 z-[58] mx-auto max-w-[34rem] p-2 text-fg sm:top-4 sm:p-3"
+      className="pointer-events-none absolute inset-0 z-[58] text-fg"
     >
+      {/* Soft scrim: click outside the card dismisses without trapping the whole app. */}
+      <button
+        type="button"
+        aria-label={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
+        data-studio-quickstart-backdrop="true"
+        className="pointer-events-auto absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[1px]"
+        onClick={onDismiss}
+      />
+      <div className="pointer-events-none absolute inset-x-2 top-16 z-[1] mx-auto max-w-[34rem] p-2 sm:top-4 sm:p-3">
       <section
         role="dialog"
+        aria-modal="true"
         aria-labelledby="studio-quick-start-title"
         aria-describedby="studio-quick-start-description"
         className="pointer-events-auto flex max-h-[min(60dvh,calc(100svh-5rem))] flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]"
@@ -220,7 +243,7 @@ export function StudioQuickStartPanel({
             >
               {localizeText(
                 t,
-                "도구를 열면 바로 캔버스에서 작업해요. 설정은 나중에 바꿔도 됩니다.",
+                "도구를 열면 바로 캔버스에서 작업해요. Esc 또는 바깥 클릭으로 닫을 수 있어요.",
                 "studio.quickStart.subtitle",
               )}
             </p>
@@ -230,8 +253,8 @@ export function StudioQuickStartPanel({
             data-studio-quickstart-dismiss="true"
             onClick={onDismiss}
             className="grid size-11 shrink-0 touch-manipulation place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none"
-            aria-label={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
-            title={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
+            aria-label={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
+            title={localizeText(t, "빠른 시작 닫기 (Esc)", "studio.quickStart.dismiss")}
           >
             <X size={16} aria-hidden />
           </button>
@@ -410,6 +433,7 @@ export function StudioQuickStartPanel({
           </details>
         </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -3023,7 +3023,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               {!isExporting &&
                 tool === "select" &&
                 !activeSurfaceReviewLocked &&
-                marqueeIds.length > 1 &&
+                (marqueeIds.length > 1 || singleDrawFreeScale) &&
                 multiSelectionBounds &&
                 multiSelectionBounds.w >= 0 &&
                 multiSelectionBounds.h >= 0 && (() => {
@@ -3031,7 +3031,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   const constrained = selectionLockState !== "unlocked";
                   const label =
                     completeSelectionGroup?.name?.trim() ||
-                    (completeSelectionGroup ? "그룹" : "다중 선택");
+                    (completeSelectionGroup
+                      ? "그룹"
+                      : singleDrawFreeScale
+                        ? "선화 레이어"
+                        : "다중 선택");
                   const lockStateLabel =
                     selectionLockState === "locked"
                       ? "잠금"

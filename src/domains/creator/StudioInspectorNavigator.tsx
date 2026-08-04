@@ -137,7 +137,8 @@ function contextualSummary({
   if (layout.primary === "publish") return "제목·설명·태그";
   if (selectionLabel) return selectionLabel;
   if (drawing) return "그리기 도구";
-  return "요소를 선택하세요";
+  // Empty canvas coaching — competitive apps never leave a dead "select something" dead-end.
+  return "B 펜 · V 선택 · 빈 화면에서 바로 그리기";
 }
 
 export function StudioInspectorNavigator({
