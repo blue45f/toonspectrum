@@ -47,6 +47,7 @@ import {
   type StudioRailToolId,
 } from "./studio-app-settings";
 import { type BubbleVariant } from "./studio-assets";
+import { studioChromeRailGroupLabel } from "./studio-chrome-ia-map";
 import {
   StudioRailDivider,
   StudioRailToolButton,
@@ -158,6 +159,11 @@ export interface StudioLeftToolRailHandlers {
   onRequestPixelSelection: () => void;
   onRequestSelectImage: () => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  /**
+   * CSP/PPT-style: when a draw tool is picked from the rail, surface the
+   * properties inspector so size/color/brush options are one glance away.
+   */
+  revealDrawToolProperties: () => void;
   toggleAdvancedFill: () => void;
   toggleDodgeBurnTool: () => void;
   toggleWetMixTool: () => void;
@@ -380,6 +386,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     onRequestPixelSelection,
     onRequestSelectImage,
     onPickImage,
+    revealDrawToolProperties,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
     toggleDodgeBurnTool,
@@ -391,6 +398,16 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     openPixelSelectionTransform,
     openSelectedLayerCrop,
   } = stableHandlers;
+  /** Pick a draw mode from the rail and surface context properties (CSP/PPT IA). */
+  const activateDrawTool = (mode: DrawMode, shape?: DrawShapeKind) => {
+    disarmAllPixelTools();
+    setTool("draw");
+    setDrawMode(mode);
+    if (shape !== undefined) setDrawShape(shape);
+    setEyedropperActive(false);
+    setMenu(null);
+    revealDrawToolProperties();
+  };
   const pixelTransformNeedsSelection =
     !pixelToolTargetAvailable || !isSelectionUsable(pixelSel);
   const frameAnimationNeedsImage =
@@ -585,6 +602,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             className={cn(mobileImmersive && "hidden")}
             footer={railMoreFooter}
           >
+            <StudioRailDivider
+              data-studio-rail-group-divider="navigate-select"
+              label={studioChromeRailGroupLabel("navigate-select")}
+            />
 {isRailToolVisible("select") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="select"
@@ -615,7 +636,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="draw" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="draw"
+              label={studioChromeRailGroupLabel("draw")}
+            />
 {isRailToolVisible("pen") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="pen"
@@ -626,13 +650,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               grouped
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("pen")}
             />
             ) : null}
 {isRailToolVisible("pixel-pencil") ? (
@@ -644,13 +662,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "draw" && drawMode === "pixel" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pixel");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("pixel")}
             />
             ) : null}
 {isRailToolVisible("eraser") ? (
@@ -662,16 +674,13 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "draw" && drawMode === "eraser" && !drawToolTemporarilyOverridden}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("eraser");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("eraser")}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="paint-retouch" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="paint-retouch"
+              label={studioChromeRailGroupLabel("paint-retouch")}
+            />
 {isRailToolVisible("blend") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="blend"
@@ -745,13 +754,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "draw" && drawMode === "lasso-fill"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("lasso-fill");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("lasso-fill")}
             />
             ) : null}
 {isRailToolVisible("eyedropper") ? (
@@ -769,7 +772,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="selection" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="selection"
+              label={studioChromeRailGroupLabel("selection")}
+            />
 {isRailToolVisible("marquee-rect") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="marquee-rect"
@@ -856,7 +862,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="transform" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="transform"
+              label={studioChromeRailGroupLabel("transform")}
+            />
 {isRailToolVisible("transform") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="transform"
@@ -898,7 +907,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={openSelectedLayerCrop}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="objects" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="objects"
+              label={studioChromeRailGroupLabel("objects")}
+            />
 {isRailToolVisible("smart-shape") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="smart-shape"
@@ -916,10 +928,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => {
                 const next = !quickShapeActive;
                 if (next) {
-                  disarmAllPixelTools();
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setEyedropperActive(false);
+                  activateDrawTool("pen");
                   announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
                 } else {
                   announceDrawingShortcut("스마트 도형 꺼짐");
@@ -938,14 +947,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("rect");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("shape", "rect")}
             />
             ) : null}
 {isRailToolVisible("shape-ellipse") ? (
@@ -957,14 +959,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("ellipse");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("shape", "ellipse")}
             />
             ) : null}
 {isRailToolVisible("text") ? (
@@ -1062,10 +1057,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 const next = !perspectiveRulerActive;
                 setPerspectiveRulerActive(next);
                 if (next) {
-                  disarmAllPixelTools();
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setEyedropperActive(false);
+                  activateDrawTool("pen");
                   announceDrawingShortcut("투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요");
                 } else {
                   announceDrawingShortcut("투시도 꺼짐");
@@ -1074,7 +1066,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="media-3d" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="media-3d"
+              label={studioChromeRailGroupLabel("media-3d")}
+            />
 {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="frame-anim"
@@ -1162,7 +1157,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 onFocus={preloadStudioReferencePanel}
               />
             ) : null}
-            <StudioRailDivider data-studio-rail-group-divider="view" />
+            <StudioRailDivider
+              data-studio-rail-group-divider="view"
+              label={studioChromeRailGroupLabel("view")}
+            />
 {isRailToolVisible("zoom") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="zoom"

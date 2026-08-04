@@ -23376,12 +23376,12 @@ const puppetWarpArmed =
       }
       if (matchStudioShortcut(sc["tool-pen"], e)) {
         e.preventDefault();
-        activatePrimaryCanvasTool("draw", "pen");
+        activateDrawToolWithProperties("pen");
         return;
       }
       if (matchStudioShortcut(sc["tool-eraser"], e)) {
         e.preventDefault();
-        activatePrimaryCanvasTool("draw", "eraser");
+        activateDrawToolWithProperties("eraser");
         return;
       }
       if (matchStudioShortcut(sc["tool-fill"], e)) {
@@ -23405,7 +23405,7 @@ const puppetWarpArmed =
       if (matchStudioShortcut(sc["tool-pixel"], e)) {
         e.preventDefault();
         if (!activeSurfaceReviewLocked) {
-          activatePrimaryCanvasTool("draw", "pixel");
+          activateDrawToolWithProperties("pixel");
         }
         return;
       }
@@ -28479,6 +28479,11 @@ const puppetWarpArmed =
         setDrawMode,
       }
     );
+  }
+  /** CSP/PPT: surface properties after a draw tool pick (rail, shortcuts, companion). */
+  function activateDrawToolWithProperties(nextDrawMode?: DrawMode) {
+    activatePrimaryCanvasTool("draw", nextDrawMode);
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
   }
   function readActiveStrokeLifecycleRecovery() {
     const activeStroke = drawingRef.current;
@@ -38238,6 +38243,9 @@ function clearSelectionForEdit() {
       );
     },
     onPickImage,
+    revealDrawToolProperties: () => {
+      openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    },
     toggleAdvancedFill,
     toggleDodgeBurnTool,
     toggleWetMixTool,
@@ -38830,7 +38838,7 @@ function clearSelectionForEdit() {
     setBrushOpacity,
     setColor,
     setDrawMode: (mode) => {
-      activatePrimaryCanvasTool("draw", mode);
+      activateDrawToolWithProperties(mode);
       if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
         setBrush("pen");
       }

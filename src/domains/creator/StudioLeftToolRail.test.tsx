@@ -33,7 +33,11 @@ interface MockRailButtonProps {
 
 vi.mock("./studio-chrome-ui", () => ({
   StudioRailDivider: (props: Record<string, string | undefined>) => (
-    <hr data-studio-rail-group-divider={props["data-studio-rail-group-divider"]} />
+    <hr
+      data-studio-rail-group-divider={props["data-studio-rail-group-divider"]}
+      data-studio-rail-group-label={props.label}
+      aria-label={props.label}
+    />
   ),
   StudioRailToolButton: ({
     "aria-controls": ariaControls,
@@ -132,6 +136,7 @@ function createHandlers(): StudioLeftToolRailHandlers {
     onRequestPixelSelection: vi.fn(),
     onRequestSelectImage: vi.fn(),
     onPickImage: vi.fn(async () => undefined),
+    revealDrawToolProperties: vi.fn(),
     toggleAdvancedFill: vi.fn(),
     toggleDodgeBurnTool: vi.fn(),
     toggleWetMixTool: vi.fn(),
@@ -795,5 +800,36 @@ describe("StudioLeftToolRail", () => {
     expect(liveIds.indexOf("pen")).toBeLessThan(liveIds.indexOf("marquee-rect"));
     expect(liveIds.indexOf("marquee-rect")).toBeLessThan(liveIds.indexOf("transform"));
     expect(liveIds.indexOf("vrm3d")).toBeLessThan(liveIds.indexOf("zoom"));
+  });
+
+  it("labels rail group dividers from the chrome IA map (CSP scannable groups)", async () => {
+    const { STUDIO_CHROME_RAIL_TOOL_GROUPS } = await import("./studio-chrome-ia-map");
+    render(<StudioLeftToolRail {...createProps()} />);
+    for (const group of STUDIO_CHROME_RAIL_TOOL_GROUPS) {
+      const divider = document.querySelector(
+        `[data-studio-rail-group-divider="${group.id}"]`,
+      );
+      expect(divider, `missing divider for ${group.id}`).not.toBeNull();
+      expect(divider!.getAttribute("data-studio-rail-group-label")).toBe(group.labelKo);
+    }
+  });
+
+  it("reveals draw properties when a rail draw tool is picked", () => {
+    const props = createProps();
+    render(<StudioLeftToolRail {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "펜 (B)" }));
+    expect(props.setTool).toHaveBeenCalledWith("draw");
+    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "지우개 (E)" }));
+    expect(props.setDrawMode).toHaveBeenCalledWith("eraser");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
+    expect(props.setDrawMode).toHaveBeenCalledWith("shape");
+    expect(props.setDrawShape).toHaveBeenCalledWith("rect");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(3);
   });
 });

@@ -443,6 +443,7 @@ function MenuDropdown({
                       aria-describedby={unavailableReasonId}
                       tabIndex={itemIndex !== activeItemIndex ? -1 : 0}
                       data-studio-main-menu-item-index={itemIndex}
+                      data-studio-menu-item-id={item.id}
                       onFocus={() => setActiveItemIndex(itemIndex)}
                       onClick={() => {
                         if (item.disabled) return;

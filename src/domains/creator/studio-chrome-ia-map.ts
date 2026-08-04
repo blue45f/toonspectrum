@@ -226,6 +226,16 @@ export const STUDIO_CHROME_RAIL_TOOL_GROUPS = [
 export const STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER: readonly StudioRailToolId[] =
   STUDIO_CHROME_RAIL_TOOL_GROUPS.flatMap((group) => [...group.toolIds]);
 
+/**
+ * Caption for a left-rail group divider (`data-studio-rail-group-divider`).
+ * Labels the group that follows the hairline (CSP-style tool belt scan).
+ */
+export function studioChromeRailGroupLabel(
+  groupId: (typeof STUDIO_CHROME_RAIL_TOOL_GROUPS)[number]["id"] | string,
+): string | undefined {
+  return STUDIO_CHROME_RAIL_TOOL_GROUPS.find((group) => group.id === groupId)?.labelKo;
+}
+
 export type StudioChromeInspectorContext =
   | { readonly kind: "drawing"; readonly drawMode: "pen" | "pixel" | "eraser" | "shape" }
   | { readonly kind: "selection"; readonly selectedType: string }

@@ -9,10 +9,12 @@ import {
   STUDIO_CHROME_FILE_MENU_ITEM_ORDER,
   STUDIO_CHROME_MENUBAR_GROUP_LABELS,
   STUDIO_CHROME_MENUBAR_GROUP_ORDER,
+  STUDIO_CHROME_RAIL_TOOL_GROUPS,
   STUDIO_CHROME_REGION_ORDER,
   studioChromeEditCommandOrderIncludesCore,
   studioChromeMenubarGroupIds,
   studioChromeRailCatalogMatchesIaGroups,
+  studioChromeRailGroupLabel,
   studioChromeRegionIds,
 } from "./studio-chrome-ia-map";
 import {
@@ -167,6 +169,16 @@ describe("studio chrome IA map", () => {
     expect(STUDIO_CHROME_FILE_CORE_ACTION_IDS).toEqual(
       expect.arrayContaining(["save-draft", "import-json", "export"]),
     );
+  });
+
+  it("resolves rail group divider captions from the IA map", () => {
+    expect(studioChromeRailGroupLabel("draw")).toBe("그리기");
+    expect(studioChromeRailGroupLabel("paint-retouch")).toBe("채색·보정");
+    expect(studioChromeRailGroupLabel("selection")).toBe("선택 범위");
+    expect(studioChromeRailGroupLabel("unknown-group")).toBeUndefined();
+    for (const group of STUDIO_CHROME_RAIL_TOOL_GROUPS) {
+      expect(studioChromeRailGroupLabel(group.id)).toBe(group.labelKo);
+    }
   });
 
   it("aligns default rail order with IA groups and the live catalog", () => {

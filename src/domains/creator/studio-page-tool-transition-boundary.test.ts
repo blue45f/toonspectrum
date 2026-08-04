@@ -366,8 +366,13 @@ describe("StudioPage tool transition boundary", () => {
     expect(transition).not.toContain("openInspectorRoute(");
 
     expect(shortcuts).toContain('activatePrimaryCanvasTool("select");');
-    expect(shortcuts).toContain('activatePrimaryCanvasTool("draw", "pen");');
-    expect(shortcuts).toContain('activatePrimaryCanvasTool("draw", "eraser");');
+    // Draw shortcuts surface properties via a dedicated wrapper (keep transition pure).
+    expect(shortcuts).toContain('activateDrawToolWithProperties("pen");');
+    expect(shortcuts).toContain('activateDrawToolWithProperties("eraser");');
+    expect(studioPageSource).toContain("function activateDrawToolWithProperties(");
+    expect(studioPageSource).toContain(
+      'openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null)',
+    );
 
     expect(escapeStart).toBeGreaterThanOrEqual(0);
     expect(escape).toContain("if (hasActiveDrawingPointerSession()) {");
