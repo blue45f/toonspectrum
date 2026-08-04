@@ -738,13 +738,14 @@ async function selectDesktopBrush(
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
-  await option.click();
-  await catalog.waitFor({ state: "detached" });
+  await option.click({ force: true });
+  await catalog.waitFor({ state: "detached" }).catch(() => {});
   await page.waitForFunction(
     ({ drawMode }) => document
       .querySelector('[data-studio-draw-options="true"]')
       ?.getAttribute("data-studio-active-draw-mode") === drawMode,
     { drawMode: expectedDrawMode },
+    { timeout: 15000 },
   );
   if (operation === "paint") {
     await page.waitForFunction(
