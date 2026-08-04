@@ -110,10 +110,10 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.commitStroke(pointerId)");
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.cancelStroke(pointerId)");
     expect(poserSource).toContain(
-      'window.addEventListener("pointerup", finishMatchingPointer)',
+      'window.addEventListener("pointerup", finishMatchingPointer, { passive: true })',
     );
     expect(poserSource).toContain(
-      'window.addEventListener("pointercancel", cancelMatchingPointer)',
+      'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(poserSource).toContain(
       'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
@@ -562,7 +562,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(movementGate).toBeLessThan(execute);
 
     expect(pointerLifecycle).toContain(
-      'window.addEventListener("pointermove", cancelPendingTapOnMove)',
+      'window.addEventListener("pointermove", cancelPendingTapOnMove, { passive: true })',
     );
     expect(pointerLifecycle).toContain(
       "pending.pointerId !== event.pointerId",
@@ -571,7 +571,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       '"pointerdown",\n      cancelPendingTapOnAdditionalPointer,\n      true',
     );
     expect(pointerLifecycle).toContain(
-      'window.addEventListener("pointercancel", cancelMatchingPointer)',
+      'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(pointerLifecycle).toContain(
       'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
