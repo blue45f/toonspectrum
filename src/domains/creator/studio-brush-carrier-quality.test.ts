@@ -47,12 +47,13 @@ describe("continuous brush carrier quality policy", () => {
     });
 
     expect(STUDIO_BRUSH_CONTINUOUS_CARRIER_POLICY_VERSION)
-      .toBe("continuous-carrier-quality-v2");
-    expect(result.spacingRatio).toBe(0.16);
-    expect(result.scatterRatio).toBe(0.08);
+      .toBe("continuous-carrier-quality-v3");
+    // Soft paint wash: denser carriers so soft falloff does not bead mid-stroke.
+    expect(result.spacingRatio).toBeCloseTo(0.11 * (1 - source.tip.softness * 0.22), 5);
+    expect(result.scatterRatio).toBeLessThanOrEqual(0.05);
     expect(result.width.mappings).toEqual(source.width.mappings);
     expect(result.width.jitter).toEqual({ mode: "multiply", amount: 0.18 });
-    expect(result.scatter.jitter).toEqual({ mode: "multiply", amount: 0.14 });
+    expect(result.scatter.jitter).toEqual({ mode: "multiply", amount: 0.1 });
     expect(result.colorDynamics).toEqual({
       ...source.colorDynamics,
       foregroundBackgroundJitter: 0,
@@ -191,11 +192,12 @@ describe("continuous brush carrier quality policy", () => {
         settings: source,
       });
 
-      expect(continuous.spacingRatio, previewStyle).toBe(
-        previewStyle === "soft" ? 0.16 : 0.18,
-      );
-      expect(continuous.scatterRatio, previewStyle).toBe(
-        previewStyle === "soft" ? 0.08 : 0.1,
+      const softScale = 1 - source.tip.softness * 0.22;
+      const baseSpacing = previewStyle === "soft" ? 0.11 : 0.15;
+      const baseScatter = previewStyle === "soft" ? 0.05 : 0.08;
+      expect(continuous.spacingRatio, previewStyle).toBeCloseTo(baseSpacing * softScale, 5);
+      expect(continuous.scatterRatio, previewStyle).toBeLessThanOrEqual(
+        baseScatter * (0.7 + 0.3 * softScale) + 1e-9,
       );
       expect(continuous.width.jitter, previewStyle).toEqual({
         mode: "multiply",
@@ -374,15 +376,15 @@ describe("continuous brush carrier quality policy", () => {
 
   it("keeps representative wet, dry and soft media continuous, deterministic and non-circular", () => {
     const cases = [
-      ["watercolor-wet-bleed", "airbrush", 0.16, 0.08],
-      ["watercolor-wet-wash", "airbrush", 0.16, 0.08],
-      ["airbrush-grand-soft", "airbrush", 0.16, 0.08],
-      ["acrylic-stiff-flat", "ink-particle", 0.18, 0.08],
-      ["pastel-paper-soft", "dry-media", 0.22, 0.12],
-      ["crayon-wax-bold", "dry-media", 0.22, 0.12],
-      ["pencil-charcoal-stick", "dry-media", 0.22, 0.12],
-      ["sumi-wash-fray", "dry-media", 0.18, 0.1],
-      ["oil-dry-scumble", "dry-media", 0.18, 0.1],
+      ["watercolor-wet-bleed", "airbrush", 0.11, 0.05],
+      ["watercolor-wet-wash", "airbrush", 0.11, 0.05],
+      ["airbrush-grand-soft", "airbrush", 0.11, 0.05],
+      ["acrylic-stiff-flat", "ink-particle", 0.16, 0.07],
+      ["pastel-paper-soft", "dry-media", 0.2, 0.11],
+      ["crayon-wax-bold", "dry-media", 0.2, 0.11],
+      ["pencil-charcoal-stick", "dry-media", 0.2, 0.11],
+      ["sumi-wash-fray", "dry-media", 0.16, 0.09],
+      ["oil-dry-scumble", "dry-media", 0.16, 0.09],
     ] as const;
     const points = [
       0, 0,

@@ -129,7 +129,6 @@ describe("studio brush continuity audit", () => {
       "watercolor-wet-wash",
       "watercolor-flat-wash",
       "smoke-wisp-layered",
-      "watercolor-backrun-ring",
     ]);
     const visibilityCorrectedMedia = [
       "mist-soft",

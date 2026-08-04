@@ -19,7 +19,7 @@ import {
 } from "./studio-brush-dynamics";
 
 export const STUDIO_BRUSH_CONTINUOUS_CARRIER_POLICY_VERSION =
-  "continuous-carrier-quality-v2" as const;
+  "continuous-carrier-quality-v3" as const;
 
 export interface StudioBrushContinuousCarrierPolicyInput {
   readonly runtimeBrushId: "airbrush" | "dry-media" | "ink-particle";
@@ -48,17 +48,23 @@ interface CarrierLimits {
   readonly scatterRatio: number;
 }
 
+/**
+ * Soft airbrush washes hide most of the tip disk in falloff, so a 0.16 tip-diameter station gap
+ * still reads as a row of beads ("번짐 끊김"). Keep wash/paint carriers denser than hard nibs.
+ * Softness further tightens the envelope without rewriting intentional particle presets.
+ */
 function carrierLimits(
   input: StudioBrushContinuousCarrierPolicyInput,
 ): CarrierLimits {
   if (input.runtimeBrushId === "airbrush") {
     if (input.category === "marker") {
-      return { spacingRatio: 0.14, scatterRatio: 0.06 };
+      return { spacingRatio: 0.12, scatterRatio: 0.05 };
     }
     if (input.previewStyle === "soft" || input.category === "paint") {
-      return { spacingRatio: 0.16, scatterRatio: 0.08 };
+      // ~1.45× denser than v2 (0.16). Soft wash falloff still beads above ~0.12 tip-diameter.
+      return { spacingRatio: 0.11, scatterRatio: 0.05 };
     }
-    return { spacingRatio: 0.18, scatterRatio: 0.1 };
+    return { spacingRatio: 0.15, scatterRatio: 0.08 };
   }
   if (input.runtimeBrushId === "dry-media") {
     if (
@@ -67,13 +73,35 @@ function carrierLimits(
       || input.category === "paint"
     ) {
       return {
-        spacingRatio: 0.18,
-        scatterRatio: input.category === "marker" ? 0.08 : 0.1,
+        spacingRatio: 0.16,
+        scatterRatio: input.category === "marker" ? 0.07 : 0.09,
       };
     }
-    return { spacingRatio: 0.22, scatterRatio: 0.12 };
+    return { spacingRatio: 0.2, scatterRatio: 0.11 };
   }
-  return { spacingRatio: 0.18, scatterRatio: 0.08 };
+  return { spacingRatio: 0.16, scatterRatio: 0.07 };
+}
+
+/** Softer tips need denser stations; hard tips keep the full limit. */
+function softnessSpacingScale(softness: number): number {
+  const soft = Math.min(1, Math.max(0, softness));
+  // softness 0 → 1.0, 0.5 → 0.89, 0.85 → 0.81, 1.0 → 0.78
+  return 1 - soft * 0.22;
+}
+
+function clampSpacingSpeedMappings(
+  property: NormalizedStudioBrushDynamicsProperty,
+  maxTo = 1.12,
+): NormalizedStudioBrushDynamicsProperty {
+  if (property.mappings.length === 0) return property;
+  let changed = false;
+  const mappings = property.mappings.map((mapping) => {
+    if (mapping.source !== "speed") return mapping;
+    if (mapping.to <= maxTo) return mapping;
+    changed = true;
+    return { ...mapping, to: maxTo };
+  });
+  return changed ? { ...property, mappings } : property;
 }
 
 function capJitter(
@@ -168,12 +196,15 @@ export function applyStudioBrushContinuousCarrierQualityPolicy(
 
   const limits = carrierLimits(input);
   const settings = input.settings;
+  const softnessScale = softnessSpacingScale(settings.tip.softness);
+  const spacingCap = limits.spacingRatio * softnessScale;
+  const scatterCap = limits.scatterRatio * (0.7 + 0.3 * softnessScale);
   const spacingRatio = settings.spacingRatio === null
     ? null
-    : Math.min(settings.spacingRatio, limits.spacingRatio);
+    : Math.min(settings.spacingRatio, spacingCap);
   const scatterRatio = settings.scatterRatio === null
     ? null
-    : Math.min(settings.scatterRatio, limits.scatterRatio);
+    : Math.min(settings.scatterRatio, scatterCap);
   const angle = capJitter(settings.angle, 12);
   /*
    * An alpha map is only a tip silhouette transport. Broad chisel/calligraphy tips also use an
@@ -191,6 +222,20 @@ export function applyStudioBrushContinuousCarrierQualityPolicy(
         },
       };
 
+  // Soft wash only: speed-widened station gaps reopen holes the ratio cap just closed.
+  // Line tools (G-pen etc.) keep authored speed→spacing so ink loading still varies by speed.
+  const softWash =
+    input.runtimeBrushId === "airbrush"
+    && (
+      input.previewStyle === "soft"
+      || input.category === "paint"
+      || input.category === "marker"
+    );
+  const spacing = softWash
+    ? clampSpacingSpeedMappings(capJitter(settings.spacing, 0.08), 1.12)
+    : capJitter(settings.spacing, 0.1);
+  const scatterJitterCap = softWash ? 0.1 : 0.14;
+
   return normalizeStudioBrushDynamicsSettings({
     ...settings,
     spacingRatio,
@@ -198,8 +243,8 @@ export function applyStudioBrushContinuousCarrierQualityPolicy(
     width: capJitter(settings.width, 0.18),
     opacity: capJitter(settings.opacity, 0.2),
     flow: capJitter(settings.flow, 0.16),
-    spacing: capJitter(settings.spacing, 0.1),
-    scatter: capJitter(settings.scatter, 0.14),
+    spacing,
+    scatter: capJitter(settings.scatter, scatterJitterCap),
     angle: antiRepeatAngle,
     roundness: capJitter(settings.roundness, 0.12),
     colorDynamics: stabilizeContinuousCarrierColor(input),
