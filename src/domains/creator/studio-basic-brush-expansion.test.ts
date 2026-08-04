@@ -198,8 +198,8 @@ describe("commercial basic brush expansion", () => {
       });
     }
     expect(await materializeStudioBrushCatalogSelection("kneaded-eraser"))
-      .toMatchObject({ drawMode: "pen" });
-    expect(resolveStudioBrushPresetDrawMode("kneaded-eraser")).toBe("pen");
+      .toMatchObject({ drawMode: "eraser" });
+    expect(resolveStudioBrushPresetDrawMode("kneaded-eraser")).toBe("eraser");
     expect(resolveStudioBrushPresetDrawMode("gel-pen")).toBe("pen");
     expect(resolveStudioBrushPresetDrawMode("unknown-future-id")).toBe("pen");
 
