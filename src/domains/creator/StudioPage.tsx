@@ -6747,10 +6747,15 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     const session = groupResizeRef.current;
     if (!session) return;
-    const currentIds = marqueeIdsRef.current;
+    // Multi-resize sessions track marquee only; single-draw free-scale tracks selectedId.
+    const currentIds =
+      marqueeIdsRef.current.length > 0
+        ? marqueeIdsRef.current
+        : selectedIdRef.current
+          ? [selectedIdRef.current]
+          : [];
     const currentIdSet = new Set(currentIds);
     const selectionStillMatches =
-      selectedIdRef.current === null &&
       currentIds.length === session.selectedIds.length &&
       currentIdSet.size === currentIds.length &&
       session.selectedIds.every((id) => currentIdSet.has(id));
@@ -6824,18 +6829,32 @@ function StudioCuttoonEditor() {
       bounds.height > 0
     );
   }
+  /**
+   * Active resize target IDs: multi-marquee first, else single selected object.
+   * Single draw free-scale uses the same uniform-resize planner as groups (CSP-style).
+   */
+  function currentCanvasResizeSelectionIds(): string[] {
+    const marquee = marqueeIdsRef.current;
+    if (marquee.length > 0) return [...marquee];
+    const single = selectedIdRef.current;
+    return single ? [single] : [];
+  }
   function beginCanvasSelectionResize(
     sourceBounds: StudioGroupUniformResizeBounds
   ): boolean {
     if (groupResizeRef.current || groupDragRef.current) return false;
-    const selectedIds = [...marqueeIdsRef.current];
+    const selectedIds = currentCanvasResizeSelectionIds();
     const uniqueIds = new Set(selectedIds);
     const currentElements = activeElementsRef.current;
     const currentById = new Map(
       currentElements.map((element) => [element.id, element])
     );
+    const singleDrawResize =
+      selectedIds.length === 1
+      && currentById.get(selectedIds[0]!)?.type === "draw";
+    // Multi-selection (2+) or a single freehand stroke — other single objects use Konva Transformer.
     if (
-      selectedIds.length < 2 ||
+      (selectedIds.length < 2 && !singleDrawResize) ||
       uniqueIds.size !== selectedIds.length ||
       !finitePositiveGroupResizeBounds(sourceBounds) ||
       activeSurfaceReviewLockedRef.current ||
@@ -6852,7 +6871,7 @@ function StudioCuttoonEditor() {
           ? collaborationAccessRef.current.locked
             ? collaborationLockMessage()
             : "이 작업면은 검토 잠금 상태예요. 잠금을 해제한 뒤 크기를 조절하세요."
-          : "그룹 크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
+          : "크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
       );
       return false;
     }
@@ -6880,7 +6899,7 @@ function StudioCuttoonEditor() {
     groupResizeRef.current = null;
     if (!session) return;
     try {
-      const currentIds = marqueeIdsRef.current;
+      const currentIds = currentCanvasResizeSelectionIds();
       const currentIdSet = new Set(currentIds);
       const currentElements = activeElementsRef.current;
       const currentById = new Map(
@@ -6903,7 +6922,7 @@ function StudioCuttoonEditor() {
         !canApplyStudioMutation(session.mutationTicket)
       ) {
         setError(
-          "그룹 크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
+          "크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
         );
         return;
       }
@@ -6928,7 +6947,7 @@ function StudioCuttoonEditor() {
           Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
         if (boundsChanged) {
           setError(
-            "선택 안에 크기를 조절할 수 없는 요소가 있어 그룹 전체를 변경하지 않았어요."
+            "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
           );
         }
         return;
@@ -6939,7 +6958,11 @@ function StudioCuttoonEditor() {
           Math.round((targetBounds.width / session.sourceBounds.width) * 100)
         );
         setError(null);
-        announceDrawingShortcut(`그룹 크기 조절 · ${percent}%`);
+        announceDrawingShortcut(
+          session.selectedIds.length === 1
+            ? `레이어 크기 조절 · ${percent}%`
+            : `그룹 크기 조절 · ${percent}%`,
+        );
       }
     } finally {
       endLiveResourceEdit();
@@ -35630,19 +35653,58 @@ function clearSelectionForEdit() {
     );
     announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
   }
+  /**
+   * Free Transform (CSP/PS-style ⇧T):
+   * - freehand stroke → select tool + corner handles (uniform free-scale)
+   * - image without marquee → whole-layer pixel selection + content transform panel
+   * - image with marquee → content transform panel
+   * - other objects → select tool (Konva handles already attached)
+   */
   function openPixelSelectionTransform() {
+    if (activeSurfaceReviewLocked) {
+      setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
+      return;
+    }
+    // Vector stroke / freehand: object free-scale handles (not pixel marquee).
+    if (selected?.type === "draw") {
+      if (isEffectivelyLocked(selected, groups)) {
+        setError("잠긴 레이어는 변형할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+        return;
+      }
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리 핸들을 끌어 크기·위치를 조절하세요");
+      return;
+    }
+    // Image / shape / text / bubble with Konva transformer — just ensure select mode.
+    if (
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyLocked(selected, groups)
+    ) {
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리·회전 핸들로 변형하세요");
+      return;
+    }
+
     const target = ensurePixelToolTarget("내용 변형");
     if (!target) return;
     if (!isSelectionUsable(pixelSel)) {
-      // 변형은 "선택 안 픽셀"을 다루므로 대상만으로는 부족하다 — 조용히 무시하지 않고 안내한다.
-      setError("변형할 픽셀 영역을 먼저 선택하세요(사각/올가미 선택 후 다시 누르면 됩니다).");
-      return;
+      // Competitive whole-layer free transform: auto-select entire layer contents.
+      commitPixelSelectionState((current) => selectAllPixels(current), "select-all");
+      announceDrawingShortcut("레이어 전체 선택 · 리터치에서 크기·회전·뒤집기를 적용하세요");
+    } else {
+      announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
     }
     openInspectorRoute(
       { primary: "properties", image: "retouch" },
       isMobile ? "props" : null
     );
-    announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
   }
   function openImagePastePicker() {
     editMenuImageInputRef.current?.click();

@@ -408,8 +408,18 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     setMenu(null);
     revealDrawToolProperties();
   };
+  /** Object free-transform path (stroke handles / Konva) — no pixel marquee needed. */
+  const objectFreeTransformReady =
+    selected !== null
+    && !activeSurfaceReviewLocked
+    && !(selected.type === "image" && selectedImageMutationLocked);
+  const pixelContentTransformReady =
+    pixelToolTargetAvailable && isSelectionUsable(pixelSel);
+  /** Only fall back to “start marquee” when no object is free-transformable. */
   const pixelTransformNeedsSelection =
-    !pixelToolTargetAvailable || !isSelectionUsable(pixelSel);
+    !objectFreeTransformReady
+    && !pixelContentTransformReady
+    && !pixelToolTargetAvailable;
   const frameAnimationNeedsImage =
     selected?.type !== "image" || !pixelToolTargetAvailable;
   const pixelTransformRecoveryAvailable =
@@ -873,8 +883,14 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
               description={
                 pixelTransformRecoveryAvailable
-                  ? "변형할 이미지 레이어를 먼저 고르세요. 이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요. 지금 사각 선택을 시작하고, 선택 뒤 이 위치에서 변형을 바로 열 수 있어요."
-                  : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+                  ? "변형할 레이어를 고르거나, 이미지 안 픽셀 영역을 사각 선택으로 잡은 뒤 다시 누르세요. 지금 사각 선택을 시작할 수 있어요."
+                  : objectFreeTransformReady
+                    ? selected?.type === "draw"
+                      ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
+                      : selected?.type === "image" && !isSelectionUsable(pixelSel)
+                        ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
+                        : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
+                    : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
               }
               active={false}
               disabled={activeSurfaceReviewLocked || selectedImageLocked}

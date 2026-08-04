@@ -832,4 +832,23 @@ describe("StudioLeftToolRail", () => {
     expect(props.setDrawShape).toHaveBeenCalledWith("rect");
     expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(3);
   });
+
+  it("offers free transform (not marquee recovery) when a stroke layer is selected", () => {
+    const stroke = {
+      id: "draw-1",
+      type: "draw",
+      mode: "pen",
+      points: [10, 10, 80, 60],
+      strokeWidth: 4,
+      stroke: "#111",
+      opacity: 1,
+    } as El;
+    const props = createProps({ selected: stroke });
+    render(<StudioLeftToolRail {...props} />);
+    const transform = screen.getByRole("button", { name: "변형 (⇧T)" });
+    expect(transform.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(transform);
+    expect(props.stableHandlers.openPixelSelectionTransform).toHaveBeenCalledOnce();
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
+  });
 });

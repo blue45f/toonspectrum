@@ -1632,22 +1632,31 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       : topLevelSelectedGroupIds.size > 0 && !completeSelectionGroup
         ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배를 잠갔어요. 그룹 하나씩 선택해 정렬하세요."
         : null);
-  const multiSelectionVisibleBounds = marqueeIds.length > 1
-    ? canvasSelectionEls
-        .filter((element) => !isEffectivelyHidden(element, groups))
-        .map((element) =>
-          // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
-          // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
-          // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
-          element.type === "draw"
-            ? elBounds(element)
-            : liveNodeDisplayBounds(
-                nodeRefsRef.current[element.id],
-                mainLayerRef.current,
-                elBounds(element)
-              )
-        )
-    : [];
+  // Multi-marquee (2+) or single freehand stroke — strokes have no Konva Transformer, so
+  // they share the uniform-resize proxy used for groups (competitive free-scale on one layer).
+  const singleDrawFreeScale =
+    marqueeIds.length === 0
+    && canvasSelectionEls.length === 1
+    && canvasSelectionEls[0]?.type === "draw"
+    && !isEffectivelyHidden(canvasSelectionEls[0]!, groups)
+    && !isEffectivelyLocked(canvasSelectionEls[0]!, groups);
+  const multiSelectionVisibleBounds =
+    marqueeIds.length > 1 || singleDrawFreeScale
+      ? canvasSelectionEls
+          .filter((element) => !isEffectivelyHidden(element, groups))
+          .map((element) =>
+            // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
+            // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
+            // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
+            element.type === "draw"
+              ? elBounds(element)
+              : liveNodeDisplayBounds(
+                  nodeRefsRef.current[element.id],
+                  mainLayerRef.current,
+                  elBounds(element)
+                )
+          )
+      : [];
   const multiSelectionBounds =
     multiSelectionVisibleBounds.length > 0
       ? unionBounds(multiSelectionVisibleBounds)
@@ -1666,8 +1675,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     !hardCanvasInteractionBlock &&
     !activeSurfaceReviewLocked &&
     selectionMutationDisabledReason === null &&
-    marqueeIds.length > 1 &&
-    canvasSelectionEls.length === marqueeIds.length &&
+    (marqueeIds.length > 1 || singleDrawFreeScale) &&
+    canvasSelectionEls.length === (marqueeIds.length > 1 ? marqueeIds.length : 1) &&
     selectionLockState === "unlocked" &&
     multiSelectionBounds !== null &&
     multiSelectionBounds.w > 0 &&
@@ -3133,7 +3142,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     </Group>
                   );
                 })()}
-              {marqueeIds.length > 1 && multiSelectionBounds ? (
+              {(marqueeIds.length > 1 || singleDrawFreeScale) && multiSelectionBounds ? (
                 <StudioGroupUniformResizeProxy
                   bounds={{
                     x: multiSelectionBounds.x,

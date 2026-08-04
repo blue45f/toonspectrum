@@ -108,7 +108,10 @@ describe("Studio inspector raster recovery boundary", () => {
     const transform = functionBody(pageSource, "openPixelSelectionTransform");
     const frameAnimation = functionBody(pageSource, "openFrameAnimationForSelected");
 
+    // Free-transform: strokes/objects first; image content transform still uses pixel target.
+    expect(transform).toContain('selected?.type === "draw"');
     expect(transform).toContain('ensurePixelToolTarget("내용 변형")');
+    expect(transform).toContain("selectAllPixels");
     expect(transform).not.toContain("ensureOrPrepareRasterRetouchTarget");
     expect(frameAnimation).not.toContain("ensureOrPrepareRasterRetouchTarget");
   });
