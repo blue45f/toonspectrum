@@ -572,7 +572,7 @@ export function StudioDrawOptionsBar({
         ) : null}
 
         {/* Active brush pill + library (PicsArt-class) */}
-        {drawMode === "pen" || drawMode === "eraser" ? (
+        {drawMode === "pen" ? (
           <div className="flex shrink-0 items-center gap-0.5">
             <StudioToolHintTarget
               className="min-w-0"
