@@ -24,6 +24,7 @@ import {
   planStudioWetInkBrushReplay,
   resolveStudioWetInkBrushPhysicalRecipe,
   STUDIO_WET_INK_BRUSH_FIELD_SCALE,
+  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
   type StudioWetInkBrushPhysicalRecipe,
   type StudioWetInkBrushReplayPlan,
   type StudioWetInkBrushSurface,
@@ -49,8 +50,42 @@ const MAX_LIVE_TILES = 4_096;
 const MAX_LIVE_CELLS = 4_194_304;
 const MAX_LIVE_UPLOAD_BYTES = 64 * 1024 * 1024;
 const MAX_COORDINATE_ABS = 1_000_000;
-const LIVE_SIMULATION_STEPS_PER_SUFFIX = 1;
+/**
+ * Committed wet-ink settles with STUDIO_WET_INK_BRUSH_SIMULATION_STEPS (16). Live used to run
+ * only 1 step per pointer suffix on the dirty region, so the stroke looked dry/beaded mid-drag
+ * and then jumped on pointer-up when the exact 16-step plan replaced it.
+ *
+ * Adaptive local steps keep pointer frames cheap on large dirty regions while making short/medium
+ * strokes look much closer to the settled material.
+ */
+const LIVE_SIMULATION_STEPS_MIN = 3;
+const LIVE_SIMULATION_STEPS_MAX = 8;
+const LIVE_SIMULATION_CATCH_UP_CAP = 4;
 const POINT_EPSILON = 1e-6;
+
+/** Exported for tests — how many diffusion steps a live dirty suffix should take. */
+export function resolveStudioLiveWetInkSimulationSteps(
+  dirty: Pick<StudioWetInkBounds, "width" | "height"> | null | undefined,
+  options?: {
+    readonly catchUpDebt?: number;
+  },
+): number {
+  if (!dirty || dirty.width <= 0 || dirty.height <= 0) return 0;
+  const area = dirty.width * dirty.height;
+  let steps: number;
+  if (area <= 64 * 64) steps = LIVE_SIMULATION_STEPS_MAX;
+  else if (area <= 128 * 128) steps = 6;
+  else if (area <= 256 * 256) steps = 4;
+  else steps = LIVE_SIMULATION_STEPS_MIN;
+  const debt = Math.max(0, Math.floor(options?.catchUpDebt ?? 0));
+  if (debt > 0) {
+    steps = Math.min(
+      LIVE_SIMULATION_STEPS_MAX + LIVE_SIMULATION_CATCH_UP_CAP,
+      steps + Math.min(LIVE_SIMULATION_CATCH_UP_CAP, debt),
+    );
+  }
+  return steps;
+}
 
 export interface StudioLiveWetInkOverlayCanvases {
   readonly activeCanvas: HTMLCanvasElement;
@@ -132,6 +167,12 @@ interface ActiveWetInkStroke {
   consumedSourcePoints: number;
   previousSourceX: number;
   previousSourceY: number;
+  /** Live diffusion steps already applied (toward committed settle quality). */
+  simulationApplied: number;
+  /** Extra steps owed so long strokes approach committed 16-step settle. */
+  simulationDebt: number;
+  /** Suffix paint frames since stroke begin (for catch-up pacing). */
+  paintFrames: number;
 }
 
 interface PreparedUpload {
@@ -294,6 +335,8 @@ export class StudioLiveWetInkOverlayRenderer {
   private active: ActiveWetInkStroke | null = null;
   private settled: StudioWetInkBrushReplayPlan[] = [];
   private fallbackReason: StudioLiveWetInkFallbackReason | null = null;
+  /** Reused offscreen tile canvases keyed by "w×h" to cut live-frame GC pressure. */
+  private readonly tileSurfacePool = new Map<string, StudioWetInkBrushSurface[]>();
 
   constructor(options: StudioLiveWetInkOverlayOptions = {}) {
     this.surfaceFactory = options.surfaceFactory ?? defaultSurfaceFactory;
@@ -413,6 +456,9 @@ export class StudioLiveWetInkOverlayRenderer {
       consumedSourcePoints: 1,
       previousSourceX: firstX,
       previousSourceY: firstY,
+      simulationApplied: 0,
+      simulationDebt: 0,
+      paintFrames: 0,
     };
     this.active = active;
     this.setActiveCanvasOpacity(recipe.compositeOpacity);
@@ -619,13 +665,30 @@ export class StudioLiveWetInkOverlayRenderer {
     }
     // Live transport is deliberately local to the newest dirty suffix. Older wet tiles retain
     // their material until exact pointer-up replay, keeping pointer-frame cost independent of the
-    // already accepted prefix.
+    // already accepted prefix. Simulation depth is adaptive so mid-stroke wash looks closer to
+    // the committed 16-step settle without running a full-field 16 steps every sample.
     active.field.activeBounds = deposited.value.dirtyBounds;
-    const simulated = simulateStudioWetInkField(
-      active.field,
-      LIVE_SIMULATION_STEPS_PER_SUFFIX,
+    active.paintFrames += 1;
+    // Pace catch-up: by stroke end we want ~committed steps applied across the life of the stroke.
+    const targetLive = STUDIO_WET_INK_BRUSH_SIMULATION_STEPS;
+    const expectedByNow = Math.min(
+      targetLive,
+      Math.ceil((active.paintFrames / Math.max(8, active.paintFrames + 4)) * targetLive),
     );
+    active.simulationDebt = Math.max(
+      0,
+      expectedByNow - active.simulationApplied,
+    );
+    const steps = resolveStudioLiveWetInkSimulationSteps(deposited.value.dirtyBounds, {
+      catchUpDebt: active.simulationDebt,
+    });
+    const simulated = simulateStudioWetInkField(active.field, steps);
     if (!simulated.ok) return this.failActive("simulation-budget");
+    active.simulationApplied += simulated.value.appliedSteps;
+    active.simulationDebt = Math.max(
+      0,
+      active.simulationDebt - simulated.value.appliedSteps,
+    );
     const dirty = active.field.dirtyBounds;
     const uploads = planStudioWetInkTileUploads(active.field, dirty);
     if (!uploads.ok) return this.failActive("upload-budget");
@@ -646,6 +709,33 @@ export class StudioLiveWetInkOverlayRenderer {
     };
   }
 
+  private acquireTileSurface(width: number, height: number): StudioWetInkBrushSurface | null {
+    const key = `${width}x${height}`;
+    const pool = this.tileSurfacePool.get(key);
+    const pooled = pool?.pop();
+    if (pooled) return pooled;
+    return this.surfaceFactory(width, height);
+  }
+
+  private releaseTileSurface(surface: StudioWetInkBrushSurface): void {
+    const width = surface.width;
+    const height = surface.height;
+    if (
+      !Number.isFinite(width)
+      || !Number.isFinite(height)
+      || width <= 0
+      || height <= 0
+    ) {
+      return;
+    }
+    const key = `${width}x${height}`;
+    const pool = this.tileSurfacePool.get(key) ?? [];
+    // Cap per-size pool so long strokes cannot retain unbounded canvases.
+    if (pool.length >= 12) return;
+    pool.push(surface);
+    this.tileSurfacePool.set(key, pool);
+  }
+
   private prepareUploads(
     uploads: readonly StudioWetInkTileUpload[],
   ): PreparedUpload[] | null {
@@ -657,9 +747,12 @@ export class StudioLiveWetInkOverlayRenderer {
     const prepared: PreparedUpload[] = [];
     try {
       for (const upload of uploads) {
-        const surface = this.surfaceFactory(upload.width, upload.height);
+        const surface = this.acquireTileSurface(upload.width, upload.height);
         const context = surface?.getContext("2d", { willReadFrequently: false });
-        if (!surface || !context) return null;
+        if (!surface || !context) {
+          for (const item of prepared) this.releaseTileSurface(item.surface);
+          return null;
+        }
         const imageData = context.createImageData(upload.width, upload.height);
         imageData.data.set(upload.rgba);
         context.putImageData(imageData, 0, 0);
@@ -667,6 +760,7 @@ export class StudioLiveWetInkOverlayRenderer {
       }
       return prepared;
     } catch {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
       return null;
     }
   }
@@ -680,7 +774,10 @@ export class StudioLiveWetInkOverlayRenderer {
     const prepared = this.prepareUploads(uploads);
     if (!prepared) return false;
     const context = this.preparedActive();
-    if (!context) return false;
+    if (!context) {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
+      return false;
+    }
     try {
       for (const item of prepared) {
         const destinationX =
@@ -715,6 +812,7 @@ export class StudioLiveWetInkOverlayRenderer {
     } catch {
       return false;
     } finally {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
       context.restore();
     }
   }
@@ -723,7 +821,10 @@ export class StudioLiveWetInkOverlayRenderer {
     const prepared = this.prepareUploads(plan.uploads);
     if (!prepared) return false;
     const context = this.preparedActive();
-    if (!context) return false;
+    if (!context) {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
+      return false;
+    }
     try {
       // Preparation happens before this mutation, so allocation/upload failures leave the current
       // live surface intact and the retained fallback can be exposed without a blank flash.
@@ -732,6 +833,7 @@ export class StudioLiveWetInkOverlayRenderer {
       this.setActiveCanvasOpacity(plan.compositeOpacity);
       return this.drawPreparedUploads(plan.uploads, prepared, plan.originX, plan.originY);
     } catch {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
       try {
         context.restore();
       } catch {
@@ -747,9 +849,15 @@ export class StudioLiveWetInkOverlayRenderer {
     originX: number,
     originY: number,
   ): boolean {
-    if (uploads.length !== prepared.length) return false;
+    if (uploads.length !== prepared.length) {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
+      return false;
+    }
     const context = this.preparedActive();
-    if (!context) return false;
+    if (!context) {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
+      return false;
+    }
     try {
       for (const item of prepared) {
         context.drawImage(
@@ -768,6 +876,7 @@ export class StudioLiveWetInkOverlayRenderer {
     } catch {
       return false;
     } finally {
+      for (const item of prepared) this.releaseTileSurface(item.surface);
       context.restore();
     }
   }

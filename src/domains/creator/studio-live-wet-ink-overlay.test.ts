@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  resolveStudioLiveWetInkSimulationSteps,
   StudioLiveWetInkOverlayRenderer,
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
-import { planStudioWetInkBrushReplay } from "./studio-wet-ink-brush-runtime";
+import {
+  planStudioWetInkBrushReplay,
+  STUDIO_WET_INK_BRUSH_SIMULATION_STEPS,
+} from "./studio-wet-ink-brush-runtime";
 
 import type { DrawEl } from "./studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
@@ -280,5 +284,22 @@ describe("StudioLiveWetInkOverlayRenderer", () => {
       status: "fallback",
       reason: "native-scale-unsupported",
     });
+  });
+});
+
+describe("resolveStudioLiveWetInkSimulationSteps", () => {
+  it("runs deeper local diffusion than the old 1-step live path while remaining below full settle", () => {
+    expect(resolveStudioLiveWetInkSimulationSteps(null)).toBe(0);
+    const small = resolveStudioLiveWetInkSimulationSteps({ width: 32, height: 32 });
+    const large = resolveStudioLiveWetInkSimulationSteps({ width: 400, height: 400 });
+    expect(small).toBeGreaterThanOrEqual(3);
+    expect(small).toBeLessThanOrEqual(STUDIO_WET_INK_BRUSH_SIMULATION_STEPS);
+    expect(large).toBeGreaterThanOrEqual(3);
+    expect(large).toBeLessThan(small);
+    const catchUp = resolveStudioLiveWetInkSimulationSteps(
+      { width: 64, height: 64 },
+      { catchUpDebt: 8 },
+    );
+    expect(catchUp).toBeGreaterThan(small);
   });
 });
