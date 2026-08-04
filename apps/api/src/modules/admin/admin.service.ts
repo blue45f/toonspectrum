@@ -129,14 +129,15 @@ function parseBool(value: unknown, fallback = false) {
   return fallback;
 }
 
+const DEFAULT_ADMIN_EMAILS = ["blue45f@gmail.com"];
+
 function normalizeAdminEmailWhitelist() {
-  return new Set(
+  const envEmails =
     process.env.ADMIN_EMAILS
       ?.split(",")
       .map((email) => email.trim().toLowerCase())
-      .filter(Boolean) ??
-      [],
-  );
+      .filter(Boolean) ?? [];
+  return new Set([...DEFAULT_ADMIN_EMAILS, ...envEmails]);
 }
 
 function toPlainObject(value: unknown) {
