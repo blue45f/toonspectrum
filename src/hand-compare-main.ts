@@ -6,31 +6,17 @@ import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import { POSER_FINGER_BONES, pickNaturalIdlePose } from "./domains/creator/studio-pose-presets";
+import { pickNaturalIdlePose } from "./domains/creator/studio-pose-presets";
 import {
-  applyFingerRotations,
   applyPoseToVrm,
   estimateVrmPalmNormal,
-  stripFingerBones,
-  type FingerRotationMap,
   type PoseBoneMap,
-  type Vec3,
 } from "./domains/creator/studio-vrm-poser-utils";
 
 const statusEl = document.getElementById("status")!;
 
 function setStatus(text: string) {
   statusEl.textContent = text;
-}
-
-function extractFingers(bones: PoseBoneMap): FingerRotationMap {
-  const fingers: FingerRotationMap = {};
-  for (const boneName of POSER_FINGER_BONES) {
-    const rotation = bones[boneName]?.rotation as Vec3 | undefined;
-    if (!rotation) continue;
-    fingers[boneName] = [rotation[0], rotation[1], rotation[2]];
-  }
-  return fingers;
 }
 
 async function loadVrm(url: string): Promise<VRM> {
@@ -44,10 +30,8 @@ async function loadVrm(url: string): Promise<VRM> {
 
 function applyNaturalIdle(vrm: VRM, characterId: string) {
   const pose = pickNaturalIdlePose(characterId);
-  const bones = stripFingerBones(pose.bones as PoseBoneMap);
-  const fingers = extractFingers(pose.bones as PoseBoneMap);
-  applyPoseToVrm(vrm, bones, pose.yOffset ?? 0);
-  applyFingerRotations(vrm, fingers);
+  // Single path: applyPoseToVrm already runs fingers + one palm pass (same as Studio).
+  applyPoseToVrm(vrm, pose.bones as PoseBoneMap, pose.yOffset ?? 0);
   vrm.humanoid?.update();
   vrm.scene.updateMatrixWorld(true);
   return pose;

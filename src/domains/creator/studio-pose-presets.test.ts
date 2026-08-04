@@ -225,11 +225,11 @@ describe("자연 아이들 포즈(NATURAL_IDLE_POSES)", () => {
       expect(rightShoulderRoll, `${pose.id} right shoulder`).toBeGreaterThanOrEqual(2.9);
       expect(rightShoulderRoll).toBeLessThanOrEqual(5.1);
 
-      // 손목 안쪽 5~8°.
+      // 손목 1~2° — 편안한 차렷(과도한 롤은 한쪽 손목이 꺾여 보임).
       for (const handName of ["leftHand", "rightHand"] as const) {
         const wristRoll = Math.abs(toDegrees(pose.bones[handName]?.rotation?.[2] ?? 0));
-        expect(wristRoll, `${pose.id} ${handName} wrist`).toBeGreaterThanOrEqual(4.9);
-        expect(wristRoll).toBeLessThanOrEqual(8.1);
+        expect(wristRoll, `${pose.id} ${handName} wrist`).toBeGreaterThanOrEqual(1);
+        expect(wristRoll).toBeLessThanOrEqual(2.5);
       }
 
       // 좌우 본 회전 불일치(비대칭 필수) — 미러 대칭 쌍이 아니어야 한다.
@@ -261,7 +261,7 @@ describe("자연 아이들 포즈(NATURAL_IDLE_POSES)", () => {
     }
   });
 
-  it("includes relaxed finger curls (12-25 degrees) in every idle pose", () => {
+  it("includes relaxed finger curls (open comfortable-attention range) in every idle pose", () => {
     for (const pose of NATURAL_IDLE_POSES) {
       for (const boneName of POSER_FINGER_BONES) {
         const rotation = pose.bones[boneName]?.rotation;
