@@ -209,6 +209,47 @@ export function StudioLivingInkControls({
               {materialLockedReason}
             </p>
           ) : null}
+
+          <div className="mb-2.5">
+            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">종이 질감 선택</span>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { name: "전통 한지", fiber: 0.55, tooth: 0.40, gran: 0.35 },
+                { name: "수채화지", fiber: 0.75, tooth: 0.82, gran: 0.65 },
+                { name: "켄트지", fiber: 0.15, tooth: 0.18, gran: 0.10 },
+                { name: "거친 코튼", fiber: 0.90, tooth: 0.95, gran: 0.85 },
+                { name: "크라프트", fiber: 0.65, tooth: 0.60, gran: 0.50 },
+                { name: "매끄러움", fiber: 0.00, tooth: 0.00, gran: 0.00 },
+              ].map((preset) => {
+                const isActive =
+                  Math.abs(material.paperFiber - preset.fiber) < 0.05 &&
+                  Math.abs(material.paperTooth - preset.tooth) < 0.05;
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    disabled={busy || materialLocked}
+                    onClick={() =>
+                      onMaterialChange({
+                        paperFiber: preset.fiber,
+                        paperTooth: preset.tooth,
+                        granulation: preset.gran,
+                      })
+                    }
+                    className={cn(
+                      "h-6 rounded border px-1 text-[0.55rem] font-medium transition-colors",
+                      isActive
+                        ? "border-accent bg-accent/15 text-accent font-bold"
+                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                    )}
+                  >
+                    {preset.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {([
             ["flow", "안료 흐름"],
             ["bleed", "번짐"],
@@ -216,6 +257,7 @@ export function StudioLivingInkControls({
             ["chromaticSeparation", "색상 분리"],
             ["dryingEdgeDeposition", "테두리 응집"],
             ["paperFiber", "종이 섬유"],
+            ["paperTooth", "종이 요철"],
             ["granulation", "과립"],
           ] as const).map(([key, label]) => (
             <label key={key} className="mb-2 grid grid-cols-[4.7rem_1fr_2rem] items-center gap-2 text-[0.62rem] text-fg-2">
