@@ -734,7 +734,7 @@ async function selectDesktopBrush(
   const expectedDrawMode = operation === "erase" ? "eraser" : "pen";
   const catalog = await openDesktopCatalog(page);
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.id);
+  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.name);
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
