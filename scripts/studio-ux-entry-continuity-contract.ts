@@ -280,9 +280,10 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
         clauses: [{
           file: "src/domains/creator/StudioLeftToolRail.tsx",
           allOf: [
-            "변형할 레이어를 고르거나",
-            "사각 선택으로 잡은 뒤 다시 누르세요",
+            "이미지 픽셀 내용 변형을 위해 사각 선택을 시작합니다",
+            "변형할 선·도형·이미지를 캔버스에서 먼저 고르세요",
             "objectFreeTransformReady",
+            "objectTransformPickRecoveryAvailable",
           ],
         }],
       },
@@ -292,8 +293,9 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
           file: "src/domains/creator/StudioLeftToolRail.tsx",
           allOf: [
             "onRequestPixelSelection",
-            'label={pixelTransformRecoveryAvailable ? "선택 시작하기"',
-            'className={pixelTransformRecoveryAvailable ? "size-11"',
+            '"선택 시작하기"',
+            '"선택 후 변형"',
+            "pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable",
           ],
         }],
       },
