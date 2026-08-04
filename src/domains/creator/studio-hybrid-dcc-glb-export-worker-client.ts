@@ -3,6 +3,7 @@ import {
   unpackStudioHybridDccGlbExportInput,
 } from "./studio-hybrid-dcc-glb-export-packed-mesh";
 import {
+  STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH,
   STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_RESPONSE_BYTES,
   STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_INPUT_TRANSPORT,
   STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_PROTOCOL_VERSION,
@@ -176,17 +177,21 @@ async function exportSynchronously(
 }
 
 /**
- * Exports one bounded batch from editable Geometry Authority inputs.
+ * Exports one worker-protocol window (≤ MAX_BATCH) from editable Geometry Authority inputs.
  *
  * Browsers always use a fresh one-shot module Worker. A synchronous implementation is loaded only
  * when the host has no Worker API (for SSR/Node), never as a silent recovery from Worker/CSP faults.
  */
-export function exportStudioHybridDccGlbBatch(
+function exportStudioHybridDccGlbBatchWindow(
   inputs: readonly StudioHybridDccMeshGlbExportInput[],
   options: StudioHybridDccGlbExportBatchOptions = {},
 ): Promise<readonly StudioHybridDccMeshGlbExportResult[]> {
   if (options.signal?.aborted) {
     return Promise.reject(new StudioHybridDccGlbExportClientError("aborted"));
+  }
+  if (inputs.length === 0) return Promise.resolve([]);
+  if (inputs.length > STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH) {
+    return Promise.reject(new StudioHybridDccGlbExportClientError("invalid-input"));
   }
   const request = requestFor(takeRequestId(), inputs);
   if (!request) {
@@ -297,4 +302,42 @@ export function exportStudioHybridDccGlbBatch(
       fail(worker ? "worker-failed" : "worker-unavailable");
     }
   });
+}
+
+/**
+ * Exports a Geometry Authority mesh batch to GLB.
+ *
+ * Worker protocol windows stay ≤ {@link STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH}. Larger
+ * product handoffs (classroom room presets + props) are chunked into sequential windows so the
+ * BG3D attachment budget (256) is reachable without rejecting valid DCC scenes as `invalid-input`.
+ */
+export async function exportStudioHybridDccGlbBatch(
+  inputs: readonly StudioHybridDccMeshGlbExportInput[],
+  options: StudioHybridDccGlbExportBatchOptions = {},
+): Promise<readonly StudioHybridDccMeshGlbExportResult[]> {
+  if (options.signal?.aborted) {
+    throw new StudioHybridDccGlbExportClientError("aborted");
+  }
+  if (inputs.length === 0) return [];
+  if (inputs.length <= STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH) {
+    return exportStudioHybridDccGlbBatchWindow(inputs, options);
+  }
+
+  const results: StudioHybridDccMeshGlbExportResult[] = [];
+  for (
+    let offset = 0;
+    offset < inputs.length;
+    offset += STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH
+  ) {
+    if (options.signal?.aborted) {
+      throw new StudioHybridDccGlbExportClientError("aborted");
+    }
+    const windowInputs = inputs.slice(
+      offset,
+      offset + STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH,
+    );
+    const windowResults = await exportStudioHybridDccGlbBatchWindow(windowInputs, options);
+    results.push(...windowResults);
+  }
+  return results;
 }

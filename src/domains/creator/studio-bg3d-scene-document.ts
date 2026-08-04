@@ -33,7 +33,12 @@ const STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION = 1 as const;
 // payloads while retaining a small, deterministic metadata budget.
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES = 320 * 1024;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES = 512;
-export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS = 64;
+/**
+ * Attachment budget must cover Hybrid DCC editable room presets (classroom ≈ 66
+ * parts) plus a few CAD/prop assets. Align with Hybrid layout/room authority
+ * caps (256) so "교실 세트 → 3D 배경 편집기" handoff does not fail by default.
+ */
+export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS = 256;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS = 64;
 export const STUDIO_BG3D_SHOT_ID_MAX_LENGTH = 80;
 export const STUDIO_BG3D_SHOT_NAME_MAX_LENGTH = 80;

@@ -490,11 +490,16 @@ describe("exportStudioHybridDccGlbBatch", () => {
     });
     await expect(overBudget).rejects.toMatchObject({ code: "response-budget-exceeded" });
 
-    const exportInput = input("too-many");
-    await expect(exportStudioHybridDccGlbBatch(Array.from(
-      { length: STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH + 1 },
-      () => exportInput,
-    ), { workerFactory: () => new FakeWorker() })).rejects.toMatchObject({ code: "invalid-input" });
+    // Oversize product handoffs are chunked into worker-sized windows rather than rejected.
+    vi.stubGlobal("Worker", undefined);
+    const oversizeCount = STUDIO_HYBRID_DCC_GLB_EXPORT_WORKER_MAX_BATCH + 3;
+    const oversize = Array.from(
+      { length: oversizeCount },
+      (_, index) => input(`chunk-${index}`),
+    );
+    const oversizeResults = await exportStudioHybridDccGlbBatch(oversize);
+    expect(oversizeResults).toHaveLength(oversizeCount);
+    expect(oversizeResults.every((result) => result.ok)).toBe(true);
   });
 
   it("uses the deterministic exporter only when the host genuinely has no Worker API", async () => {

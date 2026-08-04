@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_BG3D_ROOM_PRESETS,
   buildStudioBg3dRoomParts,
   getStudioBg3dRoomPreset,
 } from "./studio-bg3d-room-builder";
+import { STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS } from "./studio-bg3d-scene-document";
 import { hashStudioEditableMesh } from "./studio-editable-half-edge-mesh";
 import {
   buildStudioHybridDccRoomAuthority,
@@ -11,6 +13,22 @@ import {
 } from "./studio-hybrid-dcc-room-authority";
 
 describe("Hybrid DCC editable room authority", () => {
+  it("keeps every shipped room preset inside the BG3D handoff attachment budget", () => {
+    // Classroom alone was ~66 parts when the BG3D attachment cap was 64, which
+    // broke the product path "교실 세트 → 3D 배경 편집기" with no extra props.
+    for (const preset of STUDIO_BG3D_ROOM_PRESETS) {
+      const build = buildStudioHybridDccRoomPresetAuthority(preset.id, preset.id);
+      expect(build.assets.length).toBeGreaterThan(0);
+      expect(build.assets.length).toBeLessThanOrEqual(
+        STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+      );
+      // Leave headroom for a few CAD/prop assets created in the same session.
+      expect(build.assets.length).toBeLessThanOrEqual(
+        STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS - 8,
+      );
+    }
+  });
+
   it("turns every classroom part into a deterministic editable authority asset", () => {
     const preset = getStudioBg3dRoomPreset("classroom")!;
     const expectedParts = buildStudioBg3dRoomParts(preset.spec);

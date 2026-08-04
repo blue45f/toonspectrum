@@ -745,13 +745,16 @@ export async function handoffStudioHybridDccWorkspaceToBg3d(
   if (authorityRecords.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) {
     throw new StudioHybridDccBg3dHandoffError(
       "asset-budget-exceeded",
-      `DCC asset count ${authorityRecords.length} exceeds ${STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS}`,
+      `DCC 오브젝트 ${authorityRecords.length}개가 배경 편집기 첨부 한도 `
+      + `${STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS}개를 넘습니다. `
+      + "불필요한 방 파츠·복제본을 줄인 뒤 다시 전달하세요.",
     );
   }
   if (workspace.bridge.shots.length > STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS) {
     throw new StudioHybridDccBg3dHandoffError(
       "asset-budget-exceeded",
-      `DCC Shot count ${workspace.bridge.shots.length} exceeds ${STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS}`,
+      `DCC 컷 ${workspace.bridge.shots.length}개가 배경 편집기 컷 한도 `
+      + `${STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS}개를 넘습니다.`,
     );
   }
   const records = await resolveStudioHybridDccDeliveryRecords(
