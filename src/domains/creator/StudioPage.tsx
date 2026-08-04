@@ -35577,14 +35577,33 @@ function clearSelectionForEdit() {
   /**
    * 리터치 도구의 한 번 클릭 진입 경계.
    *
-   * 선택 이미지 또는 유일한 이미지가 있으면 기존 직접 편집 경로를 사용한다. 이미지가 없거나
-   * 여러 장이라 대상이 모호하지만 페이지에 표시 콘텐츠가 있으면, 현재 보이는 결과를 원본 보존
-   * 합성본으로 만든 뒤 같은 도구를 자동 재개한다. 빈 페이지/잠금은 기존 정확한 오류를 유지한다.
+   * 1) 선택 이미지 → 그 레이어만 직접 편집
+   * 2) 선택 선화·도형·텍스트 등 비이미지 → 해당 id만 래스터 복사 후 재개 (페이지 전체가 아님)
+   * 3) 유일한 이미지 / 페이지 합성 폴백 → 기존 경로
    */
   function ensureOrPrepareRasterRetouchTarget(
     toolId: "crop" | "smudge" | "dodge-burn" | "wet-mix" | "liquify",
     toolLabel: string,
   ): ImageEl | null {
+    if (
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyHidden(selected, groups)
+      && !isEffectivelyLocked(selected, groups)
+      && !localHiddenElementIds.has(selected.id)
+    ) {
+      const layerLabel =
+        selected.type === "draw"
+          ? "선택 선화 편집 복사본"
+          : selected.type === "text" || selected.type === "bubble"
+            ? "선택 텍스트 편집 복사본"
+            : "선택 레이어 편집 복사본";
+      void createEditableRasterCopyForInspector(toolId, {
+        sourceIds: [selected.id],
+        layerName: layerLabel,
+      });
+      return null;
+    }
     const directCandidates = elements.filter(
       (element): element is ImageEl =>
         element.type === "image"
@@ -35665,10 +35684,10 @@ function clearSelectionForEdit() {
     announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
   }
   /**
-   * Free Transform (CSP/PS-style ⇧T):
-   * - freehand stroke → select tool + corner handles (uniform free-scale)
-   * - image without marquee → whole-layer pixel selection + content transform panel
-   * - image with marquee → content transform panel
+   * Free Transform (CSP/PS-style ⇧T) — always one selected layer when possible:
+   * - freehand stroke → select tool + uniform free-scale proxy handles
+   * - image without marquee → Konva free-transform of that image layer
+   * - image with marquee → content transform panel (pixel-region scale/rotate/flip)
    * - other objects → select tool (Konva handles already attached)
    */
   function openPixelSelectionTransform() {
@@ -35686,10 +35705,27 @@ function clearSelectionForEdit() {
       setTool("select");
       setMenu(null);
       setError(null);
-      announceDrawingShortcut("모서리 핸들을 끌어 크기·위치를 조절하세요");
+      announceDrawingShortcut("모서리 핸들을 끌어 선택 선화 레이어의 크기·위치를 조절하세요");
       return;
     }
-    // Image / shape / text / bubble with Konva transformer — just ensure select mode.
+    // Whole image layer free-transform (no marquee) — keep ops on this layer only.
+    if (
+      selected?.type === "image"
+      && !isEffectivelyLocked(selected, groups)
+      && !isSelectionUsable(pixelSel)
+    ) {
+      if (selectedImageMutationLocked) {
+        setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
+        return;
+      }
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리·회전 핸들로 선택 이미지 레이어를 변형하세요");
+      return;
+    }
+    // Shape / text / bubble with Konva transformer — just ensure select mode.
     if (
       selected
       && selected.type !== "image"
@@ -35699,18 +35735,18 @@ function clearSelectionForEdit() {
       setTool("select");
       setMenu(null);
       setError(null);
-      announceDrawingShortcut("모서리·회전 핸들로 변형하세요");
+      announceDrawingShortcut("모서리·회전 핸들로 선택 레이어를 변형하세요");
       return;
     }
 
     const target = ensurePixelToolTarget("내용 변형");
     if (!target) return;
     if (!isSelectionUsable(pixelSel)) {
-      // Competitive whole-layer free transform: auto-select entire layer contents.
+      // Pixel marquee path when transform was requested without a free-transformable object.
       commitPixelSelectionState((current) => selectAllPixels(current), "select-all");
       announceDrawingShortcut("레이어 전체 선택 · 리터치에서 크기·회전·뒤집기를 적용하세요");
     } else {
-      announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
+      announceDrawingShortcut("리터치 패널에서 선택 영역의 내용 변형을 적용하세요");
     }
     openInspectorRoute(
       { primary: "properties", image: "retouch" },
@@ -35736,6 +35772,7 @@ function clearSelectionForEdit() {
     name: string,
     rasterRuntime: typeof import("./studio-raster-edit-preparation"),
     purpose: "page-filter" | "pixel-selection",
+    options?: { readonly sourceIds?: readonly string[] },
   ) {
     const currentHistory = pagesHistoryRef.current;
     const currentHistoryIndex = Math.max(
@@ -35744,7 +35781,7 @@ function clearSelectionForEdit() {
     );
     const currentPages = currentHistory[currentHistoryIndex] ?? pages;
     const targetPage = currentPages.find((page) => page.id === currentPageIdRef.current) ?? activePage;
-    return rasterRuntime.createStudioEditablePageRasterContext({
+    const context = rasterRuntime.createStudioEditablePageRasterContext({
       page: targetPage,
       canvasWidth: CANVAS_W,
       masterElements: masterRenderElsRef.current,
@@ -35762,6 +35799,25 @@ function clearSelectionForEdit() {
       purpose,
       budgets: currentStudioVectorReferenceBudgets(),
     });
+    const sourceIds = options?.sourceIds?.filter((id) =>
+      context.destinationElements.some((element) => element.id === id),
+    );
+    // Selected-layer copies omit page paper and hide only the chosen sources so crop/filter/
+    // retouch stay on one layer instead of flattening the whole page.
+    if (sourceIds && sourceIds.length > 0) {
+      return {
+        ...context,
+        input: {
+          ...context.input,
+          sourceIds,
+          includeBackground: false,
+          sourceDisposition: "hide-originals" as const,
+          sourceDispositionIds: sourceIds,
+          name,
+        },
+      };
+    }
+    return context;
   }
 
   function currentStudioFilterPageRasterContext(
@@ -35805,6 +35861,15 @@ function clearSelectionForEdit() {
       });
       return;
     }
+    // Selected vector/stroke layer: filter that layer only (not whole-page flatten).
+    const selectedLayerFilterIds =
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyHidden(selected, groups)
+      && !isEffectivelyLocked(selected, groups)
+      && !localHiddenElementIds.has(selected.id)
+        ? [selected.id] as const
+        : null;
     disarmAllPixelTools();
     setTool("select");
     if (!prepareStudioDocumentReplacement("필터 미리보기를 준비", { flushPending: true })) return;
@@ -35812,7 +35877,10 @@ function clearSelectionForEdit() {
     const mutationTicket = captureStudioMutationTicket();
     const historyIndex = pagesHiRef.current;
     const pageId = currentPageIdRef.current;
-    const layerName = "필터 · 현재 페이지 합성";
+    const layerScopedFilter = Boolean(selectedLayerFilterIds?.length);
+    const layerName = layerScopedFilter
+      ? "필터 · 선택 레이어"
+      : "필터 · 현재 페이지 합성";
     const runId = ++studioFilterPreparationRunIdRef.current;
     studioFilterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
@@ -35821,12 +35889,23 @@ function clearSelectionForEdit() {
     setStudioFilterPreview(null);
     setStudioFilterPreparationBusy(true);
     setError(null);
-    announceDrawingShortcut("선과 레이어를 필터 미리보기로 준비하고 있어요");
+    announceDrawingShortcut(
+      layerScopedFilter
+        ? "선택한 레이어만 필터 미리보기로 준비하고 있어요"
+        : "선과 레이어를 필터 미리보기로 준비하고 있어요",
+    );
 
     try {
       const rasterRuntime = await import("./studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
-      const initialContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      const initialContext = layerScopedFilter
+        ? currentStudioEditablePageRasterContext(
+          layerName,
+          rasterRuntime,
+          "page-filter",
+          { sourceIds: selectedLayerFilterIds! },
+        )
+        : currentStudioFilterPageRasterContext(layerName, rasterRuntime);
       const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
       if (!planned.ok) throw new Error(planned.reason);
       const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
@@ -35843,7 +35922,14 @@ function clearSelectionForEdit() {
         currentPageIdRef.current !== pageId ||
         !canApplyStudioMutation(mutationTicket)
       ) return;
-      const latestContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      const latestContext = layerScopedFilter
+        ? currentStudioEditablePageRasterContext(
+          layerName,
+          rasterRuntime,
+          "page-filter",
+          { sourceIds: selectedLayerFilterIds! },
+        )
+        : currentStudioFilterPageRasterContext(layerName, rasterRuntime);
       if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(planned.plan, latestContext.input)) {
         throw new Error("필터 미리보기 준비 중 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
       }
@@ -35853,7 +35939,8 @@ function clearSelectionForEdit() {
           rendered,
           newId: uid(),
         }),
-        filterPageComposite: true,
+        // Layer-scoped previews still use the composite apply pipeline, but are not full-page.
+        filterPageComposite: !layerScopedFilter,
         noClip: true,
       } satisfies ImageEl & El;
       studioFilterSessionIdRef.current += 1;
@@ -35869,7 +35956,11 @@ function clearSelectionForEdit() {
         kind,
         ...(initialDraft?.kind === kind ? { initialDraft } : {}),
       });
-      announceDrawingShortcut("원본을 보존한 페이지 필터 미리보기를 열었어요");
+      announceDrawingShortcut(
+        layerScopedFilter
+          ? "원본 레이어를 보존한 선택 레이어 필터 미리보기를 열었어요"
+          : "원본을 보존한 페이지 필터 미리보기를 열었어요",
+      );
     } catch (filterError) {
       if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
       setError(
@@ -35887,6 +35978,10 @@ function clearSelectionForEdit() {
 
   async function createEditableRasterCopyForInspector(
     resumeToolId?: StudioRasterToolId,
+    options?: {
+      readonly sourceIds?: readonly string[];
+      readonly layerName?: string;
+    },
   ) {
     if (studioFilterPreparationBusy) {
       announceDrawingShortcut("편집용 래스터 복사본을 준비하고 있어요");
@@ -35900,11 +35995,13 @@ function clearSelectionForEdit() {
     const resumePlan = resumeToolId
       ? resolveStudioRasterToolResumePlan(resumeToolId)
       : null;
+    const layerScoped = Boolean(options?.sourceIds?.length);
 
     const mutationTicket = captureStudioMutationTicket();
     const historyIndex = pagesHiRef.current;
     const pageId = currentPageIdRef.current;
-    const layerName = "편집용 래스터 복사본";
+    const layerName = options?.layerName
+      ?? (layerScoped ? "선택 레이어 편집 복사본" : "편집용 래스터 복사본");
     const runId = ++studioFilterPreparationRunIdRef.current;
     studioFilterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
@@ -35914,15 +36011,23 @@ function clearSelectionForEdit() {
       : null;
     setStudioFilterPreparationBusy(true);
     setError(null);
-    announceDrawingShortcut("원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요");
+    announceDrawingShortcut(
+      layerScoped
+        ? "선택한 레이어만 원본 보존 래스터로 준비하고 있어요"
+        : "원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요",
+    );
 
     try {
       const rasterRuntime = await import("./studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
+      const layerOptions = options?.sourceIds?.length
+        ? { sourceIds: options.sourceIds }
+        : undefined;
       const initialContext = currentStudioEditablePageRasterContext(
         layerName,
         rasterRuntime,
         "pixel-selection",
+        layerOptions,
       );
       const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
       if (!planned.ok) throw new Error(planned.reason);
@@ -35942,6 +36047,7 @@ function clearSelectionForEdit() {
         layerName,
         rasterRuntime,
         "pixel-selection",
+        layerOptions,
       );
       if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(
         planned.plan,
@@ -36004,8 +36110,13 @@ function clearSelectionForEdit() {
           id: composite.id,
         });
       }
+      const scopeLabel = layerScoped ? "선택 레이어 복사본" : "페이지 합성본";
       if (!resumePlan) {
-        announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
+        announceDrawingShortcut(
+          layerScoped
+            ? "선택 레이어 원본은 숨겨 보존하고 편집 복사본을 선택했어요"
+            : "원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요",
+        );
         return;
       }
       switch (resumePlan.kind) {
@@ -36020,12 +36131,12 @@ function clearSelectionForEdit() {
           );
           announceDrawingShortcut(
             resumePlan.retouchTool === "smudge"
-              ? "페이지 합성본에서 혼합(스머지)을 시작해요"
+              ? `${scopeLabel}에서 혼합(스머지)을 시작해요`
               : resumePlan.retouchTool === "dodge-burn"
-                ? "페이지 합성본에서 닷지/번을 시작해요"
+                ? `${scopeLabel}에서 닷지/번을 시작해요`
                 : resumePlan.retouchTool === "wet-mix"
-                  ? "페이지 합성본에서 혼색 브러시를 시작해요"
-                  : "페이지 합성본에서 리퀴파이를 시작해요",
+                  ? `${scopeLabel}에서 혼색 브러시를 시작해요`
+                  : `${scopeLabel}에서 리퀴파이를 시작해요`,
           );
           return;
         case "start-crop":
@@ -36034,7 +36145,11 @@ function clearSelectionForEdit() {
             resumePlan.inspectorRoute,
             isMobile ? "props" : null,
           );
-          announceDrawingShortcut("페이지 합성본의 자르기 경계를 조절하세요");
+          announceDrawingShortcut(
+            layerScoped
+              ? "선택 레이어 자르기 경계를 조절하세요"
+              : "페이지 합성본의 자르기 경계를 조절하세요",
+          );
           return;
         case "activate-selection":
           applyPixelSelectionActivation(resumePlan.selectionTool);
@@ -36042,7 +36157,7 @@ function clearSelectionForEdit() {
             { primary: "properties", image: "retouch" },
             isMobile ? "props" : null,
           );
-          announceDrawingShortcut("페이지 합성본에서 픽셀 선택을 시작해요");
+          announceDrawingShortcut(`${scopeLabel}에서 픽셀 선택을 시작해요`);
           return;
         case "open-inspector":
           openInspectorRoute(

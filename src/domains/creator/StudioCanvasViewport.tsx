@@ -1644,18 +1644,28 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     marqueeIds.length > 1 || singleDrawFreeScale
       ? canvasSelectionEls
           .filter((element) => !isEffectivelyHidden(element, groups))
-          .map((element) =>
+          .map((element) => {
             // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
             // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
             // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
-            element.type === "draw"
-              ? elBounds(element)
-              : liveNodeDisplayBounds(
-                  nodeRefsRef.current[element.id],
-                  mainLayerRef.current,
-                  elBounds(element)
-                )
-          )
+            if (element.type === "draw") {
+              const raw = elBounds(element);
+              // Horizontal/vertical freehand lines can report 0 height/width; free-scale
+              // handles require a positive box, so pad by stroke radius.
+              const pad = Math.max(1, Number(element.strokeWidth) > 0 ? element.strokeWidth / 2 : 1);
+              return {
+                x: raw.x - pad,
+                y: raw.y - pad,
+                w: Math.max(pad * 2, raw.w + pad * 2),
+                h: Math.max(pad * 2, raw.h + pad * 2),
+              };
+            }
+            return liveNodeDisplayBounds(
+              nodeRefsRef.current[element.id],
+              mainLayerRef.current,
+              elBounds(element),
+            );
+          })
       : [];
   const multiSelectionBounds =
     multiSelectionVisibleBounds.length > 0
@@ -2680,6 +2690,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       : [];
                   const hitKind = liveEl.kind ?? "freehand";
                   const hitShapeParams = normalizeShapeParams(liveEl.shapeParams);
+                  // Generous screen-space hit pad so thin strokes stay clickable at high zoom
+                  // (layer-scoped transform/crop starts with a reliable single-layer select).
                   const hitStrokeWidth = Math.max(
                     liveEl.mode === "eraser"
                       ? liveEl.strokeWidth
@@ -2687,7 +2699,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                           liveEl.brush,
                           liveEl.strokeWidth
                         ),
-                    10 / Math.max(effScale, 0.001)
+                    16 / Math.max(effScale, 0.001)
                   );
                   const hitClosedShape =
                     hitKind === "rect" ||
