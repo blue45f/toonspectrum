@@ -7,7 +7,6 @@ import {
 import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 
 import { AuthMenuShell } from "./auth/auth-menu-shell";
-import { MemberAuthControlShell } from "./auth/member-auth-control-shell";
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { cx } from "@/lib/cx";
@@ -201,10 +200,7 @@ export function SiteHeader() {
                 {keepInlineText(t("nav.library"))}
               </span>
             </Link>
-            {/* 통합 회원 로그인(Firebase 이메일/게스트) — 기존 세션 AuthMenu 와 별개로 추가 */}
-            <div className="hidden min-[380px]:contents">
-              <MemberAuthControlShell />
-            </div>
+            {/* 통합 회원 로그인/프로필 드롭다운 */}
             <AuthMenuShell />
 
             {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}
