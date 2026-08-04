@@ -26,6 +26,7 @@ import {
   resolveSignupAvatarImage,
 } from "../../../../../lib/avatar";
 import { db, users } from "../../../../../lib/db";
+import { resolveEffectiveAdminRole } from "../../../../../lib/server/admin-emails";
 import { getAppConfig } from "../../../../../lib/server/app-config";
 import {
   buildAuthorizeUrl,
@@ -561,12 +562,15 @@ export function authResponseUser(user: {
   readonly image?: string | null;
   readonly role?: string | null;
 }) {
+  // 로그인 직후 응답에도 ADMIN_EMAILS 화이트리스트를 반영한다.
+  // (resolveAuthSessionUser 와 동일 규칙 — 메뉴가 role===admin 만으로도 열리게)
+  const email = user.email ?? null;
   return {
     id: user.id,
     name: user.name ?? null,
-    email: user.email ?? null,
+    email,
     image: user.image ?? null,
-    role: normalizeRole(user.role),
+    role: resolveEffectiveAdminRole(normalizeRole(user.role), email),
   };
 }
 

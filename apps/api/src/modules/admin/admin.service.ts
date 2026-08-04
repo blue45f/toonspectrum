@@ -18,6 +18,10 @@ import {
   revenueLedger,
   users,
 } from "../../../../../lib/db";
+import {
+  getAdminEmailWhitelist,
+  normalizeAdminEmail,
+} from "../../../../../lib/server/admin-emails";
 import { getAppConfig, setAppConfig } from "../../../../../lib/server/app-config";
 import { deleteFanPost, ensureCommunityTables } from "../../../../../lib/server/community";
 import { invalidateSessionUser } from "../../../../../lib/server/session";
@@ -127,17 +131,6 @@ function parseBool(value: unknown, fallback = false) {
     return normalized === "1" || normalized === "true" || normalized === "on" || normalized === "yes" || normalized === "y";
   }
   return fallback;
-}
-
-const DEFAULT_ADMIN_EMAILS = ["blue45f@gmail.com"];
-
-function normalizeAdminEmailWhitelist() {
-  const envEmails =
-    process.env.ADMIN_EMAILS
-      ?.split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean) ?? [];
-  return new Set([...DEFAULT_ADMIN_EMAILS, ...envEmails]);
 }
 
 function toPlainObject(value: unknown) {
@@ -300,7 +293,9 @@ interface CampaignResponseRow {
 export class AdminService {
   async getAdminMe(userId: string) {
     try {
-      await ensureAdminSchema();
+      // 권한 판정만 한다. ensureAdminSchema(DDL) 는 runtime role 에 CREATE 가 없으면
+      // permission denied 로 떨어지는데, 그걸 403 "관리자 아님"으로 오인하면
+      // role=admin 계정도 콘솔에 못 들어온다. 스키마 보정은 쓰기 엔드포인트에서만.
       const admin = await requireAdminUser(userId);
       return {
         id: admin.id,
@@ -1691,8 +1686,8 @@ async function requireAdminUser(userId: string): Promise<{ id: string; name: str
   }
 
   const dbRole = normalizeRole(row.role);
-  const email = String(row.email ?? "").trim().toLowerCase();
-  const whitelist = normalizeAdminEmailWhitelist();
+  const email = normalizeAdminEmail(row.email);
+  const whitelist = getAdminEmailWhitelist();
   const finalRole: AdminRole = ADMIN_ROLES.has(dbRole) ? dbRole : whitelist.has(email) ? "admin" : dbRole;
 
   if (whitelist.has(email) && finalRole === "admin" && dbRole !== "admin") {
@@ -1963,23 +1958,92 @@ async function ensureAdminSchema() {
   if (adminSchemaReady) return;
   await ensureUserLifecycleSchema();
 
+  // runtime role(toonspectrum_runtime) 은 보통 public schema CREATE 권한이 없다.
+  // 테이블이 이미 있으면 DDL 없이 통과하고, 없을 때만 CREATE 를 시도한다.
+  // (CREATE IF NOT EXISTS 도 테이블이 있어도 CREATE 권한이 필요 — PG 규칙)
+  const requiredTables = [
+    "creator_profile",
+    "monetization_plan",
+    "creator_campaign",
+    "revenue_ledger",
+    "admin_audit_logs",
+    "admin_banned_words",
+    "admin_promos",
+    "admin_announcements",
+    "admin_security_policies",
+    "admin_content_reports",
+  ] as const;
+
+  const existing = await listPublicTables(requiredTables);
+  const missing = requiredTables.filter((name) => !existing.has(name));
+
   const userInfo = await dbClient.execute({
     sql: `SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
     args: ["user", "role"],
   });
   const hasRole = userInfo.rows.length > 0;
   if (!hasRole) {
-    await dbClient.execute(
-      `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`
-    );
+    try {
+      await dbClient.execute(
+        `ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user'`
+      );
+    } catch (error) {
+      if (!isInsufficientPrivilegeError(error)) throw error;
+      // role 컬럼이 이미 있는데 ALTER 권한만 없는 경우는 위에서 hasRole 로 걸러진다.
+      throw error;
+    }
   }
 
-  for (const sqlText of getAdminMigrationSql()) {
-    await dbClient.execute(sqlText);
+  if (missing.length > 0) {
+    try {
+      for (const sqlText of getAdminMigrationSql()) {
+        await dbClient.execute(sqlText);
+      }
+    } catch (error) {
+      if (!isInsufficientPrivilegeError(error)) throw error;
+      // migrator 가 이미 채워 둔 경우: 다시 조회해 전부 있으면 통과, 아니면 원인 노출.
+      const after = await listPublicTables(requiredTables);
+      const stillMissing = requiredTables.filter((name) => !after.has(name));
+      if (stillMissing.length > 0) {
+        throw new Error(
+          `admin schema incomplete and runtime role cannot CREATE (missing: ${stillMissing.join(", ")})`,
+          { cause: error },
+        );
+      }
+    }
   }
-  await ensureRevenueLedgerAuditColumns();
+
+  try {
+    await ensureRevenueLedgerAuditColumns();
+  } catch (error) {
+    if (!isInsufficientPrivilegeError(error)) throw error;
+    // 읽기 경로에서 컬럼 부재는 이후 쿼리 단계에서 드러난다. 권한 없으면 스킵.
+  }
 
   adminSchemaReady = true;
+}
+
+async function listPublicTables(names: readonly string[]): Promise<Set<string>> {
+  if (names.length === 0) return new Set();
+  const result = await dbClient.execute({
+    sql: `SELECT table_name AS name
+          FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = ANY(?::text[])`,
+    args: [names as unknown as string[]],
+  });
+  const out = new Set<string>();
+  for (const row of result.rows as Array<Record<string, unknown>>) {
+    const name = String(row.name ?? row.table_name ?? "");
+    if (name) out.add(name);
+  }
+  return out;
+}
+
+function isInsufficientPrivilegeError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string };
+  if (err?.code === "42501") return true; // insufficient_privilege
+  const message = String(err?.message ?? error ?? "").toLowerCase();
+  return message.includes("permission denied") || message.includes("must be owner");
 }
 
 function getAdminMigrationSql() {

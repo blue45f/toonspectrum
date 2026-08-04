@@ -200,7 +200,11 @@ export function SiteHeader() {
                 {keepInlineText(t("nav.library"))}
               </span>
             </Link>
-            {/* 통합 회원 로그인/프로필 드롭다운 */}
+            {/*
+              사이트 계정 진입점은 AuthMenuShell 하나뿐이다.
+              (Google/크리덴셜 세션 → 프로필·서재·설정·관리자·로그아웃)
+              Firebase "회원" 버튼은 별도 세션이라 같은 GNB에 두지 않는다.
+            */}
             <AuthMenuShell />
 
             {/* 오버플로 메뉴 트리거 (<1024px) — 모든 목적지 도달 보장 */}

@@ -5,6 +5,8 @@ import { OAuth2Client } from "google-auth-library";
 
 import { accounts, db, dbClient, users } from "../db";
 
+import { isWhitelistedAdminEmail, resolveEffectiveAdminRole } from "./admin-emails";
+import { invalidateSessionUser } from "./session";
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";
 
 // ── 소셜 로그인(Google·Kakao·Naver) ──
@@ -495,12 +497,23 @@ async function upsertOAuthUser(
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   const block = getUserAuthBlock(user);
   if (block) throw new OAuthAccountBlockedError(block);
+
+  const resolvedEmail = user?.email ?? email;
+  const dbRole = normalizeRole(user?.role);
+  const role = resolveEffectiveAdminRole(dbRole, resolvedEmail);
+
+  // 화이트리스트 계정은 로그인 시점에 DB role 을 admin 으로 지연 승격한다.
+  if (role === "admin" && dbRole !== "admin" && isWhitelistedAdminEmail(resolvedEmail)) {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
+    invalidateSessionUser(userId);
+  }
+
   return {
     id: userId,
     name: user?.name ?? name,
-    email: user?.email ?? email,
+    email: resolvedEmail,
     image: user?.image ?? profile.image ?? null,
-    role: normalizeRole(user?.role),
+    role,
     sessionVersion: normalizeSessionVersion(user?.sessionVersion),
   };
 }

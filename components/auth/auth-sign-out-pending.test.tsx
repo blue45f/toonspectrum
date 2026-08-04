@@ -4,15 +4,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthMenu } from "./auth-menu";
-import { MemberAuthControl } from "./member-auth-control";
 
 import type { AnchorHTMLAttributes } from "react";
 
 const sessionMocks = vi.hoisted(() => ({
-  signOut: vi.fn(),
-}));
-
-const firebaseMocks = vi.hoisted(() => ({
   signOut: vi.fn(),
 }));
 
@@ -46,30 +41,16 @@ vi.mock("@/src/compat/router-link", () => ({
 }));
 
 vi.mock("@/lib/i18n", () => ({
-  useT: () => (key: string) => ({
-    "auth.menu.triggerLabel": "계정 메뉴",
-    "auth.menu.fallbackName": "사용자",
-    "auth.menu.adminPanel": "관리자",
-    "auth.menu.profile": "프로필",
-    "nav.library": "서재",
-    "auth.menu.settings": "설정",
-    "auth.menu.signOut": "로그아웃",
-  })[key] ?? key,
-}));
-
-vi.mock("@/lib/firebaseAuth", () => ({
-  AuthDialog: () => null,
-  useAuth: () => ({
-    user: {
-      uid: "firebase-user-1",
-      email: "member@example.com",
-      isAnonymous: false,
-      displayName: "Member",
-    },
-    loading: false,
-    error: null,
-    signOut: firebaseMocks.signOut,
-  }),
+  useT: () => (key: string) =>
+    ({
+      "auth.menu.triggerLabel": "계정 메뉴",
+      "auth.menu.fallbackName": "사용자",
+      "auth.menu.adminPanel": "관리자",
+      "auth.menu.profile": "프로필",
+      "nav.library": "서재",
+      "auth.menu.settings": "설정",
+      "auth.menu.signOut": "로그아웃",
+    })[key] ?? key,
 }));
 
 function deferred<T>() {
@@ -85,7 +66,6 @@ function deferred<T>() {
 describe("logout pending UX", () => {
   beforeEach(() => {
     sessionMocks.signOut.mockReset();
-    firebaseMocks.signOut.mockReset();
   });
 
   afterEach(() => {
@@ -139,37 +119,5 @@ describe("logout pending UX", () => {
     await waitFor(() => expect(sessionMocks.signOut).toHaveBeenCalledTimes(2));
     expect(screen.queryByRole("status")).toBeNull();
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-  });
-
-  it("keeps the Firebase member visible and exposes a same-button retry after failure", async () => {
-    const first = deferred<void>();
-    firebaseMocks.signOut.mockReturnValueOnce(first.promise).mockResolvedValueOnce(undefined);
-
-    render(<MemberAuthControl />);
-
-    const firstAction = screen.getByRole("button", { name: "member@example.com 로그아웃" });
-    fireEvent.click(firstAction);
-    fireEvent.click(firstAction);
-
-    expect(firebaseMocks.signOut).toHaveBeenCalledTimes(1);
-    expect((screen.getByRole("button", { name: "member@example.com 로그아웃 처리 중" }) as HTMLButtonElement).disabled).toBe(true);
-
-    await act(async () => {
-      first.reject(new Error("offline"));
-      await first.promise.catch(() => undefined);
-    });
-
-    const status = screen.getByRole("status");
-    expect(status.className).not.toContain("sr-only");
-    expect(status.getAttribute("aria-live")).toBe("polite");
-    expect(status.textContent).toContain("연결을 확인한 뒤 다시 시도해 주세요");
-    expect(screen.getByText("member@example.com")).not.toBeNull();
-
-    const retryAction = screen.getByRole("button", { name: "member@example.com 로그아웃 다시 시도" });
-    expect(retryAction.getAttribute("aria-describedby")).toBe(status.id);
-    fireEvent.click(retryAction);
-
-    await waitFor(() => expect(firebaseMocks.signOut).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole("status")).toBeNull();
   });
 });
