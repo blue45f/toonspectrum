@@ -29,15 +29,25 @@ export const STUDIO_STAMP_BRUSH_MAX_DABS = 100_000;
 export function resolveStudioStampBrushKind(
   brushId: string | undefined
 ): StudioStampBrushKind | null {
-  if (!brushId) return null;
-  const id = brushId.toLowerCase();
-  if (id.includes("airbrush")) return "airbrush";
-  if (id.includes("pencil")) return "pencil";
-  if (id === "ink-brush" || id.includes("ink") || id.includes("pen")) return "ink";
-  if (id.includes("wash") || id.includes("watercolor")) return "watercolor";
-  if (id.includes("mypaint")) return "mypaint";
-  if (id.includes("krita")) return "krita-auto";
-  return null;
+  switch (brushId) {
+    case "ink-brush":
+      return "ink";
+    case "airbrush-fine":
+    case "airbrush-soft":
+      return "airbrush";
+    case "pencil-grain":
+      return "pencil";
+    case "wash-brush":
+      return "watercolor";
+    case "mypaint-smudge-oil":
+    case "mypaint-watercolor-expressive":
+      return "mypaint";
+    case "krita-auto-soft":
+    case "krita-dual-pattern":
+      return "krita-auto";
+    default:
+      return null;
+  }
 }
 
 export interface StudioStampBrushStyle {
