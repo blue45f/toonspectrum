@@ -490,7 +490,7 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
   shapeParams?: ShapeParams;
   symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
     centerX: number;
     centerY: number;
     radialCount?: number;

@@ -66,6 +66,7 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "mannequin3d", label: "3D 데생 인형", labelKey: "studio.settings.tool.mannequin", defaultShortcut: "" },
   { id: "vrm3d", label: "3D 캐릭터", labelKey: "studio.settings.tool.vrm3d", defaultShortcut: "" },
   { id: "bg3d", label: "3D 배경", labelKey: "studio.settings.tool.bg3d", defaultShortcut: "" },
+  { id: "hybrid-dcc", label: "Hybrid 3D DCC", labelKey: "studio.settings.tool.hybridDcc", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", labelKey: "studio.settings.tool.reference", defaultShortcut: "" },
 ] as const;
 

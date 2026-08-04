@@ -157,6 +157,54 @@ export function tintColor(baseHex: string, targetHex: string, strength = 0.85): 
   return rgbToHex(hslToRgb({ h: mixedHue, s: mixedSat, l }));
 }
 
+/**
+ * Mannequin clay gray (StudioVrmMannequinMaterial). Ephemeral paint — never lock as
+ * a costume "native" base, or recolor restores collapse garments to clay/black.
+ */
+export const COSTUME_MANNEQUIN_CLAY_HEX = "#b7b2a8" as const;
+
+/** Safe white lit factor when texture holds albedo (MToon color × map). */
+export const COSTUME_SAFE_LIT_BASE_HEX = "#ffffff" as const;
+
+export function normalizeCostumeHex(hex: string): string {
+  const trimmed = hex.trim().toLowerCase();
+  if (!trimmed) return COSTUME_SAFE_LIT_BASE_HEX;
+  return trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+}
+
+/** Near-black lit factors multiply texture albedo to pure black garments. */
+export function isNearBlackCostumeHex(hex: string): boolean {
+  const { r, g, b } = hexToRgb(normalizeCostumeHex(hex));
+  return r <= 0.02 && g <= 0.02 && b <= 0.02;
+}
+
+export function isMannequinClayCostumeHex(hex: string): boolean {
+  return normalizeCostumeHex(hex) === COSTUME_MANNEQUIN_CLAY_HEX;
+}
+
+/**
+ * Resolve the lit-factor base used for costume recolor / restore.
+ * - Mannequin clay is never cacheable (ephemeral pose paint).
+ * - Near-black × map is never cacheable as native (would bake pure black clothes).
+ * - Otherwise the current hex is a stable native base and may be cached once.
+ */
+export function resolveCostumeMaterialBaseHex(
+  currentHex: string,
+  options?: { hasMap?: boolean; cached?: string | null },
+): { hex: string; cacheable: boolean } {
+  if (options?.cached) {
+    return { hex: normalizeCostumeHex(options.cached), cacheable: true };
+  }
+  const normalized = normalizeCostumeHex(currentHex);
+  if (isMannequinClayCostumeHex(normalized)) {
+    return { hex: COSTUME_SAFE_LIT_BASE_HEX, cacheable: false };
+  }
+  if (isNearBlackCostumeHex(normalized) && options?.hasMap) {
+    return { hex: COSTUME_SAFE_LIT_BASE_HEX, cacheable: false };
+  }
+  return { hex: normalized, cacheable: true };
+}
+
 /* ── 의상 프리셋 팔레트 ────────────────────────────────────────────── */
 
 export interface CostumePalette {

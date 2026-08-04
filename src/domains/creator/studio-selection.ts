@@ -102,6 +102,25 @@ export function selectIdsByMarquee<T extends { id: string }>(
     .map((item) => item.id);
 }
 
+/**
+ * Topmost (last matching) object id under a document point. Linear scan for product paths
+ * that do not yet hold an RBush index; hybrid large-doc pick should prefer spatial indexes.
+ */
+export function pickObjectIdAtPoint<T extends { id: string }>(
+  items: readonly T[],
+  getBounds: (item: T) => Rect,
+  point: Readonly<{ x: number; y: number }>,
+  opts?: { include?: (item: T) => boolean },
+): string | null {
+  const include = opts?.include ?? (() => true);
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index]!;
+    if (!include(item)) continue;
+    if (rectContainsPoint(getBounds(item), point.x, point.y)) return item.id;
+  }
+  return null;
+}
+
 /** 여러 bounds의 합집합 bbox. */
 export function unionBounds(bounds: readonly Rect[]): Rect {
   if (bounds.length === 0) return { x: 0, y: 0, w: 0, h: 0 };

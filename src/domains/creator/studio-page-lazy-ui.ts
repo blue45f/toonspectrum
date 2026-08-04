@@ -475,6 +475,10 @@ const StudioNodeEditOverlay = lazyRetry(
   () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioNodeEditOverlay })),
   "StudioNodeEditOverlay"
 );
+const StudioCreativeCompetitorModesPanel = lazyRetry(
+  () => import("./StudioCreativeCompetitorModesPanel").then((mod) => ({ default: mod.StudioCreativeCompetitorModesPanel })),
+  "StudioCreativeCompetitorModesPanel"
+);
 const StudioDrawSelectionOverlay = lazyRetry(
   () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioDrawSelectionOverlay })),
   "StudioDrawSelectionOverlay"
@@ -866,6 +870,7 @@ export {
   StudioLiveStampOverlayHost,
   StudioMainMenu,
   StudioMasterPagePanel,
+  StudioCreativeCompetitorModesPanel,
   StudioDrawSelectionOverlay,
   StudioNodeEditOverlay,
   StudioOnionSkinImage,

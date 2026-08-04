@@ -18,7 +18,14 @@ import {
   createFullStateLoadHandlers,
   applyVrmMaterialFx,
   applyVrmCustomColors,
+  classifyVrmCustomColorPart,
+  classifyVrmCustomColorPartForMaterial,
   hasVrmMToonMaterial,
+  isVrmMannequinPaintColor,
+  isVrmNearBlackLitColor,
+  repairVrmTexturedNearBlackLitFactors,
+  scrubVrmMannequinColorCaches,
+  STUDIO_VRM_MANNEQUIN_COLOR_HEX,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
   type FingerRotationMap,
@@ -695,5 +702,132 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     // Resetting custom colors to empty or #ffffff restores original #1a2b3c
     applyVrmCustomColors(vrm, { tops: "#ffffff" });
     expect(`#${topsMat.color.getHexString()}`).toBe("#1a2b3c");
+  });
+
+  it("applyVrmCustomColors refuses near-black originals so textured clothes do not restore to pure black", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    expect(isVrmNearBlackLitColor(topsMat.color)).toBe(true);
+
+    applyVrmCustomColors(vrm, { tops: "#ff3366" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ff3366");
+
+    // Reset must restore white lit factor, not the near-black poison that multiplies texture to black.
+    applyVrmCustomColors(vrm, {});
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("applyVrmCustomColors refuses mannequin clay as native original", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(STUDIO_VRM_MANNEQUIN_COLOR_HEX),
+    });
+    addMesh(vrm.scene, "Tops_Jacket", topsMat);
+
+    expect(isVrmMannequinPaintColor(topsMat.color)).toBe(true);
+
+    applyVrmCustomColors(vrm, { tops: "#2244aa" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#2244aa");
+
+    applyVrmCustomColors(vrm, { tops: "#ffffff" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("scrubVrmMannequinColorCaches drops clay/near-black cached originals", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#abcdef") });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+    topsMat.userData.__vrmCustomColorOriginal = new THREE.Color("#000000");
+    topsMat.userData.__vrmCustomColorApplied = true;
+    topsMat.userData.__vrmMannequinActive = true;
+
+    scrubVrmMannequinColorCaches(vrm);
+
+    expect(topsMat.userData.__vrmMannequinActive).toBe(false);
+    expect(topsMat.userData.__vrmCustomColorOriginal).toBeUndefined();
+    expect(topsMat.userData.__vrmCustomColorApplied).toBe(false);
+  });
+
+  it("applyVrmCustomColors leaves materials alone while mannequin paint is active", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#b7b2a8") });
+    topsMat.userData.__vrmMannequinActive = true;
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    applyVrmCustomColors(vrm, { tops: "#ff0000" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#b7b2a8");
+  });
+
+  it("classifies clothing materials on multi-material Body meshes by material name", () => {
+    expect(classifyVrmCustomColorPart("Body")).toBe("body");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "F00_006_01_Tops_01_CLOTH")).toBe("tops");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "F00_008_01_Bottoms_01_CLOTH")).toBe("bottoms");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "Body_00_SKIN")).toBe("body");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "HairBack_00_HAIR")).toBe("hair");
+    expect(classifyVrmCustomColorPart("Alicia_wear")).toBe("tops");
+    expect(classifyVrmCustomColorPart("cloth")).toBe("tops");
+  });
+
+  it("applyVrmCustomColors recolors only matching materials on a multi-material Body mesh", () => {
+    const { vrm } = createMinimalVrm();
+    const skin = new THREE.MeshStandardMaterial({
+      name: "Body_00_SKIN",
+      color: new THREE.Color("#ffccaa"),
+    });
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), [skin, tops, bottoms]);
+    mesh.name = "Body";
+    vrm.scene.add(mesh);
+
+    applyVrmCustomColors(vrm, { tops: "#ff0000", bottoms: "#0000ff" });
+    expect(`#${skin.color.getHexString()}`).toBe("#ffccaa");
+    expect(`#${tops.color.getHexString()}`).toBe("#ff0000");
+    expect(`#${bottoms.color.getHexString()}`).toBe("#0000ff");
+
+    applyVrmCustomColors(vrm, {});
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    expect(`#${skin.color.getHexString()}`).toBe("#ffccaa");
+  });
+
+  it("repairVrmTexturedNearBlackLitFactors restores white lit on textured clothes", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Body", tops);
+
+    const fixed = repairVrmTexturedNearBlackLitFactors(vrm);
+    expect(fixed).toBe(1);
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("applyVrmCustomColors idle pass repairs textured near-black clothes on load", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Body", tops);
+
+    applyVrmCustomColors(vrm, {});
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
   });
 });

@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COSTUME_MANNEQUIN_CLAY_HEX,
   COSTUME_PALETTES,
+  COSTUME_SAFE_LIT_BASE_HEX,
   classifyMeshName,
   hexToRgb,
   hslToRgb,
   isCostumeMesh,
+  isMannequinClayCostumeHex,
+  isNearBlackCostumeHex,
   parseCostumeState,
+  resolveCostumeMaterialBaseHex,
   rgbToHex,
   rgbToHsl,
   serializeCostume,
@@ -87,6 +92,50 @@ describe("틴트(텍스처 음영 보존 리컬러)", () => {
     const dark = rgbToHsl(hexToRgb(tintColor("#303030", "#2b3a5e", 0.85))).l;
     const light = rgbToHsl(hexToRgb(tintColor("#b0b0b0", "#2b3a5e", 0.85))).l;
     expect(light).toBeGreaterThan(dark); // 주름/그림자 유지
+  });
+});
+
+describe("의상 lit base 안전 해석 (검정 옷 방지)", () => {
+  it("detects mannequin clay and near-black hex", () => {
+    expect(isMannequinClayCostumeHex(COSTUME_MANNEQUIN_CLAY_HEX)).toBe(true);
+    expect(isMannequinClayCostumeHex("#2b3a5e")).toBe(false);
+    expect(isNearBlackCostumeHex("#000000")).toBe(true);
+    expect(isNearBlackCostumeHex("#010101")).toBe(true);
+    expect(isNearBlackCostumeHex("#1c1c22")).toBe(false);
+  });
+
+  it("refuses mannequin clay as a cacheable native base", () => {
+    const resolved = resolveCostumeMaterialBaseHex(COSTUME_MANNEQUIN_CLAY_HEX, { hasMap: true });
+    expect(resolved.hex).toBe(COSTUME_SAFE_LIT_BASE_HEX);
+    expect(resolved.cacheable).toBe(false);
+  });
+
+  it("refuses near-black×map as a cacheable native base (black × texture = pure black clothes)", () => {
+    const resolved = resolveCostumeMaterialBaseHex("#000000", { hasMap: true });
+    expect(resolved.hex).toBe(COSTUME_SAFE_LIT_BASE_HEX);
+    expect(resolved.cacheable).toBe(false);
+  });
+
+  it("keeps legitimate dark untextured bases cacheable", () => {
+    const resolved = resolveCostumeMaterialBaseHex("#000000", { hasMap: false });
+    expect(resolved.hex).toBe("#000000");
+    expect(resolved.cacheable).toBe(true);
+  });
+
+  it("prefers a previously cached stable base", () => {
+    const resolved = resolveCostumeMaterialBaseHex("#000000", {
+      hasMap: true,
+      cached: "#2b3a5e",
+    });
+    expect(resolved.hex).toBe("#2b3a5e");
+    expect(resolved.cacheable).toBe(true);
+  });
+
+  it("tint from safe white base does not collapse recolor to black", () => {
+    const poisoned = tintColor("#000000", "#2b3a5e", 0.85);
+    const safe = tintColor(COSTUME_SAFE_LIT_BASE_HEX, "#2b3a5e", 0.85);
+    expect(rgbToHsl(hexToRgb(safe)).l).toBeGreaterThan(rgbToHsl(hexToRgb(poisoned)).l);
+    expect(rgbToHsl(hexToRgb(safe)).l).toBeGreaterThan(0.15);
   });
 });
 

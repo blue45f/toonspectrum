@@ -1,4 +1,5 @@
 import {
+  Box,
   Boxes,
   Circle,
   CircleDashed,
@@ -197,6 +198,7 @@ interface StudioLeftToolRailProps {
   mannequinPoserOpen?: boolean;
   poserVrmOpen?: boolean;
   bg3dOpen?: boolean;
+  hybridDccOpen?: boolean;
   selected: El | null;
   selectedImageMutationLocked: boolean;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
@@ -214,6 +216,7 @@ interface StudioLeftToolRailProps {
   setMannequinPoserOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setHybridDccOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
@@ -256,6 +259,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   mannequinPoserOpen = false,
   poserVrmOpen = false,
   bg3dOpen = false,
+  hybridDccOpen = false,
   selected,
   selectedImageMutationLocked,
   setAppSettingsInitialTab,
@@ -273,6 +277,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setMannequinPoserOpen,
   setPoserVrmOpen,
   setBg3dOpen,
+  setHybridDccOpen,
+  setStrokeWidth: _setStrokeWidth,
   setTool,
   setViewTool,
   dodgeBurnActive,
@@ -530,6 +536,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 "mannequin3d",
                 "vrm3d",
                 "bg3d",
+                "hybrid-dcc",
                 "reference",
               ] as StudioRailToolId[]
             )
@@ -643,7 +650,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("transform") ? (
             <StudioRailToolButton
               icon={Maximize2}
-              label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
+              label={pixelTransformRecoveryAvailable ? "변형 준비 · 선택" : "변형 (⇧T)"}
               description={
                 pixelTransformRecoveryAvailable
                   ? "변형할 이미지 레이어를 먼저 고르세요. 이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요. 지금 사각 선택을 시작하고, 선택 뒤 이 위치에서 변형을 바로 열 수 있어요."
@@ -1129,6 +1136,16 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={poserVrmOpen}
               accented
               onClick={() => setPoserVrmOpen?.((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("hybrid-dcc") ? (
+            <StudioRailToolButton
+              icon={Box}
+              label="Hybrid 3D DCC"
+              description="메시·불리언·CAD/스컬프/클로스·샷·.toon3d 하이브리드 워크스페이스를 엽니다. 웹툰 세트장 구축과 컷 연출을 한 화면에서 처리합니다."
+              active={hybridDccOpen}
+              accented
+              onClick={() => setHybridDccOpen?.((v) => !v)}
             />
             ) : null}
             {isRailToolVisible("bg3d") ? (

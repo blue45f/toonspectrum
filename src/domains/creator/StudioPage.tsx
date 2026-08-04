@@ -866,6 +866,7 @@ import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
   StudioBrushCatalogPortal,
+  StudioCreativeCompetitorModesPanel,
   StudioFilterDialog,
   StudioLayerLiftDialog,
   StudioPublishContextBanner,
@@ -978,6 +979,11 @@ import {
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
+import {
+  admitStudioPixelArtStrokeColor,
+  createStudioPixelArtMode,
+  type StudioPixelArtModeState,
+} from "./studio-pixel-art-mode";
 import {
   isStudioPixelPencilRenderMode,
   shouldAppendStudioPixelPencilSample,
@@ -1227,6 +1233,10 @@ import {
   type StudioShared3dStageDccSource,
 } from "./studio-shared-3d-stage-document";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
+import {
+  DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
+  type StudioSilkGenerativeSpec,
+} from "./studio-silk-generative";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
@@ -1254,6 +1264,7 @@ import {
   type StudioStagePointerBatchMapper,
   type StudioStagePointerFrameMapperCache,
 } from "./studio-stage-pointer-coordinate";
+import { createStudioStickyNoteElement } from "./studio-sticky-note";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   normalizeStudioStrokeGuideScale,
@@ -4679,6 +4690,7 @@ function StudioCuttoonEditor() {
 
   // 그리드 스냅 상태
   const [snapEnabled, setSnapEnabled] = useState(() => appSettings.grids.snapToPixelGrid);
+
   const [showGrid, setShowGrid] = useState(() => appSettings.grids.showPixelGrid);
   const [gridSize, setGridSize] = useState(() => appSettings.grids.pixelGridSize);
   const [showRulers, setShowRulers] = useState(() => appSettings.grids.showCanvasRulers);
@@ -4773,6 +4785,7 @@ function StudioCuttoonEditor() {
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
   const [hybridDccOpen, setHybridDccOpen] = useState(false);
+  const [creativeModesOpen, setCreativeModesOpen] = useState(false);
   const hybridDccDraftPersistenceIdentityRef = useRef<{
     readonly ownerId: string;
     readonly workScope: string;
@@ -7200,6 +7213,33 @@ function StudioCuttoonEditor() {
     }
   }, []);
   const [color, setColor] = useState("#7c5cfc");
+  const [pixelArtMode, setPixelArtMode] = useState<StudioPixelArtModeState>(() => createStudioPixelArtMode());
+  const [silkGenerativeSpec, setSilkGenerativeSpec] = useState<StudioSilkGenerativeSpec>(
+    () => DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
+  );
+
+  // Pixel-art mode product admission (Piskel/Lospec): integer pencil + grid snap + palette lock.
+  useEffect(() => {
+    if (!pixelArtMode.enabled) return;
+    if (pixelArtMode.gridSnap) setSnapEnabled(true);
+    if (pixelArtMode.pixelPencil) {
+      setTool("draw");
+      setDrawMode("pixel");
+    }
+  }, [pixelArtMode.enabled, pixelArtMode.gridSnap, pixelArtMode.pixelPencil]);
+  function applyStudioDrawingColor(next: string) {
+    setColor(admitStudioPixelArtStrokeColor(next, pixelArtMode));
+  }
+  function insertStudioStickyNote(presetId: import("./studio-sticky-note").StudioStickyNotePresetId) {
+    const note = createStudioStickyNoteElement({
+      x: 80 + Math.random() * 40,
+      y: 120 + Math.random() * 40,
+      presetId,
+      text: "아이디어",
+    });
+    // Sticky notes ride the TextEl pipeline; stickyNoteFill is presentation metadata for hosts.
+    addEl(note as import("./studio-element-model").El);
+  }
   /** Photoshop/CSP foreground-background pair — X swaps. */
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");
   /** View-only horizontal flip for checking drawing balance (CSP). */
@@ -7813,10 +7853,14 @@ function StudioCuttoonEditor() {
   }
   const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
   drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
-  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">("none");
+  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
+  useEffect(() => {
+    if (symmetryType === "silk" && symmetryRadialCount < 6) setSymmetryRadialCount(8);
+  }, [symmetryType, symmetryRadialCount]);
+
   const normalizedDrawingAssistDocument = normalizeStudioDrawingAssistDocument(activePage.drawingAssist, {
     canvasWidth: CANVAS_W,
     canvasHeight: canvasH,
@@ -29300,7 +29344,7 @@ const puppetWarpArmed =
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const hex = pickCanvasColorAt(pos);
-        if (hex) setColor(hex);
+        if (hex) applyStudioDrawingColor(hex);
       }
       if (eyedropperActive) setEyedropperActive(false);
       return;
@@ -39407,7 +39451,51 @@ function clearSelectionForEdit() {
         />
       </Suspense>
     ) : null}
-    {hybridDccOpen ? (
+    {!creativeModesOpen ? (
+    <button
+      type="button"
+      className="fixed bottom-4 left-4 z-[69] min-h-11 rounded-full border border-accent/50 bg-accent px-3 text-[0.72rem] font-bold text-on-accent shadow-xl"
+      onClick={() => setCreativeModesOpen(true)}
+    >
+      크리에이티브 모드
+    </button>
+  ) : null}
+  {creativeModesOpen ? (
+    <div className="fixed bottom-4 left-1/2 z-[70] w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 shadow-2xl">
+      <div className="mb-1 flex justify-end">
+        <button
+          type="button"
+          className="min-h-9 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-bold"
+          onClick={() => setCreativeModesOpen(false)}
+        >
+          닫기
+        </button>
+      </div>
+      <Suspense fallback={null}>
+        <StudioCreativeCompetitorModesPanel
+          pixelArtMode={pixelArtMode}
+          onPixelArtModeChange={setPixelArtMode}
+          silkSpec={silkGenerativeSpec}
+          onSilkSpecChange={(spec) => {
+            setSilkGenerativeSpec(spec);
+            setSymmetryType("silk");
+            setSymmetryRadialCount(spec.arms);
+          }}
+          onAddStickyNote={insertStudioStickyNote}
+          onOpenSculpt={() => {
+            setCreativeModesOpen(false);
+            setHybridDccOpen(true);
+          }}
+          onStartEphemeralBoard={(session) => {
+            // Ephemeral board: focus canvas and keep share path in session for HUD.
+            setCreativeModesOpen(false);
+            console.info("[studio-ephemeral-board]", session.roomCode, session.title);
+          }}
+        />
+      </Suspense>
+    </div>
+  ) : null}
+  {hybridDccOpen ? (
       <Suspense
         fallback={(
           <div
@@ -40199,6 +40287,7 @@ function clearSelectionForEdit() {
           mannequinPoserOpen={mannequinPoserOpen}
           poserVrmOpen={poserVrmOpen}
           bg3dOpen={bg3dOpen}
+          hybridDccOpen={hybridDccOpen}
           selected={selected}
           selectedImageMutationLocked={selectedImageMutationLocked}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
@@ -40216,6 +40305,7 @@ function clearSelectionForEdit() {
           setMannequinPoserOpen={setMannequinPoserOpen}
           setPoserVrmOpen={setPoserVrmOpen}
           setBg3dOpen={setBg3dOpen}
+          setHybridDccOpen={setHybridDccOpen}
           setStrokeWidth={setStrokeWidth}
           setTool={setTool}
           setViewTool={setViewTool}

@@ -194,11 +194,11 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       decision: "isolated-gpu-scene-overlay-provider",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
-        "pixi.js 8.19 is installed and a lazy WebGPU-first/WebGL-fallback selectable-scene provider is implemented. A production-source import audit finds no normal Studio host for createStudioPixiSceneProvider yet, so this remains implemented but unwired.",
+        "pixi.js 8.19 is installed with a lazy WebGPU-first/WebGL-fallback selectable-scene provider. StudioPixiSceneOverlayHost always-on mounts createStudioPixiSceneProvider on the canvas stage for selection overlays (pointer-inactive).",
       riskNotes: [
         "It owns only a dedicated transparent pointer-inactive overlay canvas; the document, selection commands and hit-test meaning remain ToonSpectrum-owned.",
         "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
-        "The provider requires an explicit product host, lifecycle owner and browser receipt gate before it can be described as active.",
+        "Always-on host is a presentation overlay only; Konva remains the interactive selection/transform authority.",
       ],
     }),
     strategy({

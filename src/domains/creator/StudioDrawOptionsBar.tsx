@@ -70,7 +70,7 @@ import type {
 import { cn } from "@/lib/utils";
 
 export type StudioDrawModeUi = "pen" | "pixel" | "eraser" | "shape";
-export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
 export type StudioStabilizerModeUi = "standard" | "adaptive" | "precision";
 export type StudioPressureCurveUi = "soft" | "linear" | "firm";
 
@@ -1295,6 +1295,7 @@ export function StudioDrawOptionsBar({
                   { id: "horizontal" as const, label: "가로" },
                   { id: "radial" as const, label: "방사" },
                   { id: "kaleidoscope" as const, label: "만화경" },
+                  { id: "silk" as const, label: "실크" },
                 ] as const
               ).map((item) => (
                 <StudioToolHintTarget
@@ -1309,6 +1310,8 @@ export function StudioDrawOptionsBar({
                           ? "가로 중심축을 기준으로 위아래에 같은 획을 동시에 그립니다."
                           : item.id === "radial"
                             ? "중심을 둘러싼 여러 방향으로 획을 복제해 장식·효과선을 만듭니다."
+                            : item.id === "silk"
+                            ? "여러 팔로 퍼지는 생성형 대칭 문양(Silk 스타일)을 만듭니다."
                             : "회전과 반사를 함께 반복해 만화경처럼 연속된 무늬를 만듭니다.",
                     undefined,
                     "symmetry",

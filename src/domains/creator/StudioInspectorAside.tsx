@@ -655,7 +655,7 @@ interface StudioInspectorAsideProps {
   setSymmetryCenterX: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryCenterY: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryRadialCount: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">>;
+  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">>;
   setTiltEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTipAngle: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTipRoundness: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -703,7 +703,7 @@ interface StudioInspectorAsideProps {
   symmetryCenterX: number;
   symmetryCenterY: number;
   symmetryRadialCount: number;
-  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
   tagsText: string;
   timelinePlaying: boolean;
   tiltEnabled: boolean;

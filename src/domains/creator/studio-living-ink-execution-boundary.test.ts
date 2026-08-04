@@ -39,10 +39,34 @@ describe("Living Ink actual execution boundary", () => {
     expect(runtime).toContain("fixDurationSeconds");
   });
 
+  it("ships InkWash §06 chromatography chemistry and brush-tip scrub bleed on the GPU path", () => {
+    // Chemistry is computed in TS helpers and uploaded as uniforms — not re-derived only in GLSL.
+    expect(runtime).toContain("studioLivingInkChromaBleedMultipliers");
+    expect(runtime).toContain("studioLivingInkPigmentDiffusionRates");
+    expect(runtime).toContain("chromaMultipliers");
+    expect(runtime).toContain("separatedDiffusionQuiet");
+    expect(runtime).toContain("separatedDiffusionTip");
+    expect(runtime).toContain("mix(separatedDiffusionQuiet, separatedDiffusionTip, brush)");
+    expect(runtime).toContain("uniform vec3 brushFootprint");
+    expect(runtime).toContain("clearBrushFootprint");
+    expect(runtime).toContain("0.16 * load");
+    // Interactive path must not interleave a full fluid step every few marks (stutter).
+    expect(runtime).not.toContain("interleaved-wash-step");
+    expect(runtime).toContain("paper * exp(-opticalDensity)");
+    expect(runtime).toContain("bleachCoverage");
+    // Ghost tip must not survive pen-up into settle/advance/fix ticks.
+    expect(runtime).toContain("this.clearBrushFootprint()");
+    const clearAfterDeposit = runtime.indexOf("this.clearBrushFootprint()");
+    const settleLoop = runtime.indexOf("for (let tick = 0; tick < ticks; tick += 1)");
+    expect(clearAfterDeposit).toBeGreaterThan(0);
+    expect(settleLoop).toBeGreaterThan(clearAfterDeposit);
+  });
+
   it("keeps continuous Gaussian segments, selection orientation and ping-pong identity explicit", () => {
     expect(runtime).toContain("float along = clamp");
     expect(runtime).toContain("private syncDoubleDirty");
-    expect(runtime.match(/this\.syncDoubleDirty\(/g)?.length).toBeGreaterThanOrEqual(9);
+    // Jacobi mid-loop sync was removed for interactive perf; remaining syncs still cover parity.
+    expect(runtime.match(/this\.syncDoubleDirty\(/g)?.length).toBeGreaterThanOrEqual(6);
     expect(runtime).toContain("this.advanceDirtyHalo();");
     expect(runtime).toContain("height - 1 - (selection.bounds.y + row)");
     expect(runtime).toContain("accepted = clamp(settle * coverage");

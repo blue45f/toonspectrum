@@ -74,6 +74,7 @@ import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "./StudioKonvaPrimitiveNodes";
 import { StudioKonvaStickerNode, StudioKonvaTextNode } from "./StudioKonvaTextNodes";
 import { StudioPageSequenceStrip } from "./StudioPageSequenceStrip";
+import { StudioPixiSceneOverlayHost } from "./StudioPixiSceneOverlayHost";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
@@ -708,7 +709,7 @@ export interface StudioCanvasViewportProps {
   symmetryCenterX: number;
   symmetryCenterY: number;
   symmetryRadialCount: number;
-  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
   textAiConfigured: boolean;
   timelapseCapturing: boolean;
   timelineFocusedTrackId: string | null;
@@ -1162,6 +1163,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canonicalDryMediaCanvasAuthority,
     setCanonicalDryMediaCanvasAuthority,
   ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
+  const [pixiMountParent, setPixiMountParent] = useState<HTMLDivElement | null>(null);
   const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
   const livingInkCanvasRef = useRef<HTMLCanvasElement>(null);
   const hokusaiSurfaceLeft = webGpuViewportSurface?.surface.left;
@@ -2032,7 +2034,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               "bg-[oklch(0.145_0.008_70)]",
               "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
               "[background-size:24px_24px]",
-              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-none",
+              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent focus-visible:shadow-[inset_0_0_0_1px_oklch(0.72_0.14_55/0.45)] lg:max-h-none",
               canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
@@ -2212,7 +2214,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               invariant (surface + Stage share this filter ancestor, vignette stays outside) is
               pinned by studio-raster-handoff-authority.test.ts. */}
           <div
-            ref={zoomHostRef}
+            ref={(node) => {
+              zoomHostRef.current = node;
+              setPixiMountParent(node);
+            }}
             data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
             data-studio-brush-cursor-style={
               tool === "draw" && isStudioBrushCursorMode(drawMode)
@@ -3678,6 +3683,20 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             ) : null}
           </Suspense>
+          <StudioPixiSceneOverlayHost
+            enabled
+            mountParent={pixiMountParent}
+            width={stageViewLayout.width}
+            height={stageViewLayout.height}
+            elements={elements}
+            selectedIds={
+              marqueeIds.length > 0
+                ? marqueeIds
+                : selectedId
+                  ? [selectedId]
+                  : []
+            }
+          />
           {webGpuViewportSurface ? (
             <canvas
               ref={livingInkCanvasRef}

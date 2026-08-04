@@ -142,7 +142,7 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
   ],
   stabilizer: ["standard", "adaptive", "precision", "post-correction"],
   pressure: ["linear", "soft", "firm"],
-  symmetry: ["none", "vertical", "horizontal", "radial", "kaleidoscope"],
+  symmetry: ["none", "vertical", "horizontal", "radial", "kaleidoscope", "silk"],
   "zoom-view": ["zoom-out", "zoom-in", "actual-size", "fit-width", "reset"],
   "view-hud": ["zoom-open", "zoom-close", "rotate-open", "rotate-close"],
   "color-vision": ["original", "grayscale", "protanopia", "deuteranopia", "tritanopia"],

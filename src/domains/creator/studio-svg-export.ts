@@ -425,7 +425,7 @@ export interface SvgDrawElLike extends SvgElMeta {
   shapeParams?: ShapeParams;
   sketch?: StudioSketchStyle;
   symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
     centerX: number;
     centerY: number;
     radialCount?: number;

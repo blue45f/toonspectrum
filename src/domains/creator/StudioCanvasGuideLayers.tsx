@@ -158,7 +158,8 @@ export type StudioCanvasSymmetryType =
   | "vertical"
   | "horizontal"
   | "radial"
-  | "kaleidoscope";
+  | "kaleidoscope"
+  | "silk";
 
 export interface StudioCanvasGuideOverlayLayersProps {
   isExporting: boolean;
@@ -606,7 +607,7 @@ export function StudioCanvasGuideOverlayLayers({
               />
             </>
           )}
-          {symmetryType === "kaleidoscope" && (
+          {(symmetryType === "kaleidoscope" || symmetryType === "silk") && (
             <>
               {Array.from({ length: symmetryRadialCount }).map((_, index) => {
                 const angle = wedgeBoundaryAngle(index, symmetryRadialCount);

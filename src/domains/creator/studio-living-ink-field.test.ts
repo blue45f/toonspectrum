@@ -6,6 +6,11 @@ import {
   createStudioLivingInkStrokeOperation,
   decodeStudioLivingInkSnapshot,
   encodeStudioLivingInkSnapshot,
+  studioLivingInkBrushBleedBoost,
+  studioLivingInkChromaBleedMultipliers,
+  studioLivingInkPigmentDiffusionRates,
+  STUDIO_LIVING_INK_BRUSH_BLEED,
+  STUDIO_LIVING_INK_CHROMA_COEFFS,
   STUDIO_LIVING_INK_FIELD_VERSION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
   undoStudioLivingInkOperation,
@@ -101,6 +106,154 @@ async function applied(
 }
 
 describe("Studio Living Ink field", () => {
+  it("keeps InkWash chromatography chemistry ordered: red-absorbing dye escapes fastest", () => {
+    const zero = studioLivingInkChromaBleedMultipliers(0);
+    expect(zero[0]).toBeCloseTo(1, 10);
+    expect(zero[1]).toBeCloseTo(1, 10);
+    expect(zero[2]).toBeCloseTo(1, 10);
+    const full = studioLivingInkChromaBleedMultipliers(1);
+    expect(full[0]).toBeGreaterThan(full[1]);
+    expect(full[1]).toBeGreaterThan(full[2]);
+    expect(full[0]).toBeCloseTo(1 + STUDIO_LIVING_INK_CHROMA_COEFFS.redGain, 10);
+    expect(full[1]).toBeCloseTo(1 + STUDIO_LIVING_INK_CHROMA_COEFFS.greenGain, 10);
+    expect(full[2]).toBeCloseTo(
+      Math.max(
+        STUDIO_LIVING_INK_CHROMA_COEFFS.blueFloor,
+        1 - STUDIO_LIVING_INK_CHROMA_COEFFS.blueLoss,
+      ),
+      10,
+    );
+    expect(studioLivingInkBrushBleedBoost(0)).toBeCloseTo(STUDIO_LIVING_INK_BRUSH_BLEED.base, 10);
+    expect(studioLivingInkBrushBleedBoost(1)).toBeCloseTo(
+      STUDIO_LIVING_INK_BRUSH_BLEED.base + STUDIO_LIVING_INK_BRUSH_BLEED.gain,
+      10,
+    );
+    expect(studioLivingInkBrushBleedBoost(1)).toBeGreaterThan(studioLivingInkBrushBleedBoost(0) * 5);
+  });
+
+  it("ships the same pigment diffusion rates the WebGL2 runtime uploads each step", () => {
+    const quiet = studioLivingInkPigmentDiffusionRates({
+      bleed: 0.56,
+      mobility: 1,
+      dt: 1 / 60,
+      brushFootprint: 0,
+      chromaticSeparation: 1,
+    });
+    const tip = studioLivingInkPigmentDiffusionRates({
+      bleed: 0.56,
+      mobility: 1,
+      dt: 1 / 60,
+      brushFootprint: 1,
+      chromaticSeparation: 1,
+    });
+    // Red-absorbing channel bleeds faster than blue-absorbing when chroma is maxed.
+    expect(quiet[0]).toBeGreaterThan(quiet[1]);
+    expect(quiet[1]).toBeGreaterThan(quiet[2]);
+    // Active tip scrub multiplies bleed vs quiet paper.
+    expect(tip[0]).toBeGreaterThan(quiet[0] * 5);
+    expect(tip[1]).toBeGreaterThan(quiet[1] * 5);
+    expect(tip[2]).toBeGreaterThan(quiet[2] * 5);
+    // Dry paper (mobility 0) freezes diffusion regardless of tip.
+    const dry = studioLivingInkPigmentDiffusionRates({
+      bleed: 1,
+      mobility: 0,
+      dt: 1 / 60,
+      brushFootprint: 1,
+      chromaticSeparation: 1,
+    });
+    expect(dry).toEqual([0, 0, 0, 0]);
+    // Rates must be the exact values the runtime uploads (quiet/tip mix uniforms).
+    expect(quiet.every((rate) => rate >= 0 && rate <= STUDIO_LIVING_INK_BRUSH_BLEED.channelCeiling))
+      .toBe(true);
+    expect(tip.every((rate) => rate >= 0 && rate <= STUDIO_LIVING_INK_BRUSH_BLEED.channelCeiling))
+      .toBe(true);
+  });
+
+  it("runs a scripted ink→water→fix→second-layer sequence with fixed immutability", async () => {
+    const initial = session(16, 16);
+    const line = await applied(initial, ink(1, {
+      x: 8,
+      y: 8,
+      radius: 2.2,
+      pigmentMass: 4,
+      waterMass: 2,
+      color: [0.08, 0.1, 0.18, 1],
+    }));
+    const mobileAfterLine = total(line.session.state.mobilePigmentMass);
+    expect(mobileAfterLine).toBeGreaterThan(0);
+
+    const wash = await applied(line.session, {
+      kind: "water",
+      version: 1,
+      sequence: 2,
+      tool: "water-brush",
+      marks: [
+        { x: 6, y: 8, radius: 3, pressure: 0.9, speed: 30, waterMass: 6 },
+        { x: 10, y: 8, radius: 3, pressure: 0.9, speed: 30, waterMass: 6 },
+      ],
+      selection: null,
+    });
+    expect(total(wash.session.state.surfaceWater)).toBeGreaterThan(total(line.session.state.surfaceWater));
+    expect(total(wash.session.state.mobilePigmentMass)).toBeCloseTo(mobileAfterLine, 10);
+
+    const settled = await applied(wash.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 3,
+      fixedTicks: 6,
+    });
+    expect(total(settled.session.state.mobilePigmentMass)).toBeGreaterThan(0);
+
+    const fixed = await applied(settled.session, {
+      kind: "fix",
+      version: 1,
+      sequence: 4,
+      scope: "all",
+      selection: null,
+    });
+    const fixedMass = total(fixed.session.state.fixedPigmentMass);
+    expect(total(fixed.session.state.mobilePigmentMass)).toBe(0);
+    expect(fixedMass).toBeGreaterThan(0);
+    expect(total(fixed.session.state.surfaceWater)).toBe(0);
+
+    const secondLayer = await applied(fixed.session, ink(5, {
+      x: 10,
+      y: 10,
+      radius: 1.8,
+      pigmentMass: 2.5,
+      waterMass: 1.5,
+      color: [0.05, 0.06, 0.1, 1],
+    }));
+    expect(total(secondLayer.session.state.mobilePigmentMass)).toBeGreaterThan(0);
+    expect(total(secondLayer.session.state.fixedPigmentMass)).toBeCloseTo(fixedMass, 10);
+
+    const mobileBeforeRewet = total(secondLayer.session.state.mobilePigmentMass);
+    const rewet = await applied(secondLayer.session, {
+      kind: "water",
+      version: 1,
+      sequence: 6,
+      tool: "water-brush",
+      marks: [{ x: 8, y: 8, radius: 4, pressure: 1, speed: 0, waterMass: 10 }],
+      selection: null,
+    });
+    // Water alone must not lift fixed pigment (rewet lift disabled, InkWash §07).
+    expect(total(rewet.session.state.fixedPigmentMass)).toBeCloseTo(fixedMass, 10);
+    expect(total(rewet.session.state.mobilePigmentMass)).toBeCloseTo(mobileBeforeRewet, 10);
+
+    const afterRewet = await applied(rewet.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 7,
+      fixedTicks: 8,
+    });
+    // Natural fixation may grow the fixed well; rewet must never shrink it.
+    expect(total(afterRewet.session.state.fixedPigmentMass)).toBeGreaterThanOrEqual(fixedMass - 1e-9);
+    const pigmentBefore = mobileBeforeRewet + fixedMass;
+    const pigmentAfter = total(afterRewet.session.state.mobilePigmentMass)
+      + total(afterRewet.session.state.fixedPigmentMass);
+    expect(pigmentAfter).toBeCloseTo(pigmentBefore, 6);
+  });
+
   it("keeps white gouache canonical through dark→fix→white→save→fix→dark layering", async () => {
     const initial = session();
     const dark = await applied(initial, ink(1, {

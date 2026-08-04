@@ -5,6 +5,10 @@
  * - Canva Draw: beginner-first short brush set + size chips + large starter cards
  * - Picsart Draw: visual brush tray with categories + stroke previews
  * - Adobe Express: digital pencil/marker/brush named for easy pick
+ * - Piskel/Lospec: pixel art + restricted palettes
+ * - Miro/tldraw: sticky notes + ephemeral whiteboard
+ * - Silk: generative multi-arm symmetry trails
+ * - SculptGL: browser sculpt (Hybrid DCC sculpt kernel)
  * - 레이아웃 밀도 프리셋은 studio-ui-density.ts 에 매핑돼 있다
  *
  * Pure data + presentation helpers; no document state.
@@ -396,7 +400,12 @@ export type StudioCreativeStarterId =
   | "collab-focus"
   | "character"
   | "bubble"
-  | "publish";
+  | "publish"
+  | "pixel-art"
+  | "sticky-board"
+  | "silk-flow"
+  | "ephemeral-board"
+  | "sculpt-3d";
 
 export interface StudioCreativeStarterCard {
   id: StudioCreativeStarterId;
@@ -454,5 +463,35 @@ export const STUDIO_CREATIVE_STARTER_CARDS: readonly StudioCreativeStarterCard[]
     label: "말풍선",
     hint: "대사 넣기",
     inspiredBy: "webtoon workflow",
+  },
+  {
+    id: "pixel-art",
+    label: "픽셀 아트",
+    hint: "도트·팔레트 잠금·GIF",
+    inspiredBy: "Piskel / Pixilart / Lospec",
+  },
+  {
+    id: "sticky-board",
+    label: "스티키 보드",
+    hint: "아이디어 포스트잇",
+    inspiredBy: "Miro / tldraw",
+  },
+  {
+    id: "silk-flow",
+    label: "실크 플로우",
+    hint: "대칭 생성형 문양",
+    inspiredBy: "Silk generative art",
+  },
+  {
+    id: "ephemeral-board",
+    label: "빠른 보드",
+    hint: "휘발 공유 화이트보드",
+    inspiredBy: "Witeboard / Whiteboard.fi",
+  },
+  {
+    id: "sculpt-3d",
+    label: "3D 스컬프",
+    hint: "찰흙 조형 브러시",
+    inspiredBy: "SculptGL",
   },
 ]);

@@ -53,12 +53,13 @@ const capabilities: StudioLivingInkExecutionCapabilities = {
   worker: true,
   offscreenCanvas: true,
   webgl2: true,
+  webgpu: false,
   halfFloatRenderable: true,
   rgba16Float: true,
   rg16Float: true,
   r16Float: true,
   maximumTextureSize: 16_384,
-  pressureIterations: { interactive: 10, settle: 22 },
+  pressureIterations: { interactive: 4, settle: 22 },
 };
 
 function bitmap(): ImageBitmap & { closed: boolean } {

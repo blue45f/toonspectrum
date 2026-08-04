@@ -9,7 +9,7 @@ import type {
 
 export const STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION =
-  "1.1.0-independent-webgl2-continuous-capsule" as const;
+  "1.2.0-webgpu-pure-wgsl-field-or-webgl2-capsule" as const;
 
 export const STUDIO_LIVING_INK_EXECUTION_LIMITS = Object.freeze({
   maximumFineDimension: 2_048,
@@ -17,7 +17,11 @@ export const STUDIO_LIVING_INK_EXECUTION_LIMITS = Object.freeze({
   maximumMarksPerRequest: 4_096,
   maximumAdvanceTicks: 1_080,
   maximumJournalOperations: 512,
-  interactivePressureIterations: 10,
+  /**
+   * Live stroke budget. Full 10+ Jacobi was for settle quality; interactive only needs a stable
+   * incompressible field, and each iteration was paired with a dirty-region ping-pong copy.
+   */
+  interactivePressureIterations: 4,
   settlePressureIterations: 22,
   fixedTimeStepSeconds: 1 / 60,
   fixDurationSeconds: 1.2,
@@ -37,19 +41,24 @@ export interface StudioLivingInkExecutionConfig {
   readonly displayMode: StudioLivingInkDisplayMode;
 }
 
+export type StudioLivingInkExecutionBackend =
+  | "webgl2-offscreen-half-float"
+  | "webgpu-offscreen-half-float";
+
 export interface StudioLivingInkExecutionCapabilities {
-  readonly backend: "webgl2-offscreen-half-float";
+  readonly backend: StudioLivingInkExecutionBackend;
   readonly worker: true;
   readonly offscreenCanvas: true;
-  readonly webgl2: true;
+  readonly webgl2: boolean;
+  readonly webgpu: boolean;
   readonly halfFloatRenderable: true;
   readonly rgba16Float: true;
   readonly rg16Float: true;
   readonly r16Float: true;
   readonly maximumTextureSize: number;
   readonly pressureIterations: Readonly<{
-    readonly interactive: 10;
-    readonly settle: 22;
+    readonly interactive: typeof STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations;
+    readonly settle: typeof STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations;
   }>;
 }
 
@@ -60,7 +69,7 @@ export interface StudioLivingInkExecutionReceipt {
   readonly requestId: number;
   readonly revision: number;
   readonly operationKind: StudioLivingInkOperation["kind"] | "restore";
-  readonly backend: "webgl2-offscreen-half-float";
+  readonly backend: StudioLivingInkExecutionBackend;
   readonly displaySha256: `sha256:${string}`;
   readonly operationSha256: `sha256:${string}`;
   readonly dirtyBounds: StudioLivingInkBounds;
@@ -102,7 +111,7 @@ export interface StudioLivingInkExecutionApplied {
   readonly revision: number;
   readonly operationKind: StudioLivingInkOperation["kind"];
   readonly operationSha256: `sha256:${string}`;
-  readonly backend: "webgl2-offscreen-half-float";
+  readonly backend: StudioLivingInkExecutionBackend;
   readonly dirtyBounds: StudioLivingInkBounds;
   readonly dirtyTileCount: number;
   readonly passCount: number;

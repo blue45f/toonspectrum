@@ -42,6 +42,86 @@ export function studioLivingInkOpticalDensityFromReflectance(reflectance: number
   ));
 }
 
+/**
+ * InkWash §06 chromatography coefficients. The WebGL2 pigment pass uploads the same numbers via
+ * `studioLivingInkChromaBleedMultipliers` each step — keep this object as the single numeric source.
+ */
+export const STUDIO_LIVING_INK_CHROMA_COEFFS = Object.freeze({
+  redGain: 0.85,
+  greenGain: 0.15,
+  blueLoss: 0.65,
+  blueFloor: 0.25,
+} as const);
+
+/**
+ * InkWash §06 brush-tip scrub bleed: `base + gain * footprint` multiplies the wet bleed rate.
+ * Uploaded as uniforms by the WebGL2 pigment pass (not re-derived in GLSL).
+ */
+export const STUDIO_LIVING_INK_BRUSH_BLEED = Object.freeze({
+  base: 0.25,
+  gain: 1.3,
+  diffusionDtScale: 9,
+  diffusionCeiling: 0.28,
+  channelCeiling: 0.92,
+  whiteChannelGain: 1.05,
+} as const);
+
+/**
+ * InkWash §06 chromatography: per-channel optical-density bleed rates.
+ * Red-absorbing dye (reads cyan-blue) escapes fastest; blue-absorbing dye drags.
+ * Shared by the WebGL2 pigment pass (uniforms) and unit tests.
+ */
+export function studioLivingInkChromaBleedMultipliers(
+  chromaticSeparation: number,
+): readonly [number, number, number] {
+  const chroma = Math.min(1, Math.max(0, chromaticSeparation));
+  const { redGain, greenGain, blueLoss, blueFloor } = STUDIO_LIVING_INK_CHROMA_COEFFS;
+  return Object.freeze([
+    1 + redGain * chroma,
+    1 + greenGain * chroma,
+    Math.max(blueFloor, 1 - blueLoss * chroma),
+  ]);
+}
+
+/**
+ * Brush-tip scrubbing boost from InkWash §06: bleed runs ~5× faster under the bristles.
+ * `brushFootprint` is a unit gaussian (0 outside the tip); returns the scalar multiplier on bleed.
+ */
+export function studioLivingInkBrushBleedBoost(brushFootprint: number): number {
+  const footprint = Math.min(1, Math.max(0, brushFootprint));
+  return STUDIO_LIVING_INK_BRUSH_BLEED.base + STUDIO_LIVING_INK_BRUSH_BLEED.gain * footprint;
+}
+
+/**
+ * Per-channel diffusion blend amounts for one pigment step. The WebGL2 pigment fragment samples
+ * the same rates through uniforms computed here each tick — formula drift fails unit tests.
+ */
+export function studioLivingInkPigmentDiffusionRates(input: Readonly<{
+  bleed: number;
+  mobility: number;
+  dt: number;
+  brushFootprint: number;
+  chromaticSeparation: number;
+}>): readonly [number, number, number, number] {
+  const bleed = Math.min(1, Math.max(0, input.bleed));
+  const mobility = Math.min(1, Math.max(0, input.mobility));
+  const dt = Math.max(0, input.dt);
+  const brushBleed = studioLivingInkBrushBleedBoost(input.brushFootprint);
+  const chroma = studioLivingInkChromaBleedMultipliers(input.chromaticSeparation);
+  const { diffusionDtScale, diffusionCeiling, channelCeiling, whiteChannelGain } =
+    STUDIO_LIVING_INK_BRUSH_BLEED;
+  const diffusion = Math.min(
+    diffusionCeiling,
+    Math.max(0, bleed * brushBleed * mobility * dt * diffusionDtScale),
+  );
+  return Object.freeze([
+    Math.min(channelCeiling, Math.max(0, diffusion * chroma[0])),
+    Math.min(channelCeiling, Math.max(0, diffusion * chroma[1])),
+    Math.min(channelCeiling, Math.max(0, diffusion * chroma[2])),
+    Math.min(channelCeiling, Math.max(0, diffusion * whiteChannelGain)),
+  ]);
+}
+
 export const STUDIO_LIVING_INK_LIMITS = Object.freeze({
   maxCpuCells: 262_144,
   maxMarksPerOperation: 4_096,

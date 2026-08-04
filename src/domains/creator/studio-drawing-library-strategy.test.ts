@@ -126,7 +126,8 @@ describe("studio drawing library strategy", () => {
       brushPixelAuthority: false,
     });
     expect(pixi?.maintenanceNote).toContain("WebGPU-first/WebGL-fallback");
-    expect(pixi?.maintenanceNote).toContain("implemented but unwired");
+    expect(pixi?.maintenanceNote).toContain("always-on");
+    expect(pixi?.maintenanceNote).toContain("StudioPixiSceneOverlayHost");
     expect(pixi?.riskNotes).toContain(
       "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
     );
