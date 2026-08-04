@@ -275,11 +275,10 @@ describe("자연 아이들 포즈(NATURAL_IDLE_POSES)", () => {
           continue;
         }
 
-        // 손바닥 쪽 굽힘 방향: 왼손 -z / 오른손 +z.
+        // 프리셋 데이터는 좌우 모두 local +Z curl. 모델별 축 반전은 applyFingerRotations 가 보정한다.
         const curlDeg = toDegrees(rotation[2]);
-        const signedCurl = boneName.startsWith("left") ? -curlDeg : curlDeg;
-        expect(signedCurl, `${pose.id}:${boneName} curl`).toBeGreaterThanOrEqual(RELAXED_FINGER_CURL_MIN_DEG - 0.1);
-        expect(signedCurl).toBeLessThanOrEqual(RELAXED_FINGER_CURL_MAX_DEG + 0.1);
+        expect(curlDeg, `${pose.id}:${boneName} curl`).toBeGreaterThanOrEqual(RELAXED_FINGER_CURL_MIN_DEG - 0.1);
+        expect(curlDeg).toBeLessThanOrEqual(RELAXED_FINGER_CURL_MAX_DEG + 0.1);
       }
     }
   });
