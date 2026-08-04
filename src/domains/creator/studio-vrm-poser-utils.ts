@@ -824,9 +824,9 @@ function aimBoneToWorldDirection(humanoid: NonNullable<VRM["humanoid"]>, boneNam
 /**
  * World-space palm normal (out of the palm face, not the dorsal/back).
  *
- * Built from hand→middle × hand→thumb with a fixed winding that matches VRM
- * humanoid rest for both hands. (The opposite winding points out of the back
- * of the hand and made hanging-arm twist flip palms outward.)
+ * VRM left/right finger axes are mirrored: after limb aim, left hands need
+ * along×across while right hands need across×along to point palm-out. A single
+ * winding made one side look correct and the other look like a spun wrist.
  */
 export function estimateVrmPalmNormal(vrm: VRM, side: "left" | "right"): THREE.Vector3 | null {
   const humanoid = vrm.humanoid;
@@ -855,8 +855,18 @@ export function estimateVrmPalmNormal(vrm: VRM, side: "left" | "right"): THREE.V
   const across = thumbPos.sub(handPos);
   if (!normalizeDirection(across)) return null;
 
-  // along × across = palm-out. across × along was dorsal-out and inverted every correction.
-  const palm = new THREE.Vector3().crossVectors(along, across);
+  return palmNormalFromAlongAcross(along, across, side);
+}
+
+/** Side-aware palm-out normal from finger axes (see estimateVrmPalmNormal). */
+function palmNormalFromAlongAcross(
+  along: THREE.Vector3,
+  across: THREE.Vector3,
+  side: "left" | "right",
+): THREE.Vector3 | null {
+  const palm = side === "right"
+    ? new THREE.Vector3().crossVectors(across, along)
+    : new THREE.Vector3().crossVectors(along, across);
   return normalizeDirection(palm) ? palm : null;
 }
 
@@ -885,10 +895,17 @@ export function correctVrmHangingHandPalmTwist(vrm: VRM): number {
   return corrected;
 }
 
+/** Max forearm twist per pass (larger snaps read as a spun wrist). */
+export const STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD = THREE.MathUtils.degToRad(42);
+/** Fraction of remaining twist error applied each pass. */
+export const STUDIO_VRM_HANGING_PALM_TWIST_BLEND = 0.62;
+/** Max extra pitch used only to kill obvious palm-up residuals. */
+export const STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD = THREE.MathUtils.degToRad(12);
+
 /**
  * Desired palm normal for a relaxed hand on a standing character facing +Z.
  * Pure "toward hips" pulls palms camera-back when hands sit in front of the torso.
- * Bias is medial + clearly down (toward thighs) + mild character-forward.
+ * Keep the target mild so the wrist only needs a small twist from limb-aim residual.
  */
 export function desiredRelaxedPalmNormal(
   side: "left" | "right",
@@ -905,22 +922,20 @@ export function desiredRelaxedPalmNormal(
   // Soft pull toward the torso (spine/chest) without letting a forward hand force -Z palms.
   const towardTorso = spineWorldPos.clone().sub(handWorldPos);
   if (normalizeDirection(towardTorso)) {
-    // Keep medial + vertical contribution; crush rearward so palms don't face camera-back.
-    towardTorso.x *= 0.45;
-    // Prefer downward torso pull (thigh-facing) over upward chest pull.
-    towardTorso.y = Math.min(0, towardTorso.y) * 0.55;
-    towardTorso.z = Math.max(0, towardTorso.z) * 0.15;
+    towardTorso.x *= 0.4;
+    towardTorso.y = Math.min(0, towardTorso.y) * 0.4;
+    towardTorso.z = Math.max(0, towardTorso.z) * 0.12;
   } else {
     towardTorso.set(0, 0, 0);
   }
 
-  // Stronger down (−Y) + lighter forward so hanging palms read thigh-side, not palm-up.
+  // Mild down + mild forward — extreme targets force 100°+ twists that look like spun wrists.
   const desired = medial
-    .multiplyScalar(0.62)
+    .multiplyScalar(0.72)
     .add(towardTorso)
-    .add(new THREE.Vector3(0, -0.62, 0.28));
+    .add(new THREE.Vector3(0, -0.38, 0.32));
   if (!normalizeDirection(desired)) {
-    return new THREE.Vector3(-sideSign, -0.62, 0.28).normalize();
+    return new THREE.Vector3(-sideSign, -0.38, 0.32).normalize();
   }
   return desired;
 }
@@ -945,9 +960,7 @@ function measurePalmNormalFromBones(
   }
   const across = thumbPos.sub(handPos);
   if (!normalizeDirection(across)) return null;
-  // Same palm-out winding as estimateVrmPalmNormal (along × across).
-  const palm = new THREE.Vector3().crossVectors(along, across);
-  return normalizeDirection(palm) ? palm : null;
+  return palmNormalFromAlongAcross(along, across, side);
 }
 
 function applyWorldTwistToHand(
@@ -1002,7 +1015,8 @@ function orientRelaxedHandPalm(
   spine.getWorldPosition(spinePos);
   const desired = desiredRelaxedPalmNormal(side, handPos, spinePos);
 
-  // Pass 1 — twist around the forearm for medial + down + mild forward.
+  // Pass 1 — partial forearm twist toward medial + mild down/forward.
+  // Full error correction often needs 120°+ and reads as a spun wrist.
   const palmProj = palm.clone().addScaledVector(forearmAxis, -palm.dot(forearmAxis));
   const desiredProj = desired.clone().addScaledVector(forearmAxis, -desired.dot(forearmAxis));
   if (!normalizeDirection(palmProj) || !normalizeDirection(desiredProj)) return false;
@@ -1011,31 +1025,30 @@ function orientRelaxedHandPalm(
   const cos = palmProj.dot(desiredProj);
   let angle = Math.atan2(sin, cos);
   if (!Number.isFinite(angle)) return false;
-  // Cap so we never spin a hand more than ~150° in one pass.
-  angle = THREE.MathUtils.clamp(angle, -Math.PI * 0.85, Math.PI * 0.85);
+  angle *= STUDIO_VRM_HANGING_PALM_TWIST_BLEND;
+  angle = THREE.MathUtils.clamp(
+    angle,
+    -STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD,
+    STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD,
+  );
   let changed = false;
   if (Math.abs(angle) >= THREE.MathUtils.degToRad(1.5)) {
     applyWorldTwistToHand(hand, forearmAxis, angle);
     changed = true;
   }
 
-  // Pass 2 — hanging forearms are nearly vertical, so pure twist keeps palm.y near 0.
-  // A small extra pitch tips the palm toward the thighs (−Y) without undoing medial.
+  // Pass 2 — only kill obvious palm-up (not chase a deep thigh target).
   const palmAfter = measurePalmNormalFromBones(hand, middle, thumb, side);
   if (!palmAfter) return changed;
-  const TARGET_PALM_Y = -0.32;
-  if (palmAfter.y > TARGET_PALM_Y + 0.03) {
-    // Pitch axis ⊥ forearm; pick the rotation sign that actually lowers palm.y.
+  if (palmAfter.y > 0.12) {
     const worldDown = new THREE.Vector3(0, -1, 0);
     const pitchAxis = new THREE.Vector3().crossVectors(forearmAxis, worldDown);
     if (normalizeDirection(pitchAxis)) {
-      const excess = palmAfter.y - TARGET_PALM_Y;
       const magnitude = THREE.MathUtils.clamp(
-        excess * 1.35,
+        (palmAfter.y - 0.05) * 0.9,
         THREE.MathUtils.degToRad(2),
-        Math.PI * 0.38,
+        STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD,
       );
-      // Probe both directions with a temporary quaternion so we do not flip the wrong way.
       const parentWorldQ = new THREE.Quaternion();
       hand.parent!.getWorldQuaternion(parentWorldQ);
       const baseLocal = hand.quaternion.clone();
@@ -1051,15 +1064,19 @@ function orientRelaxedHandPalm(
         hand.updateMatrixWorld(true);
         const trialPalm = measurePalmNormalFromBones(hand, middle, thumb, side);
         const trialY = trialPalm?.y ?? Number.POSITIVE_INFINITY;
-        if (trialY < bestY - 0.01) {
+        // Prefer lower palm.y but do not sacrifice medial too much.
+        const trialMedial = trialPalm
+          ? (side === "left" ? -trialPalm.x : trialPalm.x)
+          : -1;
+        const baseMedial = side === "left" ? -palmAfter.x : palmAfter.x;
+        if (trialY < bestY - 0.02 && trialMedial > baseMedial - 0.15) {
           bestY = trialY;
           bestAngle = trial;
         }
-        // Restore for the next probe.
         hand.quaternion.copy(baseLocal);
         hand.updateMatrixWorld(true);
       }
-      if (bestAngle !== 0 && bestY < palmAfter.y - 0.015) {
+      if (bestAngle !== 0 && bestY < palmAfter.y - 0.02) {
         applyWorldTwistToHand(hand, pitchAxis, bestAngle);
         changed = true;
       }
@@ -1132,6 +1149,7 @@ export function applyPoseToVrm(
   bones: PoseBoneMap,
   yOffset: number,
   rawTranslations: StudioVrmPoseTranslations = EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+  options: { readonly skipPalmCorrect?: boolean } = {},
 ) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return false;
@@ -1177,9 +1195,6 @@ export function applyPoseToVrm(
     }
   });
 
-  // After limb aims + wrist eulers: fix hanging-arm palm twist (Harin / VRoid outward palms).
-  correctVrmHangingHandPalmTwist(vrm);
-
   // Optional finger eulers carried in the pose map (natural idle, extras) — polarity-aware.
   const fingerEdits: Partial<Record<VRMHumanBoneName, Vec3>> = {};
   for (const boneName of FINGER_ROTATION_BONE_ORDER) {
@@ -1188,8 +1203,11 @@ export function applyPoseToVrm(
   }
   if (Object.keys(fingerEdits).length > 0) {
     applyFingerRotations(vrm, fingerEdits);
-    // Finger curls rotate proximal phalanges and can nudge the measured palm normal —
-    // re-seat hanging-hand medial/down after curl polarity settles.
+  }
+
+  // One hanging-palm pass after limbs + hand euler + fingers (unless caller defers).
+  // Stacking this with a second call after applyPoserVisualState fingers spun wrists.
+  if (!options.skipPalmCorrect) {
     correctVrmHangingHandPalmTwist(vrm);
   }
 
@@ -2148,12 +2166,14 @@ export function applyPoserVisualState(
     fingerEdits = {},
     bodyScale,
   } = state;
-  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations);
+  // Defer palm correct until after finger polarity so we only twist wrists once.
+  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations, {
+    skipPalmCorrect: true,
+  });
   if (Object.keys(fingerEdits).length) {
     applyFingerRotations(vrm, fingerEdits);
-    // Match applyPoseToVrm: finger curl can lift palm.y; re-tip hanging hands down/medial.
-    correctVrmHangingHandPalmTwist(vrm);
   }
+  correctVrmHangingHandPalmTwist(vrm);
   if (bodyScale) {
     applyBodyScale(vrm, bodyScale);
   }

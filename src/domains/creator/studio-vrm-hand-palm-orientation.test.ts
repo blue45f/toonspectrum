@@ -79,9 +79,9 @@ describe("desiredRelaxedPalmNormal", () => {
     // Hands in front of torso must not request a strongly rearward palm.
     expect(left.z).toBeGreaterThan(-0.15);
     expect(right.z).toBeGreaterThan(-0.15);
-    // Thigh-facing bias: desired palm should point clearly down.
-    expect(left.y).toBeLessThan(-0.25);
-    expect(right.y).toBeLessThan(-0.25);
+    // Mild thigh-facing bias (not extreme — that forced spun wrists).
+    expect(left.y).toBeLessThan(-0.12);
+    expect(right.y).toBeLessThan(-0.12);
   });
 });
 
@@ -109,7 +109,7 @@ describe("relaxed hand palm orientation across bundled characters", () => {
         continue;
       }
 
-      // Medial: left palm toward -X, right toward +X.
+      // Medial with side-aware winding (no 100°+ wrist spins).
       if (left.x >= -0.15) {
         failures.push(`${character.name}: left palm not medial (x=${left.x.toFixed(2)})`);
       }
@@ -123,12 +123,11 @@ describe("relaxed hand palm orientation across bundled characters", () => {
       if (right.z < -0.55) {
         failures.push(`${character.name}: right palm too camera-back (z=${right.z.toFixed(2)})`);
       }
-      // Prefer thigh-facing over palm-up. Hanging forearms limit how negative palm.y can go
-      // via twist+pitch; reject only clearly palm-up residuals.
-      if (left.y > 0.12) {
+      // Reject only clearly palm-up residuals.
+      if (left.y > 0.35) {
         failures.push(`${character.name}: left palm too up (y=${left.y.toFixed(2)})`);
       }
-      if (right.y > 0.12) {
+      if (right.y > 0.35) {
         failures.push(`${character.name}: right palm too up (y=${right.y.toFixed(2)})`);
       }
     }
