@@ -137,7 +137,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
     ]);
   });
 
-  it("audits all 226 identities and never promotes a procedural carrier as charcoal", () => {
+  it("audits all 230 identities and never promotes a procedural carrier as charcoal", () => {
     const professional = materializeAllStudioBrushPackSelections();
     const identities = [
       ...BRUSH_PRESETS.map((preset) => ({

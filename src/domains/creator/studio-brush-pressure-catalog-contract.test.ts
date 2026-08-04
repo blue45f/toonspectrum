@@ -361,7 +361,7 @@ function allPressureProbes(): PressureProbe[] {
   return [...core, ...procedural];
 }
 
-describe("226-brush hardware-pressure catalogue planner proxy", () => {
+describe("230-brush hardware-pressure catalogue planner proxy", () => {
   beforeAll(async () => {
     perfectFreehandStroker = await loadStudioPerfectFreehandStroker();
   });

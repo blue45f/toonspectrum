@@ -211,14 +211,16 @@ export function StudioLivingInkControls({
           ) : null}
 
           <div className="mb-2.5">
-            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">종이 질감 선택</span>
-            <div className="grid grid-cols-3 gap-1">
+            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">종이 질감 선택 (Paper Texture Presets)</span>
+            <div className="grid grid-cols-4 gap-1">
               {[
                 { name: "전통 한지", fiber: 0.55, tooth: 0.40, gran: 0.35 },
                 { name: "수채화지", fiber: 0.75, tooth: 0.82, gran: 0.65 },
                 { name: "켄트지", fiber: 0.15, tooth: 0.18, gran: 0.10 },
                 { name: "거친 코튼", fiber: 0.90, tooth: 0.95, gran: 0.85 },
                 { name: "크라프트", fiber: 0.65, tooth: 0.60, gran: 0.50 },
+                { name: "아마포", fiber: 0.45, tooth: 0.70, gran: 0.40 },
+                { name: "파스텔 펠트", fiber: 0.30, tooth: 0.50, gran: 0.25 },
                 { name: "매끄러움", fiber: 0.00, tooth: 0.00, gran: 0.00 },
               ].map((preset) => {
                 const isActive =

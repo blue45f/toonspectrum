@@ -34,7 +34,10 @@ import {
 import {
   resolveStudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
-import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
+import {
+  resolveStudioBrushRuntimeContract,
+  resolveStudioBrushSinglePointRoute,
+} from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
@@ -296,9 +299,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
-  const composite = el.mode === "eraser" ? "destination-out" : "source-over";
+  const isEraserOperation = el.mode === "eraser"
+    || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
+  const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
-  const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
+  const stroke = isEraserOperation ? "#16100c" : el.stroke;
   const strokeWidth = Math.max(1, el.strokeWidth);
   // 스트로크 스타일(점선/선 끝) + 도형 파라미터 — 미설정 요소는 기본값으로 정규화된다.
   const strokeStyle = normalizeStrokeStyle(el.strokeStyle);

@@ -203,7 +203,7 @@ export const BRUSH_PRESETS: BrushPreset[] = [
     defaultOpacity: 0.38,
     defaultColor: "#b7ada0",
     searchAliases: ["말랑 지우개", "찰흙 지우개", "kneaded eraser", "putty eraser"],
-    drawMode: "eraser",
+    drawMode: "pen",
   },
   // —— Markers (Canva Draw / Express / Picsart / CSP) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
