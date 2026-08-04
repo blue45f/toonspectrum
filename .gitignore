@@ -82,6 +82,7 @@ test-accounts.local.*
 /web-home-*.jpeg
 /web-mobile-*.jpeg
 /.playwright-mcp/
+/scratch/
 
 # stray screenshot artifacts at repo root
 /*.jpeg
