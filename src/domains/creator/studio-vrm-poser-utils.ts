@@ -822,8 +822,11 @@ function aimBoneToWorldDirection(humanoid: NonNullable<VRM["humanoid"]>, boneNam
 }
 
 /**
- * World-space palm normal from hand → middle finger × hand → thumb.
- * Returns null when the side lacks the required humanoid bones.
+ * World-space palm normal (out of the palm face, not the dorsal/back).
+ *
+ * Built from hand→middle × hand→thumb with a fixed winding that matches VRM
+ * humanoid rest for both hands. (The opposite winding points out of the back
+ * of the hand and made hanging-arm twist flip palms outward.)
  */
 export function estimateVrmPalmNormal(vrm: VRM, side: "left" | "right"): THREE.Vector3 | null {
   const humanoid = vrm.humanoid;
@@ -852,7 +855,8 @@ export function estimateVrmPalmNormal(vrm: VRM, side: "left" | "right"): THREE.V
   const across = thumbPos.sub(handPos);
   if (!normalizeDirection(across)) return null;
 
-  const palm = new THREE.Vector3().crossVectors(across, along);
+  // along × across = palm-out. across × along was dorsal-out and inverted every correction.
+  const palm = new THREE.Vector3().crossVectors(along, across);
   return normalizeDirection(palm) ? palm : null;
 }
 
@@ -941,7 +945,8 @@ function measurePalmNormalFromBones(
   }
   const across = thumbPos.sub(handPos);
   if (!normalizeDirection(across)) return null;
-  const palm = new THREE.Vector3().crossVectors(across, along);
+  // Same palm-out winding as estimateVrmPalmNormal (along × across).
+  const palm = new THREE.Vector3().crossVectors(along, across);
   return normalizeDirection(palm) ? palm : null;
 }
 
