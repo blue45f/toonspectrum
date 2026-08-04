@@ -458,9 +458,9 @@ export function StudioDrawingPaletteStack({
     } catch {
       // Global listeners keep mouse, pen, and touch resizing functional without capture support.
     }
-    globalThis.addEventListener("pointermove", onMove);
-    globalThis.addEventListener("pointerup", onPointerUp);
-    globalThis.addEventListener("pointercancel", onPointerCancel);
+    globalThis.addEventListener("pointermove", onMove, { passive: true });
+    globalThis.addEventListener("pointerup", onPointerUp, { passive: true });
+    globalThis.addEventListener("pointercancel", onPointerCancel, { passive: true });
     globalThis.addEventListener("blur", onBlur);
     target.addEventListener("lostpointercapture", onLostPointerCapture);
     setDragging(true);

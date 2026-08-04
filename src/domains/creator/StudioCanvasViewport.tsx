@@ -2251,7 +2251,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
             // touch events, and a second touch cancels an unfinished finger stroke above.
             style={{
-              touchAction: tool === "draw" || liquifyArmed ? "none" : "auto",
+              touchAction: "none",
             }}
             scaleX={stageViewLayout.scaleX}
             scaleY={stageViewLayout.scaleY}

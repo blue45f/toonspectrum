@@ -3474,6 +3474,9 @@ function StudioCuttoonEditor() {
         });
         return;
       }
+      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
+      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+      if (controller.signal.aborted) return;
       const snapshotJson = JSON.stringify(currentStudioProjectSnapshot());
       const request = createStudioDraftCollaborationProvisionRequest({
         identity,
@@ -3481,7 +3484,6 @@ function StudioCuttoonEditor() {
         intent: "share-link",
         initialSnapshotByteLength: new TextEncoder().encode(snapshotJson).byteLength,
       });
-      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
       const room = await provisionCreatorDraftCollaborationRoom(request, {
         signal: controller.signal,
       });
@@ -4244,7 +4246,7 @@ function StudioCuttoonEditor() {
     );
   }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const applyFrontier = (
       frontier: {
@@ -7672,10 +7674,12 @@ function StudioCuttoonEditor() {
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
       });
-      saveStudioBrushSlotsState(
-        typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-        next
-      );
+      queueMicrotask(() => {
+        saveStudioBrushSlotsState(
+          typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+          next
+        );
+      });
       return next;
     });
   }

@@ -791,15 +791,15 @@ export function StudioKonvaImageNode({
           outCanvas.height = filtered.height;
           const outCtx = outCanvas.getContext("2d");
           if (!outCtx) return;
-          outCtx.putImageData(
-            new ImageData(
-              new Uint8ClampedArray(filtered.data),
-              filtered.width,
-              filtered.height,
-            ),
-            0,
-            0,
+          const clamped = filtered.data instanceof Uint8ClampedArray
+            ? filtered.data
+            : new Uint8ClampedArray(filtered.data);
+          const imageData = new ImageData(
+            clamped as unknown as Uint8ClampedArray<ArrayBuffer>,
+            filtered.width,
+            filtered.height,
           );
+          outCtx.putImageData(imageData, 0, 0);
           resultCache.canvases.set(filterKey, outCanvas);
           trimWorkerResultCache(resultCache, workerResultCacheLimit, filterKey);
           setWorkerFallbackKey((current) => current === requestKey ? undefined : current);

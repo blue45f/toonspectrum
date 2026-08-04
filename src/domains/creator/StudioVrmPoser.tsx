@@ -2592,9 +2592,9 @@ function VrmActor({
       cancelTexturePaintPendingOneShotTap();
       cancelTexturePaint();
     };
-    window.addEventListener("pointermove", cancelPendingTapOnMove);
-    window.addEventListener("pointerup", finishMatchingPointer);
-    window.addEventListener("pointercancel", cancelMatchingPointer);
+    window.addEventListener("pointermove", cancelPendingTapOnMove, { passive: true });
+    window.addEventListener("pointerup", finishMatchingPointer, { passive: true });
+    window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true });
     window.addEventListener("blur", cancelOnWindowBlur);
     gl.domElement.addEventListener(
       "pointerdown",

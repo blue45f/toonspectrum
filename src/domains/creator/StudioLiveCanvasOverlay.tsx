@@ -697,10 +697,10 @@ export function StudioLiveCanvasOverlay({
     };
     ownerWindow.addEventListener("pointermove", handlePointerMove, {
       capture: true,
-      passive: false,
+      passive: true,
     });
-    ownerWindow.addEventListener("pointerup", handlePointerUp, { capture: true });
-    ownerWindow.addEventListener("pointercancel", handlePointerCancel, { capture: true });
+    ownerWindow.addEventListener("pointerup", handlePointerUp, { capture: true, passive: true });
+    ownerWindow.addEventListener("pointercancel", handlePointerCancel, { capture: true, passive: true });
     return () => {
       ownerWindow.removeEventListener("pointermove", handlePointerMove, { capture: true });
       ownerWindow.removeEventListener("pointerup", handlePointerUp, { capture: true });

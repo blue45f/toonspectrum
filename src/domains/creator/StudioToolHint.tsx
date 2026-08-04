@@ -231,28 +231,26 @@ export function StudioToolHintPreferencesProvider({
       dismissAll();
     }
 
+    const passiveCapture = { capture: true, passive: true } as const;
     globalThis.addEventListener("keydown", onKeyDown);
-    globalThis.addEventListener("pointerdown", onPointerDown, true);
-    globalThis.addEventListener("pointermove", onPointerMove, true);
-    globalThis.addEventListener("pointerup", onPointerEnd, true);
-    globalThis.addEventListener("pointercancel", onPointerEnd, true);
-    globalThis.addEventListener("pointerover", onPointerOver, true);
-    globalThis.addEventListener("focusin", onFocusIn, true);
-    globalThis.addEventListener("wheel", suppressPassivePointerHints, {
-      capture: true,
-      passive: true,
-    });
-    globalThis.addEventListener("scroll", suppressPassivePointerHints, true);
+    globalThis.addEventListener("pointerdown", onPointerDown, passiveCapture);
+    globalThis.addEventListener("pointermove", onPointerMove, passiveCapture);
+    globalThis.addEventListener("pointerup", onPointerEnd, passiveCapture);
+    globalThis.addEventListener("pointercancel", onPointerEnd, passiveCapture);
+    globalThis.addEventListener("pointerover", onPointerOver, passiveCapture);
+    globalThis.addEventListener("focusin", onFocusIn, passiveCapture);
+    globalThis.addEventListener("wheel", suppressPassivePointerHints, passiveCapture);
+    globalThis.addEventListener("scroll", suppressPassivePointerHints, passiveCapture);
     return () => {
       globalThis.removeEventListener("keydown", onKeyDown);
-      globalThis.removeEventListener("pointerdown", onPointerDown, true);
-      globalThis.removeEventListener("pointermove", onPointerMove, true);
-      globalThis.removeEventListener("pointerup", onPointerEnd, true);
-      globalThis.removeEventListener("pointercancel", onPointerEnd, true);
-      globalThis.removeEventListener("pointerover", onPointerOver, true);
-      globalThis.removeEventListener("focusin", onFocusIn, true);
-      globalThis.removeEventListener("wheel", suppressPassivePointerHints, true);
-      globalThis.removeEventListener("scroll", suppressPassivePointerHints, true);
+      globalThis.removeEventListener("pointerdown", onPointerDown, passiveCapture);
+      globalThis.removeEventListener("pointermove", onPointerMove, passiveCapture);
+      globalThis.removeEventListener("pointerup", onPointerEnd, passiveCapture);
+      globalThis.removeEventListener("pointercancel", onPointerEnd, passiveCapture);
+      globalThis.removeEventListener("pointerover", onPointerOver, passiveCapture);
+      globalThis.removeEventListener("focusin", onFocusIn, passiveCapture);
+      globalThis.removeEventListener("wheel", suppressPassivePointerHints, passiveCapture);
+      globalThis.removeEventListener("scroll", suppressPassivePointerHints, passiveCapture);
       interaction.reset();
       clearPointerSuppression();
     };
@@ -296,9 +294,10 @@ function armPointerSuppression(x: number, y: number) {
     }
     clearPointerSuppression();
   }
-  globalThis.addEventListener("pointermove", onPointerMove, true);
+  const passiveCapture = { capture: true, passive: true } as const;
+  globalThis.addEventListener("pointermove", onPointerMove, passiveCapture);
   clearPointerSuppressionListener = () =>
-    globalThis.removeEventListener("pointermove", onPointerMove, true);
+    globalThis.removeEventListener("pointermove", onPointerMove, passiveCapture);
 }
 
 function hideRenderedToolHintElement(hintId: string | null) {
