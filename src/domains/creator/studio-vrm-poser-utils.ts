@@ -884,6 +884,7 @@ export function correctVrmHangingHandPalmTwist(vrm: VRM): number {
 /**
  * Desired palm normal for a relaxed hand on a standing character facing +Z.
  * Pure "toward hips" pulls palms camera-back when hands sit in front of the torso.
+ * Bias is medial + clearly down (toward thighs) + mild character-forward.
  */
 export function desiredRelaxedPalmNormal(
   side: "left" | "right",
@@ -901,22 +902,65 @@ export function desiredRelaxedPalmNormal(
   const towardTorso = spineWorldPos.clone().sub(handWorldPos);
   if (normalizeDirection(towardTorso)) {
     // Keep medial + vertical contribution; crush rearward so palms don't face camera-back.
-    towardTorso.x *= 0.55;
-    towardTorso.y *= 0.35;
-    towardTorso.z = Math.max(0, towardTorso.z) * 0.25;
+    towardTorso.x *= 0.45;
+    // Prefer downward torso pull (thigh-facing) over upward chest pull.
+    towardTorso.y = Math.min(0, towardTorso.y) * 0.55;
+    towardTorso.z = Math.max(0, towardTorso.z) * 0.15;
   } else {
     towardTorso.set(0, 0, 0);
   }
 
-  // Slight character-forward (+Z) + down so relaxed hands read like anime idle, not T-pose leftovers.
+  // Stronger down (−Y) + lighter forward so hanging palms read thigh-side, not palm-up.
   const desired = medial
-    .multiplyScalar(0.7)
+    .multiplyScalar(0.62)
     .add(towardTorso)
-    .add(new THREE.Vector3(0, -0.35, 0.45));
+    .add(new THREE.Vector3(0, -0.62, 0.28));
   if (!normalizeDirection(desired)) {
-    return new THREE.Vector3(-sideSign, -0.35, 0.45).normalize();
+    return new THREE.Vector3(-sideSign, -0.62, 0.28).normalize();
   }
   return desired;
+}
+
+function measurePalmNormalFromBones(
+  hand: THREE.Object3D,
+  middle: THREE.Object3D,
+  thumb: THREE.Object3D | null,
+  side: "left" | "right",
+): THREE.Vector3 | null {
+  const handPos = new THREE.Vector3();
+  const middlePos = new THREE.Vector3();
+  hand.getWorldPosition(handPos);
+  middle.getWorldPosition(middlePos);
+  const along = middlePos.clone().sub(handPos);
+  if (!normalizeDirection(along)) return null;
+  const thumbPos = new THREE.Vector3();
+  if (thumb) {
+    thumb.getWorldPosition(thumbPos);
+  } else {
+    thumbPos.copy(handPos).add(new THREE.Vector3(side === "left" ? -0.02 : 0.02, 0, 0));
+  }
+  const across = thumbPos.sub(handPos);
+  if (!normalizeDirection(across)) return null;
+  const palm = new THREE.Vector3().crossVectors(across, along);
+  return normalizeDirection(palm) ? palm : null;
+}
+
+function applyWorldTwistToHand(
+  hand: THREE.Object3D,
+  worldAxis: THREE.Vector3,
+  angle: number,
+): void {
+  if (!hand.parent || !Number.isFinite(angle) || Math.abs(angle) < THREE.MathUtils.degToRad(1)) {
+    return;
+  }
+  const parentWorldQ = new THREE.Quaternion();
+  hand.parent.getWorldQuaternion(parentWorldQ);
+  const handWorldQ = new THREE.Quaternion();
+  hand.getWorldQuaternion(handWorldQ);
+  const twist = new THREE.Quaternion().setFromAxisAngle(worldAxis, angle);
+  const newWorldQ = twist.clone().multiply(handWorldQ);
+  hand.quaternion.copy(parentWorldQ.clone().invert().multiply(newWorldQ));
+  hand.updateMatrixWorld(true);
 }
 
 function orientRelaxedHandPalm(
@@ -946,30 +990,14 @@ function orientRelaxedHandPalm(
   // Skip clearly raised arms. Allow slight forward hang (natural idle often has z>0).
   if (forearmAxis.y > -0.15) return false;
 
-  const middlePos = new THREE.Vector3();
-  middle.getWorldPosition(middlePos);
-  const along = middlePos.clone().sub(handPos);
-  if (!normalizeDirection(along)) return false;
-
-  const thumbPos = new THREE.Vector3();
-  if (thumb) {
-    thumb.getWorldPosition(thumbPos);
-  } else {
-    thumbPos.copy(handPos).add(new THREE.Vector3(side === "left" ? -0.02 : 0.02, 0, 0));
-  }
-  const across = thumbPos.sub(handPos);
-  if (!normalizeDirection(across)) return false;
-
-  // Keep a single winding (matches estimateVrmPalmNormal). Flipping per-model made
-  // "inward" corrections invert for every character.
-  const palm = new THREE.Vector3().crossVectors(across, along);
-  if (!normalizeDirection(palm)) return false;
+  const palm = measurePalmNormalFromBones(hand, middle, thumb, side);
+  if (!palm) return false;
 
   const spinePos = new THREE.Vector3();
   spine.getWorldPosition(spinePos);
   const desired = desiredRelaxedPalmNormal(side, handPos, spinePos);
 
-  // Twist only — project onto the plane perpendicular to the forearm.
+  // Pass 1 — twist around the forearm for medial + down + mild forward.
   const palmProj = palm.clone().addScaledVector(forearmAxis, -palm.dot(forearmAxis));
   const desiredProj = desired.clone().addScaledVector(forearmAxis, -desired.dot(forearmAxis));
   if (!normalizeDirection(palmProj) || !normalizeDirection(desiredProj)) return false;
@@ -977,20 +1005,63 @@ function orientRelaxedHandPalm(
   const sin = forearmAxis.dot(new THREE.Vector3().crossVectors(palmProj, desiredProj));
   const cos = palmProj.dot(desiredProj);
   let angle = Math.atan2(sin, cos);
-  if (!Number.isFinite(angle) || Math.abs(angle) < THREE.MathUtils.degToRad(1.5)) return false;
+  if (!Number.isFinite(angle)) return false;
   // Cap so we never spin a hand more than ~150° in one pass.
   angle = THREE.MathUtils.clamp(angle, -Math.PI * 0.85, Math.PI * 0.85);
+  let changed = false;
+  if (Math.abs(angle) >= THREE.MathUtils.degToRad(1.5)) {
+    applyWorldTwistToHand(hand, forearmAxis, angle);
+    changed = true;
+  }
 
-  const parentWorldQ = new THREE.Quaternion();
-  hand.parent.getWorldQuaternion(parentWorldQ);
-  const handWorldQ = new THREE.Quaternion();
-  hand.getWorldQuaternion(handWorldQ);
-  // World-space twist: R' = twist ⊗ R (premultiply in three.js convention via clone).
-  const twist = new THREE.Quaternion().setFromAxisAngle(forearmAxis, angle);
-  const newWorldQ = twist.clone().multiply(handWorldQ);
-  hand.quaternion.copy(parentWorldQ.clone().invert().multiply(newWorldQ));
-  hand.updateMatrixWorld(true);
-  return true;
+  // Pass 2 — hanging forearms are nearly vertical, so pure twist keeps palm.y near 0.
+  // A small extra pitch tips the palm toward the thighs (−Y) without undoing medial.
+  const palmAfter = measurePalmNormalFromBones(hand, middle, thumb, side);
+  if (!palmAfter) return changed;
+  const TARGET_PALM_Y = -0.32;
+  if (palmAfter.y > TARGET_PALM_Y + 0.03) {
+    // Pitch axis ⊥ forearm; pick the rotation sign that actually lowers palm.y.
+    const worldDown = new THREE.Vector3(0, -1, 0);
+    const pitchAxis = new THREE.Vector3().crossVectors(forearmAxis, worldDown);
+    if (normalizeDirection(pitchAxis)) {
+      const excess = palmAfter.y - TARGET_PALM_Y;
+      const magnitude = THREE.MathUtils.clamp(
+        excess * 1.35,
+        THREE.MathUtils.degToRad(2),
+        Math.PI * 0.38,
+      );
+      // Probe both directions with a temporary quaternion so we do not flip the wrong way.
+      const parentWorldQ = new THREE.Quaternion();
+      hand.parent!.getWorldQuaternion(parentWorldQ);
+      const baseLocal = hand.quaternion.clone();
+      const handWorldQ = new THREE.Quaternion();
+      hand.getWorldQuaternion(handWorldQ);
+      let bestAngle = 0;
+      let bestY = palmAfter.y;
+      for (const sign of [1, -1] as const) {
+        const trial = magnitude * sign;
+        const twist = new THREE.Quaternion().setFromAxisAngle(pitchAxis, trial);
+        const newWorldQ = twist.clone().multiply(handWorldQ);
+        hand.quaternion.copy(parentWorldQ.clone().invert().multiply(newWorldQ));
+        hand.updateMatrixWorld(true);
+        const trialPalm = measurePalmNormalFromBones(hand, middle, thumb, side);
+        const trialY = trialPalm?.y ?? Number.POSITIVE_INFINITY;
+        if (trialY < bestY - 0.01) {
+          bestY = trialY;
+          bestAngle = trial;
+        }
+        // Restore for the next probe.
+        hand.quaternion.copy(baseLocal);
+        hand.updateMatrixWorld(true);
+      }
+      if (bestAngle !== 0 && bestY < palmAfter.y - 0.015) {
+        applyWorldTwistToHand(hand, pitchAxis, bestAngle);
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
 }
 
 const translatedBoneBasePositions = new WeakMap<THREE.Object3D, THREE.Vector3>();
@@ -1112,6 +1183,9 @@ export function applyPoseToVrm(
   }
   if (Object.keys(fingerEdits).length > 0) {
     applyFingerRotations(vrm, fingerEdits);
+    // Finger curls rotate proximal phalanges and can nudge the measured palm normal —
+    // re-seat hanging-hand medial/down after curl polarity settles.
+    correctVrmHangingHandPalmTwist(vrm);
   }
 
   humanoid.update();
@@ -2072,6 +2146,8 @@ export function applyPoserVisualState(
   applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations);
   if (Object.keys(fingerEdits).length) {
     applyFingerRotations(vrm, fingerEdits);
+    // Match applyPoseToVrm: finger curl can lift palm.y; re-tip hanging hands down/medial.
+    correctVrmHangingHandPalmTwist(vrm);
   }
   if (bodyScale) {
     applyBodyScale(vrm, bodyScale);

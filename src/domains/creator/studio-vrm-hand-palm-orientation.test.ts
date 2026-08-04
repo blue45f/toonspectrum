@@ -79,13 +79,14 @@ describe("desiredRelaxedPalmNormal", () => {
     // Hands in front of torso must not request a strongly rearward palm.
     expect(left.z).toBeGreaterThan(-0.15);
     expect(right.z).toBeGreaterThan(-0.15);
-    expect(left.y).toBeLessThan(0);
-    expect(right.y).toBeLessThan(0);
+    // Thigh-facing bias: desired palm should point clearly down.
+    expect(left.y).toBeLessThan(-0.25);
+    expect(right.y).toBeLessThan(-0.25);
   });
 });
 
 describe("relaxed hand palm orientation across bundled characters", () => {
-  it("orients natural-idle palms inward (not outward / camera-back) for humanoid samples", async () => {
+  it("orients natural-idle palms inward + down (not outward / camera-back / palm-up)", async () => {
     const failures: string[] = [];
 
     for (const character of CHARACTERS) {
@@ -121,6 +122,14 @@ describe("relaxed hand palm orientation across bundled characters", () => {
       }
       if (right.z < -0.55) {
         failures.push(`${character.name}: right palm too camera-back (z=${right.z.toFixed(2)})`);
+      }
+      // Prefer thigh-facing over palm-up. Hanging forearms limit how negative palm.y can go
+      // via twist+pitch; reject only clearly palm-up residuals.
+      if (left.y > 0.12) {
+        failures.push(`${character.name}: left palm too up (y=${left.y.toFixed(2)})`);
+      }
+      if (right.y > 0.12) {
+        failures.push(`${character.name}: right palm too up (y=${right.y.toFixed(2)})`);
       }
     }
 
