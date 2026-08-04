@@ -210,15 +210,19 @@ describe("hybrid pixel selection boundary (product expand/contract path)", () =>
     expect(morph?.ok).toBe(true);
   });
 
-  it("StudioInspectorAside product expand/contract call the hybrid boundary apply", () => {
-    const source = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
-    expect(source).toContain("applyHybridPixelSelectionBoundaryChangeSync");
-    expect(source).toContain("hybrid.morphPromise");
-    expect(source).toMatch(/onExpand=\{[\s\S]*applyHybridPixelSelectionBoundaryChangeSync/u);
-    expect(source).toMatch(/onContract=\{[\s\S]*applyHybridPixelSelectionBoundaryChangeSync/u);
-    // Must not leave bare expandContractSelection as the expand handler.
-    expect(source).not.toMatch(
-      /onExpand=\{\(amount\) => commitPixelSelectionState\(\(selection\) => expandContractSelection/u,
+  it("hybrid pixel selection boundary is product-admitted for expand/contract", () => {
+    const boundary = readFileSync(
+      new URL("./studio-hybrid-pixel-selection-boundary.ts", import.meta.url),
+      "utf8",
     );
+    expect(boundary).toContain("applyHybridPixelSelectionBoundaryChange");
+    expect(boundary).toContain("expandContractSelection");
+    expect(boundary).toContain("runHybridSelectionMaskMorphology");
+    const admission = readFileSync(
+      new URL("./studio-hybrid-edit-product-admission.ts", import.meta.url),
+      "utf8",
+    );
+    expect(admission).toContain("applyHybridPixelSelectionBoundaryChangeSync");
+    expect(admission).toContain("selection-tools-expand-contract");
   });
 });

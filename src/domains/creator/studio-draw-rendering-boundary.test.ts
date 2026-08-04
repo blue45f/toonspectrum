@@ -202,9 +202,13 @@ describe("studio draw rendering ownership boundary", () => {
     expect(previewLayers.source).not.toContain("settledRuns.map(");
     expect(previewLayers.source).toContain("STUDIO_DRAFT_PREVIEW_ACTIVE_CANVAS_Z");
 
-    const zoomHostStart = viewport.source.indexOf("ref={zoomHostRef}");
+    // Zoom host uses a callback ref (Pixi mount parent colocation); pin isolation on that host,
+    // not on the Konva Stage (which only owns touch-action for the contact stream).
+    const zoomHostStart = viewport.source.indexOf("zoomHostRef.current = node");
     const stageStart = viewport.source.indexOf("<Stage", zoomHostStart);
     const stageEnd = viewport.source.indexOf(">", stageStart);
+    expect(zoomHostStart).toBeGreaterThanOrEqual(0);
+    expect(stageStart).toBeGreaterThan(zoomHostStart);
     expect(viewport.source.slice(zoomHostStart, stageStart)).toContain('isolation: "isolate"');
     expect(viewport.source.slice(stageStart, stageEnd)).not.toContain("isolation");
   });

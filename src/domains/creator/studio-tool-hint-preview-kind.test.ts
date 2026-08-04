@@ -34,7 +34,7 @@ describe("Studio tool hint preview kind/variant contract", () => {
     ).toHaveLength(40);
     expect(
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).flat()
-    ).toHaveLength(178);
+    ).toHaveLength(179);
 
     for (const kind of STUDIO_TOOL_HINT_PREVIEW_KINDS) {
       expect(studioToolHintPreviewSpec(kind)).toEqual({ kind });

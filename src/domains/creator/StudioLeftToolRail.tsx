@@ -650,7 +650,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("transform") ? (
             <StudioRailToolButton
               icon={Maximize2}
-              label={pixelTransformRecoveryAvailable ? "변형 준비 · 선택" : "변형 (⇧T)"}
+              label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
               description={
                 pixelTransformRecoveryAvailable
                   ? "변형할 이미지 레이어를 먼저 고르세요. 이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요. 지금 사각 선택을 시작하고, 선택 뒤 이 위치에서 변형을 바로 열 수 있어요."

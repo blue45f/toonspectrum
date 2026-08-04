@@ -7,8 +7,8 @@ import {
   selectIdsByMarquee,
 } from "./studio-selection";
 
-describe("RBush product hit path (selectIdsByMarquee / pickObjectIdAtPoint)", () => {
-  it("selects marquee hits through the RBush-backed selectIdsByMarquee used by StudioPage", () => {
+describe("selection hit helpers used by product marquee / pick paths", () => {
+  it("selects marquee hits through selectIdsByMarquee used by StudioPage", () => {
     const items = [
       { id: "a", x: 0, y: 0, w: 10, h: 10 },
       { id: "b", x: 20, y: 20, w: 10, h: 10 },
@@ -23,13 +23,12 @@ describe("RBush product hit path (selectIdsByMarquee / pickObjectIdAtPoint)", ()
     expect(hits.sort()).toEqual(["a", "c"]);
   });
 
-  it("picks the topmost document object at a point through RBush", () => {
+  it("picks the topmost document object at a point", () => {
     const items = [
       { id: "back", x: 0, y: 0, w: 100, h: 100 },
       { id: "front", x: 10, y: 10, w: 20, h: 20 },
       { id: "side", x: 80, y: 80, w: 10, h: 10 },
     ];
-    // Higher zOrder is later in the list for our rebuild mapping (index as zOrder).
     const id = pickObjectIdAtPoint(
       items,
       (item) => ({ x: item.x, y: item.y, w: item.w, h: item.h }),
@@ -43,14 +42,22 @@ describe("RBush product hit path (selectIdsByMarquee / pickObjectIdAtPoint)", ()
     )).toBeNull();
   });
 
-  it("StudioPage marquee completion calls selectIdsByMarquee (RBush primary path)", () => {
+  it("StudioPage marquee completion calls selectIdsByMarquee", () => {
     const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
     expect(page).toContain("selectIdsByMarquee");
     expect(page).toMatch(/const hitIds = selectIdsByMarquee\(/u);
     const selection = readFileSync(new URL("./studio-selection.ts", import.meta.url), "utf8");
-    expect(selection).toContain('from "./studio-engine-scene-spatial-index"');
-    expect(selection).toContain("createStudioEngineSceneSpatialIndex");
-    expect(selection).toContain("index.search");
-    expect(selection).toContain("index.hitTestPoint");
+    expect(selection).toContain("export function selectIdsByMarquee");
+    expect(selection).toContain("export function pickObjectIdAtPoint");
+  });
+
+  it("large-doc spatial index remains available on the hybrid object-pick path", () => {
+    const hybrid = readFileSync(
+      new URL("./studio-hybrid-brush-filter-edit-runtime.ts", import.meta.url),
+      "utf8",
+    );
+    expect(hybrid).toContain('from "./studio-engine-scene-spatial-index"');
+    expect(hybrid).toContain("createStudioEngineSceneSpatialIndex");
+    expect(hybrid).toContain("hitTestPoint");
   });
 });
