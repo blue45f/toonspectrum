@@ -125,7 +125,24 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
 
 export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRenderFamily {
   if (typeof brushId !== "string" || !brushId) return "pen";
-  return STUDIO_BRUSH_RENDER_FAMILY[brushId] ?? "pen";
+  const mapped = STUDIO_BRUSH_RENDER_FAMILY[brushId];
+  if (mapped) return mapped;
+  // Pack-expansion / alias ids keep one presentation family so wash/air/dry share UI chrome.
+  const id = brushId.toLowerCase();
+  if (/(?:watercolor|ink-?wash|inkwash|sumi|gouache|bleed-wash|wet-wash|flat-wash)/u.test(id)) {
+    return "watercolor";
+  }
+  if (/(?:airbrush|soft-brush|^spray$|mist-soft|grand-soft)/u.test(id)) return "airbrush";
+  if (/(?:charcoal|crayon|chalk|pastel|dry-media|pencil)/u.test(id)) {
+    if (id.includes("pastel") && !id.includes("highlighter")) return "pastel";
+    if (id.includes("pencil")) return "pencil";
+    return "dry-media";
+  }
+  if (/(?:oil|acrylic|paint-tube)/u.test(id)) return "oil";
+  if (/(?:marker|highlighter|felt-tip)/u.test(id)) {
+    return id.includes("highlighter") ? "highlighter" : "marker";
+  }
+  return "pen";
 }
 
 /**

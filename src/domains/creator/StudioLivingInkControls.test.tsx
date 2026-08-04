@@ -33,17 +33,17 @@ function renderControls(overrides: Partial<Parameters<typeof StudioLivingInkCont
 describe("StudioLivingInkControls", () => {
   it("keeps Fix and persisted material controls truthfully disabled", () => {
     renderControls();
-    expect(screen.getByRole("button", { name: "Living Ink 정착" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("slider", { name: "Living Ink 번짐" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "수채 번짐 정착" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("slider", { name: "수채 번짐 번짐" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "재질 기본값 복원" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/기존 물리 레이어의 재질을 바꾸면/)).toBeTruthy();
+    expect(screen.getByText(/이미 그려 둔 번짐 레이어의 재질을 바꾸면/)).toBeTruthy();
   });
 
   it("offers water and selection only when the exact product state permits them", () => {
     const { props } = renderControls({ selectionAvailable: true, materialLocked: false });
-    fireEvent.click(screen.getByRole("button", { name: "Living Ink 물" }));
+    fireEvent.click(screen.getByRole("button", { name: "수채 번짐 물" }));
     expect(props.onModeChange).toHaveBeenCalledWith("water");
-    fireEvent.change(screen.getByRole("combobox", { name: "Living Ink 처리 범위" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "수채 번짐 처리 범위" }), {
       target: { value: "selection" },
     });
     expect(props.onScopeChange).toHaveBeenCalledWith("selection");
@@ -51,9 +51,18 @@ describe("StudioLivingInkControls", () => {
 
   it("exposes Fix only after product admission proves a persisted physical layer", () => {
     const { props } = renderControls({ fixAvailable: true, materialLocked: true });
-    const fix = screen.getByRole("button", { name: "Living Ink 정착" });
+    const fix = screen.getByRole("button", { name: "수채 번짐 정착" });
     expect(fix.hasAttribute("disabled")).toBe(false);
     fireEvent.click(fix);
     expect(props.onFix).toHaveBeenCalledOnce();
+  });
+
+  it("uses product chrome tokens (not a separate cyan system shell)", () => {
+    renderControls();
+    const root = document.querySelector("[data-studio-living-ink-controls=\"true\"]");
+    expect(root).not.toBeNull();
+    expect(root!.className).toContain("border-line");
+    expect(root!.className).not.toMatch(/cyan/u);
+    expect(root!.getAttribute("data-studio-brush-behavior")).toBe("wash");
   });
 });

@@ -11002,8 +11002,8 @@ function StudioCuttoonEditor() {
     void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
     setError(
       studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop"
-        ? `Living Ink 물 도구를 적용하지 못해 문서를 변경하지 않았습니다. ${reason}`
-        : `Living Ink 물리 표면을 유지하지 못해 원본 벡터 획으로 복구합니다. ${reason}`,
+        ? `수채 번짐 물 도구를 적용하지 못해 문서를 변경하지 않았습니다. ${reason}`
+        : `수채 번짐 표면을 유지하지 못해 원본 벡터 획으로 복구합니다. ${reason}`,
     );
   }
 
@@ -11064,7 +11064,7 @@ function StudioCuttoonEditor() {
       livingInkCanonicalHandoffTimerRef.current = null;
       if (!expected || livingInkCanonicalHandoffRef.current !== expected) return;
       const message = [
-        "Living Ink 저장 PNG의 실제 바이트 해시와 메인 캔버스 표시 영수증을 확인하지 못했습니다.",
+        "수채 번짐 저장 PNG의 실제 바이트 해시와 메인 캔버스 표시 영수증을 확인하지 못했습니다.",
         "물리 표면은 화면에 그대로 보존되며 실행 취소 후 다시 시도할 수 있습니다.",
       ].join(" ");
       setError(message);
@@ -11253,7 +11253,7 @@ function StudioCuttoonEditor() {
     });
     const config = receipt?.config ?? (freshPlan.ok ? freshPlan.config : null);
     const qualityFailure = receipt && !studioLivingInkConfigMeetsProductQualityFloor(receipt.config)
-      ? "저장된 Living Ink 물리 필드가 현재 제품 해상도 하한보다 낮아 PNG만 보존하고 물리 편집은 열지 않았습니다."
+      ? "저장된 수채 번짐 필드가 현재 제품 해상도 하한보다 낮아 PNG만 보존하고 번짐 편집은 열지 않았습니다."
       : !freshPlan.ok ? freshPlan.message : null;
     if (!config || qualityFailure) {
       livingInkAuthorityVerificationEpochRef.current += 1;
@@ -11263,7 +11263,7 @@ function StudioCuttoonEditor() {
       livingInkRejectedAuthorityRef.current = null;
       livingInkConfigRef.current = null;
       setLivingInkState("unavailable");
-      setLivingInkStateMessage(qualityFailure ?? "Living Ink 물리 필드를 만들 수 없습니다.");
+      setLivingInkStateMessage(qualityFailure ?? "수채 번짐 필드를 만들 수 없습니다.");
       if (qualityFailure) setError(qualityFailure);
       void livingInkCoordinatorRef.current.dispose();
       return;
@@ -11345,7 +11345,7 @@ function StudioCuttoonEditor() {
       if (!ready && receipt) {
         livingInkAcceptedAuthorityRef.current = null;
         setError(
-          "저장된 Living Ink PNG는 그대로 보존했지만 GPU 물리 상태 재열기 검증에 실패해 물·정착 편집을 비활성화했습니다.",
+          "저장된 수채 번짐 PNG는 그대로 보존했지만 GPU 상태 재열기 검증에 실패해 물·정착 편집을 비활성화했습니다.",
         );
         return;
       }
@@ -11361,7 +11361,7 @@ function StudioCuttoonEditor() {
       if (!isCurrent() || (cause instanceof DOMException && cause.name === "AbortError")) return;
       const message = cause instanceof Error
         ? cause.message
-        : "Living Ink 저장 PNG 무결성을 확인하지 못했습니다.";
+        : "수채 번짐 저장 PNG 무결성을 확인하지 못했습니다.";
       livingInkAcceptedAuthorityRef.current = null;
       livingInkRejectedAuthorityRef.current = null;
       livingInkConfigRef.current = null;
@@ -22827,7 +22827,7 @@ const puppetWarpArmed =
       } else {
         if (hasActiveDrawingPointerSession()) discardDrawingPointerSession();
         else discardStudioLivingInkStroke(livingInkStroke.strokeId);
-        announceDrawingShortcut("저장 중이던 Living Ink 획을 취소했습니다");
+        announceDrawingShortcut("저장 중이던 수채 번짐 획을 취소했습니다");
         return;
       }
     }
@@ -22874,7 +22874,7 @@ const puppetWarpArmed =
     }
     const livingInkStroke = livingInkStrokeRef.current;
     if (livingInkStroke && !livingInkStroke.transactionCommitted) {
-      announceDrawingShortcut("Living Ink 획을 저장한 뒤 다시 실행할 수 있어요");
+      announceDrawingShortcut("수채 번짐 획을 저장한 뒤 다시 실행할 수 있어요");
       return;
     }
     if (livingInkStroke?.transactionCommitted) releaseStudioLivingInkPresentation();
@@ -29174,9 +29174,9 @@ const puppetWarpArmed =
           void livingInkCoordinatorRef.current.cancelStroke(next.id);
           if (livingInkMode === "water") {
             livingInkWaterNoopStrokeIdsRef.current.add(next.id);
-            setError("Living Ink 물 도구 route를 고정하지 못해 문서를 변경하지 않습니다.");
+            setError("수채 번짐 물 도구 경로를 고정하지 못해 문서를 변경하지 않습니다.");
           } else {
-            setError("Living Ink pointer route를 고정하지 못해 현재 획은 벡터로 보존합니다.");
+            setError("수채 번짐 포인터 경로를 고정하지 못해 현재 획은 벡터로 보존합니다.");
           }
           // No lower provider was started after Living Ink admission. Re-resolve this still-
           // pointerdown snapshot as ordinary Konva so the retained draft stays visible; this is
@@ -30007,7 +30007,7 @@ const puppetWarpArmed =
     }
     if (tool === "draw") {
       if (livingInkFinalizingRef.current) {
-        announceDrawingShortcut("Living Ink 물리 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
+        announceDrawingShortcut("수채 번짐 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
         return;
       }
       if (hokusaiLiveFinalizingRef.current) {
@@ -32790,8 +32790,8 @@ const puppetWarpArmed =
     setLivingInkBusy(false);
     void livingInkCoordinatorRef.current.cancelStroke(strokeId);
     liveDraftLayerRef.current?.drawScene();
-    announceDrawingShortcut("Living Ink 물 도구 · 변경 없음");
-    setError(`Living Ink 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
+    announceDrawingShortcut("수채 번짐 물 도구 · 변경 없음");
+    setError(`수채 번짐 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
   }
 
   function commitStudioLivingInkFallbackVector(
@@ -38700,7 +38700,7 @@ function clearSelectionForEdit() {
       kind === "clear"
       &&
       livingInkScope === "all"
-      && !globalThis.confirm("현재 페이지의 Living Ink 물리 레이어 전체를 지울까요? 실행 취소로 되돌릴 수 있습니다.")
+      && !globalThis.confirm("현재 페이지의 수채 번짐 레이어 전체를 지울까요? 실행 취소로 되돌릴 수 있습니다.")
     ) return;
     if (
       kind === "fix"
@@ -39032,7 +39032,7 @@ function clearSelectionForEdit() {
         fixUnavailableReason:
           livingInkStateMessage
           ?? (livingInkPersistedLayer
-            ? "Living Ink 물리 상태를 복원한 뒤 정착할 수 있습니다."
+            ? "수채 번짐 상태를 복원한 뒤 정착할 수 있습니다."
             : "먼저 Living Ink 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
         material: livingInkMaterial,
         materialLocked: livingInkPersistedLayer,

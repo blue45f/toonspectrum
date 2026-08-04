@@ -704,14 +704,14 @@ describe("StudioMobileEditingDock", () => {
 
     const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
     const livingInk = within(sheet).getByRole("region", {
-      name: "Living Ink 빠른 도구",
+      name: "수채 번짐 빠른 도구",
     });
     expect(livingInk.getAttribute("data-studio-mobile-living-ink")).toBe("true");
     expect(document.querySelectorAll('[data-studio-living-ink-controls="true"]')).toHaveLength(1);
 
-    within(livingInk).getByRole("button", { name: "Living Ink 물" }).click();
-    within(livingInk).getByRole("button", { name: "Living Ink 정착" }).click();
-    within(livingInk).getByRole("button", { name: "Living Ink 지우기" }).click();
+    within(livingInk).getByRole("button", { name: "수채 번짐 물" }).click();
+    within(livingInk).getByRole("button", { name: "수채 번짐 정착" }).click();
+    within(livingInk).getByRole("button", { name: "수채 번짐 지우기" }).click();
 
     expect(onModeChange).toHaveBeenCalledWith("water");
     expect(onFix).toHaveBeenCalledOnce();

@@ -85,7 +85,7 @@ export function StudioInspectorCurrentBrushSummary({
       />
       <div className="flex items-center justify-between gap-2 px-1">
         <p className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
-          하단 빠른 바와 같은 브러시 목록을 사용합니다.
+          하단 빠른 바와 같은 브러시 목록을 사용합니다. 선화·번짐·에어 모두 크기·농도·색 조작은 같습니다.
         </p>
         {onOpenBrushCatalog ? (
           <button

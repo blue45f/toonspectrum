@@ -1053,13 +1053,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 </div>
                 {livingInk.supported ? (
                   <section
-                    aria-label="Living Ink 빠른 도구"
+                    aria-label="수채 번짐 빠른 도구"
                     data-studio-mobile-living-ink="true"
-                    className="mb-2.5 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-2"
+                    data-studio-brush-behavior="wash"
+                    className="mb-2.5 rounded-2xl border border-line/70 bg-card/70 p-2"
                   >
                     <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
-                      <p className="text-[0.68rem] font-bold text-fg-2">Living Ink</p>
-                      <p className="text-[0.6rem] text-fg-3">잉크 · 물 · 정착 · 지우기</p>
+                      <p className="text-[0.68rem] font-bold text-fg-2">수채 번짐</p>
+                      <p className="text-[0.6rem] text-fg-3">안료 · 물 · 정착 · 지우기 · 크기·농도는 위와 동일</p>
                     </div>
                     <div className="overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       <StudioLivingInkControls {...livingInk} />
