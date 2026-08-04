@@ -23,7 +23,8 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(localization).toContain("export function localizeStudioMainMenuGroups(");
     // 캔버스 px 눈금자, 빠른 액세스, 전문 필터 항목을 소유해도 카탈로그가 독립 모듈
     // 경계를 유지한다. 기능 카탈로그 확장분만 허용하고 React/browser 경계는 위에서 엄격히 막는다.
-    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_120);
+    // 의도적 변경(2026-08-05): File 메뉴 save→import→export 재배치 주석(1_120 → 1_130).
+    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_130);
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {
