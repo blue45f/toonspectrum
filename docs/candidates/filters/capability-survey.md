@@ -84,3 +84,30 @@ tests/benchmarks/results/filter-candidates.json, M4 Mac·Node 24 단일 스레�
 - OpenCV Canny/모폴로지 성능은 인터랙티브 분석 레인(마술봉·선 추출·먼지 제거 보조) 요구를 충족한다.
 - wasm-vips 단일 스레드 기준선은 대형 최종 출력 레인용으로 기록. SMP는 COOP/COEP 워커 필요
   (스튜디오는 이미 cross-origin isolation 게이트 보유 — boundary 감사 참조).
+
+## 품질 실측 (Quality Lab v1, 2026-08-07 — 선택 기준에 품질 반영)
+
+기준은 엔진 독립 참조(다운스케일=float 박스 평균, 블러=분리형 float 가우시안 r=4σ), 지표는 PSNR·8×8
+평균 SSIM. 원시/아티팩트: tests/benchmarks/results/quality-lab.json + tests/benchmarks/artifacts/quality-lab/*.png
+(참조 이미지 포함 — 승인 요건).
+
+| 과제 | 후보 | PSNR | SSIM | wall |
+| --- | --- | --- | --- | --- |
+| 다운스케일 2048→512 | nearest(바닥선) | 13.92dB | 0.792 | 3.2ms |
+| | canvaskit cubic(Mitchell) | 23.78dB | 0.977 | 30.0ms |
+| | canvaskit linear(no mips) | 25.31dB | 0.983 | 15.0ms |
+| | **wasm-vips lanczos3** | **27.26dB** | **0.989** | 123.6ms |
+| 가우시안 σ4 512² | **canvaskit ImageFilter** | **47.94dB** | 0.987 | 29.5ms |
+| | wasm-vips gaussblur | 43.93dB | 0.969 | 97.0ms |
+| | opencv(auto kernel) | 36.58dB | 0.970 | 42.1ms |
+
+판정(§3.2 visualQuality 축 반영):
+- **대형 다운스케일/최종 출력 = wasm-vips 우승**(품질 1위, 7.5× 느림) → E17 final 레인 배정이 실측으로
+  확정. 인터랙티브 프리뷰는 canvaskit이 품질·속도 균형.
+- **가우시안 충실도 = canvaskit 우승**(47.9dB) → 심미 필터 레인은 canvaskit 우선. opencv는 분석
+  마스크 레인 전용(블러 충실도 열위 36.6dB — 자동 커널 절단).
+- 주의: 다운스케일 참조가 박스 평균이라 area 계열에 유리한 바이어스가 있으나 SSIM 서열 동일, lanczos
+  우승은 유지. Mitchell(선예) 계열은 참조 선택에 민감 — 인쇄/선화용 별도 평가 항목으로 백로그.
+- 이 수치는 ProviderBenchmarkRegistry의 visualQuality 축으로 주입되어 **EffectGraph 컴파일러의
+  후보 선정을 실제로 결정한다**(등록 순서가 아니라 §3.2 가중 점수; 증거 반전 시 선택도 반전됨을
+  테스트로 고정).

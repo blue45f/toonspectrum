@@ -5,10 +5,12 @@ import type { ProviderDescriptor } from "@toonspectrum/studio-engine-registry";
 /**
  * Vello CPU provider descriptor (matrix E04, ADR 0004).
  *
- * Role: deterministic CPU reference lane — cross-renderer diff, golden images,
- * GPU-loss recovery, background export. It intentionally does NOT claim
- * surface.primary: interactive surfaces belong to the production baseline
- * (CanvasKit today) until Vello Classic/Hybrid pass their capability gates.
+ * Role: deterministic CPU lane — cross-renderer diff, golden images, GPU-loss
+ * recovery, background export, and (ADR-0010 승격) vector-island preview
+ * rendering. It does not claim surface.primary yet: interactive surface
+ * ownership moves with the Vello Classic/Hybrid GPU validation track, which
+ * ADR-0010 prioritizes under the product-owner risk acceptance — candidates
+ * are gated by quality + fallback chains, not by maturity labels.
  */
 export const velloCpuProviderDescriptor: ProviderDescriptor =
   providerDescriptorSchema.parse({
@@ -18,7 +20,7 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
     version: "vello_cpu 0.2.0 / crate 0.1.0",
     license: "MIT / Apache-2.0",
     attribution: "Linebender Vello project",
-    maturity: "candidate",
+    maturity: "conditional",
     runtime: "wasm",
     capabilities: [
       "render.vector.fill",
@@ -35,7 +37,7 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
       "no text shaping lane yet — text islands must route to a paragraph-capable provider",
       "single-threaded baseline SIMD level pinned for bit-stable golden images",
     ],
-    previewQuality: "reference",
+    previewQuality: "production",
     finalQuality: "reference",
     determinism: "bit-exact",
     memoryEstimateMb: 12,

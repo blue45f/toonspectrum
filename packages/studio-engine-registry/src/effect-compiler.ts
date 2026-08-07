@@ -4,6 +4,7 @@ import {
   type EffectNodeIR,
 } from "@toonspectrum/studio-project-model";
 
+import type { ProviderBenchmarkRegistry } from "./benchmark-registry";
 import type { EngineCapabilityRegistry, RegisteredProvider } from "./registry";
 
 /**
@@ -84,10 +85,27 @@ function candidatesFor(
   ];
 }
 
+export interface EffectCompileOptions {
+  mode: EffectCompileMode;
+  /**
+   * Measured §3.2 axis scores. When present, candidate selection is the
+   * weighted quality+performance score (visualQuality 30/100) instead of
+   * registration order — quality evidence decides, not arrival time.
+   */
+  benchmarks?: ProviderBenchmarkRegistry;
+  /**
+   * §3.2 "최소 통과 조건" + 제품 오너 지시(2026-08-07): 품질·손맛·정밀함이
+   * 성능보다 우선한다. 측정된 visualQuality가 이 바닥선 미만인 후보는 아무리
+   * 빨라도 탈락한다. 측정 없는 후보는 측정 통과 후보가 하나라도 있으면
+   * 제외(증거 우선), 아무도 통과 못 하면 폴백으로 유지된다.
+   */
+  minVisualQuality?: number;
+}
+
 export function compileEffectGraph(
   graph: EffectGraphIR,
   registry: EngineCapabilityRegistry,
-  options: { mode: EffectCompileMode },
+  options: EffectCompileOptions,
 ): CompiledEffectGraph {
   const issues = validateEffectGraph(graph);
   if (issues.length > 0) {
@@ -120,14 +138,48 @@ export function compileEffectGraph(
       missingOps.push(node.op);
       continue;
     }
-    // Final mode prefers production final quality; ties resolve by
-    // registration order (registry priority).
-    const chosen =
+    // Final mode narrows to production final quality first when available.
+    const pool =
       options.mode === "final"
-        ? (phased.find(
-            (candidate) => candidate.descriptor.finalQuality === "production",
-          ) ?? phased[0])
-        : phased[0];
+        ? (() => {
+            const production = phased.filter(
+              (candidate) => candidate.descriptor.finalQuality === "production",
+            );
+            return production.length > 0 ? production : phased;
+          })()
+        : phased;
+    // Quality floor (성능보다 품질 우선): measured sub-floor candidates are
+    // out regardless of speed; unmeasured ones survive only when no measured
+    // candidate passes.
+    let gatedPool = pool;
+    const floor = options.minVisualQuality;
+    const benchmarks = options.benchmarks;
+    if (floor !== undefined && benchmarks) {
+      const passing = pool.filter(
+        (candidate) =>
+          benchmarks.hasMeasurements(candidate.descriptor.id) &&
+          benchmarks.axisScores(candidate.descriptor.id).visualQuality >= floor,
+      );
+      gatedPool =
+        passing.length > 0
+          ? passing
+          : pool.filter(
+              (candidate) => !benchmarks.hasMeasurements(candidate.descriptor.id),
+            );
+      if (gatedPool.length === 0) {
+        missingOps.push(`${node.op} (below quality floor ${floor})`);
+        continue;
+      }
+    }
+    // With benchmark evidence: highest §3.2 weighted score wins (stable sort
+    // keeps registration order as the tiebreak). Without evidence: order.
+    const chosen = benchmarks
+      ? [...gatedPool].sort(
+          (a, b) =>
+            (benchmarks.score(b.descriptor.id) ?? 0) -
+            (benchmarks.score(a.descriptor.id) ?? 0),
+        )[0]
+      : gatedPool[0];
     if (!chosen) continue;
     assignments.push({ node, providerId: chosen.descriptor.id });
   }
