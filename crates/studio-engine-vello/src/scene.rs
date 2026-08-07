@@ -138,6 +138,8 @@ pub enum SceneNodeIR {
         id: String,
         opacity: f32,
         blend: BlendModeIR,
+        #[serde(default)]
+        clip: Option<PathIR>,
         children: Vec<SceneNodeIR>,
     },
 }

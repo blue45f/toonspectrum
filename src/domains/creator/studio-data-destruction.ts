@@ -11,7 +11,7 @@
  */
 
 export const STUDIO_DATA_RESET_CONFIRMATION_PHRASE =
-  "REPLACE_CURRENT_TOONSTUDIO_IN_PLACE";
+  "REPLACE_CURRENT_TOONSTUDIO_IN_PLACE_V12";
 
 /**
  * Studio 내부 데이터 인벤토리. 문자열 리터럴은 각 저장 모듈의 소스와

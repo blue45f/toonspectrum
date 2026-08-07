@@ -162,16 +162,26 @@ fn encode_nodes(out: &mut Scene, nodes: &[SceneNodeIR], canvas: Rect) {
             SceneNodeIR::Group {
                 opacity,
                 blend,
+                clip,
                 children,
                 ..
             } => {
-                out.push_layer(
-                    Fill::NonZero,
-                    to_blend(*blend),
-                    *opacity,
-                    Affine::IDENTITY,
-                    &canvas,
-                );
+                match clip.as_ref().map(to_bez) {
+                    Some(clip_bez) => out.push_layer(
+                        Fill::NonZero,
+                        to_blend(*blend),
+                        *opacity,
+                        Affine::IDENTITY,
+                        &clip_bez,
+                    ),
+                    None => out.push_layer(
+                        Fill::NonZero,
+                        to_blend(*blend),
+                        *opacity,
+                        Affine::IDENTITY,
+                        &canvas,
+                    ),
+                }
                 encode_nodes(out, children, canvas);
                 out.pop_layer();
             }

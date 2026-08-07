@@ -50,7 +50,7 @@ describe("authorizeStudioDataDestruction", () => {
       {},
       { ...VALID_FLAGS, RESET_EXISTING_STUDIO_DATA: "yes" },
       { ...VALID_FLAGS, RESET_TARGET: "some-other-deployment" },
-      { ...VALID_FLAGS, RESET_CONFIRMATION: "REPLACE" },
+      { ...VALID_FLAGS, RESET_CONFIRMATION: "REPLACE_CURRENT_TOONSTUDIO_IN_PLACE" },
     ];
     for (const flags of badCases) {
       const result = authorizeStudioDataDestruction(flags, DEPLOYMENT);

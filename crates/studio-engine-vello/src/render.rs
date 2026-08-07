@@ -196,10 +196,18 @@ fn render_nodes(ctx: &mut RenderContext, nodes: &[SceneNodeIR]) {
             SceneNodeIR::Group {
                 opacity,
                 blend,
+                clip,
                 children,
                 ..
             } => {
-                ctx.push_layer(None, Some(to_blend(*blend)), Some(*opacity), None, None);
+                let clip_bez = clip.as_ref().map(to_bez_path);
+                ctx.push_layer(
+                    clip_bez.as_ref(),
+                    Some(to_blend(*blend)),
+                    Some(*opacity),
+                    None,
+                    None,
+                );
                 render_nodes(ctx, children);
                 ctx.pop_layer();
             }
