@@ -461,6 +461,8 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  packages/command-registry-v11: {}
+
   packages/core:
     dependencies:
       embla-carousel-react:
@@ -468,6 +470,18 @@ importers:
         version: 8.6.0(react@19.2.7)
 
   packages/play-core: {}
+
+  packages/project-model-v11:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
+  packages/provider-catalog-v11:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
 packages:
 
