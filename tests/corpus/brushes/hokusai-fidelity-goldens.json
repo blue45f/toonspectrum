@@ -1,0 +1,106 @@
+{
+  "harness": "tests/visual/hokusai-fidelity.test.ts",
+  "engine": "studio-hokusai-wasm (hokusai 0.3.0 pinned, packed transparent RGBA8)",
+  "canvas": {
+    "size": 96,
+    "samples": 48
+  },
+  "variants": [
+    {
+      "id": "ink-default",
+      "params": {
+        "id": "ink-default",
+        "seed": 101,
+        "colorHsv": [
+          0,
+          0,
+          0.1
+        ],
+        "radiusLog2": 1.5,
+        "pressureScale": 1
+      },
+      "sha256": "0335d4dd9c1cfe1c37255541977f6d8ee97ff025a8803824bb9664c5459c7acb",
+      "inkedPixels": 786
+    },
+    {
+      "id": "ink-fine",
+      "params": {
+        "id": "ink-fine",
+        "seed": 101,
+        "colorHsv": [
+          0,
+          0,
+          0.1
+        ],
+        "radiusLog2": 0.5,
+        "pressureScale": 1
+      },
+      "sha256": "e0ea2f199b44c3d5d6f9dbc3b317c011c580c14e13b0df0e6c92a0605736f1db",
+      "inkedPixels": 541
+    },
+    {
+      "id": "ink-broad",
+      "params": {
+        "id": "ink-broad",
+        "seed": 101,
+        "colorHsv": [
+          0,
+          0,
+          0.1
+        ],
+        "radiusLog2": 2.5,
+        "pressureScale": 1
+      },
+      "sha256": "52ecd2e5eeda40b450a497202ca0ed7d66d5f9c147f7226b1db7bfb871e31c53",
+      "inkedPixels": 1520
+    },
+    {
+      "id": "crimson-light-touch",
+      "params": {
+        "id": "crimson-light-touch",
+        "seed": 202,
+        "colorHsv": [
+          0.98,
+          0.85,
+          0.75
+        ],
+        "radiusLog2": 1.8,
+        "pressureScale": 0.55
+      },
+      "sha256": "790bdfff0304556a579d7239f562f87ddfb82cc003101071eeed3e318cb480a6",
+      "inkedPixels": 771
+    },
+    {
+      "id": "indigo-heavy",
+      "params": {
+        "id": "indigo-heavy",
+        "seed": 303,
+        "colorHsv": [
+          0.64,
+          0.7,
+          0.55
+        ],
+        "radiusLog2": 2,
+        "pressureScale": 1
+      },
+      "sha256": "d5c46e328a252ed9b305b07e93db2440b50384e43faeab12b4abfd61b3099f1f",
+      "inkedPixels": 1058
+    },
+    {
+      "id": "seed-variation",
+      "params": {
+        "id": "seed-variation",
+        "seed": 404,
+        "colorHsv": [
+          0.3,
+          0.6,
+          0.5
+        ],
+        "radiusLog2": 1.8,
+        "pressureScale": 0.8
+      },
+      "sha256": "a5261d1ecc912dd7a2ec6395a1a5100e12504c2b7049f223999b92fa04cdc357",
+      "inkedPixels": 836
+    }
+  ]
+}
