@@ -57,6 +57,42 @@ describe("StudioLivingInkControls", () => {
     expect(props.onFix).toHaveBeenCalledOnce();
   });
 
+  it("wires every wash material knob through to the real material patch path", () => {
+    const { props } = renderControls({ materialLocked: false, fixAvailable: true });
+    for (const label of [
+      "수채 번짐 안료 흐름",
+      "수채 번짐 번짐",
+      "수채 번짐 건조 속도",
+      "수채 번짐 색상 분리",
+      "수채 번짐 브러시 안료",
+      "수채 번짐 모세관 확산",
+      "수채 번짐 소용돌이",
+      "수채 번짐 가장자리 암화",
+      "수채 번짐 젖은 광택",
+      "수채 번짐 광학 밀도",
+    ] as const) {
+      const slider = screen.getByRole("slider", { name: label });
+      expect(slider.hasAttribute("disabled")).toBe(false);
+      fireEvent.change(slider, { target: { value: "0.42" } });
+    }
+    const patches = (props.onMaterialChange as ReturnType<typeof vi.fn>).mock.calls
+      .map((call) => call[0] as Record<string, number>);
+    for (const key of [
+      "flow",
+      "bleed",
+      "dryRate",
+      "chromaticSeparation",
+      "brushPigmentLoad",
+      "capillaryCreep",
+      "vorticity",
+      "edgeDarkening",
+      "wetSheen",
+      "beerLambertDensity",
+    ] as const) {
+      expect(patches.some((patch) => key in patch), `missing patch key: ${key}`).toBe(true);
+    }
+  });
+
   it("uses product chrome tokens (not a separate cyan system shell)", () => {
     renderControls();
     const root = document.querySelector("[data-studio-living-ink-controls=\"true\"]");
