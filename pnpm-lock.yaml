@@ -98,30 +98,30 @@ importers:
       '@techstark/opencv-js':
         specifier: 5.0.0-release.1
         version: 5.0.0-release.1
-      '@toonspectrum/brush-platform-v11':
-        specifier: workspace:*
-        version: link:packages/brush-platform-v11
-      '@toonspectrum/command-registry-v11':
-        specifier: workspace:*
-        version: link:packages/command-registry-v11
       '@toonspectrum/core':
         specifier: workspace:*
         version: link:packages/core
       '@toonspectrum/play-core':
         specifier: workspace:*
         version: link:packages/play-core
-      '@toonspectrum/project-model-v11':
+      '@toonspectrum/studio-brush-platform':
         specifier: workspace:*
-        version: link:packages/project-model-v11
-      '@toonspectrum/provider-catalog-v11':
+        version: link:packages/studio-brush-platform
+      '@toonspectrum/studio-command-registry':
         specifier: workspace:*
-        version: link:packages/provider-catalog-v11
-      '@toonspectrum/skia-adapter-v11':
+        version: link:packages/studio-command-registry
+      '@toonspectrum/studio-engine-registry':
         specifier: workspace:*
-        version: link:packages/skia-adapter-v11
-      '@toonspectrum/vello-adapter-v11':
+        version: link:packages/studio-engine-registry
+      '@toonspectrum/studio-engine-skia':
         specifier: workspace:*
-        version: link:packages/vello-adapter-v11
+        version: link:packages/studio-engine-skia
+      '@toonspectrum/studio-engine-vello':
+        specifier: workspace:*
+        version: link:packages/studio-engine-vello
+      '@toonspectrum/studio-project-model':
+        specifier: workspace:*
+        version: link:packages/studio-project-model
       ag-psd:
         specifier: ^31.0.1
         version: 31.0.1
@@ -479,42 +479,6 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
-  apps/benchmark-lab-v11:
-    dependencies:
-      '@toonspectrum/brush-platform-v11':
-        specifier: workspace:*
-        version: link:../../packages/brush-platform-v11
-      '@toonspectrum/project-model-v11':
-        specifier: workspace:*
-        version: link:../../packages/project-model-v11
-      '@toonspectrum/skia-adapter-v11':
-        specifier: workspace:*
-        version: link:../../packages/skia-adapter-v11
-      '@toonspectrum/vello-adapter-v11':
-        specifier: workspace:*
-        version: link:../../packages/vello-adapter-v11
-    devDependencies:
-      '@types/node':
-        specifier: ^24
-        version: 24.13.2
-      tsx:
-        specifier: ^4.22.3
-        version: 4.22.3
-
-  packages/brush-platform-v11:
-    dependencies:
-      '@toonspectrum/project-model-v11':
-        specifier: workspace:*
-        version: link:../project-model-v11
-      '@toonspectrum/provider-catalog-v11':
-        specifier: workspace:*
-        version: link:../provider-catalog-v11
-      perfect-freehand:
-        specifier: 1.2.3
-        version: 1.2.3
-
-  packages/command-registry-v11: {}
-
   packages/core:
     dependencies:
       embla-carousel-react:
@@ -523,26 +487,34 @@ importers:
 
   packages/play-core: {}
 
-  packages/project-model-v11:
+  packages/studio-brush-platform:
+    dependencies:
+      '@toonspectrum/studio-engine-registry':
+        specifier: workspace:*
+        version: link:../studio-engine-registry
+      '@toonspectrum/studio-project-model':
+        specifier: workspace:*
+        version: link:../studio-project-model
+      perfect-freehand:
+        specifier: 1.2.3
+        version: 1.2.3
+
+  packages/studio-command-registry: {}
+
+  packages/studio-engine-registry:
     dependencies:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/provider-catalog-v11:
+  packages/studio-engine-skia:
     dependencies:
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/skia-adapter-v11:
-    dependencies:
-      '@toonspectrum/project-model-v11':
+      '@toonspectrum/studio-engine-registry':
         specifier: workspace:*
-        version: link:../project-model-v11
-      '@toonspectrum/provider-catalog-v11':
+        version: link:../studio-engine-registry
+      '@toonspectrum/studio-project-model':
         specifier: workspace:*
-        version: link:../provider-catalog-v11
+        version: link:../studio-project-model
       canvaskit-wasm:
         specifier: 0.41.1
         version: 0.41.1
@@ -551,18 +523,24 @@ importers:
         specifier: ^24
         version: 24.13.2
 
-  packages/vello-adapter-v11:
+  packages/studio-engine-vello:
     dependencies:
-      '@toonspectrum/project-model-v11':
+      '@toonspectrum/studio-engine-registry':
         specifier: workspace:*
-        version: link:../project-model-v11
-      '@toonspectrum/provider-catalog-v11':
+        version: link:../studio-engine-registry
+      '@toonspectrum/studio-project-model':
         specifier: workspace:*
-        version: link:../provider-catalog-v11
+        version: link:../studio-project-model
     devDependencies:
       '@types/node':
         specifier: ^24
         version: 24.13.2
+
+  packages/studio-project-model:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
 packages:
 

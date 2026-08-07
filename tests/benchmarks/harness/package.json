@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "description": "ESM marker so tsx runs the benchmark harness's top-level await; not a workspace package."
+}

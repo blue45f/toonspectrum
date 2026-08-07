@@ -9,10 +9,10 @@ import {
   recoverProject,
   sceneDigest,
   solidPaint,
-} from "@toonspectrum/project-model-v11";
+} from "@toonspectrum/studio-project-model";
 import { describe, expect, it } from "vitest";
 
-import type { CommandIR, SceneNodeIR } from "@toonspectrum/project-model-v11";
+import type { CommandIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
 
 /**
  * Phase 7 fault-injection slice (V11 §10.5): storage failures during append

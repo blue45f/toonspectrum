@@ -1,5 +1,5 @@
 {
-  "harness": "tests/studio-v11/cross-renderer-diff.test.ts",
+  "harness": "tests/visual/cross-renderer-diff.test.ts",
   "engines": {
     "a": "skia-canvaskit 0.41.1 (CPU surface, unpremul sRGB)",
     "b": "vello-cpu (vello_cpu 0.2.0, baseline SIMD, single thread)"

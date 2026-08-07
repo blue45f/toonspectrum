@@ -1,0 +1,17 @@
+{
+  "name": "studio-engine-vello",
+  "type": "module",
+  "description": "ToonStudio V11 deterministic CPU reference renderer: SceneIR JSON -> RGBA8 via vello_cpu (Linebender sparse-strip CPU renderer).",
+  "version": "0.1.0",
+  "license": "MIT OR Apache-2.0",
+  "files": [
+    "studio_engine_vello_bg.wasm",
+    "studio_engine_vello.js",
+    "studio_engine_vello.d.ts"
+  ],
+  "main": "studio_engine_vello.js",
+  "types": "studio_engine_vello.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -16,7 +16,7 @@ export default defineConfig(
     // wasm-bindgen가 재현 가능 빌드로 생성하고 별도 SHA-256 release gate가 검증하는 배포물.
     // 생성 JS를 직접 고치면 다음 pinned rebuild에서 덮어써지므로 호스트 ESLint 대상에서 제외한다.
     'packages/studio-hokusai-wasm/pkg/**',
-    'crates/vello-adapter-v11/pkg/**',
+    'crates/studio-engine-vello/pkg/**',
     // 에이전트 워크플로가 격리 작업용으로 만드는 임시 git worktree(전역 gitignore 대상이라
     // 커밋되진 않지만, eslint 기본 스캔은 gitignore 를 안 따라가므로 이 안에 있는 이 저장소의
     // 사본까지 전부 다시 스캔해버린다 — vitest.config.ts 의 동일 제외와 같은 이유).

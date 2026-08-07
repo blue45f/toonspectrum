@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+/**
+ * V11 engine-layer verification gate.
+ *
+ * 1. Integrity: the committed vello wasm pkg must match INTEGRITY.sha256
+ *    (same release-contract idea as studio-hokusai-wasm — generated artifacts
+ *    are pinned, never hand-edited).
+ * 2. Contracts: typecheck every *-v11 package.
+ * 3. Behavior: run the V11 test scope (packages, cross-renderer diff, shadow
+ *    parity) through the root vitest config.
+ */
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+const PKG_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg");
+
+function fail(message) {
+  console.error(`verify:studio-engine FAILED — ${message}`);
+  process.exit(1);
+}
+
+// 1. wasm pkg integrity
+const manifest = readFileSync(join(PKG_DIR, "INTEGRITY.sha256"), "utf8");
+for (const line of manifest.split("\n")) {
+  if (line.trim() === "") continue;
+  const match = line.match(/^([0-9a-f]{64}) [ *](.+)$/);
+  if (!match) fail(`unparseable INTEGRITY line: ${line}`);
+  const [, expected, file] = match;
+  const actual = createHash("sha256")
+    .update(readFileSync(join(PKG_DIR, file)))
+    .digest("hex");
+  if (actual !== expected) {
+    fail(
+      `${file} hash mismatch — rebuild via wasm-pack (crates/studio-engine-vello) and refresh INTEGRITY.sha256`,
+    );
+  }
+}
+console.log("vello wasm pkg integrity: OK");
+
+const STUDIO_ENGINE_PACKAGES = [
+  "@toonspectrum/studio-project-model",
+  "@toonspectrum/studio-engine-registry",
+  "@toonspectrum/studio-command-registry",
+  "@toonspectrum/studio-engine-skia",
+  "@toonspectrum/studio-engine-vello",
+  "@toonspectrum/studio-brush-platform",
+];
+
+// 2. package + benchmark-harness typechecks
+const harnessTsc = spawnSync(
+  "pnpm",
+  ["exec", "tsc", "-p", "tests/benchmarks/harness/tsconfig.json"],
+  { cwd: ROOT, stdio: "inherit" },
+);
+if (harnessTsc.status !== 0) fail("typecheck failed: tests/benchmarks/harness");
+for (const name of STUDIO_ENGINE_PACKAGES) {
+  const result = spawnSync("pnpm", ["--filter", name, "typecheck"], {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
+  if (result.status !== 0) fail(`typecheck failed: ${name}`);
+}
+
+// 3. V11 test scope
+const test = spawnSync(
+  "pnpm",
+  [
+    "exec",
+    "vitest",
+    "run",
+    "packages/studio-project-model",
+    "packages/studio-engine-registry",
+    "packages/studio-command-registry",
+    "packages/studio-engine-skia",
+    "packages/studio-engine-vello",
+    "packages/studio-brush-platform",
+    "tests/visual",
+    "tests/fault-injection",
+    "src/domains/creator/studio-surface-plan-shadow.test.ts",
+    "src/domains/creator/studio-filter-island-plan.test.ts",
+  ],
+  { cwd: ROOT, stdio: "inherit" },
+);
+if (test.status !== 0) fail("V11 vitest scope failed");
+
+console.log("verify:studio-engine PASSED");

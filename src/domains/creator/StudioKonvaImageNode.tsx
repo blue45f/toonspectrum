@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
+import { planStudioFilterIslandLanes } from "./studio-filter-island-plan";
 import {
   applyFilterMaskToPixels,
   computeFilterMaskCoverage,
@@ -19,7 +20,6 @@ import { resizableNodeProps } from "./studio-node-props";
 import { computePanelAutoFitPatch } from "./studio-panel-autofit";
 import { sha256HexPortable } from "./studio-sha256";
 import { toKonvaSkewAttrs } from "./studio-skew";
-import { planStudioFilterIslandLanes } from "./studio-v11-filter-island-plan";
 
 import type { FrameEl, ImageEl } from "./studio-element-model";
 import type Konva from "konva";
