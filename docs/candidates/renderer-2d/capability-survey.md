@@ -71,3 +71,22 @@ tests/benchmarks/results/vello-gpu-native.json.
   대형 장면(30k 스트립·8K) 벤치가 다음 단계.
 - 측정 시 readback은 테스트 전용 증거 수집이며 인터랙티브 경로 금지 규칙(§9.1)과 무관.
 - 다음: wgpu WebGPU(wasm) 어댑터 PoC — 브라우저에서 같은 패리티/성능 게이트 재현.
+
+---
+
+## V12 wasm GPU 빌드 게이트 (2026-08-08)
+
+위 "다음" 항목의 첫 게이트(컴파일·링크)를 실측 통과했다.
+
+- 명령: `crates/studio-engine-vello`에서
+  `cargo build --release --target wasm32-unknown-unknown --features gpu`
+- 결과: 성공 — `` Finished `release` profile [optimized] target(s) in 21.28s `` (빌드 로그 실측).
+  컴파일 목록에 vello 0.9.0 · wgpu 29.0.4 · wgpu-types 29.0.4 · wasm-bindgen-futures 0.4.76 포함.
+- 산출물: `target/wasm32-unknown-unknown/release/studio_engine_vello.wasm` = **4,406,493바이트(≈4.4MB)**
+  (opt-level="s" + LTO). `gpu` 피처는 optional lane으로, 기본 wasm-pack 산출물(vello_cpu 기준선)에는
+  포함되지 않는다.
+- 의미: "WebGPU 필수라 wasm 채택 불가" 유보 중 **빌드 실패 리스크는 실측으로 기각** — Vello GPU 레인이
+  wasm32 타깃에서 링크된다. 핀·라이선스·증거 전체는 `docs/engines/vello-baseline.md` 참조.
+- 남은 게이트: 실브라우저 WebGPU 구동(디바이스 획득·렌더·네이티브와 동일한 퍼지 패리티·성능 실측).
+  통과 전까지 이 레인의 상태는 격리 원장
+  `docs/adr/0011-v12-frontier-quarantine-ledger.md` 레인 2("빌드 게이트 통과")로 관리한다.
