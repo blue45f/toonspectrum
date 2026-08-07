@@ -65,3 +65,18 @@ V11 최종 아키텍처의 결정을 그대로 반영한다.
 2. **Parley 스택은 벤치 하니스에 상시 탑재**하되 프로덕션 비활성. `tests/benchmarks` 게이트(benchmark-plan.md)를 통과하고 세로쓰기·금칙 확장의 구현 우위가 입증되면 주력 승격(아키텍처 §0.1 마지막 단계).
 3. **ICU4X만은 조기 분리 도입** — KinsokuEngine의 분절 데이터 계층으로, CanvasKit 기준선 시기부터 가치가 있다.
 4. **Glifo는 GlyphCacheAdapter 뒤 격리.** Vello 텍스트 경로가 열리기 전에는 코드 경로에 넣지 않는다.
+
+---
+
+## 실측 현황 갱신 (2026-08-07, Parley 레인 PoC 출하)
+
+- **구현**: `crates/studio-engine-vello/src/text.rs` — parley 0.11(fontique 0.11·harfrust 0.10·ICU4X 2.2)
+  + skrifa 0.43 아웃라인 추출 → 캐노니컬 PathIR. wasm export `shape_text_json`, TS 래퍼
+  `shapeTextToGlyphPaths`(zod 검증).
+- **증거**: 크레이트 테스트 6종(셰이핑·줄바꿈·결정성·vello_cpu 렌더 통합·한글 no-crash·입력 검증) +
+  래퍼 테스트 2종(스키마·**교차 렌더 잉크 커버리지 vello↔CanvasKit 10% 이내 일치**).
+- **비용 실측**: wasm 1,855,463 → 3,149,976 bytes (**+1.29MB**, E07 스택 전체 포함). lazy load
+  전제(§9.1)에서 수용 가능하나 텍스트 미사용 세션의 로딩 회피를 위해 분리 빌드 후보로 기록.
+- **잔여 게이트**: CJK 폰트 자산(현재 코퍼스는 Roboto — 한글 커버리지 없음, no-crash만 보장),
+  세로쓰기·금칙·루비, CanvasKit Paragraph와의 시각 기준 비교(현재는 아웃라인 경로 동등성만),
+  Glifo 글리프 캐시. 이 게이트 통과 전까지 production 텍스트는 CanvasKit Paragraph 기준선 유지.

@@ -7,10 +7,12 @@
 pub mod geometry;
 pub mod render;
 pub mod scene;
+pub mod text;
 
 pub use geometry::{bez_path_to_path_ir_json, fit_polyline, segment_count};
 pub use render::{parse_scene, render_scene, RenderError};
 pub use scene::SceneIR;
+pub use text::{shape_text, shaped_text_to_json, ShapedText};
 
 use wasm_bindgen::prelude::*;
 
@@ -27,6 +29,20 @@ pub fn fit_polyline_json(points: &[f64], closed: bool, accuracy: f64) -> Result<
     let path = fit_polyline(points, closed, accuracy)
         .map_err(|error| JsError::new(&error.to_string()))?;
     Ok(bez_path_to_path_ir_json(&path))
+}
+
+/// Shapes text with the given font bytes into positioned glyph PathIR JSON
+/// (Parley/harfrust/ICU4X lane, matrix E07).
+#[wasm_bindgen]
+pub fn shape_text_json(
+    text: &str,
+    font_bytes: &[u8],
+    font_size: f32,
+    max_width: f32,
+) -> Result<String, JsError> {
+    let shaped = shape_text(text, font_bytes, font_size, max_width)
+        .map_err(|error| JsError::new(&error.to_string()))?;
+    Ok(shaped_text_to_json(&shaped))
 }
 
 /// Provider identity string surfaced in descriptors and benchmark reports.

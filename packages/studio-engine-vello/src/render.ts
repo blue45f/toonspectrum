@@ -34,6 +34,12 @@ export function loadVelloWasm(moduleOrPath?: VelloInitInput): Promise<void> {
   return initialized;
 }
 
+export function assertVelloInitialized(): void {
+  if (initialized === null) {
+    throw new Error("vello wasm not initialized — call loadVelloWasm() first");
+  }
+}
+
 const FEATURE_ERROR_MARKER = "cannot render required scene features:";
 
 /**

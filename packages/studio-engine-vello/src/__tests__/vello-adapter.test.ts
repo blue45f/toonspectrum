@@ -129,3 +129,69 @@ describe("kurbo editable-proxy fitting (wasm)", () => {
     expect(a.verbs.at(-1)?.v).toBe("Z");
   });
 });
+
+describe("parley text lane (wasm)", () => {
+  async function shapeInk() {
+    const { readFile } = await import("node:fs/promises");
+    const { shapeTextToGlyphPaths } = await import("../text");
+    const fontBytes = new Uint8Array(
+      await readFile(
+        new URL(
+          "../../../../tests/corpus/text/fonts/Roboto-Regular.ttf",
+          import.meta.url,
+        ),
+      ),
+    );
+    return shapeTextToGlyphPaths("Ink", fontBytes, {
+      fontSizePx: 48,
+      maxWidthPx: 400,
+    });
+  }
+
+  it("shapes text into schema-valid positioned glyph paths", async () => {
+    const shaped = await shapeInk();
+    expect(shaped.lineCount).toBe(1);
+    expect(shaped.glyphs.length).toBeGreaterThanOrEqual(3);
+    expect(shaped.glyphs.some((glyph) => glyph.path.verbs.length > 0)).toBe(true);
+  });
+
+  it("glyph paths render equivalently through vello and canvaskit", async () => {
+    const shaped = await shapeInk();
+    const scene: SceneIR = {
+      version: 11,
+      width: 128,
+      height: 72,
+      background: { r: 1, g: 1, b: 1, a: 1 },
+      nodes: shaped.glyphs
+        .filter((glyph) => glyph.path.verbs.length > 0)
+        .map((glyph, index) => ({
+          id: `g${index}`,
+          kind: "fill-path" as const,
+          path: glyph.path,
+          paint: solidPaint(0, 0, 0),
+          opacity: 1,
+          blend: "src-over" as const,
+          fillRule: "nonzero" as const,
+        })),
+    };
+    const velloPixels = renderSceneToPixels(scene);
+    const { loadCanvasKitNode } = await import("@toonspectrum/studio-engine-skia/node");
+    const { renderSceneToPixels: renderWithSkia } = await import(
+      "@toonspectrum/studio-engine-skia"
+    );
+    const ck = await loadCanvasKitNode();
+    const skiaPixels = renderWithSkia(ck, scene);
+    const ink = (pixels: Uint8Array): number => {
+      let count = 0;
+      for (let offset = 0; offset < pixels.length; offset += 4) {
+        if ((pixels[offset] ?? 255) < 200) count += 1;
+      }
+      return count;
+    };
+    const velloInk = ink(velloPixels);
+    const skiaInk = ink(skiaPixels);
+    expect(velloInk).toBeGreaterThan(150);
+    // Same PathIR glyphs must produce closely matching coverage on both engines.
+    expect(Math.abs(velloInk - skiaInk) / Math.max(velloInk, skiaInk)).toBeLessThan(0.1);
+  });
+});

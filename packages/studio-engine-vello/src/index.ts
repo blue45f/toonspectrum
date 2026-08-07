@@ -6,3 +6,5 @@ export {
   renderSceneToPixels,
   type VelloInitInput,
 } from "./render";
+export { shapeTextToGlyphPaths, shapedTextSchema, shapedGlyphSchema } from "./text";
+export type { ShapedText, ShapedGlyph, ShapeTextOptions } from "./text";

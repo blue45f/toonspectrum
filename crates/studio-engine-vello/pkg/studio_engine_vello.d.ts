@@ -16,6 +16,12 @@ export function fit_polyline_json(points: Float64Array, closed: boolean, accurac
  */
 export function render_scene_json(scene_json: string): Uint8Array;
 
+/**
+ * Shapes text with the given font bytes into positioned glyph PathIR JSON
+ * (Parley/harfrust/ICU4X lane, matrix E07).
+ */
+export function shape_text_json(text: string, font_bytes: Uint8Array, font_size: number, max_width: number): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -23,6 +29,7 @@ export interface InitOutput {
     readonly adapter_version: () => [number, number];
     readonly fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
+    readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
