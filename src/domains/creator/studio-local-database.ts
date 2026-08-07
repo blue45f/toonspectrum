@@ -74,7 +74,12 @@ export interface StudioLocalDatabaseMigration {
   statements: readonly string[];
 }
 
-/** 스키마 v1 — kv·tournament_winners·cost_samples(+조회 인덱스). */
+/**
+ * 스키마 마이그레이션 체인.
+ * - v1: kv·tournament_winners·cost_samples(+조회 인덱스).
+ * - v2: CommandBus 저널 영속(journal_entries)·two-slot 스냅샷(snapshots).
+ *   기존 v1 DB 는 재개방 시 러너가 v2 로 자동 전진시킨다.
+ */
 export const STUDIO_LOCAL_DATABASE_MIGRATIONS: readonly StudioLocalDatabaseMigration[] =
   Object.freeze([
     {
@@ -106,6 +111,27 @@ export const STUDIO_LOCAL_DATABASE_MIGRATIONS: readonly StudioLocalDatabaseMigra
         )`,
         `CREATE INDEX IF NOT EXISTS cost_samples_provider_bucket
           ON cost_samples (provider_id, bucket)`,
+      ]),
+    },
+    {
+      toVersion: 2,
+      statements: Object.freeze([
+        `CREATE TABLE IF NOT EXISTS journal_entries (
+          project_id TEXT NOT NULL,
+          seq INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          crc32 INTEGER NOT NULL,
+          PRIMARY KEY (project_id, seq)
+        )`,
+        `CREATE TABLE IF NOT EXISTS snapshots (
+          project_id TEXT NOT NULL,
+          slot INTEGER NOT NULL CHECK (slot IN (0, 1)),
+          seq INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          crc32 INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          PRIMARY KEY (project_id, slot)
+        )`,
       ]),
     },
   ]);
@@ -184,6 +210,40 @@ export interface StudioCostSampleRecord {
   recordedAt: number;
 }
 
+/**
+ * 구조화 로드용 raw 토너먼트 우승 후보 행 — 이 계층은 타입을 단정하지 않는다.
+ * 오염 행의 드롭 정책은 호출자 검증기(parsePersistedTournamentState)가
+ * 소유한다(부분 필드 오염이 전체 로드를 못 깨뜨리게).
+ */
+export interface StudioTournamentWinnerCandidate {
+  bucket: unknown;
+  deviceHash: unknown;
+  providerId: unknown;
+  expectedWarmMs: unknown;
+  decidedAtSample: unknown;
+}
+
+/** two-slot 스냅샷 슬롯 컬럼 값(0=A, 1=B) — 스키마 CHECK 와 동일한 도메인. */
+export type StudioJournalSnapshotSlot = 0 | 1;
+
+export interface StudioJournalEntryRecord {
+  seq: number;
+  /** 저장 계층이 해석하지 않는 직렬화된 저널 엔트리(JSON). */
+  payload: string;
+  /** 엔트리가 이미 지니고 있는 CRC32(기존 entryCrc 산출값의 사본). */
+  crc32: number;
+}
+
+export interface StudioJournalSnapshotRecord {
+  slot: StudioJournalSnapshotSlot;
+  seq: number;
+  /** 저장 계층이 해석하지 않는 직렬화된 스냅샷(JSON). */
+  payload: string;
+  /** 스냅샷이 이미 지니고 있는 CRC32(기존 snapshotCrc 산출값의 사본). */
+  crc32: number;
+  updatedAt: number;
+}
+
 /** 코디네이터가 토너먼트 영속 포트에 접합하는 최소 async KV 어댑터. */
 export interface StudioAsyncKeyValueStore {
   get(key: string): Promise<string | null>;
@@ -203,6 +263,15 @@ export interface StudioLocalDatabase {
     deviceHash: string,
   ): Promise<StudioTournamentWinnerRecord | null>;
   listTournamentWinners(): Promise<StudioTournamentWinnerRecord[]>;
+  /** 검증 없는 raw 우승 후보 행 — 오염 행 드롭 정책은 호출자 검증기 몫. */
+  listTournamentWinnerCandidates(): Promise<StudioTournamentWinnerCandidate[]>;
+  /**
+   * 우승 테이블 전체를 단일 트랜잭션으로 교체한다(upsert + 고아 삭제).
+   * 중간 실패 시 전체가 롤백되어 이전 상태가 그대로 남는다.
+   */
+  replaceTournamentWinners(
+    winners: readonly Omit<StudioTournamentWinnerRecord, "updatedAt">[],
+  ): Promise<void>;
   /** provider 의 우승 기록 전부 삭제. 삭제된 행 수를 돌려준다. */
   evictTournamentProvider(providerId: string): Promise<number>;
   recordCostSample(
@@ -216,6 +285,23 @@ export interface StudioLocalDatabase {
     bucket: string,
     limit?: number,
   ): Promise<StudioCostSampleRecord[]>;
+  /**
+   * 프로젝트 저널에 엔트리 1개를 단일 트랜잭션으로 추가한다. 같은 seq 이상에
+   * 남아 있던 잔여 꼬리(복구가 논리적으로 잘라낸 torn/부패 엔트리)는 같은
+   * 트랜잭션 안에서 물리 삭제되므로, 재개 후 replay 가 두 seq 를 볼 수 없다.
+   */
+  appendJournalEntry(projectId: string, entry: StudioJournalEntryRecord): Promise<void>;
+  /** 프로젝트의 저널 엔트리 전부(seq 오름차순). */
+  listJournalEntries(projectId: string): Promise<StudioJournalEntryRecord[]>;
+  /** 스냅샷이 덮은 seq 미만 엔트리 삭제(compaction). 삭제 행 수를 돌려준다. */
+  deleteJournalEntriesBefore(projectId: string, seq: number): Promise<number>;
+  /** (project, slot) 기준 upsert — two-slot A/B 교대는 호출자가 결정한다. */
+  putJournalSnapshot(
+    projectId: string,
+    snapshot: Omit<StudioJournalSnapshotRecord, "updatedAt">,
+  ): Promise<void>;
+  /** 프로젝트의 스냅샷 슬롯 전부(slot 오름차순, 최대 2행). */
+  listJournalSnapshots(projectId: string): Promise<StudioJournalSnapshotRecord[]>;
   asAsyncKeyValueStore(namespace: string): StudioAsyncKeyValueStore;
   close(): Promise<void>;
 }
@@ -267,11 +353,31 @@ const WINNER_GET_SQL = `SELECT ${WINNER_COLUMNS} FROM tournament_winners
 const WINNER_LIST_SQL = `SELECT ${WINNER_COLUMNS} FROM tournament_winners
   ORDER BY bucket, device_hash`;
 const WINNER_EVICT_SQL = "DELETE FROM tournament_winners WHERE provider_id = ?";
+const WINNER_DELETE_ALL_SQL = "DELETE FROM tournament_winners";
 const COST_SAMPLE_INSERT_SQL = `INSERT INTO cost_samples
   (provider_id, bucket, kind, ms, recorded_at) VALUES (?, ?, ?, ?, ?)`;
 const COST_SAMPLE_LIST_SQL = `SELECT id, provider_id, bucket, kind, ms, recorded_at
   FROM cost_samples WHERE provider_id = ? AND bucket = ?
   ORDER BY recorded_at DESC, id DESC LIMIT ?`;
+const JOURNAL_DELETE_TAIL_SQL =
+  "DELETE FROM journal_entries WHERE project_id = ? AND seq >= ?";
+const JOURNAL_INSERT_SQL = `INSERT INTO journal_entries
+  (project_id, seq, payload, crc32) VALUES (?, ?, ?, ?)`;
+const JOURNAL_LIST_SQL = `SELECT seq, payload, crc32 FROM journal_entries
+  WHERE project_id = ? ORDER BY seq`;
+const JOURNAL_COMPACT_SQL =
+  "DELETE FROM journal_entries WHERE project_id = ? AND seq < ?";
+const SNAPSHOT_PUT_SQL = `INSERT INTO snapshots
+  (project_id, slot, seq, payload, crc32, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT (project_id, slot)
+  DO UPDATE SET
+    seq = excluded.seq,
+    payload = excluded.payload,
+    crc32 = excluded.crc32,
+    updated_at = excluded.updated_at`;
+const SNAPSHOT_LIST_SQL = `SELECT slot, seq, payload, crc32, updated_at
+  FROM snapshots WHERE project_id = ? ORDER BY slot`;
 
 function expectString(value: unknown, column: string): string {
   if (typeof value !== "string") {
@@ -295,6 +401,38 @@ function rowToWinner(row: readonly unknown[]): StudioTournamentWinnerRecord {
     expectedWarmMs: expectNumber(row[3], "expected_warm_ms"),
     decidedAtSample: expectNumber(row[4], "decided_at_sample"),
     updatedAt: expectNumber(row[5], "updated_at"),
+  };
+}
+
+function rowToWinnerCandidate(row: readonly unknown[]): StudioTournamentWinnerCandidate {
+  return {
+    bucket: row[0],
+    deviceHash: row[1],
+    providerId: row[2],
+    expectedWarmMs: row[3],
+    decidedAtSample: row[4],
+  };
+}
+
+function rowToJournalEntry(row: readonly unknown[]): StudioJournalEntryRecord {
+  return {
+    seq: expectNumber(row[0], "seq"),
+    payload: expectString(row[1], "payload"),
+    crc32: expectNumber(row[2], "crc32"),
+  };
+}
+
+function rowToJournalSnapshot(row: readonly unknown[]): StudioJournalSnapshotRecord {
+  const slot = expectNumber(row[0], "slot");
+  if (slot !== 0 && slot !== 1) {
+    throw new Error(`studio local database: unexpected snapshot slot ${slot}`);
+  }
+  return {
+    slot,
+    seq: expectNumber(row[1], "seq"),
+    payload: expectString(row[2], "payload"),
+    crc32: expectNumber(row[3], "crc32"),
+    updatedAt: expectNumber(row[4], "updated_at"),
   };
 }
 
@@ -343,6 +481,28 @@ class SqliteStudioLocalDatabase implements StudioLocalDatabase {
       }
     } finally {
       statement.reset();
+    }
+  }
+
+  /**
+   * BEGIN IMMEDIATE 트랜잭션 안에서 여러 statement 를 실행한다.
+   * 중간 실패 시 ROLLBACK 후 원 에러를 전파한다(마이그레이션 러너와 동일 규약).
+   */
+  private transaction(work: () => void): void {
+    if (this.closed) {
+      throw new Error("studio local database is closed");
+    }
+    this.handle.exec("BEGIN IMMEDIATE");
+    try {
+      work();
+      this.handle.exec("COMMIT");
+    } catch (error) {
+      try {
+        this.handle.exec("ROLLBACK");
+      } catch {
+        // 트랜잭션이 이미 SQLite 쪽에서 자동 롤백된 경우 — 원 에러가 우선한다.
+      }
+      throw error;
     }
   }
 
@@ -410,6 +570,32 @@ class SqliteStudioLocalDatabase implements StudioLocalDatabase {
     return this.selectRows(WINNER_LIST_SQL, [], 6).map(rowToWinner);
   }
 
+  async listTournamentWinnerCandidates(): Promise<StudioTournamentWinnerCandidate[]> {
+    return this.selectRows(WINNER_LIST_SQL, [], 6).map(rowToWinnerCandidate);
+  }
+
+  async replaceTournamentWinners(
+    winners: readonly Omit<StudioTournamentWinnerRecord, "updatedAt">[],
+  ): Promise<void> {
+    const updatedAt = this.now();
+    this.transaction(() => {
+      // 전체 교체 = 새 집합의 upsert + 새 집합에 없는 고아 행 삭제. 두 단계를
+      // 개별 SQL 로 흉내내는 대신 전삭제+재삽입으로 같은 결과를 원자적으로
+      // 만든다(updated_at 은 어차피 매 save 마다 새로 스탬프된다).
+      this.run(WINNER_DELETE_ALL_SQL, []);
+      for (const winner of winners) {
+        this.run(WINNER_PUT_SQL, [
+          winner.bucket,
+          winner.deviceHash,
+          winner.providerId,
+          winner.expectedWarmMs,
+          winner.decidedAtSample,
+          updatedAt,
+        ]);
+      }
+    });
+  }
+
   async evictTournamentProvider(providerId: string): Promise<number> {
     this.run(WINNER_EVICT_SQL, [providerId]);
     return this.handle.changes();
@@ -436,6 +622,46 @@ class SqliteStudioLocalDatabase implements StudioLocalDatabase {
     return this.selectRows(COST_SAMPLE_LIST_SQL, [providerId, bucket, limit], 6).map(
       rowToCostSample,
     );
+  }
+
+  async appendJournalEntry(
+    projectId: string,
+    entry: StudioJournalEntryRecord,
+  ): Promise<void> {
+    this.transaction(() => {
+      // 복구가 논리적으로 잘라낸 seq 이상의 잔여 꼬리를 물리 삭제한 뒤 새
+      // 엔트리를 넣는다 — replay 가 같은 seq 의 부패본/재기록본을 동시에
+      // 보는 일이 구조적으로 불가능해진다.
+      this.run(JOURNAL_DELETE_TAIL_SQL, [projectId, entry.seq]);
+      this.run(JOURNAL_INSERT_SQL, [projectId, entry.seq, entry.payload, entry.crc32]);
+    });
+  }
+
+  async listJournalEntries(projectId: string): Promise<StudioJournalEntryRecord[]> {
+    return this.selectRows(JOURNAL_LIST_SQL, [projectId], 3).map(rowToJournalEntry);
+  }
+
+  async deleteJournalEntriesBefore(projectId: string, seq: number): Promise<number> {
+    this.run(JOURNAL_COMPACT_SQL, [projectId, seq]);
+    return this.handle.changes();
+  }
+
+  async putJournalSnapshot(
+    projectId: string,
+    snapshot: Omit<StudioJournalSnapshotRecord, "updatedAt">,
+  ): Promise<void> {
+    this.run(SNAPSHOT_PUT_SQL, [
+      projectId,
+      snapshot.slot,
+      snapshot.seq,
+      snapshot.payload,
+      snapshot.crc32,
+      this.now(),
+    ]);
+  }
+
+  async listJournalSnapshots(projectId: string): Promise<StudioJournalSnapshotRecord[]> {
+    return this.selectRows(SNAPSHOT_LIST_SQL, [projectId], 5).map(rowToJournalSnapshot);
   }
 
   asAsyncKeyValueStore(namespace: string): StudioAsyncKeyValueStore {

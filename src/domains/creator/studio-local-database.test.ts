@@ -76,17 +76,19 @@ afterAll(async () => {
 });
 
 describe("migration runner", () => {
-  it("brings a fresh database to user_version 1 with the full v1 schema", () => {
+  it("brings a fresh database to user_version 2 with the full schema", () => {
     const handle = memoryHandle();
     try {
       const version = runStudioLocalDatabaseMigrations(handle);
-      expect(version).toBe(1);
-      expect(selectValue(handle, "PRAGMA user_version")).toBe(1);
+      expect(version).toBe(2);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
       const names = tableNames(handle);
       expect(names).toContain("kv");
       expect(names).toContain("tournament_winners");
       expect(names).toContain("cost_samples");
       expect(names).toContain("cost_samples_provider_bucket");
+      expect(names).toContain("journal_entries");
+      expect(names).toContain("snapshots");
     } finally {
       handle.close();
     }
@@ -96,8 +98,33 @@ describe("migration runner", () => {
     const handle = memoryHandle();
     try {
       runStudioLocalDatabaseMigrations(handle);
-      expect(runStudioLocalDatabaseMigrations(handle)).toBe(1);
-      expect(selectValue(handle, "PRAGMA user_version")).toBe(1);
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(2);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("advances an existing v1 database to v2 on reopen, preserving v1 data", () => {
+    const handle = memoryHandle();
+    try {
+      // 구버전 세션: v1 마이그레이션까지만 적용된 DB 를 흉내낸다.
+      const v1Only = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter((m) => m.toVersion === 1);
+      expect(runStudioLocalDatabaseMigrations(handle, v1Only)).toBe(1);
+      handle.exec(
+        "INSERT INTO kv (namespace, key, value, updated_at) VALUES ('ns', 'k', 'v', 1)",
+      );
+      expect(tableNames(handle)).not.toContain("journal_entries");
+
+      // 재개방(전체 체인) — v2 로 자동 전진하고 v1 데이터는 그대로 남는다.
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(2);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
+      const names = tableNames(handle);
+      expect(names).toContain("journal_entries");
+      expect(names).toContain("snapshots");
+      expect(
+        selectValue(handle, "SELECT value FROM kv WHERE namespace = 'ns' AND key = 'k'"),
+      ).toBe("v");
     } finally {
       handle.close();
     }
@@ -139,12 +166,16 @@ describe("migration runner", () => {
     }
   });
 
-  it("ships exactly the sequential v1 migration set", () => {
-    expect(STUDIO_LOCAL_DATABASE_MIGRATIONS.map((m) => m.toVersion)).toEqual([1]);
-    const ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[0].statements.join("\n");
-    expect(ddl).toContain("PRIMARY KEY (namespace, key)");
-    expect(ddl).toContain("PRIMARY KEY (bucket, device_hash)");
-    expect(ddl).toContain("CHECK (kind IN ('warm', 'cold'))");
+  it("ships exactly the sequential v1..v2 migration set", () => {
+    expect(STUDIO_LOCAL_DATABASE_MIGRATIONS.map((m) => m.toVersion)).toEqual([1, 2]);
+    const v1Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[0].statements.join("\n");
+    expect(v1Ddl).toContain("PRIMARY KEY (namespace, key)");
+    expect(v1Ddl).toContain("PRIMARY KEY (bucket, device_hash)");
+    expect(v1Ddl).toContain("CHECK (kind IN ('warm', 'cold'))");
+    const v2Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[1].statements.join("\n");
+    expect(v2Ddl).toContain("PRIMARY KEY (project_id, seq)");
+    expect(v2Ddl).toContain("CHECK (slot IN (0, 1))");
+    expect(v2Ddl).toContain("PRIMARY KEY (project_id, slot)");
   });
 });
 
@@ -229,6 +260,145 @@ describe("tournament winners", () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0].providerId).toBe("konva");
     expect(await database.evictTournamentProvider("vello-cpu")).toBe(0);
+  });
+});
+
+describe("tournament winner replacement (structured save path)", () => {
+  const WINNER_A = {
+    bucket: "brush-2048",
+    deviceHash: "device-a",
+    providerId: "vello-cpu",
+    expectedWarmMs: 4.25,
+    decidedAtSample: 128,
+  };
+  const WINNER_B = {
+    bucket: "filter-4096",
+    deviceHash: "device-a",
+    providerId: "konva",
+    expectedWarmMs: 9,
+    decidedAtSample: 32,
+  };
+
+  it("replaces the whole table atomically, deleting orphans", async () => {
+    const database = await openTracked(() => 42);
+    await database.replaceTournamentWinners([WINNER_A, WINNER_B]);
+    expect(await database.listTournamentWinners()).toHaveLength(2);
+
+    await database.replaceTournamentWinners([{ ...WINNER_A, providerId: "skia" }]);
+    const winners = await database.listTournamentWinners();
+    expect(winners).toHaveLength(1);
+    expect(winners[0]).toEqual({ ...WINNER_A, providerId: "skia", updatedAt: 42 });
+  });
+
+  it("rolls the previous state back intact when a mid-replace insert fails", async () => {
+    const database = await openTracked();
+    await database.replaceTournamentWinners([WINNER_A, WINNER_B]);
+    // NaN 은 SQLite 바인딩에서 NULL 이 되어 NOT NULL 제약에 걸린다 —
+    // 두 번째 행에서 실패해도 전체 교체가 원자적으로 롤백되어야 한다.
+    await expect(
+      database.replaceTournamentWinners([
+        { ...WINNER_A, providerId: "skia" },
+        { ...WINNER_B, expectedWarmMs: Number.NaN },
+      ]),
+    ).rejects.toThrow();
+    const winners = await database.listTournamentWinners();
+    expect(winners.map((winner) => winner.providerId).sort()).toEqual([
+      "konva",
+      "vello-cpu",
+    ]);
+  });
+
+  it("lists raw candidates without asserting column types", async () => {
+    const database = await openTracked();
+    await database.putTournamentWinner(WINNER_A);
+    // 부분 필드 오염 행 — REAL 컬럼에 TEXT 가 앉은 상황(비트로트/외부 오염).
+    await database.putTournamentWinner({
+      ...WINNER_B,
+      expectedWarmMs: "fast" as unknown as number,
+    });
+    await expect(database.listTournamentWinners()).rejects.toThrow(/not numeric/);
+    const candidates = await database.listTournamentWinnerCandidates();
+    expect(candidates).toHaveLength(2);
+    expect(candidates.map((candidate) => candidate.expectedWarmMs).sort()).toEqual([
+      4.25,
+      "fast",
+    ]);
+  });
+});
+
+describe("journal entries", () => {
+  it("appends, lists in seq order, and scopes by project", async () => {
+    const database = await openTracked();
+    await database.appendJournalEntry("p1", { seq: 1, payload: "one", crc32: 11 });
+    await database.appendJournalEntry("p1", { seq: 2, payload: "two", crc32: 22 });
+    await database.appendJournalEntry("p2", { seq: 1, payload: "other", crc32: 33 });
+    expect(await database.listJournalEntries("p1")).toEqual([
+      { seq: 1, payload: "one", crc32: 11 },
+      { seq: 2, payload: "two", crc32: 22 },
+    ]);
+    expect(await database.listJournalEntries("p2")).toEqual([
+      { seq: 1, payload: "other", crc32: 33 },
+    ]);
+    expect(await database.listJournalEntries("missing")).toEqual([]);
+  });
+
+  it("re-appending a seq physically replaces the stale tail in one transaction", async () => {
+    const database = await openTracked();
+    await database.appendJournalEntry("p1", { seq: 1, payload: "keep", crc32: 1 });
+    await database.appendJournalEntry("p1", { seq: 2, payload: "torn", crc32: 2 });
+    await database.appendJournalEntry("p1", { seq: 3, payload: "stale", crc32: 3 });
+    // 복구가 seq 2 부터 잘라낸 뒤 세션이 이어서 기록하는 상황.
+    await database.appendJournalEntry("p1", { seq: 2, payload: "rewritten", crc32: 4 });
+    expect(await database.listJournalEntries("p1")).toEqual([
+      { seq: 1, payload: "keep", crc32: 1 },
+      { seq: 2, payload: "rewritten", crc32: 4 },
+    ]);
+  });
+
+  it("compacts strictly below the given seq for one project only", async () => {
+    const database = await openTracked();
+    for (const seq of [1, 2, 3]) {
+      await database.appendJournalEntry("p1", { seq, payload: `e${seq}`, crc32: seq });
+    }
+    await database.appendJournalEntry("p2", { seq: 1, payload: "other", crc32: 9 });
+    expect(await database.deleteJournalEntriesBefore("p1", 3)).toBe(2);
+    expect((await database.listJournalEntries("p1")).map((entry) => entry.seq)).toEqual([
+      3,
+    ]);
+    expect(await database.listJournalEntries("p2")).toHaveLength(1);
+    expect(await database.deleteJournalEntriesBefore("p1", 3)).toBe(0);
+  });
+});
+
+describe("journal snapshots", () => {
+  it("upserts per (project, slot) and stamps updated_at from the clock", async () => {
+    let tick = 0;
+    const database = await openTracked(() => {
+      tick += 1;
+      return tick;
+    });
+    await database.putJournalSnapshot("p1", { slot: 0, seq: 2, payload: "a", crc32: 1 });
+    await database.putJournalSnapshot("p1", { slot: 1, seq: 4, payload: "b", crc32: 2 });
+    await database.putJournalSnapshot("p1", { slot: 0, seq: 6, payload: "a2", crc32: 3 });
+    await database.putJournalSnapshot("p2", { slot: 0, seq: 1, payload: "x", crc32: 4 });
+    expect(await database.listJournalSnapshots("p1")).toEqual([
+      { slot: 0, seq: 6, payload: "a2", crc32: 3, updatedAt: 3 },
+      { slot: 1, seq: 4, payload: "b", crc32: 2, updatedAt: 2 },
+    ]);
+    expect(await database.listJournalSnapshots("p2")).toHaveLength(1);
+  });
+
+  it("rejects a slot outside (0, 1) via the schema CHECK constraint", async () => {
+    const database = await openTracked();
+    await expect(
+      database.putJournalSnapshot("p1", {
+        slot: 2 as unknown as 0,
+        seq: 1,
+        payload: "bad",
+        crc32: 0,
+      }),
+    ).rejects.toThrow(/CHECK|constraint/i);
+    expect(await database.listJournalSnapshots("p1")).toEqual([]);
   });
 });
 

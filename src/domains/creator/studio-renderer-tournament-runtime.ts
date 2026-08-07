@@ -260,6 +260,13 @@ export interface StudioTournamentKillEntry {
   reason: string;
 }
 
+/** One accepted real render measurement, as seen by recordRenderSample. */
+export interface StudioTournamentRenderSampleEvent {
+  providerId: string;
+  bucket: string;
+  ms: number;
+}
+
 export interface StudioTournamentRuntimeOptions {
   /**
    * Persistence port. `undefined` = currently installed default adapter
@@ -270,6 +277,12 @@ export interface StudioTournamentRuntimeOptions {
   /** Injected remote kill config. Default: empty (nothing killed). */
   killList?: readonly StudioTournamentKillEntry[];
   deviceHash?: string;
+  /**
+   * Observer for samples the cost model accepted (e.g. the SQLite
+   * cost_samples sink). Invalid samples are dropped before it fires, and
+   * observer failures never affect the hot path or the recorded sample.
+   */
+  onRenderSample?: (sample: StudioTournamentRenderSampleEvent) => void;
 }
 
 export class StudioRendererTournamentRuntime {
@@ -280,6 +293,9 @@ export class StudioRendererTournamentRuntime {
 
   private readonly persistence: TournamentPersistencePort | null;
   private readonly persisted = new Map<string, PersistedWinnerEntry>();
+  private readonly onRenderSample:
+    | ((sample: StudioTournamentRenderSampleEvent) => void)
+    | null;
   private hydration: Promise<boolean> | null = null;
 
   constructor(options?: StudioTournamentRuntimeOptions) {
@@ -287,6 +303,7 @@ export class StudioRendererTournamentRuntime {
       options?.persistence === undefined
         ? resolveDefaultTournamentPersistence()
         : options.persistence;
+    this.onRenderSample = options?.onRenderSample ?? null;
     this.deviceHash = options?.deviceHash ?? computeStudioDeviceHash();
     const killList = options?.killList ?? [];
     for (const kill of killList) {
@@ -375,6 +392,13 @@ export class StudioRendererTournamentRuntime {
   recordRenderSample(providerId: string, bucket: string, ms: number): boolean {
     if (!Number.isFinite(ms) || ms < 0) return false;
     this.costModel.record(providerId, bucket, { warmMs: ms });
+    if (this.onRenderSample) {
+      try {
+        this.onRenderSample({ providerId, bucket, ms });
+      } catch {
+        // Observer hygiene never affects the hot path or the recorded sample.
+      }
+    }
     return true;
   }
 

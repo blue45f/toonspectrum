@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "group": "ToonSpectrum Corpus",
+  "comment": "Soft wash — pressure-driven natural-media corpus brush (raster compile bridge)",
+  "settings": {
+    "opaque": {
+      "base_value": 0.62,
+      "inputs": {
+        "pressure": [[0.0, -0.5], [0.4, 0.0], [1.0, 0.32]]
+      }
+    },
+    "opaque_multiply": {
+      "base_value": 0.0,
+      "inputs": {
+        "pressure": [[0.0, 0.0], [1.0, 1.0]]
+      }
+    },
+    "hardness": { "base_value": 0.34 },
+    "radius_logarithmic": {
+      "base_value": 2.25,
+      "inputs": {
+        "pressure": [[0.0, -0.85], [1.0, 0.4]]
+      }
+    },
+    "dabs_per_actual_radius": { "base_value": 3.4 },
+    "slow_tracking": { "base_value": 1.8 },
+    "smudge": { "base_value": 0.22 },
+    "smudge_length": { "base_value": 0.42 },
+    "color_h": { "base_value": 0.58 },
+    "color_s": { "base_value": 0.52 },
+    "color_v": { "base_value": 0.38 }
+  }
+}

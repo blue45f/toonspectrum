@@ -292,6 +292,30 @@ describe("cost model sampling", () => {
     // No measurement ⇒ no estimate — nothing is ever invented.
     expect(runtime.costModel.estimate("p2", "bucket")).toBeNull();
   });
+
+  it("notifies onRenderSample for accepted samples only; observer failures stay contained", () => {
+    const seen: Array<{ providerId: string; bucket: string; ms: number }> = [];
+    const observed = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-a",
+      onRenderSample: (sample) => seen.push(sample),
+    });
+    expect(observed.recordRenderSample("p1", "bucket", 4)).toBe(true);
+    expect(observed.recordRenderSample("p1", "bucket", Number.NaN)).toBe(false);
+    expect(observed.recordRenderSample("p1", "bucket", -1)).toBe(false);
+    expect(seen).toEqual([{ providerId: "p1", bucket: "bucket", ms: 4 }]);
+
+    const throwing = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-a",
+      onRenderSample: () => {
+        throw new Error("sink exploded");
+      },
+    });
+    // Observer hygiene: the sample is still recorded and reported true.
+    expect(throwing.recordRenderSample("p1", "bucket", 2)).toBe(true);
+    expect(throwing.costModel.sampleCount("p1", "bucket")).toBe(1);
+  });
 });
 
 describe("remote kill switch", () => {
