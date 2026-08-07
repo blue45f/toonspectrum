@@ -6,3 +6,4 @@ export * from "./filter-providers";
 export * from "./effect-compiler";
 export * from "./benchmark-registry";
 export * from "./tournament";
+export * from "./wgsl-variants";

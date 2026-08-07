@@ -1,0 +1,70 @@
+{
+  "harness": "packages/studio-engine-registry/src/__tests__/wgsl-variants-browser.test.ts (WGSL_VARIANT_BROWSER_PROBE=1)",
+  "note": "V12 lane 5 (WESL_SHADER_PLATFORM) 재개 게이트 근거 — EffectGraph 융합 WGSL variant 전수 브라우저 컴파일 + 대표 variant 디스패치 CPU 정합",
+  "measuredAt": "2026-08-07T18:11:27.880Z",
+  "browser": {
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "version": "140.0.7339.186"
+  },
+  "adapter": {
+    "vendor": "apple",
+    "architecture": "metal-3",
+    "device": "",
+    "description": ""
+  },
+  "variantCount": 35,
+  "compileErrorCount": 0,
+  "compileWarnings": [],
+  "dispatch": {
+    "variantKey": "wgslfx-v1-bc.hsl.lv.cv.cb-41190ba0",
+    "stages": [
+      "brightness-contrast",
+      "hsl",
+      "levels",
+      "curves",
+      "color-balance"
+    ],
+    "pixelCount": 4096,
+    "channelTolerance": 2,
+    "maxChannelDiff": 0,
+    "mismatchedChannels": 0,
+    "totalColorChannels": 12288
+  },
+  "variantKeys": [
+    "wgslfx-v1-bc-6315e001",
+    "wgslfx-v1-hsl-29b08829",
+    "wgslfx-v1-lv-113694b0",
+    "wgslfx-v1-cv-4bfd893b",
+    "wgslfx-v1-cb-ca410de5",
+    "wgslfx-v1-bc.bc-c17dca0c",
+    "wgslfx-v1-bc.hsl-2792e142",
+    "wgslfx-v1-bc.lv-dc0a2521",
+    "wgslfx-v1-bc.cv-631bd6d2",
+    "wgslfx-v1-bc.cb-6fbcb18c",
+    "wgslfx-v1-hsl.bc-4ebf4514",
+    "wgslfx-v1-hsl.hsl-5e3a556a",
+    "wgslfx-v1-hsl.lv-f3b8b789",
+    "wgslfx-v1-hsl.cv-1c5ae7fa",
+    "wgslfx-v1-hsl.cb-3506a594",
+    "wgslfx-v1-lv.bc-fa0ece83",
+    "wgslfx-v1-lv.hsl-38027cff",
+    "wgslfx-v1-lv.lv-499da56e",
+    "wgslfx-v1-lv.cv-06425de9",
+    "wgslfx-v1-lv.cb-d86a87f3",
+    "wgslfx-v1-cv.bc-a367d19e",
+    "wgslfx-v1-cv.hsl-ee1e5a88",
+    "wgslfx-v1-cv.lv-71341c87",
+    "wgslfx-v1-cv.cv-a6d7b7c0",
+    "wgslfx-v1-cv.cb-42ab460a",
+    "wgslfx-v1-cb.bc-c3cdfcf8",
+    "wgslfx-v1-cb.hsl-4e7129c6",
+    "wgslfx-v1-cb.lv-6803a58d",
+    "wgslfx-v1-cb.cv-e1f8d26e",
+    "wgslfx-v1-cb.cb-797a6d18",
+    "wgslfx-v1-bc.hsl.lv.cv.cb-41190ba0",
+    "wgslfx-v1-bc-d269a5e7",
+    "wgslfx-v1-bc-6c89a728",
+    "wgslfx-v1-hsl-0b7a44eb",
+    "wgslfx-v1-cb-5fdef04d"
+  ]
+}
