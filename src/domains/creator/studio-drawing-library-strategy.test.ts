@@ -131,6 +131,11 @@ describe("studio drawing library strategy", () => {
     expect(pixi?.riskNotes).toContain(
       "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
     );
+    // The audit rationale must not contradict the maintenance note: the host is mounted, so the
+    // entry may not still describe the provider as unwired.
+    const pixiAudit = STUDIO_DRAWING_SOURCE_AUDIT.find((entry) => entry.id === "pixi");
+    expect(pixiAudit?.rationale).toContain("StudioPixiSceneOverlayHost");
+    expect(pixiAudit?.rationale).not.toContain("unwired");
     expect(resolveStudioDrawingLibraryStrategy("paper")).toMatchObject({
       productLayer: "vector-geometry",
       decision: "isolated-vector-geometry-provider",

@@ -50,7 +50,7 @@ export const STUDIO_HYBRID_EDIT_PRODUCT_SURFACES = Object.freeze({
   "draw-options-stabilizer":
     "StudioDrawOptionsBar stabilizerMode=precision → lazy-brush leash via stroke stabilizer bridge",
   "selection-tools-expand-contract":
-    "StudioInspectorAside onExpand/onContract → applyHybridPixelSelectionBoundaryChangeSync (geometry + OpenCV morph)",
+    "applyHybridPixelSelectionBoundaryChangeSync (vector geometry + OpenCV morph receipt) — available to callers; the StudioInspectorAside expand/contract buttons still commit the vector geometry alone, because the morph result is a receipt and never becomes the selection",
   "filter-dialog-canonical-plan":
     "StudioFilterDialog / SmartFilters → planStudioCanonicalFilterExecution / WebGPU filter runtime",
   "object-pick-spatial-index":

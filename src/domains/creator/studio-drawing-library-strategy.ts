@@ -706,7 +706,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "isolated-runtime",
     brushAuthorityOverlap: "scene-model-overlap",
     rationale:
-      "The WebGPU-first selectable overlay provider is isolated and implemented, but remains unwired until a product host and receipt gate own its lifecycle.",
+      "The WebGPU-first selectable overlay provider is isolated and always-on mounted by StudioPixiSceneOverlayHost; it stays a pointer-inactive presentation overlay while Konva keeps selection and transform authority.",
   }),
   sourceAudit({
     id: "paper",
