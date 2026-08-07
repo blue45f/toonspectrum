@@ -17,29 +17,44 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PKG_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg");
+// V12 lane 2 (ADR-0011): separate GPU artifact built with
+// `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu`.
+const PKG_GPU_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg-gpu");
 
 function fail(message) {
   console.error(`verify:studio-engine FAILED — ${message}`);
   process.exit(1);
 }
 
-// 1. wasm pkg integrity
-const manifest = readFileSync(join(PKG_DIR, "INTEGRITY.sha256"), "utf8");
-for (const line of manifest.split("\n")) {
-  if (line.trim() === "") continue;
-  const match = line.match(/^([0-9a-f]{64}) [ *](.+)$/);
-  if (!match) fail(`unparseable INTEGRITY line: ${line}`);
-  const [, expected, file] = match;
-  const actual = createHash("sha256")
-    .update(readFileSync(join(PKG_DIR, file)))
-    .digest("hex");
-  if (actual !== expected) {
-    fail(
-      `${file} hash mismatch — rebuild via wasm-pack (crates/studio-engine-vello) and refresh INTEGRITY.sha256`,
-    );
+// 1. wasm pkg integrity (CPU lane + GPU browser lane)
+function verifyPkgIntegrity(pkgDir, label, rebuildHint) {
+  const manifest = readFileSync(join(pkgDir, "INTEGRITY.sha256"), "utf8");
+  for (const line of manifest.split("\n")) {
+    if (line.trim() === "") continue;
+    const match = line.match(/^([0-9a-f]{64}) [ *](.+)$/);
+    if (!match) fail(`unparseable ${label} INTEGRITY line: ${line}`);
+    const [, expected, file] = match;
+    const actual = createHash("sha256")
+      .update(readFileSync(join(pkgDir, file)))
+      .digest("hex");
+    if (actual !== expected) {
+      fail(`${label}/${file} hash mismatch — ${rebuildHint}`);
+    }
   }
+  console.log(`vello wasm ${label} integrity: OK`);
 }
-console.log("vello wasm pkg integrity: OK");
+
+verifyPkgIntegrity(
+  PKG_DIR,
+  "pkg",
+  "rebuild via wasm-pack (crates/studio-engine-vello) and refresh INTEGRITY.sha256",
+);
+verifyPkgIntegrity(
+  PKG_GPU_DIR,
+  "pkg-gpu",
+  "rebuild via `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu` " +
+    "(then re-apply the eslint-disable banner per docs/engines/vello-baseline.md §2) and refresh INTEGRITY.sha256",
+);
 
 const STUDIO_ENGINE_PACKAGES = [
   "@toonspectrum/studio-project-model",

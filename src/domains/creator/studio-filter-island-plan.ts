@@ -5,6 +5,12 @@ import {
   type SurfacePlan,
 } from "@toonspectrum/studio-engine-registry";
 
+import {
+  getStudioTournamentRuntime,
+  selectFilterLane,
+} from "./studio-renderer-tournament-runtime";
+import { installStudioTournamentSqlitePersistence } from "./studio-tournament-sqlite-persistence";
+
 /**
  * V11 strangler step (c) — first real-path delegation (ADR 0001 2차 개정).
  *
@@ -16,6 +22,12 @@ import {
  * the registry, and the final readback is legal because the island plans in
  * "final-export" mode — the same request in "interactive" mode is rejected,
  * which keeps absolute rule 8 (no hot-path readback) machine-checked.
+ *
+ * V12 §5 wiring: the planner ladder then passes through selectFilterLane so
+ * the renderer tournament's persisted winner cache and remote kill switch act
+ * on this real call path (StudioKonvaImageNode consumes `lanes`). With an
+ * empty winner cache and nothing killed the ladder is byte-identical to the
+ * planner output — the pre-tournament contract is preserved exactly.
  */
 
 export type StudioFilterLane = "gpu-chain" | "worker" | "konva-native";
@@ -94,6 +106,22 @@ export interface StudioFilterIslandPlan {
   /** Ordered lanes; runtime advances on decline/failure of the current lane. */
   lanes: StudioFilterLane[];
   plan: SurfacePlan;
+  /**
+   * V12 §5 audit field: non-null only when the remote kill switch would have
+   * emptied the ladder and was therefore ignored (a fallback chain always
+   * survives). Null on the normal path.
+   */
+  killIgnoredReason: string | null;
+}
+
+/** Tournament winner-cache bucket for this island (per eligibility class). */
+export function studioFilterIslandBucket(input: StudioFilterIslandPlanInput): string {
+  return `studio-filter-island|gpu${input.gpuChainEligible ? 1 : 0}`;
+}
+
+/** Provider id under which a lane races in the tournament/kill switch. */
+export function studioFilterLaneProviderId(lane: StudioFilterLane): string {
+  return `${LANE_PROVIDER_PREFIX}${lane}`;
 }
 
 export function planStudioFilterIslandLanes(
@@ -115,8 +143,23 @@ export function planStudioFilterIslandLanes(
       },
     ],
   });
-  const lanes = (plan.islands[0]?.fallbackChain ?? []).map(
+  const plannedLanes = (plan.islands[0]?.fallbackChain ?? []).map(
     (providerId) => providerId.slice(LANE_PROVIDER_PREFIX.length) as StudioFilterLane,
   );
-  return { lanes, plan };
+  // V12 §5: tournament conclusions (persisted winners, remote kills) reorder
+  // or prune the planner ladder on this real call path. Empty cache + no
+  // kills ⇒ `selection.lanes` equals `plannedLanes` exactly.
+  // Default persistence chain: SQLite(OPFS) first, localStorage fallback —
+  // must be installed before the lazy runtime hydrates on first use.
+  installStudioTournamentSqlitePersistence();
+  const runtime = getStudioTournamentRuntime();
+  const selection = selectFilterLane({
+    lanes: plannedLanes,
+    bucket: studioFilterIslandBucket(input),
+    deviceHash: runtime.deviceHash,
+    winnerCache: runtime.winnerCache,
+    killSwitch: runtime.killSwitch,
+    laneProviderId: studioFilterLaneProviderId,
+  });
+  return { lanes: selection.lanes, plan, killIgnoredReason: selection.killIgnoredReason };
 }

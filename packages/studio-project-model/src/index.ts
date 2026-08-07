@@ -1,5 +1,6 @@
 export * from "./ir/color";
 export * from "./ir/path";
+export * from "./ir/path-transform";
 export * from "./ir/scene";
 export * from "./ir/scene-features";
 export * from "./ir/stroke";

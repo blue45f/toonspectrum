@@ -1,10 +1,18 @@
 import { readFileSync } from "node:fs";
 
 import { PlanUnsatisfiableError } from "@toonspectrum/studio-engine-registry";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 
-import { planStudioFilterIslandLanes } from "./studio-filter-island-plan";
+import {
+  planStudioFilterIslandLanes,
+  studioFilterIslandBucket,
+  studioFilterLaneProviderId,
+} from "./studio-filter-island-plan";
+import {
+  createStudioTournamentRuntime,
+  installStudioTournamentRuntime,
+} from "./studio-renderer-tournament-runtime";
 
 /**
  * First real-path V11 delegation gate (ADR 0001 2차 개정 step c): the image
@@ -87,5 +95,92 @@ describe("V11 filter island plan", () => {
     expect(source).not.toMatch(
       /if \(gpuFilterModule\?\.isStudioGpuFilterChainEligible\(elRef\.current\)\) \{/u,
     );
+  });
+});
+
+/**
+ * V12 §5 wiring: the tournament runtime (persisted winner cache + remote kill
+ * switch) acts on this plan's real call path. The first case pins the
+ * backwards contract — a pristine runtime changes nothing about the ladder.
+ */
+describe("V12 §5 tournament wiring through the filter island plan", () => {
+  afterEach(() => {
+    // Restore lazy default creation so other suites see a pristine runtime.
+    installStudioTournamentRuntime(null);
+  });
+
+  it("a pristine runtime (empty cache, no kills) leaves the plan untouched", () => {
+    installStudioTournamentRuntime(
+      createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-test" }),
+    );
+    const eligible = planStudioFilterIslandLanes({ gpuChainEligible: true });
+    expect(eligible.lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
+    expect(eligible.killIgnoredReason).toBeNull();
+    expect(planStudioFilterIslandLanes({ gpuChainEligible: false }).lanes).toEqual([
+      "worker",
+      "konva-native",
+    ]);
+  });
+
+  it("a cached tournament winner reorders the real lane ladder per bucket", () => {
+    const runtime = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-test",
+    });
+    runtime.recordWinner(
+      studioFilterIslandBucket({ gpuChainEligible: true }),
+      runtime.deviceHash,
+      {
+        providerId: studioFilterLaneProviderId("worker"),
+        expectedWarmMs: 3,
+        decidedAtSample: 5,
+      },
+    );
+    installStudioTournamentRuntime(runtime);
+    expect(planStudioFilterIslandLanes({ gpuChainEligible: true }).lanes).toEqual([
+      "worker",
+      "gpu-chain",
+      "konva-native",
+    ]);
+    // Bucket separation: the win above lives in the gpu-eligible bucket only,
+    // so the ineligible ladder stays the untouched planner product.
+    expect(planStudioFilterIslandLanes({ gpuChainEligible: false }).lanes).toEqual([
+      "worker",
+      "konva-native",
+    ]);
+  });
+
+  it("a remote kill removes its lane while the fallback chain survives", () => {
+    const runtime = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-test",
+    });
+    runtime.applyKillList([studioFilterLaneProviderId("gpu-chain")], "remote flag");
+    installStudioTournamentRuntime(runtime);
+    const { lanes, killIgnoredReason } = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+    });
+    expect(lanes).toEqual(["worker", "konva-native"]);
+    expect(killIgnoredReason).toBeNull();
+  });
+
+  it("killing every lane is ignored — the chain never goes empty and the reason is logged", () => {
+    const runtime = createStudioTournamentRuntime({
+      persistence: null,
+      deviceHash: "dev-test",
+    });
+    runtime.applyKillList(
+      (["gpu-chain", "worker", "konva-native"] as const).map((lane) =>
+        studioFilterLaneProviderId(lane),
+      ),
+      "panic",
+    );
+    installStudioTournamentRuntime(runtime);
+    const { lanes, killIgnoredReason } = planStudioFilterIslandLanes({
+      gpuChainEligible: true,
+    });
+    expect(lanes).toEqual(["gpu-chain", "worker", "konva-native"]);
+    expect(killIgnoredReason).toContain("keeping the original order");
+    expect(killIgnoredReason).toContain("panic");
   });
 });

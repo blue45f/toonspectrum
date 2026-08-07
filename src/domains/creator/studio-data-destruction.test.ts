@@ -117,6 +117,10 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(
       read("../../../packages/studio-project-model/src/browser/opfs-journal-store.ts"),
     ).toContain('"toonspectrum-studio-projects"');
+    expect(read("./studio-local-database.ts")).toContain(
+      'STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite"',
+    );
+    expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite");
   });
 
   it("IndexedDB names match the library modules", () => {

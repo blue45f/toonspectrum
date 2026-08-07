@@ -11,184 +11,22 @@
 use std::num::NonZeroUsize;
 use std::time::Instant;
 
-use studio_engine_vello::scene::{
-    BlendModeIR, FillRuleIR, PaintIR, PathIR, PathVerbIR, SceneIR, SceneNodeIR, StrokeCapIR,
-    StrokeJoinIR,
-};
-use vello::kurbo::{Affine, BezPath, Cap, Join, Point, Rect, Stroke};
-use vello::peniko::{BlendMode, Brush, Color, Compose, Fill, Gradient, Mix};
+use studio_engine_vello::scene::SceneIR;
+use vello::peniko::Color;
 use vello::wgpu;
-use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
+use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions};
 
-fn to_bez(path: &PathIR) -> BezPath {
-    let mut bez = BezPath::new();
-    for verb in &path.verbs {
-        match *verb {
-            PathVerbIR::M { x, y } => bez.move_to(Point::new(x, y)),
-            PathVerbIR::L { x, y } => bez.line_to(Point::new(x, y)),
-            PathVerbIR::Q { cx, cy, x, y } => bez.quad_to(Point::new(cx, cy), Point::new(x, y)),
-            PathVerbIR::C {
-                c1x,
-                c1y,
-                c2x,
-                c2y,
-                x,
-                y,
-            } => bez.curve_to(Point::new(c1x, c1y), Point::new(c2x, c2y), Point::new(x, y)),
-            PathVerbIR::Z => bez.close_path(),
-        }
-    }
-    bez
-}
+// Re-export so the shared module resolves `super::scene::*` identically here
+// and inside the library (see src/gpu_scene.rs header).
+pub use studio_engine_vello::scene;
 
-fn to_color(c: &studio_engine_vello::scene::ColorIR, opacity: f32) -> Color {
-    Color::new([c.r, c.g, c.b, c.a * opacity])
-}
-
-fn to_brush(paint: &PaintIR, opacity: f32) -> Brush {
-    match paint {
-        PaintIR::Solid { color } => Brush::Solid(to_color(color, opacity)),
-        PaintIR::LinearGradient { from, to, stops } => Brush::Gradient(
-            Gradient::new_linear(Point::new(from[0], from[1]), Point::new(to[0], to[1]))
-                .with_stops(
-                    stops
-                        .iter()
-                        .map(|s| (s.offset, to_color(&s.color, opacity)))
-                        .collect::<Vec<(f32, Color)>>()
-                        .as_slice(),
-                ),
-        ),
-        PaintIR::RadialGradient {
-            center,
-            radius,
-            stops,
-        } => Brush::Gradient(
-            Gradient::new_radial(Point::new(center[0], center[1]), *radius as f32).with_stops(
-                stops
-                    .iter()
-                    .map(|s| (s.offset, to_color(&s.color, opacity)))
-                    .collect::<Vec<(f32, Color)>>()
-                    .as_slice(),
-            ),
-        ),
-    }
-}
-
-fn to_blend(blend: BlendModeIR) -> BlendMode {
-    let mix = match blend {
-        BlendModeIR::SrcOver => Mix::Normal,
-        BlendModeIR::Multiply => Mix::Multiply,
-        BlendModeIR::Screen => Mix::Screen,
-        BlendModeIR::Darken => Mix::Darken,
-        BlendModeIR::Lighten => Mix::Lighten,
-    };
-    BlendMode::new(mix, Compose::SrcOver)
-}
-
-fn full_rect(scene: &SceneIR) -> Rect {
-    Rect::new(0.0, 0.0, scene.width as f64, scene.height as f64)
-}
-
-fn encode_nodes(out: &mut Scene, nodes: &[SceneNodeIR], canvas: Rect) {
-    for node in nodes {
-        match node {
-            SceneNodeIR::FillPath {
-                path,
-                paint,
-                opacity,
-                blend,
-                fill_rule,
-                ..
-            } => {
-                let layered = *blend != BlendModeIR::SrcOver;
-                if layered {
-                    out.push_layer(Fill::NonZero, to_blend(*blend), 1.0, Affine::IDENTITY, &canvas);
-                }
-                let rule = match fill_rule {
-                    FillRuleIR::NonZero => Fill::NonZero,
-                    FillRuleIR::EvenOdd => Fill::EvenOdd,
-                };
-                out.fill(
-                    rule,
-                    Affine::IDENTITY,
-                    &to_brush(paint, *opacity),
-                    None,
-                    &to_bez(path),
-                );
-                if layered {
-                    out.pop_layer();
-                }
-            }
-            SceneNodeIR::StrokePath {
-                path,
-                paint,
-                opacity,
-                blend,
-                stroke_width,
-                cap,
-                join,
-                miter_limit,
-                ..
-            } => {
-                let layered = *blend != BlendModeIR::SrcOver;
-                if layered {
-                    out.push_layer(Fill::NonZero, to_blend(*blend), 1.0, Affine::IDENTITY, &canvas);
-                }
-                let cap = match cap {
-                    StrokeCapIR::Butt => Cap::Butt,
-                    StrokeCapIR::Round => Cap::Round,
-                    StrokeCapIR::Square => Cap::Square,
-                };
-                let join = match join {
-                    StrokeJoinIR::Miter => Join::Miter,
-                    StrokeJoinIR::Round => Join::Round,
-                    StrokeJoinIR::Bevel => Join::Bevel,
-                };
-                let stroke = Stroke::new(*stroke_width)
-                    .with_caps(cap)
-                    .with_join(join)
-                    .with_miter_limit(*miter_limit);
-                out.stroke(
-                    &stroke,
-                    Affine::IDENTITY,
-                    &to_brush(paint, *opacity),
-                    None,
-                    &to_bez(path),
-                );
-                if layered {
-                    out.pop_layer();
-                }
-            }
-            SceneNodeIR::Group {
-                opacity,
-                blend,
-                clip,
-                children,
-                ..
-            } => {
-                match clip.as_ref().map(to_bez) {
-                    Some(clip_bez) => out.push_layer(
-                        Fill::NonZero,
-                        to_blend(*blend),
-                        *opacity,
-                        Affine::IDENTITY,
-                        &clip_bez,
-                    ),
-                    None => out.push_layer(
-                        Fill::NonZero,
-                        to_blend(*blend),
-                        *opacity,
-                        Affine::IDENTITY,
-                        &canvas,
-                    ),
-                }
-                encode_nodes(out, children, canvas);
-                out.pop_layer();
-            }
-            SceneNodeIR::Text { .. } => unreachable!("corpus scenes carry no text"),
-        }
-    }
-}
+/// SceneIR -> vello Scene encoding shared with the browser WebGPU wasm lane
+/// (src/gpu_web.rs). Included by path so this harness keeps running on plain
+/// `cargo test` (dev-dependency vello) while the library only carries the
+/// module behind the `gpu` feature.
+#[path = "../src/gpu_scene.rs"]
+#[allow(dead_code)]
+mod gpu_scene;
 
 struct Gpu {
     device: wgpu::Device,
@@ -223,9 +61,7 @@ fn gpu() -> Option<Gpu> {
 }
 
 fn render_gpu(gpu: &mut Gpu, scene_ir: &SceneIR) -> Vec<u8> {
-    let mut scene = Scene::new();
-    let canvas = full_rect(scene_ir);
-    encode_nodes(&mut scene, &scene_ir.nodes, canvas);
+    let scene = gpu_scene::encode_scene(scene_ir).expect("corpus scenes carry no text");
 
     let width = scene_ir.width;
     let height = scene_ir.height;

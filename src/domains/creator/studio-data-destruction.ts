@@ -30,6 +30,8 @@ export const STUDIO_OPFS_ROOTS: readonly string[] = Object.freeze([
   // packages/studio-project-model OpfsJournalStore root (+ pre-V11.1 name)
   "toonspectrum-studio-projects",
   "toonstudio-v11",
+  // studio-local-database.ts STUDIO_SQLITE_OPFS_DIRECTORY (opfs-sahpool VFS root)
+  "toonspectrum-studio-sqlite",
 ]);
 
 export const STUDIO_INDEXED_DB_DATABASES: readonly string[] = Object.freeze([

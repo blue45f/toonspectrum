@@ -1,4 +1,19 @@
-export { velloCpuProviderDescriptor } from "./descriptor";
+export {
+  velloCpuProviderDescriptor,
+  velloGpuBrowserProviderDescriptor,
+} from "./descriptor";
+export {
+  compareGpuVsCpu,
+  fuzzyMismatchPct,
+  hasWebGpu,
+  loadVelloGpuBrowser,
+  probeWebGpu,
+  renderSceneToPixelsGpu,
+  type GpuCpuComparison,
+  type VelloGpuInitInput,
+  type WebGpuAdapterInfo,
+  type WebGpuProbeResult,
+} from "./gpu-browser";
 export {
   adapterVersion,
   fitPolylineToPath,
@@ -8,3 +23,15 @@ export {
 } from "./render";
 export { shapeTextToGlyphPaths, shapedTextSchema, shapedGlyphSchema } from "./text";
 export type { ShapedText, ShapedGlyph, ShapeTextOptions } from "./text";
+export {
+  computeTextShapeKey,
+  createTextShapeCache,
+  estimateShapedTextBytes,
+  fnv1a32,
+  shapeTextCached,
+} from "./text-cache";
+export type {
+  TextShapeCache,
+  TextShapeCacheMetrics,
+  TextShapeCacheOptions,
+} from "./text-cache";

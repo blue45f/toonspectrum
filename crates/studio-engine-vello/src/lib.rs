@@ -5,6 +5,10 @@
 //! in `packages/studio-project-model`; this crate consumes its JSON form.
 
 pub mod geometry;
+#[cfg(feature = "gpu")]
+pub mod gpu_scene;
+#[cfg(all(target_arch = "wasm32", feature = "gpu"))]
+pub mod gpu_web;
 pub mod render;
 pub mod scene;
 pub mod text;
