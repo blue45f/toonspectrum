@@ -1,0 +1,60 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 1, "g": 1, "b": 1, "a": 1 },
+  "nodes": [
+    {
+      "id": "butt-thin",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 12, "y": 16 }, { "v": "L", "x": 116, "y": 16 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0, "g": 0, "b": 0, "a": 1 } },
+      "strokeWidth": 2,
+      "cap": "butt"
+    },
+    {
+      "id": "round-mid",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 12, "y": 34 }, { "v": "L", "x": 116, "y": 34 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0.8, "g": 0.1, "b": 0.2, "a": 1 } },
+      "strokeWidth": 6,
+      "cap": "round"
+    },
+    {
+      "id": "square-wide",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 12, "y": 56 }, { "v": "L", "x": 116, "y": 56 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0.1, "g": 0.3, "b": 0.8, "a": 1 } },
+      "strokeWidth": 10,
+      "cap": "square"
+    },
+    {
+      "id": "miter-join",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 14, "y": 116 }, { "v": "L", "x": 32, "y": 82 }, { "v": "L", "x": 50, "y": 116 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0.15, "g": 0.55, "b": 0.2, "a": 1 } },
+      "strokeWidth": 8,
+      "cap": "butt",
+      "join": "miter",
+      "miterLimit": 8
+    },
+    {
+      "id": "round-join",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 52, "y": 116 }, { "v": "L", "x": 70, "y": 82 }, { "v": "L", "x": 88, "y": 116 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0.6, "g": 0.3, "b": 0.7, "a": 1 } },
+      "strokeWidth": 8,
+      "cap": "butt",
+      "join": "round"
+    },
+    {
+      "id": "bevel-join",
+      "kind": "stroke-path",
+      "path": { "verbs": [ { "v": "M", "x": 90, "y": 116 }, { "v": "L", "x": 108, "y": 82 }, { "v": "L", "x": 126, "y": 116 } ] },
+      "paint": { "kind": "solid", "color": { "r": 0.9, "g": 0.5, "b": 0.1, "a": 1 } },
+      "strokeWidth": 8,
+      "cap": "butt",
+      "join": "bevel"
+    }
+  ]
+}

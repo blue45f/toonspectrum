@@ -1,0 +1,58 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 1, "g": 1, "b": 1, "a": 1 },
+  "nodes": [
+    {
+      "id": "square",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 10, "y": 10 },
+        { "v": "L", "x": 54, "y": 10 },
+        { "v": "L", "x": 54, "y": 54 },
+        { "v": "L", "x": 10, "y": 54 },
+        { "v": "Z" }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.86, "g": 0.12, "b": 0.16, "a": 1 } }
+    },
+    {
+      "id": "triangle",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 96, "y": 12 },
+        { "v": "L", "x": 120, "y": 56 },
+        { "v": "L", "x": 72, "y": 56 },
+        { "v": "Z" }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.05, "g": 0.55, "b": 0.55, "a": 1 } }
+    },
+    {
+      "id": "star-evenodd",
+      "kind": "fill-path",
+      "fillRule": "evenodd",
+      "path": { "verbs": [
+        { "v": "M", "x": 64, "y": 60 },
+        { "v": "L", "x": 87.5, "y": 118.4 },
+        { "v": "L", "x": 26, "y": 82.6 },
+        { "v": "L", "x": 102, "y": 82.6 },
+        { "v": "L", "x": 40.5, "y": 118.4 },
+        { "v": "Z" }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.2, "g": 0.25, "b": 0.75, "a": 1 } }
+    },
+    {
+      "id": "translucent-overlap",
+      "kind": "fill-path",
+      "opacity": 0.6,
+      "path": { "verbs": [
+        { "v": "M", "x": 30, "y": 40 },
+        { "v": "L", "x": 100, "y": 40 },
+        { "v": "L", "x": 100, "y": 84 },
+        { "v": "L", "x": 30, "y": 84 },
+        { "v": "Z" }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.98, "g": 0.7, "b": 0.1, "a": 1 } }
+    }
+  ]
+}

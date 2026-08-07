@@ -107,6 +107,11 @@
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
+    "@toonspectrum/command-registry-v11": "workspace:*",
+    "@toonspectrum/project-model-v11": "workspace:*",
+    "@toonspectrum/provider-catalog-v11": "workspace:*",
+    "@toonspectrum/skia-adapter-v11": "workspace:*",
+    "@toonspectrum/vello-adapter-v11": "workspace:*",
     "@babylonjs/core": "9.19.0",
     "@babylonjs/loaders": "9.19.0",
     "@dimforge/rapier3d-deterministic-compat": "0.19.3",

@@ -1,0 +1,65 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 1, "g": 1, "b": 1, "a": 1 },
+  "nodes": [
+    {
+      "id": "half-group",
+      "kind": "group",
+      "opacity": 0.5,
+      "children": [
+        {
+          "id": "left",
+          "kind": "fill-path",
+          "path": { "verbs": [
+            { "v": "M", "x": 12, "y": 12 },
+            { "v": "L", "x": 76, "y": 12 },
+            { "v": "L", "x": 76, "y": 76 },
+            { "v": "L", "x": 12, "y": 76 },
+            { "v": "Z" }
+          ] },
+          "paint": { "kind": "solid", "color": { "r": 0.1, "g": 0.1, "b": 0.1, "a": 1 } }
+        },
+        {
+          "id": "right",
+          "kind": "fill-path",
+          "path": { "verbs": [
+            { "v": "M", "x": 52, "y": 12 },
+            { "v": "L", "x": 116, "y": 12 },
+            { "v": "L", "x": 116, "y": 76 },
+            { "v": "L", "x": 52, "y": 76 },
+            { "v": "Z" }
+          ] },
+          "paint": { "kind": "solid", "color": { "r": 0.85, "g": 0.15, "b": 0.2, "a": 1 } }
+        }
+      ]
+    },
+    {
+      "id": "nested",
+      "kind": "group",
+      "opacity": 0.8,
+      "children": [
+        {
+          "id": "inner-multiply-group",
+          "kind": "group",
+          "opacity": 0.75,
+          "children": [
+            {
+              "id": "bottom-bar",
+              "kind": "fill-path",
+              "path": { "verbs": [
+                { "v": "M", "x": 20, "y": 88 },
+                { "v": "L", "x": 108, "y": 88 },
+                { "v": "L", "x": 108, "y": 120 },
+                { "v": "L", "x": 20, "y": 120 },
+                { "v": "Z" }
+              ] },
+              "paint": { "kind": "solid", "color": { "r": 0.2, "g": 0.5, "b": 0.35, "a": 1 } }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

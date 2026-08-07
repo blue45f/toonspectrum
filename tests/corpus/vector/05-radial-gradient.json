@@ -1,0 +1,49 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 0.12, "g": 0.12, "b": 0.16, "a": 1 },
+  "nodes": [
+    {
+      "id": "glow",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 4, "y": 4 },
+        { "v": "L", "x": 124, "y": 4 },
+        { "v": "L", "x": 124, "y": 124 },
+        { "v": "L", "x": 4, "y": 124 },
+        { "v": "Z" }
+      ] },
+      "paint": {
+        "kind": "radial-gradient",
+        "center": [64, 64],
+        "radius": 56,
+        "stops": [
+          { "offset": 0, "color": { "r": 1, "g": 0.95, "b": 0.75, "a": 1 } },
+          { "offset": 0.6, "color": { "r": 0.9, "g": 0.45, "b": 0.2, "a": 1 } },
+          { "offset": 1, "color": { "r": 0.12, "g": 0.12, "b": 0.16, "a": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "satellite",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 88, "y": 12 },
+        { "v": "L", "x": 124, "y": 12 },
+        { "v": "L", "x": 124, "y": 48 },
+        { "v": "L", "x": 88, "y": 48 },
+        { "v": "Z" }
+      ] },
+      "paint": {
+        "kind": "radial-gradient",
+        "center": [106, 30],
+        "radius": 18,
+        "stops": [
+          { "offset": 0, "color": { "r": 0.6, "g": 0.85, "b": 1, "a": 1 } },
+          { "offset": 1, "color": { "r": 0.1, "g": 0.2, "b": 0.5, "a": 1 } }
+        ]
+      }
+    }
+  ]
+}

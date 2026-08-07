@@ -1,0 +1,44 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 0.98, "g": 0.98, "b": 0.96, "a": 1 },
+  "nodes": [
+    {
+      "id": "quad-s",
+      "kind": "stroke-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 10, "y": 100 },
+        { "v": "Q", "cx": 40, "cy": 10, "x": 64, "y": 60 },
+        { "v": "Q", "cx": 88, "cy": 110, "x": 118, "y": 24 }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.1, "g": 0.1, "b": 0.1, "a": 1 } },
+      "strokeWidth": 4,
+      "cap": "round",
+      "join": "round"
+    },
+    {
+      "id": "cubic-loop",
+      "kind": "stroke-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 20, "y": 116 },
+        { "v": "C", "c1x": 120, "c1y": 40, "c2x": 8, "c2y": 40, "x": 108, "y": 116 }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.75, "g": 0.2, "b": 0.4, "a": 1 } },
+      "strokeWidth": 5,
+      "cap": "round",
+      "join": "round"
+    },
+    {
+      "id": "cubic-fill",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 34, "y": 34 },
+        { "v": "C", "c1x": 64, "c1y": 4, "c2x": 94, "c2y": 34, "x": 94, "y": 34 },
+        { "v": "C", "c1x": 94, "c1y": 64, "c2x": 34, "c2y": 64, "x": 34, "y": 34 },
+        { "v": "Z" }
+      ] },
+      "paint": { "kind": "solid", "color": { "r": 0.3, "g": 0.6, "b": 0.9, "a": 0.85 } }
+    }
+  ]
+}

@@ -98,12 +98,27 @@ importers:
       '@techstark/opencv-js':
         specifier: 5.0.0-release.1
         version: 5.0.0-release.1
+      '@toonspectrum/command-registry-v11':
+        specifier: workspace:*
+        version: link:packages/command-registry-v11
       '@toonspectrum/core':
         specifier: workspace:*
         version: link:packages/core
       '@toonspectrum/play-core':
         specifier: workspace:*
         version: link:packages/play-core
+      '@toonspectrum/project-model-v11':
+        specifier: workspace:*
+        version: link:packages/project-model-v11
+      '@toonspectrum/provider-catalog-v11':
+        specifier: workspace:*
+        version: link:packages/provider-catalog-v11
+      '@toonspectrum/skia-adapter-v11':
+        specifier: workspace:*
+        version: link:packages/skia-adapter-v11
+      '@toonspectrum/vello-adapter-v11':
+        specifier: workspace:*
+        version: link:packages/vello-adapter-v11
       ag-psd:
         specifier: ^31.0.1
         version: 31.0.1
@@ -482,6 +497,35 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/skia-adapter-v11:
+    dependencies:
+      '@toonspectrum/project-model-v11':
+        specifier: workspace:*
+        version: link:../project-model-v11
+      '@toonspectrum/provider-catalog-v11':
+        specifier: workspace:*
+        version: link:../provider-catalog-v11
+      canvaskit-wasm:
+        specifier: 0.41.1
+        version: 0.41.1
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.2
+
+  packages/vello-adapter-v11:
+    dependencies:
+      '@toonspectrum/project-model-v11':
+        specifier: workspace:*
+        version: link:../project-model-v11
+      '@toonspectrum/provider-catalog-v11':
+        specifier: workspace:*
+        version: link:../provider-catalog-v11
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.2
 
 packages:
 
@@ -9218,7 +9262,7 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 22.19.19
+      '@types/node': 24.13.2
 
   '@types/chai@5.2.3':
     dependencies:
@@ -9247,7 +9291,7 @@ snapshots:
 
   '@types/express-serve-static-core@5.1.1':
     dependencies:
-      '@types/node': 22.19.19
+      '@types/node': 24.13.2
       '@types/qs': 6.15.1
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -9307,7 +9351,7 @@ snapshots:
   '@types/serve-static@2.2.0':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 22.19.19
+      '@types/node': 24.13.2
 
   '@types/stats.js@0.17.4': {}
 
