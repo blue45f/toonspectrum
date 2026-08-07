@@ -21,3 +21,8 @@ skrifa = "0.43"
 opt-level = "s"
 lto = true
 codegen-units = 1
+
+# ADR-0010: Vello GPU(Classic) 네이티브 검증 전용 — wasm 산출물에 포함되지 않는다.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+vello = "0.9"
+pollster = "0.4"

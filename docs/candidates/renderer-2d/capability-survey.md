@@ -48,3 +48,26 @@ V11 1차 구현에서 실코드로 들어가는 renderer-2d 엔진은 **두 개*
 - `tests/benchmarks` 하니스가 산출한 p50/p95/p99·Peak Memory는 **장치 프로파일·코퍼스 ID·엔진 commit과 함께** 이 표를 갱신한다.
 - "미실측" 셀을 수치로 바꿀 때는 반드시 측정 리포트 경로를 각주로 남긴다.
 - 판정(Final Role) 변경은 benchmark-plan.md의 통과 게이트를 근거로만 수행한다.
+
+---
+
+## Vello GPU(Classic) 네이티브 실검증 (2026-08-08, ADR-0010 §4)
+
+`crates/studio-engine-vello/tests/gpu_parity.rs` — vello 0.9.0을 headless wgpu(Metal, Area AA)로
+구동해 동일 SceneIR 코퍼스를 vello_cpu 골든과 3×3/δ48 퍼지 비교. 원시:
+tests/benchmarks/results/vello-gpu-native.json.
+
+| 장면 | GPU↔CPU 퍼지 불일치 | GPU p50 | GPU p95 |
+| --- | --- | --- | --- |
+| 01-solid-shapes | **0.0000%** | 1.61ms | 2.59ms |
+| 02-strokes | **0.0000%** | 1.54ms | 1.58ms |
+| 03-curves | 0.0366% | 1.54ms | 1.76ms |
+| 04~07 (gradient·blend·group) | **전부 0.0000%** | ~1.6ms | ~1.7~2.9ms |
+
+판정:
+- **품질 리스크 해소**: Vello GPU는 결정적 CPU 기준선과 사실상 픽셀 동일(최악 0.037%, 게이트 0.6%의
+  1/16). "알파라서 품질 불안"이라는 유보는 실측으로 기각 — ADR-0010의 게이트 조건 (a) 충족.
+- 성능: 128² 소형 장면에서 readback 포함 p50 ~1.6ms(오버헤드 지배 구간). 대량 path 상한 검증은
+  대형 장면(30k 스트립·8K) 벤치가 다음 단계.
+- 측정 시 readback은 테스트 전용 증거 수집이며 인터랙티브 경로 금지 규칙(§9.1)과 무관.
+- 다음: wgpu WebGPU(wasm) 어댑터 PoC — 브라우저에서 같은 패리티/성능 게이트 재현.
