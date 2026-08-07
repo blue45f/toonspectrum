@@ -62,6 +62,8 @@
     "turbo:typecheck": "pnpm exec turbo run typecheck",
     "turbo:lint": "pnpm exec turbo run lint",
     "turbo:test": "pnpm exec turbo run test --concurrency=1",
+    "bench:studio-v11": "pnpm --filter @toonspectrum/benchmark-lab-v11 bench",
+    "verify:studio-v11": "node scripts/verify-studio-v11.mjs",
     "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
@@ -107,6 +109,7 @@
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
+    "@toonspectrum/brush-platform-v11": "workspace:*",
     "@toonspectrum/command-registry-v11": "workspace:*",
     "@toonspectrum/project-model-v11": "workspace:*",
     "@toonspectrum/provider-catalog-v11": "workspace:*",

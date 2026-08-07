@@ -98,6 +98,9 @@ importers:
       '@techstark/opencv-js':
         specifier: 5.0.0-release.1
         version: 5.0.0-release.1
+      '@toonspectrum/brush-platform-v11':
+        specifier: workspace:*
+        version: link:packages/brush-platform-v11
       '@toonspectrum/command-registry-v11':
         specifier: workspace:*
         version: link:packages/command-registry-v11
@@ -475,6 +478,28 @@ importers:
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+
+  apps/benchmark-lab-v11:
+    dependencies:
+      '@toonspectrum/brush-platform-v11':
+        specifier: workspace:*
+        version: link:../../packages/brush-platform-v11
+      '@toonspectrum/project-model-v11':
+        specifier: workspace:*
+        version: link:../../packages/project-model-v11
+      '@toonspectrum/skia-adapter-v11':
+        specifier: workspace:*
+        version: link:../../packages/skia-adapter-v11
+      '@toonspectrum/vello-adapter-v11':
+        specifier: workspace:*
+        version: link:../../packages/vello-adapter-v11
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.2
+      tsx:
+        specifier: ^4.22.3
+        version: 4.22.3
 
   packages/brush-platform-v11:
     dependencies:
