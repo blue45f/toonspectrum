@@ -506,6 +506,9 @@ importers:
 
   packages/studio-engine-registry:
     dependencies:
+      '@toonspectrum/studio-project-model':
+        specifier: workspace:*
+        version: link:../studio-project-model
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -534,6 +537,19 @@ importers:
       '@toonspectrum/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
+    devDependencies:
+      '@types/node':
+        specifier: ^24
+        version: 24.13.2
+
+  packages/studio-format-gateway:
+    dependencies:
+      '@toonspectrum/studio-project-model':
+        specifier: workspace:*
+        version: link:../studio-project-model
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^24

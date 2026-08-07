@@ -64,6 +64,7 @@
     "turbo:test": "pnpm exec turbo run test --concurrency=1",
     "bench:studio-engine": "tsx tests/benchmarks/harness/main.ts",
     "bench:filter-candidates": "tsx tests/benchmarks/harness/filter-candidates.ts",
+    "soak:studio-engine": "tsx tests/benchmarks/harness/soak.ts",
     "verify:studio-engine": "node scripts/verify-studio-engine.mjs",
     "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",

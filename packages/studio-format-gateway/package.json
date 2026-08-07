@@ -1,9 +1,9 @@
 {
-  "name": "@toonspectrum/studio-engine-registry",
+  "name": "@toonspectrum/studio-format-gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "ToonStudio V11 EngineCapabilityRegistry, provider descriptors, hybrid execution planner and the E01-E28 candidate manifest.",
+  "description": "ToonStudio external creative-format gateway: brush/asset importers mapping into stable IR with zero silent data loss.",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "types": "./src/index.ts",
@@ -19,7 +19,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "zod": "^4.4.3",
-    "@toonspectrum/studio-project-model": "workspace:*"
+    "@toonspectrum/studio-project-model": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24"
   }
 }

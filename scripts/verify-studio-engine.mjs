@@ -48,6 +48,7 @@ const STUDIO_ENGINE_PACKAGES = [
   "@toonspectrum/studio-engine-skia",
   "@toonspectrum/studio-engine-vello",
   "@toonspectrum/studio-brush-platform",
+  "@toonspectrum/studio-format-gateway",
 ];
 
 // 2. package + benchmark-harness typechecks
@@ -78,6 +79,7 @@ const test = spawnSync(
     "packages/studio-engine-skia",
     "packages/studio-engine-vello",
     "packages/studio-brush-platform",
+    "packages/studio-format-gateway",
     "tests/visual",
     "tests/fault-injection",
     "src/domains/creator/studio-surface-plan-shadow.test.ts",

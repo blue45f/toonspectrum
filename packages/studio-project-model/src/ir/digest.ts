@@ -53,9 +53,11 @@ export function crc32(text: string): number {
 
 export function fnv1a64Hex(text: string): string {
   const bytes = new TextEncoder().encode(text);
-  let hash = 0xcbf29ce484222325n;
-  const prime = 0x100000001b3n;
-  const mask = 0xffffffffffffffffn;
+  // BigInt() calls (not literals) keep this file compilable under the root
+  // app program's ES2017 target while behaving identically at runtime.
+  let hash = BigInt("0xcbf29ce484222325");
+  const prime = BigInt("0x100000001b3");
+  const mask = BigInt("0xffffffffffffffff");
   for (const byte of bytes) {
     hash ^= BigInt(byte);
     hash = (hash * prime) & mask;
