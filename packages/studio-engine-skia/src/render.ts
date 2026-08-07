@@ -215,20 +215,38 @@ function drawPathNode(
 
 function drawGroupNode(ctx: RenderContext, node: GroupNodeIR): void {
   const { ck, canvas } = ctx;
-  const layerPaint = new ck.Paint();
-  try {
-    layerPaint.setAlphaf(node.opacity);
-    layerPaint.setBlendMode(toBlendMode(ck, node.blend));
-    // saveLayer copies the paint into the layer record, so the paint can be
-    // deleted immediately after.
-    canvas.saveLayer(layerPaint);
-  } finally {
-    layerPaint.delete();
+  // Clip first (its own save/restore pair), then the opacity/blend layer, so
+  // children composite inside the clipped region — mirrors the vello lane's
+  // push_layer(clip, blend, opacity).
+  let clipSaved = false;
+  if (node.clip !== null) {
+    const clipPath = buildPath(ck, node.clip);
+    try {
+      canvas.save();
+      clipSaved = true;
+      canvas.clipPath(clipPath, ck.ClipOp.Intersect, true);
+    } finally {
+      clipPath.delete();
+    }
   }
   try {
-    renderNodes(ctx, node.children);
+    const layerPaint = new ck.Paint();
+    try {
+      layerPaint.setAlphaf(node.opacity);
+      layerPaint.setBlendMode(toBlendMode(ck, node.blend));
+      // saveLayer copies the paint into the layer record, so the paint can be
+      // deleted immediately after.
+      canvas.saveLayer(layerPaint);
+    } finally {
+      layerPaint.delete();
+    }
+    try {
+      renderNodes(ctx, node.children);
+    } finally {
+      canvas.restore();
+    }
   } finally {
-    canvas.restore();
+    if (clipSaved) canvas.restore();
   }
 }
 

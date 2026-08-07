@@ -163,6 +163,7 @@ describe("renderSceneToPixels", () => {
         kind: "group",
         opacity: 0.5,
         blend: "src-over",
+        clip: null,
         children: [
           {
             id: "black",

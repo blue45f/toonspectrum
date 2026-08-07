@@ -96,6 +96,7 @@ describe("CommandBus", () => {
       kind: "group",
       opacity: 1,
       blend: "src-over",
+      clip: null,
       children: [strokeNode("inner")],
     };
     await bus.dispatch({ type: "scene/add-node", node: group });

@@ -13,6 +13,7 @@ export type SceneFeature =
   | "render.vector.gradient"
   | "render.text.paragraph"
   | "render.group.opacity"
+  | "render.group.clip"
   | `render.blend.${string}`;
 
 export function collectSceneFeatures(scene: SceneIR): SceneFeature[] {
@@ -34,6 +35,7 @@ export function collectSceneFeatures(scene: SceneIR): SceneFeature[] {
           break;
         case "group":
           features.add("render.group.opacity");
+          if (node.clip !== null) features.add("render.group.clip");
           visit(node.children);
           break;
       }

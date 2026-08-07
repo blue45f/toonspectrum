@@ -3,6 +3,8 @@ import { z } from "zod";
 import { blendModeIRSchema, colorIRSchema, paintIRSchema } from "./color";
 import { pathIRSchema } from "./path";
 
+import type { PathIR } from "./path";
+
 /**
  * SceneIR — the renderer-neutral document scene (V11 §2.1).
  *
@@ -64,6 +66,8 @@ export type SceneNodeIR =
       kind: "group";
       opacity: number;
       blend: z.infer<typeof blendModeIRSchema>;
+      /** Layer-scoped clip mask (panel boundary etc.); null = no clipping. */
+      clip: PathIR | null;
       children: SceneNodeIR[];
     };
 
@@ -75,6 +79,7 @@ export const sceneNodeIRSchema: z.ZodType<SceneNodeIR> = z.lazy(() =>
     z.object({
       ...nodeBaseShape,
       kind: z.literal("group"),
+      clip: pathIRSchema.nullable().default(null),
       children: z.array(sceneNodeIRSchema),
     }),
   ]),

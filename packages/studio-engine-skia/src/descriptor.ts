@@ -23,6 +23,7 @@ export const canvasKitProviderDescriptor: ProviderDescriptor =
       "render.vector.stroke",
       "render.vector.gradient",
       "render.group.opacity",
+      "render.group.clip",
       "render.blend.multiply",
       "render.blend.screen",
       "render.blend.darken",
