@@ -70,8 +70,9 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     );
 
     expect(eagerLoad).toBeLessThan(libraryHydration);
+    // 의도적 변경(2026-08-07): 취소된 로드가 status=loading 에 갇히지 않도록 설치 여부(vrmRef)까지 확인.
     expect(poserSource).toContain(
-      "if (modelLoadTargetIdRef.current === targetEntry.id) return;",
+      "if (modelLoadTargetIdRef.current === targetEntry.id && vrmRef.current) return;",
     );
     expect(readyFrame).toContain("useLayoutEffect(() => {");
     expect(readyFrame).toContain("settledFrame = requestAnimationFrame(() => invalidate())");
