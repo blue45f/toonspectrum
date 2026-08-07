@@ -11,3 +11,4 @@ export * from "./command/reducer";
 export * from "./command/journal-store";
 export * from "./command/recovery";
 export * from "./command/bus";
+export * from "./testing/fault-injection";

@@ -32,6 +32,7 @@ export class CommandBus {
   private readonly now: () => number;
   private readonly listeners = new Set<CommandBusListener>();
   private readonly startedAtSeq: number;
+  private lastSnapshotError: unknown = null;
 
   private constructor(
     private readonly store: JournalStore,
@@ -79,10 +80,23 @@ export class CommandBus {
     this.scene = nextScene;
     this.seq = seq;
     if ((seq - this.startedAtSeq) % this.snapshotEvery === 0) {
-      await this.writeSnapshot();
+      // Snapshots are a recovery accelerator, not a durability requirement —
+      // the entry above is already appended, so an automatic snapshot failure
+      // must not fail the dispatch. Recovery replays from the journal.
+      try {
+        await this.writeSnapshot();
+        this.lastSnapshotError = null;
+      } catch (error) {
+        this.lastSnapshotError = error;
+      }
     }
     for (const listener of this.listeners) listener(this.scene, this.seq);
     return nextScene;
+  }
+
+  /** Last automatic-snapshot failure since the most recent success, if any. */
+  getLastSnapshotError(): unknown {
+    return this.lastSnapshotError;
   }
 
   /** Forces a snapshot into the next A/B slot (also used on clean shutdown). */
