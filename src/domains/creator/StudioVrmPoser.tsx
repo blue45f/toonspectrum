@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal, type ThreeEvent } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -6464,25 +6464,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     }
   }
 
+  // Effect Event so the dispose runs on true unmount only. With the cancel* callbacks as deps, any
+  // identity churn re-fires this cleanup, bumping loadRequestRef while modelLoadTargetIdRef still
+  // reads "in progress" — the open effect then skips the reload and the poser sits on
+  // status="loading" forever.
+  const disposeVrmOnUnmount = useEffectEvent(() => {
+    cancelPendingInsertCapture();
+    cancelPendingPoseShare();
+    cancelPendingSharedPoseCatalog();
+    cancelPendingSharedPoseSelection();
+    jointIkTransactionRef.current = null;
+    loadRequestRef.current += 1;
+    modelLoadTargetIdRef.current = null;
+    if (vrmRef.current) {
+      disposeVrm(vrmRef.current);
+      vrmRef.current = null;
+    }
+  });
+
   useEffect(() => {
-    return () => {
-      cancelPendingInsertCapture();
-      cancelPendingPoseShare();
-      cancelPendingSharedPoseCatalog();
-      cancelPendingSharedPoseSelection();
-      jointIkTransactionRef.current = null;
-      loadRequestRef.current += 1;
-      if (vrmRef.current) {
-        disposeVrm(vrmRef.current);
-        vrmRef.current = null;
-      }
-    };
-  }, [
-    cancelPendingInsertCapture,
-    cancelPendingPoseShare,
-    cancelPendingSharedPoseCatalog,
-    cancelPendingSharedPoseSelection,
-  ]);
+    return () => disposeVrmOnUnmount();
+  }, []);
 
   useEffect(() => {
     if (open) return;
@@ -6495,6 +6497,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     loadRequestRef.current += 1;
     thumbnailRequestRef.current += 1;
     captureHelperLeaseCountRef.current = 0;
+    modelLoadTargetIdRef.current = null;
     if (groundShadowRef.current) groundShadowRef.current.visible = true;
     if (envRootRef.current) envRootRef.current.visible = true;
     clearCurrentVrm();
@@ -6575,14 +6578,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         setLibraryError("이 장면이 사용하는 VRM 모델을 찾지 못했습니다. 프로젝트 모델 attachment를 먼저 복원해 주세요.");
         return;
       }
-      if (modelLoadTargetIdRef.current === targetEntry.id) return;
+      // Skip only when this model is actually installed. A matching target id alone is not
+      // enough — a cancelled in-flight load leaves the id set with vrmRef null, which would
+      // strand the poser on "loading".
+      if (modelLoadTargetIdRef.current === targetEntry.id && vrmRef.current) return;
       loadModelRef.current(targetEntry);
     };
 
+    // Kick the sample load whenever nothing is installed yet (covers Strict Mode remount).
     if (
       pendingPoseDataRef.current === null
       && activeModelIdRef.current === SAMPLE_VRM_ID
-      && modelLoadTargetIdRef.current === null
+      && !vrmRef.current
     ) {
       loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);
     }
@@ -6604,6 +6611,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
     return () => {
       cancelled = true;
+      // Let the next pass start a fresh load after a Strict Mode remount.
+      loadRequestRef.current += 1;
+      modelLoadTargetIdRef.current = null;
     };
   }, [initialSceneModelIdentity, open]);
 
@@ -6870,7 +6880,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           disposeVrm(loadedVrm);
           return;
         }
-        installVrm(loadedVrm, nextModelName, nextModelId);
+        try {
+          installVrm(loadedVrm, nextModelName, nextModelId);
+        } catch (installError: unknown) {
+          // An install throw would otherwise leak the loaded scene and leave status on "loading".
+          disposeVrm(loadedVrm);
+          handleLoadFailure(requestId, installError);
+        }
       })
       .catch((caughtError: unknown) => {
         handleLoadFailure(requestId, caughtError);

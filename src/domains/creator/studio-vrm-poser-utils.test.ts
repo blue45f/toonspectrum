@@ -771,6 +771,28 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     expect(classifyVrmCustomColorPartForMaterial("Body", "HairBack_00_HAIR")).toBe("hair");
     expect(classifyVrmCustomColorPart("Alicia_wear")).toBe("tops");
     expect(classifyVrmCustomColorPart("cloth")).toBe("tops");
+    // "Hair_Top" must stay hair — a bare "top" substring cannot outrank the hair marker.
+    expect(classifyVrmCustomColorPart("F00_Hair_Top")).toBe("hair");
+    expect(classifyVrmCustomColorPart("Face_00")).toBe("face");
+  });
+
+  it("applyVrmCustomColors never repaints mannequin clay cached as an original", () => {
+    const { vrm } = createMinimalVrm();
+    const native = new THREE.Color("#c48a6a");
+    const bodyMat = new THREE.MeshStandardMaterial({ color: native.clone() });
+    addMesh(vrm.scene, "Body_Mesh", bodyMat);
+
+    // Race we have to survive: mannequin painted clay gray, then a recolor pass cached that
+    // gray as the material's "original".
+    bodyMat.color.set(STUDIO_VRM_MANNEQUIN_COLOR_HEX);
+    bodyMat.userData.__vrmCustomColorOriginal = new THREE.Color(STUDIO_VRM_MANNEQUIN_COLOR_HEX);
+    bodyMat.userData.__vrmCustomColorApplied = true;
+
+    // After a faithful restore to native albedo, clearing custom colors must not bring gray back.
+    bodyMat.color.copy(native);
+    applyVrmCustomColors(vrm, {});
+    expect(`#${bodyMat.color.getHexString()}`).toBe("#c48a6a");
+    expect(bodyMat.userData.__vrmCustomColorOriginal).toBeUndefined();
   });
 
   it("applyVrmCustomColors recolors only matching materials on a multi-material Body mesh", () => {
