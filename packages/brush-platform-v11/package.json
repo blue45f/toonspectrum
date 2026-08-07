@@ -1,0 +1,26 @@
+{
+  "name": "@toonspectrum/brush-platform-v11",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ToonStudio V11 input pipeline, stabilizer and stroke-geometry brush platform (Phase 2 baseline).",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@toonspectrum/project-model-v11": "workspace:*",
+    "@toonspectrum/provider-catalog-v11": "workspace:*",
+    "perfect-freehand": "1.2.3"
+  }
+}

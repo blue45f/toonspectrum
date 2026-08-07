@@ -476,6 +476,18 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  packages/brush-platform-v11:
+    dependencies:
+      '@toonspectrum/project-model-v11':
+        specifier: workspace:*
+        version: link:../project-model-v11
+      '@toonspectrum/provider-catalog-v11':
+        specifier: workspace:*
+        version: link:../provider-catalog-v11
+      perfect-freehand:
+        specifier: 1.2.3
+        version: 1.2.3
+
   packages/command-registry-v11: {}
 
   packages/core:
