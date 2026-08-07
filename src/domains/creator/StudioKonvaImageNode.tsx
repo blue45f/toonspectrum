@@ -19,6 +19,7 @@ import { resizableNodeProps } from "./studio-node-props";
 import { computePanelAutoFitPatch } from "./studio-panel-autofit";
 import { sha256HexPortable } from "./studio-sha256";
 import { toKonvaSkewAttrs } from "./studio-skew";
+import { planStudioFilterIslandLanes } from "./studio-v11-filter-island-plan";
 
 import type { FrameEl, ImageEl } from "./studio-element-model";
 import type Konva from "konva";
@@ -871,9 +872,15 @@ export function StudioKonvaImageNode({
             setWorkerFallbackKey(requestKey);
           });
       };
-      // M1 GPU 경로 — 지원 5필드 체인만 GPU에서 시도, null(미지원/디바이스 손실/검증 오류)이면
-      // 기존 Worker 경로로 그대로 폴백한다. 결과는 동일한 commit/캐시 경로를 공유한다.
-      if (gpuFilterModule?.isStudioGpuFilterChainEligible(elRef.current)) {
+      // V11 필터 island 위임 — GPU 체인 적격성 판정은 기존 모듈이 하고, 레인 순서·폴백 체인은
+      // HybridExecutionPlanner(final-export)가 산출한다(ADR 0001 2차 개정 step c). gpu-chain 레인의
+      // null/예외 → worker, worker 실패 → konva-native 순서는 아래 기존 콜백 구조가 그대로 플랜의
+      // 폴백 체인을 실행하는 형태다. 결과는 동일한 commit/캐시 경로를 공유한다.
+      const filterIslandPlan = planStudioFilterIslandLanes({
+        gpuChainEligible:
+          gpuFilterModule?.isStudioGpuFilterChainEligible(elRef.current) === true,
+      });
+      if (filterIslandPlan.lanes[0] === "gpu-chain" && gpuFilterModule) {
         const gpuInput = { data: new Uint8ClampedArray(sourcePixels.data), width, height };
         void gpuFilterModule.applyGpuFilterChain(gpuInput, elRef.current)
           .then((gpuResult) => {
