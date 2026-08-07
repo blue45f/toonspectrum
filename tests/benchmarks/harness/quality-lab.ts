@@ -285,7 +285,7 @@ async function main(): Promise<void> {
         alphaType: ck.AlphaType.Unpremul,
         colorSpace: ck.ColorSpace.SRGB,
       });
-      surface.delete();
+      surface.dispose();
       if (!pixels) throw new Error("readPixels failed");
       return { pixels: new Uint8Array(pixels as Uint8Array), wallMs };
     };
@@ -382,7 +382,7 @@ async function main(): Promise<void> {
     const pixels = canvas.readPixels(0, 0, info);
     filter.delete();
     paint.delete();
-    surface.delete();
+    surface.dispose();
     image.delete();
     if (!pixels) throw new Error("readPixels failed");
     await recordBlur("canvaskit-imagefilter", new Uint8Array(pixels as Uint8Array), wallMs);

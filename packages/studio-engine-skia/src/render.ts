@@ -360,7 +360,9 @@ export function renderSceneToPixels(
     }
     return pixels;
   } finally {
-    surface.delete();
+    // MakeSurface CPU surfaces malloc their pixel buffer on the JS side;
+    // only dispose() frees it — delete() alone leaks width*height*4 bytes.
+    surface.dispose();
   }
 }
 
@@ -385,7 +387,7 @@ export function renderSceneToPng(
       image.delete();
     }
   } finally {
-    surface.delete();
+    surface.dispose();
   }
 }
 
