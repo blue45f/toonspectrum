@@ -58,3 +58,29 @@
 3. GEGL 도입이 G'MIC+libvips+OpenCV 조합 대비 실질 이득(비파괴 DAG 충실도)을 주는가, 아니면 EffectGraphIR 자체 스케줄러로 충분한가.
 4. CanvasKit RuntimeEffect 근사 preview와 final 결과의 픽셀 diff가 노드 클래스별 예산을 넘는 필터 목록(=proxy 품질 부채 목록).
 5. Custom wgpu pass fusion이 실제로 copy-cost를 줄여 p95를 개선하는 병목 체인이 존재하는가(V11 §3.3 조건 3).
+
+---
+
+## 실측 현황 갱신 (2026-08-07, 후보 증거 벤치 — dev 전용)
+
+`pnpm run bench:filter-candidates` (tests/benchmarks/harness/filter-candidates.ts, raw:
+tests/benchmarks/results/filter-candidates.json, M4 Mac·Node 24 단일 스레드):
+
+| Candidate | 연산 | p50 | p95 | 출력 서명 |
+| --- | --- | --- | --- | --- |
+| opencv-js 5.0.0-release.1 | Canny 512² | 1.37ms | 2.03ms | nonZero 2,956 (실제 에지) |
+| opencv-js | dilate 5×5 512² | 0.48ms | 0.55ms | nonZero 261,630 |
+| opencv-js | Gaussian 9×9 512² | 3.21ms | 3.34ms | nonZero 260,597 |
+| wasm-vips 0.0.18 | resize 2048²→512² | 16.4ms | 17.5ms | nonZero 1,045,483 |
+| wasm-vips | gaussblur σ4 2048² | 46.7ms | 60.5ms | nonZero 16,721,848 |
+
+판정 메모(정정 포함):
+- **OpenCV.js는 이미 프로덕션 의존성이다** — 하이브리드 프로바이더 핀(5.0.0-release.1,
+  generate-third-party-notices HYBRID_PROVIDER_DEPENDENCIES)과 워커 프로토콜
+  (src/domains/creator/studio-opencv-image-worker-protocol.ts)이 기배선. 이번 벤치는 dev 하니스의
+  추가 실측 증거이며, V11 FilterProvider 디스크립터 등록(E16 레인)이 남은 작업이다.
+- **wasm-vips만 신규 devDependency 후보**(번들 0바이트). 프로덕션 배선은 §9.1 lazy worker +
+  engine-lab 번들 규칙 + LGPL 격리 모드 게이트를 통과하는 별도 슬라이스로 진행한다.
+- OpenCV Canny/모폴로지 성능은 인터랙티브 분석 레인(마술봉·선 추출·먼지 제거 보조) 요구를 충족한다.
+- wasm-vips 단일 스레드 기준선은 대형 최종 출력 레인용으로 기록. SMP는 COOP/COEP 워커 필요
+  (스튜디오는 이미 cross-origin isolation 게이트 보유 — boundary 감사 참조).

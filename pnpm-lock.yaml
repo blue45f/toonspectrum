@@ -387,6 +387,9 @@ importers:
       vitest:
         specifier: '>=4.1.9'
         version: 4.1.9(@types/node@24.13.2)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+      wasm-vips:
+        specifier: ^0.0.18
+        version: 0.0.18
       wrangler:
         specifier: 4.116.0
         version: 4.116.0
@@ -6709,6 +6712,10 @@ packages:
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
+
+  wasm-vips@0.0.18:
+    resolution: {integrity: sha512-AJyCvxZj/3qceKNnh+YyEobu/IaJFoPN7x7SxyyHmYBS3kASMqJqxQEuN0ZHKQDWsCJ8armfx4Tq3uKrNc+nMA==}
+    engines: {node: '>=17.0.0'}
 
   web-ifc@0.0.77:
     resolution: {integrity: sha512-VzQ0W/Iiqbidxn1ECUvz6qJ6p2sXBVNcOsUOBCETzy77psAH6yFLKQm74aXabkx3JH4OvFVHe8k1qS6+Z2zl1w==}
@@ -13130,6 +13137,8 @@ snapshots:
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
+
+  wasm-vips@0.0.18: {}
 
   web-ifc@0.0.77: {}
 
