@@ -5,6 +5,8 @@ export * from "./ir/scene-features";
 export * from "./ir/stroke";
 export * from "./ir/brush";
 export * from "./ir/effect";
+export * from "./ir/comic";
+export * from "./ir/animation";
 export * from "./ir/journal";
 export * from "./ir/digest";
 export * from "./command/reducer";
