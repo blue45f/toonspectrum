@@ -9,6 +9,8 @@ pub mod geometry;
 pub mod gpu_scene;
 #[cfg(all(target_arch = "wasm32", feature = "gpu"))]
 pub mod gpu_web;
+#[cfg(feature = "lottie")]
+pub mod lottie;
 pub mod render;
 pub mod scene;
 pub mod text;

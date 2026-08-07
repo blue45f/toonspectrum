@@ -20,6 +20,19 @@ export function fit_polyline_json(points: Float64Array, closed: boolean, accurac
 export function probe_webgpu(): Promise<string>;
 
 /**
+ * Renders one frame of a Lottie (bodymovin) JSON document on the browser's
+ * WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
+ * over a transparent base (Lottie output is meant to be composited).
+ *
+ * ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+ * `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
+ * SceneIR lane validated. Rejections carry a JSON message
+ * `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
+ * constructs, out-of-range frames and WebGPU absence are all explicit.
+ */
+export function render_lottie_gpu_json(lottie_json: string, frame: number, width: number, height: number): Promise<Uint8Array>;
+
+/**
  * Renders SceneIR JSON on the browser's WebGPU device and resolves with the
  * RGBA8 pixels (width * height * 4). Rejects with an explicit error when
  * WebGPU is unavailable, the scene is invalid, or it needs unsupported
@@ -45,6 +58,7 @@ export interface InitOutput {
     readonly adapter_version: () => [number, number];
     readonly fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly probe_webgpu: () => any;
+    readonly render_lottie_gpu_json: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly render_scene_gpu_json: (a: number, b: number) => any;
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];

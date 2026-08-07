@@ -111,3 +111,42 @@ next:                toon-vello patches + wgpu 30
 `tests/benchmarks/results/vello-gpu-browser.json`)으로 개설 조건이 충족되었다. fork 디렉터리·next 트랙
 개설 자체는 별도 트랙으로 착수한다(ADR-0011 레인 2 유지 게이트) — 본 문서 §1 핀은 그때까지
 upstream-compatible 트랙 단일 소스로 유지된다.
+
+## 4. Velato Lottie 레인 (ADR-0011 Velato 레인, 2026-08-08)
+
+- **핀**: velato 0.11.0, `Apache-2.0 OR MIT`,
+  https://crates.io/crates/velato · https://github.com/linebender/velato.
+  crates.io 인덱스 실측(2026-08-08): 0.9.x/0.10.x는 `vello ^0.7.0` 의존이라 본 리포 핀(0.9.0)과
+  비호환, **0.11.0이 `vello ^0.9.0`·`kurbo ^0.13`·`peniko ^0.6` 의존**으로 §1 핀과 단일 버전으로
+  유니파이된다(rust-version 1.88 ≤ 로컬 rustc 1.97.1). Cargo.toml 피처:
+  `lottie = ["gpu", "dep:velato"]` — gpu 피처의 strict superset.
+- **경계**: Rust `crates/studio-engine-vello/src/lottie.rs`
+  (velato Composition 파싱→frame 시점 vello 0.9 Scene 하강, `src/gpu_web.rs`
+  `render_lottie_gpu_json`이 SceneIR 레인과 공용 텍스처/readback 경로 재사용),
+  TS `packages/studio-engine-vello/src/lottie.ts`(`renderLottieToPixelsGpu`,
+  `LottieRenderError`). 에러 계약: 파싱 실패·미지원 구성·범위 밖 프레임·비정상 크기는 전부
+  `{"code":"lottie-*","reason":"..."}` JSON 명시 에러 — 조용한 빈 프레임 없음.
+- **패닉 격리 (velato 0.11.0 소스 실측)**: velato importer(`Composition::from_slice`)는
+  레이어 회전(`ks.r`) 부재/분리, 셰이프 트랜스폼 분리 위치/회전, 비-precomp 에셋(이미지),
+  Add(16)/HardMix(17) 블렌드에서 `todo!()`/`unimplemented!()`로 패닉한다(wasm abort).
+  `src/lottie.rs`의 스키마 사전 검증이 이 구성 전부를 importer 도달 전에
+  `lottie-unsupported` 명시 에러로 변환한다(네이티브 게이트로 고정:
+  `tests/lottie_parity.rs` `parse_rejects_*`).
+- **실측 증거**:
+  - 네이티브(Metal): `crates/studio-engine-vello/tests/lottie_parity.rs` 8테스트 —
+    직접 저작 픽스처 2종(`tests/fixtures/lottie/translating-square.json`·`rotating-bar.json`,
+    외부 다운로드 없음)에서 프레임 0/30/60 바이트 동일 결정성, 위치 키프레임 중간값(선형 96px)
+    실보간, 0°→90° 회전 실측, 캔버스 밖 완전 클리핑(전 픽셀 0), 자유 스케일(64²≈256px²·
+    256²≈4096px² 커버리지) 검증.
+  - 실브라우저(WebGPU): `tests/benchmarks/results/velato-lottie-browser.json`
+    (하니스 `packages/studio-engine-vello/src/__tests__/lottie-browser-probe.test.ts`,
+    `VELLO_LOTTIE_BROWSER_PROBE=1`): Chromium 140.0.7339.186 headless, wgpu `BrowserWebGpu`
+    어댑터에서 2픽스처×3프레임 전부 결정성 통과, 프레임 상호 상이 + 클리핑 재현,
+    p50 3.1~3.3ms / 128²(JSON 파싱+velato 하강+렌더+readback+JS 경계 포함).
+- **산출물 갱신**: `pkg-gpu/`는 이제
+  `wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie`로 빌드한다
+  (lottie ⊃ gpu — SceneIR GPU 레인 동일 포함, 재빌드 후 §2 실브라우저 패리티 프로브 재실행으로
+  7장면 동수치 재확인). wasm 4,256,707B → **4,595,864B**(+339,157B, +8.0% — velato 하강 비용).
+  §2 재현 절차 2단계(수동 배너 삽입)는 더 이상 필요 없다: 루트 eslint flat config가
+  `crates/studio-engine-vello/pkg-gpu/**`를 ignore하므로 wasm-pack 생성물 원본이 그대로 핀 대상이다.
+  INTEGRITY.sha256은 §2와 동일한 shasum 절차로 재생성.

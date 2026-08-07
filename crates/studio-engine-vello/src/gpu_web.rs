@@ -136,10 +136,25 @@ async fn render_scene_gpu(scene_ir: &SceneIR) -> Result<Vec<u8>, String> {
             features.join(", ")
         )
     })?;
+    let base_color = Color::new([
+        scene_ir.background.r,
+        scene_ir.background.g,
+        scene_ir.background.b,
+        scene_ir.background.a,
+    ]);
+    render_encoded_scene_gpu(&scene, scene_ir.width, scene_ir.height, base_color).await
+}
+
+/// Texture render + 256-byte-aligned readback shared by the SceneIR lane and
+/// the Velato Lottie lane — both feed an already-encoded vello `Scene` here.
+async fn render_encoded_scene_gpu(
+    scene: &vello::Scene,
+    width: u32,
+    height: u32,
+    base_color: Color,
+) -> Result<Vec<u8>, String> {
     let context = acquire_context().await?;
 
-    let width = scene_ir.width;
-    let height = scene_ir.height;
     let texture = context.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("vello-gpu-browser-target"),
         size: wgpu::Extent3d {
@@ -161,15 +176,10 @@ async fn render_scene_gpu(scene_ir: &SceneIR) -> Result<Vec<u8>, String> {
         .render_to_texture(
             &context.device,
             &context.queue,
-            &scene,
+            scene,
             &view,
             &RenderParams {
-                base_color: Color::new([
-                    scene_ir.background.r,
-                    scene_ir.background.g,
-                    scene_ir.background.b,
-                    scene_ir.background.a,
-                ]),
+                base_color,
                 width,
                 height,
                 antialiasing_method: AaConfig::Area,
@@ -245,6 +255,33 @@ async fn render_scene_gpu(scene_ir: &SceneIR) -> Result<Vec<u8>, String> {
 pub async fn render_scene_gpu_json(scene_json: String) -> Result<js_sys::Uint8Array, JsError> {
     let scene = parse_scene(&scene_json).map_err(|error| JsError::new(&error.to_string()))?;
     let pixels = render_scene_gpu(&scene)
+        .await
+        .map_err(|error| JsError::new(&error))?;
+    Ok(js_sys::Uint8Array::from(pixels.as_slice()))
+}
+
+/// Renders one frame of a Lottie (bodymovin) JSON document on the browser's
+/// WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
+/// over a transparent base (Lottie output is meant to be composited).
+///
+/// ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+/// `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
+/// SceneIR lane validated. Rejections carry a JSON message
+/// `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
+/// constructs, out-of-range frames and WebGPU absence are all explicit.
+#[cfg(feature = "lottie")]
+#[wasm_bindgen]
+pub async fn render_lottie_gpu_json(
+    lottie_json: String,
+    frame: f64,
+    width: u32,
+    height: u32,
+) -> Result<js_sys::Uint8Array, JsError> {
+    let composition =
+        crate::lottie::parse_composition(&lottie_json).map_err(|error| JsError::new(&error))?;
+    let scene = crate::lottie::compose_frame_scene(&composition, frame, width, height)
+        .map_err(|error| JsError::new(&error))?;
+    let pixels = render_encoded_scene_gpu(&scene, width, height, Color::new([0.0, 0.0, 0.0, 0.0]))
         .await
         .map_err(|error| JsError::new(&error))?;
     Ok(js_sys::Uint8Array::from(pixels.as_slice()))

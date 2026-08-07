@@ -13,6 +13,9 @@ crate-type = ["cdylib", "rlib"]
 vello_cpu = "0.2.0"
 # V12 WebGPU wasm PoC lane — optional, excluded from default wasm-pack builds.
 vello = { version = "0.9", optional = true }
+# V12 Velato lane — Lottie(bodymovin) -> vello Scene lowering; velato 0.11.0
+# depends on vello ^0.9 (crates.io index 실측), unified with our 0.9.0 pin.
+velato = { version = "0.11", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wasm-bindgen = "0.2"
@@ -22,6 +25,9 @@ skrifa = "0.43"
 [features]
 default = []
 gpu = ["dep:vello", "dep:wasm-bindgen-futures", "dep:js-sys"]
+# Velato Lottie lane (ADR-0011): rides on the gpu render path, so it is a
+# strict superset feature — `pkg-gpu` is built with `--features lottie`.
+lottie = ["gpu", "dep:velato"]
 
 # V12 lane 2 (ADR-0011): browser WebGPU async entry needs the JS futures
 # bridge; both stay optional so the default CPU wasm artifact is unchanged.
@@ -35,6 +41,9 @@ lto = true
 codegen-units = 1
 
 # ADR-0010: Vello GPU(Classic) 네이티브 검증 전용 — wasm 산출물에 포함되지 않는다.
+# velato: tests/lottie_parity.rs가 src/lottie.rs를 #[path]로 포함해 기본
+# 피처에서도 Lottie 레인을 네이티브 검증한다(gpu_scene.rs와 같은 패턴).
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 vello = "0.9"
+velato = "0.11"
 pollster = "0.4"

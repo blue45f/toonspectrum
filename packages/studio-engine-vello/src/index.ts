@@ -15,6 +15,11 @@ export {
   type WebGpuProbeResult,
 } from "./gpu-browser";
 export {
+  LottieRenderError,
+  renderLottieToPixelsGpu,
+  type LottieErrorCode,
+} from "./lottie";
+export {
   adapterVersion,
   fitPolylineToPath,
   loadVelloWasm,
