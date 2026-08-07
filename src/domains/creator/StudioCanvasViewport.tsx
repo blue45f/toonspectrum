@@ -345,6 +345,8 @@ export interface StudioCanvasViewportHandlers {
   commitTextTransformEnd: (elId: string, fontSize: number, e: Konva.KonvaEventObject<Event>, opts: { minFontSize: number; patchWidth?: boolean }) => void;
   acknowledgeAiNotice: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
+  zoomToSelection: () => void;
+  flipSelected: (axis: "horizontal" | "vertical") => void;
   applyAdvancedFillPreview: () => void;
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
   applyDialogueReplacePlan: (plan: DialogueReplacePlan) => void;
@@ -1054,6 +1056,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     commitCanvasSelectionResize,
     acknowledgeAiNotice,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
     applyAdvancedFillPreview,
     applyBuiltInBrushPreset,
     applyDialogueReplacePlan,
@@ -1628,9 +1632,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const alignmentSelectionDisabledReason =
     selectionMutationDisabledReason ??
     (selectionLockedCount > 0
-      ? "잠긴 객체가 포함되어 있어 정렬·분배할 수 없어요. 선택 항목의 잠금을 모두 해제하세요."
+      ? "잠긴 객체가 포함되어 있어 정렬·분배·반전할 수 없어요. 선택 항목의 잠금을 모두 해제하세요."
       : topLevelSelectedGroupIds.size > 0 && !completeSelectionGroup
-        ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배를 잠갔어요. 그룹 하나씩 선택해 정렬하세요."
+        ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배·반전을 잠갔어요. 그룹 하나씩 선택해 주세요."
         : null);
   // Multi-marquee (2+) or single freehand stroke — strokes have no Konva Transformer, so
   // they share the uniform-resize proxy used for groups (competitive free-scale on one layer).
@@ -1792,6 +1796,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onToggleSelectionLock={toggleSelectedElementsLocked}
             onReorderSelection={reorderSelectedElements}
             onAlignSelection={alignSelected}
+            onZoomToSelection={zoomToSelection}
+            onFlipSelection={flipSelected}
             showBubbleMerge={showBubbleMerge}
             bubbleMergeDisabledReason={bubbleMergeReason}
             onMergeBubbles={mergeSelectedBubbles}

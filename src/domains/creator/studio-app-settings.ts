@@ -111,6 +111,9 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "brush-larger", label: "브러시 크게", labelKey: "studio.settings.shortcut.brushLarger", defaultKeys: "]" },
   { id: "flip-canvas", label: "캔버스 좌우 반전(보기)", labelKey: "studio.settings.shortcut.flipCanvas", defaultKeys: "H" },
   { id: "reset-view", label: "화면 리셋(줌·위치·반전)", labelKey: "studio.settings.shortcut.resetView", defaultKeys: "Shift+0" },
+  { id: "zoom-to-selection", label: "선택 영역으로 확대", labelKey: "studio.settings.shortcut.zoomToSelection", defaultKeys: "Shift+F" },
+  { id: "flip-selection-h", label: "선택 좌우 반전", labelKey: "studio.settings.shortcut.flipSelectionH", defaultKeys: "Shift+H" },
+  { id: "flip-selection-v", label: "선택 상하 반전", labelKey: "studio.settings.shortcut.flipSelectionV", defaultKeys: "Shift+V" },
   { id: "shortcuts-help", label: "단축키 도움말", labelKey: "studio.settings.shortcut.help", defaultKeys: "?" },
 ] as const;
 

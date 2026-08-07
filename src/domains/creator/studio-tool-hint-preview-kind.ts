@@ -113,6 +113,8 @@ export const STUDIO_TOOL_HINT_PREVIEW_VARIANTS = {
     "align-bottom",
     "distribute-horizontal",
     "distribute-vertical",
+    "flip-horizontal",
+    "flip-vertical",
   ],
   "lasso-fill": [],
   "marquee-rect": [],

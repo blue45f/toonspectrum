@@ -117,7 +117,7 @@ describe("Studio canvas selection interaction guards", () => {
     );
     expect(selectionGuards).toContain("selectionLockedCount > 0");
     expect(selectionGuards).toContain(
-      "잠긴 객체가 포함되어 있어 정렬·분배할 수 없어요. 선택 항목의 잠금을 모두 해제하세요.",
+      "잠긴 객체가 포함되어 있어 정렬·분배·반전할 수 없어요. 선택 항목의 잠금을 모두 해제하세요.",
     );
     expect(selectionGuards.indexOf("selectionLockedCount > 0")).toBeLessThan(
       selectionGuards.indexOf("topLevelSelectedGroupIds.size > 0"),

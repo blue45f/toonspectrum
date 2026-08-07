@@ -2907,6 +2907,8 @@ function SelectionLayoutPreview({
     "align-bottom",
     "distribute-horizontal",
     "distribute-vertical",
+    "flip-horizontal",
+    "flip-vertical",
   ] as const;
   const operation =
     operations.find((candidate) => previewVariantMatches(variant, candidate)) ?? "group";
@@ -2928,10 +2930,21 @@ function SelectionLayoutPreview({
     if (operation === "distribute-vertical") {
       return { x: item.x, y: [17, 35.5, 60][index] ?? item.y };
     }
+    // Mirror about the selection AABB (x 55..161, y 24..86), matching planStudioSelectionFlip.
+    if (operation === "flip-horizontal") {
+      return { x: 216 - (item.x + item.width), y: item.y };
+    }
+    if (operation === "flip-vertical") {
+      return { x: item.x, y: 110 - (item.y + item.height) };
+    }
     return { x: item.x, y: item.y };
   });
-  const verticalGuide = ["align-left", "align-hcenter", "align-right"].includes(operation);
-  const horizontalGuide = ["align-top", "align-vcenter", "align-bottom"].includes(operation);
+  const verticalGuide = ["align-left", "align-hcenter", "align-right", "flip-horizontal"].includes(
+    operation,
+  );
+  const horizontalGuide = ["align-top", "align-vcenter", "align-bottom", "flip-vertical"].includes(
+    operation,
+  );
   const guideX = operation === "align-left" ? 55 : operation === "align-right" ? 161 : 108;
   const guideY = operation === "align-top" ? 24 : operation === "align-bottom" ? 86 : 55;
 

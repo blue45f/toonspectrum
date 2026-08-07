@@ -104,7 +104,8 @@ describe("Studio inspector bubble-appearance boundary", () => {
     // 의도적 변경(2026-07-29): Paper Worker 경로 정리·잠금 중 취소 배선(3_960 → 4_000).
     // 의도적 변경(2026-08-05): inspector context testid 배선(4_000 → 4_010).
     // 의도적 변경(2026-08-05): empty-state coach CTA 블록(4_010 → 4_050).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_050);
+    // 의도적 변경(2026-08-07): 선택 디자인(X/Y/W/H·반전·선택 확대) 패널 배선(4_050 → 4_070).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_070);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(

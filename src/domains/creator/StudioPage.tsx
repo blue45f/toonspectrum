@@ -500,6 +500,14 @@ import {
 } from "./studio-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
 import {
+  planStudioSelectionFlip,
+  planStudioSelectionLayoutPatch,
+  planStudioZoomToSelection,
+  selectStudioFigmaDesignTargets,
+  type StudioFigmaSelectionLayoutPatch,
+  unionStudioSelectionBounds,
+} from "./studio-figma-selection-ux";
+import {
   collectOverlappingStudioFillReferenceLayers,
   composeStudioFillReferenceImageWithPageReferences,
   type StudioFillPageReference,
@@ -770,6 +778,12 @@ import {
   DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS,
   type StudioLivingInkMaterialControls,
 } from "./studio-living-ink-gpu-protocol";
+import {
+  createDefaultLivingInkInputRoutingState,
+  resolveLivingInkStrokeRoute,
+  withPencilSeen,
+  type StudioLivingInkInputRoutingState,
+} from "./studio-living-ink-input-routing";
 import {
   StudioLivingInkOverlayRenderer,
   type StudioLivingInkOverlayPresentationReceipt,
@@ -10888,6 +10902,27 @@ function StudioCuttoonEditor() {
     () => ({ ...DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS }),
   );
   const [livingInkBusy, setLivingInkBusy] = useState(false);
+  /** Dual-wield routing: once a pen has been seen, a finger draws water; barrel swaps ink/water. */
+  const livingInkInputRoutingRef = useRef<StudioLivingInkInputRoutingState>(
+    createDefaultLivingInkInputRoutingState("ink"),
+  );
+  const livingInkForceTouchRef = useRef<number | null>(null);
+  function releaseLivingInkInputPointer(): void {
+    livingInkInputRoutingRef.current = Object.freeze({
+      ...livingInkInputRoutingRef.current,
+      activePointerId: null,
+    });
+  }
+  useEffect(() => {
+    // Safari trackpad Force Touch → wash pressure. webkitForce is 1..~3.3; map to 0..1.
+    const onForce = (event: Event) => {
+      const force = (event as Event & { webkitForce?: number }).webkitForce;
+      if (typeof force !== "number" || !Number.isFinite(force)) return;
+      livingInkForceTouchRef.current = Math.min(1, Math.max(0, (force - 1) / 1.7));
+    };
+    globalThis.addEventListener("webkitmouseforcechanged", onForce as EventListener);
+    return () => globalThis.removeEventListener("webkitmouseforcechanged", onForce as EventListener);
+  }, []);
   const livingInkConfigRef = useRef<StudioLivingInkExecutionConfig | null>(null);
   const livingInkOverlaySurfaceRef = useRef<StudioLivingInkOverlaySurfaceState | null>(null);
   const livingInkStrokeRef = useRef<StudioLivingInkPinnedStroke | null>(null);
@@ -11021,6 +11056,7 @@ function StudioCuttoonEditor() {
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     livingInkStrokeRef.current = null;
+    releaseLivingInkInputPointer();
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
     setLivingInkBusy(false);
@@ -11170,25 +11206,51 @@ function StudioCuttoonEditor() {
       ? livingInkSelectionSnapshot(config)
       : null;
     if (livingInkScope === "selection" && !selection) return false;
+    // Dual-wield routing: pen draws ink, a finger after the pen has been seen draws water, and
+    // the barrel button swaps momentarily — all without touching the toolbar.
+    livingInkInputRoutingRef.current = withPencilSeen(
+      {
+        ...livingInkInputRoutingRef.current,
+        uiMode: livingInkMode,
+        activePointerId: livingInkStrokeRef.current
+          ? livingInkInputRoutingRef.current.activePointerId
+          : null,
+      },
+      pointerEvent.pointerType,
+    );
+    const route = resolveLivingInkStrokeRoute(livingInkInputRoutingRef.current, {
+      pointerId: Math.max(0, pointerEvent.pointerId),
+      pointerType: pointerEvent.pointerType,
+      buttons: pointerEvent.buttons,
+      pressure: pointerEvent.pressure,
+      forceTouch: livingInkForceTouchRef.current,
+    });
+    // Palm rests and second contacts are rejected here rather than becoming stray strokes.
+    if (!route.accept) return false;
+    livingInkInputRoutingRef.current = Object.freeze({
+      ...livingInkInputRoutingRef.current,
+      activePointerId: Math.max(0, pointerEvent.pointerId),
+      uiMode: livingInkMode,
+    });
+    // Keep the toolbar honest when the barrel or a second finger resolved a different tool.
+    if (route.mode !== livingInkMode) setLivingInkMode(route.mode);
     return livingInkCoordinatorRef.current.admitStroke({
       pageId: activePage.id,
       strokeId: element.id,
       recipe: {
-        mode: livingInkMode,
+        mode: route.mode,
         tool: "pigment-water-brush",
         baseWidth: Math.max(0.5, studioLiveBrushEffectiveDiameter(element)),
         fieldScale,
-        waterLoad: livingInkMode === "water" ? 0.9 : Math.max(0.1, livingInkMaterial.flow),
-        pigmentLoad: livingInkMode === "water" ? 0 : Math.max(0.1, livingInkMaterial.brushPigmentLoad),
+        waterLoad: route.mode === "water" ? 0.9 : Math.max(0.1, livingInkMaterial.flow),
+        pigmentLoad: route.mode === "water" ? 0 : Math.max(0.1, livingInkMaterial.brushPigmentLoad),
         color: Object.freeze([
           color[0],
           color[1],
           color[2],
           Math.max(0.01, Math.min(1, element.opacity ?? 1)),
         ]),
-        pointerSource: pointerEvent.pointerType === "pen"
-          ? "pen"
-          : pointerEvent.pointerType === "touch" ? "finger" : "mouse",
+        pointerSource: route.pointerSource,
         selection,
       },
     });
@@ -22812,6 +22874,95 @@ const puppetWarpArmed =
       patchEl(selected.id, { x: b.x + dx, y: b.y + dy } as Partial<El>);
     }
   }
+
+  /**
+   * Frame the current selection in the viewport (Figma "zoom to selection", ⇧F here —
+   * ⇧1–6 already belongs to the brush slots, so the Figma ⇧2 chord is not available).
+   */
+  function zoomToSelection() {
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
+    const selectedEls = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    if (selectedEls.length === 0) {
+      announceDrawingShortcut("확대할 요소를 먼저 선택하세요");
+      return;
+    }
+    const bounds = unionStudioSelectionBounds(selectedEls);
+    const wrap = wrapRef.current;
+    if (!bounds || !wrap) return;
+    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
+    const plan = planStudioZoomToSelection({
+      bounds,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      maxScale: maximumScale,
+      minScale: 0.15,
+    });
+    if (!plan) return;
+    // Drop any in-flight wheel/pinch gesture first: with zoom already at 1, setZoom(1) bails out,
+    // so the cancel layout effect never runs and the gesture's leftover CSS transform plus its
+    // 170ms settle would undo this framing.
+    const pendingZoomGesture = zoomGestureRef.current;
+    if (pendingZoomGesture) {
+      zoomGestureRef.current = null;
+      if (pendingZoomGesture.raf) globalThis.cancelAnimationFrame(pendingZoomGesture.raf);
+      if (pendingZoomGesture.settleTimer) globalThis.clearTimeout(pendingZoomGesture.settleTimer);
+      zoomSettleAnchorRef.current = null;
+      const zoomHost = zoomHostRef.current;
+      if (zoomHost) {
+        zoomHost.style.transform = "";
+        zoomHost.style.willChange = "";
+      }
+    }
+    setScale(plan.scale);
+    setZoom(1);
+    requestAnimationFrame(() => {
+      const host = wrapRef.current;
+      if (!host) return;
+      host.scrollLeft = plan.scrollLeft;
+      host.scrollTop = plan.scrollTop;
+    });
+    announceDrawingShortcut("선택 영역으로 확대 · ⇧F");
+  }
+
+  /** Figma Flip H/V around the selection AABB center. */
+  function flipSelected(axis: "horizontal" | "vertical") {
+    const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    if (targets.length === 0) return;
+    if (targets.some((element) => isEffectivelyLocked(element, groups))) {
+      setError("잠긴 레이어는 반전할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
+    const next = planStudioSelectionFlip(
+      elements,
+      targets.map((element) => element.id),
+      axis,
+    );
+    if (!next) return;
+    if (next.every((element, index) => element === elements[index])) {
+      announceDrawingShortcut("이 선택은 반전할 수 없어요 · 이미지나 여러 요소를 골라 보세요");
+      return;
+    }
+    // commit() refuses (and explains why via setError) while saving, review-locked or
+    // collaboration-locked — announcing a flip it rejected would be a lie to the live region.
+    if (!commit(next)) return;
+    announceDrawingShortcut(axis === "horizontal" ? "좌우 반전" : "상하 반전");
+  }
+
+  function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
+    if (!selected || marqueeIds.length > 0) return;
+    if (isEffectivelyLocked(selected, groups)) {
+      setError("잠긴 레이어는 수정할 수 없어요.");
+      return;
+    }
+    const next = planStudioSelectionLayoutPatch(selected, patch);
+    if (!next) return;
+    patchEl(selected.id, next);
+  }
+
   function reorder(dir: "front" | "back" | "forward" | "backward") {
     if (marqueeIds.length > 0) {
       reorderSelectedElements(dir);
@@ -23535,6 +23686,21 @@ const puppetWarpArmed =
         e.preventDefault();
         resetView();
         announceDrawingShortcut("화면 리셋");
+        return;
+      }
+      if (matchStudioShortcut(sc["zoom-to-selection"], e) && !e.repeat) {
+        e.preventDefault();
+        zoomToSelection();
+        return;
+      }
+      if (matchStudioShortcut(sc["flip-selection-h"], e) && !e.repeat) {
+        e.preventDefault();
+        flipSelected("horizontal");
+        return;
+      }
+      if (matchStudioShortcut(sc["flip-selection-v"], e) && !e.repeat) {
+        e.preventDefault();
+        flipSelected("vertical");
         return;
       }
       if (matchStudioShortcut(sc["deselect-pixels"], e)) {
@@ -32832,6 +32998,7 @@ const puppetWarpArmed =
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     livingInkStrokeRef.current = null;
+    releaseLivingInkInputPointer();
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
     setLivingInkBusy(false);
@@ -38295,6 +38462,9 @@ function clearSelectionForEdit() {
     addVanishingPointHandler,
     alignPerspectiveToEyeLevel,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
+    applyFigmaSelectionLayoutPatch,
     announceDrawingShortcut,
     applyBgPreset,
     applyBrushDefaultRestoreTransaction,
@@ -39317,6 +39487,8 @@ function clearSelectionForEdit() {
   commitTextTransformEnd,
     acknowledgeAiNotice,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
     applyAdvancedFillPreview,
     applyBuiltInBrushPreset,
     applyDialogueReplacePlan,

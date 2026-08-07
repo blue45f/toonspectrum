@@ -75,6 +75,11 @@ import {
   type TextEl,
 } from "./studio-element-model";
 import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
+import {
+  resolveStudioFigmaSelectionLayoutMetrics,
+  selectStudioFigmaDesignTargets,
+  type StudioFigmaSelectionLayoutPatch,
+} from "./studio-figma-selection-ux";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { type StudioFilterKind } from "./studio-filter-menu";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
@@ -199,6 +204,7 @@ import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shap
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
   type StudioHokusaiNaturalMediaReplaceHandler,
@@ -264,6 +270,9 @@ export interface StudioInspectorAsideHandlers {
   createLayerMaskFromSelection: (outside: boolean) => void;
   addVanishingPointHandler: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
+  zoomToSelection: () => void;
+  flipSelected: (axis: "horizontal" | "vertical") => void;
+  applyFigmaSelectionLayoutPatch: (patch: StudioFigmaSelectionLayoutPatch) => void;
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
   applyBrushDefaultRestoreTransaction: (
@@ -1085,6 +1094,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     createLayerMaskFromSelection,
     addVanishingPointHandler,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
+    applyFigmaSelectionLayoutPatch,
     announceDrawingShortcut,
     applyBgPreset,
     applyBrushDefaultRestoreTransaction,
@@ -1686,6 +1698,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onPatch={patchPageGrade}
             onReset={resetPageGrade}
           />
+          {/* Outside the `selected` branch on purpose: a marquee selection has no single
+              `selected` element, and position/flip/frame are exactly what it needs. */}
+          {inspectorContentMode === "selection" && (
+            <div hidden={inspectorLayout.primary !== "properties"}>
+              <StudioFigmaDesignPanel
+                metrics={resolveStudioFigmaSelectionLayoutMetrics(
+                  selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
+                )}
+                disabled={inspectorInteractionPolicy.selection.disabled}
+                onChange={applyFigmaSelectionLayoutPatch}
+                onZoomToSelection={zoomToSelection}
+                onFlipHorizontal={() => flipSelected("horizontal")}
+                onFlipVertical={() => flipSelected("vertical")}
+              />
+            </div>
+          )}
+
           {inspectorContentMode === "selection" && selected && (
             <div
               role="tabpanel"
@@ -1725,6 +1754,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <legend className="sr-only">선택 요소 편집 설정</legend>
                 <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
+
               {selected.type === "draw" && (
                 <div className="space-y-3">
                   <StudioInspectorSelectionStrokeControls

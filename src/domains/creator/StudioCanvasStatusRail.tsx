@@ -5,12 +5,15 @@ import {
   AlignLeft,
   AlignRight,
   Combine,
+  FlipHorizontal2,
+  FlipVertical2,
   FolderMinus,
   FolderPlus,
   Lock,
   LockOpen,
   Loader2,
   PaintBucket,
+  ScanSearch,
 } from "lucide-react";
 
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -119,6 +122,33 @@ const SELECTION_LAYOUT_HINTS = {
     preview: "selection-layout",
     previewVariant: "distribute-vertical",
   },
+  zoomToSelection: {
+    id: "selection-layout-zoom-to-selection",
+    title: "선택 영역으로 확대",
+    description:
+      "선택 범위가 화면 대부분을 채우도록 확대합니다. Figma의 Zoom to selection과 같은 빠른 포커스예요.",
+    tip: "단축키 ⇧F",
+    preview: "zoom-view",
+    previewVariant: "zoom-in",
+  },
+  flipH: {
+    id: "selection-layout-flip-horizontal",
+    title: "좌우 반전",
+    description:
+      "선택 범위 중심을 기준으로 좌우로 뒤집습니다. 이미지는 그림까지 미러링되고, 여러 개를 골랐다면 배치가 뒤집혀요.",
+    tip: "단축키 ⇧H",
+    preview: "selection-layout",
+    previewVariant: "flip-horizontal",
+  },
+  flipV: {
+    id: "selection-layout-flip-vertical",
+    title: "상하 반전",
+    description:
+      "선택 범위 중심을 기준으로 상하로 뒤집습니다. 이미지는 그림까지 미러링되고, 여러 개를 골랐다면 배치가 뒤집혀요.",
+    tip: "단축키 ⇧V",
+    preview: "selection-layout",
+    previewVariant: "flip-vertical",
+  },
 } as const;
 
 export type StudioCanvasSelectionAlignment =
@@ -224,6 +254,9 @@ export interface StudioCanvasStatusRailProps {
   onToggleSelectionLock?: () => void;
   onReorderSelection?: (direction: "front" | "back") => void;
   onAlignSelection: (alignment: StudioCanvasSelectionAlignment) => void;
+  /** Figma-like zoom-to-selection / flip affordances on the selection chip strip. */
+  onZoomToSelection?: () => void;
+  onFlipSelection?: (axis: "horizontal" | "vertical") => void;
   /** 다중 선택에 병합 가능한 말풍선(2개 이상)이 있어 "말풍선 병합" 액션을 노출할지. */
   showBubbleMerge?: boolean;
   /** 병합 비활성 사유(null이면 활성) — 혼합 선택·개수 범위 초과 시 툴팁으로 안내. */
@@ -260,6 +293,8 @@ export function StudioCanvasStatusRail({
   onToggleSelectionLock,
   onReorderSelection,
   onAlignSelection,
+  onZoomToSelection,
+  onFlipSelection,
   showBubbleMerge = false,
   bubbleMergeDisabledReason = null,
   onMergeBubbles,
@@ -466,6 +501,51 @@ export function StudioCanvasStatusRail({
                 >
                   <ArrowDownToLine size={13} aria-hidden />
                 </SelectionLayoutAction>
+              </div>
+            ) : null}
+            {onZoomToSelection || onFlipSelection ? (
+              <div
+                className="inline-flex shrink-0 gap-0.5 rounded-md border border-line bg-card/50 p-0.5"
+                role="group"
+                aria-label="선택 보기 · 반전"
+              >
+                {onZoomToSelection ? (
+                  <SelectionLayoutAction
+                    hint={SELECTION_LAYOUT_HINTS.zoomToSelection}
+                    label="선택 영역으로 확대"
+                    onClick={onZoomToSelection}
+                    ariaKeyShortcuts="Shift+F"
+                    className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                  >
+                    <ScanSearch size={13} aria-hidden />
+                  </SelectionLayoutAction>
+                ) : null}
+                {onFlipSelection ? (
+                  <>
+                    <SelectionLayoutAction
+                      hint={SELECTION_LAYOUT_HINTS.flipH}
+                      label="선택 좌우 반전"
+                      onClick={() => onFlipSelection("horizontal")}
+                      ariaKeyShortcuts="Shift+H"
+                      disabled={alignmentSelectionDisabledReason !== null}
+                      unavailableReason={alignmentSelectionDisabledReason ?? undefined}
+                      className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                    >
+                      <FlipHorizontal2 size={13} aria-hidden />
+                    </SelectionLayoutAction>
+                    <SelectionLayoutAction
+                      hint={SELECTION_LAYOUT_HINTS.flipV}
+                      label="선택 상하 반전"
+                      onClick={() => onFlipSelection("vertical")}
+                      ariaKeyShortcuts="Shift+V"
+                      disabled={alignmentSelectionDisabledReason !== null}
+                      unavailableReason={alignmentSelectionDisabledReason ?? undefined}
+                      className="cursor-pointer rounded p-1 text-fg-3 hover:bg-raised hover:text-fg"
+                    >
+                      <FlipVertical2 size={13} aria-hidden />
+                    </SelectionLayoutAction>
+                  </>
+                ) : null}
               </div>
             ) : null}
             <div className="mx-1 h-4 w-px shrink-0 bg-line/60" />
