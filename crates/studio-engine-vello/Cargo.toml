@@ -47,3 +47,7 @@ codegen-units = 1
 vello = "0.9"
 velato = "0.11"
 pollster = "0.4"
+# V12 lane 5 재개 게이트 2단계: tests/wgsl_variant_validation.rs가 커밋 WGSL
+# variant 코퍼스(tests/corpus/wgsl-variants/)를 naga로 전수 파싱+검증한다.
+# 버전은 wgpu 경유로 이미 Cargo.lock에 있는 29.0.x 와 통일.
+naga = { version = "29.0", features = ["wgsl-in"] }

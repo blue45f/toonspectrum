@@ -1288,6 +1288,7 @@ name = "studio-engine-vello"
 version = "0.1.0"
 dependencies = [
  "js-sys",
+ "naga",
  "parley",
  "pollster",
  "serde",

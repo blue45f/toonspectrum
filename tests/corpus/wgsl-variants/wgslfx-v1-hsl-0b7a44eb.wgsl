@@ -1,0 +1,50 @@
+// wgsl-variant wgslfx-v1-hsl-0b7a44eb
+// structure: v1:hsl[hue]
+struct Params {
+  pixel_count : u32,
+  _pad0 : u32,
+  _pad1 : u32,
+  _pad2 : u32,
+  s0_row_r : vec4<f32>,
+  s0_row_g : vec4<f32>,
+  s0_row_b : vec4<f32>,
+}
+
+@group(0) @binding(0) var<storage, read> src : array<u32>;
+@group(0) @binding(1) var<storage, read_write> dst : array<u32>;
+@group(0) @binding(2) var<uniform> params : Params;
+
+fn studio_unpack_r(texel : u32) -> f32 { return f32(texel & 0xffu); }
+fn studio_unpack_g(texel : u32) -> f32 { return f32((texel >> 8u) & 0xffu); }
+fn studio_unpack_b(texel : u32) -> f32 { return f32((texel >> 16u) & 0xffu); }
+fn studio_unpack_a(texel : u32) -> u32 { return (texel >> 24u) & 0xffu; }
+
+fn studio_quantize_byte(value : f32) -> u32 {
+  return u32(clamp(round(value), 0.0, 255.0));
+}
+
+fn studio_repack(r : u32, g : u32, b : u32, a : u32) -> u32 {
+  return r | (g << 8u) | (b << 16u) | (a << 24u);
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  let i = gid.y * 16384u + gid.x;
+  if (i >= params.pixel_count) { return; }
+  let texel = src[i];
+  var r : u32 = texel & 0xffu;
+  var g : u32 = (texel >> 8u) & 0xffu;
+  var b : u32 = (texel >> 16u) & 0xffu;
+  let a = studio_unpack_a(texel);
+  // stage 0: hsl (nativeHSL matrix rows via uniform)
+  {
+    let p = vec4<f32>(f32(r), f32(g), f32(b), 1.0);
+    let hr = studio_quantize_byte(dot(p, params.s0_row_r));
+    let hg = studio_quantize_byte(dot(p, params.s0_row_g));
+    let hb = studio_quantize_byte(dot(p, params.s0_row_b));
+    r = hr;
+    g = hg;
+    b = hb;
+  }
+  dst[i] = studio_repack(r, g, b, a);
+}
