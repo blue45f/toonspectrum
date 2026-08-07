@@ -88,3 +88,6 @@ test-accounts.local.*
 /*.jpeg
 /*.jpg
 /*.png
+
+# cargo build artifacts
+crates/*/target/
