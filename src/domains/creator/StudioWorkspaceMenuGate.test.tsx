@@ -58,6 +58,34 @@ describe("StudioWorkspaceMenuGate", () => {
     expect(html).toContain(">세션</span>");
   });
 
+  it("lets only the workspace name absorb width pressure so status badges stay inside the chip", () => {
+    const gateSource = readFileSync(
+      fileURLToPath(new URL("./StudioWorkspaceMenuGate.tsx", import.meta.url)),
+      "utf8"
+    );
+    const menuSource = readFileSync(
+      fileURLToPath(new URL("./StudioWorkspaceMenu.tsx", import.meta.url)),
+      "utf8"
+    );
+
+    for (const source of [gateSource, menuSource]) {
+      const classLine = source
+        .slice(source.indexOf("inline-flex min-h-11"))
+        .split("\n")[0];
+      expect(classLine).toContain("max-w-52");
+      // `overflow-hidden` 은 flex 자동 최소 크기를 0 으로 풀어 배지가 잘리게 만든다.
+      // 겹침은 이름 truncate 로 이미 흡수되므로 이 칩에는 넣지 않는다(2026-08-09 실측).
+      expect(classLine).not.toContain("overflow-hidden");
+    }
+    // 유일한 shrink 대상은 이름이고, 두 상태 배지는 shrink-0 로 남는다.
+    expect(gateSource).toContain('<span className="min-w-0 truncate">');
+    expect(gateSource).toContain('className="shrink-0 rounded-full bg-warn/15');
+    expect(gateSource).toContain('className="shrink-0 rounded-full bg-cool/15');
+    expect(menuSource).toContain('<span className="min-w-0 truncate">');
+    expect(menuSource).toContain('className="shrink-0 rounded-full bg-warn/15');
+    expect(menuSource).toContain('className="shrink-0 rounded-full bg-cool/15');
+  });
+
   it("uses one analyzable lazy import and all three intent preload signals", () => {
     const source = readFileSync(
       fileURLToPath(new URL("./StudioWorkspaceMenuGate.tsx", import.meta.url)),

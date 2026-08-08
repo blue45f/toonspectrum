@@ -852,10 +852,64 @@ export function summarizeStudioRasterPreparationSources(
   return analyzeStudioRasterPreparationSources(input).summary;
 }
 
+/**
+ * The preflight's loss labels are authored for the SVG export dialog ("…는 SVG에 없어…"), which is
+ * the wrong vocabulary the moment the same label surfaces on a filter: an artist reading it learns
+ * nothing about what to do next. Fail-closed is right — a filter must never quietly produce
+ * something other than what is on screen — so the copy, not the gate, is what changes here. Each
+ * known blocker maps to the edit that clears it; anything unmapped falls back to the one action
+ * that always works (bake that layer to an image first).
+ */
+const FIDELITY_ACTIONS: readonly { readonly match: RegExp; readonly action: string }[] = [
+  {
+    match: /자동 줄바꿈/u,
+    action:
+      "말풍선·글상자의 글이 상자보다 길어 자동으로 줄이 바뀝니다. 상자를 조금 넓히거나 원하는 자리에서 엔터로 줄을 나눈 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /지우개/u,
+    action:
+      "지우개로 지운 자국이 남은 그리기 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /세로쓰기/u,
+    action:
+      "세로쓰기 안의 영문·숫자 구간은 줄 나눔이 화면과 조금 달라질 수 있습니다. 해당 텍스트를 가로쓰기로 바꾸거나 이미지로 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /외부 주소/u,
+    action:
+      "인터넷 주소로 연결된 이미지가 있습니다. 그 이미지를 작업 파일에 넣어 두거나(다시 올리기) 잠시 숨긴 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /혼합 모드|클리핑 마스크|아래 레이어로 자르기/u,
+    action:
+      "혼합 모드나 아래 레이어로 자르기가 걸린 레이어가 있습니다. 그 레이어를 먼저 아래 레이어와 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /픽셀 필터·색보정/u,
+    action:
+      "이미 색보정이 걸려 있는 이미지 레이어가 있습니다. 그 보정을 레이어에 먼저 적용(병합)한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /중복 요소 id|연결되지 않은 레이어 그룹|레이어 그룹 변형|올바르지 않습니다/u,
+    action:
+      "레이어 구조가 어긋난 요소가 있습니다. 문제 레이어를 그룹에서 꺼내거나 지운 뒤 다시 시도해 주세요.",
+  },
+];
+
+const FIDELITY_FALLBACK_ACTION =
+  "화면과 똑같이 합칠 수 없는 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.";
+
+function fidelityAction(label: string): string {
+  return FIDELITY_ACTIONS.find((entry) => entry.match.test(label))?.action
+    ?? FIDELITY_FALLBACK_ACTION;
+}
+
 function fidelityReason(labels: readonly string[]): string {
-  const unique = [...new Set(labels)].slice(0, 3);
-  const detail = unique.length > 0 ? ` (${unique.join(" · ")})` : "";
-  return `일부 표시 요소를 화면과 똑같이 합성할 수 없어 편집용 복사본을 만들지 않았습니다${detail}. 지원되지 않는 합성이나 지우개 획을 먼저 정리해 주세요.`;
+  const actions = [...new Set(labels.map(fidelityAction))].slice(0, 2);
+  const detail = actions.length > 0 ? ` ${actions.join(" ")}` : ` ${FIDELITY_FALLBACK_ACTION}`;
+  return `화면에 보이는 그대로 만들 수 없어 아무것도 바꾸지 않았습니다.${detail}`;
 }
 
 /**

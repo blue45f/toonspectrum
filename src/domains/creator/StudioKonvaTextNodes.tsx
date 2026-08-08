@@ -16,7 +16,12 @@ import {
 } from "./studio-gradient-engine";
 import { textNodeProps } from "./studio-node-props";
 import { toKonvaSkewAttrs } from "./studio-skew";
-import { buildTextPathData, isFlatTextPath, normalizeTextPath } from "./studio-text-path";
+import {
+  buildTextPathData,
+  isFlatTextPath,
+  normalizeTextPath,
+  textPathAdvanceWidth,
+} from "./studio-text-path";
 
 import type { El } from "./studio-element-model";
 import type Konva from "konva";
@@ -75,6 +80,15 @@ export function StudioKonvaTextNode({
   });
 
   if (el.textPath && !isFlatTextPath(normalizeTextPath(el.textPath))) {
+    // 경로는 요소 박스 폭이 아니라 **글자가 실제로 먹는 폭**을 담아야 한다 — Konva TextPath는
+    // 경로 길이를 넘는 글자를 조용히 버린다(studio-text-path의 "경로 길이 = 글자 예산").
+    const pathAdvance = textPathAdvanceWidth({
+      text: el.text,
+      fontSize: el.fontSize,
+      fontFamily: el.font ?? "Pretendard, sans-serif",
+      fontStyle: el.fontStyle ?? "bold",
+      letterSpacing: el.letterSpacing ?? 0,
+    });
     return (
       <KTextPath
         studioElementId={el.id}
@@ -83,14 +97,15 @@ export function StudioKonvaTextNode({
         text={el.text}
         x={el.x}
         y={el.y}
-        data={buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize)}
+        data={buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize, pathAdvance)}
         fontSize={el.fontSize}
         fill={el.fillType === "gradient" ? undefined : el.fill}
         {...(el.fillType === "gradient"
           ? konvaGradientProps(
               el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
               // 곡선 텍스트 로컬 bbox 근사 — baseline(fontSize×1.4) 중심으로 위아래 글자 폭 커버.
-              { x: 0, y: 0, width: Math.max(1, el.width), height: el.fontSize * 2.8 },
+              // 폭은 박스가 아니라 글자가 실제로 뻗는 길이 기준(경로가 박스보다 길어질 수 있다).
+              { x: 0, y: 0, width: Math.max(1, el.width, pathAdvance), height: el.fontSize * 2.8 },
             )
           : {})}
         stroke={el.stroke}

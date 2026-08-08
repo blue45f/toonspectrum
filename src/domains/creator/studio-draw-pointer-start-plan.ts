@@ -22,6 +22,7 @@ import {
   resolveStudioStampBrushKind,
   type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
+import { resolveStudioCalligraphyAuthoringTip } from "./studio-calligraphy-nib-profile";
 import { captureStudioDrawPointerPressureContract } from "./studio-draw-pointer-pressure-contract";
 import { captureStudioPointerStartInkChannels } from "./studio-draw-pointer-start-ink-channels";
 import { normalizeStudioBrushCatalogIdentityMetadata, type DrawEl } from "./studio-element-model";
@@ -246,7 +247,11 @@ export function planStudioDrawPointerStart(
     ...pressureContract,
     ...brushCatalogIdentity,
     ...(outlineStroke ? { outlineStroke } : {}),
-    brushTip: drawMode === "pen" && brush === "calligraphy" ? { ...brushTip } : undefined,
+    // The inspector tip belongs to the `calligraphy` brush; every other family member is sold
+    // with its own nib and must persist that instead of silently inheriting a 45° default.
+    brushTip: drawMode === "pen"
+      ? resolveStudioCalligraphyAuthoringTip(brush, brushTip)
+      : undefined,
     stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,

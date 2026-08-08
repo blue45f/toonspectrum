@@ -1130,6 +1130,8 @@ export function StudioWorkspaceMenu({
         aria-controls={dialogId}
         aria-label={`작업공간: ${activeWorkspace?.name ?? "알 수 없음"}${dirty ? ", 저장되지 않은 배치 변경 있음" : ""}${effectivePersistence.status === "session-only" ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨"}`}
         className={cn(
+          // StudioWorkspaceMenuGate 트리거와 같은 칩 박스 규약(이름만 shrink, 배지는 shrink-0).
+          // `overflow-hidden` 을 더하지 않는 이유는 그쪽 주석 참고 — 배지를 잘리게 만든다.
           "inline-flex min-h-11 max-w-52 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg pointer-coarse:min-h-11 lg:min-h-8",
           open && "border-accent/60 bg-accent-soft text-fg",
           focusClass

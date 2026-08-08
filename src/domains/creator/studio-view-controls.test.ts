@@ -33,7 +33,9 @@ describe("studio view shortcuts", () => {
     [{ code: "Home" }, "fit-width"],
     [{ code: "End" }, "actual-pixels"],
     [{ code: "F11" }, "fullscreen"],
-    [{ code: "KeyQ" }, "toggle-grayscale"],
+    // 색각 검수 흑백 명암은 `⌥Q`. 단독 `Q` 는 퀵 마스크가 갖는다
+    // (conflict `q-quickmask-vs-grayscale` 해소, 2026-08-08).
+    [{ code: "KeyQ", altKey: true }, "toggle-grayscale"],
     [{ code: "KeyS", shiftKey: true }, "save-view"],
     [{ code: "KeyZ", shiftKey: true }, "restore-view"],
     [{ code: "KeyG", shiftKey: true }, "toggle-perspective-guide"],
@@ -44,10 +46,20 @@ describe("studio view shortcuts", () => {
   it("keeps modifier aliases and composing input available to other handlers", () => {
     expect(resolveStudioViewShortcut({ code: "Equal", metaKey: true })).toBeNull();
     expect(resolveStudioViewShortcut({ code: "Minus", ctrlKey: true })).toBeNull();
-    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true, metaKey: true })).toBeNull();
     expect(resolveStudioViewShortcut({ code: "KeyS", shiftKey: true, repeat: true })).toBeNull();
-    expect(resolveStudioViewShortcut({ code: "KeyQ", isComposing: true })).toBeNull();
-    expect(resolveStudioViewShortcut({ code: "KeyQ", keyCode: 229 })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true, isComposing: true })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true, keyCode: 229 })).toBeNull();
+  });
+
+  it("leaves a bare Q to the quick-mask handler and never fires grayscale from it", () => {
+    // 감사 D5: 캔버스 포커스에서 `Q` 가 색각 검수를 켜서 퀵 마스크 배지가 거짓이 됐다.
+    expect(resolveStudioViewShortcut({ code: "KeyQ" })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", key: "q" })).toBeNull();
+    // `⇧Q` 는 빠른 액세스 팔레트(StudioPage)의 것이므로 보기 리졸버가 삼키면 안 된다.
+    expect(resolveStudioViewShortcut({ code: "KeyQ", shiftKey: true })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true, shiftKey: true })).toBeNull();
+    expect(resolveStudioViewShortcut({ code: "KeyQ", altKey: true, repeat: true })).toBeNull();
   });
 
   it("allows held zoom keys but prevents repeated toggles", () => {

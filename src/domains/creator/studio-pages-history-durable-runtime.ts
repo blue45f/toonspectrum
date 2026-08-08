@@ -9,6 +9,7 @@ import {
 import {
   createStudioOpfsRecoveryJournal,
   createStudioOpfsRecoveryJournalAdapter,
+  describeStudioOpfsRecoveryJournalError,
   StudioOpfsRecoveryJournalError,
   type StudioOpfsRecoveryAppendInput,
   type StudioOpfsRecoveryCheckpointInput,
@@ -583,10 +584,18 @@ export function createStudioPagesHistoryIndexedDbRecoveryVault(input: {
       return withState("readwrite", signal, async (state, store) => {
         const acquiredAt = now();
         if (state.lease && state.lease.expiresAt > acquiredAt) {
-          throw new StudioOpfsRecoveryJournalError(
+          // 사용자 문구와 내부 식별자를 분리한다 — OPFS 저널 쪽과 같은 계약.
+          const busy = new StudioOpfsRecoveryJournalError(
             "LEASE_BUSY",
-            `다른 writer(${state.lease.ownerId})가 IndexedDB history recovery를 사용 중입니다.`,
+            "이 작품의 작업 내역 복구 저장소를 다른 탭이나 창이 사용하고 있어요.",
+            {
+              diagnostics:
+                `lease ownerId=${state.lease.ownerId} epoch=${state.lease.epoch}`
+                + ` expiresInMs=${state.lease.expiresAt - acquiredAt}`,
+            },
           );
+          console.warn(describeStudioOpfsRecoveryJournalError(busy));
+          throw busy;
         }
         const lease: StoredHistoryRecoveryLease = {
           documentId: input.identity.documentId,

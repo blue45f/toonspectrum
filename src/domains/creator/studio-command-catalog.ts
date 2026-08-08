@@ -239,7 +239,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    measuredCount: 169,
+    measuredCount: 185,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -381,7 +381,9 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "brush/import-pack",
   "brush/bg",
   "brush/style",
-  // filter (35)
+  // filter (51) — 마지막 필터 + 코어 5 + 레이어 보정 2 + 필터 팩 43.
+  // 팩 구간은 studio-filter-pack-registry.ts 의 STUDIO_FILTER_PACK_KINDS 순서 그대로다:
+  // 메뉴가 그 배열을 순회하므로 여기 순서를 임의로 바꾸면 드리프트 가드가 즉시 깨진다.
   "filter/last-filter",
   "filter/gaussian-blur",
   "filter/motion-blur",
@@ -393,6 +395,11 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/mosaic",
   "filter/radial-blur",
   "filter/zoom-blur",
+  "filter/lens-blur",
+  "filter/field-iris-blur",
+  "filter/tilt-shift-blur",
+  "filter/selective-gaussian-blur",
+  "filter/tileable-blur",
   "filter/chromatic-aberration",
   "filter/glitch",
   "filter/scanline",
@@ -403,11 +410,6 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/threshold",
   "filter/oil-paint",
   "filter/surface-blur",
-  "filter/lens-blur",
-  "filter/field-iris-blur",
-  "filter/tilt-shift-blur",
-  "filter/selective-gaussian-blur",
-  "filter/tileable-blur",
   "filter/line-cleanup",
   "filter/screentone-removal",
   "filter/jpeg-artifact-reduction",
@@ -417,6 +419,22 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/color-to-alpha",
   "filter/duotone",
   "filter/noise-add",
+  "filter/wave-warp",
+  "filter/ripple-warp",
+  "filter/fisheye",
+  "filter/twirl",
+  "filter/pinch-bloat",
+  "filter/lens-distortion",
+  "filter/film-grain-pro",
+  "filter/salt-pepper",
+  "filter/rgb-noise",
+  "filter/perlin-texture",
+  "filter/pointillize",
+  "filter/stained-glass",
+  "filter/poster-edges",
+  "filter/photocopy",
+  "filter/normal-map",
+  "filter/god-rays",
   // vector (2) — lifted out of insert, plus the eraser's vector mode
   "vector/elements",
   "vector/erase-to-intersection",
@@ -811,7 +829,10 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
         quickAccess("quick-mask", { shortcut: "Q" }),
         help("edit.quickMask", { shortcut: "Q" }),
       ],
-      note: "`Q` 를 view.color-vision-grayscale 도 주장한다 — conflict `q-quickmask-vs-grayscale`.",
+      note:
+        "2026-08-08: 단독 `Q` 는 이 명령만의 것이다. view.color-vision-grayscale 이 같이 주장하던 충돌"
+        + "(`q-quickmask-vs-grayscale`)은 grayscale 을 `⌥Q` 로 옮겨 해소했다. 도달 조건(편집 가능한"
+        + " 이미지 레이어 선택)은 선택 메뉴 행이 `disabled` + 사유로 화면에 적는다.",
     }),
 
     /* --------------------------------------------------------------- layer */
@@ -843,22 +864,21 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "layer.send-back",
       labels: [ko("레이어 · 맨 뒤로"), en("Send to back")],
       aliases: [csp("맨 뒤로"), ps("Send to Back"), krita("Move Layer to Bottom")],
-      shortcut: "⌘[",
+      shortcut: "⌘⇧[",
       origins: [
-        menu("layer/send-back", { shortcut: "⌘[" }),
-        editMenu("send-back", { shortcut: "⌘[" }),
+        menu("layer/send-back", { shortcut: "⌘⇧[" }),
+        editMenu("send-back", { shortcut: "⌘⇧[" }),
         help("layers.backward", { shortcut: "⌘[ · ⌘⇧[" }),
       ],
-      note: "Photoshop 은 맨 뒤로가 ⌘⇧[ 다 — conflict `layer-order-chord-inversion`.",
     }),
     defineCommand({
       id: "layer.send-backward",
       labels: [ko("레이어 · 뒤로"), en("Send backward")],
       aliases: [csp("뒤로"), ps("Send Backward"), krita("Lower Layer")],
-      shortcut: "⌘⇧[",
+      shortcut: "⌘[",
       origins: [
-        menu("layer/send-backward", { shortcut: "⌘⇧[" }),
-        editMenu("send-backward", { shortcut: "⌘⇧[" }),
+        menu("layer/send-backward", { shortcut: "⌘[" }),
+        editMenu("send-backward", { shortcut: "⌘[" }),
         help("layers.backward", { shortcut: "⌘[ · ⌘⇧[" }),
       ],
     }),
@@ -1004,11 +1024,13 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "view.color-vision-grayscale",
       labels: [ko("색각 검수 · 흑백 명암"), en("Color vision proof · grayscale")],
       aliases: [ps("Proof Colors · Grayscale"), krita("Grayscale Preview")],
-      shortcut: "Q",
+      shortcut: "⌥Q",
       origins: [
-        menu("view/color-vision-grayscale", { shortcut: "Q" }),
+        menu("view/color-vision-grayscale", { shortcut: "⌥Q" }),
       ],
-      note: "`Q` 를 select.quick-mask 도 주장한다 — conflict `q-quickmask-vs-grayscale`.",
+      note:
+        "2026-08-08: 원래 `Q` 였으나 select.quick-mask 와 같은 배지를 달고 선택 상태에 따라 갈렸다"
+        + "(conflict `q-quickmask-vs-grayscale`). `⇧Q` 는 빠른 액세스 팔레트가 쓰므로 `⌥Q` 로 옮겼다.",
     }),
     defineCommand({
       id: "view.color-vision-protanopia",
@@ -1871,6 +1893,104 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [ps("Add Noise"), krita("Random Noise"), procreate("Noise")],
       origins: [menu("filter/noise-add")],
     }),
+    // 필터 유니온 웨이브 16종. 엔진·다이얼로그·검색 메타데이터는 이미 출하돼 있었지만
+    // 메뉴 행이 없어 갤러리 검색으로만 도달할 수 있었다 — 이 16개가 그 문이다.
+    defineCommand({
+      id: "filter.wave-warp",
+      labels: [ko("사인 웨이브"), en("Wave warp")],
+      aliases: [ps("Wave"), krita("Wave")],
+      origins: [menu("filter/wave-warp")],
+    }),
+    defineCommand({
+      id: "filter.ripple-warp",
+      labels: [ko("원형 리플"), en("Ripple warp")],
+      aliases: [ps("Ripple"), krita("Ripple")],
+      origins: [menu("filter/ripple-warp")],
+    }),
+    defineCommand({
+      id: "filter.fisheye",
+      labels: [ko("어안 렌즈"), en("Fisheye")],
+      aliases: [ps("Spherize"), krita("Lens Correction · barrel")],
+      origins: [menu("filter/fisheye")],
+    }),
+    defineCommand({
+      id: "filter.twirl",
+      labels: [ko("트월 회전"), en("Twirl")],
+      aliases: [ps("Twirl"), krita("Twirl")],
+      origins: [menu("filter/twirl")],
+    }),
+    defineCommand({
+      id: "filter.pinch-bloat",
+      labels: [ko("핀치 / 블로트"), en("Pinch / bloat")],
+      aliases: [ps("Pinch"), ours("핀치 · 블로트")],
+      origins: [menu("filter/pinch-bloat")],
+    }),
+    defineCommand({
+      id: "filter.lens-distortion",
+      labels: [ko("렌즈 왜곡 보정"), en("Lens distortion")],
+      aliases: [ps("Lens Correction"), krita("Lens Correction")],
+      origins: [menu("filter/lens-distortion")],
+    }),
+    defineCommand({
+      id: "filter.film-grain-pro",
+      labels: [ko("시네마 필름 그레인"), en("Cinema film grain")],
+      aliases: [ps("Film Grain"), krita("Film Grain")],
+      origins: [menu("filter/film-grain-pro")],
+    }),
+    defineCommand({
+      id: "filter.salt-pepper",
+      labels: [ko("소금·후추 노이즈"), en("Salt and pepper noise")],
+      aliases: [krita("Random Pick"), ours("소금 후추 노이즈")],
+      origins: [menu("filter/salt-pepper")],
+    }),
+    defineCommand({
+      id: "filter.rgb-noise",
+      labels: [ko("RGB 채널 노이즈"), en("RGB channel noise")],
+      aliases: [krita("Noise · RGB"), ours("채널 노이즈")],
+      origins: [menu("filter/rgb-noise")],
+    }),
+    defineCommand({
+      id: "filter.perlin-texture",
+      labels: [ko("프랙탈 밸류 텍스처"), en("Fractal value texture")],
+      aliases: [ps("Clouds · Difference"), krita("Pattern · fractal")],
+      origins: [menu("filter/perlin-texture")],
+    }),
+    defineCommand({
+      id: "filter.pointillize",
+      labels: [ko("포인틸리즘"), en("Pointillize")],
+      aliases: [ps("Pointillize"), krita("Halftone · dots")],
+      origins: [menu("filter/pointillize")],
+    }),
+    defineCommand({
+      id: "filter.stained-glass",
+      labels: [ko("스테인드글라스"), en("Stained glass")],
+      aliases: [ps("Stained Glass"), krita("Halftone · cells")],
+      origins: [menu("filter/stained-glass")],
+    }),
+    defineCommand({
+      id: "filter.poster-edges",
+      labels: [ko("포스터 엣지"), en("Poster edges")],
+      aliases: [ps("Poster Edges"), csp("포스터화")],
+      origins: [menu("filter/poster-edges")],
+    }),
+    defineCommand({
+      id: "filter.photocopy",
+      labels: [ko("고대비 포토카피"), en("Photocopy")],
+      aliases: [ps("Photocopy"), krita("Threshold · high contrast")],
+      origins: [menu("filter/photocopy")],
+    }),
+    defineCommand({
+      id: "filter.normal-map",
+      labels: [ko("노멀 맵 변환"), en("Normal map")],
+      aliases: [ps("Generate Normal Map"), krita("Height to Normal Map")],
+      origins: [menu("filter/normal-map")],
+    }),
+    defineCommand({
+      id: "filter.god-rays",
+      labels: [ko("볼류메트릭 광선"), en("God rays")],
+      aliases: [ps("Radial Blur · zoom light"), ours("갓 레이")],
+      origins: [menu("filter/god-rays")],
+    }),
 
     /* ------------------------------------------------------------------ ai */
     defineCommand({
@@ -2159,22 +2279,6 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
  */
 export const COMMAND_CONFLICTS: readonly StudioCommandConflict[] = Object.freeze([
   {
-    id: "q-quickmask-vs-grayscale",
-    kind: "shortcut-collision",
-    key: "Q",
-    commandIds: ["select.quick-mask", "view.color-vision-grayscale"],
-    detail:
-      "퀵 마스크와 색각 검수 흑백 명암이 같은 `Q` 를 주장한다. 메뉴는 grayscale 을, 도움말은 quick mask 를 문서화해 두 문서가 서로 어긋난다.",
-    evidence: [
-      "StudioPage.tsx:23732 (quick mask)",
-      "studio-view-controls.ts:695 (grayscale)",
-      "studio-main-menu-groups.ts:703 (메뉴는 grayscale=Q)",
-      "StudioShortcutsHelp.tsx:96 (도움말은 quick mask=Q)",
-    ],
-    resolution:
-      "키맵 흡수(1단계)에서 `Q`=select.quick-mask 로 고정하고 grayscale 은 `⇧Q` 계열로 이전하거나 chord 없이 메뉴 전용으로 둔다. 결정 전까지 두 문서를 같은 값으로 맞춘다.",
-  },
-  {
     id: "shift-s-saveview-vs-sizelock",
     kind: "shortcut-collision",
     key: "⇧S",
@@ -2218,21 +2322,6 @@ export const COMMAND_CONFLICTS: readonly StudioCommandConflict[] = Object.freeze
     ],
     resolution:
       "두 명령을 분리 유지하고, `Delete` 는 컨텍스트에 따라 둘 중 하나로 라우팅하는 단일 디스패처를 둔다. 메뉴·팔레트 라벨을 '내용 지우기' / '요소 삭제'로 구분한다.",
-  },
-  {
-    id: "layer-order-chord-inversion",
-    kind: "shortcut-divergence",
-    commandIds: ["layer.send-back", "layer.send-backward"],
-    detail:
-      "앞으로 보내기 쌍은 Photoshop 과 같지만(맨 위 ⌘⇧], 위 ⌘]), 뒤로 보내기 쌍은 뒤집혀 있다(맨 뒤 ⌘[, 뒤 ⌘⇧[). Photoshop·CSP 는 맨 뒤가 ⌘⇧[ 다.",
-    evidence: [
-      "studio-edit-controls.ts:76 (bring-front ⌘⇧])",
-      "studio-edit-controls.ts:82 (bring-forward ⌘])",
-      "studio-edit-controls.ts:88 (send-back ⌘[)",
-      "studio-edit-controls.ts:94 (send-backward ⌘⇧[)",
-    ],
-    resolution:
-      "메뉴 흡수(2단계)에서 send-back=⌘⇧[, send-backward=⌘[ 로 정정한다. 사용자 키맵 마이그레이션이 필요하므로 단독 커밋으로 분리한다.",
   },
   {
     id: "zoom-chord-divergence",

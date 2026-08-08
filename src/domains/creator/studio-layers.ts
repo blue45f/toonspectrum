@@ -13,7 +13,18 @@
 export type LayerGroup = { id: string; name: string; collapsed?: boolean; hidden?: boolean; locked?: boolean };
 
 // StudioPage El의 최소 부분집합(엔진은 이 형태만 본다).
-export type LayerItemLike = { id: string; groupId?: string; hidden?: boolean; locked?: boolean };
+// name/type 은 순수 플래너가 사람이 읽을 결과 이름을 만들 때만 본다 — z-order 연산은 쓰지 않는다.
+// (id 를 잘라 쓴 `병합 e6659cca` 같은 해시 이름이 레이어 행에 노출되던 결함의 재발 방지.)
+export type LayerItemLike = {
+  id: string;
+  groupId?: string;
+  hidden?: boolean;
+  locked?: boolean;
+  /** 사용자가 지정한 레이어 이름(없으면 표시 계층이 종류에서 파생한다). */
+  name?: string;
+  /** El의 판별자. `"image"` 만 한 장으로 구울 수 있다. */
+  type?: string;
+};
 
 /** 새 레이어 그룹 생성 — 펼침/표시/잠금 해제 상태로 시작. */
 export function createLayerGroup(id: string, name: string): LayerGroup {

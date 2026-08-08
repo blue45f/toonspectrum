@@ -2,6 +2,8 @@
 // 브라우저 캔버스는 한 변이 대략 16k~32k px를 넘으면 조용히 빈 이미지를 내놓으므로
 // 합성 전에 총 높이를 검사해 배율 하향 또는 분할 저장으로 우회한다.
 
+import { tagStudioRasterBlobResolution } from "./studio-raster-resolution-metadata";
+
 export const EXPORT_SCALES = [1, 2, 3] as const;
 export type ExportScale = (typeof EXPORT_SCALES)[number];
 
@@ -99,17 +101,27 @@ export function splitPagesForExport(
 }
 
 // canvas.toBlob을 Promise로 — dataURL(base64 문자열) 대비 대형 출력 메모리 절감.
-export function canvasToBlob(canvas: HTMLCanvasElement, type = "image/png", quality?: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
+//
+// canvas.toBlob 은 물리 해상도를 절대 기록하지 않는다. 그래서 인쇄 지오메트리를 정한 뒤 저장한
+// 파일도 인쇄소 워크플로에서는 72DPI 배치로 떨어진다. 내보내기 옵션이 해상도를 게시했을 때만
+// (studio-raster-resolution-metadata) 컨테이너 태그(PNG pHYs · JPEG JFIF density)를 덧쓴다 —
+// **픽셀·색은 건드리지 않으며**, 게시된 해상도가 없으면 원본 Blob 을 그대로 돌려준다.
+export async function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type = "image/png",
+  quality?: number
+): Promise<Blob> {
+  const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
+      (result) => {
+        if (result) resolve(result);
         else reject(new Error("캔버스를 이미지로 변환하지 못했어요. 배율을 낮춰 다시 시도해주세요."));
       },
       type,
       quality
     );
   });
+  return tagStudioRasterBlobResolution(blob, type);
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

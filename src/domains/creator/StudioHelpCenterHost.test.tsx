@@ -85,4 +85,32 @@ describe("StudioHelpCenterHost", () => {
     });
     expect(screen.queryByTestId("studio-help-center")).toBeNull();
   });
+
+  it("닫은 뒤 포커스를 도움말을 연 트리거로 돌려준다", async () => {
+    // 회귀 근거(브라우저 실측 2026-08-08): 도움말 9개 표면 중 튜토리얼·단축키 둘만 트리거로
+    // 복귀했고, 도움말 센터 6개 구역과 통합 검색은 전부 `document.body` 로 떨어졌다.
+    // 복원은 호스트가 거는 그물 한 곳이 책임진다 — 구역마다 따로 기억하지 않는다.
+    const trigger = document.createElement("button");
+    trigger.setAttribute("data-studio-main-menu-trigger", "help");
+    document.body.append(trigger);
+    trigger.focus();
+
+    await openHelp({ section: "diagnostics" });
+    expect(document.activeElement).not.toBe(trigger);
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Escape" });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    expect(screen.queryByTestId("studio-help-center")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+
+    trigger.remove();
+  });
 });

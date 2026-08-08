@@ -116,6 +116,7 @@ import {
   thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   planStudioCausalDynamicBrushDepositsV2,
@@ -168,6 +169,7 @@ import {
   planStudioHighlighterWashRibbon,
   planStudioHighlighterWashTap,
   resolveStudioHighlighterWashBrushId,
+  studioHighlighterWashDetailPathData,
   studioHighlighterWashPlanPathData,
 } from "./studio-highlighter-wash-ribbon";
 import {
@@ -2497,7 +2499,8 @@ function serializeFreehand(
       ),
       stylusSamples,
       aliasStrokeWidth,
-      el.brushTip
+      // Same fallback as the Canvas node so the two renderers cannot disagree about the nib.
+      resolveStudioCalligraphyRenderTip(el.brush, el.brushTip)
     );
     if (segments.length === 0) {
       return `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.5, aliasStrokeWidth * 0.18))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
@@ -2667,7 +2670,12 @@ function serializeFreehand(
       baseWidth: aliasStrokeWidth,
     });
     const pathData = studioHighlighterWashPlanPathData(washPlan);
-    return `<g data-brush-engine="${washPlan.version}" data-highlighter-cap="${washPlan.capProfile}" data-highlighter-wash="single-fill"${opacityAttr}><path d="${pathData}" fill="${escapeXml(stroke)}" fill-rule="nonzero" stroke="none" opacity="${fmtDabOpacity(washPlan.opacityScale)}" style="mix-blend-mode:multiply"/></g>`;
+    const detailPathData = studioHighlighterWashDetailPathData(washPlan);
+    // Same two passes as the Canvas node: one base wash, one rim/fibre wash, each painted once.
+    const detailPath = detailPathData
+      ? `<path d="${detailPathData}" fill="${escapeXml(stroke)}" fill-rule="nonzero" stroke="none" data-highlighter-wash="detail" opacity="${fmtDabOpacity(washPlan.opacityScale * washPlan.detailOpacityScale)}" style="mix-blend-mode:multiply"/>`
+      : "";
+    return `<g data-brush-engine="${washPlan.version}" data-highlighter-cap="${washPlan.capProfile}" data-highlighter-wash="single-fill"${opacityAttr}><path d="${pathData}" fill="${escapeXml(stroke)}" fill-rule="nonzero" stroke="none" opacity="${fmtDabOpacity(washPlan.opacityScale)}" style="mix-blend-mode:multiply"/>${detailPath}</g>`;
   }
 
   if (brushFamily === "neon") {
@@ -2835,8 +2843,10 @@ function serializeFreehand(
     const carrier = planStudioOilRibbonCarrier(dabs);
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
+    // One <path> per load band, with every run of that band as a subpath: SVG paints a path once,
+    // which is what keeps a self-crossing from depositing its bristle ridges twice.
     const bristles = carrier.bristleLanes.map((lane) => (
-      `<path data-paint-bristle-lane="true" d="${studioOilRibbonPathData(lane)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
+      `<path data-paint-bristle-lane="true" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
     )).join("");
     return `<g data-brush-engine="oil-ribbon-carrier-v1">${body}<g style="mix-blend-mode:multiply">${bristles}</g></g>`;
   }

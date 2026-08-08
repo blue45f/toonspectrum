@@ -29,8 +29,12 @@ import {
 } from "./studio-living-ink-execution-protocol";
 import {
   studioLivingInkChromaBleedMultipliers,
-  studioLivingInkOpticalDensityFromReflectance,
+  studioLivingInkDepositionPathLength,
+  studioLivingInkMeanMarkRadius,
+  studioLivingInkPigmentCoatFactor,
   studioLivingInkPigmentDiffusionRates,
+  studioLivingInkPigmentOpticalDensity,
+  STUDIO_LIVING_INK_PIGMENT_COAT,
   STUDIO_LIVING_INK_WHITE_GOUACHE_LOAD_GAIN,
   type StudioLivingInkBounds,
   type StudioLivingInkOperation,
@@ -155,6 +159,9 @@ export function studioLivingInkPresentedPixelsAreBlank(
 export const STUDIO_LIVING_INK_WGSL_ADMISSION = Object.freeze({
   minimumPaperLuminanceStandardDeviation: 1,
   minimumProbeStrokeDarkness: 6,
+  /** An untouched strip has to come back as clean page, not as a repainted paper sheet. */
+  maximumUntouchedPageLuminanceStandardDeviation: 0.5,
+  minimumUntouchedPageLuminance: 254.5,
 });
 
 export interface StudioLivingInkWatercolourProof {
@@ -164,6 +171,13 @@ export interface StudioLivingInkWatercolourProof {
   readonly probeStrokeDarkness: number;
 }
 
+/**
+ * Region statistics of the frame **as the page shows it**, i.e. composited over the white document.
+ *
+ * The resolve emits wash coverage in alpha, so raw RGB outside a wash is the un-premultiply's
+ * placeholder rather than a picture. Compositing here keeps every admission number meaning the same
+ * thing it did when the surface was an opaque sheet: what the artist would actually see.
+ */
 function regionLuminance(
   pixels: Uint8Array,
   width: number,
@@ -175,7 +189,9 @@ function regionLuminance(
   for (let y = region.y; y < region.y + region.height; y += 1) {
     for (let x = region.x; x < region.x + region.width; x += 1) {
       const index = (y * width + x) * 4;
-      const luminance = ((pixels[index] ?? 0) + (pixels[index + 1] ?? 0) + (pixels[index + 2] ?? 0)) / 3;
+      const alpha = (pixels[index + 3] ?? 0) / 255;
+      const channel = (offset: number) => 255 + ((pixels[index + offset] ?? 0) - 255) * alpha;
+      const luminance = (channel(0) + channel(1) + channel(2)) / 3;
       sum += luminance;
       sumSquares += luminance * luminance;
       count += 1;
@@ -248,6 +264,12 @@ export class StudioLivingInkWebGpuPureRuntime {
   private dirty: StudioLivingInkBounds | null = null;
   /** Set while a `fix` with `scope: "selection"` is settling; gates the exchange coverage mask. */
   private fixSelectionEnabled = false;
+  /**
+   * Last deposited ink mark, kept across operations so a batch knows the path length it covers.
+   * Product code forwards a stroke as a run of suffix operations, so the distance a batch actually
+   * travels includes the gap back to the previous batch's last mark.
+   */
+  private lastInkMark: Readonly<{ x: number; y: number }> | null = null;
 
   private constructor(
     device: GPUDevice,
@@ -312,7 +334,8 @@ export class StudioLivingInkWebGpuPureRuntime {
      * context here and never configure or render into it, which only looked like a GPU present
      * path: `transferToImageBitmap()` then handed back a surface nothing had drawn to.
      */
-    const presentation = canvas.getContext("2d", { alpha: false });
+    // Alpha stays on: the resolve writes wash coverage there so an untouched page is transparent.
+    const presentation = canvas.getContext("2d", { alpha: true });
     if (!presentation) return null;
 
     const runtime = new StudioLivingInkWebGpuPureRuntime(device, config, canvas, presentation);
@@ -454,6 +477,7 @@ export class StudioLivingInkWebGpuPureRuntime {
 
   private dispatchClearAll(): void {
     this.writeUniforms();
+    this.lastInkMark = null;
     for (const buffer of [
       this.mobile,
       this.mobileScratch,
@@ -631,6 +655,10 @@ export class StudioLivingInkWebGpuPureRuntime {
         { binding: 1, resource: { buffer: this.strokeDeposit } },
       ]);
     }
+    const coat = studioLivingInkPigmentCoatFactor(
+      studioLivingInkDepositionPathLength(operation.marks, this.lastInkMark),
+      studioLivingInkMeanMarkRadius(operation.marks),
+    );
     let previousX: number | null = null;
     let previousY: number | null = null;
     let previousRadius: number | null = null;
@@ -678,10 +706,17 @@ export class StudioLivingInkWebGpuPureRuntime {
       if (operation.kind === "ink") {
         const pigmentMark = operation.marks[index]!;
         const pigment = pigmentMark.pigmentMass * load;
+        // One pass is one coat: divide the batch by the path length it covers and by the measured
+        // gain of the resolve, then scale by the stroke's own opacity as the CPU oracle already did.
+        // Opaque white is a coverage well rather than an optical density, so it keeps the raw load.
+        const pigmentCoat = pigment
+          * clamp01(pigmentMark.color[3])
+          * coat
+          / STUDIO_LIVING_INK_PIGMENT_COAT.resolveGain;
         const white = operation.tool === "white-gouache";
-        const densityRed = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[0]) * pigment;
-        const densityGreen = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[1]) * pigment;
-        const densityBlue = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[2]) * pigment;
+        const densityRed = studioLivingInkPigmentOpticalDensity(pigmentMark.color[0]) * pigmentCoat;
+        const densityGreen = studioLivingInkPigmentOpticalDensity(pigmentMark.color[1]) * pigmentCoat;
+        const densityBlue = studioLivingInkPigmentOpticalDensity(pigmentMark.color[2]) * pigmentCoat;
         const deposit: readonly [number, number, number, number] = white
           ? [
               0,
@@ -729,6 +764,8 @@ export class StudioLivingInkWebGpuPureRuntime {
         { binding: 1, resource: { buffer: this.mobile } },
         { binding: 2, resource: { buffer: this.strokeDeposit } },
       ]);
+      const last = operation.marks[operation.marks.length - 1]!;
+      this.lastInkMark = Object.freeze({ x: last.x, y: last.y });
     }
   }
 
@@ -1106,13 +1143,21 @@ export class StudioLivingInkWebGpuPureRuntime {
         height: Math.max(1, Math.floor(displayHeight * 0.08)),
       });
       const probeStrokeDarkness = paper.mean - stroke.mean;
+      // Paper texture now lives *inside* the wash: the resolve stops painting paper where there is
+      // no wash so a committed page-sized layer cannot repaint the document background. So the
+      // texture floor is read off the stroke band, and the untouched strip earns a second floor of
+      // its own — it has to come back as clean page, which is exactly the regression it used to hide.
+      const pageIsClean = paper.standardDeviation
+        <= STUDIO_LIVING_INK_WGSL_ADMISSION.maximumUntouchedPageLuminanceStandardDeviation
+        && paper.mean >= STUDIO_LIVING_INK_WGSL_ADMISSION.minimumUntouchedPageLuminance;
       return Object.freeze({
         admitted: !blank
-          && paper.standardDeviation
+          && pageIsClean
+          && stroke.standardDeviation
             >= STUDIO_LIVING_INK_WGSL_ADMISSION.minimumPaperLuminanceStandardDeviation
           && probeStrokeDarkness >= STUDIO_LIVING_INK_WGSL_ADMISSION.minimumProbeStrokeDarkness,
         blank,
-        paperLuminanceStandardDeviation: paper.standardDeviation,
+        paperLuminanceStandardDeviation: stroke.standardDeviation,
         probeStrokeDarkness,
       });
     } catch {
@@ -1216,7 +1261,9 @@ export class StudioLivingInkWebGpuPureRuntime {
       out[index] = Math.round(clamp01(f32[index] ?? 0) * 255);
       out[index + 1] = Math.round(clamp01(f32[index + 1] ?? 0) * 255);
       out[index + 2] = Math.round(clamp01(f32[index + 2] ?? 0) * 255);
-      out[index + 3] = 255;
+      // Wash coverage, not a constant: an untouched page has to stay transparent so the committed
+      // page-sized layer cannot repaint the document background.
+      out[index + 3] = Math.round(clamp01(f32[index + 3] ?? 0) * 255);
     }
     return out;
   }

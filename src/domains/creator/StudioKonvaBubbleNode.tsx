@@ -34,12 +34,22 @@ import {
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   bubbleHorizontalPadding,
+  bubbleLetterSpacing,
+  bubbleTextBoxHeight,
+  bubbleTextBoxWidth,
   bubbleVerticalPadding,
   fitBubbleFontSize,
+  measureBubbleTextBlock,
+  resolveBubbleFontFamily,
+  resolveBubbleFontSize,
+  resolveBubbleFontStyle,
+  resolveBubbleLineHeight,
 } from "./studio-bubble-text-fit";
 import {
   BUBBLE_TEXT_MEASURER,
-  formatVerticalText,
+  verticalBlockAlign,
+  verticalTextItemGeometry,
+  verticalTextLayout,
 } from "./studio-bubble-text-runtime";
 import {
   planDialogueRubyOverlayPlacements,
@@ -170,23 +180,36 @@ export function StudioKonvaBubbleNode({
         ])
       : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec)
   );
-  // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히).
-  const bubbleLineHeight =
-    el.lineHeight ?? (el.vertical ? 1.4 : theme === "soft" ? 1.35 : theme === "vivid" ? 1.2 : 1.25);
-  const bubbleLetterSpacing = theme === "vivid" ? 0 : 0.3;
+  // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히). 기본값은 전부
+  // studio-bubble-text-fit 의 단일 소스에서 온다 — 커밋 측정(StudioPage.commitEditText)과
+  // 높이 맞춤(studio-fit)이 예전에 각각 1.1 / 1.2 를 쓰다가 대사를 잘라먹은 결함의 재발 방지.
+  const bubbleFontFamily = resolveBubbleFontFamily(el.font);
+  const bubbleFontStyle = resolveBubbleFontStyle(el.fontStyle);
+  const bubbleLineHeight = resolveBubbleLineHeight({
+    lineHeight: el.lineHeight,
+    vertical: el.vertical,
+    theme,
+  });
+  const bubbleLetterSpacingPx = bubbleLetterSpacing(theme);
   // 안쪽 여백: 글자 크기 비례(좌우 대칭, 상<하로 시각 중심 보정).
-  const bubbleMaxFontSize = el.fontSize ?? 24;
+  const bubbleMaxFontSize = resolveBubbleFontSize(el.fontSize);
+  const bubbleBlockAlign = verticalBlockAlign(el.align ?? "center");
   const bFs = el.autoShrinkText
     ? fitBubbleFontSize(
         {
-          text: el.vertical ? formatVerticalText(el.text) : el.text,
+          // 세로쓰기는 레거시 전치 문자열이 아니라 **원문 + vertical:true** 로 판정한다
+          // (studio-bubble-text-fit 의 vertical 경로 계약 — 전치 근사는 열 수를 잘못 센다).
+          text: el.text,
           boxWidth: el.width,
           boxHeight: el.height,
           maxFontSize: bubbleMaxFontSize,
           minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
-          fontFamily: el.font ?? "Pretendard, sans-serif",
-          fontStyle: el.fontStyle ?? "bold",
+          fontFamily: bubbleFontFamily,
+          fontStyle: bubbleFontStyle,
           lineHeight: bubbleLineHeight,
+          letterSpacing: bubbleLetterSpacingPx,
+          vertical: el.vertical,
+          blockAlign: bubbleBlockAlign,
         },
         BUBBLE_TEXT_MEASURER,
       ).fontSize
@@ -194,7 +217,7 @@ export function StudioKonvaBubbleNode({
   // bHPad/bVPadTop/bVPadBot 공식을 studio-bubble-text-fit.ts와 공유(§1.1) — fitBubbleFontSize의
   // 내부 탐색이 가정한 패딩과 실제 렌더 패딩이 정확히 일치해야 한다.
   const bHPad = bubbleHorizontalPadding(bFs);
-  const { top: bVPadTop, bottom: bVPadBot } = bubbleVerticalPadding(bFs);
+  const { top: bVPadTop } = bubbleVerticalPadding(bFs);
 
   // 생각 말풍선 꼬리: 큰→중간→작은 3단 구름방울(코미포식) — 캔버스·SVG export 가 공유하는
   // thoughtTailDots 단일 소스. tailXRatio/tailHeight 가 있으면 손잡이를 따라 움직인다.
@@ -339,14 +362,54 @@ export function StudioKonvaBubbleNode({
     { onInteractionBegin, onInteractionEnd }
   );
 
-  // Text box + optional horizontal ruby overlays (base stays one KText; vertical skips ruby paint).
-  const textBoxWidth = Math.max(8, el.width - bHPad * 2);
-  const textBoxHeight = Math.max(8, el.height - (bVPadTop + bVPadBot));
+  // Text box + optional horizontal ruby overlays (base stays one KText; vertical uses the column core).
+  const textBoxWidth = bubbleTextBoxWidth(el.width, bFs);
+  const textBoxHeight = bubbleTextBoxHeight(el.height, bFs);
   const bubbleAlign = el.align ?? "center";
-  const bubbleFontFamily = el.font ?? "Pretendard, sans-serif";
-  const bubbleFontStyle = el.fontStyle ?? "bold";
-  const baseText = el.vertical ? formatVerticalText(el.text) : el.text;
-  // Vertical bubbles keep base-only paint (formatVerticalText). Stacked ruby is horizontal-only
+  // 세로쓰기는 studio-vertical-text 코어로 조판한다. 레거시 formatVerticalText 는 "가로 문자열을
+  // 전치해 가로 렌더러에 먹이는" 근사라, 상자 높이를 넘는 열이 Konva 의 무음 절단에 그대로
+  // 걸렸다(측정: "안녕하세요" 5자 중 3자만 렌더 / 103자 대사는 103줄 필요 · 6줄 표시).
+  const verticalLayout = el.vertical
+    ? verticalTextLayout({
+        text: el.text,
+        fontSize: bFs,
+        lineHeight: bubbleLineHeight,
+        letterSpacing: bubbleLetterSpacingPx,
+        fontFamily: bubbleFontFamily,
+        fontStyle: bubbleFontStyle,
+        maxColumnLength: textBoxHeight,
+        blockAlign: bubbleBlockAlign,
+      })
+    : null;
+  // 가로쓰기 무음 절단 방어: Konva.Text 는 height 가 고정이면 넘치는 줄을 경고 없이 버린다.
+  // 실제로 필요한 블록 높이를 재서 그보다 작지 않은 페인트 상자를 주고, 그만큼 y 를 위로
+  // 되돌려 시각 중심(verticalAlign:"middle")을 상자 중심에 그대로 유지한다 — 텍스트가 들어가는
+  // 보통의 경우 결과 픽셀은 예전과 완전히 동일하고, 넘칠 때만 잘리는 대신 밖으로 흘러넘친다.
+  // autoShrinkText("크기 고정")는 사용자가 상자를 못 넘게 하겠다고 명시한 모드라 제외한다
+  // (그 모드는 인스펙터가 overflow 경고를 따로 띄운다).
+  // 줄 수는 아무리 좁아도 "글자 수 + 1"을 넘을 수 없다(빈 문단 포함). 그 상한으로도 상자 안이면
+  // 절단이 원리적으로 불가능하므로 측정 자체를 건너뛴다 — 짧은 대사(대부분의 말풍선)는 렌더마다
+  // 캔버스 measureText 를 한 번도 부르지 않는다.
+  const cannotOverflow =
+    ([...el.text].length + 1) * bFs * bubbleLineHeight <= textBoxHeight;
+  const horizontalBlockHeight =
+    verticalLayout || el.autoShrinkText || cannotOverflow
+      ? 0
+      : measureBubbleTextBlock(
+          {
+            text: el.text,
+            boxWidth: el.width,
+            fontSize: bFs,
+            fontFamily: bubbleFontFamily,
+            fontStyle: bubbleFontStyle,
+            lineHeight: bubbleLineHeight,
+            letterSpacing: bubbleLetterSpacingPx,
+          },
+          BUBBLE_TEXT_MEASURER,
+        ).blockHeight;
+  const textPaintHeight = Math.max(textBoxHeight, Math.ceil(horizontalBlockHeight));
+  const textPaintY = bVPadTop - (textPaintHeight - textBoxHeight) / 2;
+  // Vertical bubbles keep base-only paint (column core). Stacked ruby is horizontal-only
   // in this MVP — column layout does not host furigana beside upright glyphs yet.
   const rubySpans = !el.vertical
     ? readDialogueRubySpans(
@@ -356,7 +419,7 @@ export function StudioKonvaBubbleNode({
   const rubyOverlays = rubySpans
     ? planDialogueRubyOverlayPlacements(el.text, rubySpans, {
         fontSize: bFs,
-        letterSpacing: bubbleLetterSpacing,
+        letterSpacing: bubbleLetterSpacingPx,
         textWidth: textBoxWidth,
         align: bubbleAlign,
       })
@@ -569,21 +632,52 @@ export function StudioKonvaBubbleNode({
           lineCap="round"
         />
       )}
-      <KText
-        text={baseText}
-        width={textBoxWidth}
-        height={textBoxHeight}
-        x={bHPad}
-        y={bVPadTop}
-        fontSize={bFs}
-        fontFamily={bubbleFontFamily}
-        fontStyle={bubbleFontStyle}
-        fill={el.textFill}
-        align={bubbleAlign}
-        verticalAlign="middle"
-        lineHeight={bubbleLineHeight}
-        letterSpacing={bubbleLetterSpacing}
-      />
+      {verticalLayout ? (
+        <Group
+          x={bHPad + Math.max(0, (textBoxWidth - verticalLayout.width) / 2)}
+          y={bVPadTop + Math.max(0, (textBoxHeight - verticalLayout.height) / 2)}
+        >
+          {verticalLayout.columns.flatMap((column) =>
+            column.items.map((item, itemIndex) => {
+              const { boxWidth, lineHeight } = verticalTextItemGeometry(item, bFs);
+              return (
+                <KText
+                  key={`bubble-vcol-${column.index}-${itemIndex}`}
+                  text={item.text}
+                  x={item.x}
+                  y={item.y}
+                  rotation={item.rotation}
+                  {...(item.rotation === 0
+                    ? { width: boxWidth, align: "center" as const, wrap: "none" as const }
+                    : {})}
+                  fontSize={bFs}
+                  fontFamily={bubbleFontFamily}
+                  fontStyle={bubbleFontStyle}
+                  fill={el.textFill}
+                  lineHeight={lineHeight}
+                  letterSpacing={item.rotation === 90 ? bubbleLetterSpacingPx : 0}
+                />
+              );
+            }),
+          )}
+        </Group>
+      ) : (
+        <KText
+          text={el.text}
+          width={textBoxWidth}
+          height={textPaintHeight}
+          x={bHPad}
+          y={textPaintY}
+          fontSize={bFs}
+          fontFamily={bubbleFontFamily}
+          fontStyle={bubbleFontStyle}
+          fill={el.textFill}
+          align={bubbleAlign}
+          verticalAlign="middle"
+          lineHeight={bubbleLineHeight}
+          letterSpacing={bubbleLetterSpacingPx}
+        />
+      )}
       {rubyOverlays.map((placement) => (
         <KText
           key={`bubble-ruby-${placement.start}-${placement.end}-${placement.ruby}`}

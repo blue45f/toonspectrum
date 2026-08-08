@@ -18,10 +18,14 @@ import {
   type ExportFormat,
 } from "./studio-export";
 import {
+  readStudioExportGeometryDraft,
+  writeStudioExportGeometryDraft,
+} from "./studio-export-geometry-draft";
+import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
+  planStudioExportPrintGeometry,
   preflightStudioExportPackage,
-  recommendExportScaleForPrint,
   STUDIO_EXPORT_BLEED_MM_RANGE,
   STUDIO_EXPORT_DPI_RANGE,
   STUDIO_EXPORT_TRIM_MM_RANGE,
@@ -46,6 +50,7 @@ import {
   exportContactSheetPdf,
 } from "./studio-pdf-contact-sheet";
 import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
+import { publishStudioExportResolutionDpi } from "./studio-raster-resolution-metadata";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
@@ -217,19 +222,24 @@ export function StudioExportMenuPanel({
   const [rangeToPage, setRangeToPage] = useState(Math.max(1, pageCount));
   const [includeDialogueTxt, setIncludeDialogueTxt] = useState(false);
   const [packageStatus, setPackageStatus] = useState<ExportRunStatus | null>(null);
-  /** Editable print geometry for package preflight (init from optional props). */
-  const [geometryDpi, setGeometryDpi] = useState(exportDpi);
+  /**
+   * Editable print geometry for package preflight. Seeded from the surviving draft first —
+   * this panel unmounts whenever the menu closes, and losing "인쇄 A4 300" on every close made
+   * the geometry (and the resolution written into the file) silently fall back to 72 DPI.
+   */
+  const geometryDraft = readStudioExportGeometryDraft();
+  const [geometryDpi, setGeometryDpi] = useState(geometryDraft?.dpi ?? exportDpi);
   const [geometryTrimW, setGeometryTrimW] = useState<number | null>(
-    exportTrimWidthMm ?? null
+    geometryDraft ? geometryDraft.trimWidthMm : exportTrimWidthMm ?? null
   );
   const [geometryTrimH, setGeometryTrimH] = useState<number | null>(
-    exportTrimHeightMm ?? null
+    geometryDraft ? geometryDraft.trimHeightMm : exportTrimHeightMm ?? null
   );
   const [geometryBleed, setGeometryBleed] = useState<number | null>(
-    exportBleedMm ?? null
+    geometryDraft ? geometryDraft.bleedMm : exportBleedMm ?? null
   );
   const [geometryPresetId, setGeometryPresetId] = useState<StudioExportGeometryPresetId | null>(
-    null
+    geometryDraft?.presetId ?? null
   );
   // 페이지당 요소 수만큼 순차 캡처라 다른 내보내기보다 오래 걸린다 — 진행 중 패널이 닫히거나
   // 언마운트되면(다른 내보내기 형식으로 전환 등) 뒤늦게 도착한 결과가 상태를 덮어쓰지 않게 막는다.
@@ -266,6 +276,43 @@ export function StudioExportMenuPanel({
     pagesForDialogue: dialoguePages ?? undefined,
     dialogueTitle: exportTitle,
   });
+
+  /**
+   * 인쇄 지오메트리 계획 — 트림/도련은 픽셀에 굽지 않고(그림을 자르지 않기 위해) "지금 배율이
+   * 실제로 몇 DPI인가"와 "목표 DPI에 닿으려면 무엇이 바뀌어야 하는가"만 계산한다.
+   */
+  const printPlan =
+    geometryTrimW != null && geometryTrimH != null
+      ? planStudioExportPrintGeometry({
+          canvasWidthPx: canvasWidth,
+          canvasHeightPx: canvasHeight,
+          dpi: geometryDpi,
+          trimWidthMm: geometryTrimW,
+          trimHeightMm: geometryTrimH,
+          ...(geometryBleed != null ? { bleedMm: geometryBleed } : {}),
+          exportScale,
+        })
+      : null;
+  /**
+   * 파일에 실제로 기록할 해상도 — 트림이 있으면 "출력 크기를 덮는 실측 DPI", 없으면 사용자가
+   * 고른 DPI 그대로. UI 표기와 파일 바이트가 같은 값을 말하게 하는 단일 출처다.
+   */
+  const exportResolutionDpi = printPlan ? printPlan.currentDpi : geometryDpi;
+
+  useEffect(() => {
+    // 언마운트(메뉴 닫힘)에서 지우지 않는다 — 툴바 다운로드는 이 패널이 닫힌 뒤에 눌린다.
+    publishStudioExportResolutionDpi(exportResolutionDpi);
+  }, [exportResolutionDpi]);
+
+  useEffect(() => {
+    writeStudioExportGeometryDraft({
+      dpi: geometryDpi,
+      trimWidthMm: geometryTrimW,
+      trimHeightMm: geometryTrimH,
+      bleedMm: geometryBleed,
+      presetId: geometryPresetId,
+    });
+  }, [geometryDpi, geometryTrimW, geometryTrimH, geometryBleed, geometryPresetId]);
 
   function applyGeometryPreset(id: StudioExportGeometryPresetId) {
     const preset = studioExportGeometryPreset(id);
@@ -1018,7 +1065,7 @@ export function StudioExportMenuPanel({
             </label>
           </div>
           <p className="text-[0.6rem] leading-snug text-fg-3">
-            DPI {geometryDpi}
+            목표 DPI {geometryDpi}
             {geometryTrimW != null && geometryTrimH != null
               ? ` · 트림 ${geometryTrimW}×${geometryTrimH}mm`
               : " · 웹툰 화면용(트림 없음)"}
@@ -1027,25 +1074,48 @@ export function StudioExportMenuPanel({
               ? ` · 출력 ${packagePreflight.outputSizeMm.width}×${packagePreflight.outputSizeMm.height}mm`
               : ""}
           </p>
-          {geometryTrimW != null && geometryTrimH != null ? (
+          <p data-testid="export-geometry-actual" className="text-[0.6rem] leading-snug text-fg-2">
+            {printPlan
+              ? `실제 저장: ${exportScale}× → ${printPlan.currentWidthPx}×${printPlan.currentHeightPx}px `
+                + `· ${Math.round(printPlan.currentDpi)}DPI 기록`
+              : `실제 저장: ${exportScale}× → ${Math.round(canvasWidth * exportScale)}×${Math.round(canvasHeight * exportScale)}px `
+                + `· ${Math.round(geometryDpi)}DPI 기록`}
+          </p>
+          <p className="text-[0.58rem] leading-snug text-fg-3">
+            트림·도련은 픽셀에 적용하지 않습니다 — 캔버스 비율을 유지해 그림을 자르지 않고, 출력
+            크기에 맞춘 해상도만 PNG(pHYs)·JPG(JFIF)·PSD에 기록합니다. WebP·QOI는 규격상 해상도
+            태그를 담지 못합니다.
+            {printPlan && (printPlan.overflowWidthMm > 0.5 || printPlan.overflowHeightMm > 0.5)
+              ? ` 캔버스 비율이 출력 비율과 달라 인쇄 시 ${
+                  printPlan.overflowHeightMm >= printPlan.overflowWidthMm ? "세로" : "가로"
+                }가 ${Math.round(Math.max(printPlan.overflowWidthMm, printPlan.overflowHeightMm))}mm 넘칩니다(재단 영역 밖).`
+              : ""}
+          </p>
+          {printPlan?.issue ? (
+            <p
+              role="alert"
+              data-testid="export-geometry-dpi-alert"
+              className="rounded-md bg-warn/10 px-2 py-1.5 text-[0.62rem] leading-snug text-warn"
+            >
+              {printPlan.issue.message}
+            </p>
+          ) : null}
+          {printPlan ? (
             <button
               type="button"
               data-testid="export-geometry-recommend-scale"
               onClick={() => {
-                const scale = recommendExportScaleForPrint({
-                  canvasWidthPx: canvasWidth,
-                  canvasHeightPx: canvasHeight,
-                  trimWidthMm: geometryTrimW,
-                  trimHeightMm: geometryTrimH,
-                  dpi: geometryDpi,
-                });
-                setExportScale(scale);
+                setExportScale(printPlan.recommendedScale);
                 setExportPresetId(null);
               }}
               className="flex h-9 w-full items-center justify-center rounded-lg border border-line bg-card text-[0.62rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              title="트림·DPI 기준으로 내보내기 배율(1–3×)을 권장합니다"
+              title={
+                printPlan.reachable
+                  ? `${printPlan.recommendedScale}×(${printPlan.recommendedWidthPx}×${printPlan.recommendedHeightPx}px)에서 목표 ${Math.round(printPlan.targetDpi)}DPI를 채웁니다`
+                  : `안전 배율 상한 ${printPlan.maxSafeScale}×에서 낼 수 있는 최대 해상도(${Math.round(printPlan.recommendedDpi)}DPI)를 적용합니다`
+              }
             >
-              배율 권장
+              배율 권장 {printPlan.recommendedScale}× · {Math.round(printPlan.recommendedDpi)}DPI
             </button>
           ) : null}
         </div>

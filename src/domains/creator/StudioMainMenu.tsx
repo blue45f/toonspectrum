@@ -4,7 +4,10 @@
  * Vector · Text · Comic · 3D · Window · AI · Help) as compact dropdowns.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
- * When one menu is open, hovering another group switches (desktop app menubar UX).
+ * When one menu is open, hovering another group switches (desktop app menubar UX), and
+ * clicking a neighbouring title commits to that menu instead of toggling it back shut.
+ * The bar is a WAI-ARIA `menubar` with a roving tab stop: one Tab press skips it, arrows
+ * move between groups, and Tab from inside a panel dismisses it back to its own title.
  */
 import { Check, ChevronDown } from "lucide-react";
 import {
@@ -247,6 +250,8 @@ function MenuDropdown({
   onClose,
   onNavigateGroup,
   barActive,
+  isTabStop,
+  onFocusTrigger,
   t,
 }: {
   group: StudioMainMenuGroup;
@@ -258,6 +263,9 @@ function MenuDropdown({
     openNextMenu: boolean,
   ) => void;
   barActive: boolean;
+  /** True for the single group that carries the menubar's roving tab stop. */
+  isTabStop: boolean;
+  onFocusTrigger: () => void;
   t: (key: string) => string;
 }): ReactElement {
   const unavailableReasonLabel = localizeText(t, "Unavailable condition", "studio.mainMenu.unavailableReason");
@@ -266,6 +274,11 @@ function MenuDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const openedRef = useRef(false);
+  // Desktop hover switching opens this menu the moment the cursor crosses the title,
+  // which lands *before* the click that carried the cursor there. Without this flag the
+  // trigger's toggle sees `open === true` and closes the menu the artist just asked for,
+  // so clicking neighbouring titles alternates open/closed instead of switching.
+  const hoverOpenedRef = useRef(false);
   const openFocusIntentRef = useRef<MenuOpenFocusIntent>("first");
   const closeMenuRef = useRef<(restoreFocus?: boolean) => void>(() => undefined);
   // Keep last coords so the panel can paint on the same frame as open=true
@@ -310,6 +323,7 @@ function MenuDropdown({
   useLayoutEffect(() => {
     if (!open) {
       openedRef.current = false;
+      hoverOpenedRef.current = false;
       return;
     }
     if (openedRef.current) return;
@@ -366,6 +380,15 @@ function MenuDropdown({
   }, [open]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Tab") {
+      // The panel is portalled to <body>, so sequential focus from inside it has nowhere
+      // to go: the browser drops focus on BODY and leaves the menu open. Dismiss the menu
+      // and hand focus back to its owning title, which is the menubar's single tab stop.
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      return;
+    }
     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
       event.stopPropagation();
@@ -519,12 +542,20 @@ function MenuDropdown({
 
   return (
     <div
+      // Presentational: the menubar owns the `menuitem` trigger, not this positioning shell.
+      role="none"
       className="relative shrink-0"
       onMouseEnter={() => {
         if (barActive && !open) {
           // Desktop hover switching should not yank keyboard focus into the newly revealed menu.
+          hoverOpenedRef.current = true;
           openMenu("preserve");
         }
+      }}
+      onMouseLeave={() => {
+        // The pointer left both the title and its panel, so a later click is an ordinary
+        // toggle rather than the tail of the hover that revealed this menu.
+        hoverOpenedRef.current = false;
       }}
     >
       <StudioToolHintTarget
@@ -536,6 +567,11 @@ function MenuDropdown({
           ref={buttonRef}
           type="button"
           data-studio-main-menu-trigger={group.id}
+          role="menuitem"
+          // APG roving tabindex: the menubar is one tab stop, and arrows move between the
+          // 18 groups. Before this, reaching the canvas by keyboard cost 18 Tab presses.
+          tabIndex={isTabStop ? 0 : -1}
+          onFocus={onFocusTrigger}
           aria-haspopup="menu"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
@@ -549,6 +585,12 @@ function MenuDropdown({
               event.preventDefault();
               event.stopPropagation();
               closeMenu();
+              return;
+            }
+            if (event.key === "Tab" && open) {
+              // Leaving the menubar must not strand an open panel over the canvas. Do not
+              // preventDefault: the browser still performs its own move to the next stop.
+              closeMenu(false);
               return;
             }
             if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
@@ -569,7 +611,19 @@ function MenuDropdown({
               openMenu("first");
             }
           }}
-          onClick={() => (open ? closeMenu() : openMenu("first"))}
+          onClick={() => {
+            if (!open) {
+              openMenu("first");
+              return;
+            }
+            if (hoverOpenedRef.current) {
+              // This menu was revealed by the same cursor trip that produced the click.
+              // Treat the click as the artist committing to it, not as a toggle-off.
+              hoverOpenedRef.current = false;
+              return;
+            }
+            closeMenu();
+          }}
           className={cn(
             // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
             // The chevron is decorative (aria-haspopup owns the affordance), so compact it
@@ -603,8 +657,13 @@ function MenuDropdown({
 export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
   const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
-  const menuBarRef = useRef<HTMLElement>(null);
+  // APG roving tabindex: exactly one trigger stays in the sequential tab order and the
+  // arrow keys move that stop, so the menubar costs one Tab press to skip, not one per group.
+  const [tabStopIndex, setTabStopIndex] = useState(0);
+  const menuBarRef = useRef<HTMLDivElement>(null);
   const barActive = openId !== null;
+  const activeTabStopIndex =
+    tabStopIndex >= 0 && tabStopIndex < groups.length ? tabStopIndex : 0;
 
   const navigateGroup = (
     currentIndex: number,
@@ -616,6 +675,7 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
     const nextIndex = (currentIndex + offset + groups.length) % groups.length;
     const nextGroup = groups[nextIndex];
     if (!nextGroup) return;
+    setTabStopIndex(nextIndex);
     if (openNextMenu) {
       setOpenId(nextGroup.id);
       return;
@@ -627,8 +687,13 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
   };
 
   return (
-    <nav
+    // A `nav` landmark cannot carry `menubar` (jsx-a11y/no-noninteractive-element-to-
+    // interactive-role), and an application menu is not site navigation anyway: the
+    // arrow-key group traversal this bar already implements only becomes discoverable to
+    // assistive tech once it announces itself as a menubar.
+    <div
       ref={menuBarRef}
+      role="menubar"
       aria-label={localizeText(t, "Main menu", "studio.mainMenu.aria")}
       data-studio-main-menu="true"
       data-studio-shortcut-boundary="true"
@@ -640,6 +705,8 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
           group={group}
           open={openId === group.id}
           barActive={barActive}
+          isTabStop={groupIndex === activeTabStopIndex}
+          onFocusTrigger={() => setTabStopIndex(groupIndex)}
           onOpen={() => setOpenId(group.id)}
           onClose={() => setOpenId((id) => (id === group.id ? null : id))}
           onNavigateGroup={(direction, openNextMenu) =>
@@ -648,7 +715,7 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
           t={t}
         />
       ))}
-    </nav>
+    </div>
   );
 }
 

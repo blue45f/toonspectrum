@@ -4,6 +4,9 @@ import {
   collapseStudioMobileSheetSnap,
   expandStudioMobileSheetSnap,
   nextStudioMobileSheetSnap,
+  STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT,
+  STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
+  STUDIO_MOBILE_SHEET_DEFAULT_SNAP,
   studioMobileSheetSizeStyle,
   studioMobileSheetSnapLabel,
   studioMobileSheetSnapValue,
@@ -40,5 +43,25 @@ describe("studio mobile sheet snap", () => {
     });
     expect(studioMobileSheetSizeStyle("compact", -20).height).toContain("- 0px)");
     expect(studioMobileSheetSizeStyle("full", Number.NaN).height).toContain("88dvh");
+  });
+
+  it("floors an opt-in minimum height without touching the default snap sizes", () => {
+    expect(studioMobileSheetSizeStyle("compact", 0, "16.5rem").height).toBe(
+      "min(max(34dvh, 16.5rem), calc(100dvh - env(safe-area-inset-top) - 0.75rem - 0px))",
+    );
+    // 34dvh is 218px at 360×640 and clips the opacity slider by 36px; the floor is what keeps
+    // both primary sliders reachable without scrolling on the smallest supported phone.
+    expect(STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT).toBe("16.5rem");
+    expect(studioMobileSheetSizeStyle("compact", 0).height).not.toContain("max(");
+  });
+
+  it("opens the brush sheet smaller than a list sheet so the canvas under it stays judgeable", () => {
+    // Measured on a 360×640 touch viewport: `medium` left 126 canvas rows (19.7%) once the brush
+    // sheet was up, so the size slider could not be judged against the artwork it changes.
+    expect(STUDIO_MOBILE_SHEET_DEFAULT_SNAP).toBe("medium");
+    expect(STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP).toBe("compact");
+    expect(studioMobileSheetSnapValue(STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP)).toBeLessThan(
+      studioMobileSheetSnapValue(STUDIO_MOBILE_SHEET_DEFAULT_SNAP),
+    );
   });
 });

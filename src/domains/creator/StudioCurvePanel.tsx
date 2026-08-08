@@ -4,6 +4,8 @@
  * studio-curves 엔진의 CurvePoint[](마스터)와 CurveRgbChannels(r/g/b)를 props로 읽고
  * onChange/onChannelsChange/onReset으로만 쓴다. onChannelsChange가 없으면 채널 UI를 숨긴다(하위호환).
  * 로컬 상태는 드래그/선택 중인 점과 편집 채널, 좌표 입력 draft뿐이며 실제 곡선은 부모가 소유한다.
+ * 포인터 계약은 포토샵·클립스튜디오와 같다 — 점 위 누르기=잡기, 빈 곳 누르기=그 자리에 점 추가 후
+ * 같은 제스처로 드래그 계속, 중간점 더블클릭=삭제.
  * 좌표 변환은 svgRef의 getBoundingClientRect로 CSS 스케일을 보정한다(브라우저 전용, 테스트 대상 아님).
  * histogramSource(선택 이미지 디코드 픽셀)가 주어지면 커브 위에 히스토그램을 그린다 —
  * 없으면 기존과 완전히 동일하게 렌더된다(하위호환).
@@ -46,6 +48,9 @@ const HIT_RADIUS = 10;
 const POINT_HIT_SIZE = 44;
 const KEYBOARD_STEP = 1;
 const KEYBOARD_LARGE_STEP = 10;
+// 같은 더블클릭 제스처인지 판정하는 창. pointerdown의 detail은 Chromium에서 항상 0이라 클릭 횟수로
+// 쓸 수 없으므로, 브라우저 더블클릭 간격(대개 500ms 이하)보다 조금 넉넉한 시간으로 가른다.
+const SAME_GESTURE_MS = 700;
 
 // 프리셋 칩 — StudioLevelsPanel과 동일 idiom(활성 시 accent 보더 + raised 배경).
 const CHIP_CLASS =
@@ -201,6 +206,9 @@ export function StudioCurvePanel({
 }): React.ReactElement {
   const svgRef = useRef<SVGSVGElement>(null);
   const pointHitRefs = useRef<Array<SVGRectElement | null>>([]);
+  // 방금 pointerdown이 새로 만든 점의 시각. 같은 제스처의 dblclick이 그 점을 곧바로 되지우지 않게
+  // 해, "빈 곳 더블클릭 = 점 추가"라는 기존 계약을 그대로 남긴다.
+  const pointerAddedAtRef = useRef<number | null>(null);
   // 실제 곡선은 부모가 소유하고, 여기서는 드래그/선택 인덱스와 편집 채널만 추적한다.
   const [drag, setDrag] = useState<number | null>(null);
   const [channel, setChannel] = useState<ToneChannel>("master");
@@ -330,16 +338,27 @@ export function StudioCurvePanel({
 
   // Overlapping 44px targets are common on subtle curves. Resolve pointer input geometrically
   // instead of trusting SVG paint order, so the nearest visible point always owns the gesture.
+  // 빈 곳을 누르면 포토샵·클립스튜디오와 같이 그 자리에 점이 생기고, 손을 떼지 않은 채
+  // 그대로 드래그로 이어진다(점을 만든 뒤 다시 잡게 하지 않는다).
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>): void => {
     if (event.button !== 0) return;
-    const index = hitTestPoint(
+    let index = hitTestPoint(
       event.clientX,
       event.clientY,
       POINT_HIT_SIZE / Math.SQRT2,
     );
-    if (index < 0) return;
+    if (index < 0) {
+      if (curvePointLimitReached) return;
+      const spot = clientToCurve(event.clientX, event.clientY);
+      if (!spot) return;
+      const next = addCurvePoint(curve, spot.cx, spot.cy);
+      index = nearestCurvePointIndex(next, spot.cx);
+      pointerAddedAtRef.current = event.timeStamp;
+      emitCurve(next);
+    }
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    // key={i} 덕분에 인덱스별 rect DOM 노드는 재사용된다 — 방금 추가한 점의 최종 타깃과 같은 노드다.
     pointHitRefs.current[index]?.focus();
     setSelectedPointIndex(index);
     setDrag(index);
@@ -358,25 +377,14 @@ export function StudioCurvePanel({
     if (drag !== null) setDrag(null);
   };
 
-  // 더블클릭 — 점 위면 중간점 삭제, 빈 영역이면 그 지점에 점 추가.
+  // 더블클릭 — 중간점 삭제. 빈 영역 추가는 이제 첫 pointerdown이 이미 처리했으므로,
+  // 같은 시퀀스에서 만들어진 점은 지우지 않고 그대로 남긴다(끝점 더블클릭도 삭제 불가).
   const handleDoubleClick = (e: React.MouseEvent<SVGSVGElement>): void => {
+    const addedAt = pointerAddedAtRef.current;
+    pointerAddedAtRef.current = null;
+    if (addedAt !== null && e.timeStamp - addedAt <= SAME_GESTURE_MS) return;
     const idx = hitTestPoint(e.clientX, e.clientY);
-    if (idx > 0 && idx < curve.length - 1) {
-      // 중간점만 삭제 가능(끝점은 엔진이 거부 → no-op).
-      removePoint(idx);
-      return;
-    }
-    if (idx === -1) {
-      // 빈 영역 — 클릭 위치에 점 추가.
-      if (curvePointLimitReached) return;
-      const c = clientToCurve(e.clientX, e.clientY);
-      if (c) {
-        const next = addCurvePoint(curve, c.cx, c.cy);
-        setSelectedPointIndex(nearestCurvePointIndex(next, c.cx));
-        emitCurve(next);
-      }
-    }
-    // 끝점 더블클릭은 무시(삭제 불가).
+    if (idx > 0 && idx < curve.length - 1) removePoint(idx);
   };
 
   // 폴리라인 좌표 문자열 — 모든 점을 SVG 좌표로 변환해 잇는다.
@@ -622,7 +630,7 @@ export function StudioCurvePanel({
       </div>
 
       <p id={instructionsId} className="text-[0.6rem] leading-relaxed text-fg-4">
-        점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가는 가장 넓은 구간의 중간에 배치되며 채널마다 최대 {STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.
+        그래프의 빈 곳을 클릭하면 그 자리에 점이 생기고 그대로 드래그됩니다. 점 위를 더블클릭하면 삭제됩니다. 점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가 버튼은 가장 넓은 구간의 중간에 배치되며 채널마다 최대 {STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.
       </p>
     </div>
   );

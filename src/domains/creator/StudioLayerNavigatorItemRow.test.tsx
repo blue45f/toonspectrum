@@ -351,7 +351,67 @@ describe("StudioLayerNavigatorItemRow", () => {
     expect(opacity.getAttribute("aria-valuenow")).toBe("60");
     expect(opacity.getAttribute("aria-valuetext")).toBe("60%");
     fireEvent.keyDown(opacity, { key: "ArrowRight" });
+    // The preview is immediate; the document write lands once the gesture settles.
+    expect(opacity.getAttribute("aria-valuenow")).toBe("61");
+    fireEvent.blur(opacity);
     expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.61);
+  });
+
+  it("keeps one opacity gesture at one document write while aria-valuenow tracks every step", () => {
+    // 측정된 결함(D7): 100 → 87 드래그 한 번이 히스토리 13칸을 먹었다. 스크러버는 제스처 중
+    // 프리뷰만 하고, 포인터를 떼거나 키 입력이 멎을 때 한 번만 문서에 쓴다.
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 1 },
+        stableHandlers: rowHandlers({ onSetItemOpacity }),
+      })
+    );
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    const trail: (string | null)[] = [];
+    for (let press = 0; press < 8; press += 1) {
+      fireEvent.keyDown(opacity, { key: "ArrowLeft" });
+      trail.push(opacity.getAttribute("aria-valuenow"));
+    }
+
+    expect(trail).toEqual(["99", "98", "97", "96", "95", "94", "93", "92"]);
+    expect(opacity.getAttribute("aria-valuetext")).toBe("92%");
+    expect(onSetItemOpacity).not.toHaveBeenCalled();
+
+    fireEvent.blur(opacity);
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.92);
+
+    // A trailing blur after the gesture already settled must not write the same edit twice.
+    fireEvent.blur(opacity);
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits a pointer scrub once, on release", () => {
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 1 },
+        stableHandlers: rowHandlers({ onSetItemOpacity }),
+      })
+    );
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    opacity.setPointerCapture = vi.fn();
+    opacity.releasePointerCapture = vi.fn();
+    opacity.hasPointerCapture = vi.fn(() => true);
+
+    fireEvent.pointerDown(opacity, { pointerId: 7, button: 0, clientX: 200 });
+    for (const clientX of [191, 182, 173, 161]) {
+      fireEvent.pointerMove(opacity, { pointerId: 7, clientX });
+    }
+    expect(opacity.getAttribute("aria-valuenow")).toBe("87");
+    expect(onSetItemOpacity).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(opacity, { pointerId: 7 });
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.87);
   });
 
   it("keeps the row's own tab stop — inline actions never add per-layer tab stops", () => {

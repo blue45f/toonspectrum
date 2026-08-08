@@ -80,12 +80,16 @@ const MAX_JSON_STRING_LENGTH = 64 * 1024;
 const TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
-function exactIdentifier(value: unknown): value is string {
-  if (typeof value !== "string" || value.length === 0 || value.length > MAX_ID_LENGTH) return false;
-  return ![...value].some((character) => {
+function hasControlCharacter(value: string): boolean {
+  return [...value].some((character) => {
     const codePoint = character.codePointAt(0) ?? 0;
     return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
   });
+}
+
+function exactIdentifier(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_ID_LENGTH) return false;
+  return !hasControlCharacter(value);
 }
 
 /** Collision-free page-scoped identity shared by the client document and server validator. */
@@ -117,6 +121,9 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
     "fillType", "gradientColorStart", "gradientColorEnd", "gradientDirection", "gradient",
     "textPath", "skewX", "skewY",
+    // 의도적 변경(2026-08-08): 루비(후리가나) 구간은 대사 요소(text·bubble)의 렌더·내보내기가
+    // 이미 읽는 저작 상태다. 값 검증은 parseStudioCrdtRubySpans가 담당한다.
+    "rubySpans",
   ]),
   bubble: new Set([
     ...COMMON_SCENE_ELEMENT_KEYS,
@@ -128,6 +135,8 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity", "customShapePoints",
     // 의도적 변경(2026-07-24): 말풍선 burst 스파이크 수(starPoints)·손그림 외곽선(outlineStyle) 동기화.
     "outlineStyle",
+    // 의도적 변경(2026-08-08): 말풍선 루비(후리가나) — text 요소와 같은 검증 모양을 공유한다.
+    "rubySpans",
   ]),
   sticker: new Set([
     ...COMMON_SCENE_ELEMENT_KEYS,
@@ -314,6 +323,53 @@ function finiteRange(value: unknown, minimum: number, maximum: number, label: st
   }
 }
 
+/**
+ * 루비(후리가나) 구간의 실시간 동기화 봉투. 저작 경로(`studio-dialogue-ruby.ts`)는 요소당 64구간·
+ * 읽기 80자로 스스로를 좁히지만, 이 스키마는 그보다 넉넉한 바깥 울타리만 친다 — 스키마가 저작보다
+ * 엄격해지는 순간 그것이 곧 동기화 차단 배너가 되기 때문이다(이 상수들이 고치는 결함이 정확히 그것).
+ */
+export const STUDIO_CRDT_MAX_RUBY_SPANS = 256;
+export const STUDIO_CRDT_MAX_RUBY_READING_LENGTH = 256;
+
+const RUBY_SPAN_KEYS: ReadonlySet<string> = new Set(["start", "end", "ruby"]);
+
+/**
+ * 허용 목록 통과만으로는 안전하지 않다 — 렌더·내보내기 계층은 `rubySpans`를 그대로 신뢰하므로
+ * 구조/개수/오프셋/읽기를 모두 좁힌 정규 사본만 되돌린다.
+ *
+ * 오프셋을 현재 `text` 길이로 검사하지 않는 것은 의도적이다: 루비를 단 뒤 본문을 줄이는 흔한 편집이
+ * 곧바로 동기화 거절이 되면 안 되고, 레이아웃(`planDialogueRubyRuns`)이 이미 범위 밖 구간을 버린다.
+ */
+function rejectRubySpans(): never {
+  throw new Error("장면 요소의 루비 구간이 올바르지 않습니다.");
+}
+
+function parseStudioCrdtRubySpans(value: StudioCrdtJsonValue): StudioCrdtJsonValue {
+  if (!Array.isArray(value) || value.length > STUDIO_CRDT_MAX_RUBY_SPANS) rejectRubySpans();
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) rejectRubySpans();
+    const keys = Object.keys(entry);
+    if (keys.length !== RUBY_SPAN_KEYS.size || keys.some((key) => !RUBY_SPAN_KEYS.has(key))) {
+      rejectRubySpans();
+    }
+    const { start, end, ruby } = entry as Record<string, StudioCrdtJsonValue>;
+    if (
+      !Number.isInteger(start) || !Number.isInteger(end) ||
+      (start as number) < 0 || (end as number) <= (start as number) ||
+      (end as number) > MAX_JSON_STRING_LENGTH
+    ) {
+      rejectRubySpans();
+    }
+    if (
+      !boundedString(ruby, STUDIO_CRDT_MAX_RUBY_READING_LENGTH) ||
+      ruby.length === 0 || hasControlCharacter(ruby)
+    ) {
+      rejectRubySpans();
+    }
+    return { start, end, ruby } satisfies StudioCrdtJsonObject;
+  });
+}
+
 export function validateStudioCrdtSceneElementPayload(
   payload: StudioCrdtSceneElementPayload
 ): StudioCrdtSceneElementPayload {
@@ -413,6 +469,7 @@ export function validateStudioCrdtSceneElementPayload(
   if ("text" in props && !boundedString(props.text)) {
     throw new Error("장면 요소의 텍스트가 올바르지 않습니다.");
   }
+  if ("rubySpans" in props) props.rubySpans = parseStudioCrdtRubySpans(props.rubySpans);
   for (const key of ["fill", "textFill", "stroke", "variant", "direction"] as const) {
     if (key in props && !boundedString(props[key], 512)) {
       throw new Error(`장면 요소의 ${key} 값이 올바르지 않습니다.`);
@@ -528,10 +585,7 @@ export function validateStudioCrdtLayerGroupPayload(
   }
   if (
     !boundedString(props.name, 512) || props.name.length === 0 ||
-    [...props.name].some((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
-    })
+    hasControlCharacter(props.name)
   ) {
     throw new Error("레이어 그룹 이름이 올바르지 않습니다.");
   }

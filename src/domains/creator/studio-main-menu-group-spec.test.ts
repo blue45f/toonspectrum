@@ -167,14 +167,18 @@ describe("§15.3 menu group spec", () => {
   it("pins the measured §15.3 coverage so it cannot move without a decision", () => {
     // Audit baseline (docs/rewrite/ux-audit-v5.md §2.7): 5 of 17 groups, 12 absent.
     // Wave C reached 14 present / 19 partial / 102 absent; Wave D moved it again.
+    // The filter-union wave (16 shipped filters that had no menubar row) moved
+    // Filter ▸ Depth/Normal Effects from absent to partial: normal-map bakes a
+    // normal map and god-rays casts volumetric light, but there is still no depth
+    // input and no relighting, so it is not "present".
     expect(studioMenuSpecCoverageSummary()).toEqual({
       specGroups: 17,
       groupsWithItems: 17,
       emptyGroupIds: [],
       specRows: 135,
       rowsPresent: 37,
-      rowsPartial: 34,
-      rowsAbsent: 64,
+      rowsPartial: 35,
+      rowsAbsent: 63,
       // 툴벨트에서 승격한 검수·미리보기 3종은 §15.3 행이 없어 extras로 센다.
       extras: 37,
     });

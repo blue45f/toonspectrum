@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioMainMenu } from "./StudioMainMenu";
@@ -67,7 +67,7 @@ describe("StudioMainMenu tooltips", () => {
       </StudioToolHintPreferencesProvider>,
     );
 
-    fireEvent.focus(screen.getByRole("button", { name: "Help" }));
+    fireEvent.focus(screen.getByRole("menuitem", { name: "Help" }));
     expect(screen.getByRole("tooltip").textContent).toContain(
       "Find step-by-step feature guides",
     );
@@ -76,8 +76,8 @@ describe("StudioMainMenu tooltips", () => {
 
   it("describes keyboard-focused top menus and keeps only the latest hint visible", () => {
     renderMenu();
-    const file = screen.getByRole("button", { name: "파일" });
-    const edit = screen.getByRole("button", { name: "편집" });
+    const file = screen.getByRole("menuitem", { name: "파일" });
+    const edit = screen.getByRole("menuitem", { name: "편집" });
 
     fireEvent.focus(file);
     expect(screen.getAllByRole("tooltip")).toHaveLength(1);
@@ -94,7 +94,7 @@ describe("StudioMainMenu tooltips", () => {
   it("honors the hover-intent delay and Escape dismissal contract", () => {
     vi.useFakeTimers();
     renderMenu();
-    const filter = screen.getByRole("button", { name: "필터" });
+    const filter = screen.getByRole("menuitem", { name: "필터" });
 
     fireEvent.mouseEnter(filter);
     act(() => vi.advanceTimersByTime(279));
@@ -110,7 +110,7 @@ describe("StudioMainMenu tooltips", () => {
   it("does not interrupt a normal touch tap with a transient tooltip", () => {
     vi.useFakeTimers();
     renderMenu();
-    const file = screen.getByRole("button", { name: "파일" });
+    const file = screen.getByRole("menuitem", { name: "파일" });
     expect(file.className).toContain("pointer-coarse:h-11");
 
     fireEvent.pointerDown(file, { button: 0, pointerType: "touch", clientX: 12, clientY: 8 });
@@ -122,7 +122,7 @@ describe("StudioMainMenu tooltips", () => {
     expect(screen.getByRole("menu", { name: "파일" })).not.toBeNull();
     expect(screen.queryByRole("tooltip")).toBeNull();
 
-    fireEvent.mouseEnter(screen.getByRole("button", { name: "편집" }));
+    fireEvent.mouseEnter(screen.getByRole("menuitem", { name: "편집" }));
     act(() => vi.advanceTimersByTime(280));
     expect(screen.getByRole("menu", { name: "편집" })).not.toBeNull();
     expect(screen.queryByRole("tooltip")).toBeNull();
@@ -130,9 +130,9 @@ describe("StudioMainMenu tooltips", () => {
 
   it("moves across top-level menus with ArrowLeft and ArrowRight, including open menus", () => {
     renderMenu();
-    const file = screen.getByRole("button", { name: "파일" });
-    const edit = screen.getByRole("button", { name: "편집" });
-    const filter = screen.getByRole("button", { name: "필터" });
+    const file = screen.getByRole("menuitem", { name: "파일" });
+    const edit = screen.getByRole("menuitem", { name: "편집" });
+    const filter = screen.getByRole("menuitem", { name: "필터" });
 
     fireEvent.focus(file);
     fireEvent.keyDown(file, { key: "ArrowRight" });
@@ -192,7 +192,7 @@ describe("StudioMainMenu tooltips", () => {
       </StudioToolHintPreferencesProvider>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "보기" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "보기" }));
     const choices = screen.getAllByRole("menuitemradio");
     expect(choices).toHaveLength(2);
     expect(choices[0]?.getAttribute("aria-checked")).toBe("false");
@@ -239,8 +239,9 @@ describe("StudioMainMenu tooltips", () => {
       </StudioToolHintPreferencesProvider>
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "필터" }));
-    const filters = screen.getAllByRole("menuitem");
+    fireEvent.click(screen.getByRole("menuitem", { name: "필터" }));
+    // The menubar trigger is a `menuitem` too now, so scope the count to the open panel.
+    const filters = within(screen.getByRole("menu", { name: "필터" })).getAllByRole("menuitem");
     expect(filters).toHaveLength(5);
 
     for (const filter of filters) {

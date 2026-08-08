@@ -29,7 +29,60 @@ const filterDialogSource = readFileSync(
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  document.body.replaceChildren();
 });
+
+const CANVAS_RECT = {
+  bottom: 700,
+  height: 500,
+  left: 300,
+  right: 1200,
+  top: 200,
+  width: 900,
+  x: 300,
+  y: 200,
+} as const;
+
+/** 실제 스튜디오와 같은 형태의 루트 + 포커스 가능한 작업 캔버스 뷰포트(jsdom은 레이아웃이 없다). */
+function mountStudioRootWithCanvas(): {
+  root: HTMLElement;
+  rootRef: { current: HTMLElement | null };
+  viewport: HTMLElement;
+} {
+  const root = document.createElement("div");
+  const viewport = document.createElement("div");
+  viewport.setAttribute("data-studio-canvas-viewport", "");
+  viewport.tabIndex = 0;
+  const rect = { ...CANVAS_RECT, toJSON: () => ({}) } as DOMRect;
+  viewport.getBoundingClientRect = () => rect;
+  viewport.getClientRects = () => [rect] as unknown as DOMRectList;
+  root.append(viewport);
+  document.body.append(root);
+  return { root, rootRef: { current: root }, viewport };
+}
+
+function backdrop(): HTMLElement {
+  return document.querySelector<HTMLElement>("[data-studio-modal-backdrop='true']")!;
+}
+
+/**
+ * jsdom에는 레이아웃이 없어 모든 요소가 getClientRects().length === 0이고, 그러면 모달이 초기
+ * 포커스를 다이얼로그 안으로 못 옮긴다. 그 상태로 언마운트하면 React가 커밋 뮤테이션 단계에서
+ * "커밋 직전 포커스"(= 런처)를 되돌려 놓아, 실제 브라우저에서는 일어나지 않는 결과가 나온다.
+ * 최소한의 레이아웃만 흉내 내 진짜 포커스 복귀 경로를 측정한다.
+ */
+function withStubbedLayout<T>(run: () => T): T {
+  const original = Element.prototype.getClientRects;
+  const rect = { ...CANVAS_RECT, toJSON: () => ({}) } as DOMRect;
+  Element.prototype.getClientRects = function getClientRects() {
+    return [rect] as unknown as DOMRectList;
+  };
+  try {
+    return run();
+  } finally {
+    Element.prototype.getClientRects = original;
+  }
+}
 
 function renderMotionFilterDialog(
   mutationLocked = false,
@@ -455,5 +508,119 @@ describe("StudioFilterDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply.mock.calls[0]?.[1]).toMatchObject({ kind: "lens-flare" });
+  });
+
+  it("cuts the canvas out of the scrim while the canvas preview is on, without changing dismissal", () => {
+    const { rootRef } = mountStudioRootWithCanvas();
+    const onClose = vi.fn();
+    render(
+      <StudioFilterDialog
+        activeKey="filter:motion-blur"
+        kind="motion-blur"
+        image={{}}
+        rootRef={rootRef}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    const scrim = backdrop();
+    expect(scrim.dataset.studioFilterPreviewCutout).toBe("true");
+    const bands = [...scrim.querySelectorAll("span")].filter((band) =>
+      band.className.includes("backdrop-blur-sm"),
+    );
+    expect(bands).toHaveLength(4);
+    // 캔버스 사각형(300,200 ~ 1200,700)이 어느 밴드에도 칠해지지 않는다.
+    expect(bands.map((band) => band.getAttribute("style"))).toEqual([
+      "top: 0px; left: 0px; right: 0px; height: 200px;",
+      "top: 700px; left: 0px; right: 0px; bottom: 0px;",
+      "top: 200px; left: 0px; width: 300px; height: 500px;",
+      "top: 200px; left: 1200px; right: 0px; height: 500px;",
+    ]);
+    // 클릭 캐처는 여전히 화면 전체 하나 — 바깥 클릭 해제 동작은 그대로다.
+    expect(scrim.className).toContain("absolute inset-0");
+    fireEvent.click(scrim);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the whole-screen scrim when the artist turns the canvas preview off", () => {
+    const { rootRef } = mountStudioRootWithCanvas();
+    render(
+      <StudioFilterDialog
+        activeKey="filter:motion-blur"
+        kind="motion-blur"
+        image={{}}
+        rootRef={rootRef}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "캔버스 미리보기" }));
+
+    const scrim = backdrop();
+    expect(scrim.dataset.studioFilterPreviewCutout).toBeUndefined();
+    const bands = [...scrim.querySelectorAll("span")].filter((band) =>
+      band.className.includes("backdrop-blur-sm"),
+    );
+    expect(bands).toHaveLength(1);
+    expect(bands[0]?.className).toContain("inset-0");
+  });
+
+  it("returns focus to the working canvas instead of the shortcut-swallowing menu trigger", () => {
+    withStubbedLayout(() => {
+      const { root, rootRef, viewport } = mountStudioRootWithCanvas();
+      const menu = document.createElement("nav");
+      menu.setAttribute("data-studio-shortcut-boundary", "true");
+      const trigger = document.createElement("button");
+      menu.append(trigger);
+      root.append(menu);
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+
+      const view = render(
+        <StudioFilterDialog
+          activeKey="filter:motion-blur"
+          kind="motion-blur"
+          image={{}}
+          rootRef={rootRef}
+          onPreview={vi.fn()}
+          onApply={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      // 모달은 먼저 다이얼로그 안으로 포커스를 가져간다.
+      expect(document.activeElement).not.toBe(trigger);
+
+      view.unmount();
+
+      expect(document.activeElement).toBe(viewport);
+    });
+  });
+
+  it("keeps the default trigger restoration when the launcher does not swallow shortcuts", () => {
+    withStubbedLayout(() => {
+      const { root, rootRef } = mountStudioRootWithCanvas();
+      const trigger = document.createElement("button");
+      root.append(trigger);
+      trigger.focus();
+
+      const view = render(
+        <StudioFilterDialog
+          activeKey="filter:motion-blur"
+          kind="motion-blur"
+          image={{}}
+          rootRef={rootRef}
+          onPreview={vi.fn()}
+          onApply={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      view.unmount();
+
+      expect(document.activeElement).toBe(trigger);
+    });
   });
 });

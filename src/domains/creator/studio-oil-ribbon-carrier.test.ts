@@ -23,12 +23,40 @@ describe("studio oil/acrylic ribbon carrier", () => {
     expect(plan.repeatedBodyStampCount).toBe(0);
     expect(plan.body).not.toBeNull();
     expect(plan.body!.points.length).toBe(dabs.length * 4 + 12);
-    expect(plan.bristleLanes).toHaveLength(5);
-    expect(plan.bristleLanes.every((lane) => lane.points.length === dabs.length * 2))
-      .toBe(true);
+    // Five bristles cut into runs and regrouped into load bands. Every station of every bristle
+    // is still covered — the relief is quantised for compositing, never dropped.
+    expect(plan.bristleLanes.length).toBeGreaterThan(0);
+    const runStations = plan.bristleLanes
+      .flatMap((lane) => lane.runs)
+      .reduce((total, run) => total + run.points.length / 2, 0);
+    expect(runStations).toBeGreaterThanOrEqual(5 * dabs.length);
     expect(plan.bodyOpacity).toBeGreaterThan(
       dabs.reduce((sum, dab) => sum + dab.opacity, 0) / dabs.length,
     );
+  });
+
+  it("keeps bristle load varying along the stroke instead of collapsing it to one mean", () => {
+    const dabs = planOilBrushDabs({
+      points: [0, 0, 240, 0, 480, 0, 720, 0],
+      pressures: [0.6, 0.6, 0.6, 0.6],
+      baseWidth: 22,
+      seed: 7,
+    });
+    const plan = planStudioOilRibbonCarrier(dabs);
+    expect(plan.bristleLanes).toHaveLength(2);
+    const opacities = plan.bristleLanes.map(({ opacity }) => opacity);
+    const widths = plan.bristleLanes.map(({ lineWidth }) => lineWidth);
+    // A single averaged lane made this range exactly zero, which is what a 770 px measured stroke
+    // reported as a length-axis coefficient of variation of 0.002.
+    expect(Math.max(...opacities) - Math.min(...opacities)).toBeGreaterThan(0.4);
+    // Both bands must actually be spread over the stroke rather than one band owning everything.
+    for (const lane of plan.bristleLanes) {
+      expect(lane.runs.length).toBeGreaterThan(8);
+    }
+    // The ridge must be a material fraction of the ribbon rather than a hairline.
+    const meanRadiusY = dabs.reduce((sum, dab) => sum + dab.radiusY, 0) / dabs.length;
+    expect(Math.max(...widths)).toBeGreaterThan(meanRadiusY * 0.15);
+    expect(Math.max(...widths)).toBeLessThan(meanRadiusY * 0.45);
   });
 
   it("keeps an 8k-pixel acrylic stroke dense with a bounded 4096-station ribbon", () => {

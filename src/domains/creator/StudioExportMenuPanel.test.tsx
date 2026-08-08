@@ -3,10 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resetStudioExportGeometryDraft } from "./studio-export-geometry-draft";
 import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
 } from "./studio-export-package-preflight";
+import {
+  readStudioExportResolutionDpi,
+  resetStudioExportResolutionDpi,
+} from "./studio-raster-resolution-metadata";
 import { STUDIO_Z } from "./studio-z-index";
 import { StudioExportMenuPanel } from "./StudioExportMenuPanel";
 
@@ -55,6 +60,9 @@ const baseProps = {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // Print geometry deliberately survives panel unmounts in product; isolate it per case.
+  resetStudioExportGeometryDraft();
+  resetStudioExportResolutionDpi();
 });
 
 describe("StudioExportMenuPanel commercial chrome", () => {
@@ -363,5 +371,127 @@ describe("StudioExportMenuPanel page-range capture paths", () => {
       expect(archiveStatus?.textContent).toMatch(/CBZ 2페이지/u);
       expect(archiveStatus?.textContent).toMatch(/페이지 2–3/u);
     });
+  });
+});
+
+describe("StudioExportMenuPanel print resolution honesty", () => {
+  it("states the DPI the current scale really delivers and blocks the 300 DPI claim", () => {
+    render(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        exportScale={3}
+        pageCount={1}
+        pageLabels={["1"]}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("export-geometry-preset-print300-a4"));
+
+    // 720×1080 at 3× is 2160×3240 px — 254 DPI on a 216×303 mm sheet, not the requested 300.
+    expect(screen.getByTestId("export-geometry-actual").textContent).toContain("2160×3240px");
+    expect(screen.getByTestId("export-geometry-actual").textContent).toContain("254DPI");
+
+    const alert = screen.getByTestId("export-geometry-dpi-alert");
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(alert.textContent).toContain("254DPI");
+    expect(alert.textContent).toContain("300DPI");
+    expect(alert.textContent).toContain("3.55×");
+  });
+
+  it("recommends the exact scale that reaches the target instead of clamping to 3×", () => {
+    const setExportScale = vi.fn();
+    render(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        exportScale={3}
+        pageCount={1}
+        pageLabels={["1"]}
+        setExportScale={setExportScale}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("export-geometry-preset-print300-a4"));
+    const recommend = screen.getByTestId("export-geometry-recommend-scale");
+    expect(recommend.textContent).toContain("배율 권장");
+    expect(recommend.textContent).toContain("3.55×");
+    fireEvent.click(recommend);
+    expect(setExportScale).toHaveBeenCalledWith(3.55);
+  });
+
+  it("never promises that trim/bleed are applied to the pixels", () => {
+    const html = renderToStaticMarkup(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        pageCount={1}
+        pageLabels={["1"]}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+    expect(html).toContain("트림·도련은 픽셀에 적용하지 않습니다");
+    expect(html).toContain("pHYs");
+    expect(html).toContain("목표 DPI");
+  });
+
+  it("publishes the delivered DPI so encoders tag the file with the same number the UI shows", () => {
+    render(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        exportScale={3}
+        pageCount={1}
+        pageLabels={["1"]}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+    // Screen geometry publishes the plain DPI setting.
+    expect(readStudioExportResolutionDpi()).toBe(72);
+
+    fireEvent.click(screen.getByTestId("export-geometry-preset-print300-a4"));
+    // Print geometry publishes the measured DPI, not the requested 300.
+    expect(Math.round(readStudioExportResolutionDpi() ?? 0)).toBe(254);
+  });
+
+  it("keeps the chosen print geometry across panel unmounts", () => {
+    const first = render(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        exportScale={3}
+        pageCount={1}
+        pageLabels={["1"]}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("export-geometry-preset-print300-a4"));
+    expect((screen.getByTestId("export-geometry-dpi") as HTMLInputElement).value).toBe("300");
+    // Closing the export menu unmounts the panel — the geometry must not evaporate with it.
+    first.unmount();
+
+    render(
+      <StudioExportMenuPanel
+        {...baseProps}
+        canvasWidth={720}
+        canvasHeight={1080}
+        exportScale={3}
+        pageCount={1}
+        pageLabels={["1"]}
+        capturePagesForPreset={vi.fn(async () => [])}
+      />,
+    );
+    expect((screen.getByTestId("export-geometry-dpi") as HTMLInputElement).value).toBe("300");
+    expect((screen.getByTestId("export-geometry-trim-w") as HTMLInputElement).value).toBe("210");
+    expect((screen.getByTestId("export-geometry-trim-h") as HTMLInputElement).value).toBe("297");
+    expect((screen.getByTestId("export-geometry-bleed") as HTMLInputElement).value).toBe("3");
+    expect(Math.round(readStudioExportResolutionDpi() ?? 0)).toBe(254);
   });
 });

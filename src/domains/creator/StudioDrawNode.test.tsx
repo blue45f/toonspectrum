@@ -1240,16 +1240,19 @@ describe("StudioDrawNode orchestration", () => {
       return result;
     };
 
+    // Two compound fills, never more: one base wash and one rim/fibre detail wash. Each pass is a
+    // single fill, so a self-crossing still receives each wash at most once — the invariant this
+    // test guards — while the marker stops printing a single flat alpha over its whole area.
     expect(renderWash(false)).toEqual({
       lineCount: 0,
       shapeCount: 1,
-      fillCount: 1,
+      fillCount: 2,
       strokeCount: 0,
     });
     expect(renderWash(true)).toEqual({
       lineCount: 0,
       shapeCount: 1,
-      fillCount: 1,
+      fillCount: 2,
       strokeCount: 0,
     });
   });
@@ -1468,6 +1471,7 @@ describe("StudioDrawNode orchestration", () => {
           boundsSpan:
             Math.max(...xs) - Math.min(...xs)
             + Math.max(...ys) - Math.min(...ys),
+          detailAlpha: context.fillAlphas[1],
           fillCount: context.fillPolygons.length,
           separateCaps: context.arcs.length + context.fillRects.length,
           strokeCount: context.strokeWidths.length,
@@ -1483,7 +1487,11 @@ describe("StudioDrawNode orchestration", () => {
 
       expect(heavy.boundsSpan).toBeGreaterThan(light.boundsSpan);
       expect(heavy.alpha).toBeGreaterThan(light.alpha);
-      expect(heavy.fillCount).toBe(1);
+      // Base wash + detail wash; still no per-segment capsule stack.
+      expect(heavy.fillCount).toBe(2);
+      // The rim/fibre wash is a lighter second glaze, never a repaint of the whole body.
+      expect(heavy.detailAlpha).toBeGreaterThan(0);
+      expect(heavy.detailAlpha).toBeLessThan(heavy.alpha ?? 0);
       expect(heavy.separateCaps).toBe(0);
       expect(heavy.strokeCount).toBe(0);
       expect(liveHeavy).toEqual(heavy);
@@ -1544,7 +1552,7 @@ describe("StudioDrawNode orchestration", () => {
     );
 
     expect(active).toEqual(retained);
-    expect(active.fillCount).toBe(1);
+    expect(active.fillCount).toBe(2);
     expect(exportedOutline).toEqual(active.outline);
     expect(exportedAlpha).toBeCloseTo(active.alpha ?? 0, 6);
     expect(exported).not.toContain("data-pressure-endcap=");

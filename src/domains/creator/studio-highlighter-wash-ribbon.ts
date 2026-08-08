@@ -42,6 +42,23 @@ export interface StudioHighlighterWashRun {
   readonly role: "body" | "join" | "start-cap" | "end-cap" | "tap";
 }
 
+/**
+ * Second wash: where a felt marker actually leaves more pigment than its own average.
+ *
+ * A highlighter is not a rectangle of uniform dye. Solvent migrates to the wet boundary and dries
+ * there, so the rim of a stroke is visibly darker than its middle — "edge pooling" — and the felt
+ * chisel's fibre bundles drag streaks of extra ink along the travel direction. Without them the
+ * measured stroke printed exactly ONE alpha value over its whole area: a flat translucent bar.
+ *
+ * These runs form their own compound path and are filled ONCE, exactly like the base wash, so the
+ * module's central invariant survives: any point of one gesture receives at most one base wash and
+ * at most one detail wash, no matter how the gesture crosses itself.
+ */
+export interface StudioHighlighterWashDetailRun {
+  readonly outlinePoints: readonly number[];
+  readonly role: "edge-pool" | "fibre";
+}
+
 export interface StudioHighlighterWashPlan {
   readonly version: typeof STUDIO_HIGHLIGHTER_WASH_RIBBON_VERSION;
   readonly brushId: StudioHighlighterWashBrushId;
@@ -56,6 +73,10 @@ export interface StudioHighlighterWashPlan {
    */
   readonly opacityScale: number;
   readonly runs: readonly StudioHighlighterWashRun[];
+  /** Rim pooling and fibre streaks, filled as one additional pass over the base wash. */
+  readonly detailRuns: readonly StudioHighlighterWashDetailRun[];
+  /** Alpha of that second pass, relative to the gesture's own wash. */
+  readonly detailOpacityScale: number;
 }
 
 export interface StudioHighlighterWashPathSink {
@@ -464,6 +485,129 @@ function compoundCoverage(
   return Object.freeze(coverage);
 }
 
+/**
+ * Detail-wash character per marker.
+ *
+ * `poolRatio` is the rim band as a fraction of the half width; `fibreCount` is how many streaks the
+ * chisel drags; `fibreDuty` is the fraction of the travel a streak actually deposits on (a felt
+ * fibre skips); `opacityScale` is the second wash's strength relative to the first.
+ */
+const HIGHLIGHTER_DETAIL_PROFILES: Readonly<Record<
+  StudioHighlighterWashBrushId,
+  { poolRatio: number; fibreCount: number; fibreDuty: number; opacityScale: number }
+>> = {
+  // Chisel felt: strong rim, few broad fibre bundles.
+  highlighter: { poolRatio: 0.2, fibreCount: 3, fibreDuty: 0.55, opacityScale: 0.34 },
+  // A wider flat chisel spreads the same dye over more area: thinner rim, more bundles.
+  "chisel-highlighter": { poolRatio: 0.16, fibreCount: 4, fibreDuty: 0.6, opacityScale: 0.3 },
+  // Pastel ink is already granular from its own cap roughness; keep the second wash gentle.
+  "pastel-highlighter": { poolRatio: 0.18, fibreCount: 3, fibreDuty: 0.5, opacityScale: 0.24 },
+};
+
+/** Deterministic per-(section, fibre) duty gate — no RNG so replay and export stay identical. */
+function fibreDeposits(sectionIndex: number, fibreIndex: number, duty: number): boolean {
+  const hash = Math.sin((sectionIndex + 1) * 12.9898 + (fibreIndex + 1) * 78.233) * 43_758.545_3;
+  return hash - Math.floor(hash) < duty;
+}
+
+function bandOutline(
+  section: FlatSection,
+  innerRatio: number,
+  outerRatio: number,
+): readonly number[] {
+  const direction = normalizedDirection(section.from, section.to);
+  if (!direction) return Object.freeze([]);
+  const normal = { x: -direction.y, y: direction.x };
+  const inner = section.halfWidth * innerRatio;
+  const outer = section.halfWidth * outerRatio;
+  return sameWinding([
+    quantize(section.from.x + normal.x * inner),
+    quantize(section.from.y + normal.y * inner),
+    quantize(section.to.x + normal.x * inner),
+    quantize(section.to.y + normal.y * inner),
+    quantize(section.to.x + normal.x * outer),
+    quantize(section.to.y + normal.y * outer),
+    quantize(section.from.x + normal.x * outer),
+    quantize(section.from.y + normal.y * outer),
+  ]);
+}
+
+/**
+ * Cut the flattened path into equal arc-length steps.
+ *
+ * The detail wash cannot be keyed to sections: a straight, constant-pressure gesture flattens into
+ * a handful of very long sections, so per-section modulation would hold one value for the whole
+ * stroke — which is exactly the flat bar being fixed. Stepping by a multiple of the nib width makes
+ * the rim swell and the fibres skip on the scale of the nib, independent of how the input happened
+ * to be sampled.
+ */
+function stepSections(sections: readonly FlatSection[]): readonly FlatSection[] {
+  const stepped: FlatSection[] = [];
+  for (const section of sections) {
+    const length = Math.hypot(
+      section.to.x - section.from.x,
+      section.to.y - section.from.y,
+    );
+    const step = Math.max(POINT_EPSILON, section.halfWidth * 1.6);
+    const count = Math.min(4_096, Math.max(1, Math.ceil(length / step)));
+    for (let index = 0; index < count; index += 1) {
+      const t0 = index / count;
+      const t1 = (index + 1) / count;
+      stepped.push(Object.freeze({
+        from: Object.freeze({
+          x: section.from.x + (section.to.x - section.from.x) * t0,
+          y: section.from.y + (section.to.y - section.from.y) * t0,
+        }),
+        to: Object.freeze({
+          x: section.from.x + (section.to.x - section.from.x) * t1,
+          y: section.from.y + (section.to.y - section.from.y) * t1,
+        }),
+        halfWidth: section.halfWidth,
+        opacityScale: section.opacityScale,
+      }));
+    }
+  }
+  return Object.freeze(stepped);
+}
+
+function planDetailRuns(
+  flatSections: readonly FlatSection[],
+  brushId: StudioHighlighterWashBrushId,
+): readonly StudioHighlighterWashDetailRun[] {
+  const profile = HIGHLIGHTER_DETAIL_PROFILES[brushId];
+  const sections = stepSections(flatSections);
+  const runs: StudioHighlighterWashDetailRun[] = [];
+  for (const [sectionIndex, section] of sections.entries()) {
+    for (const [sideIndex, side] of ([1, -1] as const).entries()) {
+      // Pooling is uneven: the wet edge dries where it happens to stall, so the rim thickens,
+      // thins and breaks as the marker travels. An unbroken rim of constant thickness is just a
+      // second flat bar — the outermost row would carry one alpha for the whole stroke.
+      if (!fibreDeposits(sectionIndex, 11 + sideIndex, 0.72)) continue;
+      const swell = 0.55
+        + (fibreDeposits(sectionIndex, 23 + sideIndex, 0.5) ? 0.85 : 0.2);
+      const outline = bandOutline(
+        section,
+        side * (1 - profile.poolRatio * swell),
+        side * 1,
+      );
+      if (outline.length > 0) {
+        runs.push(Object.freeze({ outlinePoints: outline, role: "edge-pool" as const }));
+      }
+    }
+    for (let fibreIndex = 0; fibreIndex < profile.fibreCount; fibreIndex += 1) {
+      if (!fibreDeposits(sectionIndex, fibreIndex, profile.fibreDuty)) continue;
+      // Fibres sit inside the rim so they read as bundle streaks, not as a second rim.
+      const centre = -0.62 + (1.24 * (fibreIndex + 0.5)) / profile.fibreCount;
+      const halfBand = 0.62 / profile.fibreCount / 2;
+      const outline = bandOutline(section, centre - halfBand, centre + halfBand);
+      if (outline.length > 0) {
+        runs.push(Object.freeze({ outlinePoints: outline, role: "fibre" as const }));
+      }
+    }
+  }
+  return Object.freeze(runs);
+}
+
 function weightedOpacity(sections: readonly FlatSection[]): number {
   let weighted = 0;
   let distance = 0;
@@ -497,6 +641,8 @@ export function planStudioHighlighterWashRibbon(input: {
       capped: false,
       opacityScale: 1,
       runs: Object.freeze([]),
+      detailRuns: Object.freeze([]),
+      detailOpacityScale: 0,
     });
   }
   const flattened = flattenPressurePath(input.pressurePath, baseWidth);
@@ -514,6 +660,8 @@ export function planStudioHighlighterWashRibbon(input: {
     capped: flattened.capped,
     opacityScale: weightedOpacity(flattened.sections),
     runs: Object.freeze(runs),
+    detailRuns: planDetailRuns(flattened.sections, input.brushId),
+    detailOpacityScale: HIGHLIGHTER_DETAIL_PROFILES[input.brushId].opacityScale,
   });
 }
 
@@ -566,6 +714,9 @@ export function planStudioHighlighterWashTap(input: {
     capped: false,
     opacityScale,
     runs: Object.freeze(run ? [run] : []),
+    // A tap has no travel direction, so it has no fibre drag and no wet-edge migration to speak of.
+    detailRuns: Object.freeze([]),
+    detailOpacityScale: 0,
   });
 }
 
@@ -592,6 +743,44 @@ function formatPathNumber(value: number): string {
   return Number.isInteger(value)
     ? String(value)
     : value.toFixed(4).replace(/0+$/u, "").replace(/\.$/u, "");
+}
+
+/** Rim/fibre pass geometry; empty when the gesture has no detail wash. */
+export function traceStudioHighlighterWashDetail(
+  sink: StudioHighlighterWashPathSink,
+  plan: StudioHighlighterWashPlan,
+): void {
+  for (const run of plan.detailRuns) {
+    const [firstX, firstY, ...remaining] = run.outlinePoints;
+    if (firstX === undefined || firstY === undefined) continue;
+    sink.moveTo(firstX, firstY);
+    for (let index = 0; index < remaining.length; index += 2) {
+      const x = remaining[index];
+      const y = remaining[index + 1];
+      if (x === undefined || y === undefined) break;
+      sink.lineTo(x, y);
+    }
+    sink.closePath();
+  }
+}
+
+function outlinePathData(outlinePoints: readonly number[]): string {
+  const [firstX, firstY, ...remaining] = outlinePoints;
+  if (firstX === undefined || firstY === undefined) return "";
+  let path = `M${formatPathNumber(firstX)} ${formatPathNumber(firstY)}`;
+  for (let index = 0; index < remaining.length; index += 2) {
+    const x = remaining[index];
+    const y = remaining[index + 1];
+    if (x === undefined || y === undefined) break;
+    path += `L${formatPathNumber(x)} ${formatPathNumber(y)}`;
+  }
+  return `${path}Z`;
+}
+
+export function studioHighlighterWashDetailPathData(
+  plan: StudioHighlighterWashPlan,
+): string {
+  return plan.detailRuns.map((run) => outlinePathData(run.outlinePoints)).join("");
 }
 
 export function studioHighlighterWashPlanPathData(

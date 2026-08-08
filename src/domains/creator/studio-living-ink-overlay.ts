@@ -179,7 +179,10 @@ export class StudioLivingInkOverlayRenderer {
     const output = document.createElement("canvas");
     output.width = frame.image.width;
     output.height = frame.image.height;
-    const outputContext = output.getContext("2d", { alpha: false });
+    // Alpha must survive: the canonical PNG becomes a page-sized document layer, and the resolve
+    // uses alpha to say where the wash actually is. `{ alpha: false }` here flattened the wash onto
+    // an opaque paper sheet, so one stroke repainted the whole page in the exported PNG.
+    const outputContext = output.getContext("2d", { alpha: true });
     if (!outputContext) {
       frame.image.close();
       throw new Error("Living Ink canonical 표면을 만들 수 없습니다.");

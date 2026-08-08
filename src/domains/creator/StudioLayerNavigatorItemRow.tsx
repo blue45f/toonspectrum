@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   memo,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -189,9 +190,14 @@ export const StudioLayerNavigatorItemRow = memo(
     });
     const visibleStatuses = visibleStudioLayerPaletteStatuses(statuses);
     const statusSummary = statuses.map((status) => status.label).join(", ");
-    const opacityPercent = Math.round(
+    const committedOpacityPercent = Math.round(
       Math.min(1, Math.max(0, item.opacity ?? 1)) * 100
     );
+    // One scrub gesture must be one undo step. The scrubber previews into this draft while the
+    // pointer is down (or an arrow run is still going) and hands the settled value to the
+    // document exactly once, so the history stack gets one entry instead of one per 1%.
+    const [opacityDraft, setOpacityDraft] = useState<number | null>(null);
+    const opacityPercent = opacityDraft ?? committedOpacityPercent;
 
     return (
       <li role="none">
@@ -412,7 +418,14 @@ export const StudioLayerNavigatorItemRow = memo(
             step={1}
             valueText={`${opacityPercent}%`}
             disabled={readOnly || effectivelyLocked}
-            onChange={(next) => stableHandlers.onSetItemOpacity(item.id, next / 100)}
+            onChange={setOpacityDraft}
+            onCommit={(next) => {
+              // Clearing the draft in the same batch as the mutation means a rejected commit
+              // (read-only page, save in flight) snaps back to the truth instead of lying.
+              setOpacityDraft(null);
+              if (next === committedOpacityPercent) return;
+              stableHandlers.onSetItemOpacity(item.id, next / 100);
+            }}
             className={cn(
               "grid h-7 w-9 shrink-0 place-items-center rounded text-[0.58rem] font-bold tabular-nums text-fg-3 transition-colors hover:bg-raised hover:text-fg",
               STUDIO_LAYER_NAVIGATOR_COARSE_TARGET,

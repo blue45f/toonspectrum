@@ -32,8 +32,17 @@ export interface StudioLayerMergePlan {
   insertIndex: number;
   /** Union bounds of sources when bounds map is provided; otherwise null. */
   bounds: StudioLayerBounds | null;
-  /** Suggested name for the baked layer. */
+  /**
+   * Suggested name for the result row. Never a raw element id — the row this names is read by a
+   * human, and `병합 e6659cca` told them nothing except that something hashed happened.
+   */
   resultName: string;
+  /**
+   * False when at least one source is not an image layer. The bake can only composite images, so
+   * such a plan lands on the non-destructive group fallback and the row count goes *up*.
+   * Surfaces must say so before the click instead of calling the result a merge.
+   */
+  bakesToSingleLayer: boolean;
 }
 
 export type StudioLayerMergeResult =
@@ -70,6 +79,31 @@ function unionBounds(
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+/** Type-only twin of `studioMergeSourcesAreRasterizable` — no `src` needed to know a vector blocks the bake. */
+export function studioLayerSourcesBakeToSingleLayer(sources: readonly LayerItemLike[]): boolean {
+  return sources.length >= 2 && sources.every((source) => source.type === "image");
+}
+
+/** Type fallback for layers the author never named. Mirrors `elementLabel` without its asset imports. */
+const UNNAMED_LAYER_LABEL: Record<string, string> = {
+  image: "이미지",
+  draw: "그림",
+  text: "텍스트",
+  bubble: "말풍선",
+  sticker: "스티커",
+  frame: "패널",
+  focusLines: "집중선",
+  speedLines: "속도선",
+};
+
+function resultNameFor(front: LayerItemLike, count: number, bakesToSingleLayer: boolean): string {
+  const authored = front.name?.trim();
+  const base = authored || UNNAMED_LAYER_LABEL[front.type ?? ""] || `레이어 ${count}장`;
+  // The group fallback adds a row instead of removing one. Calling that "병합" is the lie the
+  // layer panel audit caught, so the row the user ends up reading says what actually happened.
+  return bakesToSingleLayer ? `${base} 병합` : `${base} 묶음(병합 보류)`;
+}
+
 function planFromIndices(
   kind: StudioLayerMergeKind,
   items: readonly LayerItemLike[],
@@ -85,7 +119,10 @@ function planFromIndices(
     zIndex,
   }));
   const removeIds = sources.map((source) => source.id);
-  const frontName = items[sorted[sorted.length - 1]!]!.id;
+  const front = items[sorted[sorted.length - 1]!]!;
+  const bakesToSingleLayer = studioLayerSourcesBakeToSingleLayer(
+    sorted.map((zIndex) => items[zIndex]!)
+  );
   return {
     ok: true,
     plan: {
@@ -94,7 +131,8 @@ function planFromIndices(
       sources,
       insertIndex: sorted[0]!,
       bounds: unionBounds(boundsById, removeIds),
-      resultName: `병합 ${frontName.slice(0, 8)}`,
+      resultName: resultNameFor(front, sorted.length, bakesToSingleLayer),
+      bakesToSingleLayer,
     },
   };
 }

@@ -79,10 +79,23 @@ function insightTone(severity: StudioScrollRhythmInsightSeverity): string {
   return "bg-accent";
 }
 
+/**
+ * 진단 줄에 붙일 "사람이 읽는" 페이지 이름. 분석기는 안정적인 참조를 위해 내부 페이지 id
+ * (UUID)를 들고 다니지만, 그 id 는 사용자 화면에 낼 물건이 아니다 — 화면에는
+ * `pageDisplayName`("3페이지" / 사용자가 지은 이름)만 내고, id 는 아래 `data-page-id`
+ * 속성(DOM·자동화·버그리포트가 읽는 자리)에 그대로 남긴다. 정보를 지우는 게 아니라
+ * 청중을 나누는 것.
+ */
+function buildPageLabelMap(pages: readonly ScrollPreviewPage[]): ReadonlyMap<string, string> {
+  return new Map(pages.map((page, index) => [page.id, pageDisplayName(page, index)]));
+}
+
 function RhythmSummaryCard({
   analysis,
+  pageLabels,
 }: {
   analysis: StudioScrollRhythmAnalysis;
+  pageLabels: ReadonlyMap<string, string>;
 }): ReactElement {
   return (
     <aside
@@ -145,6 +158,8 @@ function RhythmSummaryCard({
           analysis.insights.slice(0, 5).map((insight, index) => (
             <div
               key={`${insight.code}-${insight.pageId ?? "document"}-${index}`}
+              data-insight-code={insight.code}
+              data-page-id={insight.pageId ?? undefined}
               className="rounded-lg border border-line bg-card px-2.5 py-2"
             >
               <div className="flex items-start gap-2">
@@ -155,8 +170,10 @@ function RhythmSummaryCard({
                 <div className="min-w-0">
                   <p className="text-[0.68rem] font-semibold text-fg">
                     {insight.title}
-                    {insight.pageId && (
-                      <span className="ml-1 font-normal text-fg-4">· {insight.pageId}</span>
+                    {insight.pageId && pageLabels.has(insight.pageId) && (
+                      <span className="ml-1 font-normal text-fg-4">
+                        · {pageLabels.get(insight.pageId)}
+                      </span>
                     )}
                   </p>
                   <p className="mt-0.5 text-[0.62rem] leading-4 text-fg-4">
@@ -241,6 +258,7 @@ export function StudioScrollPreviewPanel({
     viewportHeightPx: 1_280,
     pageGapPx: PAGE_GAP_PX,
   });
+  const pageLabels = buildPageLabelMap(pages);
 
   const modal = (
     <div
@@ -368,7 +386,9 @@ export function StudioScrollPreviewPanel({
               showRhythmAnalysis ? "max-w-5xl flex-col lg:flex-row" : "max-w-max"
             )}
           >
-            {showRhythmAnalysis && <RhythmSummaryCard analysis={rhythmAnalysis} />}
+            {showRhythmAnalysis && (
+              <RhythmSummaryCard analysis={rhythmAnalysis} pageLabels={pageLabels} />
+            )}
             <div className="mx-auto shrink-0" style={{ width: framePx, maxWidth: "100%" }}>
               {pages.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-line px-3 py-8 text-center text-xs text-fg-4">

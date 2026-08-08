@@ -178,8 +178,36 @@ export interface GroupClickSelectionInput {
 }
 
 /**
+ * "이미 선택된 멤버를 Shift 없이 눌렀다" — 누름(press) 단계에서 다중 선택을 유지해야 하는가.
+ *
+ * Figma·PowerPoint·클립스튜디오·일러스트레이터가 공유하는 규약이다. 여러 개를 골라 둔 상태에서
+ * 그중 하나를 눌러 끌면 선택 전체가 함께 움직여야 한다. 누름 즉시 하나로 좁히면 그 드래그는
+ * 클릭한 하나만 옮기고 정렬해 둔 컷이 찢어진다(측정된 결함 D4).
+ *
+ * 좁히기는 버리는 게 아니라 미루는 것이다 — `planGroupClickSelectionRelease` 가 "드래그 없이 뗀"
+ * 순간에만 같은 판정을 재사용해 클릭한 단위로 좁힌다.
+ *
+ * `unit.length >= currentIds.length` 는 유지할 이유가 없다. 그 경우 단위가 곧 현재 선택이므로
+ * 유지하든 대체하든 결과가 같고, 좁힐 여지도 없다.
+ */
+function preservesMultiSelectionOnPress(
+  current: GroupSelectionState,
+  unit: readonly string[],
+  additive: boolean | undefined
+): boolean {
+  if (additive === true) return false;
+  if (unit.length === 0) return false;
+  const currentIds = currentSelectionIds(current);
+  if (currentIds.length < 2) return false;
+  if (unit.length >= currentIds.length) return false;
+  const currentSet = new Set(currentIds);
+  return unit.every((id) => currentSet.has(id));
+}
+
+/**
  * 캔버스 단일/Shift 클릭의 다음 선택 상태를 계산한다.
  *  - 일반 클릭: 단위(그룹 전체 또는 개별)로 통째로 대체.
+ *  - 단, 단위가 이미 현재 다중 선택 안에 통째로 들어 있으면 그 다중 선택을 유지한다(위 참고).
  *  - Shift 클릭: 단위가 전부 이미 선택돼 있으면 단위 전체 제거, 아니면 단위 전체 추가(z-order 유지).
  * 가산 선택은 최상위 레벨 작업이므로 진입 상태를 해제한다(단, 활성 그룹 내부 자식 토글이면 유지).
  */
@@ -193,6 +221,13 @@ export function planGroupClickSelection(input: GroupClickSelectionInput): GroupS
   );
 
   if (!input.additive) {
+    if (preservesMultiSelectionOnPress(input.current, unit, input.additive)) {
+      return {
+        selectedId: input.current.selectedId,
+        marqueeIds: [...input.current.marqueeIds],
+        activeGroupId: nextActiveGroupId,
+      };
+    }
     const shape = selectionShapeForIds(unit);
     return { ...shape, activeGroupId: nextActiveGroupId };
   }
@@ -216,6 +251,30 @@ export function planGroupClickSelection(input: GroupClickSelectionInput): GroupS
   const stayInside =
     input.current.activeGroupId !== null && nextActiveGroupId === input.current.activeGroupId;
   return { ...shape, activeGroupId: stayInside ? input.current.activeGroupId : null };
+}
+
+/**
+ * "드래그 없이 뗐다"(pointerup/click)에서만 일어나는 좁히기를 계산한다.
+ *
+ * `planGroupClickSelection` 이 누름 단계에서 다중 선택을 유지한 그 경우에만 클릭한 단위로 좁히고,
+ * 그 밖에는 `null`(할 일 없음)을 돌려준다. 누름과 같은 판정을 재사용하므로 두 단계는 갈라질 수 없다.
+ *
+ * 이 함수는 "드래그였는가"를 스스로 알지 못한다 — 호출부가 드래그 없는 뗌에서만 불러야 한다.
+ * Konva 는 실제 드래그가 일어나면 `click`/`tap` 을 아예 발화하지 않으므로(DragAndDrop
+ * `_endDragBefore` 가 `_mouseListenClick`/`_touchListenClick` 을 내린다) 그 이벤트가 곧 규약이다.
+ */
+export function planGroupClickSelectionRelease(
+  input: GroupClickSelectionInput
+): GroupSelectionState | null {
+  const knownGroupIds = new Set(input.groups.map((group) => group.id));
+  const { unit, nextActiveGroupId } = resolveClickUnit(
+    input.items,
+    knownGroupIds,
+    input.clickedId,
+    input.current.activeGroupId
+  );
+  if (!preservesMultiSelectionOnPress(input.current, unit, input.additive)) return null;
+  return { ...selectionShapeForIds(unit), activeGroupId: nextActiveGroupId };
 }
 
 export interface GroupEnterInput {

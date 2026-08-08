@@ -126,9 +126,10 @@ describe("Studio rich-hint consumer mappings", () => {
     expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "shape" as const');
     expectNearby(mobile, "const shapeHintPreviewProps", "hintPreviewVariant: drawShape");
     expectNearby(mobile, "const shapeHintPreviewProps", 'hintPreview: "draw-settings" as const');
-    expectNearby(mobile, 'label="도형"', "{...shapeHintPreviewProps}");
-    expectNearby(mobile, 'label="브러시"', 'hintPreview="draw-settings"');
-    expectNearby(mobile, 'label="브러시"', 'hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}');
+    // The dock's labels now resolve through the locale packs, so anchor on the label binding.
+    expectNearby(mobile, "label={label.shape}", "{...shapeHintPreviewProps}");
+    expectNearby(mobile, "label={label.brush}", 'hintPreview="draw-settings"');
+    expectNearby(mobile, "label={label.brush}", 'hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}');
     expectNearby(menubar, "assets: {", 'preview: "assets"');
     expectNearby(menubar, "exportOptions: {", 'preview: "export-options"');
     expectNearby(menubar, "project: {", 'preview: "project"');

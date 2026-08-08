@@ -1,22 +1,26 @@
 /**
- * Studio Bubble Text Fit — 말풍선 "크기 고정 시 폰트 자동 축소" 순수 엔진.
+ * Studio Bubble Text Fit — 말풍선 **타이포그래피 단일 소스**이자 두 자동 맞춤 엔진.
  *
- * 기존 동작(StudioPage.tsx의 commitEditText, grep "말풍선은 텍스트가 넘치지 않게 높이를 자동
- * 확장")은 텍스트가 넘치면 말풍선 "높이"를 늘려 항상 다 들어오게 한다(폭은 고정). 이 모듈은 그
- * 반대 모드 — 사용자가 말풍선 크기(폭·높이)를 고정하고 싶을 때, 높이를 늘리는 대신 폰트 크기를
- * 이진 탐색으로 줄여 고정된 박스 안에 맞추는 계산만 담당한다(Canva/Figma의 "autosize: shrink
- * text on overflow"와 동일한 패턴).
+ * 말풍선에는 대사가 상자를 넘칠 때의 대응이 둘 있다.
+ *  · 기본 모드: 상자 **높이**를 늘려 다 들어오게 한다 → `fitBubbleBoxHeightToText`
+ *  · "크기 고정"(autoShrinkText): 높이 대신 **폰트 크기**를 이진 탐색으로 줄인다
+ *    → `fitBubbleFontSize` (Canva/Figma의 "autosize: shrink text on overflow"와 같은 패턴)
+ * 둘은 **같은 판정**(`bubbleTextFitsInBox`)을 공유한다 — 서로 다른 여유/패딩을 가정하면 한쪽이
+ * "맞다"고 한 상자를 다른 쪽이 "넘친다"고 보는 모순이 생긴다.
+ *
+ * 그리고 이 모듈은 렌더·측정·맞춤 세 경로가 공유하는 기본값(행간·글꼴 두께·자간·패딩)의 유일한
+ * 소스다. 이 값들이 경로마다 달랐던 것이 "커밋하면 대사가 조용히 사라진다" 결함의 뿌리였다
+ * (아래 "말풍선 타이포그래피 기본값 단일 소스" 절 참고).
  *
  * 전부 순수·결정적 — 텍스트 폭 측정은 호출부가 주입하는 BubbleTextMeasurer 포트로 분리했다
  * (studio-pdf-contact-sheet.ts의 ctx.measureText 기반 이진 탐색과 동일한 관례: 코어 알고리즘은
  * Canvas/Konva 런타임과 무관하고, 테스트는 글자 수 기반 가짜 측정기를 주입해 결정적으로 검증
  * 한다). 실제 화면에서는 createCanvasBubbleTextMeasurer()가 만드는 실제 2D 컨텍스트 측정기를 쓴다.
  *
- * 패딩 계산(bubbleHorizontalPadding/bubbleVerticalPadding)은 StudioPage.tsx가 이미 쓰고 있는
- * bHPad/bVPadTop/bVPadBot 공식(폰트 크기의 0.6/0.48/0.64배, 최소 12/8/10px)을 그대로 옮겨온
- * 것이다 — 두 곳이 다른 공식을 쓰면 "탐색이 가정한 여유 폭"과 "실제 렌더 여유 폭"이 어긋나
- * 잘못된 크기를 고를 수 있어, 하나의 소스를 공유해야 한다(통합 설계 문서 §2 참고 — StudioPage.tsx의
- * 인라인 공식도 이 함수를 호출하도록 바꾼다).
+ * 패딩 계산(bubbleHorizontalPadding/bubbleVerticalPadding)은 폰트 크기의 0.6/0.48/0.64배(최소
+ * 12/8/10px) 공식이며, 렌더(StudioKonvaBubbleNode)·커밋 측정(StudioPage.commitEditText)·인라인
+ * 편집(StudioTextEditOverlay)·높이 맞춤(studio-fit)이 전부 여기를 호출한다 — 두 곳이 다른 공식을
+ * 쓰면 "탐색이 가정한 여유 폭"과 "실제 렌더 여유 폭"이 어긋나 잘못된 크기를 고른다.
  *
  * 단조성 가정(왜 이진 탐색이 유효한가): fontSize가 작아질수록 (1) hPad/vPad는 `max(고정 하한,
  * fontSize*비율)` 형태라 단조 비증가하므로 사용 가능 폭/높이는 단조 비감소하고, (2) 같은 폭에서
@@ -37,13 +41,84 @@
 import { layoutVerticalText, type VerticalBlockAlign } from "./studio-vertical-text";
 
 export interface BubbleTextMeasurer {
-  /** text를 (fontPx, fontFamily, fontStyle)로 그렸을 때의 렌더 폭(px). letterSpacing은 무시한다
-   *  (근사 — letterSpacing이 있는 말풍선은 실제보다 살짝 여유 있게 계산될 수 있다). */
+  /** text를 (fontPx, fontFamily, fontStyle)로 그렸을 때의 렌더 폭(px). 자간은 포함하지 않는다 —
+   *  자간이 필요한 호출부는 `withBubbleLetterSpacing()`으로 감싸서 Konva 와 같은 규약으로 얹는다. */
   measureWidth(text: string, fontPx: number, fontFamily: string, fontStyle: string): number;
 }
 
 /** 자동 축소 하한 기본값 — 패널 슬라이더/렌더 통합이 공유한다. */
 export const BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT = 10;
+
+// ── 말풍선 타이포그래피 기본값 단일 소스 ─────────────────────────────────────
+//
+// 2026-08 브라우저 감사에서 "커밋하면 대사가 조용히 잘린다"가 측정됐다. 원인은 **같은 말풍선의
+// 줄높이·글꼴 두께 기본값이 경로마다 달랐던 것**이다:
+//   · 렌더(StudioKonvaBubbleNode)            → lineHeight 1.25/1.35/1.4, fontStyle "bold"
+//   · 커밋 측정(StudioPage.commitEditText)   → lineHeight 1.1,            fontStyle 미지정(normal)
+//   · 높이 맞춤(studio-fit.estimateBubbleHeight) → lineHeight 1.2
+// 1.1로 잰 블록 높이는 실제(1.35 bold)보다 ~13% 낮게 나와 상자가 작게 잡혔고, Konva.Text 는
+// height 가 고정이면 남는 줄을 **경고 없이 버린다**(konva/lib/shapes/Text.js `_setTextData`:
+// `if (fixedHeight && currentHeightPx + lineHeightPx > maxHeightPx) break;`). 그래서 대사가 사라졌다.
+//
+// 아래 상수/리졸버가 그 기본값들의 유일한 소스다. 렌더·측정·맞춤 세 경로 모두 여기만 본다.
+
+export type BubbleWebtoonTheme = "classic" | "soft" | "vivid";
+
+export const BUBBLE_FONT_SIZE_DEFAULT = 24;
+export const BUBBLE_FONT_FAMILY_DEFAULT = "Pretendard, sans-serif";
+/** 말풍선 기본 글꼴 두께 — 렌더가 `el.fontStyle ?? "bold"`이므로 측정도 반드시 bold 로 재야 한다. */
+export const BUBBLE_FONT_STYLE_DEFAULT = "bold";
+
+/** 테마·세로쓰기 조합별 기본 행간(배수). 렌더가 쓰는 값 그대로다. */
+export const BUBBLE_LINE_HEIGHT_DEFAULTS = {
+  vertical: 1.4,
+  classic: 1.25,
+  soft: 1.35,
+  vivid: 1.2,
+} as const;
+
+/**
+ * 테마를 모르는 호출부(예: 자동 콘티 조판)가 쓸 안전한 기본 행간 — 위 표의 **최댓값**이다.
+ * 과소평가는 글자를 잃지만 과대평가는 상자만 조금 넉넉해질 뿐이라, 모를 때는 큰 쪽이 옳다.
+ */
+export const BUBBLE_LINE_HEIGHT_FALLBACK = Math.max(
+  BUBBLE_LINE_HEIGHT_DEFAULTS.vertical,
+  BUBBLE_LINE_HEIGHT_DEFAULTS.classic,
+  BUBBLE_LINE_HEIGHT_DEFAULTS.soft,
+  BUBBLE_LINE_HEIGHT_DEFAULTS.vivid
+);
+
+/** 말풍선 실효 행간 — `el.lineHeight` 우선, 없으면 (세로쓰기 → 테마) 순으로 기본값을 고른다. */
+export function resolveBubbleLineHeight(input: {
+  lineHeight?: number;
+  vertical?: boolean;
+  theme?: BubbleWebtoonTheme;
+}): number {
+  const explicit = input.lineHeight;
+  if (typeof explicit === "number" && Number.isFinite(explicit) && explicit > 0) return explicit;
+  if (input.vertical) return BUBBLE_LINE_HEIGHT_DEFAULTS.vertical;
+  if (!input.theme) return BUBBLE_LINE_HEIGHT_FALLBACK;
+  return BUBBLE_LINE_HEIGHT_DEFAULTS[input.theme];
+}
+
+export function resolveBubbleFontSize(fontSize?: number): number {
+  return typeof fontSize === "number" && Number.isFinite(fontSize) && fontSize > 0
+    ? fontSize
+    : BUBBLE_FONT_SIZE_DEFAULT;
+}
+
+export function resolveBubbleFontFamily(font?: string): string {
+  return font ?? BUBBLE_FONT_FAMILY_DEFAULT;
+}
+
+export function resolveBubbleFontStyle(fontStyle?: string): string {
+  return fontStyle ?? BUBBLE_FONT_STYLE_DEFAULT;
+}
+
+/** 말풍선 자간(px) — 테마에서만 결정된다(요소 필드 없음). 렌더/측정이 공유한다. */
+export function bubbleLetterSpacing(theme?: BubbleWebtoonTheme): number {
+  return theme === "vivid" ? 0 : 0.3;
+}
 
 /** 자동 축소 하한 슬라이더 범위 — 패널 UI가 공유한다. */
 export const BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE = { min: 8, max: 24, step: 1 } as const;
@@ -70,6 +145,43 @@ export function bubbleVerticalPadding(fontSize: number): { top: number; bottom: 
   return {
     top: Math.max(8, Math.round(fontSize * 0.48)),
     bottom: Math.max(10, Math.round(fontSize * 0.64)),
+  };
+}
+
+/** 상/하 패딩 합(px) — "말풍선 전체 높이 ↔ 텍스트 상자 높이" 변환의 단일 소스. */
+export function bubbleVerticalPaddingTotal(fontSize: number): number {
+  const pad = bubbleVerticalPadding(fontSize);
+  return pad.top + pad.bottom;
+}
+
+/** 말풍선 전체 폭 → Konva Text 의 width. 렌더·측정·오버레이가 모두 이 함수만 쓴다. */
+export function bubbleTextBoxWidth(boxWidth: number, fontSize: number): number {
+  return Math.max(8, boxWidth - bubbleHorizontalPadding(fontSize) * 2);
+}
+
+/** 말풍선 전체 높이 → Konva Text 의 height. */
+export function bubbleTextBoxHeight(boxHeight: number, fontSize: number): number {
+  return Math.max(8, boxHeight - bubbleVerticalPaddingTotal(fontSize));
+}
+
+/**
+ * 자간을 얹은 측정기 래퍼 — Konva.Text `_getTextWidth`와 **같은 규약**이다
+ * (`ctx.measureText(t).width + (글자수 - 1) × letterSpacing`). 말풍선은 vivid 외 테마에서
+ * 0.3px 자간을 쓰는데, 이걸 빼고 재면 줄당 3px 안팎을 과소평가해 줄 수가 한 줄 모자라게
+ * 잡힐 수 있다(= 커밋 후 마지막 줄이 사라진다). letterSpacing 이 0/미지정이면 원본을 그대로
+ * 돌려줘 기존 경로는 한 글자도 달라지지 않는다.
+ */
+export function withBubbleLetterSpacing(
+  measurer: BubbleTextMeasurer,
+  letterSpacing: number | undefined
+): BubbleTextMeasurer {
+  if (!letterSpacing) return measurer;
+  return {
+    measureWidth(text, fontPx, fontFamily, fontStyle) {
+      const length = [...text].length;
+      const base = measurer.measureWidth(text, fontPx, fontFamily, fontStyle);
+      return length > 0 ? base + (length - 1) * letterSpacing : base;
+    },
   };
 }
 
@@ -162,15 +274,12 @@ export interface BubbleFontFitInput {
   fontFamily: string;
   fontStyle?: string;
   /**
-   * 행간 배수 — **필수**(선택값이 아니다). 반드시 StudioPage.tsx의 실제 렌더가 쓰는
-   * `bubbleLineHeight`(`el.lineHeight ?? (el.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 :
-   * webtoonTheme === "vivid" ? 1.2 : 1.25)`)와 정확히 같은 값을 호출부가 계산해 넘겨야 한다 —
-   * 테마/세로쓰기 여부에 따라 1.2~1.4 사이에서 갈리므로(어떤 조합에서도 1.1이 나오지 않는다) 이
-   * 모듈은 고정 기본값을 두지 않는다(패딩과 동일하게 "탐색과 실제 렌더가 같은 소스를 공유해야
-   * 한다"는 원칙 — 모듈 상단 docstring 참고). 예전 버전은 `?? 1.1`로 조용히 폴백했는데, 1.1은
-   * 실제로 가능한 어떤 테마/세로 조합보다도 작아 텍스트 블록 높이를 항상 과소평가했다(최대 ~27%
-   * 오차) — 폰트를 필요한 만큼 충분히 줄이지 못해 "크기 고정"인데도 텍스트가 넘치는 회귀로
-   * 이어질 수 있었다(검증 단계에서 발견·수정).
+   * 행간 배수 — **필수**(선택값이 아니다). 반드시 `resolveBubbleLineHeight()` 결과를 넘긴다
+   * (이 모듈이 그 기본값의 유일한 소스다 — 위 "말풍선 타이포그래피 기본값 단일 소스" 참고).
+   * 이 모듈은 고정 기본값을 두지 않는다: 예전 호출부들이 각자 `?? 1.1`, `?? 1.2`로 조용히
+   * 폴백했고, 둘 다 실제로 가능한 어떤 테마/세로 조합(1.2~1.4)보다도 작아 텍스트 블록 높이를
+   * 항상 과소평가했다(최대 ~27% 오차) — 커밋 시 대사가 잘리고, "크기 고정"에서는 폰트를
+   * 충분히 줄이지 못하는 회귀로 이어졌다.
    */
   lineHeight: number;
   /**
@@ -180,7 +289,11 @@ export interface BubbleFontFitInput {
    * 이때 `text`에는 **원문 그대로** 넘겨야 한다(레거시 `formatVerticalText` 전치 문자열이 아니라).
    */
   vertical?: boolean;
-  /** 세로쓰기 전용 — 글자 사이 세로 간격(px). 가로쓰기 경로는 이 값을 쓰지 않는다(측정기가 무시). */
+  /**
+   * 자간(px). 세로쓰기에서는 글자 사이 **세로** 간격, 가로쓰기에서는 Konva.Text 와 같은 규약의
+   * 가로 간격(`(글자수-1) × letterSpacing`)으로 줄바꿈 측정에 반영된다. 미지정/0이면 예전과
+   * 동일하게 무시된다(하위호환).
+   */
   letterSpacing?: number;
   /** 세로쓰기 전용 — 열 안 정렬(가로쓰기 align의 세로축 대응). 판정 결과에는 영향이 없다. */
   blockAlign?: VerticalBlockAlign;
@@ -215,12 +328,10 @@ function fitsAtFontSize(
   fontSize: number,
   measurer: BubbleTextMeasurer
 ): { ok: boolean; lines: string[] } {
-  const fontStyle = input.fontStyle ?? "bold";
+  const fontStyle = resolveBubbleFontStyle(input.fontStyle);
   const lineHeight = input.lineHeight;
-  const hPad = bubbleHorizontalPadding(fontSize);
-  const vPad = bubbleVerticalPadding(fontSize);
-  const availW = Math.max(4, input.boxWidth - hPad * 2);
-  const availH = Math.max(4, (input.boxHeight - (vPad.top + vPad.bottom)) * HEIGHT_SAFETY_MARGIN);
+  const availW = bubbleTextBoxWidth(input.boxWidth, fontSize);
+  const availH = bubbleTextBoxHeight(input.boxHeight, fontSize) * HEIGHT_SAFETY_MARGIN;
   if (input.vertical) {
     // 세로쓰기 — 열은 세로축(availH)으로 끊고, 그렇게 나온 블록 폭이 availW 안이면 맞는 것이다.
     const layout = layoutVerticalText(
@@ -239,9 +350,40 @@ function fitsAtFontSize(
     const columns = layout.columns.map((column) => column.items.map((item) => item.text.split("\n").join("")).join(""));
     return { ok: !layout.overflow && layout.width <= availW, lines: columns };
   }
-  const lines = wrapBubbleTextLines(input.text || " ", availW, fontSize, input.fontFamily, fontStyle, measurer);
+  const lines = wrapBubbleTextLines(
+    input.text || " ",
+    availW,
+    fontSize,
+    input.fontFamily,
+    fontStyle,
+    withBubbleLetterSpacing(measurer, input.letterSpacing)
+  );
   const blockHeight = lines.length * fontSize * lineHeight;
   return { ok: blockHeight <= availH, lines };
+}
+
+/**
+ * "이 폰트 크기로 이 상자에 대사가 다 들어가는가" — 자동 축소 탐색이 쓰는 판정을 그대로 공개한다.
+ * 높이 자동 확장(fitBubbleBoxHeightToText)이 **같은 판정**을 쓰게 해서, 두 기능이 서로 다른
+ * 기준으로 상자를 잡는 일이 구조적으로 불가능하게 만든다.
+ */
+export function bubbleTextFitsInBox(
+  input: Pick<
+    BubbleFontFitInput,
+    | "text"
+    | "boxWidth"
+    | "boxHeight"
+    | "fontFamily"
+    | "fontStyle"
+    | "lineHeight"
+    | "vertical"
+    | "letterSpacing"
+    | "blockAlign"
+  >,
+  fontSize: number,
+  measurer: BubbleTextMeasurer = createCanvasBubbleTextMeasurer()
+): boolean {
+  return fitsAtFontSize(input, fontSize, measurer).ok;
 }
 
 /**
@@ -282,6 +424,103 @@ export function fitBubbleFontSize(
   }
   const chosen = sizes[lo]!;
   return { fontSize: chosen, lines: fitsAtFontSize(input, chosen, measurer).lines, overflow: false };
+}
+
+// ── 높이 자동 확장(기본 모드) ────────────────────────────────────────────────
+
+export interface BubbleTextBlockInput {
+  text: string;
+  /** 말풍선 **전체** 폭(px, 패딩 포함) — el.width 그대로. */
+  boxWidth: number;
+  fontSize: number;
+  fontFamily: string;
+  fontStyle?: string;
+  /** 반드시 resolveBubbleLineHeight() 결과를 넘긴다(경로별 기본값 불일치가 이 결함의 원인이었다). */
+  lineHeight: number;
+  letterSpacing?: number;
+}
+
+export interface BubbleTextBlockMeasurement {
+  /** 그리디 워드랩 결과 줄 배열(Konva.Text 내부 워드랩의 근사 — 모듈 상단 docstring 참고). */
+  lines: string[];
+  /** 줄 수 × fontSize × lineHeight — Konva.Text 가 쓰는 블록 높이 공식 그대로. */
+  blockHeight: number;
+  /** 이 폰트 크기에서의 Konva.Text width. */
+  textBoxWidth: number;
+}
+
+/** 가로쓰기 말풍선 텍스트 블록의 줄 수/높이 측정 — 렌더가 쓸 값과 같은 공식. */
+export function measureBubbleTextBlock(
+  input: BubbleTextBlockInput,
+  measurer: BubbleTextMeasurer = createCanvasBubbleTextMeasurer()
+): BubbleTextBlockMeasurement {
+  const textBoxWidth = bubbleTextBoxWidth(input.boxWidth, input.fontSize);
+  const lines = wrapBubbleTextLines(
+    input.text || " ",
+    textBoxWidth,
+    input.fontSize,
+    input.fontFamily,
+    resolveBubbleFontStyle(input.fontStyle),
+    withBubbleLetterSpacing(measurer, input.letterSpacing)
+  );
+  return {
+    lines,
+    blockHeight: lines.length * input.fontSize * input.lineHeight,
+    textBoxWidth,
+  };
+}
+
+export interface BubbleBoxHeightFitInput extends BubbleTextBlockInput {
+  /** 세로쓰기 말풍선이면 true — 높이를 늘리면 열이 길어져 열 수(=블록 폭)가 줄어든다. */
+  vertical?: boolean;
+  blockAlign?: VerticalBlockAlign;
+  /** 결과의 하한(px). 보통 el.height 를 넘겨 "수동으로 키운 크기는 보존"한다. */
+  minHeight?: number;
+}
+
+/** 세로쓰기 높이 탐색 상한 — 열 하나에 전체 대사가 다 들어가고도 남는 길이. */
+function verticalHeightSearchCeiling(input: BubbleBoxHeightFitInput): number {
+  const glyphs = [...input.text].length + 1;
+  return (
+    glyphs * (input.fontSize + Math.abs(input.letterSpacing ?? 0))
+    + bubbleVerticalPaddingTotal(input.fontSize)
+  );
+}
+
+/**
+ * 대사가 **한 글자도 잘리지 않는** 말풍선 전체 높이(px, 패딩 포함)를 돌려준다.
+ *
+ * 판정은 자동 축소(fitBubbleFontSize)와 **완전히 같은** `bubbleTextFitsInBox`를 쓴다 — 두 기능이
+ * 서로 다른 여유(HEIGHT_SAFETY_MARGIN)나 다른 패딩을 가정하면 한쪽이 "맞다"고 한 상자를 다른
+ * 쪽이 "넘친다"고 보는 모순이 생긴다. 가로쓰기는 줄 수에서 곧바로 닫힌 해가 나오고, 세로쓰기는
+ * 높이↑ → 열 길이↑ → 열 수↓ → 블록 폭↓ 이 단조라 이진 탐색으로 최소 높이를 찾는다.
+ */
+export function fitBubbleBoxHeightToText(
+  input: BubbleBoxHeightFitInput,
+  measurer: BubbleTextMeasurer = createCanvasBubbleTextMeasurer()
+): number {
+  const padding = bubbleVerticalPaddingTotal(input.fontSize);
+  const floor = Math.max(
+    input.minHeight ?? 0,
+    Math.ceil(input.fontSize * input.lineHeight / HEIGHT_SAFETY_MARGIN) + padding
+  );
+  if (!input.vertical) {
+    const { blockHeight } = measureBubbleTextBlock(input, measurer);
+    return Math.max(floor, Math.ceil(blockHeight / HEIGHT_SAFETY_MARGIN) + padding);
+  }
+  const fits = (boxHeight: number) =>
+    bubbleTextFitsInBox({ ...input, boxHeight }, input.fontSize, measurer);
+  let hi = Math.max(floor, Math.ceil(verticalHeightSearchCeiling(input)));
+  if (!fits(hi)) return hi; // 폭이 한 열도 못 담는 병적 입력 — 더 키워도 소용없다.
+  let lo = floor;
+  if (fits(lo)) return lo;
+  // [lo, hi] 경계 이진 탐색 — lo는 안 맞고 hi는 맞는다는 불변식을 유지한다.
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (fits(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
 
 // ── 실제 런타임 측정기(Canvas 2D) ────────────────────────────────────────────

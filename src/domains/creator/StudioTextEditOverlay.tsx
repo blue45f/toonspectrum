@@ -3,9 +3,13 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   bubbleHorizontalPadding,
+  bubbleTextBoxHeight,
+  bubbleTextBoxWidth,
   bubbleVerticalPadding,
   createCanvasBubbleTextMeasurer,
   fitBubbleFontSize,
+  measureBubbleTextBlock,
+  resolveBubbleFontSize,
 } from "./studio-bubble-text-fit";
 
 import type { El } from "./studio-element-model";
@@ -188,27 +192,63 @@ export default function StudioTextEditOverlay({
       return;
     }
     textNode.text(nextValue);
-    if (el.type === "bubble" && el.autoShrinkText) {
-      const fontSize = fitBubbleFontSize(
-        {
-          text: nextValue,
-          boxWidth: el.width,
-          boxHeight: el.height,
-          maxFontSize: el.fontSize ?? 24,
-          minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
-          fontFamily: textNode.fontFamily(),
-          fontStyle: textNode.fontStyle() as "normal" | "bold" | "italic" | "bold italic",
-          lineHeight: textNode.lineHeight(),
-        },
-        OVERLAY_BUBBLE_TEXT_MEASURER
-      ).fontSize;
+    // 세로쓰기 말풍선은 이 인라인 오버레이가 아니라 폴백 모달로 열린다(하단 주석 참고). 혹시
+    // 열리더라도 열 조판 노드를 가로 상자 공식으로 건드리지 않도록 기하 갱신은 건너뛴다.
+    if (el.type === "bubble" && !el.vertical) {
+      // 타이핑 중에도 커밋 후와 **같은 공식**으로 상자를 다시 잡는다. 예전에는 autoShrinkText가
+      // 켜졌을 때만 재계산해, 기본(꺼짐) 모드에서는 첫 상자 크기 그대로 굳었다 — Konva.Text 는
+      // 고정 height 를 넘는 줄을 경고 없이 버리므로 103자 대사에서 49자가 조용히 사라졌다.
+      const maxFontSize = resolveBubbleFontSize(el.fontSize);
+      const lineHeight = textNode.lineHeight();
+      const letterSpacing = textNode.letterSpacing();
+      const fontFamily = textNode.fontFamily();
+      const fontStyle = textNode.fontStyle();
+      const fontSize = el.autoShrinkText
+        ? fitBubbleFontSize(
+            {
+              text: nextValue,
+              boxWidth: el.width,
+              boxHeight: el.height,
+              maxFontSize,
+              minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
+              fontFamily,
+              fontStyle,
+              lineHeight,
+              letterSpacing,
+            },
+            OVERLAY_BUBBLE_TEXT_MEASURER
+          ).fontSize
+        : maxFontSize;
       const hPad = bubbleHorizontalPadding(fontSize);
-      const { top, bottom } = bubbleVerticalPadding(fontSize);
+      const { top } = bubbleVerticalPadding(fontSize);
+      const boxHeight = bubbleTextBoxHeight(el.height, fontSize);
+      // "크기 고정"(autoShrinkText)은 상자를 넘지 않겠다고 사용자가 고른 모드라 그대로 두고,
+      // 기본 모드에서는 실제 필요한 블록 높이만큼 페인트 상자를 넓혀 절단을 막는다(중심 보정
+      // 포함 — StudioKonvaBubbleNode 의 textPaintHeight/textPaintY 와 같은 계산이다).
+      const paintHeight = el.autoShrinkText
+        ? boxHeight
+        : Math.max(
+            boxHeight,
+            Math.ceil(
+              measureBubbleTextBlock(
+                {
+                  text: nextValue,
+                  boxWidth: el.width,
+                  fontSize,
+                  fontFamily,
+                  fontStyle,
+                  lineHeight,
+                  letterSpacing,
+                },
+                OVERLAY_BUBBLE_TEXT_MEASURER
+              ).blockHeight
+            )
+          );
       textNode.fontSize(fontSize);
       textNode.x(hPad);
-      textNode.y(top);
-      textNode.width(Math.max(8, el.width - hPad * 2));
-      textNode.height(Math.max(8, el.height - (top + bottom)));
+      textNode.y(top - (paintHeight - boxHeight) / 2);
+      textNode.width(bubbleTextBoxWidth(el.width, fontSize));
+      textNode.height(paintHeight);
     }
     textNode.getLayer()?.batchDraw();
     setVisual(readOverlayVisual(textNode));
@@ -283,10 +323,13 @@ interface StudioTextEditFallbackModalProps {
 /**
  * StudioTextEditOverlay 가 안전하게 다룰 수 없는 두 경우만을 위한 예전 중앙 모달 폴백: 좌우
  * 미리보기 반전(canvasFlipH — Stage 자체에 음수 scaleX가 baked-in 되어, 오버레이 DOM에 그대로
- * 적용하면 실제 글자가 거울상으로 보인다)과 세로쓰기(el.vertical — formatVerticalText 의 개행
- * 기반 근사를 일반 textarea 줄바꿈으로 그대로 표현할 수 없다). 두 경우 모두 흔치 않고(반전은
- * 임시 미리보기 토글, 세로쓰기는 소수 요소), 캔버스 실시간 동기화 없이 커밋 시점에만 반영되는
- * 예전 동작으로 되돌아가는 것으로 충분한 v1 범위다.
+ * 적용하면 실제 글자가 거울상으로 보인다)과 세로쓰기(el.vertical — 열 조판은 단일 Text 노드가
+ * 아니라 열별 노드 묶음이라 인라인 캐럿 오버레이가 붙을 단일 글자면이 없다). 두 경우 모두
+ * 흔치 않고(반전은 임시 미리보기 토글, 세로쓰기는 소수 요소), 캔버스 실시간 동기화 없이 커밋
+ * 시점에만 반영되는 예전 동작으로 되돌아가는 것으로 충분한 v1 범위다.
+ *
+ * 한글 IME 가드는 인라인 오버레이와 **반드시 같아야 한다** — 조합 중 Escape 를 그대로 닫기로
+ * 흘리면 입력 전체가 사라진다(2026-08 감사에서 이 모달에만 가드가 없었다).
  */
 export function StudioTextEditFallbackModal({
   elementId,
@@ -310,6 +353,10 @@ export function StudioTextEditFallbackModal({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
+            // 인라인 오버레이와 **같은** IME 가드. 이게 없으면 한글 조합 중 누른 Escape 가
+            // "조합 취소"가 아니라 모달 닫기로 흘러가 입력 전체가 사라진다(측정된 결함).
+            // Safari/WebKit 은 확정 keydown 에서 isComposing=false 와 legacy 229 를 함께 보낸다.
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
             if (event.key === "Escape") {
               event.preventDefault();
               onCancel();

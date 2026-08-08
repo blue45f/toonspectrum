@@ -3,6 +3,7 @@ import {
   Check,
   CheckCheck,
   CircleAlert,
+  CircleDashed,
   LoaderCircle,
   Sparkles,
   Undo2,
@@ -317,6 +318,15 @@ export function StudioWriterRoomCanvasPlanHandoff({
   const errorCount = nonNegativeCount(plan.errorCount);
   const warningCount = nonNegativeCount(plan.warningCount);
   const ready = plan.canApply && pageCount > 0 && panelCount > 0;
+  /**
+   * 아직 컷이 하나도 없는 상태는 **오류가 아니라 빈 상태**다. 처음 연 Writer Room 이
+   * 붉은 "수정 필요 / 오류 1"로 시작하면, 사용자가 무언가 망가뜨렸다고 읽는다.
+   *
+   * 구분 기준은 투영된 컷 수 하나다. 컷이 0개면 아직 만들지 않은 것이고(중립 빈 상태),
+   * 컷이 있는데 적용할 수 없으면 그건 진짜 오류다(붉은 상태 유지). 빈 상태에서도 진단은
+   * 지우지 않고 조용한 접힘(details) 안에 그대로 둔다 — 조용하게 만들되 숨기지는 않는다.
+   */
+  const pending = panelCount === 0;
   const effectiveBusy = busy || requestingApply;
   const diagnosticMessages = plan.diagnosticMessages
     .map((message) => message.trim().slice(0, 400))
@@ -345,7 +355,11 @@ export function StudioWriterRoomCanvasPlanHandoff({
       aria-labelledby="writer-room-canvas-plan-title"
       aria-live="polite"
       className={`shrink-0 border-b px-3 py-3 sm:px-5 ${
-        ready ? "border-good/30 bg-good/10" : "border-bad/35 bg-bad/10"
+        pending
+          ? "border-line bg-card/40"
+          : ready
+            ? "border-good/30 bg-good/10"
+            : "border-bad/35 bg-bad/10"
       }`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -356,32 +370,40 @@ export function StudioWriterRoomCanvasPlanHandoff({
             </h3>
             <span
               className={`inline-flex items-center gap-1 text-[0.68rem] font-semibold ${
-                ready ? "text-good" : "text-bad"
+                pending ? "text-fg-3" : ready ? "text-good" : "text-bad"
               }`}
             >
-              {ready ? <CheckCheck size={13} aria-hidden /> : <CircleAlert size={13} aria-hidden />}
-              {ready ? "적용 준비" : "수정 필요"}
+              {pending ? (
+                <CircleDashed size={13} aria-hidden />
+              ) : ready ? (
+                <CheckCheck size={13} aria-hidden />
+              ) : (
+                <CircleAlert size={13} aria-hidden />
+              )}
+              {pending ? "아직 없음" : ready ? "적용 준비" : "수정 필요"}
             </span>
           </div>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
-            {ready
-              ? onApply
-                ? "검토된 컷 순서대로 새 페이지를 만듭니다. 버튼을 누르기 전에는 캔버스를 바꾸지 않습니다."
-                : "컷과 페이지 구성이 준비되었습니다. 캔버스 적용 연결은 아직 제공되지 않습니다."
-              : "끊어진 참조나 빈 컷을 수정하면 안전한 새 페이지 계획으로 다시 계산됩니다."}
+            {pending
+              ? "1단계 기획부터 순서대로 채워 보세요. 5단계 컷 구성이 생기면 여기에서 새 페이지 계획으로 정리해 드려요."
+              : ready
+                ? onApply
+                  ? "검토된 컷 순서대로 새 페이지를 만듭니다. 버튼을 누르기 전에는 캔버스를 바꾸지 않습니다."
+                  : "컷과 페이지 구성이 준비되었습니다. 캔버스 적용 연결은 아직 제공되지 않습니다."
+                : "끊어진 참조나 빈 컷을 수정하면 안전한 새 페이지 계획으로 다시 계산됩니다."}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.68rem] tabular-nums text-fg-3">
-            <span className="font-semibold text-fg-2">
+            <span className={pending ? "font-semibold text-fg-3" : "font-semibold text-fg-2"}>
               {panelCount.toLocaleString("ko-KR")}컷
             </span>
             <span aria-hidden>·</span>
             <span>새 페이지 {pageCount.toLocaleString("ko-KR")}개</span>
-            {errorCount > 0 && (
+            {!pending && errorCount > 0 && (
               <span className="font-semibold text-bad">
                 오류 {errorCount.toLocaleString("ko-KR")}
               </span>
             )}
-            {warningCount > 0 && (
+            {!pending && warningCount > 0 && (
               <span className="font-semibold text-warn">
                 경고 {warningCount.toLocaleString("ko-KR")}
               </span>
@@ -410,7 +432,35 @@ export function StudioWriterRoomCanvasPlanHandoff({
         )}
       </div>
 
-      {!ready && (
+      {/* 빈 상태의 진단은 지우지 않고 접어 둔다 — 화면은 조용하지만 내용은 그대로 남는다. */}
+      {pending && diagnosticMessages.length > 0 && (
+        <details className="mt-2 border-t border-line pt-1" aria-label="컷 플랜 확인 항목">
+          <summary className="flex min-h-11 cursor-pointer items-center text-[0.68rem] font-medium text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+            확인 항목 {diagnosticMessages.length.toLocaleString("ko-KR")}개 보기
+          </summary>
+          {(errorCount > 0 || warningCount > 0) && (
+            <p className="pb-1 text-[0.65rem] tabular-nums text-fg-3">
+              진단 상세 — 오류 {errorCount.toLocaleString("ko-KR")}건 · 경고{" "}
+              {warningCount.toLocaleString("ko-KR")}건
+            </p>
+          )}
+          <ul className="space-y-1 pb-1 text-[0.68rem] leading-relaxed text-fg-2">
+            {visibleDiagnostics.map((message, index) => (
+              <li key={`${message}-${index}`} className="flex min-w-0 items-start gap-1.5">
+                <CircleDashed size={12} className="mt-0.5 shrink-0 text-fg-4" aria-hidden />
+                <span className="min-w-0 break-words">{message}</span>
+              </li>
+            ))}
+          </ul>
+          {hiddenDiagnosticCount > 0 && (
+            <p className="pb-1 text-[0.65rem] tabular-nums text-fg-3">
+              그 밖의 확인 항목 {hiddenDiagnosticCount.toLocaleString("ko-KR")}개
+            </p>
+          )}
+        </details>
+      )}
+
+      {!pending && !ready && (
         <div className="mt-3 border-t border-bad/25 pt-2.5" aria-label="컷 플랜 수정 항목">
           <p className="text-[0.68rem] font-semibold text-bad">적용 전 확인</p>
           {visibleDiagnostics.length > 0 ? (

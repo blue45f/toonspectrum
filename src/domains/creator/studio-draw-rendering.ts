@@ -23,6 +23,10 @@ import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
 import {
+  resolveStudioCausalInkNib,
+  type StudioCausalInkNib,
+} from "./studio-marker-nib-profile";
+import {
   fillStudioPixelPencilCells,
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
@@ -276,6 +280,8 @@ export interface StudioCausalInkDrawContract {
   readonly paintModel?: StudioStrokePaintModel;
   readonly opacity: number;
   readonly composite: GlobalCompositeOperation;
+  /** Chisel/bullet footprint for the marker family; omitted brushes keep the round dab. */
+  readonly nib?: StudioCausalInkNib;
 }
 
 export function resolveStudioCausalInkDrawContract(
@@ -298,6 +304,8 @@ export function resolveStudioCausalInkDrawContract(
     paintModel: isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined,
     opacity: Math.min(1, Math.max(0, el.opacity ?? 1)),
     composite: eraser ? "destination-out" : "source-over",
+    // An eraser lifts ink with its own footprint, not with the selected marker's wedge.
+    ...(eraser ? {} : { nib: resolveStudioCausalInkNib(el.brush) }),
   };
 }
 
@@ -401,7 +409,8 @@ export function drawStudioCausalInkDabs(
   strokeWidth: number,
   minDistance: number,
   pressureModel?: StudioInkPressureModel,
-  paintModel?: StudioStrokePaintModel
+  paintModel?: StudioStrokePaintModel,
+  nib?: StudioCausalInkNib
 ): void {
   const plan = planStudioCausalInk({
     points,
@@ -410,7 +419,7 @@ export function drawStudioCausalInkDabs(
     size: strokeWidth,
     pressureModel,
   });
-  fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel);
+  fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel, nib);
 }
 
 /** Draws the already-resolved contract without reapplying alias or pressure transformations. */
@@ -426,7 +435,8 @@ export function drawStudioCausalInkContract(
     contract.strokeWidth,
     contract.minDistance,
     contract.pressureModel,
-    contract.paintModel
+    contract.paintModel,
+    contract.nib
   );
 }
 

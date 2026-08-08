@@ -1,5 +1,5 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -33,6 +33,7 @@ import { elementLabel } from "./studio-element-label";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type OnionSkinSettings } from "./studio-frame-animation";
 import { type SharedGutterSegment } from "./studio-frame-folder";
+import { planGroupClickSelectionRelease } from "./studio-group-selection";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { computeHistoryBrushAvailability } from "./studio-history-brush";
 import { type StudioHokusaiLiveOverlayProjection } from "./studio-hokusai-live-brush-overlay";
@@ -1536,6 +1537,27 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       : null,
   });
   const stageViewClip = stageViewLayout.clip;
+  // Pixi 선택 오버레이는 Stage 와 같은 문서→뷰포트 배치를 써야 한다. Stage 는 뷰포트 클립만큼
+  // 원점을 당겨 두고 컨테이너 CSS transform 으로 되돌리지만, 이 캔버스는 클립되지 않은 줌 호스트
+  // 박스를 그대로 덮으므로 클립 오프셋을 다시 더해 "클립 이전" 배치를 복원한다.
+  const pixiSceneDocumentTransform = useMemo(
+    () => ({
+      scaleX: stageViewLayout.scaleX,
+      scaleY: stageViewLayout.scaleY,
+      offsetX: stageViewLayout.x + (stageViewClip?.left ?? 0),
+      offsetY: stageViewLayout.y + (stageViewClip?.top ?? 0),
+      rotation: stageViewLayout.rotation,
+    }),
+    [
+      stageViewLayout.scaleX,
+      stageViewLayout.scaleY,
+      stageViewLayout.x,
+      stageViewLayout.y,
+      stageViewLayout.rotation,
+      stageViewClip?.left,
+      stageViewClip?.top,
+    ],
+  );
   const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
   // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
   // 다시 맞춘다. 컨테이너 transform 과 stage.x/y 는 크기가 같고 부호가 반대라, 둘 중 하나만
@@ -1887,6 +1909,64 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     }
     const elementId = studioElementIdOf(event.target);
     if (elementId) selectElementFromCanvas(elementId, event, true);
+  };
+  /**
+   * 다중 선택 좁히기의 "뗌" 단계 — Figma/PPT/CSP 규약의 나머지 절반.
+   *
+   * 누름(`onSelect` → `planGroupClickSelection`)은 이미 선택된 멤버를 Shift 없이 눌러도 다중 선택을
+   * 유지한다. 그래야 이어지는 드래그가 선택 전체를 함께 옮긴다. 하나로 좁히는 일은 "드래그 없이 뗐을
+   * 때"만 일어나야 하는데, Konva 는 실제 드래그가 시작되면 `click`/`tap` 을 발화하지 않으므로
+   * (DragAndDrop `_endDragBefore` 가 `_mouseListenClick`/`_touchListenClick` 을 내린다)
+   * Stage 로 버블링된 이 두 이벤트가 곧 "드래그 없는 뗌"이다. 별도의 이동거리 추정이 필요 없다.
+   *
+   * 판정 자체는 `studio-group-selection` 의 순수 함수가 누름과 같은 규칙으로 계산한다 — 두 단계가
+   * 갈라지지 않는다. 좁힐 게 없으면 `null` 이라 이 핸들러는 아무 상태도 건드리지 않는다.
+   */
+  const narrowCanvasSelectionOnRelease = (
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
+    if (
+      canvasInteractionBlocked ||
+      tool !== "select" ||
+      commentPinArmed ||
+      eyedropperActive ||
+      advancedFillArmed ||
+      pixelToolArmed ||
+      cropArmed ||
+      smudgeArmed ||
+      dodgeBurnArmed ||
+      wetMixArmed ||
+      liquifyArmed ||
+      panelSplitArmed ||
+      nodeEditArmed ||
+      healCloneArmed ||
+      layerMaskPaintArmed ||
+      filterMaskPaintArmed ||
+      quickMaskArmed ||
+      historyBrushArmed ||
+      bubbleShapeArmed ||
+      puppetWarpArmed
+    ) {
+      return;
+    }
+    // Konva 는 `mouseup` 에서 버튼과 무관하게 자체 `click` 을 합성한다. 우클릭(컨텍스트 메뉴)과
+    // macOS 의 Ctrl+클릭은 선택을 좁히는 제스처가 아니다 — 멀티 선택에 대고 우클릭했는데 메뉴가
+    // 하나짜리 선택에 적용되면 안 된다.
+    const mouse = event.evt as Partial<MouseEvent> | undefined;
+    if (typeof mouse?.button === "number" && mouse.button !== 0) return;
+    if (mouse?.ctrlKey === true) return;
+    const elementId = studioElementIdOf(event.target);
+    if (!elementId) return;
+    const narrowed = planGroupClickSelectionRelease({
+      items: elements,
+      groups,
+      clickedId: elementId,
+      current: { selectedId, marqueeIds, activeGroupId },
+      additive: mouse?.shiftKey === true,
+    });
+    if (!narrowed) return;
+    setSelectedId(narrowed.selectedId);
+    setMarqueeIds(narrowed.marqueeIds);
   };
   return (
         <div
@@ -2421,6 +2501,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
             onPointerCancel={onStagePointerCancel}
+            onClick={narrowCanvasSelectionOnRelease}
+            onTap={narrowCanvasSelectionOnRelease}
             onDblClick={enterGroupFromCanvasGesture}
             onDblTap={enterGroupFromCanvasGesture}
             onMouseLeave={() => {
@@ -3858,6 +3940,12 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             // 좌표계는 문서 박스 그대로여야 한다.
             width={stageViewLayout.hostWidth}
             height={stageViewLayout.hostHeight}
+            // 오버레이 도형은 문서 단위로 만들어지므로 배치 변환을 함께 넘긴다. Stage 와 같은
+            // 값을 쓰되 뷰포트 클립은 되돌린다 — 클립되는 것은 Stage 하나뿐이고 이 캔버스는
+            // 문서 박스 전체를 덮기 때문이다.
+            documentTransform={pixiSceneDocumentTransform}
+            documentWidth={CANVAS_W}
+            documentHeight={canvasH}
             elements={elements}
             selectedIds={
               marqueeIds.length > 0

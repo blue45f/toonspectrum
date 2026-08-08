@@ -387,10 +387,13 @@ export function buildStudioViewMenuItems({
         editor.toggleFullscreen();
       },
     },
+    // 흑백 명암은 `Q` 가 아니라 `⌥Q` 다. 단독 `Q` 는 퀵 마스크가 가져갔고(conflict
+    // `q-quickmask-vs-grayscale`), 두 메뉴 행이 같은 배지를 달고 선택 상태에 따라
+    // 서로 다른 명령을 실행하던 상태를 끊는다. `⇧Q` 는 빠른 액세스 팔레트가 쓴다.
     ...(
       [
         { id: "original", label: "색각 검수 · 원본", mode: "none" as const },
-        { id: "grayscale", label: "색각 검수 · 흑백 명암", mode: "grayscale" as const, shortcut: "Q" },
+        { id: "grayscale", label: "색각 검수 · 흑백 명암", mode: "grayscale" as const, shortcut: "⌥Q" },
         { id: "protanopia", label: "색각 검수 · 1형 적록", mode: "protanopia" as const },
         { id: "deuteranopia", label: "색각 검수 · 2형 적록", mode: "deuteranopia" as const },
         { id: "tritanopia", label: "색각 검수 · 3형 청황", mode: "tritanopia" as const },

@@ -8,8 +8,14 @@ import {
   encodeStudioLivingInkSnapshot,
   studioLivingInkBrushBleedBoost,
   studioLivingInkChromaBleedMultipliers,
+  studioLivingInkDepositionPathLength,
+  studioLivingInkDisplayReflectance,
+  studioLivingInkMeanMarkRadius,
+  studioLivingInkPigmentCoatFactor,
   studioLivingInkPigmentDiffusionRates,
+  studioLivingInkPigmentOpticalDensity,
   STUDIO_LIVING_INK_BRUSH_BLEED,
+  STUDIO_LIVING_INK_PIGMENT_COAT,
   STUDIO_LIVING_INK_CHROMA_COEFFS,
   STUDIO_LIVING_INK_FIELD_VERSION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
@@ -617,5 +623,61 @@ describe("Studio Living Ink field", () => {
       { x: 0, y: 0, pressure: 0.3, timeMs: 0 },
       { x: 2_048, y: 0, pressure: 0.9, timeMs: 20 },
     ])).toThrow(/requires 4097 marks; maximum is 4096/);
+  });
+});
+
+describe("Studio Living Ink pigment coat", () => {
+  const linearFromSrgb = (channel: number) =>
+    channel <= 0.040_45 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+
+  it("re-encodes a linear channel back to the space the display resolve writes", () => {
+    for (const srgb of [0, 0.05, 0.2, 0.584, 0.95, 1]) {
+      expect(studioLivingInkDisplayReflectance(linearFromSrgb(srgb))).toBeCloseTo(srgb, 5);
+    }
+  });
+
+  it("reproduces the picked colour at one coat instead of collapsing onto one channel", () => {
+    // #ff9500 and #ff3b30 used to land on the same near-black red because their absorbances were
+    // taken in linear light and then multiplied far past unit optical depth.
+    const orange = [1, 0.584, 0].map(linearFromSrgb);
+    const vermilion = [1, 0.231, 0.188].map(linearFromSrgb);
+    const coat = (linear: number[]) =>
+      linear.map((channel) => Math.exp(-studioLivingInkPigmentOpticalDensity(channel)));
+    const [orangeR, orangeG, orangeB] = coat(orange);
+    const [, vermilionG, vermilionB] = coat(vermilion);
+    expect(orangeR!).toBeCloseTo(0.985, 2);
+    expect(orangeG!).toBeCloseTo(0.584, 2);
+    expect(orangeB!).toBeCloseTo(0.015, 2);
+    expect(vermilionG!).toBeCloseTo(0.231, 2);
+    expect(vermilionB!).toBeCloseTo(0.188, 2);
+    // The two hues stay far apart in green, which is the channel that used to be crushed to zero.
+    expect(orangeG! - vermilionG!).toBeGreaterThan(0.3);
+  });
+
+  it("lays one coat per pass no matter how the samples were batched", () => {
+    const radius = 8;
+    const reach = STUDIO_LIVING_INK_PIGMENT_COAT.profileReach * radius;
+    // A pixel is reached by roughly reach/pathLength batches, so coat x batches must stay at 1.
+    for (const pathLength of [reach / 4, reach / 2, reach]) {
+      const batches = reach / pathLength;
+      expect(studioLivingInkPigmentCoatFactor(pathLength, radius) * batches).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("caps a long batch at one coat and floors a dwell so a tap still lays pigment", () => {
+    expect(studioLivingInkPigmentCoatFactor(1_000, 8)).toBe(1);
+    expect(studioLivingInkPigmentCoatFactor(0, 8)).toBe(1);
+    expect(studioLivingInkPigmentCoatFactor(1e-6, 8))
+      .toBe(STUDIO_LIVING_INK_PIGMENT_COAT.minimumCoat);
+  });
+
+  it("measures a batch from the previous batch's last mark, not from its own first mark", () => {
+    const marks = [
+      { x: 10, y: 0, radius: 4 },
+      { x: 13, y: 0, radius: 4 },
+    ];
+    expect(studioLivingInkDepositionPathLength(marks, null)).toBeCloseTo(3, 6);
+    expect(studioLivingInkDepositionPathLength(marks, { x: 4, y: 0 })).toBeCloseTo(9, 6);
+    expect(studioLivingInkMeanMarkRadius(marks)).toBeCloseTo(4, 6);
   });
 });

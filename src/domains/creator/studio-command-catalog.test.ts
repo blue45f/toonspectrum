@@ -27,6 +27,7 @@ import {
   STUDIO_MENU_ITEM_INVENTORY,
 } from "./studio-command-catalog";
 import { STUDIO_EDIT_MENU_COMMAND_ORDER } from "./studio-edit-controls";
+import { STUDIO_FILTER_PACK_KINDS } from "./studio-filter-pack-registry";
 import { STUDIO_QUICK_ACCESS_COMMAND_IDS } from "./studio-quick-access-integration";
 import { QUICK_ACTION_IDS } from "./studio-quick-actions";
 
@@ -204,8 +205,14 @@ describe("studio command catalog — shortcut conflicts", () => {
         "eyedropper-toggle-divergence",
         "fill-id-divergence",
         "help-row-multiplexing",
-        "layer-order-chord-inversion",
-        "q-quickmask-vs-grayscale",
+        // `layer-order-chord-inversion` 은 2026-08-09 에 해소돼 목록에서 빠졌다:
+        // ⌘[ = 한 칸 뒤로(send-backward), ⌘⇧[ = 맨 뒤로(send-back) 로 정정해
+        // Photoshop·CSP·Illustrator 및 바로 옆 `]` 쌍과 대칭을 맞췄다
+        // (studio-edit-controls.ts). 회귀 감시는 studio-edit-controls.test.ts 가 맡는다.
+        // `q-quickmask-vs-grayscale` 는 2026-08-08 에 해소돼 목록에서 빠졌다:
+        // 단독 `Q` = select.quick-mask, 색각 검수 흑백 명암 = `⌥Q`
+        // (studio-view-controls.ts / studio-main-menu-items-document.ts).
+        // 회귀 감시는 studio-main-menu-items-selection.test.ts 가 맡는다.
         "shift-s-saveview-vs-sizelock",
         "transform-tool-vs-pixel",
         "zoom-chord-divergence",
@@ -234,7 +241,7 @@ describe("studio command catalog — coverage of the five live lists", () => {
     expectSourceCoverage("edit-menu", STUDIO_EDIT_MENU_COMMAND_ORDER);
   });
 
-  it("covers the menu inventory (166) and the help inventory (37)", () => {
+  it("covers the menu inventory (185) and the help inventory (37)", () => {
     expectSourceCoverage("menu", STUDIO_MENU_ITEM_INVENTORY);
     expectSourceCoverage("help", STUDIO_HELP_ROW_INVENTORY);
   });
@@ -281,8 +288,12 @@ describe("studio command catalog — drift guards for the non-importable lists",
 
     // Items spread from STUDIO_EDIT_MENU_COMMANDS carry their id from that table,
     // so they never appear as literals here; the colour-vision items are literal
-    // as bare ids and get their `color-vision-` prefix at map time.
+    // as bare ids and get their `color-vision-` prefix at map time. The Filter
+    // group's pack rows are generated from STUDIO_FILTER_PACK_KINDS for the same
+    // reason the edit rows are generated from their table — the registry is what
+    // they must not drift from, so it stands in for their literals here.
     const fromEditCommandTable = new Set<string>(STUDIO_EDIT_MENU_COMMAND_ORDER);
+    const fromFilterPackRegistry = [...STUDIO_FILTER_PACK_KINDS] as string[];
     const expected = new Set<string>();
     for (const qualified of STUDIO_MENU_ITEM_INVENTORY) {
       const [, item = ""] = qualified.split("/");
@@ -290,8 +301,9 @@ describe("studio command catalog — drift guards for the non-importable lists",
       expected.add(item.replace(/^color-vision-/u, ""));
     }
 
-    expect(new Set(literals)).toEqual(expected);
-    expect(literals).toHaveLength(expected.size);
+    const declared = [...literals, ...fromFilterPackRegistry];
+    expect(new Set(declared)).toEqual(expected);
+    expect(declared).toHaveLength(expected.size);
   });
 
   it("the help source still declares exactly the 37 rows in the snapshot", () => {

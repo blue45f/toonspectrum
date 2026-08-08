@@ -84,6 +84,7 @@ import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { type StudioFilterKind } from "./studio-filter-menu";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
+import { openStudioHelpCenter } from "./studio-help-center-channel";
 import { uid } from "./studio-id";
 import {
   resolveStudioInspectorContentMode,
@@ -1573,6 +1574,19 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               changeDrawingPaletteLayout(
                 toggleStudioDrawingPalette(drawingPaletteLayout, paletteId),
               );
+            }}
+            /*
+              명령 행의 실제 소비자. 이게 없던 동안 명령 결과(코퍼스의 대부분)는
+              클릭·Enter 둘 다 조용한 no-op 이었다. 도움말 센터의 명령 패널은
+              카탈로그가 실제로 들고 있는 이름·단축키·타사 별칭·관련 항목을
+              그리므로, 실행 배선이 오기 전까지 "이게 무엇이고 어디 있는가"에
+              답하는 가장 정직한 목적지다.
+            */
+            onOpenHelp={(_helpNodeId, commandId) => {
+              openStudioHelpCenter({
+                section: "current-tool",
+                toolCommandId: commandId,
+              });
             }}
           />
           <StudioInspectorNavigator

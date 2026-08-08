@@ -22,6 +22,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -817,10 +818,9 @@ export function StudioHelpCenterDialog({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose, open]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    const raf = requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => cancelAnimationFrame(raf);
+    dialogRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   if (!open || typeof document === "undefined") return null;

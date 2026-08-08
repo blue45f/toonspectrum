@@ -41,6 +41,7 @@ import {
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -82,6 +83,7 @@ import {
   planStudioHighlighterWashRibbon,
   planStudioHighlighterWashTap,
   resolveStudioHighlighterWashBrushId,
+  traceStudioHighlighterWashDetail,
   traceStudioHighlighterWashPlan,
 } from "./studio-highlighter-wash-ribbon";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
@@ -1302,7 +1304,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               ),
               stylusSamples,
               aliasStrokeWidth,
-              el.brushTip
+              // Pre-nib-table documents carry no brushTip; the catalogue nib stands in so a stored
+              // fountain/parallel pen renders as the pen it was drawn with.
+              resolveStudioCalligraphyRenderTip(brush, el.brushTip)
             );
             const ribbon = planStudioCalligraphyRibbon(segments);
             return (
@@ -1766,11 +1770,20 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 sceneFunc={(context) => {
                   if (washPlan.runs.length === 0) return;
                   context.save();
-                  context.globalAlpha *= washPlan.opacityScale;
+                  const washAlpha = context.globalAlpha * washPlan.opacityScale;
+                  context.globalAlpha = washAlpha;
                   context.fillStyle = stroke;
                   context.beginPath();
                   traceStudioHighlighterWashPlan(context, washPlan);
                   context.fill();
+                  // Rim pooling and fibre streaks: one extra compound fill, so a self-crossing
+                  // still receives at most one detail wash.
+                  if (washPlan.detailRuns.length > 0) {
+                    context.globalAlpha = washAlpha * washPlan.detailOpacityScale;
+                    context.beginPath();
+                    traceStudioHighlighterWashDetail(context, washPlan);
+                    context.fill();
+                  }
                   context.restore();
                 }}
                 opacity={opacity}
@@ -2124,8 +2137,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       Math.max(0, lane.opacity * opacity),
                     );
                     context.lineWidth = Math.max(0.12, lane.lineWidth);
+                    // One path, one stroke per load band. Stroking each run separately made a
+                    // figure-eight deposit its ridges twice at the crossing and read as a knot;
+                    // a single stroke rasterises the band's whole coverage before compositing.
                     context.beginPath();
-                    traceStudioOilRibbonPath(context, lane);
+                    for (const run of lane.runs) {
+                      traceStudioOilRibbonPath(context, run);
+                    }
                     context.stroke();
                   }
                   context.restore();

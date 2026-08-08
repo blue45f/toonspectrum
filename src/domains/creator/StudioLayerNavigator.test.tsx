@@ -221,6 +221,49 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('aria-selected="true"');
   });
 
+  it("keeps a group's member count from fusing with its name", () => {
+    // 측정된 결함(D9): `병합 e6659cca` + 배지 `2` 가 한 덩어리로 `병합 e6659cca2` 처럼 읽혔다.
+    const group = createLayerGroup("merged", "병합 1");
+    const html = renderNavigator(
+      [
+        layer("a", "image", 0, { label: "배경", groupId: group.id }),
+        layer("b", "image", 1, { label: "톤", groupId: group.id }),
+      ],
+      [group]
+    );
+
+    expect(html).not.toContain("병합 12");
+    expect(html).toContain("병합 1</span>");
+    expect(html).toContain("2개");
+    // 그룹 행의 접근성 이름은 이미 개수를 따로 말한다 — 배지는 시각 전용이어야 한다.
+    expect(html).toContain('aria-label="병합 1, 그룹, 2개 레이어"');
+  });
+
+  it("says a mixed-kind merge will group instead of collapsing to one layer", () => {
+    // 행이 늘어나는 결과를 '병합' 이라고 부르면 라벨이 거짓말이 된다 — 클릭 전에 알린다.
+    const mixed = renderNavigator(
+      [
+        layer("bottom", "image", 0, { label: "배경" }),
+        layer("mid", "draw", 1, { label: "선화" }),
+      ],
+      [],
+      { selectedIds: ["bottom", "mid"] }
+    );
+    expect(mixed).toContain("이미지가 아닌 레이어 1개가 있어 한 장으로 굽지 못해요");
+    expect(mixed).toContain("레이어 수는 줄지 않습니다");
+
+    const rasterOnly = renderNavigator(
+      [
+        layer("bottom", "image", 0, { label: "배경" }),
+        layer("top", "image", 1, { label: "톤" }),
+      ],
+      [],
+      { selectedIds: ["bottom", "top"] }
+    );
+    expect(rasterOnly).not.toContain("한 장으로 굽지 못해요");
+    expect(rasterOnly).toContain('aria-label="선택 레이어 병합"');
+  });
+
   it("renders 500 independently contained rows without truncating the professional layer document", () => {
     const items = Array.from({ length: 500 }, (_, index) =>
       layer(`layer-${index}`, index % 2 === 0 ? "image" : "draw", index, {

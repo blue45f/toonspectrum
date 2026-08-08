@@ -105,6 +105,26 @@ describe("StudioScrollPreviewPanel rhythm analysis", () => {
     expect(html).not.toContain("편집하기");
   });
 
+  it("names insight pages the way a reader reads them and keeps the raw id on the diagnostic hook", () => {
+    const pageId = "864fd343-f4e9-47f5-abda-84e1941780a5";
+    const unnamed = (id: string): ScrollPreviewPage => ({
+      id,
+      elements: [],
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1_280,
+    });
+    const html = renderPanel([unnamed("e0e2b0ce-0000-4000-8000-000000000000"), unnamed(pageId)]);
+
+    // 화면 문구에는 내부 UUID 가 없다.
+    expect(html).toContain("빈 페이지");
+    expect(html).toContain("· 2페이지");
+    expect(html).not.toContain(`· ${pageId}`);
+    // 진단 가치는 남는다 — DOM 훅으로 어느 페이지인지 여전히 특정할 수 있다.
+    expect(html).toContain(`data-page-id="${pageId}"`);
+    expect(html).toContain('data-insight-code="');
+  });
+
   it("renders nothing and avoids a portal while closed", () => {
     vi.stubGlobal("document", { body: { nodeName: "BODY" } });
     const html = renderToStaticMarkup(

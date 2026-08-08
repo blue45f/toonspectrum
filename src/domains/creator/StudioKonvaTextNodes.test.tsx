@@ -3,7 +3,12 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildTextPathData, normalizeTextPath } from "./studio-text-path";
+import {
+  buildTextPathData,
+  normalizeTextPath,
+  textPathAdvanceWidth,
+  textPathLength,
+} from "./studio-text-path";
 import {
   StudioKonvaStickerNode,
   StudioKonvaTextNode,
@@ -149,6 +154,38 @@ describe("StudioKonvaTextNode", () => {
       curvedEvent,
       { minFontSize: 10 },
     );
+  });
+
+  it("sizes the curved path by the measured text, not by the element box (D6)", () => {
+    // Konva TextPath는 경로 길이를 넘는 글자를 조용히 버린다 — 박스(220px)보다 긴 효과음
+    // 레터링(한글 12자 @40px ≈ 415px)이면 경로가 그만큼 길어져야 한 글자도 잃지 않는다.
+    const el = textElement({
+      fontSize: 40,
+      text: "가나다라마바사아자차카타",
+      textPath: { shape: "arcUp", curve: 70 },
+      width: 220,
+    });
+    render(<StudioKonvaTextNode {...commonProps()} el={el} />);
+
+    const curved = latest(konvaCapture.textPaths, "long curved text") as { data: string };
+    const advance = textPathAdvanceWidth({
+      text: el.text,
+      fontSize: el.fontSize,
+      fontFamily: "Pretendard, sans-serif",
+      fontStyle: "bold",
+      letterSpacing: 0,
+    });
+    expect(advance).toBeGreaterThan(el.width);
+    expect(curved.data).toBe(
+      buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize, advance),
+    );
+    // 박스 폭만 쓰던 시절의 경로는 233.8px(12자 중 6자)였다.
+    expect(textPathLength(normalizeTextPath(el.textPath), el.width, el.fontSize)).toBeLessThan(
+      advance,
+    );
+    expect(
+      textPathLength(normalizeTextPath(el.textPath), el.width, el.fontSize, advance),
+    ).toBeGreaterThanOrEqual(advance);
   });
 
   it("typesets vertical text as right-to-left columns with rotated latin runs", () => {

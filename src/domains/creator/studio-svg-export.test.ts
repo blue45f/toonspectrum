@@ -1427,7 +1427,15 @@ describe("도형 직렬화", () => {
 
     expect(svg).toContain('data-brush-engine="oil-ribbon-carrier-v1"');
     expect(svg).toContain('data-paint-carrier="contiguous-variable-width-ribbon"');
-    expect((svg.match(/data-paint-bristle-lane="true"/gu) ?? [])).toHaveLength(5);
+    // One <path> per bristle LOAD BAND, each carrying every run of that band as a subpath. Painting
+    // per hair let a self-crossing deposit its ridges twice; one path per band deposits once.
+    const bristlePaths = svg.match(/data-paint-bristle-lane="true"/gu) ?? [];
+    expect(bristlePaths.length).toBeGreaterThan(0);
+    expect(bristlePaths.length).toBeLessThanOrEqual(2);
+    // Each band still has to be a genuinely broken relief rather than one polyline.
+    for (const lanePath of svg.match(/data-paint-bristle-lane="true" d="([^"]+)"/gu) ?? []) {
+      expect((lanePath.match(/M/gu) ?? []).length).toBeGreaterThan(1);
+    }
     expect(svg).not.toContain("<ellipse");
     expect(exportPageToSvg(page([rectEl({
       id: "acrylic-contiguous-ribbon",

@@ -88,7 +88,9 @@ export function StudioColorBlindPreviewToggle({
             onKeyDown={(event) => handleRadioKeyDown(event, index)}
             aria-label={accessibleLabel}
             aria-checked={value === mode}
-            aria-keyshortcuts={mode === "grayscale" ? "Q" : undefined}
+            // 단독 `Q` 는 퀵 마스크의 화음이다 — 흑백 명암은 `⌥Q`
+            // (conflict `q-quickmask-vs-grayscale` 해소, 2026-08-08).
+            aria-keyshortcuts={mode === "grayscale" ? "Alt+Q" : undefined}
             tabIndex={value === mode ? 0 : -1}
             data-studio-color-vision-mode={mode}
             className={cvdBtnClass(value === mode)}

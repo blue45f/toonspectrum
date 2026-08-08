@@ -12,13 +12,14 @@
  * 상한. 잘린 개수는 감추지 않고 "외 N건"으로 보고한다.
  */
 
-import { ChevronRight, HelpCircle, Search, X } from "lucide-react";
+import { Ban, ChevronRight, HelpCircle, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { searchStudio } from "./studio-command-search";
 
 import type {
+  StudioSearchEntry,
   StudioSearchOutcome,
   StudioSearchResult,
 } from "./studio-command-search";
@@ -27,17 +28,19 @@ import type { StudioInspectorRoute } from "./studio-inspector-layout";
 export interface StudioCommandSearchDialogProps {
   open: boolean;
   onClose: () => void;
-  /** 인스펙터 라우트로 이동. 없으면 결과는 위치 안내만 하고 닫지 않는다. */
+  /** 인스펙터 라우트로 이동. 없으면 그 행은 이동한다고 광고하지 않는다. */
   onNavigateInspector?: (route: StudioInspectorRoute) => void;
   /** 튜토리얼 허브 열기. */
   onOpenTutorial?: (tutorialId: string) => void;
   /** 그리기 팔레트 펼치기. */
   onExpandPalette?: (paletteId: "sub-tools" | "tool-properties") => void;
   /**
-   * 도움말 노드 열기. Wave A 카탈로그의 `helpNodeId` 를 그대로 넘긴다.
-   * HelpGraph 가 아직 없으므로 소비자가 없으면 버튼을 그리지 않는다.
+   * 명령 도움말 열기. 첫 인자는 Wave A 카탈로그의 `helpNodeId`, 둘째는 그 노드가
+   * 딸린 **카탈로그 명령 id** 다 — 도움말 표면이 실제로 렌더할 수 있는 것은
+   * 카탈로그 명령뿐이라(`buildStudioToolHelp`) 이 콜백은 명령 행에서만 불린다.
+   * 소비자가 없으면 명령 행은 "도움말"이라고 광고하지 않는다.
    */
-  onOpenHelp?: (helpNodeId: string) => void;
+  onOpenHelp?: (helpNodeId: string, commandId: string) => void;
 }
 
 const FOCUSABLE =
@@ -46,6 +49,88 @@ const FOCUSABLE =
 function resultKey(result: StudioSearchResult): string {
   return `${result.entry.kind}:${result.entry.id}`;
 }
+
+/* ------------------------------------------------------------ activation */
+
+/**
+ * 행 하나가 **실제로** 할 수 있는 일.
+ *
+ * 감사가 잡은 결함은 "결과를 실행할 수 없다"가 아니라 **"실행할 수 없는데
+ * 실행한다고 적혀 있다"** 였다. 푸터는 언제나 `Enter 실행` 이라고 말했지만
+ * 명령 행(코퍼스의 대부분)의 활성화 분기는 소비자가 없는 옵셔널 콜백 하나뿐이라
+ * 조용히 no-op 이었다. 그래서 이 모듈은 능력을 먼저 계산하고 배지·푸터·비활성
+ * 표시를 전부 그 계산에서 파생시킨다 — **배선이 없으면 광고도 없다.**
+ */
+export type StudioCommandSearchActionKind =
+  | "inspector"
+  | "palette"
+  | "tutorial"
+  | "help"
+  | "none";
+
+export interface StudioCommandSearchAction {
+  kind: StudioCommandSearchActionKind;
+  /** 행 오른쪽 배지 — "이 행에서 Enter 를 누르면 무엇이 되는가". */
+  badge: string;
+  /** 푸터가 `Enter ` 뒤에 붙이는 문구. */
+  hint: string;
+}
+
+/** 소비자가 실제로 넘겨 준 핸들러 집합. */
+export interface StudioCommandSearchHandlerAvailability {
+  inspector: boolean;
+  palette: boolean;
+  tutorial: boolean;
+  help: boolean;
+}
+
+const NO_ACTION: StudioCommandSearchAction = Object.freeze({
+  kind: "none",
+  badge: "열 수 없음",
+  hint: "이 항목은 아직 검색에서 열 수 없습니다",
+});
+
+function studioCommandSearchAction(
+  entry: StudioSearchEntry,
+  available: StudioCommandSearchHandlerAvailability,
+): StudioCommandSearchAction {
+  const target = entry.target;
+  switch (target.type) {
+    case "inspector":
+      return available.inspector
+        ? { kind: "inspector", badge: "이동", hint: "인스펙터로 이동" }
+        : NO_ACTION;
+    case "palette":
+      return available.palette
+        ? { kind: "palette", badge: "펼치기", hint: "팔레트 펼치기" }
+        : NO_ACTION;
+    case "tutorial":
+      return available.tutorial
+        ? { kind: "tutorial", badge: "튜토리얼", hint: "튜토리얼 열기" }
+        : NO_ACTION;
+    case "command":
+      // 명령을 **실행**하려면 CommandRegistry 배선이 StudioPage 밖으로 나와야
+      // 한다(아직 없다). 그때까지 명령 행이 할 수 있는 정직한 최선은 "이게
+      // 무엇이고 어디 있는지"를 여는 것이고, 배지·푸터가 실행이 아니라
+      // 도움말이라고 말한다.
+      return available.help
+        ? { kind: "help", badge: "도움말", hint: "도움말 열기" }
+        : NO_ACTION;
+    default:
+      // `panel`(자동 액션)처럼 아직 소비자가 없는 타깃. 열리는 척하지 않는다.
+      return NO_ACTION;
+  }
+}
+
+const ACTION_ICON: Readonly<
+  Record<StudioCommandSearchActionKind, typeof ChevronRight>
+> = Object.freeze({
+  inspector: ChevronRight,
+  palette: ChevronRight,
+  tutorial: ChevronRight,
+  help: HelpCircle,
+  none: Ban,
+});
 
 /** 어떤 이름으로 맞았는지 — 타사 용어로 찾아온 사람에게 확인을 준다. */
 function matchNote(result: StudioSearchResult): string | null {
@@ -76,6 +161,7 @@ export function StudioCommandSearchDialog({
 }: StudioCommandSearchDialogProps) {
   const titleId = useId();
   const inputId = useId();
+  const listboxId = useId();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,10 +171,51 @@ export function StudioCommandSearchDialog({
     () => searchStudio(query),
     [query],
   );
-  const flat = useMemo(
-    () => outcome.sections.flatMap((section) => section.results),
-    [outcome],
+
+  const available = useMemo<StudioCommandSearchHandlerAvailability>(
+    () => ({
+      inspector: Boolean(onNavigateInspector),
+      palette: Boolean(onExpandPalette),
+      tutorial: Boolean(onOpenTutorial),
+      help: Boolean(onOpenHelp),
+    }),
+    [onExpandPalette, onNavigateInspector, onOpenHelp, onOpenTutorial],
   );
+
+  /**
+   * 구획 구조를 유지한 채 행마다 평면 인덱스·option id·실제 능력을 미리 붙인다.
+   * `aria-activedescendant` 가 가리킬 id 와 `data-active` 가 붙을 행이 같은 곳에서
+   * 나와야 둘이 어긋나지 않는다.
+   */
+  const grouped = useMemo(() => {
+    const groups: {
+      section: (typeof outcome.sections)[number];
+      rows: readonly {
+        result: StudioSearchResult;
+        index: number;
+        optionId: string;
+        action: StudioCommandSearchAction;
+      }[];
+    }[] = [];
+    let consumed = 0;
+    for (const section of outcome.sections) {
+      const base = consumed;
+      groups.push({
+        section,
+        rows: section.results.map((result, offset) => ({
+          result,
+          index: base + offset,
+          optionId: `${listboxId}-option-${base + offset}`,
+          action: studioCommandSearchAction(result.entry, available),
+        })),
+      });
+      consumed = base + section.results.length;
+    }
+    return groups;
+  }, [available, listboxId, outcome]);
+
+  const flat = useMemo(() => grouped.flatMap((group) => group.rows), [grouped]);
+  const activeRow = flat[activeIndex];
 
   useEffect(() => {
     setActiveIndex(0);
@@ -101,11 +228,21 @@ export function StudioCommandSearchDialog({
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
+  // 활성 행을 시야에 유지한다. 포커스는 combobox 에 남으므로 브라우저가 자동으로
+  // 스크롤해 주지 않는다 — activedescendant 패턴에서는 우리가 해야 한다.
+  useEffect(() => {
+    if (!open || !activeRow) return;
+    const node = document.getElementById(activeRow.optionId);
+    node?.scrollIntoView?.({ block: "nearest" });
+  }, [activeRow, open]);
+
   const activate = useCallback(
     (result: StudioSearchResult) => {
       const target = result.entry.target;
-      switch (target.type) {
+      const action = studioCommandSearchAction(result.entry, available);
+      switch (action.kind) {
         case "inspector": {
+          if (target.type !== "inspector") return;
           const route: StudioInspectorRoute = {
             primary: target.primary,
             ...(target.image ? { image: target.image } : {}),
@@ -115,23 +252,39 @@ export function StudioCommandSearchDialog({
           return;
         }
         case "tutorial": {
+          if (target.type !== "tutorial") return;
           onOpenTutorial?.(target.tutorialId);
           onClose();
           return;
         }
         case "palette": {
+          if (target.type !== "palette") return;
           onExpandPalette?.(target.paletteId);
           onClose();
           return;
         }
-        default: {
-          // 명령 실행 배선은 Wave A 레지스트리가 붙은 뒤에 온다. 그때까지는
-          // "어디에 있는지"를 보여주는 것이 정직한 최선이고, 도움말은 열린다.
-          onOpenHelp?.(result.entry.helpNodeId);
+        case "help": {
+          if (target.type !== "command") return;
+          // 도움말 표면도 모달이다. 검색을 열어 둔 채 겹치면 Esc 가 어느 쪽을
+          // 닫는지 알 수 없으므로 검색은 닫고 넘긴다.
+          onOpenHelp?.(result.entry.helpNodeId, target.commandId);
+          onClose();
+          return;
         }
+        default:
+          // 능력이 없는 행. 행 배지와 푸터가 이미 그렇게 말하고 있으므로
+          // 여기서 조용히 아무것도 하지 않는 것이 계약대로다.
+          return;
       }
     },
-    [onClose, onExpandPalette, onNavigateInspector, onOpenHelp, onOpenTutorial],
+    [
+      available,
+      onClose,
+      onExpandPalette,
+      onNavigateInspector,
+      onOpenHelp,
+      onOpenTutorial,
+    ],
   );
 
   const onKeyDown = useCallback(
@@ -152,10 +305,10 @@ export function StudioCommandSearchDialog({
         return;
       }
       if (event.key === "Enter") {
-        const result = flat[activeIndex];
-        if (result) {
+        const row = flat[activeIndex];
+        if (row) {
           event.preventDefault();
-          activate(result);
+          activate(row.result);
         }
         return;
       }
@@ -164,7 +317,11 @@ export function StudioCommandSearchDialog({
       // 트랩 부재를 심각 결함으로 판정했으므로 새 모달은 처음부터 가둔다.
       const root = dialogRef.current;
       if (!root) return;
-      const focusables = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      // 결과 행은 `role="option"` + `tabIndex=-1` 이라 탭 순서에 없다(콤보박스
+      // 계약). 트랩 후보에서도 같은 기준으로 빼지 않으면 Tab 이 옵션에 갇힌다.
+      const focusables = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (node) => node.tabIndex >= 0,
+      );
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
@@ -191,7 +348,10 @@ export function StudioCommandSearchDialog({
 
   if (!open || typeof document === "undefined") return null;
 
-  let cursor = -1;
+  const hasResults = flat.length > 0;
+  const footerHint = hasResults
+    ? `↑↓ 이동 · Enter ${activeRow?.action.hint ?? "열기"} · Esc 닫기`
+    : "Esc 닫기";
 
   return createPortal(
     <div
@@ -212,11 +372,25 @@ export function StudioCommandSearchDialog({
           <h2 id={titleId} className="sr-only">
             명령·속성 통합 검색
           </h2>
+          {/*
+            콤보박스 계약(WAI-ARIA APG). `role="searchbox"` 였을 때는 결과 목록이
+            보조기술에 아예 존재하지 않았고 ↑↓ 하이라이트도 `data-active` 라는
+            시각 전용 속성으로만 움직였다 — 스크린리더 사용자에게는 검색 결과가
+            없는 화면이었다. 이제 포커스는 입력에 남고 활성 행은
+            `aria-activedescendant` 로 전달된다.
+          */}
           <input
             ref={inputRef}
             id={inputId}
             type="search"
-            role="searchbox"
+            role="combobox"
+            aria-labelledby={titleId}
+            aria-autocomplete="list"
+            aria-expanded={hasResults}
+            aria-controls={listboxId}
+            {...(activeRow
+              ? { "aria-activedescendant": activeRow.optionId }
+              : {})}
             value={query}
             autoComplete="off"
             onChange={(event) => setQuery(event.currentTarget.value)}
@@ -251,73 +425,110 @@ export function StudioCommandSearchDialog({
             <p className="px-2 py-6 text-center text-xs text-fg-3">
               &ldquo;{query}&rdquo; 와 맞는 기능을 찾지 못했습니다.
             </p>
-          ) : (
-            outcome.sections.map((section) => (
-              <section key={section.kind} className="mb-2 last:mb-0">
-                <div className="flex items-baseline justify-between gap-2 px-2 py-1">
-                  <h3 className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-                    {section.label}
-                  </h3>
-                  {section.truncated ? (
-                    <span className="text-[0.62rem] tabular-nums text-fg-3">
-                      외 {section.matched - section.results.length}건
-                    </span>
-                  ) : null}
-                </div>
-                <ul className="space-y-0.5">
-                  {section.results.map((result) => {
-                    cursor += 1;
-                    const index = cursor;
-                    const note = matchNote(result);
-                    return (
-                      <li key={resultKey(result)} className="flex items-stretch gap-1">
-                        <button
-                          type="button"
-                          data-active={index === activeIndex ? "true" : undefined}
-                          onPointerEnter={() => setActiveIndex(index)}
-                          onClick={() => activate(result)}
-                          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-raised data-[active=true]:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm text-fg">
-                              {result.entry.label}
-                            </span>
-                            <span className="block truncate text-[0.66rem] text-fg-3">
-                              {result.entry.location}
-                              {note ? ` · ${note}` : ""}
-                            </span>
-                          </span>
-                          <span className="flex shrink-0 items-center gap-1.5">
-                            {result.entry.shortcut ? (
-                              <kbd className="rounded border border-line bg-card px-1.5 py-px text-[0.66rem] text-fg-3">
-                                {result.entry.shortcut}
-                              </kbd>
-                            ) : null}
-                            <ChevronRight size={14} aria-hidden className="text-fg-3" />
-                          </span>
-                        </button>
-                        {onOpenHelp ? (
-                          <button
-                            type="button"
-                            onClick={() => onOpenHelp(result.entry.helpNodeId)}
-                            title={`${result.entry.label} 도움말`}
-                            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                          >
-                            <HelpCircle size={15} aria-hidden />
-                            <span className="sr-only">{result.entry.label} 도움말</span>
-                          </button>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))
-          )}
+          ) : null}
+          {/*
+            콤보박스의 `aria-controls` 는 언제나 실재하는 id 를 가리켜야 하므로
+            목록 컨테이너는 항상 남기고, 결과가 없을 때만 `hidden` 으로 접근성
+            트리에서 뺀다(APG collapsed combobox 와 같은 처리).
+          */}
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={titleId}
+            hidden={!hasResults}
+          >
+            {grouped.map(({ section, rows }) => {
+                const groupHeadingId = `${listboxId}-group-${section.kind}`;
+                return (
+                  <section
+                    key={section.kind}
+                    role="group"
+                    aria-labelledby={groupHeadingId}
+                    className="mb-2 last:mb-0"
+                  >
+                    <div className="flex items-baseline justify-between gap-2 px-2 py-1">
+                      <h3
+                        id={groupHeadingId}
+                        className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3"
+                      >
+                        {section.label}
+                      </h3>
+                      {section.truncated ? (
+                        <span className="text-[0.62rem] tabular-nums text-fg-3">
+                          외 {section.matched - section.results.length}건
+                        </span>
+                      ) : null}
+                    </div>
+                    {/*
+                      DOM 은 목록으로 두되 ARIA 트리는 listbox › group › option 이
+                      되도록 중간 래퍼를 presentation 으로 지운다.
+                    */}
+                    <ul role="presentation" className="space-y-0.5">
+                      {rows.map(({ result, index, optionId, action }) => {
+                        const note = matchNote(result);
+                        const inert = action.kind === "none";
+                        const ActionIcon = ACTION_ICON[action.kind];
+                        return (
+                          <li key={resultKey(result)} role="presentation">
+                            <button
+                              type="button"
+                              id={optionId}
+                              role="option"
+                              tabIndex={-1}
+                              aria-selected={index === activeIndex}
+                              {...(inert ? { "aria-disabled": true } : {})}
+                              data-active={index === activeIndex ? "true" : undefined}
+                              data-action={action.kind}
+                              onPointerEnter={() => setActiveIndex(index)}
+                              onClick={() => activate(result)}
+                              className={`flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors data-[active=true]:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                                inert
+                                  ? "cursor-not-allowed opacity-55"
+                                  : "hover:bg-raised"
+                              }`}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm text-fg">
+                                  {result.entry.label}
+                                </span>
+                                <span className="block truncate text-[0.66rem] text-fg-3">
+                                  {result.entry.location}
+                                  {note ? ` · ${note}` : ""}
+                                </span>
+                              </span>
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                {result.entry.shortcut ? (
+                                  <kbd className="rounded border border-line bg-card px-1.5 py-px text-[0.66rem] text-fg-3">
+                                    {result.entry.shortcut}
+                                  </kbd>
+                                ) : null}
+                                {/*
+                                  행마다 "Enter 를 누르면 무엇이 되는지"를 글자로
+                                  적는다. 명령 행은 "도움말"이라고 적히므로
+                                  실행되는 척하지 않는다.
+                                */}
+                                <span className="rounded-full border border-line px-1.5 py-px text-[0.6rem] text-fg-3">
+                                  {action.badge}
+                                </span>
+                                <ActionIcon
+                                  size={14}
+                                  aria-hidden
+                                  className="text-fg-3"
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-1.5 text-[0.62rem] text-fg-3">
-          <span>↑↓ 이동 · Enter 실행 · Esc 닫기</span>
+          <span>{footerHint}</span>
           {outcome.truncated ? (
             <span className="tabular-nums">
               {outcome.totalMatched}건 중 {outcome.totalShown}건 표시

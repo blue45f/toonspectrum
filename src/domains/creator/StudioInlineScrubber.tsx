@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,24 @@ export interface StudioInlineScrubberProps {
   step: number;
   /** Human-readable current value ("18px", "80%"). */
   valueText: string;
+  /** Fires on every value change. With `onCommit` present this is the preview channel. */
   onChange: (next: number) => void;
+  /**
+   * Fires once when a gesture ends — pointer release/cancel, keyboard idle, or blur —
+   * with the last previewed value.
+   *
+   * A host whose `onChange` pushes a document history entry records one undo step per
+   * 1% otherwise: a single 100→87 drag measured at 13 undos to revert. Such hosts pass a
+   * local preview setter as `onChange` and the real mutation here, so one gesture is one
+   * undo step while `aria-valuenow` still tracks every intermediate value.
+   */
+  onCommit?: (next: number) => void;
+  /**
+   * Idle after the last arrow/page/home/end key that ends a *keyboard* gesture.
+   * Pointer gestures have an unambiguous end (pointerup); a key run does not, so a short
+   * idle is what "the user stopped adjusting" means here. Blur commits immediately.
+   */
+  keyboardIdleMs?: number;
   disabled?: boolean;
   className?: string;
   /** CSS px of pointer travel per `step`. */
@@ -42,6 +59,7 @@ export interface StudioInlineScrubberProps {
 }
 
 const DEFAULT_PIXELS_PER_STEP = 3;
+const DEFAULT_KEYBOARD_IDLE_MS = 400;
 
 function quantize(value: number, min: number, max: number, step: number): number {
   if (!(step > 0)) return Math.min(max, Math.max(min, value));
@@ -59,6 +77,8 @@ export function StudioInlineScrubber({
   step,
   valueText,
   onChange,
+  onCommit,
+  keyboardIdleMs = DEFAULT_KEYBOARD_IDLE_MS,
   disabled = false,
   className,
   pixelsPerStep = DEFAULT_PIXELS_PER_STEP,
@@ -69,10 +89,34 @@ export function StudioInlineScrubber({
   tabIndex = 0,
 }: StudioInlineScrubberProps) {
   const dragRef = useRef<{ pointerId: number; originX: number; originValue: number } | null>(null);
+  // Last previewed value that still owes `onCommit` a call. Null means the gesture is settled,
+  // so a trailing blur after a pointerup can never commit the same edit twice.
+  const pendingRef = useRef<number | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearIdleTimer = () => {
+    if (idleTimerRef.current === null) return;
+    clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = null;
+  };
+
+  const flushGesture = () => {
+    clearIdleTimer();
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (pending !== null) onCommit?.(pending);
+  };
+
+  // A pending timer must not outlive the row (filter/page switches unmount rows mid-gesture).
+  // The un-flushed preview is simply dropped — committing from teardown would write a value the
+  // user can no longer see.
+  useEffect(() => clearIdleTimer, []);
 
   const commit = (next: number) => {
     const quantized = quantize(next, min, max, step);
-    if (quantized !== value) onChange(quantized);
+    if (quantized === value) return;
+    if (onCommit) pendingRef.current = quantized;
+    onChange(quantized);
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -81,6 +125,8 @@ export function StudioInlineScrubber({
     // selection. Both must stay out of a scrub.
     event.preventDefault();
     event.stopPropagation();
+    // A keyboard run that has not idled out yet folds into this drag — still one commit.
+    clearIdleTimer();
     dragRef.current = { pointerId: event.pointerId, originX: event.clientX, originValue: value };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.focus({ preventScroll: true });
@@ -102,6 +148,7 @@ export function StudioInlineScrubber({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    flushGesture();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -118,6 +165,10 @@ export function StudioInlineScrubber({
     event.preventDefault();
     event.stopPropagation();
     commit(next);
+    if (!onCommit) return;
+    // Held arrows auto-repeat; every repeat restarts the idle window so the whole run is one edit.
+    clearIdleTimer();
+    idleTimerRef.current = setTimeout(flushGesture, Math.max(0, keyboardIdleMs));
   };
 
   return (
@@ -140,6 +191,7 @@ export function StudioInlineScrubber({
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
+      onBlur={flushGesture}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
       className={cn(

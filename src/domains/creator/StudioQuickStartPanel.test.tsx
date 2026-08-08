@@ -190,6 +190,77 @@ describe("StudioQuickStartPanel", () => {
     Element.prototype.getClientRects = originalGetClientRects;
   });
 
+  it("treats the first interaction outside the coach as a real dismissal", async () => {
+    // 회귀 근거(브라우저 실측 2026-08-08): 코치가 떠 있는 채로 메뉴바에서 `텍스트 ▸ 말풍선`을
+    // 열면 코치가 가려지기만 하고 dismiss 상태가 남지 않아, 그 패널을 Esc 로 닫는 순간 코치가
+    // **다시 나타났다**. 바깥 조작을 진짜 dismiss 로 기록해야 재등장 경로가 닫힌다.
+    const outside = document.createElement("button");
+    outside.setAttribute("data-studio-main-menu-trigger", "text");
+    document.body.append(outside);
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    // pointerdown 이 아니라 click 이어야 한다: pointerdown 에서 닫으면 코치 언마운트가
+    // mousedown~mouseup 사이에 끼어들어 메뉴바가 재배치되고, 브라우저가 click 을 트리거가
+    // 아닌 공통 조상으로 올려 첫 클릭이 통째로 사라졌다(실측 2026-08-08).
+    fireEvent.pointerDown(outside);
+    await Promise.resolve();
+    expect(handlers.onDismiss).not.toHaveBeenCalled();
+
+    // 그리고 클릭 dispatch 안에서가 아니라 그 뒤(마이크로태스크)에 닫아야 한다 — 클릭을
+    // 처리하는 도중에 닫으면 재배치된 메뉴바가 사용자가 겨눈 트리거를 바꿔치기한다.
+    fireEvent.click(outside);
+    expect(handlers.onDismiss).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+
+    outside.remove();
+  });
+
+  it("does not treat a click inside the coach as an outside dismissal", async () => {
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "처음이라면 이 순서로 시작하세요",
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: /2\. 그리기/u }));
+    await Promise.resolve();
+    expect(handlers.onDismiss).not.toHaveBeenCalled();
+
+    // 배경(scrim)은 자기 onClick 으로 한 번만 닫는다 — 바깥 감시자가 겹쳐 두 번 부르면 안 된다.
+    fireEvent.click(document.querySelector('[data-studio-quickstart-backdrop="true"]')!);
+    await Promise.resolve();
+    expect(handlers.onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("lands keyboard focus on the menubar instead of the document body when it closes", () => {
+    // 스스로 뜬 코치에는 "열어 준 컨트롤"이 없어서 실측상 Esc 뒤 포커스가 BODY 로 떨어졌다.
+    // 키보드 사용자가 문서 맨 앞부터 다시 Tab 하지 않도록 메뉴바 첫 트리거로 착지시킨다.
+    const originalGetClientRects = Element.prototype.getClientRects;
+    Element.prototype.getClientRects = function getClientRects() {
+      return [
+        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
+      ] as unknown as DOMRectList;
+    };
+
+    const anchor = document.createElement("button");
+    anchor.setAttribute("data-studio-main-menu-trigger", "file");
+    document.body.append(anchor);
+    const handlers = createHandlers();
+    const view = render(<StudioQuickStartPanel {...handlers} />);
+
+    expect(document.activeElement?.getAttribute("data-studio-quickstart-dismiss")).toBe(
+      "true",
+    );
+
+    view.unmount();
+    expect(document.activeElement).toBe(anchor);
+
+    anchor.remove();
+    Element.prototype.getClientRects = originalGetClientRects;
+  });
+
   it("keeps the scrim clickable while the modal isolator runs", () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);

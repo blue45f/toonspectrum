@@ -12,8 +12,13 @@ import {
 } from "./studio-living-ink-execution-protocol";
 import {
   studioLivingInkChromaBleedMultipliers,
-  studioLivingInkOpticalDensityFromReflectance,
+  studioLivingInkDepositionPathLength,
+  studioLivingInkMeanMarkRadius,
+  studioLivingInkPigmentCoatFactor,
   studioLivingInkPigmentDiffusionRates,
+  studioLivingInkPigmentOpticalDensity,
+  STUDIO_LIVING_INK_PIGMENT_COAT,
+  STUDIO_LIVING_INK_SURFACE_COVERAGE,
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_LOAD_GAIN,
 } from "./studio-living-ink-field";
@@ -685,7 +690,24 @@ void main(){
     * wetGate * clamp(wetGradient * 6.0, 0.0, 1.0);
   vec2 centered = uv - vec2(0.5);
   color *= 1.0 - dot(centered, centered) * vignetteAmount;
-  outColor = vec4(clamp(color, vec3(0.0), vec3(1.0)), 1.0);
+  // Paper is paper only where the wash is. This surface is committed to the document as a
+  // page-sized layer, so an opaque sheet repaints the whole page — one stroke used to turn a
+  // 1440x2160 export from pure white to warm cream everywhere, baked into the delivered PNG.
+  // Presence is the union of pigment, opaque white and standing water, so every mark the resolve
+  // can draw still carries its own fibre, tooth and granulation, and nothing else does.
+  float washPresence = 1.0 - exp(-${STUDIO_LIVING_INK_SURFACE_COVERAGE.presenceGain.toFixed(1)} * (
+    max(max(opticalDensity.r, opticalDensity.g), opticalDensity.b)
+    + clamp(mobileWhiteCoverage, 0.0, 1.0)
+    + wetGate
+  ));
+  vec3 shown = mix(vec3(1.0), clamp(color, vec3(0.0), vec3(1.0)), clamp(washPresence, 0.0, 1.0));
+  // Un-premultiply against the page so compositing this layer back over white reproduces "shown"
+  // exactly, and so the layer's multiply blend reads as backdrop * shown over artwork underneath.
+  float surfaceAlpha = 1.0 - min(shown.r, min(shown.g, shown.b));
+  vec3 straight = surfaceAlpha > ${STUDIO_LIVING_INK_SURFACE_COVERAGE.alphaEpsilon}
+    ? (shown - vec3(1.0 - surfaceAlpha)) / surfaceAlpha
+    : vec3(1.0);
+  outColor = vec4(clamp(straight, vec3(0.0), vec3(1.0)), surfaceAlpha);
 }`;
 
 function integer(value: unknown, minimum: number, maximum: number): value is number {
@@ -946,13 +968,24 @@ export class StudioLivingInkWebGl2Runtime {
     y: 0,
     radiusCells: 0,
   });
+  /**
+   * Last deposited ink mark, kept across operations so a batch knows the path length it covers.
+   *
+   * Product code forwards a stroke as a run of suffix operations, so the distance a batch actually
+   * travels includes the gap back to the previous batch's last mark. Journal replay applies the same
+   * operations in the same order, so this stays deterministic.
+   */
+  private lastInkMark: Readonly<{ x: number; y: number }> | null = null;
 
   constructor(config: StudioLivingInkExecutionConfig) {
     validateStudioLivingInkExecutionConfig(config);
     this.config = Object.freeze({ ...config });
     this.canvas = new OffscreenCanvas(config.displayWidth, config.displayHeight);
     const gl = this.canvas.getContext("webgl2", {
-      alpha: false,
+      // The resolve writes wash coverage in alpha so an untouched page stays transparent; the
+      // transferred ImageBitmap has to carry it, and it is authored straight, not premultiplied.
+      alpha: true,
+      premultipliedAlpha: false,
       antialias: false,
       depth: false,
       desynchronized: true,
@@ -1144,6 +1177,7 @@ export class StudioLivingInkWebGl2Runtime {
     this.clearSurface(this.resources.curl);
     this.clearSurface(this.resources.selection, 1);
     this.dirtyBounds = null;
+    this.lastInkMark = null;
   }
 
   private uploadSelection(selection: StudioLivingInkSelectionMask | null): boolean {
@@ -1275,6 +1309,10 @@ export class StudioLivingInkWebGl2Runtime {
     }
     const selectionEnabled = this.uploadSelection(operation.selection);
     if (operation.kind === "ink") this.clearDouble(this.resources.strokeDeposit);
+    const coat = studioLivingInkPigmentCoatFactor(
+      studioLivingInkDepositionPathLength(operation.marks, this.lastInkMark),
+      studioLivingInkMeanMarkRadius(operation.marks),
+    );
     let previousX: number | null = null;
     let previousY: number | null = null;
     let previousRadius: number | null = null;
@@ -1329,10 +1367,17 @@ export class StudioLivingInkWebGl2Runtime {
       if (operation.kind === "ink") {
         const pigmentMark = operation.marks[index]!;
         const pigment = pigmentMark.pigmentMass * load;
+        // One pass is one coat: divide the batch by the path length it covers and by the measured
+        // gain of the resolve, then scale by the stroke's own opacity as the CPU oracle already did.
+        // Opaque white is a coverage well rather than an optical density, so it keeps the raw load.
+        const pigmentCoat = pigment
+          * clamp(pigmentMark.color[3], 0, 1)
+          * coat
+          / STUDIO_LIVING_INK_PIGMENT_COAT.resolveGain;
         const white = operation.tool === "white-gouache";
-        const densityRed = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[0]) * pigment;
-        const densityGreen = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[1]) * pigment;
-        const densityBlue = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[2]) * pigment;
+        const densityRed = studioLivingInkPigmentOpticalDensity(pigmentMark.color[0]) * pigmentCoat;
+        const densityGreen = studioLivingInkPigmentOpticalDensity(pigmentMark.color[1]) * pigmentCoat;
+        const densityBlue = studioLivingInkPigmentOpticalDensity(pigmentMark.color[2]) * pigmentCoat;
         const deposit: readonly [number, number, number, number] = white
           ? [
               0,
@@ -1459,6 +1504,8 @@ export class StudioLivingInkWebGl2Runtime {
       this.resources.mobile.swap();
       this.syncDoubleDirty(this.resources.mobile, bounds);
       // continuous-stroke-deposit-merge: one physical pigment write after the capsule union pass.
+      const last = operation.marks[operation.marks.length - 1]!;
+      this.lastInkMark = Object.freeze({ x: last.x, y: last.y });
     }
     // Pen-up: clear the scrub tip so post-stroke settle/advance/fix ticks do not keep a ghost
     // brushFootprint localizing bleed forever (InkWash only boosts under the live pointer).

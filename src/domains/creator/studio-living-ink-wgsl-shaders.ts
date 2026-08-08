@@ -27,7 +27,10 @@ import {
   studioLivingInkVelocityDamping,
   studioLivingInkVorticityStrength,
 } from "./studio-living-ink-execution-protocol";
-import { STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION } from "./studio-living-ink-field";
+import {
+  STUDIO_LIVING_INK_SURFACE_COVERAGE,
+  STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
+} from "./studio-living-ink-field";
 
 import type { StudioLivingInkDisplayMode } from "./studio-living-ink-gpu-protocol";
 
@@ -1186,7 +1189,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     * wetGate * clamp(wetGradient * 6.0, 0.0, 1.0);
   let centered = uv - vec2f(0.5);
   color = color * (1.0 - dot(centered, centered) * u.vignetteAmount);
-  outRgba[i] = vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), 1.0);
+  // Paper is paper only where the wash is. This surface is committed to the document as a
+  // page-sized layer, so an opaque sheet repaints the whole page — one stroke used to turn a
+  // 1440x2160 export from pure white to warm cream everywhere, baked into the delivered PNG.
+  // Presence is the union of pigment, opaque white and standing water, so every mark the resolve
+  // can draw still carries its own fibre, tooth and granulation, and nothing else does.
+  let washPresence = 1.0 - exp(-${wgslFloat(STUDIO_LIVING_INK_SURFACE_COVERAGE.presenceGain)} * (
+    max(max(opticalDensity.x, opticalDensity.y), opticalDensity.z)
+    + clamp(mobileWhiteCoverage, 0.0, 1.0)
+    + wetGate
+  ));
+  let shown = mix(vec3f(1.0), clamp(color, vec3f(0.0), vec3f(1.0)), clamp(washPresence, 0.0, 1.0));
+  // Un-premultiply against the page so compositing this layer back over white reproduces "shown"
+  // exactly, and so the layer's multiply blend reads as backdrop * shown over artwork underneath.
+  let surfaceAlpha = 1.0 - min(shown.x, min(shown.y, shown.z));
+  var straight = vec3f(1.0);
+  if (surfaceAlpha > ${wgslFloat(STUDIO_LIVING_INK_SURFACE_COVERAGE.alphaEpsilon)}) {
+    straight = (shown - vec3f(1.0 - surfaceAlpha)) / surfaceAlpha;
+  }
+  outRgba[i] = vec4f(clamp(straight, vec3f(0.0), vec3f(1.0)), surfaceAlpha);
 }
 `;
 

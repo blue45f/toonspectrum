@@ -31,7 +31,11 @@ import {
   createStudioPixiSceneProvider,
 } from "./studio-pixi-scene-provider";
 
-import type { StudioSceneProvider, StudioSceneSelectableOverlay  } from "./studio-scene-provider";
+import type {
+  StudioSceneDocumentTransform,
+  StudioSceneProvider,
+  StudioSceneSelectableOverlay,
+} from "./studio-scene-provider";
 
 export interface StudioPixiSceneOverlayHostProps {
   readonly enabled?: boolean;
@@ -42,6 +46,14 @@ export interface StudioPixiSceneOverlayHostProps {
   readonly dpr?: number;
   readonly elements: readonly StudioPixiHostElementLike[];
   readonly selectedIds: readonly string[];
+  /**
+   * Document → surface placement, mirroring the Konva stage. Overlay geometry is authored in
+   * document units, so without this the chrome only lands correctly at 100% zoom.
+   */
+  readonly documentTransform?: StudioSceneDocumentTransform;
+  /** Page box; a selection that covers it is a tool composite, not artist-authored chrome. */
+  readonly documentWidth?: number;
+  readonly documentHeight?: number;
 }
 
 export function StudioPixiSceneOverlayHost({
@@ -52,22 +64,29 @@ export function StudioPixiSceneOverlayHost({
   dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1,
   elements,
   selectedIds,
+  documentTransform,
+  documentWidth,
+  documentHeight,
 }: StudioPixiSceneOverlayHostProps) {
   const providerRef = useRef<StudioSceneProvider | null>(null);
   const trackedIdsRef = useRef<string[]>([]);
   const generationRef = useRef(0);
 
   const overlays = useMemo(
-    () => buildStudioPixiSelectableOverlaysForSelection(elements, selectedIds),
-    [elements, selectedIds],
+    () =>
+      buildStudioPixiSelectableOverlaysForSelection(elements, selectedIds, {
+        documentWidth,
+        documentHeight,
+      }),
+    [elements, selectedIds, documentWidth, documentHeight],
   );
   /** Nothing selected means nothing is drawn; the surface is pure cost. */
   const presentable = overlays.length > 0;
 
   // Geometry is read through refs inside the lifecycle effect so a stage resize
   // never re-runs it. Resizing is the separate effect below.
-  const geometryRef = useRef({ width, height, dpr });
-  geometryRef.current = { width, height, dpr };
+  const geometryRef = useRef({ width, height, dpr, documentTransform });
+  geometryRef.current = { width, height, dpr, documentTransform };
   const overlaysRef = useRef<readonly StudioSceneSelectableOverlay[]>(overlays);
   overlaysRef.current = overlays;
 
@@ -87,6 +106,9 @@ export function StudioPixiSceneOverlayHost({
           width: initial.width,
           height: initial.height,
           dpr: Math.max(1, Math.min(3, initial.dpr)),
+          ...(initial.documentTransform
+            ? { documentTransform: initial.documentTransform }
+            : {}),
           ownerDocument: mountParent.ownerDocument,
         });
         if (cancelled || generation !== generationRef.current) {
@@ -101,11 +123,18 @@ export function StudioPixiSceneOverlayHost({
         // already been through the sync effect below. Seed it here or the first
         // selection after a cold start would present an empty overlay.
         const current = geometryRef.current;
-        if (current.width !== initial.width || current.height !== initial.height) {
+        if (
+          current.width !== initial.width
+          || current.height !== initial.height
+          || current.documentTransform !== initial.documentTransform
+        ) {
           provider.resize({
             width: current.width,
             height: current.height,
             dpr: Math.max(1, Math.min(3, current.dpr)),
+            ...(current.documentTransform
+              ? { documentTransform: current.documentTransform }
+              : {}),
           });
         }
         for (const overlay of overlaysRef.current) provider.upsertSelectableOverlay(overlay);
@@ -149,7 +178,8 @@ export function StudioPixiSceneOverlayHost({
     provider.render();
   }, [overlays]);
 
-  // Resize when stage metrics change without remounting provider when possible.
+  // Resize / re-place when stage metrics change, without remounting the provider. The document
+  // transform rides along: zoom, flip and rotation change the placement, never the geometry.
   useEffect(() => {
     const provider = providerRef.current;
     if (!provider || provider.destroyed) return;
@@ -159,12 +189,13 @@ export function StudioPixiSceneOverlayHost({
         width,
         height,
         dpr: Math.max(1, Math.min(3, dpr)),
+        ...(documentTransform ? { documentTransform } : {}),
       });
       provider.render();
     } catch {
       /* provider may be mid-destroy */
     }
-  }, [width, height, dpr]);
+  }, [width, height, dpr, documentTransform]);
 
   return null;
 }

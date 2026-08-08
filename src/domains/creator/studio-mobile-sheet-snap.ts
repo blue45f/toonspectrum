@@ -4,6 +4,14 @@ export const STUDIO_MOBILE_SHEET_SNAPS = ["compact", "medium", "full"] as const;
 
 export type StudioMobileSheetSnap = (typeof STUDIO_MOBILE_SHEET_SNAPS)[number];
 
+/**
+ * Sheets that only hold a list open at `medium`. The brush settings sheet is different: it floats
+ * over the very canvas the artist is judging, so it opens at `compact` and the grabber promotes it.
+ * Measured at 360×640: `medium` leaves 126 canvas rows (19.7%), `compact` leaves 190 (29.7%).
+ */
+export const STUDIO_MOBILE_SHEET_DEFAULT_SNAP: StudioMobileSheetSnap = "medium";
+export const STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP: StudioMobileSheetSnap = "compact";
+
 const SNAP_INDEX = new Map<StudioMobileSheetSnap, number>(
   STUDIO_MOBILE_SHEET_SNAPS.map((snap, index) => [snap, index]),
 );
@@ -50,13 +58,24 @@ export function nextStudioMobileSheetSnap(
   return STUDIO_MOBILE_SHEET_SNAPS[(index + 1) % STUDIO_MOBILE_SHEET_SNAPS.length]!;
 }
 
+/**
+ * Floor for the brush sheet's compact snap. 34dvh is only 218px on a 360×640 phone, which fits the
+ * grabber, the title row and the size slider but clips 투명도 by 36px. Keeping a pixel floor lets
+ * the smallest viewport show both primary sliders while every taller phone keeps the 34dvh ratio.
+ */
+export const STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT = "16.5rem";
+
 export function studioMobileSheetSizeStyle(
   snap: StudioMobileSheetSnap,
   keyboardInset: number,
+  minimumHeight?: string,
 ): Pick<CSSProperties, "height" | "maxHeight"> {
   const safeKeyboardInset = Number.isFinite(keyboardInset)
     ? Math.max(0, Math.round(keyboardInset))
     : 0;
-  const height = `min(${SNAP_HEIGHT_DVH[snap]}dvh, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${safeKeyboardInset}px))`;
+  const requested = minimumHeight
+    ? `max(${SNAP_HEIGHT_DVH[snap]}dvh, ${minimumHeight})`
+    : `${SNAP_HEIGHT_DVH[snap]}dvh`;
+  const height = `min(${requested}, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${safeKeyboardInset}px))`;
   return { height, maxHeight: height };
 }

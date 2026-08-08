@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +10,7 @@ import {
   planAtomicSelectionAffineTransform,
   planAtomicSelectionTranslation,
   planGroupClickSelection,
+  planGroupClickSelectionRelease,
   planGroupEnter,
   planGroupEscape,
   resolveClickUnit,
@@ -142,14 +145,27 @@ describe("planGroupClickSelection — 일반 클릭", () => {
     expect(next).toEqual({ selectedId: null, marqueeIds: ["d", "e"], activeGroupId: null });
   });
 
-  it("진입 중 자식 클릭 → 개별 선택하며 진입 유지", () => {
+  // 이 케이스의 예전 기대는 "누르는 즉시 b 하나로 좁힌다"였다. 그 즉시 좁힘이 곧 결함 D4다 —
+  // 다중 선택 중 하나를 눌러 끌면 그 하나만 움직였다. 좁히기는 사라지지 않고 "드래그 없이 뗌"으로
+  // 미뤄지므로, 두 단계를 함께 검증해 기대를 약화가 아니라 강화한다.
+  it("진입 중 자식 클릭 → 누름은 다중 선택을 유지하고 진입도 유지", () => {
     const next = planGroupClickSelection({
       items: list,
       groups: gs,
       clickedId: "b",
       current: multi(["a", "b"], "g1"),
     });
-    expect(next).toEqual({ selectedId: "b", marqueeIds: [], activeGroupId: "g1" });
+    expect(next).toEqual({ selectedId: null, marqueeIds: ["a", "b"], activeGroupId: "g1" });
+  });
+
+  it("진입 중 자식 클릭 → 드래그 없이 뗐을 때 개별 선택으로 좁히고 진입 유지", () => {
+    const released = planGroupClickSelectionRelease({
+      items: list,
+      groups: gs,
+      clickedId: "b",
+      current: multi(["a", "b"], "g1"),
+    });
+    expect(released).toEqual({ selectedId: "b", marqueeIds: [], activeGroupId: "g1" });
   });
 
   it("단일 요소만 있는 그룹은 단일 선택으로 정규화된다", () => {
@@ -161,6 +177,140 @@ describe("planGroupClickSelection — 일반 클릭", () => {
       current: EMPTY_GROUP_SELECTION,
     });
     expect(next).toEqual({ selectedId: "a", marqueeIds: [], activeGroupId: null });
+  });
+});
+
+/**
+ * 결함 D4 회귀 방지 — 러버밴드로 3개를 고른 뒤 가운데 하나를 끌면 3개가 함께 움직여야 한다.
+ * 브라우저에서 측정된 증상은 헤더가 "3개 선택"→"1개 선택"으로 바뀌고 델타가
+ * [{0,0},{+90,+60},{0,0}] 였다. 캔버스 드래그는 누름 직후의 선택(marqueeIds)을 이동 단위로
+ * 읽으므로, 누름이 선택을 하나로 접으면 나머지 둘은 제자리에 남는다.
+ */
+describe("planGroupClickSelection — 다중 선택 멤버 누름(D4 회귀)", () => {
+  const lines = items(["l1", "l2", "l3"]);
+  const three = multi(["l1", "l2", "l3"]);
+
+  it("무그룹 3개 선택 중 가운데를 Shift 없이 눌러도 선택 3개가 그대로 유지된다", () => {
+    const next = planGroupClickSelection({
+      items: lines,
+      groups: [],
+      clickedId: "l2",
+      current: three,
+    });
+    expect(next).toEqual({
+      selectedId: null,
+      marqueeIds: ["l1", "l2", "l3"],
+      activeGroupId: null,
+    });
+    // 반환값은 입력 배열을 재사용하지 않는다(호출부의 상태 변형 방지).
+    expect(next.marqueeIds).not.toBe(three.marqueeIds);
+  });
+
+  it("드래그 없이 뗐을 때만 눌렀던 하나로 좁힌다", () => {
+    const released = planGroupClickSelectionRelease({
+      items: lines,
+      groups: [],
+      clickedId: "l2",
+      current: three,
+    });
+    expect(released).toEqual({ selectedId: "l2", marqueeIds: [], activeGroupId: null });
+  });
+
+  it("선택 밖 요소를 누르면 유지하지 않고 즉시 그 요소로 대체한다", () => {
+    const withOutsider = items(["l1", "l2", "l3", "l4"]);
+    const next = planGroupClickSelection({
+      items: withOutsider,
+      groups: [],
+      clickedId: "l4",
+      current: three,
+    });
+    expect(next).toEqual({ selectedId: "l4", marqueeIds: [], activeGroupId: null });
+    expect(
+      planGroupClickSelectionRelease({
+        items: withOutsider,
+        groups: [],
+        clickedId: "l4",
+        current: three,
+      })
+    ).toBeNull();
+  });
+
+  it("단일 선택 상태에서 그 요소를 다시 눌러도 좁힐 게 없다(null)", () => {
+    expect(
+      planGroupClickSelectionRelease({
+        items: lines,
+        groups: [],
+        clickedId: "l2",
+        current: single("l2"),
+      })
+    ).toBeNull();
+  });
+
+  it("Shift 클릭은 유지 규칙을 타지 않는다 — 기존 토글 그대로", () => {
+    const next = planGroupClickSelection({
+      items: lines,
+      groups: [],
+      clickedId: "l2",
+      current: three,
+      additive: true,
+    });
+    expect(next).toEqual({ selectedId: null, marqueeIds: ["l1", "l3"], activeGroupId: null });
+    expect(
+      planGroupClickSelectionRelease({
+        items: lines,
+        groups: [],
+        clickedId: "l2",
+        current: three,
+        additive: true,
+      })
+    ).toBeNull();
+  });
+
+  it("혼합 선택(그룹 g1 + 낱개)에서 그룹 멤버를 누르면 전체를 유지하고, 뗐을 때 그룹 단위로 좁힌다", () => {
+    const mixed = items(["a:g1", "b:g1", "c"]);
+    const gs = groups("g1");
+    const current = multi(["a", "b", "c"]);
+    expect(
+      planGroupClickSelection({ items: mixed, groups: gs, clickedId: "a", current })
+    ).toEqual({ selectedId: null, marqueeIds: ["a", "b", "c"], activeGroupId: null });
+    expect(
+      planGroupClickSelectionRelease({ items: mixed, groups: gs, clickedId: "a", current })
+    ).toEqual({ selectedId: null, marqueeIds: ["a", "b"], activeGroupId: null });
+  });
+
+  it("선택이 곧 그룹 전체면(단위 == 선택) 유지·좁히기 모두 무의미하다", () => {
+    const grouped = items(["a:g1", "b:g1"]);
+    const gs = groups("g1");
+    const current = multi(["a", "b"]);
+    expect(
+      planGroupClickSelection({ items: grouped, groups: gs, clickedId: "a", current })
+    ).toEqual({ selectedId: null, marqueeIds: ["a", "b"], activeGroupId: null });
+    expect(
+      planGroupClickSelectionRelease({ items: grouped, groups: gs, clickedId: "a", current })
+    ).toBeNull();
+  });
+
+  it("유지된 선택은 원자 이동 계획을 그대로 통과시킨다 — 3개가 같은 델타로 움직인다", () => {
+    const pressed = planGroupClickSelection({
+      items: lines,
+      groups: [],
+      clickedId: "l2",
+      current: three,
+    });
+    const docs = [
+      { id: "l1", type: "draw", points: [191, 100, 200, 140] },
+      { id: "l2", type: "draw", points: [241, 100, 250, 140] },
+      { id: "l3", type: "draw", points: [291, 100, 300, 140] },
+    ];
+    const moved = planAtomicSelectionTranslation({
+      items: docs,
+      selectedIds: currentSelectionIds(pressed),
+      deltaX: 90,
+      deltaY: 60,
+      isLocked: () => false,
+    });
+    expect(moved.map((item) => item.points?.[0])).toEqual([281, 331, 381]);
+    expect(moved.map((item) => item.points?.[1])).toEqual([160, 160, 160]);
   });
 });
 
@@ -603,6 +753,29 @@ describe("planAtomicSelectionAffineTransform — 혼합 그룹 전체 변형", (
       items: [box, meta],
       orderedSelectedIds: ["box", "meta"],
     });
+  });
+});
+
+/**
+ * 순수 함수만으로는 D4가 다시 살아나는 걸 못 막는다 — 좁히기를 "드래그 없는 뗌"으로 미룬 이상,
+ * 그 뗌을 실제로 받아 주는 배선이 사라지면 다중 선택이 영영 안 좁혀진다. 배선 계약을 소스로 고정한다.
+ * (같은 도메인의 `studio-group-convenience-boundary.test.ts` 가 쓰는 것과 동일한 소스 계약 패턴.)
+ */
+describe("캔버스 배선 계약 — 뗌 단계 좁히기", () => {
+  const viewportSource = readFileSync(
+    new URL("./StudioCanvasViewport.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("Stage 의 click/tap 이 planGroupClickSelectionRelease 로 간다", () => {
+    expect(viewportSource).toContain("planGroupClickSelectionRelease");
+    expect(viewportSource).toContain("onClick={narrowCanvasSelectionOnRelease}");
+    expect(viewportSource).toContain("onTap={narrowCanvasSelectionOnRelease}");
+  });
+
+  it("누름 경로는 그대로 planGroupClickSelection(=selectElementFromCanvas)에 남아 있다", () => {
+    expect(viewportSource).toContain("onMouseDown={onSelect}");
+    expect(viewportSource).toContain("onTap={onSelect}");
   });
 });
 

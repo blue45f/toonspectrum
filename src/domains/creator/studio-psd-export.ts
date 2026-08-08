@@ -43,6 +43,8 @@ import {
   type Psd,
 } from "ag-psd";
 
+import { readStudioExportResolutionDpi } from "./studio-raster-resolution-metadata";
+
 import type {
   PsdInterchangeLossDecision,
   PsdInterchangeLossManifest,
@@ -381,6 +383,28 @@ const BLEND_MODE_MAP: Record<string, BlendMode> = {
   color: "color",
   luminosity: "luminosity",
 };
+
+/**
+ * PSD ResolutionInfo(8BIM 1005) — Photoshop·인쇄 워크플로가 PSD를 물리 크기로 배치할 때 읽는
+ * 유일한 해상도 태그다. 없으면 72PPI로 열린다. 내보내기 옵션이 해상도를 게시했을 때만 기록해,
+ * 지오메트리를 정하지 않은 문서의 출력 바이트는 그대로 둔다.
+ */
+function publishedPsdResolutionInfo(): Pick<Psd, "imageResources"> {
+  const dpi = readStudioExportResolutionDpi();
+  if (dpi == null) return {};
+  return {
+    imageResources: {
+      resolutionInfo: {
+        horizontalResolution: dpi,
+        horizontalResolutionUnit: "PPI",
+        widthUnit: "Inches",
+        verticalResolution: dpi,
+        verticalResolutionUnit: "PPI",
+        heightUnit: "Inches",
+      },
+    },
+  };
+}
 
 function mapBlendMode(mode: string | undefined): BlendMode {
   if (!mode) return "normal";
@@ -950,7 +974,7 @@ export async function exportPagePsd(
 
   if (elements.length === 0) {
     skipped.push("페이지에 요소가 없어 빈 캔버스로 저장했어요.");
-    const psd: Psd = { width: psdWidth, height: psdHeight };
+    const psd: Psd = { width: psdWidth, height: psdHeight, ...publishedPsdResolutionInfo() };
     const buffer = writePsd(psd);
     assertPsdOutputBudget(buffer);
     return {
@@ -1081,7 +1105,12 @@ export async function exportPagePsd(
     children.push(makeBackgroundLayer(psdWidth, psdHeight, opts.background));
   }
 
-  const psd: Psd = { width: psdWidth, height: psdHeight, children };
+  const psd: Psd = {
+    width: psdWidth,
+    height: psdHeight,
+    children,
+    ...publishedPsdResolutionInfo(),
+  };
 
   // 합성 썸네일(파일탐색기 미리보기용, 순수 장식)은 만들지 않는다 — 실측 결과 요소 2개짜리 거의
   // 빈 페이지에서도 전체 합성 캔버스를 한 번 더 렌더링+압축하는 이 단계 때문에 내보내기가 90초

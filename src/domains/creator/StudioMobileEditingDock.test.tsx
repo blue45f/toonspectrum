@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
+import { STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP } from "./studio-mobile-sheet-snap";
 import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
@@ -22,6 +23,8 @@ import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynam
 import type { StudioBrushSnapshot } from "./studio-brush-library";
 import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 import type { StudioWorkspaceState } from "./studio-workspaces";
+
+import { useI18n } from "@/lib/i18n";
 
 interface MockDockButtonProps {
   readonly "aria-controls"?: string;
@@ -295,6 +298,12 @@ function createProps(
     ...overrides,
   };
 }
+
+// The dock's labels come from the locale packs now, so the locale has to be explicit: jsdom
+// reports `en-US`, and these assertions are written against the Korean source copy.
+beforeEach(() => {
+  useI18n.getState().setLang("ko");
+});
 
 afterEach(() => {
   cleanup();
@@ -658,7 +667,10 @@ describe("StudioMobileEditingDock", () => {
     const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
     expect(drawSheet.getAttribute("data-studio-sheet-id")).toBe("draw");
     expect(drawSheet.getAttribute("aria-modal")).toBe("false");
-    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("medium");
+    // The brush sheet floats over the canvas the artist is judging, so it must open at the
+    // smallest snap. Opening at `medium` left 126 canvas rows (19.7%) on a 360×640 viewport.
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("compact");
+    expect(STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP).toBe("compact");
 
     view.rerender(
       <StudioMobileEditingDock
@@ -1085,6 +1097,12 @@ describe("StudioMobileEditingDock", () => {
     expect(
       drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
     ).toContain("72px");
+    // Opens compact so the canvas under it stays judgeable; the grabber promotes from there.
+    expect(handle.getAttribute("aria-valuenow")).toBe("0");
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("compact");
+
+    fireEvent.click(handle);
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("medium");
     expect(handle.getAttribute("aria-valuenow")).toBe("1");
 
     fireEvent.click(handle);
@@ -1544,5 +1562,44 @@ describe("StudioMobileEditingDock", () => {
 
     fireEvent.click(close);
     expect(stableHandlers.dismissMobileHint).toHaveBeenCalledOnce();
+  });
+
+  it("puts brush size and opacity above the presets so a compact sheet still exposes them", () => {
+    render(
+      <StudioMobileEditingDock {...createProps({ isMobile: true, mobileSheet: "draw" })} />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    const size = within(sheet).getByLabelText("브러시 굵기 슬라이더");
+    const opacity = within(sheet).getByLabelText("브러시 투명도 슬라이더");
+    const modeSwitch = within(sheet).getByRole("group", { name: "그리기 모드" });
+
+    const follows = Node.DOCUMENT_POSITION_FOLLOWING;
+    // Size/opacity were below the preset shelf, the catalog picker and the swatch grid, so on a
+    // 360×640 viewport they sat off the bottom of the sheet at every snap.
+    expect(size.compareDocumentPosition(opacity) & follows).toBe(follows);
+    expect(opacity.compareDocumentPosition(modeSwitch) & follows).toBe(follows);
+  });
+
+  it("renders the drawing tool row in the active locale instead of hardcoded Korean", () => {
+    useI18n.getState().setLang("en");
+    render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+
+    const toolbar = screen.getByRole("toolbar", { name: "Drawing tools" });
+    expect(screen.getByRole("navigation", { name: "Studio mobile toolbar" })).toBeTruthy();
+    for (const name of ["Select", "Pen", "Pixel", "Eraser", "Fill", "Shape"]) {
+      expect(within(toolbar).getByRole("button", { name })).toBeTruthy();
+    }
+    expect(within(toolbar).getByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(within(toolbar).getByRole("button", { name: "Redo" })).toBeTruthy();
+    expect(
+      within(toolbar).getByRole("button", { name: "Brush settings (size, color, presets)" }),
+    ).toBeTruthy();
+
+    // No Hangul may survive anywhere in the tool row once a non-Korean locale is active.
+    expect(toolbar.textContent ?? "").not.toMatch(/[가-힣]/u);
+    for (const element of toolbar.querySelectorAll("[aria-label]")) {
+      expect(element.getAttribute("aria-label") ?? "").not.toMatch(/[가-힣]/u);
+    }
   });
 });

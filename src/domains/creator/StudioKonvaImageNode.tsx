@@ -28,6 +28,33 @@ import { toast } from "@/lib/toast-store";
 
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
 const IMAGE_FILTER_WORKER_DEBOUNCE_MS = 80;
+// ── Slider-drag scheduling ────────────────────────────────────────────────────────────────────
+// Measured 2026-08-09 (headless Chromium, page-composite radial blur): dragging the strength
+// slider produced 5.8–9.4 s before the first pixel moved and 8.7–9.0 s more after release. The
+// cause is not the main thread (longtask stayed under 150 ms) — it is that every slider value
+// dispatched a full-resolution job, and aborting an already-posted Worker request only rejects
+// the promise: the Worker keeps computing, so each new value queued behind the last one.
+//
+// The fix is scheduling, not arithmetic. A value that arrives while the previous one is still
+// warm is treated as a drag frame: it renders through a small proxy surface (a separate Worker,
+// so it can never queue behind the expensive job) and the full-resolution pass is deferred until
+// the drag stops. The settle pass is the untouched original code path, so the pixels an artist
+// keeps are bit-identical to before — only what they see mid-drag is an approximation.
+/** A value this soon after the previous one is a drag frame, not a decision. */
+const IMAGE_FILTER_DRAG_WINDOW_MS = 450;
+/** Full-resolution recompute waits for the drag to stop; the proxy carries the frames until then. */
+const IMAGE_FILTER_DRAG_SETTLE_MS = 220;
+/** One frame — the proxy exists to answer the pointer, so it must not sit behind a debounce. */
+const IMAGE_FILTER_PROXY_DEBOUNCE_MS = 16;
+/** Drag-preview budget. 512² is an order of magnitude cheaper than a full page composite. */
+const IMAGE_FILTER_PROXY_MAX_PIXELS = 512 * 512;
+/** Below this the full-resolution pass is already interactive and a proxy would only add a hop. */
+const IMAGE_FILTER_PROXY_MIN_SOURCE_PIXELS = 4 * IMAGE_FILTER_PROXY_MAX_PIXELS;
+/**
+ * An abandoned request still occupies the Worker until it finishes. Past this age the session is
+ * torn down instead, so the settle pass starts on a free Worker rather than behind a dead job.
+ */
+const IMAGE_FILTER_STALE_REQUEST_TEARDOWN_MS = 250;
 const IMAGE_FILTER_WORKER_RESULT_CACHE_LIMIT = 4;
 const PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT = 1;
 // One RGBA input plus transfer/result/intermediate buffers can coexist. Keep interactive filtering
@@ -37,6 +64,11 @@ const PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT = 1;
 const IMAGE_FILTER_INTERACTIVE_MAX_PIXELS = 16 * 1024 * 1024;
 // HiDPI 필터 슈퍼샘플 상한 — 3D 인서트 캡처와 같은 이유로 2를 넘기지 않는다(픽셀 4× 메모리 캡).
 const IMAGE_FILTER_SUPERSAMPLE_MAX = 2;
+
+/** Monotonic effect clock kept outside the component body for React purity. */
+function studioImageFilterClockMs(): number {
+  return globalThis.performance.now();
+}
 
 // eslint-disable-next-line react-refresh/only-export-components -- pure handoff verifier is tested independently from the Konva node
 export function verifyStudioLivingInkPngDataUrlHash(
@@ -347,11 +379,19 @@ export function StudioKonvaImageNode({
   const [filterWorkerClient, setFilterWorkerClient] = useState<StudioImageFilterWorkerClientModule | null>(null);
   const [gpuFilterModule, setGpuFilterModule] = useState<StudioGpuFilterApplyModule | null>(null);
   const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
+  const [proxyFilteredCanvas, setProxyFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const [workerRequiredFailureKey, setWorkerRequiredFailureKey] = useState<string>();
   const [verifiedLivingInkHash, setVerifiedLivingInkHash] = useState<`sha256:${string}` | null>(null);
   const imageRef = useRef<Konva.Image | null>(null);
   const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
+  // Drag previews get their own Worker on purpose: the expensive full-resolution job cannot be
+  // preempted once posted, so sharing a session would make the proxy queue behind exactly the
+  // computation it exists to hide.
+  const filterProxySessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
+  const proxySourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
+  const proxyCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const filterRequestAtRef = useRef(0);
   const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
   const workerSourceRevisionRef = useRef(0);
   const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
@@ -577,6 +617,11 @@ export function StudioKonvaImageNode({
   useEffect(() => () => {
     filterWorkerSessionRef.current?.dispose();
     filterWorkerSessionRef.current = null;
+    filterProxySessionRef.current?.dispose();
+    filterProxySessionRef.current = null;
+    proxySourcePixelsRef.current = null;
+    if (proxyCanvasRef.current) releaseWorkerResultCanvas(proxyCanvasRef.current);
+    proxyCanvasRef.current = null;
     releaseWorkerResultCache(workerResultCacheRef.current);
     workerResultCacheRef.current = null;
   }, [filterWorkerClient]);
@@ -643,6 +688,17 @@ export function StudioKonvaImageNode({
     filterMaskWantedSrc ?? null,
   ]);
   const workerPipelineActive = useWorkerFilterPath && workerFallbackKey !== workerRequestKey;
+  // Drag-preview surface. A masked filter is excluded on purpose: its blend reads the exact
+  // full-resolution source, so approximating it would put unrequested pixels on screen.
+  const proxyPreviewEligible =
+    useWorkerFilterPath
+    && !filterMaskWantedSrc
+    && workerPixelCount >= IMAGE_FILTER_PROXY_MIN_SOURCE_PIXELS;
+  const proxyScale = proxyPreviewEligible
+    ? Math.sqrt(IMAGE_FILTER_PROXY_MAX_PIXELS / workerPixelCount)
+    : 1;
+  const proxyWidth = Math.max(1, Math.round(workerWidth * proxyScale));
+  const proxyHeight = Math.max(1, Math.round(workerHeight * proxyScale));
   const paddedWorkerRequiredBlocked = cachePad > 0 && workerRequiredForSafeExecution;
   const workerResultCacheLimit = el.filterPageComposite === true
     ? PAGE_COMPOSITE_FILTER_RESULT_CACHE_LIMIT
@@ -692,7 +748,13 @@ export function StudioKonvaImageNode({
     if (!useWorkerFilterPath || !displayImg || !filterWorkerClient) {
       filterWorkerSessionRef.current?.dispose();
       filterWorkerSessionRef.current = null;
+      filterProxySessionRef.current?.dispose();
+      filterProxySessionRef.current = null;
+      proxySourcePixelsRef.current = null;
+      if (proxyCanvasRef.current) releaseWorkerResultCanvas(proxyCanvasRef.current);
+      proxyCanvasRef.current = null;
       setWorkerFilteredCanvas(undefined);
+      setProxyFilteredCanvas(undefined);
       setWorkerFallbackKey(undefined);
       if (!paddedWorkerRequiredBlocked) setWorkerRequiredFailureKey(undefined);
       workerSourcePixelsRef.current = null;
@@ -714,6 +776,16 @@ export function StudioKonvaImageNode({
       : undefined;
     let controller: AbortController | null = null;
     let cancelled = false;
+    // A request that is still posted when this effect is torn down keeps the Worker busy, so the
+    // teardown below has to know whether one was actually dispatched and for how long.
+    let dispatchedAt = 0;
+    let dispatchSettled = false;
+    // Drag detection: how long since the previous parameter change reached this effect.
+    const requestAt = studioImageFilterClockMs();
+    const sincePreviousRequest = requestAt - filterRequestAtRef.current;
+    filterRequestAtRef.current = requestAt;
+    const draggingParameters =
+      proxyPreviewEligible && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
     setWorkerRequiredFailureKey((current) => current === requestKey ? current : undefined);
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
     // A regular image can retain several recent filter results. If the same source becomes a
@@ -815,6 +887,7 @@ export function StudioKonvaImageNode({
       };
       const dispatchWorkerRequest = (): void => {
         controller = new AbortController();
+        dispatchedAt = studioImageFilterClockMs();
         if (!filterWorkerSessionRef.current) {
           const createSession = filterWorkerClient.createStudioImageFilterResidentWorkerSession;
           if (typeof createSession === "function") {
@@ -845,9 +918,11 @@ export function StudioKonvaImageNode({
             }, { signal: controller.signal });
         pending
           .then((result) => {
+            dispatchSettled = true;
             commitFilteredPixels(result.imageData);
           })
           .catch((error) => {
+            dispatchSettled = true;
             if ((error as { name?: string })?.name === "AbortError") return;
             if (isStudioFilterWorkerRequiredError(error)) {
               console.error(
@@ -903,12 +978,121 @@ export function StudioKonvaImageNode({
         return;
       }
       dispatchWorkerRequest();
-    }, IMAGE_FILTER_WORKER_DEBOUNCE_MS);
+    }, draggingParameters ? IMAGE_FILTER_DRAG_SETTLE_MS : IMAGE_FILTER_WORKER_DEBOUNCE_MS);
+
+    // ── Drag proxy. Same filter program, a much smaller surface, its own Worker. It only ever
+    // writes `proxyFilteredCanvas`, which the render below drops the instant the exact
+    // full-resolution result for this key exists — so it can approximate without ever becoming
+    // the pixels the artist keeps.
+    let proxyController: AbortController | null = null;
+    const proxyTimer = draggingParameters
+      ? setTimeout(() => {
+          if (cancelled) return;
+          let proxyPixels = proxySourcePixelsRef.current;
+          if (
+            !proxyPixels
+            || proxyPixels.source !== source
+            || proxyPixels.width !== proxyWidth
+            || proxyPixels.height !== proxyHeight
+          ) {
+            try {
+              const proxyCanvas = document.createElement("canvas");
+              proxyCanvas.width = proxyWidth;
+              proxyCanvas.height = proxyHeight;
+              const proxyCtx = proxyCanvas.getContext("2d");
+              if (!proxyCtx) return;
+              proxyCtx.drawImage(source, 0, 0, proxyWidth, proxyHeight);
+              proxyPixels = {
+                data: proxyCtx.getImageData(0, 0, proxyWidth, proxyHeight).data,
+                height: proxyHeight,
+                revision: ++workerSourceRevisionRef.current,
+                source,
+                width: proxyWidth,
+              };
+              proxySourcePixelsRef.current = proxyPixels;
+            } catch {
+              // A drag preview is optional by construction; the settle pass still runs.
+              return;
+            }
+          }
+          if (!filterProxySessionRef.current) {
+            const createSession = filterWorkerClient.createStudioImageFilterResidentWorkerSession;
+            if (typeof createSession !== "function") return;
+            filterProxySessionRef.current = createSession();
+          }
+          const proxySession = filterProxySessionRef.current;
+          const proxySource = proxyPixels;
+          if (!proxySession || !proxySource) return;
+          proxyController = new AbortController();
+          proxySession
+            .run(
+              {
+                imageData: {
+                  data: proxySource.data,
+                  width: proxySource.width,
+                  height: proxySource.height,
+                },
+                el: elRef.current,
+              },
+              { signal: proxyController.signal, sourceRevision: proxySource.revision },
+            )
+            .then((result) => {
+              if (cancelled) return;
+              const filtered = result.imageData;
+              if (filtered.width !== proxySource.width || filtered.height !== proxySource.height) {
+                return;
+              }
+              const outCanvas = document.createElement("canvas");
+              outCanvas.width = filtered.width;
+              outCanvas.height = filtered.height;
+              const outCtx = outCanvas.getContext("2d");
+              if (!outCtx) return;
+              const clamped = filtered.data instanceof Uint8ClampedArray
+                ? filtered.data
+                : new Uint8ClampedArray(filtered.data);
+              outCtx.putImageData(
+                new ImageData(
+                  clamped as unknown as Uint8ClampedArray<ArrayBuffer>,
+                  filtered.width,
+                  filtered.height,
+                ),
+                0,
+                0,
+              );
+              if (proxyCanvasRef.current) releaseWorkerResultCanvas(proxyCanvasRef.current);
+              proxyCanvasRef.current = outCanvas;
+              setProxyFilteredCanvas({
+                canvas: outCanvas,
+                filterKey,
+                height: filtered.height,
+                source,
+                src,
+                width: filtered.width,
+              });
+            })
+            .catch(() => {
+              // Preview-only lane: a failure just means this frame keeps the previous pixels.
+            });
+        }, IMAGE_FILTER_PROXY_DEBOUNCE_MS)
+      : null;
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      if (proxyTimer !== null) clearTimeout(proxyTimer);
+      if (proxyController !== null) proxyController.abort();
       if (controller !== null) controller.abort();
+      // Abort only rejects the promise — an already-posted request keeps the Worker busy until it
+      // finishes, which is what made every dragged value queue behind the last one. Past the
+      // teardown age the session is closed so the next pass starts on a free Worker.
+      if (
+        dispatchedAt > 0
+        && !dispatchSettled
+        && studioImageFilterClockMs() - dispatchedAt >= IMAGE_FILTER_STALE_REQUEST_TEARDOWN_MS
+      ) {
+        filterWorkerSessionRef.current?.dispose();
+        filterWorkerSessionRef.current = null;
+      }
     };
   }, [
     useWorkerFilterPath,
@@ -920,14 +1104,26 @@ export function StudioKonvaImageNode({
     el.src,
     workerWidth,
     workerHeight,
+    proxyPreviewEligible,
+    proxyWidth,
+    proxyHeight,
     filterChainSteps,
     workerRequestKey,
     workerResultCacheLimit,
     paddedWorkerRequiredBlocked,
   ]);
 
+  // The drag proxy is the same source and the same filter key at a smaller size, so it is only
+  // ever consulted when the exact result for this key is not on hand. Konva scales it into the
+  // element's box; the settle pass replaces it with the exact pixels a moment later.
+  const currentProxyFilteredCanvas =
+    proxyFilteredCanvas?.src === el.src
+    && proxyFilteredCanvas.source === displayImg
+    && proxyFilteredCanvas.filterKey === maskedFilterKey
+      ? proxyFilteredCanvas.canvas
+      : undefined;
   const visibleWorkerFilteredCanvas =
-    currentWorkerFilteredCanvas ?? retainedWorkerFilteredCanvas;
+    currentWorkerFilteredCanvas ?? retainedWorkerFilteredCanvas ?? currentProxyFilteredCanvas;
   const showWorkerCanvas = workerPipelineActive && !!visibleWorkerFilteredCanvas;
   const synchronousFallbackBlocked =
     filterMaskActivationBlocked

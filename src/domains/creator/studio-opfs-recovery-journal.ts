@@ -74,19 +74,46 @@ export type StudioOpfsRecoveryJournalErrorCode =
 export class StudioOpfsRecoveryJournalError extends Error {
   readonly code: StudioOpfsRecoveryJournalErrorCode;
   readonly path: string | null;
+  /**
+   * 내부 식별자(writer ownerId, epoch, 토큰 …)를 담는 진단 전용 자리.
+   *
+   * `message` 는 저장 강등 배너처럼 **사용자 화면에 그대로 흘러가는** 문자열이다
+   * (`studio-storage-recovery-runtime`의 `causeMessage`). 그래서 사람이 읽을 문장만
+   * 남기고, 사람이 읽을 수 없는 식별자는 지우는 대신 이 필드로 옮긴다 — 진단 가치는
+   * 로그·버그리포트 쪽에 그대로 두고 청중만 나눈다.
+   */
+  readonly diagnostics: string | null;
   override readonly cause?: unknown;
 
   constructor(
     code: StudioOpfsRecoveryJournalErrorCode,
     message: string,
-    options: { readonly path?: string; readonly cause?: unknown } = {},
+    options: {
+      readonly path?: string;
+      readonly cause?: unknown;
+      readonly diagnostics?: string;
+    } = {},
   ) {
     super(message);
     this.name = "StudioOpfsRecoveryJournalError";
     this.code = code;
     this.path = options.path ?? null;
+    this.diagnostics = options.diagnostics ?? null;
     this.cause = options.cause;
   }
+}
+
+/**
+ * 로그·버그리포트용 한 줄. 사용자 문구 + 코드 + 내부 진단을 한 번에 붙인다.
+ * 화면에 쓰지 말 것 — 화면은 `error.message` 만 쓴다.
+ */
+export function describeStudioOpfsRecoveryJournalError(
+  error: StudioOpfsRecoveryJournalError,
+): string {
+  const parts = [`[${error.code}] ${error.message}`];
+  if (error.path) parts.push(`path=${error.path}`);
+  if (error.diagnostics) parts.push(error.diagnostics);
+  return parts.join(" ");
 }
 
 export interface StudioOpfsRecoveryJournalLimits {
@@ -342,9 +369,19 @@ interface StagedEntry {
 function journalError(
   code: StudioOpfsRecoveryJournalErrorCode,
   message: string,
-  options?: { readonly path?: string; readonly cause?: unknown },
+  options?: {
+    readonly path?: string;
+    readonly cause?: unknown;
+    readonly diagnostics?: string;
+  },
 ): never {
-  throw new StudioOpfsRecoveryJournalError(code, message, options);
+  const error = new StudioOpfsRecoveryJournalError(code, message, options);
+  // 진단이 붙은 오류는 삼켜지더라도(강등 폴백 경로) 개발자 콘솔에는 남는다 —
+  // 화면에서 뺀 내부 식별자가 어디에도 없어지지 않게 하는 반대편 절반.
+  if (error.diagnostics) {
+    console.warn(describeStudioOpfsRecoveryJournalError(error));
+  }
+  throw error;
 }
 
 function createAbortError(): StudioOpfsRecoveryJournalError {
@@ -1496,7 +1533,12 @@ export class StudioOpfsRecoveryJournal {
       if (existing && existing.expiresAt > now) {
         journalError(
           "LEASE_BUSY",
-          `다른 writer(${existing.ownerId})가 OPFS 복구 저널을 사용 중입니다.`,
+          "이 작품의 복구 저장소를 다른 탭이나 창이 사용하고 있어요.",
+          {
+            diagnostics:
+              `lease ownerId=${existing.ownerId} epoch=${existing.epoch}`
+              + ` expiresInMs=${existing.expiresAt - now}`,
+          },
         );
       }
       const scan = await this.#scanInternal(input.signal);

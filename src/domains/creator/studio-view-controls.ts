@@ -774,6 +774,17 @@ export function resolveStudioViewShortcut(
     if (code === "Home") return "fit-width";
     if (code === "End") return "actual-pixels";
     if (code === "F11") return "fullscreen";
+    // 단독 `Q` 는 퀵 마스크(select.quick-mask)의 것이다 — conflict
+    // `q-quickmask-vs-grayscale` 의 해소. 페이지 마스터 핸들러가 퀵 마스크를 먼저
+    // 시도하고, 이미지 레이어가 없으면 여기로 흘러 내려와 색각 검수가 대신 켜졌다.
+    // 같은 배지를 두 명령이 달고 조건에 따라 다른 일을 하던 상태를 끊는다.
+    return null;
+  }
+
+  // ⌥Q — 색각 검수 흑백 명암. `⇧Q` 는 빠른 액세스 팔레트가 이미 쓰고 있어
+  // (StudioPage 마스터 핸들러) Shift 계열로는 옮길 수 없다.
+  if (event.altKey && !event.shiftKey) {
+    if (event.repeat) return null;
     if (code === "KeyQ") return "toggle-grayscale";
     return null;
   }

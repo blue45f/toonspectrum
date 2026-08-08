@@ -16,12 +16,16 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import {
+  resolveStudioDialogOpener,
+  studioDialogFocusAnchor,
+} from "./studio-dialog-focus-return";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -153,14 +157,60 @@ export function StudioQuickStartPanel({
   // 밖으로 새는 focusin 되돌리기, 트리거 포커스 복원을 한꺼번에 책임진다(WCAG 2.1 2.4.3).
   // 배경 격리는 이 오버레이 안쪽으로만 제한해 캔버스를 inert로 만들지 않는다 — 첫 획까지의
   // 경로를 막지 않으면서 키보드/스크린리더는 다이얼로그 안에 머문다.
+  //
+  // 이 코치는 사용자가 부른 게 아니라 스스로 뜬다. 그래서 닫을 때 돌려줄 "열어 준 컨트롤"이
+  // 없고, 실측에서 Esc 뒤 포커스가 `document.body` 로 떨어져 키보드 사용자가 문서 맨 앞부터
+  // 다시 Tab 해야 했다. 실제 트리거(우하단 빠른 실행 버튼)로 열렸으면 그쪽을, 자동으로 떴으면
+  // 메뉴바 첫 트리거를 착지점으로 준다 — Esc 한 번이면 메뉴바에 도달한다.
   useStudioModalSheet({
     activeKey: "studio-quick-start",
     dialogRef,
     onDismiss,
     resolveInitialFocus: (dialog) =>
       dialog.querySelector<HTMLElement>("[data-studio-quickstart-dismiss='true']"),
+    resolveReturnFocus: () => {
+      const ownerDocument = rootRef.current?.ownerDocument ?? null;
+      if (!ownerDocument) return null;
+      return (
+        resolveStudioDialogOpener(ownerDocument, null) ??
+        studioDialogFocusAnchor(ownerDocument)
+      );
+    },
     rootRef,
   });
+
+  // 코치는 바깥에서 벌어지는 첫 실제 조작에 자리를 내준다.
+  //
+  // 실측(2026-08-08): 코치가 떠 있는 채로 메뉴바 `텍스트 ▸ 말풍선`을 열면 코치가 사라졌다가,
+  // 그 패널을 Esc 로 닫는 순간 **다시 나타났다**. 표시 조건이 파생 상태(`!menu` 등)라 메뉴를
+  // 여는 경로는 코치를 *가리기*만 하고 dismiss 상태를 남기지 않기 때문이다. 배경 클릭이 이미
+  // dismiss 인데 배경 밖 클릭만 dismiss 가 아니었던 셈이라, 같은 규칙을 바깥 전체로 넓힌다.
+  // 이 한 줄이 dismiss 를 진짜 상태로 기록하게 만들어 재등장 경로를 닫는다.
+  //
+  // "언제" 닫느냐는 실측으로 두 번 고쳐서 얻었다. 코치가 사라지면 메뉴바가 다시 배치되고
+  // React 가 트리거 DOM 노드를 재활용하기 때문에, 클릭이 처리되는 도중에 닫으면 사용자가
+  // 겨눈 대상이 발밑에서 바뀐다:
+  //   · `pointerdown` 에서 닫음 → mouseup 이 옆 트리거 위에서 떨어져 브라우저가 click 을
+  //     공통 조상(DIV)으로 올림 → 트리거 onClick 이 아예 안 돌아 첫 클릭이 먹통.
+  //   · `click` 캡처에서 즉시 닫음 → 같은 노드가 다른 그룹으로 재활용된 뒤 React 가
+  //     dispatch → `텍스트` 를 눌렀는데 `Draw` 메뉴가 열림.
+  // 그래서 관찰은 캡처 단계에서(중간 stopPropagation 에 가려지지 않게), 실행은 dispatch 가
+  // 완전히 끝난 뒤 마이크로태스크에서 한다. 코치의 재배치가 사용자의 클릭을 건드리지 않는다.
+  const dismissFromOutsideClick = useEffectEvent(() => onDismiss());
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const ownerDocument = root.ownerDocument;
+    const onClick = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && root.contains(target)) return;
+      queueMicrotask(dismissFromOutsideClick);
+    };
+    ownerDocument.addEventListener("click", onClick, true);
+    return () => {
+      ownerDocument.removeEventListener("click", onClick, true);
+    };
+  }, []);
 
   const quickTools: {
     id: "smart-shape" | "brush-kit" | "template" | "character" | "background-3d" | "collab-focus";

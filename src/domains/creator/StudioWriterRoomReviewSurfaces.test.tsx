@@ -258,6 +258,60 @@ describe("StudioWriterRoomCanvasPlanHandoff", () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
+  it("컷이 아직 없는 첫 진입은 오류가 아니라 중립 빈 상태로 안내한다", () => {
+    render(
+      <StudioWriterRoomCanvasPlanHandoff
+        plan={{
+          canApply: false,
+          pageCount: 0,
+          panelCount: 0,
+          errorCount: 1,
+          warningCount: 0,
+          diagnosticMessages: ["캔버스로 보낼 패널 계획이 없어요."],
+        }}
+        onApply={vi.fn()}
+        busy={false}
+        onError={vi.fn()}
+      />
+    );
+
+    const region = screen.getByRole("region", { name: "캔버스 컷 플랜" });
+    expect(within(region).getByText("아직 없음")).toBeTruthy();
+    expect(within(region).queryByText("수정 필요")).toBeNull();
+    expect(within(region).queryByText("적용 전 확인")).toBeNull();
+    // 붉은 "오류 N" 배지는 사라지되, 진단 자체는 접힌 채로 남아 있다.
+    expect(within(region).queryByText("오류 1")).toBeNull();
+    expect(within(region).getByText(/1단계 기획부터/)).toBeTruthy();
+    expect(within(region).getByText("확인 항목 1개 보기")).toBeTruthy();
+    expect(within(region).getByText("캔버스로 보낼 패널 계획이 없어요.")).toBeTruthy();
+    expect(within(region).getByText("진단 상세 — 오류 1건 · 경고 0건")).toBeTruthy();
+  });
+
+  it("컷이 실제로 있는데 적용 불가면 여전히 오류 상태를 유지한다", () => {
+    render(
+      <StudioWriterRoomCanvasPlanHandoff
+        plan={{
+          canApply: false,
+          pageCount: 0,
+          panelCount: 4,
+          errorCount: 2,
+          warningCount: 0,
+          diagnosticMessages: ["패널이 참조한 장면을 찾을 수 없어요."],
+        }}
+        onApply={vi.fn()}
+        busy={false}
+        onError={vi.fn()}
+      />
+    );
+
+    const region = screen.getByRole("region", { name: "캔버스 컷 플랜" });
+    expect(within(region).getByText("수정 필요")).toBeTruthy();
+    expect(within(region).queryByText("아직 없음")).toBeNull();
+    expect(within(region).getByText("오류 2")).toBeTruthy();
+    expect(within(region).getByText("적용 전 확인")).toBeTruthy();
+    expect(within(region).getByText("패널이 참조한 장면을 찾을 수 없어요.")).toBeTruthy();
+  });
+
   it("비동기 적용 중에는 중복 요청을 차단하고 완료 후 다시 활성화한다", async () => {
     const pending = deferredPromise();
     const onApply = vi.fn(() => pending.promise);

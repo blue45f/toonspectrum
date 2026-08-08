@@ -43,6 +43,150 @@ export function studioLivingInkOpticalDensityFromReflectance(reflectance: number
 }
 
 /**
+ * Linear-light channel → the reflectance encoding the *display resolve actually writes*.
+ *
+ * The resolve ends at `outColor = paper * exp(-opticalDensity)` and hands those numbers straight to
+ * an RGBA8 surface — no `pow(x, 1/2.2)` anywhere — and its paper constant (0.965, 0.956, 0.932) is
+ * likewise authored as display code values, not as linear reflectance. So `exp(-density)` is read
+ * back by the browser as an sRGB code, and a pigment whose density came from a *linear* reflectance
+ * can never reproduce the colour the artist picked: the picked mid-tones land one transfer function
+ * too dark, and the pure channels land on the 0.015 floor where every saturated hue collapses onto
+ * whichever channel happens to survive.
+ *
+ * Product code hands the recipe colour over already linearised, so the pigment model re-encodes it
+ * here. Then `exp(-a) === picked colour` in the same space the surface stores, and one coat of
+ * pigment is exactly the swatch the artist clicked.
+ */
+export function studioLivingInkDisplayReflectance(linearChannel: number): number {
+  const linear = Math.min(1, Math.max(0, linearChannel));
+  return linear <= 0.003_130_8 ? linear * 12.92 : 1.055 * linear ** (1 / 2.4) - 0.055;
+}
+
+/** Absorbance of one coat of the picked colour, in the encoding the display resolve writes. */
+export function studioLivingInkPigmentOpticalDensity(linearChannel: number): number {
+  return studioLivingInkOpticalDensityFromReflectance(
+    studioLivingInkDisplayReflectance(linearChannel),
+  );
+}
+
+/**
+ * One coat of pigment — the deposition calibration that binds a stroke to its palette colour.
+ *
+ * `studioLivingInkPigmentOpticalDensity` returns the absorbance that reproduces the picked colour
+ * at unit optical depth, so the only remaining job is to keep the *accumulated* depth of a single
+ * pass near one. Two things used to break that, and both are corrected at deposition rather than in
+ * the resolve, because the resolve's plume/granulation/drying-front gains are the wash's physics and
+ * must keep their shape:
+ *
+ * 1. Deposition was per *pointer sample*: each appended batch merged another full-strength capsule
+ *    union into the mobile well, so a slow stroke stacked depth in proportion to the sampling rate.
+ *    `studioLivingInkPigmentCoatFactor` divides each batch by the path length it actually covered,
+ *    measured against the Gaussian capsule's own reach, so one pass over a pixel is one coat no
+ *    matter how the samples were grouped or how fast the hand moved.
+ * 2. The measured end-to-end gain of the shipped resolve — capillary plume reconstruction, sediment
+ *    granulation and drying-front edge concentration multiplied together — is far above one, so a
+ *    nominal coat arrived at ~60× unit depth and every hue collapsed onto its surviving channel.
+ *    `resolveGain` divides it back out. It is a measurement, not a taste knob: browser-measured peak
+ *    exposure of a default 수채 번짐 stroke before this change was 61.6 coats.
+ */
+export const STUDIO_LIVING_INK_PIGMENT_COAT = Object.freeze({
+  /** Gaussian falloff the deposit splat uses for pigment capsules. */
+  falloff: 3.25,
+  /** ∫exp(-falloff·x²/r²)dx / r = √(π/falloff): how far one capsule keeps contributing. */
+  profileReach: Math.sqrt(Math.PI / 3.25),
+  /** A dwell or a tap still lays pigment; it just cannot lay a full pass per sample. */
+  minimumCoat: 0.2,
+  /**
+   * Measured resolve gain that one coat has to be divided by.
+   *
+   * Browser-measured peak exposure of a default 수채 번짐 stroke was 61.6 coats before this change;
+   * the resolve's own plume, granulation and drying-front terms account for ~46x of it and the rest
+   * was sample-rate stacking. Dividing here rather than inside the resolve keeps the wet edge alive:
+   * the drying-front term is density-proportional, so it stays a visible fraction of a coat instead
+   * of collapsing to unity the way a flat post-resolve ceiling would make it.
+   *
+   * Calibrated in a real browser against a shipped production preview: at 3.6 the darkest pixel of
+   * a default stroke measured 2.3 coats, so 6 puts the wet-edge rim at ~1.4 coats and the body of
+   * the wash near half a coat. The rim is meant to sit above one coat — that is the edge darkening —
+   * it just has to stay close enough to it that 주황 and 주홍 remain different colours there.
+   */
+  resolveGain: 6,
+} as const);
+
+/**
+ * Fraction of one coat a deposition batch may lay, given the path length it covers.
+ *
+ * A batch of capsules of radius `r` laid along `pathLengthCells` keeps contributing to a pixel for
+ * `profileReach · r` cells in each direction, so a pixel sees roughly `reach / pathLength` batches.
+ * Scaling each batch by `pathLength / reach` cancels that exactly, leaving one coat per pass and
+ * making the result independent of pointer sampling rate and of how samples were batched.
+ */
+export function studioLivingInkPigmentCoatFactor(
+  pathLengthCells: number,
+  radiusCells: number,
+): number {
+  const reach = STUDIO_LIVING_INK_PIGMENT_COAT.profileReach * Math.max(radiusCells, 1e-3);
+  if (!Number.isFinite(pathLengthCells) || pathLengthCells <= 0) return 1;
+  return Math.min(
+    1,
+    Math.max(STUDIO_LIVING_INK_PIGMENT_COAT.minimumCoat, pathLengthCells / reach),
+  );
+}
+
+/**
+ * How the display resolve turns a wash into a *surface* rather than a sheet of paper.
+ *
+ * The resolve output is committed to the document as one page-sized image, so its alpha channel is
+ * the only thing that keeps an untouched webtoon page pure white. Both backends share these numbers
+ * so the WGSL and GLSL resolves cannot drift apart on where the paper stops.
+ */
+export const STUDIO_LIVING_INK_SURFACE_COVERAGE = Object.freeze({
+  /** Beer-Lambert style presence: pigment/white/water this far above zero already reads as wash. */
+  presenceGain: 24,
+  /** Below this alpha the un-premultiply is unstable and the pixel is bare page anyway. */
+  alphaEpsilon: 0.0005,
+} as const);
+
+/** Minimal geometry both GPU runtimes read off a deposition mark. */
+export interface StudioLivingInkMarkGeometry {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+}
+
+/**
+ * Path length a deposition batch covers, including the gap back to the previous batch's last mark.
+ * A stroke arrives as a run of suffix operations, so ignoring that gap would read every batch as a
+ * standing dab and re-lay a full coat per pointer sample.
+ */
+export function studioLivingInkDepositionPathLength(
+  marks: readonly StudioLivingInkMarkGeometry[],
+  previous: Readonly<{ x: number; y: number }> | null,
+): number {
+  let total = 0;
+  let lastX = previous?.x ?? null;
+  let lastY = previous?.y ?? null;
+  for (const mark of marks) {
+    if (lastX !== null && lastY !== null) {
+      total += Math.hypot(mark.x - lastX, mark.y - lastY);
+    }
+    lastX = mark.x;
+    lastY = mark.y;
+  }
+  return total;
+}
+
+/** Representative capsule radius of a batch, used as the coat normalisation's reach. */
+export function studioLivingInkMeanMarkRadius(
+  marks: readonly StudioLivingInkMarkGeometry[],
+): number {
+  if (marks.length === 0) return 1;
+  let total = 0;
+  for (const mark of marks) total += Math.max(0, mark.radius);
+  return total / marks.length;
+}
+
+/**
  * InkWash §06 chromatography coefficients. The WebGL2 pigment pass uploads the same numbers via
  * `studioLivingInkChromaBleedMultipliers` each step — keep this object as the single numeric source.
  */

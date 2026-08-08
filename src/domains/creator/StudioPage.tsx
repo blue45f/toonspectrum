@@ -276,6 +276,16 @@ import {
   mergeStudioBubbles,
 } from "./studio-bubble-merge";
 import {
+  bubbleLetterSpacing,
+  bubbleTextBoxWidth,
+  bubbleVerticalPaddingTotal,
+  fitBubbleBoxHeightToText,
+  resolveBubbleFontFamily,
+  resolveBubbleFontSize,
+  resolveBubbleFontStyle,
+  resolveBubbleLineHeight,
+} from "./studio-bubble-text-fit";
+import {
   hasStudioCanonicalVNextQualityShadowRuntime,
   submitStudioCanonicalVNextQualityShadowFinalParity,
 } from "./studio-canonical-vnext-quality-shadow";
@@ -446,6 +456,7 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./studio-dialogue-translate";
+import { attachStudioDismissableSurface } from "./studio-dismissable-surface";
 import {
   loadStudioPsdExportModule,
   loadStudioPsdImportModule,
@@ -829,6 +840,7 @@ import {
   type StudioLivingInkStrokeMode,
   type StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
+import { localizeStudioText } from "./studio-localize-text";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -4883,6 +4895,24 @@ function StudioCuttoonEditor() {
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
   const [hybridDccOpen, setHybridDccOpen] = useState(false);
   const [creativeModesOpen, setCreativeModesOpen] = useState(false);
+  const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
+  // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
+  // (75개 로케일 팩에 이미 번역이 있어 새 키를 만들 이유가 없다).
+  const creativeModesCloseLabel = localizeStudioText(t, "닫기", "common.close");
+  const creativeModesPanelRef = useRef<HTMLDivElement | null>(null);
+  const creativeModesTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // 크리에이티브 모드 시트는 캔버스와 모바일 도크를 계속 쓸 수 있어야 하므로 모달이 아니다.
+  // 대신 Escape·바깥 탭 두 경로를 직접 붙여, 화면보다 큰 뷰포트에서도 탈출로가 사라지지 않게 한다.
+  useEffect(() => {
+    if (!creativeModesOpen) return;
+    const surface = creativeModesPanelRef.current;
+    if (!surface) return;
+    return attachStudioDismissableSurface({
+      ignore: [creativeModesTriggerRef.current],
+      onDismiss: () => setCreativeModesOpen(false),
+      surface,
+    });
+  }, [creativeModesOpen]);
   const hybridDccDraftPersistenceIdentityRef = useRef<{
     readonly ownerId: string;
     readonly workScope: string;
@@ -26389,7 +26419,24 @@ const puppetWarpArmed =
     const mutationTicket = captureStudioMutationTicket();
     const { estimateBubbleHeight } = await import("./studio-fit");
     if (!canApplyStudioMutation(mutationTicket)) return;
-    const h = estimateBubbleHeight(selected.text, selected.width, selected.fontSize ?? 24, selected.lineHeight ?? 1.2);
+    // 행간·글꼴 두께·자간은 실제 렌더가 쓰는 값을 그대로 넘긴다 — 예전에는 여기만 1.2를 쓰고
+    // fontStyle/자간을 빼서, 이 버튼이 오히려 상자를 줄여 대사를 더 잘라먹었다(감사 측정).
+    const h = estimateBubbleHeight(
+      selected.text,
+      selected.width,
+      resolveBubbleFontSize(selected.fontSize),
+      resolveBubbleLineHeight({
+        lineHeight: selected.lineHeight,
+        vertical: selected.vertical,
+        theme: webtoonTheme,
+      }),
+      {
+        fontFamily: resolveBubbleFontFamily(selected.font),
+        fontStyle: resolveBubbleFontStyle(selected.fontStyle),
+        letterSpacing: bubbleLetterSpacing(webtoonTheme),
+        vertical: selected.vertical,
+      }
+    );
     patchEl(selected.id, { height: h });
   }
   function addFxOverlay(svgMarkup: string, w: number, h: number) {
@@ -35472,18 +35519,54 @@ const puppetWarpArmed =
         // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존) — 단,
         // autoShrinkText(크기 고정 모드)가 켜져 있으면 높이는 건드리지 않는다(렌더 시점에
         // fitBubbleFontSize가 폰트 크기를 알아서 줄인다).
+        //
+        // 측정 노드는 **실제 렌더 KText와 완전히 같은 속성**으로 만들어야 한다. 예전에는
+        // lineHeight 1.1(실제 1.25~1.4)·fontStyle 미지정(실제 bold)·width `-36`(실제 패딩
+        // 2×bHPad)·높이 여유 `+28`(실제 상하 패딩 합)이라 블록 높이를 항상 과소평가했고,
+        // Konva.Text는 고정 height를 넘는 줄을 경고 없이 버려 대사가 조용히 잘렸다.
+        // 기본값·패딩은 전부 studio-bubble-text-fit 단일 소스에서 가져온다.
         let height: number | undefined;
         if (el && el.type === "bubble" && !el.autoShrinkText) {
-          const measure = new KonvaRuntime.Text({
-            text: finalValue || " ",
-            width: el.width - 36,
-            fontSize: el.fontSize ?? 24,
-            fontFamily: el.font ?? "Pretendard, sans-serif",
-            align: "center",
-            lineHeight: el.lineHeight ?? 1.1,
+          const fontSize = resolveBubbleFontSize(el.fontSize);
+          const fontFamily = resolveBubbleFontFamily(el.font);
+          const fontStyle = resolveBubbleFontStyle(el.fontStyle);
+          const lineHeight = resolveBubbleLineHeight({
+            lineHeight: el.lineHeight,
+            vertical: el.vertical,
+            theme: webtoonTheme,
           });
-          height = Math.max(el.height, Math.ceil(measure.height()) + 28);
-          measure.destroy();
+          const letterSpacing = bubbleLetterSpacing(webtoonTheme);
+          if (el.vertical) {
+            // 세로쓰기는 열 조판이라 가로 KText로 잴 수 없다 — 세로 코어를 쓰는 공유 계산.
+            height = fitBubbleBoxHeightToText({
+              text: finalValue,
+              boxWidth: el.width,
+              fontSize,
+              fontFamily,
+              fontStyle,
+              lineHeight,
+              letterSpacing,
+              vertical: true,
+              // blockAlign은 열 안 정렬일 뿐이라 "들어가느냐" 판정에는 영향이 없다(코어 계약).
+              minHeight: el.height,
+            });
+          } else {
+            const measure = new KonvaRuntime.Text({
+              text: finalValue || " ",
+              width: bubbleTextBoxWidth(el.width, fontSize),
+              fontSize,
+              fontFamily,
+              fontStyle,
+              align: el.align ?? "center",
+              lineHeight,
+              letterSpacing,
+            });
+            height = Math.max(
+              el.height,
+              Math.ceil(measure.height()) + bubbleVerticalPaddingTotal(fontSize)
+            );
+            measure.destroy();
+          }
         }
         patchEl(editing.id, { text: finalValue, ...(height !== undefined ? { height } : {}) } as Partial<El>);
       }
@@ -40181,24 +40264,29 @@ function clearSelectionForEdit() {
     ]
   );
 
+  const selectionOptionsSuppressed =
+    advancedFillActive ||
+    commentPinArmed ||
+    cropRect !== null ||
+    dodgeBurnActive ||
+    eyedropperActive ||
+    liquifyActive ||
+    pixelTool !== null ||
+    smudgeActive ||
+    wetMixActive;
+  /**
+   * 선택 옵션 줄은 "선택 도구가 켜져 있는 동안" 항상 같은 높이를 차지한다.
+   * 예전에는 선택이 생기는 순간에만 44px 스트립이 flow 로 끼어들어 툴 레일·페이지
+   * 패널·캔버스·인스펙터가 통째로 아래로 밀렸다(브라우저 실측: 선택할 때마다 캔버스
+   * 원점이 95px 이동, 그중 44px 이 이 스트립). Photoshop/CSP 처럼 도구 옵션 줄을
+   * 상시 유지해 선택 상태가 캔버스 기하를 건드리지 못하게 한다.
+   */
+  const selectOptionsStripArmed = tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
+
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
-    const selectionOptionsSuppressed =
-      advancedFillActive ||
-      commentPinArmed ||
-      cropRect !== null ||
-      dodgeBurnActive ||
-      eyedropperActive ||
-      liquifyActive ||
-      pixelTool !== null ||
-      smudgeActive ||
-      wetMixActive;
     return {
-      visible:
-        tool === "select" &&
-        !canvasOnlyMode &&
-        !selectionOptionsSuppressed &&
-        count > 0,
+      visible: selectOptionsStripArmed && count > 0,
       count,
       label: selected ? elementLabel(selected) : null,
       locked: Boolean(selected?.locked),
@@ -40218,21 +40306,11 @@ function clearSelectionForEdit() {
     };
   }, [
     activeSurfaceReviewLocked,
-    advancedFillActive,
-    canvasOnlyMode,
-    commentPinArmed,
-    cropRect,
-    dodgeBurnActive,
-    eyedropperActive,
     groups,
-    liquifyActive,
     marqueeIds.length,
-    pixelTool,
+    selectOptionsStripArmed,
     selected,
     selectedId,
-    smudgeActive,
-    tool,
-    wetMixActive,
   ]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
@@ -40617,24 +40695,44 @@ function clearSelectionForEdit() {
     ) : null}
     {!creativeModesOpen ? (
     <button
+      ref={creativeModesTriggerRef}
       type="button"
-      className="fixed bottom-4 left-4 z-[69] min-h-11 rounded-full border border-accent/50 bg-accent px-3 text-[0.72rem] font-bold text-on-accent shadow-xl"
+      data-studio-creative-modes-trigger="true"
+      // 모바일에서는 도크(z-55) 위 여백에 앉힌다. bottom-4 로 두면 도크 좌측 도구를 덮어
+      // 선택·펜 탭이 이 필로 흘러간다. 데스크톱은 도크가 없으므로 lg 에서 원래 자리로 돌아온다.
+      className="fixed left-4 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4rem)] z-[52] min-h-11 rounded-full border border-accent/50 bg-accent px-3 text-[0.72rem] font-bold text-on-accent shadow-xl lg:bottom-4 lg:z-[69]"
       onClick={() => setCreativeModesOpen(true)}
     >
-      크리에이티브 모드
+      {creativeModesLabel}
     </button>
   ) : null}
   {creativeModesOpen ? (
-    <div className="fixed bottom-4 left-1/2 z-[70] w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 shadow-2xl">
-      <div className="mb-1 flex justify-end">
+    <div
+      ref={creativeModesPanelRef}
+      role="dialog"
+      aria-label={creativeModesLabel}
+      data-studio-creative-modes-panel="true"
+      // 뷰포트보다 큰 내용을 안고 화면 밖으로 밀려나지 않도록 높이를 잘라 시트 자체가 스크롤한다.
+      // 모바일에서는 도크 위에서 멈춰 도구막대를 계속 쓸 수 있게 두고, 데스크톱 배치는 그대로다.
+      className="fixed inset-x-3 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.5rem)] z-[70] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-4rem)] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl lg:inset-x-auto lg:left-1/2 lg:bottom-4 lg:max-h-[calc(100dvh-5rem)] lg:w-[min(22rem,calc(100vw-1.5rem))] lg:-translate-x-1/2"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-1">
+        <p className="min-w-0 truncate px-1 text-[0.72rem] font-bold text-fg">{creativeModesLabel}</p>
         <button
           type="button"
-          className="min-h-9 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-bold"
+          data-studio-creative-modes-close="true"
+          data-autofocus
+          aria-label={creativeModesCloseLabel}
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-[0.9rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           onClick={() => setCreativeModesOpen(false)}
         >
-          닫기
+          <span aria-hidden>✕</span>
         </button>
       </div>
+      <div
+        data-studio-creative-modes-scroll="true"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
       <Suspense fallback={null}>
         <StudioCreativeCompetitorModesPanel
           pixelArtMode={pixelArtMode}
@@ -40657,6 +40755,7 @@ function clearSelectionForEdit() {
           }}
         />
       </Suspense>
+      </div>
     </div>
   ) : null}
   {hybridDccOpen ? (
@@ -41100,6 +41199,24 @@ function clearSelectionForEdit() {
         ) : null}
       </div>
 
+      {/*
+        선택 옵션 줄의 자리를 미리 확보한다 — 선택이 생겨도 스트립이 새로 flow 에
+        끼어들지 않으므로 캔버스 원점이 0px 이동한다. 빈 줄로 두면 고장처럼 보여서
+        같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
+        않는다).
+      */}
+      {selectOptionsStripArmed && !studioOptionsBarsSelectionModel.visible ? (
+        <div
+          data-studio-select-options-reserve="true"
+          data-studio-icon-first="true"
+          className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
+        >
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
+          <span className="truncate">
+            요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택
+          </span>
+        </div>
+      ) : null}
       <StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}

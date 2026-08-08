@@ -62,6 +62,16 @@ function StudioWorkspaceMenuTrigger({
       data-testid="studio-workspace-menu-gate"
       data-studio-shortcut-boundary="true"
     >
+      {/* 칩 박스 규약(2026-08-09 렌더 겹침 재측정).
+          이 트리거의 폭 압력은 **이름만** 흡수한다: 이름 span 은 `min-w-0 truncate`(유일한
+          shrink 대상)이고, 상태 배지와 아이콘·화살표는 `shrink-0` 이다. 그래서 `max-w-52`
+          가 걸려도 flex 는 이름을 먼저 줄이고, 배지는 언제나 박스 안에 남는다(1280·1440·
+          1600·1920 전 폭에서 긴 이름 + 두 배지 동시 상태까지 실측: 박스 밖 유출 0px).
+          `overflow-hidden` 을 여기에 더하지 않는 이유가 있다 — overflow 가 visible 이
+          아니게 되는 순간 flex 자동 최소 크기가 min-content 에서 0 으로 풀려, 오히려
+          상위가 칩을 눌러 배지를 잘라낼 수 있게 된다. 겹침을 막으려다 "변경됨"을 숨기는
+          맞바꿈이라 채택하지 않았다. 배지를 잘라야 할 만큼 좁아지는 상황이 생기면
+          `max-w-52` 를 이름 span 쪽 max-width 로 옮기는 것이 먼저다. */}
       <button
         type="button"
         onClick={onActivate}

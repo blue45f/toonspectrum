@@ -87,17 +87,19 @@ export const STUDIO_EDIT_MENU_COMMANDS = {
     labelKey: "studio.mainMenu.edit.command.bring-forward",
     shortcut: "⌘]",
   },
+  // Photoshop·클립스튜디오·일러스트레이터와 같은 배치: ⌘[ = 한 칸 뒤로, ⌘⇧[ = 맨 뒤로.
+  // 바로 위 bring-front/bring-forward 쌍과 대칭이어야 한다(이전에는 뒤로 쌍만 뒤집혀 있었다).
   "send-back": {
     id: "send-back",
     label: "레이어 · 맨 뒤로",
     labelKey: "studio.mainMenu.edit.command.send-back",
-    shortcut: "⌘[",
+    shortcut: "⌘⇧[",
   },
   "send-backward": {
     id: "send-backward",
     label: "레이어 · 뒤로",
     labelKey: "studio.mainMenu.edit.command.send-backward",
-    shortcut: "⌘⇧[",
+    shortcut: "⌘[",
   },
   "crop-layer": {
     id: "crop-layer",
@@ -269,8 +271,9 @@ export function resolveStudioEditShortcut(
   if (code === "KeyD" && !event.shiftKey) return "deselect";
   if (code === "KeyI" && event.shiftKey) return "invert-selection";
   if (code === "KeyJ" && !event.shiftKey) return "duplicate";
+  // 두 브래킷 쌍은 반드시 대칭이다 — ⇧ 가 "맨 끝까지", 무수식이 "한 칸".
   if (code === "BracketRight") return event.shiftKey ? "bring-front" : "bring-forward";
-  if (code === "BracketLeft") return event.shiftKey ? "send-backward" : "send-back";
+  if (code === "BracketLeft") return event.shiftKey ? "send-back" : "send-backward";
   return null;
 }
 

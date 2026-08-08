@@ -1371,7 +1371,15 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           offsetRatio,
           radiusXRatio: 0.7 + tooth * 0.22,
           radiusYRatio: 0.045 + tooth * 0.035,
-          opacity: 0.1 + tooth * 0.12,
+          // Bristle load is bimodal, not uniform: a hair either carries paint and leaves a ridge
+          // or it skims and leaves a dry film. A 0.10–0.22 uniform band gave the ribbon carrier
+          // nothing to build relief from — every ridge landed at the same tone and the measured
+          // stroke came out perfectly smooth (length-axis CV 0.002). Splitting the range also
+          // keeps self-crossings honest: the extra ink a second pass adds is proportional to
+          // a·(1−a), which is worst exactly at the mid alphas this mapping avoids.
+          opacity: tooth > 0.55
+            ? 0.3 + (tooth - 0.55) * 0.62
+            : 0.02 + tooth * 0.05,
         };
       }
     );

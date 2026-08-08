@@ -6,7 +6,18 @@
  * - 말풍선 맞춤: 대사 길이에 맞춰 말풍선 높이를 자동 산정한다.
  *
  * 전부 순수·결정적. DOM/Konva 의존 없음 — StudioPage가 결과 박스로 patchEl 한다.
+ * (말풍선 높이만 예외적으로 글자 폭을 알아야 해서 studio-bubble-text-fit 의 측정기 포트를 쓴다.
+ *  기본 측정기는 오프스크린 캔버스이고, 캔버스가 없는 환경에서는 알아서 근사로 폴백한다.)
  */
+
+import {
+  BUBBLE_LINE_HEIGHT_FALLBACK,
+  BUBBLE_FONT_FAMILY_DEFAULT,
+  BUBBLE_FONT_STYLE_DEFAULT,
+  createCanvasBubbleTextMeasurer,
+  fitBubbleBoxHeightToText,
+  type BubbleTextMeasurer,
+} from "./studio-bubble-text-fit";
 
 export interface FitBox {
   x: number;
@@ -55,22 +66,47 @@ export function containFitInFrame(el: Sized, frame: FitBox, padding = 0): FitBox
   };
 }
 
+export interface EstimateBubbleHeightOptions {
+  fontFamily?: string;
+  fontStyle?: string;
+  letterSpacing?: number;
+  vertical?: boolean;
+  /** 테스트/결정적 계산용 주입. 미지정 시 오프스크린 캔버스 실측. */
+  measurer?: BubbleTextMeasurer;
+}
+
 /**
- * 말풍선 텍스트가 들어갈 높이 추정(글자 수·폭·크기 기반). 줄바꿈과 자동 줄넘김을 모두 고려하고
- * 말풍선 안쪽 여백을 더한다. 최소 높이를 보장한다.
+ * 말풍선 텍스트가 들어갈 **말풍선 전체 높이**(패딩 포함) 추정.
+ *
+ * 2026-08 감사 전에는 `charsPerLine = usableWidth / (fontSize * 0.62)` 라는 글자 수 추정이었다.
+ * 0.62는 라틴 문자의 평균 폭 비율인데 한글 완성형은 전각(≈1.0em)이라 **한 줄에 1.6배 많이
+ * 들어간다고 계산**했고, 그래서 "높이를 텍스트에 맞춤" 버튼이 상자를 오히려 줄여 글자를 더
+ * 잘라먹었다(측정: 클릭 전 8자 소실 → 클릭 후 22자 소실, 265px → 210px). 지금은 글자 수 추정
+ * 대신 실측 측정기로 실제 줄바꿈을 재고, 패딩·행간·글꼴 두께 기본값은 전부
+ * studio-bubble-text-fit 의 단일 소스를 쓴다(렌더가 쓰는 값과 정확히 같다).
+ *
+ * `lineHeight`를 생략하면 테마를 모를 때의 안전값(BUBBLE_LINE_HEIGHT_FALLBACK = 최댓값)을 쓴다 —
+ * 과소평가는 글자를 잃고 과대평가는 상자만 넉넉해지므로, 모를 때는 큰 쪽이 옳다. 실제 렌더
+ * 테마를 아는 호출부(StudioPage)는 resolveBubbleLineHeight() 결과를 넘겨 정확히 맞춘다.
  */
 export function estimateBubbleHeight(
   text: string,
   width: number,
   fontSize: number,
-  lineHeight = 1.2,
-  padding = 22
+  lineHeight: number = BUBBLE_LINE_HEIGHT_FALLBACK,
+  options: EstimateBubbleHeightOptions = {}
 ): number {
-  const usableWidth = Math.max(1, width - padding * 1.4);
-  const charsPerLine = Math.max(4, Math.floor(usableWidth / (fontSize * 0.62)));
-  const explicitLines = text.split("\n").length;
-  const wrapped = Math.ceil(Math.max(1, text.length) / charsPerLine);
-  const lines = Math.max(explicitLines, wrapped, 1);
-  const minHeight = Math.round(fontSize * lineHeight + padding * 1.6);
-  return Math.max(minHeight, Math.round(lines * fontSize * lineHeight + padding * 1.6));
+  return fitBubbleBoxHeightToText(
+    {
+      text,
+      boxWidth: width,
+      fontSize,
+      fontFamily: options.fontFamily ?? BUBBLE_FONT_FAMILY_DEFAULT,
+      fontStyle: options.fontStyle ?? BUBBLE_FONT_STYLE_DEFAULT,
+      lineHeight,
+      letterSpacing: options.letterSpacing,
+      vertical: options.vertical,
+    },
+    options.measurer ?? createCanvasBubbleTextMeasurer()
+  );
 }

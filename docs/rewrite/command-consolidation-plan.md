@@ -74,7 +74,7 @@ Wave A는 **토대만** 만들었다. 실행 배선은 건드리지 않았다.
 
 | id | 키 | 명령 | 처리 |
 | --- | --- | --- | --- |
-| `q-quickmask-vs-grayscale` | `Q` | `select.quick-mask` ↔ `view.color-vision-grayscale` | 메뉴는 grayscale, 도움말은 quick mask 로 **문서까지 어긋나 있다** |
+| ~~`q-quickmask-vs-grayscale`~~ | `Q` | `select.quick-mask` ↔ `view.color-vision-grayscale` | **2026-08-08 해소** — 단독 `Q` = 퀵 마스크, 색각 검수 흑백 명암 = `⌥Q`(`⇧Q`는 빠른 액세스 팔레트가 이미 사용). 메뉴 배지·보기 리졸버·카탈로그·도움말 네 곳을 같은 값으로 맞췄고 `COMMAND_CONFLICTS`에서 제거했다 |
 | `shift-s-saveview-vs-sizelock` | `⇧S` | `view.save-current-view` (+ 도달 불가 크기 잠금) | view 리졸버가 먼저 실행돼 크기 잠금은 dead code |
 | `cmd-d-duplicate-vs-deselect` | `⌘D` | `edit.duplicate` ↔ `select.deselect` | **Wave A 신규 발견** — 팔레트만 복제를 ⌘D 로 광고, 메뉴는 ⌘J |
 
