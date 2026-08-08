@@ -33,6 +33,7 @@ describe("StudioDestructiveConfirmHost", () => {
       studioDeletePageRequest({ pageNumber: 3, elementCount: 12 }),
     );
     await flush();
+    await screen.findByText("3페이지 삭제");
 
     const dialog = document.querySelector("[data-studio-destructive-confirm]");
     expect(dialog).not.toBeNull();
@@ -57,7 +58,7 @@ describe("StudioDestructiveConfirmHost", () => {
     );
     await flush();
 
-    expect(screen.getByText("되돌릴 수 없음")).toBeTruthy();
+    expect(await screen.findByText("되돌릴 수 없음")).toBeTruthy();
     fireEvent.click(
       document.querySelector("[data-studio-destructive-cancel]") as HTMLElement,
     );
@@ -76,7 +77,7 @@ describe("StudioDestructiveConfirmHost", () => {
     );
     await flush();
 
-    expect(screen.getByText("4개 파일로 나눠 저장")).toBeTruthy();
+    expect(await screen.findByText("4개 파일로 나눠 저장")).toBeTruthy();
     expect(screen.getByText("2×로 낮춰 한 파일")).toBeTruthy();
     // 문서를 건드리지 않는 명령에 손실 블록을 띄우지 않는다.
     expect(document.querySelector("[data-studio-destructive-losses]")).toBeNull();
@@ -97,7 +98,7 @@ describe("StudioDestructiveConfirmHost", () => {
     );
     await flush();
 
-    expect(screen.getByText("1페이지 삭제")).toBeTruthy();
+    expect(await screen.findByText("1페이지 삭제")).toBeTruthy();
     expect(screen.getByText("뒤에 1건 대기")).toBeTruthy();
 
     fireEvent.click(
@@ -106,7 +107,7 @@ describe("StudioDestructiveConfirmHost", () => {
     await expect(first).resolves.toBe(false);
     await flush();
 
-    expect(screen.getByText("2페이지 삭제")).toBeTruthy();
+    expect(await screen.findByText("2페이지 삭제")).toBeTruthy();
     fireEvent.click(
       document.querySelector("[data-studio-destructive-confirm-button]") as HTMLElement,
     );
@@ -119,6 +120,7 @@ describe("StudioDestructiveConfirmHost", () => {
       studioDeletePageRequest({ pageNumber: 5 }),
     );
     await flush();
+    await screen.findByRole("alertdialog");
     expect(document.querySelector("[data-studio-destructive-confirm]")).not.toBeNull();
 
     view.unmount();
