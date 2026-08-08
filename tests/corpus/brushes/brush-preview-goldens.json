@@ -1,0 +1,97 @@
+{
+  "harness": "tests/visual/brush-preview.test.ts",
+  "api": "renderBrushPreview (packages/studio-brush-platform/src/brush-preview.ts)",
+  "engines": "libmypaint 1.6.1 pinned wasm | hokusai 0.3.0 via studio-hokusai-wasm | gateway abr dab-stamp",
+  "canvas": {
+    "width": 192,
+    "height": 96,
+    "seed": 7,
+    "samples": 96
+  },
+  "path": "standardZigzagStrokeSamples (stroke lanes) / gateway S-curve (abr lane)",
+  "variants": [
+    {
+      "id": "myb-wash-soft--libmypaint",
+      "engine": "libmypaint",
+      "routingReason": "myb → libmypaint: `.myb` documents render on the pinned libmypaint reference lane (ADR-0011 lane 11) through the injection API",
+      "sha256": "6b0444601ea8fdc5a003138b2c09625f17995c17f7ad8705db3a5f19608d73fc",
+      "inkedPixels": 3301,
+      "warnings": []
+    },
+    {
+      "id": "myb-wash-soft--hokusai-challenger",
+      "engine": "hokusai",
+      "routingReason": "myb → hokusai: challenger lane requested via options.mybEngine; compileRasterBrush cross-checks the document against Hokusai-evaluated dimensions",
+      "sha256": "ed55985d0956e392a8d2fd7eb8c712d1157e8d5c480a309a745fa29bf95a14e2",
+      "inkedPixels": 2960,
+      "warnings": []
+    },
+    {
+      "id": "myb-ink-crisp--libmypaint",
+      "engine": "libmypaint",
+      "routingReason": "myb → libmypaint: `.myb` documents render on the pinned libmypaint reference lane (ADR-0011 lane 11) through the injection API",
+      "sha256": "8f0e2e89286a1062ffe9c9a8fefb1e80616c70899138afff357c8581cc261ed8",
+      "inkedPixels": 2591,
+      "warnings": []
+    },
+    {
+      "id": "kpp-paintbrush-ink-basic--hokusai",
+      "engine": "hokusai",
+      "routingReason": "kpp(paintbrush) → hokusai: pixel-brush params map to BrushProgramIR graphs and lower through compileRasterBrush",
+      "sha256": "4deceac6a8c33c85b40cc0f0c6e42d870c9acf501c1e38e874ea821254d7199e",
+      "inkedPixels": 3457,
+      "warnings": [
+        "parse[kpp]: MaskGenerator hfade/vfade differ; averaged into a single hardness",
+        "parse[kpp] unmapped: ColorSource",
+        "parse[kpp] unmapped: chunk:tEXt(version)",
+        "compile[hokusai]: sourcePayload.format=krita-kpp is not myb-v3; compiled from IR graphs instead",
+        "compile[hokusai]: stabilizer lowered to in-engine slow_tracking; do not re-apply the JS stabilizer on this lane",
+        "compile[hokusai] unmapped: flowDynamics[0].input=constant",
+        "compile[hokusai] unmapped: flowDynamics[1].input=constant",
+        "compile[hokusai] unmapped: sizeDynamics[0].input=constant"
+      ]
+    },
+    {
+      "id": "kpp-paintbrush-pressure-curve--hokusai",
+      "engine": "hokusai",
+      "routingReason": "kpp(paintbrush) → hokusai: pixel-brush params map to BrushProgramIR graphs and lower through compileRasterBrush",
+      "sha256": "6129cc59e994cbc178d142ac12d92b37948c6b8485342c5ada48e68b40b3d574",
+      "inkedPixels": 1872,
+      "warnings": [
+        "parse[kpp]: MaskGenerator hfade/vfade differ; averaged into a single hardness",
+        "parse[kpp] unmapped: chunk:tEXt(version)",
+        "compile[hokusai]: sourcePayload.format=krita-kpp is not myb-v3; compiled from IR graphs instead",
+        "compile[hokusai]: stabilizer lowered to in-engine slow_tracking; do not re-apply the JS stabilizer on this lane",
+        "compile[hokusai] unmapped: flowDynamics[0].input=constant",
+        "compile[hokusai] unmapped: sizeDynamics[0].input=constant"
+      ]
+    },
+    {
+      "id": "kpp-mypaint-wash-soft--libmypaint",
+      "engine": "libmypaint",
+      "routingReason": "kpp(mypaintbrush) → libmypaint: the embedded mypaint_json is a `.myb` v3 document, delegated through the myb lane onto the reference engine",
+      "sha256": "839f1fe3143f0429e7720919d3efcfaa7c3948a14c3fa2c956cb151f7bf7d17f",
+      "inkedPixels": 5828,
+      "warnings": [
+        "parse[kpp] unmapped: chunk:tEXt(version)",
+        "parse[kpp] unmapped: mypaint:smudge"
+      ]
+    },
+    {
+      "id": "abr-computed-oval--abr-stamp",
+      "engine": "abr-stamp",
+      "routingReason": "abr → abr-stamp: legacy v1/v2 tips render through the gateway's deterministic dab-stamping stroke preview",
+      "sha256": "809ddb47f0ea77b4a72bc564f2227df924510af8b0096be478966d56fa7edfea",
+      "inkedPixels": 2545,
+      "warnings": []
+    },
+    {
+      "id": "abr-sampled-radial--abr-stamp",
+      "engine": "abr-stamp",
+      "routingReason": "abr → abr-stamp: legacy v1/v2 tips render through the gateway's deterministic dab-stamping stroke preview",
+      "sha256": "bf53b71b75281a68a037c6efd759b341fd6024d14699f14a76a95ea79e36880d",
+      "inkedPixels": 1086,
+      "warnings": []
+    }
+  ]
+}

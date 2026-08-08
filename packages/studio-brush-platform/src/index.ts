@@ -1,3 +1,4 @@
+export * from "./brush-preview";
 export * from "./input";
 export * from "./stabilizer";
 export * from "./geometry";
