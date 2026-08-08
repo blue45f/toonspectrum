@@ -1,8 +1,8 @@
 {
   "gate": "tests/benchmarks/harness/studio-runtime-commit-gate.ts",
   "contract": "src/domains/creator/studio-hot-path-commit-budget.ts",
-  "generatedAt": "2026-08-08T10:11:31.100Z",
-  "route": "http://127.0.0.1:54723/studio",
+  "generatedAt": "2026-08-08T11:43:15.125Z",
+  "route": "http://127.0.0.1:55959/studio",
   "build": "production dist/ served by vite preview (pnpm exec vite build)",
   "host": {
     "platform": "darwin",
@@ -130,5 +130,5 @@
   "violations": [],
   "failure": null,
   "passed": true,
-  "runtimeMs": 23801.8
+  "runtimeMs": 23862.3
 }

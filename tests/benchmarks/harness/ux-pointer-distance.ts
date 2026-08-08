@@ -185,24 +185,33 @@ const MEASURE_SOURCE = String.raw`
           fromRowCenterPx: Math.hypot(center.x - rowCenter.x, center.y - rowCenter.y),
         });
       }
-      return { rect: rowRect, actions: actions };
+      return {
+        rect: rowRect,
+        rowCount: document.querySelectorAll('[data-studio-layer-row="true"]').length,
+        actions: actions,
+      };
     },
 
-    /** Distance from the row centre to a control inside the open "…" popover. */
+    /**
+     * Baseline route: the row's own action popover, which before Wave C was the
+     * only place 잠금 and 불투명도 lived. Resolved through the menu button's
+     * aria-controls id so it can never accidentally match an inline control.
+     */
     layerPopoverControl: function (rowRect, pattern) {
+      const menu = document.querySelector('[data-studio-layer-row-action="menu"]');
+      const popoverId = menu ? menu.getAttribute("aria-controls") : null;
+      const popover = popoverId ? document.getElementById(popoverId) : null;
+      if (!popover || !visible(popover)) return null;
       const rowCenter = centerOf(rowRect);
-      const nodes = document.querySelectorAll(INTERACTIVE);
+      const nodes = popover.querySelectorAll(INTERACTIVE);
       const re = new RegExp(pattern, "u");
       let best = null;
       for (let i = 0; i < nodes.length; i += 1) {
         const node = nodes[i];
         if (!visible(node)) continue;
-        // Inline row controls are the *new* route; the baseline is the popover.
-        if (node.closest('[data-studio-layer-row="true"]')) continue;
         const text = (node.getAttribute("aria-label") || node.textContent || "").trim();
         if (!re.test(text)) continue;
         const rect = rectOf(node);
-        if (rect.top === rowRect.top && rect.left === rowRect.left) continue;
         const center = centerOf(rect);
         const distance = Math.hypot(center.x - rowCenter.x, center.y - rowCenter.y);
         if (best === null || distance < best.distancePx) {
@@ -293,6 +302,7 @@ interface SelectionBarReading {
 
 interface LayerRowReading {
   rect: SurfaceRect;
+  rowCount: number;
   actions: {
     action: string | null;
     label: string | null;
@@ -507,6 +517,42 @@ async function measureSelectionBar(page: Page, center: { x: number; y: number })
   return { selectionRect, pointerPoint, measured };
 }
 
+/**
+ * Functional proof that the HUD dispatches through the shared quick-action
+ * dispatcher rather than a private handler: 지우개 flips the live tool, which is
+ * what re-labels the cell.
+ */
+async function verifyHudEraserToggle(page: Page, point: { x: number; y: number }) {
+  const cell = page.locator('[data-studio-brush-hud-cell="eraser"]').first();
+  if (!(await cell.isVisible().catch(() => false))) return { available: false as const };
+  const before = await cell.getAttribute("aria-label");
+  await cell.click({ timeout: 3_000 }).catch(() => undefined);
+  await page.waitForTimeout(350);
+  const after = await cell.getAttribute("aria-label");
+  // Restore the pen so the stroke that follows is ink, not an erase.
+  await cell.click({ timeout: 3_000 }).catch(() => undefined);
+  await page.waitForTimeout(300);
+  await page.mouse.move(point.x, point.y);
+  await page.waitForTimeout(160);
+  return { available: true as const, before, after, toggled: before !== after };
+}
+
+/** Fire one selection command and report whether the bar survived it. */
+async function runSelectionCommand(page: Page, command: string) {
+  const button = page.locator(`[data-studio-selection-command="${command}"]`).first();
+  if (!(await button.isVisible().catch(() => false))) return { available: false as const };
+  await button.click({ timeout: 3_000 }).catch(() => undefined);
+  await page.waitForTimeout(500);
+  return {
+    available: true as const,
+    command,
+    barStillVisible: await page.evaluate(() => {
+      const bar = document.querySelector('[data-studio-selection-context-bar="true"]');
+      return bar instanceof HTMLElement && bar.style.visibility === "visible";
+    }),
+  };
+}
+
 async function openLayerPanel(page: Page): Promise<boolean> {
   if (await page.locator('[data-studio-layer-row="true"]').first().isVisible().catch(() => false)) {
     return true;
@@ -551,19 +597,21 @@ async function measureLayerRow(page: Page) {
   }
   // Baseline for the comparison: the pre-Wave-C route to 잠금 went through the
   // row's `…` popover. Open it and measure the same command from the row centre.
-  let popover: unknown = null;
+  const popoverRoute: Record<string, unknown> = {};
   const menuButton = page.locator('[data-studio-layer-row-action="menu"]').first();
   if (await menuButton.isVisible().catch(() => false)) {
     await menuButton.click({ timeout: 3_000 }).catch(() => undefined);
     await page.waitForTimeout(350);
-    popover = await page.evaluate(
-      (rect) => globalThis.__uxPointerDistance.layerPopoverControl(rect, "잠금"),
-      inline.rect,
-    );
+    for (const [key, pattern] of [["lock", "잠금"], ["opacity", "불투명도"]] as const) {
+      popoverRoute[key] = await page.evaluate(
+        (input) => globalThis.__uxPointerDistance.layerPopoverControl(input.rect, input.pattern),
+        { rect: inline.rect, pattern },
+      );
+    }
     await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
   }
-  return { available: true as const, inline, popoverRoute: popover };
+  return { available: true as const, inline, popoverRoute };
 }
 
 function summarize(
@@ -641,7 +689,9 @@ async function main(): Promise<void> {
           center,
         );
 
+        const hudCommandRouting = await verifyHudEraserToggle(page, center);
         const selection = await measureSelectionBar(page, center);
+        const duplicateRouting = await runSelectionCommand(page, "duplicate");
         const layerRow = await measureLayerRow(page);
 
         const hudDistances = hud?.controls.map((control) => control.centerDistancePx) ?? [];
@@ -690,6 +740,7 @@ async function main(): Promise<void> {
           nearestInteractiveExcludingNewSurfaces: beforeNearest,
           nearestInteractiveIncludingNewSurfaces: afterNearest,
           brushHud: hud,
+          commandRouting: { hudEraserToggle: hudCommandRouting, selection: duplicateRouting },
           selection: {
             selectionRect: selection.selectionRect,
             pointerPoint: selection.pointerPoint,

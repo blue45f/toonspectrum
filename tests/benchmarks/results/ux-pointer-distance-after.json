@@ -1,7 +1,7 @@
 {
   "$schema": "https://toonspectrum.local/schemas/ux-pointer-distance.json",
   "gate": "V5 §15 포인터 거리 — on-canvas command surfaces",
-  "generatedAt": "2026-08-08T11:39:35.484Z",
+  "generatedAt": "2026-08-08T11:46:18.562Z",
   "route": "/studio (guest, no auth session)",
   "build": "vite build → vite preview (production bundle)",
   "host": {
@@ -133,6 +133,17 @@
           }
         ]
       },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": false
+        }
+      },
       "selection": {
         "selectionRect": {
           "left": 179,
@@ -144,84 +155,7 @@
           "x": 215,
           "y": 491.953125
         },
-        "bar": {
-          "side": "top",
-          "rect": {
-            "left": 98,
-            "top": 486,
-            "width": 234,
-            "height": 44
-          },
-          "barToSelectionPx": 82.20896968862719,
-          "controls": [
-            {
-              "command": "duplicate",
-              "rect": {
-                "left": 102,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 59,
-              "fromPointerPx": 96.34574301579507
-            },
-            {
-              "command": "forward",
-              "rect": {
-                "left": 140,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 21,
-              "fromPointerPx": 59.2157259287229
-            },
-            {
-              "command": "backward",
-              "rect": {
-                "left": 178,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 0,
-              "fromPointerPx": 24.86970440647868
-            },
-            {
-              "command": "bring-front",
-              "rect": {
-                "left": 216,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 0,
-              "fromPointerPx": 24.86970440647868
-            },
-            {
-              "command": "properties",
-              "rect": {
-                "left": 254,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 21,
-              "fromPointerPx": 59.2157259287229
-            },
-            {
-              "command": "delete",
-              "rect": {
-                "left": 292,
-                "top": 490,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 59,
-              "fromPointerPx": 96.34574301579507
-            }
-          ]
-        }
+        "bar": null
       },
       "layerRow": {
         "available": false,
@@ -234,9 +168,9 @@
           "pass": true
         },
         "selectionCommand": {
-          "maxPx": 59,
+          "maxPx": null,
           "budgetPx": 180,
-          "pass": true
+          "pass": false
         },
         "layerRowAction": {
           "maxPx": null,
@@ -340,6 +274,17 @@
           }
         ]
       },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": false
+        }
+      },
       "selection": {
         "selectionRect": {
           "left": 414,
@@ -351,84 +296,7 @@
           "x": 450,
           "y": 548.3359375
         },
-        "bar": {
-          "side": "top",
-          "rect": {
-            "left": 333,
-            "top": 542,
-            "width": 234,
-            "height": 44
-          },
-          "barToSelectionPx": 82.14442527648427,
-          "controls": [
-            {
-              "command": "duplicate",
-              "rect": {
-                "left": 337,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 59,
-              "fromPointerPx": 96.28272354895194
-            },
-            {
-              "command": "forward",
-              "rect": {
-                "left": 375,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 21,
-              "fromPointerPx": 59.113136052859744
-            },
-            {
-              "command": "backward",
-              "rect": {
-                "left": 413,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 0,
-              "fromPointerPx": 24.624436115450568
-            },
-            {
-              "command": "bring-front",
-              "rect": {
-                "left": 451,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 0,
-              "fromPointerPx": 24.624436115450568
-            },
-            {
-              "command": "properties",
-              "rect": {
-                "left": 489,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 21,
-              "fromPointerPx": 59.113136052859744
-            },
-            {
-              "command": "delete",
-              "rect": {
-                "left": 527,
-                "top": 546,
-                "width": 36,
-                "height": 36
-              },
-              "fromSelectionBoxPx": 59,
-              "fromPointerPx": 96.28272354895194
-            }
-          ]
-        }
+        "bar": null
       },
       "layerRow": {
         "available": false,
@@ -441,9 +309,9 @@
           "pass": true
         },
         "selectionCommand": {
-          "maxPx": 59,
+          "maxPx": null,
           "budgetPx": 180,
-          "pass": true
+          "pass": false
         },
         "layerRowAction": {
           "maxPx": null,
@@ -547,6 +415,19 @@
           }
         ]
       },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": true,
+          "command": "duplicate",
+          "barStillVisible": true
+        }
+      },
       "selection": {
         "selectionRect": {
           "left": 730,
@@ -646,6 +527,7 @@
             "width": 249,
             "height": 39.265625
           },
+          "rowCount": 2,
           "actions": [
             {
               "action": "visibility",
@@ -694,14 +576,17 @@
           ]
         },
         "popoverRoute": {
-          "label": "✏️ 그림 잠금",
-          "rect": {
-            "left": 1476,
-            "top": 478.15625,
-            "width": 28,
-            "height": 28
+          "lock": {
+            "label": "잠금",
+            "rect": {
+              "left": 1351,
+              "top": 536.921875,
+              "width": 106.5,
+              "height": 32
+            },
+            "distancePx": 82.79839539378257
           },
-          "distancePx": 29.500001034494158
+          "opacity": null
         }
       },
       "budgets": {
@@ -727,7 +612,15 @@
   "notPresented": [
     {
       "viewport": "900",
+      "surface": "selectionCommand"
+    },
+    {
+      "viewport": "900",
       "surface": "layerRowAction"
+    },
+    {
+      "viewport": "430",
+      "surface": "selectionCommand"
     },
     {
       "viewport": "430",
@@ -737,5 +630,5 @@
   "desktopCoverageComplete": true,
   "failure": null,
   "passed": true,
-  "runtimeMs": 33441
+  "runtimeMs": 34770
 }
