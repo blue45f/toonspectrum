@@ -955,6 +955,26 @@ export class StudioLivingInkWebGpuPureRuntime {
             { binding: 2, resource: { buffer: this.selection } },
           ]);
         }
+        /*
+         * The certified runtime clears five surfaces under the mask, not three: velocity and
+         * pressure go with the pigment and the water. Leaving them was a real behavioural
+         * divergence rather than an omission of bookkeeping — the wash momentum inside a cleared
+         * region survived the clear, so the next stroke laid into that region was advected by the
+         * velocity of the marks the user had just erased. WebGL2 users never saw that.
+         *
+         * `velocityScratch` and `curl` are deliberately not masked, for the same reason the GLSL
+         * runtime never masks its own curl surface: both are fully rewritten from the live field
+         * (by `advect-velocity` and `curl`) before anything reads them, so they hold no state a
+         * clear could leave behind. Both pressure halves are masked because the Jacobi ping-pong's
+         * solved head alternates with the iteration count — neither half is "the" live one.
+         */
+        for (const buffer of [this.velocity, this.pressureA, this.pressureB]) {
+          this.dispatch("clear-masked-coarse", [
+            { binding: 0, resource: { buffer: this.uniforms } },
+            { binding: 1, resource: { buffer } },
+            { binding: 2, resource: { buffer: this.selection } },
+          ]);
+        }
       } else {
         this.dispatchClearAll();
       }

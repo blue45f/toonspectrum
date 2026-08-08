@@ -394,6 +394,39 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/**
+ * Selection-masked clear for the coarse velocity/pressure grid.
+ *
+ * The selection mask is authored at pigment resolution and there is only ever one of it, so a
+ * coarse cell has to *resample* it rather than index it: the bilinear read below is the compute
+ * twin of what the GLSL runtime gets for free, where `CLEAR_MASKED_FRAGMENT` draws into a coarse
+ * framebuffer while sampling a fine, `GL_LINEAR` selection texture at the coarse fragment's uv.
+ * Indexing `selection[i]` with a coarse index instead would read a fine cell from the top-left
+ * eighth of the field — a mask silently sampled in the wrong place, which is exactly the kind of
+ * plausible-looking wrong that this file's history is made of.
+ *
+ * Coverage is a partial-alpha mask, so `keep` is a continuous `1 - coverage` here as well: a
+ * half-selected coarse cell keeps half its momentum, matching the fine-grid twin above.
+ */
+export const STUDIO_LIVING_INK_WGSL_CLEAR_MASKED_COARSE = /* wgsl */ `
+${STUDIO_LIVING_INK_WGSL_COMMON}
+@group(0) @binding(1) var<storage, read_write> field: array<vec4f>;
+@group(0) @binding(2) var<storage, read> selection: array<vec4f>;
+${bilinearSampler("sampleSelection", "selection", "u.width", "u.height")}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= u.coarseWidth || gid.y >= u.coarseHeight) { return; }
+  let i = gid.y * u.coarseWidth + gid.x;
+  let uv = vec2f(
+    (f32(gid.x) + 0.5) / f32(u.coarseWidth),
+    (f32(gid.y) + 0.5) / f32(u.coarseHeight),
+  );
+  let keep = 1.0 - clamp(sampleSelection(uv).x, 0.0, 1.0);
+  field[i] = field[i] * keep;
+}
+`;
+
 /** Additive merge of the per-stroke capsule-union deposit into the mobile pigment well. */
 export const STUDIO_LIVING_INK_WGSL_MERGE_DEPOSIT = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
@@ -1165,6 +1198,7 @@ export const STUDIO_LIVING_INK_WGSL_PASS_ORDER = Object.freeze([
   "clear",
   "clear-coarse",
   "clear-masked",
+  "clear-masked-coarse",
   "splat",
   "merge-deposit",
   "splat-velocity",
@@ -1193,6 +1227,7 @@ export const STUDIO_LIVING_INK_WGSL_LEGACY_PASS_ORDER = Object.freeze([
 /** Passes dispatched over the coarse velocity/pressure grid rather than the pigment field. */
 export const STUDIO_LIVING_INK_WGSL_COARSE_PASSES = Object.freeze([
   "clear-coarse",
+  "clear-masked-coarse",
   "splat-velocity",
   "advect-velocity",
   "curl",
@@ -1209,6 +1244,7 @@ const WGSL_PASS_SOURCES: Readonly<Record<StudioLivingInkWgslPassId, string>> = O
   clear: STUDIO_LIVING_INK_WGSL_CLEAR,
   "clear-coarse": STUDIO_LIVING_INK_WGSL_CLEAR_COARSE,
   "clear-masked": STUDIO_LIVING_INK_WGSL_CLEAR_MASKED,
+  "clear-masked-coarse": STUDIO_LIVING_INK_WGSL_CLEAR_MASKED_COARSE,
   splat: STUDIO_LIVING_INK_WGSL_SPLAT,
   "merge-deposit": STUDIO_LIVING_INK_WGSL_MERGE_DEPOSIT,
   "splat-velocity": STUDIO_LIVING_INK_WGSL_SPLAT_VELOCITY,

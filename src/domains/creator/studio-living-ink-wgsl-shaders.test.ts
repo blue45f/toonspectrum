@@ -123,6 +123,34 @@ describe("studio-living-ink-wgsl-shaders", () => {
       .toContain("1.0 - clamp(selection[i].x, 0.0, 1.0)");
   });
 
+  /*
+   * A selection clear has to reach velocity and pressure too, which live on the coarse grid. The
+   * WGSL runtime used to clear only the three fine surfaces, so wash momentum survived inside a
+   * cleared region and advected the next stroke laid there — a divergence from the certified GLSL
+   * runtime that no gate caught, because the harness measures the cleared frame rather than what
+   * the *following* stroke does.
+   *
+   * The coarse variant cannot index `selection[i]`: the mask is authored at pigment resolution and
+   * a coarse index would read a fine cell from the top-left eighth of the field. It must resample,
+   * which is what the GLSL twin gets for free from a `GL_LINEAR` fine selection texture sampled at
+   * a coarse fragment's uv.
+   */
+  it("clears velocity and pressure under a selection by resampling the fine mask", () => {
+    const coarse = studioLivingInkWgslSourceForPass("clear-masked-coarse");
+    // Dispatched and indexed on the coarse grid...
+    expect(coarse).toContain("if (gid.x >= u.coarseWidth || gid.y >= u.coarseHeight) { return; }");
+    expect(coarse).toContain("let i = gid.y * u.coarseWidth + gid.x;");
+    expect(studioLivingInkWgslPassGrid("clear-masked-coarse")).toBe("coarse");
+    // ...while the mask is read bilinearly at fine resolution, never indexed by the coarse index.
+    expect(coarse).toContain("fn sampleSelection(");
+    expect(coarse).toContain("let cw = u.width;");
+    expect(coarse).toContain("let ch = u.height;");
+    expect(coarse).toContain("1.0 - clamp(sampleSelection(uv).x, 0.0, 1.0)");
+    expect(coarse).not.toContain("selection[i]");
+    // Same partial-alpha law as the fine twin: a half-covered cell keeps half of what it held.
+    expect(coarse).toContain("field[i] = field[i] * keep;");
+  });
+
   it("ships the incompressibility chain: divergence, Jacobi, gradient subtract", () => {
     for (const pass of ["divergence", "jacobi", "gradient"] as const) {
       expect(STUDIO_LIVING_INK_WGSL_PASS_ORDER).toContain(pass);
