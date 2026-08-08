@@ -10,13 +10,14 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
 import {
   STUDIO_MENU_GROUP_ORDER,
-  STUDIO_MENU_GROUP_SPEC,
+  studioMenuGroupSpec,
   studioMenuSpecClaimedItems,
   studioMenuSpecCoverageSummary,
   studioMenuSpecMissingRows,
-} from "./studio-main-menu-group-spec";
+} from "./studio-main-menu-group-spec-coverage";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 
 import type {
@@ -68,6 +69,18 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   leftPanelOpen: true,
   rightPanelOpen: true,
   lastFilterDraft: null,
+  clippingMaskActive: false,
+  clippingMaskDisabled: false,
+  imageLayerSelected: true,
+  activeToolCommandId: "tool.pen",
+  pixelSelectionTool: null,
+  quickMaskActive: false,
+  animationTimelineOpen: false,
+  onionSkinEnabled: false,
+  documentCommentsOpen: false,
+  canvasGridVisible: false,
+  vectorEraseToIntersection: false,
+  masterEditMode: false,
 };
 
 function liveMenu() {
@@ -143,32 +156,86 @@ describe("§15.3 menu group spec", () => {
     ).map((group) => group.id);
 
     expect(rendered).toEqual(withItems);
-    expect(rendered).not.toContain("transform");
-    expect(rendered).not.toContain("animation");
-    expect(rendered).not.toContain("collaboration");
+    // Transform left the declared-but-unrendered list in Wave D; Animation and
+    // Collaboration left it in Wave E, when the menu finally got a door onto the
+    // timeline, the team panel and the review flow. No §15.3 group is empty now.
+    expect(rendered).toContain("transform");
+    expect(rendered).toContain("animation");
+    expect(rendered).toContain("collaboration");
   });
 
   it("pins the measured §15.3 coverage so it cannot move without a decision", () => {
     // Audit baseline (docs/rewrite/ux-audit-v5.md §2.7): 5 of 17 groups, 12 absent.
+    // Wave C reached 14 present / 19 partial / 102 absent; Wave D moved it again.
     expect(studioMenuSpecCoverageSummary()).toEqual({
       specGroups: 17,
-      groupsWithItems: 14,
-      emptyGroupIds: ["transform", "animation", "collaboration"],
+      groupsWithItems: 17,
+      emptyGroupIds: [],
       specRows: 135,
-      rowsPresent: 14,
-      rowsPartial: 19,
-      rowsAbsent: 102,
-      extras: 32,
+      rowsPresent: 37,
+      rowsPartial: 34,
+      rowsAbsent: 64,
+      extras: 34,
     });
+  });
+
+  /**
+   * Brush was the worst group in the audit — 0 of 10 — even though the preset
+   * browser, dynamics editor, saved library and ABR importer all shipped. This
+   * pins the door count so the group cannot silently regress to "reachable only
+   * from the inspector", and pins the four rows that are genuine product gaps so
+   * they are never closed with a menu row that leads nowhere.
+   */
+  it("gives the Brush group real doors and keeps its real gaps named", () => {
+    const brush = studioMenuGroupSpec("brush");
+    const covered = brush?.rows.filter((row) => row.coverage !== "absent") ?? [];
+    expect(covered.map((row) => row.spec)).toEqual([
+      "Preset Browser",
+      "Brush Studio/Brush DNA",
+      "Natural Media/Pigment",
+      "Import SUT/ABR/MYB/KPP",
+    ]);
+    // Not routing gaps — the product has no such feature to route to.
+    const absent = brush?.rows.filter((row) => row.coverage === "absent") ?? [];
+    expect(absent.map((row) => row.spec)).toEqual([
+      "Pressure/Tilt/Velocity",
+      "Stabilizer",
+      "Tip/Texture/Dual Tip",
+      "Particle/Physics",
+      "Fidelity Lab",
+      "Team Preset Versioning",
+    ]);
+    expect(absent.every((row) => (row.note ?? "").trim().length > 0)).toBe(true);
+
+    const items = liveMenu().find((group) => group.id === "brush")?.items ?? [];
+    const ids = items.map((item) => item.id);
+    for (const id of [
+      "preset-browser",
+      "brush-studio",
+      "natural-media",
+      "my-brushes",
+      "import-pack",
+    ]) {
+      expect(ids, `Brush ▸ ${id}`).toContain(id);
+    }
   });
 
   it("keeps the §15.3 shortfall list enumerable rather than folklore", () => {
     const missing = studioMenuSpecMissingRows();
 
-    expect(missing).toContain("Layer ▸ Mask/Clipping");
-    expect(missing).toContain("Transform ▸ Scale/Rotate/Skew/Perspective");
-    expect(missing).toContain("Filter ▸ Adjustment Layer");
-    expect(missing).toContain("Help ▸ Command Search");
+    expect(missing).toContain("Layer ▸ Group/Folder");
+    expect(missing).toContain("Transform ▸ Mesh Warp");
+    // Wave E closed these, so they must no longer read as absent.
+    expect(missing).not.toContain("Select ▸ Quick Mask");
+    expect(missing).not.toContain("Animation ▸ Timeline");
+    expect(missing).not.toContain("Collaboration ▸ Share/Permission");
+    expect(missing).not.toContain("Comic & Story ▸ Animatic");
+    expect(missing).toContain("Filter ▸ Filter Gallery");
+    expect(missing).toContain("Animation ▸ State Machine");
+    // Wave D closed these three partially, so they must no longer read as absent.
+    expect(missing).not.toContain("Layer ▸ Mask/Clipping");
+    expect(missing).not.toContain("Transform ▸ Scale/Rotate/Skew/Perspective");
+    expect(missing).not.toContain("Filter ▸ Adjustment Layer");
     expect(missing).toHaveLength(studioMenuSpecCoverageSummary().rowsAbsent);
   });
 
@@ -194,20 +261,26 @@ describe("§15.3 menu group spec", () => {
     expect(menuCost("select.all")).toBe(2);
     expect(menuCost("view.canvas-rulers")).toBe(2);
 
-    // Still failing: the commands exist in the product but have no host callback
-    // on the menu contract, so Wave C (menu-only, no StudioPage budget left)
-    // cannot reach them. Recorded so the next wave inherits an exact list.
-    const stillBlocked = [
-      { audit: "선택 후 변형", commandId: "transform.pixel-selection", needs: "ui.activateTransformTool" },
-      { audit: "레벨(Levels)", commandId: null, needs: "ui.openImageAdjustments (레벨 명령 자체가 없음)" },
-      { audit: "커브(Curves)", commandId: null, needs: "ui.openImageAdjustments (필터의 색상 커브와 다른 명령)" },
-      { audit: "클리핑 마스크", commandId: null, needs: "editor.toggleClippingMask" },
+    // Wave D: the four rows the audit measured at 3+ actions. Each was already
+    // implemented; what was missing was a host callback on the menu contract, so
+    // the fix is a door onto the existing surface, not a second implementation.
+    const wasFailing = [
+      // 3 → 2 (tool rail y=1003, below the 1440×900 fold).
+      { audit: "선택 후 변형", commandId: "transform.pixel-selection", via: "ui.activateTransformTool" },
+      // >3 → 2 (우패널 속성 → 색보정 → 스크롤 → 섹션).
+      { audit: "레벨(Levels)", commandId: "filter.levels", via: "ui.openImageAdjustments" },
+      // >3 → 2. Distinct from `filter.color-curves`, the destructive dialog.
+      { audit: "커브(Curves)", commandId: "filter.tone-curve", via: "ui.openImageAdjustments" },
+      // 3 → 2 (선택 → 속성 탭 → 체크박스).
+      { audit: "클리핑 마스크", commandId: "layer.clipping-mask", via: "editor.toggleClippingMask" },
     ] as const;
-    for (const row of stillBlocked) {
-      expect(row.commandId === null || !commandIds.has(row.commandId), row.audit).toBe(true);
-      expect(row.needs).not.toBe("");
+    for (const row of wasFailing) {
+      expect(menuCost(row.commandId), row.audit).toBe(2);
+      expect(row.via).not.toBe("");
     }
-    expect(live.find((group) => group.id === "transform")).toBeUndefined();
+    // §2.2 measured 15 commands, 10 passing. With these four the menu answers 14;
+    // "새 레이어" is the remaining panel-only path and already passed at 2.
+    expect(live.find((group) => group.id === "transform")).toBeDefined();
   });
 
   it("gives every partial row a note saying what is missing", () => {

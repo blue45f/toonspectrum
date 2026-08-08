@@ -18,8 +18,11 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { BUBBLE_VARIANTS } from "./studio-assets";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeleteWorkRequest } from "./studio-destructive-command-catalog";
 import { readWorkFx } from "./studio-motion-fx";
 import { STUDIO_RASTER_ASSETS } from "./studio-raster-assets";
+import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { WebtoonFxPlayer } from "./WebtoonFxPlayer";
 import { WorkFxPanel } from "./WorkFxPanel";
 
@@ -561,7 +564,11 @@ export function CreateWorkPage() {
 
   async function onDelete() {
     if (!work || deleting) return;
-    if (!globalThis.confirm("이 창작물을 삭제할까요? 되돌릴 수 없습니다.")) return;
+    if (
+      !(await confirmStudioDestructiveAction(
+        studioDeleteWorkRequest(work.title || "이 창작물")
+      ))
+    ) return;
     setDeleting(true);
     setActionError(null);
     try {
@@ -604,6 +611,8 @@ export function CreateWorkPage() {
 
   return (
     <Container size="prose" className="py-8 lg:py-10">
+      {/* 스튜디오 밖 라우트에도 승인 표면을 둔다 — 없으면 네이티브 confirm 으로 떨어진다. */}
+      <StudioDestructiveConfirmHost />
       <Link
         href="/create"
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeletePromisePayoffEntryRequest } from "./studio-destructive-command-catalog";
 import {
   addStudioPromisePayoffEntry,
   diagnoseStudioPromisePayoffLedger,
@@ -311,17 +313,18 @@ export function StudioPromisePayoffLedgerPanel({
 
   function deleteEntry(): void {
     if (!selectedEntry) return;
-    if (
-      typeof globalThis.confirm === "function"
-      && !globalThis.confirm(
-        `“${selectedEntry.title || selectedEntry.id}” 약속과 연결된 단서를 삭제할까요?`
-      )
-    ) {
-      return;
-    }
-    const nextId = visibleEntries.find(({ id }) => id !== selectedEntry.id)?.id ?? null;
-    setRequestedEntryId(nextId);
-    applyChange(removeStudioPromisePayoffEntry(ledger, selectedEntry.id));
+    void (async () => {
+      if (
+        !(await confirmStudioDestructiveAction(
+          studioDeletePromisePayoffEntryRequest(
+            selectedEntry.title || selectedEntry.id
+          )
+        ))
+      ) return;
+      const nextId = visibleEntries.find(({ id }) => id !== selectedEntry.id)?.id ?? null;
+      setRequestedEntryId(nextId);
+      applyChange(removeStudioPromisePayoffEntry(ledger, selectedEntry.id));
+    })();
   }
 
   function newLink(stage: StoryStage): StudioPromisePayoffStoryLink {

@@ -4,14 +4,18 @@ import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import {
+  createTextShapeCache,
   fitPolylineToPath,
   renderSceneToPixels,
+  shapeTextCached,
 } from "@toonspectrum/studio-engine-vello";
 import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   COMPOSITION_PRESETS,
+  PATTERN_STAR_MOTIF,
+  PATTERN_STAR_MOTIF_SVG_PATH_DATA,
   UNAVAILABLE_COMPOSITION_ROWS,
   V12_SECTION_12_2_ROW_NAMES,
   describeCompositionChain,
@@ -20,6 +24,7 @@ import {
 } from "../../packages/studio-brush-platform/src/brush-composition";
 import { loadInkStrokeModeler } from "../../packages/studio-brush-platform/src/ink-modeler";
 import { loadLibMypaint } from "../../packages/studio-brush-platform/src/libmypaint/index";
+import { parseSvgToScene } from "../../packages/studio-format-gateway/src/svg";
 
 import type {
   CompositionEngines,
@@ -57,6 +62,14 @@ const GOLDEN_PATH = join(
   "brushes",
   "brush-composition-goldens.json",
 );
+const FONT_PATH = join(
+  REPO_ROOT,
+  "tests",
+  "corpus",
+  "text",
+  "fonts",
+  "Roboto-Regular.ttf",
+);
 const REGEN = process.env.REGEN_V11_GOLDENS === "1";
 const THROUGHPUT_OUT = process.env.COMPOSITION_THROUGHPUT_OUT;
 const PRESSURE_OUT = process.env.COMPOSITION_PRESSURE_OUT;
@@ -69,11 +82,20 @@ const SAMPLE_COUNT = 96;
 const THROUGHPUT_FLOOR_PTS_PER_MS = 0.1;
 const PRESSURE_CORRELATION_GATE = 0.9;
 
-/** Presets whose ink response must track pressure (모노라인 is uniform by design). */
+/**
+ * Presets excluded from the per-COLUMN pressure correlation, with the reason:
+ * - 모노라인·기술펜: uniform width by design (thinning 0);
+ * - 텍스트 브러시: a column is not a quantum of a text brush. Glyph outlines
+ *   modulate column mass by tens of percent at CONSTANT pressure ('T' stem vs
+ *   'O' bowl vs inter-glyph gap), so per-column Pearson measures the font, not
+ *   the pressure response. Its 필압 응답 is gated separately, per glyph cell,
+ *   in "텍스트 브러시 keeps 필압 응답 per glyph cell" below.
+ */
+const COLUMN_PRESSURE_EXEMPT_IDS = new Set(["monoline-technical-pen", "text-brush"]);
 const PRESSURE_DRIVEN_IDS = new Set(
-  COMPOSITION_PRESETS.filter((preset) => preset.id !== "monoline-technical-pen").map(
-    (preset) => preset.id,
-  ),
+  COMPOSITION_PRESETS.filter(
+    (preset) => !COLUMN_PRESSURE_EXEMPT_IDS.has(preset.id),
+  ).map((preset) => preset.id),
 );
 
 type HokusaiModule =
@@ -174,23 +196,78 @@ beforeAll(async () => {
     join(HOKUSAI_PKG_DIR, "studio_hokusai_wasm_bg.wasm"),
   );
   await hokusaiModule.default({ module_or_path: wasmBytes });
+  // 텍스트 브러시 lane: the parley shaper with the corpus font bound, fronted
+  // by the package's own LRU so repeated executions re-shape at most once.
+  const fontBytes = new Uint8Array(
+    await readFile(FONT_PATH),
+  );
+  const textShapeCache = createTextShapeCache({ maxEntries: 32, maxBytes: 4_000_000 });
   engines = {
     libmypaint,
     hokusai: hokusaiModule as unknown as HokusaiModuleLike,
     inkModeler,
     vello: { renderScene: renderSceneToPixels, fitPolyline: fitPolylineToPath },
+    text: {
+      shapeText: (text, options) =>
+        shapeTextCached(textShapeCache, text, fontBytes, options),
+    },
   };
   strokeInput = standardCompositionStrokeSamples(WIDTH, HEIGHT, SAMPLE_COUNT);
 }, 120_000);
 
 describe("V12 §12.2 composition brush programs (real engine chain)", () => {
-  it("covers the §12.2 table: 8 composed presets + 5 explicit unavailable rows", () => {
-    expect(COMPOSITION_PRESETS).toHaveLength(8);
-    expect(UNAVAILABLE_COMPOSITION_ROWS).toHaveLength(5);
+  it("covers the §12.2 table: 12 composed presets + 1 explicit unavailable row", () => {
+    expect(COMPOSITION_PRESETS).toHaveLength(12);
+    expect(UNAVAILABLE_COMPOSITION_ROWS).toHaveLength(1);
     expect(
       [...COMPOSITION_PRESETS.map((preset) => preset.name),
         ...UNAVAILABLE_COMPOSITION_ROWS.map((row) => row.name)].sort(),
     ).toEqual([...V12_SECTION_12_2_ROW_NAMES].sort());
+    // The one remaining gap must name the shipped-but-unreachable provider,
+    // not a vague "not implemented" — zero silent loss applies to the record.
+    expect(UNAVAILABLE_COMPOSITION_ROWS[0]?.name).toBe("3D 표면 브러시");
+    expect(UNAVAILABLE_COMPOSITION_ROWS[0]?.missing).toContain(
+      "src/domains/creator/studio-vrm-texture-uv.ts",
+    );
+  });
+
+  it("the 장식·패턴 motif is exactly what the SVG lane parses (자산 연결 증명)", () => {
+    const { scene, unsupported, warnings } = parseSvgToScene(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2">` +
+        `<path d="${PATTERN_STAR_MOTIF_SVG_PATH_DATA}" fill="#000"/></svg>`,
+    );
+    expect(unsupported).toEqual([]);
+    expect(warnings).toEqual([]);
+    const node = scene.nodes[0];
+    expect(node?.kind).toBe("fill-path");
+    expect(node?.kind === "fill-path" ? node.path : null).toEqual(
+      PATTERN_STAR_MOTIF,
+    );
+  });
+
+  it("every row-9..12 provider reports the instances it actually emitted", () => {
+    const providerRows = new Map<string, string>([
+      ["decoration-pattern", "pattern-stamp"],
+      ["particle-spray", "particle-splat"],
+      ["ribbon-hair-rope", "ribbon-xpbd"],
+      ["text-brush", "text-on-path"],
+    ]);
+    for (const preset of COMPOSITION_PRESETS) {
+      const expectedGeometry = providerRows.get(preset.id);
+      if (expectedGeometry === undefined) continue;
+      const report = execute(preset).layers[0];
+      expect(report?.geometry, `${preset.id} geometry stage`).toBe(
+        expectedGeometry,
+      );
+      expect(report?.instances ?? 0, `${preset.id} instances`).toBeGreaterThan(4);
+    }
+    // The eight rows that shipped first never grew an `instances` field.
+    for (const preset of COMPOSITION_PRESETS) {
+      if (providerRows.has(preset.id)) continue;
+      for (const layer of execute(preset).layers) {
+        expect(layer.instances, `${preset.id}.${layer.id} instances`).toBeUndefined();
+      }
+    }
   });
 
   it("every preset renders deterministically on the shared canvas", () => {
@@ -287,6 +364,63 @@ describe("V12 §12.2 composition brush programs (real engine chain)", () => {
           2,
         )}\n`,
       );
+    }
+  });
+
+  it("텍스트 브러시 keeps 필압 응답 per glyph cell (컬럼 대신 글리프 단위)", () => {
+    const preset = COMPOSITION_PRESETS.find((entry) => entry.id === "text-brush");
+    expect(preset, "text-brush preset").toBeDefined();
+    if (preset === undefined) return;
+
+    // (1) The ramp profile, box-smoothed over one glyph cell (font size +
+    // letter spacing ≈ 17 px, rounded up to an odd 21 px window), still tracks
+    // pressure: the glyph comb is quotiented out, the mass gradient is not.
+    const ramp = pressureRampSamples();
+    const margin = 24;
+    const columns = columnDarkness(
+      executeCompositionProgram(preset, ramp, engines, {
+        width: WIDTH,
+        height: HEIGHT,
+        seed: SEED,
+      }).pixels,
+    );
+    const window = 21;
+    const half = (window - 1) / 2;
+    const smoothed: number[] = [];
+    const pressures: number[] = [];
+    for (let x = margin; x < WIDTH - margin; x += 1) {
+      let sum = 0;
+      for (let offset = -half; offset <= half; offset += 1) {
+        sum += columns[Math.min(WIDTH - 1, Math.max(0, x + offset))] ?? 0;
+      }
+      smoothed.push(sum / window);
+      pressures.push(0.1 + (0.9 * (x - margin)) / (WIDTH - 2 * margin));
+    }
+    const correlation = pearson(pressures, smoothed);
+    expect(
+      correlation,
+      `text-brush 글리프셀 필압 상관 (measured ${correlation.toFixed(4)})`,
+    ).toBeGreaterThan(PRESSURE_CORRELATION_GATE);
+
+    // (2) Direct proof, immune to any smoothing choice: flat-pressure strokes
+    // must deposit strictly more ink as pressure rises.
+    const flatInk = [0.25, 0.6, 1].map((pressure) => {
+      const flat = ramp.map((sample) => ({ ...sample, pressure }));
+      return inkedPixels(
+        executeCompositionProgram(preset, flat, engines, {
+          width: WIDTH,
+          height: HEIGHT,
+          seed: SEED,
+        }).pixels,
+      );
+    });
+    for (let index = 1; index < flatInk.length; index += 1) {
+      const previous = flatInk[index - 1] ?? 0;
+      const current = flatInk[index] ?? 0;
+      expect(
+        current,
+        `text-brush flat-pressure ink ${JSON.stringify(flatInk)}`,
+      ).toBeGreaterThan(previous * 1.15);
     }
   });
 

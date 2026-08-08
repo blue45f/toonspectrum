@@ -16,6 +16,9 @@ describe("studio z-index scale", () => {
     expect(STUDIO_Z.menubarMenu).toBe(STUDIO_Z.workspace);
     expect(STUDIO_Z.workspace).toBeLessThan(STUDIO_Z.help);
     expect(STUDIO_Z.help).toBeLessThan(STUDIO_Z.legal);
+    // 파괴 승인 창은 자기를 띄운 어떤 모달보다도 위여야 한다(레이어 리프트 140, 손실 미리보기 130).
+    expect(STUDIO_Z.legal).toBeLessThan(STUDIO_Z.destructiveConfirm);
+    expect(STUDIO_Z.destructiveConfirm).toBeGreaterThan(140);
   });
 
   it("exposes matching Tailwind arbitrary class tokens", () => {

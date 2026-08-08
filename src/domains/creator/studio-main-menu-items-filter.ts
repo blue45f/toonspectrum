@@ -26,6 +26,7 @@ import {
   ScanLine,
   SlidersHorizontal,
   Sparkles,
+  Spline,
   Sun,
   Tv,
   Wind,
@@ -39,6 +40,7 @@ import type { StudioMainMenuItem } from "./studio-main-menu-model";
 export function buildStudioFilterMenuItems({
   state,
   editor,
+  ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
   const filterUnavailableReason = state.filterDisabled
     ? state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다."
@@ -119,11 +121,36 @@ export function buildStudioFilterMenuItems({
       shortcut: "⌘⇧5",
       disabled: state.filterDisabled,
       unavailableReason: filterUnavailableReason,
-      separatorAfter: true,
       onSelect: () => {
         editor.openStudioFilter("color-curves");
       },
     },
+    // §15.3 Filter ▸ Adjustment Layer. 위 항목들과 달리 픽셀을 굽지 않고 선택 레이어의
+    // 보정 파라미터를 편집한다 — 인스펙터 보정 패널이 실제 편집면이고, 메뉴는 그 문이다.
+    // (감사 §2.2: 레벨·커브 둘 다 메뉴·팔레트·검색 어디에도 없어 3동작을 넘겼다.)
+    ...([
+      { id: "levels", commandId: "filter.levels", label: "레이어 보정 · 레벨", icon: SlidersHorizontal },
+      {
+        id: "tone-curve",
+        commandId: "filter.tone-curve",
+        label: "레이어 보정 · 톤 커브",
+        icon: Spline,
+        separatorAfter: true,
+      },
+    ] as const).map(({ id, commandId, label, icon, ...rest }) => ({
+      id,
+      commandId,
+      label,
+      icon,
+      ...("separatorAfter" in rest && rest.separatorAfter ? { separatorAfter: true } : {}),
+      disabled: !state.imageLayerSelected,
+      unavailableReason: state.imageLayerSelected
+        ? undefined
+        : "보정할 이미지 레이어를 먼저 선택하세요.",
+      onSelect: () => {
+        ui.openImageAdjustments();
+      },
+    })),
     // 자주 쓰는 필터 팩 — 라벨은 다이얼로그(STUDIO_FILTER_PACK_DEFS)와 동일 문구를 하드코딩한다.
     // (value import 시 필터 엔진 체인이 첫 청크에 딸려오므로 기존 5개 항목과 같은 방식.)
     ...([

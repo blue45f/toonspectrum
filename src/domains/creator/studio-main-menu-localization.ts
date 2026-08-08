@@ -90,7 +90,11 @@ function localizeUnavailableReason(
   t: StudioMainMenuTranslate,
 ): string | undefined {
   if (!item.unavailableReason) return undefined;
-  if (path.startsWith("filter/") && state.filterDisabled) {
+  // Layer adjustments sit in the Filter group but do not run the destructive filter
+  // pipeline, so they must not inherit "필터를 적용할 수 없습니다" — their blocker is
+  // always "no image layer selected".
+  const layerAdjustment = path === "filter/levels" || path === "filter/tone-curve";
+  if (!layerAdjustment && path.startsWith("filter/") && state.filterDisabled) {
     return localizeText(
       t,
       state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다.",

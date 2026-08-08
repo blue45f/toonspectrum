@@ -82,11 +82,13 @@ describe("Studio drawing palette workspace integration boundary", () => {
       "page live workspace layout",
     );
 
+    // The palette layout has been part of the workspace envelope since v3; the device-override
+    // axis moved it to v4. Both constants must keep moving together.
     expect(workspaceSource).toContain(
-      "export const STUDIO_WORKSPACE_STATE_VERSION = 3 as const",
+      "export const STUDIO_WORKSPACE_STATE_VERSION = 4 as const",
     );
     expect(workspaceSource).toContain(
-      "export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 3 as const",
+      "export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 4 as const",
     );
     expect(layoutContract).toContain(
       "readonly drawingPalettes: StudioDrawingPaletteLayout",
@@ -177,11 +179,14 @@ describe("Studio drawing palette workspace integration boundary", () => {
     expect(dragController).toContain(
       "setDrawingPaletteCancelEpoch((current) => current + 1)",
     );
+    // `presented` is the workspace layout resolved for the current input surface. The drag has to
+    // be cancelled before it lands either way: a palette that is mid-drag while its layout is
+    // replaced would keep dragging against coordinates that no longer exist.
     expect(applyLayout.indexOf("cancelDrawingPaletteDrag()")).toBeLessThan(
-      applyLayout.indexOf("setDrawingPaletteLayout(layout.drawingPalettes)"),
+      applyLayout.indexOf("setDrawingPaletteLayout(presented.drawingPalettes)"),
     );
     expect(applyLayout).toContain(
-      "setDrawingPaletteLayout(layout.drawingPalettes)",
+      "setDrawingPaletteLayout(presented.drawingPalettes)",
     );
     expect(ownerSync.indexOf("replacePendingExternalWorkspaceSync(null)")).toBeLessThan(
       ownerSync.indexOf("loadStudioWorkspacePersistence("),

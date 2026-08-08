@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
 import { MAX_BRUSHES } from "./studio-brush-library";
+import { STUDIO_BRUSH_PACK_ACCEPT } from "./studio-brush-pack-format";
 import { StudioBrushLibraryPanel } from "./StudioBrushLibraryPanel";
 
 import type { StudioBrushSnapshot, StudioSavedBrush } from "./studio-brush-library";
@@ -60,8 +61,14 @@ describe("StudioBrushLibraryPanel", () => {
     expect(html).toContain("내 브러시 · 사용자 설정");
     expect(html).toContain("저장·가져오기·공유·재적용");
     expect(html).toContain(`1/${MAX_BRUSHES}`);
-    expect(html).toContain('aria-label="브러시 설정 또는 Photoshop ABR 가져오기"');
-    expect(html).toContain('accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"');
+    expect(html).toContain(
+      'aria-label="브러시 설정 · Photoshop ABR · libmypaint MYB · Krita KPP 가져오기"',
+    );
+    // MYB/KPP 파서가 있는데 진입점이 없던 상태를 되돌리지 못하게 accept 를 고정한다.
+    expect(html).toContain(`accept="${STUDIO_BRUSH_PACK_ACCEPT}"`);
+    for (const extension of [".json", ".abr", ".myb", ".kpp"]) {
+      expect(STUDIO_BRUSH_PACK_ACCEPT).toContain(extension);
+    }
     expect(html).toContain("주력 펜 고정 해제");
     expect(html).toContain("주력 펜 복제");
     expect(html).toContain("주력 펜 이름 변경");

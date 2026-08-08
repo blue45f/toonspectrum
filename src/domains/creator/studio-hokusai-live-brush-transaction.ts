@@ -119,7 +119,10 @@ export function createStudioHokusaiLiveCanonicalTransaction(input: Readonly<{
     || source.hidden === true
     || source.mode === "eraser"
     || (source.kind ?? "freehand") !== "freehand"
-    || source.points.length < 4
+    // A deliberate tap is one contact sample, and the hidden restore vector for it is a single
+    // point that Studio already renders as a dot. Demanding two samples here rejected every
+    // natural-media tap after the engine had legitimately composed its mark.
+    || source.points.length < 2
     || source.points.length % 2 !== 0
   ) {
     return failure(

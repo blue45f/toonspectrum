@@ -8,6 +8,13 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 
 import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
 import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  studioDeleteCustomPoseRequest,
+  studioDeleteSharedPoseRequest,
+  studioImportPosesRequest,
+  studioSharePoseConsentRequest,
+} from "./studio-destructive-command-catalog";
 import {
   isStudioHumanoidBoneName,
   type StudioHumanoidBoneName,
@@ -3915,7 +3922,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   async function handleDeleteSharedPose(asset: SharedAssetCatalogItem, e: MouseEvent<HTMLButtonElement>): Promise<void> {
     e.stopPropagation();
-    if (!globalThis.confirm(`공유된 포즈 '${asset.name.replace("[3D_POSE] ", "")}'를 서버에서 삭제하시겠습니까?`)) {
+    if (
+      !(await confirmStudioDestructiveAction(
+        studioDeleteSharedPoseRequest(asset.name.replace("[3D_POSE] ", ""))
+      ))
+    ) {
       return;
     }
     cancelPendingSharedPoseSelection();
@@ -5982,13 +5993,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   function handleDeletePose(id: string, e: MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
-    if (!globalThis.confirm("이 커스텀 포즈를 삭제할까요?")) return;
-    const next = savedPoses.filter((p) => p.id !== id);
-    setSavedPoses(next);
-    localStorage.setItem("studio_custom_poses", JSON.stringify(next));
-    if (activePoseId === id) {
-      setActivePoseId("default");
-    }
+    const poseLabel = savedPoses.find((p) => p.id === id)?.label;
+    void (async () => {
+      if (
+        !(await confirmStudioDestructiveAction(studioDeleteCustomPoseRequest(poseLabel)))
+      ) return;
+      const next = savedPoses.filter((p) => p.id !== id);
+      setSavedPoses(next);
+      localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+      if (activePoseId === id) {
+        setActivePoseId("default");
+      }
+    })().catch(() => {
+      alert("포즈 삭제를 이 기기에 저장하지 못했습니다.");
+    });
   }
 
   function handleCustomPoseSelect(pose: CustomPose) {
@@ -6282,7 +6300,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             return;
           }
           
-          if (globalThis.confirm(`${validPoses.length}개의 포즈를 가져올까요? (기존 포즈에 추가됩니다)`)) {
+          // 승인이 비동기라 아래 저장은 바깥 try/catch 밖에서 일어난다. 실패를 삼키면
+          // "가져왔다고 했는데 다음 실행에 없는" 조용한 실패가 되므로 여기서 다시 잡는다.
+          void (async () => {
+            if (
+              !(await confirmStudioDestructiveAction(
+                studioImportPosesRequest(validPoses.length)
+              ))
+            ) return;
             const sanitized = validPoses.map((p) => ({
               ...p,
               id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
@@ -6290,7 +6315,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             const next = [...savedPoses, ...sanitized];
             setSavedPoses(next);
             localStorage.setItem("studio_custom_poses", JSON.stringify(next));
-          }
+          })().catch(() => {
+            alert("가져온 포즈를 이 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.");
+          });
         } catch (_err) {
           alert("파일 읽기 또는 파싱에 실패했습니다.");
         }
@@ -6355,9 +6382,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       alert("이름은 최대 30자까지 가능합니다.");
       return;
     }
-    if (!globalThis.confirm(
-      "이 포즈 이미지와 모델·의상·소품 표현을 ToonSpectrum 표준 사용권으로 공유할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니까?"
-    )) return;
+    if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest(title)))) return;
 
     const name = `[3D_POSE] ${title}`;
     const sharePoseSignature = currentPersistentIkSignature();

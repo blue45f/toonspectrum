@@ -1,6 +1,8 @@
 // 브러시 라이브러리 패널 — StudioPage가 소유하는 단일 목록을 데스크톱/모바일과 공유하는
 // controlled consumer다. 이름 붙은 브러시 설정을 저장·고정·복제·이름변경·안전 삭제하고,
-// 앱 전용 JSON과 Photoshop ABR 팩을 가져오고, 안전한 앱 전용 JSON으로 내보낸다.
+// 앱 전용 JSON·Photoshop ABR·libmypaint MYB·Krita KPP 를 가져오고, 안전한 앱 전용 JSON으로
+// 내보낸다. MYB/KPP 는 그릴 수 있는 범위만 등록하고 나머지는 경고로 노출한다
+// (studio-brush-pack-import.ts).
 import {
   Check,
   ChevronDown,
@@ -40,6 +42,10 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import {
+  STUDIO_BRUSH_PACK_ACCEPT,
+  studioBrushPackFormatOf,
+} from "./studio-brush-pack-format";
 import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import {
   studioBrushPreviewDashArray,
@@ -50,6 +56,7 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { downloadBlob } from "./studio-export";
+import { useStudioInspectorFocusScroll } from "./studio-inspector-focus-effect";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
 import { cx } from "@/lib/cx";
@@ -213,7 +220,11 @@ export function StudioBrushLibraryPanel({
   const [viewMode, setViewMode] = useState<"stroke" | "text">("stroke");
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const orderedBrushes = sortBrushesForLibrary(brushes);
+
+  // 그리기 ▸ 내 브러시 메뉴 항목이 인스펙터를 열고 이 목록까지 스크롤한다.
+  useStudioInspectorFocusScroll("brush.saved-library", sectionRef);
 
   function setMutationError(status: "storage-error" | "library-unreadable") {
     setError(status === "library-unreadable" ? libraryUnreadableMessage : storageErrorMessage);
@@ -338,14 +349,60 @@ export function StudioBrushLibraryPanel({
     globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
   }
 
+  /**
+   * libmypaint `.myb` and Krita `.kpp` are single presets whose parsers live in
+   * the format gateway. Only the fields with a drawable counterpart become
+   * brush settings; everything else comes back as `warnings`/`unmapped` and is
+   * shown, because a preset that imports "successfully" and then draws nothing
+   * like the source is worse than a refusal.
+   */
+  async function importBrushProgramFile(file: File, format: "myb" | "kpp") {
+    setImporting(true);
+    try {
+      const { importStudioBrushProgramFile } = await import("./studio-brush-pack-import");
+      const result = await importStudioBrushProgramFile(file, format);
+      const candidate = result.brushes[0];
+      if (!candidate) {
+        setError("이 파일에서 가져올 수 있는 브러시를 찾지 못했어요.");
+        return;
+      }
+      const created = createBrush(candidate.name, candidate.snapshot);
+      const label = format === "myb" ? "libmypaint" : "Krita";
+      if (!storeNewBrush(created, `${label} 브러시 "${created.name}"을(를) 가져왔어요.`)) return;
+      const notes = [...result.warnings];
+      if (result.unmapped.length > 0) {
+        const shown = result.unmapped.slice(0, 4).join(", ");
+        const rest = result.unmapped.length - Math.min(4, result.unmapped.length);
+        notes.push(
+          `이 포맷 전용 설정 ${result.unmapped.length}개(${shown}${rest > 0 ? ` 외 ${rest}개` : ""})는 옮기지 못했어요.`,
+        );
+      }
+      if (notes.length > 0) {
+        setDoneMsg(`${label} 브러시 "${created.name}"을(를) 가져왔어요. ${notes.join(" ")}`);
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "브러시 프리셋 파일을 가져오지 못했어요.",
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     setError(null);
     setDoneMsg(null);
-    const abr = /\.abr$/iu.test(file.name) || file.type === "application/x-photoshop";
-    if (abr) {
+    const format = studioBrushPackFormatOf(file.name, file.type);
+    if (format === "myb" || format === "kpp") {
+      await importBrushProgramFile(file, format);
+      return;
+    }
+    if (format === "abr") {
       setImporting(true);
       try {
         const { importStudioAbrFile } = await import("./studio-abr-import-client");
@@ -447,6 +504,7 @@ export function StudioBrushLibraryPanel({
 
   return (
     <section
+      ref={sectionRef}
       className="space-y-2 border-t border-line/35 pt-2"
       aria-label="내 브러시"
       data-studio-brush-library-scope="saved"
@@ -466,8 +524,8 @@ export function StudioBrushLibraryPanel({
           {importing ? "변환 중…" : "가져오기"}
           <input
             type="file"
-            accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"
-            aria-label="브러시 설정 또는 Photoshop ABR 가져오기"
+            accept={STUDIO_BRUSH_PACK_ACCEPT}
+            aria-label="브러시 설정 · Photoshop ABR · libmypaint MYB · Krita KPP 가져오기"
             className="sr-only"
             disabled={importing}
             onChange={handleImportFile}

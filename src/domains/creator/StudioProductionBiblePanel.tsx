@@ -19,6 +19,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeleteProductionBibleEntryRequest } from "./studio-destructive-command-catalog";
 import {
   addStudioProductionBibleEntry,
   createStudioProductionBibleEntryId,
@@ -413,17 +415,16 @@ export function StudioProductionBiblePanelSurface({
   const deleteEntry = () => {
     if (!selectedEntry) return;
     const label = selectedEntry.name || kindLabel(selectedEntry.kind);
-    if (
-      typeof globalThis.confirm === "function"
-      && !globalThis.confirm(
-        `${label}을(를) 삭제할까요? 연결된 장면의 내부 참조도 함께 정리됩니다.`
-      )
-    ) {
-      return;
-    }
-    const next = visibleEntries.find(({ id }) => id !== selectedEntry.id) ?? null;
-    setRequestedEntryId(next?.id ?? null);
-    applyChange(removeStudioProductionBibleEntry(bible, selectedEntry.id));
+    void (async () => {
+      if (
+        !(await confirmStudioDestructiveAction(
+          studioDeleteProductionBibleEntryRequest(label)
+        ))
+      ) return;
+      const next = visibleEntries.find(({ id }) => id !== selectedEntry.id) ?? null;
+      setRequestedEntryId(next?.id ?? null);
+      applyChange(removeStudioProductionBibleEntry(bible, selectedEntry.id));
+    })();
   };
 
   const copyExport = async () => {

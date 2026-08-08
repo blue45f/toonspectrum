@@ -12,24 +12,8 @@
   "path": "standardCompositionStrokeSamples (preview-spec zigzag lifted to ModeledSampleIR)",
   "unavailableRows": [
     {
-      "name": "장식·패턴",
-      "missing": "arc-length pattern stamping provider (vello_svg/ThorVG recording or CanvasKit image stamps)"
-    },
-    {
-      "name": "파티클",
-      "missing": "GPU particle provider (ThorVG/Pixi fallback included)"
-    },
-    {
-      "name": "리본·헤어·로프",
-      "missing": "XPBD guide-curve solver (spring spline fallback included)"
-    },
-    {
-      "name": "텍스트 브러시",
-      "missing": "Parley glyph-run shaper on the brush path (Glifo/CanvasKit Paragraph)"
-    },
-    {
       "name": "3D 표면 브러시",
-      "missing": "Three.js hit/UV projection + GPU texture paint provider"
+      "missing": "Three.js hit/UV projection + texture paint provider reachable from packages/. The provider EXISTS but on the app side of the layering boundary: src/domains/creator/studio-vrm-texture-uv.ts (computeStudioVrmBarycentric, resolveStudioVrmTriangleUv, resolveStudioVrmTextureHit) and studio-vrm-texture-paint-ops.ts (applyStudioVrmTexturePaintOp, the 2D dab engine reused on the UV atlas). packages/* must not import src/*, so the composition executor only declares the injection seam (SurfaceProjectionProvider, CompositionEngines.surface); wiring it needs a package-facing adapter published from the app layer."
     }
   ],
   "presets": [
@@ -198,6 +182,86 @@
           "geometry": "raster-dab",
           "engine": "libmypaint",
           "inkedPixels": 5927
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "decoration-pattern",
+      "name": "장식·패턴",
+      "lane": "studio-max",
+      "chain": "ema → [trail: pattern-stamp → vector-fill → src-over@1]",
+      "outSamples": 96,
+      "sha256": "d8ede93595f1fc4d72f45ff69a7dfc61a2a9cfbffcb78c5b5ddab2d585fa000d",
+      "inkedPixels": 2528,
+      "layers": [
+        {
+          "id": "trail",
+          "geometry": "pattern-stamp",
+          "engine": "vector-fill",
+          "inkedPixels": 2711,
+          "geometrySamples": 96,
+          "instances": 53
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "particle-spray",
+      "name": "파티클",
+      "lane": "stable",
+      "chain": "spring → [spray: particle-splat → vector-fill → src-over@1]",
+      "outSamples": 96,
+      "sha256": "d4c0d12d66c671b0899a525dfe9a18e7e23d0583808a04622cded0d7d56c4721",
+      "inkedPixels": 8436,
+      "layers": [
+        {
+          "id": "spray",
+          "geometry": "particle-splat",
+          "engine": "vector-fill",
+          "inkedPixels": 8906,
+          "geometrySamples": 96,
+          "instances": 4376
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "ribbon-hair-rope",
+      "name": "리본·헤어·로프",
+      "lane": "studio-max",
+      "chain": "ema → [strands: ribbon-xpbd → vector-fill → src-over@1]",
+      "outSamples": 96,
+      "sha256": "0ca6ed04bdecd39a9cad67b7ddb526503320bdc2e73acf2e7ae1840ef5f22dbf",
+      "inkedPixels": 4186,
+      "layers": [
+        {
+          "id": "strands",
+          "geometry": "ribbon-xpbd",
+          "engine": "vector-fill",
+          "inkedPixels": 4413,
+          "geometrySamples": 96,
+          "instances": 5
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "text-brush",
+      "name": "텍스트 브러시",
+      "lane": "studio-max",
+      "chain": "ema → [run: text-on-path → vector-fill → src-over@1]",
+      "outSamples": 96,
+      "sha256": "051d03872f4b3e35590ab3c23cec3dbd26ea5b769c192b76b38296877adba98e",
+      "inkedPixels": 825,
+      "layers": [
+        {
+          "id": "run",
+          "geometry": "text-on-path",
+          "engine": "vector-fill",
+          "inkedPixels": 951,
+          "geometrySamples": 96,
+          "instances": 27
         }
       ],
       "warnings": []
