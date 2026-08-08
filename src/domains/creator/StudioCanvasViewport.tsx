@@ -1,5 +1,5 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -94,6 +94,7 @@ import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
 import type { StudioDialogueImportApplyResult, StudioDialogueImportMatchMode, StudioDialogueInterchangeDocument } from "./studio-dialogue-interchange";
 import type { StudioDraftPreviewStore } from "./studio-draft-preview-store";
+import type { StudioDrawingShortcutNoticeStore } from "./studio-drawing-shortcut-notice-store";
 import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
 import type { DrawEl, El, FrameEl, ImageEl } from "./studio-element-model";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
@@ -123,6 +124,59 @@ function localizeText(
 ): string {
   const translated = t(key);
   return translated === key ? fallback : translated;
+}
+
+function StudioDrawingShortcutNoticeLayer({
+  canvasOnlyMode,
+  drawMode,
+  hasAutosave,
+  noticeStore,
+  quickShapeActive,
+  tool,
+}: {
+  readonly canvasOnlyMode: boolean;
+  readonly drawMode: DrawMode;
+  readonly hasAutosave: boolean;
+  readonly noticeStore: StudioDrawingShortcutNoticeStore;
+  readonly quickShapeActive: boolean;
+  readonly tool: Tool;
+}) {
+  const t = useT();
+  const snapshot = useSyncExternalStore(
+    noticeStore.subscribe,
+    noticeStore.getSnapshot,
+    noticeStore.getSnapshot,
+  );
+  const notice = hasAutosave ? null : snapshot;
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
+      style={
+        tool === "draw" && !canvasOnlyMode
+          ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
+          : undefined
+      }
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {notice ? (
+        <span
+          key={notice.id}
+          className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
+        >
+          {notice.message}
+        </span>
+      ) : null}
+      {quickShapeActive && tool === "draw" && drawMode === "pen" && !notice ? (
+        <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
+          <Shapes size={12} aria-hidden />
+          {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function readStageDevicePixelRatio(): number {
@@ -340,6 +394,7 @@ function StudioViewInputModeControls({
 
 export interface StudioCanvasViewportHandlers {
   addPage: () => void;
+  closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   beginCanvasSelectionResize: (
     sourceBounds: StudioGroupUniformResizeBounds
   ) => boolean;
@@ -465,6 +520,9 @@ export interface StudioCanvasViewportHandlers {
   reanchorStudioCommentPin: (payload: StudioCommentPinReanchorPayload) => void;
   stopStudioCommentPlacementSession: () => void;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
+  setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
   startEditText: (id: string) => void;
@@ -549,7 +607,7 @@ export interface StudioCanvasViewportProps {
   dialogueBatchOpen: boolean;
   dialogueTranslateOpen: boolean;
   drawingRef: import("react").RefObject<DrawEl | null>;
-  drawingShortcutNotice: { id: number; message: string; } | null;
+  drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   editing: { id: string; } | null;
@@ -854,7 +912,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   dialogueBatchOpen,
   dialogueTranslateOpen,
   drawingRef,
-  drawingShortcutNotice,
+  drawingShortcutNoticeStore,
   drawMode,
   drawShape,
   editing,
@@ -2847,6 +2905,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         liveStrokeRef={drawingRef}
                         onHokusaiCanonicalImageReady={onHokusaiCanonicalImageReady}
                         onLivingInkCanonicalImageReady={onLivingInkCanonicalImageReady}
+                        rasterPresentationEligible={!isNonInteractiveRender}
                       />
                     </Fragment>
                   );
@@ -4119,32 +4178,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             </Suspense>
           ) : null}
 
-          <div
-            className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
-            style={
-              tool === "draw" && !canvasOnlyMode
-                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
-                : undefined
-            }
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {drawingShortcutNotice ? (
-              <span
-                key={drawingShortcutNotice.id}
-                className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
-              >
-                {drawingShortcutNotice.message}
-              </span>
-            ) : null}
-            {quickShapeActive && tool === "draw" && drawMode === "pen" && !drawingShortcutNotice ? (
-              <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
-                <Shapes size={12} aria-hidden />
-                {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
-              </span>
-            ) : null}
-          </div>
+          <StudioDrawingShortcutNoticeLayer
+            canvasOnlyMode={canvasOnlyMode}
+            drawMode={drawMode}
+            hasAutosave={hasAutosave}
+            noticeStore={drawingShortcutNoticeStore}
+            quickShapeActive={quickShapeActive}
+            tool={tool}
+          />
 
           <button
             type="button"

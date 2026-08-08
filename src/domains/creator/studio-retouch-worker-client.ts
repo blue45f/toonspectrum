@@ -40,8 +40,9 @@ export interface StudioRetouchWorkerClientResult {
 
 const DEFAULT_READY_TIMEOUT_MS = 3_000;
 const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 45_000;
 
-/** Vite statically emits one shared code chunk; each operation gets an isolated one-shot Worker. */
+/** Vite statically emits one shared code chunk; the default client keeps one serial module Worker. */
 export function createStudioRetouchModuleWorker(): StudioRetouchWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-retouch.worker.ts", import.meta.url), {
@@ -54,6 +55,12 @@ function createAbortError(message = "리터치 계산을 취소했습니다."): 
   if (typeof DOMException === "function") return new DOMException(message, "AbortError");
   const error = new Error(message);
   error.name = "AbortError";
+  return error;
+}
+
+function createTimeoutError(): Error {
+  const error = new Error("리터치 Worker가 제한 시간 안에 완료되지 않았습니다.");
+  error.name = "TimeoutError";
   return error;
 }
 
@@ -106,6 +113,11 @@ function runRetouchWithWorker(
   worker: StudioRetouchWorkerLike,
   request: StudioRetouchWorkerRunRequest,
   options: StudioRetouchWorkerClientOptions,
+  lifecycle: {
+    readonly keepAlive?: boolean;
+    readonly workerAlreadyReady?: boolean;
+    readonly disposeSignal?: AbortSignal;
+  } = {},
 ): Promise<StudioRetouchWorkerClientResult> {
   return new Promise((resolve, reject) => {
     const { signal } = options;
@@ -119,18 +131,19 @@ function runRetouchWithWorker(
       request,
     };
 
-    const cleanup = () => {
+    const cleanup = (keepWorker = false) => {
       if (readyTimer !== null) clearTimeout(readyTimer);
       if (operationTimer !== null) clearTimeout(operationTimer);
       signal?.removeEventListener("abort", onAbort);
+      lifecycle.disposeSignal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
-      worker.terminate();
+      if (!keepWorker) worker.terminate();
     };
-    const finish = (callback: () => void) => {
+    const finish = (callback: () => void, keepWorker = false) => {
       if (settled) return;
       settled = true;
-      cleanup();
+      cleanup(keepWorker);
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
@@ -141,9 +154,32 @@ function runRetouchWithWorker(
         reject(error);
       }
     });
-    const onOperationTimeout = () => finish(() => reject(createAbortError(
-      "리터치 Worker가 제한 시간 안에 완료되지 않았습니다.",
-    )));
+    const onOperationTimeout = () => finish(() => reject(createTimeoutError()));
+
+    const postRequest = () => {
+      if (requestPosted || settled) return;
+      if (readyTimer !== null) {
+        clearTimeout(readyTimer);
+        readyTimer = null;
+      }
+      try {
+        requestPosted = true;
+        worker.postMessage(message, studioRetouchRequestTransfers(message));
+        if (!settled) {
+          operationTimer = setTimeout(
+            onOperationTimeout,
+            boundedTimeout(options.operationTimeoutMilliseconds, DEFAULT_OPERATION_TIMEOUT_MS),
+          );
+        }
+      } catch (error) {
+        // Once postMessage starts, a custom transport may have detached the buffer before throwing.
+        // Fail closed instead of inspecting it in a synchronous fallback.
+        const transferError = error instanceof Error
+          ? error
+          : new Error("리터치 Worker로 픽셀 소유권을 전송하지 못했습니다.");
+        finish(() => reject(transferError));
+      }
+    };
 
     worker.onmessage = (event) => {
       const response = event.data;
@@ -156,30 +192,7 @@ function runRetouchWithWorker(
         return;
       }
       if (response.type === "studio-retouch/ready") {
-        if (requestPosted) return;
-        if (readyTimer !== null) {
-          clearTimeout(readyTimer);
-          readyTimer = null;
-        }
-        try {
-          requestPosted = true;
-          worker.postMessage(message, studioRetouchRequestTransfers(message));
-          if (!settled) {
-            operationTimer = setTimeout(
-              onOperationTimeout,
-              boundedTimeout(options.operationTimeoutMilliseconds, DEFAULT_OPERATION_TIMEOUT_MS),
-            );
-          }
-        } catch (error) {
-          // A custom Worker-like transport can detach transferables and still throw. Once the
-          // transfer call begins, never inspect or synchronously process the possibly detached
-          // source buffer. Construction, load and ready-timeout failures still use the bounded
-          // direct fallback before this ownership boundary.
-          const transferError = error instanceof Error
-            ? error
-            : new Error("리터치 Worker로 픽셀 소유권을 전송하지 못했습니다.");
-          finish(() => reject(transferError));
-        }
+        postRequest();
         return;
       }
       if (!requestPosted) {
@@ -187,6 +200,15 @@ function runRetouchWithWorker(
         return;
       }
       if (response.type === "studio-retouch/failure") {
+        if (
+          !response.error
+          || typeof response.error !== "object"
+          || typeof response.error.name !== "string"
+          || typeof response.error.message !== "string"
+        ) {
+          finish(() => reject(new Error("리터치 Worker가 알 수 없는 응답을 반환했습니다.")));
+          return;
+        }
         finish(() => reject(deserializeWorkerError(response)));
         return;
       }
@@ -201,7 +223,10 @@ function runRetouchWithWorker(
         finish(() => reject(new Error("리터치 Worker 결과가 요청과 일치하지 않습니다.")));
         return;
       }
-      finish(() => resolve({ execution: "worker", kind: response.kind, data: response.data }));
+      finish(
+        () => resolve({ execution: "worker", kind: response.kind, data: response.data }),
+        lifecycle.keepAlive === true,
+      );
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
@@ -216,22 +241,146 @@ function runRetouchWithWorker(
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted) {
+    lifecycle.disposeSignal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted || lifecycle.disposeSignal?.aborted) {
       onAbort();
       return;
     }
-    readyTimer = setTimeout(
-      resolveDirectFallback,
-      boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
-    );
+    if (lifecycle.workerAlreadyReady) {
+      postRequest();
+    } else {
+      readyTimer = setTimeout(
+        resolveDirectFallback,
+        boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
+      );
+    }
   });
 }
 
+let sharedRetouchWorker: StudioRetouchWorkerLike | null = null;
+let sharedRetouchWorkerReady = false;
+let sharedRetouchWorkerEpoch = 0;
+let sharedRetouchDisposeGeneration = 0;
+let sharedRetouchQueue: Promise<void> = Promise.resolve();
+let sharedRetouchIdleTimer: ReturnType<typeof setTimeout> | null = null;
+let sharedRetouchFlight: {
+  readonly worker: StudioRetouchWorkerLike;
+  readonly epoch: number;
+  readonly controller: AbortController;
+} | null = null;
+
+function clearSharedRetouchIdleTimer(): void {
+  if (sharedRetouchIdleTimer === null) return;
+  clearTimeout(sharedRetouchIdleTimer);
+  sharedRetouchIdleTimer = null;
+}
+
+/** Releases the warm module Worker, primarily for route/HMR teardown and deterministic tests. */
+export function disposeStudioRetouchModuleWorker(): void {
+  clearSharedRetouchIdleTimer();
+  const worker = sharedRetouchWorker;
+  const flight = sharedRetouchFlight;
+  const flightOwnsWorker = worker !== null
+    && flight?.worker === worker
+    && flight.epoch === sharedRetouchWorkerEpoch;
+  sharedRetouchWorker = null;
+  sharedRetouchWorkerReady = false;
+  sharedRetouchWorkerEpoch += 1;
+  sharedRetouchDisposeGeneration += 1;
+  sharedRetouchFlight = null;
+  flight?.controller.abort();
+  if (worker && !flightOwnsWorker) worker.terminate();
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(disposeStudioRetouchModuleWorker);
+}
+
+function clearSharedRetouchWorker(
+  worker: StudioRetouchWorkerLike,
+  epoch: number,
+): void {
+  if (sharedRetouchWorker !== worker || sharedRetouchWorkerEpoch !== epoch) return;
+  sharedRetouchWorker = null;
+  sharedRetouchWorkerReady = false;
+  sharedRetouchWorkerEpoch += 1;
+}
+
+function scheduleSharedRetouchIdleDisposal(
+  worker: StudioRetouchWorkerLike,
+  epoch: number,
+  disposeGeneration: number,
+): void {
+  clearSharedRetouchIdleTimer();
+  sharedRetouchIdleTimer = setTimeout(() => {
+    sharedRetouchIdleTimer = null;
+    if (
+      sharedRetouchWorker === worker
+      && sharedRetouchWorkerEpoch === epoch
+      && sharedRetouchDisposeGeneration === disposeGeneration
+      && sharedRetouchFlight === null
+    ) {
+      disposeStudioRetouchModuleWorker();
+    }
+  }, DEFAULT_IDLE_TIMEOUT_MS);
+}
+
+function runRetouchWithSharedModuleWorker(
+  request: StudioRetouchWorkerRunRequest,
+  options: StudioRetouchWorkerClientOptions,
+): Promise<StudioRetouchWorkerClientResult> {
+  const disposeGeneration = sharedRetouchDisposeGeneration;
+  clearSharedRetouchIdleTimer();
+  const operation = sharedRetouchQueue.then(async () => {
+    clearSharedRetouchIdleTimer();
+    if (disposeGeneration !== sharedRetouchDisposeGeneration) throw createAbortError();
+    throwIfAborted(options.signal);
+    if (!sharedRetouchWorker) {
+      try {
+        sharedRetouchWorker = createStudioRetouchModuleWorker();
+      } catch {
+        sharedRetouchWorker = null;
+      }
+      sharedRetouchWorkerReady = false;
+      if (sharedRetouchWorker) sharedRetouchWorkerEpoch += 1;
+    }
+    const worker = sharedRetouchWorker;
+    if (!worker) return runRetouchDirect(request, options.signal);
+    const epoch = sharedRetouchWorkerEpoch;
+    const controller = new AbortController();
+    sharedRetouchFlight = { worker, epoch, controller };
+    try {
+      const result = await runRetouchWithWorker(worker, request, options, {
+        keepAlive: true,
+        workerAlreadyReady: sharedRetouchWorkerReady,
+        disposeSignal: controller.signal,
+      });
+      if (result.execution === "worker") {
+        if (sharedRetouchWorker === worker && sharedRetouchWorkerEpoch === epoch) {
+          sharedRetouchWorkerReady = true;
+          scheduleSharedRetouchIdleDisposal(worker, epoch, disposeGeneration);
+        }
+      } else {
+        clearSharedRetouchWorker(worker, epoch);
+      }
+      return result;
+    } catch (error) {
+      // Every failure path in runRetouchWithWorker terminates a non-retained Worker.
+      clearSharedRetouchWorker(worker, epoch);
+      throw error;
+    } finally {
+      if (sharedRetouchFlight?.controller === controller) sharedRetouchFlight = null;
+    }
+  });
+  sharedRetouchQueue = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
 /**
- * Runs exactly one destructive retouch operation. Pixel ownership is transferred only after the
- * module Worker reports ready; construction/load/ready-timeout failures before that boundary use a
- * bounded direct fallback. A `postMessage` call itself is the ownership boundary, so synchronous
- * post failures and later Worker failures reject rather than reading a possibly detached buffer.
+ * Runs one serialized destructive retouch operation. The default module Worker stays warm across
+ * strokes; explicit test/custom factories retain the isolated one-shot lifecycle. Pixel ownership
+ * is transferred only after readiness, and failures after that boundary reject rather than reading
+ * a possibly detached buffer.
  */
 export async function runStudioRetouchWorker(
   request: StudioRetouchWorkerRunRequest,
@@ -239,9 +388,10 @@ export async function runStudioRetouchWorker(
 ): Promise<StudioRetouchWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafe = cloneSafeRequest(request);
-  const factory = options.workerFactory === undefined
-    ? createStudioRetouchModuleWorker
-    : options.workerFactory;
+  if (options.workerFactory === undefined) {
+    return runRetouchWithSharedModuleWorker(cloneSafe, options);
+  }
+  const factory = options.workerFactory;
   if (!factory) return runRetouchDirect(cloneSafe, options.signal);
 
   let worker: StudioRetouchWorkerLike | null;

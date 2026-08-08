@@ -1,7 +1,14 @@
 /** Browser orchestration for the pure Smudge engine. */
-import { loadFloodFillSourceImage } from "./studio-flood-fill";
 import { flipNormalizedPoint } from "./studio-magic-wand";
-import { encodeStudioRetouchCanvasPng } from "./studio-retouch-browser";
+import {
+  planStudioRasterRetouchRegion,
+  translateStudioRasterRetouchPoints,
+} from "./studio-raster-retouch-region";
+import {
+  encodeStudioRetouchCanvasPng,
+  loadStudioRetouchSourceImage,
+  studioRetouchSourceDimensions,
+} from "./studio-retouch-browser";
 import { type SmudgePixelPoint } from "./studio-smudge";
 import { runStudioSmudgeWorker } from "./studio-smudge-worker-client";
 
@@ -30,9 +37,8 @@ export async function smudgeStrokeImage(
 ): Promise<string> {
   if (strokePoints.length < 2 || strength <= 0) return src;
 
-  const img = await loadFloodFillSourceImage(src);
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
+  const img = await loadStudioRetouchSourceImage(src, opts?.signal);
+  const { width: w, height: h } = studioRetouchSourceDimensions(img);
   if (!w || !h) throw new Error("이미지 크기를 확인할 수 없습니다.");
 
   const canvas = document.createElement("canvas");
@@ -41,7 +47,6 @@ export async function smudgeStrokeImage(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("캔버스를 만들 수 없습니다.");
   ctx.drawImage(img, 0, 0, w, h);
-  const imageData = ctx.getImageData(0, 0, w, h);
 
   const flipX = opts?.flipX ?? false;
   const flipY = opts?.flipY ?? false;
@@ -51,11 +56,15 @@ export async function smudgeStrokeImage(
   });
 
   const radiusPx = Number.isFinite(radiusNorm) ? Math.max(1, radiusNorm * w) : 1;
+  const region = planStudioRasterRetouchRegion(pixelPoints, radiusPx, w, h);
+  if (!region) return src;
+  const imageData = ctx.getImageData(region.x, region.y, region.width, region.height);
+  const regionPoints = translateStudioRasterRetouchPoints(pixelPoints, region);
   const { data } = await runStudioSmudgeWorker({
     data: imageData.data,
-    w,
-    h,
-    points: pixelPoints,
+    w: region.width,
+    h: region.height,
+    points: regionPoints,
     radiusPx,
     strength,
   }, { signal: opts?.signal });
@@ -63,6 +72,10 @@ export async function smudgeStrokeImage(
   // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
   // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
   // 로 넓어져 있어 새 뷰로 감싸 좁힌다(studio-image-filter-worker-client 관례와 동일).
-  ctx.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  ctx.putImageData(
+    new ImageData(new Uint8ClampedArray(data), region.width, region.height),
+    region.x,
+    region.y,
+  );
   return encodeStudioRetouchCanvasPng(canvas, { signal: opts?.signal });
 }

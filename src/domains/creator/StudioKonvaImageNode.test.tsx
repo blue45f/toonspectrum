@@ -12,6 +12,11 @@ import {
 } from "./studio-hokusai-live-brush-protocol";
 import { STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION } from "./studio-living-ink-execution-protocol";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
+import {
+  clearStudioRasterEditSurfaces,
+  rememberStudioRasterEditSurface,
+} from "./studio-raster-edit-surface-cache";
+import { STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION } from "./studio-raster-image-presentation";
 import { sha256HexPortable } from "./studio-sha256";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
@@ -33,7 +38,10 @@ type CapturedImageProps = {
 };
 
 type CanvasContextCapture = {
+  createImageData: ReturnType<typeof vi.fn>;
   drawImage: ReturnType<typeof vi.fn>;
+  getImageData: ReturnType<typeof vi.fn>;
+  putImageData: ReturnType<typeof vi.fn>;
   scale: ReturnType<typeof vi.fn>;
   translate: ReturnType<typeof vi.fn>;
 };
@@ -49,17 +57,37 @@ class TestImage {
 }
 
 const konvaCapture = vi.hoisted(() => {
-  const layer = { batchDraw: vi.fn(), drawScene: vi.fn() };
-  return {
+  const drawListeners = new Set<() => void>();
+  const layer = {
+    batchDraw: vi.fn(),
+    drawScene: vi.fn(),
+    off: vi.fn((_event: string, listener: () => void) => {
+      drawListeners.delete(listener);
+    }),
+    on: vi.fn((_event: string, listener: () => void) => {
+      drawListeners.add(listener);
+    }),
+  };
+  const capture = {
+    appliedImage: undefined as CanvasImageSource | undefined,
+    drawListeners,
     layer,
     node: {
       cache: vi.fn(),
       clearCache: vi.fn(),
       getLayer: vi.fn(() => layer),
+      image: vi.fn(() => capture.appliedImage),
+      isVisible: vi.fn(() => true),
     },
     currentProps: null as Record<string, unknown> | null,
+    fireLayerDraw: () => {
+      const listeners = [...drawListeners];
+      drawListeners.clear();
+      listeners.forEach((listener) => listener());
+    },
     props: [] as Record<string, unknown>[],
   };
+  return capture;
 });
 
 const filterCapture = vi.hoisted(() => ({
@@ -67,13 +95,16 @@ const filterCapture = vi.hoisted(() => ({
   cachePad: 0,
   filter: vi.fn(),
   register: vi.fn(),
-  runWorker: vi.fn(() => new Promise<never>(() => undefined)),
+  runWorker: vi.fn((): Promise<unknown> => new Promise(() => undefined)),
 }));
 
 vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   const { forwardRef, useEffect, useImperativeHandle } = await import("react");
   const Image = forwardRef<unknown, Record<string, unknown>>((props, ref) => {
-    useImperativeHandle(ref, () => konvaCapture.node);
+    useImperativeHandle(ref, () => {
+      konvaCapture.appliedImage = props.image as CanvasImageSource | undefined;
+      return konvaCapture.node;
+    }, [props.image]);
     useEffect(() => {
       konvaCapture.currentProps = props;
       return () => {
@@ -97,8 +128,14 @@ vi.mock("./studio-konva-filters", () => ({
 }));
 
 vi.mock("./studio-image-filter-worker-client", () => ({
+  createStudioImageFilterResidentWorkerSession: undefined,
   runStudioImageFilterWorker: filterCapture.runWorker,
   studioImageFilterRequiresWorker: () => false,
+}));
+
+vi.mock("./studio-gpu-filter-apply", () => ({
+  applyGpuFilterChain: vi.fn(async () => null),
+  isStudioGpuFilterChainEligible: () => false,
 }));
 
 const imageCapture = {
@@ -276,9 +313,13 @@ function fireNextAnimationFrame(now: number): number {
 }
 
 beforeEach(() => {
+  clearStudioRasterEditSurfaces();
   vi.clearAllMocks();
   konvaCapture.props.length = 0;
   konvaCapture.currentProps = null;
+  konvaCapture.appliedImage = undefined;
+  konvaCapture.drawListeners.clear();
+  delete window.__studioRasterImagePresentationProbe;
   imageCapture.instances.length = 0;
   canvasCapture.contexts.length = 0;
   animationFrames.nextId = 1;
@@ -302,7 +343,18 @@ beforeEach(() => {
     ((contextId: string) => {
       if (contextId !== "2d") return null;
       const context: CanvasContextCapture = {
+        createImageData: vi.fn((width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          height,
+          width,
+        })),
         drawImage: vi.fn(),
+        getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          height,
+          width,
+        })),
+        putImageData: vi.fn(),
         scale: vi.fn(),
         translate: vi.fn(),
       };
@@ -325,11 +377,360 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  clearStudioRasterEditSurfaces();
+  delete window.__studioRasterImagePresentationProbe;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("StudioKonvaImageNode image lifecycle", () => {
+  it("retains the exact surface only until its canonical PNG source is ready", async () => {
+    const element = imageEl({ src: "data:image/png;base64,cached-retouch" });
+    const cached = document.createElement("canvas");
+    cached.width = 64;
+    cached.height = 48;
+    rememberStudioRasterEditSurface(element.src, cached);
+    window.__studioRasterImagePresentationProbe = {
+      version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+      expectationEpoch: 1,
+      expected: { elementId: element.id, epoch: 1, src: element.src },
+      receiptEpoch: 0,
+      receipt: null,
+    };
+
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(latestImageProps().image).toBe(cached));
+    expect(imageCapture.instances).toHaveLength(1);
+    act(() => clearStudioRasterEditSurfaces());
+    expect(latestImageProps().image).toBe(cached);
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+    await waitFor(() => expect(konvaCapture.layer.on).toHaveBeenCalledWith(
+      "draw.studioRasterPresentation",
+      expect.any(Function),
+    ));
+    act(() => konvaCapture.fireLayerDraw());
+    expect(window.__studioRasterImagePresentationProbe.receipt).toMatchObject({
+      elementId: element.id,
+      src: element.src,
+    });
+
+    const canonical = await resolveLatestImage();
+    await waitFor(() => expect(latestImageProps().image).toBe(canonical));
+    expect(latestImageProps().image).not.toBe(cached);
+  });
+
+  it("prepares a canonical flipped source before releasing an evicted surface", async () => {
+    const element = imageEl({
+      flipped: true,
+      src: "data:image/png;base64,cached-flipped-retouch",
+    });
+    const cached = document.createElement("canvas");
+    cached.width = 64;
+    cached.height = 48;
+    rememberStudioRasterEditSurface(element.src, cached);
+
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(latestImageProps().image).toBeInstanceOf(HTMLCanvasElement));
+    const cachedFlip = latestImageProps().image;
+    expect(cachedFlip).not.toBe(cached);
+
+    act(() => clearStudioRasterEditSurfaces());
+    expect(latestImageProps().image).toBe(cachedFlip);
+
+    const canonical = await resolveLatestImage();
+    await waitFor(() => {
+      expect(latestImageProps().image).toBeInstanceOf(HTMLCanvasElement);
+      expect(latestImageProps().image).not.toBe(cachedFlip);
+    });
+    expect(canvasCapture.contexts.at(-1)?.drawImage).toHaveBeenCalledWith(canonical, 0, 0);
+  });
+
+  it("keeps a filtered cached surface receipt open until the exact Worker result draws", async () => {
+    let resolveWorker: ((value: {
+      imageData: { data: Uint8ClampedArray; height: number; width: number };
+    }) => void) | undefined;
+    filterCapture.runWorker.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveWorker = resolve;
+    }));
+    vi.stubGlobal("ImageData", class FakeImageData {
+      readonly data: Uint8ClampedArray;
+      readonly height: number;
+      readonly width: number;
+
+      constructor(data: Uint8ClampedArray, width: number, height: number) {
+        this.data = data;
+        this.width = width;
+        this.height = height;
+      }
+    });
+    const element = imageEl({
+      brightness: 0.2,
+      src: "data:image/png;base64,cached-filtered-retouch",
+    });
+    const cached = document.createElement("canvas");
+    cached.width = 64;
+    cached.height = 48;
+    rememberStudioRasterEditSurface(element.src, cached);
+    window.__studioRasterImagePresentationProbe = {
+      version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+      expectationEpoch: 1,
+      expected: { elementId: element.id, epoch: 1, src: element.src },
+      receiptEpoch: 0,
+      receipt: null,
+    };
+
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(filterCapture.runWorker).toHaveBeenCalledOnce());
+    expect(latestImageProps().image).toBe(cached);
+    act(() => konvaCapture.fireLayerDraw());
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+
+    await act(async () => {
+      resolveWorker?.({
+        imageData: {
+          data: new Uint8ClampedArray(200 * 200 * 4),
+          height: 200,
+          width: 200,
+        },
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => {
+      expect(latestImageProps().image).toBeInstanceOf(HTMLCanvasElement);
+      expect(latestImageProps().image).not.toBe(cached);
+      expect(konvaCapture.layer.on).toHaveBeenCalledWith(
+        "draw.studioRasterPresentation",
+        expect.any(Function),
+      );
+    });
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+    act(() => konvaCapture.fireLayerDraw());
+    expect(window.__studioRasterImagePresentationProbe.receipt).toMatchObject({
+      elementId: element.id,
+      src: element.src,
+    });
+
+    const filteredCanvas = latestImageProps().image;
+    await resolveLatestImage();
+    act(() => clearStudioRasterEditSurfaces());
+    await waitFor(() => expect(latestImageProps().image).toBe(filteredCanvas));
+    await act(async () => {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
+    });
+    expect(filterCapture.runWorker).toHaveBeenCalledTimes(1);
+    expect(latestImageProps().image).toBe(filteredCanvas);
+  });
+
+  it("receipts a Konva outline fallback only after its current source cache is ready", async () => {
+    filterCapture.cachePad = 7;
+    const element = imageEl({
+      outline: { color: "#ff00ff", opacity: 100, width: 9 },
+      src: "data:image/png;base64,cached-outline-retouch",
+    });
+    const cached = document.createElement("canvas");
+    cached.width = 64;
+    cached.height = 48;
+    rememberStudioRasterEditSurface(element.src, cached);
+    window.__studioRasterImagePresentationProbe = {
+      version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+      expectationEpoch: 1,
+      expected: { elementId: element.id, epoch: 1, src: element.src },
+      receiptEpoch: 0,
+      receipt: null,
+    };
+
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+    await waitFor(() => {
+      expect(konvaCapture.node.cache).toHaveBeenCalledWith({ offset: 7 });
+      expect(konvaCapture.layer.on).toHaveBeenCalledWith(
+        "draw.studioRasterPresentation",
+        expect.any(Function),
+      );
+    });
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+    act(() => konvaCapture.fireLayerDraw());
+    expect(window.__studioRasterImagePresentationProbe.receipt).toMatchObject({
+      elementId: element.id,
+      src: element.src,
+    });
+
+    const cacheCallsBeforeHandoff = konvaCapture.node.cache.mock.calls.length;
+    const canonical = await resolveLatestImage();
+    act(() => clearStudioRasterEditSurfaces());
+    await waitFor(() => expect(latestImageProps().image).toBe(canonical));
+    await waitFor(() => {
+      expect(konvaCapture.node.cache.mock.calls.length).toBeGreaterThan(cacheCallsBeforeHandoff);
+    });
+  });
+
+  it("receipts the exact decoded raster source only after its real Konva layer draw", async () => {
+    const element = imageEl({ src: "data:image/png;base64,presentation-target" });
+    window.__studioRasterImagePresentationProbe = {
+      version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+      expectationEpoch: 1,
+      expected: { elementId: element.id, epoch: 1, src: element.src },
+      receiptEpoch: 0,
+      receipt: null,
+    };
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+    await resolveLatestImage();
+    await waitFor(() => expect(konvaCapture.layer.on).toHaveBeenCalledWith(
+      "draw.studioRasterPresentation",
+      expect.any(Function),
+    ));
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+
+    act(() => konvaCapture.fireLayerDraw());
+
+    expect(window.__studioRasterImagePresentationProbe.receipt).toMatchObject({
+      elementId: element.id,
+      expectationEpoch: 1,
+      receiptEpoch: 1,
+      src: element.src,
+    });
+    expect(window.__studioRasterImagePresentationProbe.receipt?.presentedAt).toEqual(expect.any(Number));
+    expect(konvaCapture.node.image).toHaveReturnedWith(latestImageProps().image);
+  });
+
+  it("does not confuse a re-armed probe's restarted epoch with the prior operation", async () => {
+    const first = imageEl({ src: "data:image/png;base64,heal-cold" });
+    const second = imageEl({ src: "data:image/png;base64,heal-warm" });
+    const handlers = {
+      innerRef: vi.fn(),
+      onChange: vi.fn(),
+      onSelect: vi.fn(),
+    };
+    const arm = (element: ImageEl) => {
+      window.__studioRasterImagePresentationProbe = {
+        version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+        expectationEpoch: 1,
+        expected: { elementId: element.id, epoch: 1, src: element.src },
+        receiptEpoch: 0,
+        receipt: null,
+      };
+    };
+    arm(first);
+    const view = render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={first}
+        {...handlers}
+      />,
+    );
+    await resolveLatestImage();
+    await waitFor(() => expect(konvaCapture.layer.on).toHaveBeenCalledTimes(1));
+    act(() => konvaCapture.fireLayerDraw());
+    expect(window.__studioRasterImagePresentationProbe?.receipt?.src).toBe(first.src);
+
+    // Heal prepares its raster before measurement: cold effect and freshly armed warm effect are
+    // both epoch 1, but they belong to different probe objects and must each receive a draw fence.
+    arm(second);
+    view.rerender(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={second}
+        {...handlers}
+      />,
+    );
+    await resolveLatestImage();
+    await waitFor(() => expect(konvaCapture.layer.on).toHaveBeenCalledTimes(2));
+    expect(window.__studioRasterImagePresentationProbe?.receipt).toBeNull();
+    act(() => konvaCapture.fireLayerDraw());
+
+    expect(window.__studioRasterImagePresentationProbe?.receipt).toMatchObject({
+      elementId: second.id,
+      expectationEpoch: 1,
+      receiptEpoch: 1,
+      src: second.src,
+    });
+  });
+
+  it("does not receipt a draw for a different raster src", async () => {
+    const element = imageEl({ src: "data:image/png;base64,current" });
+    window.__studioRasterImagePresentationProbe = {
+      version: STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION,
+      expectationEpoch: 1,
+      expected: {
+        elementId: element.id,
+        epoch: 1,
+        src: "data:image/png;base64,different",
+      },
+      receiptEpoch: 0,
+      receipt: null,
+    };
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={element}
+        innerRef={vi.fn()}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    await resolveLatestImage();
+    await waitFor(() => expect(latestImageProps().image).toBeDefined());
+    act(() => konvaCapture.fireLayerDraw());
+
+    expect(konvaCapture.layer.on).not.toHaveBeenCalled();
+    expect(window.__studioRasterImagePresentationProbe.receipt).toBeNull();
+  });
+
   it("acknowledges a Hokusai canonical image only after its decoded pixels draw on the main layer", async () => {
     const onReady = vi.fn();
     render(

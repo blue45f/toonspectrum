@@ -9,7 +9,13 @@ export { bakeHealCloneStrokeToCanvas } from "./studio-heal-clone-browser";
 export { magicWandScanFromImage, sampleImageLuminanceField } from "./studio-magic-wand-browser";
 export {
   encodeStudioRetouchCanvasPng,
+  loadStudioRetouchSourceImage,
   runStudioDodgeBurnRetouch,
   runStudioWetMixRetouch,
+  studioRetouchSourceDimensions,
 } from "./studio-retouch-browser";
+export {
+  planStudioRasterRetouchRegion,
+  translateStudioRasterRetouchPoints,
+} from "./studio-raster-retouch-region";
 export { smudgeStrokeImage } from "./studio-smudge-browser";

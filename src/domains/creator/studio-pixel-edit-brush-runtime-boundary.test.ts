@@ -71,6 +71,7 @@ function moduleEdges(relativePath: string): ModuleEdges {
 const BROWSER_ORCHESTRATORS = [
   "./studio-heal-clone-browser",
   "./studio-magic-wand-browser",
+  "./studio-raster-retouch-region",
   "./studio-retouch-browser",
   "./studio-smudge-browser",
 ] as const;
@@ -103,13 +104,37 @@ describe("Studio pixel-edit brush runtime boundary", () => {
     expect(source).toContain(
       "const { smudgeStrokeImage } = await loadStudioPixelEditBrushRuntime();"
     );
-    expect(source).toContain(
-      "const { bakeHealCloneStrokeToCanvas } = await loadStudioPixelEditBrushRuntime();"
-    );
+    expect(source).toContain("bakeHealCloneStrokeToCanvas");
     expect(source).toContain("runStudioDodgeBurnRetouch");
     expect(source).toContain("runStudioWetMixRetouch");
     expect(source).toContain("encodeStudioRetouchCanvasPng");
     expect(source).not.toContain('await import("./studio-dodge-burn")');
     expect(source).not.toContain('await import("./studio-wet-mix")');
+  });
+
+  it("keeps heal/clone completion cancellable and its pointer-move preview off React state", () => {
+    const { source } = moduleEdges("./StudioPage.tsx");
+    const bakeStart = source.indexOf("async function bakeHealCloneDragStroke");
+    const bakeEnd = source.indexOf("// ── 히스토리 브러시 소스 지정", bakeStart);
+    expect(bakeStart).toBeGreaterThanOrEqual(0);
+    expect(bakeEnd).toBeGreaterThan(bakeStart);
+    const bakeSource = source.slice(bakeStart, bakeEnd);
+    expect(bakeSource).toContain("bakeHealCloneStrokeToCanvas");
+    expect(bakeSource).toContain("encodeStudioRetouchCanvasPng");
+    expect(bakeSource).toContain("{ signal: controller.signal }");
+    expect(bakeSource).not.toContain(".toDataURL(");
+
+    const moveStart = source.indexOf("function onStageMove");
+    const moveEnd = source.indexOf("function onStageUp", moveStart);
+    const healMoveStart = source.indexOf("if (healCloneDragRef.current)", moveStart);
+    const healMoveEnd = source.indexOf("// 히스토리 브러시 드래그 중이면", healMoveStart);
+    expect(moveEnd).toBeGreaterThan(moveStart);
+    expect(healMoveStart).toBeGreaterThan(moveStart);
+    expect(healMoveEnd).toBeLessThan(moveEnd);
+    const healMoveSource = source.slice(healMoveStart, healMoveEnd);
+    expect(healMoveSource).toContain("session.points.push(appended)");
+    expect(healMoveSource).toContain("scheduleHealCloneDragPreview(session)");
+    expect(healMoveSource).not.toContain("setHealCloneDragPreview");
+    expect(healMoveSource).not.toContain("session.points =");
   });
 });

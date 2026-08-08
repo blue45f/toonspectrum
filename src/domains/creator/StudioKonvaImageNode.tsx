@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Image as KImage } from "react-konva/lib/ReactKonvaCore";
 
 import { planStudioFilterIslandLanes } from "./studio-filter-island-plan";
@@ -18,6 +18,15 @@ import {
 import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
 import { resizableNodeProps } from "./studio-node-props";
 import { computePanelAutoFitPatch } from "./studio-panel-autofit";
+import {
+  getStudioRasterEditSurfaceSnapshot,
+  subscribeStudioRasterEditSurfaces,
+} from "./studio-raster-edit-surface-cache";
+import {
+  acknowledgeStudioRasterImagePresentation,
+  expectedStudioRasterImagePresentation,
+  type StudioRasterImagePresentationExpectation,
+} from "./studio-raster-image-presentation";
 import { sha256HexPortable } from "./studio-sha256";
 import { toKonvaSkewAttrs } from "./studio-skew";
 
@@ -218,13 +227,52 @@ interface LoadedImageState {
   src: string;
 }
 
+type StudioRasterDisplaySource = HTMLImageElement | HTMLCanvasElement;
+
 interface DisplayImageState {
   flipped: boolean;
   flippedY: boolean;
   image: CanvasImageSource;
   isAnimatedGif: boolean;
-  loadedImage: HTMLImageElement;
+  loadedImage: StudioRasterDisplaySource;
   src: string;
+}
+
+function studioRasterDisplaySourceDimensions(source: StudioRasterDisplaySource): {
+  readonly height: number;
+  readonly width: number;
+} {
+  const naturalWidth = "naturalWidth" in source ? Number(source.naturalWidth) : 0;
+  const naturalHeight = "naturalHeight" in source ? Number(source.naturalHeight) : 0;
+  return {
+    width: naturalWidth || Number(source.width),
+    height: naturalHeight || Number(source.height),
+  };
+}
+
+function createStudioRasterFlippedDisplaySource(
+  source: StudioRasterDisplaySource,
+  flipped: boolean,
+  flippedY: boolean,
+): CanvasImageSource {
+  const scaleX = flipped ? -1 : 1;
+  const scaleY = flippedY ? -1 : 1;
+  if (scaleX === 1 && scaleY === 1) return source;
+  try {
+    const { width, height } = studioRasterDisplaySourceDimensions(source);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return source;
+    context.translate(scaleX === -1 ? width : 0, scaleY === -1 ? height : 0);
+    context.scale(scaleX, scaleY);
+    context.drawImage(source, 0, 0);
+    return canvas;
+  } catch (error) {
+    console.error("[studio] image flip canvas failed, using original image:", error);
+    return source;
+  }
 }
 
 interface WorkerFilteredCanvasState {
@@ -254,6 +302,11 @@ interface WorkerResultCacheState {
 interface FilterMaskDecodedState {
   coverage: FilterMaskCoverage;
   src: string;
+}
+
+interface KonvaFilterPresentationReadyState {
+  readonly requestKey: string;
+  readonly source: CanvasImageSource;
 }
 
 function isStudioFilterWorkerRequiredError(error: unknown): boolean {
@@ -356,6 +409,8 @@ export interface StudioKonvaImageNodeProps {
     pngHash: `sha256:${string}`,
     routeKey: string,
   ) => void;
+  /** False for mask/preview copies that must never satisfy the canonical raster draw fence. */
+  rasterPresentationEligible?: boolean;
 }
 
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
@@ -372,6 +427,7 @@ export function StudioKonvaImageNode({
   liveStrokeRef,
   onHokusaiCanonicalImageReady,
   onLivingInkCanonicalImageReady,
+  rasterPresentationEligible = true,
 }: StudioKonvaImageNodeProps) {
   const [loadedImage, setLoadedImage] = useState<LoadedImageState>();
   const [displayImage, setDisplayImage] = useState<DisplayImageState>();
@@ -382,6 +438,8 @@ export function StudioKonvaImageNode({
   const [proxyFilteredCanvas, setProxyFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const [workerFallbackKey, setWorkerFallbackKey] = useState<string>();
   const [workerRequiredFailureKey, setWorkerRequiredFailureKey] = useState<string>();
+  const [konvaFilterPresentationReady, setKonvaFilterPresentationReady] =
+    useState<KonvaFilterPresentationReadyState>();
   const [verifiedLivingInkHash, setVerifiedLivingInkHash] = useState<`sha256:${string}` | null>(null);
   const imageRef = useRef<Konva.Image | null>(null);
   const filterWorkerSessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
@@ -398,6 +456,8 @@ export function StudioKonvaImageNode({
   const workerFailureNoticeRef = useRef<{ key: string } | null>(null);
   const hokusaiPresentationReceiptRef = useRef<string | null>(null);
   const livingInkPresentationReceiptRef = useRef<string | null>(null);
+  const rasterImagePresentationReceiptRef =
+    useRef<StudioRasterImagePresentationExpectation | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
   const elRef = useRef(el);
@@ -425,19 +485,55 @@ export function StudioKonvaImageNode({
     };
   }, [el.src]);
 
-  // src가 바뀐 render와 해당 effect 사이에도 이전 이미지를 한 프레임 노출하지 않는다.
-  const img = loadedImage?.src === el.src ? loadedImage.image : undefined;
+  const rasterEditSurfaceSnapshot = useSyncExternalStore(
+    subscribeStudioRasterEditSurfaces,
+    () => getStudioRasterEditSurfaceSnapshot(el.src),
+    () => null,
+  );
+  // Cache eviction drops global ownership, but a mounted node must not swap an equivalent source
+  // identity mid-frame: doing so invalidates exact Worker-filter results and briefly exposes raw
+  // pixels. This short handoff state is released as soon as the canonical decoded/flip-ready source
+  // can replace it; it must not outlive the global cache lease for the rest of the component mount.
+  const [mountedRasterEditSurface, setMountedRasterEditSurface] = useState<{
+    readonly src: string;
+    readonly surface: HTMLCanvasElement;
+  } | null>(null);
+  useLayoutEffect(() => {
+    if (rasterEditSurfaceSnapshot) {
+      setMountedRasterEditSurface((current) => (
+        current?.src === el.src && current.surface === rasterEditSurfaceSnapshot
+          ? current
+          : { src: el.src, surface: rasterEditSurfaceSnapshot }
+      ));
+    } else {
+      setMountedRasterEditSurface((current) => current?.src === el.src ? current : null);
+    }
+  }, [el.src, rasterEditSurfaceSnapshot]);
+  const rasterEditSurface = rasterEditSurfaceSnapshot
+    ?? (
+      mountedRasterEditSurface?.src === el.src
+        ? mountedRasterEditSurface.surface
+        : null
+    );
+  // The exact just-encoded canvas can render immediately while the canonical PNG continues
+  // decoding above. A different src never reuses it, so undo/remote edits fail closed.
+  const decodedImg = loadedImage?.src === el.src ? loadedImage.image : undefined;
+  const img: StudioRasterDisplaySource | undefined = rasterEditSurface ?? decodedImg;
   const flipped = !!el.flipped;
   const flippedY = !!el.flippedY;
   const isAnimatedGif = !!el.isAnimatedGif;
-  const displayImg =
-    displayImage?.src === el.src
-    && displayImage.loadedImage === img
-    && displayImage.flipped === flipped
-    && displayImage.flippedY === flippedY
-    && displayImage.isAnimatedGif === isAnimatedGif
-      ? displayImage.image
-      : undefined;
+  const requiresBakedFlip = !isAnimatedGif && (flipped || flippedY);
+  const displayImg = requiresBakedFlip
+    ? (
+        displayImage?.src === el.src
+        && displayImage.loadedImage === img
+        && displayImage.flipped === flipped
+        && displayImage.flippedY === flippedY
+        && displayImage.isAnimatedGif === isAnimatedGif
+          ? displayImage.image
+          : undefined
+      )
+    : img;
 
   useEffect(() => {
     if (!img) {
@@ -454,39 +550,23 @@ export function StudioKonvaImageNode({
         src: el.src,
       });
     };
-    if (isAnimatedGif) {
+    if (!requiresBakedFlip) {
       // 반전은 캔버스에 한 프레임을 구워야만 가능한데, 그러면 애니메이션이 멈춘다 — 재생 보존이
       // 우선이므로 이 경로를 건너뛰고 항상 라이브 img를 그대로 쓴다(알려진 한계: 애니메이션 GIF는
-      // 좌우/상하 반전이 적용되지 않는다).
-      commitDisplayImage(img);
+      // 좌우/상하 반전이 적용되지 않는다). 정적 비반전 이미지도 render-time에 그대로 전달해
+      // 캐시 표면이 effect 한 번을 기다리지 않고 첫 Konva draw에 참여하게 한다.
+      setDisplayImage(undefined);
       return;
     }
-    const scaleX = flipped ? -1 : 1;
-    const scaleY = flippedY ? -1 : 1;
-    if (scaleX === 1 && scaleY === 1) {
-      commitDisplayImage(img);
-      return;
-    }
-    try {
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
-      const c = document.createElement("canvas");
-      c.width = w;
-      c.height = h;
-      const cx = c.getContext("2d");
-      if (!cx) {
-        commitDisplayImage(img);
-        return;
-      }
-      cx.translate(scaleX === -1 ? w : 0, scaleY === -1 ? h : 0);
-      cx.scale(scaleX, scaleY);
-      cx.drawImage(img, 0, 0);
-      commitDisplayImage(c);
-    } catch (error) {
-      console.error("[studio] image flip canvas failed, using original image:", error);
-      commitDisplayImage(img);
-    }
-  }, [img, el.src, flipped, flippedY, isAnimatedGif]);
+    if (
+      displayImage?.src === el.src
+      && displayImage.loadedImage === img
+      && displayImage.flipped === flipped
+      && displayImage.flippedY === flippedY
+      && displayImage.isAnimatedGif === isAnimatedGif
+    ) return;
+    commitDisplayImage(createStudioRasterFlippedDisplaySource(img, flipped, flippedY));
+  }, [displayImage, img, el.src, flipped, flippedY, isAnimatedGif, requiresBakedFlip]);
 
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
@@ -720,6 +800,85 @@ export function StudioKonvaImageNode({
     && workerFilteredCanvas.height === workerHeight
       ? workerFilteredCanvas.canvas
       : undefined;
+
+  useEffect(() => {
+    if (
+      rasterEditSurfaceSnapshot
+      || mountedRasterEditSurface?.src !== el.src
+      || !decodedImg
+    ) return;
+
+    // The canonical Image is decoded before the short mounted lease is released. Flipped images
+    // prepare their replacement canvas first, then all source identities move in one React batch;
+    // there is never a render where the node has neither the cached source nor a flip-ready source.
+    const previousSource = displayImg;
+    const canonicalDisplaySource = requiresBakedFlip
+      ? createStudioRasterFlippedDisplaySource(decodedImg, flipped, flippedY)
+      : decodedImg;
+    // Canvas allocation/context recovery can fail under memory pressure. In that case the decoded
+    // image is not flip-ready, so keep the fail-closed handoff lease instead of replacing a
+    // correctly flipped visible source with raw canonical pixels.
+    if (requiresBakedFlip && canonicalDisplaySource === decodedImg) return;
+
+    if (previousSource) {
+      const sourcePixels = workerSourcePixelsRef.current;
+      if (sourcePixels?.source === previousSource) {
+        workerSourcePixelsRef.current = { ...sourcePixels, source: canonicalDisplaySource };
+      }
+      const proxySourcePixels = proxySourcePixelsRef.current;
+      if (proxySourcePixels?.source === previousSource) {
+        proxySourcePixelsRef.current = { ...proxySourcePixels, source: canonicalDisplaySource };
+      }
+      const resultCache = workerResultCacheRef.current;
+      if (resultCache?.source === previousSource) {
+        // Both sources represent the same immutable PNG authority. Rebinding preserves exact
+        // filtered canvases across the handoff instead of exposing raw pixels or scheduling a full
+        // filter pass solely because Canvas/Image object identity changed.
+        workerResultCacheRef.current = { ...resultCache, source: canonicalDisplaySource };
+      }
+      setWorkerFilteredCanvas((current) => (
+        current?.source === previousSource && current.src === el.src
+          ? { ...current, source: canonicalDisplaySource }
+          : current
+      ));
+      setProxyFilteredCanvas((current) => (
+        current?.source === previousSource && current.src === el.src
+          ? { ...current, source: canonicalDisplaySource }
+          : current
+      ));
+      // A synchronous Konva cache is rebuilt for the canonical source below. Do not let the old
+      // source's readiness token acknowledge a draw during that rebuild.
+      setKonvaFilterPresentationReady((current) => (
+        current?.source === previousSource ? undefined : current
+      ));
+    }
+
+    setDisplayImage(requiresBakedFlip
+      ? {
+          flipped,
+          flippedY,
+          image: canonicalDisplaySource,
+          isAnimatedGif,
+          loadedImage: decodedImg,
+          src: el.src,
+        }
+      : undefined);
+    setMountedRasterEditSurface((current) => (
+      current?.src === el.src && current.surface === mountedRasterEditSurface.surface
+        ? null
+        : current
+    ));
+  }, [
+    decodedImg,
+    displayImg,
+    el.src,
+    flipped,
+    flippedY,
+    isAnimatedGif,
+    mountedRasterEditSurface,
+    rasterEditSurfaceSnapshot,
+    requiresBakedFlip,
+  ]);
 
   useEffect(() => {
     if (!paddedWorkerRequiredBlocked) return;
@@ -1133,6 +1292,7 @@ export function StudioKonvaImageNode({
   useEffect(() => {
     const node = imageRef.current;
     if (!node) return;
+    let ready: KonvaFilterPresentationReadyState | undefined;
     if (displayImg) {
       node.clearCache();
       // Worker 경로가 선택된 동안은 pending 상태에서도 동기 full-filter를 중복 실행하지 않는다.
@@ -1152,10 +1312,18 @@ export function StudioKonvaImageNode({
         // Konva 10 은 미지정 시 기기 dpr 를 암묵 사용해 px 단위 필터가 Worker 경로와 다르게
         // 보였다(HiDPI에서 효과가 절반으로 줄어듦). 테두리(cachePad>0) 경로는 기존 동작 유지.
         node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });
+        ready = { requestKey: workerRequestKey, source: displayImg };
       }
+      setKonvaFilterPresentationReady((current) => (
+        current?.requestKey === ready?.requestKey && current?.source === ready?.source
+          ? current
+          : ready
+      ));
       node.getLayer()?.batchDraw();
+    } else {
+      setKonvaFilterPresentationReady(undefined);
     }
-  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity, synchronousFallbackBlocked]);
+  }, [displayImg, el.width, el.height, maskedFilterKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, workerPipelineActive, workerDimensionsSafe, filterDensity, synchronousFallbackBlocked, workerRequestKey]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
@@ -1237,13 +1405,79 @@ export function StudioKonvaImageNode({
     verifiedLivingInkHash,
   ]);
 
-  if (!displayImg) return null;
+  // Worker-backed filters replace the raw decoded/cached source at the actual Konva `image` prop.
+  // Keep the receipt tied to that concrete visible source; acknowledging `displayImg` while the
+  // filtered canvas is still pending would under-report the presentation latency and could release
+  // a transient editing surface before the pixels the artist sees have drawn.
+  const imageSource: CanvasImageSource | undefined = displayImg
+    ? (showWorkerCanvas ? visibleWorkerFilteredCanvas! : displayImg)
+    : undefined;
+  const rasterPresentationSource = !imageSource
+    ? undefined
+    : workerPipelineActive
+      // A proxy canvas is intentionally approximate and a retained canvas may belong to a prior
+      // parameter revision. Only the exact current full-resolution Worker result closes the fence.
+      ? (currentWorkerFilteredCanvas === imageSource ? imageSource : undefined)
+      : hasFilters
+        // Konva's synchronous filter path is exact only after node.cache() completed for this
+        // concrete source and filter request. A module-ready flag alone can race the passive cache
+        // effect and acknowledge an old/unfiltered layer draw.
+        ? (
+            konvaFilterPresentationReady?.requestKey === workerRequestKey
+            && konvaFilterPresentationReady.source === imageSource
+              ? imageSource
+              : undefined
+          )
+        : imageSource;
+
+  useLayoutEffect(() => {
+    if (!rasterPresentationSource || !rasterPresentationEligible) return;
+    const expected = expectedStudioRasterImagePresentation({
+      elementId: el.id,
+      src: el.src,
+    });
+    // The verifier installs a fresh probe for each cold/warm operation, so its numeric epoch may
+    // restart at 1. Dedupe by the expectation object owned by that probe, not by epoch alone.
+    if (!expected || rasterImagePresentationReceiptRef.current === expected) return;
+    const node = imageRef.current;
+    const layer = node?.getLayer();
+    if (!node || !layer) return;
+
+    let active = true;
+    const acknowledgeAfterDraw = () => {
+      // React-Konva has applied this render's image prop before layout effects. A layer draw alone
+      // is insufficient: an unrelated image may finish later and draw the same layer, so retain
+      // the concrete CanvasImageSource identity in the receipt fence as well as element/src.
+      if (
+        !active
+        || imageRef.current !== node
+        || node.getLayer() !== layer
+        || !node.isVisible()
+        || node.image() !== rasterPresentationSource
+        || elRef.current.id !== expected.elementId
+        || elRef.current.src !== expected.src
+      ) return;
+      const receipt = acknowledgeStudioRasterImagePresentation(expected);
+      if (receipt) {
+        layer.off("draw.studioRasterPresentation", acknowledgeAfterDraw);
+        rasterImagePresentationReceiptRef.current = expected;
+      }
+    };
+    layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);
+    // Coalesce with React-Konva's pending draw instead of forcing another synchronous full Stage
+    // pass. `draw` fires only after drawScene completes, so the receipt is an actual presentation
+    // fence rather than an image-decode or React-commit approximation.
+    layer.batchDraw();
+    return () => {
+      active = false;
+      layer.off("draw.studioRasterPresentation", acknowledgeAfterDraw);
+    };
+  }, [el.id, el.src, rasterPresentationEligible, rasterPresentationSource]);
+
+  if (!displayImg || !imageSource) return null;
 
   // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
   // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
-  const imageSource: CanvasImageSource = showWorkerCanvas
-    ? visibleWorkerFilteredCanvas!
-    : displayImg;
   // Konva 폴백(cachePad>0 테두리 경로·Worker 준비/실행 실패 fail-closed)도 같은 마스크 결과를
   // 내야 한다 — 내장 필터 체인을 [원본 스냅샷, ...체인, 마스크 블렌드]로 감싼다. 캐시 캔버스는
   // 표시 반전이 구워져 있고 cachePad 만큼 패딩이 있으므로 샘플 변환으로 콘텐츠 창을 되돌린다.

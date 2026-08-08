@@ -150,6 +150,63 @@ describe("Studio canvas viewport module boundary", () => {
     expect(viewport.source).toContain('<Profiler id="studio:stage"');
   });
 
+  it("stabilizes compiler-opted-out viewport projections and event bridges", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+
+    expect(page.source).toContain(
+      "const studioWorkAssetRenderProjection = useMemo(",
+    );
+    expect(page.source).toContain("const pageGrade = useMemo(");
+    expect(page.source).toContain("const animTimeline = useMemo(");
+    expect(page.source).toContain("const defaultedDrawingAssistDocument = useMemo(");
+    expect(page.source).toContain("const webGpuViewportSurface = useMemo(");
+    expect(page.source).toContain("const studioRasterHiddenOperationIds = useMemo(");
+    expect(page.source).toContain("const sharedGutters = useMemo(");
+    expect(page.source).toContain("const pixelOverlayFrame: SelectionFrame | null = useMemo(");
+    expect(page.source).toContain(
+      "closeViewToolWithFocus={studioCanvasViewportHandlers.closeViewToolWithFocus}",
+    );
+    expect(page.source).toContain(
+      "setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}",
+    );
+    expect(page.source).toContain(
+      "setDrawMode={studioCanvasViewportHandlers.setDrawMode}",
+    );
+    expect(page.source).toContain(
+      "setRightPanelOpen={studioCanvasViewportHandlers.setRightPanelOpen}",
+    );
+    expect(viewport.source).toContain(
+      "closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;",
+    );
+  });
+
+  it("keeps transient shortcut notices below the memoized Stage boundary", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+
+    expect(page.source).toContain(
+      "const [drawingShortcutNoticeStore] = useState(createStudioDrawingShortcutNoticeStore);",
+    );
+    expect(page.source).toContain("const drawingShortcutNotice = useSyncExternalStore(");
+    expect(page.source).toContain("if (!publishedNotice) return;");
+    expect(page.source).toContain("drawingShortcutNoticeStore.clear(publishedNotice.id);");
+    expect(page.source).toContain("}, 1_400);");
+    expect(page.source).toContain("drawingShortcutNotice === null;");
+    expect(page.source).toContain(
+      "drawingShortcutNoticeStore={drawingShortcutNoticeStore}",
+    );
+    expect(page.source).not.toContain("drawingShortcutNotice={");
+    expect(viewport.source).toContain("function StudioDrawingShortcutNoticeLayer({");
+    expect(viewport.source).toContain("const snapshot = useSyncExternalStore(");
+    expect(viewport.source).toContain(
+      "drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;",
+    );
+    expect(viewport.source).toContain('aria-live="polite"');
+    expect(viewport.source).toContain("key={notice.id}");
+    expect(viewport.source).toContain("const notice = hasAutosave ? null : snapshot;");
+  });
+
   it("keeps the viewport and right inspector in one desktop row without collapsing canvas height", () => {
     const page = moduleShape("./StudioPage.tsx");
     const viewport = moduleShape("./StudioCanvasViewport.tsx");

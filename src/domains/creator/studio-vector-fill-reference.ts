@@ -90,6 +90,24 @@ export interface StudioVectorReferenceRenderOptions {
   readonly rasterize?: StudioVectorReferenceRasterizer;
 }
 
+/**
+ * Validated input plus the single authoritative SVG export produced for a vector reference.
+ *
+ * Keeping this intermediate explicit lets workflows that need to inspect `skipped` fidelity
+ * metadata (editable-raster preparation, for example) reuse the exact same Worker result for
+ * rasterization. The object deliberately owns the normalized output budgets and namespace so a
+ * caller cannot accidentally render the export under a different set of limits.
+ */
+export interface StudioVectorReferencePreparedExport {
+  readonly result: SvgExportResult;
+  readonly execution: "worker" | "direct";
+  readonly width: number;
+  readonly height: number;
+  readonly fingerprintNamespace: string;
+  readonly maxSvgBytes: number;
+  readonly maxPngBytes: number;
+}
+
 export interface StudioVectorReferenceOffscreenOptions {
   /** Test/platform seam. Production uses the browser's asynchronous SVG ImageBitmap decoder. */
   readonly createBitmap?: (source: Blob) => Promise<ImageBitmap>;
@@ -302,7 +320,7 @@ function assertSourceBudget(
 
 function assertSvgResult(
   result: SvgExportResult,
-  budgets: NormalizedStudioVectorReferenceBudgets,
+  maxSvgBytes: number,
 ): number {
   if (result.skipped.length > 0) {
     throw new StudioVectorReferenceError(
@@ -311,7 +329,7 @@ function assertSvgResult(
     );
   }
   const svgByteLength = utf8ByteLength(result.svg);
-  if (svgByteLength > budgets.maxSvgBytes) {
+  if (svgByteLength > maxSvgBytes) {
     throw new StudioVectorReferenceError(
       "svg-budget-exceeded",
       "벡터 선화의 렌더 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합한 뒤 다시 시도해 주세요.",
@@ -586,6 +604,18 @@ export async function renderStudioVectorReference(
   input: StudioVectorReferenceInput,
   options: StudioVectorReferenceRenderOptions = {},
 ): Promise<StudioVectorReferenceResult> {
+  const prepared = await prepareStudioVectorReferenceExport(input, options);
+  return renderPreparedStudioVectorReference(prepared, options);
+}
+
+/**
+ * Runs the expensive SVG serializer exactly once and retains its fidelity census for a later
+ * rasterization step. Source/dimension limits are checked before the Worker receives the tree.
+ */
+export async function prepareStudioVectorReferenceExport(
+  input: StudioVectorReferenceInput,
+  options: StudioVectorReferenceRenderOptions = {},
+): Promise<StudioVectorReferencePreparedExport> {
   throwIfAborted(options.signal);
   const budgets = normalizeBudgets(input.budgets);
   const dimensions = validateVectorDimensions(input.width, input.height, budgets);
@@ -607,27 +637,44 @@ export async function renderStudioVectorReference(
   throwIfAborted(options.signal);
   const exported = await runStudioSvgExportWorker(exportInput, workerOptions);
   throwIfAborted(options.signal);
-  const svgByteLength = assertSvgResult(exported.result, budgets);
-  const fingerprint = fingerprintStudioVectorReference(
-    exported.result.svg,
-    input.fingerprintNamespace ?? "vector-reference-v1",
-  );
-  const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceHybrid)({
-    svg: exported.result.svg,
+  return {
+    result: exported.result,
+    execution: exported.execution,
     width: dimensions.width,
     height: dimensions.height,
-    maxOutputBytes: budgets.maxPngBytes,
+    fingerprintNamespace: input.fingerprintNamespace ?? "vector-reference-v1",
+    maxSvgBytes: budgets.maxSvgBytes,
+    maxPngBytes: budgets.maxPngBytes,
+  };
+}
+
+/** Rasterizes a previously prepared export without invoking the SVG serializer again. */
+export async function renderPreparedStudioVectorReference(
+  prepared: StudioVectorReferencePreparedExport,
+  options: Pick<StudioVectorReferenceRenderOptions, "signal" | "rasterize"> = {},
+): Promise<StudioVectorReferenceResult> {
+  throwIfAborted(options.signal);
+  const svgByteLength = assertSvgResult(prepared.result, prepared.maxSvgBytes);
+  const fingerprint = fingerprintStudioVectorReference(
+    prepared.result.svg,
+    prepared.fingerprintNamespace,
+  );
+  const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceHybrid)({
+    svg: prepared.result.svg,
+    width: prepared.width,
+    height: prepared.height,
+    maxOutputBytes: prepared.maxPngBytes,
     signal: options.signal,
   });
   throwIfAborted(options.signal);
-  if (rasterized.width !== dimensions.width || rasterized.height !== dimensions.height) {
+  if (rasterized.width !== prepared.width || rasterized.height !== prepared.height) {
     throw new StudioVectorReferenceError("invalid-png-output", "벡터 선화 PNG의 페이지 크기가 일치하지 않습니다.");
   }
   const pngByteLength = pngDataUrlByteLength(rasterized.dataUrl);
   if (pngByteLength === null) {
     throw new StudioVectorReferenceError("invalid-png-output", "벡터 선화 PNG 형식을 확인하지 못했습니다.");
   }
-  if (pngByteLength > budgets.maxPngBytes) {
+  if (pngByteLength > prepared.maxPngBytes) {
     throw new StudioVectorReferenceError(
       "png-budget-exceeded",
       "벡터 선화 PNG가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 해상도를 낮춰 주세요.",
@@ -636,12 +683,12 @@ export async function renderStudioVectorReference(
   return {
     dataUrl: rasterized.dataUrl,
     fingerprint,
-    elementCount: exported.result.elementCount,
-    width: dimensions.width,
-    height: dimensions.height,
+    elementCount: prepared.result.elementCount,
+    width: prepared.width,
+    height: prepared.height,
     svgByteLength,
     pngByteLength,
-    execution: exported.execution,
+    execution: prepared.execution,
   };
 }
 

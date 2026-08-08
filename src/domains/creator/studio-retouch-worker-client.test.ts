@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  disposeStudioRetouchModuleWorker,
   runStudioRetouchWorker,
   type StudioRetouchWorkerLike,
 } from "./studio-retouch-worker-client";
@@ -13,6 +14,12 @@ import {
   type StudioRetouchWorkerSuccessMessage,
 } from "./studio-retouch-worker-protocol";
 import { applyStudioRetouchWorkerRequest } from "./studio-retouch-worker-runtime";
+
+afterEach(() => {
+  disposeStudioRetouchModuleWorker();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 function request(kind: "dodge-burn" | "wet-mix" = "dodge-burn"): StudioRetouchWorkerRunRequest {
   const data = new Uint8ClampedArray(8 * 8 * 4);
@@ -83,6 +90,7 @@ class ApplyingWorker implements StudioRetouchWorkerLike {
 class HangingWorker implements StudioRetouchWorkerLike {
   onmessage: StudioRetouchWorkerLike["onmessage"] = null;
   onerror: StudioRetouchWorkerLike["onerror"] = null;
+  postCount = 0;
   terminateCount = 0;
 
   constructor(ready = true) {
@@ -94,6 +102,7 @@ class HangingWorker implements StudioRetouchWorkerLike {
   postMessage(message?: unknown, transfer?: unknown): void {
     void message;
     void transfer;
+    this.postCount += 1;
   }
   terminate(): void {
     this.terminateCount += 1;
@@ -127,7 +136,115 @@ class PostTransferFailureWorker extends HangingWorker {
   }
 }
 
+class MalformedFailureWorker extends HangingWorker {
+  override postMessage(): void {
+    this.onmessage?.({
+      data: { type: "studio-retouch/failure", version: 1 },
+    } as unknown as MessageEvent<StudioRetouchWorkerResponseMessage>);
+  }
+}
+
 describe("runStudioRetouchWorker", () => {
+  it("reuses one warm default module Worker across sequential retouch strokes", async () => {
+    let worker: ApplyingWorker | null = null;
+    const WorkerConstructor = vi.fn(function MockWorker() {
+      worker = new ApplyingWorker();
+      return worker;
+    });
+    vi.stubGlobal("Worker", WorkerConstructor);
+
+    await expect(runStudioRetouchWorker(request("dodge-burn"))).resolves.toMatchObject({
+      execution: "worker",
+      kind: "dodge-burn",
+    });
+    await expect(runStudioRetouchWorker(request("wet-mix"))).resolves.toMatchObject({
+      execution: "worker",
+      kind: "wet-mix",
+    });
+
+    expect(WorkerConstructor).toHaveBeenCalledOnce();
+    expect(worker!.postCount).toBe(2);
+    expect(worker!.terminateCount).toBe(0);
+    disposeStudioRetouchModuleWorker();
+    expect(worker!.terminateCount).toBe(1);
+  });
+
+  it("disposes an idle shared Worker after 45 seconds and recreates it on demand", async () => {
+    vi.useFakeTimers();
+    const workers: ApplyingWorker[] = [];
+    const WorkerConstructor = vi.fn(function MockWorker() {
+      const worker = new ApplyingWorker();
+      workers.push(worker);
+      return worker;
+    });
+    vi.stubGlobal("Worker", WorkerConstructor);
+
+    const first = runStudioRetouchWorker(request());
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(first).resolves.toMatchObject({ execution: "worker" });
+    await vi.advanceTimersByTimeAsync(44_999);
+    expect(workers[0]!.terminateCount).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(workers[0]!.terminateCount).toBe(1);
+
+    const recovered = runStudioRetouchWorker(request("wet-mix"));
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(recovered).resolves.toMatchObject({ execution: "worker", kind: "wet-mix" });
+    expect(WorkerConstructor).toHaveBeenCalledTimes(2);
+  });
+
+  it("dispose aborts active and queued work without resurrecting the old generation", async () => {
+    vi.useFakeTimers();
+    let firstWorker: HangingWorker | null = null;
+    let recoveredWorker: ApplyingWorker | null = null;
+    const WorkerConstructor = vi.fn(function MockWorker() {
+      if (WorkerConstructor.mock.calls.length === 1) {
+        firstWorker = new HangingWorker();
+        return firstWorker;
+      }
+      recoveredWorker = new ApplyingWorker();
+      return recoveredWorker;
+    });
+    vi.stubGlobal("Worker", WorkerConstructor);
+
+    const pending = runStudioRetouchWorker(request(), { operationTimeoutMilliseconds: 120_000 });
+    const queued = runStudioRetouchWorker(request("wet-mix"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(firstWorker!.postCount).toBe(1);
+    const disposed = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    const queuedDisposed = expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    disposeStudioRetouchModuleWorker();
+    const recovered = runStudioRetouchWorker(request("wet-mix"));
+
+    await disposed;
+    await queuedDisposed;
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(recovered).resolves.toMatchObject({ execution: "worker", kind: "wet-mix" });
+    expect(firstWorker!.terminateCount).toBe(1);
+    expect(WorkerConstructor).toHaveBeenCalledTimes(2);
+    expect(recoveredWorker!.terminateCount).toBe(0);
+  });
+
+  it("rejects a malformed failure payload and recreates the warm Worker", async () => {
+    let broken: MalformedFailureWorker | null = null;
+    let recovered: ApplyingWorker | null = null;
+    const WorkerConstructor = vi.fn(function MockWorker() {
+      if (WorkerConstructor.mock.calls.length === 1) {
+        broken = new MalformedFailureWorker();
+        return broken;
+      }
+      recovered = new ApplyingWorker();
+      return recovered;
+    });
+    vi.stubGlobal("Worker", WorkerConstructor);
+
+    await expect(runStudioRetouchWorker(request())).rejects.toThrow(/알 수 없는 응답/u);
+    expect(broken!.terminateCount).toBe(1);
+    await expect(runStudioRetouchWorker(request())).resolves.toMatchObject({ execution: "worker" });
+    expect(WorkerConstructor).toHaveBeenCalledTimes(2);
+    expect(recovered!.terminateCount).toBe(0);
+  });
+
   it.each(["dodge-burn", "wet-mix"] as const)(
     "runs %s in one fresh-buffer Worker flight with exact direct parity",
     async (kind) => {
@@ -190,7 +307,7 @@ describe("runStudioRetouchWorker", () => {
     expect(data.byteLength).toBe(8 * 8 * 4);
   });
 
-  it("aborts and times out an in-flight one-shot Worker", async () => {
+  it("keeps external abort classified separately from a recoverable operation timeout", async () => {
     const abortWorker = new HangingWorker();
     const controller = new AbortController();
     const aborted = runStudioRetouchWorker(request(), {
@@ -205,16 +322,31 @@ describe("runStudioRetouchWorker", () => {
 
     vi.useFakeTimers();
     try {
-      const timeoutWorker = new HangingWorker();
+      let timeoutWorker: HangingWorker | null = null;
+      let recoveredWorker: ApplyingWorker | null = null;
+      const WorkerConstructor = vi.fn(function MockWorker() {
+        if (WorkerConstructor.mock.calls.length === 1) {
+          timeoutWorker = new HangingWorker();
+          return timeoutWorker;
+        }
+        recoveredWorker = new ApplyingWorker();
+        return recoveredWorker;
+      });
+      vi.stubGlobal("Worker", WorkerConstructor);
       const timedOut = runStudioRetouchWorker(request(), {
-        workerFactory: () => timeoutWorker,
         operationTimeoutMilliseconds: 5,
       });
-      const timeoutExpectation = expect(timedOut).rejects.toMatchObject({ name: "AbortError" });
-      await Promise.resolve();
+      const timeoutExpectation = expect(timedOut).rejects.toMatchObject({ name: "TimeoutError" });
+      await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(6);
       await timeoutExpectation;
-      expect(timeoutWorker.terminateCount).toBe(1);
+      expect(timeoutWorker!.terminateCount).toBe(1);
+
+      const recovered = runStudioRetouchWorker(request("wet-mix"));
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(recovered).resolves.toMatchObject({ execution: "worker", kind: "wet-mix" });
+      expect(WorkerConstructor).toHaveBeenCalledTimes(2);
+      expect(recoveredWorker!.terminateCount).toBe(0);
     } finally {
       vi.useRealTimers();
     }

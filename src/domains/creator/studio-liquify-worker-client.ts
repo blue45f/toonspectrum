@@ -1,4 +1,3 @@
-import { applyLiquifyDisplacement, type LiquifyDisplacementField } from "./studio-liquify";
 import {
   STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
   assertStudioLiquifyImageData,
@@ -30,12 +29,20 @@ export interface StudioLiquifyWorkerClientOptions {
   signal?: AbortSignal;
   /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
   workerFactory?: StudioLiquifyWorkerFactory | null;
+  readyTimeoutMilliseconds?: number;
+  operationTimeoutMilliseconds?: number;
 }
 
 export interface StudioLiquifyWorkerClientResult {
   execution: "worker" | "direct";
+  /** false면 스트로크가 유효한 변위 필드를 만들지 못해 dst가 원본 그대로다. */
+  applied: boolean;
   dst: StudioImageDataLike;
 }
+
+const DEFAULT_READY_TIMEOUT_MS = 3_000;
+const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 45_000;
 
 /** Vite statically discovers this exact URL pattern and emits an isolated module-worker chunk. */
 export function createStudioLiquifyModuleWorker(): StudioLiquifyWorkerLike | null {
@@ -55,8 +62,19 @@ function createAbortError(): Error {
   return error;
 }
 
+function createTimeoutError(): Error {
+  const error = new Error("리퀴파이 Worker가 제한 시간 안에 완료되지 않았습니다.");
+  error.name = "TimeoutError";
+  return error;
+}
+
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
+}
+
+function boundedTimeout(value: number | undefined, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.min(120_000, Math.round(value!)));
 }
 
 function transferableView<T extends Uint8ClampedArray | Float32Array>(
@@ -80,7 +98,7 @@ function transferableView<T extends Uint8ClampedArray | Float32Array>(
 function cloneSafeLiquifyRequest(request: StudioLiquifyWorkerRunRequest): StudioLiquifyWorkerRunRequest {
   assertStudioLiquifyRequest(request);
   const claimedBuffers = new Set<ArrayBuffer>();
-  return {
+  const pixels = {
     src: {
       data: transferableView(request.src.data, claimedBuffers),
       width: request.src.width,
@@ -91,24 +109,64 @@ function cloneSafeLiquifyRequest(request: StudioLiquifyWorkerRunRequest): Studio
       width: request.dst.width,
       height: request.dst.height,
     },
+    ...(request.region === undefined ? {} : { region: { ...request.region } }),
+  };
+  if ("stroke" in request) {
+    return {
+      ...pixels,
+      stroke: {
+        points: request.stroke.points.map((point) => ({
+          x: point.x,
+          y: point.y,
+          ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
+        })),
+        radiusPx: request.stroke.radiusPx,
+        strength: request.stroke.strength,
+        ...(request.stroke.options === undefined ? {} : { options: { ...request.stroke.options } }),
+      },
+    };
+  }
+  return {
+    ...pixels,
     field: {
       originX: request.field.originX,
       originY: request.field.originY,
       width: request.field.width,
       height: request.field.height,
-      dx: transferableView(request.field.dx, claimedBuffers),
-      dy: transferableView(request.field.dy, claimedBuffers),
+      // A retained displacement field is caller-owned session state. Unlike src/dst, it must be
+      // reusable for reconstruct/smooth/refine after this Worker request, so always transfer
+      // private copies even when the original views happen to span whole ArrayBuffers.
+      dx: new Float32Array(request.field.dx),
+      dy: new Float32Array(request.field.dy),
     },
   };
 }
 
-function runLiquifyDirect(
+async function runLiquifyDirect(
   request: StudioLiquifyWorkerRunRequest,
   signal: AbortSignal | undefined,
-): StudioLiquifyWorkerClientResult {
+): Promise<StudioLiquifyWorkerClientResult> {
   throwIfAborted(signal);
-  applyLiquifyDisplacement(request.src, request.dst, request.field as LiquifyDisplacementField, { signal });
-  return { execution: "direct", dst: request.dst };
+  // 정상 브라우저 경로는 Worker chunk만 실행한다. 순수 픽셀 엔진은 Worker 생성/CSP 실패 시에만
+  // main thread fallback chunk로 로드해 첫 정상 stroke의 parse/compile 비용까지 격리한다.
+  const { applyLiquifyDisplacement, buildLiquifyDisplacementField } = await import("./studio-liquify");
+  throwIfAborted(signal);
+  const field = "stroke" in request
+    ? buildLiquifyDisplacementField(
+        request.stroke.points,
+        request.stroke.radiusPx,
+        request.stroke.strength,
+        request.region?.canvasWidth ?? request.src.width,
+        request.region?.canvasHeight ?? request.src.height,
+        { ...request.stroke.options, signal },
+      )
+    : request.field;
+  if (!field) return { execution: "direct", applied: false, dst: request.dst };
+  applyLiquifyDisplacement(request.src, request.dst, field, {
+    signal,
+    ...(request.region === undefined ? {} : { region: request.region }),
+  });
+  return { execution: "direct", applied: true, dst: request.dst };
 }
 
 function deserializeWorkerError(response: Extract<
@@ -123,39 +181,72 @@ function deserializeWorkerError(response: Extract<
 function runLiquifyWithWorker(
   worker: StudioLiquifyWorkerLike,
   request: StudioLiquifyWorkerRunRequest,
-  signal: AbortSignal | undefined,
+  options: StudioLiquifyWorkerClientOptions,
+  lifecycle: {
+    readonly keepAlive?: boolean;
+    readonly workerAlreadyReady?: boolean;
+    readonly disposeSignal?: AbortSignal;
+  } = {},
 ): Promise<StudioLiquifyWorkerClientResult> {
   return new Promise((resolve, reject) => {
+    const { signal } = options;
     let settled = false;
     let requestPosted = false;
     let readyTimer: ReturnType<typeof setTimeout> | null = null;
+    let operationTimer: ReturnType<typeof setTimeout> | null = null;
     const message: StudioLiquifyWorkerRunMessage = {
       type: "studio-liquify/run",
       version: STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
       request,
     };
 
-    const cleanup = () => {
+    const cleanup = (keepWorker = false) => {
       if (readyTimer !== null) clearTimeout(readyTimer);
+      if (operationTimer !== null) clearTimeout(operationTimer);
       signal?.removeEventListener("abort", onAbort);
+      lifecycle.disposeSignal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
-      worker.terminate();
+      if (!keepWorker) worker.terminate();
     };
-    const finish = (callback: () => void) => {
+    const finish = (callback: () => void, keepWorker = false) => {
       if (settled) return;
       settled = true;
-      cleanup();
+      cleanup(keepWorker);
       callback();
     };
     const onAbort = () => finish(() => reject(createAbortError()));
     const resolveDirectFallback = () => finish(() => {
-      try {
-        resolve(runLiquifyDirect(request, signal));
-      } catch (error) {
-        reject(error);
-      }
+      void runLiquifyDirect(request, signal).then(resolve, reject);
     });
+
+    const onOperationTimeout = () => finish(() => reject(createTimeoutError()));
+
+    const postRequest = () => {
+      if (requestPosted || settled) return;
+      if (readyTimer !== null) {
+        clearTimeout(readyTimer);
+        readyTimer = null;
+      }
+      try {
+        requestPosted = true;
+        worker.postMessage(message, studioLiquifyRequestTransfers(message));
+        if (!settled) {
+          operationTimer = setTimeout(
+            onOperationTimeout,
+            boundedTimeout(options.operationTimeoutMilliseconds, DEFAULT_OPERATION_TIMEOUT_MS),
+          );
+        }
+      } catch (error) {
+        // postMessage 구현은 소유권을 detach한 뒤 예외를 던질 수도 있다. 이 경계 뒤에는 direct
+        // fallback이 안전하지 않으므로 실패로 닫고 공유 Worker epoch를 폐기한다.
+        finish(() => reject(
+          error instanceof Error
+            ? error
+            : new Error("리퀴파이 Worker로 픽셀 소유권을 전송하지 못했습니다."),
+        ));
+      }
+    };
 
     worker.onmessage = (event) => {
       const response = event.data;
@@ -168,18 +259,7 @@ function runLiquifyWithWorker(
         return;
       }
       if (response.type === "studio-liquify/ready") {
-        if (requestPosted) return;
-        if (readyTimer !== null) {
-          clearTimeout(readyTimer);
-          readyTimer = null;
-        }
-        try {
-          requestPosted = true;
-          worker.postMessage(message, studioLiquifyRequestTransfers(message));
-        } catch {
-          requestPosted = false;
-          resolveDirectFallback();
-        }
+        postRequest();
         return;
       }
       if (!requestPosted) {
@@ -187,6 +267,15 @@ function runLiquifyWithWorker(
         return;
       }
       if (response.type === "studio-liquify/failure") {
+        if (
+          !response.error
+          || typeof response.error !== "object"
+          || typeof response.error.name !== "string"
+          || typeof response.error.message !== "string"
+        ) {
+          finish(() => reject(new Error("리퀴파이 Worker가 알 수 없는 응답을 반환했습니다.")));
+          return;
+        }
         finish(() => reject(deserializeWorkerError(response)));
         return;
       }
@@ -196,6 +285,9 @@ function runLiquifyWithWorker(
       }
       try {
         assertStudioLiquifyImageData(response.dst, "리퀴파이 Worker 결과");
+        if (typeof response.applied !== "boolean") {
+          throw new TypeError("리퀴파이 Worker 적용 여부가 올바르지 않습니다.");
+        }
         if (response.dst.width !== request.dst.width || response.dst.height !== request.dst.height) {
           throw new RangeError("리퀴파이 Worker 결과 크기가 요청과 일치하지 않습니다.");
         }
@@ -203,7 +295,10 @@ function runLiquifyWithWorker(
         finish(() => reject(error));
         return;
       }
-      finish(() => resolve({ execution: "worker", dst: response.dst }));
+      finish(
+        () => resolve({ execution: "worker", applied: response.applied, dst: response.dst }),
+        lifecycle.keepAlive === true,
+      );
     };
     worker.onerror = (event) => {
       event.preventDefault?.();
@@ -220,18 +315,147 @@ function runLiquifyWithWorker(
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted) {
+    lifecycle.disposeSignal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted || lifecycle.disposeSignal?.aborted) {
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    if (lifecycle.workerAlreadyReady) {
+      postRequest();
+    } else {
+      readyTimer = setTimeout(
+        resolveDirectFallback,
+        boundedTimeout(options.readyTimeoutMilliseconds, DEFAULT_READY_TIMEOUT_MS),
+      );
+    }
   });
 }
 
+let sharedLiquifyWorker: StudioLiquifyWorkerLike | null = null;
+let sharedLiquifyWorkerReady = false;
+let sharedLiquifyWorkerEpoch = 0;
+let sharedLiquifyDisposeGeneration = 0;
+let sharedLiquifyQueue: Promise<void> = Promise.resolve();
+let sharedLiquifyIdleTimer: ReturnType<typeof setTimeout> | null = null;
+let sharedLiquifyFlight: {
+  readonly worker: StudioLiquifyWorkerLike;
+  readonly epoch: number;
+  readonly controller: AbortController;
+} | null = null;
+
+function clearSharedLiquifyIdleTimer(): void {
+  if (sharedLiquifyIdleTimer === null) return;
+  clearTimeout(sharedLiquifyIdleTimer);
+  sharedLiquifyIdleTimer = null;
+}
+
+/** Releases the warm module Worker for route/HMR teardown and deterministic tests. */
+export function disposeStudioLiquifyModuleWorker(): void {
+  clearSharedLiquifyIdleTimer();
+  const worker = sharedLiquifyWorker;
+  const flight = sharedLiquifyFlight;
+  const flightOwnsWorker = worker !== null
+    && flight?.worker === worker
+    && flight.epoch === sharedLiquifyWorkerEpoch;
+  sharedLiquifyWorker = null;
+  sharedLiquifyWorkerReady = false;
+  sharedLiquifyWorkerEpoch += 1;
+  sharedLiquifyDisposeGeneration += 1;
+  sharedLiquifyFlight = null;
+  flight?.controller.abort();
+  if (worker && !flightOwnsWorker) worker.terminate();
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(disposeStudioLiquifyModuleWorker);
+}
+
+function clearSharedLiquifyWorker(
+  worker: StudioLiquifyWorkerLike,
+  epoch: number,
+): void {
+  if (sharedLiquifyWorker !== worker || sharedLiquifyWorkerEpoch !== epoch) return;
+  // runLiquifyWithWorker already terminated every non-success path. Only invalidate ownership here
+  // so an older flight can never clear a newer HMR/recovery Worker.
+  sharedLiquifyWorker = null;
+  sharedLiquifyWorkerReady = false;
+  sharedLiquifyWorkerEpoch += 1;
+}
+
+function scheduleSharedLiquifyIdleDisposal(
+  worker: StudioLiquifyWorkerLike,
+  epoch: number,
+  disposeGeneration: number,
+): void {
+  clearSharedLiquifyIdleTimer();
+  sharedLiquifyIdleTimer = setTimeout(() => {
+    sharedLiquifyIdleTimer = null;
+    if (
+      sharedLiquifyWorker === worker
+      && sharedLiquifyWorkerEpoch === epoch
+      && sharedLiquifyDisposeGeneration === disposeGeneration
+      && sharedLiquifyFlight === null
+    ) {
+      disposeStudioLiquifyModuleWorker();
+    }
+  }, DEFAULT_IDLE_TIMEOUT_MS);
+}
+
+function runLiquifyWithSharedModuleWorker(
+  request: StudioLiquifyWorkerRunRequest,
+  options: StudioLiquifyWorkerClientOptions,
+): Promise<StudioLiquifyWorkerClientResult> {
+  const disposeGeneration = sharedLiquifyDisposeGeneration;
+  clearSharedLiquifyIdleTimer();
+  const operation = sharedLiquifyQueue.then(async () => {
+    clearSharedLiquifyIdleTimer();
+    if (disposeGeneration !== sharedLiquifyDisposeGeneration) throw createAbortError();
+    throwIfAborted(options.signal);
+    if (!sharedLiquifyWorker) {
+      try {
+        sharedLiquifyWorker = createStudioLiquifyModuleWorker();
+      } catch {
+        sharedLiquifyWorker = null;
+      }
+      sharedLiquifyWorkerReady = false;
+      if (sharedLiquifyWorker) sharedLiquifyWorkerEpoch += 1;
+    }
+    const worker = sharedLiquifyWorker;
+    if (!worker) return runLiquifyDirect(request, options.signal);
+    const epoch = sharedLiquifyWorkerEpoch;
+    const controller = new AbortController();
+    sharedLiquifyFlight = { worker, epoch, controller };
+    try {
+      const result = await runLiquifyWithWorker(worker, request, options, {
+        keepAlive: true,
+        workerAlreadyReady: sharedLiquifyWorkerReady,
+        disposeSignal: controller.signal,
+      });
+      if (result.execution === "worker") {
+        if (sharedLiquifyWorker === worker && sharedLiquifyWorkerEpoch === epoch) {
+          sharedLiquifyWorkerReady = true;
+          scheduleSharedLiquifyIdleDisposal(worker, epoch, disposeGeneration);
+        }
+      } else {
+        clearSharedLiquifyWorker(worker, epoch);
+      }
+      return result;
+    } catch (error) {
+      clearSharedLiquifyWorker(worker, epoch);
+      throw error;
+    } finally {
+      if (sharedLiquifyFlight?.controller === controller) sharedLiquifyFlight = null;
+    }
+  });
+  sharedLiquifyQueue = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
 /**
- * 리퀴파이 변위 적용(backward mapping + bilinear 샘플링)을 한 번의 모듈 Worker 호출로 실행한다.
- * ArrayBuffer 기반 픽셀 데이터·변위 필드는 소유권이 이전(detach)되어 전송된다. Worker를 못
- * 만들면(구형 브라우저·CSP) 동일한 applyLiquifyDisplacement를 메인 스레드에서 동기 실행해 폴백한다.
+ * 리퀴파이 필드 생성과 변위 적용(backward mapping + bilinear 샘플링)을 capacity 1 모듈 Worker
+ * 큐에서 실행한다. 기본 Worker는 첫 ready 이후 스트로크 간 유지되며, 명시적 workerFactory만 기존
+ * 격리된 one-shot 수명을 사용한다. Reconstruct/Smooth의 field 요청도 기존대로 지원한다. Worker를
+ * 만들지 못하면 동일한 build/apply 엔진을 메인 스레드에서 동기 실행해 폴백한다.
  */
 export async function runStudioLiquifyWorker(
   request: StudioLiquifyWorkerRunRequest,
@@ -239,8 +463,10 @@ export async function runStudioLiquifyWorker(
 ): Promise<StudioLiquifyWorkerClientResult> {
   throwIfAborted(options.signal);
   const cloneSafeRequest = cloneSafeLiquifyRequest(request);
-  const factory =
-    options.workerFactory === undefined ? createStudioLiquifyModuleWorker : options.workerFactory;
+  if (options.workerFactory === undefined) {
+    return runLiquifyWithSharedModuleWorker(cloneSafeRequest, options);
+  }
+  const factory = options.workerFactory;
   if (!factory) return runLiquifyDirect(cloneSafeRequest, options.signal);
 
   let worker: StudioLiquifyWorkerLike | null;
@@ -250,5 +476,5 @@ export async function runStudioLiquifyWorker(
     return runLiquifyDirect(cloneSafeRequest, options.signal);
   }
   if (!worker) return runLiquifyDirect(cloneSafeRequest, options.signal);
-  return runLiquifyWithWorker(worker, cloneSafeRequest, options.signal);
+  return runLiquifyWithWorker(worker, cloneSafeRequest, options);
 }

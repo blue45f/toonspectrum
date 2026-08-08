@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,16 +9,63 @@ import {
   isStudioEditableRasterCopyPlanCurrent,
   materializeStudioEditableRasterCopy,
   planStudioEditableRasterCopy,
+  prepareAndRenderStudioEditableRasterCopy,
   renderStudioEditableRasterCopy,
   STUDIO_EDITABLE_RASTER_SELECTION_TOOL_KINDS,
   summarizeStudioRasterPreparationSources,
 } from "./studio-raster-edit-preparation";
-import { renderStudioVectorReference } from "./studio-vector-fill-reference";
+import {
+  prepareStudioVectorReferenceExport,
+  renderPreparedStudioVectorReference,
+  renderStudioVectorReference,
+} from "./studio-vector-fill-reference";
 
 import type { El } from "./studio-element-model";
+import type { StudioVectorReferencePreparedExport } from "./studio-vector-fill-reference";
 
 const PNG = "data:image/png;base64,iVBORw0KGgo=";
 const PAGE_COMPOSITE_MAX_BYTES = 4 * 1024 * 1024;
+
+function preparedVectorExport(input: {
+  readonly svg?: string;
+  readonly width?: number;
+  readonly height?: number;
+  readonly elementCount?: number;
+  readonly skipped?: StudioVectorReferencePreparedExport["result"]["skipped"];
+  readonly maxSvgBytes?: number;
+  readonly maxPngBytes?: number;
+} = {}): StudioVectorReferencePreparedExport {
+  return {
+    result: {
+      svg: input.svg ?? '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="480"></svg>',
+      skipped: input.skipped ? [...input.skipped] : [],
+      fontFamilies: [],
+      caveats: [],
+      elementCount: input.elementCount ?? 1,
+    },
+    execution: "worker",
+    width: input.width ?? 320,
+    height: input.height ?? 480,
+    fingerprintNamespace: "editable-raster-copy-v1",
+    maxSvgBytes: input.maxSvgBytes ?? 16 * 1024 * 1024,
+    maxPngBytes: input.maxPngBytes ?? 32 * 1024 * 1024,
+  };
+}
+
+function renderedPreparedVectorExport(
+  prepared: StudioVectorReferencePreparedExport,
+) {
+  return {
+    dataUrl: PNG,
+    fingerprint: `${prepared.fingerprintNamespace}:0000000000000000`,
+    elementCount: prepared.result.elementCount,
+    width: prepared.width,
+    height: prepared.height,
+    svgByteLength: new TextEncoder().encode(prepared.result.svg).byteLength,
+    pngByteLength: 8,
+    execution: prepared.execution,
+  } as const;
+}
 
 function line(id = "line", patch: Partial<Extract<El, { type: "draw" }>> = {}): Extract<El, { type: "draw" }> {
   return {
@@ -204,7 +253,10 @@ describe("editable raster copy planning", () => {
     expect(context.input.sourceDisposition).toBe("hide-originals");
     expect(planned).toMatchObject({
       ok: true,
-      plan: { sourceDisposition: "hide-originals" },
+      plan: {
+        sourceDisposition: "hide-originals",
+        frame: { x: 0, y: 0, width: 320, height: 480, rotation: 0 },
+      },
     });
   });
 
@@ -713,6 +765,235 @@ describe("editable raster copy planning", () => {
   });
 });
 
+describe("Worker-fused editable raster preparation", () => {
+  it("reuses one prepared SVG object for fidelity planning and rasterization", async () => {
+    const prepared = preparedVectorExport({ elementCount: 2 });
+    const prepare = vi.fn(async () => prepared);
+    const render = vi.fn(async (received: StudioVectorReferencePreparedExport) =>
+      renderedPreparedVectorExport(received));
+
+    const result = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line(), text()],
+      includeBackground: false,
+      sourceDisposition: "hide-originals",
+    }, prepare, render);
+
+    expect(result.ok).toBe(true);
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]?.[0]).toBe(prepared);
+    if (!result.ok) return;
+    expect(result.plan.sourceElementCount).toBe(2);
+    expect(result.rendered.fingerprint).toBe(result.plan.sourceFingerprint);
+  });
+
+  it("keeps the established sync plan byte-for-byte equivalent to a fused direct export", async () => {
+    const input = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line(), text(), shape()],
+      groups: [] as const,
+      includeBackground: true,
+      bg: "#f3e9d2",
+      name: "동일성 검사",
+      sourceDisposition: "preserve-visible" as const,
+    };
+    const synchronous = planStudioEditableRasterCopy(input);
+    expect(synchronous.ok).toBe(true);
+
+    let rasterizedSvg = "";
+    const fused = await prepareAndRenderStudioEditableRasterCopy(
+      input,
+      prepareStudioVectorReferenceExport,
+      renderPreparedStudioVectorReference,
+      {
+        workerFactory: null,
+        rasterize: async (request) => {
+          rasterizedSvg = request.svg;
+          return { dataUrl: PNG, width: request.width, height: request.height };
+        },
+      },
+    );
+
+    expect(fused.ok).toBe(true);
+    if (!synchronous.ok || !fused.ok) return;
+    expect(fused.plan).toEqual(synchronous.plan);
+    expect(rasterizedSvg).not.toContain("동일성 검사");
+    expect(rasterizedSvg).toContain("#f3e9d2");
+    expect(fused.rendered.fingerprint).toBe(fused.plan.sourceFingerprint);
+  });
+
+  it("fails closed on the authoritative Worker skip census before rasterization", async () => {
+    const prepared = preparedVectorExport({
+      skipped: [{
+        id: "line",
+        type: "draw",
+        mode: "approximated",
+        label: "지우개 합성은 SVG에 없어 근사됩니다.",
+      }],
+    });
+    const render = vi.fn(async () => renderedPreparedVectorExport(prepared));
+    const result = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+    }, async () => prepared, render);
+
+    expect(result).toMatchObject({ ok: false, code: "unsupported-fidelity" });
+    expect(result.ok ? "" : result.reason).toMatch(/지우개/u);
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("enforces source and SVG budgets before any unsafe downstream phase", async () => {
+    const prepare = vi.fn(async () => preparedVectorExport());
+    const render = vi.fn(async (prepared: StudioVectorReferencePreparedExport) =>
+      renderedPreparedVectorExport(prepared));
+    const sourceLimited = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+      budgets: { maxSourceBytes: 1 },
+    }, prepare, render);
+    expect(sourceLimited).toMatchObject({ ok: false, code: "source-budget-exceeded" });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+
+    const oversizedSvg = preparedVectorExport({
+      svg: `<svg>${"x".repeat(128)}</svg>`,
+      maxSvgBytes: 16,
+    });
+    const svgLimited = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+      budgets: { maxSvgBytes: 16 },
+    }, async () => oversizedSvg, render);
+    expect(svgLimited).toMatchObject({ ok: false, code: "svg-budget-exceeded" });
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("preserves document/source locks and the PNG budget on the fused path", async () => {
+    const prepare = vi.fn(async () => preparedVectorExport());
+    const render = vi.fn(async (prepared: StudioVectorReferencePreparedExport) =>
+      renderedPreparedVectorExport(prepared));
+
+    const documentLocked = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+      documentMutationBlockedReason: "검토 잠금",
+    }, prepare, render);
+    expect(documentLocked).toMatchObject({ ok: false, code: "document-locked" });
+
+    const sourceLocked = await prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line("line", { locked: true })],
+      includeBackground: false,
+      sourceDisposition: "hide-originals",
+    }, prepare, render);
+    expect(sourceLocked).toMatchObject({ ok: false, code: "source-locked" });
+    expect(prepare).not.toHaveBeenCalled();
+
+    const pngLimitedPrepared = preparedVectorExport({ maxPngBytes: 1 });
+    await expect(prepareAndRenderStudioEditableRasterCopy({
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+      budgets: { maxPngBytes: 1 },
+    }, async () => pngLimitedPrepared, async () =>
+      renderedPreparedVectorExport(pngLimitedPrepared))).rejects.toThrow(/허용치/u);
+  });
+
+  it("preserves stale ownership checks after its single async preparation boundary", async () => {
+    const input = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+    } as const;
+    const prepared = preparedVectorExport();
+    const result = await prepareAndRenderStudioEditableRasterCopy(
+      input,
+      async () => prepared,
+      async () => renderedPreparedVectorExport(prepared),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(isStudioEditableRasterCopyPlanCurrent(result.plan, input)).toBe(true);
+    expect(isStudioEditableRasterCopyPlanCurrent(result.plan, {
+      ...input,
+      elements: [line("line", { points: [10, 10, 70, 90] })],
+    })).toBe(false);
+  });
+
+  it("honors abort before export and between export and rasterization", async () => {
+    const input = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+    } as const;
+    const prepared = preparedVectorExport();
+    const prepare = vi.fn(async () => prepared);
+    const render = vi.fn(async () => renderedPreparedVectorExport(prepared));
+    const alreadyAborted = new AbortController();
+    alreadyAborted.abort();
+
+    await expect(prepareAndRenderStudioEditableRasterCopy(
+      input,
+      prepare,
+      render,
+      { signal: alreadyAborted.signal },
+    )).rejects.toMatchObject({ name: "AbortError" });
+    expect(prepare).not.toHaveBeenCalled();
+
+    const betweenPhases = new AbortController();
+    await expect(prepareAndRenderStudioEditableRasterCopy(
+      input,
+      async () => {
+        betweenPhases.abort();
+        return prepared;
+      },
+      render,
+      { signal: betweenPhases.signal },
+    )).rejects.toMatchObject({ name: "AbortError" });
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it("keeps the fused implementation off the synchronous SVG exporter", () => {
+    const implementation = readFileSync(
+      new URL("./studio-raster-edit-preparation.ts", import.meta.url),
+      "utf8",
+    );
+    const start = implementation.indexOf("export async function prepareAndRenderStudioEditableRasterCopy");
+    const end = implementation.indexOf("export function materializeStudioEditableRasterCopy", start);
+    const fusedBody = implementation.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(fusedBody).toContain("prepared.result");
+    expect(fusedBody).not.toContain("exportPageToSvg");
+    expect(fusedBody).not.toContain("planStudioEditableRasterCopy(");
+  });
+});
+
 describe("editable raster copy rendering", () => {
   it("uses the shared SVG-to-PNG seam and materializes exactly one full-page ImageEl", async () => {
     const planned = planStudioEditableRasterCopy({
@@ -888,6 +1169,149 @@ describe("editable raster copy rendering", () => {
       ...input,
       documentMutationBlockedReason: "검토 잠금을 해제하세요.",
     })).toBe(false);
+  });
+
+  it("lightweight revalidation preserves source selection, page style and mutation ownership", () => {
+    const editableGroup = { id: "editable", name: "편집", hidden: false, locked: false };
+    const selected = line("selected", { groupId: editableGroup.id, points: [100, 120, 160, 180] });
+    const other = line("other", { points: [220, 260, 280, 320] });
+    const input = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [selected, other],
+      groups: [editableGroup],
+      sourceIds: [selected.id],
+      excludedSourceIds: [other.id],
+      includeBackground: true,
+      bg: "#ffffff",
+      theme: "classic" as const,
+      insertionIndex: 2,
+      sourceDisposition: "hide-originals" as const,
+      sourceDispositionIds: [selected.id],
+    };
+    const planned = planStudioEditableRasterCopy(input);
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, input)).toBe(true);
+    // Inspector-only group presentation metadata is not a rendered document revision.
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      groups: [{ ...editableGroup, name: "이름만 변경", collapsed: true }],
+    })).toBe(true);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      groups: [{ ...editableGroup, hidden: true }],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      groups: [{ ...editableGroup, locked: true }],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      groups: [],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      sourceIds: [other.id],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      excludedSourceIds: [selected.id],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      width: 321,
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      theme: "soft",
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      bg: "#f3e9d2",
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      bgGrad: ["#ffffff", "#111111"],
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      insertionIndex: 1,
+    })).toBe(false);
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      sourceDisposition: "preserve-visible",
+    })).toBe(false);
+  });
+
+  it("fails closed when any current raster budget becomes stricter", () => {
+    const budgets = {
+      maxPixelCount: 1_000_000,
+      maxSourceBytes: 1_000_000,
+      maxSvgBytes: 1_000_000,
+      maxPngBytes: 1_000_000,
+    };
+    const input = {
+      pageId: "page-1",
+      width: 320,
+      height: 480,
+      elements: [line()],
+      includeBackground: false,
+      budgets,
+    };
+    const planned = planStudioEditableRasterCopy(input);
+    expect(planned.ok).toBe(true);
+    if (!planned.ok) return;
+    expect(planned.plan.budgets).toEqual(budgets);
+    expect(planned.plan.budgets).not.toBe(budgets);
+
+    const budgetKeys = [
+      "maxPixelCount",
+      "maxSourceBytes",
+      "maxSvgBytes",
+      "maxPngBytes",
+    ] as const;
+    const stricterResults = Object.fromEntries(budgetKeys.map((budgetKey) => [
+      budgetKey,
+      isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+        ...input,
+        budgets: { ...budgets, [budgetKey]: budgets[budgetKey] - 1 },
+      }),
+    ]));
+
+    expect(stricterResults).toEqual({
+      maxPixelCount: false,
+      maxSourceBytes: false,
+      maxSvgBytes: false,
+      maxPngBytes: false,
+    });
+    expect(isStudioEditableRasterCopyPlanCurrent(planned.plan, {
+      ...input,
+      budgets: {
+        maxPixelCount: budgets.maxPixelCount + 1,
+        maxSourceBytes: budgets.maxSourceBytes + 1,
+        maxSvgBytes: budgets.maxSvgBytes + 1,
+        maxPngBytes: budgets.maxPngBytes + 1,
+      },
+    })).toBe(true);
+  });
+
+  it("keeps async current checks free of repeated SVG planning", () => {
+    const implementation = readFileSync(
+      new URL("./studio-raster-edit-preparation.ts", import.meta.url),
+      "utf8",
+    );
+    const start = implementation.indexOf("export function isStudioEditableRasterCopyPlanCurrent");
+    const end = implementation.indexOf("export function applyStudioEditableRasterCopy", start);
+    const currentCheck = implementation.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(currentCheck).toContain("fingerprintEditableRasterCopySource");
+    expect(currentCheck).not.toContain("planStudioEditableRasterCopy(current)");
+    expect(currentCheck).not.toContain("exportPageToSvg");
   });
 });
 

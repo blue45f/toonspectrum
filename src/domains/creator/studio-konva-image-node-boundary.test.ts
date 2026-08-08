@@ -154,6 +154,7 @@ const IMAGE_NODE_PROPS = [
   "liveStrokeRef",
   "onHokusaiCanonicalImageReady",
   "onLivingInkCanonicalImageReady",
+  "rasterPresentationEligible",
 ] as const;
 
 const MOVED_DECLARATIONS = [
@@ -189,7 +190,7 @@ describe("Studio Konva image node boundary", () => {
     expect(page.source).not.toMatch(/\bUrlImage\b/u);
   });
 
-  it("preserves the exact twelve-prop effective image call contract", () => {
+  it("preserves the exact effective image call contract", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
     const contract = propertyNames(
@@ -213,6 +214,8 @@ describe("Studio Konva image node boundary", () => {
       .toBe("{onHokusaiCanonicalImageReady}");
     expect(attributes.get("onLivingInkCanonicalImageReady"))
       .toBe("{onLivingInkCanonicalImageReady}");
+    expect(attributes.get("rasterPresentationEligible"))
+      .toBe("{!isNonInteractiveRender}");
   });
 
   it("keeps filters and the worker behind literal image-node intent boundaries", () => {
@@ -249,7 +252,7 @@ describe("Studio Konva image node boundary", () => {
     expect(source).toContain("globalThis.cancelAnimationFrame(raf)");
     expect(source).toContain("if (el.frames && el.frames.length > 1) return;");
     expect(source).toContain("if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS)");
-    expect(source).toContain("cx.scale(scaleX, scaleY);");
+    expect(source).toContain("context.scale(scaleX, scaleY);");
     expect(source).toContain(
       "node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });"
     );
