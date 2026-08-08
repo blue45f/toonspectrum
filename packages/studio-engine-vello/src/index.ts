@@ -26,6 +26,12 @@ export {
   renderSceneToPixels,
   type VelloInitInput,
 } from "./render";
+export {
+  renderShardedScene,
+  renderSceneToPixelsWithFragments,
+  type ShardRenderTiming,
+  type ShardedRenderResult,
+} from "./scene-sharding";
 export { shapeTextToGlyphPaths, shapedTextSchema, shapedGlyphSchema } from "./text";
 export type { ShapedText, ShapedGlyph, ShapeTextOptions } from "./text";
 export {

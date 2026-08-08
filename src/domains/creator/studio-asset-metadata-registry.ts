@@ -1,0 +1,380 @@
+import {
+  canvasKitImageFilterDescriptor,
+  openCvImageWorkerDescriptor,
+  wasmVipsPipelineDescriptor,
+} from "@toonspectrum/studio-engine-registry";
+import {
+  assertAssetCapabilitiesKnown,
+  assetMetadataIRSchema,
+  canonicalJson,
+  collectSceneFeatures,
+  computeAssetContentDigest,
+  sceneFeatureCapabilityVocabulary,
+} from "@toonspectrum/studio-project-model";
+
+// Descriptor-only modules are imported by file path (same precedent as
+// studio-live-ink-stabilizer-plan.ts): the package INDEX of the skia/vello
+// engines drags in canvaskit-wasm / wasm loader sources that the root app
+// program must not typecheck or bundle, while these descriptor modules are
+// pure data.
+import {
+  hokusaiProviderDescriptor,
+  perfectFreehandProviderDescriptor,
+} from "../../../packages/studio-brush-platform/src/providers";
+import { canvasKitProviderDescriptor } from "../../../packages/studio-engine-skia/src/descriptor";
+import {
+  velloCpuProviderDescriptor,
+  velloGpuBrowserProviderDescriptor,
+} from "../../../packages/studio-engine-vello/src/descriptor";
+
+import type { StudioAsyncKeyValueStore } from "./studio-local-database";
+import type { KppImportResult } from "../../../packages/studio-format-gateway/src/kpp";
+import type { MybImportResult } from "../../../packages/studio-format-gateway/src/myb";
+import type { SvgImportResult } from "../../../packages/studio-format-gateway/src/svg";
+import type {
+  EngineCapabilityRegistry,
+  ProviderDescriptor,
+} from "@toonspectrum/studio-engine-registry";
+import type {
+  AssetKindIR,
+  AssetLicenseIR,
+  AssetMetadataIR,
+  BrushProgramIR,
+} from "@toonspectrum/studio-project-model";
+
+/**
+ * V12 §15 — asset ecosystem engine metadata registry.
+ *
+ * Holds AssetMetadataIR cards (the AssetPackage "provider requirements +
+ * license/SPDX/provenance" slice), answers "can the CURRENT engine set render
+ * this material?" against the EngineCapabilityRegistry, and persists through
+ * the studio-local-database kv namespace — no new tables, no migrations.
+ */
+
+// ---------------------------------------------------------------------------
+// Capability vocabulary
+// ---------------------------------------------------------------------------
+
+/**
+ * Every provider descriptor the studio ships today. This is the KNOWN
+ * capability universe used to reject unregisterable metadata; whether a
+ * material is renderable RIGHT NOW is judged separately against whatever
+ * subset is actually registered on the device (see judgeAssetRenderability).
+ */
+export const STUDIO_KNOWN_ENGINE_DESCRIPTORS: readonly ProviderDescriptor[] = [
+  canvasKitProviderDescriptor,
+  velloCpuProviderDescriptor,
+  velloGpuBrowserProviderDescriptor,
+  perfectFreehandProviderDescriptor,
+  hokusaiProviderDescriptor,
+  canvasKitImageFilterDescriptor,
+  openCvImageWorkerDescriptor,
+  wasmVipsPipelineDescriptor,
+];
+
+/**
+ * Full asset capability vocabulary: the union of every descriptor's declared
+ * capabilities plus the scene-feature tokens `collectSceneFeatures` can emit
+ * (an SVG using a blend no provider declares yet must still REGISTER — it is
+ * a renderability verdict, not an unknown token).
+ */
+export function studioAssetCapabilityVocabulary(
+  descriptors: readonly ProviderDescriptor[] = STUDIO_KNOWN_ENGINE_DESCRIPTORS,
+): ReadonlySet<string> {
+  const vocabulary = new Set<string>(sceneFeatureCapabilityVocabulary());
+  for (const descriptor of descriptors) {
+    for (const capability of descriptor.capabilities) vocabulary.add(capability);
+  }
+  return vocabulary;
+}
+
+// ---------------------------------------------------------------------------
+// Registry
+// ---------------------------------------------------------------------------
+
+export const STUDIO_ASSET_METADATA_KV_NAMESPACE = "asset-metadata";
+export const STUDIO_ASSET_METADATA_CATALOG_KEY = "catalog.v1";
+export const STUDIO_ASSET_METADATA_CATALOG_REVISION = 1 as const;
+
+export class StudioAssetMetadataRegistryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StudioAssetMetadataRegistryError";
+  }
+}
+
+export interface StudioAssetRenderabilityReport {
+  assetId: string;
+  /** True when every required capability is declared by ≥1 registered provider. */
+  renderable: boolean;
+  /** Required capabilities no registered provider declares (sorted). */
+  missingCapabilities: string[];
+  /** capability token → provider ids declaring it (sorted; [] when missing). */
+  capabilityProviders: Record<string, string[]>;
+}
+
+/**
+ * Judges whether `metadata` can render on the CURRENT engine set. Union
+ * semantics on purpose: the hybrid planner routes islands to different
+ * providers, so a material is renderable when each required capability is
+ * declared by at least one registered provider — not necessarily the same one.
+ */
+export function judgeAssetRenderability(
+  metadata: AssetMetadataIR,
+  engines: EngineCapabilityRegistry,
+): StudioAssetRenderabilityReport {
+  const providers = engines.list();
+  const capabilityProviders: Record<string, string[]> = {};
+  const missingCapabilities: string[] = [];
+  for (const token of [...new Set(metadata.engineRequirements)].sort()) {
+    const declaring = providers
+      .filter((provider) => provider.descriptor.capabilities.includes(token))
+      .map((provider) => provider.descriptor.id)
+      .sort();
+    capabilityProviders[token] = declaring;
+    if (declaring.length === 0) missingCapabilities.push(token);
+  }
+  return {
+    assetId: metadata.id,
+    renderable: missingCapabilities.length === 0,
+    missingCapabilities,
+    capabilityProviders,
+  };
+}
+
+interface PersistedCatalog {
+  revision: number;
+  assets: unknown[];
+}
+
+export class StudioAssetMetadataRegistry {
+  private readonly assets = new Map<string, AssetMetadataIR>();
+  private readonly vocabulary: ReadonlySet<string>;
+
+  constructor(vocabulary: Iterable<string> = studioAssetCapabilityVocabulary()) {
+    this.vocabulary =
+      vocabulary instanceof Set ? vocabulary : new Set(vocabulary);
+  }
+
+  /**
+   * Validates (schema + capability vocabulary) and registers. Duplicate ids
+   * and unknown capability tokens are rejected loudly — a card that cannot
+   * be matched against any engine must never enter the catalog silently.
+   */
+  register(candidate: unknown): AssetMetadataIR {
+    const metadata = assetMetadataIRSchema.parse(candidate);
+    if (this.assets.has(metadata.id)) {
+      throw new StudioAssetMetadataRegistryError(
+        `asset already registered: ${metadata.id}`,
+      );
+    }
+    assertAssetCapabilitiesKnown(metadata, this.vocabulary);
+    this.assets.set(metadata.id, metadata);
+    return metadata;
+  }
+
+  get(id: string): AssetMetadataIR | null {
+    return this.assets.get(id) ?? null;
+  }
+
+  list(kind?: AssetKindIR): AssetMetadataIR[] {
+    const all = [...this.assets.values()].sort((a, b) =>
+      a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
+    return kind === undefined ? all : all.filter((asset) => asset.kind === kind);
+  }
+
+  judgeRenderability(
+    id: string,
+    engines: EngineCapabilityRegistry,
+  ): StudioAssetRenderabilityReport {
+    const metadata = this.assets.get(id);
+    if (metadata === undefined) {
+      throw new StudioAssetMetadataRegistryError(`asset not registered: ${id}`);
+    }
+    return judgeAssetRenderability(metadata, engines);
+  }
+
+  /**
+   * Persists the whole catalog as ONE canonical-JSON snapshot under the
+   * "asset-metadata" kv namespace. A single key means a torn multi-key
+   * update cannot exist; canonicalJson means byte-identical snapshots for
+   * identical catalogs.
+   */
+  async saveTo(store: StudioAsyncKeyValueStore): Promise<void> {
+    const catalog: PersistedCatalog = {
+      revision: STUDIO_ASSET_METADATA_CATALOG_REVISION,
+      assets: this.list(),
+    };
+    await store.set(STUDIO_ASSET_METADATA_CATALOG_KEY, canonicalJson(catalog));
+  }
+
+  /**
+   * Loads a catalog snapshot. A missing key is an empty registry; anything
+   * unreadable (bad JSON, wrong revision, invalid entry) throws — corrupted
+   * catalogs are surfaced, never partially and silently dropped.
+   */
+  static async loadFrom(
+    store: StudioAsyncKeyValueStore,
+    vocabulary: Iterable<string> = studioAssetCapabilityVocabulary(),
+  ): Promise<StudioAssetMetadataRegistry> {
+    const registry = new StudioAssetMetadataRegistry(vocabulary);
+    const payload = await store.get(STUDIO_ASSET_METADATA_CATALOG_KEY);
+    if (payload === null) return registry;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch (error) {
+      throw new StudioAssetMetadataRegistryError(
+        `asset-metadata catalog is not valid JSON: ${(error as Error).message}`,
+      );
+    }
+    const catalog = parsed as Partial<PersistedCatalog> | null;
+    if (
+      catalog === null ||
+      typeof catalog !== "object" ||
+      catalog.revision !== STUDIO_ASSET_METADATA_CATALOG_REVISION ||
+      !Array.isArray(catalog.assets)
+    ) {
+      throw new StudioAssetMetadataRegistryError(
+        "asset-metadata catalog has an unknown shape or revision — refusing " +
+          "a lossy partial load",
+      );
+    }
+    for (const entry of catalog.assets) registry.register(entry);
+    return registry;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Derivation from format-gateway outputs (the real wiring proof)
+// ---------------------------------------------------------------------------
+
+export interface DeriveAssetIdentity {
+  id: string;
+  name?: string;
+  /** Defaults to "1.0.0" — imported materials start at their first release. */
+  version?: string;
+  license: AssetLicenseIR;
+  sourceFileName?: string | null;
+  now?: () => number;
+}
+
+export type DeriveAssetMetadataInput =
+  | { format: "myb"; bytes: Uint8Array; result: MybImportResult }
+  | { format: "kpp"; bytes: Uint8Array; result: KppImportResult }
+  | { format: "svg"; svgText: string; result: SvgImportResult };
+
+/**
+ * Engine requirements of an imported brush program, grounded in the shipped
+ * provider vocabulary (no invented tokens):
+ * - vector-path output executes on the stroke-geometry lane
+ *   → "stroke.geometry.pressure-outline"
+ * - a hokusai provider preference means faithful rendering needs the
+ *   natural-media lane → "brush.natural-media.dynamics"
+ * - `.myb` payloads additionally need the myb interpreter
+ *   → "brush.natural-media.myb"
+ */
+function deriveBrushEngineRequirements(
+  program: BrushProgramIR,
+  sourceFormat: "myb" | "kpp",
+): string[] {
+  const requirements = new Set<string>();
+  if (program.output.target === "vector-path") {
+    requirements.add("stroke.geometry.pressure-outline");
+  }
+  if (
+    sourceFormat === "myb" ||
+    program.providerPreference.includes("hokusai-natural-media")
+  ) {
+    requirements.add("brush.natural-media.dynamics");
+  }
+  if (sourceFormat === "myb") {
+    requirements.add("brush.natural-media.myb");
+  }
+  return [...requirements].sort();
+}
+
+/**
+ * Derives an AssetMetadataIR card from a format-gateway import result. The
+ * digest always covers the ORIGINAL payload (bytes / source text), and the
+ * importer's unmapped/warning ledgers ride into provenance verbatim so the
+ * zero-silent-loss trail survives into the marketplace layer.
+ */
+export function deriveAssetMetadata(
+  input: DeriveAssetMetadataInput,
+  identity: DeriveAssetIdentity,
+): AssetMetadataIR {
+  const now = identity.now ?? Date.now;
+  const base = {
+    id: identity.id,
+    version: identity.version ?? "1.0.0",
+    license: identity.license,
+    createdAt: now(),
+  };
+  const provenanceBase = {
+    sourceFileName: identity.sourceFileName ?? null,
+    importedAt: base.createdAt,
+  };
+
+  let candidate: unknown;
+  switch (input.format) {
+    case "myb": {
+      const { preset, unmappedSettings } = input.result;
+      candidate = {
+        ...base,
+        kind: "brush-program",
+        name: identity.name ?? preset.name,
+        engineRequirements: deriveBrushEngineRequirements(preset, "myb"),
+        sourceFormat: "myb",
+        contentDigest: computeAssetContentDigest(input.bytes),
+        provenance: {
+          ...provenanceBase,
+          importer: "studio-format-gateway/importMybBrush",
+          warnings: [],
+          unmapped: [...unmappedSettings],
+        },
+      };
+      break;
+    }
+    case "kpp": {
+      const { program, unmapped, warnings } = input.result;
+      candidate = {
+        ...base,
+        kind: "brush-program",
+        name: identity.name ?? program.name,
+        engineRequirements: deriveBrushEngineRequirements(program, "kpp"),
+        sourceFormat: "kpp",
+        contentDigest: computeAssetContentDigest(input.bytes),
+        provenance: {
+          ...provenanceBase,
+          importer: "studio-format-gateway/parseKppPreset",
+          warnings: [...warnings],
+          unmapped: [...unmapped],
+        },
+      };
+      break;
+    }
+    case "svg": {
+      const { scene, warnings, unsupported } = input.result;
+      candidate = {
+        ...base,
+        kind: "svg-decoration",
+        name: identity.name ?? identity.id,
+        // Scene-feature inventory IS the requirement list: exactly what the
+        // planner will ask an adapter to honor for this decoration.
+        engineRequirements: collectSceneFeatures(scene),
+        sourceFormat: "svg",
+        contentDigest: computeAssetContentDigest(input.svgText),
+        provenance: {
+          ...provenanceBase,
+          importer: "studio-format-gateway/parseSvgToScene",
+          warnings: [...warnings],
+          unmapped: [...unsupported],
+        },
+      };
+      break;
+    }
+  }
+  return assetMetadataIRSchema.parse(candidate);
+}

@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "date": "2026-08-08",
+    "lane": "ADR-0011 lane 6 — Xilem/Masonry CanvasWidgetIsland (V12 §8.2)",
+    "goal": "Replace quarantine rationale ('web-target experimental, 0 PoC in repo') with measured build + browser-run evidence",
+    "pocLocation": "~/toolchains/xilem-poc (workspace: poc-xilem, poc-masonry, vendor/masonry_core)",
+    "toolchain": {
+      "cargo": "1.97.1",
+      "rustc": "1.97.1",
+      "wasmPack": "0.15.0",
+      "wasmBindgen": "0.2.127",
+      "target": "wasm32-unknown-unknown"
+    },
+    "browser": "Playwright Chromium 140.0.7339.186 headless (--enable-unsafe-webgpu --enable-features=WebGPU --use-angle=metal)"
+  },
+  "versionAlignment": {
+    "xilem": "0.4.0 (2025-10-29, latest on crates.io)",
+    "masonry": "0.4.0 / masonry_core 0.4.0 / masonry_winit 0.4.0",
+    "masonryRequiresVello": "^0.6.0 (resolved 0.6.0) — repo pin is vello 0.9: 3-minor gap, masonry lane cannot share our vello 0.9 scene pipeline without dual-vello or upstream catch-up",
+    "masonryVelloWgpu": "wgpu 26.0.1 (repo GPU lane also wgpu via vello 0.9 — separate wgpu instance/device if co-deployed)",
+    "accesskit": "0.21.1 + accesskit_winit 0.29.2 — platform adapters are macos/windows/android/unix only; NO web adapter crate exists (browser a11y projection gap remains)",
+    "xilemTokio": "xilem 0.4.0 hard-depends tokio ^1.48 with rt-multi-thread (non-optional)"
+  },
+  "buildAttempts": [
+    {
+      "crate": "poc-xilem (xilem 0.4.0)",
+      "result": "FAIL",
+      "failurePoint": "tokio-1.53.1/src/lib.rs:479 compile_error!(\"Only features sync,macros,io-util,rt,time are supported on wasm.\") — triggered by xilem's non-optional rt-multi-thread feature",
+      "verdict": "xilem view layer is hard-blocked on wasm32-unknown-unknown at 0.4.0; masonry retained layer is the viable island"
+    },
+    {
+      "crate": "poc-masonry (masonry 0.4.0 + masonry_winit 0.4.0, published crates.io)",
+      "result": "FAIL as published",
+      "failurePoint": "masonry_core 0.4.0 src/app/tracing_backend.rs wasm path references tracing_wasm + console_error_panic_hook which are NOT declared in its Cargo.toml (E0433 x3), plus bit-rot: unqualified Registry and tracing-wasm 0.2.1 set_max_level type mismatch (E0308) — upstream never compiled the published wasm path",
+      "upstreamStatus": "fixed on xilem git main (deps declared under [target.'cfg(target_arch = \"wasm32\")'.dependencies], function body rewritten)"
+    },
+    {
+      "crate": "poc-masonry with vendored masonry_core 0.4.0 + 2-dep/2-line local patch (mirrors upstream main)",
+      "result": "PASS",
+      "detail": "Full stack compiles for wasm32-unknown-unknown: masonry_core(patched) + masonry 0.4.0 + masonry_winit 0.4.0 + vello 0.6.0 + wgpu 26.0.1 + parley 0.6.0 + accesskit 0.21.1 + accesskit_winit 0.29.2 + copypasta 0.10.2",
+      "artifact": "poc_masonry_bg.wasm 2,990,509 B (sha256 16c632091a8b97fc…), embedded Roboto-Regular.ttf 488,584 B => engine net ~2.50 MB; JS glue 59.9 KB; wasm-pack build 31.1 s cold / 3.5 s warm"
+    }
+  ],
+  "runtimeArchitectureFinding": {
+    "masonryWinit": "NOT runnable on web: event_loop_runner.rs:965 pollster::block_on(render_cx.create_surface(...)) synchronously blocks on JS-async WebGPU adapter/device futures — compiles but can never resolve in a browser",
+    "pocPath": "Bypass masonry_winit entirely: drive masonry_core::RenderRoot directly — handle_pointer_event() in, redraw() -> (vello Scene, Option<accesskit TreeUpdate>) out, we own WebGPU device + vello Renderer::render_to_texture + wgpu TextureBlitter -> canvas surface. This IS the V12 §8.2 CanvasWidgetIsland shape (no winit window, scene fragment composited into our canvas)"
+  },
+  "browserRun": {
+    "widgets": "Button('Click me', real Roboto text via parley glyph runs) + Slider(0..1) + custom ColorPatch Widget impl (paint() -> vello Scene fill/circle)",
+    "initMs": { "wasmLoadCold": 21.2, "appInitColdInclAdapterDeviceRendererShaders": 224.9, "appInitWarm": 37.0 },
+    "clickRoundTrip": {
+      "assertion": "pointer_down+up at button center -> ButtonPress action -> edit_widget(ColorPatch)::set_clicked -> redraw -> render -> readback pixel flips (200,40,40,255)->(24,160,88,255)",
+      "clicksCounter": "0 -> 1",
+      "wallClockMs": 1.4
+    },
+    "sliderDragRoundTrip": {
+      "assertion": "down + 8 moves + up across slider -> f64 actions -> value 0.3 -> 0.9348, yellow circle center x scanned in readback 135.5 -> 339",
+      "wallClockMs10EventsWithRenders": 2.8
+    },
+    "pointerMoveLatencyMs": {
+      "note": "event -> RenderRoot passes -> vello render_to_texture -> blit -> present submit, wall clock per event, n=100",
+      "p50": 0.1,
+      "p95": 0.3,
+      "p99": 0.9
+    },
+    "accessKit": "TreeUpdate generation WORKS on wasm: initial tree 8 nodes after WindowEvent::EnableAccessTree, incremental deltas 2 nodes on interaction. Caveat: data-only — no accesskit web adapter exists to project into browser a11y tree; §8 'screen reader 회귀 없음' gate still requires a DOM mirror we'd have to build",
+    "consoleErrors": 0,
+    "screenshot": "scratchpad poc-masonry.png — button text + slider at 0.93 + green patch + yellow circle, matches asserted state"
+  },
+  "verdict": {
+    "lane6Status": "빌드 게이트 통과 (with recorded caveats) — masonry_core-as-island builds and runs round-trips in real browser WebGPU",
+    "caveats": [
+      "published masonry_core 0.4.0 needs 2-dep local patch (fixed upstream main; next release should clear)",
+      "xilem view-diff layer itself is wasm-blocked at 0.4.0 (tokio rt-multi-thread)",
+      "masonry pins vello 0.6 vs repo 0.9 — island cannot share our Scene/Renderer objects; separate renderer or upstream version catch-up needed",
+      "AccessKit web projection layer does not exist upstream",
+      "IME/text-input path untested (§8 gate item)"
+    ],
+    "promotionGatesRemaining": "§8 승격 조건 그대로: React+Vello 오버레이 대비 pointer latency 동률(오버레이 A/B 하니스 필요), focus/IME/screen-reader 회귀 없음, 120Hz repaint budget, deterministic event replay"
+  }
+}

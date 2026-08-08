@@ -38,6 +38,15 @@ const INK_MODELER_DIR = join(
   "src",
   "ink-modeler",
 );
+// V12 lane 3 / §11.2 (ADR-0011): google/ink brush-geometry mesh artifact
+// (commit-pinned direct-emcc subset build + C bridge — see its README.md).
+const INK_MESH_DIR = join(
+  ROOT,
+  "packages",
+  "studio-brush-platform",
+  "src",
+  "ink-mesh",
+);
 
 function fail(message) {
   console.error(`verify:studio-engine FAILED — ${message}`);
@@ -79,6 +88,12 @@ verifyPkgIntegrity(
   INK_MODELER_DIR,
   "ink-modeler",
   "rebuild via emcc per packages/studio-brush-platform/src/ink-modeler/README.md " +
+    "(re-apply the two-line @generated banner) and refresh INTEGRITY.sha256",
+);
+verifyPkgIntegrity(
+  INK_MESH_DIR,
+  "ink-mesh",
+  "rebuild via emcc per packages/studio-brush-platform/src/ink-mesh/README.md " +
     "(re-apply the two-line @generated banner) and refresh INTEGRITY.sha256",
 );
 verifyPkgIntegrity(

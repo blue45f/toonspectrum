@@ -2,8 +2,14 @@ import { z } from "zod";
 
 import { animationGraphIRSchema } from "./animation";
 import { colorIRSchema, paintIRSchema } from "./color";
-import { comicGraphIRSchema, comicPageIRSchema } from "./comic";
+import {
+  comicBalloonIRSchema,
+  comicGraphIRSchema,
+  comicPageIRSchema,
+  comicPanelIRSchema,
+} from "./comic";
 import { effectGraphIRSchema } from "./effect";
+import { pathIRSchema } from "./path";
 import { sceneIRSchema, sceneNodeIRSchema } from "./scene";
 
 /**
@@ -19,6 +25,12 @@ import { sceneIRSchema, sceneNodeIRSchema } from "./scene";
  * gap — partial-edit commands (move one balloon, retime one exposure) are the
  * planned v2 surface and will be added as new discriminants, so today's
  * journals stay replayable forever.
+ *
+ * v2 (V12 §14.1 만화 제작 Transaction) adds the comic partial-edit commands
+ * below as *new* discriminants only — the v1 members are byte-frozen, so every
+ * existing journal parses and replays unchanged. Each partial edit targets one
+ * page by id, applies a minimal structural change and is re-validated through
+ * validateComicGraph before it may consume a journal seq.
  */
 
 export const commandIRSchema = z.discriminatedUnion("type", [
@@ -47,6 +59,74 @@ export const commandIRSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("comic/set-page"), page: comicPageIRSchema }),
   /** Drops the whole comic layer (explicit, journaled — never implicit). */
   z.object({ type: z.literal("comic/clear") }),
+  /**
+   * Translates one balloon (shape + tail) by (x, y) in page space. The linked
+   * scene text node is untouched — text placement derives from balloon layout.
+   */
+  z.object({
+    type: z.literal("comic/move-balloon"),
+    pageId: z.string().min(1),
+    balloonId: z.string().min(1),
+    x: z.number(),
+    y: z.number(),
+  }),
+  /** Links (or unlinks with null) a balloon to a scene text node. */
+  z.object({
+    type: z.literal("comic/set-balloon-text-node"),
+    pageId: z.string().min(1),
+    balloonId: z.string().min(1),
+    textNodeId: z.string().min(1).nullable(),
+  }),
+  /** Replaces one panel's boundary shape (move/resize as a wholesale path). */
+  z.object({
+    type: z.literal("comic/move-panel"),
+    pageId: z.string().min(1),
+    panelId: z.string().min(1),
+    shape: pathIRSchema,
+  }),
+  /**
+   * Re-assigns panel reading order. `readingOrder` lists the page's panel ids
+   * in their new 0..n-1 reading positions and must be an exact permutation.
+   */
+  z.object({
+    type: z.literal("comic/reorder-panels"),
+    pageId: z.string().min(1),
+    readingOrder: z.array(z.string().min(1)).min(1),
+  }),
+  /** Appends one panel; readingOrder contiguity is enforced by validation. */
+  z.object({
+    type: z.literal("comic/add-panel"),
+    pageId: z.string().min(1),
+    panel: comicPanelIRSchema,
+  }),
+  /**
+   * Removes one panel. Referential integrity is refuse-based: if any balloon,
+   * tone or effect line still references the panel the command is rejected
+   * with the offending ids (V12 §14.1 specifies the transaction chain but no
+   * cascade for panel removal, so dependents must be removed explicitly —
+   * consistent with the "no silent loss" journal principle).
+   */
+  z.object({
+    type: z.literal("comic/remove-panel"),
+    pageId: z.string().min(1),
+    panelId: z.string().min(1),
+  }),
+  /** Appends one balloon; panel/character refs and order are validated. */
+  z.object({
+    type: z.literal("comic/add-balloon"),
+    pageId: z.string().min(1),
+    balloon: comicBalloonIRSchema,
+  }),
+  /**
+   * Removes one balloon and compacts the per-panel balloon reading order. Any
+   * linked scene text node stays in the scene layer — dropping scene content
+   * must always be an explicit, journaled scene command.
+   */
+  z.object({
+    type: z.literal("comic/remove-balloon"),
+    pageId: z.string().min(1),
+    balloonId: z.string().min(1),
+  }),
   /** Replaces the entire animation graph (X-sheet, camera, audio). */
   z.object({ type: z.literal("animation/set-graph"), graph: animationGraphIRSchema }),
   z.object({ type: z.literal("animation/clear") }),
@@ -61,6 +141,32 @@ export type SceneCommandIR = Extract<CommandIR, { type: `scene/${string}` }>;
 
 export function isSceneCommand(command: CommandIR): command is SceneCommandIR {
   return command.type.startsWith("scene/");
+}
+
+/** Comic partial-edit subset (the V12 §14.1 v2 surface; excludes set-page/clear). */
+export type ComicPartialCommandIR = Extract<
+  CommandIR,
+  {
+    type:
+      | "comic/move-balloon"
+      | "comic/set-balloon-text-node"
+      | "comic/move-panel"
+      | "comic/reorder-panels"
+      | "comic/add-panel"
+      | "comic/remove-panel"
+      | "comic/add-balloon"
+      | "comic/remove-balloon";
+  }
+>;
+
+export function isComicPartialCommand(
+  command: CommandIR,
+): command is ComicPartialCommandIR {
+  return (
+    command.type.startsWith("comic/") &&
+    command.type !== "comic/set-page" &&
+    command.type !== "comic/clear"
+  );
 }
 
 export const journalEntryIRSchema = z.object({
