@@ -3,7 +3,7 @@
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
  * Desktop IA (Magma-style):
- * - Visible: app menubar + MainMenu (파일/편집/삽입/보기/필터/그리기/AI/도움말) + left tool rail
+ * - Visible: app menubar + V5 §15.3 MainMenu groups + left tool rail
  * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
@@ -34,32 +34,36 @@ const MAIN_MENU: Record<string, string[]> = {
     "복사",
     "복제",
     "선택 제거",
-    "모두 선택",
-    "선택 해제",
     "작업 내역",
   ],
-  삽입: [
-    "템플릿 · 에셋",
-    "콜라주",
+  선택: ["모두 선택", "선택 해제"],
+  레이어: ["이미지…"],
+  벡터: [
     "요소 · 도형",
-    "말풍선",
-    "텍스트",
-    "이미지…",
+  ],
+  텍스트: ["말풍선", "텍스트"],
+  만화: ["콜라주", "새 페이지"],
+  "3D": [
     "3D 캐릭터",
     "3D 배경",
-    "참고 이미지",
-    "새 페이지",
   ],
   보기: [
-    "슈퍼심플 레이아웃",
-    "전체 레이아웃",
-    "패널 접어 넓게",
     "화면에 맞게 조정",
     "확대",
     "축소",
     "실제 픽셀 (100%)",
     "전체화면",
+    "다중 레이어 타임라인",
+    "세로 스크롤 미리보기",
+    "스토리보드 그리드 보기",
+  ],
+  창: [
+    "슈퍼심플 레이아웃",
+    "전체 레이아웃",
+    "패널 접어 넓게",
     "캔버스만",
+    "템플릿 · 에셋",
+    "참고 이미지",
   ],
   필터: [
     "가우시안 블러",
@@ -99,7 +103,7 @@ const MENU_DRIVEN_POPOVERS: {
   expectDialogName?: string;
 }[] = [
   {
-    group: "삽입",
+    group: "창",
     item: "템플릿 · 에셋",
     expectVisible: ["템플릿", "이메레스", "장면", "클립", "효과"],
   },
