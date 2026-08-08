@@ -1786,6 +1786,99 @@ export function resolveStudioWorkspaceControlSide(
 }
 
 /**
+ * Fold a layout as it was presented on one device back into the layout an artist authored.
+ *
+ * "Save this arrangement" means the arrangement on screen — but on a device that overrides the docks
+ * the screen is showing the override, not the authored geometry. Writing what is on screen straight
+ * back is what permanently overwrites a workspace with whatever device it was last opened on: save
+ * once from a pen display and the desktop docks the artist authored are gone for good. The presented
+ * dock geometry lands in that device's override slot instead, leaving the authored `desktop`
+ * untouched, while everything deliberately device-independent — inspector, palettes, quick actions —
+ * saves exactly as presented.
+ *
+ * Returns the presented layout unchanged when there was nothing to undo — no device, or a device
+ * this profile does not override — because then the screen was already showing authored geometry.
+ */
+export function captureStudioWorkspaceDeviceLayout(
+  authored: StudioWorkspaceLayout,
+  presented: StudioWorkspaceLayout,
+  device?: StudioWorkspaceDeviceKind | null,
+): StudioWorkspaceLayout {
+  const base = normalizeWorkspaceLayout(authored, defaultWorkspace("storyboard").layout);
+  const shown = normalizeWorkspaceLayout(presented, base);
+  // A device the profile does not override showed the authored geometry unchanged, so what came
+  // back is authored geometry too — editing docks on a plain desktop must still move the profile,
+  // not quietly mint an override for a surface nobody adapted.
+  if (!device || !base.deviceOverrides[device]) return shown;
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  for (const kind of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    // The presented layout carries the authored overrides through `resolveStudioWorkspaceDeviceLayout`,
+    // but preferring it keeps an override the artist edited in this same session from being reverted.
+    const existing = shown.deviceOverrides[kind] ?? base.deviceOverrides[kind];
+    if (existing) overrides[kind] = existing;
+  }
+  if (sameDesktopLayout(shown.desktop, base.desktop)) {
+    // Docks dragged back to the authored geometry read as clearing the override, not as pinning a
+    // duplicate of it — otherwise a device could never return to inheriting. A handedness override
+    // is a separate deliberate choice and survives: geometry matching again is not a reason to
+    // un-flip the grip someone set for this device.
+    const controlSide = overrides[device]?.controlSide ?? null;
+    if (controlSide === null) delete overrides[device];
+    else overrides[device] = Object.freeze({ desktop: base.desktop, controlSide });
+  } else {
+    overrides[device] = Object.freeze({
+      desktop: shown.desktop,
+      controlSide: overrides[device]?.controlSide ?? null,
+    });
+  }
+  return freezeLayout({
+    ...shown,
+    desktop: base.desktop,
+    deviceOverrides: Object.freeze(overrides),
+  });
+}
+
+/**
+ * Write one device's override onto a layout, or clear it so the device inherits again.
+ *
+ * The editing counterpart to `captureStudioWorkspaceDeviceLayout`: that one infers an override from
+ * what happened to be on screen, this one takes a deliberate choice from the workspace menu. Passing
+ * `null` removes the override rather than storing a copy of the authored geometry, so "inherits" and
+ * "pinned to the same values" stay distinguishable.
+ */
+export function setStudioWorkspaceDeviceOverride(
+  layout: StudioWorkspaceLayout,
+  device: StudioWorkspaceDeviceKind,
+  override: {
+    readonly desktop?: StudioWorkspaceDesktopLayout;
+    readonly controlSide?: StudioMobileControlSide | null;
+  } | null,
+): StudioWorkspaceLayout {
+  const normalized = normalizeWorkspaceLayout(layout, defaultWorkspace("storyboard").layout);
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  for (const kind of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    const existing = normalized.deviceOverrides[kind];
+    if (existing) overrides[kind] = existing;
+  }
+  if (override === null) {
+    delete overrides[device];
+  } else {
+    const existing = overrides[device];
+    const controlSide = override.controlSide === undefined
+      ? existing?.controlSide ?? null
+      : override.controlSide;
+    overrides[device] = Object.freeze({
+      desktop: normalizeDesktopLayout(
+        override.desktop ?? existing?.desktop ?? normalized.desktop,
+        normalized.desktop,
+      ),
+      controlSide,
+    });
+  }
+  return freezeLayout({ ...normalized, deviceOverrides: Object.freeze(overrides) });
+}
+
+/**
  * Classify the current input surface from observable runtime signals.
  *
  * Order matters and is deliberate: an explicit keyboard-driven session wins because it is a stated
@@ -1803,8 +1896,14 @@ export function resolveStudioWorkspaceDeviceKind(
     && signals.viewportWidth < 1_024;
   if (signals.pointerType === "pen") return narrow ? "mobile" : "pen-display";
   if (narrow && touchCapable) return "mobile";
-  if (signals.pointerType === "touch" || touchCapable) return "touch";
+  // An observed press outranks the hardware census. `maxTouchPoints > 0` says the panel *can* be
+  // touched, which is true of most laptops now; believing it over a mouse the artist just clicked
+  // handed every touchscreen laptop the handheld layout with both docks shut.
+  if (signals.pointerType === "touch") return "touch";
   if (signals.pointerType === "mouse") return "mouse";
+  // With nothing observed yet, only a coarse *primary* pointer is evidence of a finger-first
+  // surface; touch points alone are not, and guessing wrong here lands on first paint.
+  if (signals.coarsePointer === true) return "touch";
   return null;
 }
 
@@ -1852,6 +1951,15 @@ export function areStudioWorkspaceLayoutsEqual(
   );
 }
 
+/**
+ * Whether the live layout has drifted from the workspace it was applied from.
+ *
+ * Both sides are authored-form layouts: the live layout keeps device adaptation in its own
+ * `deviceOverrides` slot rather than folded into `desktop` (see
+ * `captureStudioWorkspaceDeviceLayout`), so this compares like with like. Were the live layout ever
+ * stored device-resolved, every workspace would read as modified the moment it was opened on a pen
+ * display — an edit nobody made, in front of a button that writes it over the authored docks.
+ */
 export function isStudioWorkspaceDirty(state: StudioWorkspaceState): boolean {
   const normalized = normalizeStudioWorkspaceState(state);
   const active = resolveStudioWorkspace(normalized, normalized.activeWorkspaceId);

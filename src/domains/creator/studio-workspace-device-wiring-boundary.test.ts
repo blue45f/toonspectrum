@@ -45,6 +45,16 @@ describe("workspace device overrides reach the studio", () => {
     expect(source).toContain("updateStudioWorkspaceLiveLayout(sourceState, nextLayout)");
     expect(source).not.toContain("resolveStudioWorkspaceDeviceLayout(nextLayout");
   });
+
+  it("folds the screen's geometry back to authored form before it is stored", () => {
+    // The device-resolved geometry must not reach `liveLayout.desktop`: it is shared by every
+    // surface and by the menu's save buttons, so one phone visit would otherwise collapse the
+    // desktop docks for good. Both assembly sites — the memo the menu reads and the autosave
+    // effect — have to de-resolve. The behavioural proof lives in
+    // studio-workspace-authored-layout-boundary.test.ts; this only guards the call sites.
+    const source = studioPageSource();
+    expect(source.match(/captureStudioWorkspaceDeviceLayout\(/g) ?? []).toHaveLength(2);
+  });
 });
 
 describe("every default profile answers for every device", () => {

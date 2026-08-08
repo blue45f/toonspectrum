@@ -1435,6 +1435,29 @@ describe("Studio workspace device overrides", () => {
     expect(resolveStudioWorkspaceDeviceKind({ pointerType: "unknown" })).toBeNull();
   });
 
+  it("believes an observed press over the hardware's touch census", () => {
+    // Most laptops now report touch points whether or not anyone touches the screen. Reading that
+    // as "handheld" handed a desktop artist the both-docks-closed layout mid-session.
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "mouse",
+      maxTouchPoints: 10,
+      viewportWidth: 1_680,
+    })).toBe("mouse");
+    // An iPad on a keyboard case still drives a pen or a finger, and stays a touch surface.
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "touch",
+      maxTouchPoints: 5,
+      coarsePointer: true,
+      viewportWidth: 1_180,
+    })).toBe("touch");
+    // Before the first press only a coarse *primary* pointer is evidence of a finger-first screen;
+    // touch points alone are not, and first paint is exactly when nothing has been pressed yet.
+    expect(resolveStudioWorkspaceDeviceKind({ maxTouchPoints: 10, viewportWidth: 1_680 }))
+      .toBeNull();
+    expect(resolveStudioWorkspaceDeviceKind({ coarsePointer: true, viewportWidth: 1_180 }))
+      .toBe("touch");
+  });
+
   it("carries overrides through save, switch, reload and dirty comparison", () => {
     const base = DEFAULT_STUDIO_WORKSPACE_STATE;
     const withOverride = updateStudioWorkspaceLiveLayout(base, normalizeStudioWorkspaceLayout({

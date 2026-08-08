@@ -26,12 +26,14 @@ const noopLayout: StudioWorkspaceMenuProps["onApplyLayout"] = () => {
 function renderMenu(
   state: StudioWorkspaceState = DEFAULT_STUDIO_WORKSPACE_STATE,
   liveLayout: StudioWorkspaceLayout = state.liveLayout,
-  persistence: StudioWorkspaceMenuProps["persistence"] = persisted
+  persistence: StudioWorkspaceMenuProps["persistence"] = persisted,
+  resolveDeviceKind?: StudioWorkspaceMenuProps["resolveDeviceKind"]
 ): string {
   return renderToStaticMarkup(
     <StudioWorkspaceMenu
       state={state}
       liveLayout={liveLayout}
+      resolveDeviceKind={resolveDeviceKind}
       persistence={persistence}
       onStateChange={noopState}
       onApplyLayout={noopLayout}
@@ -295,5 +297,64 @@ describe("StudioWorkspaceMenu responsive settings", () => {
     expect(html).toContain("브라우저 저장에 실패해 이 세션에서만 유지");
     expect(html).toContain(">세션</span>");
     expect(html).not.toContain("이 기기 저장 확인됨");
+  });
+});
+
+describe("StudioWorkspaceMenu per-device overrides", () => {
+  function customState() {
+    const state = saveStudioWorkspace(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      "내 펜 배치",
+      normalizeStudioWorkspaceLayout({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+        deviceOverrides: {
+          "pen-display": {
+            desktop: {
+              leftPanelOpen: false,
+              rightPanelOpen: true,
+              leftPanelWidth: 160,
+              rightPanelWidth: 240,
+            },
+            controlSide: "left",
+          },
+        },
+      }),
+    );
+    return state;
+  }
+
+  it("offers every device on the closed axis as an editable surface", () => {
+    const html = renderMenu(customState(), undefined, persisted, () => "pen-display");
+
+    expect(html).toContain("기기별 배치");
+    for (const label of ["펜 디스플레이", "모바일", "키보드", "마우스", "터치"]) {
+      expect(html, label).toContain(label);
+    }
+  });
+
+  it("opens on the surface under the artist's hands and says which it is", () => {
+    const html = renderMenu(customState(), undefined, persisted, () => "mobile");
+
+    // 지금 이 기기가 먼저 선택되어 있어야 눈으로 보고 판단할 수 있다.
+    expect(html).toContain("모바일 · 지금 이 기기");
+    expect(html).toContain('aria-label="모바일 · 지금 이 기기 · 저장된 배치를 따름"');
+  });
+
+  it("distinguishes an adapted surface from one that inherits the saved layout", () => {
+    const html = renderMenu(customState(), undefined, persisted, () => "pen-display");
+
+    expect(html).toContain("펜 디스플레이 · 지금 이 기기 · 따로 조정됨");
+    expect(html).toContain('aria-label="마우스 · 저장된 배치를 따름"');
+    // 이 프로필의 펜 그립은 왼쪽으로 잡혀 있다.
+    expect(html).toContain('aria-label="펜 디스플레이 주요 도구 왼쪽 배치" class');
+  });
+
+  it("locks the editor on a built-in profile, which cannot be rewritten", () => {
+    // 기본 작업공간은 불변이라 오버라이드를 쓰면 예외가 난다. 버튼을 눌러보게 두는 대신
+    // 왜 못 고치는지 먼저 말한다.
+    const html = renderMenu(DEFAULT_STUDIO_WORKSPACE_STATE, undefined, persisted, () => "mouse");
+
+    expect(html).toContain("기본 작업공간은 고칠 수 없어요. 복사본을 저장한 뒤 조정하세요.");
+    expect(html).toContain("disabled=\"\"");
   });
 });

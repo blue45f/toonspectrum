@@ -105,6 +105,7 @@ function createProps(
     isExporting: false,
     isMobile: false,
     liveWorkspaceLayout: {} as StudioMenubarContentProps["liveWorkspaceLayout"],
+    resolveWorkspaceDeviceKind: () => null,
     loadedWork: null,
     masterEditMode: false,
     menu: null,

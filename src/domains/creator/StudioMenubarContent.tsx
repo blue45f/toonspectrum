@@ -66,6 +66,7 @@ import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type {
+  StudioWorkspaceDeviceKind,
   StudioWorkspaceLayout,
   StudioWorkspaceLoadResult,
   StudioWorkspaceSaveResult,
@@ -222,6 +223,8 @@ export interface StudioMenubarContentProps {
   isExporting: boolean;
   isMobile: boolean;
   liveWorkspaceLayout: StudioWorkspaceLayout;
+  /** Samples the input surface in use, for device-aware workspace resolution. */
+  resolveWorkspaceDeviceKind: () => StudioWorkspaceDeviceKind | null;
   loadedWork: WorkDetail | null;
   masterEditMode: boolean;
   menu: StudioMenu | null;
@@ -303,6 +306,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   isExporting,
   isMobile,
   liveWorkspaceLayout,
+  resolveWorkspaceDeviceKind,
   loadedWork,
   masterEditMode,
   menu,
@@ -434,6 +438,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
               state={workspaceState}
               liveLayout={liveWorkspaceLayout}
+              resolveDeviceKind={resolveWorkspaceDeviceKind}
               persistence={workspacePersistence}
               onStateChange={persistStudioWorkspaceState}
               onApplyLayout={applyStudioWorkspaceLayout}

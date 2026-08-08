@@ -1480,9 +1480,9 @@ import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
+  captureStudioWorkspaceDeviceLayout,
   loadStudioWorkspacePersistence,
   normalizeStudioWorkspaceLayout,
-  resolveStudioWorkspace,
   resolveStudioWorkspaceControlSide,
   resolveStudioWorkspaceDeviceKind,
   resolveStudioWorkspaceDeviceLayout,
@@ -5715,26 +5715,42 @@ function StudioCuttoonEditor() {
   const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const workspaceState = workspacePersistence.state;
-  // Device adaptation is sampled when a workspace is applied, never continuously: docks that
+  // Device adaptation is *applied* only when a workspace is applied, never continuously: docks that
   // re-arrange because the artist reached for the keyboard mid-drawing would be worse than docks
-  // that stay where the profile put them. Pointer presses only write a ref, so no stroke re-renders.
+  // that stay where the profile put them. A pointer press writes a ref and, on the rare press that
+  // changes the classification, one state update — never per stroke, so the drawing route keeps its
+  // zero-render contract.
   const workspaceDevicePointerTypeRef = useRef<string | null>(null);
-  const [workspaceControlSide, setWorkspaceControlSide] = useState<StudioMobileControlSide>(
-    () => workspaceState.mobileControlSide
+  const [workspaceControlSide, setWorkspaceControlSide] = useState<StudioMobileControlSide>(() =>
+    resolveStudioWorkspaceControlSide(
+      workspaceState,
+      workspaceState.liveLayout,
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    )
   );
-  useEffect(() => {
-    const recordPointerType = (event: PointerEvent) => {
-      workspaceDevicePointerTypeRef.current = event.pointerType || null;
-    };
-    globalThis.addEventListener("pointerdown", recordPointerType, { passive: true, capture: true });
-    return () =>
-      globalThis.removeEventListener("pointerdown", recordPointerType, { capture: true });
-  }, []);
   function currentStudioWorkspaceDeviceKind(): StudioWorkspaceDeviceKind | null {
     return resolveStudioWorkspaceDeviceKind(
       readStudioWorkspaceDeviceSignalsFromGlobals(workspaceDevicePointerTypeRef.current)
     );
   }
+  // 기기 종류는 layout을 저자형으로 되돌릴 때(캡처) 필요해서 렌더가 읽을 수 있어야 한다. 다만 획마다
+  // 리렌더가 나면 안 되므로, 실제로 종류가 *바뀔 때만* 상태를 옮긴다 — 보통 세션당 0~1회다.
+  const [workspaceDeviceKind, setWorkspaceDeviceKind] =
+    useState<StudioWorkspaceDeviceKind | null>(() =>
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    );
+  useEffect(() => {
+    const recordPointerType = (event: PointerEvent) => {
+      const pointerType = event.pointerType || null;
+      if (workspaceDevicePointerTypeRef.current === pointerType) return;
+      workspaceDevicePointerTypeRef.current = pointerType;
+      const next = currentStudioWorkspaceDeviceKind();
+      setWorkspaceDeviceKind((current) => (current === next ? current : next));
+    };
+    globalThis.addEventListener("pointerdown", recordPointerType, { passive: true, capture: true });
+    return () =>
+      globalThis.removeEventListener("pointerdown", recordPointerType, { capture: true });
+  }, []);
   // Toggling the thumb-side preference is itself an application of handedness, so re-resolve here
   // too. A device override still wins: a left-handed pen-display grip is a deliberate per-device
   // choice, not something the owner-wide preference should silently undo.
@@ -5752,15 +5768,21 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     syncWorkspaceControlSide();
   }, [workspaceMobileControlSide, workspaceLiveLayout]);
-  const workspaceSnapshotLayout =
-    resolveStudioWorkspace(workspaceState, workspaceState.activeWorkspaceId)?.layout ??
-    workspaceState.liveLayout;
+  // 첫 페인트도 기기 오버라이드를 거친다. applyStudioWorkspaceLayout은 전환·소유자 변경·외부 동기화
+  // 에서만 도는데, 마운트는 그중 어느 것도 아니다. 이 시드가 없으면 데스크톱에서 저장한 배치가
+  // 펜 디스플레이에서 그대로 한 번 그려졌다가 프리셋을 다시 고를 때에야 맞춰진다.
+  //
+  // 해석 원본은 liveLayout이다 — 접어둔 도크가 새로고침 뒤에도 그대로여야 하고, liveLayout은
+  // captureStudioWorkspaceDeviceLayout 덕분에 저자형이라 기기 기하가 섞여 있지 않다.
+  const [initialWorkspaceDeviceLayout] = useState(() =>
+    resolveStudioWorkspaceDeviceLayout(workspaceState.liveLayout, workspaceDeviceKind)
+  );
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.leftPanelOpen
+    initialWorkspaceDeviceLayout.desktop.leftPanelOpen
   );
   const [rightPanelOpen, setRightPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.rightPanelOpen
+    initialWorkspaceDeviceLayout.desktop.rightPanelOpen
   );
   const [forceRightPanelOpen, setForceRightPanelOpen] = useState(false);
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
@@ -6107,13 +6129,13 @@ function StudioCuttoonEditor() {
   }, [isMobile, mobileSheet]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
   const leftResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.leftPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.leftPanelWidth,
     min: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
     edge: "right",
   });
   const rightResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.rightPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.rightPanelWidth,
     min: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
     edge: "left",
@@ -6214,23 +6236,34 @@ function StudioCuttoonEditor() {
   const visibleRightPanelOpen =
     rightPanelOpen && !presentationPanelsHidden && rightPanelDensityAllows;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
+  //
+  // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
+  // 오버라이드가 적용된 모습이라, 그걸 liveLayout.desktop에 그대로 넣으면 폰에서 한 번 연 것만으로
+  // 데스크톱 도크가 접힌 채 굳는다. 기기별 조정은 기기 슬롯에, 저자 기하는 desktop에 남긴다.
+  // 이 덕분에 liveLayout은 항상 저자형(authored-form)이고, 자동 저장·dirty 비교·메뉴 저장이 모두
+  // 같은 형태를 주고받는다.
   const liveWorkspaceLayout = useMemo(
     () =>
-      normalizeStudioWorkspaceLayout(
-        {
-          inspector: inspectorLayout,
-          desktop: {
-            leftPanelOpen,
-            rightPanelOpen,
-            leftPanelWidth: leftResize.width,
-            rightPanelWidth: rightResize.width,
+      captureStudioWorkspaceDeviceLayout(
+        workspaceState.liveLayout,
+        normalizeStudioWorkspaceLayout(
+          {
+            inspector: inspectorLayout,
+            desktop: {
+              leftPanelOpen,
+              rightPanelOpen,
+              leftPanelWidth: leftResize.width,
+              rightPanelWidth: rightResize.width,
+            },
+            drawingPalettes: drawingPaletteLayout,
+            quickActions: quickActionsPreferences,
           },
-          drawingPalettes: drawingPaletteLayout,
-          quickActions: quickActionsPreferences,
-        },
-        workspaceState.liveLayout
+          workspaceState.liveLayout
+        ),
+        workspaceDeviceKind
       ),
     [
+      workspaceDeviceKind,
       inspectorLayout,
       leftPanelOpen,
       rightPanelOpen,
@@ -6619,19 +6652,25 @@ function StudioCuttoonEditor() {
     if (workspacePersistence.ownerScope !== ownerScope) return;
     if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return;
     if (pendingExternalWorkspaceSync) return;
-    const nextLayout = normalizeStudioWorkspaceLayout(
-      {
-        inspector: inspectorLayout,
-        desktop: {
-          leftPanelOpen,
-          rightPanelOpen,
-          leftPanelWidth: leftResize.width,
-          rightPanelWidth: rightResize.width,
+    // 화면 기하를 저자형으로 되돌려 저장한다. 되돌리지 않으면 폰에서 한 번 연 것이 데스크톱 도크로
+    // 굳어, 작가가 저술한 배치가 "마지막에 연 기기"로 영구히 덮인다.
+    const nextLayout = captureStudioWorkspaceDeviceLayout(
+      workspacePersistence.state.liveLayout,
+      normalizeStudioWorkspaceLayout(
+        {
+          inspector: inspectorLayout,
+          desktop: {
+            leftPanelOpen,
+            rightPanelOpen,
+            leftPanelWidth: leftResize.width,
+            rightPanelWidth: rightResize.width,
+          },
+          drawingPalettes: drawingPaletteLayout,
+          quickActions: quickActionsPreferences,
         },
-        drawingPalettes: drawingPaletteLayout,
-        quickActions: quickActionsPreferences,
-      },
-      workspacePersistence.state.liveLayout
+        workspacePersistence.state.liveLayout
+      ),
+      workspaceDeviceKind
     );
     if (
       areStudioWorkspaceLayoutsEqual(
@@ -6683,6 +6722,7 @@ function StudioCuttoonEditor() {
     rightResize.dragging,
     rightResize.width,
     studioAuthUserId,
+    workspaceDeviceKind,
     workspacePersistence.ownerScope,
     workspacePersistence.state,
   ]);
@@ -40851,6 +40891,7 @@ function clearSelectionForEdit() {
           isExporting={isExporting}
           isMobile={isMobile}
           liveWorkspaceLayout={liveWorkspaceLayout}
+          resolveWorkspaceDeviceKind={currentStudioWorkspaceDeviceKind}
           loadedWork={loadedWork}
           masterEditMode={masterEditMode}
           menu={menu}
