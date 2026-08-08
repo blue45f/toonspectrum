@@ -254,9 +254,12 @@ export function resolveStudioDrawingShortcut(
   if (code === "KeyD" && !event.altKey && !event.shiftKey && !event.repeat) {
     return { type: "default-colors" };
   }
-  // SAI / CSP stabilizer cycle; Shift+S = size lock, Alt+S = opacity lock (Procreate-adjacent).
+  // SAI / CSP stabilizer cycle; Alt+S = opacity lock, Shift+Alt+S = size lock (Procreate-adjacent).
+  // ⇧S는 보기 리졸버가 `현재 보기 저장`으로 먼저 소비하므로(StudioPage 마스터 핸들러 순서),
+  // 여기서 ⇧S를 다시 주장하면 크기 잠금이 영원히 도달하지 못하는 dead branch가 된다.
+  // 잠금 두 개를 Alt 계열로 모아 두면 두 명령 모두 실제로 실행된다.
   if (code === "KeyS" && !event.repeat) {
-    if (event.shiftKey && !event.altKey) return { type: "toggle-size-lock" };
+    if (event.shiftKey && event.altKey) return { type: "toggle-size-lock" };
     if (event.altKey && !event.shiftKey) return { type: "toggle-opacity-lock" };
     if (!event.altKey && !event.shiftKey) return { type: "cycle-stabilizer" };
   }

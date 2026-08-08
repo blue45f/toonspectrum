@@ -72,6 +72,13 @@ function createHandlers(): StudioMenubarContentHandlers {
     setWatermark: vi.fn(),
     toggleHistoryPanel: vi.fn(),
     undo: vi.fn(),
+    toggleAnimationTimeline: vi.fn(),
+    openTimelapse: vi.fn(),
+    openStoryboardGrid: vi.fn(),
+    openScrollPreview: vi.fn(),
+    openContinuityCheck: vi.fn(),
+    toggleDocumentComments: vi.fn(),
+    openPageReview: vi.fn(),
   };
 }
 
@@ -99,10 +106,13 @@ function createProps(
     isMobile: false,
     liveWorkspaceLayout: {} as StudioMenubarContentProps["liveWorkspaceLayout"],
     loadedWork: null,
+    masterEditMode: false,
     menu: null,
     mobileImmersive: false,
     historyPanelOpen: false,
+    openStudioCommentCount: 0,
     pageCount: 2,
+    pageEditLocked: false,
     pageLabels: ["첫 장면", "두 번째"],
     projectActionsOpen: false,
     projectActionsRef: { current: null },
@@ -299,6 +309,84 @@ describe("StudioMenubarContent", () => {
     expect(trigger.getAttribute("data-studio-hybrid-dcc-open")).toBe("true");
     fireEvent.click(trigger);
     expect(setHybridDccOpen).toHaveBeenCalledWith(true);
+  });
+
+  /**
+   * 회귀 계약 — 아래 7종은 툴벨트에만 트리거가 있었고, 벨트 호스트는 데스크톱 `lg:hidden` +
+   * 모바일 몰입 `max-lg:hidden`이 겹쳐 1600 / 900 / 430 전 구간에서 display:none 이었다.
+   * (docs/perf/heavy-feature-findings.md §4-1) 다시 벨트 단독 소유로 돌아가면 여기서 깨진다.
+   */
+  it("restores every belt-only review surface as a clickable project action", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMenubarContent
+        {...createProps({ projectActionsOpen: true, stableHandlers })}
+      />
+    );
+
+    const expectations = [
+      ["anim-timeline", "다중 레이어 타임라인", stableHandlers.toggleAnimationTimeline],
+      ["timelapse", "타임랩스 녹화", stableHandlers.openTimelapse],
+      ["storyboard-grid", "스토리보드 그리드 보기", stableHandlers.openStoryboardGrid],
+      ["scroll-preview", "세로 스크롤 미리보기", stableHandlers.openScrollPreview],
+      ["continuity", "이야기 연속성 검사", stableHandlers.openContinuityCheck],
+      ["comments", "문서 댓글", stableHandlers.toggleDocumentComments],
+      ["page-review", "페이지 검토와 편집 잠금", stableHandlers.openPageReview],
+    ] as const;
+
+    for (const [actionId, accessibleName, handler] of expectations) {
+      const trigger = screen.getByRole<HTMLButtonElement>("button", { name: accessibleName });
+      expect(trigger.getAttribute("data-studio-project-action")).toBe(actionId);
+      // 벨트와 달리 이 호스트에는 뷰포트 게이트가 없다 — 실제로 눌린다.
+      expect(trigger.disabled).toBe(false);
+      expect(trigger.closest("[hidden]")).toBeNull();
+      fireEvent.click(trigger);
+      expect(handler).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("keeps history-scrubbing surfaces disabled during master edit and shows the unresolved comment count", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          masterEditMode: true,
+          openStudioCommentCount: 3,
+          pageEditLocked: true,
+          stableHandlers,
+        })}
+      />
+    );
+
+    const disabledState = (name: string) =>
+      screen.getByRole<HTMLButtonElement>("button", { name }).disabled;
+
+    expect(disabledState("다중 레이어 타임라인")).toBe(true);
+    expect(disabledState("타임랩스 녹화")).toBe(true);
+    // 히스토리와 무관한 검수 표면은 마스터 편집 중에도 열려 있어야 한다.
+    expect(disabledState("스토리보드 그리드 보기")).toBe(false);
+    expect(disabledState("문서 댓글, 열림 3개")).toBe(false);
+    expect(disabledState("페이지 검토, 현재 편집 잠금")).toBe(false);
+  });
+
+  it("locks the comment entry point when the shared document forbids even viewing", () => {
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          projectActionsOpen: true,
+          collaborationDocumentLocked: true,
+          collaborationLockMessage: () => "문서가 잠겨 있어요",
+          sharedDocument: {
+            capabilities: { view: false },
+          } as unknown as StudioMenubarContentProps["sharedDocument"],
+        })}
+      />
+    );
+
+    const trigger = screen.getByRole<HTMLButtonElement>("button", { name: "문서 댓글" });
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.getAttribute("title")).toBe("문서가 잠겨 있어요");
   });
 
   it("opens the placed-asset rights ledger from project actions", () => {

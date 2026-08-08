@@ -392,4 +392,42 @@ describe("StudioPageListPane", () => {
     // Unselected rows omit the attribute or set it false depending on markup.
     expect(items[0]?.getAttribute("data-selected")).not.toBe("true");
   });
+  it("keeps every page-row action at or above the 24px WCAG 2.2 target size", () => {
+    // 감사 근거(docs/rewrite/ux-audit-v5.md §2.9): 데스크톱에서 페이지 행 아이콘 버튼 11개가
+    // 18x18(맨 위로/아래로는 14x14)로 WCAG 2.2 AA 2.5.8을 어겼다. `페이지 삭제` 같은 파괴적
+    // 명령이 가장 작았다. 모바일은 size-11(44px), 데스크톱은 lg:size-6(24px)이 최소 계약이다.
+    const props = createProps();
+    render(<StudioPageListPane {...props} />);
+
+    const rowActionLabels = [
+      "위로 이동",
+      "아래로 이동",
+      "맨 위로 이동",
+      "맨 아래로 이동",
+      "이 앞에 빈 페이지 삽입",
+      "이 뒤에 빈 페이지 삽입",
+      "페이지 복제",
+      "미러 복제 (좌우 반전)",
+      "이 페이지 내용 비우기",
+      "페이지 삭제",
+    ];
+
+    const firstPage = screen.getAllByTestId("studio-page-item")[0];
+    expect(firstPage).toBeTruthy();
+    if (!firstPage) return;
+
+    for (const label of rowActionLabels) {
+      const button = within(firstPage).getByRole("button", { name: label });
+      expect(button.className, label).toContain("size-11");
+      expect(button.className, label).toContain("lg:size-6");
+      expect(button.className, label).not.toContain("lg:size-auto");
+      expect(button.className, label).not.toContain("lg:p-0.5");
+    }
+
+    const metaEdit = within(firstPage).getByRole("button", {
+      name: /이름·콘티 메모 편집/u,
+    });
+    expect(metaEdit.className).toContain("lg:size-6");
+    expect(metaEdit.className).not.toContain("lg:p-0.5");
+  });
 });

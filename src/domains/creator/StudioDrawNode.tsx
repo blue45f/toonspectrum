@@ -109,6 +109,7 @@ import {
 } from "./studio-pixel-pencil";
 import {
   planStudioRetainedMediaPressureCurve,
+  planStudioRetainedMediaTapDab,
   resolveStudioRetainedMediaPressure,
   resolveStudioRetainedMediaPressureProfileId,
 } from "./studio-retained-media-pressure";
@@ -1549,33 +1550,66 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               el.materialPressureModel
               !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
             ) {
+              // A pointerdown that never travelled has no polyline to stroke: a one-coordinate
+              // `<Line>` only emits a `moveTo`. Legacy documents therefore need the same contact
+              // dot the canonical ribbon plans below, or a tap reads as an unresponsive canvas.
+              const legacyTapDab = planStudioRetainedMediaTapDab(
+                renderPath.points,
+                undefined,
+                "pencil",
+              );
               if (aliasPencilPasses.length > 0) {
                 return (
                   <Group key={index} opacity={opacity} listening={false}>
-                    {aliasPencilPasses.map((pass) => (
-                      <Line
-                        key={pass.role}
-                        points={processStudioPencilAliasPassPoints(
-                          renderPath.points,
-                          pass.jitterRadius,
-                        )}
-                        stroke={stroke}
-                        strokeWidth={Math.max(
-                          0.5,
-                          aliasStrokeWidth * pass.widthScale,
-                        )}
-                        opacity={pass.opacityScale}
-                        lineCap="round"
-                        lineJoin="round"
-                        tension={renderPath.tension}
-                        globalCompositeOperation={composite}
-                        listening={false}
-                      />
-                    ))}
+                    {aliasPencilPasses.map((pass) => {
+                      const passWidth = Math.max(
+                        0.5,
+                        aliasStrokeWidth * pass.widthScale,
+                      );
+                      return legacyTapDab ? (
+                        <KCircle
+                          key={pass.role}
+                          x={legacyTapDab.x}
+                          y={legacyTapDab.y}
+                          radius={Math.max(0.25, passWidth / 2)}
+                          fill={stroke}
+                          opacity={pass.opacityScale}
+                          globalCompositeOperation={composite}
+                          listening={false}
+                        />
+                      ) : (
+                        <Line
+                          key={pass.role}
+                          points={processStudioPencilAliasPassPoints(
+                            renderPath.points,
+                            pass.jitterRadius,
+                          )}
+                          stroke={stroke}
+                          strokeWidth={passWidth}
+                          opacity={pass.opacityScale}
+                          lineCap="round"
+                          lineJoin="round"
+                          tension={renderPath.tension}
+                          globalCompositeOperation={composite}
+                          listening={false}
+                        />
+                      );
+                    })}
                   </Group>
                 );
               }
-              return (
+              return legacyTapDab ? (
+                <KCircle
+                  key={index}
+                  x={legacyTapDab.x}
+                  y={legacyTapDab.y}
+                  radius={Math.max(0.25, strokeWidth / 2)}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              ) : (
                 <Line
                   key={index}
                   points={processPencilPoints(renderPath.points)}
@@ -1600,6 +1634,42 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   opacityScale: 1,
                   jitterRadius: 0.75,
                 }];
+            // Detected on the accepted geometry, never on the per-pass grain jitter: a tap whose
+            // samples the jitter has nudged apart would otherwise be planned as a sub-pixel ribbon
+            // sliver instead of the nib the user pressed down, and read as an unresponsive canvas.
+            const tapDab = planStudioRetainedMediaTapDab(
+              renderPath.points,
+              el.pressures,
+              pressureProfile,
+              { minimumDiameterRatio: el.materialMinimumDiameterRatio },
+            );
+            if (tapDab) {
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  {passes.map((pass) => (
+                    <KCircle
+                      key={pass.role}
+                      x={tapDab.x}
+                      y={tapDab.y}
+                      radius={Math.max(
+                        0.35,
+                        Math.max(0.5, aliasStrokeWidth * pass.widthScale)
+                        * tapDab.sizeScale
+                        / 2,
+                      )}
+                      fill={stroke}
+                      opacity={Math.min(
+                        1,
+                        pass.opacityScale
+                        * Math.sqrt(tapDab.opacityScale * tapDab.flowScale),
+                      )}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ))}
+                </Group>
+              );
+            }
             const passPlans = passes.map((pass) => {
               const curve = planStudioRetainedMediaPressureCurve(
                 processStudioPencilAliasPassPoints(

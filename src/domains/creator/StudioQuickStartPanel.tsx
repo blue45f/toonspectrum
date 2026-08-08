@@ -16,12 +16,13 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useRef } from "react";
 
 import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { useI18n, useT } from "@/lib/i18n";
@@ -145,17 +146,21 @@ export function StudioQuickStartPanel({
     copy.unassigned,
   );
   const undoShortcut = displayQuickStartShortcut(shortcuts, "undo", "Mod+Z", copy.unassigned);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
 
-  // Esc is the universal "get this overlay out of my way" for drawing apps.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      event.preventDefault();
-      onDismiss();
-    };
-    globalThis.addEventListener("keydown", onKeyDown, true);
-    return () => globalThis.removeEventListener("keydown", onKeyDown, true);
-  }, [onDismiss]);
+  // `aria-modal="true"`를 선언한 이상 포커스 루프도 계약이다. 이 훅이 Esc, Tab/⇧Tab 순환,
+  // 밖으로 새는 focusin 되돌리기, 트리거 포커스 복원을 한꺼번에 책임진다(WCAG 2.1 2.4.3).
+  // 배경 격리는 이 오버레이 안쪽으로만 제한해 캔버스를 inert로 만들지 않는다 — 첫 획까지의
+  // 경로를 막지 않으면서 키보드/스크린리더는 다이얼로그 안에 머문다.
+  useStudioModalSheet({
+    activeKey: "studio-quick-start",
+    dialogRef,
+    onDismiss,
+    resolveInitialFocus: (dialog) =>
+      dialog.querySelector<HTMLElement>("[data-studio-quickstart-dismiss='true']"),
+    rootRef,
+  });
 
   const quickTools: {
     id: "smart-shape" | "brush-kit" | "template" | "character" | "background-3d" | "collab-focus";
@@ -210,21 +215,27 @@ export function StudioQuickStartPanel({
 
   return (
     <div
+      ref={rootRef}
       data-studio-creative-starter="true"
       className="pointer-events-none absolute inset-0 z-[58] text-fg"
     >
-      {/* Soft scrim: click outside the card dismisses without trapping the whole app. */}
+      {/* Soft scrim: click outside the card dismisses without trapping the whole app.
+          `data-studio-modal-backdrop` keeps it out of the modal isolator so a tap outside
+          still dismisses while the keyboard loop stays inside the dialog. */}
       <button
         type="button"
         aria-label={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
         data-studio-quickstart-backdrop="true"
+        data-studio-modal-backdrop="true"
         className="pointer-events-auto absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[1px]"
         onClick={onDismiss}
       />
       <div className="pointer-events-none absolute inset-x-2 top-16 z-[1] mx-auto max-w-[34rem] p-2 sm:top-4 sm:p-3">
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        data-studio-shortcut-boundary="true"
         aria-labelledby="studio-quick-start-title"
         aria-describedby="studio-quick-start-description"
         className="pointer-events-auto flex max-h-[min(60dvh,calc(100svh-5rem))] flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]"

@@ -1,15 +1,24 @@
 /**
- * Pure WebGPU/WGSL Living Ink field runtime.
+ * Pure WebGPU/WGSL wet-media field runtime.
  *
  * Replaces the WebGL2 GLSL executor when a GPU device is available: field state
- * lives in storage buffers and Stam/pigment/fix/Beer–Lambert passes are WGSL
- * compute kernels from studio-living-ink-wgsl-shaders.ts.
+ * lives in storage buffers and the Stam stable-fluid, vorticity-confinement,
+ * pressure-projection, pigment/fix/Beer–Lambert passes are WGSL compute kernels
+ * from studio-living-ink-wgsl-shaders.ts.
+ *
+ * Grid split (v2): pigment, water and paper are full resolution; velocity,
+ * pressure and curl live on a 1/2…1/8 coarse grid, which is what makes a real
+ * 22-sweep incompressibility solve fit in the interactive frame budget.
  */
 
 import {
   STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
   STUDIO_LIVING_INK_EXECUTION_LIMITS,
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
+  studioLivingInkCoarseVelocityGrid,
+  studioLivingInkDryWindowSeconds,
+  studioLivingInkFluidPlan,
+  type StudioLivingInkCoarseVelocityScale,
   type StudioLivingInkExecutionApplied,
   type StudioLivingInkExecutionApplyOptions,
   type StudioLivingInkExecutionApplyResult,
@@ -27,11 +36,20 @@ import { validateStudioLivingInkExecutionConfig } from "./studio-living-ink-webg
 import {
   listStudioLivingInkWgslPassSources,
   STUDIO_LIVING_INK_WGSL_SHADER_REVISION,
+  STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS,
+  studioLivingInkWgslPassIsCoarse,
+  writeStudioLivingInkFieldUniforms,
   type StudioLivingInkWgslPassId,
 } from "./studio-living-ink-wgsl-shaders";
 import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioLivingInkDisplayMode } from "./studio-living-ink-gpu-protocol";
+
+/**
+ * Converts pointer travel into wash momentum. Tuned so a fast flick reaches roughly half the
+ * velocity clamp (3 uv/s) at flow = 1 without letting a jitter-sized step kick the solver.
+ */
+const STROKE_MOMENTUM_GAIN = 0.06;
 
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -78,15 +96,22 @@ export class StudioLivingInkWebGpuPureRuntime {
   readonly preferredBackend = "webgpu" as const;
   readonly webGpuDevice: GPUDevice;
   readonly wgslRevision = STUDIO_LIVING_INK_WGSL_SHADER_REVISION;
+  readonly coarseVelocityScale: StudioLivingInkCoarseVelocityScale;
 
   private readonly device: GPUDevice;
   private readonly config: StudioLivingInkExecutionConfig;
   private readonly canvas: OffscreenCanvas;
   private readonly pipelines = new Map<StudioLivingInkWgslPassId, GPUComputePipeline>();
-  private readonly bindGroupLayouts = new Map<string, GPUBindGroupLayout>();
+  private readonly coarseWidth: number;
+  private readonly coarseHeight: number;
   private mobile!: GPUBuffer;
+  private mobileScratch!: GPUBuffer;
   private fixed!: GPUBuffer;
   private wet!: GPUBuffer;
+  private wetScratch!: GPUBuffer;
+  private velocity!: GPUBuffer;
+  private velocityScratch!: GPUBuffer;
+  private curl!: GPUBuffer;
   private pressureA!: GPUBuffer;
   private pressureB!: GPUBuffer;
   private display!: GPUBuffer;
@@ -96,6 +121,8 @@ export class StudioLivingInkWebGpuPureRuntime {
   private passCount = 0;
   private disposed = false;
   private dirty: StudioLivingInkBounds | null = null;
+  /** Previous stroke sample, used to derive the momentum impulse handed to the velocity field. */
+  private previousMark: Readonly<{ x: number; y: number }> | null = null;
 
   private constructor(
     device: GPUDevice,
@@ -106,6 +133,14 @@ export class StudioLivingInkWebGpuPureRuntime {
     this.webGpuDevice = device;
     this.config = Object.freeze({ ...config });
     this.canvas = canvas;
+    const coarse = studioLivingInkCoarseVelocityGrid(
+      config.fieldWidth,
+      config.fieldHeight,
+      config.coarseBase,
+    );
+    this.coarseWidth = coarse.width;
+    this.coarseHeight = coarse.height;
+    this.coarseVelocityScale = coarse.scale;
     this.capabilities = Object.freeze({
       backend: "webgpu-offscreen-half-float",
       worker: true,
@@ -169,20 +204,30 @@ export class StudioLivingInkWebGpuPureRuntime {
     return this.config.fieldWidth * this.config.fieldHeight;
   }
 
+  private coarseCellCount(): number {
+    return this.coarseWidth * this.coarseHeight;
+  }
+
   private allocateBuffers(): void {
     const bytes = this.cellCount() * 16;
+    const coarseBytes = this.coarseCellCount() * 16;
     const usage =
       GPUBufferUsage.STORAGE
       | GPUBufferUsage.COPY_SRC
       | GPUBufferUsage.COPY_DST;
     this.mobile = this.device.createBuffer({ size: bytes, usage });
+    this.mobileScratch = this.device.createBuffer({ size: bytes, usage });
     this.fixed = this.device.createBuffer({ size: bytes, usage });
     this.wet = this.device.createBuffer({ size: bytes, usage });
-    this.pressureA = this.device.createBuffer({ size: bytes, usage });
-    this.pressureB = this.device.createBuffer({ size: bytes, usage });
+    this.wetScratch = this.device.createBuffer({ size: bytes, usage });
+    this.velocity = this.device.createBuffer({ size: coarseBytes, usage });
+    this.velocityScratch = this.device.createBuffer({ size: coarseBytes, usage });
+    this.curl = this.device.createBuffer({ size: coarseBytes, usage });
+    this.pressureA = this.device.createBuffer({ size: coarseBytes, usage });
+    this.pressureB = this.device.createBuffer({ size: coarseBytes, usage });
     this.display = this.device.createBuffer({ size: bytes, usage: usage | GPUBufferUsage.MAP_READ });
     this.uniforms = this.device.createBuffer({
-      size: 48,
+      size: STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.splatUniforms = this.device.createBuffer({
@@ -202,43 +247,50 @@ export class StudioLivingInkWebGpuPureRuntime {
     }
   }
 
-  private writeUniforms(extra?: { fixTransfer?: number }): void {
+  private writeUniforms(extra?: { fixTransfer?: number; fixing?: boolean }): void {
     const chroma = studioLivingInkChromaBleedMultipliers(
       this.config.material.chromaticSeparation,
     );
-    const data = new Float32Array(12);
-    const u32 = new Uint32Array(data.buffer);
-    u32[0] = this.config.fieldWidth;
-    u32[1] = this.config.fieldHeight;
-    data[2] = STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds;
-    data[3] = this.config.material.bleed;
-    data[4] = this.config.material.dryRate;
-    data[5] = chroma[0];
-    data[6] = chroma[1];
-    data[7] = chroma[2];
-    data[8] = this.config.material.beerLambertDensity;
-    data[9] = extra?.fixTransfer ?? 0.22;
-    this.device.queue.writeBuffer(this.uniforms, 0, data);
+    this.device.queue.writeBuffer(this.uniforms, 0, writeStudioLivingInkFieldUniforms({
+      width: this.config.fieldWidth,
+      height: this.config.fieldHeight,
+      coarseWidth: this.coarseWidth,
+      coarseHeight: this.coarseHeight,
+      dt: STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
+      bleed: this.config.material.bleed,
+      dryRate: this.config.material.dryRate,
+      chroma,
+      chromaticSeparation: this.config.material.chromaticSeparation,
+      beerDensity: this.config.material.beerLambertDensity,
+      fixTransfer: extra?.fixTransfer ?? 0.22,
+      flow: this.config.material.flow,
+      vorticity: this.config.material.vorticity,
+      capillaryCreep: this.config.material.capillaryCreep,
+      fixing: extra?.fixing ?? false,
+    }));
   }
 
   private dispatchClearAll(): void {
     this.writeUniforms();
-    this.dispatch("clear", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.mobile } },
-    ]);
-    this.dispatch("clear", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.fixed } },
-    ]);
-    this.dispatch("clear", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.wet } },
-    ]);
-    this.dispatch("clear", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.pressureA } },
-    ]);
+    for (const buffer of [this.mobile, this.mobileScratch, this.fixed, this.wet, this.wetScratch]) {
+      this.dispatch("clear", [
+        { binding: 0, resource: { buffer: this.uniforms } },
+        { binding: 1, resource: { buffer } },
+      ]);
+    }
+    for (const buffer of [
+      this.velocity,
+      this.velocityScratch,
+      this.curl,
+      this.pressureA,
+      this.pressureB,
+    ]) {
+      this.dispatch("clear-coarse", [
+        { binding: 0, resource: { buffer: this.uniforms } },
+        { binding: 1, resource: { buffer } },
+      ]);
+    }
+    this.previousMark = null;
   }
 
   private dispatch(
@@ -255,9 +307,10 @@ export class StudioLivingInkWebGpuPureRuntime {
       entries,
     });
     passEncoder.setBindGroup(0, bindGroup);
-    const gx = Math.ceil(this.config.fieldWidth / 8);
-    const gy = Math.ceil(this.config.fieldHeight / 8);
-    passEncoder.dispatchWorkgroups(gx, gy);
+    const coarse = studioLivingInkWgslPassIsCoarse(pass);
+    const width = coarse ? this.coarseWidth : this.config.fieldWidth;
+    const height = coarse ? this.coarseHeight : this.config.fieldHeight;
+    passEncoder.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
     passEncoder.end();
     this.device.queue.submit([encoder.finish()]);
     this.passCount += 1;
@@ -307,6 +360,10 @@ export class StudioLivingInkWebGpuPureRuntime {
     return result ?? Object.freeze({ x: 0, y: 0, width: 1, height: 1 });
   }
 
+  private writeSplatUniforms(values: readonly number[]): void {
+    this.device.queue.writeBuffer(this.splatUniforms, 0, new Float32Array(values));
+  }
+
   private splatMark(mark: {
     x: number;
     y: number;
@@ -315,7 +372,7 @@ export class StudioLivingInkWebGpuPureRuntime {
     color?: readonly [number, number, number];
     wet?: number;
   }): void {
-    const data = new Float32Array([
+    this.writeSplatUniforms([
       mark.x,
       mark.y,
       Math.max(0.5, mark.radius),
@@ -325,7 +382,6 @@ export class StudioLivingInkWebGpuPureRuntime {
       mark.color?.[2] ?? 0.1,
       mark.wet ?? 0.8,
     ]);
-    this.device.queue.writeBuffer(this.splatUniforms, 0, data);
     this.writeUniforms();
     this.dispatch("splat", [
       { binding: 0, resource: { buffer: this.uniforms } },
@@ -338,39 +394,127 @@ export class StudioLivingInkWebGpuPureRuntime {
       { binding: 1, resource: { buffer: this.wet } },
       { binding: 2, resource: { buffer: this.splatUniforms } },
     ]);
+    this.splatMomentum(mark.x, mark.y, mark.radius);
   }
 
+  /**
+   * Hands the stroke's own motion to the fluid. Without an impulse the velocity field stays at
+   * rest and every projection/confinement pass below is a no-op — the wash would only ever
+   * diffuse. The impulse is expressed in uv units per second, matching the velocity field.
+   */
+  private splatMomentum(x: number, y: number, radius: number): void {
+    const previous = this.previousMark;
+    this.previousMark = Object.freeze({ x, y });
+    if (!previous) return;
+    const dx = (x - previous.x) / this.config.fieldWidth;
+    const dy = (y - previous.y) / this.config.fieldHeight;
+    if (dx === 0 && dy === 0) return;
+    const perSecond = 1 / Math.max(1e-4, STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds);
+    const flow = Math.min(1, Math.max(0, this.config.material.flow));
+    const gain = STROKE_MOMENTUM_GAIN * (0.35 + flow * 0.65);
+    this.writeSplatUniforms([
+      x,
+      y,
+      Math.max(0.5, radius),
+      1,
+      dx * perSecond * gain,
+      dy * perSecond * gain,
+      0,
+      0,
+    ]);
+    this.dispatch("splat-velocity", [
+      { binding: 0, resource: { buffer: this.uniforms } },
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: this.splatUniforms } },
+    ]);
+  }
+
+  private swapVelocity(): void {
+    const spare = this.velocity;
+    this.velocity = this.velocityScratch;
+    this.velocityScratch = spare;
+  }
+
+  /**
+   * One fixed tick of the Stable Fluids loop, in the order the fluid requires:
+   * advect → confine vorticity → project (divergence, Jacobi, gradient) → water → pigment.
+   */
   private step(fixing: boolean, pressureIterations: number): void {
-    this.writeUniforms({ fixTransfer: fixing ? 0.18 : 0 });
-    // pressure / jacobi ping-pong
-    for (let i = 0; i < pressureIterations; i += 1) {
-      const src = i % 2 === 0 ? this.pressureA : this.pressureB;
-      const dst = i % 2 === 0 ? this.pressureB : this.pressureA;
+    this.writeUniforms({ fixTransfer: fixing ? 0.18 : 0, fixing });
+    const uniforms = { binding: 0, resource: { buffer: this.uniforms } } as const;
+
+    this.dispatch("advect-velocity", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: this.velocityScratch } },
+      { binding: 3, resource: { buffer: this.wet } },
+    ]);
+    this.swapVelocity();
+
+    this.dispatch("curl", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: this.curl } },
+    ]);
+    this.dispatch("vorticity", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: this.curl } },
+      { binding: 3, resource: { buffer: this.velocityScratch } },
+    ]);
+    this.swapVelocity();
+
+    this.dispatch("divergence", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: this.pressureA } },
+    ]);
+    let solved = this.pressureA;
+    for (let iteration = 0; iteration < pressureIterations; iteration += 1) {
+      const src = iteration % 2 === 0 ? this.pressureA : this.pressureB;
+      const dst = iteration % 2 === 0 ? this.pressureB : this.pressureA;
       this.dispatch("jacobi", [
-        { binding: 0, resource: { buffer: this.uniforms } },
+        uniforms,
         { binding: 1, resource: { buffer: src } },
         { binding: 2, resource: { buffer: dst } },
       ]);
+      solved = dst;
     }
-    // pigment diffusion on mobile
-    this.dispatch("pigment", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.mobile } },
-      { binding: 2, resource: { buffer: this.pressureA } }, // reuse as temp dst — swap via copy
-      { binding: 3, resource: { buffer: this.wet } },
+    this.dispatch("gradient", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.velocity } },
+      { binding: 2, resource: { buffer: solved } },
+      { binding: 3, resource: { buffer: this.velocityScratch } },
     ]);
-    // copy pressureA temp back into mobile via second pigment with identity-ish rates
-    // Use jacobi-free: re-splat not needed — run pigment mobile<-pressureA using clear+pigment inverted
-    // Simpler: re-dispatch pigment reading pressureA into mobile by swapping bindings
+    this.swapVelocity();
+
+    this.dispatch("wet", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.wet } },
+      { binding: 2, resource: { buffer: this.wetScratch } },
+      { binding: 3, resource: { buffer: this.velocity } },
+    ]);
+    const spareWet = this.wet;
+    this.wet = this.wetScratch;
+    this.wetScratch = spareWet;
+
+    this.dispatch("advect-pigment", [
+      uniforms,
+      { binding: 1, resource: { buffer: this.mobile } },
+      { binding: 2, resource: { buffer: this.mobileScratch } },
+      { binding: 3, resource: { buffer: this.wet } },
+      { binding: 4, resource: { buffer: this.velocity } },
+    ]);
     this.dispatch("pigment", [
-      { binding: 0, resource: { buffer: this.uniforms } },
-      { binding: 1, resource: { buffer: this.pressureA } },
+      uniforms,
+      { binding: 1, resource: { buffer: this.mobileScratch } },
       { binding: 2, resource: { buffer: this.mobile } },
       { binding: 3, resource: { buffer: this.wet } },
     ]);
+
     if (fixing) {
       this.dispatch("fix", [
-        { binding: 0, resource: { buffer: this.uniforms } },
+        uniforms,
         { binding: 1, resource: { buffer: this.mobile } },
         { binding: 2, resource: { buffer: this.fixed } },
         { binding: 3, resource: { buffer: this.wet } },
@@ -393,6 +537,9 @@ export class StudioLivingInkWebGpuPureRuntime {
     if (operation.kind === "clear") {
       this.dispatchClearAll();
     } else if (operation.kind === "ink" || operation.kind === "water") {
+      // Each operation is one pointer segment; a stale previous sample would fabricate a jump
+      // impulse across the pen-up gap between two strokes.
+      this.previousMark = null;
       for (const mark of operation.marks) {
         if (isCancelled()) throw new DOMException("Living Ink request cancelled.", "AbortError");
         if (operation.kind === "water") {
@@ -428,9 +575,7 @@ export class StudioLivingInkWebGpuPureRuntime {
     }
 
     const quality = options.quality ?? (operation.kind === "fix" ? "settle" : "interactive");
-    const pressureIterations = quality === "settle"
-      ? STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations
-      : STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations;
+    const { pressureIterations } = studioLivingInkFluidPlan(this.config, quality);
     let ticks = options.simulationTicks
       ?? (operation.kind === "advance" ? operation.fixedTicks : 1);
     if (operation.kind === "fix") {
@@ -620,7 +765,7 @@ export class StudioLivingInkWebGpuPureRuntime {
       simulationTicks: input.simulationTicks,
       elapsedMilliseconds: performance.now() - input.started,
       fixedPigmentPolicy: "immutable",
-      dryingWindowSeconds: 2 + (1 - this.config.material.dryRate) * 16,
+      dryingWindowSeconds: studioLivingInkDryWindowSeconds(this.config.material.dryRate),
       fixDurationSeconds: 1.2,
       determinism: "same-runtime-replay",
       crossDeviceBitExact: false,
@@ -640,8 +785,13 @@ export class StudioLivingInkWebGpuPureRuntime {
     this.disposed = true;
     for (const buffer of [
       this.mobile,
+      this.mobileScratch,
       this.fixed,
       this.wet,
+      this.wetScratch,
+      this.velocity,
+      this.velocityScratch,
+      this.curl,
       this.pressureA,
       this.pressureB,
       this.display,

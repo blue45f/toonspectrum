@@ -31,17 +31,22 @@ describe("header width budget", () => {
   });
 
   it("keeps EN nav labels within the measured width budget", () => {
-    const i18n = read("lib/i18n.ts");
-    const enStart = i18n.indexOf("  en: {");
-    const enEnd = i18n.indexOf("\n  },", enStart);
-    const en = i18n.slice(enStart, enEnd);
+    // The English dictionary moved out of lib/i18n.ts into the published locale asset when the
+    // 75 inlined dictionaries were split off the app shell.
+    const en = JSON.parse(read("public/i18n/app/en.json")) as Record<string, string>;
     const labels = [
-      ...en.matchAll(
-        /"nav\.(?:home|ranking|calendar|recommend|explore|reviews|community|insights|create)": "([^"]+)"/g
-      ),
-    ].map((m) => m[1]);
+      "home",
+      "ranking",
+      "calendar",
+      "recommend",
+      "explore",
+      "reviews",
+      "community",
+      "insights",
+      "create",
+    ].map((key) => en[`nav.${key}`]);
 
-    expect(labels).toHaveLength(9);
+    expect(labels.filter((label) => typeof label === "string")).toHaveLength(9);
     // 글자수는 폭의 근사 프록시다. 실측(2026-06) 기준 합산 52자에서 lg 여유 ≈25px이므로
     // 개별 ≤9자·합산 ≤56자를 상한으로 잠근다(초과분 ~4자 ≈ 그 여유를 소진).
     for (const label of labels) {

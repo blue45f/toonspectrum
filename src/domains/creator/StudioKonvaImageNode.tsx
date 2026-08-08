@@ -615,6 +615,8 @@ export function StudioKonvaImageNode({
   const filters: NonNullable<Konva.NodeConfig["filters"]> =
     (workerDimensionsSafe ? built.filters : []) as NonNullable<Konva.NodeConfig["filters"]>;
   const filterAttrs = built.attrs;
+  // 필터 패스 수 — 레인 비용 모델의 체인 길이 입력(CPU 레인은 픽셀×패스에 선형).
+  const filterChainSteps = built.filters.length;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
   const workerRequiredForSafeExecution =
     typeof filterWorkerClient?.studioImageFilterRequiresWorker === "function"
@@ -876,9 +878,13 @@ export function StudioKonvaImageNode({
       // HybridExecutionPlanner(final-export)가 산출한다(ADR 0001 2차 개정 step c). gpu-chain 레인의
       // null/예외 → worker, worker 실패 → konva-native 순서는 아래 기존 콜백 구조가 그대로 플랜의
       // 폴백 체인을 실행하는 형태다. 결과는 동일한 commit/캐시 경로를 공유한다.
+      // 워크로드(픽셀 수·체인 길이)를 넘겨 레인 순서가 크기를 인지하게 한다. GPU 레인은 크기와
+      // 거의 무관한 제출+리드백 플로어(~2.4ms)를 물기 때문에 교차점 아래 캔버스에서는 CPU 레인이
+      // 더 빠르다(실측: tests/benchmarks/results/filter-lanes.json).
       const filterIslandPlan = planStudioFilterIslandLanes({
         gpuChainEligible:
           gpuFilterModule?.isStudioGpuFilterChainEligible(elRef.current) === true,
+        workload: { width, height, chainSteps: filterChainSteps },
       });
       if (filterIslandPlan.lanes[0] === "gpu-chain" && gpuFilterModule) {
         const gpuInput = { data: new Uint8ClampedArray(sourcePixels.data), width, height };
@@ -914,6 +920,7 @@ export function StudioKonvaImageNode({
     el.src,
     workerWidth,
     workerHeight,
+    filterChainSteps,
     workerRequestKey,
     workerResultCacheLimit,
     paddedWorkerRequiredBlocked,

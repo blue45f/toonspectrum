@@ -123,6 +123,7 @@ const USABLE_SELECTION = {
 
 function createHandlers(): StudioLeftToolRailHandlers {
   return {
+    activatePrimaryCanvasTool: vi.fn(),
     fitCanvasToWidth: vi.fn(),
     openFrameAnimationForSelected: vi.fn(),
     openPixelSelectionTransform: vi.fn(),
@@ -178,7 +179,6 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     selectedImageMutationLocked: false,
     setAppSettingsInitialTab: vi.fn(),
     setAppSettingsOpen: vi.fn(),
-    setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),
     setEyedropperActive: vi.fn(),
     setMenu: vi.fn(),
@@ -298,15 +298,14 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     fireEvent.click(screen.getByRole("button", { name: "펜 (B)" }));
-    expect(props.setTool).toHaveBeenCalledWith("draw");
-    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pen");
 
     fireEvent.click(screen.getByRole("button", { name: "픽셀 펜 (P)" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("pixel");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pixel");
     expect(props.setStrokeWidth).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("shape");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "shape");
     expect(props.setDrawShape).toHaveBeenCalledWith("rect");
 
     fireEvent.click(screen.getByRole("button", { name: "텍스트 추가" }));
@@ -635,10 +634,13 @@ describe("StudioLeftToolRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "투시도" }));
 
     expect(props.setPerspectiveRulerActive).toHaveBeenCalledWith(true);
-    expect(props.stableHandlers.disarmAllPixelTools).toHaveBeenCalledOnce();
-    expect(props.setTool).toHaveBeenCalledWith("draw");
-    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
-    expect(props.setEyedropperActive).toHaveBeenCalledWith(false);
+    // 획 취소·disarm(스포이드 해제 포함)은 전이 함수가 단독으로 책임진다.
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledExactlyOnceWith(
+      "draw",
+      "pen",
+    );
+    expect(props.stableHandlers.disarmAllPixelTools).not.toHaveBeenCalled();
+    expect(props.setTool).not.toHaveBeenCalled();
     expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalledWith(
       "투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요",
     );
@@ -839,16 +841,15 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     fireEvent.click(screen.getByRole("button", { name: "펜 (B)" }));
-    expect(props.setTool).toHaveBeenCalledWith("draw");
-    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pen");
     expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole("button", { name: "지우개 (E)" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("eraser");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "eraser");
     expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("shape");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "shape");
     expect(props.setDrawShape).toHaveBeenCalledWith("rect");
     expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(3);
   });

@@ -44,6 +44,7 @@ import {
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
+import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
@@ -52,6 +53,7 @@ import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ExportFormat } from "./studio-export";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
+import type { StudioProjectReviewActionHandlers } from "./studio-project-review-actions";
 import type { PsdExportResult } from "./studio-psd-export";
 import type {
   StudioRasterEncoded,
@@ -161,7 +163,12 @@ const MENUBAR_HINTS = {
   },
 } satisfies Readonly<Record<string, StudioToolHintSpec>>;
 
-export interface StudioMenubarContentHandlers {
+/**
+ * 검수·미리보기 진입점 7종. 예전에는 툴벨트에만 트리거가 있었는데 벨트 호스트가
+ * 전 뷰포트에서 `display:none`이라 도달 불가였다 — `StudioProjectReviewActions` 상단 주석 참조.
+ * `useStudioStableHandlers` 계약상 핸들러 백은 평면(함수만)이어야 해서 여기에 펼쳐 둔다.
+ */
+export interface StudioMenubarContentHandlers extends StudioProjectReviewActionHandlers {
   applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
   cancelInterchangeImport: () => void;
   changeMobileImmersiveMode: (enabled: boolean) => void;
@@ -216,10 +223,15 @@ export interface StudioMenubarContentProps {
   isMobile: boolean;
   liveWorkspaceLayout: StudioWorkspaceLayout;
   loadedWork: WorkDetail | null;
+  masterEditMode: boolean;
   menu: StudioMenu | null;
   mobileImmersive: boolean;
   historyPanelOpen: boolean;
+  /** 미해결 문서 댓글 수 — 프로젝트 시트의 댓글 진입점 배지. */
+  openStudioCommentCount: number;
   pageCount: number;
+  /** 현재 페이지가 검토 잠금인지 — 페이지 검토 진입점 라벨에 반영. */
+  pageEditLocked: boolean;
   pageLabels: string[];
   /** Optional story pages for dialogue TXT package export preflight. */
   dialoguePages?: readonly import("./studio-dialogue-batch").DialoguePageLike[] | null;
@@ -292,10 +304,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   isMobile,
   liveWorkspaceLayout,
   loadedWork,
+  masterEditMode,
   menu,
   mobileImmersive,
   historyPanelOpen,
+  openStudioCommentCount,
   pageCount,
+  pageEditLocked,
   pageLabels,
   dialoguePages = null,
   projectActionsOpen,
@@ -371,7 +386,16 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
+    toggleAnimationTimeline,
+    openTimelapse,
+    openStoryboardGrid,
+    openScrollPreview,
+    openContinuityCheck,
+    toggleDocumentComments,
+    openPageReview,
   } = stableHandlers;
+  const commentsLocked =
+    collaborationDocumentLocked && !sharedDocument?.capabilities.view;
   return (
     <>
         {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
@@ -1131,6 +1155,24 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Package size={14} /> 게시 패키지
           </button>
+          {/* 벨트 전용이던 검수·미리보기 7종의 정본 진입점. 벨트 호스트는 전 뷰포트에서
+              display:none이라 여기가 유일한 포인터 경로다(StudioProjectReviewActions 주석). */}
+          <StudioProjectReviewActions
+            masterEditMode={masterEditMode}
+            pageEditLocked={pageEditLocked}
+            commentsLocked={commentsLocked}
+            commentsLockedReason={commentsLocked ? collaborationLockMessage() : ""}
+            openCommentCount={openStudioCommentCount}
+            handlers={{
+              toggleAnimationTimeline,
+              openTimelapse,
+              openStoryboardGrid,
+              openScrollPreview,
+              openContinuityCheck,
+              toggleDocumentComments,
+              openPageReview,
+            }}
+          />
               </div>,
               document.body
             )

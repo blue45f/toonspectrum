@@ -381,8 +381,16 @@ export interface PresetSliceExportOptions {
   /** 있으면 슬라이스마다 서명 — 파일 단위 귀속이 유지되고 절단면에서 잘리지 않는다. */
   watermark?: WatermarkSettings;
   onProgress?: (done: number, total: number) => void;
-  /** 파일 사이 대기(ms) — 연속 다운로드 차단 회피. 기본 250, 테스트에선 0. */
+  /**
+   * 다운로드 사이 **최소 간격**(ms) — 연속 다운로드 차단 회피. 기본 250, 테스트에선 0.
+   * 다운로드 뒤에 무조건 쉬는 시간이 아니라, 다음 슬라이스의 합성·인코딩 시간이
+   * 함께 차감되는 간격이다(§exportPresetSlices 주석).
+   */
   delayMs?: number;
+  /** 테스트 주입용 — 기본은 performance.now()(없으면 Date.now()). 단조 시계만 쓴다. */
+  now?: () => number;
+  /** 테스트 주입용 — 기본은 setTimeout 기반 대기. */
+  sleep?: (ms: number) => Promise<void>;
   /** 테스트 주입용 — 기본은 document.createElement("canvas"). */
   createCanvas?: (width: number, height: number) => HTMLCanvasElement;
   /** 테스트 주입용 — 기본은 downloadBlob(실제 파일 저장). */
@@ -566,6 +574,29 @@ export function drawWatermarkOnSlice(canvas: HTMLCanvasElement, settings: Waterm
 }
 
 /**
+ * 다운로드 사이 최소 간격(ms).
+ *
+ * 왜 0 이 아닌가 — 브라우저에는 "저장이 끝났다"는 신호가 페이지 쪽에 없다.
+ * a[download] + object URL 조합은 이벤트를 돌려주지 않고, downloadBlob 은 click 직후
+ * revokeObjectURL 까지 한다. 그래서 완료 신호를 기다리는 코드로 바꿀 수가 없고,
+ * 짧은 간격 안에 click 을 연달아 때리면 WebKit 계열에서 뒤 파일이 조용히 사라진다.
+ * 남길 수 있는 건 "간격 보장"뿐이므로 값은 유지하되, 아래 루프가 이 간격을
+ * **마감시각**으로 다뤄 다음 슬라이스의 합성·인코딩 시간이 간격에 함께 계산되게 했다.
+ * 인코딩이 이 값보다 오래 걸리는 큰 페이지에서는 추가 정지가 0 이 된다.
+ */
+const DEFAULT_SLICE_DOWNLOAD_INTERVAL_MS = 250;
+
+function defaultMonotonicNow(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * 규격 슬라이스 내보내기 실행 — 캡처된 페이지들을 규격 폭으로 리샘플해 이어 붙인 뒤
  * 규격 높이 단위 이미지 여러 장으로 순차 다운로드한다. 플랫폼 업로드용이라 배경은
  * 흰색 불투명(네이버 등 JPG 전용 + 뷰어 배경 일치). 저장한 파일 수·용량 초과 수를
@@ -584,10 +615,16 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
   const prepared = await prepareVipsRoutedPresetPages(pages, plan, options);
   const createCanvas = options.createCanvas ?? createSliceCanvas;
   const download = options.download ?? downloadBlob;
-  const delayMs = options.delayMs ?? 250;
+  const delayMs = options.delayMs ?? DEFAULT_SLICE_DOWNLOAD_INTERVAL_MS;
+  const now = options.now ?? defaultMonotonicNow;
+  const sleep = options.sleep ?? defaultSleep;
   const mime = exportMimeType(plan.format);
   const quality = exportQuality(plan.format);
   let oversized = 0;
+  // 다음 다운로드를 시작해도 되는 가장 이른 시각. 다운로드 뒤에 고정으로 쉬는 대신
+  // 마감시각을 잡아 두면, 다음 슬라이스의 합성·인코딩에 흘러간 시간이 그대로 간격에
+  // 차감된다 — 다운로드 사이 최소 간격(delayMs)은 그대로 지켜지고 누적 정지만 사라진다.
+  let nextDownloadAt = Number.NEGATIVE_INFINITY;
   for (const slice of plan.slices) {
     const canvas = createCanvas(plan.targetWidth, slice.height);
     const ctx = canvas.getContext("2d");
@@ -603,12 +640,12 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
     if (watermark) drawWatermarkOnSlice(canvas, watermark);
     const blob = await canvasToBlob(canvas, mime, quality);
     if (preset.maxFileBytes !== undefined && blob.size > preset.maxFileBytes) oversized += 1;
+    // 아직 간격이 안 찼을 때만, 모자란 만큼만 쉰다(첫 장은 항상 즉시 저장).
+    const waitMs = nextDownloadAt - now();
+    if (waitMs > 0) await sleep(waitMs);
     download(blob, presetSliceFileName(title, preset.id, plan.format, { index: slice.index, total: plan.slices.length }));
+    nextDownloadAt = now() + delayMs;
     onProgress?.(slice.index + 1, plan.slices.length);
-    // 연속 다운로드가 브라우저에서 차단되지 않게 한 박자 쉼(마지막 장 제외).
-    if (delayMs > 0 && slice.index < plan.slices.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
   }
   return {
     files: plan.slices.length,

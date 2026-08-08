@@ -332,8 +332,8 @@ void main(){
   float wetUpper = texture(wetTexture, uv + vec2(0.0, fineTexel.y)).r;
   vec2 wetGradient = 0.5 * vec2(wetRight - wetLeft, wetUpper - wetLower);
   vec2 towardWetCenter = normalize(wetGradient + vec2(1e-6));
-  vec2 capillaryBacktrace = towardWetCenter * fineTexel
-    * (0.22 + capillaryTransport * 0.68) * mobility;
+  float capillaryReach = 0.22 + capillaryTransport * 0.68;
+  vec2 capillaryBacktrace = towardWetCenter * fineTexel * capillaryReach * mobility;
   vec2 baseOrigin = clamp(
     uv - velocity * dt * mobility + capillaryBacktrace,
     vec2(0.0),
@@ -389,6 +389,51 @@ void main(){
   evolved.rgb *= 1.0 + edgePool * dt * 2.4;
   float saturatedWashCenter = smoothstep(0.26, 0.7, wetness);
   evolved.rgb *= 1.0 - bleed * saturatedWashCenter * dt * 0.42;
+  // Deegan transport (the "coffee ring") — why a dwell mark must empty its own centre.
+  // capillaryBacktrace above already carries pigment down the wetness gradient: water leaving the
+  // puddle to replace what evaporates at the pinned front drags its suspended pigment outward.
+  // But pigment here is an *areal density*, and semi-Lagrangian advection transports a sampled
+  // value, which silently drops the compressibility term of the conservation law
+  //   dc/dt = -c * div(u).
+  // For a radial dwell flow div(u) > 0 everywhere inside the front (the same annulus of water
+  // spreads over a larger circumference), so omitting it is exactly what leaves the darkest
+  // pigment sitting dead centre and reads as an ink dot instead of a wash. The velocity solver
+  // cannot supply this term either: an evaporation-driven flux is divergent by construction —
+  // mass leaves the film as vapour, not sideways — and pressure projection deletes precisely that
+  // component. So it belongs here, on the pigment field.
+  //
+  // The divergence of that displacement field d = A*n is available almost for free, and it splits
+  // into exactly the two things a wash does:
+  //   div(d) = A * div(n)      geometric spreading — the same ring of water covers a longer
+  //                            circumference as it moves out, so the interior thins. This is the
+  //                            term that stops a dwell mark from reading as a dot.
+  //          + grad(A) . n     deceleration — transport weakens as the film thins toward the
+  //                            front, so pigment piles into the drying edge (the hard rim).
+  // div(n) is the curvature of the wet level set, (laplacian(wet) - d2wet/dn2) / |grad wet|, and
+  // equals -1/r around a round dwell mark, so it is singular at the crest of a puddle. The bound
+  // below is not cosmetic: the wet pass advances its capillary front with a stencil several texels
+  // wide (parallelReach and its far probe), so a front curvature tighter than roughly twice that
+  // reach is not represented in the wetness field at all — measuring it there returns paper grain,
+  // not surface shape, and would turn fibre noise into a pigment sink.
+  // grad(A).n reduces to reach * dMobility/dWet * |grad wet|, because A varies only through the
+  // mobility ramp and n is the unit wetness gradient.
+  float wetLaplacian = wetLeft + wetRight + wetLower + wetUpper - 4.0 * wetness;
+  vec2 frontNormalStep = towardWetCenter * fineTexel;
+  float wetSecondDerivativeAlongNormal =
+    texture(wetTexture, clamp(uv + frontNormalStep, vec2(0.0), vec2(1.0))).r
+    + texture(wetTexture, clamp(uv - frontNormalStep, vec2(0.0), vec2(1.0))).r
+    - 2.0 * wetness;
+  float resolvedFrontCurvature = 0.08;
+  float frontCurvature = clamp(
+    (wetLaplacian - wetSecondDerivativeAlongNormal) / max(wetGradientStrength, 1e-5),
+    -resolvedFrontCurvature,
+    resolvedFrontCurvature
+  );
+  float mobilityRamp = clamp((wetness - 0.015) / 0.445, 0.0, 1.0);
+  float mobilitySlope = 6.0 * mobilityRamp * (1.0 - mobilityRamp) / 0.445;
+  float displacementDivergence = capillaryReach
+    * (mobility * frontCurvature + mobilitySlope * wetGradientStrength);
+  evolved.rgb *= clamp(1.0 + displacementDivergence, 0.8, 1.3);
   // Advection is a rate over the fixed step. Replacing most of the pigment texture every tick
   // bleaches the water path and piles all colour at the two ends of a stroke. A dt-scaled blend
   // retains resident pigment while still moving a bounded fraction toward the capillary front.

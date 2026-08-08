@@ -256,16 +256,91 @@ describe("StudioGroupUniformResizeProxy", () => {
     });
 
     expect(props.onCommit).toHaveBeenCalledTimes(1);
-    expect(props.onCommit).toHaveBeenCalledWith({
-      x: 30,
-      y: 40,
-      width: 200,
-      height: 100,
-    });
+    // Rotation is reported alongside the box and is 0 for the default uniform proxy.
+    expect(props.onCommit).toHaveBeenCalledWith(
+      {
+        x: 30,
+        y: 40,
+        width: 200,
+        height: 100,
+      },
+      0,
+    );
     expect(props.onCancel).not.toHaveBeenCalled();
 
     act(() => rectProps().onTransformEnd({ target: rect }));
     expect(props.onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("freeTransform은 회전 핸들과 8방향 앵커를 열고 비균등 스케일을 허용한다", () => {
+    const props = { ...commonProps(), freeTransform: true };
+    render(<StudioGroupUniformResizeProxy {...props} />);
+    const transformer = transformerProps();
+
+    expect(transformer.rotateEnabled).toBe(true);
+    expect(transformer.keepRatio).toBe(false);
+    expect(transformer.enabledAnchors).toEqual([
+      "top-left",
+      "top-right",
+      "bottom-left",
+      "bottom-right",
+      "middle-left",
+      "middle-right",
+      "top-center",
+      "bottom-center",
+    ]);
+    expect(transformer.rotationSnaps).toEqual([0, 45, 90, 135, 180, 225, 270, 315]);
+  });
+
+  it("freeTransform 커밋은 회전각을 박스와 함께 넘기고 proxy를 원복한다", () => {
+    const props = { ...commonProps(), freeTransform: true };
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    render(<StudioGroupUniformResizeProxy {...props} />);
+
+    act(() => rectProps().onTransformStart());
+    act(() => {
+      rect.position({ x: 30, y: 40 });
+      rect.scaleX(2);
+      rect.scaleY(3);
+      rect.rotation(45);
+      rectProps().onTransformEnd({ target: rect });
+    });
+
+    expect(props.onCommit).toHaveBeenCalledTimes(1);
+    expect(props.onCommit).toHaveBeenCalledWith(
+      { x: 30, y: 40, width: 200, height: 150 },
+      45,
+    );
+    // The gesture proxy always returns to its source box; the document owns the result.
+    expect(rect.rotation()).toBe(0);
+    expect(rect.scaleX()).toBe(1);
+    expect(rect.scaleY()).toBe(1);
+  });
+
+  it("회전이 비유한 값이면 커밋 대신 취소한다", () => {
+    const props = { ...commonProps(), freeTransform: true };
+    const rect = konvaHarness.rectNode as unknown as FakeRectNode;
+    render(<StudioGroupUniformResizeProxy {...props} />);
+
+    act(() => rectProps().onTransformStart());
+    act(() => {
+      rect.position({ x: 30, y: 40 });
+      rect.rotation(Number.NaN);
+      rectProps().onTransformEnd({ target: rect });
+    });
+
+    expect(props.onCommit).not.toHaveBeenCalled();
+    expect(props.onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("기본(그룹) 모드는 회전 핸들 없이 균등 코너 리사이즈만 유지한다", () => {
+    const props = commonProps();
+    render(<StudioGroupUniformResizeProxy {...props} />);
+    const transformer = transformerProps();
+
+    expect(transformer.rotateEnabled).toBe(false);
+    expect(transformer.keepRatio).toBe(true);
+    expect(transformer.rotationSnaps).toEqual([]);
   });
 
   it("onBegin 거부 시 즉시 stopTransform하고 원복하며 commit/cancel을 만들지 않는다", () => {

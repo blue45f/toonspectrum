@@ -1166,7 +1166,8 @@ export function StudioDrawOptionsBar({
                   sizeLocked
                     ? `잠금을 풀어 다음에 브러시 프리셋을 선택할 때 해당 프리셋의 기본 크기를 적용합니다. 현재 ${strokeWidth}px 값은 즉시 바뀌지 않아요.`
                     : `현재 ${strokeWidth}px을 고정해 다른 브러시 프리셋을 선택해도 그 프리셋의 기본 크기로 바뀌지 않게 합니다.`,
-                  undefined,
+                  // ⇧S는 보기 리졸버가 `현재 보기 저장`으로 선점하므로 크기 잠금 화음은 ⇧⌥S다.
+                  "⇧⌥S",
                   "brush-size",
                   sizeLocked ? "unlock" : "lock"
                 )}

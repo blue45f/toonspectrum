@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   planStudioRetainedMediaPressureCurve,
+  planStudioRetainedMediaTapDab,
   resolveStudioRetainedMediaPressure,
   resolveStudioRetainedMediaPressureProfileId,
   resolveStudioRetainedMediaPressureSeries,
@@ -101,6 +102,42 @@ describe("studio retained media pressure", () => {
     expect(series).toHaveLength(5);
     expect(series.map(({ pressure }) => pressure)).toEqual([0, 0.25, 0.5, 0.75, 1]);
     expect(series[2]!.sizeScale).toBe(1);
+  });
+
+  it("resolves a contact dab only while the gesture has no extent", () => {
+    const contact = planStudioRetainedMediaTapDab([12, 34], [1], "pencil");
+    const held = planStudioRetainedMediaTapDab(
+      [12, 34, 12, 34, 12, 34],
+      [0.2, 0.6, 1],
+      "pencil",
+    );
+    const light = planStudioRetainedMediaTapDab([12, 34], [0], "pencil");
+
+    expect(contact).toMatchObject({ x: 12, y: 34, pressure: 1 });
+    expect(contact!.sizeScale).toBeGreaterThan(1);
+    // A held tap is the same mark: the response follows the contact sample, not the journal tail.
+    expect(held).toEqual(planStudioRetainedMediaTapDab([12, 34], [0.2], "pencil"));
+    expect(light!.sizeScale).toBeLessThan(contact!.sizeScale);
+    expect(light!.opacityScale).toBeLessThan(contact!.opacityScale);
+    expect(planStudioRetainedMediaTapDab([], undefined, "pencil")).toBeNull();
+  });
+
+  it("never resolves a contact dab once any sample has travelled", () => {
+    for (const points of [
+      [0, 0, 0.001, 0],
+      [0, 0, 0, -0.001],
+      [5, 5, 5, 5, 5.5, 5],
+      [0, 0, 20, 12, 45, 8],
+    ]) {
+      expect(planStudioRetainedMediaTapDab(points, [0.5], "pencil"), String(points))
+        .toBeNull();
+    }
+    // A malformed suffix is discarded before the extent test, so its prefix still taps.
+    expect(planStudioRetainedMediaTapDab(
+      [3, 4, Number.NaN, 9, 80, 80],
+      [0.5],
+      "brush",
+    )).toMatchObject({ x: 3, y: 4 });
   });
 
   it("fails closed at malformed coordinates and clamps malformed pressures", () => {

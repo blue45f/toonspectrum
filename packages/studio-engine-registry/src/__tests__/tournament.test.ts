@@ -7,6 +7,7 @@ import {
   HysteresisPolicy,
   PromotionRegistry,
   ProviderCostModel,
+  quantizePow2Bucket,
   RemoteKillSwitch,
   runShadowComparison,
   runTournament,
@@ -553,5 +554,38 @@ describe("PromotionRegistry", () => {
     expect(registry.evidenceFor("vello")).toEqual(full);
     expect(registry.demote("vello")).toBe(true);
     expect(registry.isPromoted("vello")).toBe(false);
+  });
+});
+
+/**
+ * The quantizer is exported so callers outside this module (the studio's
+ * filter-island bucket key) pool their cost samples exactly the way
+ * computeSceneFingerprint does — a mismatch would silently split buckets and
+ * strand measurements.
+ */
+describe("quantizePow2Bucket", () => {
+  it("is the power-of-two class, deterministic and monotonic", () => {
+    expect([0, 1, 2, 3, 4, 5, 8, 9].map(quantizePow2Bucket)).toEqual([
+      0, 1, 2, 2, 3, 3, 4, 4,
+    ]);
+    expect(quantizePow2Bucket(1024 * 1024)).toBe(21);
+    expect(quantizePow2Bucket(1024 * 1024)).toBe(quantizePow2Bucket(1100 * 1100));
+    expect(quantizePow2Bucket(4096 * 4096)).toBeGreaterThan(
+      quantizePow2Bucket(2048 * 2048),
+    );
+  });
+
+  it("collapses non-positive and non-finite values to the zero class", () => {
+    expect(quantizePow2Bucket(0)).toBe(0);
+    expect(quantizePow2Bucket(-5)).toBe(0);
+    expect(quantizePow2Bucket(Number.NaN)).toBe(0);
+    expect(quantizePow2Bucket(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
+  it("is the same quantizer computeSceneFingerprint keys its bucket with", () => {
+    const scene = makeScene(1024, 1024, []);
+    expect(computeSceneFingerprint(scene).bucket).toContain(
+      `a${quantizePow2Bucket(1024 * 1024)}|`,
+    );
   });
 });

@@ -34,11 +34,21 @@ export interface SceneFingerprint {
   bucket: string;
 }
 
-/** Power-of-two quantizer: 0→0, 1→1, 2→2, 3..4→3, 5..8→4, … (deterministic). */
-function pow2Bucket(value: number): number {
-  if (value <= 0) return 0;
+/**
+ * Power-of-two quantizer: 0→0, 1→1, 2→2, 3..4→3, 5..8→4, … (deterministic).
+ *
+ * Exported so every bucket key in the studio quantizes identically — the
+ * filter island's size/chain bucket (studio-filter-island-plan.ts) pools
+ * cost samples the same way {@link computeSceneFingerprint} does, which is
+ * what makes a `ProviderCostModel` estimate comparable to a seeded estimate
+ * for the same bucket.
+ */
+export function quantizePow2Bucket(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.floor(Math.log2(value)) + 1;
 }
+
+const pow2Bucket = quantizePow2Bucket;
 
 export function computeSceneFingerprint(scene: SceneIR): SceneFingerprint {
   let nodeCount = 0;

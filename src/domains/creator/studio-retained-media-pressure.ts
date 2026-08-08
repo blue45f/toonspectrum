@@ -44,6 +44,19 @@ export interface StudioRetainedMediaCurveSegment
   readonly sourceSegmentIndex: number;
 }
 
+/**
+ * Contact mark for a gesture that never travelled.
+ *
+ * A ribbon needs two distinct samples before it has any extent. Planning a tap as a ribbon either
+ * yields no segment at all or — once the pencil grain jitter has nudged the coincident samples
+ * apart — a sub-pixel sliver whose coverage is far below the nib the user pressed down.
+ */
+export interface StudioRetainedMediaTapDab
+  extends StudioRetainedMediaPressureResponse {
+  readonly x: number;
+  readonly y: number;
+}
+
 export interface StudioRetainedMediaCurvePlan {
   readonly kind: "studio-retained-media-pressure-curve";
   readonly version: typeof STUDIO_RETAINED_MEDIA_PRESSURE_VERSION;
@@ -76,6 +89,11 @@ interface ResponseProfile {
 const MAX_COORDINATE_ABS = 1_000_000_000;
 const MAX_SOURCE_POINTS = 1_000_000;
 const DEFAULT_PRESSURE = 0.5;
+/**
+ * Mirrors the ribbon planner's own degenerate-direction threshold. Below it no flattened cell can
+ * exist, so a tap dab and ribbon cells are mutually exclusive descriptions of the same gesture.
+ */
+const TAP_EXTENT_EPSILON = 1e-6;
 
 const PROFILE: Readonly<Record<StudioRetainedMediaPressureProfileId, ResponseProfile>> = {
   pencil: {
@@ -226,17 +244,8 @@ function finiteCoordinate(value: unknown): number | null {
     : null;
 }
 
-/**
- * Converts the midpoint-quadratic path used by retained pencil rendering into pressure-bearing
- * segments. Each response is evaluated at the segment midpoint, preventing width steps at noisy
- * sample boundaries while preserving the exact first and final coordinates.
- */
-export function planStudioRetainedMediaPressureCurve(
-  points: readonly number[],
-  pressures: readonly number[] | null | undefined,
-  profileId: StudioRetainedMediaPressureProfileId,
-  options?: StudioRetainedMediaCurveOptions | null,
-): StudioRetainedMediaCurvePlan {
+/** Leading run of well-formed coordinate pairs. Planning stops at the first malformed sample. */
+function finitePointPrefix(points: readonly number[]): number[] {
   const requestedPointCount = Math.min(
     MAX_SOURCE_POINTS,
     Math.floor(points.length / 2),
@@ -248,6 +257,73 @@ export function planStudioRetainedMediaPressureCurve(
     if (x === null || y === null) break;
     finitePoints.push(x, y);
   }
+  return finitePoints;
+}
+
+/**
+ * Resolves the contact mark of a gesture whose accepted samples never separated.
+ *
+ * The response is evaluated at the contact pressure rather than an average: a tap deposits what the
+ * nib delivered when it touched down. Returns null as soon as any sample moved, so a travelling
+ * stroke keeps its existing segment-only plan byte for byte.
+ */
+function tapDabOfFinitePoints(
+  finitePoints: readonly number[],
+  pressures: readonly number[] | null | undefined,
+  profileId: StudioRetainedMediaPressureProfileId,
+  minimumDiameterRatio: unknown,
+): StudioRetainedMediaTapDab | null {
+  const pointCount = Math.floor(finitePoints.length / 2);
+  if (pointCount < 1) return null;
+  const x = finitePoints[0]!;
+  const y = finitePoints[1]!;
+  for (let pointIndex = 1; pointIndex < pointCount; pointIndex += 1) {
+    if (
+      Math.abs(finitePoints[pointIndex * 2]! - x) > TAP_EXTENT_EPSILON
+      || Math.abs(finitePoints[pointIndex * 2 + 1]! - y) > TAP_EXTENT_EPSILON
+    ) return null;
+  }
+  return Object.freeze({
+    x,
+    y,
+    ...resolveStudioRetainedMediaPressure(
+      profileId,
+      pressureAtProgress(pressures, 0),
+      minimumDiameterRatio,
+    ),
+  });
+}
+
+/**
+ * Standalone contact mark for renderers that do not build a pressure curve, such as the legacy
+ * alias pencil passes. Non-null only for a gesture with no extent.
+ */
+export function planStudioRetainedMediaTapDab(
+  points: readonly number[],
+  pressures: readonly number[] | null | undefined,
+  profileId: StudioRetainedMediaPressureProfileId,
+  options?: StudioRetainedMediaCurveOptions | null,
+): StudioRetainedMediaTapDab | null {
+  return tapDabOfFinitePoints(
+    finitePointPrefix(points),
+    pressures,
+    profileId,
+    options?.minimumDiameterRatio,
+  );
+}
+
+/**
+ * Converts the midpoint-quadratic path used by retained pencil rendering into pressure-bearing
+ * segments. Each response is evaluated at the segment midpoint, preventing width steps at noisy
+ * sample boundaries while preserving the exact first and final coordinates.
+ */
+export function planStudioRetainedMediaPressureCurve(
+  points: readonly number[],
+  pressures: readonly number[] | null | undefined,
+  profileId: StudioRetainedMediaPressureProfileId,
+  options?: StudioRetainedMediaCurveOptions | null,
+): StudioRetainedMediaCurvePlan {
+  const finitePoints = finitePointPrefix(points);
   const sourcePointCount = finitePoints.length / 2;
   if (sourcePointCount < 2) {
     return Object.freeze({

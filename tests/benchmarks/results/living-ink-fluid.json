@@ -1,0 +1,522 @@
+{
+  "generatedAt": "2026-08-08",
+  "revision": "wgsl-field-v2",
+  "oracle": "cpu-reference-mirror-of-wgsl-kernels",
+  "sections": [
+    "beerLambertOverlap",
+    "capillaryOutflow",
+    "chromatography",
+    "determinism",
+    "frameBudget",
+    "grainSpectrum",
+    "incompressibility",
+    "mobilityGating",
+    "productAxes",
+    "vorticityPreservation"
+  ],
+  "complete": true,
+  "notes": [
+    "Node has no WebGPU device. Gates run the CPU reference solver exported by studio-living-ink-wgsl-shaders.ts, which shares its uniform helpers with the WGSL kernels; WGSL compilation stays covered by the browser probe.",
+    "Divergence/gradient use the wide central difference (0.5·(r−l)) while the Jacobi uses the compact 5-point Laplacian — the standard collocated GPU-fluid scheme this repo's certified GLSL already ships. The odd/even decoupling that implies is why white noise plateaus near 36% reduction while a real stroke impulse keeps converging.",
+    "grainSpectrum reuses tests/benchmarks/harness/brush-texture-lab grainMetrics, so the numbers share a yardstick with the brush texture lab (wash-soft mid-band 3.6%).",
+    "Incompressibility is a diagnostic, not the objective. interactivePressureIterations is bounded on both sides by measurement: the browser probe's isolated-wash radial shape gate fails at 4 sweeps (edge jump 0.2183 > 0.2) and passes at 12 (0.1838), while capillaryOutflow below shows rim/core transport falling monotonically as sweeps rise, because a dwell mark's radial impulse is deliberately divergent."
+  ],
+  "defaults": {
+    "velocityWetGate": {
+      "minimum": 0.004,
+      "maximum": 0.24
+    },
+    "pigmentWetGate": {
+      "minimum": 0.015,
+      "maximum": 0.46
+    },
+    "velocityDampingBase": 3,
+    "velocityDampingFlowGain": 2.35,
+    "fixingVelocityDamping": 7,
+    "vorticityBase": 0.6,
+    "vorticityGain": 6,
+    "velocityClamp": 3,
+    "wetAdvectionScale": 0.6,
+    "wetCeiling": 4,
+    "creepBlendGain": 0.29,
+    "creepBlendCeiling": 0.38,
+    "creepReachGain": 3,
+    "creepFarReach": 1.4,
+    "frontAdvanceGain": 0.105,
+    "pigmentCapillaryBase": 0.22,
+    "pigmentCapillaryGain": 0.68,
+    "pigmentTransportBase": 6,
+    "pigmentTransportBleedGain": 9,
+    "pigmentTransportCeiling": 0.24,
+    "chromaShiftScale": 20,
+    "chromaGreenShiftScale": 0.15,
+    "chromaBlueShiftScale": 1.35,
+    "pigmentDiffusionDtScale": 9,
+    "pigmentDiffusionCeiling": 0.28,
+    "pigmentChannelCeiling": 0.92,
+    "pigmentWhiteChannelGain": 1.05,
+    "minimumDryTimeSeconds": 2,
+    "maximumDryTimeSeconds": 18,
+    "fixingDryTimeSeconds": 0.25,
+    "interactivePressureIterations": 12,
+    "settlePressureIterations": 22,
+    "maximumPressureIterations": 64,
+    "coarseVelocityScales": [
+      2,
+      4,
+      8
+    ]
+  },
+  "incompressibility": {
+    "field": {
+      "width": 1024,
+      "height": 1024,
+      "coarseBase": 128,
+      "coarse": "128x128"
+    },
+    "interactiveDefault": 12,
+    "settleDefault": 22,
+    "curves": [
+      {
+        "label": "stroke-impulse",
+        "curve": [
+          {
+            "iterations": 0,
+            "reduction": 0,
+            "milliseconds": 6.367416000000048
+          },
+          {
+            "iterations": 1,
+            "reduction": 0.09157809105755532,
+            "milliseconds": 3.441249999999968
+          },
+          {
+            "iterations": 2,
+            "reduction": 0.1710620993891092,
+            "milliseconds": 3.4890420000000404
+          },
+          {
+            "iterations": 4,
+            "reduction": 0.30219825390513855,
+            "milliseconds": 4.72462500000006
+          },
+          {
+            "iterations": 6,
+            "reduction": 0.40425424418057165,
+            "milliseconds": 6.254165999999941
+          },
+          {
+            "iterations": 8,
+            "reduction": 0.4843866060113574,
+            "milliseconds": 0.921875
+          },
+          {
+            "iterations": 10,
+            "reduction": 0.5477456922481041,
+            "milliseconds": 1.6224159999999301
+          },
+          {
+            "iterations": 12,
+            "reduction": 0.5981555168352946,
+            "milliseconds": 1.7197499999999764
+          },
+          {
+            "iterations": 16,
+            "reduction": 0.671024677911479,
+            "milliseconds": 1.165124999999989
+          },
+          {
+            "iterations": 22,
+            "reduction": 0.7367943246945253,
+            "milliseconds": 1.4534580000000688
+          },
+          {
+            "iterations": 32,
+            "reduction": 0.7915652504810287,
+            "milliseconds": 1.879833000000076
+          },
+          {
+            "iterations": 48,
+            "reduction": 0.8296844726518429,
+            "milliseconds": 2.5976670000000013
+          },
+          {
+            "iterations": 64,
+            "reduction": 0.8486755997786537,
+            "milliseconds": 3.2690830000000233
+          }
+        ]
+      },
+      {
+        "label": "white-noise",
+        "curve": [
+          {
+            "iterations": 0,
+            "reduction": 0,
+            "milliseconds": 0.4656250000000455
+          },
+          {
+            "iterations": 1,
+            "reduction": 0.30563398215041204,
+            "milliseconds": 0.5000830000000178
+          },
+          {
+            "iterations": 2,
+            "reduction": 0.2962978357841195,
+            "milliseconds": 0.5720000000000027
+          },
+          {
+            "iterations": 4,
+            "reduction": 0.3355845897673906,
+            "milliseconds": 0.6363340000000335
+          },
+          {
+            "iterations": 6,
+            "reduction": 0.34731879499911156,
+            "milliseconds": 0.7257500000000618
+          },
+          {
+            "iterations": 8,
+            "reduction": 0.35215282069056286,
+            "milliseconds": 0.8065420000000358
+          },
+          {
+            "iterations": 10,
+            "reduction": 0.3545482622428314,
+            "milliseconds": 0.8990000000000009
+          },
+          {
+            "iterations": 12,
+            "reduction": 0.3558880952814777,
+            "milliseconds": 0.9915000000000873
+          },
+          {
+            "iterations": 16,
+            "reduction": 0.35723549964096657,
+            "milliseconds": 1.1691250000000082
+          },
+          {
+            "iterations": 22,
+            "reduction": 0.35804519083805164,
+            "milliseconds": 1.425875000000019
+          },
+          {
+            "iterations": 32,
+            "reduction": 0.3585113316963854,
+            "milliseconds": 1.8669160000000602
+          },
+          {
+            "iterations": 48,
+            "reduction": 0.3587356221652306,
+            "milliseconds": 2.572999999999979
+          },
+          {
+            "iterations": 64,
+            "reduction": 0.3588133146187308,
+            "milliseconds": 3.2776249999999436
+          }
+        ]
+      }
+    ],
+    "strokeReductionAtInteractive": 0.5981555168352946,
+    "strokeReductionAtSettle": 0.7367943246945253,
+    "strokeReductionAtLegacyFour": 0.30219825390513855
+  },
+  "vorticityPreservation": {
+    "frames": 90,
+    "metric": "enstrophy = Σω² on the coarse grid",
+    "productDefault": {
+      "vorticity": 0.18,
+      "on": {
+        "enstrophy": 0.009438785357758502,
+        "angularMomentum": 12526.519248421278
+      },
+      "off": {
+        "enstrophy": 0.00554218165599372,
+        "angularMomentum": 12719.503085983855
+      },
+      "enstrophyRatio": 1.703081195029165,
+      "angularMomentumRatio": 0.9848277219433805
+    },
+    "maximum": {
+      "vorticity": 1,
+      "on": {
+        "enstrophy": 0.1456755234689005,
+        "angularMomentum": 12220.186871536644
+      },
+      "off": {
+        "enstrophy": 0.00554218165599372,
+        "angularMomentum": 12719.503085983855
+      },
+      "enstrophyRatio": 26.28486984206957,
+      "angularMomentumRatio": 0.9607440470691477
+    },
+    "note": "Net angular momentum is ~0.99× with confinement: confinement is not a torque, it re-injects the small-scale vorticity that semi-Lagrangian advection dissipates. Enstrophy is the quantity the gate is on."
+  },
+  "mobilityGating": {
+    "frames": 60,
+    "gate": {
+      "minimum": 0.015,
+      "maximum": 0.46
+    },
+    "dryWetness": 0.009,
+    "dry": {
+      "start": 3.8647483158708695,
+      "end": 3.8647483158708695
+    },
+    "wet": {
+      "start": 3.8647483158708695,
+      "end": 5.153242121088392
+    },
+    "dryGrowthCells": 0,
+    "wetGrowthRatio": 1.333396562960188
+  },
+  "chromatography": {
+    "chromaticSeparation": 0.8,
+    "frames": 60,
+    "diffusionOnly": {
+      "radii": {
+        "red": 4.09642642086468,
+        "green": 3.736082239612083,
+        "blue": 3.276081555025893
+      },
+      "redOverBlue": 1.250404286969072
+    },
+    "control": {
+      "red": 3.6542455755528485,
+      "green": 3.6542455755528485,
+      "blue": 3.6542455755528485
+    },
+    "coreHaloSeparationCells": 6.853632069800272
+  },
+  "beerLambertOverlap": {
+    "beerDensity": 0.82,
+    "inkDensity": [
+      0.35,
+      1.05,
+      1.6
+    ],
+    "layers": 4,
+    "beerReflectance": [
+      [
+        0.750511728837068,
+        0.42273913174596284,
+        0.26928095555244996
+      ],
+      [
+        0.5632678551220047,
+        0.17870837350933053,
+        0.07251223302324053
+      ],
+      [
+        0.42273913174596295,
+        0.0755470226530676,
+        0.019526163397740125
+      ],
+      [
+        0.31727067661374364,
+        0.03193668276235039,
+        0.005258023938016735
+      ]
+    ],
+    "alphaReflectance": [
+      [
+        0.8378326237440942,
+        0.6247804356348758,
+        0.5250326211090924
+      ],
+      [
+        0.7810740420545271,
+        0.4934535881070824,
+        0.3587940384972748
+      ],
+      [
+        0.7612085384631786,
+        0.44748919147235466,
+        0.3006105345831387
+      ],
+      [
+        0.7542556122062067,
+        0.4314016526502,
+        0.280246308213191
+      ]
+    ],
+    "beerSaturation": [
+      0.6412035345940484,
+      0.8712650964121958,
+      0.9538103716183199,
+      0.9834273245982388
+    ],
+    "alphaSaturation": [
+      0.3733442620522052,
+      0.5406401708684268,
+      0.6050878052549854,
+      0.6284465058291483
+    ],
+    "beerHueDrift": 0,
+    "alphaHueDrift": 0.14329378417392324,
+    "note": "Hue drift is measured as the change in the ratio of the two largest channel optical densities. Beer-Lambert is exactly 0 by construction; src-over is not."
+  },
+  "determinism": {
+    "pigmentCells": 16384,
+    "frames": 24,
+    "toleranceUlp": 0,
+    "identical": true
+  },
+  "grainSpectrum": {
+    "frames": 90,
+    "window": {
+      "size": 64,
+      "centre": [
+        64,
+        64
+      ]
+    },
+    "source": "Beer-Lambert coverage of the pigment field, encoded as alpha",
+    "harness": "tests/benchmarks/harness/brush-texture-lab.ts grainMetrics (same bands)",
+    "withConfinement": {
+      "midBandRatio": 0.07768372545408694,
+      "midBandPowerNormalised": 0.007129061917101481,
+      "totalPowerExDc": 0.010600157108291645,
+      "midBandPeakPeriodPx": 28.621670111997307
+    },
+    "withoutConfinement": {
+      "midBandRatio": 0.08107231511953056,
+      "midBandPowerNormalised": 0.007591629974041135,
+      "totalPowerExDc": 0.010695637853849463
+    },
+    "midBandPowerRatio": 0.9390686771455719,
+    "brushTextureLabWashSoftMidBandRatio": 0.036,
+    "finding": "Confinement multiplies coarse-grid enstrophy by 24.8× at vorticity 1, but the pigment's mid-band power moves only ~0.94×: the bilinear resample inside the semi-Lagrangian pigment transport smooths faster than the extra eddies imprint. The visible-texture bottleneck is the transport scheme, not the fluid. Next slice: a MacCormack/BFECC corrector on advect-pigment, measured on this same window."
+  },
+  "capillaryOutflow": {
+    "frames": 45,
+    "geometry": {
+      "coreRadius": 7,
+      "rimRadii": [
+        10,
+        20
+      ]
+    },
+    "shipped": {
+      "pressureIterations": 12,
+      "core": 0.6264967492614419,
+      "rim": 0.045305400906146445,
+      "ratio": 0.0723154604705541
+    },
+    "overSolved": {
+      "pressureIterations": 48,
+      "core": 0.5602806336365831,
+      "rim": 0.029316824499979674,
+      "ratio": 0.05232525049044539
+    },
+    "unprojected": {
+      "pressureIterations": 0,
+      "core": 0.6566476606740019,
+      "rim": 0.10204254319382293,
+      "ratio": 0.1553992335693141
+    },
+    "note": "Mirrors the browser probe's isolatedBloomRimMinusCenterDarkness geometry. Rim/core pigment ratio falls monotonically as pressure sweeps rise, because a dwell mark's capillary impulse is deliberately divergent. Incompressibility is not the objective function — the wash is."
+  },
+  "productAxes": {
+    "axes": [
+      {
+        "id": "bleed",
+        "materialKey": "bleed",
+        "label": "번짐",
+        "description": "물길을 따라 안료가 퍼지는 정도",
+        "minimum": 0,
+        "maximum": 1
+      },
+      {
+        "id": "flow",
+        "materialKey": "flow",
+        "label": "유동",
+        "description": "붓이 만든 흐름이 얼마나 오래 살아 움직이는지",
+        "minimum": 0,
+        "maximum": 1
+      },
+      {
+        "id": "dry",
+        "materialKey": "dryRate",
+        "label": "건조",
+        "description": "물이 마르는 속도 — 마른 자리에서는 더 이상 번지지 않는다",
+        "minimum": 0,
+        "maximum": 1
+      },
+      {
+        "id": "chroma",
+        "materialKey": "chromaticSeparation",
+        "label": "색분리",
+        "description": "안료가 채널별로 다른 속도로 퍼지며 생기는 색 갈라짐",
+        "minimum": 0,
+        "maximum": 1
+      }
+    ],
+    "interactivePlan": {
+      "quality": "interactive",
+      "pressureIterations": 12,
+      "coarseVelocityScale": 8,
+      "coarseWidth": 128,
+      "coarseHeight": 128,
+      "vorticityStrength": 1.6800000000000002,
+      "dryWindowSeconds": 15.120000000000001,
+      "velocityWetGate": {
+        "minimum": 0.004,
+        "maximum": 0.24
+      },
+      "pigmentWetGate": {
+        "minimum": 0.015,
+        "maximum": 0.46
+      },
+      "coarseCellUpdatesPerTick": 278528,
+      "fineCellUpdatesPerTick": 3145728
+    },
+    "settlePlan": {
+      "quality": "settle",
+      "pressureIterations": 22,
+      "coarseVelocityScale": 8,
+      "coarseWidth": 128,
+      "coarseHeight": 128,
+      "vorticityStrength": 1.6800000000000002,
+      "dryWindowSeconds": 15.120000000000001,
+      "velocityWetGate": {
+        "minimum": 0.004,
+        "maximum": 0.24
+      },
+      "pigmentWetGate": {
+        "minimum": 0.015,
+        "maximum": 0.46
+      },
+      "coarseCellUpdatesPerTick": 442368,
+      "fineCellUpdatesPerTick": 3145728
+    }
+  },
+  "frameBudget": {
+    "note": "Analytic cell-write budget per fixed tick; the CPU reference timings in incompressibility.curves are solver cost, not GPU cost.",
+    "shapes": [
+      {
+        "fieldWidth": 1024,
+        "fieldHeight": 1024,
+        "coarseBase": 128,
+        "coarseVelocityScale": 8,
+        "coarseCells": 16384,
+        "fineCells": 1048576,
+        "v1CellUpdatesPerTick": 6291456,
+        "v2CellUpdatesPerTick": 3424256,
+        "ratio": 0.5442708333333334
+      },
+      {
+        "fieldWidth": 2048,
+        "fieldHeight": 1152,
+        "coarseBase": 256,
+        "coarseVelocityScale": 8,
+        "coarseCells": 36864,
+        "fineCells": 2359296,
+        "v1CellUpdatesPerTick": 14155776,
+        "v2CellUpdatesPerTick": 7704576,
+        "ratio": 0.5442708333333334
+      }
+    ]
+  }
+}

@@ -12,6 +12,11 @@ import {
 } from "./src/app/studio-cross-origin-isolation";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
+// Chunks that must never be pulled into the entry document's <link rel="modulepreload"> set.
+// A modulepreload is a highest-priority fetch on every route, so anything here competes with the
+// entry script and the render-blocking stylesheet for the first round trip.
+// "i18n" covers the shared dictionary chunk and the route i18n loaders: translations resolve
+// through an explicit ko/en fallback chain, so nothing on the critical path blocks on them.
 const ENTRY_PRELOAD_EXCLUSIONS = [
   "studio-konva-runtime",
   "StudioVrmPoser",
@@ -19,6 +24,7 @@ const ENTRY_PRELOAD_EXCLUSIONS = [
   "three-vrm.module",
   "GLTFLoader",
   "lucide-studio-core-icons",
+  "i18n",
 ];
 const INITIAL_ICON_MODULES = new Set([
   "chevron-left",

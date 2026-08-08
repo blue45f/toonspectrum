@@ -452,6 +452,22 @@ export function getStudioTournamentRuntime(): StudioRendererTournamentRuntime {
 }
 
 /**
+ * Non-creating, non-hydrating view of the shared runtime — null until
+ * something has actually booted it.
+ *
+ * Decision paths that must stay free of I/O use this instead of
+ * {@link getStudioTournamentRuntime}: creating the runtime kicks off
+ * hydration, and hydration is what pulls the persistence adapter (and, with
+ * the SQLite/OPFS adapter installed, its ~865 KB wasm) over the network. A
+ * null runtime is not a correctness problem — an unbooted tournament has an
+ * empty winner cache and nothing killed, which is exactly the state the lane
+ * ladder is contractually unchanged by.
+ */
+export function peekStudioTournamentRuntime(): StudioRendererTournamentRuntime | null {
+  return sharedRuntime;
+}
+
+/**
  * Replaces the shared runtime (e.g. boot code injecting a remote kill list,
  * or tests injecting fake persistence). `null` restores lazy default
  * creation. The caller owns hydration of an injected runtime.

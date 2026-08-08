@@ -142,6 +142,12 @@ function measureStudioRailMorePosition(
 }
 
 export interface StudioLeftToolRailHandlers {
+  /**
+   * 선택/그리기 전환의 단일 정본. 진행 중인 획 취소 → 픽셀 도구 disarm(스포이드 포함) →
+   * tool/drawMode 커밋을 한 순서로 수행한다. 레일이 setTool/setDrawMode를 직접 만지면
+   * 같은 명령이 진입점마다 다른 부수효과를 갖게 되므로 항상 이 핸들러를 거친다.
+   */
+  activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   fitCanvasToWidth: () => void;
   openFrameAnimationForSelected: () => void;
   openPixelSelectionTransform: () => void;
@@ -209,7 +215,6 @@ interface StudioLeftToolRailProps {
   selectedImageMutationLocked: boolean;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
@@ -270,7 +275,6 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   selectedImageMutationLocked,
   setAppSettingsInitialTab,
   setAppSettingsOpen,
-  setDrawMode,
   setDrawShape,
   setEyedropperActive,
   setMenu,
@@ -376,6 +380,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     top: 8,
   });
   const {
+    activatePrimaryCanvasTool,
     addBubble,
     addText,
     announceDrawingShortcut,
@@ -400,11 +405,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   } = stableHandlers;
   /** Pick a draw mode from the rail and surface context properties (CSP/PPT IA). */
   const activateDrawTool = (mode: DrawMode, shape?: DrawShapeKind) => {
-    disarmAllPixelTools();
-    setTool("draw");
-    setDrawMode(mode);
+    // 진행 중인 획 취소 + disarm(스포이드 포함) + tool/drawMode 커밋은 전이 함수가 정본이다.
+    activatePrimaryCanvasTool("draw", mode);
     if (shape !== undefined) setDrawShape(shape);
-    setEyedropperActive(false);
     setMenu(null);
     // First tool click should clear first-use chrome so the canvas stays the focus.
     revealDrawToolProperties();
@@ -635,9 +638,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
               active={tool === "select" && !selectionSubtoolActive}
               onClick={() => {
-                disarmAllPixelTools();
-                setTool("select");
-                setEyedropperActive(false);
+                activatePrimaryCanvasTool("select");
                 setMenu(null);
               }}
             />

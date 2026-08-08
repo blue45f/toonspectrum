@@ -176,11 +176,28 @@ export function FloatingControls({
             onChange={(event) => setLang(event.target.value)}
             className="max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
           >
-            {langOptions.map((o) => (
-              <option key={o.code} value={o.code}>
-                {o.label}
-              </option>
-            ))}
+            {/*
+              대부분의 로케일은 실측 번역률이 3% 미만이라 사실상 영어로 렌더된다.
+              한 목록에 섞어 두면 "번역 있음"으로 위장되므로 실측값 기준으로 그룹을 나눈다.
+            */}
+            <optgroup label={t("control.language.group.translated")}>
+              {langOptions
+                .filter((o) => o.fullyTranslated)
+                .map((o) => (
+                  <option key={o.code} value={o.code}>
+                    {o.label}
+                  </option>
+                ))}
+            </optgroup>
+            <optgroup label={t("control.language.group.englishBase")}>
+              {langOptions
+                .filter((o) => !o.fullyTranslated)
+                .map((o) => (
+                  <option key={o.code} value={o.code}>
+                    {o.label}
+                  </option>
+                ))}
+            </optgroup>
           </select>
         </div>
       )}

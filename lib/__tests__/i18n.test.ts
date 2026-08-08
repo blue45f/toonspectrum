@@ -12,6 +12,7 @@ import {
   ensureRuntimeLocaleBundle,
   resolveI18nValue,
 } from "@/lib/i18n";
+import { APP_I18N_BUILT_IN_LOCALES } from "@/lib/i18n-locale-catalog";
 
 function mockTranslationResponseForRequest(url: string): Response {
   const parsed = new URL(url);
@@ -347,18 +348,20 @@ describe("translation dictionary completeness", () => {
     });
   });
 
-  it("covers all registered world base locales in DICT with at least 525 App keys each", () => {
-    const appKeys = Object.keys(i18nDict.en).filter((k) => !k.startsWith("studio."));
-    expect(appKeys).toHaveLength(525);
+  // Per-locale coverage of the 75 published dictionaries lives in i18n-locale-assets.test.ts;
+  // it reads public/i18n/app/*.json directly because those assets are no longer bundled.
+  it("compiles only the ko/en fallback pair into the app shell", () => {
+    expect([...APP_I18N_BUILT_IN_LOCALES]).toEqual(["ko", "en"]);
 
-    for (const [locale, dict] of Object.entries(i18nDict)) {
-      if (locale === "ia" || locale === "eo") continue;
-      const localeKeys = Object.keys(dict);
-      expect(localeKeys.length, `Locale ${locale} key count`).toBeGreaterThanOrEqual(525);
-      for (const key of appKeys) {
-        expect(dict[key], `Key ${key} in ${locale}`).toBeDefined();
-        expect(typeof dict[key], `Key ${key} type in ${locale}`).toBe("string");
-      }
+    // FALLBACK_CHAIN is the last line of defence for every one of the 75 locales, so every link
+    // in it must resolve out of the shell without awaiting an asset.
+    for (const locale of FALLBACK_CHAIN) {
+      expect(
+        (APP_I18N_BUILT_IN_LOCALES as readonly string[]).includes(locale),
+        `fallback locale ${locale} must be compiled into the shell`,
+      ).toBe(true);
+      const appKeys = Object.keys(i18nDict[locale]).filter((key) => !key.startsWith("studio."));
+      expect(appKeys.length, `shell locale ${locale} app key count`).toBeGreaterThanOrEqual(525);
     }
   });
 

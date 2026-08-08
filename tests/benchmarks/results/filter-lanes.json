@@ -1,0 +1,6138 @@
+{
+  "harness": "tests/benchmarks/harness/filter-lanes.ts",
+  "note": "프로덕션 필터 레인(gpu-chain → worker → konva-native) 중 CPU/Worker 레인의 크기별·체인별 실측. GPU 레인은 packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)가 같은 파일의 gpuLanes/crossover 를 채운다.",
+  "generatedAt": "2026-08-08T05:54:18.069Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "cores": 12,
+    "totalMemGb": 32,
+    "node": "v24.16.0"
+  },
+  "concurrentLoad": {
+    "note": "이 측정은 같은 머신에서 다른 에이전트의 빌드/테스트와 24h 소크가 병행 실행되는 동안 수행됐다. 절대 시간은 부풀려질 수 있으므로 (1) 셀마다 세 레인을 교차 실행하고 (2) 비교는 전부 중앙값(p50) 기준으로 설계했다. 전체 표본을 남기므로 재요약 가능하다.",
+    "loadavgBefore": [
+      9.061,
+      9.39,
+      9.362
+    ],
+    "loadavgAfter": [
+      11.751,
+      10.057,
+      9.605
+    ],
+    "cpuCount": 12
+  },
+  "measurementFloors": {
+    "workerRoundTrip": "worker-cpu 는 postMessage 왕복 + 결과 ArrayBuffer transfer + 워커 내 원본 사본 할당을 포함한다. direct-cpu 와의 차이가 곧 그 왕복 비용이며, 작은 캔버스에서는 이 왕복이 필터 연산 자체를 가린다(= Worker 레인의 측정 플로어).",
+    "konvaCacheCanvas": "konva-fallback 은 Konva 가 필터를 태우는 filter.call 루프(applyImageFilters 와 동일)만 잰다. 실제 Konva 노드 경로에는 여기에 cache() 의 canvas getImageData/putImageData 왕복이 추가로 붙는다(node 에는 canvas 가 없어 제외) — 즉 이 수치는 하한이다.",
+    "gpuSubmitFloor": "GPU 레인의 submit→onSubmittedWorkDone 왕복(~2.5ms, wgsl-variants-pipeline.json 에서 관측)은 작은 작업을 가린다. 브라우저 프로브가 timestamp-query 보조 계측으로 순수 GPU 실행 시간을 분리해 기록한다."
+  },
+  "config": {
+    "sizes": [
+      {
+        "size": "256x256",
+        "pixels": 65536,
+        "warmup": 5,
+        "iterations": 25
+      },
+      {
+        "size": "512x512",
+        "pixels": 262144,
+        "warmup": 3,
+        "iterations": 20
+      },
+      {
+        "size": "1024x1024",
+        "pixels": 1048576,
+        "warmup": 2,
+        "iterations": 15
+      },
+      {
+        "size": "2048x2048",
+        "pixels": 4194304,
+        "warmup": 1,
+        "iterations": 9
+      },
+      {
+        "size": "4096x4096",
+        "pixels": 16777216,
+        "warmup": 1,
+        "iterations": 5
+      }
+    ],
+    "chains": [
+      {
+        "id": "single",
+        "label": "밝기 1단",
+        "steps": [
+          "brightness"
+        ]
+      },
+      {
+        "id": "triple",
+        "label": "밝기+대비+HSL 3단",
+        "steps": [
+          "brightness",
+          "contrast",
+          "hsl"
+        ]
+      },
+      {
+        "id": "full5",
+        "label": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "steps": [
+          "brightness",
+          "contrast",
+          "hsl",
+          "levels",
+          "curves",
+          "colorBalance"
+        ]
+      }
+    ],
+    "source": "deterministic LCG RGBA (브라우저 프로브와 동일 시드·점화식)",
+    "quick": false
+  },
+  "lanes": {
+    "worker-cpu": "src/domains/creator/studio-image-filter.worker.ts 원본 모듈 + 상주 원본 프로토콜 (load-source 1회 → run-source tick → 결과 transfer), node worker_threads 실행",
+    "direct-cpu": "studio-image-filter-worker-client.ts runImageFilterDirect 와 동일 구성 (빈 레지스트리 + registerStudioKonvaFilters 네이티브 포팅) 메인스레드 동기 실행 — CPU 참조 픽셀",
+    "konva-fallback": "StudioKonvaImageNode 비-Worker 경로와 동일하게 실제 konva 패키지 Filters 레지스트리로 buildImageFilters → applyImageFilters"
+  },
+  "results": [
+    {
+      "size": 256,
+      "pixels": 65536,
+      "megabytes": 0.25,
+      "chain": "single",
+      "chainLabel": "밝기 1단",
+      "chainSteps": [
+        "brightness"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 1,
+        "fusedKernelIds": [
+          "brightness-contrast"
+        ],
+        "unfusedDispatches": 1
+      },
+      "iterations": 25,
+      "warmup": 5,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 0.463,
+          "p95Ms": 1.066,
+          "p99Ms": 1.432,
+          "meanMs": 0.538,
+          "minMs": 0.227,
+          "maxMs": 1.432,
+          "jankP99OverP50": 3.095,
+          "mbPerSec": 540.491,
+          "megapixelsPerSec": 141.687,
+          "samplesMs": [
+            0.49,
+            0.406,
+            0.632,
+            0.371,
+            0.272,
+            0.837,
+            0.39,
+            0.673,
+            1.432,
+            0.378,
+            1.066,
+            0.257,
+            0.235,
+            0.227,
+            0.334,
+            0.304,
+            0.668,
+            0.307,
+            0.583,
+            0.552,
+            0.262,
+            0.463,
+            0.576,
+            0.755,
+            0.979
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 0.23,
+          "p95Ms": 0.482,
+          "p99Ms": 0.649,
+          "meanMs": 0.289,
+          "minMs": 0.214,
+          "maxMs": 0.649,
+          "jankP99OverP50": 2.817,
+          "mbPerSec": 1085.776,
+          "megapixelsPerSec": 284.63,
+          "samplesMs": [
+            0.217,
+            0.225,
+            0.421,
+            0.219,
+            0.219,
+            0.219,
+            0.257,
+            0.22,
+            0.236,
+            0.225,
+            0.222,
+            0.23,
+            0.215,
+            0.214,
+            0.323,
+            0.224,
+            0.482,
+            0.649,
+            0.314,
+            0.404,
+            0.446,
+            0.234,
+            0.305,
+            0.215,
+            0.284
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 0.214,
+          "p95Ms": 0.465,
+          "p99Ms": 0.936,
+          "meanMs": 0.3,
+          "minMs": 0.195,
+          "maxMs": 0.936,
+          "jankP99OverP50": 4.369,
+          "mbPerSec": 1166.638,
+          "megapixelsPerSec": 305.827,
+          "samplesMs": [
+            0.434,
+            0.201,
+            0.417,
+            0.205,
+            0.203,
+            0.204,
+            0.311,
+            0.376,
+            0.37,
+            0.936,
+            0.31,
+            0.2,
+            0.199,
+            0.199,
+            0.465,
+            0.195,
+            0.238,
+            0.206,
+            0.269,
+            0.457,
+            0.203,
+            0.282,
+            0.203,
+            0.214,
+            0.207
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 256,
+      "pixels": 65536,
+      "megabytes": 0.25,
+      "chain": "triple",
+      "chainLabel": "밝기+대비+HSL 3단",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 2,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl"
+        ],
+        "unfusedDispatches": 2
+      },
+      "iterations": 25,
+      "warmup": 5,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 1.112,
+          "p95Ms": 1.827,
+          "p99Ms": 2.371,
+          "meanMs": 1.197,
+          "minMs": 0.841,
+          "maxMs": 2.371,
+          "jankP99OverP50": 2.133,
+          "mbPerSec": 224.913,
+          "megapixelsPerSec": 58.96,
+          "samplesMs": [
+            1.488,
+            0.902,
+            1.827,
+            1.679,
+            1.039,
+            1.222,
+            0.916,
+            0.914,
+            0.908,
+            1.332,
+            0.947,
+            1.153,
+            2.371,
+            0.98,
+            0.862,
+            1.761,
+            1.117,
+            1.376,
+            1.112,
+            1.141,
+            1.023,
+            0.919,
+            1.209,
+            0.876,
+            0.841
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 1.02,
+          "p95Ms": 1.904,
+          "p99Ms": 2.177,
+          "meanMs": 1.174,
+          "minMs": 0.813,
+          "maxMs": 2.177,
+          "jankP99OverP50": 2.134,
+          "mbPerSec": 245.078,
+          "megapixelsPerSec": 64.246,
+          "samplesMs": [
+            1.214,
+            1.215,
+            1.304,
+            0.947,
+            1.315,
+            1.343,
+            1.675,
+            1.258,
+            1.78,
+            0.822,
+            0.826,
+            0.929,
+            1.09,
+            0.818,
+            0.825,
+            0.922,
+            1.02,
+            2.177,
+            0.954,
+            1.904,
+            0.836,
+            0.844,
+            1.692,
+            0.813,
+            0.824
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 1.054,
+          "p95Ms": 1.628,
+          "p99Ms": 1.927,
+          "meanMs": 1.127,
+          "minMs": 0.803,
+          "maxMs": 1.927,
+          "jankP99OverP50": 1.828,
+          "mbPerSec": 237.154,
+          "megapixelsPerSec": 62.169,
+          "samplesMs": [
+            1.054,
+            0.824,
+            1.529,
+            1.927,
+            0.885,
+            0.9,
+            1.106,
+            1.288,
+            1.339,
+            1.073,
+            1.524,
+            1.208,
+            1.243,
+            1.616,
+            0.821,
+            0.919,
+            0.803,
+            1.28,
+            1.628,
+            0.998,
+            0.929,
+            0.869,
+            0.806,
+            0.804,
+            0.806
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 256,
+      "pixels": 65536,
+      "megabytes": 0.25,
+      "chain": "full5",
+      "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl",
+        "levels",
+        "curves",
+        "colorBalance"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 4,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl",
+          "lut-fused",
+          "color-balance"
+        ],
+        "unfusedDispatches": 5
+      },
+      "iterations": 25,
+      "warmup": 5,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 1.635,
+          "p95Ms": 3.96,
+          "p99Ms": 6.58,
+          "meanMs": 2.251,
+          "minMs": 1.51,
+          "maxMs": 6.58,
+          "jankP99OverP50": 4.024,
+          "mbPerSec": 152.89,
+          "megapixelsPerSec": 40.079,
+          "samplesMs": [
+            1.635,
+            1.571,
+            1.539,
+            1.802,
+            3.892,
+            1.649,
+            3.531,
+            6.58,
+            3.529,
+            2.841,
+            3.96,
+            3.188,
+            1.851,
+            1.759,
+            1.675,
+            1.563,
+            1.552,
+            1.521,
+            1.519,
+            1.51,
+            1.517,
+            1.521,
+            1.525,
+            1.517,
+            1.533
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 1.529,
+          "p95Ms": 2.665,
+          "p99Ms": 3.365,
+          "meanMs": 1.761,
+          "minMs": 1.478,
+          "maxMs": 3.365,
+          "jankP99OverP50": 2.201,
+          "mbPerSec": 163.528,
+          "megapixelsPerSec": 42.868,
+          "samplesMs": [
+            1.519,
+            1.843,
+            1.832,
+            1.59,
+            1.674,
+            1.529,
+            1.5,
+            2.204,
+            2.665,
+            3.365,
+            1.992,
+            2.028,
+            1.52,
+            1.682,
+            1.517,
+            1.843,
+            1.823,
+            1.483,
+            1.486,
+            1.486,
+            1.493,
+            1.49,
+            1.478,
+            1.489,
+            1.498
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 1.55,
+          "p95Ms": 2.05,
+          "p99Ms": 2.08,
+          "meanMs": 1.662,
+          "minMs": 1.481,
+          "maxMs": 2.08,
+          "jankP99OverP50": 1.342,
+          "mbPerSec": 161.243,
+          "megapixelsPerSec": 42.269,
+          "samplesMs": [
+            1.529,
+            1.839,
+            1.882,
+            1.55,
+            1.8,
+            1.557,
+            1.485,
+            2.049,
+            1.601,
+            2.05,
+            1.628,
+            1.536,
+            2.08,
+            1.867,
+            1.505,
+            1.839,
+            1.87,
+            1.49,
+            1.486,
+            1.481,
+            1.484,
+            1.483,
+            1.492,
+            1.492,
+            1.482
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 512,
+      "pixels": 262144,
+      "megabytes": 1,
+      "chain": "single",
+      "chainLabel": "밝기 1단",
+      "chainSteps": [
+        "brightness"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 1,
+        "fusedKernelIds": [
+          "brightness-contrast"
+        ],
+        "unfusedDispatches": 1
+      },
+      "iterations": 20,
+      "warmup": 3,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 0.795,
+          "p95Ms": 2.059,
+          "p99Ms": 2.219,
+          "meanMs": 0.933,
+          "minMs": 0.74,
+          "maxMs": 2.219,
+          "jankP99OverP50": 2.79,
+          "mbPerSec": 1257.597,
+          "megapixelsPerSec": 329.672,
+          "samplesMs": [
+            0.91,
+            0.848,
+            0.824,
+            0.855,
+            2.219,
+            2.059,
+            0.823,
+            0.794,
+            0.74,
+            0.743,
+            0.784,
+            0.785,
+            0.79,
+            0.79,
+            0.799,
+            0.744,
+            0.744,
+            0.807,
+            0.795,
+            0.819
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 0.762,
+          "p95Ms": 0.802,
+          "p99Ms": 0.809,
+          "meanMs": 0.762,
+          "minMs": 0.712,
+          "maxMs": 0.809,
+          "jankP99OverP50": 1.061,
+          "mbPerSec": 1311.69,
+          "megapixelsPerSec": 343.852,
+          "samplesMs": [
+            0.775,
+            0.809,
+            0.78,
+            0.791,
+            0.775,
+            0.785,
+            0.802,
+            0.785,
+            0.762,
+            0.727,
+            0.712,
+            0.762,
+            0.714,
+            0.758,
+            0.762,
+            0.741,
+            0.722,
+            0.717,
+            0.77,
+            0.786
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 0.758,
+          "p95Ms": 1.25,
+          "p99Ms": 1.256,
+          "meanMs": 0.812,
+          "minMs": 0.709,
+          "maxMs": 1.256,
+          "jankP99OverP50": 1.657,
+          "mbPerSec": 1318.898,
+          "megapixelsPerSec": 345.741,
+          "samplesMs": [
+            0.777,
+            0.78,
+            0.783,
+            0.79,
+            0.982,
+            1.256,
+            1.25,
+            0.734,
+            0.717,
+            0.753,
+            0.717,
+            0.74,
+            0.758,
+            0.759,
+            0.754,
+            0.711,
+            0.709,
+            0.713,
+            0.788,
+            0.766
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 512,
+      "pixels": 262144,
+      "megabytes": 1,
+      "chain": "triple",
+      "chainLabel": "밝기+대비+HSL 3단",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 2,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl"
+        ],
+        "unfusedDispatches": 2
+      },
+      "iterations": 20,
+      "warmup": 3,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 3.268,
+          "p95Ms": 3.781,
+          "p99Ms": 5.705,
+          "meanMs": 3.439,
+          "minMs": 3.192,
+          "maxMs": 5.705,
+          "jankP99OverP50": 1.746,
+          "mbPerSec": 306.017,
+          "megapixelsPerSec": 80.221,
+          "samplesMs": [
+            5.705,
+            3.399,
+            3.261,
+            3.293,
+            3.229,
+            3.409,
+            3.401,
+            3.342,
+            3.619,
+            3.781,
+            3.301,
+            3.225,
+            3.222,
+            3.268,
+            3.268,
+            3.208,
+            3.197,
+            3.237,
+            3.192,
+            3.219
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 3.179,
+          "p95Ms": 4.797,
+          "p99Ms": 4.892,
+          "meanMs": 3.431,
+          "minMs": 3.148,
+          "maxMs": 4.892,
+          "jankP99OverP50": 1.539,
+          "mbPerSec": 314.544,
+          "megapixelsPerSec": 82.456,
+          "samplesMs": [
+            3.972,
+            4.797,
+            3.167,
+            3.179,
+            3.178,
+            3.319,
+            3.216,
+            3.171,
+            3.226,
+            4.892,
+            3.995,
+            3.152,
+            3.148,
+            3.161,
+            3.213,
+            3.193,
+            3.156,
+            3.149,
+            3.148,
+            3.184
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 3.201,
+          "p95Ms": 5.878,
+          "p99Ms": 12.614,
+          "meanMs": 3.963,
+          "minMs": 3.116,
+          "maxMs": 12.614,
+          "jankP99OverP50": 3.941,
+          "mbPerSec": 312.447,
+          "megapixelsPerSec": 81.906,
+          "samplesMs": [
+            4.789,
+            4.8,
+            3.201,
+            3.222,
+            3.135,
+            3.227,
+            3.207,
+            3.337,
+            3.455,
+            12.614,
+            3.127,
+            3.157,
+            3.116,
+            3.156,
+            3.206,
+            3.158,
+            3.154,
+            3.182,
+            3.133,
+            5.878
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 512,
+      "pixels": 262144,
+      "megabytes": 1,
+      "chain": "full5",
+      "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl",
+        "levels",
+        "curves",
+        "colorBalance"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 4,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl",
+          "lut-fused",
+          "color-balance"
+        ],
+        "unfusedDispatches": 5
+      },
+      "iterations": 20,
+      "warmup": 3,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 6.027,
+          "p95Ms": 10.541,
+          "p99Ms": 12.128,
+          "meanMs": 7.092,
+          "minMs": 5.858,
+          "maxMs": 12.128,
+          "jankP99OverP50": 2.012,
+          "mbPerSec": 165.919,
+          "megapixelsPerSec": 43.495,
+          "samplesMs": [
+            8.369,
+            10.541,
+            5.96,
+            7.707,
+            5.963,
+            12.128,
+            5.919,
+            6.107,
+            6.027,
+            5.874,
+            5.858,
+            6.027,
+            5.95,
+            5.943,
+            6.315,
+            7.493,
+            5.904,
+            6.066,
+            7.895,
+            9.799
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 5.825,
+          "p95Ms": 11.904,
+          "p99Ms": 11.968,
+          "meanMs": 7.112,
+          "minMs": 5.737,
+          "maxMs": 11.968,
+          "jankP99OverP50": 2.054,
+          "mbPerSec": 171.66,
+          "megapixelsPerSec": 45,
+          "samplesMs": [
+            11.968,
+            11.904,
+            5.813,
+            5.825,
+            6.347,
+            7.285,
+            5.822,
+            6.004,
+            9.502,
+            5.821,
+            5.793,
+            5.806,
+            5.82,
+            5.814,
+            5.737,
+            5.861,
+            9.974,
+            5.842,
+            5.813,
+            9.488
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 5.815,
+          "p95Ms": 7.258,
+          "p99Ms": 7.31,
+          "meanMs": 6.063,
+          "minMs": 5.756,
+          "maxMs": 7.31,
+          "jankP99OverP50": 1.257,
+          "mbPerSec": 171.974,
+          "megapixelsPerSec": 45.082,
+          "samplesMs": [
+            6.021,
+            5.849,
+            5.801,
+            5.825,
+            6.707,
+            5.943,
+            5.805,
+            5.801,
+            6.816,
+            5.784,
+            5.781,
+            5.764,
+            5.786,
+            5.816,
+            5.756,
+            5.815,
+            7.31,
+            5.8,
+            5.819,
+            7.258
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 1024,
+      "pixels": 1048576,
+      "megabytes": 4,
+      "chain": "single",
+      "chainLabel": "밝기 1단",
+      "chainSteps": [
+        "brightness"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 1,
+        "fusedKernelIds": [
+          "brightness-contrast"
+        ],
+        "unfusedDispatches": 1
+      },
+      "iterations": 15,
+      "warmup": 2,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 2.926,
+          "p95Ms": 3.288,
+          "p99Ms": 3.288,
+          "meanMs": 3.023,
+          "minMs": 2.875,
+          "maxMs": 3.288,
+          "jankP99OverP50": 1.124,
+          "mbPerSec": 1366.957,
+          "megapixelsPerSec": 358.34,
+          "samplesMs": [
+            3.139,
+            3.121,
+            3.168,
+            3.154,
+            3.288,
+            2.924,
+            2.917,
+            2.926,
+            2.944,
+            2.896,
+            3.282,
+            2.924,
+            2.875,
+            2.905,
+            2.876
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 2.901,
+          "p95Ms": 3.208,
+          "p99Ms": 3.208,
+          "meanMs": 2.978,
+          "minMs": 2.851,
+          "maxMs": 3.208,
+          "jankP99OverP50": 1.106,
+          "mbPerSec": 1378.716,
+          "megapixelsPerSec": 361.422,
+          "samplesMs": [
+            3.056,
+            3.084,
+            3.063,
+            3.082,
+            3.174,
+            2.882,
+            2.885,
+            2.894,
+            2.901,
+            2.935,
+            3.208,
+            2.896,
+            2.882,
+            2.874,
+            2.851
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 2.892,
+          "p95Ms": 3.098,
+          "p99Ms": 3.098,
+          "meanMs": 2.964,
+          "minMs": 2.838,
+          "maxMs": 3.098,
+          "jankP99OverP50": 1.071,
+          "mbPerSec": 1383.166,
+          "megapixelsPerSec": 362.589,
+          "samplesMs": [
+            3.098,
+            3.089,
+            3.067,
+            3.091,
+            3.092,
+            2.884,
+            2.882,
+            2.892,
+            2.921,
+            2.888,
+            3.091,
+            2.89,
+            2.883,
+            2.849,
+            2.838
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 1024,
+      "pixels": 1048576,
+      "megabytes": 4,
+      "chain": "triple",
+      "chainLabel": "밝기+대비+HSL 3단",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 2,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl"
+        ],
+        "unfusedDispatches": 2
+      },
+      "iterations": 15,
+      "warmup": 2,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 13.606,
+          "p95Ms": 15.776,
+          "p99Ms": 15.776,
+          "meanMs": 13.815,
+          "minMs": 12.74,
+          "maxMs": 15.776,
+          "jankP99OverP50": 1.16,
+          "mbPerSec": 293.992,
+          "megapixelsPerSec": 77.068,
+          "samplesMs": [
+            14.507,
+            15.776,
+            14.295,
+            13.606,
+            14.577,
+            15.622,
+            15.315,
+            13.966,
+            12.77,
+            12.742,
+            12.783,
+            12.881,
+            12.771,
+            12.871,
+            12.74
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 14.209,
+          "p95Ms": 20.896,
+          "p99Ms": 20.896,
+          "meanMs": 14.472,
+          "minMs": 13.171,
+          "maxMs": 20.896,
+          "jankP99OverP50": 1.471,
+          "mbPerSec": 281.515,
+          "megapixelsPerSec": 73.797,
+          "samplesMs": [
+            14.257,
+            14.578,
+            14.347,
+            20.896,
+            14.58,
+            15.741,
+            14.209,
+            13.646,
+            14.354,
+            13.456,
+            13.171,
+            13.5,
+            13.471,
+            13.457,
+            13.415
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 14.253,
+          "p95Ms": 18.55,
+          "p99Ms": 18.55,
+          "meanMs": 14.615,
+          "minMs": 13.295,
+          "maxMs": 18.55,
+          "jankP99OverP50": 1.302,
+          "mbPerSec": 280.646,
+          "megapixelsPerSec": 73.57,
+          "samplesMs": [
+            16.994,
+            14.262,
+            14.359,
+            14.948,
+            14.249,
+            16.679,
+            14.462,
+            18.55,
+            13.58,
+            13.349,
+            13.457,
+            13.295,
+            13.401,
+            13.387,
+            14.253
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 1024,
+      "pixels": 1048576,
+      "megabytes": 4,
+      "chain": "full5",
+      "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl",
+        "levels",
+        "curves",
+        "colorBalance"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 4,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl",
+          "lut-fused",
+          "color-balance"
+        ],
+        "unfusedDispatches": 5
+      },
+      "iterations": 15,
+      "warmup": 2,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 23.374,
+          "p95Ms": 25.229,
+          "p99Ms": 25.229,
+          "meanMs": 23.522,
+          "minMs": 23.203,
+          "maxMs": 25.229,
+          "jankP99OverP50": 1.079,
+          "mbPerSec": 171.129,
+          "megapixelsPerSec": 44.86,
+          "samplesMs": [
+            23.276,
+            23.419,
+            23.588,
+            23.265,
+            23.211,
+            23.203,
+            25.229,
+            23.3,
+            23.374,
+            24.023,
+            23.412,
+            23.307,
+            23.523,
+            23.39,
+            23.313
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 25.402,
+          "p95Ms": 25.724,
+          "p99Ms": 25.724,
+          "meanMs": 25.375,
+          "minMs": 25.097,
+          "maxMs": 25.724,
+          "jankP99OverP50": 1.013,
+          "mbPerSec": 157.468,
+          "megapixelsPerSec": 41.279,
+          "samplesMs": [
+            25.192,
+            25.507,
+            25.352,
+            25.314,
+            25.135,
+            25.458,
+            25.268,
+            25.435,
+            25.097,
+            25.47,
+            25.3,
+            25.724,
+            25.463,
+            25.402,
+            25.506
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 24.004,
+          "p95Ms": 24.482,
+          "p99Ms": 24.482,
+          "meanMs": 23.997,
+          "minMs": 23.616,
+          "maxMs": 24.482,
+          "jankP99OverP50": 1.02,
+          "mbPerSec": 166.641,
+          "megapixelsPerSec": 43.684,
+          "samplesMs": [
+            23.821,
+            24.068,
+            23.78,
+            23.735,
+            23.616,
+            24.06,
+            23.951,
+            24.174,
+            23.947,
+            23.964,
+            24.147,
+            24.023,
+            24.188,
+            24.482,
+            24.004
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 2048,
+      "pixels": 4194304,
+      "megabytes": 16,
+      "chain": "single",
+      "chainLabel": "밝기 1단",
+      "chainSteps": [
+        "brightness"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 1,
+        "fusedKernelIds": [
+          "brightness-contrast"
+        ],
+        "unfusedDispatches": 1
+      },
+      "iterations": 9,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 13.613,
+          "p95Ms": 15.644,
+          "p99Ms": 15.644,
+          "meanMs": 13.697,
+          "minMs": 11.766,
+          "maxMs": 15.644,
+          "jankP99OverP50": 1.149,
+          "mbPerSec": 1175.361,
+          "megapixelsPerSec": 308.114,
+          "samplesMs": [
+            15.644,
+            14.289,
+            13.555,
+            13.613,
+            14.093,
+            11.766,
+            13.004,
+            13.3,
+            14.009
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 11.358,
+          "p95Ms": 14.027,
+          "p99Ms": 14.027,
+          "meanMs": 11.783,
+          "minMs": 11.162,
+          "maxMs": 14.027,
+          "jankP99OverP50": 1.235,
+          "mbPerSec": 1408.647,
+          "megapixelsPerSec": 369.268,
+          "samplesMs": [
+            12.297,
+            12.257,
+            11.358,
+            11.166,
+            11.414,
+            14.027,
+            11.197,
+            11.172,
+            11.162
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 11.475,
+          "p95Ms": 12.746,
+          "p99Ms": 12.746,
+          "meanMs": 11.681,
+          "minMs": 11.175,
+          "maxMs": 12.746,
+          "jankP99OverP50": 1.111,
+          "mbPerSec": 1394.28,
+          "megapixelsPerSec": 365.502,
+          "samplesMs": [
+            12.214,
+            11.313,
+            11.475,
+            12.746,
+            11.192,
+            11.175,
+            12.063,
+            11.354,
+            11.594
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 2048,
+      "pixels": 4194304,
+      "megabytes": 16,
+      "chain": "triple",
+      "chainLabel": "밝기+대비+HSL 3단",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 2,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl"
+        ],
+        "unfusedDispatches": 2
+      },
+      "iterations": 9,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 60.5,
+          "p95Ms": 78.05,
+          "p99Ms": 78.05,
+          "meanMs": 60.445,
+          "minMs": 51.939,
+          "maxMs": 78.05,
+          "jankP99OverP50": 1.29,
+          "mbPerSec": 264.463,
+          "megapixelsPerSec": 69.327,
+          "samplesMs": [
+            56.329,
+            78.05,
+            61.445,
+            64.126,
+            52.278,
+            61.798,
+            57.543,
+            60.5,
+            51.939
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 54.554,
+          "p95Ms": 72.061,
+          "p99Ms": 72.061,
+          "meanMs": 58.724,
+          "minMs": 50.847,
+          "maxMs": 72.061,
+          "jankP99OverP50": 1.321,
+          "mbPerSec": 293.288,
+          "megapixelsPerSec": 76.884,
+          "samplesMs": [
+            52.895,
+            50.847,
+            69.118,
+            54.554,
+            63.363,
+            53.522,
+            72.061,
+            60.235,
+            51.922
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 53.49,
+          "p95Ms": 77.184,
+          "p99Ms": 77.184,
+          "meanMs": 58.615,
+          "minMs": 49.581,
+          "maxMs": 77.184,
+          "jankP99OverP50": 1.443,
+          "mbPerSec": 299.122,
+          "megapixelsPerSec": 78.413,
+          "samplesMs": [
+            52.648,
+            69.102,
+            54.714,
+            49.581,
+            67.082,
+            51.816,
+            77.184,
+            51.92,
+            53.49
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 2048,
+      "pixels": 4194304,
+      "megabytes": 16,
+      "chain": "full5",
+      "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl",
+        "levels",
+        "curves",
+        "colorBalance"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 4,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl",
+          "lut-fused",
+          "color-balance"
+        ],
+        "unfusedDispatches": 5
+      },
+      "iterations": 9,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 101.653,
+          "p95Ms": 114.152,
+          "p99Ms": 114.152,
+          "meanMs": 102.772,
+          "minMs": 96.654,
+          "maxMs": 114.152,
+          "jankP99OverP50": 1.123,
+          "mbPerSec": 157.398,
+          "megapixelsPerSec": 41.261,
+          "samplesMs": [
+            110.148,
+            98.253,
+            104.268,
+            105.921,
+            96.654,
+            96.761,
+            97.135,
+            114.152,
+            101.653
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 108.017,
+          "p95Ms": 127.616,
+          "p99Ms": 127.616,
+          "meanMs": 109.83,
+          "minMs": 99.086,
+          "maxMs": 127.616,
+          "jankP99OverP50": 1.181,
+          "mbPerSec": 148.125,
+          "megapixelsPerSec": 38.83,
+          "samplesMs": [
+            113.839,
+            105.728,
+            108.017,
+            121.391,
+            101.508,
+            102.511,
+            99.086,
+            108.776,
+            127.616
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 97.2,
+          "p95Ms": 117.323,
+          "p99Ms": 117.323,
+          "meanMs": 100.35,
+          "minMs": 92.849,
+          "maxMs": 117.323,
+          "jankP99OverP50": 1.207,
+          "mbPerSec": 164.609,
+          "megapixelsPerSec": 43.151,
+          "samplesMs": [
+            97.2,
+            98.418,
+            94.737,
+            117.323,
+            96.297,
+            92.849,
+            97.26,
+            113.376,
+            95.693
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 4096,
+      "pixels": 16777216,
+      "megabytes": 64,
+      "chain": "single",
+      "chainLabel": "밝기 1단",
+      "chainSteps": [
+        "brightness"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 1,
+        "fusedKernelIds": [
+          "brightness-contrast"
+        ],
+        "unfusedDispatches": 1
+      },
+      "iterations": 5,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 61.716,
+          "p95Ms": 65.377,
+          "p99Ms": 65.377,
+          "meanMs": 58.884,
+          "minMs": 49.939,
+          "maxMs": 65.377,
+          "jankP99OverP50": 1.059,
+          "mbPerSec": 1037.015,
+          "megapixelsPerSec": 271.847,
+          "samplesMs": [
+            52.229,
+            65.377,
+            49.939,
+            65.158,
+            61.716
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 61.06,
+          "p95Ms": 78.546,
+          "p99Ms": 78.546,
+          "meanMs": 61.597,
+          "minMs": 47.753,
+          "maxMs": 78.546,
+          "jankP99OverP50": 1.286,
+          "mbPerSec": 1048.156,
+          "megapixelsPerSec": 274.768,
+          "samplesMs": [
+            63.623,
+            61.06,
+            47.753,
+            57.002,
+            78.546
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 65.746,
+          "p95Ms": 84.306,
+          "p99Ms": 84.306,
+          "meanMs": 65.249,
+          "minMs": 52.326,
+          "maxMs": 84.306,
+          "jankP99OverP50": 1.282,
+          "mbPerSec": 973.447,
+          "megapixelsPerSec": 255.183,
+          "samplesMs": [
+            53.792,
+            84.306,
+            52.326,
+            65.746,
+            70.075
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 4096,
+      "pixels": 16777216,
+      "megabytes": 64,
+      "chain": "triple",
+      "chainLabel": "밝기+대비+HSL 3단",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 2,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl"
+        ],
+        "unfusedDispatches": 2
+      },
+      "iterations": 5,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 226.977,
+          "p95Ms": 244.189,
+          "p99Ms": 244.189,
+          "meanMs": 230.128,
+          "minMs": 211.935,
+          "maxMs": 244.189,
+          "jankP99OverP50": 1.076,
+          "mbPerSec": 281.967,
+          "megapixelsPerSec": 73.916,
+          "samplesMs": [
+            226.977,
+            244.189,
+            223.846,
+            243.691,
+            211.935
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 216.829,
+          "p95Ms": 225.04,
+          "p99Ms": 225.04,
+          "meanMs": 218.378,
+          "minMs": 209.663,
+          "maxMs": 225.04,
+          "jankP99OverP50": 1.038,
+          "mbPerSec": 295.163,
+          "megapixelsPerSec": 77.375,
+          "samplesMs": [
+            209.663,
+            223.948,
+            225.04,
+            216.411,
+            216.829
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 211.19,
+          "p95Ms": 225.308,
+          "p99Ms": 225.308,
+          "meanMs": 211.756,
+          "minMs": 202.668,
+          "maxMs": 225.308,
+          "jankP99OverP50": 1.067,
+          "mbPerSec": 303.045,
+          "megapixelsPerSec": 79.441,
+          "samplesMs": [
+            205.188,
+            214.425,
+            202.668,
+            225.308,
+            211.19
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    },
+    {
+      "size": 4096,
+      "pixels": 16777216,
+      "megabytes": 64,
+      "chain": "full5",
+      "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+      "chainSteps": [
+        "brightness",
+        "contrast",
+        "hsl",
+        "levels",
+        "curves",
+        "colorBalance"
+      ],
+      "gpuPlan": {
+        "eligible": true,
+        "fusedDispatches": 4,
+        "fusedKernelIds": [
+          "brightness-contrast",
+          "hsl",
+          "lut-fused",
+          "color-balance"
+        ],
+        "unfusedDispatches": 5
+      },
+      "iterations": 5,
+      "warmup": 1,
+      "lanes": {
+        "worker-cpu": {
+          "p50Ms": 415.5,
+          "p95Ms": 483.445,
+          "p99Ms": 483.445,
+          "meanMs": 428.251,
+          "minMs": 386.522,
+          "maxMs": 483.445,
+          "jankP99OverP50": 1.164,
+          "mbPerSec": 154.031,
+          "megapixelsPerSec": 40.378,
+          "samplesMs": [
+            462.687,
+            415.5,
+            393.1,
+            386.522,
+            483.445
+          ]
+        },
+        "direct-cpu": {
+          "p50Ms": 414.778,
+          "p95Ms": 445.282,
+          "p99Ms": 445.282,
+          "meanMs": 409.056,
+          "minMs": 381.475,
+          "maxMs": 445.282,
+          "jankP99OverP50": 1.074,
+          "mbPerSec": 154.299,
+          "megapixelsPerSec": 40.449,
+          "samplesMs": [
+            445.282,
+            414.778,
+            387.357,
+            416.388,
+            381.475
+          ]
+        },
+        "konva-fallback": {
+          "p50Ms": 419.406,
+          "p95Ms": 548.48,
+          "p99Ms": 548.48,
+          "meanMs": 445.934,
+          "minMs": 381.899,
+          "maxMs": 548.48,
+          "jankP99OverP50": 1.308,
+          "mbPerSec": 152.597,
+          "megapixelsPerSec": 40.002,
+          "samplesMs": [
+            548.48,
+            462.837,
+            381.899,
+            419.406,
+            417.047
+          ]
+        }
+      },
+      "quality": {
+        "worker-cpu-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        },
+        "konva-fallback-vs-direct": {
+          "maxColorDiff": 0,
+          "mismatchedColorChannels": 0,
+          "alphaMismatches": 0
+        }
+      }
+    }
+  ],
+  "gpuLanes": {
+    "probe": "packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)",
+    "measuredAt": "2026-08-08T05:54:40.746Z",
+    "browser": {
+      "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+      "version": "140.0.7339.186"
+    },
+    "adapter": {
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "device": "",
+      "description": ""
+    },
+    "adapterLimits": {
+      "maxBufferSize": 4294967296,
+      "maxStorageBufferBindingSize": 4294967292,
+      "maxComputeWorkgroupsPerDimension": 65535
+    },
+    "concurrentLoad": {
+      "note": "다른 에이전트의 빌드/테스트와 24h 소크가 병행 실행되는 머신에서 측정했다. 융합/비융합 두 variant 를 반복마다 교차 실행하고 비교는 중앙값(p50) 기준이다.",
+      "loadavgBeforeLaunch": [
+        11.689,
+        10.103,
+        9.627
+      ],
+      "loadavgAfterMeasurement": [
+        13.006,
+        10.486,
+        9.772
+      ],
+      "cpuCount": 12
+    },
+    "productionFidelity": {
+      "kernels": "studio-gpu-filter-kernels.ts 실물 WGSL·바인딩·디스패치 좌표계",
+      "plan": "planStudioGpuFilterChain 실물(융합) / 같은 planner 를 커널 그룹별로 호출해 이어붙인 비융합",
+      "reproducedInProbe": "디스패치 루프·버퍼 핑퐁·리드백 절차는 applyGpuFilterChain 을 페이지 안에서 재현한 것이다(모듈 자체는 번들 없이 페이지에 넣을 수 없다). 버퍼 usage·핑퐁 순서·리드백 스테이징 구성은 동일하다.",
+      "notReproduced": "error scope fail-closed, 디바이스 손실 처리, 버퍼 풀 재활용, revision supersede 취소는 성능 경로가 아니어서 재현하지 않았다."
+    },
+    "fusionScope": "프로덕션 planner 의 LUT 융합은 **인접한 lut3 스텝이 둘 이상일 때만** 작동한다. 밝기+대비는 이미 한 lut3 커널이라 single/triple 체인은 융합/비융합 스텝 열이 동일하다(디스패치 수가 같다). 융합 이득이 실제로 측정되는 셀은 레벨+커브가 함께 켜지는 full5(5 → 4 디스패치)뿐이며, 그 셀의 dispatches 값이 그 사실을 드러낸다.",
+    "metrics": {
+      "dispatchMs": "인코드+submit+onSubmittedWorkDone. 업로드/리드백 제외 — 동기화 플로어(~2.5ms 관측)를 포함한다.",
+      "applyMs": "writeBuffer 업로드 + 디스패치 + 스테이징 리드백(mapAsync) = applyGpuFilterChain 이 실제로 무는 비용. **레인 전환 임계는 이 값으로 판정한다.**",
+      "gpuPassMs": "timestamp-query 로 잰 컴퓨트 패스 실행 시간 합 — 동기화/전송 플로어를 제외한 순수 GPU 시간."
+    },
+    "config": {
+      "sizes": [
+        {
+          "size": "256x256",
+          "warmup": 5,
+          "iterations": 30,
+          "fullPixelDiff": true
+        },
+        {
+          "size": "512x512",
+          "warmup": 4,
+          "iterations": 25,
+          "fullPixelDiff": true
+        },
+        {
+          "size": "1024x1024",
+          "warmup": 3,
+          "iterations": 20,
+          "fullPixelDiff": true
+        },
+        {
+          "size": "2048x2048",
+          "warmup": 2,
+          "iterations": 12,
+          "fullPixelDiff": false
+        },
+        {
+          "size": "4096x4096",
+          "warmup": 1,
+          "iterations": 8,
+          "fullPixelDiff": false
+        }
+      ],
+      "chains": [
+        {
+          "id": "single",
+          "label": "밝기 1단"
+        },
+        {
+          "id": "triple",
+          "label": "밝기+대비+HSL 3단"
+        },
+        {
+          "id": "full5",
+          "label": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인"
+        }
+      ],
+      "source": "deterministic LCG RGBA (하니스와 동일 시드·점화식)",
+      "timestampQuery": true
+    },
+    "results": [
+      {
+        "size": 256,
+        "pixels": 65536,
+        "megabytes": 0.25,
+        "chain": "single",
+        "chainLabel": "밝기 1단",
+        "iterations": 30,
+        "warmup": 5,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.49,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.2,
+                2.6,
+                2.7,
+                2.2,
+                2.2,
+                2.7,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.3,
+                2.3,
+                2.6,
+                2.7,
+                2.3,
+                2.5,
+                2.6,
+                2.6,
+                2.5,
+                2.1,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.1,
+                2.6,
+                2.7,
+                2.2,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.557,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.7,
+                2.7,
+                2.7,
+                2.2,
+                2.6,
+                2.6,
+                2.1,
+                2.7,
+                2.5,
+                2.2,
+                2.4,
+                2.8,
+                2.6,
+                2.6,
+                2.5,
+                2.7,
+                2.7,
+                2.7,
+                2.7,
+                2.1,
+                2.3,
+                2.6,
+                2.5,
+                2.6,
+                2.7,
+                2.6
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.016,
+              "p95Ms": 0.017,
+              "p99Ms": 0.095,
+              "meanMs": 0.019,
+              "minMs": 0.014,
+              "maxMs": 0.095,
+              "jankP99OverP50": 5.883,
+              "mbPerSec": 15503.876,
+              "megapixelsPerSec": 4064.248,
+              "samplesMs": [
+                0.014,
+                0.016,
+                0.016,
+                0.095,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.014,
+                0.016,
+                0.016,
+                0.016,
+                0.017,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.014,
+                0.016,
+                0.014,
+                0.016
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.5,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.43,
+              "minMs": 2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.08,
+              "mbPerSec": 100,
+              "megapixelsPerSec": 26.214,
+              "samplesMs": [
+                2.7,
+                2.3,
+                2.2,
+                2.1,
+                2.5,
+                2.5,
+                2.5,
+                2,
+                2.4,
+                2.4,
+                2.1,
+                2.7,
+                2.4,
+                2.2,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.2,
+                2.6,
+                2.1,
+                2.4,
+                2.6,
+                2.7,
+                2.6,
+                2.2,
+                2.3,
+                2.6,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.7,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.57,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.037,
+              "mbPerSec": 92.593,
+              "megapixelsPerSec": 24.273,
+              "samplesMs": [
+                2.7,
+                2.7,
+                2.7,
+                2.7,
+                2.4,
+                2.5,
+                2.6,
+                2.7,
+                2.7,
+                2.4,
+                2.7,
+                2.1,
+                2.6,
+                2.8,
+                2.7,
+                2.6,
+                2.7,
+                2.7,
+                2.1,
+                2.3,
+                2.5,
+                2.2,
+                2.6,
+                2.7,
+                2.7,
+                2.7,
+                2.7,
+                2.5,
+                2.7,
+                2.4
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.016,
+              "p95Ms": 0.031,
+              "p99Ms": 0.151,
+              "meanMs": 0.02,
+              "minMs": 0.014,
+              "maxMs": 0.151,
+              "jankP99OverP50": 9.666,
+              "mbPerSec": 16043.124,
+              "megapixelsPerSec": 4205.609,
+              "samplesMs": [
+                0.016,
+                0.151,
+                0.016,
+                0.031,
+                0.016,
+                0.016,
+                0.016,
+                0.016,
+                0.015,
+                0.016,
+                0.016,
+                0.015,
+                0.016,
+                0.015,
+                0.016,
+                0.016,
+                0.016,
+                0.014,
+                0.016,
+                0.015,
+                0.016,
+                0.016,
+                0.015,
+                0.015,
+                0.014,
+                0.015,
+                0.014,
+                0.016,
+                0.014,
+                0.014
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 344939973,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 344939973,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 344939973,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 256,
+        "pixels": 65536,
+        "megabytes": 0.25,
+        "chain": "triple",
+        "chainLabel": "밝기+대비+HSL 3단",
+        "iterations": 30,
+        "warmup": 5,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.4,
+              "p95Ms": 2.6,
+              "p99Ms": 2.7,
+              "meanMs": 2.423,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.125,
+              "mbPerSec": 104.167,
+              "megapixelsPerSec": 27.307,
+              "samplesMs": [
+                2.4,
+                2.7,
+                2.5,
+                2.6,
+                2.6,
+                2.2,
+                2.5,
+                2.1,
+                2.6,
+                2.2,
+                2.4,
+                2.2,
+                2.6,
+                2.4,
+                2.2,
+                2.3,
+                2.6,
+                2.6,
+                2.6,
+                2.5,
+                2.2,
+                2.5,
+                2.3,
+                2.3,
+                2.2,
+                2.2,
+                2.4,
+                2.6,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.8,
+              "p99Ms": 2.8,
+              "meanMs": 2.567,
+              "minMs": 2.3,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.4,
+                2.6,
+                2.6,
+                2.8,
+                2.7,
+                2.6,
+                2.8,
+                2.7,
+                2.6,
+                2.3,
+                2.3,
+                2.5,
+                2.6,
+                2.6,
+                2.5,
+                2.6,
+                2.6,
+                2.6,
+                2.5,
+                2.7,
+                2.7,
+                2.5,
+                2.5,
+                2.7,
+                2.5,
+                2.3,
+                2.4,
+                2.5,
+                2.7,
+                2.6
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.028,
+              "p95Ms": 0.028,
+              "p99Ms": 0.029,
+              "meanMs": 0.028,
+              "minMs": 0.027,
+              "maxMs": 0.029,
+              "jankP99OverP50": 1.034,
+              "mbPerSec": 9009.009,
+              "megapixelsPerSec": 2361.658,
+              "samplesMs": [
+                0.027,
+                0.028,
+                0.028,
+                0.028,
+                0.027,
+                0.028,
+                0.028,
+                0.027,
+                0.028,
+                0.027,
+                0.028,
+                0.027,
+                0.027,
+                0.028,
+                0.029,
+                0.028,
+                0.028,
+                0.028,
+                0.028,
+                0.028,
+                0.028,
+                0.027,
+                0.028,
+                0.028,
+                0.028,
+                0.027,
+                0.027,
+                0.028,
+                0.028,
+                0.028
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.483,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.5,
+                2.5,
+                2.7,
+                2.6,
+                2.5,
+                2.6,
+                2.5,
+                2.5,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.1,
+                2.4,
+                2.6,
+                2.4,
+                2.7,
+                2.2,
+                2.6,
+                2.6,
+                2.1,
+                2.1,
+                2.1,
+                2.3,
+                2.6,
+                2.3,
+                2.6,
+                2.6,
+                2.8
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.547,
+              "minMs": 2.2,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.5,
+                2.3,
+                2.3,
+                2.7,
+                2.6,
+                2.2,
+                2.6,
+                2.7,
+                2.4,
+                2.6,
+                2.2,
+                2.8,
+                2.7,
+                2.7,
+                2.7,
+                2.7,
+                2.7,
+                2.6,
+                2.6,
+                2.5,
+                2.4,
+                2.7,
+                2.3,
+                2.4,
+                2.7,
+                2.6,
+                2.6,
+                2.4
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.027,
+              "p95Ms": 0.028,
+              "p99Ms": 0.028,
+              "meanMs": 0.027,
+              "minMs": 0.026,
+              "maxMs": 0.028,
+              "jankP99OverP50": 1.032,
+              "mbPerSec": 9174.649,
+              "megapixelsPerSec": 2405.079,
+              "samplesMs": [
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.028,
+                0.028,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.028,
+                0.028,
+                0.028,
+                0.027,
+                0.027,
+                0.027,
+                0.028,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.027,
+                0.028,
+                0.027,
+                0.027,
+                0.026,
+                0.027
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3884752325,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3884752325,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 3884752325,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 256,
+        "pixels": 65536,
+        "megabytes": 0.25,
+        "chain": "full5",
+        "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "iterations": 30,
+        "warmup": 5,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 4,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "lut-fused",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 3.2,
+              "meanMs": 2.53,
+              "minMs": 2.1,
+              "maxMs": 3.2,
+              "jankP99OverP50": 1.231,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.6,
+                3.2,
+                2.6,
+                2.3,
+                2.4,
+                2.6,
+                2.6,
+                2.1,
+                2.1,
+                2.7,
+                2.2,
+                2.7,
+                2.7,
+                2.6,
+                2.4,
+                2.6,
+                2.6,
+                2.5,
+                2.1,
+                2.6,
+                2.5,
+                2.2,
+                2.6,
+                2.7,
+                2.7,
+                2.5,
+                2.7,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.567,
+              "minMs": 2.2,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.7,
+                2.5,
+                2.8,
+                2.5,
+                2.5,
+                2.7,
+                2.5,
+                2.5,
+                2.4,
+                2.7,
+                2.2,
+                2.7,
+                2.7,
+                2.4,
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.2,
+                2.7,
+                2.5,
+                2.7,
+                2.5,
+                2.5,
+                2.5,
+                2.6,
+                2.7,
+                2.3,
+                2.7,
+                2.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.053,
+              "p95Ms": 0.506,
+              "p99Ms": 0.578,
+              "meanMs": 0.085,
+              "minMs": 0.032,
+              "maxMs": 0.578,
+              "jankP99OverP50": 10.946,
+              "mbPerSec": 4735.835,
+              "megapixelsPerSec": 1241.471,
+              "samplesMs": [
+                0.133,
+                0.043,
+                0.042,
+                0.054,
+                0.043,
+                0.054,
+                0.053,
+                0.054,
+                0.053,
+                0.053,
+                0.053,
+                0.052,
+                0.054,
+                0.053,
+                0.053,
+                0.054,
+                0.053,
+                0.053,
+                0.054,
+                0.054,
+                0.054,
+                0.053,
+                0.052,
+                0.057,
+                0.033,
+                0.033,
+                0.032,
+                0.036,
+                0.506,
+                0.578
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 5,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "levels",
+              "curves",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.523,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.2,
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.5,
+                2.2,
+                2.8,
+                2.6,
+                2.6,
+                2.4,
+                2.2,
+                2.7,
+                2.5,
+                2.6,
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.5,
+                2.5,
+                2.4,
+                2.4,
+                2.1,
+                2.6,
+                2.7,
+                2.6,
+                2.7,
+                2.2,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.8,
+              "p99Ms": 2.9,
+              "meanMs": 2.567,
+              "minMs": 2.2,
+              "maxMs": 2.9,
+              "jankP99OverP50": 1.115,
+              "mbPerSec": 96.154,
+              "megapixelsPerSec": 25.206,
+              "samplesMs": [
+                2.9,
+                2.6,
+                2.7,
+                2.3,
+                2.7,
+                2.7,
+                2.7,
+                2.6,
+                2.8,
+                2.6,
+                2.4,
+                2.7,
+                2.6,
+                2.6,
+                2.2,
+                2.2,
+                2.4,
+                2.4,
+                2.6,
+                2.2,
+                2.4,
+                2.6,
+                2.5,
+                2.6,
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.6,
+                2.8
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.065,
+              "p95Ms": 0.14,
+              "p99Ms": 0.157,
+              "meanMs": 0.07,
+              "minMs": 0.036,
+              "maxMs": 0.157,
+              "jankP99OverP50": 2.401,
+              "mbPerSec": 3819.476,
+              "megapixelsPerSec": 1001.253,
+              "samplesMs": [
+                0.14,
+                0.045,
+                0.052,
+                0.065,
+                0.065,
+                0.064,
+                0.064,
+                0.066,
+                0.066,
+                0.065,
+                0.066,
+                0.065,
+                0.065,
+                0.066,
+                0.066,
+                0.065,
+                0.065,
+                0.066,
+                0.066,
+                0.067,
+                0.065,
+                0.066,
+                0.065,
+                0.157,
+                0.036,
+                0.094,
+                0.13,
+                0.046,
+                0.044,
+                0.039
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 638787013,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 638787013,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 638787013,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 195
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 196608
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 512,
+        "pixels": 262144,
+        "megabytes": 1,
+        "chain": "single",
+        "chainLabel": "밝기 1단",
+        "iterations": 25,
+        "warmup": 4,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.504,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 384.615,
+              "megapixelsPerSec": 100.825,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.1,
+                2.1,
+                2.5,
+                2.5,
+                2.6,
+                2.4,
+                2.6,
+                2.3,
+                2.7,
+                2.6,
+                2.7,
+                2.7,
+                2.4,
+                2.7,
+                2.6,
+                2.6,
+                2.2,
+                2.7,
+                2.6,
+                2.4,
+                2.2,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.8,
+              "p95Ms": 3,
+              "p99Ms": 3.1,
+              "meanMs": 2.796,
+              "minMs": 2.4,
+              "maxMs": 3.1,
+              "jankP99OverP50": 1.107,
+              "mbPerSec": 357.143,
+              "megapixelsPerSec": 93.623,
+              "samplesMs": [
+                2.7,
+                3,
+                2.8,
+                2.9,
+                2.5,
+                2.7,
+                2.5,
+                3.1,
+                2.8,
+                2.9,
+                2.9,
+                2.8,
+                2.8,
+                2.9,
+                2.9,
+                2.9,
+                2.7,
+                2.8,
+                2.9,
+                2.9,
+                2.8,
+                2.7,
+                2.9,
+                2.4,
+                2.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.031,
+              "p95Ms": 0.128,
+              "p99Ms": 0.169,
+              "meanMs": 0.045,
+              "minMs": 0.021,
+              "maxMs": 0.169,
+              "jankP99OverP50": 5.491,
+              "mbPerSec": 32478.077,
+              "megapixelsPerSec": 8513.933,
+              "samplesMs": [
+                0.08,
+                0.031,
+                0.169,
+                0.05,
+                0.038,
+                0.031,
+                0.031,
+                0.031,
+                0.031,
+                0.031,
+                0.031,
+                0.03,
+                0.03,
+                0.096,
+                0.03,
+                0.03,
+                0.03,
+                0.03,
+                0.031,
+                0.031,
+                0.03,
+                0.031,
+                0.128,
+                0.021,
+                0.023
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.504,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 384.615,
+              "megapixelsPerSec": 100.825,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.5,
+                2.8,
+                2.3,
+                2.6,
+                2.1,
+                2.2,
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.5,
+                2.5,
+                2.6,
+                2.6,
+                2.1,
+                2.5,
+                2.3,
+                2.7,
+                2.6,
+                2.3,
+                2.3
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.8,
+              "p95Ms": 3,
+              "p99Ms": 3,
+              "meanMs": 2.784,
+              "minMs": 2.4,
+              "maxMs": 3,
+              "jankP99OverP50": 1.071,
+              "mbPerSec": 357.143,
+              "megapixelsPerSec": 93.623,
+              "samplesMs": [
+                2.9,
+                3,
+                2.7,
+                2.7,
+                2.8,
+                2.6,
+                2.9,
+                2.8,
+                3,
+                2.8,
+                2.9,
+                2.9,
+                3,
+                2.8,
+                2.7,
+                2.5,
+                2.9,
+                2.5,
+                2.4,
+                2.8,
+                2.8,
+                2.7,
+                2.7,
+                2.9,
+                2.9
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.031,
+              "p95Ms": 0.107,
+              "p99Ms": 0.363,
+              "meanMs": 0.049,
+              "minMs": 0.017,
+              "maxMs": 0.363,
+              "jankP99OverP50": 11.772,
+              "mbPerSec": 32432.783,
+              "megapixelsPerSec": 8502.059,
+              "samplesMs": [
+                0.031,
+                0.031,
+                0.031,
+                0.363,
+                0.052,
+                0.107,
+                0.046,
+                0.031,
+                0.031,
+                0.031,
+                0.03,
+                0.032,
+                0.031,
+                0.032,
+                0.031,
+                0.03,
+                0.03,
+                0.031,
+                0.031,
+                0.03,
+                0.031,
+                0.03,
+                0.067,
+                0.021,
+                0.017
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3471285701,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3471285701,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 3471285701,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 512,
+        "pixels": 262144,
+        "megabytes": 1,
+        "chain": "triple",
+        "chainLabel": "밝기+대비+HSL 3단",
+        "iterations": 25,
+        "warmup": 4,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.4,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.404,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.125,
+              "mbPerSec": 416.667,
+              "megapixelsPerSec": 109.227,
+              "samplesMs": [
+                2.7,
+                2.7,
+                2.2,
+                2.7,
+                2.6,
+                2.2,
+                2.4,
+                2.4,
+                2.5,
+                2.5,
+                2.1,
+                2.7,
+                2.7,
+                2.6,
+                2.1,
+                2.2,
+                2.1,
+                2.7,
+                2.1,
+                2.4,
+                2.2,
+                2.6,
+                2.1,
+                2.3,
+                2.3
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.8,
+              "p95Ms": 3,
+              "p99Ms": 3,
+              "meanMs": 2.74,
+              "minMs": 2.4,
+              "maxMs": 3,
+              "jankP99OverP50": 1.071,
+              "mbPerSec": 357.143,
+              "megapixelsPerSec": 93.623,
+              "samplesMs": [
+                2.5,
+                2.6,
+                2.4,
+                3,
+                2.8,
+                2.8,
+                2.8,
+                2.8,
+                2.5,
+                2.4,
+                2.9,
+                2.7,
+                2.9,
+                2.9,
+                2.8,
+                2.8,
+                3,
+                2.8,
+                2.4,
+                2.8,
+                2.9,
+                2.8,
+                2.8,
+                2.9,
+                2.5
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.057,
+              "p95Ms": 0.058,
+              "p99Ms": 0.058,
+              "meanMs": 0.057,
+              "minMs": 0.057,
+              "maxMs": 0.058,
+              "jankP99OverP50": 1.012,
+              "mbPerSec": 17455.053,
+              "megapixelsPerSec": 4575.737,
+              "samplesMs": [
+                0.058,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.058,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.058,
+                0.057,
+                0.058,
+                0.058,
+                0.057,
+                0.058,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.058
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.5,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.468,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.08,
+              "mbPerSec": 400,
+              "megapixelsPerSec": 104.858,
+              "samplesMs": [
+                2.5,
+                2.6,
+                2.7,
+                2.5,
+                2.7,
+                2.1,
+                2.5,
+                2.2,
+                2.5,
+                2.6,
+                2.2,
+                2.5,
+                2.5,
+                2.5,
+                2.7,
+                2.2,
+                2.6,
+                2.1,
+                2.4,
+                2.5,
+                2.6,
+                2.4,
+                2.6,
+                2.5,
+                2.5
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.8,
+              "p95Ms": 2.9,
+              "p99Ms": 2.9,
+              "meanMs": 2.72,
+              "minMs": 2.4,
+              "maxMs": 2.9,
+              "jankP99OverP50": 1.036,
+              "mbPerSec": 357.143,
+              "megapixelsPerSec": 93.623,
+              "samplesMs": [
+                2.8,
+                2.4,
+                2.9,
+                2.8,
+                2.6,
+                2.9,
+                2.5,
+                2.9,
+                2.5,
+                2.7,
+                2.8,
+                2.7,
+                2.7,
+                2.8,
+                2.6,
+                2.8,
+                2.8,
+                2.9,
+                2.8,
+                2.8,
+                2.7,
+                2.8,
+                2.4,
+                2.9,
+                2.5
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.057,
+              "p95Ms": 0.058,
+              "p99Ms": 0.059,
+              "meanMs": 0.058,
+              "minMs": 0.057,
+              "maxMs": 0.059,
+              "jankP99OverP50": 1.02,
+              "mbPerSec": 17416.445,
+              "megapixelsPerSec": 4565.616,
+              "samplesMs": [
+                0.057,
+                0.058,
+                0.057,
+                0.058,
+                0.058,
+                0.058,
+                0.057,
+                0.058,
+                0.058,
+                0.057,
+                0.057,
+                0.058,
+                0.058,
+                0.057,
+                0.058,
+                0.058,
+                0.057,
+                0.057,
+                0.058,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.057,
+                0.059
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 450665925,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 450665925,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 450665925,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 512,
+        "pixels": 262144,
+        "megabytes": 1,
+        "chain": "full5",
+        "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "iterations": 25,
+        "warmup": 4,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 4,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "lut-fused",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.5,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.464,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.12,
+              "mbPerSec": 400,
+              "megapixelsPerSec": 104.858,
+              "samplesMs": [
+                2.7,
+                2.8,
+                2.7,
+                2.4,
+                2.2,
+                2.4,
+                2.5,
+                2.6,
+                2.2,
+                2.1,
+                2.4,
+                2.5,
+                2.3,
+                2.6,
+                2.3,
+                2.6,
+                2.4,
+                2.6,
+                2.6,
+                2.2,
+                2.6,
+                2.4,
+                2.5,
+                2.3,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.8,
+              "p95Ms": 2.9,
+              "p99Ms": 2.9,
+              "meanMs": 2.684,
+              "minMs": 2.3,
+              "maxMs": 2.9,
+              "jankP99OverP50": 1.036,
+              "mbPerSec": 357.143,
+              "megapixelsPerSec": 93.623,
+              "samplesMs": [
+                2.5,
+                2.6,
+                2.6,
+                2.9,
+                2.8,
+                2.5,
+                2.6,
+                2.5,
+                2.8,
+                2.6,
+                2.4,
+                2.7,
+                2.9,
+                2.3,
+                2.9,
+                2.9,
+                2.8,
+                2.8,
+                2.8,
+                2.9,
+                2.8,
+                2.5,
+                2.9,
+                2.8,
+                2.3
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.113,
+              "p95Ms": 0.113,
+              "p99Ms": 0.113,
+              "meanMs": 0.113,
+              "minMs": 0.112,
+              "maxMs": 0.113,
+              "jankP99OverP50": 1.008,
+              "mbPerSec": 8879.496,
+              "megapixelsPerSec": 2327.707,
+              "samplesMs": [
+                0.113,
+                0.113,
+                0.113,
+                0.113,
+                0.113,
+                0.112,
+                0.113,
+                0.112,
+                0.112,
+                0.113,
+                0.113,
+                0.112,
+                0.112,
+                0.113,
+                0.113,
+                0.112,
+                0.113,
+                0.112,
+                0.112,
+                0.113,
+                0.112,
+                0.113,
+                0.113,
+                0.112,
+                0.113
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 5,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "levels",
+              "curves",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.456,
+              "minMs": 2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 384.615,
+              "megapixelsPerSec": 100.825,
+              "samplesMs": [
+                2.6,
+                2.4,
+                2.2,
+                2.7,
+                2.7,
+                2.6,
+                2.4,
+                2.4,
+                2.6,
+                2.1,
+                2.7,
+                2.6,
+                2.5,
+                2.6,
+                2.4,
+                2,
+                2.6,
+                2.6,
+                2.4,
+                2.6,
+                2.2,
+                2.6,
+                2.1,
+                2.2,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 2.7,
+              "p95Ms": 2.9,
+              "p99Ms": 2.9,
+              "meanMs": 2.664,
+              "minMs": 2.3,
+              "maxMs": 2.9,
+              "jankP99OverP50": 1.074,
+              "mbPerSec": 370.37,
+              "megapixelsPerSec": 97.09,
+              "samplesMs": [
+                2.8,
+                2.8,
+                2.5,
+                2.7,
+                2.8,
+                2.4,
+                2.8,
+                2.8,
+                2.9,
+                2.5,
+                2.3,
+                2.3,
+                2.3,
+                2.7,
+                2.4,
+                2.8,
+                2.9,
+                2.5,
+                2.9,
+                2.8,
+                2.9,
+                2.9,
+                2.7,
+                2.5,
+                2.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.14,
+              "p95Ms": 0.141,
+              "p99Ms": 0.141,
+              "meanMs": 0.14,
+              "minMs": 0.139,
+              "maxMs": 0.141,
+              "jankP99OverP50": 1.009,
+              "mbPerSec": 7141.174,
+              "megapixelsPerSec": 1872.016,
+              "samplesMs": [
+                0.14,
+                0.14,
+                0.14,
+                0.139,
+                0.14,
+                0.139,
+                0.14,
+                0.141,
+                0.141,
+                0.14,
+                0.139,
+                0.14,
+                0.139,
+                0.14,
+                0.14,
+                0.139,
+                0.14,
+                0.141,
+                0.139,
+                0.14,
+                0.139,
+                0.141,
+                0.14,
+                0.139,
+                0.141
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 351706565,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 351706565,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 351706565,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 780
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 786432
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 1024,
+        "pixels": 1048576,
+        "megabytes": 4,
+        "chain": "single",
+        "chainLabel": "밝기 1단",
+        "iterations": 20,
+        "warmup": 3,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.585,
+              "minMs": 2.2,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.3,
+                2.8,
+                2.6,
+                2.2,
+                2.7,
+                2.6,
+                2.6,
+                2.3,
+                2.7,
+                2.7,
+                2.7,
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.6,
+                2.7,
+                2.5,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.6,
+              "p95Ms": 3.8,
+              "p99Ms": 3.9,
+              "meanMs": 3.56,
+              "minMs": 3.2,
+              "maxMs": 3.9,
+              "jankP99OverP50": 1.083,
+              "mbPerSec": 1111.111,
+              "megapixelsPerSec": 291.271,
+              "samplesMs": [
+                3.3,
+                3.4,
+                3.6,
+                3.8,
+                3.4,
+                3.5,
+                3.6,
+                3.9,
+                3.3,
+                3.8,
+                3.2,
+                3.2,
+                3.8,
+                3.5,
+                3.7,
+                3.6,
+                3.7,
+                3.6,
+                3.7,
+                3.6
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.088,
+              "p95Ms": 0.213,
+              "p99Ms": 0.263,
+              "meanMs": 0.105,
+              "minMs": 0.05,
+              "maxMs": 0.263,
+              "jankP99OverP50": 2.993,
+              "mbPerSec": 45566.909,
+              "megapixelsPerSec": 11945.092,
+              "samplesMs": [
+                0.089,
+                0.088,
+                0.09,
+                0.089,
+                0.089,
+                0.088,
+                0.088,
+                0.09,
+                0.213,
+                0.2,
+                0.198,
+                0.056,
+                0.263,
+                0.059,
+                0.072,
+                0.07,
+                0.058,
+                0.05,
+                0.071,
+                0.078
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.545,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.6,
+                2.5,
+                2.3,
+                2.6,
+                2.6,
+                2.4,
+                2.7,
+                2.1,
+                2.3,
+                2.6,
+                2.6,
+                2.4,
+                2.7,
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.7,
+                2.7,
+                2.5
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.4,
+              "p95Ms": 3.9,
+              "p99Ms": 3.9,
+              "meanMs": 3.47,
+              "minMs": 3.1,
+              "maxMs": 3.9,
+              "jankP99OverP50": 1.147,
+              "mbPerSec": 1176.471,
+              "megapixelsPerSec": 308.405,
+              "samplesMs": [
+                3.9,
+                3.7,
+                3.3,
+                3.2,
+                3.5,
+                3.4,
+                3.1,
+                3.9,
+                3.7,
+                3.3,
+                3.4,
+                3.7,
+                3.3,
+                3.6,
+                3.7,
+                3.3,
+                3.7,
+                3.2,
+                3.4,
+                3.1
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.071,
+              "p95Ms": 0.089,
+              "p99Ms": 0.338,
+              "meanMs": 0.088,
+              "minMs": 0.052,
+              "maxMs": 0.338,
+              "jankP99OverP50": 4.737,
+              "mbPerSec": 56111.212,
+              "megapixelsPerSec": 14709.218,
+              "samplesMs": [
+                0.089,
+                0.088,
+                0.088,
+                0.088,
+                0.089,
+                0.088,
+                0.088,
+                0.089,
+                0.052,
+                0.065,
+                0.068,
+                0.338,
+                0.056,
+                0.071,
+                0.08,
+                0.053,
+                0.058,
+                0.069,
+                0.068,
+                0.069
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3091766725,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3091766725,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 3091766725,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 1024,
+        "pixels": 1048576,
+        "megabytes": 4,
+        "chain": "triple",
+        "chainLabel": "밝기+대비+HSL 3단",
+        "iterations": 20,
+        "warmup": 3,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.53,
+              "minMs": 2.2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.2,
+                2.6,
+                2.5,
+                2.6,
+                2.6,
+                2.5,
+                2.6,
+                2.6,
+                2.6,
+                2.3,
+                2.7,
+                2.3,
+                2.6,
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.2,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.6,
+              "p95Ms": 3.7,
+              "p99Ms": 3.8,
+              "meanMs": 3.525,
+              "minMs": 3.1,
+              "maxMs": 3.8,
+              "jankP99OverP50": 1.056,
+              "mbPerSec": 1111.111,
+              "megapixelsPerSec": 291.271,
+              "samplesMs": [
+                3.6,
+                3.5,
+                3.6,
+                3.2,
+                3.7,
+                3.5,
+                3.6,
+                3.7,
+                3.6,
+                3.1,
+                3.7,
+                3.7,
+                3.7,
+                3.3,
+                3.3,
+                3.8,
+                3.2,
+                3.3,
+                3.7,
+                3.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.178,
+              "p95Ms": 0.18,
+              "p99Ms": 0.181,
+              "meanMs": 0.179,
+              "minMs": 0.177,
+              "maxMs": 0.181,
+              "jankP99OverP50": 1.017,
+              "mbPerSec": 22441.4,
+              "megapixelsPerSec": 5882.878,
+              "samplesMs": [
+                0.178,
+                0.179,
+                0.177,
+                0.179,
+                0.178,
+                0.177,
+                0.178,
+                0.178,
+                0.179,
+                0.181,
+                0.177,
+                0.179,
+                0.178,
+                0.179,
+                0.18,
+                0.178,
+                0.178,
+                0.18,
+                0.178,
+                0.179
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.515,
+              "minMs": 2.1,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.2,
+                2.7,
+                2.6,
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.5,
+                2.6,
+                2.6,
+                2.2,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.1,
+                2.7,
+                2.5,
+                2.1
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.6,
+              "p95Ms": 3.8,
+              "p99Ms": 3.8,
+              "meanMs": 3.53,
+              "minMs": 3.2,
+              "maxMs": 3.8,
+              "jankP99OverP50": 1.056,
+              "mbPerSec": 1111.111,
+              "megapixelsPerSec": 291.271,
+              "samplesMs": [
+                3.3,
+                3.6,
+                3.3,
+                3.4,
+                3.6,
+                3.6,
+                3.5,
+                3.7,
+                3.5,
+                3.6,
+                3.3,
+                3.4,
+                3.2,
+                3.7,
+                3.8,
+                3.4,
+                3.8,
+                3.6,
+                3.6,
+                3.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.177,
+              "p95Ms": 0.178,
+              "p99Ms": 0.179,
+              "meanMs": 0.177,
+              "minMs": 0.175,
+              "maxMs": 0.179,
+              "jankP99OverP50": 1.01,
+              "mbPerSec": 22606.661,
+              "megapixelsPerSec": 5926.201,
+              "samplesMs": [
+                0.177,
+                0.179,
+                0.175,
+                0.177,
+                0.177,
+                0.176,
+                0.176,
+                0.178,
+                0.177,
+                0.177,
+                0.177,
+                0.176,
+                0.178,
+                0.178,
+                0.177,
+                0.178,
+                0.176,
+                0.177,
+                0.176,
+                0.177
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3894189509,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3894189509,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 3894189509,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 1024,
+        "pixels": 1048576,
+        "megabytes": 4,
+        "chain": "full5",
+        "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "iterations": 20,
+        "warmup": 3,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 4,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "lut-fused",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.55,
+              "minMs": 2.2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.4,
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.7,
+                2.6,
+                2.4,
+                2.7,
+                2.6,
+                2.2,
+                2.6,
+                2.7,
+                2.7,
+                2.3,
+                2.6,
+                2.4,
+                2.3,
+                2.6,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.5,
+              "p95Ms": 3.7,
+              "p99Ms": 3.8,
+              "meanMs": 3.55,
+              "minMs": 3.2,
+              "maxMs": 3.8,
+              "jankP99OverP50": 1.086,
+              "mbPerSec": 1142.857,
+              "megapixelsPerSec": 299.593,
+              "samplesMs": [
+                3.5,
+                3.7,
+                3.7,
+                3.2,
+                3.5,
+                3.2,
+                3.4,
+                3.7,
+                3.5,
+                3.7,
+                3.5,
+                3.7,
+                3.7,
+                3.6,
+                3.5,
+                3.7,
+                3.2,
+                3.5,
+                3.8,
+                3.7
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.361,
+              "p95Ms": 0.473,
+              "p99Ms": 0.502,
+              "meanMs": 0.376,
+              "minMs": 0.358,
+              "maxMs": 0.502,
+              "jankP99OverP50": 1.391,
+              "mbPerSec": 11082.788,
+              "megapixelsPerSec": 2905.286,
+              "samplesMs": [
+                0.36,
+                0.361,
+                0.36,
+                0.358,
+                0.362,
+                0.363,
+                0.361,
+                0.363,
+                0.361,
+                0.359,
+                0.36,
+                0.36,
+                0.364,
+                0.362,
+                0.364,
+                0.414,
+                0.502,
+                0.473,
+                0.36,
+                0.361
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 5,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "levels",
+              "curves",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.8,
+              "meanMs": 2.555,
+              "minMs": 2.1,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.077,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.2,
+                2.7,
+                2.7,
+                2.7,
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.7,
+                2.7,
+                2.1,
+                2.5,
+                2.4,
+                2.4,
+                2.7,
+                2.4,
+                2.4,
+                2.8
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 3.6,
+              "p95Ms": 3.8,
+              "p99Ms": 3.8,
+              "meanMs": 3.585,
+              "minMs": 3.1,
+              "maxMs": 3.8,
+              "jankP99OverP50": 1.056,
+              "mbPerSec": 1111.111,
+              "megapixelsPerSec": 291.271,
+              "samplesMs": [
+                3.5,
+                3.2,
+                3.7,
+                3.6,
+                3.1,
+                3.5,
+                3.8,
+                3.6,
+                3.7,
+                3.5,
+                3.8,
+                3.6,
+                3.2,
+                3.6,
+                3.8,
+                3.8,
+                3.7,
+                3.7,
+                3.7,
+                3.6
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.45,
+              "p95Ms": 0.452,
+              "p99Ms": 0.452,
+              "meanMs": 0.45,
+              "minMs": 0.447,
+              "maxMs": 0.452,
+              "jankP99OverP50": 1.005,
+              "mbPerSec": 8891.378,
+              "megapixelsPerSec": 2330.822,
+              "samplesMs": [
+                0.45,
+                0.45,
+                0.449,
+                0.452,
+                0.452,
+                0.45,
+                0.449,
+                0.452,
+                0.452,
+                0.449,
+                0.45,
+                0.451,
+                0.449,
+                0.447,
+                0.452,
+                0.452,
+                0.45,
+                0.45,
+                0.451,
+                0.45
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3498352069,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3498352069,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-unfused": {
+            "checksum": 3498352069,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3120
+            },
+            "fullFrame": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 3145728
+            }
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 2048,
+        "pixels": 4194304,
+        "megabytes": 16,
+        "chain": "single",
+        "chainLabel": "밝기 1단",
+        "iterations": 12,
+        "warmup": 2,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.567,
+              "minMs": 2.2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 6153.846,
+              "megapixelsPerSec": 1613.194,
+              "samplesMs": [
+                2.7,
+                2.6,
+                2.6,
+                2.7,
+                2.2,
+                2.6,
+                2.3,
+                2.7,
+                2.4,
+                2.6,
+                2.7,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.9,
+              "p95Ms": 11.6,
+              "p99Ms": 11.6,
+              "meanMs": 10.775,
+              "minMs": 9.8,
+              "maxMs": 11.6,
+              "jankP99OverP50": 1.064,
+              "mbPerSec": 1467.89,
+              "megapixelsPerSec": 384.799,
+              "samplesMs": [
+                10.9,
+                11.6,
+                11.2,
+                11.1,
+                9.8,
+                10.6,
+                9.8,
+                11.1,
+                11,
+                11.1,
+                10.3,
+                10.8
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.209,
+              "p95Ms": 0.33,
+              "p99Ms": 0.33,
+              "meanMs": 0.219,
+              "minMs": 0.128,
+              "maxMs": 0.33,
+              "jankP99OverP50": 1.583,
+              "mbPerSec": 76679.399,
+              "megapixelsPerSec": 20101.044,
+              "samplesMs": [
+                0.33,
+                0.234,
+                0.234,
+                0.182,
+                0.128,
+                0.182,
+                0.265,
+                0.154,
+                0.165,
+                0.251,
+                0.209,
+                0.293
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.5,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.508,
+              "minMs": 2.3,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.08,
+              "mbPerSec": 6400,
+              "megapixelsPerSec": 1677.722,
+              "samplesMs": [
+                2.7,
+                2.3,
+                2.3,
+                2.4,
+                2.5,
+                2.7,
+                2.6,
+                2.6,
+                2.3,
+                2.3,
+                2.7,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.9,
+              "p95Ms": 11.8,
+              "p99Ms": 11.8,
+              "meanMs": 11.067,
+              "minMs": 10.1,
+              "maxMs": 11.8,
+              "jankP99OverP50": 1.083,
+              "mbPerSec": 1467.89,
+              "megapixelsPerSec": 384.799,
+              "samplesMs": [
+                10.7,
+                11.8,
+                11.2,
+                10.9,
+                10.7,
+                10.8,
+                10.1,
+                11.7,
+                11.2,
+                11.1,
+                11.7,
+                10.9
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.191,
+              "p95Ms": 0.328,
+              "p99Ms": 0.328,
+              "meanMs": 0.207,
+              "minMs": 0.142,
+              "maxMs": 0.328,
+              "jankP99OverP50": 1.719,
+              "mbPerSec": 83901.856,
+              "megapixelsPerSec": 21994.368,
+              "samplesMs": [
+                0.328,
+                0.268,
+                0.142,
+                0.176,
+                0.156,
+                0.169,
+                0.197,
+                0.191,
+                0.159,
+                0.216,
+                0.2,
+                0.286
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 1573690821,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 1573690821,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 1573690821,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 2048,
+        "pixels": 4194304,
+        "megabytes": 16,
+        "chain": "triple",
+        "chainLabel": "밝기+대비+HSL 3단",
+        "iterations": 12,
+        "warmup": 2,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.558,
+              "minMs": 2.2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 6153.846,
+              "megapixelsPerSec": 1613.194,
+              "samplesMs": [
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.3,
+                2.2,
+                2.7,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.4,
+              "p95Ms": 11.3,
+              "p99Ms": 11.3,
+              "meanMs": 10.45,
+              "minMs": 9.9,
+              "maxMs": 11.3,
+              "jankP99OverP50": 1.087,
+              "mbPerSec": 1538.462,
+              "megapixelsPerSec": 403.298,
+              "samplesMs": [
+                10.4,
+                9.9,
+                10.6,
+                10.6,
+                10.8,
+                10.2,
+                10.5,
+                10.1,
+                10.4,
+                10.1,
+                11.3,
+                10.5
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.656,
+              "p95Ms": 0.854,
+              "p99Ms": 0.854,
+              "meanMs": 0.625,
+              "minMs": 0.407,
+              "maxMs": 0.854,
+              "jankP99OverP50": 1.3,
+              "mbPerSec": 24375.826,
+              "megapixelsPerSec": 6389.977,
+              "samplesMs": [
+                0.66,
+                0.656,
+                0.656,
+                0.854,
+                0.659,
+                0.66,
+                0.662,
+                0.656,
+                0.687,
+                0.407,
+                0.426,
+                0.521
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.5,
+              "p95Ms": 2.8,
+              "p99Ms": 2.8,
+              "meanMs": 2.525,
+              "minMs": 2.3,
+              "maxMs": 2.8,
+              "jankP99OverP50": 1.12,
+              "mbPerSec": 6400,
+              "megapixelsPerSec": 1677.722,
+              "samplesMs": [
+                2.8,
+                2.3,
+                2.5,
+                2.4,
+                2.6,
+                2.7,
+                2.6,
+                2.3,
+                2.5,
+                2.6,
+                2.7,
+                2.3
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.9,
+              "p95Ms": 11.2,
+              "p99Ms": 11.2,
+              "meanMs": 10.875,
+              "minMs": 10.4,
+              "maxMs": 11.2,
+              "jankP99OverP50": 1.028,
+              "mbPerSec": 1467.89,
+              "megapixelsPerSec": 384.799,
+              "samplesMs": [
+                11.2,
+                10.6,
+                10.8,
+                11,
+                10.9,
+                10.4,
+                10.8,
+                10.9,
+                11.1,
+                10.6,
+                11.1,
+                11.1
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 0.649,
+              "p95Ms": 0.762,
+              "p99Ms": 0.762,
+              "meanMs": 0.617,
+              "minMs": 0.406,
+              "maxMs": 0.762,
+              "jankP99OverP50": 1.174,
+              "mbPerSec": 24648.072,
+              "megapixelsPerSec": 6461.344,
+              "samplesMs": [
+                0.683,
+                0.654,
+                0.651,
+                0.648,
+                0.669,
+                0.762,
+                0.649,
+                0.649,
+                0.66,
+                0.406,
+                0.407,
+                0.562
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 488414661,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 488414661,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 488414661,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 2048,
+        "pixels": 4194304,
+        "megabytes": 16,
+        "chain": "full5",
+        "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "iterations": 12,
+        "warmup": 2,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 4,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "lut-fused",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.583,
+              "minMs": 2.4,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 6153.846,
+              "megapixelsPerSec": 1613.194,
+              "samplesMs": [
+                2.7,
+                2.7,
+                2.4,
+                2.4,
+                2.6,
+                2.7,
+                2.6,
+                2.6,
+                2.5,
+                2.6,
+                2.7,
+                2.5
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.5,
+              "p95Ms": 11.2,
+              "p99Ms": 11.2,
+              "meanMs": 10.525,
+              "minMs": 9.9,
+              "maxMs": 11.2,
+              "jankP99OverP50": 1.067,
+              "mbPerSec": 1523.81,
+              "megapixelsPerSec": 399.458,
+              "samplesMs": [
+                10.8,
+                9.9,
+                11.2,
+                10.1,
+                10.7,
+                10.1,
+                10.5,
+                10.6,
+                10.6,
+                10.2,
+                11.1,
+                10.5
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 1.298,
+              "p95Ms": 1.302,
+              "p99Ms": 1.302,
+              "meanMs": 1.145,
+              "minMs": 0.771,
+              "maxMs": 1.302,
+              "jankP99OverP50": 1.003,
+              "mbPerSec": 12326.609,
+              "megapixelsPerSec": 3231.347,
+              "samplesMs": [
+                0.824,
+                1.302,
+                1.298,
+                1.302,
+                1.298,
+                0.771,
+                0.821,
+                0.921,
+                1.298,
+                1.302,
+                1.295,
+                1.302
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 5,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "levels",
+              "curves",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.567,
+              "minMs": 2.2,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 6153.846,
+              "megapixelsPerSec": 1613.194,
+              "samplesMs": [
+                2.7,
+                2.2,
+                2.7,
+                2.6,
+                2.2,
+                2.5,
+                2.6,
+                2.7,
+                2.7,
+                2.6,
+                2.6,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 10.9,
+              "p95Ms": 11.4,
+              "p99Ms": 11.4,
+              "meanMs": 10.9,
+              "minMs": 10.4,
+              "maxMs": 11.4,
+              "jankP99OverP50": 1.046,
+              "mbPerSec": 1467.89,
+              "megapixelsPerSec": 384.799,
+              "samplesMs": [
+                11.4,
+                10.6,
+                10.9,
+                11.1,
+                11.1,
+                10.4,
+                10.7,
+                11.1,
+                10.9,
+                10.6,
+                11.1,
+                10.9
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 1.602,
+              "p95Ms": 1.61,
+              "p99Ms": 1.61,
+              "meanMs": 1.406,
+              "minMs": 0.941,
+              "maxMs": 1.61,
+              "jankP99OverP50": 1.005,
+              "mbPerSec": 9987.809,
+              "megapixelsPerSec": 2618.244,
+              "samplesMs": [
+                1.044,
+                1.61,
+                1.602,
+                1.601,
+                1.606,
+                0.941,
+                0.943,
+                1.106,
+                1.603,
+                1.604,
+                1.602,
+                1.608
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 3200032197,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 3200032197,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 3200032197,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 12471
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 4096,
+        "pixels": 16777216,
+        "megabytes": 64,
+        "chain": "single",
+        "chainLabel": "밝기 1단",
+        "iterations": 8,
+        "warmup": 1,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.55,
+              "minMs": 2.3,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 24615.384,
+              "megapixelsPerSec": 6452.775,
+              "samplesMs": [
+                2.7,
+                2.7,
+                2.7,
+                2.3,
+                2.3,
+                2.5,
+                2.6,
+                2.6
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 32.1,
+              "p95Ms": 35.1,
+              "p99Ms": 35.1,
+              "meanMs": 32.763,
+              "minMs": 31.4,
+              "maxMs": 35.1,
+              "jankP99OverP50": 1.093,
+              "mbPerSec": 1993.769,
+              "megapixelsPerSec": 522.655,
+              "samplesMs": [
+                35.1,
+                33.8,
+                32,
+                33,
+                32.8,
+                32.1,
+                31.9,
+                31.4
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 1.288,
+              "p95Ms": 1.29,
+              "p99Ms": 1.29,
+              "meanMs": 1.183,
+              "minMs": 0.839,
+              "maxMs": 1.29,
+              "jankP99OverP50": 1.002,
+              "mbPerSec": 49708.545,
+              "megapixelsPerSec": 13030.797,
+              "samplesMs": [
+                1.289,
+                1.288,
+                1.29,
+                0.893,
+                0.839,
+                1.289,
+                1.285,
+                1.29
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 1,
+            "kernelIds": [
+              "brightness-contrast"
+            ],
+            "dispatchMs": {
+              "p50Ms": 2.6,
+              "p95Ms": 2.7,
+              "p99Ms": 2.7,
+              "meanMs": 2.65,
+              "minMs": 2.6,
+              "maxMs": 2.7,
+              "jankP99OverP50": 1.038,
+              "mbPerSec": 24615.384,
+              "megapixelsPerSec": 6452.775,
+              "samplesMs": [
+                2.6,
+                2.6,
+                2.6,
+                2.6,
+                2.7,
+                2.7,
+                2.7,
+                2.7
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 34.3,
+              "p95Ms": 35.1,
+              "p99Ms": 35.1,
+              "meanMs": 34.425,
+              "minMs": 33.8,
+              "maxMs": 35.1,
+              "jankP99OverP50": 1.023,
+              "mbPerSec": 1865.889,
+              "megapixelsPerSec": 489.132,
+              "samplesMs": [
+                34,
+                34.6,
+                34.7,
+                35.1,
+                34.6,
+                34.3,
+                33.8,
+                34.3
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 1.279,
+              "p95Ms": 1.283,
+              "p99Ms": 1.283,
+              "meanMs": 1.175,
+              "minMs": 0.806,
+              "maxMs": 1.283,
+              "jankP99OverP50": 1.003,
+              "mbPerSec": 50058.545,
+              "megapixelsPerSec": 13122.547,
+              "samplesMs": [
+                1.277,
+                1.283,
+                1.28,
+                0.806,
+                0.911,
+                1.279,
+                1.282,
+                1.28
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 4091321797,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 4091321797,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 4091321797,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 4096,
+        "pixels": 16777216,
+        "megabytes": 64,
+        "chain": "triple",
+        "chainLabel": "밝기+대비+HSL 3단",
+        "iterations": 8,
+        "warmup": 1,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 3.9,
+              "p95Ms": 4.1,
+              "p99Ms": 4.1,
+              "meanMs": 3.762,
+              "minMs": 2.3,
+              "maxMs": 4.1,
+              "jankP99OverP50": 1.051,
+              "mbPerSec": 16410.257,
+              "megapixelsPerSec": 4301.85,
+              "samplesMs": [
+                4.1,
+                3.9,
+                4.1,
+                3.9,
+                2.3,
+                3.9,
+                4,
+                3.9
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 28.7,
+              "p95Ms": 31.3,
+              "p99Ms": 31.3,
+              "meanMs": 29.362,
+              "minMs": 28.2,
+              "maxMs": 31.3,
+              "jankP99OverP50": 1.091,
+              "mbPerSec": 2229.965,
+              "megapixelsPerSec": 584.572,
+              "samplesMs": [
+                29.7,
+                30.2,
+                28.7,
+                28.2,
+                28.7,
+                29.5,
+                28.6,
+                31.3
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 2.595,
+              "p95Ms": 3.213,
+              "p99Ms": 3.213,
+              "meanMs": 2.62,
+              "minMs": 1.537,
+              "maxMs": 3.213,
+              "jankP99OverP50": 1.238,
+              "mbPerSec": 24661.967,
+              "megapixelsPerSec": 6464.987,
+              "samplesMs": [
+                2.594,
+                2.598,
+                2.595,
+                1.537,
+                3.201,
+                2.594,
+                2.629,
+                3.213
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 2,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl"
+            ],
+            "dispatchMs": {
+              "p50Ms": 3.9,
+              "p95Ms": 4,
+              "p99Ms": 4,
+              "meanMs": 3.462,
+              "minMs": 2.6,
+              "maxMs": 4,
+              "jankP99OverP50": 1.026,
+              "mbPerSec": 16410.257,
+              "megapixelsPerSec": 4301.85,
+              "samplesMs": [
+                2.7,
+                4,
+                3.9,
+                2.6,
+                2.7,
+                4,
+                3.9,
+                3.9
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 30.1,
+              "p95Ms": 31.2,
+              "p99Ms": 31.2,
+              "meanMs": 30.237,
+              "minMs": 29.7,
+              "maxMs": 31.2,
+              "jankP99OverP50": 1.037,
+              "mbPerSec": 2126.246,
+              "megapixelsPerSec": 557.383,
+              "samplesMs": [
+                29.7,
+                30.1,
+                30.1,
+                29.9,
+                31.2,
+                30.4,
+                30.6,
+                29.9
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 2.589,
+              "p95Ms": 3.201,
+              "p99Ms": 3.201,
+              "meanMs": 2.619,
+              "minMs": 1.556,
+              "maxMs": 3.201,
+              "jankP99OverP50": 1.237,
+              "mbPerSec": 24721.077,
+              "megapixelsPerSec": 6480.482,
+              "samplesMs": [
+                2.589,
+                2.583,
+                2.897,
+                1.556,
+                2.484,
+                3.201,
+                2.622,
+                3.018
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 4045184453,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 4045184453,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 4045184453,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      },
+      {
+        "size": 4096,
+        "pixels": 16777216,
+        "megabytes": 64,
+        "chain": "full5",
+        "chainLabel": "밝기/대비+HSL+레벨+커브+컬러밸런스 5단 풀체인",
+        "iterations": 8,
+        "warmup": 1,
+        "variants": {
+          "gpu-fused": {
+            "dispatches": 4,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "lut-fused",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 3.9,
+              "p95Ms": 5.2,
+              "p99Ms": 5.2,
+              "meanMs": 4.175,
+              "minMs": 3.8,
+              "maxMs": 5.2,
+              "jankP99OverP50": 1.333,
+              "mbPerSec": 16410.256,
+              "megapixelsPerSec": 4301.85,
+              "samplesMs": [
+                3.9,
+                5.2,
+                3.9,
+                3.8,
+                4,
+                4.8,
+                3.9,
+                3.9
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 34.3,
+              "p95Ms": 39.3,
+              "p99Ms": 39.3,
+              "meanMs": 34.875,
+              "minMs": 30.8,
+              "maxMs": 39.3,
+              "jankP99OverP50": 1.146,
+              "mbPerSec": 1865.889,
+              "megapixelsPerSec": 489.132,
+              "samplesMs": [
+                37.9,
+                39.3,
+                35.6,
+                34.3,
+                33.6,
+                35,
+                30.8,
+                32.5
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 2.786,
+              "p95Ms": 4.198,
+              "p99Ms": 4.198,
+              "meanMs": 3.085,
+              "minMs": 2.743,
+              "maxMs": 4.198,
+              "jankP99OverP50": 1.507,
+              "mbPerSec": 22974.419,
+              "megapixelsPerSec": 6022.606,
+              "samplesMs": [
+                3.186,
+                2.751,
+                2.763,
+                2.786,
+                3.163,
+                4.198,
+                2.743,
+                3.094
+              ]
+            }
+          },
+          "gpu-unfused": {
+            "dispatches": 5,
+            "kernelIds": [
+              "brightness-contrast",
+              "hsl",
+              "levels",
+              "curves",
+              "color-balance"
+            ],
+            "dispatchMs": {
+              "p50Ms": 5.1,
+              "p95Ms": 6.5,
+              "p99Ms": 6.5,
+              "meanMs": 5.025,
+              "minMs": 3.9,
+              "maxMs": 6.5,
+              "jankP99OverP50": 1.275,
+              "mbPerSec": 12549.02,
+              "megapixelsPerSec": 3289.65,
+              "samplesMs": [
+                5.2,
+                6.3,
+                4.1,
+                5.2,
+                5.1,
+                6.5,
+                3.9,
+                3.9
+              ]
+            },
+            "applyMs": {
+              "p50Ms": 36.8,
+              "p95Ms": 40,
+              "p99Ms": 40,
+              "meanMs": 37.612,
+              "minMs": 36.5,
+              "maxMs": 40,
+              "jankP99OverP50": 1.087,
+              "mbPerSec": 1739.13,
+              "megapixelsPerSec": 455.903,
+              "samplesMs": [
+                37.9,
+                37.5,
+                38.9,
+                36.7,
+                36.5,
+                40,
+                36.6,
+                36.8
+              ]
+            },
+            "gpuPassMs": {
+              "p50Ms": 3.331,
+              "p95Ms": 4.524,
+              "p99Ms": 4.524,
+              "meanMs": 3.582,
+              "minMs": 2.998,
+              "maxMs": 4.524,
+              "jankP99OverP50": 1.358,
+              "mbPerSec": 19211.442,
+              "megapixelsPerSec": 5036.164,
+              "samplesMs": [
+                4.524,
+                3.331,
+                3.378,
+                3.239,
+                4.191,
+                3.043,
+                2.998,
+                3.953
+              ]
+            }
+          }
+        },
+        "quality": {
+          "reference": "direct-cpu (buildImageFilters + applyImageFilters, 네이티브 포팅 레지스트리) — tests/benchmarks/harness/filter-lanes.ts 의 CPU 참조와 동일 픽셀",
+          "checksumAlgorithm": "FNV-1a 32bit over the full RGBA buffer",
+          "referenceChecksum": 2006752709,
+          "sampleStridePixels": 1009,
+          "gpu-fused": {
+            "checksum": 2006752709,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-unfused": {
+            "checksum": 2006752709,
+            "bitIdenticalToCpu": true,
+            "stridedSample": {
+              "maxColorDiff": 0,
+              "mismatchedColorChannels": 0,
+              "alphaMismatches": 0,
+              "comparedChannels": 49884
+            },
+            "fullFrame": null
+          },
+          "gpu-fused-vs-gpu-unfused-checksumMatch": true
+        }
+      }
+    ]
+  },
+  "crossover": {
+    "note": "GPU 레인 비용은 applyMs(업로드+디스패치+리드백) p50, CPU 레인 비용은 하니스의 레인별 p50. gpuWins=true 인 가장 작은 (크기, 체인) 조합이 실측 레인 전환 임계다. belowMeasuredRange=true 면 측정한 모든 크기에서 GPU 가 이겼다는 뜻이라 임계는 최소 측정 크기보다 아래에 있다.",
+    "basis": "gpu-fused applyMs p50 vs worker-cpu p50 (same size/chain cell)",
+    "thresholdByChain": [
+      {
+        "chain": "single",
+        "gpuWinsFromSize": 2048,
+        "belowMeasuredRange": false,
+        "largestCpuWinSize": 1024
+      },
+      {
+        "chain": "triple",
+        "gpuWinsFromSize": 512,
+        "belowMeasuredRange": false,
+        "largestCpuWinSize": 256
+      },
+      {
+        "chain": "full5",
+        "gpuWinsFromSize": 512,
+        "belowMeasuredRange": false,
+        "largestCpuWinSize": 256
+      }
+    ],
+    "costModelSeed": {
+      "model": "cost(MP) = fixedMs + perMegapixelMs × megapixels (least squares over the measured sizes)",
+      "note": "GPU 레인의 fixedMs 는 크기와 무관한 제출/리드백 플로어, perMegapixelMs 는 처리량이다. 두 레인의 직선이 만나는 지점이 곧 레인 전환 임계이고, thresholdByChain 의 실측 계단값과 교차 검증된다. 계수는 이 호스트·이 병행 부하에서의 값이므로 절대치가 아니라 비율·절편 구조를 시드로 쓰는 것이 안전하다.",
+      "byChain": [
+        {
+          "chain": "single",
+          "gpuDispatches": 1,
+          "lanes": {
+            "gpu-fused-apply": {
+              "fixedMs": 2.446,
+              "perMegapixelMs": 1.779,
+              "r2": 0.998,
+              "points": 5
+            },
+            "gpu-fused-pure-pass": {
+              "fixedMs": -0.015,
+              "perMegapixelMs": 0.076,
+              "r2": 0.99,
+              "points": 5
+            },
+            "worker-cpu": {
+              "fixedMs": -0.615,
+              "perMegapixelMs": 3.696,
+              "r2": 0.999,
+              "points": 5
+            },
+            "direct-cpu": {
+              "fixedMs": -1.117,
+              "perMegapixelMs": 3.665,
+              "r2": 0.996,
+              "points": 5
+            },
+            "konva-fallback": {
+              "fixedMs": -1.451,
+              "perMegapixelMs": 3.953,
+              "r2": 0.994,
+              "points": 5
+            }
+          }
+        },
+        {
+          "chain": "triple",
+          "gpuDispatches": 2,
+          "lanes": {
+            "gpu-fused-apply": {
+              "fixedMs": 2.597,
+              "perMegapixelMs": 1.571,
+              "r2": 0.996,
+              "points": 5
+            },
+            "gpu-fused-pure-pass": {
+              "fixedMs": 0.016,
+              "perMegapixelMs": 0.154,
+              "r2": 1,
+              "points": 5
+            },
+            "worker-cpu": {
+              "fixedMs": 0.599,
+              "perMegapixelMs": 13.535,
+              "r2": 1,
+              "points": 5
+            },
+            "direct-cpu": {
+              "fixedMs": 0.243,
+              "perMegapixelMs": 12.913,
+              "r2": 1,
+              "points": 5
+            },
+            "konva-fallback": {
+              "fixedMs": 0.473,
+              "perMegapixelMs": 12.566,
+              "r2": 1,
+              "points": 5
+            }
+          }
+        },
+        {
+          "chain": "full5",
+          "gpuDispatches": 4,
+          "lanes": {
+            "gpu-fused-apply": {
+              "fixedMs": 2.172,
+              "perMegapixelMs": 1.917,
+              "r2": 0.999,
+              "points": 5
+            },
+            "gpu-fused-pure-pass": {
+              "fixedMs": 0.209,
+              "perMegapixelMs": 0.16,
+              "r2": 0.956,
+              "points": 5
+            },
+            "worker-cpu": {
+              "fixedMs": -1.308,
+              "perMegapixelMs": 24.823,
+              "r2": 1,
+              "points": 5
+            },
+            "direct-cpu": {
+              "fixedMs": 0.527,
+              "perMegapixelMs": 24.741,
+              "r2": 1,
+              "points": 5
+            },
+            "konva-fallback": {
+              "fixedMs": -2.431,
+              "perMegapixelMs": 25.064,
+              "r2": 1,
+              "points": 5
+            }
+          }
+        }
+      ]
+    },
+    "cells": [
+      {
+        "size": 256,
+        "chain": "single",
+        "gpuFusedApplyP50Ms": 2.6,
+        "gpuFusedPurePassP50Ms": 0.016,
+        "workerCpuP50Ms": 0.463,
+        "directCpuP50Ms": 0.23,
+        "konvaFallbackP50Ms": 0.214,
+        "gpuSpeedupOverWorker": 0.178,
+        "gpuSpeedupOverKonva": 0.082,
+        "gpuWins": false
+      },
+      {
+        "size": 256,
+        "chain": "triple",
+        "gpuFusedApplyP50Ms": 2.6,
+        "gpuFusedPurePassP50Ms": 0.028,
+        "workerCpuP50Ms": 1.112,
+        "directCpuP50Ms": 1.02,
+        "konvaFallbackP50Ms": 1.054,
+        "gpuSpeedupOverWorker": 0.428,
+        "gpuSpeedupOverKonva": 0.405,
+        "gpuWins": false
+      },
+      {
+        "size": 256,
+        "chain": "full5",
+        "gpuFusedApplyP50Ms": 2.6,
+        "gpuFusedPurePassP50Ms": 0.053,
+        "workerCpuP50Ms": 1.635,
+        "directCpuP50Ms": 1.529,
+        "konvaFallbackP50Ms": 1.55,
+        "gpuSpeedupOverWorker": 0.629,
+        "gpuSpeedupOverKonva": 0.596,
+        "gpuWins": false
+      },
+      {
+        "size": 512,
+        "chain": "single",
+        "gpuFusedApplyP50Ms": 2.8,
+        "gpuFusedPurePassP50Ms": 0.031,
+        "workerCpuP50Ms": 0.795,
+        "directCpuP50Ms": 0.762,
+        "konvaFallbackP50Ms": 0.758,
+        "gpuSpeedupOverWorker": 0.284,
+        "gpuSpeedupOverKonva": 0.271,
+        "gpuWins": false
+      },
+      {
+        "size": 512,
+        "chain": "triple",
+        "gpuFusedApplyP50Ms": 2.8,
+        "gpuFusedPurePassP50Ms": 0.057,
+        "workerCpuP50Ms": 3.268,
+        "directCpuP50Ms": 3.179,
+        "konvaFallbackP50Ms": 3.201,
+        "gpuSpeedupOverWorker": 1.167,
+        "gpuSpeedupOverKonva": 1.143,
+        "gpuWins": true
+      },
+      {
+        "size": 512,
+        "chain": "full5",
+        "gpuFusedApplyP50Ms": 2.8,
+        "gpuFusedPurePassP50Ms": 0.113,
+        "workerCpuP50Ms": 6.027,
+        "directCpuP50Ms": 5.825,
+        "konvaFallbackP50Ms": 5.815,
+        "gpuSpeedupOverWorker": 2.153,
+        "gpuSpeedupOverKonva": 2.077,
+        "gpuWins": true
+      },
+      {
+        "size": 1024,
+        "chain": "single",
+        "gpuFusedApplyP50Ms": 3.6,
+        "gpuFusedPurePassP50Ms": 0.088,
+        "workerCpuP50Ms": 2.926,
+        "directCpuP50Ms": 2.901,
+        "konvaFallbackP50Ms": 2.892,
+        "gpuSpeedupOverWorker": 0.813,
+        "gpuSpeedupOverKonva": 0.803,
+        "gpuWins": false
+      },
+      {
+        "size": 1024,
+        "chain": "triple",
+        "gpuFusedApplyP50Ms": 3.6,
+        "gpuFusedPurePassP50Ms": 0.178,
+        "workerCpuP50Ms": 13.606,
+        "directCpuP50Ms": 14.209,
+        "konvaFallbackP50Ms": 14.253,
+        "gpuSpeedupOverWorker": 3.779,
+        "gpuSpeedupOverKonva": 3.959,
+        "gpuWins": true
+      },
+      {
+        "size": 1024,
+        "chain": "full5",
+        "gpuFusedApplyP50Ms": 3.5,
+        "gpuFusedPurePassP50Ms": 0.361,
+        "workerCpuP50Ms": 23.374,
+        "directCpuP50Ms": 25.402,
+        "konvaFallbackP50Ms": 24.004,
+        "gpuSpeedupOverWorker": 6.678,
+        "gpuSpeedupOverKonva": 6.858,
+        "gpuWins": true
+      },
+      {
+        "size": 2048,
+        "chain": "single",
+        "gpuFusedApplyP50Ms": 10.9,
+        "gpuFusedPurePassP50Ms": 0.209,
+        "workerCpuP50Ms": 13.613,
+        "directCpuP50Ms": 11.358,
+        "konvaFallbackP50Ms": 11.475,
+        "gpuSpeedupOverWorker": 1.249,
+        "gpuSpeedupOverKonva": 1.053,
+        "gpuWins": true
+      },
+      {
+        "size": 2048,
+        "chain": "triple",
+        "gpuFusedApplyP50Ms": 10.4,
+        "gpuFusedPurePassP50Ms": 0.656,
+        "workerCpuP50Ms": 60.5,
+        "directCpuP50Ms": 54.554,
+        "konvaFallbackP50Ms": 53.49,
+        "gpuSpeedupOverWorker": 5.817,
+        "gpuSpeedupOverKonva": 5.143,
+        "gpuWins": true
+      },
+      {
+        "size": 2048,
+        "chain": "full5",
+        "gpuFusedApplyP50Ms": 10.5,
+        "gpuFusedPurePassP50Ms": 1.298,
+        "workerCpuP50Ms": 101.653,
+        "directCpuP50Ms": 108.017,
+        "konvaFallbackP50Ms": 97.2,
+        "gpuSpeedupOverWorker": 9.681,
+        "gpuSpeedupOverKonva": 9.257,
+        "gpuWins": true
+      },
+      {
+        "size": 4096,
+        "chain": "single",
+        "gpuFusedApplyP50Ms": 32.1,
+        "gpuFusedPurePassP50Ms": 1.288,
+        "workerCpuP50Ms": 61.716,
+        "directCpuP50Ms": 61.06,
+        "konvaFallbackP50Ms": 65.746,
+        "gpuSpeedupOverWorker": 1.923,
+        "gpuSpeedupOverKonva": 2.048,
+        "gpuWins": true
+      },
+      {
+        "size": 4096,
+        "chain": "triple",
+        "gpuFusedApplyP50Ms": 28.7,
+        "gpuFusedPurePassP50Ms": 2.595,
+        "workerCpuP50Ms": 226.977,
+        "directCpuP50Ms": 216.829,
+        "konvaFallbackP50Ms": 211.19,
+        "gpuSpeedupOverWorker": 7.909,
+        "gpuSpeedupOverKonva": 7.359,
+        "gpuWins": true
+      },
+      {
+        "size": 4096,
+        "chain": "full5",
+        "gpuFusedApplyP50Ms": 34.3,
+        "gpuFusedPurePassP50Ms": 2.786,
+        "workerCpuP50Ms": 415.5,
+        "directCpuP50Ms": 414.778,
+        "konvaFallbackP50Ms": 419.406,
+        "gpuSpeedupOverWorker": 12.114,
+        "gpuSpeedupOverKonva": 12.228,
+        "gpuWins": true
+      }
+    ],
+    "mergedAgainstCpuRun": "2026-08-08T05:54:18.069Z"
+  },
+  "peakMemory": {
+    "rssMb": 1039.828,
+    "externalMb": 260.584
+  }
+}

@@ -614,8 +614,13 @@ async function main(): Promise<void> {
   }, 4);
   const providers: StudioLivingInkExecutionProvider[] = [];
   try {
-    const bloomProvider = await createStudioLivingInkExecutionProvider(config);
+    // Constructed by hand rather than through the factory so the harness keeps the capability
+    // record the Worker answers with: it names the runtime that actually executed (WebGL2 GLSL or
+    // the WGSL field runtime), which is what makes this probe a per-backend gate instead of a
+    // gate on whichever backend the launch flags happened to select.
+    const bloomProvider = new StudioLivingInkExecutionProvider(config);
     providers.push(bloomProvider);
+    const capabilities = await bloomProvider.initialize();
     const lineFrame = await bloomProvider.apply(darkInk(1, lineMarks()));
     const lineReceiptHash = lineFrame.receipt.displaySha256;
     const lineImage = drawFrame(lineFrame, "line");
@@ -944,13 +949,19 @@ async function main(): Promise<void> {
     );
     const result = {
       status: "ok",
-      backend: "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+      backend: capabilities.backend === "webgpu-offscreen-half-float"
+        ? "real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1"
+        : "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+      capabilities,
       viewport: { width: WIDTH, height: HEIGHT },
       executionContract: {
-        worker: true,
-        offscreenCanvas: true,
-        webgl2: true,
-        halfFloatFields: true,
+        worker: capabilities.worker,
+        offscreenCanvas: capabilities.offscreenCanvas,
+        // Either GPU API is acceptable; the runner asserts which one this lane was meant to get.
+        gpuApi: capabilities.webgl2 || capabilities.webgpu,
+        webgl2: capabilities.webgl2,
+        webgpu: capabilities.webgpu,
+        halfFloatFields: capabilities.halfFloatRenderable,
         rgba8Readback: true,
       },
       line: {

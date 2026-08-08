@@ -1,0 +1,376 @@
+{
+  "$schema": "https://toonspectrum.local/schemas/ux-audit-v5.json",
+  "audit": "ToonStudio UI/UX 동선 감사 — V5 §15 정량 수용 기준 대비",
+  "generatedAt": "2026-08-08T05:55:00.000Z",
+  "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum/.claude/worktrees/toonstudio-v11-codex-master-23fdef",
+  "branch": "claude/toonstudio-v11-codex-master-23fdef",
+  "specSource": "docs/architecture/ToonStudio_최종공유본_초확장_멀티엔진_제품기능_UIUX_성능품질_아키텍처_V5_2026-08-07.md:533-660",
+  "method": {
+    "runtime": "playwright chromium (channel=chrome, headless), vite dev server 127.0.0.1:5199",
+    "route": "/studio (guest, no auth session)",
+    "viewportDesktop": "1440x900",
+    "viewportMobile": "390x844",
+    "caveats": [
+      "모든 시간 측정은 vite dev(비번들) 기준. 프로덕션 번들에서는 더 빠를 수 있으므로 시간 지표는 상한선으로 읽어야 한다.",
+      "cold run에서 vite dep-optimizer가 도는 첫 로드는 tCanvas=18999ms였고, warm run은 1569~1646ms였다. warm 값을 대표값으로 사용.",
+      "코드 판정(중복 구현·Safe Mode·alias)은 전부 grep/파일 열람 실측이며 파일:라인 근거를 병기했다."
+    ],
+    "probeScripts": "scratchpad probe1..probe6.mjs (세션 임시 디렉터리, 레포 미커밋)"
+  },
+
+  "criteria": [
+    { "id": "C01", "name": "첫 작업 — 30초 안에 첫 획, 포맷 선택 강요 금지", "verdict": "부분" },
+    { "id": "C02", "name": "CSP 전환 — 파일·브러시·단축키·Workspace 가져오기", "verdict": "부분" },
+    { "id": "C03", "name": "명령 일관성 — 단일 CommandID, 중복 구현 금지", "verdict": "미충족" },
+    { "id": "C04", "name": "1–2–3 규칙", "verdict": "부분" },
+    { "id": "C05", "name": "포인터 거리 — 브러시 HUD 80 / 선택 180 / 레이어 행 120px", "verdict": "미충족" },
+    { "id": "C06", "name": "진행 공개 — 숨은 실패 금지", "verdict": "부분" },
+    { "id": "C07", "name": "Progressive disclosure — 기본 5~9 속성", "verdict": "미충족" },
+    { "id": "C08", "name": "장치 적응 — 장치별 Workspace override", "verdict": "미충족" },
+    { "id": "C09", "name": "Undo 신뢰 — 파괴적 명령 preview/transaction/undo", "verdict": "부분" },
+    { "id": "C10", "name": "도움말 — F1/툴팁/영상/HelpGraph + 경쟁 제품 용어 alias 검색", "verdict": "미충족" },
+    { "id": "C11", "name": "접근성 — 캔버스 외 UI WCAG gate", "verdict": "부분" },
+    { "id": "C12", "name": "오류 복구 — GPU loss/탭 종료/저장소 압박 시 Safe Mode", "verdict": "미충족" }
+  ],
+  "verdictTally": { "충족": 0, "부분": 6, "미충족": 6, "total": 12 },
+
+  "measurements": {
+    "firstStroke": {
+      "criterion": "30초 안에 첫 획 + 포맷 선택 강요 금지",
+      "formatChoiceForced": false,
+      "guestCanvasAutoCreated": true,
+      "defaultDocument": "무제 / 1페이지 / 작업공간=스토리보드",
+      "msNavigationToCanvasInDom_warm": 1569,
+      "msNavigationToCanvasInDom_cold": 18999,
+      "msNavigationToUiSettled_warm": 5570,
+      "msNavigationToFirstStrokeCommitted_warm": 9027,
+      "msInteractionOnly": 3453,
+      "userActionsRequiredBeforeFirstStroke": 2,
+      "totalActionsIncludingStroke": 3,
+      "actionSequence": [
+        "Escape 또는 바깥 클릭 — 온로드 모달 '처음이라면 이 순서로 시작하세요' 해제",
+        "B 키 또는 툴레일 클릭 — 기본 도구가 '선택(V)'이므로 펜 전환 필요",
+        "캔버스 드래그"
+      ],
+      "blockers": [
+        {
+          "type": "modal-backdrop-blocks-canvas",
+          "evidence": "elementFromPoint(canvasCenter) === BUTTON[aria-label='빠른 시작 닫기'] class='pointer-events-auto absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[...]'",
+          "note": "aria-modal=true 다이얼로그(520x396)와 전체 캔버스를 덮는 backdrop 버튼(924x856)이 온로드 상태로 존재. Escape 후 elementFromPoint는 CANVAS로 바뀜."
+        },
+        {
+          "type": "default-tool-is-not-a-brush",
+          "measured": "aria-pressed=true 도구 = '선택 (V)'",
+          "zeroActionDrawAttempt": { "undoEnabledAfterDrag": false, "conclusion": "사전 동작 0회로는 획이 남지 않음" }
+        }
+      ],
+      "verdict": "부분 — 30초/포맷강요 기준은 통과, '즉시 캔버스에서 첫 획' 정신은 모달 + 비-브러시 기본 도구로 2동작 지연"
+    },
+
+    "pointerDistance": {
+      "unit": "css px, 뷰포트 내 캔버스 가시영역 중심 기준",
+      "viewport": "1440x900",
+      "canvasRect": { "x": 224, "y": 44, "w": 924, "h": 1386 },
+      "canvasVisibleCenter": [686, 472],
+      "note": "캔버스 논리 높이(1386)가 뷰포트(900)보다 커서 세로 웹툰 캔버스는 항상 잘려 보인다. 기하학적 중심(686,737) 기준 값도 병기.",
+      "nearestAnyInteractiveControl": { "label": "맞춤 (하단 뷰바)", "distance": 388 },
+      "budgets": {
+        "brushHud": { "budgetPx": 80, "measuredPx": 388, "measuredFromGeometricCenterPx": 122, "nearestControl": "하단 드로우 옵션바 '맞춤'/추천 브러시 칩", "pass": false },
+        "brushSizeControl": { "budgetPx": 80, "measuredPx": 423, "nearestControl": "브러시 크기 슬라이더 (1091,859)", "pass": false },
+        "brushOpacityControl": { "budgetPx": 80, "measuredPx": 555, "nearestControl": "브러시 불투명도 (1227,859)", "pass": false },
+        "penToolButton": { "budgetPx": 80, "measuredPx": 488, "nearestControl": "툴레일 펜(B) (198,240)", "pass": false },
+        "colorSwatch": { "budgetPx": 80, "measuredPx": 534, "nearestControl": "#8a5a44 색상 선택 (1187,553)", "pass": false },
+        "selectionCommand": { "budgetPx": 180, "measuredPx": 495, "nearestControl": "사각 선택(M) (198,818)", "pass": false },
+        "lassoSelect": { "budgetPx": 180, "measuredPx": 522, "offscreenAt900h": true, "pass": false },
+        "transformAfterSelect": { "budgetPx": 180, "measuredPx": 556, "offscreenAt900h": true, "pass": false },
+        "layerRowAction": { "budgetPx": 120, "measuredPx": 614, "nearestControl": "레이어 탭 활성 후 '레이어 이름·텍스트·그룹 검색' (1270,281)", "pass": false },
+        "layerTabItself": { "budgetPx": 120, "measuredPx": 668, "pass": false },
+        "undoButton": { "budgetPx": null, "measuredPx": 812, "note": "참고값" }
+      },
+      "budgetsMet": 0,
+      "budgetsTotal": 10,
+      "toolRailOverflow": {
+        "railButtonsTotal": 34,
+        "railButtonsOutsideViewportAt1440x900": 19,
+        "outsideRatio": 0.56,
+        "firstOffscreenY": 900,
+        "lastRailButtonY": 2004,
+        "offscreenExamples": ["올가미 선택", "선택 후 변형", "자르기 (C)", "스마트 도형", "텍스트 추가", "말풍선 추가", "투시도", "3D 데생 인형", "3D 배경", "보기 확대·축소 (Z)", "너비에 맞춤 (Home)", "보기 회전 (R)"]
+      },
+      "visibleInteractiveTotals": { "allRendered": 98, "insideViewport": 79 }
+    },
+
+    "oneTwoThreeRule": {
+      "sampleSize": 15,
+      "passing": 10,
+      "failing": 5,
+      "commands": [
+        { "cmd": "실행취소", "class": "매 획(≤1)", "actions": 1, "path": "⌘Z(하드코딩) 또는 상단바 버튼", "evidence": "StudioPage.tsx:23821 / 상단바 (274,4)", "pass": true },
+        { "cmd": "펜 전환", "class": "매 획(≤1)", "actions": 1, "path": "B 키 / 툴레일", "evidence": "studio-main-menu-groups.ts:1005-1012, 툴레일 (176,218)", "pass": true },
+        { "cmd": "지우개 전환", "class": "매 획(≤1)", "actions": 1, "path": "E 키 / 툴레일", "evidence": "툴레일 (176,322)", "pass": true },
+        { "cmd": "브러시 크기 조절", "class": "매 획(≤1)", "actions": 1, "path": "[ / ] 또는 하단바 슬라이더", "evidence": "studio-drawing-shortcuts.ts:268-275", "pass": true },
+        { "cmd": "불투명도 조절", "class": "매 획(≤1)", "actions": 1, "path": "하단바 슬라이더 (1227,859)", "pass": true },
+        { "cmd": "스포이드", "class": "매 획(≤1)", "actions": 1, "path": "I 키 / 툴레일", "note": "Quick Deck 경로는 토글이 아니라 항상 ON — 동작 불일치", "evidence": "StudioPage.tsx:23581-23586 vs 23117-23119", "pass": true },
+        { "cmd": "색 변경(팔레트)", "class": "매 획(≤1)", "actions": 1, "path": "우패널 스와치", "note": "속성 탭이 활성일 때만; 거리 534px", "pass": true },
+        { "cmd": "확대/축소", "class": "자주(≤2)", "actions": 1, "path": "= / - 또는 하단 뷰바", "pass": true },
+        { "cmd": "화면에 맞추기", "class": "자주(≤2)", "actions": 1, "path": "Home 또는 '맞춤'", "pass": true },
+        { "cmd": "임시저장", "class": "자주(≤2)", "actions": 1, "path": "상단바 '임시저장' 버튼", "note": "메뉴가 광고하는 ⌘S 단축키는 핸들러 없음", "evidence": "studio-main-menu-groups.ts:237 광고 / KeyS+meta 핸들러 부재; 합성 keydown defaultPrevented=false", "pass": true },
+        { "cmd": "새 레이어", "class": "자주(≤2)", "actions": 2, "path": "우패널 '레이어' 탭 → '새 레이어'", "note": "메뉴에 항목 자체가 없음", "pass": true },
+        { "cmd": "선택 후 변형", "class": "자주(≤2)", "actions": 2, "path": "툴레일 스크롤 → 클릭", "note": "1440x900에서 뷰포트 밖(y=1003)이라 스크롤 1동작 추가", "pass": false },
+        { "cmd": "레벨(Levels) 보정", "class": "관리(≤3)", "actions": ">3", "path": "우패널 속성 → 색보정 서브탭 → 스크롤 → 레벨 섹션", "note": "메뉴·팔레트·검색 어디에도 없음", "evidence": "StudioImageAdjustmentsPanel.tsx:724-726; 필터 메뉴 33항목에 미포함", "pass": false },
+        { "cmd": "커브(Curves) 보정", "class": "관리(≤3)", "actions": ">3", "path": "동일", "evidence": "StudioImageAdjustmentsPanel.tsx:793", "pass": false },
+        { "cmd": "클리핑 마스크", "class": "자주(≤2)", "actions": 3, "path": "요소 선택 → 우패널 속성 → '아래 레이어에 클리핑' 체크박스", "evidence": "StudioInspectorAside.tsx:2420-2428", "pass": false }
+      ],
+      "structuralFindings": [
+        "브러시·뷰 계열 '매 획' 명령은 단축키 덕분에 1동작 목표를 대체로 만족한다.",
+        "레이어/보정 계열은 메인 메뉴에 항목이 없어(레이어 메뉴 부재) 우패널 탭 전환이 강제되고, 이 탭 전환이 모든 레이어 명령에 +1동작을 붙인다.",
+        "툴레일 34개 중 19개가 1440x900 뷰포트 밖이라 하위 도구는 구조적으로 +1동작(스크롤)이다."
+      ]
+    },
+
+    "menuCoverage": {
+      "specMenuGroups": 17,
+      "specMenuGroupsList": ["File", "Edit", "View", "Canvas", "Layer", "Select", "Transform", "Brush", "Filter", "Vector", "Text & Balloon", "Comic & Story", "Animation", "3D & Physics", "Collaboration", "Window", "Help"],
+      "currentMenuGroups": 8,
+      "currentMenuGroupsList": ["파일", "편집", "삽입", "보기", "필터", "그리기", "AI", "도움말"],
+      "currentMenuItemsTotal": 116,
+      "currentMenuItemsByGroup": { "파일": 10, "편집": 20, "삽입": 11, "보기": 31, "필터": 33, "그리기": 6, "AI": 3, "도움말": 2 },
+      "sourceFile": "src/domains/creator/studio-main-menu-groups.ts",
+      "groupDefinitionLines": { "file": 230, "edit": 330, "insert": 500, "view": 596, "filter": 880, "draw": 1003, "ai": 1061, "help": 1091 },
+      "specGroupsMissingEntirely": ["Canvas", "Layer", "Select", "Transform", "Brush", "Vector", "Text & Balloon", "Comic & Story", "Animation", "3D & Physics", "Collaboration", "Window"],
+      "specGroupsPresentUnderDifferentName": [
+        { "spec": "File", "current": "파일", "coverage": "부분 — Publish Package·포맷 호환성 보고서·복구 센터·권리 BOM 없음" },
+        { "spec": "Edit", "current": "편집", "coverage": "부분 — History Branch·Automation Recipe 없음; 레이어 순서 명령이 Edit에 잘못 들어가 있음" },
+        { "spec": "View", "current": "보기", "coverage": "부분 — 31항목이나 Proof/ICC Soft Proof·Onion Skin·Performance HUD·Safe Mode 없음" },
+        { "spec": "Filter", "current": "필터", "coverage": "양호 — 33항목; EffectGraph Editor·Bake/Proxy·Adjustment Layer 없음" },
+        { "spec": "Help", "current": "도움말", "coverage": "미흡 — 2항목만(튜토리얼·단축키). Command Search·용어 검색·진단·복구 가이드·버그 리포트 없음" },
+        { "spec": "(없음)", "current": "삽입", "coverage": "스펙에 없는 자체 그룹 — 3D/텍스트/말풍선 진입점이 여기에 혼재" },
+        { "spec": "(없음)", "current": "그리기", "coverage": "스펙 Brush 그룹의 축소판(6항목)" },
+        { "spec": "(없음)", "current": "AI", "coverage": "스펙에 없는 자체 그룹" }
+      ],
+      "coverageRatioGroups": 0.294
+    },
+
+    "workspaceProfiles": {
+      "specCount": 12,
+      "specList": ["Quick Sketch", "CSP Migration", "Pen Display", "Mobile Draw", "Comic Production", "Paint Studio", "Vector Design", "Photo Edit", "Animation", "Pose & 3D", "Collaboration Review", "Presentation/Publish"],
+      "currentCount": 7,
+      "currentList": ["스토리보드", "선화", "채색", "대사·레터링", "검수", "게시", "프로 만화"],
+      "sourceFile": "src/domains/creator/studio-workspaces.ts",
+      "definitionLine": 337,
+      "itemLines": { "storyboard": 339, "lineart": 349, "coloring": 359, "lettering": 369, "review": 379, "publish": 389, "pro-comic": 399 },
+      "companionPresets": { "count": 4, "list": ["draw", "navigate", "review", "reference"], "file": "src/domains/creator/StudioCompanionWorkspacePresets.tsx", "lines": [26, 34, 42, 50], "note": "멀티 디스플레이 보조창 전용이며 §15.2 프로파일이 아님" },
+      "mapping": [
+        { "spec": "Quick Sketch", "current": null, "status": "미구현" },
+        { "spec": "CSP Migration", "current": null, "status": "미구현" },
+        { "spec": "Pen Display", "current": null, "status": "미구현" },
+        { "spec": "Mobile Draw", "current": null, "status": "미구현 — mobileControlSide(좌/우손) 필드만 존재", "evidence": "studio-workspaces.ts:137,429,654-665" },
+        { "spec": "Comic Production", "current": "프로 만화", "status": "근사" },
+        { "spec": "Paint Studio", "current": "채색", "status": "근사" },
+        { "spec": "Vector Design", "current": null, "status": "미구현" },
+        { "spec": "Photo Edit", "current": null, "status": "미구현" },
+        { "spec": "Animation", "current": null, "status": "미구현" },
+        { "spec": "Pose & 3D", "current": null, "status": "미구현" },
+        { "spec": "Collaboration Review", "current": "검수", "status": "근사 — 리뷰 세션 개념 없음" },
+        { "spec": "Presentation/Publish", "current": "게시", "status": "근사" }
+      ],
+      "unmappedCurrent": ["스토리보드", "선화", "대사·레터링"],
+      "exactMatches": 0,
+      "approximateMatches": 4,
+      "missing": 8,
+      "deviceOverrideSupport": false,
+      "deviceOverrideEvidence": "studio-workspaces.ts 전수 — desktop 레이아웃 + mobileControlSide만 존재. penDisplay/touch/keyboard 프로파일 필드 없음."
+    },
+
+    "commandConsistency": {
+      "commandRegistryPackageExists": true,
+      "commandRegistryFile": "packages/studio-command-registry/src/index.ts",
+      "commandRegistryLines": 83,
+      "commandRegistryImportSitesInProductCode": 0,
+      "commandRegistryOnlyReferences": ["package.json:138 (deps)", "pnpm-lock.yaml:114-116,512", "scripts/verify-studio-engine.mjs:109,140 (존재 여부만 확인)", "packages/studio-command-registry/src/__tests__/command-registry.test.ts"],
+      "specInterfaceFieldsImplemented": { "id": true, "labels": false, "aliases": false, "availability": "when()으로 근사", "preview": false, "execute": "run()으로 근사", "undo": false, "helpNodeId": false, "permissions": false },
+      "specInterfaceCoverage": "9개 필드 중 3개 근사, 6개 부재",
+      "disjointIdNamespaces": 7,
+      "disjointIdNamespaceList": [
+        { "name": "메뉴 item id", "file": "src/domains/creator/studio-main-menu-model.ts:11-28", "note": "id는 표시/테스트용, 디스패치는 onSelect 클로저" },
+        { "name": "STUDIO_EDIT_MENU_COMMANDS", "file": "src/domains/creator/studio-edit-controls.ts:6-111", "count": 15, "note": "label+shortcut 문자열만, run 없음" },
+        { "name": "STUDIO_SHORTCUT_ACTIONS", "file": "src/domains/creator/studio-app-settings.ts:83-118", "count": 34 },
+        { "name": "QUICK_ACTION_IDS", "file": "src/domains/creator/studio-quick-actions.ts:19-35", "count": 16 },
+        { "name": "STUDIO_QUICK_ACCESS_COMMAND_IDS", "file": "src/domains/creator/studio-quick-access-integration.ts:10-28", "count": 18 },
+        { "name": "StudioCompanionCommandName", "file": "src/domains/creator/studio-tools-companion.ts:107-112" },
+        { "name": "StudioLayerNavigatorAction", "file": "src/domains/creator/StudioLayerNavigator.tsx:82-115", "count": 20 }
+      ],
+      "menuOnSelectClosures": 85,
+      "keyboardShortcutResolvers": 6,
+      "keyboardResolverFiles": [
+        "src/domains/creator/StudioPage.tsx:23498-24236 (마스터 핸들러, 27 matchStudioShortcut + 24 하드코딩 chord)",
+        "src/domains/creator/studio-view-controls.ts:672-701 (9)",
+        "src/domains/creator/studio-edit-controls.ts:251-275 (11)",
+        "src/domains/creator/studio-drawing-shortcuts.ts:210-277 (12)",
+        "src/domains/creator/studio-pixel-selection-history.ts:687",
+        "src/domains/creator/StudioHybridDccViewport.tsx:1506-1590 (~13, 3D 뷰포트)"
+      ],
+      "handMaintainedCommandLists": 5,
+      "handMaintainedCommandListDetail": "메뉴 85 / Quick Access 팔레트 18 / Radial quick action 16 / 키맵 34 / 단축키 도움말 37행",
+      "duplicateImplementationExamples": [
+        { "command": "zoom-in", "sites": 7, "kind": "DUP-LOGIC", "evidence": "studio-main-menu-groups.ts:600-608, StudioPage.tsx:23868, StudioPage.tsx:23765, StudioToolBeltContent.tsx:1497, StudioCanvasViewport.tsx:1875/2128/4300 — 동일 식 setZoom((c)=>stepStudioViewZoom(c,1)) 7회 복붙" },
+        { "command": "zoom-out", "sites": 7, "kind": "DUP-LOGIC" },
+        { "command": "pen/eraser 전환", "sites": 8, "kind": "DUP-LOGIC", "note": "부수효과 집합이 4가지로 갈림(속성패널 열기/eyedropper 해제/drawingShortcutStateRef 갱신 유무)" },
+        { "command": "fit-to-screen", "sites": 9, "kind": "SHARED-FN", "note": "단축키 경로만 announceDrawingShortcut 추가" },
+        { "command": "undo", "sites": 8, "kind": "SHARED-FN", "note": "STUDIO_SHORTCUT_ACTIONS의 undo 항목은 dead — 실제로는 StudioPage.tsx:23821 하드코딩" },
+        { "command": "eyedropper", "sites": 4, "kind": "DUP-LOGIC-BUG", "evidence": "StudioPage.tsx:23581-23586(토글) vs StudioLeftToolRail.tsx:787-793(토글 재작성) vs StudioPage.tsx:23117-23119(항상 ON)" },
+        { "command": "delete", "sites": 7, "kind": "DUP-LOGIC", "note": "키보드 경로만 말풍선포인트/픽셀영역/엘리먼트 분기를 가짐 — 컨텍스트 메뉴 Delete와 동작이 다름" },
+        { "command": "brush size", "sites": 8, "kind": "DUP-LOGIC", "note": "클램프 상수가 2개 — studio-brush-library.ts:184 [1,80] vs studio-draw-ux.ts:17 {1,80}" }
+      ],
+      "deadShortcutRegistryEntries": ["undo (studio-app-settings.ts:104)", "redo (:105)", "tool-hand (:85)"],
+      "advertisedButUnboundShortcuts": ["⌘S (studio-main-menu-groups.ts:237 및 Quick Access deck에 표기, 핸들러 부재)"],
+      "shortcutCollisions": [
+        { "chord": "⇧S", "claimants": ["studio-view-controls.ts:698 save-view", "studio-drawing-shortcuts.ts:259 size-lock"], "winner": "view", "result": "size-lock 도달 불가" },
+        { "chord": "Q", "claimants": ["StudioPage.tsx:23732 quick mask", "studio-view-controls.ts:695 grayscale"], "result": "선택 상태에 따라 달라짐; 메뉴(studio-main-menu-groups.ts:703)와 도움말(StudioShortcutsHelp.tsx:96)이 서로 다르게 문서화" }
+      ],
+      "commandPalettes": [
+        { "name": "글로벌 ⌘K", "file": "components/command-palette.tsx:22-72", "items": 10, "note": "라우트 목록만, 에디터 명령 0개. AppShell.tsx:142에서 스튜디오에도 마운트됨" },
+        { "name": "Quick Access ⇧Q", "file": "src/domains/creator/studio-quick-access-integration.ts:64-207", "items": 18, "measuredDeckSlots": 10, "note": "메뉴 85항목에서 파생되지 않은 별도 하드코딩 목록" }
+      ],
+      "voiceCommandSurface": false
+    },
+
+    "progressiveDisclosure": {
+      "budget": "기본 5~9개 속성",
+      "measuredDocumentWideVisibleControls": 83,
+      "measuredDocumentWideInteractive": 170,
+      "measuredRightPanelControlsDefault": 29,
+      "measuredRightPanelInteractiveDefault": 57,
+      "panels": [
+        { "panel": "StudioDrawOptionsBar (하단 드로우 옵션바)", "file": "src/domains/creator/StudioDrawOptionsBar.tsx", "defaultVisibleControls": 13, "advancedSection": true, "advancedEvidence": ":296 state, :1005 토글 버튼, :1122 접힌 섹션", "withinBudget": false },
+        { "panel": "StudioInspectorAside — 속성 탭(이미지 선택 시)", "file": "src/domains/creator/StudioInspectorAside.tsx:1719-3285", "defaultVisibleControls": 33, "advancedSection": false, "note": "탭 게이팅만 존재, 고급/기본 구분 없음. 하단 액션바에만 버튼 15개(:3194-3283)", "withinBudget": false },
+        { "panel": "도구 속성 팔레트(그리기 모드)", "file": "src/domains/creator/StudioInspectorAside.tsx:3484-3811", "defaultVisibleGroups": 13, "defaultVisibleLeafControls": 35, "advancedSection": false, "note": "studio-drawing-palettes.ts:56-62에서 두 팔레트 모두 collapsed:false 기본값", "withinBudget": false },
+        { "panel": "StudioBrushStudio", "file": "src/domains/creator/StudioBrushStudio.tsx", "defaultVisibleControls": 0, "advancedSection": true, "note": "모달+탭. 21 RangeRow + 6 ToggleRow가 카테고리로 분할됨. 기준 충족", "withinBudget": true },
+        { "panel": "StudioImageAdjustmentsPanel", "file": "src/domains/creator/StudioImageAdjustmentsPanel.tsx", "defaultOpenSections": 6, "totalSections": 28, "advancedSection": true, "advancedEvidence": ":575-621 AdjustmentSection", "withinBudget": "섹션 단위 충족, 리프 컨트롤 단위 초과" }
+      ],
+      "panelsWithinBudget": 1,
+      "panelsMeasured": 5,
+      "namingSingleSourceOfTruth": { "exists": true, "scope": "4개 리터치 도구만", "file": "src/domains/creator/studio-retouch-help.ts:1-14" },
+      "budgetEnforcementTest": false
+    },
+
+    "accessibility": {
+      "scope": "캔버스 외 UI, 데스크톱 1440x900 / 모바일 390x844",
+      "desktop": {
+        "visibleInteractive": 98,
+        "keyboardFocusable": 81,
+        "tabindexMinusOne": 12,
+        "unnamedInteractiveElements": 0,
+        "accessibleNameCoverage": 1.0,
+        "touchTargets": { "total": 97, "under24x24": 15, "under44x44": 57, "wcag22_2_5_8_AA_failures": 15 },
+        "under24Samples": ["1페이지 이름·콘티 메모 편집 18x18", "위로 이동 18x18", "아래로 이동 18x18", "맨 위로 이동 14x14", "맨 아래로 이동 13x14", "이 앞에 빈 페이지 삽입 18x18", "이 뒤에 빈 페이지 삽입 18x18", "페이지 복제 18x18", "미러 복제 (좌우 반전) 18x18", "이 페이지 내용 비우기 18x18", "페이지 삭제 18x18"],
+        "contrast": { "textNodesChecked": 52, "wcag_AA_failures": 0, "method": "computed color/background를 canvas 2d fillStyle로 rgb 해석 후 WCAG 상대휘도비 계산(OKLCH 토큰 대응)" },
+        "focusTrap": {
+          "surface": "온로드 '빠른 시작' 다이얼로그 (aria-modal=true)",
+          "trapped": false,
+          "evidence": "Tab 1회에 포커스가 다이얼로그 밖 '크리에이티브 모드' 버튼으로 이동. 26회 Tab 중 다이얼로그 내부 정지 0회.",
+          "severity": "WCAG 2.1 2.4.3 / ARIA aria-modal 계약 위반"
+        }
+      },
+      "mobile": { "visibleInteractive": 64, "insideViewport": 36, "under44x44": 0, "onLoadDialogs": 0, "note": "모바일 타깃 크기는 양호. 온로드 모달도 뜨지 않음." },
+      "tremorProfile": { "exists": false, "evidence": "src/domains/creator 전수 grep 'tremor' 0건" },
+      "screenReaderLandmarks": "미검증(별도 항목)"
+    },
+
+    "helpAndAlias": {
+      "helpMenuItems": 2,
+      "helpMenuFile": "src/domains/creator/studio-main-menu-groups.ts:1091-1117",
+      "f1Binding": false,
+      "helpShortcut": "?",
+      "helpGraph": false,
+      "helpNodeId": false,
+      "shortVideoHelp": false,
+      "toolTooltips": { "exists": true, "entries": 16, "file": "src/domains/creator/studio-tool-hints.ts" },
+      "tutorials": { "exists": true, "count": 32, "file": "src/domains/creator/studio-feature-tutorials.ts" },
+      "unifiedCommandSearch": false,
+      "searchSurfaces": [
+        { "name": "단축키 도움말 검색", "file": "src/domains/creator/StudioShortcutsHelp.tsx:280-296", "corpus": 35 },
+        { "name": "Quick Access 팔레트 검색", "file": "src/domains/creator/studio-quick-access.ts:628-646", "corpus": 18 },
+        { "name": "인스펙터 네비게이터 검색", "file": "src/domains/creator/studio-inspector-layout.ts:263-277", "corpus": 12, "note": "명령 실행이 아니라 탭 이동" },
+        { "name": "튜토리얼 허브 검색", "file": "src/domains/creator/StudioFeatureTutorialHub.tsx:132-143", "corpus": 32 }
+      ],
+      "competitorTerminologyAliasLayer": false,
+      "adHocSynonymLists": 3,
+      "adHocSynonymEvidence": ["StudioShortcutsHelp.tsx:20-21 searchAliases (35행 중 7행만)", "studio-quick-access-integration.ts:74-205 keywords", "studio-inspector-layout.ts:154-220 keywords"],
+      "aliasProbe": [
+        { "term": "Bucket fill / 페인트 버킷", "found": true },
+        { "term": "레이어 마스크", "found": true, "scope": "인스펙터 검색만" },
+        { "term": "선택 범위 (CSP)", "found": false },
+        { "term": "Clipping / 클리핑", "found": false, "note": "기능은 StudioInspectorAside.tsx:2420-2428에 존재하나 어떤 검색 인덱스에도 없음" },
+        { "term": "Sub tool / 서브 도구", "found": false },
+        { "term": "Auto action", "found": false },
+        { "term": "Levels / 레벨", "found": false },
+        { "term": "Curves / 커브", "found": false }
+      ],
+      "aliasHitRate": 0.25,
+      "cspFormatImport": { "clip": "unsupported/bridge-only", "sut": "unsupported/bridge-only", "psd": "supported", "abr": "supported", "ora": "supported", "evidence": "src/domains/creator/studio-interchange-capabilities.ts:1132-1150, :479-503, :1037-1046" },
+      "cspShortcutImport": false,
+      "cspWorkspaceImport": false
+    },
+
+    "errorRecovery": {
+      "safeModeExists": false,
+      "safeModeEvidence": "src apps packages 전수 grep 'safe mode' — 제품 코드 0건. V5 문서 :548,:586,:858 등에만 존재",
+      "paths": [
+        { "path": "메인 2D 캔버스 WebGPU device loss", "userVisible": false, "evidence": "StudioWebGpuCanvas.tsx:76/245/487 → StudioCanvasViewport.tsx:3791 → StudioPage.tsx:12116-12121; failOverGpuAuthorityAfterSurfaceLoss(:12062-12079)로 canvas2d 강등. 토스트/배너 없음", "classification": "internal-silent" },
+        { "path": "WebGPU 필터 런타임 device loss", "userVisible": false, "evidence": "studio-engine-webgpu-filter-runtime.ts:680-682, :1202-1208", "classification": "internal-silent" },
+        { "path": "Hybrid DCC 3D 뷰포트 WebGL context lost", "userVisible": true, "evidence": "StudioHybridDccViewport.tsx:1244-1257 리스너, role=alert 오버레이 :2012-2020", "classification": "user-visible" },
+        { "path": "메인 문서 자동저장 실패/쿼터 초과", "userVisible": false, "evidence": "StudioPage.tsx:9674-9721, 최종 실패는 console.error(:9720)만", "classification": "internal-silent" },
+        { "path": "OPFS 쿼터 감지", "userVisible": false, "evidence": "studio-opfs-filesystem.ts:27,318-319,387-390,485,498 / studio-opfs-recovery-journal.ts:994-995 — 메시지가 UI에 도달하지 않음", "classification": "internal-silent" },
+        { "path": "앱 설정 영속화 불가", "userVisible": true, "evidence": "StudioAppSettingsPanel.tsx:915-931 role=alert + 재시도", "classification": "user-visible-narrow" },
+        { "path": "Hybrid DCC 워크스페이스 session-only 강등", "userVisible": true, "evidence": "StudioPage.tsx:4931-4946,:6196-6204 → StudioHybridDccDialog.tsx:23,:143", "classification": "user-visible-narrow" },
+        { "path": "3D 샷 배치 쿼터 저하", "userVisible": true, "evidence": "studio-bg3d-shot-batch-recovery-store.ts:766-767 → StudioBg3dViewPanel.tsx:832-833", "classification": "user-visible-narrow" },
+        { "path": "탭 종료 경고 (beforeunload)", "userVisible": false, "evidence": "src apps packages 전수 grep 'beforeunload' 0건", "classification": "absent" },
+        { "path": "pagehide 긴급 플러시", "userVisible": false, "evidence": "StudioPage.tsx:13861,:13868-13872", "classification": "internal-only" },
+        { "path": "세션 복구 배너", "userVisible": true, "evidence": "StudioPage.tsx:9809-9840 감지 → StudioCanvasStatusRail.tsx:321-356 '복구하기'/'비우기' + JSON 백업 탈출구(:334)", "classification": "user-visible" },
+        { "path": "명명 체크포인트", "userVisible": true, "evidence": "StudioCheckpointPanel.tsx:84, StudioPage.tsx:37547-37592", "classification": "user-visible" }
+      ],
+      "deadRecoveryModules": [
+        { "file": "src/domains/creator/studio-device-loss-recovery.ts:323", "state": "테스트 외 소비자 0 — healthy/lost/retrying/recovered/permanently-demoted 상태기계(:199-205) 미가동" },
+        { "file": "src/domains/creator/studio-gpu-fabric.ts:221,:256,:316", "state": "테스트 외 소비자 0" },
+        { "file": "src/domains/creator/studio-opfs-recovery-runtime.ts", "state": "importer 0 — cleanupQuota(:93,:467) 미가동" }
+      ],
+      "userVisiblePathCount": 6,
+      "internalSilentPathCount": 4,
+      "absentPathCount": 2
+    },
+
+    "undoTrust": {
+      "undoRedoPresent": true,
+      "historyPanel": true,
+      "destructiveConfirmMechanism": "네이티브 globalThis.confirm()",
+      "confirmSites": ["StudioPage.tsx:22409", ":22454", ":22484", ":25989", ":26324", ":26342", ":26405", ":37569", ":37583", ":39035"],
+      "previewBeforeExecute": false,
+      "transactionalUndoFactory": false,
+      "note": "V5는 파괴적 명령에 preview/transaction/undo 3종을 요구. 현행은 undo + 네이티브 confirm만. CommandDefinition에 preview/undo 필드 자체가 없음(packages/studio-command-registry/src/index.ts:14-23)"
+    },
+
+    "progressDisclosureOfStatus": {
+      "saveStatusVisible": true,
+      "syncStatusVisible": true,
+      "syncStatusEvidence": "상단 우측 '안전하게 동기화됨. 같은 출처 탭끼리 연결되었습니다…' 버튼 (999,59) 44px",
+      "gpuStatusVisible": false,
+      "gpuStatusEvidence": "GPU 강등이 사용자에게 알려지지 않음 — StudioPage.tsx:12116-12121",
+      "conversionStatusVisible": "부분 — 3D 배치/내보내기만",
+      "hiddenFailures": ["메인 캔버스 GPU 강등", "메인 문서 자동저장 실패", "OPFS 쿼터 초과"]
+    }
+  },
+
+  "topGaps": [
+    { "rank": 1, "id": "G-CMD", "title": "CommandRegistry 미배선 — 7개 ID 네임스페이스 · 6개 단축키 리졸버 · 5개 수기 명령 목록", "userImpact": 5, "implCost": 5, "priority": "P0" },
+    { "rank": 2, "id": "G-MENU", "title": "§15.3 17개 메뉴 중 12개 그룹 부재 (Layer/Select/Transform/Canvas/Brush/Vector/Text/Comic/Animation/3D/Collaboration/Window)", "userImpact": 5, "implCost": 3, "priority": "P0" },
+    { "rank": 3, "id": "G-DIST", "title": "포인터 거리 10개 예산 전부 초과 — 최근접 컨트롤 388px, 툴레일 34개 중 19개 뷰포트 밖", "userImpact": 5, "implCost": 3, "priority": "P0" },
+    { "rank": 4, "id": "G-SAFE", "title": "Safe Mode 부재 + 복구 모듈 3종 dead code + GPU/저장 실패 무고지", "userImpact": 4, "implCost": 2, "priority": "P0" },
+    { "rank": 5, "id": "G-DISC", "title": "Progressive disclosure 위반 — 인스펙터 속성 33개 노출, 5개 패널 중 1개만 기준 충족", "userImpact": 4, "implCost": 3, "priority": "P1" },
+    { "rank": 6, "id": "G-A11Y", "title": "온로드 모달 포커스 트랩 부재 + 24x24 미만 타깃 15개", "userImpact": 3, "implCost": 1, "priority": "P1" },
+    { "rank": 7, "id": "G-ALIAS", "title": "경쟁 제품 용어 alias 레이어 부재 — 8개 CSP/PS 용어 중 2개만 검색됨", "userImpact": 4, "implCost": 2, "priority": "P1" },
+    { "rank": 8, "id": "G-WS", "title": "Workspace Profiles 7/12, 장치별 override 없음", "userImpact": 3, "implCost": 3, "priority": "P1" },
+    { "rank": 9, "id": "G-FIRST", "title": "첫 획 앞 2동작 강제 — 온로드 모달 + 비-브러시 기본 도구", "userImpact": 4, "implCost": 1, "priority": "P1" },
+    { "rank": 10, "id": "G-UNDO", "title": "파괴적 명령이 네이티브 confirm() 10곳 — preview/transaction 없음", "userImpact": 3, "implCost": 3, "priority": "P2" }
+  ]
+}

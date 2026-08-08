@@ -144,6 +144,63 @@ describe("StudioQuickStartPanel", () => {
     expect(handlers.onDismiss).toHaveBeenCalledOnce();
   });
 
+  it("honours its aria-modal contract by trapping Tab inside the dialog", () => {
+    // 감사 근거(docs/rewrite/ux-audit-v5.md §2.9): aria-modal="true" 인데 Tab 한 번에 포커스가
+    // 다이얼로그 밖 `크리에이티브 모드` 버튼으로 새어 나갔다(WCAG 2.1 2.4.3 위반).
+    // jsdom은 레이아웃을 계산하지 않아 getClientRects()가 항상 비어 있다. 포커스 가능 판정이
+    // 실제 브라우저와 같아지도록 이 테스트 동안만 가시 사각형을 흉내 낸다.
+    const originalGetClientRects = Element.prototype.getClientRects;
+    Element.prototype.getClientRects = function getClientRects() {
+      return [
+        { bottom: 24, height: 24, left: 0, right: 24, top: 0, width: 24, x: 0, y: 0 },
+      ] as unknown as DOMRectList;
+    };
+
+    const outside = document.createElement("button");
+    outside.textContent = "배경 버튼";
+    document.body.append(outside);
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "처음이라면 이 순서로 시작하세요",
+    });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+
+    outside.focus();
+    // focusin 되돌리기: 다이얼로그 밖으로 옮겨간 포커스는 다시 안으로 끌려온다.
+    fireEvent.focusIn(outside);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    // Tab/⇧Tab은 다이얼로그 안에서 순환하고 배경으로 넘어가지 않는다.
+    const focusables = [...dialog.querySelectorAll<HTMLElement>("button:not([disabled])")];
+    const first = focusables[0];
+    const last = focusables.at(-1);
+    expect(focusables.length).toBeGreaterThan(1);
+
+    last?.focus();
+    // fireEvent 반환 false = preventDefault 됨 = 네이티브 탭 이동이 일어나지 않음
+    expect(fireEvent.keyDown(document, { key: "Tab" })).toBe(false);
+    expect(document.activeElement).toBe(first);
+
+    expect(fireEvent.keyDown(document, { key: "Tab", shiftKey: true })).toBe(false);
+    expect(document.activeElement).toBe(last);
+
+    outside.remove();
+    Element.prototype.getClientRects = originalGetClientRects;
+  });
+
+  it("keeps the scrim clickable while the modal isolator runs", () => {
+    const handlers = createHandlers();
+    render(<StudioQuickStartPanel {...handlers} />);
+
+    const backdrop = document.querySelector<HTMLElement>(
+      '[data-studio-quickstart-backdrop="true"]',
+    );
+    expect(backdrop?.getAttribute("data-studio-modal-backdrop")).toBe("true");
+    expect(backdrop?.hasAttribute("inert")).toBe(false);
+  });
+
   it("shows the current shortcut remap and uses 미지정 for an empty binding", () => {
     const handlers = createHandlers();
     render(

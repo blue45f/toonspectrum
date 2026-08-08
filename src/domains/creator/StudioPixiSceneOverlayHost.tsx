@@ -4,9 +4,22 @@
  * Mounts a dedicated transparent, pointer-inactive Pixi canvas above the Konva
  * stage. Syncs document selection bounds into Pixi; never owns brush pixels or
  * hit-test authority (pointer-events: none).
+ *
+ * Surface economics (measured, see docs/perf/canvas-findings.md §7-1): the Pixi
+ * canvas is sized to the *stage*, so at 500% zoom it is a 4620x6930 WebGL
+ * framebuffer — one quarter of the editor's whole raster budget. Wheel-zoom
+ * settle time is linear in total canvas backing-store area, so an overlay that
+ * has nothing to present must not hold that surface. Two rules follow:
+ *
+ *   1. The renderer is only created once there is at least one selectable
+ *      overlay to draw. With an empty selection the overlay renders nothing, so
+ *      not allocating it is pixel-identical and frees the framebuffer.
+ *   2. Stage geometry changes resize the live renderer; they must never destroy
+ *      and rebuild it. Recreating tore down a WebGL context and re-ran the lazy
+ *      pixi.js import on every zoom notch and every panel resize.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import {
   buildStudioPixiSelectableOverlaysForSelection,
@@ -18,7 +31,7 @@ import {
   createStudioPixiSceneProvider,
 } from "./studio-pixi-scene-provider";
 
-import type { StudioSceneProvider } from "./studio-scene-provider";
+import type { StudioSceneProvider, StudioSceneSelectableOverlay  } from "./studio-scene-provider";
 
 export interface StudioPixiSceneOverlayHostProps {
   readonly enabled?: boolean;
@@ -44,9 +57,25 @@ export function StudioPixiSceneOverlayHost({
   const trackedIdsRef = useRef<string[]>([]);
   const generationRef = useRef(0);
 
-  // Create / destroy provider for always-on lifecycle.
+  const overlays = useMemo(
+    () => buildStudioPixiSelectableOverlaysForSelection(elements, selectedIds),
+    [elements, selectedIds],
+  );
+  /** Nothing selected means nothing is drawn; the surface is pure cost. */
+  const presentable = overlays.length > 0;
+
+  // Geometry is read through refs inside the lifecycle effect so a stage resize
+  // never re-runs it. Resizing is the separate effect below.
+  const geometryRef = useRef({ width, height, dpr });
+  geometryRef.current = { width, height, dpr };
+  const overlaysRef = useRef<readonly StudioSceneSelectableOverlay[]>(overlays);
+  overlaysRef.current = overlays;
+
+  // Create / destroy provider for the presentable lifecycle.
   useEffect(() => {
-    if (!enabled || !mountParent || width <= 0 || height <= 0) return;
+    if (!enabled || !mountParent || !presentable) return;
+    const initial = geometryRef.current;
+    if (initial.width <= 0 || initial.height <= 0) return;
 
     let cancelled = false;
     const generation = generationRef.current + 1;
@@ -55,9 +84,9 @@ export function StudioPixiSceneOverlayHost({
     void (async () => {
       try {
         const provider = await createStudioPixiSceneProvider({
-          width,
-          height,
-          dpr: Math.max(1, Math.min(3, dpr)),
+          width: initial.width,
+          height: initial.height,
+          dpr: Math.max(1, Math.min(3, initial.dpr)),
           ownerDocument: mountParent.ownerDocument,
         });
         if (cancelled || generation !== generationRef.current) {
@@ -68,6 +97,19 @@ export function StudioPixiSceneOverlayHost({
         canvas.style.zIndex = "18";
         mountParent.appendChild(canvas);
         providerRef.current = provider;
+        // Creation is async, so the selection that asked for this surface has
+        // already been through the sync effect below. Seed it here or the first
+        // selection after a cold start would present an empty overlay.
+        const current = geometryRef.current;
+        if (current.width !== initial.width || current.height !== initial.height) {
+          provider.resize({
+            width: current.width,
+            height: current.height,
+            dpr: Math.max(1, Math.min(3, current.dpr)),
+          });
+        }
+        for (const overlay of overlaysRef.current) provider.upsertSelectableOverlay(overlay);
+        trackedIdsRef.current = overlaysRef.current.map((overlay) => overlay.documentId);
         provider.render();
       } catch {
         // Headless / no GPU: leave Konva overlays as sole selection chrome.
@@ -89,17 +131,13 @@ export function StudioPixiSceneOverlayHost({
         }
       }
     };
-  }, [enabled, mountParent, width, height, dpr]);
+  }, [enabled, mountParent, presentable]);
 
   // Sync selection overlays every selection/layout change.
   useEffect(() => {
     const provider = providerRef.current;
     if (!provider || provider.destroyed) return;
 
-    const overlays = buildStudioPixiSelectableOverlaysForSelection(
-      elements,
-      selectedIds,
-    );
     const plan = planStudioPixiOverlaySync(trackedIdsRef.current, overlays);
     for (const id of plan.removeIds) {
       provider.removeSelectableOverlay(id);
@@ -109,7 +147,7 @@ export function StudioPixiSceneOverlayHost({
     }
     trackedIdsRef.current = overlays.map((overlay) => overlay.documentId);
     provider.render();
-  }, [elements, selectedIds]);
+  }, [overlays]);
 
   // Resize when stage metrics change without remounting provider when possible.
   useEffect(() => {

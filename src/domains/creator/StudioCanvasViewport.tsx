@@ -14,7 +14,11 @@ import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
 import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "./studio-bubble-merge";
 import { isStudioBrushCursorMode, studioCanvasCursorClassName, studioCanvasViewportCursorClassName } from "./studio-canvas-cursor";
-import { recordStudioRenderProfile, studioElementIdOf } from "./studio-canvas-shared-runtime";
+import {
+  recordStudioHotPathRender,
+  recordStudioRenderProfile,
+  studioElementIdOf,
+} from "./studio-canvas-shared-runtime";
 import { StudioHudPill, StudioStatusBar } from "./studio-chrome-ui";
 import { type CropRect } from "./studio-crop";
 import { type DialogueReplacePlan } from "./studio-dialogue-batch";
@@ -311,7 +315,8 @@ export interface StudioCanvasViewportHandlers {
   ) => boolean;
   cancelCanvasSelectionResize: () => void;
   commitCanvasSelectionResize: (
-    targetBounds: StudioGroupUniformResizeBounds
+    targetBounds: StudioGroupUniformResizeBounds,
+    rotationDeg: number
   ) => void;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
@@ -1439,6 +1444,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const editingFallbackToModal = !!editingTarget && (
     canvasFlipH || canvasRotation !== 0 || editingVertical
   );
+  // 핫패스 탈React 계약의 런타임 계측점 — StudioPage 와 같은 규약(의존성 없는 effect 이므로
+  // 실제 렌더된 커밋만 센다). 하네스가 싱크를 심지 않으면 no-op 이다.
+  useEffect(() => {
+    recordStudioHotPathRender("studio:canvas");
+  });
   // 보기 변환은 문서 데이터가 아니다. 저장·내보내기·타임랩스 캡처 프레임에서는
   // Stage를 정규 좌표계로 되돌려 회전/반전이 결과 픽셀에 굽히지 않게 한다.
   const suppressViewTransform = isExporting || saving || timelapseCapturing;
@@ -3176,6 +3186,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   mobile={isMobile}
                   coarse={hasCoarsePointer}
                   enabled={groupResizeEnabled}
+                  // One stroke can absorb rotation and independent width/height exactly, so it
+                  // gets the full handle set. A multi-selection stays on uniform corners.
+                  freeTransform={singleDrawFreeScale}
+                  // Group drags already shift the proxy through translateGroupPreview; a lone
+                  // stroke has no such path, so the proxy follows the wrapper's transform itself.
+                  mirrorDragElementId={
+                    singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
+                  }
                   onBegin={beginCanvasSelectionResize}
                   onCommit={commitCanvasSelectionResize}
                   onCancel={cancelCanvasSelectionResize}

@@ -689,11 +689,29 @@ describe("StudioKonvaImageNode async identity", () => {
 
   it("falls back to the worker lane when the GPU chain declines the request", async () => {
     gpuHarness.eligible = true;
-    render(node(imageEl({ brightness: 0.2 })));
+    // Above the measured GPU/CPU crossover (~1140² for a one-step chain), so
+    // the size-aware lane order still puts the GPU lane at the head — that is
+    // the precondition for exercising its decline→worker fallback at all.
+    render(node(imageEl({ brightness: 0.2, width: 1_600, height: 1_600 })));
     await load(imageHarness.assigned[0]!);
     await flushWorkerDebounce();
 
     expect(gpuHarness.apply).toHaveBeenCalledTimes(1);
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+  });
+
+  it("skips the GPU lane below the crossover even when the chain is eligible", async () => {
+    gpuHarness.eligible = true;
+    // 20.4×10.4: the GPU lane's ~2.4 ms submit+readback floor dwarfs the work
+    // itself, so the cost model demotes it and the worker lane runs directly.
+    render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(gpuHarness.apply).not.toHaveBeenCalled();
     expect(workerHarness.runs).toHaveLength(1);
 
     await act(async () => resolveRun(workerHarness.runs[0]!));
