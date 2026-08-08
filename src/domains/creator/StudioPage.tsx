@@ -2447,11 +2447,16 @@ function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
   });
 }
 
-// 스튜디오 전용 구글폰트 7종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
-// 전역 폰트(Space Grotesk·Nanum Myeongjo)만 남기고, 이 7종은 스튜디오 마운트 시에만 주입한다.
+// 스튜디오 전용 구글폰트 8종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
+// 전역 폰트 Space Grotesk 만 남기고, 이 8종은 스튜디오 마운트 시에만 주입한다.
+// Nanum Myeongjo(브랜드킷 "명조")도 여기 속한다. index.html 에 있을 땐 전 라우트가 184블록
+// 25,604 B(gzip)를 렌더 차단 경로에서 받았는데, 정작 그 글꼴이 필요한 건 캔버스에서 명조를 고른
+// 스튜디오 사용자뿐이다. 나머지 BRAND_KIT_FONTS 와 같은 <link> 에 둬야 아래 idle 프리로드 타이밍과
+// document.fonts "loadingdone" 재도색 보정이 8종에 똑같이 걸린다(Konva 캔버스 텍스트는 DOM 과 달리
+// 폰트 스왑을 스스로 감지하지 못한다). 웹 크롬 쪽 소비자는 src/app/serif-webfont.ts 가 담당한다.
 const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
 const STUDIO_FONTS_CSS2_URL =
-  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
+  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
 
 // 부착된 말풍선(tailAnchorId/tailAnchorPoint)의 꼬리 방향/비율/길이를 매 커밋마다 다시
 // 계산한다. commit()/commitCoalesced() 가 pagesHistory 에 넣기 직전(+ masterEditMode 분기

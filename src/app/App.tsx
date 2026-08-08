@@ -7,6 +7,7 @@ import { apiPath } from "../infrastructure/api";
 
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
+import { ensureSerifWebFontForRoute } from "./serif-webfont";
 
 import { FloatingControls } from "@/components/FloatingControls";
 import { SiteHeader } from "@/components/site-header";
@@ -140,6 +141,21 @@ function StudioRouteImmersiveBridge() {
   return null;
 }
 
+/**
+ * --font-serif(Nanum Myeongjo) 소유자 — 웹 크롬 경로에서만 스타일시트를 주입한다.
+ * 최초 진입은 main.tsx 가 렌더 전에 처리하므로, 여기는 /studio 에서 웹 라우트로 넘어오는
+ * SPA 전환을 덮는 몫이다(멱등이라 겹쳐 불려도 <link>는 하나).
+ */
+function SerifWebFontBridge() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    ensureSerifWebFontForRoute(pathname);
+  }, [pathname]);
+
+  return null;
+}
+
 // 웹 앱 — 공유 AppShell 을 BrowserRouter(실 URL/history) 안에서 마운트하고 웹 전용 크롬을 주입한다.
 export default function App() {
   const [compatResult, setCompatResult] = useState<BrowserCompatibilityResult | null>(null);
@@ -166,6 +182,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <StudioRouteImmersiveBridge />
+      <SerifWebFontBridge />
       <AppShell
         header={studioImmersive ? null : <SiteHeader />}
         footer={studioImmersive ? null : <DeferredFooter />}

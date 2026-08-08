@@ -98,10 +98,19 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Pretendard(주 한국어 UI 폰트)는 jsDelivr에서 옴 — 렌더 임계 경로라 연결을 미리 warm -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <!-- 임계 경로에는 전역 폰트 2종만 — Space Grotesk(--font-display)·Nanum Myeongjo(--font-serif).
-         스튜디오 전용 7종(Jua·Black Han Sans·Gaegu 등)은 StudioPage 마운트 시 동적 주입한다. -->
+    <!-- 임계 경로에 남는 Google Font 는 Space Grotesk(--font-display) 하나뿐이다. globals.css 의
+         numeral/eyebrow 유틸이 전 라우트에서 쓰므로 전역이어야 하는데, 라틴 전용이라 스타일시트가
+         12블록 543 B(gzip 실측)에 그친다.
+         Nanum Myeongjo(--font-serif)는 여기서 뺐다 — 한글이 유니코드 범위별로 쪼개져 혼자
+         184블록 25,604 B 로 기존 <link> 25,974 B 의 98.6 % 였는데, /studio 부팅 화면에는
+         font-serif 를 쓰는 DOM 이 한 곳도 없다. 두 실사용처로 각각 넘겼다:
+         웹 크롬(랜딩·탐색·운세·리뷰·디자인)은 src/app/serif-webfont.ts 가 렌더 직전에 주입하고,
+         스튜디오는 브랜드킷 "명조"(BRAND_KIT_FONTS)를 위해 나머지 8종과 같은 idle 프리로드
+         (StudioPage.tsx STUDIO_FONTS_CSS2_URL)에 합류시켰다 — Konva 캔버스 텍스트는 폰트 스왑을
+         스스로 감지하지 못해 그 레인의 재도색 훅과 한 벌로 있어야 한다.
+         스튜디오 전용 8종(Jua·Black Han Sans·Gaegu·명조 등)은 StudioPage 마운트 시 동적 주입한다. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <!-- dynamic-subset: unicode-range 로 쪼갠 서브셋만 받는다. 통짜 PretendardVariable.woff2 는

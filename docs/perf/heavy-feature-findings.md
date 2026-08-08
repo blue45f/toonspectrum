@@ -182,7 +182,8 @@ gzip 기준 상위 자산: `opencascade.wasm` 13.7 MB, `vision_wasm_internal` 3.
 **woff2 2.06 MB (45.6 %)**, js 2.18 MB, css 54 KB,
 json 46 KB, png 42 KB. 단일 최대 요청은
 `cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/…/PretendardVariable.woff2` **2,058,664 B**
-— StudioPage 청크(566 KB)의 3.6배다. 여기에 Google Fonts `/css2` 102 KB가 더해진다.
+— StudioPage 청크(566 KB)의 3.6배다. Google Fonts는 전역 head 링크(명조+Space Grotesk)가
+약 26 KB이고, 이와 별개로 StudioPage가 idle에 주입하는 7종 `/css2`가 약 102 KB다.
 `index.html:100` 주석은 이 폰트를 "렌더 임계 경로"로 명시하고 preconnect까지 걸어 둔다.
 
 **개선안.**
@@ -190,9 +191,58 @@ json 46 KB, png 42 KB. 단일 최대 요청은
    같은 jsDelivr 경로에 존재함을 확인했다(HTTP 200). `unicode-range` 서브셋으로 쪼개져 실제 사용 글자
    범위만 받으므로 한국어 UI 기준 통상 수십 KB다. **부팅에서 약 2 MB가 즉시 사라진다.**
    CSP `font-src`에 `cdn.jsdelivr.net`이 이미 있어 정책 변경도 필요 없다.
-2. Google Fonts(`Nanum Myeongjo`, `Space Grotesk`)는 UI 본문에 쓰이지 않는다면 셀프호스팅하거나
-   실제 사용 화면에서만 지연 로드한다. `/css2` 102 KB + 뒤따르는 gstatic 폰트 왕복이 사라진다.
+2. Google Fonts(`Nanum Myeongjo`, `Space Grotesk`)는 UI 본문에 쓰이지 않는 경로에서 빼고
+   실제 사용 화면에서 지연 로드한다. 전역 head 약 26 KB와 Studio idle 약 102 KB를 서로 구분해
+   최적화해야 하며, 렌더된 글자 범위에 따라 뒤따르는 gstatic 폰트 요청도 달라진다.
 3. 두 CDN 모두 서드파티다. 부팅 임계 경로에서 서드파티 왕복을 없애면 지연의 분산도 함께 줄어든다.
+
+#### 4-2 처리 결과 (2026-08-09 갱신)
+
+**1번은 반영됐다**(`16f15f37`). 같은 빌드에서 스타일시트만 바꾼 A/B: **4,482,765 B/268req →
+2,863,241 B/284req**(−1.62 MB), woff2 2,058,718 B(1개) → 451,469 B(17개), CLS 0.04091 동일.
+
+2026-08-09 현재 프로덕션 재검증에서는 기존 하네스의 quiet-window 기준 **2,645,744 B**, 4초 idle까지
+포함한 상세 인구조사 기준 **2,672,009 B/273req**였다. 후자는 woff2 **451,498 B/17개**가 전부
+`PretendardVariable.subset.*.woff2`였고 통짜 `PretendardVariable.woff2` 요청은 0개였다.
+
+**2번을 실측하다가 위 `/css2` 102 KB의 기존 귀속이 틀렸다는 걸 확인했다.** 실제 전송 바이트(Chrome,
+CDP `encodedDataLength`, 오리진 협상 압축)는 이렇다:
+
+| Google Fonts 요청 | 전송 | @font-face |
+| --- | ---: | ---: |
+| `index.html` head 링크(명조+Space Grotesk) | 25,974 B | 196 |
+| ├ Nanum Myeongjo 단독 | 25,604 B (98.6 %) | 184 |
+| └ Space Grotesk 단독 | 543 B | 12 |
+| **StudioPage idle 프리로드(스튜디오 전용 7종)** | **102,088 B** | 724 |
+
+즉 **102 KB 는 head 링크가 아니라 StudioPage.tsx 가 `requestIdleCallback` 으로 주입하는
+스튜디오 전용 글꼴 스타일시트**다. head 링크는 그 1/4이다.
+
+**한 일.** Nanum Myeongjo 를 렌더 차단 경로에서 뺐다 — `/studio` 부팅 화면에는 `font-serif` 를
+쓰는 DOM 이 한 곳도 없는데(실측: `.font-serif` 노드 0개) 전 라우트가 184블록을 렌더 차단으로 받고
+있었다. 소비자 둘에게 각각 넘겼다: 웹 크롬은 `src/app/serif-webfont.ts`(렌더 직전 주입),
+스튜디오는 브랜드킷 "명조" 를 위해 나머지 8종과 같은 idle 링크에 합류.
+
+| | head 링크 | 스튜디오 idle 링크 | 렌더 차단 CSS |
+| --- | ---: | ---: | ---: |
+| 이전 | 25,974 B | 102,088 B | 25,974 B |
+| 이후 | 543 B | 127,951 B | **543 B** |
+
+**바이트로는 `/studio` 가 사실상 본전이다(≈ +432 B).** head 에서 뺀 25,431 B 가 스튜디오 idle
+링크로 25,863 B 만큼 되돌아오기 때문이다. 얻은 것은 **렌더 차단 서드파티 CSS 가 25,974 → 543 B
+(48배, 196 → 12 @font-face)로 줄어든 것**이고, 이건 `/studio` 뿐 아니라 전 라우트에 적용된다.
+스튜디오가 아닌 라우트는 명조를 앱 스크립트와 병렬로 받게 되어 총량은 +216 B/+1요청이었다
+(랜딩 실측 422,801 → 423,017 B). woff2 전송량은 어느 쪽도 바뀌지 않았다.
+
+**남은 것 — idle 프리로드 102 KB 는 CSS 만 받고 폰트 파일은 한 개도 받지 않는다.** 위 표의
+102,088 B / 127,951 B 는 전부 **요청 1개, CSS 뿐**이다. Google Fonts 는 유니코드 범위별로
+`@font-face` 를 쪼개 두고 브라우저는 *렌더된 DOM 텍스트가 실제로 쓰는 범위*만 내려받는데,
+캔버스(Konva)는 DOM 텍스트가 아니라서 그 휴리스틱을 켜지 못한다 — `StudioBrandKitPanel.tsx:44`
+주석이 같은 이유로 `document.fonts.load()` 를 한글 샘플로 명시 호출한다. 그래서 이 프리로드의
+의도("사용자가 텍스트를 추가할 즈음엔 이미 도착해 있게")는 절반만 이뤄진다: 스타일시트는 와 있고
+폰트 파일은 첫 사용 때 받는다. 8종에 대해 `document.fonts.load()` 를 함께 호출하거나, 반대로
+CSS 자체를 첫 사용까지 미루는 쪽이 일관적이다. **품질(캔버스 깜빡임) 판단이 걸려 있어 이번 변경에는
+포함하지 않았다.**
 
 ### 4-3. VRM 포저 첫 진입 7.83 MB — 기본 아바타 한 개가 7.29 MB (P1)
 
@@ -267,7 +317,7 @@ long task 110 ms도 이 구간에 있다.
 | 순위 | 항목 | 기대 효과 | 난이도 |
 | --- | --- | --- | --- |
 | ~~1~~ | ~~툴벨트 전용 7기능 진입점 복구 (§4-1)~~ — **완료 2026-08-09** | 기능 7종이 다시 사용 가능 | 낮음 |
-| 2 | Pretendard dynamic-subset 전환 (§4-2) | 콜드 부팅 −2 MB (−45 %) | 매우 낮음 |
+| ~~2~~ | ~~Pretendard dynamic-subset 전환 (§4-2)~~ — **완료 2026-08-08** | 콜드 부팅 −1.62 MB 실측 | 매우 낮음 |
 | 3 | 필터 오픈 경로에서 SQLite wasm 분리 (§4-4) | 필터 오픈 −928 KB (−90 %) | 낮음 |
 | 4 | VRM 기본 아바타 경량화 + 88모델 외부화 (§4-3) | 포저 첫 진입 −6 MB, 배포 −470 MB | 중간 |
 | 5 | 규격 슬라이스 250 ms 대기 재검토 (§2) | 다장 회차 내보내기 체감 단축 | 낮음 |

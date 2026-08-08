@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import { installStaticCatalog } from "../catalog-static";
 
 import App from "./App";
+import { ensureSerifWebFontForRoute } from "./serif-webfont";
 import "../styles/globals.css";
 
 const STUDIO_BG3D_MAGIC_PRODUCTION_PROOF_QUERY =
@@ -29,6 +30,10 @@ function loadStudioBg3dMagicProductionProofFromExplicitDiagnosticQuery(): void {
 // VITE_CATALOG_SOURCE=static 일 때만 정적 파일/클라이언트 계산 라우팅을 설치한다.
 installStaticCatalog();
 loadStudioBg3dMagicProductionProofFromExplicitDiagnosticQuery();
+// --font-serif(Nanum Myeongjo)는 index.html 렌더 차단 경로에서 뺐다. 첫 진입 경로가 웹 크롬이면
+// 여기서 — 렌더가 시작되기 전에 — 요청을 출발시켜 랜딩의 폰트 스왑 창이 넓어지지 않게 한다.
+// 이후 SPA 라우팅은 App.tsx 의 SerifWebFontBridge 가 이어받는다(멱등).
+ensureSerifWebFontForRoute(globalThis.location.pathname);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

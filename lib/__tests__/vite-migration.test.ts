@@ -87,15 +87,33 @@ describe("vite migration", () => {
       "Gaegu",
       "Gamja+Flower",
       "Jua",
+      "Nanum+Myeongjo",
       "Nanum+Pen+Script",
       "Yeon+Sung",
     ];
 
+    // Space Grotesk alone earns the render-blocking slot: globals.css numeral/eyebrow use it on
+    // every route and, being latin-only, its stylesheet is 12 @font-face / 543 B gzip.
     expect(html).toContain("family=Space+Grotesk");
-    expect(html).toContain("family=Nanum+Myeongjo");
     for (const family of studioOnlyFamilies) {
       expect(html).not.toContain(`family=${family}`);
       expect(studio).toContain(`family=${family}`);
     }
+  });
+
+  it("hands the serif web font to the web chrome instead of the render-blocking stylesheet", () => {
+    // Nanum Myeongjo is 184 @font-face / 25,604 B gzip on its own — 98.6% of what the old head
+    // link cost — and no /studio boot DOM uses font-serif. Both consumers must own it explicitly:
+    // the web chrome lazily, the studio through its idle preload (asserted above).
+    const serif = readFileSync(join(process.cwd(), "src/app/serif-webfont.ts"), "utf8");
+    const main = readFileSync(join(process.cwd(), "src/app/main.tsx"), "utf8");
+    const app = readFileSync(join(process.cwd(), "src/app/App.tsx"), "utf8");
+
+    expect(serif).toContain("family=Nanum+Myeongjo:wght@400;700");
+    expect(serif).toContain("display=swap");
+    // The route rule lives in one place so /studio can never pick this link up.
+    expect(serif).toContain("isImmersiveMobileRoute");
+    expect(main).toContain("ensureSerifWebFontForRoute");
+    expect(app).toContain("ensureSerifWebFontForRoute");
   });
 });
