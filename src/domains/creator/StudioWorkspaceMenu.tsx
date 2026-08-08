@@ -10,6 +10,8 @@ import {
   Contrast,
   Droplets,
   Eraser,
+  Hand,
+  Keyboard,
   LayoutPanelTop,
   LockKeyhole,
   Maximize2,
@@ -60,6 +62,7 @@ import {
 import {
   STUDIO_DEFAULT_WORKSPACES,
   STUDIO_PRO_COMIC_PALETTE_PRIORITY,
+  STUDIO_WORKSPACE_DEVICE_KINDS,
   STUDIO_WORKSPACE_MAX_CUSTOM,
   STUDIO_WORKSPACE_NAME_MAX_LENGTH,
   deleteStudioWorkspace,
@@ -70,11 +73,14 @@ import {
   reloadStudioWorkspace,
   renameStudioWorkspace,
   resolveStudioWorkspace,
+  resolveStudioWorkspaceDeviceLayout,
   saveStudioWorkspace,
+  setStudioWorkspaceDeviceOverride,
   switchStudioWorkspace,
   updateStudioWorkspaceLiveLayout,
   updateStudioWorkspacePreferences,
   type StudioDefaultWorkspaceId,
+  type StudioWorkspaceDeviceKind,
   type StudioWorkspaceId,
   type StudioWorkspaceLayout,
   type StudioWorkspaceMoveDirection,
@@ -92,8 +98,22 @@ export interface StudioWorkspaceMenuProps {
   onInitialOpenReady?: (ready: true) => void;
   /** Persisted workspace catalog and preferences. */
   state: StudioWorkspaceState;
-  /** Authoritative layout currently rendered by StudioPage. */
+  /**
+   * Authoritative layout currently rendered by StudioPage, in authored form.
+   *
+   * StudioPage folds device adaptation back into `deviceOverrides` before handing it over, so this
+   * is safe to store into the catalog directly — it is never one device's geometry in disguise.
+   */
   liveLayout: StudioWorkspaceLayout;
+  /**
+   * Samples which input surface the studio is being drawn on right now, or `null` for no adaptation.
+   *
+   * A function rather than a value so the manager reads it once as it opens. The answer can change
+   * mid-session — the first time an artist puts a pen down — and a device editor that re-labelled
+   * itself while someone was reading it would be worse than one that answers for the moment it was
+   * opened.
+   */
+  resolveDeviceKind?: () => StudioWorkspaceDeviceKind | null;
   /** Result of loading or most recently persisting this owner's workspace state. */
   persistence: StudioWorkspacePersistenceSnapshot;
   /** Persists catalog, active selection, and device preferences. */
@@ -125,6 +145,22 @@ const DEFAULT_WORKSPACE_ICONS: Record<StudioDefaultWorkspaceId, LucideIcon> = {
   "pen-display": Tablet,
   "mobile-draw": Smartphone,
   "photo-edit": SunMedium,
+};
+
+const DEVICE_KIND_LABELS: Record<StudioWorkspaceDeviceKind, string> = {
+  "pen-display": "펜 디스플레이",
+  mobile: "모바일",
+  keyboard: "키보드",
+  mouse: "마우스",
+  touch: "터치",
+};
+
+const DEVICE_KIND_ICONS: Record<StudioWorkspaceDeviceKind, LucideIcon> = {
+  "pen-display": Tablet,
+  mobile: Smartphone,
+  keyboard: Keyboard,
+  mouse: MousePointer2,
+  touch: Hand,
 };
 
 const INSPECTOR_PRIMARY_LABELS: Record<
@@ -430,6 +466,7 @@ export function StudioWorkspaceMenu({
   onInitialOpenReady,
   state,
   liveLayout,
+  resolveDeviceKind,
   persistence,
   onStateChange,
   onApplyLayout,
@@ -476,10 +513,22 @@ export function StudioWorkspaceMenu({
     syncedState,
     syncedState.activeWorkspaceId
   );
-  const dirty = isStudioWorkspaceDirty(syncedState);
   const activeIsCustom = syncedState.customWorkspaces.some(
     (workspace) => workspace.id === syncedState.activeWorkspaceId
   );
+  // Sampled once when the dialog mounts — the manager is lazily mounted on the artist's click, so
+  // "at mount" is "when they opened it", and a stable answer keeps the editor below from changing
+  // which device it is describing while someone is reading it.
+  const [deviceKind] = useState<StudioWorkspaceDeviceKind | null>(
+    () => resolveDeviceKind?.() ?? null
+  );
+  // The surface being edited defaults to the one under the artist's hands, which is the only one
+  // they can judge by looking. The other four stay reachable for setting up a device in advance.
+  const [overrideDevice, setOverrideDevice] = useState<StudioWorkspaceDeviceKind>(
+    () => deviceKind ?? "pen-display"
+  );
+  const activeDeviceOverride = activeWorkspace?.layout.deviceOverrides[overrideDevice];
+  const dirty = isStudioWorkspaceDirty(syncedState);
   const atCustomLimit =
     syncedState.customWorkspaces.length >= STUDIO_WORKSPACE_MAX_CUSTOM;
   const showSearch =
@@ -1028,6 +1077,40 @@ export function StudioWorkspaceMenu({
     } catch (actionError) {
       setError(errorText(actionError));
     }
+  }
+
+  /**
+   * Rewrites the active workspace's own layout, then re-applies it through StudioPage.
+   *
+   * The re-apply is what makes an override take effect now instead of at the next switch: it runs
+   * the layout back through the device resolver, so editing the surface you are sitting at shows
+   * its result immediately.
+   */
+  function commitActiveWorkspaceLayout(layout: StudioWorkspaceLayout, message: string) {
+    try {
+      const next = overwriteStudioWorkspace(
+        syncedState,
+        syncedState.activeWorkspaceId,
+        layout
+      );
+      const result = commitState(next);
+      onApplyLayout(next.liveLayout);
+      announceCommitted(message, result);
+      setError(null);
+    } catch (actionError) {
+      setError(errorText(actionError));
+    }
+  }
+
+  function changeDeviceOverride(
+    override: Parameters<typeof setStudioWorkspaceDeviceOverride>[2],
+    message: string
+  ) {
+    if (!activeWorkspace) return;
+    commitActiveWorkspaceLayout(
+      setStudioWorkspaceDeviceOverride(activeWorkspace.layout, overrideDevice, override),
+      message
+    );
   }
 
   return (
@@ -1918,6 +2001,150 @@ export function StudioWorkspaceMenu({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                <div className="border-t border-line px-3 py-2">
+                  <p className="text-xs font-bold text-fg-2">기기별 배치</p>
+                  <p className="mt-0.5 text-[0.6875rem] text-fg-3">
+                    {activeIsCustom
+                      ? "저장된 배치는 그대로 두고, 기기마다 도크만 다르게 세웁니다."
+                      : "기본 작업공간은 고칠 수 없어요. 복사본을 저장한 뒤 조정하세요."}
+                  </p>
+                  <div
+                    role="group"
+                    aria-label="조정할 기기"
+                    className="mt-2 grid min-w-0 grid-cols-5 gap-1"
+                  >
+                    {STUDIO_WORKSPACE_DEVICE_KINDS.map((device) => {
+                      const Icon = DEVICE_KIND_ICONS[device];
+                      const selected = device === overrideDevice;
+                      const overridden = Boolean(
+                        activeWorkspace?.layout.deviceOverrides[device]
+                      );
+                      return (
+                        <button
+                          key={device}
+                          type="button"
+                          aria-pressed={selected}
+                          aria-label={[
+                            DEVICE_KIND_LABELS[device],
+                            device === deviceKind ? "지금 이 기기" : null,
+                            overridden ? "따로 조정됨" : "저장된 배치를 따름",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                          onClick={() => setOverrideDevice(device)}
+                          className={cn(
+                            "relative inline-flex min-h-11 min-w-0 items-center justify-center rounded-lg border transition-colors pointer-coarse:min-h-11",
+                            selected
+                              ? "border-accent bg-accent-soft text-accent"
+                              : "border-line bg-panel text-fg-2 hover:bg-raised",
+                            focusClass
+                          )}
+                        >
+                          <Icon size={14} aria-hidden />
+                          {overridden ? (
+                            <span
+                              aria-hidden
+                              className="absolute right-1 top-1 size-1.5 rounded-full bg-accent"
+                            />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[0.6875rem] text-fg-3">
+                    {[
+                      DEVICE_KIND_LABELS[overrideDevice],
+                      overrideDevice === deviceKind ? "지금 이 기기" : null,
+                      activeDeviceOverride ? "따로 조정됨" : "저장된 배치를 따름",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+
+                  <div
+                    role="group"
+                    aria-label={`${DEVICE_KIND_LABELS[overrideDevice]} 주요 도구 위치`}
+                    className="mt-2 grid min-w-0 grid-cols-3 gap-1.5"
+                  >
+                    {([null, "left", "right"] as const).map((side) => {
+                      const selected = (activeDeviceOverride?.controlSide ?? null) === side;
+                      const label =
+                        side === null ? "기본" : side === "left" ? "왼쪽" : "오른쪽";
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          disabled={!activeIsCustom}
+                          aria-pressed={selected}
+                          aria-label={
+                            side === null
+                              ? `${DEVICE_KIND_LABELS[overrideDevice]}는 기본 손 위치를 따름`
+                              : `${DEVICE_KIND_LABELS[overrideDevice]} 주요 도구 ${label} 배치`
+                          }
+                          onClick={() =>
+                            changeDeviceOverride(
+                              { controlSide: side },
+                              `${DEVICE_KIND_LABELS[overrideDevice]} 손 위치를 ${label}으로 바꿨어요.`
+                            )
+                          }
+                          className={cn(
+                            "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg border text-[0.6875rem] font-bold transition-colors pointer-coarse:min-h-11",
+                            selected
+                              ? "border-accent bg-accent-soft text-accent"
+                              : "border-line bg-panel text-fg-2 hover:bg-raised",
+                            "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-panel",
+                            focusClass
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!activeIsCustom}
+                      onClick={() =>
+                        changeDeviceOverride(
+                          // 화면에 실제로 서 있는 기하 — liveLayout 은 저자형이라 .desktop 을 그대로
+                          // 쓰면 지금 보이는 도크가 아니라 저술된 도크를 집는다.
+                          {
+                            desktop: resolveStudioWorkspaceDeviceLayout(liveLayout, deviceKind)
+                              .desktop,
+                          },
+                          `지금 도크 배치를 ${DEVICE_KIND_LABELS[overrideDevice]} 값으로 저장했어요.`
+                        )
+                      }
+                      className={cn(
+                        "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-[0.6875rem] font-bold text-fg-2 transition-colors hover:bg-raised pointer-coarse:min-h-11",
+                        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-panel",
+                        focusClass
+                      )}
+                    >
+                      <Save size={13} aria-hidden /> 지금 도크로
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!activeIsCustom || !activeDeviceOverride}
+                      onClick={() =>
+                        changeDeviceOverride(
+                          null,
+                          `${DEVICE_KIND_LABELS[overrideDevice]} 조정을 지웠어요.`
+                        )
+                      }
+                      className={cn(
+                        "inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-[0.6875rem] font-bold text-fg-2 transition-colors hover:bg-raised pointer-coarse:min-h-11",
+                        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-panel",
+                        focusClass
+                      )}
+                    >
+                      <RotateCcw size={13} aria-hidden /> 조정 지우기
+                    </button>
                   </div>
                 </div>
               </div>
