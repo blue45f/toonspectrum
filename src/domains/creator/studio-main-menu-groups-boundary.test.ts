@@ -158,9 +158,9 @@ describe("studio main-menu catalogue ownership boundary", () => {
     expect(composition).toContain("bindStudioMainMenuEditorActions(studioMainMenuActions)");
     expect(composition).not.toContain("copyImageToClipboard:");
     // Null-guarded root import clicks add a few lines vs optional-chaining form. Menu item
-    // definitions, including Quick Access, remain owned by the pure catalogue.
-    // 2026-08-08: 검수·미리보기 3종 승격으로 state 2줄 + ui 3줄 + 주석 = +9. 전부 기존
-    // 패널 setter 로의 배선이고, 항목 정의는 여전히 카탈로그가 소유한다.
-    expect(composition.split("\n").length).toBeLessThanOrEqual(221);
+    // definitions, including Quick Access, remain owned by the pure catalogue. The ceiling
+    // is the pre-Wave-D one: new wiring has to come out of the slack the split created,
+    // not out of a bigger budget.
+    expect(composition.split("\n").length).toBeLessThanOrEqual(212);
   });
 });

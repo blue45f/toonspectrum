@@ -21,11 +21,12 @@
  * (conflict `menu-item-id-collision`). Which §15.3 rows we cover lives in
  * `studio-main-menu-group-spec.ts`.
  *
- * 그 뒤 툴벨트 전용이던 검수·미리보기 3종(`view/anim-timeline`, `view/vertical-scroll-preview`,
- * `view/storyboard-grid`)이 보기 메뉴로 승격되며 116 → 119가 됐다.
+ * 후속 메뉴 진입점 확장으로 카탈로그가 166개까지 늘어난 뒤, 툴벨트 전용이던
+ * 검수·미리보기 3종(`view/anim-timeline`, `view/vertical-scroll-preview`,
+ * `view/storyboard-grid`)이 보기 메뉴로 승격되며 166 → 169가 됐다.
  *
- * Measured 2026-08-08 against:
- * - `studio-main-menu-items-*.ts`     15 rendered groups / 119 items
+ * Measured 2026-08-09 against:
+ * - `studio-main-menu-items-*.ts`     17 rendered groups / 169 items
  * - `studio-edit-controls.ts`         STUDIO_EDIT_MENU_COMMANDS, 20 entries
  * - `studio-quick-access-integration.ts` STUDIO_QUICK_ACCESS_COMMAND_IDS, 18
  * - `studio-quick-actions.ts`         QUICK_ACTION_IDS, 16
