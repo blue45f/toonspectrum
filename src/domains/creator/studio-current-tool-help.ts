@@ -22,80 +22,12 @@ import { searchStudio } from "./studio-command-search";
 
 import type { StudioCommandCatalogEntry } from "./studio-command-catalog";
 import type { StudioSearchEntry } from "./studio-command-search";
-import type { DrawMode, Tool } from "./studio-editor-tool-model";
-import type { SelectionToolKind } from "./studio-selection-tools";
 import type { TerminologyAlias } from "@toonspectrum/studio-command-registry";
 
-/**
- * 캔버스 포인터를 지금 누가 쥐고 있는지 판정하는 데 필요한 최소 신호.
- *
- * `studio-canvas-tool-state-machine.ts` 의 보조 소유자(auxiliary owner) 개념과
- * 같은 우선순위를 쓴다 — 무장된 보조 도구가 기억된 기본 도구를 이긴다.
- */
-export interface StudioActiveToolSignals {
-  readonly tool: Tool;
-  readonly drawMode: DrawMode;
-  readonly commentPlacementActive?: boolean;
-  readonly cropActive?: boolean;
-  readonly transformActive?: boolean;
-  readonly liquifyArmed?: boolean;
-  readonly dodgeBurnArmed?: boolean;
-  readonly wetMixArmed?: boolean;
-  readonly smudgeArmed?: boolean;
-  readonly quickMaskArmed?: boolean;
-  readonly eyedropperArmed?: boolean;
-  readonly quickShapeActive?: boolean;
-  /** 픽셀 선택 도구가 무장돼 있으면 그 종류. */
-  readonly pixelSelectionTool?: SelectionToolKind | "wand" | null;
-}
-
-/**
- * 픽셀 선택 도구 → 카탈로그 명령. `brush`(선택 영역을 붓으로 칠하기)와 `wand`
- * (마술봉)는 카탈로그에 대응 명령이 **없다** — 없는 것을 가까운 것에 억지로
- * 붙이면 도움말이 다른 도구를 설명하게 되므로 비워 둔다.
- */
-const PIXEL_SELECTION_COMMANDS: Readonly<Record<string, string | null>> =
-  Object.freeze({
-    rect: "tool.marquee-rect",
-    ellipse: "tool.marquee-ellipse",
-    lasso: "tool.lasso",
-    "poly-lasso": "tool.lasso",
-    brush: null,
-    wand: null,
-  });
-
-const DRAW_MODE_COMMANDS: Readonly<Record<DrawMode, string>> = Object.freeze({
-  pen: "tool.pen",
-  eraser: "tool.eraser",
-  shape: "tool.smart-shape",
-  pixel: "tool.pixel-pen",
-  "lasso-fill": "tool.fill",
-});
-
-/**
- * 활성 도구를 카탈로그 명령 id 로 환원한다. 보조 도구 → 그리기 모드 → 기본 도구
- * 순서다. 카탈로그에 대응 명령이 없는 도구가 잡고 있으면 `null` — 그때 도움말은
- * "확인 못 함"이라고 말하지, 엉뚱한 도구를 설명하지 않는다.
- */
-export function resolveStudioActiveToolCommandId(
-  signals: StudioActiveToolSignals,
-): string | null {
-  if (signals.commentPlacementActive) return "tool.comment";
-  if (signals.cropActive) return "tool.crop";
-  if (signals.transformActive) return "tool.transform";
-  if (signals.liquifyArmed) return "tool.liquify";
-  if (signals.dodgeBurnArmed) return "tool.dodge-burn";
-  if (signals.wetMixArmed) return "tool.wet-mix";
-  if (signals.smudgeArmed) return "tool.smudge";
-  if (signals.quickMaskArmed) return "select.quick-mask";
-  if (signals.eyedropperArmed) return "tool.eyedropper";
-  const pixelSelection = signals.pixelSelectionTool;
-  if (pixelSelection) return PIXEL_SELECTION_COMMANDS[pixelSelection] ?? null;
-  if (signals.tool === "hand") return "tool.hand";
-  if (signals.tool === "select") return "tool.select";
-  if (signals.quickShapeActive) return "tool.smart-shape";
-  return DRAW_MODE_COMMANDS[signals.drawMode] ?? "tool.pen";
-}
+export {
+  resolveStudioActiveToolCommandId,
+  type StudioActiveToolSignals,
+} from "./studio-active-tool-command";
 
 /* ------------------------------------------------------------------ view */
 

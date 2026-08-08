@@ -11,13 +11,26 @@
  *    미해결 프라미스를 남기면 호출부가 영원히 멈춘 채 아무것도 알리지 않는다.
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 
 import {
   setStudioDestructiveConfirmPresenter,
   type StudioDestructiveActionRequest,
 } from "./studio-destructive-action-preview";
-import { StudioDestructiveConfirmDialog } from "./StudioDestructiveConfirmDialog";
+
+const StudioDestructiveConfirmDialog = lazy(() =>
+  import("./StudioDestructiveConfirmDialog").then((module) => ({
+    default: module.StudioDestructiveConfirmDialog,
+  })),
+);
 
 interface PendingApproval {
   readonly key: number;
@@ -87,12 +100,14 @@ export function StudioDestructiveConfirmHost(): ReactElement | null {
   if (!active) return null;
 
   return (
-    <StudioDestructiveConfirmDialog
-      key={active.key}
-      request={active.request}
-      queuedCount={queue.length - 1}
-      onConfirm={() => answer(active.key, true)}
-      onCancel={() => answer(active.key, false)}
-    />
+    <Suspense fallback={null}>
+      <StudioDestructiveConfirmDialog
+        key={active.key}
+        request={active.request}
+        queuedCount={queue.length - 1}
+        onConfirm={() => answer(active.key, true)}
+        onCancel={() => answer(active.key, false)}
+      />
+    </Suspense>
   );
 }

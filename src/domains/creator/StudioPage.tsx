@@ -24,6 +24,7 @@ import {
   studioActiveStrokeRecoveryFingerprint,
   type StudioActiveStrokePointerType,
 } from "./studio-active-stroke-lifecycle";
+import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
@@ -411,7 +412,6 @@ import {
   type CropDragSession,
   type CropRect,
 } from "./studio-crop";
-import { resolveStudioActiveToolCommandId } from "./studio-current-tool-help";
 import {
   NODE_SMOOTH_DEFAULT_STRENGTH,
   NODE_SMOOTH_DRAG_RANGE_PX,
