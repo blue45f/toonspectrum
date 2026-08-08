@@ -52,6 +52,17 @@ pub enum PaintIR {
         radius: f64,
         stops: Vec<GradientStopIR>,
     },
+    /// Angles are degrees from the +X axis, clockwise in y-down scene space
+    /// (peniko/Skia shared convention). The canonical zod schema guarantees
+    /// `end_angle_deg > start_angle_deg`; `render_scene` re-checks it because
+    /// vello_cpu would otherwise silently collapse the paint to its first stop.
+    #[serde(rename = "sweep-gradient", rename_all = "camelCase")]
+    SweepGradient {
+        center: [f64; 2],
+        start_angle_deg: f64,
+        end_angle_deg: f64,
+        stops: Vec<GradientStopIR>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

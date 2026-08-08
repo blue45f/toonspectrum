@@ -90,3 +90,35 @@ tests/benchmarks/results/vello-gpu-native.json.
 - 남은 게이트: 실브라우저 WebGPU 구동(디바이스 획득·렌더·네이티브와 동일한 퍼지 패리티·성능 실측).
   통과 전까지 이 레인의 상태는 격리 원장
   `docs/adr/0011-v12-frontier-quarantine-ledger.md` 레인 2("빌드 게이트 통과")로 관리한다.
+
+## Skia Graphite + Dawn wasm 빌드 시도 실측 (2026-08-08, ADR-0011 레인 4)
+
+격리 사유였던 "빌드 파이프라인 부재"를 실측으로 대체했다. 결과는 **빌드 게이트 미통과 — 상류
+emsdk 4.0.7 고착이 원인**이며, 전 과정은 `tests/benchmarks/results/graphite-build-attempt.json`에
+시도별로 기록되어 있다.
+
+- 파이프라인(재현 레시피): Skia 핀 `33e64a812c0b36f253cb2f59c950ecb1232f575e`(2026-08-07, depth-1
+  `~/toolchains/skia`) + **선별 DEPS 24핀**(freetype·harfbuzz·icu·codecs·dawn `bf6225076ff5`·
+  spirv 계열·dawn_cmake용 7핀; 전체 `git-sync-deps`는 angle/vulkan-deps 등 대형 불필요 딥이라 배제)
+  + emsdk는 기설치 6.0.6을 `third_party/externals/emsdk`로 심링크. 체크아웃 91초, 디스크 3.3GB.
+- 공식 경로 실측: `modules/canvaskit/compile.sh webgpu`가 곧 Graphite+Dawn 스펙
+  (`skia_enable_graphite=true skia_use_dawn=true skia_enable_ganesh=false`, gn assert
+  "Dawn is Graphite-only"). gn gen은 최소 딥 세트로 1차 통과, **1,774/1,783 타깃이 emcc 6.0.6에서
+  컴파일 성공**(Skia core·SkSL·skottie·paragraph·CanvasKit 바인딩 TU 전부). 3시도 합 476초.
+- 실패 지점(정확): ① emcc 6.0.6이 `-sUSE_WEBGPU=1`를 제거(프로브 실측: "replaced by
+  `--use-port=emdawnwebgpu`") — Skia는 `bin/activate-emsdk`에서 emsdk **4.0.7**을 핀. 이 전제로
+  graphite/dawn 16 TU 전부 `'webgpu/webgpu_cpp.h' file not found`(emsdk 5+가 구 헤더 삭제).
+  ② emdawnwebgpu 포트(dawn v20260423, emcc 6.0.6에서 단독 컴파일·링크 검증 완료)로 우회하면
+  9 TU가 **webgpu.h API 드리프트**로 실패 — `#if defined(__EMSCRIPTEN__)` 레거시 분기 ~63곳이
+  구스펙(ShaderModuleWGSLDescriptor·SupportedLimits·ImageCopyTexture/Buffer·ErrorCallback·
+  Render/ComputePassTimestampWrites·VertexStepMode::VertexBufferNotUsed·WGPUBufferMapAsyncStatus_*·
+  구형 OnSubmittedWorkDone)에 고정되어 있어 설정 우회 불가.
+- 구조 결함(컴파일이 뚫려도 남는 것): dawn_cmake가 `--target_os=wasm`에서 **호스트 clang**
+  (`-triple arm64-apple-macosx26.0.0` 실측)으로 dawn_native를 빌드 → `libdawn_combined.a`는
+  Mach-O라 wasm 링크 포이즌. `CK_ENABLE_WEBGPU`를 정의하는 gn 규칙이 **0건**(전 `.gn`/`.gni`
+  grep) — 공식 webgpu 구성에서도 JS-facing WebGPU 바인딩(`canvaskit_bindings.cpp` §CK_ENABLE_WEBGPU)
+  은 데드코드. `webgpu.js` 인터롭은 제거된 `JsValStore`(구 library_html5_webgpu.js) 의존.
+- 판정: E01 대비 표의 "Graphite 챌린저" 유보는 유지하되, 근거가 "파이프 부재"에서 **"상류가
+  EOL emsdk 4.0.7 구스펙 WebGPU 경로에 고착"**으로 교체됐다. 재시도 관측점은 상류의
+  emdawnwebgpu 이관(graphite/dawn `__EMSCRIPTEN__` 분기 + CanvasKit 바인딩 + CK_ENABLE_WEBGPU
+  배선). 그 전까지 레인 상태는 격리 원장 레인 4(ADR-0011)로 관리한다.

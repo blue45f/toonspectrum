@@ -139,22 +139,39 @@ function buildPath(ck: CanvasKit, pathIR: PathIR): Path {
 function makeGradientShader(ck: CanvasKit, paintIR: GradientPaintIR): Shader {
   const colors = paintIR.stops.map((stop) => colorToFloat4(stop.color, 1));
   const positions = paintIR.stops.map((stop) => stop.offset);
-  if (paintIR.kind === "linear-gradient") {
-    return ck.Shader.MakeLinearGradient(
-      [paintIR.from[0], paintIR.from[1]],
-      [paintIR.to[0], paintIR.to[1]],
-      colors,
-      positions,
-      ck.TileMode.Clamp,
-    );
+  switch (paintIR.kind) {
+    case "linear-gradient":
+      return ck.Shader.MakeLinearGradient(
+        [paintIR.from[0], paintIR.from[1]],
+        [paintIR.to[0], paintIR.to[1]],
+        colors,
+        positions,
+        ck.TileMode.Clamp,
+      );
+    case "radial-gradient":
+      return ck.Shader.MakeRadialGradient(
+        [paintIR.center[0], paintIR.center[1]],
+        paintIR.radius,
+        colors,
+        positions,
+        ck.TileMode.Clamp,
+      );
+    case "sweep-gradient":
+      // IR angles are already Skia's native unit and convention: degrees from
+      // the +X axis, clockwise in y-down device space. Clamp matches the
+      // vello lane's pad extend for pixels outside the angle window.
+      return ck.Shader.MakeSweepGradient(
+        paintIR.center[0],
+        paintIR.center[1],
+        colors,
+        positions,
+        ck.TileMode.Clamp,
+        null,
+        0,
+        paintIR.startAngleDeg,
+        paintIR.endAngleDeg,
+      );
   }
-  return ck.Shader.MakeRadialGradient(
-    [paintIR.center[0], paintIR.center[1]],
-    paintIR.radius,
-    colors,
-    positions,
-    ck.TileMode.Clamp,
-  );
 }
 
 function drawPathNode(

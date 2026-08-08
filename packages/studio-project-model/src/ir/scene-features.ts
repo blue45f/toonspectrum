@@ -11,6 +11,7 @@ export type SceneFeature =
   | "render.vector.fill"
   | "render.vector.stroke"
   | "render.vector.gradient"
+  | "render.vector.gradient.sweep"
   | "render.text.paragraph"
   | "render.group.opacity"
   | "render.group.clip"
@@ -25,10 +26,16 @@ export function collectSceneFeatures(scene: SceneIR): SceneFeature[] {
         case "fill-path":
           features.add("render.vector.fill");
           if (node.paint.kind !== "solid") features.add("render.vector.gradient");
+          if (node.paint.kind === "sweep-gradient") {
+            features.add("render.vector.gradient.sweep");
+          }
           break;
         case "stroke-path":
           features.add("render.vector.stroke");
           if (node.paint.kind !== "solid") features.add("render.vector.gradient");
+          if (node.paint.kind === "sweep-gradient") {
+            features.add("render.vector.gradient.sweep");
+          }
           break;
         case "text":
           features.add("render.text.paragraph");

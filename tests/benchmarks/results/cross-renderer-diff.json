@@ -5,7 +5,7 @@
     "b": "vello-cpu (vello_cpu 0.2.0, baseline SIMD, single thread)"
   },
   "gates": {
-    "scope": "symmetric 3x3-neighborhood fuzzy match, per-channel delta <= 48; raw maxDelta/meanDelta/pctPixelsOver8 rows are evidence only; flat-region scenes (04-07) must stay at 0",
+    "scope": "symmetric 3x3-neighborhood fuzzy match, per-channel delta <= 48; raw maxDelta/meanDelta/pctPixelsOver8 rows are evidence only; flat-region scenes (04-07, 09) must stay at 0",
     "fuzzyMismatchPct": 0.5
   },
   "scenes": [
@@ -69,6 +69,15 @@
       "height": 128,
       "maxDelta": 1,
       "meanDelta": 0.265625,
+      "pctPixelsOver8": 0,
+      "fuzzyMismatchPct": 0
+    },
+    {
+      "scene": "09-sweep-gradient",
+      "width": 128,
+      "height": 128,
+      "maxDelta": 1,
+      "meanDelta": 0.12774658203125,
       "pctPixelsOver8": 0,
       "fuzzyMismatchPct": 0
     },

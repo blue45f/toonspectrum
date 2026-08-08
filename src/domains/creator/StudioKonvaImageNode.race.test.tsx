@@ -66,6 +66,25 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   };
 });
 
+// The GPU filter module must be mocked like the other lazy chunks. Left real, its dynamic
+// import resolves at wall-clock time (heavy transform graph) while the tests run on fake
+// timers; `gpuFilterModule` is a dependency of the Worker filter effect, so a late arrival
+// re-runs that effect and cancels an in-flight worker run between a test's dispatch and
+// resolution — a load-dependent flake (the committed canvas silently stays the raw source).
+const gpuHarness = vi.hoisted(() => ({
+  apply: vi.fn(async (): Promise<{
+    data: Uint8ClampedArray;
+    height: number;
+    width: number;
+  } | null> => null),
+  eligible: false,
+}));
+
+vi.mock("./studio-gpu-filter-apply", () => ({
+  applyGpuFilterChain: gpuHarness.apply,
+  isStudioGpuFilterChainEligible: () => gpuHarness.eligible,
+}));
+
 vi.mock("./studio-konva-filters", () => ({
   buildImageFilters: (el: ImageEl) => ({
     attrs: { brightness: el.brightness ?? 0 },
@@ -185,6 +204,8 @@ beforeEach(() => {
   workerHarness.runs.length = 0;
   workerHarness.run.mockClear();
   workerHarness.requiresWorker = false;
+  gpuHarness.apply.mockClear();
+  gpuHarness.eligible = false;
   imageHarness.assigned.length = 0;
   canvasHarness.getImageDataCalls = 0;
   canvasHarness.getImageDataError = null;
@@ -663,6 +684,19 @@ describe("StudioKonvaImageNode async identity", () => {
     await flushWorkerDebounce();
     expect(workerHarness.runs).toHaveLength(2);
     await act(async () => resolveRun(workerHarness.runs[1]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+  });
+
+  it("falls back to the worker lane when the GPU chain declines the request", async () => {
+    gpuHarness.eligible = true;
+    render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(gpuHarness.apply).toHaveBeenCalledTimes(1);
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await act(async () => resolveRun(workerHarness.runs[0]!));
     expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
   });
 

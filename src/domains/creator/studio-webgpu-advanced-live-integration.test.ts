@@ -34,8 +34,10 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       expect(liveSurfaceStart).toContain(higherPriorityOwner);
     }
     expect(page).toContain('destination: "transparent-overlay"');
+    // 의도적 변경(2026-08-08): V12 §5 스트로크 라우트 토너먼트 컷오버 — GPU 시작 자격은
+    // 여전히 승격된 GPU 권위를 요구하며, 그 앞에 스트로크당 1회의 토너먼트 게이트가 붙는다.
     expect(page).toContain(
-      "const gpuStartEligible = pendingGpuAuthorityPromoted"
+      'const gpuStartEligible = strokeRouteTournamentGate.admits("gpu")\n        && pendingGpuAuthorityPromoted'
     );
   });
 
@@ -85,7 +87,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(stampStart).toBeGreaterThan(promotion);
     expect(page).toContain(") || promotePendingGpuAuthoritiesToKonva()");
     expect(page).toContain(
-      "const gpuStartEligible = pendingGpuAuthorityPromoted"
+      'const gpuStartEligible = strokeRouteTournamentGate.admits("gpu")\n        && pendingGpuAuthorityPromoted'
     );
     expect(page).toContain(
       "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"

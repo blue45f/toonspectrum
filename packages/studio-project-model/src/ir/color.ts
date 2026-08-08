@@ -50,6 +50,28 @@ export const paintIRSchema = z.discriminatedUnion("kind", [
     radius: z.number().positive(),
     stops: z.array(gradientStopIRSchema).min(2),
   }),
+  /**
+   * Sweep (conic/angle) gradient. Angles are degrees from the +X axis,
+   * clockwise in the IR's y-down scene space — the shared native convention of
+   * both verified engines (peniko `SweepGradientPosition` and Skia
+   * `MakeSweepGradient`), which also share the sampling model: the pixel angle
+   * is normalized into [0°, 360°) and t = (θ − start) / (end − start) is
+   * clamped to [0, 1]. `endAngleDeg > startAngleDeg` is enforced here because
+   * vello_cpu treats end ≤ start as degenerate and silently collapses to the
+   * first stop — the schema rejects it so no engine ever hits that path.
+   */
+  z
+    .object({
+      kind: z.literal("sweep-gradient"),
+      center: z.tuple([z.number(), z.number()]),
+      startAngleDeg: z.number(),
+      endAngleDeg: z.number(),
+      stops: z.array(gradientStopIRSchema).min(2),
+    })
+    .refine((paint) => paint.endAngleDeg > paint.startAngleDeg, {
+      message: "sweep-gradient requires endAngleDeg > startAngleDeg",
+      path: ["endAngleDeg"],
+    }),
 ]);
 export type PaintIR = z.infer<typeof paintIRSchema>;
 

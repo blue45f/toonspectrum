@@ -104,6 +104,63 @@ fn stroke_round_cap_paints_on_path() {
     assert_eq!(pixel(&pixels, 32, 16, 2), [255, 255, 255, 255]);
 }
 
+/// Full-turn sweep: 0° -> red, 0.25 turn -> green. Samples sit half a pixel
+/// off the exact axes (pixel centers), so assertions use generous margins.
+const SWEEP_FULL_TURN_PAINT: &str = r#"{"kind":"sweep-gradient","center":[16,16],"startAngleDeg":0,"endAngleDeg":360,"stops":[{"offset":0,"color":{"r":1,"g":0,"b":0,"a":1}},{"offset":0.25,"color":{"r":0,"g":1,"b":0,"a":1}},{"offset":0.5,"color":{"r":0,"g":0,"b":1,"a":1}},{"offset":1,"color":{"r":1,"g":0,"b":0,"a":1}}]}"#;
+
+fn full_canvas_fill(paint: &str) -> String {
+    format!(
+        r#"{{"id":"sweep","kind":"fill-path","path":{{"verbs":[{{"v":"M","x":0,"y":0}},{{"v":"L","x":32,"y":0}},{{"v":"L","x":32,"y":32}},{{"v":"L","x":0,"y":32}},{{"v":"Z"}}]}},"paint":{paint},"opacity":1,"blend":"src-over","fillRule":"nonzero"}}"#
+    )
+}
+
+#[test]
+fn sweep_gradient_hits_stop_colors_at_0_and_90_degrees() {
+    let scene =
+        parse_scene(&scene_json(&full_canvas_fill(SWEEP_FULL_TURN_PAINT), WHITE_BG)).unwrap();
+    let pixels = render_scene(&scene).unwrap();
+    // Angle 0° is the +X ray from the center: pixel (28, 16) sits at ~2.3°,
+    // still firmly inside the red..green ramp's red end.
+    let east = pixel(&pixels, 32, 28, 16);
+    assert!(east[0] >= 235, "east r={}", east[0]);
+    assert!(east[1] <= 25, "east g={}", east[1]);
+    assert!(east[2] <= 10, "east b={}", east[2]);
+    // Angle 90° is straight down in y-down space (clockwise convention):
+    // pixel (16, 28) sits at ~87.7°, right at the green stop (offset 0.25).
+    let south = pixel(&pixels, 32, 16, 28);
+    assert!(south[1] >= 235, "south g={}", south[1]);
+    assert!(south[0] <= 25, "south r={}", south[0]);
+    assert!(south[2] <= 10, "south b={}", south[2]);
+    assert_eq!(east[3], 255);
+    assert_eq!(south[3], 255);
+}
+
+#[test]
+fn sweep_gradient_rendering_is_bit_deterministic() {
+    let scene =
+        parse_scene(&scene_json(&full_canvas_fill(SWEEP_FULL_TURN_PAINT), WHITE_BG)).unwrap();
+    let first = render_scene(&scene).unwrap();
+    let second = render_scene(&scene).unwrap();
+    assert_eq!(first, second);
+}
+
+#[test]
+fn degenerate_sweep_window_is_rejected_not_collapsed() {
+    // vello_cpu would silently collapse end <= start to the first stop; the
+    // renderer must reject it explicitly instead (canonical zod schema parity).
+    let paint = r#"{"kind":"sweep-gradient","center":[16,16],"startAngleDeg":180,"endAngleDeg":180,"stops":[{"offset":0,"color":{"r":1,"g":0,"b":0,"a":1}},{"offset":1,"color":{"r":0,"g":0,"b":1,"a":1}}]}"#;
+    let scene = parse_scene(&scene_json(&full_canvas_fill(paint), WHITE_BG)).unwrap();
+    match render_scene(&scene) {
+        Err(RenderError::InvalidScene(message)) => {
+            assert!(
+                message.contains("endAngleDeg > startAngleDeg"),
+                "unexpected message: {message}"
+            );
+        }
+        other => panic!("expected InvalidScene, got {other:?}"),
+    }
+}
+
 #[test]
 fn text_scene_is_rejected_not_skipped() {
     let node = r#"{"id":"t","kind":"text","opacity":1,"blend":"src-over","x":4,"y":20,"text":"안녕","fontSizePx":12,"color":{"r":0,"g":0,"b":0,"a":1},"fontFamily":"sans-serif"}"#;

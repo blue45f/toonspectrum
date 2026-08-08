@@ -69,6 +69,52 @@ describe("vello-cpu adapter (wasm)", () => {
     expect(velloCpuProviderDescriptor.determinism).toBe("bit-exact");
   });
 
+  it("renders sweep gradients through the wasm boundary (0°/90° stop colors)", () => {
+    const scene: SceneIR = {
+      version: 11,
+      width: 32,
+      height: 32,
+      background: { r: 1, g: 1, b: 1, a: 1 },
+      nodes: [
+        {
+          id: "sweep",
+          kind: "fill-path",
+          path: polylineToPath(
+            [
+              [0, 0],
+              [32, 0],
+              [32, 32],
+              [0, 32],
+            ],
+            true,
+          ),
+          paint: {
+            kind: "sweep-gradient",
+            center: [16, 16],
+            startAngleDeg: 0,
+            endAngleDeg: 360,
+            stops: [
+              { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+              { offset: 0.25, color: { r: 0, g: 1, b: 0, a: 1 } },
+              { offset: 0.5, color: { r: 0, g: 0, b: 1, a: 1 } },
+              { offset: 1, color: { r: 1, g: 0, b: 0, a: 1 } },
+            ],
+          },
+          opacity: 1,
+          blend: "src-over",
+          fillRule: "nonzero",
+        },
+      ],
+    };
+    const pixels = renderSceneToPixels(scene);
+    const east = pixelAt(pixels, 32, 28, 16);
+    expect(east[0]).toBeGreaterThan(230);
+    expect(east[1]).toBeLessThan(30);
+    const south = pixelAt(pixels, 32, 16, 28);
+    expect(south[1]).toBeGreaterThan(230);
+    expect(south[0]).toBeLessThan(30);
+  });
+
   it("rejects text scenes with UnsupportedSceneFeatureError (no silent skip)", () => {
     const scene = squareScene();
     scene.nodes.push({

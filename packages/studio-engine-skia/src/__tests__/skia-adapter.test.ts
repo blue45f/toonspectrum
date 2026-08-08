@@ -216,6 +216,45 @@ describe("renderSceneToPixels", () => {
     expect(nearEnd[0]).toBeLessThan(80);
   });
 
+  it("sweeps a conic gradient clockwise from the +X axis", () => {
+    const scene = makeScene(WHITE, [
+      {
+        id: "sweep",
+        kind: "fill-path",
+        opacity: 1,
+        blend: "src-over",
+        path: rectPath(0, 0, SIZE, SIZE),
+        paint: {
+          kind: "sweep-gradient",
+          center: [32, 32],
+          startAngleDeg: 0,
+          endAngleDeg: 360,
+          stops: [
+            { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+            { offset: 0.25, color: { r: 0, g: 1, b: 0, a: 1 } },
+            { offset: 0.5, color: { r: 0, g: 0, b: 1, a: 1 } },
+            { offset: 1, color: { r: 1, g: 0, b: 0, a: 1 } },
+          ],
+        },
+        fillRule: "nonzero",
+      },
+    ]);
+    const pixels = renderSceneToPixels(ck, scene);
+    // 0° is the +X ray: pixel (56, 32) sits a whisker past it — red end.
+    const east = pixelAt(pixels, SIZE, 56, 32);
+    expect(east[0]).toBeGreaterThan(230);
+    expect(east[1]).toBeLessThan(30);
+    // 90° is straight down in y-down space (clockwise): pixel (32, 56) lands
+    // on the green stop at offset 0.25.
+    const south = pixelAt(pixels, SIZE, 32, 56);
+    expect(south[1]).toBeGreaterThan(230);
+    expect(south[0]).toBeLessThan(30);
+    // 180° is the -X ray: blue stop at offset 0.5.
+    const west = pixelAt(pixels, SIZE, 8, 32);
+    expect(west[2]).toBeGreaterThan(230);
+    expect(west[0]).toBeLessThan(30);
+  });
+
   it("throws UnsupportedSceneFeatureError for text without a font asset", () => {
     const scene = makeScene(WHITE, [
       {

@@ -57,6 +57,36 @@ function groupNode(children: SceneNodeIR[], clip: PathIR | null): SceneNodeIR {
   };
 }
 
+function sweepFill(startAngleDeg: number, endAngleDeg: number): SceneNodeIR {
+  return {
+    id: "sweep",
+    kind: "fill-path",
+    opacity: 1,
+    blend: "src-over",
+    path: mixedPath,
+    paint: {
+      kind: "sweep-gradient",
+      center: [1, 1],
+      startAngleDeg,
+      endAngleDeg,
+      stops: [
+        { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+        { offset: 0.25, color: { r: 0, g: 1, b: 0, a: 1 } },
+        { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } },
+      ],
+    },
+    fillRule: "nonzero",
+  };
+}
+
+function sweepPaintOf(nodes: SceneNodeIR[]) {
+  const [node] = nodes;
+  if (node?.kind !== "fill-path" || node.paint.kind !== "sweep-gradient") {
+    throw new Error("expected sweep gradient fill");
+  }
+  return node.paint;
+}
+
 describe("mat2d primitives", () => {
   it("applies identity, translate and scale to points", () => {
     expect(applyMat2d(identityMat2d(), 3, -2)).toEqual([3, -2]);
@@ -196,6 +226,55 @@ describe("transformSceneNodes", () => {
     }
     expect(node.paint.center).toEqual([2, 2]);
     expect(node.paint.radius).toBeCloseTo(10, 12);
+  });
+
+  it("rotates sweep-gradient angle windows exactly under a rotation", () => {
+    const fill = sweepFill(30, 120);
+    const { nodes, warnings } = transformSceneNodes([fill], rotateMat2d(45));
+    expect(warnings).toEqual([]);
+    const paint = sweepPaintOf(nodes);
+    // center [1,1] under rotate(45°): x' = cos45 − sin45 = 0, y' = √2.
+    expect(paint.center[0]).toBeCloseTo(0, 12);
+    expect(paint.center[1]).toBeCloseTo(Math.SQRT2, 12);
+    expect(paint.startAngleDeg).toBeCloseTo(75, 10);
+    expect(paint.endAngleDeg).toBeCloseTo(165, 10);
+    expect(paint.stops).toEqual(sweepPaintOf([fill]).stops);
+  });
+
+  it("mirrors sweep windows and reverses stops under a reflection", () => {
+    // scale(-1, 1) reflects across the Y axis: ψ = 180°, θ → 180° − θ.
+    const fill = sweepFill(30, 120);
+    const { nodes, warnings } = transformSceneNodes([fill], scaleMat2d(-1, 1));
+    expect(warnings).toEqual([]);
+    const paint = sweepPaintOf(nodes);
+    expect(paint.startAngleDeg).toBeCloseTo(60, 10);
+    expect(paint.endAngleDeg).toBeCloseTo(150, 10);
+    expect(paint.stops.map((stop) => stop.offset)).toEqual([0, 0.75, 1]);
+    expect(paint.stops[0]?.color).toEqual({ r: 0, g: 0, b: 1, a: 1 });
+    expect(paint.stops[2]?.color).toEqual({ r: 1, g: 0, b: 0, a: 1 });
+  });
+
+  it("re-anchors rotated sweep windows into one turn and reports seam straddle", () => {
+    const fill = sweepFill(300, 350);
+    const { nodes, warnings } = transformSceneNodes([fill], rotateMat2d(30));
+    const paint = sweepPaintOf(nodes);
+    // 330..380 straddles the 360° seam: window is kept (start re-anchored into
+    // [0°, 360°)) and the clamped wedge is reported, never silently dropped.
+    expect(paint.startAngleDeg).toBeCloseTo(330, 10);
+    expect(paint.endAngleDeg).toBeCloseTo(380, 10);
+    expect(paint.endAngleDeg).toBeGreaterThan(paint.startAngleDeg);
+    expect(warnings.join("\n")).toContain("이음선");
+  });
+
+  it("keeps sweep angles and warns under non-uniform scale", () => {
+    const fill = sweepFill(0, 360);
+    const { nodes, warnings } = transformSceneNodes([fill], scaleMat2d(2, 8));
+    const paint = sweepPaintOf(nodes);
+    expect(paint.center).toEqual([2, 8]);
+    expect(paint.startAngleDeg).toBe(0);
+    expect(paint.endAngleDeg).toBe(360);
+    expect(warnings.join("\n")).toContain("sweep-gradient");
+    expect(warnings.join("\n")).toContain("비균등");
   });
 
   it("reports unrepresentable text rotation instead of dropping it", () => {

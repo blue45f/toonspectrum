@@ -19,18 +19,33 @@ function sourceSection(source: string, start: string, end: string): string {
 
 describe("Studio stroke surface route wiring boundary", () => {
   it("resolves one product route after strict-priority, short-circuited admissions", () => {
+    // V12 §5 cutover: the tournament projection is resolved once per stroke start, BEFORE any
+    // side-effecting begin call, and every specialist admission is gated by it. Each gate token
+    // is pinned immediately before its lane's begin call so the ladder order and the "gate
+    // precedes the side effect" contract are both machine-checked.
     const pointerDown = sourceSection(
       PAGE_SOURCE,
-      "const livingInkAdmitted =",
+      "installStudioTournamentSqlitePersistence();",
       "const predictionTailEligible =",
     );
     const admissions = [
+      "const strokeRouteTournamentRuntime = getStudioTournamentRuntime()",
+      "resolveStudioStrokeRoutePointerDownGate({",
+      "lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES",
+      "strokeRouteTournamentGate.selection.killIgnoredReason",
+      'strokeRouteTournamentGate.admits("living-ink")',
       "beginStudioLivingInkStroke(next, pointerSample)",
+      'strokeRouteTournamentGate.admits("hokusai")',
       "beginStudioHokusaiLiveStroke(next)",
+      'strokeRouteTournamentGate.admits("stamp")',
       "liveStampOverlayRendererRef.current.begin(",
+      'strokeRouteTournamentGate.admits("gpu")',
       "beginLiveStrokeBackendAudit(next.id, \"webgpu\")",
+      'strokeRouteTournamentGate.admits("live-ink")',
       "liveInkOverlayRendererRef.current.begin(",
+      'strokeRouteTournamentGate.admits("wet-fallback")',
       "liveWetInkOverlayRendererRef.current.begin(next",
+      'strokeRouteTournamentGate.admits("dynamic")',
       "liveDynamicBrushOverlayRendererRef.current.begin(next)",
       "resolveStudioStrokeSurfaceRoute({",
     ] as const;
@@ -42,11 +57,16 @@ describe("Studio stroke surface route wiring boundary", () => {
       previous = index;
     }
     expect(pointerDown).toMatch(
-      /const hokusaiPinned = pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& beginStudioHokusaiLiveStroke\(next\);/u,
+      /const hokusaiPinned = strokeRouteTournamentGate\.admits\("hokusai"\)\s*&& pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& beginStudioHokusaiLiveStroke\(next\);/u,
     );
     expect(pointerDown).toMatch(
-      /const gpuStartEligible = pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& !hokusaiPinned\s*&& !stampDirect\s*&& STUDIO_VISIBLE_LIVE_INK_PREFERENCE/u,
+      /const gpuStartEligible = strokeRouteTournamentGate\.admits\("gpu"\)\s*&& pendingGpuAuthorityPromoted\s*&& !livingInkAdmitted\s*&& !hokusaiPinned\s*&& !stampDirect\s*&& STUDIO_VISIBLE_LIVE_INK_PREFERENCE/u,
     );
+    // The terminal Konva fallback is never tournament-gated: no admits("konva") call may exist.
+    expect(pointerDown).not.toContain('admits("konva")');
+    // One projection per stroke start (the pointer-down hot-path budget): the gate is resolved
+    // exactly once inside the admission ladder.
+    expect(pointerDown.match(/resolveStudioStrokeRoutePointerDownGate\(/gu)?.length).toBe(1);
     expect(pointerDown).toContain("studioStrokeSurfaceRouteRef.current = strokeSurfaceRoute");
     expect(pointerDown).toContain("livingInkCoordinatorRef.current.pinActiveRoute(");
     expect(pointerDown).toContain("strokeSurfaceRoute = resolveStudioStrokeSurfaceRoute({");

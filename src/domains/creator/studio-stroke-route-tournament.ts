@@ -193,3 +193,60 @@ export function selectStudioStrokeRoute(
  */
 export const STUDIO_STROKE_ROUTE_TOURNAMENT_LANES: readonly StudioStrokeSurfaceRouteKind[] =
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY;
+
+/* ------------------------------------------------------------------ */
+/* Pointer-down admission gate — the cutover onto the real stroke path  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Per-stroke admission gate derived from one tournament projection at
+ * pointer-down. StudioPage's admission ladder is a sequence of side-effecting
+ * `begin*` calls in strict priority order; the gate decides, before any
+ * provider is invoked, which lanes may attempt admission this stroke.
+ */
+export interface StudioStrokeRoutePointerDownGate {
+  /** Projection this gate was derived from (bucket, ladder, kill audit). */
+  readonly selection: SelectStudioStrokeRouteResult;
+  /** Candidate ladder the projection ran against (contract priority order). */
+  readonly lanes: readonly StudioStrokeSurfaceRouteKind[];
+  /** True when `kind` may attempt its side-effecting admission (begin call). */
+  readonly admits: (kind: StudioStrokeSurfaceRouteKind) => boolean;
+}
+
+/**
+ * Resolves the pointer-down admission gate — the sequential realization of
+ * selectStudioStrokeRoute over a ladder whose admissions are side-effecting
+ * and attempted in fixed textual priority order:
+ *
+ * - pristine tournament state (no winner, nothing killed) admits every lane,
+ *   so every gated admission expression evaluates byte-identically to the
+ *   ungated ladder — the pre-tournament routing contract is preserved exactly;
+ * - a lane the kill switch pruned from the projection is denied: its begin is
+ *   never invoked and the resolver routes past it as if it declined (the
+ *   anti-extinction guard restores every lane and surfaces the reason);
+ * - a promoted winner denies the lanes ranked above it in the candidate
+ *   ladder, so the winner — when it admits — owns the actual route head. If
+ *   the winner then declines, admission falls through to the lanes below it
+ *   in original order; the demoted higher lanes are not retried this stroke
+ *   (retrying would require a second admission pass mid-pointer-down);
+ * - "konva" is the terminal fail-visible fallback and is never denied — a
+ *   kill against it is unenforceable by design.
+ *
+ * Pure and synchronous: one projection per stroke start, no per-point work.
+ */
+export function resolveStudioStrokeRoutePointerDownGate(
+  input: SelectStudioStrokeRouteInput,
+): StudioStrokeRoutePointerDownGate {
+  const selection = selectStudioStrokeRoute(input);
+  const admissible = new Set(selection.lanes);
+  const ranks = new Map(input.lanes.map((lane, index) => [lane, index]));
+  const head = selection.lanes[0];
+  const headRank = head === undefined ? 0 : (ranks.get(head) ?? 0);
+  const admits = (kind: StudioStrokeSurfaceRouteKind): boolean => {
+    if (kind === "konva") return true;
+    if (!admissible.has(kind)) return false;
+    const rank = ranks.get(kind);
+    return rank !== undefined && rank >= headRank;
+  };
+  return { selection, lanes: input.lanes, admits };
+}

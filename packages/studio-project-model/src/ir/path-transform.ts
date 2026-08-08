@@ -168,6 +168,65 @@ function scaleScalar(
   return value * profile.lengthScale;
 }
 
+const DEG_PER_TURN = 360;
+
+/**
+ * Sweep angles under an affine map. Similarity transforms map directions
+ * affinely: det>0 adds the matrix rotation to both angles; det<0 (reflection)
+ * mirrors the window (θ → ψ−θ, ψ = atan2(b, a)) and reverses the stops —
+ * both exact. Render-time sampling measures the pixel angle inside the single
+ * turn [0°, 360°), so the mapped window is re-anchored by whole turns until
+ * its start lies in that domain; a window that then straddles the 360° seam
+ * clamps (both engines) instead of wrapping and is reported as an
+ * approximation. Non-uniform maps distort angles non-affinely — the window is
+ * preserved and warned, never silently dropped.
+ */
+function transformSweepPaint(
+  paint: Extract<PaintIR, { kind: "sweep-gradient" }>,
+  m: Mat2d,
+  profile: Mat2dProfile,
+  warnings: string[],
+  nodeId: string,
+): PaintIR {
+  const [cx, cy] = applyMat2d(m, paint.center[0], paint.center[1]);
+  const center: [number, number] = [cx, cy];
+  if (profile.singular) {
+    warnings.push(
+      `node ${nodeId}: sweep-gradient — 특이 행렬(det=0), 각도 창 보존됨(중심만 이동)`,
+    );
+    return { ...paint, center };
+  }
+  if (!profile.uniform) {
+    warnings.push(
+      `node ${nodeId}: sweep-gradient — 비균등 스케일(sx≈${fmt(profile.sx)}, sy≈${fmt(profile.sy)})은 각도를 비선형으로 왜곡함, 각도 창 보존 근사 적용됨`,
+    );
+    return { ...paint, center };
+  }
+  const psiDeg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+  let start: number;
+  let end: number;
+  let stops = paint.stops;
+  if (profile.det > 0) {
+    start = paint.startAngleDeg + psiDeg;
+    end = paint.endAngleDeg + psiDeg;
+  } else {
+    start = psiDeg - paint.endAngleDeg;
+    end = psiDeg - paint.startAngleDeg;
+    stops = [...paint.stops]
+      .reverse()
+      .map((stop) => ({ offset: 1 - stop.offset, color: stop.color }));
+  }
+  const delta = end - start;
+  start -= Math.floor(start / DEG_PER_TURN) * DEG_PER_TURN;
+  end = start + delta;
+  if (end > DEG_PER_TURN && delta <= DEG_PER_TURN) {
+    warnings.push(
+      `node ${nodeId}: sweep-gradient — 변환된 각도 창(${fmt(start)}°→${fmt(end)}°)이 360° 이음선을 걸침, 걸친 부채꼴은 램프 끝색으로 클램프됨`,
+    );
+  }
+  return { ...paint, center, startAngleDeg: start, endAngleDeg: end, stops };
+}
+
 function transformPaint(
   paint: PaintIR,
   m: Mat2d,
@@ -193,6 +252,8 @@ function transformPaint(
       );
       return { ...paint, center: [cx, cy], radius };
     }
+    case "sweep-gradient":
+      return transformSweepPaint(paint, m, profile, warnings, nodeId);
   }
 }
 

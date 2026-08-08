@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { brushProgramIRSchema, evaluateDynamicMapping } from "../ir/brush";
+import { paintIRSchema } from "../ir/color";
 import { validateEffectGraph } from "../ir/effect";
 import { pathBounds, pathToSvgData, polylineToPath } from "../ir/path";
+import { collectSceneFeatures } from "../ir/scene-features";
 import { applyPressureCurve, deviceCalibrationIRSchema } from "../ir/stroke";
+
+import type { SceneIR } from "../ir/scene";
 
 describe("BrushProgramIR", () => {
   it("fills defaults for a minimal preset and round-trips", () => {
@@ -23,6 +27,59 @@ describe("BrushProgramIR", () => {
     expect(evaluateDynamicMapping(mapping, 0)).toBe(2);
     expect(evaluateDynamicMapping(mapping, 1)).toBe(10);
     expect(evaluateDynamicMapping(mapping, 0.25)).toBeCloseTo(4);
+  });
+});
+
+describe("PaintIR sweep-gradient", () => {
+  const sweep = {
+    kind: "sweep-gradient" as const,
+    center: [64, 64] as [number, number],
+    startAngleDeg: 45,
+    endAngleDeg: 270,
+    stops: [
+      { offset: 0, color: { r: 1, g: 0, b: 0, a: 1 } },
+      { offset: 1, color: { r: 0, g: 0, b: 1, a: 1 } },
+    ],
+  };
+
+  it("round-trips through the schema unchanged", () => {
+    const parsed = paintIRSchema.parse(sweep);
+    expect(parsed).toEqual(sweep);
+    expect(paintIRSchema.parse(parsed)).toEqual(parsed);
+  });
+
+  it("rejects a degenerate angle window (end <= start)", () => {
+    expect(() =>
+      paintIRSchema.parse({ ...sweep, startAngleDeg: 270, endAngleDeg: 270 }),
+    ).toThrow(/endAngleDeg > startAngleDeg/);
+    expect(() =>
+      paintIRSchema.parse({ ...sweep, startAngleDeg: 270, endAngleDeg: 90 }),
+    ).toThrow(/endAngleDeg > startAngleDeg/);
+  });
+
+  it("surfaces the sweep capability token in scene features", () => {
+    const scene: SceneIR = {
+      version: 11,
+      width: 128,
+      height: 128,
+      background: { r: 1, g: 1, b: 1, a: 1 },
+      nodes: [
+        {
+          id: "n1",
+          kind: "fill-path",
+          opacity: 1,
+          blend: "src-over",
+          path: { verbs: [] },
+          paint: sweep,
+          fillRule: "nonzero",
+        },
+      ],
+    };
+    expect(collectSceneFeatures(scene)).toEqual([
+      "render.vector.fill",
+      "render.vector.gradient",
+      "render.vector.gradient.sweep",
+    ]);
   });
 });
 

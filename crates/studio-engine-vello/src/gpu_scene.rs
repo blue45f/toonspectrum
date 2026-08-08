@@ -75,6 +75,29 @@ pub fn to_brush(paint: &PaintIR, opacity: f32) -> Brush {
                     .as_slice(),
             ),
         ),
+        // IR degrees -> peniko radians; conventions (from +X axis, clockwise in
+        // y-down) match. end > start is guaranteed by the canonical zod schema
+        // and re-checked by the CPU lane's render_scene, which every GPU-lane
+        // caller mirrors through the shared corpus/parity harnesses.
+        PaintIR::SweepGradient {
+            center,
+            start_angle_deg,
+            end_angle_deg,
+            stops,
+        } => Brush::Gradient(
+            Gradient::new_sweep(
+                Point::new(center[0], center[1]),
+                start_angle_deg.to_radians() as f32,
+                end_angle_deg.to_radians() as f32,
+            )
+            .with_stops(
+                stops
+                    .iter()
+                    .map(|s| (s.offset, to_color(&s.color, opacity)))
+                    .collect::<Vec<(f32, Color)>>()
+                    .as_slice(),
+            ),
+        ),
     }
 }
 

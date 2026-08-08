@@ -112,6 +112,51 @@ fn set_paint(ctx: &mut RenderContext, paint: &PaintIR, opacity: f32) {
                     .with_stops(gradient_stops(stops, opacity).as_slice());
             ctx.set_paint(gradient);
         }
+        PaintIR::SweepGradient {
+            center,
+            start_angle_deg,
+            end_angle_deg,
+            stops,
+        } => {
+            // IR degrees -> peniko radians; the +X-axis / clockwise-in-y-down
+            // convention matches 1:1, so only the unit changes.
+            let gradient = Gradient::new_sweep(
+                Point::new(center[0], center[1]),
+                start_angle_deg.to_radians() as f32,
+                end_angle_deg.to_radians() as f32,
+            )
+            .with_stops(gradient_stops(stops, opacity).as_slice());
+            ctx.set_paint(gradient);
+        }
+    }
+}
+
+/// Rejects paints vello_cpu would degrade silently instead of erroring:
+/// a sweep window with `end <= start` collapses to the first stop color inside
+/// peniko's degenerate handling. The canonical zod schema already forbids it;
+/// this guard keeps direct crate consumers on the same honest contract.
+fn collect_invalid_paints(nodes: &[SceneNodeIR], problems: &mut Vec<String>) {
+    fn check(id: &str, paint: &PaintIR, problems: &mut Vec<String>) {
+        if let PaintIR::SweepGradient {
+            start_angle_deg,
+            end_angle_deg,
+            ..
+        } = paint
+        {
+            if !(end_angle_deg > start_angle_deg) {
+                problems.push(format!(
+                    "node {id}: sweep-gradient requires endAngleDeg > startAngleDeg (got {start_angle_deg}..{end_angle_deg})"
+                ));
+            }
+        }
+    }
+    for node in nodes {
+        match node {
+            SceneNodeIR::FillPath { id, paint, .. }
+            | SceneNodeIR::StrokePath { id, paint, .. } => check(id, paint, problems),
+            SceneNodeIR::Group { children, .. } => collect_invalid_paints(children, problems),
+            SceneNodeIR::Text { .. } => {}
+        }
     }
 }
 
@@ -237,6 +282,11 @@ pub fn render_scene(scene: &SceneIR) -> Result<Vec<u8>, RenderError> {
     collect_unsupported(&scene.nodes, &mut unsupported);
     if !unsupported.is_empty() {
         return Err(RenderError::UnsupportedFeatures(unsupported));
+    }
+    let mut invalid_paints = Vec::new();
+    collect_invalid_paints(&scene.nodes, &mut invalid_paints);
+    if !invalid_paints.is_empty() {
+        return Err(RenderError::InvalidScene(invalid_paints.join("; ")));
     }
 
     let width = scene.width as u16;

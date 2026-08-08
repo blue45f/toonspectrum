@@ -236,7 +236,10 @@ describe("cross-renderer visual diff (CanvasKit vs vello_cpu)", () => {
         .toBeLessThanOrEqual(FUZZY_MISMATCH_PCT_GATE);
       // Flat-region scenes pin systematic tonal drift: any blend/gradient/
       // opacity math divergence must surface here as a non-zero mismatch.
-      if (/^0[4-7]-/.test(name)) {
+      // 09-sweep-gradient joins the pin because both engines share the sweep
+      // sampling model exactly (θ ∈ [0°,360°), clamped t) — measured maxDelta
+      // is 1/255, the same class as the linear/radial gradient scenes.
+      if (/^0[4-7]-|^09-/.test(name)) {
         expect.soft(raw.fuzzyMismatchPct, `${name} flat-region drift`).toBe(0);
       }
     }
@@ -252,7 +255,7 @@ describe("cross-renderer visual diff (CanvasKit vs vello_cpu)", () => {
               b: "vello-cpu (vello_cpu 0.2.0, baseline SIMD, single thread)",
             },
             gates: {
-              scope: `symmetric 3x3-neighborhood fuzzy match, per-channel delta <= ${FUZZY_DELTA}; raw maxDelta/meanDelta/pctPixelsOver8 rows are evidence only; flat-region scenes (04-07) must stay at 0`,
+              scope: `symmetric 3x3-neighborhood fuzzy match, per-channel delta <= ${FUZZY_DELTA}; raw maxDelta/meanDelta/pctPixelsOver8 rows are evidence only; flat-region scenes (04-07, 09) must stay at 0`,
               fuzzyMismatchPct: FUZZY_MISMATCH_PCT_GATE,
             },
             scenes: collectedMetrics,

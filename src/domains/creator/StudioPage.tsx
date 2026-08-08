@@ -1154,6 +1154,7 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import { getStudioTournamentRuntime } from "./studio-renderer-tournament-runtime";
 import {
   appendStudioPendingRasterRetouchGesturePoint,
   beginStudioPendingRasterRetouchGesture,
@@ -1290,6 +1291,10 @@ import {
 } from "./studio-stroke-object-snap-cache";
 import { StudioStrokePostprocessWorkerClient } from "./studio-stroke-postprocess-worker-client";
 import {
+  STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
+  resolveStudioStrokeRoutePointerDownGate,
+} from "./studio-stroke-route-tournament";
+import {
   DEFAULT_SHAPE_PARAMS,
 } from "./studio-stroke-shapes";
 import {
@@ -1321,6 +1326,7 @@ import {
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
+import { installStudioTournamentSqlitePersistence } from "./studio-tournament-sqlite-persistence";
 import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
@@ -29198,17 +29204,45 @@ const puppetWarpArmed =
         draftPreviewNormalLayerRef.current?.drawScene();
         draftPreviewDynamicLayerRef.current?.drawScene();
       }
+      // V12 §5 cutover: one synchronous tournament projection per stroke start decides, before
+      // any side-effecting begin call, which lanes may attempt admission. Pristine tournament
+      // state (no winner, nothing killed) admits every lane, so the gated ladder below evaluates
+      // byte-identically to the pre-tournament contract; a killed lane never begins, and a cached
+      // winner owns the head by denying the lanes ranked above it. Default persistence mirrors
+      // the filter island (SQLite/OPFS first, localStorage fallback) and must be installed before
+      // the lazy shared runtime hydrates on first use; this stroke reads only in-memory state.
+      installStudioTournamentSqlitePersistence();
+      const strokeRouteTournamentRuntime = getStudioTournamentRuntime();
+      const strokeRouteTournamentGate = resolveStudioStrokeRoutePointerDownGate({
+        lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
+        traits: {
+          pointCount: Math.floor(next.points.length / 2),
+          // An absent brush id normalizes to the "unknown" family bucket.
+          brushFamily: next.brush ?? "",
+          canvasScale: zoomRef.current,
+        },
+        state: strokeRouteTournamentRuntime,
+      });
+      if (strokeRouteTournamentGate.selection.killIgnoredReason) {
+        console.warn(
+          "Studio stroke-route tournament kill list was ignored to keep a fallback chain.",
+          strokeRouteTournamentGate.selection.killIgnoredReason,
+        );
+      }
       // Admissions are side-effecting. Attempt them strictly in product priority order and stop
       // invoking lower providers after the first accepted owner; resolving all probes first would
       // start multiple translucent surfaces and create a cancellation race.
-      const livingInkAdmitted = pendingGpuAuthorityPromoted
+      const livingInkAdmitted = strokeRouteTournamentGate.admits("living-ink")
+        && pendingGpuAuthorityPromoted
         && beginStudioLivingInkStroke(next, pointerSample);
-      const hokusaiPinned = pendingGpuAuthorityPromoted
+      const hokusaiPinned = strokeRouteTournamentGate.admits("hokusai")
+        && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && beginStudioHokusaiLiveStroke(next);
       const stampKind = resolveStudioStampBrushKind(next.brush);
       const stampDirect = Boolean(
-        !livingInkAdmitted
+        strokeRouteTournamentGate.admits("stamp")
+        && !livingInkAdmitted
         && !hokusaiPinned
         && stampKind
         && isDirectLiveStampDraftEl(next)
@@ -29231,7 +29265,8 @@ const puppetWarpArmed =
       // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
       // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
       // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-      const gpuStartEligible = pendingGpuAuthorityPromoted
+      const gpuStartEligible = strokeRouteTournamentGate.admits("gpu")
+        && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -29276,7 +29311,8 @@ const puppetWarpArmed =
       liveInkOverlayClearGenRef.current += 1;
       let liveInkOverlayStarted = false;
       if (
-        overlayCandidate
+        strokeRouteTournamentGate.admits("live-ink")
+        && overlayCandidate
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -29298,7 +29334,8 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      const wetInkOverlayStarted = !pixelDirect
+      const wetInkOverlayStarted = strokeRouteTournamentGate.admits("wet-fallback")
+        && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -29310,7 +29347,8 @@ const puppetWarpArmed =
           pageEpoch: currentPageId,
           hidden: next.hidden === true,
         }).status === "started";
-      const dynamicBrushDirect = !pixelDirect
+      const dynamicBrushDirect = strokeRouteTournamentGate.admits("dynamic")
+        && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
