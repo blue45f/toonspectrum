@@ -11442,6 +11442,22 @@ function StudioCuttoonEditor() {
     liveDraftLayerRef.current?.drawScene();
   }
 
+  function clearStudioLivingInkVectorShadow(
+    state: StudioLivingInkPinnedStroke,
+  ): void {
+    if (liveDraftVisualRef.current?.id === state.strokeId) {
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+    }
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
   function failStudioLivingInkStroke(
     state: StudioLivingInkPinnedStroke,
     reason: string,
@@ -11478,6 +11494,7 @@ function StudioCuttoonEditor() {
     });
     if (claim.status !== "owned") return;
     livingInkOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioLivingInkVectorShadow(state);
     livingInkOverlayVisibleRef.current = false;
     livingInkStrokeRef.current = null;
     releaseLivingInkInputPointer();
@@ -11505,6 +11522,8 @@ function StudioCuttoonEditor() {
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     if (!handoff || handoff.kind === "stroke") {
+      const state = livingInkStrokeRef.current;
+      if (state) clearStudioLivingInkVectorShadow(state);
       livingInkStrokeRef.current = null;
       livingInkFinalizingRef.current = false;
       studioStrokeSurfaceRouteRef.current = null;
@@ -34332,6 +34351,22 @@ const puppetWarpArmed =
             finishingHokusai.finalDrawing,
           );
         }
+      }
+      const finishingLivingInk = livingInkStrokeRef.current;
+      if (
+        deferInkCleanup
+        && finishingLivingInk?.finishing
+        && finishingLivingInk.finalDrawing
+        && !finishingLivingInk.overlayPresented
+      ) {
+        // A tap or very short watercolor stroke has fewer than one canonical sample chunk, so it
+        // cannot produce an interactive Living Ink frame before pointer-up. Keep the exact vector
+        // visible while the bounded settle creates the first canonical frame; otherwise the mark
+        // disappears for the whole finalization window even though its input is already sealed.
+        showStudioLivingInkVectorShadow(
+          finishingLivingInk.finalDrawing,
+          finishingLivingInk.pageId,
+        );
       }
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
       // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
