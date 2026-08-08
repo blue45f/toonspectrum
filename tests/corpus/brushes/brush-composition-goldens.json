@@ -1,0 +1,206 @@
+{
+  "harness": "tests/visual/brush-composition.test.ts",
+  "api": "executeCompositionProgram (packages/studio-brush-platform/src/brush-composition.ts)",
+  "doc": "docs/architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md §12.2",
+  "engines": "ink-stroke-modeler pinned wasm | libmypaint 1.6.1 pinned wasm | hokusai 0.3.0 via studio-hokusai-wasm | vello_cpu via studio-engine-vello (render + kurbo fit)",
+  "canvas": {
+    "width": 192,
+    "height": 96,
+    "seed": 7,
+    "samples": 96
+  },
+  "path": "standardCompositionStrokeSamples (preview-spec zigzag lifted to ModeledSampleIR)",
+  "unavailableRows": [
+    {
+      "name": "장식·패턴",
+      "missing": "arc-length pattern stamping provider (vello_svg/ThorVG recording or CanvasKit image stamps)"
+    },
+    {
+      "name": "파티클",
+      "missing": "GPU particle provider (ThorVG/Pixi fallback included)"
+    },
+    {
+      "name": "리본·헤어·로프",
+      "missing": "XPBD guide-curve solver (spring spline fallback included)"
+    },
+    {
+      "name": "텍스트 브러시",
+      "missing": "Parley glyph-run shaper on the brush path (Glifo/CanvasKit Paragraph)"
+    },
+    {
+      "name": "3D 표면 브러시",
+      "missing": "Three.js hit/UV projection + GPU texture paint provider"
+    }
+  ],
+  "presets": [
+    {
+      "id": "g-pen-mapping-pen",
+      "name": "G펜·매핑펜",
+      "lane": "studio-max",
+      "chain": "ink-stroke-modeler → [nib: kurbo-centerline+vector-outline → vector-fill → src-over@1]",
+      "outSamples": 199,
+      "sha256": "1c353c1a4b151c73b4585a82678ae52967af4ea19244c6ffcb8c312680f8be29",
+      "inkedPixels": 2393,
+      "layers": [
+        {
+          "id": "nib",
+          "geometry": "vector-outline",
+          "engine": "vector-fill",
+          "inkedPixels": 2485,
+          "centerlineVerbs": 7,
+          "geometrySamples": 97
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "calligraphy",
+      "name": "캘리그래피",
+      "lane": "studio-max",
+      "chain": "ink-stroke-modeler → [coat: kurbo-centerline+vector-outline → vector-fill → multiply@0.85 | core: vector-outline → vector-fill → src-over@1]",
+      "outSamples": 199,
+      "sha256": "23fcab02fed6a756cb883370da594d59a90ea9e33de40581b1bc948304eedfaf",
+      "inkedPixels": 3815,
+      "layers": [
+        {
+          "id": "coat",
+          "geometry": "vector-outline",
+          "engine": "vector-fill",
+          "inkedPixels": 3949,
+          "centerlineVerbs": 7,
+          "geometrySamples": 97
+        },
+        {
+          "id": "core",
+          "geometry": "vector-outline",
+          "engine": "vector-fill",
+          "inkedPixels": 2201,
+          "geometrySamples": 199
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "monoline-technical-pen",
+      "name": "모노라인·기술펜",
+      "lane": "studio-max",
+      "chain": "ema → [line: kurbo-centerline+vector-outline → vector-fill → src-over@1]",
+      "outSamples": 96,
+      "sha256": "f7251177fe61bef3b72af52b375edd4875c7b3614ec322d886771b39d8fc4a2e",
+      "inkedPixels": 1928,
+      "layers": [
+        {
+          "id": "line",
+          "geometry": "vector-outline",
+          "engine": "vector-fill",
+          "inkedPixels": 2013,
+          "centerlineVerbs": 16,
+          "geometrySamples": 241
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "pencil-mechanical",
+      "name": "연필·샤프",
+      "lane": "stable",
+      "chain": "ema → [graphite: raster-dab → hokusai → src-over@1]",
+      "outSamples": 96,
+      "sha256": "52b35eaadb134235b9f2b0561b1a82281615d2709738bb81b276a63ace24b5d4",
+      "inkedPixels": 1077,
+      "layers": [
+        {
+          "id": "graphite",
+          "geometry": "raster-dab",
+          "engine": "hokusai",
+          "inkedPixels": 1552
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "colored-pencil-charcoal",
+      "name": "색연필·목탄",
+      "lane": "studio-max",
+      "chain": "ema → [base: raster-dab → hokusai → multiply@0.9 | grain: raster-dab → hokusai → src-over@0.85]",
+      "outSamples": 96,
+      "sha256": "3bfb444d15f9df78c24f84d09a482903899511c6bfb7a86747635aa1890570a4",
+      "inkedPixels": 1023,
+      "layers": [
+        {
+          "id": "base",
+          "geometry": "raster-dab",
+          "engine": "hokusai",
+          "inkedPixels": 1951
+        },
+        {
+          "id": "grain",
+          "geometry": "raster-dab",
+          "engine": "hokusai",
+          "inkedPixels": 1264
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "watercolor-ink-wash",
+      "name": "수채·수묵",
+      "lane": "studio-max",
+      "chain": "spring → [wash: raster-dab → libmypaint → src-over@1]",
+      "outSamples": 96,
+      "sha256": "9670bf5e659aeff01cedd1d200dbb8e8166bf0e795743d59c46219505bca49d3",
+      "inkedPixels": 3352,
+      "layers": [
+        {
+          "id": "wash",
+          "geometry": "raster-dab",
+          "engine": "libmypaint",
+          "inkedPixels": 6465
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "oil-gouache",
+      "name": "유화·과슈",
+      "lane": "studio-max",
+      "chain": "spring → [paint: raster-dab → libmypaint → src-over@1]",
+      "outSamples": 96,
+      "sha256": "f1384911ae34cceefb9738cf64a9bae739b204ef420b321b2ba0aa912a98ce3f",
+      "inkedPixels": 5072,
+      "layers": [
+        {
+          "id": "paint",
+          "geometry": "raster-dab",
+          "engine": "libmypaint",
+          "inkedPixels": 5672
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "smudge-mixer",
+      "name": "스머지·믹서",
+      "lane": "studio-max",
+      "chain": "ema → [base: raster-dab → hokusai → src-over@1 | mix: raster-dab → libmypaint → src-over@0.9]",
+      "outSamples": 96,
+      "sha256": "1e9ba69e6feaac2dbe9c53832bcb40ec68d9d3e6eb77e692c353ce7bd35e8409",
+      "inkedPixels": 1429,
+      "layers": [
+        {
+          "id": "base",
+          "geometry": "raster-dab",
+          "engine": "hokusai",
+          "inkedPixels": 2399
+        },
+        {
+          "id": "mix",
+          "geometry": "raster-dab",
+          "engine": "libmypaint",
+          "inkedPixels": 5927
+        }
+      ],
+      "warnings": []
+    }
+  ]
+}
