@@ -27,7 +27,7 @@
  * not.
  */
 
-import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "./studio-view-controls";
+import { planStudioCanvasStageLayout, type StudioCanvasStageLayout } from "./studio-view-controls";
 
 /** Unscaled document size plus the display scale the Stage is currently rendered at. */
 export interface StudioStageDocumentGeometry {
@@ -65,7 +65,7 @@ export interface StudioDocumentViewStage {
  */
 export function planStudioStageDocumentViewBox(
   geometry: StudioStageDocumentGeometry
-): StudioViewStageLayout {
+): StudioCanvasStageLayout {
   return planStudioCanvasStageLayout({
     documentWidth: geometry.documentWidth,
     documentHeight: geometry.documentHeight,
@@ -73,6 +73,9 @@ export function planStudioStageDocumentViewBox(
     // A capture is a document read, never a screen mirror: no view-only flip, no view-only turn.
     canvasFlipH: false,
     canvasRotation: 0,
+    // A capture is also never a viewport window. Passing no clip here is belt-and-braces: the
+    // `captureDocumentView` flag below already discards any clip the planner is handed.
+    viewportClip: null,
     captureDocumentView: true,
   });
 }

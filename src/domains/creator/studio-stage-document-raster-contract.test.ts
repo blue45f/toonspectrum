@@ -62,6 +62,20 @@ const EFFECTIVE_SCALE = 5;
 const VIEWPORT_WIDTH = 800;
 const VIEWPORT_HEIGHT = 600;
 
+/*
+ * The artist's live view in every case below is a *clipped* Stage — scrolled deep into a 4620×6930
+ * page through an 800×600 window. That is the whole point of this suite: at 5× the adaptive clip is
+ * armed, so if `captureDocumentView` ever stopped discarding it, every export here would hand back
+ * an 800×600 crop of the middle of the page. Passing no clip would make the suite prove only that
+ * the feature is absent.
+ */
+const LIVE_VIEWPORT_CLIP = {
+  viewportWidth: VIEWPORT_WIDTH,
+  viewportHeight: VIEWPORT_HEIGHT,
+  scrollLeft: 1_600,
+  scrollTop: 3_200,
+} as const;
+
 interface CaptureRecord {
   readonly kind: "toCanvas" | "toDataURL";
   /** Output raster size in pixels. */
@@ -240,11 +254,17 @@ function createStageHost(options: { canvasFlipH: boolean; canvasRotation: number
         scale: EFFECTIVE_SCALE,
         canvasFlipH: options.canvasFlipH,
         canvasRotation: options.canvasRotation,
+        viewportClip: LIVE_VIEWPORT_CLIP,
         captureDocumentView,
       })
     );
   };
   relayout();
+  // Guard the guard: if the live layout were not actually clipped, every export assertion below
+  // would pass for the trivial reason that there was nothing to exclude.
+  if (stage.currentLayout().width >= DOCUMENT_WIDTH * EFFECTIVE_SCALE) {
+    throw new Error("live stage was not viewport-clipped; the export assertions would be vacuous");
+  }
 
   return {
     stage,
@@ -375,17 +395,19 @@ describe("stage raster is always the full document raster", () => {
 
     await orchestration.handleDownload();
 
+    const liveLayout = planStudioCanvasStageLayout({
+      documentWidth: DOCUMENT_WIDTH,
+      documentHeight: DOCUMENT_HEIGHT,
+      scale: EFFECTIVE_SCALE,
+      canvasFlipH: view.canvasFlipH,
+      canvasRotation: view.canvasRotation,
+      viewportClip: LIVE_VIEWPORT_CLIP,
+      captureDocumentView: false,
+    });
     expect(host.stage.currentLayout()).toEqual(before);
-    expect(before).toEqual(
-      planStudioCanvasStageLayout({
-        documentWidth: DOCUMENT_WIDTH,
-        documentHeight: DOCUMENT_HEIGHT,
-        scale: EFFECTIVE_SCALE,
-        canvasFlipH: view.canvasFlipH,
-        canvasRotation: view.canvasRotation,
-        captureDocumentView: false,
-      })
-    );
+    expect(before).toEqual(liveLayout);
+    // The restored view is the artist's clipped window, not a document-sized Stage left behind.
+    expect(liveLayout.clip).not.toBeNull();
   });
 
   /*
@@ -414,15 +436,18 @@ describe("stage raster is always the full document raster", () => {
     expect(capture.width).not.toBeCloseTo(DOCUMENT_WIDTH * EXPORT_SCALE, 6);
   });
 
-  it("fails a capture taken from a rotated stage", () => {
+  it("fails a capture taken from the artist's live stage", () => {
     const host = createStageHost({ canvasFlipH: false, canvasRotation: 90 });
     (host.stage as unknown as { toCanvas: (config: { pixelRatio: number }) => unknown }).toCanvas({
       pixelRatio: EXPORT_SCALE / EFFECTIVE_SCALE,
     });
 
     const capture = host.stage.captures[0]!;
-    // A quarter turn transposes the Stage box, so the raster is the document's height × its width.
-    expect(capture.width).toBeCloseTo(DOCUMENT_HEIGHT * EXPORT_SCALE, 6);
+    // The live Stage is both quarter-turned (which transposes its box) and clipped to a scrolled
+    // window, so the raster is neither dimension of the document and loses its corners.
+    expect(capture.width).not.toBeCloseTo(DOCUMENT_WIDTH * EXPORT_SCALE, 6);
+    expect(capture.width).not.toBeCloseTo(DOCUMENT_HEIGHT * EXPORT_SCALE, 6);
+    expect(documentCornersCovered(capture)).toBe(false);
     expect(() => expectFullDocumentRaster(capture, EXPORT_SCALE)).toThrow();
   });
 });
@@ -487,9 +512,11 @@ describe("readStudioStageInDocumentView", () => {
         documentWidth: DOCUMENT_WIDTH,
         documentHeight: DOCUMENT_HEIGHT,
         scale: EFFECTIVE_SCALE,
-        // The live canvas may be flipped and turned; a capture render must ignore both.
+        // The live canvas may be flipped, turned and clipped to a scrolled window; a capture
+        // render must ignore all three.
         canvasFlipH: true,
         canvasRotation: 90,
+        viewportClip: LIVE_VIEWPORT_CLIP,
         captureDocumentView: true,
       })
     );

@@ -26,6 +26,16 @@ interface StudioTextEditOverlayProps {
   elementById: Map<string, El>;
   nodeRefsRef: import("react").RefObject<Record<string, Konva.Node | null>>;
   effScale: number;
+  /**
+   * Where the Stage's local origin sits inside the document box, in CSS pixels.
+   *
+   * Normally zero. When the adaptive viewport clip is armed the Stage covers only a scrolled
+   * window of the document, so `getAbsoluteTransform()` returns Stage-local coordinates that are
+   * short by exactly this offset — while this overlay is a child of the document-sized zoom host.
+   * Adding it back keeps the caret on the glyphs at every magnification.
+   */
+  stageOriginOffsetX: number;
+  stageOriginOffsetY: number;
   onCommit: (value: string) => void;
   onCancel: () => void;
 }
@@ -99,6 +109,8 @@ export default function StudioTextEditOverlay({
   elementById,
   nodeRefsRef,
   effScale,
+  stageOriginOffsetX,
+  stageOriginOffsetY,
   onCommit,
   onCancel,
 }: StudioTextEditOverlayProps) {
@@ -207,7 +219,10 @@ export default function StudioTextEditOverlay({
     onCommit(value);
   }
 
-  const [a, b, c, d, e, f] = visual.matrix;
+  // Stage-local -> document-CSS. `stageOriginOffset*` is 0 unless the viewport clip is armed.
+  const [a, b, c, d, stageLocalE, stageLocalF] = visual.matrix;
+  const e = stageLocalE + stageOriginOffsetX;
+  const f = stageLocalF + stageOriginOffsetY;
 
   return (
     <textarea

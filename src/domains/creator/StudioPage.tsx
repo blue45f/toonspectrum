@@ -40955,6 +40955,8 @@ function clearSelectionForEdit() {
           canvasH={canvasH}
           canvasOnlyMode={canvasOnlyMode}
           canvasInteractionBlocked={canvasInteractionBlocked}
+          canvasScrollViewport={scrollPos}
+          scrollViewportStore={scrollViewportStore}
           hardCanvasInteractionBlock={hardCanvasInteractionBlock}
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}

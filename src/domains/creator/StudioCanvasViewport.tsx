@@ -56,9 +56,16 @@ import { movePuppetPin, type PuppetPin } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { type StudioRasterHandoffCandidate } from "./studio-raster-handoff-authority";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
+import { type StudioScrollViewport, type StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import { unionBounds } from "./studio-selection";
 import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
 import { type SmartGuideOverlay } from "./studio-smart-guides";
+import {
+  applyStudioStageViewportClip,
+  resolveStudioStageViewportClipArmed,
+  studioStageBackingPixels,
+  type StudioStageViewportClipRuntime,
+} from "./studio-stage-viewport-clip";
 import { normalizeShapeParams } from "./studio-stroke-shapes";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
@@ -116,6 +123,28 @@ function localizeText(
   const translated = t(key);
   return translated === key ? fallback : translated;
 }
+
+function readStageDevicePixelRatio(): number {
+  const ratio = globalThis.devicePixelRatio;
+  return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+}
+
+/*
+ * Two frozen style objects rather than an inline literal, so React only ever writes the Stage
+ * container's style when the clip actually turns on or off. The clip *offset* is written straight
+ * to `style.transform` by the scroll follower, and `transform` appears in neither object — React
+ * therefore never clears it out from under the follower.
+ *
+ * Drawing owns the contact stream; browser panning would otherwise cancel a fast finger stroke. The
+ * wrap's explicit two-finger pinch handler still receives bubbled touch events.
+ */
+const STUDIO_STAGE_DOCUMENT_STYLE = { touchAction: "none" } as const;
+const STUDIO_STAGE_CLIPPED_STYLE = {
+  touchAction: "none",
+  position: "absolute",
+  left: 0,
+  top: 0,
+} as const;
 
 function liveNodeDisplayBounds(
   node: Konva.Node | null | undefined,
@@ -525,6 +554,14 @@ export interface StudioCanvasViewportProps {
   editing: { id: string; } | null;
   eyedropperActive: boolean;
   effScale: number;
+  /** Settled scroll viewport of the canvas host. Frame-accurate values come from the store below. */
+  canvasScrollViewport: StudioScrollViewport;
+  /**
+   * Live scroll viewport publisher. The clipped Stage has to follow the scroll offset every frame,
+   * and the React snapshot above is deliberately deferred to gesture settle, so the Stage tracks
+   * this store imperatively instead of re-rendering the editor once per pan frame.
+   */
+  scrollViewportStore: StudioScrollViewportStore;
   elementById: Map<string, El>;
   elements: El[];
   studioFilterPageComposite: (ImageEl & El) | null;
@@ -822,6 +859,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   editing,
   eyedropperActive,
   effScale,
+  canvasScrollViewport,
+  scrollViewportStore,
   elementById,
   elements,
   studioFilterPageComposite,
@@ -1452,6 +1491,34 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   // 보기 변환은 문서 데이터가 아니다. 저장·내보내기·타임랩스 캡처 프레임에서는
   // Stage를 정규 좌표계로 되돌려 회전/반전이 결과 픽셀에 굽히지 않게 한다.
   const suppressViewTransform = isExporting || saving || timelapseCapturing;
+  // 적응형 뷰포트 클립 — 스테이지 백킹 스토어가 임계를 넘을 때만 보이는 영역으로 줄인다.
+  // 임계·이력(히스테리시스) 근거는 studio-stage-viewport-clip.ts 상단 실측 표에 있다.
+  const [stageDevicePixelRatio, setStageDevicePixelRatio] = useState(readStageDevicePixelRatio);
+  useEffect(() => {
+    // DPR 은 창을 다른 배율의 모니터로 옮길 때 바뀌고, 그때 resize 가 함께 발행된다.
+    const syncDevicePixelRatio = () => {
+      const next = readStageDevicePixelRatio();
+      setStageDevicePixelRatio((current) => (current === next ? current : next));
+    };
+    globalThis.addEventListener("resize", syncDevicePixelRatio);
+    return () => globalThis.removeEventListener("resize", syncDevicePixelRatio);
+  }, []);
+  // 이력값은 state 가 아니라 ref 다 — 임계를 넘는 순간 그 렌더에서 바로 클립돼야 하고
+  // (한 프레임 늦으면 그 프레임에 32Mpx 를 할당한다), 결정이 바뀌었다고 추가 렌더를 만들면
+  // 줌 정착 커밋 예산(studio-hot-path-commit-budget.ts)을 잡아먹는다.
+  const stageClipArmedRef = useRef(false);
+  const stageClipArmed = resolveStudioStageViewportClipArmed(
+    studioStageBackingPixels({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      scale: effScale,
+      devicePixelRatio: stageDevicePixelRatio,
+    }),
+    stageClipArmedRef.current
+  );
+  useEffect(() => {
+    stageClipArmedRef.current = stageClipArmed;
+  }, [stageClipArmed]);
   const stageViewLayout = planStudioCanvasStageLayout({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -1459,7 +1526,54 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canvasFlipH,
     canvasRotation,
     captureDocumentView: suppressViewTransform,
+    viewportClip: stageClipArmed
+      ? {
+          viewportWidth: canvasScrollViewport.width,
+          viewportHeight: canvasScrollViewport.height,
+          scrollLeft: canvasScrollViewport.left,
+          scrollTop: canvasScrollViewport.top,
+        }
+      : null,
   });
+  const stageViewClip = stageViewLayout.clip;
+  const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
+  // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
+  // 다시 맞춘다. 컨테이너 transform 과 stage.x/y 는 크기가 같고 부호가 반대라, 둘 중 하나만
+  // 반영된 프레임은 포인터 좌표를 스크롤 델타만큼 어긋나게 만든다 — 항상 같이 쓴다.
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (!stageViewClip) {
+      stageClipRuntimeRef.current = null;
+      const container = stage.container();
+      if (container && container.style.transform) container.style.transform = "";
+      return;
+    }
+    const runtime: StudioStageViewportClipRuntime = {
+      stageWidth: stageViewLayout.hostWidth,
+      stageHeight: stageViewLayout.hostHeight,
+      width: stageViewClip.width,
+      height: stageViewClip.height,
+      baseX: stageViewLayout.x + stageViewClip.left,
+      baseY: stageViewLayout.y + stageViewClip.top,
+      appliedLeft: Number.NaN,
+      appliedTop: Number.NaN,
+    };
+    stageClipRuntimeRef.current = runtime;
+    const live = scrollViewportStore.getSnapshot();
+    applyStudioStageViewportClip(stage, runtime, live.left, live.top);
+  });
+  useEffect(() => {
+    // 팬 핫패스: 스크롤 프레임마다 React 를 통과하지 않고 스테이지 창만 옮긴다.
+    const followScroll = () => {
+      const stage = stageRef.current;
+      const runtime = stageClipRuntimeRef.current;
+      if (!stage || !runtime) return;
+      const live = scrollViewportStore.getSnapshot();
+      applyStudioStageViewportClip(stage, runtime, live.left, live.top);
+    };
+    return scrollViewportStore.subscribe(followScroll);
+  }, [scrollViewportStore, stageRef]);
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
   const canvasCursorInput = {
     tool,
@@ -2273,27 +2387,31 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
             style={{
-              height: stageViewLayout.height,
+              // 줌 호스트는 항상 문서 박스를 유지한다 — 스크롤 범위, 드롭 좌표, 줌 앵커,
+              // WebGPU/라이브잉크 오버레이 좌표계가 전부 이 박스를 기준으로 한다.
+              // 뷰포트 클립이 줄이는 것은 아래 Konva Stage 하나뿐이다.
+              height: stageViewLayout.hostHeight,
               isolation: "isolate",
-              width: stageViewLayout.width,
+              width: stageViewLayout.hostWidth,
             }}
           >
           <div
             data-studio-post-processing-scope=""
             className="relative"
-            style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}
+            style={{
+              filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined,
+              // 클립된 Stage 는 흐름에서 빠지므로(absolute) 이 래퍼에 문서 박스를 명시로 박는다.
+              // 안 그러면 래퍼가 높이 0 으로 붕괴하고, inset-0 오버레이와 스크롤 범위가 함께 죽는다.
+              height: stageViewLayout.hostHeight,
+              width: stageViewLayout.hostWidth,
+            }}
           >
           <Profiler id="studio:stage" onRender={recordStudioRenderProfile}>
           <Stage
             ref={stageRef}
             width={stageViewLayout.width}
             height={stageViewLayout.height}
-            // Drawing owns the contact stream; browser panning would otherwise cancel a fast
-            // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
-            // touch events, and a second touch cancels an unfinished finger stroke above.
-            style={{
-              touchAction: "none",
-            }}
+            style={stageViewClip ? STUDIO_STAGE_CLIPPED_STYLE : STUDIO_STAGE_DOCUMENT_STYLE}
             scaleX={stageViewLayout.scaleX}
             scaleY={stageViewLayout.scaleY}
             x={stageViewLayout.x}
@@ -3736,8 +3854,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           <StudioPixiSceneOverlayHost
             enabled
             mountParent={pixiMountParent}
-            width={stageViewLayout.width}
-            height={stageViewLayout.height}
+            // 이 오버레이는 줌 호스트에 마운트돼 문서 CSS 공간에 그린다 — Stage 가 클립돼도
+            // 좌표계는 문서 박스 그대로여야 한다.
+            width={stageViewLayout.hostWidth}
+            height={stageViewLayout.hostHeight}
             elements={elements}
             selectedIds={
               marqueeIds.length > 0
@@ -3853,6 +3973,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 elementById={elementById}
                 nodeRefsRef={nodeRefsRef}
                 effScale={effScale}
+                stageOriginOffsetX={stageViewClip?.left ?? 0}
+                stageOriginOffsetY={stageViewClip?.top ?? 0}
                 onCommit={commitEditText}
                 onCancel={cancelEditText}
               />

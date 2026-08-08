@@ -1,8 +1,8 @@
 {
   "gate": "tests/benchmarks/harness/studio-runtime-commit-gate.ts",
   "contract": "src/domains/creator/studio-hot-path-commit-budget.ts",
-  "generatedAt": "2026-08-08T07:46:11.734Z",
-  "route": "http://127.0.0.1:52892/studio",
+  "generatedAt": "2026-08-08T10:11:31.100Z",
+  "route": "http://127.0.0.1:54723/studio",
   "build": "production dist/ served by vite preview (pnpm exec vite build)",
   "host": {
     "platform": "darwin",
@@ -18,7 +18,7 @@
     "reactRenderersInjected": 1,
     "controlGesture": {
       "action": "brush size slider 6 -> 18 -> 6",
-      "reactCommits": 11,
+      "reactCommits": 10,
       "editorRenders": 4,
       "canvasRenders": 4
     },
@@ -130,5 +130,5 @@
   "violations": [],
   "failure": null,
   "passed": true,
-  "runtimeMs": 24232.6
+  "runtimeMs": 23801.8
 }
