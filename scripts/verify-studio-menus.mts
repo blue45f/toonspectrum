@@ -2,8 +2,8 @@
  * scripts/verify-studio-menus.mts
  * Desktop headless check: Studio application menus + left rail + menu-driven popovers.
  *
- * Desktop IA (Magma-style):
- * - Visible: app menubar + V5 §15.3 MainMenu groups + left tool rail
+ * Desktop IA (V5 §15.3):
+ * - Visible: app menubar + 17 specification groups + AI + left tool rail
  * - Toolbelt is parked off-screen on lg+ (still mounts popovers when opened via main menu)
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
@@ -18,45 +18,97 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 
 const MAIN_MENU: Record<string, string[]> = {
   파일: [
-    "내보내기 / 다운로드",
-    "이미지를 클립보드로",
     "임시저장",
     "게시",
-    "백업 (.json)",
-    "아카이브 백업",
     "프로젝트 가져오기…",
     "PSD 가져오기…",
+    "ORA / CBZ / WILL 가져오기…",
     "프로젝트 도구…",
+    "내보내기 / 다운로드",
+    "백업 (.json)",
+    "빠른 시작 · 새 작업…",
+    "버전 체크포인트…",
+    "게시 패키지…",
+    "에셋 권리 감사…",
   ],
   편집: [
     "실행취소",
     "다시실행",
+    "잘라내기",
     "복사",
-    "복제",
+    "붙여넣기",
+    "현재 위치에 붙여넣기",
     "선택 제거",
+    "복제",
     "작업 내역",
-  ],
-  선택: ["모두 선택", "선택 해제"],
-  레이어: ["이미지…"],
-  벡터: [
-    "요소 · 도형",
-  ],
-  텍스트: ["말풍선", "텍스트"],
-  만화: ["콜라주", "새 페이지"],
-  "3D": [
-    "3D 캐릭터",
-    "3D 배경",
+    "펜 압력 설정…",
+    "애플리케이션 설정…",
+    "자동 액션 · 매크로…",
   ],
   보기: [
-    "화면에 맞게 조정",
     "확대",
     "축소",
+    "왼쪽으로 90° 회전",
+    "오른쪽으로 90° 회전",
+    "화면에 맞게 조정",
     "실제 픽셀 (100%)",
-    "전체화면",
-    "다중 레이어 타임라인",
-    "세로 스크롤 미리보기",
-    "스토리보드 그리드 보기",
+    "현재 보기 저장",
+    "제작 인사이트…",
+    "미니맵 · 탐색",
+    "밑그림 오버레이 (이메레스)",
   ],
+  캔버스: ["캔버스 크기 · 문서 설정…"],
+  레이어: [
+    "이미지…",
+    "레이어 · 맨 위로",
+    "레이어 · 맨 뒤로",
+    "레이어 자르기…",
+    "레이어 마스크 편집…",
+    "나만 숨긴 레이어 모두 표시",
+  ],
+  선택: ["모두 선택", "선택 해제", "선택 반전"],
+  변형: ["선택 변형"],
+  그리기: [
+    "펜",
+    "지우개",
+    "채우기",
+    "스마트 도형",
+    "브러시 프리셋 목록…",
+    "브러시 스튜디오…",
+    "자연 매체 · 안료…",
+    "내 브러시…",
+    "브러시 가져오기 (ABR · MYB · KPP)…",
+    "배경 · 톤",
+    "팔레트 · 브랜드",
+  ],
+  필터: [
+    "마지막 필터…",
+    "가우시안 블러",
+    "모션 블러",
+    "색조 / 채도 / 밝기",
+    "명도 / 대비",
+    "색상 커브",
+    "레이어 보정 · 레벨",
+    "색수차",
+    "스케치 선화 정리",
+    "노이즈 추가",
+  ],
+  벡터: ["요소 · 도형"],
+  텍스트: ["말풍선", "텍스트", "대사 일괄 편집…", "대사 번역 · 다국어…"],
+  만화: [
+    "새 페이지",
+    "콜라주",
+    "톤 · 스크린톤",
+    "Writer Room · 대본…",
+    "스토리보드 그리드…",
+    "제작 바이블…",
+    "이야기 연속성 검사…",
+    "세로 스크롤 미리보기…",
+    "애니매틱 타임라인…",
+  ],
+  애니메이션: ["프레임 애니메이션…"],
+  "3D": ["3D 데생 인형", "3D 캐릭터", "3D 배경"],
+  협업: ["팀 · 공유 권한…", "페이지 검토 · 승인…"],
   창: [
     "슈퍼심플 레이아웃",
     "전체 레이아웃",
@@ -64,17 +116,21 @@ const MAIN_MENU: Record<string, string[]> = {
     "캔버스만",
     "템플릿 · 에셋",
     "참고 이미지",
+    "멀티 디스플레이 작업공간…",
+    "애플리케이션 설정",
   ],
-  필터: [
-    "가우시안 블러",
-    "모션 블러",
-    "색조 / 채도 / 밝기",
-    "명도 / 대비",
-    "색상 커브",
-  ],
-  그리기: ["펜", "지우개", "채우기", "스마트 도형", "배경 · 톤", "팔레트 · 브랜드"],
   AI: ["AI 어시스트", "스톡 이미지", "연동 설정"],
-  도움말: ["사용법 · 기능 튜토리얼", "단축키 · 기본 조작"],
+  도움말: [
+    "명령 · 속성 통합 검색",
+    "CSP · Photoshop 용어 찾기",
+    "현재 도구 도움말",
+    "사용법 · 기능 튜토리얼",
+    "단축키 · 기본 조작",
+    "기기 · 브라우저 진단…",
+    "복구 가이드…",
+    "라이선스 · 서드파티 고지…",
+    "버그 리포트 패키지…",
+  ],
 };
 
 /** Left vertical rail — primary tool surface on desktop. */
@@ -347,6 +403,62 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   return failures;
 }
 
+async function assertWorkspaceDeviceEditor(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  try {
+    await closeFloatingUi(page);
+    const trigger = page.getByRole("button", { name: /^작업공간:/ }).first();
+    await trigger.click({ timeout: 4000 });
+
+    const quickDialog = page.getByRole("dialog", { name: "작업공간" });
+    await quickDialog.waitFor({ state: "visible", timeout: 5000 });
+    await quickDialog.getByRole("button", { name: "작업공간 관리", exact: true }).click({
+      timeout: 4000,
+    });
+
+    const management = page.getByRole("dialog", { name: "작업공간 관리" });
+    await management.waitFor({ state: "visible", timeout: 5000 });
+    await management.getByRole("button", { name: "전환 설정", exact: true }).click({
+      timeout: 4000,
+    });
+
+    for (const marker of ["모바일 주요 도구 위치", "기기별 배치"]) {
+      if (!(await management.getByText(marker, { exact: true }).first().isVisible().catch(() => false))) {
+        failures.push(`작업공간 기기 편집기 표식 미노출: ${marker}`);
+      }
+    }
+    if (!(await management.getByRole("group", { name: "조정할 기기" }).isVisible().catch(() => false))) {
+      failures.push("작업공간 기기 편집기 표식 미노출: 조정할 기기");
+    }
+    for (const device of ["펜 디스플레이", "모바일", "키보드", "마우스", "터치"]) {
+      const choice = management.getByRole("button", {
+        name: new RegExp(`^${device}(?: ·|$)`),
+      });
+      if (!(await choice.isVisible().catch(() => false))) {
+        failures.push(`작업공간 기기 축 선택지 미노출: ${device}`);
+      }
+    }
+    for (const side of ["왼쪽", "오른쪽"]) {
+      const choice = management.getByRole("button", {
+        name: new RegExp(`모바일 주요 도구 ${side} 배치`),
+      });
+      if (!(await choice.isVisible().catch(() => false))) {
+        failures.push(`모바일 손잡이 선택지 미노출: ${side}`);
+      }
+    }
+
+    if (failures.length === 0) log("  workspace device editor ok: 5 devices + handedness");
+    await management.getByRole("button", { name: "작업공간 메뉴 닫기", exact: true }).click();
+    await page.waitForTimeout(100);
+  } catch (err) {
+    failures.push(
+      `작업공간 기기 편집기: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    await page.keyboard.press("Escape").catch(() => undefined);
+  }
+  return failures;
+}
+
 async function assertDrawOptionsBar(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
@@ -437,6 +549,7 @@ async function main() {
       ...(await assertMainMenus(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
+      ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
       ...(await assertExportOptions(page)),
     ];

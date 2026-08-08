@@ -763,13 +763,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             mobileImmersive && "hidden"
           )}
         >
-          {/* Document context compresses down to its own min-content and no further.
-              `min-w-0` here let this lane collapse to 0px while its children kept painting
-              on top of the divider, the history cluster and the File trigger — that is the
-              "세션ile" overlap the audit caught. Title truncation still absorbs the pressure. */}
+          {/* Keep document/workspace context intact; the primary lane scrolls when commands exceed width. */}
           <div
             className={cn(
-              "flex shrink items-center gap-1.5",
+              // This lane contains the workspace dialog trigger. Let the primary menubar scroll
+              // instead of shrinking this wrapper beneath the adjacent history cluster; after a
+              // user traverses all 18 menus at laptop width, a zero-width wrapper otherwise leaves
+              // the visible workspace button covered by History and unreachable by pointer.
+              "flex min-w-max shrink-0 items-center gap-1.5",
               mobileImmersive && "hidden"
             )}
           >
