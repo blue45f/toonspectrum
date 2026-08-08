@@ -412,10 +412,14 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             mobileImmersive && "hidden"
           )}
         >
-          {/* Document context and application commands may compress; publish actions never do. */}
+          {/* Keep document/workspace context intact; the primary lane scrolls when commands exceed width. */}
           <div
             className={cn(
-              "flex min-w-0 shrink items-center gap-1.5",
+              // This lane contains the workspace dialog trigger. Let the primary menubar scroll
+              // instead of shrinking this wrapper beneath the adjacent history cluster; after a
+              // user traverses all 18 menus at laptop width, a zero-width wrapper otherwise leaves
+              // the visible workspace button covered by History and unreachable by pointer.
+              "flex min-w-max shrink-0 items-center gap-1.5",
               mobileImmersive && "hidden"
             )}
           >
