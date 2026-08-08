@@ -2215,6 +2215,7 @@ function StudioVrmMannequinMaterial({
   materialFx: VrmMaterialFx;
 }) {
   const snapshotsRef = useRef<MannequinMaterialSnapshot[]>([]);
+  const invalidate = useThree((state) => state.invalidate);
 
   const enforce = () => {
     for (const { material } of snapshotsRef.current) {
@@ -2249,6 +2250,9 @@ function StudioVrmMannequinMaterial({
     if (!enabled) {
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
+      // The static poser uses frameloop="demand". Restoring materials mutates Three objects
+      // imperatively, so React has no host prop change from which to schedule the color frame.
+      invalidate();
       return;
     }
     const seen = new Set<THREE.Material>();
@@ -2273,12 +2277,17 @@ function StudioVrmMannequinMaterial({
         material.needsUpdate = true;
       }
     });
+    // Schedule the first clay frame even while the poser is otherwise static.
+    invalidate();
     return () => {
       restore();
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
+      // Without this frame the Canvas keeps presenting the last gray framebuffer until the
+      // camera or another animation happens to invalidate it.
+      invalidate();
     };
-  }, [customColors, enabled, materialFx, vrm]);
+  }, [customColors, enabled, invalidate, materialFx, vrm]);
 
   useFrame(() => {
     if (enabled) enforce();
@@ -9849,6 +9858,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       type="button"
                       role="switch"
                       aria-checked={mannequinMode}
+                      aria-label="중립 데생 인형 보기"
                       disabled={!vrm}
                       className={cx(
                         "min-h-9 shrink-0 rounded-lg border px-2.5 text-[0.68rem] font-bold disabled:opacity-45",

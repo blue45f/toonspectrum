@@ -96,6 +96,15 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ]);
+export const STUDIO_VRM_CHROMA_DELTA_THRESHOLD = 40;
+export const STUDIO_VRM_COLOR_MIN_RATIO = 0.015;
+export const STUDIO_VRM_MANNEQUIN_MAX_RATIO = 0.005;
+
+export type StudioVrmChromaMetrics = Readonly<{
+  chromaticPixels: number;
+  pixelCount: number;
+  ratio: number;
+}>;
 
 export type Studio3dWebGpuRetryReason =
   | "context-or-device-lost"
@@ -583,6 +592,39 @@ function assertCondition(condition: unknown, message: string): asserts condition
   if (!condition) throw new Error(message);
 }
 
+export function collectStudioVrmMannequinChromaFailures(
+  baseline: StudioVrmChromaMetrics,
+  mannequin: StudioVrmChromaMetrics,
+  restored: StudioVrmChromaMetrics,
+): readonly string[] {
+  const failures: string[] = [];
+  if (baseline.pixelCount <= 0 || baseline.ratio < STUDIO_VRM_COLOR_MIN_RATIO) {
+    failures.push(
+      `the default VRM frame is not demonstrably colored (${baseline.ratio.toFixed(4)})`,
+    );
+  }
+  if (mannequin.pixelCount <= 0 || mannequin.ratio > STUDIO_VRM_MANNEQUIN_MAX_RATIO) {
+    failures.push(
+      `the mannequin frame did not become neutral (${mannequin.ratio.toFixed(4)})`,
+    );
+  }
+  if (restored.pixelCount <= 0 || restored.ratio < STUDIO_VRM_COLOR_MIN_RATIO) {
+    failures.push(
+      `the VRM frame stayed grayscale after mannequin mode was disabled (${restored.ratio.toFixed(4)})`,
+    );
+  }
+  if (
+    baseline.ratio >= STUDIO_VRM_COLOR_MIN_RATIO
+    && restored.ratio < baseline.ratio * 0.65
+  ) {
+    failures.push(
+      `the restored VRM frame retained less than 65% of its baseline chroma ` +
+        `(${restored.ratio.toFixed(4)} vs ${baseline.ratio.toFixed(4)})`,
+    );
+  }
+  return failures;
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -704,11 +746,11 @@ async function configureStudio(page: Page): Promise<void> {
   });
 }
 
-async function openInsertMenu(page: Page): Promise<Locator> {
+async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("button", { name: "삽입", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="삽입"]');
+  await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
+  const menu = page.locator('[role="menu"][aria-label="3D"]');
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }
@@ -725,6 +767,65 @@ async function waitForCanvasDialogTeardown(dialog: Locator, page: Page): Promise
   // R3F defers renderer teardown by 500ms. The compatibility patch also removes an unconsumed
   // planned-loss listener after one bounded second, so wait through both lifetimes.
   await page.waitForTimeout(1_650);
+}
+
+async function waitForLocatorEnabled(
+  locator: Locator,
+  page: Page,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (
+      await locator.isVisible().catch(() => false)
+      && await locator.isEnabled().catch(() => false)
+    ) {
+      return;
+    }
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`locator did not become enabled within ${String(timeoutMs)}ms`);
+}
+
+async function measureStudioVrmChroma(
+  page: Page,
+  canvas: Locator,
+): Promise<StudioVrmChromaMetrics> {
+  await canvas.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  const screenshot = await canvas.screenshot({ animations: "disabled", type: "png" });
+  return page.evaluate(async ({ base64, threshold }) => {
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+    const surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = surface.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      bitmap.close();
+      throw new Error("could not create the VRM chroma measurement context");
+    }
+    context.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const pixels = context.getImageData(0, 0, surface.width, surface.height).data;
+    const pixelCount = pixels.length / 4;
+    let chromaticPixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset]!;
+      const green = pixels[offset + 1]!;
+      const blue = pixels[offset + 2]!;
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) >= threshold) {
+        chromaticPixels += 1;
+      }
+    }
+    return {
+      chromaticPixels,
+      pixelCount,
+      ratio: pixelCount > 0 ? chromaticPixels / pixelCount : 0,
+    };
+  }, {
+    base64: screenshot.toString("base64"),
+    threshold: STUDIO_VRM_CHROMA_DELTA_THRESHOLD,
+  });
 }
 
 async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
@@ -840,15 +941,61 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     `opening /studio eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
   );
 
-  const characterMenu = await openInsertMenu(page);
+  const characterMenu = await openThreeDMenu(page);
   await characterMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
   const characterDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await characterDialog.waitFor({ state: "visible", timeout: 25_000 });
-  await page.waitForTimeout(1_000);
+  const insertCharacterButton = characterDialog.getByRole("button", {
+    name: "이 포즈로 추가",
+    exact: true,
+  });
+  await waitForLocatorEnabled(insertCharacterButton, page);
 
   assertCondition(
     sharedPoseRequests.length === 0,
     `opening the local character editor eagerly requested the shared-pose API:\n${sharedPoseRequests.join("\n")}`,
+  );
+
+  // The static poser renders on demand. This transition catches imperative material restores
+  // that update Three objects correctly but leave the last gray framebuffer on screen.
+  const vrmCanvas = characterDialog.getByRole("group", {
+    name: "3D 캐릭터 편집 뷰포트",
+    exact: true,
+  });
+  await vrmCanvas.waitFor({ state: "visible", timeout: 5_000 });
+  const baselineChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  await characterDialog.getByRole("tab", { name: "체형·색", exact: true }).click();
+  const mannequinSwitch = characterDialog.getByRole("switch", {
+    name: "중립 데생 인형 보기",
+    exact: true,
+  });
+  await mannequinSwitch.click();
+  assertCondition(
+    await mannequinSwitch.getAttribute("aria-checked") === "true",
+    "the mannequin switch did not activate",
+  );
+  const mannequinChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  await mannequinSwitch.click();
+  assertCondition(
+    await mannequinSwitch.getAttribute("aria-checked") === "false",
+    "the mannequin switch did not deactivate",
+  );
+  const restoredChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  const chromaFailures = collectStudioVrmMannequinChromaFailures(
+    baselineChroma,
+    mannequinChroma,
+    restoredChroma,
+  );
+  assertCondition(
+    chromaFailures.length === 0,
+    `VRM mannequin color transition failed:\n${chromaFailures.join("\n")}\n` +
+      JSON.stringify({ baselineChroma, mannequinChroma, restoredChroma }),
+  );
+  console.log(
+    "[verify-studio-3d-console] VRM chroma PASS " +
+      `baseline=${baselineChroma.ratio.toFixed(4)} ` +
+      `mannequin=${mannequinChroma.ratio.toFixed(4)} ` +
+      `restored=${restoredChroma.ratio.toFixed(4)}`,
   );
 
   await page.route(
@@ -872,16 +1019,14 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
   // Exercise the actual VRM render-target readback -> short-lived OffscreenCanvas PNG Worker ->
   // editor insertion path before deliberately losing a separate Canvas context below.
-  await characterDialog.getByRole("button", { name: "이 포즈로 추가", exact: true }).click({
-    timeout: 30_000,
-  });
+  await insertCharacterButton.click({ timeout: 30_000 });
   await waitForCanvasDialogTeardown(characterDialog, page);
   assertCondition(
     pngEncoderWorkers.length > 0,
     "VRM insertion did not start the shared off-main PNG encoder",
   );
 
-  const liveLossMenu = await openInsertMenu(page);
+  const liveLossMenu = await openThreeDMenu(page);
   await liveLossMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
   const liveLossDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await liveLossDialog.waitFor({ state: "visible", timeout: 25_000 });
@@ -903,7 +1048,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   }
   await closeCanvasDialog(liveLossDialog, page);
 
-  const backgroundMenu = await openInsertMenu(page);
+  const backgroundMenu = await openThreeDMenu(page);
   const backgroundMenuItem = backgroundMenu.getByRole("menuitem", {
     name: "3D 배경",
     exact: true,

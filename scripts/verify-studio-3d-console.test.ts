@@ -16,6 +16,7 @@ import {
   createBabylonAlignedRasterSmokeRequest,
   createBabylonStableIdParityRequests,
   classifyStudio3dWebGpuRetryableFailure,
+  collectStudioVrmMannequinChromaFailures,
   isExpectedStaticPreviewSocketIoHandshakeClose,
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
@@ -23,6 +24,9 @@ import {
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
   STUDIO_3D_WEBGPU_PROOF_SHARDS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
+  STUDIO_VRM_CHROMA_DELTA_THRESHOLD,
+  STUDIO_VRM_COLOR_MIN_RATIO,
+  STUDIO_VRM_MANNEQUIN_MAX_RATIO,
 } from "./verify-studio-3d-console.mts";
 
 const PREVIEW_URL = "http://127.0.0.1:51758/studio";
@@ -109,6 +113,75 @@ describe("3D static-preview Socket.IO diagnostics", () => {
     expect(
       isExpectedStaticPreviewSocketIoHandshakeClose(message, studioUrl),
     ).toBe(false);
+  });
+});
+
+describe("3D character production-preview color boundary", () => {
+  const colored = {
+    chromaticPixels: 26_300,
+    pixelCount: 1_000_000,
+    ratio: 0.0263,
+  } as const;
+  const neutral = {
+    chromaticPixels: 0,
+    pixelCount: 1_000_000,
+    ratio: 0,
+  } as const;
+
+  it("accepts a colored → neutral → colored mannequin transition", () => {
+    expect(STUDIO_VRM_CHROMA_DELTA_THRESHOLD).toBe(40);
+    expect(STUDIO_VRM_COLOR_MIN_RATIO).toBe(0.015);
+    expect(STUDIO_VRM_MANNEQUIN_MAX_RATIO).toBe(0.005);
+    expect(
+      collectStudioVrmMannequinChromaFailures(colored, neutral, {
+        ...colored,
+        chromaticPixels: 24_000,
+        ratio: 0.024,
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects the stale gray framebuffer left after mannequin mode is disabled", () => {
+    expect(
+      collectStudioVrmMannequinChromaFailures(colored, neutral, neutral),
+    ).toEqual([
+      "the VRM frame stayed grayscale after mannequin mode was disabled (0.0000)",
+      "the restored VRM frame retained less than 65% of its baseline chroma " +
+        "(0.0000 vs 0.0263)",
+    ]);
+  });
+
+  it("keeps the real production verifier wired to the toggle and screenshot gate", () => {
+    const productionPreview = sourceBetween(
+      "async function run(page: Page, studioUrl: string): Promise<void>",
+      "async function runBabylonStableIdOrientationParityProof(",
+    );
+    const threeDMenu = sourceBetween(
+      "async function openThreeDMenu(page: Page): Promise<Locator>",
+      "async function closeCanvasDialog(",
+    );
+    const baseline = productionPreview.indexOf(
+      "const baselineChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+    );
+    const toggleOn = productionPreview.indexOf("await mannequinSwitch.click();", baseline);
+    const mannequin = productionPreview.indexOf(
+      "const mannequinChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+      toggleOn,
+    );
+    const toggleOff = productionPreview.indexOf("await mannequinSwitch.click();", toggleOn + 1);
+    const restored = productionPreview.indexOf(
+      "const restoredChroma = await measureStudioVrmChroma(page, vrmCanvas);",
+      toggleOff,
+    );
+
+    expect(threeDMenu).toContain('getByRole("menuitem", { name: "3D", exact: true })');
+    expect(threeDMenu).toContain('aria-label="3D"');
+    expect(productionPreview).toContain('name: "중립 데생 인형 보기"');
+    expect(baseline).toBeGreaterThanOrEqual(0);
+    expect(toggleOn).toBeGreaterThan(baseline);
+    expect(mannequin).toBeGreaterThan(toggleOn);
+    expect(toggleOff).toBeGreaterThan(mannequin);
+    expect(restored).toBeGreaterThan(toggleOff);
   });
 });
 
