@@ -514,7 +514,13 @@ async function measureSelectionBar(page: Page, center: { x: number; y: number })
     (input) => globalThis.__uxPointerDistance.selectionBar(input.rect, input.point),
     { rect: selectionRect, point: pointerPoint },
   );
-  return { selectionRect, pointerPoint, measured };
+  const restoredTool = await page.evaluate(() => {
+    const pressed = [...document.querySelectorAll('[aria-pressed="true"]')]
+      .map((node) => (node.getAttribute("aria-label") || "").trim())
+      .filter((label) => label.length > 0);
+    return pressed.slice(0, 6);
+  });
+  return { selectionRect, pointerPoint, measured, restoredTool };
 }
 
 /**
@@ -532,15 +538,30 @@ async function verifyHudEraserToggle(page: Page, point: { x: number; y: number }
   // Restore the pen so the stroke that follows is ink, not an erase.
   await cell.click({ timeout: 3_000 }).catch(() => undefined);
   await page.waitForTimeout(300);
+  // Tool switches reopen the mobile 브러시 설정 sheet, which covers the canvas.
+  await dismissOpenSheets(page);
   await page.mouse.move(point.x, point.y);
-  await page.waitForTimeout(160);
+  await page.waitForTimeout(200);
   return { available: true as const, before, after, toggled: before !== after };
 }
 
 /** Fire one selection command and report whether the bar survived it. */
 async function runSelectionCommand(page: Page, command: string) {
   const button = page.locator(`[data-studio-selection-command="${command}"]`).first();
-  if (!(await button.isVisible().catch(() => false))) return { available: false as const };
+  const reachable = await button
+    .waitFor({ state: "visible", timeout: 4_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!reachable) {
+    return {
+      available: false as const,
+      reason: await page.evaluate(() => {
+        const bar = document.querySelector('[data-studio-selection-context-bar="true"]');
+        if (!(bar instanceof HTMLElement)) return "bar not mounted";
+        return `bar visibility=${bar.style.visibility} count=${bar.dataset.studioSelectionCount}`;
+      }),
+    };
+  }
   await button.click({ timeout: 3_000 }).catch(() => undefined);
   await page.waitForTimeout(500);
   return {
