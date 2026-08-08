@@ -81,6 +81,12 @@ verifyPkgIntegrity(
   "rebuild via emcc per packages/studio-brush-platform/src/ink-modeler/README.md " +
     "(re-apply the two-line @generated banner) and refresh INTEGRITY.sha256",
 );
+verifyPkgIntegrity(
+  LIBMYPAINT_DIR,
+  "libmypaint",
+  "rebuild via packages/studio-brush-platform/src/libmypaint/bridge/build.sh " +
+    "(pins libmypaint v1.6.1 + emcc, re-applies the eslint-disable banner and refreshes INTEGRITY.sha256)",
+);
 
 const STUDIO_ENGINE_PACKAGES = [
   "@toonspectrum/studio-project-model",

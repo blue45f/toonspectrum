@@ -1,3 +1,7 @@
+// The *.wesl?raw wildcard shim must travel with this module into every
+// consuming package's program; ambient declarations cannot be imported.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./wesl/wesl-source.d.ts" />
 import { link, minimalMangle } from "wesl";
 
 import weslBrightnessContrast from "./wesl/brightness_contrast.wesl?raw";
