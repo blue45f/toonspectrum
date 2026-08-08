@@ -232,8 +232,11 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain("레이어 500");
     expect(html.match(/role="treeitem"/g)).toHaveLength(500);
     expect(html.match(/content-visibility:auto/g)).toHaveLength(500);
-    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(1_000);
-    expect(html.match(/tabindex="-1"/g)?.length ?? 0).toBeGreaterThanOrEqual(1_000);
+    // 표시 · 잠금 · 불투명도 · … — four inline controls per row after Wave C.
+    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(2_000);
+    expect(html.match(/data-studio-layer-row-action="lock"/g)).toHaveLength(500);
+    expect(html.match(/data-studio-layer-row-action="opacity"/g)).toHaveLength(500);
+    expect(html.match(/tabindex="-1"/g)?.length ?? 0).toBeGreaterThanOrEqual(2_000);
     expect(html).toContain("상업 원고 레이어 500");
     expect(html).toContain("상업 원고 레이어 1");
   });

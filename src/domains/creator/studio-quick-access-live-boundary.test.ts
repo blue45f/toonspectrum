@@ -11,7 +11,7 @@ const integrationSource = readFileSync(
   "utf8",
 );
 const mainMenuCatalogueSource = readFileSync(
-  new URL("./studio-main-menu-groups.ts", import.meta.url),
+  new URL("./studio-main-menu-items-workspace.ts", import.meta.url),
   "utf8",
 );
 

@@ -7,6 +7,11 @@
  * account, project, provider, credential, or executor data crosses the durable boundary.
  */
 
+import {
+  studioSearchTextMatches,
+  tokenizeStudioSearchQuery,
+} from "./studio-search-text";
+
 export const STUDIO_QUICK_ACCESS_VERSION = 1 as const;
 export const STUDIO_QUICK_ACCESS_MAX_SETS = 12;
 export const STUDIO_QUICK_ACCESS_MAX_COMMANDS = 64;
@@ -612,15 +617,6 @@ function normalizeCommandCatalog(
   return deepFreeze(entries);
 }
 
-function normalizeSearchText(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLowerCase()
-    .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
-    .replace(/\s+/gu, " ")
-    .trim();
-}
-
 /**
  * Searches injected metadata using NFKC/case-insensitive AND-token matching.
  * Results contain only bounded, inert metadata; handlers and arbitrary catalog fields are dropped.
@@ -631,19 +627,19 @@ export function searchStudioQuickAccessCommands(
 ): readonly StudioQuickAccessCommandMeta[] {
   const entries = normalizeCommandCatalog(catalog);
   const safeQuery = typeof query === "string" ? query.slice(0, MAX_QUERY_LENGTH) : "";
-  const terms = normalizeSearchText(safeQuery).split(" ").filter(Boolean);
-  if (terms.length === 0) return entries;
-  return deepFreeze(entries.filter((entry) => {
-    const haystack = normalizeSearchText([
+  // 매칭 규칙은 통합 Command Search 와 같은 `studio-search-text` 를 쓴다.
+  // 신뢰 경계(길이 제한·메타데이터 정규화)는 여기 그대로 남는다.
+  if (tokenizeStudioSearchQuery(safeQuery).length === 0) return entries;
+  return deepFreeze(entries.filter((entry) =>
+    studioSearchTextMatches(safeQuery, [
       entry.id,
       entry.label,
       entry.description ?? "",
       entry.category ?? "",
       ...(entry.keywords ?? []),
       entry.shortcut ?? "",
-    ].join(" "));
-    return terms.every((term) => haystack.includes(term));
-  }));
+    ])
+  ));
 }
 
 function catalogMap(

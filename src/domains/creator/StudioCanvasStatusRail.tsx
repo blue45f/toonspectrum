@@ -16,6 +16,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 
+import { StudioReliabilityStatusRail } from "./StudioReliabilityStatusRail";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { ReactNode } from "react";
@@ -318,6 +319,9 @@ export function StudioCanvasStatusRail({
           : "contents"
       )}
     >
+      {/* 저장·GPU·저장소 상태와 Safe Mode 고지 — prop 없이 스토어를 직접 구독한다. */}
+      <StudioReliabilityStatusRail />
+
       {hasAutosave && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
           <span className="min-w-0 flex-1 font-medium leading-relaxed">

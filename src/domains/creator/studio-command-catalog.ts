@@ -13,8 +13,16 @@
  * shortcut or a behaviour, the disagreement is recorded in `COMMAND_CONFLICTS`
  * rather than resolved by picking a winner here.
  *
+ * Wave C (2026-08-08) regrouped the main menu to V5 §15.3. The item **count** is
+ * unchanged at 116 — nothing was added or dropped — but the qualified menu
+ * `nativeId`s moved with their groups (`edit/select-all` → `select/select-all`,
+ * `draw/pen` → `brush/pen`, and so on) and `view/app-settings` was renamed to
+ * `window/app-settings-window` to make menu item ids globally unique
+ * (conflict `menu-item-id-collision`). Which §15.3 rows we cover lives in
+ * `studio-main-menu-group-spec.ts`.
+ *
  * Measured 2026-08-08 against:
- * - `studio-main-menu-groups.ts`      8 groups / 116 items
+ * - `studio-main-menu-items-*.ts`     15 rendered groups / 116 items
  * - `studio-edit-controls.ts`         STUDIO_EDIT_MENU_COMMANDS, 20 entries
  * - `studio-quick-access-integration.ts` STUDIO_QUICK_ACCESS_COMMAND_IDS, 18
  * - `studio-quick-actions.ts`         QUICK_ACTION_IDS, 16
@@ -55,10 +63,10 @@ export type StudioCommandOriginStatus =
 export interface StudioCommandOrigin {
   source: StudioCommandSource;
   /**
-   * The id exactly as the source list spells it. Menu items are qualified
-   * `<group>/<item>` because menu item ids are **not** globally unique
-   * (see conflict `menu-item-id-collision`). Help rows use their `labelKey`
-   * suffix.
+   * The id exactly as the source list spells it. Menu items stay qualified
+   * `<group>/<item>` — bare ids became globally unique in Wave C (conflict
+   * `menu-item-id-collision`, resolved), but the group is the useful half of the
+   * provenance. Help rows use their `labelKey` suffix.
    */
   nativeId: string;
   /** Chord as that list advertises it — display text, not a parsed chord. */
@@ -112,6 +120,12 @@ export interface StudioCommandConflict {
 export interface StudioCommandSourceInfo {
   label: string;
   file: string;
+  /**
+   * Further files the drift guard must read alongside `file`. The menu source
+   * became several modules when the catalogue was regrouped to §15.3; the guard
+   * scans the union so nothing hides in a sibling module.
+   */
+  extraFiles?: readonly string[];
   declarationRef: string;
   /** Entry count measured 2026-08-08. Drift guards assert against this. */
   measuredCount: number;
@@ -135,6 +149,8 @@ const csp = vendorAlias("csp", "ko");
 /** CLIP STUDIO PAINT (English UI). */
 const cspEn = vendorAlias("csp", "en");
 const ps = vendorAlias("photoshop", "en");
+/** Photoshop as Korean users actually say it, which is not always the ko UI string. */
+const psKo = vendorAlias("photoshop", "ko");
 const krita = vendorAlias("krita", "en");
 const procreate = vendorAlias("procreate", "en");
 /** Our own legacy wording, kept searchable so renames do not orphan habits. */
@@ -202,8 +218,15 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
 > = Object.freeze({
   menu: {
     label: "메인 메뉴",
-    file: "src/domains/creator/studio-main-menu-groups.ts",
-    declarationRef: "studio-main-menu-groups.ts:228-1121 (buildStudioMainMenuGroups)",
+    file: "src/domains/creator/studio-main-menu-items-document.ts",
+    extraFiles: [
+      "src/domains/creator/studio-main-menu-items-artwork.ts",
+      "src/domains/creator/studio-main-menu-items-filter.ts",
+      "src/domains/creator/studio-main-menu-items-story.ts",
+      "src/domains/creator/studio-main-menu-items-workspace.ts",
+    ],
+    declarationRef:
+      "studio-main-menu-groups.ts (buildStudioMainMenuGroups) + studio-main-menu-items-*.ts",
     measuredCount: 116,
   },
   "edit-menu": {
@@ -245,7 +268,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
  * this snapshot plus a source-file drift guard stands in for a live import.
  */
 export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
-  // file (10) — studio-main-menu-groups.ts:230-325
+  // file (10) — studio-main-menu-items-document.ts
   "file/save-draft",
   "file/publish",
   "file/import-json",
@@ -256,7 +279,7 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "file/copy-image",
   "file/export-json",
   "file/export-archive",
-  // edit (20) — spread from STUDIO_EDIT_MENU_COMMANDS, :330-497
+  // edit (12) — spread from STUDIO_EDIT_MENU_COMMANDS
   "edit/undo",
   "edit/redo",
   "edit/cut",
@@ -264,32 +287,12 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "edit/paste",
   "edit/paste-in-place",
   "edit/paste-file",
-  "edit/select-all",
-  "edit/deselect",
-  "edit/invert-selection",
   "edit/clear-selection",
   "edit/duplicate",
-  "edit/bring-front",
-  "edit/bring-forward",
-  "edit/send-back",
-  "edit/send-backward",
-  "edit/crop-layer",
   "edit/history",
   "edit/pen-pressure",
   "edit/app-settings",
-  // insert (11) — :500-593
-  "insert/template",
-  "insert/collage",
-  "insert/elements",
-  "insert/bubble",
-  "insert/text",
-  "insert/image",
-  "insert/mannequin3d",
-  "insert/char",
-  "insert/bg3d",
-  "insert/ref",
-  "insert/page",
-  // view (31) — :596-877
+  // view (17)
   "view/zoom-in",
   "view/zoom-out",
   "view/flip-horizontal",
@@ -298,30 +301,38 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "view/reset-rotation",
   "view/fit",
   "view/actual-pixels",
-  "view/canvas-rulers",
   "view/fullscreen",
   "view/color-vision-original",
   "view/color-vision-grayscale",
   "view/color-vision-protanopia",
   "view/color-vision-deuteranopia",
   "view/color-vision-tritanopia",
-  "view/reference-window",
-  "view/page-sequence",
   "view/save-current-view",
   "view/restore-view",
-  "view/perspective-guide",
-  "view/reset-local-visibility",
   "view/production-insights",
-  "view/density-focus",
-  "view/density-full",
-  "view/wide",
-  "view/tools-companion",
-  "view/canvas-only",
-  "view/quick-access-palette",
-  "view/left-panel",
-  "view/right-panel",
-  "view/app-settings",
-  // filter (33) — :880-1000
+  // canvas (2) — lifted out of view
+  "canvas/canvas-rulers",
+  "canvas/perspective-guide",
+  // layer (7) — lifted out of edit, insert and view
+  "layer/image",
+  "layer/bring-front",
+  "layer/bring-forward",
+  "layer/send-back",
+  "layer/send-backward",
+  "layer/crop-layer",
+  "layer/reset-local-visibility",
+  // select (3) — lifted out of edit
+  "select/select-all",
+  "select/deselect",
+  "select/invert-selection",
+  // brush (6) — the former `draw` group
+  "brush/pen",
+  "brush/eraser",
+  "brush/fill",
+  "brush/smart-shape",
+  "brush/bg",
+  "brush/style",
+  // filter (33)
   "filter/last-filter",
   "filter/gaussian-blur",
   "filter/motion-blur",
@@ -355,18 +366,37 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/color-to-alpha",
   "filter/duotone",
   "filter/noise-add",
-  // draw (6) — :1003-1058
-  "draw/pen",
-  "draw/eraser",
-  "draw/fill",
-  "draw/smart-shape",
-  "draw/bg",
-  "draw/style",
-  // ai (3) — :1061-1088
+  // vector (1) — lifted out of insert
+  "vector/elements",
+  // text (2) — lifted out of insert
+  "text/bubble",
+  "text/text",
+  // comic (3) — lifted out of insert and view
+  "comic/page",
+  "comic/page-sequence",
+  "comic/collage",
+  // 3d (3) — lifted out of insert
+  "3d/mannequin3d",
+  "3d/char",
+  "3d/bg3d",
+  // window (12) — lifted out of view and insert
+  "window/density-focus",
+  "window/density-full",
+  "window/left-panel",
+  "window/right-panel",
+  "window/wide",
+  "window/canvas-only",
+  "window/quick-access-palette",
+  "window/template",
+  "window/ref",
+  "window/reference-window",
+  "window/tools-companion",
+  "window/app-settings-window",
+  // ai (3)
   "ai/ai-assist",
   "ai/stock",
   "ai/integrations",
-  // help (2) — :1091-1118
+  // help (2)
   "help/feature-tutorials",
   "help/shortcuts",
 ]);
@@ -628,7 +658,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "edit.crop-layer",
       labels: [ko("레이어 자르기…"), en("Crop layer…")],
       aliases: [ps("Crop"), csp("자르기"), krita("Crop Layer")],
-      origins: [menu("edit/crop-layer"), editMenu("crop-layer")],
+      origins: [menu("layer/crop-layer"), editMenu("crop-layer")],
     }),
     defineCommand({
       id: "edit.history",
@@ -664,7 +694,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("모두 선택"), ps("Select All"), krita("Select All"), procreate("Select All")],
       shortcut: "⌘A",
       origins: [
-        menu("edit/select-all", { shortcut: "⌘A" }),
+        menu("select/select-all", { shortcut: "⌘A" }),
         editMenu("select-all", { shortcut: "⌘A" }),
         help("edit.selectAll", { shortcut: "⌘A" }),
       ],
@@ -675,7 +705,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("선택 해제"), ps("Deselect"), krita("Deselect"), procreate("Clear")],
       shortcut: "⌘D",
       origins: [
-        menu("edit/deselect", { shortcut: "⌘D" }),
+        menu("select/deselect", { shortcut: "⌘D" }),
         editMenu("deselect", { shortcut: "⌘D" }),
         keymap("deselect-pixels", { shortcut: "Mod+D" }),
         help("edit.deselect", { shortcut: "⌘D" }),
@@ -687,7 +717,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("선택 범위 반전"), ps("Inverse"), krita("Invert Selection"), procreate("Invert")],
       shortcut: "⌘⇧I",
       origins: [
-        menu("edit/invert-selection", { shortcut: "⌘⇧I" }),
+        menu("select/invert-selection", { shortcut: "⌘⇧I" }),
         editMenu("invert-selection", { shortcut: "⌘⇧I" }),
         keymap("invert-pixels", { shortcut: "Mod+Shift+I" }),
         help("edit.invert", { shortcut: "⌘⇧I" }),
@@ -713,7 +743,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("맨 앞으로"), ps("Bring to Front"), krita("Move Layer to Top")],
       shortcut: "⌘⇧]",
       origins: [
-        menu("edit/bring-front", { shortcut: "⌘⇧]" }),
+        menu("layer/bring-front", { shortcut: "⌘⇧]" }),
         editMenu("bring-front", { shortcut: "⌘⇧]" }),
         radial("bring-front"),
         quickAccess("bring-front"),
@@ -726,7 +756,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("앞으로"), ps("Bring Forward"), krita("Raise Layer")],
       shortcut: "⌘]",
       origins: [
-        menu("edit/bring-forward", { shortcut: "⌘]" }),
+        menu("layer/bring-forward", { shortcut: "⌘]" }),
         editMenu("bring-forward", { shortcut: "⌘]" }),
         help("layers.forward", { shortcut: "⌘] · ⌘⇧]" }),
       ],
@@ -737,7 +767,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("맨 뒤로"), ps("Send to Back"), krita("Move Layer to Bottom")],
       shortcut: "⌘[",
       origins: [
-        menu("edit/send-back", { shortcut: "⌘[" }),
+        menu("layer/send-back", { shortcut: "⌘[" }),
         editMenu("send-back", { shortcut: "⌘[" }),
         help("layers.backward", { shortcut: "⌘[ · ⌘⇧[" }),
       ],
@@ -749,7 +779,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("뒤로"), ps("Send Backward"), krita("Lower Layer")],
       shortcut: "⌘⇧[",
       origins: [
-        menu("edit/send-backward", { shortcut: "⌘⇧[" }),
+        menu("layer/send-backward", { shortcut: "⌘⇧[" }),
         editMenu("send-backward", { shortcut: "⌘⇧[" }),
         help("layers.backward", { shortcut: "⌘[ · ⌘⇧[" }),
       ],
@@ -772,7 +802,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "layer.show-locally-hidden",
       labels: [ko("나만 숨긴 레이어 모두 표시"), en("Show all locally hidden layers")],
       aliases: [ps("Show All Layers"), ours("로컬 숨김 해제")],
-      origins: [menu("view/reset-local-visibility")],
+      origins: [menu("layer/reset-local-visibility")],
     }),
 
     /* ---------------------------------------------------------------- view */
@@ -853,7 +883,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("캔버스 px 눈금자"), en("Canvas pixel rulers")],
       aliases: [csp("자 표시"), ps("Rulers"), krita("Show Rulers")],
       shortcut: "⌥⌘R",
-      origins: [menu("view/canvas-rulers", { shortcut: "⌥⌘R" })],
+      origins: [menu("canvas/canvas-rulers", { shortcut: "⌥⌘R" })],
     }),
     defineCommand({
       id: "view.fullscreen",
@@ -916,7 +946,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("원근 도우미 보기"), en("Perspective guide")],
       aliases: [csp("퍼스자"), ps("Perspective Grid"), krita("Perspective Assistant")],
       shortcut: "⇧G",
-      origins: [menu("view/perspective-guide", { shortcut: "⇧G" })],
+      origins: [menu("canvas/perspective-guide", { shortcut: "⇧G" })],
     }),
     defineCommand({
       id: "view.reset",
@@ -960,7 +990,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("전체 화면 표시"), ps("Screen Mode"), krita("Canvas Only Mode"), procreate("Full Screen")],
       shortcut: "`",
       origins: [
-        menu("view/canvas-only", { shortcut: "`" }),
+        menu("window/canvas-only", { shortcut: "`" }),
         keymap("toggle-chrome", { shortcut: "`" }),
         help("view.toggleCanvas", { shortcut: "`" }),
       ],
@@ -970,19 +1000,19 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("빠른 액세스 팔레트"), en("Quick access palette")],
       aliases: [csp("퀵 액세스"), ps("Command Search"), krita("Search Actions")],
       shortcut: "⇧Q",
-      origins: [menu("view/quick-access-palette", { shortcut: "⇧Q" })],
+      origins: [menu("window/quick-access-palette", { shortcut: "⇧Q" })],
     }),
     defineCommand({
       id: "window.left-panel",
       labels: [ko("왼쪽 패널 표시 전환"), en("Toggle left panel")],
       aliases: [ps("Toggle Panels"), krita("Show Dockers")],
-      origins: [menu("view/left-panel")],
+      origins: [menu("window/left-panel")],
     }),
     defineCommand({
       id: "window.right-panel",
       labels: [ko("속성 패널 표시 전환"), en("Toggle properties panel")],
       aliases: [ps("Properties Panel"), krita("Tool Options Docker")],
-      origins: [menu("view/right-panel")],
+      origins: [menu("window/right-panel")],
     }),
     defineCommand({
       id: "window.tool-properties",
@@ -994,44 +1024,44 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "window.reference-panel",
       labels: [ko("참고 이미지 창"), en("Reference window")],
       aliases: [csp("서브 뷰"), ps("Reference Panel"), krita("Reference Images Tool"), procreate("Reference")],
-      origins: [menu("view/reference-window")],
+      origins: [menu("window/reference-window")],
     }),
     defineCommand({
       id: "window.page-sequence",
       labels: [ko("페이지 시퀀스"), en("Page sequence")],
       aliases: [csp("페이지 관리"), ps("Artboards")],
-      origins: [menu("view/page-sequence")],
+      origins: [menu("comic/page-sequence")],
     }),
     defineCommand({
       id: "window.density-focus",
       labels: [ko("슈퍼심플 레이아웃"), en("Focus layout")],
       aliases: [ours("슈퍼심플"), procreate("Minimal UI")],
-      origins: [menu("view/density-focus")],
+      origins: [menu("window/density-focus")],
     }),
     defineCommand({
       id: "window.density-full",
       labels: [ko("전체 레이아웃"), en("Full layout")],
       aliases: [ours("전체 레이아웃")],
-      origins: [menu("view/density-full")],
+      origins: [menu("window/density-full")],
     }),
     defineCommand({
       id: "window.collapse-side-panels",
       labels: [ko("패널 접어 넓게"), en("Collapse side panels")],
       aliases: [ps("Collapse Panels"), krita("Hide Dockers")],
-      origins: [menu("view/wide")],
+      origins: [menu("window/wide")],
     }),
     defineCommand({
       id: "window.tools-companion",
       labels: [ko("멀티 디스플레이 작업공간…"), en("Multi-display companion…")],
       aliases: [ps("New Window for"), krita("New Window")],
-      origins: [menu("view/tools-companion")],
+      origins: [menu("window/tools-companion")],
     }),
     defineCommand({
       id: "window.app-settings",
       labels: [ko("애플리케이션 설정"), en("Application settings")],
       aliases: [csp("환경 설정"), ps("Preferences"), krita("Configure Krita"), procreate("Settings")],
       origins: [
-        menu("view/app-settings"),
+        menu("window/app-settings-window"),
         menu("edit/app-settings", {
           note: "메뉴 항목 id `app-settings` 가 view·edit 두 그룹에 중복 등재 — conflict `menu-item-id-collision`.",
         }),
@@ -1071,7 +1101,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       shortcut: "B",
       origins: [
         keymap("tool-pen", { shortcut: "B" }),
-        menu("draw/pen", { shortcut: "B" }),
+        menu("brush/pen", { shortcut: "B" }),
         radial("pen"),
         quickAccess("pen", { shortcut: "B" }),
         help("drawing.pen", { shortcut: "B" }),
@@ -1092,7 +1122,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       shortcut: "E",
       origins: [
         keymap("tool-eraser", { shortcut: "E" }),
-        menu("draw/eraser", { shortcut: "E" }),
+        menu("brush/eraser", { shortcut: "E" }),
         radial("eraser"),
         quickAccess("eraser", { shortcut: "E" }),
         help("drawing.eraser", { shortcut: "E" }),
@@ -1101,11 +1131,20 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
     defineCommand({
       id: "tool.fill",
       labels: [ko("채우기"), en("Fill")],
-      aliases: [csp("채우기"), ps("Paint Bucket"), krita("Fill Tool"), procreate("ColorDrop")],
+      // "페인트 버킷"은 한국어권 Photoshop 사용자가 실제로 부르는 이름이다.
+      // 감사 §2.8 8개 질의 중 1번이 이 표기로 들어온다.
+      aliases: [
+        csp("채우기"),
+        ps("Paint Bucket"),
+        psKo("페인트 버킷"),
+        psKo("페인트 통"),
+        krita("Fill Tool"),
+        procreate("ColorDrop"),
+      ],
       shortcut: "G",
       origins: [
         keymap("tool-fill", { shortcut: "G" }),
-        menu("draw/fill", { shortcut: "G" }),
+        menu("brush/fill", { shortcut: "G" }),
         quickAccess("fill", { shortcut: "G" }),
         radial("advanced-fill", {
           note: "라디얼만 `advanced-fill` 로 부른다 — conflict `fill-id-divergence`.",
@@ -1240,7 +1279,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "tool.smart-shape",
       labels: [ko("스마트 도형"), en("Smart shape")],
       aliases: [csp("도형"), ps("Shape Tool"), krita("Shape Tools"), procreate("QuickShape")],
-      origins: [menu("draw/smart-shape")],
+      origins: [menu("brush/smart-shape")],
     }),
 
     /* --------------------------------------------------------------- brush */
@@ -1304,13 +1343,13 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "brush.background-tone",
       labels: [ko("배경 · 톤"), en("Background · tone")],
       aliases: [csp("톤"), ps("Halftone Pattern"), krita("Screentone")],
-      origins: [menu("draw/bg")],
+      origins: [menu("brush/bg")],
     }),
     defineCommand({
       id: "brush.palette-brand",
       labels: [ko("팔레트 · 브랜드"), en("Palette · brand")],
       aliases: [csp("컬러 세트"), ps("Swatches"), krita("Palette Docker")],
-      origins: [menu("draw/style")],
+      origins: [menu("brush/style")],
     }),
 
     /* --------------------------------------------------------------- color */
@@ -1352,68 +1391,68 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "insert.template",
       labels: [ko("템플릿 · 에셋"), en("Template · assets")],
       aliases: [csp("소재"), ps("Libraries"), krita("Resources")],
-      origins: [menu("insert/template")],
+      origins: [menu("window/template")],
     }),
     defineCommand({
       id: "insert.collage",
       labels: [ko("콜라주"), en("Collage")],
       aliases: [ours("콜라주")],
-      origins: [menu("insert/collage")],
+      origins: [menu("comic/collage")],
     }),
     defineCommand({
       id: "insert.elements",
       labels: [ko("요소 · 도형"), en("Elements · shapes")],
       aliases: [csp("도형"), ps("Custom Shape")],
-      origins: [menu("insert/elements")],
+      origins: [menu("vector/elements")],
     }),
     defineCommand({
       id: "insert.balloon",
       labels: [ko("말풍선"), en("Speech balloon")],
       aliases: [csp("말풍선"), cspEn("Balloon"), ours("말풍선 삽입")],
-      origins: [menu("insert/bubble")],
+      origins: [menu("text/bubble")],
       note: "라디얼·팔레트의 `add-bubble`(text.add-balloon)과 중복 — conflict `balloon-id-divergence`.",
     }),
     defineCommand({
       id: "insert.text",
       labels: [ko("텍스트"), en("Text")],
       aliases: [csp("텍스트"), ps("Type Tool"), krita("Text Tool")],
-      origins: [menu("insert/text")],
+      origins: [menu("text/text")],
     }),
     defineCommand({
       id: "insert.image",
       labels: [ko("이미지…"), en("Image…")],
       aliases: [csp("화상 읽어들이기"), ps("Place Embedded"), krita("Insert Image")],
-      origins: [menu("insert/image")],
+      origins: [menu("layer/image")],
     }),
     defineCommand({
       id: "insert.mannequin-3d",
       labels: [ko("3D 데생 인형"), en("3D drawing mannequin")],
       aliases: [csp("3D 데생 인형"), cspEn("3D Drawing Figure")],
-      origins: [menu("insert/mannequin3d")],
+      origins: [menu("3d/mannequin3d")],
     }),
     defineCommand({
       id: "insert.character-3d",
       labels: [ko("3D 캐릭터"), en("3D character")],
       aliases: [csp("3D 소재"), ours("VRM 캐릭터")],
-      origins: [menu("insert/char")],
+      origins: [menu("3d/char")],
     }),
     defineCommand({
       id: "insert.background-3d",
       labels: [ko("3D 배경"), en("3D background")],
       aliases: [csp("3D 배경 소재")],
-      origins: [menu("insert/bg3d")],
+      origins: [menu("3d/bg3d")],
     }),
     defineCommand({
       id: "insert.reference-image",
       labels: [ko("참고 이미지"), en("Reference image")],
       aliases: [krita("Reference Images Tool"), procreate("Reference")],
-      origins: [menu("insert/ref")],
+      origins: [menu("window/ref")],
     }),
     defineCommand({
       id: "insert.page",
       labels: [ko("새 페이지"), en("New page")],
       aliases: [csp("페이지 추가"), ps("New Artboard")],
-      origins: [menu("insert/page")],
+      origins: [menu("comic/page")],
     }),
 
     /* ---------------------------------------------------------------- text */
@@ -1850,19 +1889,6 @@ export const COMMAND_CONFLICTS: readonly StudioCommandConflict[] = Object.freeze
     ],
     resolution:
       "라벨을 '변형 도구' / '픽셀 선택 변형'으로 명시 분리하고 팔레트 표기를 바꾼다.",
-  },
-  {
-    id: "menu-item-id-collision",
-    kind: "id-divergence",
-    commandIds: ["window.app-settings"],
-    detail:
-      "메뉴 항목 id 는 전역 유일하지 않다. `app-settings` 가 view 그룹과 edit 그룹에 각각 존재한다. 그래서 카탈로그의 menu origin 은 `<group>/<item>` 로 한정한다.",
-    evidence: [
-      "studio-main-menu-groups.ts:870 (view/app-settings)",
-      "studio-edit-controls.ts:108 (edit/app-settings)",
-    ],
-    resolution:
-      "메뉴 흡수(2단계)에서 두 항목 모두 `window.app-settings` 를 가리키게 하고, 중복 노출은 제품 결정으로 남긴다(그룹별 접근성은 유지 가치가 있다).",
   },
   {
     id: "help-row-multiplexing",

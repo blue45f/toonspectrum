@@ -37,6 +37,8 @@ function rowHandlers(
     onRowClick: vi.fn(),
     onRowDoubleClick: vi.fn(),
     onToggleItemHidden: vi.fn(),
+    onToggleItemLocked: vi.fn(),
+    onSetItemOpacity: vi.fn(),
     onOpenItemActionMenu: vi.fn(),
     registerRowRef: vi.fn(),
     ...overrides,
@@ -64,6 +66,7 @@ function rowProps(
     mobileMultiSelect: false,
     readOnly: false,
     hiddenByGroup: false,
+    lockedByGroup: false,
     actionOpen: false,
     actionPopoverId: "layer-actions",
     stableHandlers: rowHandlers(),
@@ -314,5 +317,60 @@ describe("StudioLayerNavigatorItemRow", () => {
     expect(screen.getByRole("treeitem").getAttribute("aria-keyshortcuts")).toBe(
       "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
     );
+  });
+
+  it("puts 표시·잠금·불투명도 in the row itself, not behind the … popover", () => {
+    const onToggleItemHidden = vi.fn();
+    const onToggleItemLocked = vi.fn();
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 0.6 },
+        stableHandlers: rowHandlers({
+          onToggleItemHidden,
+          onToggleItemLocked,
+          onSetItemOpacity,
+        }),
+      })
+    );
+
+    const row = screen.getByRole("treeitem");
+    const inline = row.querySelectorAll("[data-studio-layer-row-action]");
+    expect([...inline].map((node) => node.getAttribute("data-studio-layer-row-action")))
+      .toEqual(["visibility", "lock", "opacity", "menu"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "주인공 원화 숨김" }));
+    expect(onToggleItemHidden).toHaveBeenCalledWith("line-art", true);
+
+    fireEvent.click(
+      row.querySelector<HTMLButtonElement>('[data-studio-layer-row-action="lock"]')!
+    );
+    expect(onToggleItemLocked).toHaveBeenCalledWith("line-art", true);
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    expect(opacity.getAttribute("aria-valuenow")).toBe("60");
+    expect(opacity.getAttribute("aria-valuetext")).toBe("60%");
+    fireEvent.keyDown(opacity, { key: "ArrowRight" });
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.61);
+  });
+
+  it("keeps the row's own tab stop — inline actions never add per-layer tab stops", () => {
+    renderRow(rowProps({ item: { ...ITEM, opacity: 1 }, tabStop: true }));
+    const row = screen.getByRole("treeitem");
+    expect(row.tabIndex).toBe(0);
+    for (const control of row.querySelectorAll("[data-layer-row-control]")) {
+      expect((control as HTMLElement).tabIndex).toBe(-1);
+    }
+  });
+
+  it("blocks 잠금/불투명도 when the parent group owns the lock or the page is read-only", () => {
+    renderRow(rowProps({ lockedByGroup: true, effectivelyLocked: true }));
+    const row = screen.getByRole("treeitem");
+    const lock = row.querySelector<HTMLButtonElement>('[data-studio-layer-row-action="lock"]');
+    expect(lock?.disabled).toBe(true);
+    expect(lock?.getAttribute("aria-label")).toBe("주인공 원화, 그룹에서 잠김");
+    expect(
+      screen.getByRole("slider", { name: "주인공 원화 불투명도" }).getAttribute("aria-disabled")
+    ).toBe("true");
   });
 });

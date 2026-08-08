@@ -165,7 +165,10 @@ describe("studio chrome IA map", () => {
     expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.file).toBe("파일");
     expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.edit).toBe("편집");
     expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.view).toBe("보기");
-    expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.draw).toBe("그리기");
+    // §15.3 renamed the group id to `brush`; the Korean copy stays "그리기".
+    expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.brush).toBe("그리기");
+    expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.layer).toBe("레이어");
+    expect(STUDIO_CHROME_MENUBAR_GROUP_LABELS.select).toBe("선택");
     expect(STUDIO_CHROME_FILE_CORE_ACTION_IDS).toEqual(
       expect.arrayContaining(["save-draft", "import-json", "export"]),
     );
@@ -203,6 +206,8 @@ describe("studio chrome IA map", () => {
     expect(audit.groupOrderOk, "group order").toBe(true);
     expect(audit.missingFileCore, String(audit.missingFileCore)).toEqual([]);
     expect(audit.missingEditCore, String(audit.missingEditCore)).toEqual([]);
+    expect(audit.missingLayerCore, String(audit.missingLayerCore)).toEqual([]);
+    expect(audit.missingSelectCore, String(audit.missingSelectCore)).toEqual([]);
     expect(
       audit.fileOrderOk,
       `file order ${groups.find((g) => g.id === "file")?.items.map((i) => i.id).join(",")}`,

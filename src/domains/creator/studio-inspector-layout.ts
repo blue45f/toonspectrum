@@ -1,3 +1,8 @@
+import {
+  studioSearchTextMatches,
+  tokenizeStudioSearchQuery,
+} from "./studio-search-text";
+
 export const STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY =
   "toonspectrum:studio:inspector-layout:v1";
 
@@ -256,22 +261,20 @@ export function studioInspectorActions(
   return [...contextual, ...ALWAYS_AVAILABLE_ACTIONS];
 }
 
-function normalizeSearchText(value: string): string {
-  return value.trim().toLocaleLowerCase("ko-KR").replace(/\s+/g, " ");
-}
-
+/**
+ * 매칭 규칙은 `studio-search-text.ts` 하나로 통일돼 있다. 감사 §2.8 이 지적한
+ * "네 검색창이 서로 다른 정규화를 쓴다" 문제를 여기서 끊는다.
+ */
 export function filterStudioInspectorActions(
   actions: readonly StudioInspectorAction[],
   query: string
 ): readonly StudioInspectorAction[] {
-  const normalizedQuery = normalizeSearchText(query);
-  if (!normalizedQuery) return actions;
-
-  const terms = normalizedQuery.split(" ");
-  return actions.filter((action) => {
-    const haystack = normalizeSearchText(
-      [action.label, action.description, ...action.keywords].join(" ")
-    );
-    return terms.every((term) => haystack.includes(term));
-  });
+  if (tokenizeStudioSearchQuery(query).length === 0) return actions;
+  return actions.filter((action) =>
+    studioSearchTextMatches(query, [
+      action.label,
+      action.description,
+      ...action.keywords,
+    ])
+  );
 }

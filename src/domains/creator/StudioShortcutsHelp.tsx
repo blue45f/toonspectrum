@@ -9,6 +9,10 @@ import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import {
+  studioSearchTextMatches,
+  tokenizeStudioSearchQuery,
+} from "./studio-search-text";
 
 import { useI18n, useT } from "@/lib/i18n";
 
@@ -220,10 +224,6 @@ const FAMILIAR_OPERATION_ICONS = {
   recover: RotateCcw,
 } as const;
 
-function normalizeHelpSearch(value: string): string {
-  return value.trim().toLocaleLowerCase().replaceAll(/\s+/gu, "");
-}
-
 function displayKeysForRow(
   row: ShortcutRow,
   shortcuts: Partial<Record<StudioShortcutActionId, string>> | Record<string, string> | undefined
@@ -278,21 +278,19 @@ export function StudioShortcutsHelp({
     ? SHORTCUT_HELP_COPY.ko
     : SHORTCUT_HELP_COPY.en;
   const [searchQuery, setSearchQuery] = useState("");
-  const normalizedSearchQuery = normalizeHelpSearch(searchQuery);
+  const searching = tokenizeStudioSearchQuery(searchQuery).length > 0;
+  // 매칭 규칙은 통합 Command Search 와 같은 `studio-search-text` 를 쓴다.
+  // 감사 §2.8 이 "네 검색창이 서로 다르게 판단한다"를 결함으로 셌다.
   const visibleGroups = GROUPS.map((group) => ({
     ...group,
-    rows: group.rows.filter((row) => {
-      if (!normalizedSearchQuery) return true;
-      const searchable = [
+    rows: group.rows.filter((row) =>
+      studioSearchTextMatches(searchQuery, [
         t(group.titleKey),
         t(row.labelKey),
         row.keysKey ? t(row.keysKey) : displayKeysForRow(row, shortcuts),
         ...(row.searchAliases ?? []),
-      ]
-        .map(normalizeHelpSearch)
-        .join(" ");
-      return searchable.includes(normalizedSearchQuery);
-    }),
+      ]),
+    ),
   })).filter((group) => group.rows.length > 0);
   const visibleShortcutCount = visibleGroups.reduce((count, group) => count + group.rows.length, 0);
 
@@ -428,7 +426,7 @@ export function StudioShortcutsHelp({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {!normalizedSearchQuery ? (
+          {!searching ? (
             <section aria-labelledby="studio-familiar-operations-title">
               <h3 id="studio-familiar-operations-title" className="text-[0.68rem] font-semibold text-fg-2">
                 {copy.familiarTitle}
@@ -455,10 +453,10 @@ export function StudioShortcutsHelp({
             </section>
           ) : null}
 
-          <section aria-labelledby="studio-shortcut-list-title" className={normalizedSearchQuery ? "" : "mt-4"}>
+          <section aria-labelledby="studio-shortcut-list-title" className={searching ? "" : "mt-4"}>
             <div className="mb-2 flex items-center justify-between gap-3">
               <h3 id="studio-shortcut-list-title" className="text-[0.68rem] font-semibold text-fg-2">
-                {normalizedSearchQuery ? copy.result(visibleShortcutCount) : copy.allShortcuts}
+                {searching ? copy.result(visibleShortcutCount) : copy.allShortcuts}
               </h3>
               <span className="text-[0.62rem] text-fg-3">{copy.toggleHint}</span>
             </div>

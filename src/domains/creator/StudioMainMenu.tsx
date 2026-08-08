@@ -1,6 +1,7 @@
 /**
  * StudioMainMenu — CSP/Photopea-style top application menu.
- * File · Edit · Insert · View · Filter · Draw · AI · Help as compact dropdowns.
+ * V5 §15.3 groups (File · Edit · View · Canvas · Layer · Select · Brush · Filter ·
+ * Vector · Text · Comic · 3D · Window · AI · Help) as compact dropdowns.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX).
@@ -20,6 +21,7 @@ import { createPortal } from "react-dom";
 
 import { StudioKbdBadge } from "./studio-chrome-ui";
 import { STUDIO_COLOR_VISION_HINTS } from "./studio-color-vision-coach";
+import { STUDIO_MENU_GROUP_SPEC } from "./studio-main-menu-group-spec";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -64,7 +66,33 @@ type StudioMainMenuHintMeta = Omit<StudioToolHintSpec, "title" | "description" |
   tipFallback?: string;
 };
 
+/**
+ * §15.3 groups the regroup introduced have no shipped locale keys yet, so their
+ * Korean copy comes from the pure spec table and the keys resolve when the packs
+ * catch up.
+ */
+const SPEC_GROUP_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> =
+  Object.fromEntries(
+    STUDIO_MENU_GROUP_SPEC.filter((group) => group.hintKo).map((group) => [
+      group.id,
+      {
+        id: `main-menu-${group.id}`,
+        titleKey: `studio.mainMenu.group.${group.id}.label`,
+        titleFallback: group.labelKo,
+        descriptionKey: `studio.mainMenu.hint.${group.id}.description`,
+        descriptionFallback: group.hintKo?.description ?? "",
+        ...(group.hintKo?.tip
+          ? {
+            tipKey: `studio.mainMenu.hint.${group.id}.tip`,
+            tipFallback: group.hintKo.tip,
+          }
+          : {}),
+      },
+    ]),
+  );
+
 const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
+  ...SPEC_GROUP_HINTS,
   file: {
     id: "main-menu-file",
     titleKey: "studio.mainMenu.hint.file.title",
@@ -78,13 +106,6 @@ const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
     descriptionKey: "studio.mainMenu.hint.edit.description",
     tipKey: "studio.mainMenu.hint.edit.tip",
     preview: "edit-workflow",
-  },
-  insert: {
-    id: "main-menu-insert",
-    titleKey: "studio.mainMenu.hint.insert.title",
-    descriptionKey: "studio.mainMenu.hint.insert.description",
-    tipKey: "studio.mainMenu.hint.insert.tip",
-    preview: "insert-content",
   },
   view: {
     id: "main-menu-view",
@@ -100,7 +121,8 @@ const MAIN_MENU_HINTS: Readonly<Record<string, StudioMainMenuHintMeta>> = {
     tipKey: "studio.mainMenu.hint.filter.tip",
     preview: "filter",
   },
-  draw: {
+  // §15.3 renamed the group to Brush; the shipped `draw` locale keys stay.
+  brush: {
     id: "main-menu-draw",
     titleKey: "studio.mainMenu.hint.draw.title",
     descriptionKey: "studio.mainMenu.hint.draw.description",

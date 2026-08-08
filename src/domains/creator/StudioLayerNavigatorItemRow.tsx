@@ -9,6 +9,7 @@ import {
   Grid2X2,
   Layers3,
   Lock,
+  LockOpen,
   MoreHorizontal,
   ScanLine,
   Sparkles,
@@ -41,6 +42,7 @@ import {
   visibleStudioLayerPaletteStatuses,
   type StudioLayerPaletteStatusKind,
 } from "./studio-layer-palette-visual";
+import { StudioInlineScrubber } from "./StudioInlineScrubber";
 
 import { cn } from "@/lib/utils";
 
@@ -89,6 +91,9 @@ export interface LayerNavigatorRowHandlers {
     label: string
   ) => void;
   onToggleItemHidden: (itemId: string, hidden: boolean) => void;
+  onToggleItemLocked: (itemId: string, locked: boolean) => void;
+  /** `opacity` is 0–1. */
+  onSetItemOpacity: (itemId: string, opacity: number) => void;
   onOpenItemActionMenu: (
     event: ReactMouseEvent<HTMLButtonElement>,
     itemId: string
@@ -114,6 +119,7 @@ export interface StudioLayerNavigatorItemRowProps {
   mobileMultiSelect: boolean;
   readOnly: boolean;
   hiddenByGroup: boolean;
+  lockedByGroup: boolean;
   actionOpen: boolean;
   actionPopoverId: string;
   stableHandlers: LayerNavigatorRowHandlers;
@@ -143,6 +149,7 @@ export const StudioLayerNavigatorItemRow = memo(
     mobileMultiSelect,
     readOnly,
     hiddenByGroup,
+    lockedByGroup,
     actionOpen,
     actionPopoverId,
     stableHandlers,
@@ -182,6 +189,9 @@ export const StudioLayerNavigatorItemRow = memo(
     });
     const visibleStatuses = visibleStudioLayerPaletteStatuses(statuses);
     const statusSummary = statuses.map((status) => status.label).join(", ");
+    const opacityPercent = Math.round(
+      Math.min(1, Math.max(0, item.opacity ?? 1)) * 100
+    );
 
     return (
       <li role="none">
@@ -296,7 +306,7 @@ export const StudioLayerNavigatorItemRow = memo(
               data-studio-layer-status-strip="true"
               aria-label={statusSummary}
               title={statusSummary}
-              className="flex max-w-[6.5rem] shrink-0 items-center gap-0.5 overflow-hidden"
+              className="flex max-w-[4.25rem] shrink-0 items-center gap-0.5 overflow-hidden"
             >
               {visibleStatuses.visible.map((status) => {
                 const StatusIcon = STATUS_ICONS[status.kind];
@@ -329,6 +339,7 @@ export const StudioLayerNavigatorItemRow = memo(
             type="button"
             tabIndex={-1}
             data-layer-row-control
+            data-studio-layer-row-action="visibility"
             onClick={(event) => {
               event.stopPropagation();
               stableHandlers.onToggleItemHidden(item.id, !item.hidden);
@@ -354,10 +365,67 @@ export const StudioLayerNavigatorItemRow = memo(
           >
             {effectivelyHidden ? <EyeOff size={13} /> : <Eye size={13} />}
           </button>
+          {/*
+            표시·잠금·불투명도를 행 안에 둔다. 이전에는 잠금·불투명도가 `…` 팝오버 안에만
+            있어서 행에서 클릭한 뒤 팝오버까지 다시 이동해야 했다 (V5 §15 레이어 행 동작 120px).
+          */}
           <button
             type="button"
             tabIndex={-1}
             data-layer-row-control
+            data-studio-layer-row-action="lock"
+            onClick={(event) => {
+              event.stopPropagation();
+              stableHandlers.onToggleItemLocked(item.id, !item.locked);
+            }}
+            disabled={readOnly || lockedByGroup}
+            aria-pressed={effectivelyLocked}
+            className={cn(
+              "grid size-7 shrink-0 place-items-center rounded transition-colors hover:bg-raised hover:text-fg disabled:opacity-35",
+              effectivelyLocked ? "text-accent" : "text-fg-3",
+              STUDIO_LAYER_NAVIGATOR_COARSE_TARGET,
+              STUDIO_LAYER_NAVIGATOR_FOCUS_RING
+            )}
+            aria-label={
+              lockedByGroup
+                ? `${item.label}, 그룹에서 잠김`
+                : item.locked
+                  ? `${item.label} 잠금 해제`
+                  : `${item.label} 잠금`
+            }
+            title={
+              lockedByGroup
+                ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요"
+                : undefined
+            }
+          >
+            {effectivelyLocked ? <Lock size={13} /> : <LockOpen size={13} />}
+          </button>
+          <StudioInlineScrubber
+            surface="layer-opacity"
+            rowAction="opacity"
+            tabIndex={-1}
+            label={`${item.label} 불투명도`}
+            value={opacityPercent}
+            min={0}
+            max={100}
+            step={1}
+            valueText={`${opacityPercent}%`}
+            disabled={readOnly || effectivelyLocked}
+            onChange={(next) => stableHandlers.onSetItemOpacity(item.id, next / 100)}
+            className={cn(
+              "grid h-7 w-9 shrink-0 place-items-center rounded text-[0.58rem] font-bold tabular-nums text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+              STUDIO_LAYER_NAVIGATOR_COARSE_TARGET,
+              STUDIO_LAYER_NAVIGATOR_FOCUS_RING
+            )}
+          >
+            <span aria-hidden>{opacityPercent}</span>
+          </StudioInlineScrubber>
+          <button
+            type="button"
+            tabIndex={-1}
+            data-layer-row-control
+            data-studio-layer-row-action="menu"
             onClick={(event) => {
               event.stopPropagation();
               stableHandlers.onOpenItemActionMenu(event, item.id);

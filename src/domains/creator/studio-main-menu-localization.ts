@@ -32,87 +32,81 @@ function localizeText(
   return text === key ? fallback : text;
 }
 
+/**
+ * Locale key path for an item: `<group>/<item>` as the locale packs were
+ * authored. Items the §15.3 regroup relocated carry `legacyPath`, so their keys
+ * stay put even though the group around them changed.
+ */
+function localePath(groupId: string, item: StudioMainMenuLocalizableItem): string {
+  return item.legacyPath ?? `${groupId}/${item.id}`;
+}
+
 function itemLabelKey(
-  groupId: string,
-  itemId: string,
+  path: string,
   item: StudioMainMenuLocalizableItem,
   state: StudioMainMenuLocalizationState,
 ): string {
   if (item.labelKey) return item.labelKey;
-  const baseKey = `studio.mainMenu.item.${groupId}.${itemId}`;
-  if (groupId === "file" && itemId === "save-draft" && state.sharedNonOwnerSave) {
-    return `${baseKey}.shared`;
-  }
-  if (groupId === "file" && itemId === "publish" && state.hasWorkId) {
-    return `${baseKey}.has-work`;
-  }
-  if (groupId === "view" && itemId === "page-sequence" && state.pageSequenceOpen) {
-    return `${baseKey}.open`;
-  }
-  if (groupId === "view" && itemId === "quick-access-palette") {
+  const baseKey = `studio.mainMenu.item.${path.replace("/", ".")}`;
+  if (path === "file/save-draft" && state.sharedNonOwnerSave) return `${baseKey}.shared`;
+  if (path === "file/publish" && state.hasWorkId) return `${baseKey}.has-work`;
+  if (path === "view/page-sequence" && state.pageSequenceOpen) return `${baseKey}.open`;
+  if (path === "view/quick-access-palette") {
     if (state.quickAccessPaletteLoading) return `${baseKey}.loading`;
     if (state.quickAccessPaletteOpen) return `${baseKey}.open`;
   }
-  if (groupId === "view" && itemId === "left-panel" && state.leftPanelOpen) {
-    return `${baseKey}.open`;
-  }
-  if (groupId === "view" && itemId === "right-panel" && state.rightPanelOpen) {
-    return `${baseKey}.open`;
-  }
-  if (groupId === "filter" && itemId === "last-filter") {
+  if (path === "view/left-panel" && state.leftPanelOpen) return `${baseKey}.open`;
+  if (path === "view/right-panel" && state.rightPanelOpen) return `${baseKey}.open`;
+  if (path === "filter/last-filter") {
     return `${baseKey}.${state.lastFilterDraft ? "ready" : "empty"}`;
   }
   return baseKey;
 }
 
 function localizeItemLabel(
-  groupId: string,
+  path: string,
   item: StudioMainMenuLocalizableItem,
   state: StudioMainMenuLocalizationState,
   t: StudioMainMenuTranslate,
 ): string {
-  const label = localizeText(t, item.label, itemLabelKey(groupId, item.id, item, state));
-  if (
-    groupId === "file"
-    && item.id === "import-ora-cbz"
-    && !/\bWILL\b/iu.test(label)
-  ) {
+  const label = localizeText(t, item.label, itemLabelKey(path, item, state));
+  if (path === "file/import-ora-cbz" && !/\bWILL\b/iu.test(label)) {
     const withWill = label.replace(
       /ORA\s*\/\s*CBZ/iu,
       (formats) => `${formats} / WILL`,
     );
     return withWill === label ? `${label} · WILL` : withWill;
   }
-  if (groupId === "view" && item.id === "reset-rotation") {
+  if (path === "view/reset-rotation") {
     return label.replace("{angle}", String(state.canvasRotation));
   }
   return label;
 }
 
 function localizeUnavailableReason(
-  groupId: string,
+  path: string,
   item: StudioMainMenuLocalizableItem,
   state: StudioMainMenuLocalizationState,
   t: StudioMainMenuTranslate,
 ): string | undefined {
   if (!item.unavailableReason) return undefined;
-  if (groupId === "filter" && state.filterDisabled) {
+  if (path.startsWith("filter/") && state.filterDisabled) {
     return localizeText(
       t,
       state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다.",
       "studio.mainMenu.item.filter.unavailable",
     );
   }
-  if (groupId === "filter" && item.id === "last-filter" && !state.lastFilterDraft) {
+  if (path === "filter/last-filter" && !state.lastFilterDraft) {
     return localizeText(
       t,
       item.unavailableReason,
       "studio.mainMenu.item.filter.last-filter.empty-unavailable",
     );
   }
-  const key = groupId === "view" && item.id.startsWith("color-vision-")
+  const key = path.startsWith("view/color-vision-")
     ? "studio.mainMenu.item.view.color-vision.unavailable"
-    : `studio.mainMenu.item.${groupId}.${item.id}.unavailable`;
+    : `studio.mainMenu.item.${path.replace("/", ".")}.unavailable`;
   return localizeText(t, item.unavailableReason, key);
 }
 
@@ -123,13 +117,18 @@ export function localizeStudioMainMenuGroups(
 ): StudioMainMenuGroup[] {
   return groups.map((group) => ({
     ...group,
-    label: localizeText(t, group.label, `studio.mainMenu.group.${group.id}.label`),
+    label: localizeText(
+      t,
+      group.label,
+      group.labelKey ?? `studio.mainMenu.group.${group.id}.label`,
+    ),
     items: group.items.map((rawItem) => {
       const item = rawItem as StudioMainMenuLocalizableItem;
+      const path = localePath(group.id, item);
       return {
         ...item,
-        label: localizeItemLabel(group.id, item, state, t),
-        unavailableReason: localizeUnavailableReason(group.id, item, state, t),
+        label: localizeItemLabel(path, item, state, t),
+        unavailableReason: localizeUnavailableReason(path, item, state, t),
       };
     }),
   }));

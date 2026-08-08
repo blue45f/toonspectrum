@@ -1,9 +1,14 @@
-import type { StudioMainMenuBuilderState } from "./studio-main-menu-groups";
+import type { StudioMainMenuBuilderState } from "./studio-main-menu-contract";
 import type {
   StudioMainMenuGroup,
   StudioMainMenuItem,
 } from "./studio-main-menu-model";
 
+/**
+ * Keyed by the item's **authoring** path (`legacyPath` when the §15.3 regroup
+ * moved it), so relocating a command never changes the sentence a blocked user
+ * reads.
+ */
 function unavailableReasonForDisabledMainMenuItem(
   groupId: string,
   itemId: string,
@@ -85,11 +90,14 @@ export function withDisabledMainMenuReasons(
     ...group,
     items: group.items.map((item): StudioMainMenuItem => {
       if (!item.disabled || item.unavailableReason) return item;
+      const [authoredGroup = group.id, authoredItem = item.id] = item.legacyPath
+        ? item.legacyPath.split("/")
+        : [];
       return {
         ...item,
         unavailableReason: unavailableReasonForDisabledMainMenuItem(
-          group.id,
-          item.id,
+          authoredGroup,
+          authoredItem,
           state,
         ),
       };

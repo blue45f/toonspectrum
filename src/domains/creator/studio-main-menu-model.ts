@@ -11,6 +11,19 @@ export type StudioMainMenuHintKey =
 export interface StudioMainMenuItem {
   id: string;
   label: string;
+  /**
+   * `CommandId` in `studio-command-catalog.ts` this item dispatches. Menu items
+   * reference the catalog instead of declaring a second command surface; the
+   * `onSelect` closure stays the host-supplied execution path until the registry
+   * absorbs it (see `docs/rewrite/command-consolidation-plan.md` §3-2).
+   */
+  commandId?: string;
+  /**
+   * `<group>/<item>` the item was declared under before the §15.3 regroup.
+   * Localization and disabled-reason lookups use this instead of the live group,
+   * so relocating an item cannot silently change its copy in 75 locale packs.
+   */
+  legacyPath?: string;
   shortcut?: string;
   icon?: LucideIcon;
   hint?: StudioToolHintSpec;
@@ -30,6 +43,12 @@ export interface StudioMainMenuItem {
 export interface StudioMainMenuGroup {
   id: string;
   label: string;
+  /**
+   * Locale key to use for the group label instead of the id-derived one. Set for
+   * groups the §15.3 regroup renamed (draw → brush) so shipped translations keep
+   * resolving.
+   */
+  labelKey?: string;
   items: readonly StudioMainMenuItem[];
 }
 

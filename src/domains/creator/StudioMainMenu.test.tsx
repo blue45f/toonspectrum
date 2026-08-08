@@ -339,9 +339,8 @@ describe("StudioMainMenu", () => {
     for (const [group, preview] of [
       ["file", "file-workflow"],
       ["edit", "edit-workflow"],
-      ["insert", "insert-content"],
       ["view", "view-workflow"],
-      ["draw", "draw-workflow"],
+      ["brush", "draw-workflow"],
       ["help", "settings"],
     ]) {
       const groupStart = mainMenuSource.indexOf(`  ${group}: {`);

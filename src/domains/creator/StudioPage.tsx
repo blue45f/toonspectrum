@@ -406,6 +406,20 @@ import {
   planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  settleStudioDestructiveCommit,
+  studioApplyCollageRequest,
+  studioApplyPanelLayoutRequest,
+  studioApplyTemplateRequest,
+  studioClearLivingInkRequest,
+  studioDeleteCheckpointRequest,
+  studioQuickComicReplaceRequest,
+  studioRemoveEmeresUnderlaysRequest,
+  studioRestoreCheckpointRequest,
+  studioSceneSnapshotReplaceRequest,
+  studioStartFromExampleRequest,
+} from "./studio-destructive-command-catalog";
 import {
   applyDialogueTextEdit,
   applyReplacePlanToPages,
@@ -871,6 +885,10 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
+import {
+  projectStudioDocumentRectToClient,
+  type StudioSurfaceRect,
+} from "./studio-oncanvas-command-surfaces";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   isDefaultPageGrade,
@@ -1156,6 +1174,7 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import { studioSafeModeQuality } from "./studio-reliability-status-store";
 import { getStudioTournamentRuntime } from "./studio-renderer-tournament-runtime";
 import {
   appendStudioPendingRasterRetouchGesturePoint,
@@ -1167,6 +1186,7 @@ import {
   type StudioRasterRetouchGestureTool,
   type StudioRasterRetouchNormalizedPoint,
 } from "./studio-retouch-raster-gesture";
+import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   STUDIO_SCROLL_VIEWPORT_ORIGIN,
@@ -1292,6 +1312,11 @@ import {
   type StudioStagePointerFrameMapperCache,
 } from "./studio-stage-pointer-coordinate";
 import { createStudioStickyNoteElement } from "./studio-sticky-note";
+import {
+  noteStudioSaveSucceeded,
+  reportStudioAutosaveFailure,
+  reportStudioSaveAuthorityDegraded,
+} from "./studio-storage-recovery-runtime";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   normalizeStudioStrokeGuideScale,
@@ -1461,6 +1486,7 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { StudioBrushHud } from "./StudioBrushHud";
 import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
   StudioCanvasViewport,
@@ -1498,6 +1524,10 @@ import {
 } from "./StudioPageListPane";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
 import { StudioScrollViewportSubscriber } from "./StudioScrollViewportSubscriber";
+import {
+  StudioSelectionContextBar,
+  type StudioSelectionAlignMode,
+} from "./StudioSelectionContextBar";
 import {
   StudioToolBeltContent,
   type FxPickerSection,
@@ -9774,11 +9804,12 @@ function StudioCuttoonEditor() {
       void import("./studio-autosave-opfs-session")
         .then(async ({ persistStudioAutosaveWithOpfsPrimary }) => {
           const session = await (sessionPromise ?? Promise.resolve(null));
-          await persistStudioAutosaveWithOpfsPrimary({
+          const receipt = await persistStudioAutosaveWithOpfsPrimary({
             session,
             storage: globalThis.localStorage,
             key: autosaveKey,
             payload,
+            onDurableAuthorityDegraded: reportStudioSaveAuthorityDegraded,
           });
           if (
             sessionPromise !== null
@@ -9790,6 +9821,7 @@ function StudioCuttoonEditor() {
           );
           studioLifecycleDurablePendingFingerprintRef.current =
             scheduledPendingFingerprint;
+          noteStudioSaveSucceeded(receipt.authority);
         })
         .catch((cause: unknown) => {
           // Module/session initialization is intentionally outside the hot edit path. If it
@@ -9816,6 +9848,8 @@ function StudioCuttoonEditor() {
           } catch {
             // The diagnostic below reports both an unavailable OPFS authority and fallback.
           }
+          // 무음 금지: 상태 레일에 도달시키고, 쿼터 압박이면 복구 저널 공간 회수까지 잇는다.
+          void reportStudioAutosaveFailure(cause);
           console.error("Auto-save failed:", cause);
         });
     }, 1500);
@@ -11294,6 +11328,8 @@ function StudioCuttoonEditor() {
       !surface
       || !config
       || livingInkState !== "ready"
+      // Safe Mode 품질 저하 강제 지점 — 라이브 잉크만 멈추고 보통 획으로 계속 그린다.
+      || studioSafeModeQuality().livingInkSuspended
       || studioLivingInkProductAdmissionBlocked({
         busy: livingInkBusy,
         finalizing: livingInkFinalizingRef.current,
@@ -12220,6 +12256,8 @@ function StudioCuttoonEditor() {
     // Active and pointerup-settled authority share one whole-group failover path. A rejected
     // corrupted promotion keeps an exact baseline for a subsequently remounted canvas handle.
     failOverGpuAuthorityAfterSurfaceLoss();
+    // 무음 금지: 메인 캔버스 강등을 복구 상태기계와 상태 레일에 알린다(ux-audit-v5 §2.10).
+    announceStudioGpuDeviceLoss("main-canvas-device-lost");
   }
   function onWebGpuFrameReady(receipt: StudioGpuFrameReceipt) {
     const auditReceipt = receiveLiveStrokeGpuAuditReceipt(receipt);
@@ -12478,6 +12516,73 @@ function StudioCuttoonEditor() {
       });
     },
   });
+  /**
+   * On-canvas command surfaces (V5 §15 포인터 거리) — see
+   * `studio-oncanvas-command-surfaces.ts`. Every command here routes through the
+   * existing dispatchers (`executeQuickAction`, `reorder`, `alignSelected`,
+   * `openColorWheelAt`, `setStrokeWidth`), so the HUD and the context bar add a
+   * *surface*, never a second implementation.
+   */
+  const studioOnCanvasSurfaceHandlers = useStudioStableHandlers({
+    onStrokeWidthChange: (next: number) => setStrokeWidth(next),
+    onOpacityChange: (next: number) => setBrushOpacity(next),
+    onOpenColorWheel: (clientX: number, clientY: number) =>
+      openColorWheelAt(clientX, clientY),
+    onToggleEraser: () => executeQuickAction(drawMode === "eraser" ? "pen" : "eraser"),
+    onQuickAction: (action: StudioQuickActionId) => executeQuickAction(action),
+    onReorder: (direction: "front" | "back" | "forward" | "backward") =>
+      reorder(direction),
+    onAlign: (mode: StudioSelectionAlignMode) => alignSelected(mode),
+    getCanvasRect: (): StudioSurfaceRect | null => {
+      const wrap = wrapRef.current;
+      if (!wrap?.isConnected) return null;
+      const rect = wrap.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0
+        ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+        : null;
+    },
+    getSelectionRect: (): StudioSurfaceRect | null => {
+      const host = zoomHostRef.current;
+      if (!host?.isConnected || canvasH <= 0) return null;
+      const ids = currentCanvasSelectionIds();
+      if (ids.length === 0) return null;
+      let minX = Number.POSITIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      for (const id of ids) {
+        const element = elementById.get(id);
+        if (!element) continue;
+        const bounds = elBounds(element);
+        minX = Math.min(minX, bounds.x);
+        minY = Math.min(minY, bounds.y);
+        maxX = Math.max(maxX, bounds.x + bounds.w);
+        maxY = Math.max(maxY, bounds.y + bounds.h);
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+      const hostRect = host.getBoundingClientRect();
+      if (!(hostRect.width > 0) || !(hostRect.height > 0)) return null;
+      return projectStudioDocumentRectToClient({
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        canvasFlipH,
+        canvasRotation,
+        rect: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+        hostRect: {
+          left: hostRect.left,
+          top: hostRect.top,
+          width: hostRect.width,
+          height: hostRect.height,
+        },
+      });
+    },
+  });
+  /** Marquee wins when present; otherwise the single selection. */
+  const currentCanvasSelectionCount = marqueeIds.length > 0
+    ? marqueeIds.length
+    : selectedId
+      ? 1
+      : 0;
   function restoreStudioCanvasViewportFocus(): void {
     globalThis.requestAnimationFrame(() => {
       wrapRef.current?.focus({ preventScroll: true });
@@ -16159,6 +16264,7 @@ function StudioCuttoonEditor() {
         groupId: masterEditMode ? undefined : element.groupId,
         hidden: element.hidden,
         locked: element.locked,
+        opacity: element.opacity,
         alphaLocked: element.alphaLocked,
         fillReference: element.type === "image" ? element.fillReference : undefined,
         masked: Boolean(element.maskSrc),
@@ -21596,6 +21702,11 @@ const puppetWarpArmed =
       case "set-items-locked":
         patchLayerItems(action.ids, () => ({ locked: action.locked }));
         return;
+      case "set-items-opacity": {
+        const opacity = Math.min(1, Math.max(0, action.opacity));
+        patchLayerItems(action.ids, () => ({ opacity }));
+        return;
+      }
       case "merge-down": {
         void commitLayerMergePlan(
           planStudioLayerMergeDown({
@@ -22512,10 +22623,8 @@ const puppetWarpArmed =
       return;
     }
     if (comipoActionBusyRef.current) return;
-    if (
-      elements.length > 0 &&
-      !globalThis.confirm("현재 페이지를 빠른 웹툰 결과로 교체할까요?")
-    ) {
+    const quickComicRequest = studioQuickComicReplaceRequest(elements.length);
+    if (elements.length > 0 && !confirmStudioDestructiveAction(quickComicRequest)) {
       return;
     }
 
@@ -22537,7 +22646,13 @@ const puppetWarpArmed =
       setTool("select");
       setMenu(null);
       setSelectedId(null);
-      if (!commit(comipoSeedsToEls(assembled.seeds))) return;
+      if (
+        !settleStudioDestructiveCommit(
+          quickComicRequest,
+          commit(comipoSeedsToEls(assembled.seeds)),
+          undo
+        )
+      ) return;
       setQuickComicOpen(false);
       announceDrawingShortcut(
         `빠른 웹툰 완성 · ${assembled.frameCount}컷 · 말풍선 ${assembled.bubbleCount}개`
@@ -22558,13 +22673,13 @@ const puppetWarpArmed =
       setError(collaborationLockMessage());
       return;
     }
-    if (
-      !globalThis.confirm(
-        `현재 ${pageDisplayName(activePage, activePageIndex)} 전체를 “${snapshot.name}” 장면으로 교체할까요?`
-      )
-    ) {
-      return;
-    }
+    const sceneSnapshotRequest = studioSceneSnapshotReplaceRequest({
+      pageName: pageDisplayName(activePage, activePageIndex),
+      sceneName: snapshot.name,
+      currentElementCount: activePage.elements.length,
+      incomingElementCount: snapshot.page.elements.length,
+    });
+    if (!confirmStudioDestructiveAction(sceneSnapshotRequest)) return;
     const restoredPage: PageState = {
       ...snapshot.page,
       id: activePage.id,
@@ -22572,7 +22687,13 @@ const puppetWarpArmed =
     const nextPages = pages.map((page) =>
       page.id === activePage.id ? restoredPage : page
     );
-    if (!commitPages(nextPages)) return;
+    if (
+      !settleStudioDestructiveCommit(
+        sceneSnapshotRequest,
+        commitPages(nextPages),
+        undo
+      )
+    ) return;
     setWebtoonTheme(snapshot.theme);
     setSelectedId(null);
     setMarqueeIds([]);
@@ -22589,7 +22710,8 @@ const puppetWarpArmed =
       return;
     }
     if (comipoActionBusyRef.current) return;
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
+    const exampleRequest = studioStartFromExampleRequest(elements.length);
+    if (elements.length > 0 && !confirmStudioDestructiveAction(exampleRequest)) return;
 
     const deferredAction = captureDeferredComipoAction();
     comipoActionBusyRef.current = true;
@@ -22617,7 +22739,11 @@ const puppetWarpArmed =
       setTool("select");
       setMenu(null);
       setSelectedId(null);
-      commit([...createQuickSampleFrames()]);
+      settleStudioDestructiveCommit(
+        exampleRequest,
+        commit([...createQuickSampleFrames()]),
+        undo
+      );
       dismissQuickStart();
       return;
     }
@@ -22634,7 +22760,7 @@ const puppetWarpArmed =
     setTool("select");
     setMenu(null);
     setSelectedId(null);
-    commit(sample);
+    settleStudioDestructiveCommit(exampleRequest, commit(sample), undo);
     dismissQuickStart();
   }
   // 삭제 버튼·Delete 키·퀵 액션·내비게이터가 모두 같은 명시적 삭제 정책을 사용한다. 잠금은
@@ -26116,8 +26242,13 @@ const puppetWarpArmed =
   const emeresUnderlayCount = elements.filter((e) => e.emeresSourceId != null).length;
   function removeEmeresUnderlays() {
     if (emeresUnderlayCount === 0) return;
-    if (!globalThis.confirm(`이메레스 밑그림 ${emeresUnderlayCount}개를 전부 지울까요? 그 위에 그린 펜 선은 지워지지 않아요.`)) return;
-    commit(elements.filter((e) => e.emeresSourceId == null));
+    const emeresRequest = studioRemoveEmeresUnderlaysRequest(emeresUnderlayCount);
+    if (!confirmStudioDestructiveAction(emeresRequest)) return;
+    settleStudioDestructiveCommit(
+      emeresRequest,
+      commit(elements.filter((e) => e.emeresSourceId == null)),
+      undo
+    );
   }
   // 장면 템플릿 삽입 — runStudioPageAddSceneTemplate 단일 shipped 경로.
   async function addSceneTemplate(template: SceneTemplate) {
@@ -26450,15 +26581,19 @@ const puppetWarpArmed =
   }
 
   function applyTemplate(tpl: TemplateSpec) {
-    // confirm 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
+    // 승인 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
+    const templateRequest = studioApplyTemplateRequest({
+      elementCount: elements.length,
+      frameCount: tpl.frames.length,
+    });
+    if (elements.length > 0 && !confirmStudioDestructiveAction(templateRequest)) return;
     setMenu(null);
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(tpl);
     const nextEls = regenerateTemplate(tpl, panelGutter, []);
-    commit(nextEls);
+    settleStudioDestructiveCommit(templateRequest, commit(nextEls), undo);
     setSelectedId(null);
     announceDrawingShortcut(
       tpl.frames.length > 0
@@ -26469,7 +26604,11 @@ const puppetWarpArmed =
   // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
   async function applyPanelLayout(layout: PanelLayoutPreset) {
     if (comipoActionBusyRef.current) return;
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
+    const panelLayoutRequest = studioApplyPanelLayoutRequest({
+      layoutName: layout.label,
+      elementCount: elements.length,
+    });
+    if (elements.length > 0 && !confirmStudioDestructiveAction(panelLayoutRequest)) return;
     const deferredAction = captureDeferredComipoAction();
     const script = dialogueScript.trim() || undefined;
     comipoActionBusyRef.current = true;
@@ -26489,7 +26628,11 @@ const puppetWarpArmed =
       setBg("#ffffff");
       setBgGrad(null);
       setCurrentTemplate(null);
-      commit(comipoSeedsToEls(assembled.seeds));
+      settleStudioDestructiveCommit(
+        panelLayoutRequest,
+        commit(comipoSeedsToEls(assembled.seeds)),
+        undo
+      );
       setSelectedId(null);
       announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
     } catch (error) {
@@ -26529,10 +26672,14 @@ const puppetWarpArmed =
     replaceExisting: boolean;
   }) {
     setMenu(null);
+    const collageRequest = studioApplyCollageRequest({
+      elementCount: elements.length,
+      frameCount: payload.frames.length,
+    });
     if (
       payload.replaceExisting
       && elements.length > 0
-      && !globalThis.confirm("기존 작업을 지우고 콜라주를 적용할까요?")
+      && !confirmStudioDestructiveAction(collageRequest)
     ) {
       return;
     }
@@ -26578,7 +26725,11 @@ const puppetWarpArmed =
     }
 
     if (payload.replaceExisting) {
-      commit([...frameEls, ...placedImages]);
+      settleStudioDestructiveCommit(
+        collageRequest,
+        commit([...frameEls, ...placedImages]),
+        undo
+      );
     } else {
       const placedIds = new Set(placedImages.map((el) => el.id));
       const kept = elements.filter((el) => !placedIds.has(el.id));
@@ -37697,12 +37848,14 @@ function clearSelectionForEdit() {
   }
 
   async function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    if (!globalThis.confirm(`'${checkpoint.name}' 시점으로 문서를 복원할까요? 현재 상태는 자동저장에 남을 수 있어요.`)) {
-      return;
-    }
+    const restoreRequest = studioRestoreCheckpointRequest({
+      checkpointName: checkpoint.name,
+      currentPageCount: pages.length,
+    });
+    if (!confirmStudioDestructiveAction(restoreRequest)) return;
     try {
       const applied = await applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
-      if (!applied) return;
+      if (!settleStudioDestructiveCommit(restoreRequest, applied, undo)) return;
       setCheckpointPanelOpen(false);
       setCheckpointError(null);
     } catch (error) {
@@ -37711,11 +37864,17 @@ function clearSelectionForEdit() {
   }
 
   async function removeNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    if (!globalThis.confirm(`'${checkpoint.name}' 복구 지점을 삭제할까요?`)) return;
+    // 되돌릴 수 없는 유일한 파괴적 명령 — 저장소에서 스냅샷을 지우며 히스토리 커밋이 없다.
+    const deleteRequest = studioDeleteCheckpointRequest({
+      checkpointName: checkpoint.name,
+      savedAtLabel: checkpoint.createdAt,
+    });
+    if (!confirmStudioDestructiveAction(deleteRequest)) return;
     try {
       setCheckpoints(
         await deleteDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id)
       );
+      settleStudioDestructiveCommit(deleteRequest, true);
       setCheckpointError(null);
     } catch (error) {
       setCheckpointError(error instanceof Error ? error.message : "복구 지점을 삭제하지 못했어요.");
@@ -39172,12 +39331,9 @@ function clearSelectionForEdit() {
         hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
       })
     ) return;
-    if (
-      kind === "clear"
-      &&
-      livingInkScope === "all"
-      && !globalThis.confirm("현재 페이지의 수채 번짐 레이어 전체를 지울까요? 실행 취소로 되돌릴 수 있습니다.")
-    ) return;
+    const livingInkClearRequest =
+      kind === "clear" && livingInkScope === "all" ? studioClearLivingInkRequest() : null;
+    if (livingInkClearRequest && !confirmStudioDestructiveAction(livingInkClearRequest)) return;
     if (
       kind === "fix"
       && !activeElementsRef.current.some((element) =>
@@ -39254,6 +39410,9 @@ function clearSelectionForEdit() {
         );
       }
       transactionCommitted = true;
+      if (livingInkClearRequest) {
+        settleStudioDestructiveCommit(livingInkClearRequest, true, undo);
+      }
       livingInkCanonicalHandoffRef.current = Object.freeze({
         token: `${routeKey}:canonical`,
         kind: "action",
@@ -41222,6 +41381,37 @@ function clearSelectionForEdit() {
           setZoomLocked={setZoomLocked}
           zoomHostRef={zoomHostRef}
           stableHandlers={studioCanvasViewportHandlers}
+        />
+
+        <StudioBrushHud
+          visible={
+            tool === "draw"
+            && isStudioBrushCursorMode(drawMode)
+            && !canvasOnlyMode
+            && !canvasInteractionBlocked
+            && !isExporting
+            && !colorWheelOpen
+          }
+          strokeWidth={strokeWidth}
+          brushOpacity={brushOpacity}
+          color={color}
+          eraserActive={drawMode === "eraser"}
+          handedness={workspaceState.mobileControlSide === "left" ? "left" : "right"}
+          canvasHostRef={wrapRef}
+          stableHandlers={studioOnCanvasSurfaceHandlers}
+        />
+        <StudioSelectionContextBar
+          visible={
+            tool === "select"
+            && currentCanvasSelectionCount > 0
+            && !canvasOnlyMode
+            && !canvasInteractionBlocked
+            && !isExporting
+          }
+          selectionCount={currentCanvasSelectionCount}
+          readOnly={activeSurfaceReviewLocked || pageEditLocked}
+          canDelete={!activeSurfaceReviewLocked && !pageEditLocked}
+          stableHandlers={studioOnCanvasSurfaceHandlers}
         />
 
         {pointCommentComposer ? (

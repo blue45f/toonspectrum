@@ -76,14 +76,26 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
   },
 ] as const;
 
-/** Top menubar group order — commercial drawing app catalog. */
+/**
+ * Top menubar group order — V5 §15.3. Transform, Animation and Collaboration are
+ * §15.3 groups we ship no command for yet, so they are declared in
+ * `studio-main-menu-group-spec.ts` but never rendered; `ai` is a product group
+ * §15.3 does not define.
+ */
 export const STUDIO_CHROME_MENUBAR_GROUP_ORDER = [
   "file",
   "edit",
-  "insert",
   "view",
+  "canvas",
+  "layer",
+  "select",
+  "brush",
   "filter",
-  "draw",
+  "vector",
+  "text",
+  "comic",
+  "3d",
+  "window",
   "ai",
   "help",
 ] as const;
@@ -97,10 +109,17 @@ export const STUDIO_CHROME_MENUBAR_GROUP_LABELS: Readonly<
 > = {
   file: "파일",
   edit: "편집",
-  insert: "삽입",
   view: "보기",
+  canvas: "캔버스",
+  layer: "레이어",
+  select: "선택",
+  brush: "그리기",
   filter: "필터",
-  draw: "그리기",
+  vector: "벡터",
+  text: "텍스트",
+  comic: "만화",
+  "3d": "3D",
+  window: "창",
   ai: "AI",
   help: "도움말",
 };
@@ -120,7 +139,7 @@ export const STUDIO_CHROME_FILE_CORE_ACTION_IDS = [
   "project",
 ] as const;
 
-/** Edit loop: undo/clipboard/layer order — must stay under Edit. */
+/** Edit loop: undo and clipboard — must stay under Edit. */
 export const STUDIO_CHROME_EDIT_CORE_ACTION_IDS = [
   "undo",
   "redo",
@@ -128,9 +147,22 @@ export const STUDIO_CHROME_EDIT_CORE_ACTION_IDS = [
   "copy",
   "paste",
   "duplicate",
+] as const;
+
+/** §15.3 Layer: ordering and layer-scoped crop left Edit in Wave C. */
+export const STUDIO_CHROME_LAYER_CORE_ACTION_IDS = [
   "bring-front",
+  "bring-forward",
   "send-back",
+  "send-backward",
   "crop-layer",
+] as const;
+
+/** §15.3 Select: the three selection commands left Edit in Wave C. */
+export const STUDIO_CHROME_SELECT_CORE_ACTION_IDS = [
+  "select-all",
+  "deselect",
+  "invert-selection",
 ] as const;
 
 /**
@@ -407,6 +439,8 @@ export function auditStudioChromeMenubarAgainstIa(
   readonly groupOrderOk: boolean;
   readonly missingFileCore: readonly string[];
   readonly missingEditCore: readonly string[];
+  readonly missingLayerCore: readonly string[];
+  readonly missingSelectCore: readonly string[];
   readonly fileOrderOk: boolean;
 } {
   const groupIds = groups.map((group) => group.id);
@@ -414,25 +448,40 @@ export function auditStudioChromeMenubarAgainstIa(
     groupIds.length === STUDIO_CHROME_MENUBAR_GROUP_ORDER.length
     && groupIds.every((id, index) => id === STUDIO_CHROME_MENUBAR_GROUP_ORDER[index]);
 
-  const file = groups.find((group) => group.id === "file");
-  const edit = groups.find((group) => group.id === "edit");
-  const fileIds = file?.items.map((item) => item.id) ?? [];
-  const editIds = new Set(edit?.items.map((item) => item.id) ?? []);
+  const idsIn = (groupId: string): Set<string> =>
+    new Set(groups.find((group) => group.id === groupId)?.items.map((item) => item.id) ?? []);
+  const fileIds =
+    groups.find((group) => group.id === "file")?.items.map((item) => item.id) ?? [];
 
   const missingFileCore = STUDIO_CHROME_FILE_CORE_ACTION_IDS.filter(
     (id) => !fileIds.includes(id),
   );
+  const editIds = idsIn("edit");
+  const layerIds = idsIn("layer");
+  const selectIds = idsIn("select");
   const missingEditCore = STUDIO_CHROME_EDIT_CORE_ACTION_IDS.filter((id) => !editIds.has(id));
+  const missingLayerCore = STUDIO_CHROME_LAYER_CORE_ACTION_IDS.filter((id) => !layerIds.has(id));
+  const missingSelectCore = STUDIO_CHROME_SELECT_CORE_ACTION_IDS.filter(
+    (id) => !selectIds.has(id),
+  );
 
   const fileOrderOk =
     fileIds.length === STUDIO_CHROME_FILE_MENU_ITEM_ORDER.length
     && fileIds.every((id, index) => id === STUDIO_CHROME_FILE_MENU_ITEM_ORDER[index]);
 
   return {
-    ok: groupOrderOk && missingFileCore.length === 0 && missingEditCore.length === 0 && fileOrderOk,
+    ok:
+      groupOrderOk
+      && missingFileCore.length === 0
+      && missingEditCore.length === 0
+      && missingLayerCore.length === 0
+      && missingSelectCore.length === 0
+      && fileOrderOk,
     groupOrderOk,
     missingFileCore,
     missingEditCore,
+    missingLayerCore,
+    missingSelectCore,
     fileOrderOk,
   };
 }

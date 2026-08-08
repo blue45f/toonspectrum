@@ -511,6 +511,12 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
   readonly key: string;
   readonly payload: StudioAutosavePayload;
   readonly signal?: AbortSignal;
+  /**
+   * 내구 저널 쓰기가 실패해 브라우저 저장소로 강등될 때 호출된다. 강등 자체는 정상
+   * 폴백이지만 **내구성이 낮아졌다는 사실**은 사용자에게 닿아야 한다(V5 숨은 실패 금지).
+   * 관측자가 던져도 폴백 저장은 계속된다.
+   */
+  readonly onDurableAuthorityDegraded?: (cause: unknown) => void;
 }): Promise<StudioAutosavePersistenceReceipt> {
   if (input.session) {
     try {
@@ -518,8 +524,13 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
       input.storage.setItem(input.key, serializeStudioAutosave(input.payload));
       input.storage.removeItem(studioLifecycleAutosaveSidecarKey(input.key));
       return receipt;
-    } catch {
+    } catch (cause: unknown) {
       // The synchronous browser slot remains a bounded compatibility and lifecycle fallback.
+      try {
+        input.onDurableAuthorityDegraded?.(cause);
+      } catch {
+        // 관측자 격리 — 고지 실패가 폴백 저장을 막지 않는다.
+      }
     }
   }
   input.storage.setItem(input.key, serializeStudioAutosave(input.payload));

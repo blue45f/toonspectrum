@@ -67,6 +67,8 @@ export interface StudioLayerNavigatorItem {
   groupId?: string;
   hidden?: boolean;
   locked?: boolean;
+  /** 0–1. Undefined means fully opaque; the row's inline scrubber edits this. */
+  opacity?: number;
   alphaLocked?: boolean;
   fillReference?: boolean;
   masked?: boolean;

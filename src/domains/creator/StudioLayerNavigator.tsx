@@ -98,6 +98,8 @@ export type StudioLayerNavigatorAction =
     }
   | { type: "set-items-hidden"; ids: readonly string[]; hidden: boolean }
   | { type: "set-items-locked"; ids: readonly string[]; locked: boolean }
+  /** 0–1. Emitted by the row's inline opacity scrubber (V5 §15 레이어 행 동작 120px). */
+  | { type: "set-items-opacity"; ids: readonly string[]; opacity: number }
   | { type: "set-item-flag"; id: string; flag: StudioLayerNavigatorItemFlag; value: boolean }
   | { type: "assign-items-to-group"; ids: readonly string[]; groupId?: string }
   | { type: "set-items-role"; ids: readonly string[]; role?: StudioLayerRole }
@@ -694,6 +696,12 @@ export function StudioLayerNavigator({
     onToggleItemHidden: (itemId, hidden) => {
       onAction({ type: "set-items-hidden", ids: [itemId], hidden });
     },
+    onToggleItemLocked: (itemId, locked) => {
+      onAction({ type: "set-items-locked", ids: [itemId], locked });
+    },
+    onSetItemOpacity: (itemId, opacity) => {
+      onAction({ type: "set-items-opacity", ids: [itemId], opacity });
+    },
     onOpenItemActionMenu: (event, itemId) => {
       openActionMenu(event, { kind: "item", id: itemId });
     },
@@ -745,6 +753,7 @@ export function StudioLayerNavigator({
         mobileMultiSelect={mobileMultiSelect}
         readOnly={readOnly}
         hiddenByGroup={entry.group?.hidden === true && item.hidden !== true}
+        lockedByGroup={entry.group?.locked === true && item.locked !== true}
         actionOpen={actionTarget?.kind === "item" && actionTarget.id === item.id}
         actionPopoverId={actionPopoverId}
         stableHandlers={rowHandlers}

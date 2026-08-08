@@ -6,25 +6,93 @@ function source(fileName: string): string {
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
 
-describe("studio main-menu catalogue ownership boundary", () => {
-  it("keeps the catalogue React-, browser-, and page-state-free", () => {
-    const catalogue = source("./studio-main-menu-groups.ts");
-    const localization = source("./studio-main-menu-localization.ts");
+/**
+ * The whole main-menu catalogue, module by module.
+ *
+ * Before the V5 §15.3 regroup this was one 1,121-line file held under a single
+ * 1,130-line cap. Growing that cap for 17 groups would have defeated the point
+ * of the cap, so the catalogue was split by §15.3 group family instead. The
+ * invariant the old budget protected — *no single catalogue module becomes the
+ * place everything lands* — is now expressed as a per-module cap, and it applies
+ * to any module added later because the list is asserted to be complete.
+ */
+const CATALOGUE_MODULE_LINE_BUDGETS = {
+  // Assembler: group order and localization wiring only.
+  "./studio-main-menu-groups.ts": 140,
+  // Host contract types (state + injected actions).
+  "./studio-main-menu-contract.ts": 200,
+  // §15.3 coverage table. Its size is set by the spec (17 groups × ~8 rows, one
+  // declaration line each), not by how much logic we let pile up.
+  "./studio-main-menu-group-spec.ts": 640,
+  "./studio-main-menu-items-document.ts": 500,
+  "./studio-main-menu-items-artwork.ts": 500,
+  "./studio-main-menu-items-filter.ts": 500,
+  "./studio-main-menu-items-story.ts": 500,
+  "./studio-main-menu-items-workspace.ts": 500,
+  "./studio-main-menu-localization.ts": 200,
+  "./studio-main-menu-unavailable.ts": 200,
+} as const;
 
-    expect(catalogue).not.toMatch(/from\s+["']react["']/u);
-    expect(catalogue).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
-    expect(catalogue).not.toContain("StudioPage");
-    expect(catalogue).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
-    expect(catalogue).toContain('from "./studio-main-menu-localization"');
-    expect(catalogue).not.toContain("function localizeText(");
-    expect(catalogue).not.toContain("translateItemUnavailableReason");
-    expect(localization).not.toMatch(/from\s+["']react["']/u);
-    expect(localization).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
-    expect(localization).toContain("export function localizeStudioMainMenuGroups(");
-    // 캔버스 px 눈금자, 빠른 액세스, 전문 필터 항목을 소유해도 카탈로그가 독립 모듈
-    // 경계를 유지한다. 기능 카탈로그 확장분만 허용하고 React/browser 경계는 위에서 엄격히 막는다.
-    // 의도적 변경(2026-08-05): File 메뉴 save→import→export 재배치 주석(1_120 → 1_130).
-    expect(catalogue.split("\n").length).toBeLessThanOrEqual(1_130);
+const CATALOGUE_MODULES = Object.keys(
+  CATALOGUE_MODULE_LINE_BUDGETS,
+) as (keyof typeof CATALOGUE_MODULE_LINE_BUDGETS)[];
+
+/**
+ * Browser-global checks must look at code, not at data. Catalog command ids like
+ * `window.app-settings` are strings, so strip literals before asserting.
+ */
+function code(fileName: string): string {
+  return source(fileName)
+    .replace(/"(?:[^"\\]|\\.)*"/gu, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/gu, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/gu, "``");
+}
+
+describe("studio main-menu catalogue ownership boundary", () => {
+  it.each(CATALOGUE_MODULES)("keeps %s React-, browser-, and page-state-free", (moduleName) => {
+    const module = code(moduleName);
+
+    expect(source(moduleName)).not.toMatch(/from\s+["']react["']/u);
+    expect(module).not.toMatch(/\b(?:document|window|globalThis)\s*\./u);
+    expect(module).not.toContain("StudioPage");
+    expect(module).not.toMatch(/\buse(?:Memo|Callback|Effect|State|Ref)\b/u);
+  });
+
+  it.each(CATALOGUE_MODULES)("keeps %s under its declared line budget", (moduleName) => {
+    expect(source(moduleName).split("\n").length).toBeLessThanOrEqual(
+      CATALOGUE_MODULE_LINE_BUDGETS[moduleName],
+    );
+  });
+
+  it("keeps the assembler an assembler — order and localization, no item literals", () => {
+    const assembler = source("./studio-main-menu-groups.ts");
+
+    expect(assembler).toContain('from "./studio-main-menu-localization"');
+    expect(assembler).toContain('from "./studio-main-menu-group-spec"');
+    expect(assembler).not.toContain("function localizeText(");
+    expect(assembler).not.toContain("translateItemUnavailableReason");
+    // Item objects (and therefore labels, icons, shortcuts) live in the item modules.
+    expect(assembler).not.toMatch(/^\s*label: "/mu);
+    expect(assembler).not.toMatch(/^\s*onSelect:/mu);
+    expect(assembler.split("\n").length).toBeLessThanOrEqual(
+      CATALOGUE_MODULE_LINE_BUDGETS["./studio-main-menu-groups.ts"],
+    );
+  });
+
+  it("routes every §15.3 group through a declared item module", () => {
+    const assembler = source("./studio-main-menu-groups.ts");
+    const itemModules = CATALOGUE_MODULES.filter((name) =>
+      name.startsWith("./studio-main-menu-items-"),
+    );
+
+    for (const moduleName of itemModules) {
+      expect(assembler, `${moduleName} must be wired into the assembler`).toContain(
+        `from "${moduleName.replace(/\.ts$/u, "")}"`,
+      );
+    }
+    // Nothing may import the item builders behind the assembler's back and then
+    // re-declare a group; the assembler owns group identity.
+    expect(assembler.match(/buildStudio[A-Za-z0-9]*MenuItems/gu)?.length ?? 0).toBeGreaterThan(10);
   });
 
   it("leaves only state projection and browser command composition in StudioPage", () => {

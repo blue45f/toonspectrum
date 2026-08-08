@@ -205,7 +205,6 @@ describe("studio command catalog — shortcut conflicts", () => {
         "fill-id-divergence",
         "help-row-multiplexing",
         "layer-order-chord-inversion",
-        "menu-item-id-collision",
         "q-quickmask-vs-grayscale",
         "shift-s-saveview-vs-sizelock",
         "transform-tool-vs-pixel",
@@ -266,20 +265,28 @@ describe("studio command catalog — coverage of the five live lists", () => {
 });
 
 describe("studio command catalog — drift guards for the non-importable lists", () => {
-  it("the menu source still declares exactly the ids in the snapshot", () => {
-    const source = readSource(STUDIO_COMMAND_SOURCES.menu.file);
-    const literals = [...source.matchAll(/id: "([a-z0-9][a-z0-9-]*)"/gu)].map(
+  it("the menu sources still declare exactly the ids in the snapshot", () => {
+    // Wave C split the menu builder into one module per §15.3 group family, so
+    // the guard reads the union. Reading only one module would let an id hide in
+    // a sibling.
+    const source = [
+      STUDIO_COMMAND_SOURCES.menu.file,
+      ...(STUDIO_COMMAND_SOURCES.menu.extraFiles ?? []),
+    ]
+      .map(readSource)
+      .join("\n");
+    const literals = [...source.matchAll(/\bid: "([a-z0-9][a-z0-9-]*)"/gu)].map(
       (match) => match[1] as string,
     );
 
-    // The edit group is spread from STUDIO_EDIT_MENU_COMMANDS, so its items do
-    // not appear as literals here; the colour-vision items are literal as bare
-    // ids and get their `color-vision-` prefix at map time.
+    // Items spread from STUDIO_EDIT_MENU_COMMANDS carry their id from that table,
+    // so they never appear as literals here; the colour-vision items are literal
+    // as bare ids and get their `color-vision-` prefix at map time.
+    const fromEditCommandTable = new Set<string>(STUDIO_EDIT_MENU_COMMAND_ORDER);
     const expected = new Set<string>();
     for (const qualified of STUDIO_MENU_ITEM_INVENTORY) {
-      const [group = "", item = ""] = qualified.split("/");
-      expected.add(group);
-      if (group === "edit") continue;
+      const [, item = ""] = qualified.split("/");
+      if (fromEditCommandTable.has(item as never)) continue;
       expected.add(item.replace(/^color-vision-/u, ""));
     }
 
@@ -296,13 +303,14 @@ describe("studio command catalog — drift guards for the non-importable lists",
     expect(rows).toEqual([...STUDIO_HELP_ROW_INVENTORY]);
   });
 
-  it("the menu inventory has no duplicate qualified ids", () => {
+  it("the menu inventory has no duplicate ids, qualified or bare", () => {
     expect(new Set(STUDIO_MENU_ITEM_INVENTORY).size).toBe(
       STUDIO_MENU_ITEM_INVENTORY.length,
     );
-    // …but bare item ids are not unique, which is why menu origins are qualified.
+    // Wave C made bare item ids globally unique too (conflict
+    // `menu-item-id-collision`); origins stay qualified for the group provenance.
     const bare = STUDIO_MENU_ITEM_INVENTORY.map((id) => id.split("/")[1]);
-    expect(new Set(bare).size).toBeLessThan(bare.length);
+    expect(new Set(bare).size).toBe(bare.length);
   });
 });
 

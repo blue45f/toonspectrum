@@ -19,7 +19,7 @@ import { resolveStudioViewShortcut } from "./studio-view-controls";
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const menuGroupsSource = readFileSync(
-  new URL("./studio-main-menu-groups.ts", import.meta.url),
+  new URL("./studio-main-menu-items-document.ts", import.meta.url),
   "utf8",
 );
 
