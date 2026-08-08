@@ -28,6 +28,8 @@ import {
   type StudioCharacterBibleEntryPatch,
   type StudioCharacterBibleField,
 } from "./studio-character-bible";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeleteCharacterBibleEntryRequest } from "./studio-destructive-command-catalog";
 
 export interface StudioCharacterBiblePanelProps {
   open: boolean;
@@ -320,12 +322,17 @@ export function StudioCharacterBiblePanel({
   const deleteCharacter = () => {
     if (!selectedCharacter) return;
     const label = selectedCharacter.name.trim() || "이 캐릭터";
-    if (typeof globalThis.confirm === "function" && !globalThis.confirm(`${label} 설정을 삭제할까요? 이 작업은 되돌릴 수 없어요.`)) {
-      return;
-    }
-    const nextSelection = bible.characters[selectedIndex + 1] ?? bible.characters[selectedIndex - 1] ?? null;
-    setRequestedCharacterId(nextSelection?.id ?? null);
-    applyChange(removeStudioCharacter(bible, selectedCharacter.id));
+    void (async () => {
+      if (
+        !(await confirmStudioDestructiveAction(
+          studioDeleteCharacterBibleEntryRequest(label),
+        ))
+      ) return;
+      const nextSelection =
+        bible.characters[selectedIndex + 1] ?? bible.characters[selectedIndex - 1] ?? null;
+      setRequestedCharacterId(nextSelection?.id ?? null);
+      applyChange(removeStudioCharacter(bible, selectedCharacter.id));
+    })();
   };
 
   const modal = (

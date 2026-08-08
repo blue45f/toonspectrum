@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode, type SetStateAction } from "react";
+import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -24,6 +24,7 @@ import {
   studioActiveStrokeRecoveryFingerprint,
   type StudioActiveStrokePointerType,
 } from "./studio-active-stroke-lifecycle";
+import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
@@ -211,10 +212,12 @@ import {
 import {
   browserBrushLibraryStorage,
   BRUSH_LIBRARY_KEY,
+  createBrush,
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   listBrushes,
   markBrushUsedWithResult,
   restoreDeletedBrush,
+  saveBrushBatchWithResult,
   type DeletedBrushRecord,
   type StudioBrushStampTuning,
   type StudioBrushSnapshot,
@@ -224,6 +227,10 @@ import {
   planStudioDrawModeChange,
   planStudioStrokeWidthChange,
 } from "./studio-brush-mode-width";
+import {
+  STUDIO_BRUSH_PACK_ACCEPT,
+  studioBrushPackFormatOf,
+} from "./studio-brush-pack-format";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   StudioBrushR8GrainHydrator,
@@ -648,6 +655,7 @@ import {
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
 import { LazyStudioInspectorAside } from "./studio-inspector-aside-loader";
+import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   navigateStudioInspector,
   type StudioInspectorLayout,
@@ -840,7 +848,9 @@ import {
   flipNormalizedPoint,
   MAGIC_WAND_TOLERANCE_DEFAULT,
 } from "./studio-magic-wand";
+import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindings";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
+import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
 import {
   composeMasterRenderElements,
   composeThumbPage,
@@ -1175,6 +1185,7 @@ import {
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
 import { studioSafeModeQuality } from "./studio-reliability-status-store";
+import { publishStudioRenderBackend } from "./studio-render-backend-beacon";
 import { getStudioTournamentRuntime } from "./studio-renderer-tournament-runtime";
 import {
   appendStudioPendingRasterRetouchGesturePoint,
@@ -1371,6 +1382,11 @@ import {
   type StudioUiDensityMode,
 } from "./studio-ui-density";
 import {
+  hasUnsavedStudioWork,
+  installStudioUnloadGuard,
+  studioPendingStrokeFingerprint,
+} from "./studio-unsaved-work-guard";
+import {
   studioVectorAsyncCommandStaleReason,
 } from "./studio-vector-async-command-guard";
 import {
@@ -1459,17 +1475,23 @@ import {
   type StudioWorkAssetRenderPlaceholder,
   type StudioWorkAssetSceneReference,
 } from "./studio-work-asset-render-projection";
+import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
+  captureStudioWorkspaceDeviceLayout,
   loadStudioWorkspacePersistence,
   normalizeStudioWorkspaceLayout,
-  resolveStudioWorkspace,
+  resolveStudioWorkspaceControlSide,
+  resolveStudioWorkspaceDeviceKind,
+  resolveStudioWorkspaceDeviceLayout,
   saveStudioWorkspaceState,
   studioWorkspaceOwnerScope,
   studioWorkspaceStorageKey,
   updateStudioWorkspaceLiveLayout,
+  type StudioMobileControlSide,
+  type StudioWorkspaceDeviceKind,
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
   type StudioWorkspaceSaveResult,
@@ -1497,6 +1519,8 @@ import {
 import {
   type CvdMode,
 } from "./StudioColorBlindPreview";
+import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
+import { StudioHelpCenterHost } from "./StudioHelpCenterHost";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
@@ -1631,6 +1655,11 @@ import type {
   StudioLivingInkExecutionConfig,
 } from "./studio-living-ink-execution-protocol";
 import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
+import type { StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
+import type {
+  StudioMainMenuSurfaceState,
+  StudioPixelSelectionToolId,
+} from "./studio-main-menu-surface-contract";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -5686,15 +5715,74 @@ function StudioCuttoonEditor() {
   const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const workspaceState = workspacePersistence.state;
-  const workspaceSnapshotLayout =
-    resolveStudioWorkspace(workspaceState, workspaceState.activeWorkspaceId)?.layout ??
-    workspaceState.liveLayout;
+  // Device adaptation is *applied* only when a workspace is applied, never continuously: docks that
+  // re-arrange because the artist reached for the keyboard mid-drawing would be worse than docks
+  // that stay where the profile put them. A pointer press writes a ref and, on the rare press that
+  // changes the classification, one state update — never per stroke, so the drawing route keeps its
+  // zero-render contract.
+  const workspaceDevicePointerTypeRef = useRef<string | null>(null);
+  const [workspaceControlSide, setWorkspaceControlSide] = useState<StudioMobileControlSide>(() =>
+    resolveStudioWorkspaceControlSide(
+      workspaceState,
+      workspaceState.liveLayout,
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    )
+  );
+  function currentStudioWorkspaceDeviceKind(): StudioWorkspaceDeviceKind | null {
+    return resolveStudioWorkspaceDeviceKind(
+      readStudioWorkspaceDeviceSignalsFromGlobals(workspaceDevicePointerTypeRef.current)
+    );
+  }
+  // 기기 종류는 layout을 저자형으로 되돌릴 때(캡처) 필요해서 렌더가 읽을 수 있어야 한다. 다만 획마다
+  // 리렌더가 나면 안 되므로, 실제로 종류가 *바뀔 때만* 상태를 옮긴다 — 보통 세션당 0~1회다.
+  const [workspaceDeviceKind, setWorkspaceDeviceKind] =
+    useState<StudioWorkspaceDeviceKind | null>(() =>
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    );
+  useEffect(() => {
+    const recordPointerType = (event: PointerEvent) => {
+      const pointerType = event.pointerType || null;
+      if (workspaceDevicePointerTypeRef.current === pointerType) return;
+      workspaceDevicePointerTypeRef.current = pointerType;
+      const next = currentStudioWorkspaceDeviceKind();
+      setWorkspaceDeviceKind((current) => (current === next ? current : next));
+    };
+    globalThis.addEventListener("pointerdown", recordPointerType, { passive: true, capture: true });
+    return () =>
+      globalThis.removeEventListener("pointerdown", recordPointerType, { capture: true });
+  }, []);
+  // Toggling the thumb-side preference is itself an application of handedness, so re-resolve here
+  // too. A device override still wins: a left-handed pen-display grip is a deliberate per-device
+  // choice, not something the owner-wide preference should silently undo.
+  const workspaceMobileControlSide = workspaceState.mobileControlSide;
+  const workspaceLiveLayout = workspaceState.liveLayout;
+  const syncWorkspaceControlSide = useEffectEvent(() => {
+    setWorkspaceControlSide(
+      resolveStudioWorkspaceControlSide(
+        workspaceState,
+        workspaceLiveLayout,
+        currentStudioWorkspaceDeviceKind()
+      )
+    );
+  });
+  useEffect(() => {
+    syncWorkspaceControlSide();
+  }, [workspaceMobileControlSide, workspaceLiveLayout]);
+  // 첫 페인트도 기기 오버라이드를 거친다. applyStudioWorkspaceLayout은 전환·소유자 변경·외부 동기화
+  // 에서만 도는데, 마운트는 그중 어느 것도 아니다. 이 시드가 없으면 데스크톱에서 저장한 배치가
+  // 펜 디스플레이에서 그대로 한 번 그려졌다가 프리셋을 다시 고를 때에야 맞춰진다.
+  //
+  // 해석 원본은 liveLayout이다 — 접어둔 도크가 새로고침 뒤에도 그대로여야 하고, liveLayout은
+  // captureStudioWorkspaceDeviceLayout 덕분에 저자형이라 기기 기하가 섞여 있지 않다.
+  const [initialWorkspaceDeviceLayout] = useState(() =>
+    resolveStudioWorkspaceDeviceLayout(workspaceState.liveLayout, workspaceDeviceKind)
+  );
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.leftPanelOpen
+    initialWorkspaceDeviceLayout.desktop.leftPanelOpen
   );
   const [rightPanelOpen, setRightPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.rightPanelOpen
+    initialWorkspaceDeviceLayout.desktop.rightPanelOpen
   );
   const [forceRightPanelOpen, setForceRightPanelOpen] = useState(false);
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
@@ -6041,13 +6129,13 @@ function StudioCuttoonEditor() {
   }, [isMobile, mobileSheet]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
   const leftResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.leftPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.leftPanelWidth,
     min: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
     edge: "right",
   });
   const rightResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.rightPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.rightPanelWidth,
     min: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
     edge: "left",
@@ -6148,23 +6236,34 @@ function StudioCuttoonEditor() {
   const visibleRightPanelOpen =
     rightPanelOpen && !presentationPanelsHidden && rightPanelDensityAllows;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
+  //
+  // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
+  // 오버라이드가 적용된 모습이라, 그걸 liveLayout.desktop에 그대로 넣으면 폰에서 한 번 연 것만으로
+  // 데스크톱 도크가 접힌 채 굳는다. 기기별 조정은 기기 슬롯에, 저자 기하는 desktop에 남긴다.
+  // 이 덕분에 liveLayout은 항상 저자형(authored-form)이고, 자동 저장·dirty 비교·메뉴 저장이 모두
+  // 같은 형태를 주고받는다.
   const liveWorkspaceLayout = useMemo(
     () =>
-      normalizeStudioWorkspaceLayout(
-        {
-          inspector: inspectorLayout,
-          desktop: {
-            leftPanelOpen,
-            rightPanelOpen,
-            leftPanelWidth: leftResize.width,
-            rightPanelWidth: rightResize.width,
+      captureStudioWorkspaceDeviceLayout(
+        workspaceState.liveLayout,
+        normalizeStudioWorkspaceLayout(
+          {
+            inspector: inspectorLayout,
+            desktop: {
+              leftPanelOpen,
+              rightPanelOpen,
+              leftPanelWidth: leftResize.width,
+              rightPanelWidth: rightResize.width,
+            },
+            drawingPalettes: drawingPaletteLayout,
+            quickActions: quickActionsPreferences,
           },
-          drawingPalettes: drawingPaletteLayout,
-          quickActions: quickActionsPreferences,
-        },
-        workspaceState.liveLayout
+          workspaceState.liveLayout
+        ),
+        workspaceDeviceKind
       ),
     [
+      workspaceDeviceKind,
       inspectorLayout,
       leftPanelOpen,
       rightPanelOpen,
@@ -6205,13 +6304,21 @@ function StudioCuttoonEditor() {
     clearSyncNotice = true
   ) {
     cancelDrawingPaletteDrag();
-    setInspectorLayout(layout.inspector);
-    setLeftPanelOpen(layout.desktop.leftPanelOpen);
-    setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
-    leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
-    rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
-    setDrawingPaletteLayout(layout.drawingPalettes);
-    setQuickActionsPreferences(layout.quickActions);
+    // Applying a profile is the one moment its device overrides are consulted. The authored profile
+    // is left untouched; only what reaches the screen (and therefore the live layout) adapts, so an
+    // artist who saved a workspace on a desktop still gets that workspace back on a desktop.
+    const deviceKind = currentStudioWorkspaceDeviceKind();
+    const presented = resolveStudioWorkspaceDeviceLayout(layout, deviceKind);
+    setInspectorLayout(presented.inspector);
+    setLeftPanelOpen(presented.desktop.leftPanelOpen);
+    setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen);
+    leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth);
+    rightResizeSetWidthRef.current(presented.desktop.rightPanelWidth);
+    setWorkspaceControlSide(
+      resolveStudioWorkspaceControlSide(workspacePersistenceRef.current.state, layout, deviceKind)
+    );
+    setDrawingPaletteLayout(presented.drawingPalettes);
+    setQuickActionsPreferences(presented.quickActions);
     setMobileSheet(null);
     setQuickActionsOpen(false);
     closeStudioMenusForWorkspace(source);
@@ -6545,19 +6652,25 @@ function StudioCuttoonEditor() {
     if (workspacePersistence.ownerScope !== ownerScope) return;
     if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return;
     if (pendingExternalWorkspaceSync) return;
-    const nextLayout = normalizeStudioWorkspaceLayout(
-      {
-        inspector: inspectorLayout,
-        desktop: {
-          leftPanelOpen,
-          rightPanelOpen,
-          leftPanelWidth: leftResize.width,
-          rightPanelWidth: rightResize.width,
+    // 화면 기하를 저자형으로 되돌려 저장한다. 되돌리지 않으면 폰에서 한 번 연 것이 데스크톱 도크로
+    // 굳어, 작가가 저술한 배치가 "마지막에 연 기기"로 영구히 덮인다.
+    const nextLayout = captureStudioWorkspaceDeviceLayout(
+      workspacePersistence.state.liveLayout,
+      normalizeStudioWorkspaceLayout(
+        {
+          inspector: inspectorLayout,
+          desktop: {
+            leftPanelOpen,
+            rightPanelOpen,
+            leftPanelWidth: leftResize.width,
+            rightPanelWidth: rightResize.width,
+          },
+          drawingPalettes: drawingPaletteLayout,
+          quickActions: quickActionsPreferences,
         },
-        drawingPalettes: drawingPaletteLayout,
-        quickActions: quickActionsPreferences,
-      },
-      workspacePersistence.state.liveLayout
+        workspacePersistence.state.liveLayout
+      ),
+      workspaceDeviceKind
     );
     if (
       areStudioWorkspaceLayoutsEqual(
@@ -6609,6 +6722,7 @@ function StudioCuttoonEditor() {
     rightResize.dragging,
     rightResize.width,
     studioAuthUserId,
+    workspaceDeviceKind,
     workspacePersistence.ownerScope,
     workspacePersistence.state,
   ]);
@@ -7660,6 +7774,10 @@ function StudioCuttoonEditor() {
   const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
     listBrushes(browserBrushLibraryStorage())
   );
+  // 그리기 ▸ 브러시 가져오기 전용 입력. 라이브러리 패널의 컨트롤과 같은 매퍼를 쓰되,
+  // 메뉴에서 곧바로 파일 선택기를 열 수 있도록 StudioPage가 입력을 소유한다.
+  const brushPackImportInputRef = useRef<HTMLInputElement>(null);
+  const [brushPackImporting, setBrushPackImporting] = useState(false);
   const [pendingBrushDeletes, setPendingBrushDeletes] = useState<PendingBrushDelete[]>([]);
   const [pausedBrushDeleteId, setPausedBrushDeleteId] = useState<string | null>(null);
   const brushUndoToastRef = useRef<HTMLDivElement>(null);
@@ -7914,6 +8032,156 @@ function StudioCuttoonEditor() {
     toggleBuiltInBrushCatalog("desktop-dock", trigger);
   }
 
+  /**
+   * §15.3 Brush menu rows open surfaces that anchor to (and return focus to) a
+   * launcher button, but a menu item's `onSelect` receives no event. The
+   * inspector's own launcher is preferred once it is mounted; the menubar row
+   * the artist just used is the fallback, so keyboard focus always lands on a
+   * real, still-connected control instead of the document body.
+   */
+  function resolveBrushMenuLauncher(): HTMLButtonElement | null {
+    const root = studioRootRef.current;
+    return (
+      root?.querySelector<HTMLButtonElement>('[data-studio-brush-catalog-launcher="true"]')
+      ?? root?.querySelector<HTMLButtonElement>('[data-studio-brush-manager-launcher="true"]')
+      ?? root?.querySelector<HTMLButtonElement>('[data-studio-main-menu-trigger="brush"]')
+      ?? null
+    );
+  }
+
+  /** Runs after the inspector route has committed, so late-mounted launchers exist. */
+  function afterInspectorCommit(run: () => void): void {
+    if (!globalThis.requestAnimationFrame) {
+      run();
+      return;
+    }
+    globalThis.requestAnimationFrame(() => {
+      globalThis.requestAnimationFrame?.(run);
+    });
+  }
+
+  /** 그리기 ▸ 브러시 프리셋 목록 — §15.3 Brush ▸ Preset Browser. */
+  function openBrushPresetBrowserFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    afterInspectorCommit(() => {
+      const launcher = resolveBrushMenuLauncher();
+      if (!launcher) {
+        announceDrawingShortcut("브러시 목록을 열지 못했어요. 오른쪽 패널의 ‘브러시 목록’을 눌러 주세요.");
+        return;
+      }
+      openBrushCatalogFromHelp(launcher);
+    });
+  }
+
+  /** 그리기 ▸ 브러시 스튜디오 — §15.3 Brush ▸ Brush Studio/Brush DNA. */
+  function openBrushStudioFromMenu() {
+    void loadStudioBrushStudio();
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    // The section is collapsed by default; the bus opens and reveals it.
+    requestStudioInspectorFocus("tool.brush-studio");
+  }
+
+  /** 그리기 ▸ 자연 매체 · 안료 — §15.3 Brush ▸ Natural Media/Pigment. */
+  function openNaturalMediaBrushesFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    requestStudioInspectorFocus("tool.brush-engines");
+  }
+
+  /** 그리기 ▸ 내 브러시 — 저장 라이브러리(가져오기 버튼 포함). */
+  function openBrushLibraryFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    if (isMobile) {
+      const launcher = resolveBrushMenuLauncher();
+      if (launcher) {
+        openBrushManager(launcher);
+        return;
+      }
+    }
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    requestStudioInspectorFocus("brush.saved-library");
+  }
+
+  /**
+   * 그리기 ▸ 브러시 가져오기 — §15.3 Brush ▸ Import SUT/ABR/MYB/KPP.
+   *
+   * Clicked synchronously inside the menu's own activation so the picker keeps
+   * the user gesture, exactly like the PSD and project-archive rows.
+   */
+  function requestBrushPackImportFromMenu() {
+    const input = brushPackImportInputRef.current;
+    if (!input) {
+      setError("브러시 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    input.click();
+  }
+
+  /**
+   * Menu-side import. Registers only what the mapper can actually draw and reads
+   * the parsers' unmapped/warning ledger out loud — the panel's control does the
+   * same, so neither entry point can quietly become the lenient one.
+   */
+  async function handleBrushPackImportFromMenu(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const format = studioBrushPackFormatOf(file.name, file.type);
+    if (format === null) {
+      setError("브러시 파일 형식을 알아보지 못했어요. .abr · .myb · .kpp · .json 파일을 선택해 주세요.");
+      return;
+    }
+    if (format === "abr" || format === "json") {
+      // Both already have an owner (worker lane / JSON validator) inside the
+      // library panel; sending the artist there beats a second implementation.
+      openBrushLibraryFromMenu();
+      announceDrawingShortcut(
+        format === "abr"
+          ? "ABR 브러시 팩은 ‘내 브러시’의 가져오기에서 변환해요."
+          : "브러시 설정(.json)은 ‘내 브러시’의 가져오기에서 불러와요.",
+      );
+      return;
+    }
+    setBrushPackImporting(true);
+    try {
+      const { importStudioBrushProgramFile } = await import("./studio-brush-pack-import");
+      const result = await importStudioBrushProgramFile(file, format);
+      const candidate = result.brushes[0];
+      if (!candidate) {
+        setError("이 파일에서 가져올 수 있는 브러시를 찾지 못했어요.");
+        return;
+      }
+      const created = createBrush(candidate.name, candidate.snapshot);
+      const saved = saveBrushBatchWithResult(browserBrushLibraryStorage(), [created]);
+      if (saved.status === "storage-error" || saved.status === "library-unreadable") {
+        setError("브러시를 이 브라우저에 저장하지 못했어요. 저장소 권한이나 여유 공간을 확인해주세요.");
+        return;
+      }
+      if (saved.status === "full" || saved.savedCount === 0) {
+        setError("브러시 라이브러리가 가득 찼어요. 기존 브러시를 정리한 뒤 다시 시도해 주세요.");
+        return;
+      }
+      setSavedBrushes(saved.brushes);
+      const label = format === "myb" ? "libmypaint" : "Krita";
+      const notes = [...result.warnings];
+      if (result.unmapped.length > 0) {
+        notes.push(`이 포맷 전용 설정 ${result.unmapped.length}개는 옮기지 못했어요.`);
+      }
+      announceDrawingShortcut(
+        `${label} 브러시 "${created.name}"을(를) 내 브러시에 추가했어요.${notes.length > 0 ? ` ${notes.join(" ")}` : ""}`,
+      );
+      openBrushLibraryFromMenu();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "브러시 프리셋 파일을 가져오지 못했어요.",
+      );
+    } finally {
+      setBrushPackImporting(false);
+    }
+  }
+
   function closeBuiltInBrushCatalog(
     reason: import("./StudioBrushLibrarySheet").StudioBrushCatalogCloseReason
   ) {
@@ -8036,6 +8304,22 @@ function StudioCuttoonEditor() {
   const [eyedropperActive, setEyedropperActive] = useState(false);
   /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
   const [eraseToIntersection, setEraseToIntersection] = useState(false);
+  /**
+   * §15.3 Vector ▸ Vector Eraser. Named rather than inlined into the options-bar
+   * handler bundle because the main menu needs the same door: the chip only
+   * renders while the eraser is already armed, so the mode was unreachable from
+   * anywhere else.
+   */
+  function toggleEraseToIntersectionMode() {
+    const next = !eraseToIntersection;
+    if (next) activatePrimaryCanvasTool("draw", "eraser");
+    setEraseToIntersection(next);
+    announceDrawingShortcut(
+      next
+        ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
+        : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
+    );
+  }
   /** Auto-color canvas scribble: click/drag selected line art to drop color seeds. */
   const [autoColorScribbleCanvasArmed, setAutoColorScribbleCanvasArmed] = useState(false);
   const [autoColorCanvasSeedHit, setAutoColorCanvasSeedHit] = useState<{
@@ -9744,9 +10028,7 @@ function StudioCuttoonEditor() {
     }
     if (!hasMeaningfulAutosaveContent && !hasExistingAutosaveAuthority) return;
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
-    const scheduledPendingFingerprint = pendingBatch
-      ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
-      : "";
+    const scheduledPendingFingerprint = studioPendingStrokeFingerprint(pendingBatch);
     const timer = setTimeout(() => {
       if (
         scheduledGeneration <= studioLifecycleDurableGenerationRef.current
@@ -12200,6 +12482,7 @@ function StudioCuttoonEditor() {
   function failOverGpuAuthorityAfterSurfaceLoss(): boolean {
     if (!gpuAuthoritySurfaceIsPending()) {
       webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
       gpuHandleBaselineRecoveryPendingRef.current = false;
       return true;
     }
@@ -12210,6 +12493,7 @@ function StudioCuttoonEditor() {
       // A lost imperative adapter may throw while the promotion fallback tries to hide or replace
       // its old pixels. The original queues are still ref-owned, so retain their remount baseline.
       webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
     }
     gpuHandleBaselineRecoveryPendingRef.current = !promoted
       && pendingGpuStrokesRef.current.length > 0;
@@ -12242,6 +12526,8 @@ function StudioCuttoonEditor() {
   }
   function onWebGpuBackendChange(backend: StudioGpuBackend) {
     webGpuBackendRef.current = backend;
+    // 진단 패널이 "지금 무엇으로 그리고 있나"를 실측으로 읽는 유일한 경로.
+    publishStudioRenderBackend(backend);
     if (backend !== "webgpu" || gpuLiveStrokePlannerRef.current) return;
     void import("./studio-webgpu-live-stroke-plan")
       .then(({ planStudioGpuLiveStroke }) => {
@@ -13318,7 +13604,10 @@ function StudioCuttoonEditor() {
   }
   function relinquishGpuLiveInkToKonva(disableWebGpuForSession = false): boolean {
     failActiveLiveStrokeBackendAuditForCanvasFallback();
-    if (disableWebGpuForSession) webGpuBackendRef.current = "canvas2d";
+    if (disableWebGpuForSession) {
+      webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
+    }
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -14079,6 +14368,43 @@ function StudioCuttoonEditor() {
       globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+  // 탭 종료 경고 — 미저장 편집이 남아 있을 때만 묻는다.
+  //
+  // `pagehide` 는 복구 사이드카를 남길 뿐 사용자에게 아무것도 알리지 않는다. 방금 그린 획이
+  // 아직 내구 저장소(그리고 서버 원고)에 닿지 않았는데 탭이 닫히면, 다른 기기에서 열었을 때
+  // 그 획은 없다. 그것이 마지막 남은 조용한 실패였다.
+  //
+  // 리스너는 **미저장 편집이 처음 생긴 뒤에만** 붙인다. 열어만 보고 나가는 문서에서
+  // beforeunload 를 등록해 bfcache 를 잃지 않기 위해서다. 한 번 붙은 뒤에도 판정은 매번
+  // 새로 하므로, 저장이 끝난 문서는 아무것도 묻지 않고 조용히 닫힌다.
+  const studioUnsavedWorkRef = useStudioStableHandlers<{
+    hasUnsavedStudioWorkNow: () => boolean;
+  }>({
+    hasUnsavedStudioWorkNow: () =>
+      hasUnsavedStudioWork({
+        hydrated: workHydrated,
+        editGeneration: studioRevisionProjectGenerationRef.current,
+        durableGeneration: studioLifecycleDurableGenerationRef.current,
+        pendingStrokeFingerprint: studioPendingStrokeFingerprint(
+          pendingStrokeCommitsRef.current
+        ),
+        durablePendingStrokeFingerprint:
+          studioLifecycleDurablePendingFingerprintRef.current,
+      }),
+  });
+  const [unloadGuardArmed, setUnloadGuardArmed] = useState(false);
+  useEffect(() => {
+    if (unloadGuardArmed) return;
+    if (!studioUnsavedWorkRef.hasUnsavedStudioWorkNow()) return;
+    setUnloadGuardArmed(true);
+  }, [pages, master, studioUnsavedWorkRef, unloadGuardArmed, workHydrated]);
+  useEffect(() => {
+    if (!unloadGuardArmed) return;
+    return installStudioUnloadGuard({
+      target: globalThis,
+      hasUnsavedWork: () => studioUnsavedWorkRef.hasUnsavedStudioWorkNow(),
+    });
+  }, [studioUnsavedWorkRef, unloadGuardArmed]);
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [advancedFillActive, setAdvancedFillActive] = useState(false);
@@ -22624,7 +22950,7 @@ const puppetWarpArmed =
     }
     if (comipoActionBusyRef.current) return;
     const quickComicRequest = studioQuickComicReplaceRequest(elements.length);
-    if (elements.length > 0 && !confirmStudioDestructiveAction(quickComicRequest)) {
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(quickComicRequest))) {
       return;
     }
 
@@ -22666,7 +22992,7 @@ const puppetWarpArmed =
       comipoActionBusyRef.current = false;
     }
   }
-  function applySceneSnapshot(
+  async function applySceneSnapshot(
     snapshot: import("./studio-scene-snapshot-library").StudioSceneSnapshot
   ) {
     if (collaborationDocumentLocked) {
@@ -22679,7 +23005,7 @@ const puppetWarpArmed =
       currentElementCount: activePage.elements.length,
       incomingElementCount: snapshot.page.elements.length,
     });
-    if (!confirmStudioDestructiveAction(sceneSnapshotRequest)) return;
+    if (!(await confirmStudioDestructiveAction(sceneSnapshotRequest))) return;
     const restoredPage: PageState = {
       ...snapshot.page,
       id: activePage.id,
@@ -22711,7 +23037,7 @@ const puppetWarpArmed =
     }
     if (comipoActionBusyRef.current) return;
     const exampleRequest = studioStartFromExampleRequest(elements.length);
-    if (elements.length > 0 && !confirmStudioDestructiveAction(exampleRequest)) return;
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(exampleRequest))) return;
 
     const deferredAction = captureDeferredComipoAction();
     comipoActionBusyRef.current = true;
@@ -26240,10 +26566,10 @@ const puppetWarpArmed =
     }
   }
   const emeresUnderlayCount = elements.filter((e) => e.emeresSourceId != null).length;
-  function removeEmeresUnderlays() {
+  async function removeEmeresUnderlays() {
     if (emeresUnderlayCount === 0) return;
     const emeresRequest = studioRemoveEmeresUnderlaysRequest(emeresUnderlayCount);
-    if (!confirmStudioDestructiveAction(emeresRequest)) return;
+    if (!(await confirmStudioDestructiveAction(emeresRequest))) return;
     settleStudioDestructiveCommit(
       emeresRequest,
       commit(elements.filter((e) => e.emeresSourceId == null)),
@@ -26580,13 +26906,13 @@ const puppetWarpArmed =
     return [...newFrames, ...nonFrames];
   }
 
-  function applyTemplate(tpl: TemplateSpec) {
+  async function applyTemplate(tpl: TemplateSpec) {
     // 승인 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
     const templateRequest = studioApplyTemplateRequest({
       elementCount: elements.length,
       frameCount: tpl.frames.length,
     });
-    if (elements.length > 0 && !confirmStudioDestructiveAction(templateRequest)) return;
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(templateRequest))) return;
     setMenu(null);
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
@@ -26608,7 +26934,7 @@ const puppetWarpArmed =
       layoutName: layout.label,
       elementCount: elements.length,
     });
-    if (elements.length > 0 && !confirmStudioDestructiveAction(panelLayoutRequest)) return;
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(panelLayoutRequest))) return;
     const deferredAction = captureDeferredComipoAction();
     const script = dialogueScript.trim() || undefined;
     comipoActionBusyRef.current = true;
@@ -26646,7 +26972,7 @@ const puppetWarpArmed =
   }
 
   /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
-  function applyCollage(payload: {
+  async function applyCollage(payload: {
     canvasH: number;
     canvasBg: string;
     frames: readonly {
@@ -26679,7 +27005,7 @@ const puppetWarpArmed =
     if (
       payload.replaceExisting
       && elements.length > 0
-      && !confirmStudioDestructiveAction(collageRequest)
+      && !(await confirmStudioDestructiveAction(collageRequest))
     ) {
       return;
     }
@@ -35687,6 +36013,31 @@ function clearSelectionForEdit() {
     );
     announceDrawingShortcut("레이어 자르기");
   }
+  // §15.3 Layer ▸ Mask/Clipping, Filter ▸ Adjustment Layer. Three menu doors onto
+  // surfaces the inspector already owns — same patch, same route, no second
+  // implementation. The audit measured all three at 3+ actions because the only
+  // path was 선택 → 속성 탭 → 스크롤 (`docs/rewrite/ux-audit-v5.md` §2.2).
+  function toggleSelectedClippingMask() {
+    if (!selected || selected.type === "frame") {
+      setError("클리핑할 레이어를 먼저 선택하세요.");
+      return;
+    }
+    const clipped = selected.clipBelow === true;
+    if (!patchEl(selected.id, { clipBelow: !clipped } as Partial<El>)) {
+      setError("잠긴 레이어는 클리핑을 바꿀 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
+    setError(null);
+    announceDrawingShortcut(clipped ? "아래 레이어 클리핑 해제" : "아래 레이어에 클리핑");
+  }
+  function openSelectedLayerAdjustments() {
+    openInspectorRoute({ primary: "properties", image: "quick" });
+    announceDrawingShortcut("레이어 보정 — 레벨과 톤 커브가 여기 있어요");
+  }
+  function openSelectedLayerMask() {
+    openInspectorRoute({ primary: "properties", image: "mask" });
+    announceDrawingShortcut("레이어 마스크 편집");
+  }
   function pixelSelectionToolForActivation(
     kind: PixelSelectionActivationKind,
   ): SelectionToolKind | "wand" | null {
@@ -36736,11 +37087,19 @@ function clearSelectionForEdit() {
     handleExportProjectArchive,
     handleSave,
     invertSelectionForEdit,
+    openBrushLibraryFromMenu,
+    openBrushPresetBrowserFromMenu,
+    openBrushStudioFromMenu,
     openImagePastePicker,
+    openNaturalMediaBrushesFromMenu,
+    openPixelSelectionTransform,
+    openSelectedLayerAdjustments,
     openSelectedLayerCrop,
+    openSelectedLayerMask,
     openStudioFilter,
     openFeatureTutorial,
     pasteStudioElementsFromClipboard,
+    requestBrushPackImportFromMenu,
     redo,
     reorder,
     removeSelected,
@@ -36750,13 +37109,16 @@ function clearSelectionForEdit() {
     saveCurrentStudioView,
     selectAllForEdit,
     setActualPixelView,
+    setColorBlindPreview,
     setStudioUiDensity,
     showAllLocallyHiddenLayers,
     toggleAdvancedFill,
+    toggleCanvasRulers: studioCanvasRulerHandlers.toggleCanvasRulers,
     toggleFullscreen,
     toggleGrayscaleView,
     toggleHorizontalCanvasView,
     togglePerspectiveGuideView,
+    toggleSelectedClippingMask,
     toggleStudioQuickAccessPalette,
     undo,
   });
@@ -36829,10 +37191,111 @@ function clearSelectionForEdit() {
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;
   const menuHasLocallyHiddenLayers = localHiddenElementIds.size > 0;
+  // Layer ▸ Mask/Clipping + Filter ▸ Adjustment Layer gating. Booleans, not the
+  // element, so the menubar memo below survives selection-object churn.
+  const menuClippingMaskActive = selected?.type !== "frame" && selected?.clipBelow === true;
+  const menuClippingMaskDisabled =
+    !menuHasSingleElementSelection || !selected || selected.type === "frame";
+  const menuImageLayerSelected = selected?.type === "image";
+  // §15.3 Help ▸ Current Tool Help. 캔버스 포인터를 실제로 쥔 도구를 카탈로그 명령
+  // 하나로 환원한다 — 무장된 보조 도구가 기억된 기본 도구를 이긴다.
+  const menuActiveToolCommandId = resolveStudioActiveToolCommandId({
+    tool,
+    drawMode,
+    commentPlacementActive,
+    cropActive: cropArmed,
+    liquifyArmed,
+    dodgeBurnArmed,
+    wetMixArmed,
+    smudgeArmed,
+    quickMaskArmed,
+    eyedropperArmed: eyedropperActive,
+    quickShapeActive,
+    pixelSelectionTool: pixelToolArmed ? pixelTool : null,
+  });
+  // §15.3 rows whose feature shipped behind a panel and whose only door was the
+  // 프로젝트 작업 sheet, the mobile-only tool belt or an inspector tab. Bundled
+  // here so the composition below stays a projection: `bindStudioMainMenu
+  // SurfaceActions` is a name-for-name map, so the menu can only reach a surface
+  // this page already opens somewhere else.
+  const studioMainMenuSurfaceActions =
+    useStudioStableHandlers<StudioMainMenuSurfaceHandlerBundle>({
+      activatePixelSelectionToolFromInspector,
+      enterQuickMask,
+      commitQuickMask,
+      toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
+      openFrameAnimationForSelected,
+      toggleOnionSkin: () =>
+        setOnionSkin((current) => ({ ...current, enabled: !current.enabled })),
+      openAnimaticTimeline: () => setAnimaticTimelineOpen(true),
+      // 데스크톱에서 라이브 세션이 없으면 프레즌스 독이 렌더되지 않아 이 패널을
+      // 열 방법이 아예 없었다. 댓글과는 상호 배타 — 시트 버튼과 같은 규칙이다.
+      openTeamPanel: () => {
+        setCommentsOpen(false);
+        setTeamPanelOpen(true);
+      },
+      toggleDocumentComments: () => {
+        setTeamPanelOpen(false);
+        setCommentsOpen((open) => !open);
+      },
+      openPageReview: () => setPageReviewOpen(true),
+      openCheckpointPanel: () => setCheckpointPanelOpen(true),
+      openWriterRoom: () => setWriterRoomOpen(true),
+      openStoryboardGrid: () => setStoryboardGridOpen(true),
+      openScrollPreview: () => setScrollPreviewOpen(true),
+      openContinuityCheck: () => setContinuityOpen(true),
+      openProductionBible: () => setProductionBibleOpen(true),
+      openQuickStart: () => setQuickStartOpen(true),
+      openPublishPackage: () => setPublishPackageOpen(true),
+      openPublishPreflight: () => setPublishPreflightOpen(true),
+      openAssetRightsAudit: () => setAssetRightsAuditOpen(true),
+      openAutoActions: () => void openAutoActions(),
+      openCanvasNavigatorRoute: () =>
+        openInspectorRoute({ primary: "document", document: "navigator" }),
+      openCanvasSettingsRoute: () =>
+        openInspectorRoute({ primary: "document", document: "canvas" }),
+      toggleCanvasGrid: () => setShowGrid((visible) => !visible),
+      toggleEraseToIntersection: toggleEraseToIntersectionMode,
+      openDialogueBatch: () => setDialogueBatchOpen(true),
+      openDialogueTranslate: () => setDialogueTranslateOpen(true),
+    });
+  // 무장된 픽셀 선택 도구를 메뉴가 읽는 단일 문자열로 환원한다. 원형 마퀴는
+  // `ellipse` + forceCircle 조합이고 색 범위는 별도 플래그라, 라디오 체크 표시를
+  // 항목마다 재계산하지 않도록 여기서 한 번만 정규화한다.
+  const menuPixelSelectionTool: StudioPixelSelectionToolId | null = colorRangePickActive
+    ? "color-range"
+    : pixelTool === "ellipse"
+      ? pixelForceCircle
+        ? "circle"
+        : "ellipse"
+      : pixelTool;
+  const studioMainMenuSurfaceState = useMemo<StudioMainMenuSurfaceState>(
+    () => ({
+      pixelSelectionTool: menuPixelSelectionTool,
+      quickMaskActive,
+      animationTimelineOpen: timelineOpen,
+      onionSkinEnabled: onionSkin.enabled,
+      documentCommentsOpen: commentsOpen,
+      canvasGridVisible: showGrid,
+      vectorEraseToIntersection: eraseToIntersection,
+      masterEditMode,
+    }),
+    [
+      commentsOpen,
+      eraseToIntersection,
+      masterEditMode,
+      menuPixelSelectionTool,
+      onionSkin.enabled,
+      quickMaskActive,
+      showGrid,
+      timelineOpen,
+    ],
+  );
   const studioMainMenuGroups = useMemo(
     () => {
       return buildStudioMainMenuGroups({
         state: {
+          ...studioMainMenuSurfaceState,
           sharedNonOwnerSave: menuSharedNonOwnerSave,
           saving,
           collaborationDocumentLocked,
@@ -36872,46 +37335,16 @@ function clearSelectionForEdit() {
           leftPanelOpen,
           rightPanelOpen,
           lastFilterDraft: lastStudioFilterDraft,
+          clippingMaskActive: menuClippingMaskActive,
+          clippingMaskDisabled: menuClippingMaskDisabled,
+          imageLayerSelected: menuImageLayerSelected,
+          activeToolCommandId: menuActiveToolCommandId,
         },
-        editor: {
-          copyImageToClipboard: studioMainMenuActions.handleCopyToClipboard,
-          save: studioMainMenuActions.handleSave,
-          exportProject: studioMainMenuActions.handleExportProject,
-          exportProjectArchive: studioMainMenuActions.handleExportProjectArchive,
-          undo: studioMainMenuActions.undo,
-          redo: studioMainMenuActions.redo,
-          cutSelectedElements: studioMainMenuActions.cutSelectedElements,
-          copySelectedElements: studioMainMenuActions.copySelectedElements,
-          pasteElements: studioMainMenuActions.pasteStudioElementsFromClipboard,
-          openImagePastePicker: studioMainMenuActions.openImagePastePicker,
-          selectAll: studioMainMenuActions.selectAllForEdit,
-          deselect: studioMainMenuActions.deselectForEdit,
-          invertSelection: studioMainMenuActions.invertSelectionForEdit,
-          clearSelection: studioMainMenuActions.clearSelectionForEdit,
-          duplicateSelected: studioMainMenuActions.duplicateSelected,
-          reorder: studioMainMenuActions.reorder,
-          openSelectedLayerCrop: studioMainMenuActions.openSelectedLayerCrop,
-          addText: studioMainMenuActions.addText,
-          addPage: studioMainMenuActions.addPage,
-          toggleHorizontalCanvasView: studioMainMenuActions.toggleHorizontalCanvasView,
-          rotateCanvasView: studioMainMenuActions.rotateCanvasView,
-          resetCanvasViewRotation: studioMainMenuActions.resetCanvasViewRotation,
-          fitCanvasToWidth: studioMainMenuActions.fitCanvasToWidth,
-          setActualPixelView: studioMainMenuActions.setActualPixelView,
-          toggleFullscreen: studioMainMenuActions.toggleFullscreen,
-          toggleCanvasRulers: studioCanvasRulerHandlers.toggleCanvasRulers,
-          setColorVisionMode: setColorBlindPreview,
-          saveCurrentStudioView: studioMainMenuActions.saveCurrentStudioView,
-          restoreSavedStudioView: studioMainMenuActions.restoreSavedStudioView,
-          togglePerspectiveGuideView: studioMainMenuActions.togglePerspectiveGuideView,
-          showAllLocallyHiddenLayers: studioMainMenuActions.showAllLocallyHiddenLayers,
-          setStudioUiDensity: studioMainMenuActions.setStudioUiDensity,
-          enterCanvasOnlyMode: studioMainMenuActions.enterCanvasOnlyMode,
-          openFeatureTutorial: () => studioMainMenuActions.openFeatureTutorial(null),
-          openStudioFilter: studioMainMenuActions.openStudioFilter,
-          toggleAdvancedFill: studioMainMenuActions.toggleAdvancedFill,
-        },
+        // Name-for-name delegation; it carries no browser state, so it lives in
+        // the pure layer (`studio-main-menu-editor-bindings.ts`).
+        editor: bindStudioMainMenuEditorActions(studioMainMenuActions),
           ui: {
+          ...bindStudioMainMenuSurfaceActions(studioMainMenuSurfaceActions),
           openExportDownload: () => {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
@@ -36991,6 +37424,14 @@ function clearSelectionForEdit() {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", "pen");
             setQuickShapeActive(true);
           },
+          activateTransformTool: studioMainMenuActions.openPixelSelectionTransform,
+          openImageAdjustments: studioMainMenuActions.openSelectedLayerAdjustments,
+          openLayerMask: studioMainMenuActions.openSelectedLayerMask,
+          openBrushPresetBrowser: studioMainMenuActions.openBrushPresetBrowserFromMenu,
+          openBrushStudio: studioMainMenuActions.openBrushStudioFromMenu,
+          openBrushLibrary: studioMainMenuActions.openBrushLibraryFromMenu,
+          requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
+          openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
         },
       t,
       });
@@ -37004,6 +37445,10 @@ function clearSelectionForEdit() {
       isFullscreen,
       lastStudioFilterDraft,
       leftPanelOpen,
+      menuActiveToolCommandId,
+      menuClippingMaskActive,
+      menuClippingMaskDisabled,
+      menuImageLayerSelected,
       menuEditClearDisabled,
       menuEditCopyDisabled,
       menuEditCropDisabled,
@@ -37033,9 +37478,10 @@ function clearSelectionForEdit() {
       saving,
       setZoom,
       showRulers,
-      studioCanvasRulerHandlers,
       studioMainMenuActions,
       viewTransformSuppressed,
+      studioMainMenuSurfaceActions,
+      studioMainMenuSurfaceState,
       t,
       workId,
     ],
@@ -37149,13 +37595,13 @@ function clearSelectionForEdit() {
       }}
       aria-haspopup="menu"
       aria-expanded={quickActionsOpen}
-      aria-label={`퀵 메뉴 · ${workspaceState.mobileControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
+      aria-label={`퀵 메뉴 · ${workspaceControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
       className={mobileBarBtn(quickActionsOpen)}
     >
       <Command size={17} aria-hidden />
       <span>퀵 메뉴</span>
     </button>
-  ), [quickActionsOpen, workspaceState.mobileControlSide]);
+  ), [quickActionsOpen, workspaceControlSide]);
 
   const rasterExportOrchestration = useStudioRasterExportOrchestration({
     activePage,
@@ -37852,7 +38298,7 @@ function clearSelectionForEdit() {
       checkpointName: checkpoint.name,
       currentPageCount: pages.length,
     });
-    if (!confirmStudioDestructiveAction(restoreRequest)) return;
+    if (!(await confirmStudioDestructiveAction(restoreRequest))) return;
     try {
       const applied = await applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
       if (!settleStudioDestructiveCommit(restoreRequest, applied, undo)) return;
@@ -37869,7 +38315,7 @@ function clearSelectionForEdit() {
       checkpointName: checkpoint.name,
       savedAtLabel: checkpoint.createdAt,
     });
-    if (!confirmStudioDestructiveAction(deleteRequest)) return;
+    if (!(await confirmStudioDestructiveAction(deleteRequest))) return;
     try {
       setCheckpoints(
         await deleteDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id)
@@ -39333,7 +39779,9 @@ function clearSelectionForEdit() {
     ) return;
     const livingInkClearRequest =
       kind === "clear" && livingInkScope === "all" ? studioClearLivingInkRequest() : null;
-    if (livingInkClearRequest && !confirmStudioDestructiveAction(livingInkClearRequest)) return;
+    if (livingInkClearRequest && !(await confirmStudioDestructiveAction(livingInkClearRequest))) {
+      return;
+    }
     if (
       kind === "fix"
       && !activeElementsRef.current.some((element) =>
@@ -39594,18 +40042,7 @@ function clearSelectionForEdit() {
       );
       announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
     },
-    toggleEraseToIntersection: () => {
-      const next = !eraseToIntersection;
-      if (next) {
-        activatePrimaryCanvasTool("draw", "eraser");
-      }
-      setEraseToIntersection(next);
-      announceDrawingShortcut(
-        next
-          ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
-          : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
-      );
-    },
+    toggleEraseToIntersection: toggleEraseToIntersectionMode,
   });
 
   const livingInkPersistedLayer = elements.some((element) =>
@@ -40003,6 +40440,9 @@ function clearSelectionForEdit() {
           : undefined
       }
     >
+    {/* 파괴적 명령 승인 표면. body 로 포털되므로 위치는 자유롭지만, 스튜디오 셸 안에 두어
+        스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
+    <StudioDestructiveConfirmHost />
     <input
       ref={editMenuImageInputRef}
       type="file"
@@ -40034,6 +40474,15 @@ function clearSelectionForEdit() {
         disabled={projectArchiveBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportProjectArchive(event)}
         aria-label="프로젝트 아카이브 가져오기"
+      />
+      <input
+        ref={brushPackImportInputRef}
+        type="file"
+        accept={STUDIO_BRUSH_PACK_ACCEPT}
+        className="hidden"
+        disabled={brushPackImporting}
+        onChange={(event) => void handleBrushPackImportFromMenu(event)}
+        aria-label="브러시 가져오기 (ABR · MYB · KPP · JSON)"
       />
       <input
         ref={psdImportInputRef}
@@ -40442,6 +40891,7 @@ function clearSelectionForEdit() {
           isExporting={isExporting}
           isMobile={isMobile}
           liveWorkspaceLayout={liveWorkspaceLayout}
+          resolveWorkspaceDeviceKind={currentStudioWorkspaceDeviceKind}
           loadedWork={loadedWork}
           masterEditMode={masterEditMode}
           menu={menu}
@@ -41396,7 +41846,7 @@ function clearSelectionForEdit() {
           brushOpacity={brushOpacity}
           color={color}
           eraserActive={drawMode === "eraser"}
-          handedness={workspaceState.mobileControlSide === "left" ? "left" : "right"}
+          handedness={workspaceControlSide === "left" ? "left" : "right"}
           canvasHostRef={wrapRef}
           stableHandlers={studioOnCanvasSurfaceHandlers}
         />
@@ -42487,6 +42937,13 @@ function clearSelectionForEdit() {
         </button>
       </div>
     ) : null}
+    {/*
+      §15.3 Help 그룹의 다섯 표면(현재 도구·용어 사전·진단·복구·라이선스·버그
+      리포트) 호스트. 자기 상태만 들고 채널로 요청을 받으므로 prop 이 없고, 열기
+      전에는 아무것도 렌더하지 않는다. 캔버스만 모드에서도 살아 있어야 해서
+      Container 밖 최상단에 둔다.
+    */}
+    <StudioHelpCenterHost />
     </div>
     </StudioToolHintPreferencesProvider>
     </StudioLiveCollaborationProvider>

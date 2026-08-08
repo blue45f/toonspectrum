@@ -6,6 +6,7 @@ import {
   parseStudioCanonicalFilterRecipe,
   planStudioCanonicalFilterExecution,
 } from "./studio-engine-canonical-filter-plan";
+import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 
 import type {
   StudioCanonicalFilterExecutionPlan,
@@ -1205,6 +1206,11 @@ export class StudioEngineWebGpuFilterRuntime {
     if (this.deviceEpoch < Number.MAX_SAFE_INTEGER) this.deviceEpoch += 1;
     this.modules.clear();
     this.pipelines.clear();
+    // `onDeviceLost` is an optional caller hook, so a caller that omits it used to lose the device
+    // in complete silence: filters simply stopped resolving. Reporting first makes the loss reach
+    // the safe-mode recovery machine and the user-facing status rail no matter who constructed
+    // this runtime. Reporting is idempotent per device epoch because of the status guard above.
+    announceStudioGpuDeviceLoss(`filter-runtime-device-lost:${info.reason}`);
     this.onDeviceLost?.(info);
   }
 

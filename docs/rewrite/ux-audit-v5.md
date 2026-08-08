@@ -31,9 +31,9 @@
 | 5 | 포인터 거리 | 브러시 80 / 선택 180 / 레이어 행 120px | **미충족** | **예산 10개 전부 초과.** 최근접 컨트롤 **388px** |
 | 6 | 진행 공개 | 숨은 실패 금지 | **부분** | 저장·동기화 상시 노출 ✅ / **GPU 강등·저장 실패·쿼터 초과 무고지** |
 | 7 | Progressive disclosure | 기본 5~9개 속성 | **미충족** | 인스펙터 속성 탭 **33개** 노출 / 5개 패널 중 1개만 충족 |
-| 8 | 장치 적응 | 장치별 Workspace override | **미충족** | 프로파일 7/12, **device override 필드 자체가 없음** |
-| 9 | Undo 신뢰 | preview/transaction/undo | **부분** | undo ✅ / preview·transaction ❌, 네이티브 `confirm()` 10곳 |
-| 10 | 도움말 | F1/툴팁/영상/HelpGraph + 용어 alias | **미충족** | F1 ❌ HelpGraph ❌ 영상 ❌ / **용어 alias 8개 중 2개만 검색** |
+| 8 | 장치 적응 | 장치별 Workspace override | **충족** | 프로파일 12/12 · `deviceOverrides` 5장치 · 프로파일 적용 시점에 리졸브(§15.2 축 3종은 배치할 표면 부재) |
+| 9 | Undo 신뢰 | preview/transaction/undo | **부분** | undo ✅ / 네이티브 `confirm()` **0곳**(되돌림 3등급 비동기 확인으로 대체) / preview·transaction ❌ |
+| 10 | 도움말 | F1/툴팁/영상/HelpGraph + 용어 alias | **부분** | F1 ✅ 용어검색 ✅ 진단·복구·라이선스·버그리포트 ✅ / HelpGraph ❌ 영상 ❌ |
 | 11 | 접근성 | 캔버스 외 UI WCAG gate | **부분** | 접근명 100% ✅ 대비 0실패 ✅ / **모달 포커스 트랩 부재**, 24px 미만 타깃 15개 |
 | 12 | 오류 복구 | GPU loss/탭 종료/저장소 압박 시 Safe Mode | **미충족** | **Safe Mode 코드 0건.** 복구 모듈 3종 dead code |
 
@@ -208,6 +208,12 @@
 
 축이 다르다. V5는 **작업 성격 × 장치**로 프로파일을 나누는데, 현행은 **웹툰 제작 파이프라인 단계**로 나눈다. 그 결과 §15의 "장치 적응 — Pen Display/Mobile/Keyboard/Mouse/Touch별 Workspace override" 요구가 구조적으로 표현 불가능하다. `studio-workspaces.ts` 전수 확인 결과 레이아웃 필드는 `desktop`(패널 열림/폭)과 `mobileControlSide`뿐이고 device override 개념이 없다.
 
+**재측정(웨이브 8)** — 위 문단은 해소됐다. 프로파일 12종, `StudioWorkspaceLayout.deviceOverrides`로 5장치 축이 생겼고, state/payload는 v4로 올리되 v1~v3를 모두 마이그레이션 소스로 받는다. override는 **도크 기하와 핸디드니스만** 바꾼다 — 액정과 노트북은 손이 필요한 공간이 다를 뿐 도구가 있어야 할 자리는 같기 때문이다.
+
+리졸브 시점은 **프로파일을 적용하는 순간 하나뿐**이다(`StudioPage.tsx` `applyStudioWorkspaceLayout`). 매 입력마다 다시 판정하면 작가가 키보드에 손을 뻗었다는 이유로 도크가 재배치되고, 마운트 시점에 리졸브하면 자동저장이 장치 해석본을 작가가 authoring한 레이아웃으로 되써버린다. 저장 권위는 계속 authored 쪽에 있고 화면만 적응한다.
+
+§15.2 12축 중 **Vector Design·Animation·Pose & 3D 3종은 여전히 부재**다. 프로파일이 지정할 수 있는 축(인스펙터 섹션·도크·팔레트·퀵액션)에 배치할 표면 자체가 없다 — 벡터 인스펙터 섹션이 없고, 타임라인과 3D/VRM은 워크스페이스가 이름 붙일 수 없는 독립 화면이다.
+
 `StudioCompanionWorkspacePresets.tsx:26,34,42,50`의 4개(`draw`·`navigate`·`review`·`reference`)는 멀티 디스플레이 보조창 전용이라 §15.2 프로파일이 아니다.
 
 ### 2.7 메뉴 구조 커버리지 — **[미충족] 17개 중 5개 그룹만 대응**
@@ -246,6 +252,7 @@
 | Collaboration | — | **부재** | 협업 기능은 있으나(팀 작업공간 버튼) 메뉴 없음 |
 | Window | — | **부재** | Workspace Profile·Quick Deck·Action Bar 전환이 `보기` 그룹에 섞여 있음 |
 | Help | 도움말(2) | 심각 미흡 | Command Search · CSP/Photoshop 용어 검색 · 장치·브라우저 진단 · 복구 가이드 · License/Attribution · Bug Report Package 전부 없음 |
+| Help *(2026-08-08 재측정)* | 도움말(9) | 8/8 도달 · 2행 부분 | 6행 신설(통합 검색 진입점 · 용어 사전 · 기기 진단 · 복구 가이드 · 라이선스 고지 · 버그 리포트). 진단·복구·라이선스는 전부 런타임 실측값이며 미측정 항목은 값 대신 이유를 적는다. 남은 부분 2행: **Current Tool Help**(산문 HelpGraph 부재 — 카탈로그 라벨·단축키·별칭·관련 항목만), **Tutorial Project**(튜토리얼 32종 허브는 있으나 예제 프로젝트 파일 없음) |
 
 **그룹 커버리지 29.4%(5/17).** 스펙에 없는 자체 그룹 3개(삽입·그리기·AI)가 존재하며, 이 셋이 Canvas/Layer/Select/Transform/Text/3D 자리를 애매하게 흡수하고 있다.
 

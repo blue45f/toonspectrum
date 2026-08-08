@@ -220,14 +220,22 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     label: "메인 메뉴",
     file: "src/domains/creator/studio-main-menu-items-document.ts",
     extraFiles: [
+      "src/domains/creator/studio-help-menu-items.ts",
+      "src/domains/creator/studio-main-menu-items-animation.ts",
       "src/domains/creator/studio-main-menu-items-artwork.ts",
+      "src/domains/creator/studio-main-menu-items-authoring.ts",
+      "src/domains/creator/studio-main-menu-items-brush.ts",
+      "src/domains/creator/studio-main-menu-items-collaboration.ts",
       "src/domains/creator/studio-main-menu-items-filter.ts",
+      "src/domains/creator/studio-main-menu-items-production.ts",
+      "src/domains/creator/studio-main-menu-items-project.ts",
+      "src/domains/creator/studio-main-menu-items-selection.ts",
       "src/domains/creator/studio-main-menu-items-story.ts",
       "src/domains/creator/studio-main-menu-items-workspace.ts",
     ],
     declarationRef:
-      "studio-main-menu-groups.ts (buildStudioMainMenuGroups) + studio-main-menu-items-*.ts",
-    measuredCount: 116,
+      "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
+    measuredCount: 166,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -279,6 +287,13 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "file/copy-image",
   "file/export-json",
   "file/export-archive",
+  // file, Wave E (5) — studio-main-menu-items-project.ts. The 프로젝트 작업
+  // sheet was the only door to these, and it is `max-sm:hidden`.
+  "file/quick-start",
+  "file/checkpoints",
+  "file/publish-preflight",
+  "file/publish-package",
+  "file/rights-manifest",
   // edit (12) — spread from STUDIO_EDIT_MENU_COMMANDS
   "edit/undo",
   "edit/redo",
@@ -292,6 +307,8 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "edit/history",
   "edit/pen-pressure",
   "edit/app-settings",
+  // edit, Wave E (1) — studio-main-menu-items-project.ts
+  "edit/auto-actions",
   // view (17)
   "view/zoom-in",
   "view/zoom-out",
@@ -310,35 +327,61 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "view/save-current-view",
   "view/restore-view",
   "view/production-insights",
+  // view, Wave E (2) — studio-main-menu-items-authoring.ts
+  "view/navigator",
+  "view/underlay",
   // canvas (2) — lifted out of view
   "canvas/canvas-rulers",
   "canvas/perspective-guide",
-  // layer (7) — lifted out of edit, insert and view
+  // canvas, Wave E (2) — studio-main-menu-items-authoring.ts
+  "canvas/canvas-settings",
+  "canvas/grid",
+  // layer (9) — lifted out of edit, insert and view; Mask/Clipping is Wave D's own row
   "layer/image",
   "layer/bring-front",
   "layer/bring-forward",
   "layer/send-back",
   "layer/send-backward",
   "layer/crop-layer",
+  "layer/clipping-mask",
+  "layer/mask",
   "layer/reset-local-visibility",
-  // select (3) — lifted out of edit
+  // select (10) — the seven §15.3 tool rows (studio-main-menu-items-selection.ts)
+  // come first, then the three commands lifted out of edit.
+  "select/marquee-rect",
+  "select/marquee-ellipse",
+  "select/lasso",
+  "select/poly-lasso",
+  "select/magic-wand",
+  "select/color-range",
+  "select/quick-mask",
   "select/select-all",
   "select/deselect",
   "select/invert-selection",
-  // brush (6) — the former `draw` group
+  // transform (1) — §15.3 group that shipped nothing until Wave D
+  "transform/pixel-transform",
+  // brush (11) — the former `draw` group, plus the five §15.3 Brush rows whose
+  // surfaces shipped inside the inspector with no menu door (spec §15.3 Brush).
   "brush/pen",
   "brush/eraser",
   "brush/fill",
   "brush/smart-shape",
+  "brush/preset-browser",
+  "brush/brush-studio",
+  "brush/natural-media",
+  "brush/my-brushes",
+  "brush/import-pack",
   "brush/bg",
   "brush/style",
-  // filter (33)
+  // filter (35)
   "filter/last-filter",
   "filter/gaussian-blur",
   "filter/motion-blur",
   "filter/hue-saturation-brightness",
   "filter/brightness-contrast",
   "filter/color-curves",
+  "filter/levels",
+  "filter/tone-curve",
   "filter/mosaic",
   "filter/radial-blur",
   "filter/zoom-blur",
@@ -366,19 +409,38 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "filter/color-to-alpha",
   "filter/duotone",
   "filter/noise-add",
-  // vector (1) — lifted out of insert
+  // vector (2) — lifted out of insert, plus the eraser's vector mode
   "vector/elements",
-  // text (2) — lifted out of insert
+  "vector/erase-to-intersection",
+  // text (4) — lifted out of insert, plus the two dialogue panels
   "text/bubble",
   "text/text",
+  "text/dialogue-batch",
+  "text/dialogue-translate",
   // comic (3) — lifted out of insert and view
   "comic/page",
   "comic/page-sequence",
   "comic/collage",
+  // comic, Wave E (7) — studio-main-menu-items-production.ts
+  "comic/tone",
+  "comic/writer-room",
+  "comic/storyboard",
+  "comic/story-bible",
+  "comic/continuity",
+  "comic/scroll-preview",
+  "comic/animatic",
+  // animation (3) — the group left the never-rendered list in Wave E
+  "animation/timeline",
+  "animation/frame-anim",
+  "animation/onion-skin",
   // 3d (3) — lifted out of insert
   "3d/mannequin3d",
   "3d/char",
   "3d/bg3d",
+  // collaboration (3) — the other group that left the never-rendered list
+  "collaboration/team",
+  "collaboration/comments",
+  "collaboration/page-review",
   // window (12) — lifted out of view and insert
   "window/density-focus",
   "window/density-full",
@@ -396,9 +458,16 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "ai/ai-assist",
   "ai/stock",
   "ai/integrations",
-  // help (2)
+  // help (9) — Wave "Help 그룹 신설"이 §15.3 Help 8행에 문을 냈다.
+  "help/command-search",
+  "help/terminology-search",
+  "help/current-tool",
   "help/feature-tutorials",
   "help/shortcuts",
+  "help/diagnostics",
+  "help/recovery",
+  "help/licenses",
+  "help/bug-report",
 ]);
 
 /**
@@ -729,6 +798,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("퀵 마스크"), ps("Quick Mask Mode"), krita("Global Selection Mask")],
       shortcut: "Q",
       origins: [
+        menu("select/quick-mask", { shortcut: "Q" }),
         radial("quick-mask"),
         quickAccess("quick-mask", { shortcut: "Q" }),
         help("edit.quickMask", { shortcut: "Q" }),
@@ -803,6 +873,30 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("나만 숨긴 레이어 모두 표시"), en("Show all locally hidden layers")],
       aliases: [ps("Show All Layers"), ours("로컬 숨김 해제")],
       origins: [menu("layer/reset-local-visibility")],
+    }),
+    defineCommand({
+      id: "layer.clipping-mask",
+      labels: [ko("아래 레이어에 클리핑"), en("Clip to layer below")],
+      aliases: [
+        csp("아래 레이어에서 클리핑"),
+        ps("Create Clipping Mask"),
+        krita("Inherit Alpha"),
+        procreate("Clipping Mask"),
+      ],
+      origins: [menu("layer/clipping-mask")],
+      note: "인스펙터 체크박스(`StudioInspectorAside.tsx` 클리핑)와 같은 `clipBelow` patch 를 실행한다.",
+    }),
+    defineCommand({
+      id: "layer.mask",
+      labels: [ko("레이어 마스크 편집"), en("Edit layer mask")],
+      aliases: [
+        cspEn("Layer Mask"),
+        psKo("레이어 마스크 편집"),
+        krita("Transparency Mask"),
+        ours("마스크 편집"),
+      ],
+      origins: [menu("layer/mask")],
+      note: "인스펙터 마스크 섹션으로 이동한다. 목적지 자체는 검색 코퍼스의 `property.layer-mask` 가 정본이다.",
     }),
 
     /* ---------------------------------------------------------------- view */
@@ -1169,21 +1263,49 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("올가미 선택"), en("Lasso select")],
       aliases: [csp("올가미 선택"), ps("Lasso Tool"), krita("Freehand Selection"), procreate("Freehand")],
       shortcut: "L",
-      origins: [keymap("tool-lasso", { shortcut: "L" })],
+      origins: [
+        menu("select/lasso", { shortcut: "L" }),
+        keymap("tool-lasso", { shortcut: "L" }),
+      ],
+    }),
+    defineCommand({
+      id: "tool.poly-lasso",
+      labels: [ko("다각형 올가미"), en("Polygonal lasso")],
+      aliases: [csp("선택 범위(꺾은선)"), ps("Polygonal Lasso"), krita("Polygonal Selection")],
+      origins: [menu("select/poly-lasso")],
+      note: "툴레일은 올가미 버튼을 lasso → poly-lasso → off 로 순환시켜 이름을 노출하지 않는다.",
     }),
     defineCommand({
       id: "tool.marquee-rect",
       labels: [ko("사각 선택"), en("Rectangular marquee")],
       aliases: [csp("선택 범위(직사각형)"), ps("Rectangular Marquee"), krita("Rectangular Selection"), procreate("Rectangle")],
       shortcut: "M",
-      origins: [keymap("tool-marquee", { shortcut: "M" })],
+      origins: [
+        menu("select/marquee-rect", { shortcut: "M" }),
+        keymap("tool-marquee", { shortcut: "M" }),
+      ],
     }),
     defineCommand({
       id: "tool.marquee-ellipse",
       labels: [ko("원형 선택"), en("Elliptical marquee")],
       aliases: [csp("선택 범위(타원)"), ps("Elliptical Marquee"), krita("Elliptical Selection"), procreate("Ellipse")],
       shortcut: "⇧M",
-      origins: [keymap("tool-marquee-circle", { shortcut: "Shift+M" })],
+      origins: [
+        menu("select/marquee-ellipse", { shortcut: "⇧M" }),
+        keymap("tool-marquee-circle", { shortcut: "Shift+M" }),
+      ],
+    }),
+    defineCommand({
+      id: "tool.magic-wand",
+      labels: [ko("자동 선택 (마술봉)"), en("Magic wand")],
+      aliases: [csp("자동 선택"), ps("Magic Wand"), krita("Contiguous Selection"), procreate("Automatic")],
+      origins: [menu("select/magic-wand")],
+    }),
+    defineCommand({
+      id: "tool.color-range",
+      labels: [ko("색 범위 선택"), en("Color range select")],
+      aliases: [csp("색역 선택"), ps("Color Range"), krita("Similar Color Selection")],
+      origins: [menu("select/color-range")],
     }),
     defineCommand({
       id: "tool.transform",
@@ -1351,6 +1473,36 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("컬러 세트"), ps("Swatches"), krita("Palette Docker")],
       origins: [menu("brush/style")],
     }),
+    defineCommand({
+      id: "brush.preset-browser",
+      labels: [ko("브러시 프리셋 목록"), en("Brush preset browser")],
+      aliases: [csp("보조 도구 팔레트"), ps("Brush Presets"), krita("Brush Presets Docker")],
+      origins: [menu("brush/preset-browser")],
+    }),
+    defineCommand({
+      id: "brush.studio",
+      labels: [ko("브러시 스튜디오"), en("Brush Studio")],
+      aliases: [csp("보조 도구 상세"), ps("Brush Settings"), procreate("Brush Studio")],
+      origins: [menu("brush/brush-studio")],
+    }),
+    defineCommand({
+      id: "brush.natural-media",
+      labels: [ko("자연 매체 · 안료"), en("Natural media · pigment")],
+      aliases: [csp("수채 경계"), krita("Watercolor / MyPaint engines")],
+      origins: [menu("brush/natural-media")],
+    }),
+    defineCommand({
+      id: "brush.saved-library",
+      labels: [ko("내 브러시"), en("My brushes")],
+      aliases: [csp("내 보조 도구"), ps("Brushes Panel"), krita("Resource Manager")],
+      origins: [menu("brush/my-brushes")],
+    }),
+    defineCommand({
+      id: "brush.import-pack",
+      labels: [ko("브러시 가져오기"), en("Import brushes")],
+      aliases: [csp("소재 읽어들이기"), ps("Load Brushes"), krita("Import Brush Preset")],
+      origins: [menu("brush/import-pack")],
+    }),
 
     /* --------------------------------------------------------------- color */
     defineCommand({
@@ -1369,7 +1521,7 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       id: "transform.pixel-selection",
       labels: [ko("픽셀 선택 변형"), en("Transform pixel selection")],
       aliases: [csp("선택 범위 변형"), ps("Transform Selection"), krita("Transform Selection")],
-      origins: [quickAccess("transform")],
+      origins: [menu("transform/pixel-transform"), quickAccess("transform")],
     }),
     defineCommand({
       id: "transform.flip-selection-horizontal",
@@ -1505,6 +1657,22 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       aliases: [csp("톤 커브"), ps("Curves"), krita("Color Adjustment Curves"), procreate("Curves")],
       shortcut: "⌘⇧5",
       origins: [menu("filter/color-curves", { shortcut: "⌘⇧5" })],
+    }),
+    // 아래 둘은 위 필터들과 달리 픽셀을 굽지 않는다 — 선택 레이어의 보정 파라미터를
+    // 편집하는 비파괴 경로(§15.3 Filter ▸ Adjustment Layer)로, 인스펙터 보정 패널을 연다.
+    defineCommand({
+      id: "filter.levels",
+      labels: [ko("레이어 보정 · 레벨"), en("Layer adjustment · Levels")],
+      aliases: [cspEn("Level Correction"), ps("Levels"), krita("Levels")],
+      origins: [menu("filter/levels")],
+      note: "검색 코퍼스의 `property.levels` 와 같은 목적지다. 이쪽은 메뉴에서 가는 명령 경로.",
+    }),
+    defineCommand({
+      id: "filter.tone-curve",
+      labels: [ko("레이어 보정 · 톤 커브"), en("Layer adjustment · Tone curve")],
+      aliases: [cspEn("Tonal Correction"), psKo("곡선"), krita("Color Adjustment Curves")],
+      origins: [menu("filter/tone-curve")],
+      note: "파괴적 `filter.color-curves`(색상 커브 다이얼로그)와 다른 명령이다 — 이쪽은 레이어 보정.",
     }),
     defineCommand({
       id: "filter.mosaic",
@@ -1706,6 +1874,244 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
         keymap("shortcuts-help", { shortcut: "?" }),
         help("view.help", { shortcut: "?" }),
       ],
+    }),
+    defineCommand({
+      id: "help.command-search",
+      labels: [
+        ko("명령 · 속성 통합 검색", "명령·속성·패널·튜토리얼을 한 색인에서 찾습니다."),
+        en("Command search"),
+      ],
+      aliases: [
+        csp("명령 검색"),
+        cspEn("Command Search"),
+        ps("Search"),
+        krita("Search Actions"),
+        procreate("빠른 메뉴"),
+      ],
+      shortcut: "F1",
+      origins: [menu("help/command-search", { shortcut: "F1" })],
+      note: "다이얼로그와 F1 바인딩은 Wave D 가 출하했고, 이 항목이 메뉴 진입점을 낸다.",
+    }),
+    defineCommand({
+      id: "help.terminology-search",
+      labels: [
+        ko("CSP · Photoshop 용어 찾기", "쓰던 프로그램의 이름이 우리 쪽에서 무엇이 됐는지 훑어봅니다."),
+        en("Vendor terminology dictionary"),
+      ],
+      aliases: [csp("용어"), ps("Terminology"), krita("Terminology")],
+      origins: [menu("help/terminology-search")],
+    }),
+    defineCommand({
+      id: "help.current-tool",
+      labels: [
+        ko("현재 도구 도움말", "지금 캔버스를 쥐고 있는 도구의 단축키·별칭·관련 기능을 봅니다."),
+        en("Current tool help"),
+      ],
+      aliases: [csp("도구 설명"), ps("Tool Help"), krita("Tool Options Help")],
+      origins: [menu("help/current-tool")],
+      note: "산문 도움말(HelpGraph)이 아직 없어 카탈로그 실측 정보만 보여 준다.",
+    }),
+    defineCommand({
+      id: "help.diagnostics",
+      labels: [
+        ko("기기 · 브라우저 진단", "WebGPU·저장소·안전 모드 상태를 실측값으로 확인합니다."),
+        en("Device and browser diagnosis"),
+      ],
+      aliases: [ps("System Info"), krita("System Information"), ours("진단")],
+      origins: [menu("help/diagnostics")],
+    }),
+    defineCommand({
+      id: "help.recovery",
+      labels: [
+        ko("복구 가이드", "임시저장·체크포인트·저장 권위 상태와 지금 할 수 있는 조치를 봅니다."),
+        en("Recovery guide"),
+      ],
+      aliases: [csp("복구"), ps("Recovery"), ours("복구 센터")],
+      origins: [menu("help/recovery")],
+    }),
+    defineCommand({
+      id: "help.licenses",
+      labels: [
+        ko("라이선스 · 서드파티 고지", "빌드가 생성한 오픈소스 고지와 엔진 라이선스 게이트 판정을 봅니다."),
+        en("License and attribution"),
+      ],
+      aliases: [ps("Legal Notices"), krita("Show license text"), ours("서드파티 고지")],
+      origins: [menu("help/licenses")],
+    }),
+    defineCommand({
+      id: "help.bug-report",
+      labels: [
+        ko("버그 리포트 패키지", "진단 실측값과 이번 세션 오류를 개인정보 없이 묶어 복사·저장합니다."),
+        en("Bug report package"),
+      ],
+      aliases: [ps("Report a Problem"), krita("Report Bug"), ours("버그 신고")],
+      origins: [menu("help/bug-report")],
+    }),
+
+    /* ------------------------------------------- shipped-but-doorless (E) */
+    /*
+     * Wave E. Every entry below names a surface the product already ships and
+     * the menubar could not reach: the 프로젝트 작업 sheet's five panels, the
+     * animation timeline, the team/review flow and the story room. None of them
+     * is a new feature; each is a new door, so the origin list is `menu` only.
+     */
+    defineCommand({
+      id: "file.quick-start",
+      labels: [ko("빠른 시작 · 새 작업", "템플릿과 웹툰 마법사로 새 작업을 시작합니다."), en("Quick start")],
+      aliases: [csp("새로 만들기"), ps("New"), krita("New File"), ours("빠른 시작")],
+      origins: [menu("file/quick-start")],
+    }),
+    defineCommand({
+      id: "file.checkpoints",
+      labels: [ko("버전 체크포인트", "이름 있는 복구 지점을 만들고 이전 시점과 비교·복원합니다."), en("Version checkpoints")],
+      aliases: [csp("작품 이력"), ps("History Snapshot"), krita("Save Incremental Version"), ours("버전")],
+      origins: [menu("file/checkpoints")],
+    }),
+    defineCommand({
+      id: "file.publish-preflight",
+      labels: [ko("게시 사전검사"), en("Publish preflight")],
+      aliases: [ps("Preflight"), ours("게시 사전검사")],
+      origins: [menu("file/publish-preflight")],
+    }),
+    defineCommand({
+      id: "file.publish-package",
+      labels: [ko("게시 패키지"), en("Publish package")],
+      aliases: [csp("작품 내보내기"), ps("Package"), ours("게시 패키지")],
+      origins: [menu("file/publish-package")],
+    }),
+    defineCommand({
+      id: "file.rights-manifest",
+      labels: [ko("에셋 권리 감사", "출처·라이선스·경고를 한 표로 모아 내보냅니다."), en("Asset rights audit")],
+      aliases: [ps("Credits"), ours("에셋 권리 감사")],
+      origins: [menu("file/rights-manifest")],
+    }),
+    defineCommand({
+      id: "edit.auto-actions",
+      labels: [ko("자동 액션 · 매크로", "액션 세트를 편집·적용하고 매크로를 녹음합니다."), en("Auto actions and macros")],
+      aliases: [csp("오토 액션"), ps("Actions"), krita("Recorder"), procreate("Actions")],
+      origins: [menu("edit/auto-actions")],
+    }),
+    defineCommand({
+      id: "view.navigator",
+      labels: [ko("미니맵 · 탐색"), en("Navigator")],
+      aliases: [csp("내비게이터"), ps("Navigator"), krita("Overview Docker")],
+      origins: [menu("view/navigator")],
+    }),
+    defineCommand({
+      id: "view.underlay",
+      labels: [ko("밑그림 오버레이", "이메레스 밑그림을 반투명 잠금 레이어로 깝니다."), en("Sketch underlay")],
+      aliases: [csp("밑그림"), ps("Template Layer"), krita("Reference Images"), ours("이메레스")],
+      origins: [menu("view/underlay")],
+    }),
+    defineCommand({
+      id: "canvas.document-settings",
+      labels: [ko("캔버스 크기 · 문서 설정"), en("Canvas size and document settings")],
+      aliases: [csp("캔버스 사이즈 변경"), ps("Canvas Size"), krita("Resize Canvas"), procreate("Canvas")],
+      origins: [menu("canvas/canvas-settings")],
+    }),
+    defineCommand({
+      id: "canvas.grid",
+      labels: [ko("그리드"), en("Grid")],
+      aliases: [csp("그리드"), ps("Show Grid"), krita("Show Grid"), procreate("Drawing Guide")],
+      origins: [menu("canvas/grid")],
+    }),
+    defineCommand({
+      id: "vector.erase-to-intersection",
+      labels: [ko("교차점까지 지우기"), en("Erase to intersection")],
+      aliases: [csp("교점까지"), krita("Vector Eraser"), ours("교차점까지 지우기")],
+      origins: [menu("vector/erase-to-intersection")],
+    }),
+    defineCommand({
+      id: "text.dialogue-batch",
+      labels: [ko("대사 일괄 편집", "대사를 한 표에서 나누고 합치고 루비를 답니다."), en("Batch dialogue editing")],
+      aliases: [csp("스토리 에디터"), ps("Paragraph Text"), ours("배치 대사 편집")],
+      origins: [menu("text/dialogue-batch")],
+    }),
+    defineCommand({
+      id: "text.dialogue-translate",
+      labels: [ko("대사 번역 · 다국어"), en("Dialogue translation")],
+      aliases: [ours("대사 번역"), ps("Translate")],
+      origins: [menu("text/dialogue-translate")],
+    }),
+    defineCommand({
+      id: "comic.tone",
+      labels: [ko("톤 · 스크린톤"), en("Screentone library")],
+      aliases: [csp("톤"), ps("Halftone Pattern"), krita("Screentone"), ours("톤")],
+      origins: [menu("comic/tone")],
+    }),
+    defineCommand({
+      id: "comic.writer-room",
+      labels: [ko("Writer Room · 대본"), en("Writer Room")],
+      aliases: [csp("스토리 에디터"), ours("Writer Room")],
+      origins: [menu("comic/writer-room")],
+    }),
+    defineCommand({
+      id: "comic.storyboard",
+      labels: [ko("스토리보드 그리드", "회차 전체를 격자로 보고 샷·카메라 태그를 붙입니다."), en("Storyboard grid")],
+      aliases: [ps("Contact Sheet"), ours("스토리보드 그리드")],
+      origins: [menu("comic/storyboard")],
+    }),
+    defineCommand({
+      id: "comic.story-bible",
+      labels: [ko("제작 바이블", "설정과 약속·회수 원장을 한 곳에서 관리합니다."), en("Production bible")],
+      aliases: [ours("제작 바이블")],
+      origins: [menu("comic/story-bible")],
+    }),
+    defineCommand({
+      id: "comic.continuity",
+      labels: [ko("이야기 연속성 검사"), en("Continuity check")],
+      aliases: [ours("연속성 검사")],
+      origins: [menu("comic/continuity")],
+    }),
+    defineCommand({
+      id: "comic.scroll-preview",
+      labels: [ko("세로 스크롤 미리보기"), en("Vertical scroll preview")],
+      aliases: [ours("세로 스크롤 미리보기")],
+      origins: [menu("comic/scroll-preview")],
+    }),
+    defineCommand({
+      id: "comic.animatic",
+      labels: [ko("애니매틱 타임라인", "컷 길이와 카메라 이동을 미리 재생합니다."), en("Animatic timeline")],
+      aliases: [ours("애니매틱")],
+      origins: [menu("comic/animatic")],
+    }),
+    defineCommand({
+      id: "animation.timeline",
+      labels: [ko("타임라인", "여러 레이어의 키프레임을 한 타임라인에서 다룹니다."), en("Animation timeline")],
+      aliases: [csp("타임라인"), ps("Timeline"), krita("Animation Timeline"), procreate("Animation Assist")],
+      origins: [menu("animation/timeline")],
+    }),
+    defineCommand({
+      id: "animation.frame-cel",
+      labels: [ko("프레임 애니메이션", "선택한 이미지의 프레임을 편집하고 GIF·APNG·WebM 으로 내보냅니다."), en("Frame animation")],
+      aliases: [csp("애니메이션 셀"), ps("Frame Animation"), krita("Animation Docker")],
+      origins: [menu("animation/frame-anim")],
+    }),
+    defineCommand({
+      id: "animation.onion-skin",
+      labels: [ko("어니언 스킨"), en("Onion skin")],
+      aliases: [csp("오니언 스킨"), ps("Onion Skins"), krita("Onion Skins"), procreate("Onion Skin")],
+      origins: [menu("animation/onion-skin")],
+    }),
+    defineCommand({
+      id: "collaboration.team",
+      labels: [ko("팀 · 공유 권한", "멤버·초대·권한과 라이브 세션을 엽니다."), en("Team and sharing")],
+      aliases: [ps("Share"), ours("팀 작업공간")],
+      origins: [menu("collaboration/team")],
+      note: "데스크톱에서 라이브 세션이 없으면 이 패널은 메뉴 이전까지 열 방법이 없었다.",
+    }),
+    defineCommand({
+      id: "collaboration.comments",
+      labels: [ko("댓글 패널"), en("Comments panel")],
+      aliases: [ps("Comments"), ours("댓글")],
+      origins: [menu("collaboration/comments")],
+      note: "위치 댓글 핀 배치는 별도 명령(`tool.comment`, ⌥C)이다.",
+    }),
+    defineCommand({
+      id: "collaboration.page-review",
+      labels: [ko("페이지 검토 · 승인"), en("Page review and approval")],
+      aliases: [ps("Review"), ours("페이지 검토")],
+      origins: [menu("collaboration/page-review")],
     }),
   ]);
 

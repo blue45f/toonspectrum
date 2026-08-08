@@ -11,6 +11,10 @@
 import type { CvdMode } from "./studio-color-vision-model";
 import type { DrawMode, StudioMenu } from "./studio-editor-tool-model";
 import type { StudioFilterDraft, StudioFilterKind } from "./studio-filter-menu";
+import type {
+  StudioMainMenuSurfaceActions,
+  StudioMainMenuSurfaceState,
+} from "./studio-main-menu-surface-contract";
 import type { StudioUiDensityMode } from "./studio-ui-density";
 import type { StudioViewRotation } from "./studio-view-controls";
 
@@ -35,7 +39,7 @@ export interface StudioMainMenuEditAvailability {
   cropLayerDisabled: boolean;
 }
 
-export interface StudioMainMenuBuilderState {
+export interface StudioMainMenuBuilderState extends StudioMainMenuSurfaceState {
   sharedNonOwnerSave: boolean;
   saving: boolean;
   collaborationDocumentLocked: boolean;
@@ -62,6 +66,18 @@ export interface StudioMainMenuBuilderState {
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   lastFilterDraft: StudioFilterDraft | null;
+  /** Selected layer already clips into the one below it (`clipBelow`). */
+  clippingMaskActive: boolean;
+  /** No single clippable element is selected, so the clipping toggle has no target. */
+  clippingMaskDisabled: boolean;
+  /** An image layer is selected, so its mask and adjustment panels have a target. */
+  imageLayerSelected: boolean;
+  /**
+   * §15.3 Help ▸ Current Tool Help — the catalog command id of whatever owns the
+   * canvas pointer right now (`studio-current-tool-help.ts` resolves it). `null`
+   * when the host cannot tell; the help surface then says so instead of guessing.
+   */
+  activeToolCommandId: string | null;
 }
 
 export interface StudioMainMenuEditorActions {
@@ -82,6 +98,8 @@ export interface StudioMainMenuEditorActions {
   duplicateSelected: () => unknown;
   reorder: (placement: StudioLayerReorder) => unknown;
   openSelectedLayerCrop: () => unknown;
+  /** Flips `clipBelow` on the selected layer — the inspector checkbox's command path. */
+  toggleClippingMask: () => unknown;
   addText: () => unknown;
   addPage: () => unknown;
   toggleHorizontalCanvasView: () => unknown;
@@ -106,7 +124,7 @@ export interface StudioMainMenuEditorActions {
   toggleAdvancedFill: () => unknown;
 }
 
-export interface StudioMainMenuUiActions {
+export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   openExportDownload: () => unknown;
   requestProjectImport: () => unknown;
   requestInterchangeImport: () => unknown;
@@ -133,6 +151,22 @@ export interface StudioMainMenuUiActions {
   openShortcuts: () => unknown;
   selectDrawMode: (mode: Extract<DrawMode, "pen" | "eraser">) => unknown;
   enableSmartShape: () => unknown;
+  /** Free-transform / pixel-selection transform, whatever the selection turns out to be. */
+  activateTransformTool: () => unknown;
+  /** Inspector 보정 섹션 — where Levels and the tone curve actually live. */
+  openImageAdjustments: () => unknown;
+  /** Inspector 마스크 섹션. */
+  openLayerMask: () => unknown;
+  /** §15.3 Brush ▸ Preset Browser — the searchable built-in brush catalogue. */
+  openBrushPresetBrowser: () => unknown;
+  /** §15.3 Brush ▸ Brush Studio — the dynamics editor inside the inspector. */
+  openBrushStudio: () => unknown;
+  /** The saved "내 브러시" library, whose import control accepts ABR/MYB/KPP. */
+  openBrushLibrary: () => unknown;
+  /** §15.3 Brush ▸ Import — opens the ABR/MYB/KPP/JSON picker with no detour. */
+  requestBrushPackImport: () => unknown;
+  /** §15.3 Brush ▸ Natural Media — the hokusai natural-media engines section. */
+  openNaturalMediaBrushes: () => unknown;
 }
 
 /** What every per-group item module receives. Read-only projection of the host. */

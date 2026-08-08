@@ -9,6 +9,7 @@ import {
   resetStudioDestructiveActionLedger,
   runStudioDestructiveAction,
   setStudioDestructiveConfirmPresenter,
+  STUDIO_DESTRUCTIVE_DOCUMENT_UNTOUCHED_HINT,
   STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT,
   STUDIO_DESTRUCTIVE_UNDO_HINT,
   subscribeStudioDestructiveActionLedger,
@@ -17,7 +18,11 @@ import {
 import {
   settleStudioDestructiveCommit,
   studioApplyTemplateRequest,
+  studioDeleteCharacterBibleEntryRequest,
   studioDeleteCheckpointRequest,
+  studioDeletePageRequest,
+  studioDeleteWriterRoomItemRequest,
+  studioExportSplitChoiceRequest,
   studioRemoveEmeresUnderlaysRequest,
   studioRestoreCheckpointRequest,
 } from "./studio-destructive-command-catalog";
@@ -78,25 +83,83 @@ describe("destructive action preview", () => {
     ).toBe("현재 페이지 3개 · 현재 제목·설명·마스터·캐릭터 설정");
   });
 
-  it("refuses to destroy when no confirmation surface exists", () => {
+  it("refuses to destroy when no confirmation surface exists", async () => {
     const original = Reflect.get(globalThis, "confirm");
     Reflect.deleteProperty(globalThis, "confirm");
     try {
-      expect(
+      await expect(
         confirmStudioDestructiveAction(studioRemoveEmeresUnderlaysRequest(1)),
-      ).toBe(false);
+      ).resolves.toBe(false);
     } finally {
       if (original !== undefined) Reflect.set(globalThis, "confirm", original);
     }
   });
+
+  it("refuses to destroy when the approval surface itself throws", async () => {
+    setStudioDestructiveConfirmPresenter(() => {
+      throw new Error("presenter crashed");
+    });
+    await expect(
+      confirmStudioDestructiveAction(studioRemoveEmeresUnderlaysRequest(1)),
+    ).resolves.toBe(false);
+  });
+
+  it("drops the empty loss block when an intro already says what happens", () => {
+    const preview = formatStudioDestructivePreview(
+      studioExportSplitChoiceRequest({
+        scale: 3,
+        maxCanvasDimLabel: "16,384",
+        partCount: 4,
+        fittingScale: 2,
+      }),
+    );
+
+    expect(preview).not.toContain("사라지는 것");
+    expect(preview).not.toContain("확인된 손실 없음");
+    expect(preview).toContain("16,384px");
+    // 되돌림도 영구 소실도 약속하지 않는다 — 문서를 건드리지 않는 명령이다.
+    expect(preview).toContain(STUDIO_DESTRUCTIVE_DOCUMENT_UNTOUCHED_HINT);
+    expect(preview).not.toContain(STUDIO_DESTRUCTIVE_UNDO_HINT);
+    expect(preview).not.toContain(STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT);
+  });
+
+  it("names both outcomes when cancelling is a second action, not a no-op", () => {
+    const request = studioExportSplitChoiceRequest({
+      scale: 3,
+      maxCanvasDimLabel: "16,384",
+      partCount: 4,
+      fittingScale: 2,
+    });
+
+    expect(request.confirmLabel).toBe("4개 파일로 나눠 저장");
+    expect(request.cancelLabel).toBe("2×로 낮춰 한 파일");
+  });
+
+  it("keeps history-free document sidecars out of the undo promise", () => {
+    for (const request of [
+      studioDeleteCharacterBibleEntryRequest("주인공"),
+      studioDeleteWriterRoomItemRequest("1화 시놉시스"),
+    ]) {
+      expect(request.reversibility).toBe("irreversible");
+      expect(formatStudioDestructivePreview(request)).toContain(
+        STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT,
+      );
+    }
+  });
+
+  it("keeps page deletion undoable because it commits through page history", () => {
+    const request = studioDeletePageRequest({ pageNumber: 3, elementCount: 12 });
+    expect(request.reversibility).toBe("undoable");
+    expect(formatStudioDestructivePreview(request)).toContain("요소 12개가 함께 사라져요");
+  });
 });
 
 describe("destructive action transaction", () => {
-  it("does not run the destruction when the user declines", () => {
+  it("does not run the destruction when the user declines", async () => {
     setStudioDestructiveConfirmPresenter(() => false);
     const execute = vi.fn();
 
-    const status = runStudioDestructiveAction({
+    const status = await runStudioDestructiveAction({
       request: studioRemoveEmeresUnderlaysRequest(3),
       execute,
     });
@@ -106,11 +169,11 @@ describe("destructive action transaction", () => {
     expect(getStudioDestructiveActionRecord()).toBeNull();
   });
 
-  it("records a committed destruction with a working undo handle", () => {
+  it("records a committed destruction with a working undo handle", async () => {
     setStudioDestructiveConfirmPresenter(() => true);
     const undo = vi.fn();
 
-    const status = runStudioDestructiveAction({
+    const status = await runStudioDestructiveAction({
       request: studioRemoveEmeresUnderlaysRequest(3),
       execute: () => true,
       undo,
@@ -126,10 +189,10 @@ describe("destructive action transaction", () => {
     expect(undo).toHaveBeenCalledTimes(1);
   });
 
-  it("never leaves a refused commit silent — the audit's ignored-return-value hole", () => {
+  it("never leaves a refused commit silent — the audit's ignored-return-value hole", async () => {
     setStudioDestructiveConfirmPresenter(() => true);
 
-    const status = runStudioDestructiveAction({
+    const status = await runStudioDestructiveAction({
       request: studioApplyTemplateRequest({ elementCount: 4, frameCount: 2 }),
       execute: () => false,
       undo: () => undefined,
@@ -143,10 +206,10 @@ describe("destructive action transaction", () => {
     expect(record?.undo).toBeNull();
   });
 
-  it("records a thrown destruction instead of swallowing it", () => {
+  it("records a thrown destruction instead of swallowing it", async () => {
     setStudioDestructiveConfirmPresenter(() => true);
 
-    const status = runStudioDestructiveAction({
+    const status = await runStudioDestructiveAction({
       request: studioApplyTemplateRequest({ elementCount: 4, frameCount: 2 }),
       execute: () => {
         throw new Error("문서가 잠겼습니다");

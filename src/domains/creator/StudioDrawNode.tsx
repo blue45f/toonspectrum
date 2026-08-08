@@ -353,6 +353,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         stroke,
         stampGrid: dynamicBrushPlan.renderBudget.stampGrid,
         markBudget: dynamicBrushPlan.markBudget,
+        // 종이 결은 획이 아니라 캔버스의 성질이라 요소 스냅샷이 아니라 렌더 플랜이 들고 온다.
+        ...(dynamicBrushPlan.paper ? { paper: dynamicBrushPlan.paper } : {}),
       })
     : null;
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;

@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  resetStudioDestructiveActionLedger,
+  setStudioDestructiveConfirmPresenter,
+  type StudioDestructiveActionRequest,
+} from "./studio-destructive-action-preview";
 import {
   parseStudioPoseMaterial,
   STUDIO_POSE_MATERIAL_KIND,
@@ -53,6 +58,7 @@ function materialFromCapture(options: StudioVrmPoseMaterialCaptureOptions) {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  resetStudioDestructiveActionLedger();
 });
 
 describe("StudioVrmPoseMaterialPanel", () => {
@@ -198,10 +204,15 @@ describe("StudioVrmPoseMaterialPanel", () => {
     expect((screen.getByRole("button", { name: "JSON 병합" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("deletes only after confirmation and preserves the already-applied character provenance callback", () => {
+  it("deletes only after confirmation and preserves the already-applied character provenance callback", async () => {
     const storage = new MemoryStorage();
     const onMaterialDeleted = vi.fn();
-    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+    // 승인은 구조화된 요청을 거친다 — 무엇이 사라지는지 요청 자체가 말해야 한다.
+    const approvals: StudioDestructiveActionRequest[] = [];
+    setStudioDestructiveConfirmPresenter((request) => {
+      approvals.push(request);
+      return true;
+    });
     render(
       <StudioVrmPoseMaterialPanel
         disabled={false}
@@ -216,8 +227,16 @@ describe("StudioVrmPoseMaterialPanel", () => {
     fireEvent.change(screen.getByLabelText("포즈 소재 이름"), { target: { value: "삭제 테스트" } });
     fireEvent.click(screen.getByRole("button", { name: "현재 자세를 범용 소재로 저장" }));
     fireEvent.click(screen.getByRole("button", { name: "삭제 테스트 포즈 소재 삭제" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
 
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({
+      id: "studio.pose-material.delete",
+      // 브라우저 저장소 레코드 삭제 — 히스토리를 지나지 않으므로 ⌘Z 로 돌아오지 않는다.
+      reversibility: "irreversible",
+    });
     expect(onMaterialDeleted).toHaveBeenCalledOnce();
     expect(screen.queryByText("삭제 테스트")).toBeNull();
     expect(screen.getByText(/이미 적용된 캐릭터 자세는 유지/)).toBeTruthy();

@@ -8,6 +8,10 @@ const studioLazyPanelStackSource = readFileSync(
   new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"
 );
+const destructiveCatalogSource = readFileSync(
+  new URL("./studio-destructive-command-catalog.ts", import.meta.url),
+  "utf8"
+);
 
 describe("Studio VRM visual pose bone boundary", () => {
   it("renders ephemeral normalized-bone markers that never enter captures", () => {
@@ -141,7 +145,10 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("const sharePoseAbortRef = useRef<AbortController | null>(null)");
     expect(source).toContain("controller.abort()");
     expect(source).toContain("}, controller.signal)");
-    expect(source).toContain("ToonSpectrum 표준 사용권으로 공유할 권한");
+    // 권리 확인 문구는 파괴/게시 승인 카탈로그가 소유하고, 포저는 그 요청을 거쳐서만
+    // 업로드에 진입한다. 문구가 코드에서 사라지면 두 검사 중 하나가 반드시 깨진다.
+    expect(source).toContain("studioSharePoseConsentRequest(title)");
+    expect(destructiveCatalogSource).toContain("ToonSpectrum 표준 사용권으로 공유할 권한");
     expect(source).toContain('license: "toonspectrum-standard"');
     expect(source).toContain('containsAi: false');
     expect(source).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');

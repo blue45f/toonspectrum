@@ -13,6 +13,8 @@
 import { Search } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 
+import { subscribeStudioCommandSearchRequests } from "./studio-help-center-channel";
+
 import type { StudioCommandSearchDialogProps } from "./StudioCommandSearchDialog";
 
 const StudioCommandSearchDialog = lazy(() =>
@@ -58,6 +60,13 @@ export function StudioCommandSearchHost({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
+
+  // 메뉴 › 도움말 › 명령·속성 통합 검색. 메뉴 항목은 순수 데이터라 이 상태를 직접
+  // 만질 수 없으므로 채널로 요청만 받는다(§15.3 Help ▸ Command Search).
+  useEffect(
+    () => subscribeStudioCommandSearchRequests(() => setOpen(true)),
+    [],
+  );
 
   return (
     <>

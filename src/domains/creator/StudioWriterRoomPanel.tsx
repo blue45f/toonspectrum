@@ -15,6 +15,8 @@ import {
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeleteWriterRoomItemRequest } from "./studio-destructive-command-catalog";
 import { SFX_CATEGORIES, SFX_LIBRARY } from "./studio-sfx-presets";
 import {
   setStudioWriterRoomStageCompleted,
@@ -159,13 +161,14 @@ function nextOrder(items: readonly { order: number }[]): number {
 }
 
 function askBeforeDelete(label: string, onDelete: () => void) {
-  if (
-    typeof globalThis.confirm === "function" &&
-    !globalThis.confirm(`${label}을 삭제할까요? 연결된 참조는 직접 다시 확인해야 해요.`)
-  ) {
-    return;
-  }
-  onDelete();
+  void (async () => {
+    if (
+      !(await confirmStudioDestructiveAction(studioDeleteWriterRoomItemRequest(label)))
+    ) {
+      return;
+    }
+    onDelete();
+  })();
 }
 
 function toggleId(ids: readonly string[], id: string, checked: boolean): string[] {

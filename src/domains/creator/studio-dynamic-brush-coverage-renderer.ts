@@ -79,6 +79,19 @@ import {
   type StudioPaintRollerRibbonPolygon,
 } from "./studio-paint-roller-ribbon-carrier";
 import {
+  acquireStudioPaperGranulationTile,
+  resolveStudioDocumentPaperSurface,
+  resolveStudioPaperGranulationAlphaMultiplierAt,
+  studioPaperGranulationIsActive,
+  type StudioPaperGranulationSettings,
+  type StudioPaperGranulationTile,
+  type StudioPaperSurfaceSettings,
+} from "./studio-paper-granulation-runtime";
+import {
+  composeStudioPaperTipAlphaMap,
+  STUDIO_PAPER_TIP_COMPOSITION_BYTE_BUDGET,
+} from "./studio-paper-tip-composition";
+import {
   planStudioProfessionalShelfRibbonCarrier,
   studioProfessionalShelfRibbonCarrierOwnsMaterial,
   studioProfessionalShelfRibbonCarrierWorkMultiplier,
@@ -310,6 +323,15 @@ export interface StudioDynamicBrushCoverageMarkPlanInput {
    * polygons from the returned marks. Full retained/export plans leave this at zero.
    */
   readonly dryMediaUnionLeadingSourceDabsToSkip?: number;
+  /**
+   * 종이 결 침착. 브러시 반응(`studio-paper-brush-response`)만 넘기면 문서가 깔아 둔 종이는
+   * 렌더러가 직접 조회한다. 생략하면 정확한 항등이라 기존 호출부의 픽셀은 한 비트도 바뀌지
+   * 않는다 — 배선은 호출부마다 독립적으로 켤 수 있다.
+   */
+  readonly paper?: Readonly<{
+    readonly response: StudioPaperGranulationSettings;
+    readonly surface?: StudioPaperSurfaceSettings;
+  }>;
 }
 
 function isStudioDynamicBrushSegmentedDabVariation(
@@ -876,6 +898,41 @@ export function renderStudioDynamicBrushCoverageMark(
 }
 
 /**
+ * 종이 결을 캐리어 하나에 적분하는 사분면 표(단위 반지름, 가중치).
+ *
+ * `studio-brush-material-dynamics`의 `STUDIO_BRUSH_GRAIN_FOOTPRINT_SAMPLES`와 같은 배치다 —
+ * 중심에 무게를 더 주고, 축 어깨가 방향성 결을 살리고, 대각이 캐리어 전체 맥동을 죽인다.
+ */
+/**
+ * dab 안에 종이 결이 "보일" 최소 크기(종이 텍셀 수).
+ *
+ * 가장 성긴 프리셋(황목)의 최저 옥타브 셀이 128px 타일에서 16텍셀이고 가장 조밀한 것(세목)이
+ * 4텍셀이라, 8텍셀이면 어떤 종이에서도 마루-골이 최소 한 번은 dab 안에 들어온다. 그보다 작은
+ * dab은 종이 위에서 사실상 한 점이라 캐리어 스칼라와 결과가 같다.
+ */
+const STUDIO_PAPER_MIN_FOOTPRINT_TEXELS = 8;
+
+/**
+ * 종이 합성 맵 하나의 바이트(기본 128² Float32 = 64 KiB).
+ *
+ * 실제 팁 맵 크기가 아니라 고정 상수를 쓴다 — 한도가 팁 해상도에 따라 흔들리면 같은 획이
+ * 브러시 설정에 따라 다른 dab에서 잘리게 되고, 무엇보다 라이브/재생 간 결정이 갈릴 수 있다.
+ */
+const PAPER_TIP_MAP_BYTES_ESTIMATE = 128 * 128 * 4;
+
+const STUDIO_PAPER_FOOTPRINT_QUADRATURE = Object.freeze([
+  [0, 0, 4],
+  [-0.46, 0, 1],
+  [0.46, 0, 1],
+  [0, -0.46, 1],
+  [0, 0.46, 1],
+  [-0.32, -0.32, 0.75],
+  [0.32, -0.32, 0.75],
+  [-0.32, 0.32, 0.75],
+  [0.32, 0.32, 0.75],
+] as const);
+
+/**
  * Flattens the existing dynamic-tip pipeline without changing any material channel. The returned
  * alpha intentionally excludes element opacity so both the coverage and frozen legacy compositors
  * can consume the exact same marks.
@@ -1071,6 +1128,67 @@ export function planStudioDynamicBrushCoverageMarks(
   }
   const marks: StudioDynamicBrushCoverageMark[] = [];
 
+  /*
+   * 종이 결 침착 — 획 전체에 타일 하나. dab마다 노이즈를 만들지 않는다.
+   *
+   * 타일과 그 정착 이득은 (종이, 강도)당 한 번 계산되어 FIFO 캐시에 남고, 이 아래의 샘플
+   * 루프는 문서 좌표에서 바이리니어 4-탭 조회만 한다. 비활성 브러시(잉크·기술펜)는 타일이
+   * 아예 null이라 `resolveStudioPaperGranulationAlphaMultiplierAt`가 즉시 1을 돌려주고,
+   * 마크 알파는 배선 전과 비트 단위로 같다.
+   */
+  const paperResponse = input.paper?.response;
+  const paperTile: StudioPaperGranulationTile | null =
+    paperResponse && studioPaperGranulationIsActive(paperResponse)
+      ? acquireStudioPaperGranulationTile(
+          input.paper?.surface ?? resolveStudioDocumentPaperSurface(),
+          paperResponse,
+        )
+      : null;
+  const paperScale = paperResponse?.scale ?? 1;
+  /**
+   * 종이 결이 dab **안쪽**까지 들어가는 마지막 dab 인덱스(배타).
+   *
+   * 예산을 "이번 호출에서 남은 바이트"로 잡으면 라이브 증분 계획과 전체 재생이 서로 다른
+   * 지점에서 예산을 소진해 같은 획이 두 경로에서 다른 픽셀이 된다. 그래서 한도를 **dab
+   * 인덱스**로 고정한다 — 인덱스는 스트로크 안에서 안정적이라 접미사만 계획하든 전체를
+   * 계획하든 같은 dab이 같은 결정을 받는다.
+   */
+  const paperTipCompositionDabCeiling = paperTile
+    ? Math.floor(STUDIO_PAPER_TIP_COMPOSITION_BYTE_BUDGET / PAPER_TIP_MAP_BYTES_ESTIMATE)
+    : 0;
+  /** 지금 처리 중인 dab의 스트로크 내 인덱스. 위 한도와 비교하는 유일한 값이다. */
+  let paperCompositionDabIndex = 0;
+  /**
+   * 캐리어 전체를 한 스칼라로 눌러야 하는 마크(솔리드 타원·해석적 falloff·전체 텍스처)용
+   * 종이 이득. 중심 한 점만 읽으면 dab이 종이 셀을 지날 때마다 캐리어 전체가 밝아졌다
+   * 어두워져 원형 격자가 드러나므로, 기존 절차적 grain과 같은 9탭 사분면 적분을 쓴다.
+   */
+  const paperAcrossFootprint = (
+    x: number,
+    y: number,
+    radiusX: number,
+    radiusY: number,
+    angleRadians: number,
+  ): number => {
+    if (!paperTile) return 1;
+    const cosine = Math.cos(angleRadians);
+    const sine = Math.sin(angleRadians);
+    let weighted = 0;
+    let totalWeight = 0;
+    for (const [unitX, unitY, weight] of STUDIO_PAPER_FOOTPRINT_QUADRATURE) {
+      const localX = unitX * radiusX;
+      const localY = unitY * radiusY;
+      weighted += resolveStudioPaperGranulationAlphaMultiplierAt(
+        paperTile,
+        x + localX * cosine - localY * sine,
+        y + localX * sine + localY * cosine,
+        paperScale,
+      ) * weight;
+      totalWeight += weight;
+    }
+    return weighted / totalWeight;
+  };
+
   const appendMark = (mark: StudioDynamicBrushCoverageMark): boolean => {
     if (!markIsValid(mark)) return false;
     if (mark.alpha <= 0) return true;
@@ -1087,17 +1205,23 @@ export function planStudioDynamicBrushCoverageMarks(
     const firstDab = studioDynamicBrushDabVariationFirst(dabs);
     const strokeOriginX = suppliedOrigin?.x ?? firstDab?.sourceX ?? firstDab?.x ?? 0;
     const strokeOriginY = suppliedOrigin?.y ?? firstDab?.sourceY ?? firstDab?.y ?? 0;
-    const grainAt = dynamics.grain.amount <= 0
+    // 절차적 grain(브러시가 들고 다니는 결)과 종이 결(캔버스에 붙어 있는 결)은 서로 독립이라
+    // 곱으로 합성한다. 둘 다 꺼져 있으면 상수 1 클로저라 호출 비용도 없다.
+    const proceduralGrainActive = dynamics.grain.amount > 0;
+    const grainAt = !proceduralGrainActive && !paperTile
       ? () => 1
       : (x: number, y: number) => (
-          resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
-            x,
-            y,
-            strokeOriginX,
-            strokeOriginY,
-            dynamicSeed,
-            dynamics.grain
-          )
+          (proceduralGrainActive
+            ? resolveNormalizedStudioBrushGrainAlphaMultiplierAt(
+                x,
+                y,
+                strokeOriginX,
+                strokeOriginY,
+                dynamicSeed,
+                dynamics.grain
+              )
+            : 1)
+          * resolveStudioPaperGranulationAlphaMultiplierAt(paperTile, x, y, paperScale)
         );
     const grainAcrossFootprint = (
       x: number,
@@ -1116,7 +1240,7 @@ export function planStudioDynamicBrushCoverageMarks(
         strokeOriginY,
         dynamicSeed,
         dynamics.grain,
-      )
+      ) * paperAcrossFootprint(x, y, radiusX, radiusY, angleRadians)
     );
     const appendTipDab = (
       composedDab: StudioBrushComposableDab,
@@ -1287,6 +1411,32 @@ export function planStudioDynamicBrushCoverageMarks(
       const radiusX = Math.max(0.25, composedDab.size / 2);
       const radiusY = radiusX * composedDab.roundness;
       const angleRadians = composedDab.angle * Math.PI / 180;
+      /*
+       * 종이 결은 dab보다 잔 구조라 캐리어 스칼라로는 표현되지 않는다 — 알파맵 안으로 넣는다.
+       *
+       * 스칼라 하나만 곱하면 dab이 종이 골을 지날 때 *통째로* 진해졌다 옅어질 뿐 획 내부는
+       * 그대로 매끈하다. R8 페이퍼 에셋 경로가 같은 이유로 같은 자리에서 맵을 합성하며,
+       * 여기서는 절차적 종이 타일로 같은 일을 한다. 합성이 예산을 넘어가면(아주 긴 획)
+       * 아래 캐리어 스칼라로 내려앉아 질감만 약해지고 획은 그대로 남는다.
+       */
+      let texturedAlphaMap = tipAlphaMap;
+      // dab이 종이 셀 하나보다 작으면 맵 안에 결이 한 마루도 들어오지 않는다. 그 구간에서는
+      // 캐리어 스칼라가 수학적으로 같은 답이면서 텍셀 루프를 통째로 아낀다.
+      const paperFitsInsideDab = paperTile !== null
+        && 2 * Math.min(radiusX, radiusY) >= STUDIO_PAPER_MIN_FOOTPRINT_TEXELS * paperScale;
+      if (paperTile && paperFitsInsideDab && paperCompositionDabIndex < paperTipCompositionDabCeiling) {
+        const composed = composeStudioPaperTipAlphaMap({
+          tip: tipAlphaMap,
+          tile: paperTile,
+          scale: paperScale,
+          centerX: composedDab.x,
+          centerY: composedDab.y,
+          radiusX,
+          radiusY,
+          angleRadians,
+        });
+        if (composed) texturedAlphaMap = composed;
+      }
       const texturedMark: StudioDynamicBrushCoverageMark = {
         x: composedDab.x,
         y: composedDab.y,
@@ -1296,19 +1446,35 @@ export function planStudioDynamicBrushCoverageMarks(
         // Canvas and SVG consume the same footprint-integrated grain scalar. This removes the
         // carrier-wide light/dark pulses caused by one centre sample while a future R8 shader
         // evolves the same deterministic grain into per-fragment paper tooth.
+        // 종이 이득이 알파맵 텍셀마다 들어가는 마크에서는 캐리어에 한 번 더 곱하지 않는다 —
+        // 두 번 곱하면 같은 물리를 제곱해 획이 근거 없이 어두워진다. 판정 기준은 "합성이
+        // 성공했는가"가 아니라 "이 dab이 종이를 맵 안에 담을 수 있는가"다: 예산 소진으로
+        // 합성을 건너뛰더라도 알파는 그대로 남아 질감만 옅어지고 획의 농도는 흔들리지 않는다.
         alpha: clampAlpha(
-          depositionAlpha * grainAcrossFootprint(
-            composedDab.x,
-            composedDab.y,
-            radiusX,
-            radiusY,
-            angleRadians,
-          ),
+          depositionAlpha * (paperFitsInsideDab
+            ? resolveNormalizedStudioBrushFootprintGrainAlphaMultiplierAt(
+                composedDab.x,
+                composedDab.y,
+                radiusX,
+                radiusY,
+                angleRadians,
+                strokeOriginX,
+                strokeOriginY,
+                dynamicSeed,
+                dynamics.grain,
+              )
+            : grainAcrossFootprint(
+                composedDab.x,
+                composedDab.y,
+                radiusX,
+                radiusY,
+                angleRadians,
+              )),
         ),
         color: dabColor,
         texture: {
           kind: "alpha-map",
-          alphaMap: tipAlphaMap,
+          alphaMap: texturedAlphaMap,
         },
       };
       if (!markIsValid(texturedMark)) return "invalid-mark";
@@ -1316,6 +1482,7 @@ export function planStudioDynamicBrushCoverageMarks(
     };
 
     for (const dab of studioDynamicBrushDabsInVariation(dabs)) {
+      paperCompositionDabIndex = dab.index;
       const dabColor = resolveNormalizedStudioBrushDabColor(
         stroke,
         dab.index,
@@ -1397,6 +1564,10 @@ export function planStudioDynamicBrushCoverageMarks(
       firstDab,
     );
     if (originAnchor) {
+      // 앵커도 자기 인덱스로 판정한다. 위 루프가 남긴 "마지막 dab 인덱스"를 물려받으면
+      // 접미사만 계획하는 라이브와 전체를 계획하는 재생이 서로 다른 값을 보게 되고,
+      // 같은 앵커가 경로마다 다른 종이 결을 받는다.
+      paperCompositionDabIndex = originAnchor.index;
       const anchorColor = resolveNormalizedStudioBrushDabColor(
         stroke,
         originAnchor.index,

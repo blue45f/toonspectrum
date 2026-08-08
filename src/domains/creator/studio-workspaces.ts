@@ -49,8 +49,8 @@ export type {
  * discarded before the value can be returned or saved again.
  */
 
-export const STUDIO_WORKSPACE_STATE_VERSION = 3 as const;
-export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 3 as const;
+export const STUDIO_WORKSPACE_STATE_VERSION = 4 as const;
+export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 4 as const;
 export const STUDIO_WORKSPACE_MAX_CUSTOM = 24;
 export const STUDIO_WORKSPACE_NAME_MAX_LENGTH = 48;
 export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
@@ -80,9 +80,39 @@ export const STUDIO_CLASSIC_WORKSPACE_IDS = [
   "publish",
 ] as const;
 
+/**
+ * Workspaces added for the twelve-profile catalogue.
+ *
+ * The seven ids above are never renamed or dropped: a saved `activeWorkspaceId` and every custom
+ * workspace derived from one of them must keep resolving after this expansion.
+ */
+export const STUDIO_EXPANDED_WORKSPACE_IDS = [
+  "quick-sketch",
+  "csp-migration",
+  "pen-display",
+  "mobile-draw",
+  "photo-edit",
+] as const;
+
 export const STUDIO_DEFAULT_WORKSPACE_IDS = [
   ...STUDIO_CLASSIC_WORKSPACE_IDS,
   "pro-comic",
+  ...STUDIO_EXPANDED_WORKSPACE_IDS,
+] as const;
+
+/**
+ * Input surfaces a workspace may adapt to.
+ *
+ * `keyboard` is a genuine surface here rather than a pointing device: a keyboard-driven session
+ * navigates by shortcut and wants both docks visible, where a pointer-driven one trades dock width
+ * for canvas. The list is closed so persisted overrides can be validated against it.
+ */
+export const STUDIO_WORKSPACE_DEVICE_KINDS = [
+  "pen-display",
+  "mobile",
+  "keyboard",
+  "mouse",
+  "touch",
 ] as const;
 
 export const STUDIO_PRO_COMIC_PALETTE_PRIORITY = [
@@ -95,10 +125,12 @@ export const STUDIO_PRO_COMIC_PALETTE_PRIORITY = [
 export type StudioClassicWorkspaceId = (typeof STUDIO_CLASSIC_WORKSPACE_IDS)[number];
 export const STUDIO_MOBILE_CONTROL_SIDES = ["left", "right"] as const;
 
+export type StudioExpandedWorkspaceId = (typeof STUDIO_EXPANDED_WORKSPACE_IDS)[number];
 export type StudioDefaultWorkspaceId = (typeof STUDIO_DEFAULT_WORKSPACE_IDS)[number];
 export type StudioProComicPalettePriority =
   (typeof STUDIO_PRO_COMIC_PALETTE_PRIORITY)[number];
 export type StudioMobileControlSide = (typeof STUDIO_MOBILE_CONTROL_SIDES)[number];
+export type StudioWorkspaceDeviceKind = (typeof STUDIO_WORKSPACE_DEVICE_KINDS)[number];
 export type StudioWorkspaceId = StudioDefaultWorkspaceId | string;
 export type StudioWorkspaceMoveDirection = "up" | "down";
 
@@ -109,11 +141,43 @@ export interface StudioWorkspaceDesktopLayout {
   readonly rightPanelWidth: number;
 }
 
+/**
+ * What one input surface may change about a workspace.
+ *
+ * Deliberately only the dock geometry and the handedness of the on-canvas controls. Inspector
+ * sections, palette order and quick actions stay device-independent so a workspace keeps one
+ * muscle memory wherever it is opened; a pen display and a laptop differ in how much room the
+ * hand needs, not in which tool lives where.
+ */
+export interface StudioWorkspaceDeviceOverride {
+  readonly desktop: StudioWorkspaceDesktopLayout;
+  /** `null` inherits `StudioWorkspaceState.mobileControlSide`. */
+  readonly controlSide: StudioMobileControlSide | null;
+}
+
+export type StudioWorkspaceDeviceOverrides = Readonly<
+  Partial<Record<StudioWorkspaceDeviceKind, StudioWorkspaceDeviceOverride>>
+>;
+
 export interface StudioWorkspaceLayout {
   readonly inspector: StudioInspectorLayout;
   readonly desktop: StudioWorkspaceDesktopLayout;
   readonly drawingPalettes: StudioDrawingPaletteLayout;
   readonly quickActions: StudioQuickActionsPreferences;
+  /** Absent devices fall through to `desktop`; an empty map is the documented default. */
+  readonly deviceOverrides: StudioWorkspaceDeviceOverrides;
+}
+
+/** Runtime signals a caller can observe without importing any workspace state. */
+export interface StudioWorkspaceDeviceSignals {
+  /** `PointerEvent.pointerType` of the most recent input, when one is known. */
+  readonly pointerType?: "pen" | "touch" | "mouse" | "unknown" | null;
+  /** `(pointer: coarse)` — a finger-sized primary pointer. */
+  readonly coarsePointer?: boolean;
+  readonly maxTouchPoints?: number;
+  readonly viewportWidth?: number;
+  /** True while the session is being driven by keyboard navigation. */
+  readonly keyboardDriven?: boolean;
 }
 
 export interface StudioDefaultWorkspace {
@@ -208,6 +272,7 @@ const IMAGE_SECTION_SET = new Set<string>(STUDIO_IMAGE_INSPECTOR_SECTIONS);
 const DOCUMENT_SECTION_SET = new Set<string>(STUDIO_DOCUMENT_INSPECTOR_SECTIONS);
 const QUICK_ACTION_ID_SET = new Set<string>(QUICK_ACTION_IDS);
 const MOBILE_CONTROL_SIDE_SET = new Set<string>(STUDIO_MOBILE_CONTROL_SIDES);
+const EMPTY_DEVICE_OVERRIDES: StudioWorkspaceDeviceOverrides = Object.freeze({});
 const STATE_OWNER_SCOPES = new WeakMap<object, string>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -253,6 +318,37 @@ function normalizeDesktopLayout(
   });
 }
 
+function normalizeDeviceOverrides(
+  value: unknown,
+  fallbackDesktop: StudioWorkspaceDesktopLayout,
+): StudioWorkspaceDeviceOverrides {
+  if (!isRecord(value)) return EMPTY_DEVICE_OVERRIDES;
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  // Iterating the closed device list (not the payload's own keys) keeps an untrusted payload from
+  // introducing a device this build does not understand.
+  for (const device of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    const candidate = value[device];
+    if (!isRecord(candidate)) continue;
+    const controlSide =
+      typeof candidate.controlSide === "string"
+      && MOBILE_CONTROL_SIDE_SET.has(candidate.controlSide)
+        ? (candidate.controlSide as StudioMobileControlSide)
+        : null;
+    overrides[device] = Object.freeze({
+      desktop: normalizeDesktopLayout(candidate.desktop, fallbackDesktop),
+      controlSide,
+    });
+  }
+  return Object.freeze(overrides);
+}
+
+function freezeDeviceOverrides(
+  overrides: StudioWorkspaceDeviceOverrides | undefined,
+  fallbackDesktop: StudioWorkspaceDesktopLayout,
+): StudioWorkspaceDeviceOverrides {
+  return overrides ? normalizeDeviceOverrides(overrides, fallbackDesktop) : EMPTY_DEVICE_OVERRIDES;
+}
+
 function freezeInspector(layout: StudioInspectorLayout): StudioInspectorLayout {
   return Object.freeze({ ...layout });
 }
@@ -267,18 +363,20 @@ function freezeQuickActions(
 }
 
 function freezeLayout(layout: StudioWorkspaceLayout): StudioWorkspaceLayout {
+  const desktop = normalizeDesktopLayout(layout.desktop, {
+    leftPanelOpen: true,
+    rightPanelOpen: true,
+    leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
+    rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
+  });
   return Object.freeze({
     inspector: freezeInspector(layout.inspector),
-    desktop: normalizeDesktopLayout(layout.desktop, {
-      leftPanelOpen: true,
-      rightPanelOpen: true,
-      leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
-      rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
-    }),
+    desktop,
     drawingPalettes: normalizeStudioDrawingPaletteLayout(
       layout.drawingPalettes,
     ),
     quickActions: freezeQuickActions(layout.quickActions),
+    deviceOverrides: freezeDeviceOverrides(layout.deviceOverrides, desktop),
   });
 }
 
@@ -305,34 +403,90 @@ function createQuickActions(
   });
 }
 
+type BuiltinDesktop =
+  Pick<StudioWorkspaceDesktopLayout, "leftPanelOpen" | "rightPanelOpen">
+  & Partial<Pick<StudioWorkspaceDesktopLayout, "leftPanelWidth" | "rightPanelWidth">>;
+
+function builtinDesktop(desktop: BuiltinDesktop): StudioWorkspaceDesktopLayout {
+  return {
+    ...desktop,
+    leftPanelWidth:
+      desktop.leftPanelWidth ?? STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
+    rightPanelWidth:
+      desktop.rightPanelWidth ?? STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
+  };
+}
+
 function createBuiltinLayout(
   inspector: StudioInspectorLayout,
-  desktop: Pick<StudioWorkspaceDesktopLayout, "leftPanelOpen" | "rightPanelOpen"> &
-    Partial<
-      Pick<
-        StudioWorkspaceDesktopLayout,
-        "leftPanelWidth" | "rightPanelWidth"
-      >
-    >,
-  actions: Parameters<typeof createQuickActions>[0]
+  desktop: BuiltinDesktop,
+  actions: Parameters<typeof createQuickActions>[0],
+  deviceOverrides: Readonly<Partial<Record<
+    StudioWorkspaceDeviceKind,
+    Readonly<{ desktop: BuiltinDesktop; controlSide?: StudioMobileControlSide }>
+  >>> = {},
 ): StudioWorkspaceLayout {
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  for (const device of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    const override = deviceOverrides[device];
+    if (!override) continue;
+    overrides[device] = Object.freeze({
+      desktop: Object.freeze(builtinDesktop(override.desktop)),
+      controlSide: override.controlSide ?? null,
+    });
+  }
   return freezeLayout({
     inspector,
-    desktop: {
-      ...desktop,
-      leftPanelWidth:
-        desktop.leftPanelWidth ?? STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default,
-      rightPanelWidth:
-        desktop.rightPanelWidth ?? STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.default,
-    },
+    desktop: builtinDesktop(desktop),
     drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
     quickActions: createQuickActions(actions),
+    deviceOverrides: Object.freeze(overrides),
   });
 }
 
 /**
- * Immutable, task-oriented workspaces. The original six remain byte-for-byte equivalent; the
- * professional comic preset only composes fields already understood by StudioPage.
+ * Dock geometry shared by the surfaces that trade panel width for canvas and reach.
+ *
+ * A pen display keeps the inspector reachable but narrow, because the hand rests on the glass and
+ * a wide dock pushes the drawing area under the wrist. Mobile and touch close both docks outright:
+ * the on-canvas command surfaces own that screen, and a 160px page strip is unusable with a thumb.
+ */
+const PEN_DISPLAY_DESKTOP: BuiltinDesktop = {
+  leftPanelOpen: false,
+  rightPanelOpen: true,
+  rightPanelWidth: 240,
+};
+const HANDHELD_DESKTOP: BuiltinDesktop = {
+  leftPanelOpen: false,
+  rightPanelOpen: false,
+  leftPanelWidth: 128,
+  rightPanelWidth: 240,
+};
+/** Keyboard navigation wants every landmark present so Tab order reaches the whole editor. */
+const KEYBOARD_DESKTOP: BuiltinDesktop = { leftPanelOpen: true, rightPanelOpen: true };
+
+/** The adaptation every drawing-first workspace shares. Review/publish profiles opt out. */
+const DRAWING_DEVICE_OVERRIDES = {
+  "pen-display": { desktop: PEN_DISPLAY_DESKTOP },
+  mobile: { desktop: HANDHELD_DESKTOP },
+  touch: { desktop: HANDHELD_DESKTOP },
+  keyboard: { desktop: KEYBOARD_DESKTOP },
+} as const;
+
+/** Reading-first workspaces keep their docks; only the handheld surfaces reclaim the screen. */
+const READING_DEVICE_OVERRIDES = {
+  mobile: { desktop: HANDHELD_DESKTOP },
+  touch: { desktop: HANDHELD_DESKTOP },
+} as const;
+
+/**
+ * Immutable, task-oriented workspaces.
+ *
+ * Every profile places only sections, docks, palettes and quick actions that this build actually
+ * renders — an inspector section from `studio-inspector-layout`, the two docks, the two drawing
+ * palettes, and the sixteen quick-action ids. Nothing here names a panel that does not exist, so a
+ * profile can never resolve to an empty pane. See `STUDIO_WORKSPACE_CATALOGUE_COVERAGE` for the
+ * requested profiles that have no addressable counterpart yet.
  */
 export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Object.freeze([
   Object.freeze({
@@ -342,7 +496,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "document", image: "quick", document: "navigator" },
       { leftPanelOpen: true, rightPanelOpen: true },
-      ["undo", "redo", "select", "pen", "add-bubble", "fit-width"]
+      ["undo", "redo", "select", "pen", "add-bubble", "fit-width"],
+      DRAWING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -352,7 +507,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "properties", image: "fill", document: "canvas" },
       { leftPanelOpen: false, rightPanelOpen: true },
-      ["undo", "redo", "pen", "eraser", "eyedropper", "advanced-fill"]
+      ["undo", "redo", "pen", "eraser", "eyedropper", "advanced-fill"],
+      DRAWING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -362,7 +518,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "properties", image: "fill", document: "grade" },
       { leftPanelOpen: false, rightPanelOpen: true },
-      ["undo", "redo", "eyedropper", "advanced-fill", "select", "eraser"]
+      ["undo", "redo", "eyedropper", "advanced-fill", "select", "eraser"],
+      DRAWING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -372,7 +529,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "properties", image: "quick", document: "canvas" },
       { leftPanelOpen: true, rightPanelOpen: true },
-      ["undo", "redo", "add-bubble", "select", "duplicate", "delete"]
+      ["undo", "redo", "add-bubble", "select", "duplicate", "delete"],
+      READING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -382,7 +540,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "document", image: "retouch", document: "navigator" },
       { leftPanelOpen: true, rightPanelOpen: true },
-      ["undo", "redo", "select", "properties", "fit-width", "bring-front"]
+      ["undo", "redo", "select", "properties", "fit-width", "bring-front"],
+      READING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -392,7 +551,8 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
     layout: createBuiltinLayout(
       { primary: "publish", image: "quick", document: "canvas" },
       { leftPanelOpen: false, rightPanelOpen: true },
-      ["fit-width", "properties", "select", "undo", "redo", "eyedropper"]
+      ["fit-width", "properties", "select", "undo", "redo", "eyedropper"],
+      READING_DEVICE_OVERRIDES,
     ),
   }),
   Object.freeze({
@@ -408,10 +568,134 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
         leftPanelWidth: 216,
         rightPanelWidth: 344,
       },
-      ["undo", "redo", "pen", "advanced-fill", "add-bubble", "fit-width"]
+      ["undo", "redo", "pen", "advanced-fill", "add-bubble", "fit-width"],
+      DRAWING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "quick-sketch",
+    name: "빠른 스케치",
+    description:
+      "패널을 걷어내고 캔버스만 남깁니다. 되돌리기·펜·지우개만 손에 두고 아이디어를 던집니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "quick", document: "canvas" },
+      { leftPanelOpen: false, rightPanelOpen: false },
+      ["undo", "redo", "pen", "eraser", "eyedropper", "fit-width"],
+      DRAWING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "csp-migration",
+    name: "CSP 이주",
+    description:
+      "클립스튜디오에서 넘어온 손에 맞춰 좌우 도크를 넓게 펼치고 서브 도구·도구 속성 동선을 유지합니다.",
+    layout: createBuiltinLayout(
+      { primary: "layers", image: "fill", document: "navigator" },
+      {
+        leftPanelOpen: true,
+        rightPanelOpen: true,
+        leftPanelWidth: 240,
+        rightPanelWidth: 360,
+      },
+      ["undo", "redo", "pen", "advanced-fill", "eyedropper", "select"],
+      DRAWING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "pen-display",
+    name: "액정 타블렛",
+    description:
+      "액정 위에 손을 얹고 그릴 때를 위한 배치입니다. 페이지 목록을 접고 인스펙터를 좁혀 손목 아래 캔버스를 넓힙니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "quick", document: "canvas" },
+      { leftPanelOpen: false, rightPanelOpen: true, rightPanelWidth: 240 },
+      ["undo", "redo", "pen", "eraser", "eyedropper", "quick-mask"],
+      {
+        "pen-display": { desktop: PEN_DISPLAY_DESKTOP, controlSide: "left" },
+        mobile: { desktop: HANDHELD_DESKTOP },
+        touch: { desktop: HANDHELD_DESKTOP },
+        keyboard: { desktop: KEYBOARD_DESKTOP },
+      },
+    ),
+  }),
+  Object.freeze({
+    id: "mobile-draw",
+    name: "모바일 드로잉",
+    description:
+      "좁은 화면에서 양쪽 도크를 모두 접고 엄지로 닿는 온캔버스 명령만 남깁니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "quick", document: "canvas" },
+      { leftPanelOpen: false, rightPanelOpen: false, rightPanelWidth: 240 },
+      ["undo", "redo", "pen", "eraser", "select", "fit-width"],
+      {
+        mobile: { desktop: HANDHELD_DESKTOP },
+        touch: { desktop: HANDHELD_DESKTOP },
+        keyboard: { desktop: KEYBOARD_DESKTOP },
+        mouse: { desktop: { leftPanelOpen: true, rightPanelOpen: true } },
+      },
+    ),
+  }),
+  Object.freeze({
+    id: "photo-edit",
+    name: "사진 보정",
+    description:
+      "사진 리터치와 페이지 색보정을 한 화면에 둡니다. 마스크·닷지번을 손에 두고 톤을 만집니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "retouch", document: "grade" },
+      { leftPanelOpen: false, rightPanelOpen: true, rightPanelWidth: 344 },
+      ["undo", "redo", "dodge-burn", "quick-mask", "eyedropper", "select"],
+      READING_DEVICE_OVERRIDES,
     ),
   }),
 ]);
+
+/**
+ * Where each requested workspace profile landed, including the ones that could not be built.
+ *
+ * A profile is only shipped when every panel it arranges exists. `workspaceId: null` records a
+ * requirement whose feature has no workspace-addressable surface in this build — the panels exist
+ * as Studio UI, but `StudioWorkspaceLayout` cannot name them, so a profile claiming to open them
+ * would resolve to an ordinary properties pane and lie to the artist.
+ */
+export const STUDIO_WORKSPACE_CATALOGUE_COVERAGE = Object.freeze([
+  Object.freeze({ requirement: "Quick Sketch", workspaceId: "quick-sketch", absence: null }),
+  Object.freeze({ requirement: "CSP Migration", workspaceId: "csp-migration", absence: null }),
+  Object.freeze({ requirement: "Pen Display", workspaceId: "pen-display", absence: null }),
+  Object.freeze({ requirement: "Mobile Draw", workspaceId: "mobile-draw", absence: null }),
+  Object.freeze({ requirement: "Comic Production", workspaceId: "pro-comic", absence: null }),
+  Object.freeze({ requirement: "Paint Studio", workspaceId: "coloring", absence: null }),
+  Object.freeze({ requirement: "Photo Edit", workspaceId: "photo-edit", absence: null }),
+  Object.freeze({ requirement: "Collaboration Review", workspaceId: "review", absence: null }),
+  Object.freeze({ requirement: "Presentation/Publish", workspaceId: "publish", absence: null }),
+  Object.freeze({
+    requirement: "Vector Design",
+    workspaceId: null,
+    absence:
+      "벡터 편집 패널이 워크스페이스 축에 없습니다. 인스펙터 primary/image/document 어디에도 벡터 섹션이 없고,"
+      + " 퀵 액션 16종에도 벡터 명령이 없어 배치할 대상 자체가 존재하지 않습니다.",
+  }),
+  Object.freeze({
+    requirement: "Animation",
+    workspaceId: null,
+    absence:
+      "애니메이션 타임라인은 별도 다이얼로그/패널로만 열리고 워크스페이스 레이아웃이 지정할 수 있는 도크가"
+      + " 아닙니다. 프로파일이 열어 줄 수 있는 것이 없어 부재로 기록합니다.",
+  }),
+  Object.freeze({
+    requirement: "Pose & 3D",
+    workspaceId: null,
+    absence:
+      "3D 배경·VRM 포저는 워크스페이스 인스펙터 섹션이 아니라 독립 화면으로 동작합니다. 도크 폭이나 인스펙터"
+      + " 탭으로는 그 화면을 불러올 수 없어 부재로 기록합니다.",
+  }),
+]);
+
+/** The requested profiles this build cannot honestly ship, kept machine-readable for the audit. */
+export const STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS = Object.freeze(
+  STUDIO_WORKSPACE_CATALOGUE_COVERAGE
+    .filter((entry) => entry.workspaceId === null)
+    .map((entry) => entry.requirement),
+);
 
 function defaultWorkspace(id: StudioDefaultWorkspaceId): StudioDefaultWorkspace {
   const workspace = STUDIO_DEFAULT_WORKSPACES.find((candidate) => candidate.id === id);
@@ -550,8 +834,19 @@ function normalizeWorkspaceLayout(
   const quickActions = isExactQuickActions(value.quickActions)
     ? normalizeStudioQuickActionsPreferences(value.quickActions)
     : fallback.quickActions;
+  // A v1-v3 payload has no device overrides at all. Inheriting the fallback's keeps a built-in
+  // profile's curated adaptations after migration instead of silently flattening them.
+  const deviceOverrides = "deviceOverrides" in value
+    ? normalizeDeviceOverrides(value.deviceOverrides, desktop)
+    : fallback.deviceOverrides;
 
-  return freezeLayout({ inspector, desktop, drawingPalettes, quickActions });
+  return freezeLayout({
+    inspector,
+    desktop,
+    drawingPalettes,
+    quickActions,
+    deviceOverrides,
+  });
 }
 
 /** Creates a canonical immutable workspace layout from UI state. */
@@ -637,12 +932,20 @@ function normalizeDecodedStudioWorkspaceState(
     !isRecord(decoded) ||
     (decoded.version !== 1 &&
       decoded.version !== 2 &&
+      decoded.version !== 3 &&
       decoded.version !== STUDIO_WORKSPACE_STATE_VERSION)
   ) {
     return null;
   }
 
-  const fallback = defaultWorkspace("storyboard").layout;
+  // Stored payloads older than the device axis are migrated to "no adaptation" rather than
+  // inheriting the storyboard profile's adaptations: an artist's own saved layout must not
+  // silently gain per-device behaviour they never configured. A current payload always carries
+  // the key explicitly, so this fallback only ever applies to v1-v3.
+  const fallback = freezeLayout({
+    ...defaultWorkspace("storyboard").layout,
+    deviceOverrides: EMPTY_DEVICE_OVERRIDES,
+  });
   const liveLayout = normalizeWorkspaceLayout(decoded.liveLayout, fallback);
   const customWorkspaces = normalizeCustomWorkspaces(decoded.customWorkspaces, fallback);
   const customIds = new Set(customWorkspaces.map((workspace) => workspace.id));
@@ -725,7 +1028,7 @@ function legacyV1StorageKey(userId: string | null | undefined): string {
 
 interface StudioWorkspaceEnvelope {
   readonly kind: typeof WORKSPACE_ENVELOPE_KIND;
-  readonly payloadVersion: 1 | 2 | typeof STUDIO_WORKSPACE_PAYLOAD_VERSION;
+  readonly payloadVersion: 1 | 2 | 3 | typeof STUDIO_WORKSPACE_PAYLOAD_VERSION;
   readonly ownerScope: string;
   readonly state: unknown;
 }
@@ -748,7 +1051,7 @@ function decodeWorkspaceEnvelope(
 
   // Bare prior-version states are accepted only as migration sources. Current storage always
   // writes an owner-scoped envelope and verifies the exact serialized value.
-  if (decoded.version === 1 || decoded.version === 2) {
+  if (decoded.version === 1 || decoded.version === 2 || decoded.version === 3) {
     const state = normalizeDecodedStudioWorkspaceState(decoded, expectedOwnerScope);
     return state
       ? {
@@ -763,6 +1066,7 @@ function decodeWorkspaceEnvelope(
     decoded.kind !== WORKSPACE_ENVELOPE_KIND ||
     (decoded.payloadVersion !== 1 &&
       decoded.payloadVersion !== 2 &&
+      decoded.payloadVersion !== 3 &&
       decoded.payloadVersion !== STUDIO_WORKSPACE_PAYLOAD_VERSION) ||
     typeof decoded.ownerScope !== "string"
   ) {
@@ -780,9 +1084,9 @@ function decodeWorkspaceEnvelope(
     state,
     needsMigration,
     migrationSource: needsMigration
-      ? decoded.payloadVersion === 2 || stateVersion === 2
-        ? "legacy-v2"
-        : "legacy-v1"
+      ? decoded.payloadVersion === 1 && stateVersion === 1
+        ? "legacy-v1"
+        : "legacy-v2"
       : null,
   };
 }
@@ -1325,6 +1629,10 @@ function applyWorkspaceLayout(
     quickActions: applyQuickActions
       ? workspaceLayout.quickActions
       : liveLayout.quickActions,
+    // Device adaptations belong to the workspace being switched to, never to the live layout the
+    // artist is leaving: keeping the old ones would silently apply one profile's pen-display
+    // geometry to another profile's docks.
+    deviceOverrides: workspaceLayout.deviceOverrides,
   });
 }
 
@@ -1421,6 +1729,184 @@ export function updateStudioWorkspacePreferences(
   });
 }
 
+function sameDesktopLayout(
+  left: StudioWorkspaceDesktopLayout,
+  right: StudioWorkspaceDesktopLayout,
+): boolean {
+  return left.leftPanelOpen === right.leftPanelOpen
+    && left.rightPanelOpen === right.rightPanelOpen
+    && left.leftPanelWidth === right.leftPanelWidth
+    && left.rightPanelWidth === right.rightPanelWidth;
+}
+
+function sameDeviceOverrides(
+  left: StudioWorkspaceDeviceOverrides,
+  right: StudioWorkspaceDeviceOverrides,
+): boolean {
+  return STUDIO_WORKSPACE_DEVICE_KINDS.every((device) => {
+    const first = left[device];
+    const second = right[device];
+    if (!first || !second) return !first && !second;
+    return first.controlSide === second.controlSide
+      && sameDesktopLayout(first.desktop, second.desktop);
+  });
+}
+
+/**
+ * Resolve the dock geometry a workspace should present on one input surface.
+ *
+ * Returns the layout unchanged when the device has no override, so a caller can always render the
+ * result without asking whether an override existed. Passing no device is the desktop default.
+ */
+export function resolveStudioWorkspaceDeviceLayout(
+  layout: StudioWorkspaceLayout,
+  device?: StudioWorkspaceDeviceKind | null,
+): StudioWorkspaceLayout {
+  const normalized = normalizeWorkspaceLayout(layout, defaultWorkspace("storyboard").layout);
+  const override = device ? normalized.deviceOverrides[device] : undefined;
+  if (!override || sameDesktopLayout(override.desktop, normalized.desktop)) return normalized;
+  return freezeLayout({ ...normalized, desktop: override.desktop });
+}
+
+/**
+ * Which side the on-canvas command surfaces belong on for one input surface.
+ *
+ * `StudioWorkspaceState.mobileControlSide` stays the owner-wide preference; a device override only
+ * wins where a workspace deliberately set one (a left-handed pen-display grip, for instance).
+ */
+export function resolveStudioWorkspaceControlSide(
+  state: StudioWorkspaceState,
+  layout: StudioWorkspaceLayout,
+  device?: StudioWorkspaceDeviceKind | null,
+): StudioMobileControlSide {
+  const normalized = normalizeWorkspaceLayout(layout, defaultWorkspace("storyboard").layout);
+  const override = device ? normalized.deviceOverrides[device] : undefined;
+  return override?.controlSide
+    ?? (MOBILE_CONTROL_SIDE_SET.has(state.mobileControlSide) ? state.mobileControlSide : "right");
+}
+
+/**
+ * Fold a layout as it was presented on one device back into the layout an artist authored.
+ *
+ * "Save this arrangement" means the arrangement on screen — but on a device that overrides the docks
+ * the screen is showing the override, not the authored geometry. Writing what is on screen straight
+ * back is what permanently overwrites a workspace with whatever device it was last opened on: save
+ * once from a pen display and the desktop docks the artist authored are gone for good. The presented
+ * dock geometry lands in that device's override slot instead, leaving the authored `desktop`
+ * untouched, while everything deliberately device-independent — inspector, palettes, quick actions —
+ * saves exactly as presented.
+ *
+ * Returns the presented layout unchanged when there was nothing to undo — no device, or a device
+ * this profile does not override — because then the screen was already showing authored geometry.
+ */
+export function captureStudioWorkspaceDeviceLayout(
+  authored: StudioWorkspaceLayout,
+  presented: StudioWorkspaceLayout,
+  device?: StudioWorkspaceDeviceKind | null,
+): StudioWorkspaceLayout {
+  const base = normalizeWorkspaceLayout(authored, defaultWorkspace("storyboard").layout);
+  const shown = normalizeWorkspaceLayout(presented, base);
+  // A device the profile does not override showed the authored geometry unchanged, so what came
+  // back is authored geometry too — editing docks on a plain desktop must still move the profile,
+  // not quietly mint an override for a surface nobody adapted.
+  if (!device || !base.deviceOverrides[device]) return shown;
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  for (const kind of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    // The presented layout carries the authored overrides through `resolveStudioWorkspaceDeviceLayout`,
+    // but preferring it keeps an override the artist edited in this same session from being reverted.
+    const existing = shown.deviceOverrides[kind] ?? base.deviceOverrides[kind];
+    if (existing) overrides[kind] = existing;
+  }
+  if (sameDesktopLayout(shown.desktop, base.desktop)) {
+    // Docks dragged back to the authored geometry read as clearing the override, not as pinning a
+    // duplicate of it — otherwise a device could never return to inheriting. A handedness override
+    // is a separate deliberate choice and survives: geometry matching again is not a reason to
+    // un-flip the grip someone set for this device.
+    const controlSide = overrides[device]?.controlSide ?? null;
+    if (controlSide === null) delete overrides[device];
+    else overrides[device] = Object.freeze({ desktop: base.desktop, controlSide });
+  } else {
+    overrides[device] = Object.freeze({
+      desktop: shown.desktop,
+      controlSide: overrides[device]?.controlSide ?? null,
+    });
+  }
+  return freezeLayout({
+    ...shown,
+    desktop: base.desktop,
+    deviceOverrides: Object.freeze(overrides),
+  });
+}
+
+/**
+ * Write one device's override onto a layout, or clear it so the device inherits again.
+ *
+ * The editing counterpart to `captureStudioWorkspaceDeviceLayout`: that one infers an override from
+ * what happened to be on screen, this one takes a deliberate choice from the workspace menu. Passing
+ * `null` removes the override rather than storing a copy of the authored geometry, so "inherits" and
+ * "pinned to the same values" stay distinguishable.
+ */
+export function setStudioWorkspaceDeviceOverride(
+  layout: StudioWorkspaceLayout,
+  device: StudioWorkspaceDeviceKind,
+  override: {
+    readonly desktop?: StudioWorkspaceDesktopLayout;
+    readonly controlSide?: StudioMobileControlSide | null;
+  } | null,
+): StudioWorkspaceLayout {
+  const normalized = normalizeWorkspaceLayout(layout, defaultWorkspace("storyboard").layout);
+  const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
+  for (const kind of STUDIO_WORKSPACE_DEVICE_KINDS) {
+    const existing = normalized.deviceOverrides[kind];
+    if (existing) overrides[kind] = existing;
+  }
+  if (override === null) {
+    delete overrides[device];
+  } else {
+    const existing = overrides[device];
+    const controlSide = override.controlSide === undefined
+      ? existing?.controlSide ?? null
+      : override.controlSide;
+    overrides[device] = Object.freeze({
+      desktop: normalizeDesktopLayout(
+        override.desktop ?? existing?.desktop ?? normalized.desktop,
+        normalized.desktop,
+      ),
+      controlSide,
+    });
+  }
+  return freezeLayout({ ...normalized, deviceOverrides: Object.freeze(overrides) });
+}
+
+/**
+ * Classify the current input surface from observable runtime signals.
+ *
+ * Order matters and is deliberate: an explicit keyboard-driven session wins because it is a stated
+ * intent rather than a hardware guess; a pen on a large coarse-pointer screen is a pen display; a
+ * narrow viewport is mobile before it is merely touch. `null` means "no adaptation" and leaves the
+ * workspace on its desktop geometry.
+ */
+export function resolveStudioWorkspaceDeviceKind(
+  signals: StudioWorkspaceDeviceSignals,
+): StudioWorkspaceDeviceKind | null {
+  if (signals.keyboardDriven === true) return "keyboard";
+  const touchCapable = (signals.maxTouchPoints ?? 0) > 0 || signals.coarsePointer === true;
+  const narrow = typeof signals.viewportWidth === "number"
+    && Number.isFinite(signals.viewportWidth)
+    && signals.viewportWidth < 1_024;
+  if (signals.pointerType === "pen") return narrow ? "mobile" : "pen-display";
+  if (narrow && touchCapable) return "mobile";
+  // An observed press outranks the hardware census. `maxTouchPoints > 0` says the panel *can* be
+  // touched, which is true of most laptops now; believing it over a mouse the artist just clicked
+  // handed every touchscreen laptop the handheld layout with both docks shut.
+  if (signals.pointerType === "touch") return "touch";
+  if (signals.pointerType === "mouse") return "mouse";
+  // With nothing observed yet, only a coarse *primary* pointer is evidence of a finger-first
+  // surface; touch points alone are not, and guessing wrong here lands on first paint.
+  if (signals.coarsePointer === true) return "touch";
+  return null;
+}
+
 export function areStudioWorkspaceLayoutsEqual(
   first: StudioWorkspaceLayout,
   second: StudioWorkspaceLayout,
@@ -1428,6 +1914,7 @@ export function areStudioWorkspaceLayoutsEqual(
 ): boolean {
   const left = normalizeWorkspaceLayout(first, defaultWorkspace("storyboard").layout);
   const right = normalizeWorkspaceLayout(second, defaultWorkspace("storyboard").layout);
+  if (!sameDeviceOverrides(left.deviceOverrides, right.deviceOverrides)) return false;
   if (
     left.inspector.primary !== right.inspector.primary ||
     left.inspector.image !== right.inspector.image ||
@@ -1464,6 +1951,15 @@ export function areStudioWorkspaceLayoutsEqual(
   );
 }
 
+/**
+ * Whether the live layout has drifted from the workspace it was applied from.
+ *
+ * Both sides are authored-form layouts: the live layout keeps device adaptation in its own
+ * `deviceOverrides` slot rather than folded into `desktop` (see
+ * `captureStudioWorkspaceDeviceLayout`), so this compares like with like. Were the live layout ever
+ * stored device-resolved, every workspace would read as modified the moment it was opened on a pen
+ * display — an edit nobody made, in front of a button that writes it over the authored docks.
+ */
 export function isStudioWorkspaceDirty(state: StudioWorkspaceState): boolean {
   const normalized = normalizeStudioWorkspaceState(state);
   const active = resolveStudioWorkspace(normalized, normalized.activeWorkspaceId);
@@ -1521,6 +2017,9 @@ export function migrateLegacyStudioWorkspaceState(
       },
       drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
       quickActions,
+      // Pre-workspace preferences predate the device axis entirely, so the migrated live layout
+      // starts with no per-device adaptation and inherits whichever profile the artist switches to.
+      deviceOverrides: EMPTY_DEVICE_OVERRIDES,
     }),
     customWorkspaces: [],
     mobileControlSide:

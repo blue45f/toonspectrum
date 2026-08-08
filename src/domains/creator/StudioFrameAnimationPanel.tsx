@@ -8,6 +8,8 @@
 import { ChevronLeft, ChevronRight, Copy, Download, Film, Ghost, Pause, Play, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioRemoveFrameAnimationRequest } from "./studio-destructive-command-catalog";
 import { downloadBlob } from "./studio-export";
 import {
   DEFAULT_FRAME_FPS,
@@ -835,7 +837,14 @@ export function StudioFrameAnimationPanel({
             <button
               type="button"
               onClick={() => {
-                if (globalThis.confirm("애니메이션을 해제하고 정지 이미지로 되돌릴까요?")) onRemoveAnimation();
+                void (async () => {
+                  if (
+                    !(await confirmStudioDestructiveAction(
+                      studioRemoveFrameAnimationRequest(element.frames?.length)
+                    ))
+                  ) return;
+                  onRemoveAnimation();
+                })();
               }}
               className={cn(buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5 text-bad hover:text-bad" }), "w-full")}
             >

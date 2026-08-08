@@ -14,6 +14,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { buildStudioHref } from "./creator-studio-links";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDiscardLocalChangesRequest } from "./studio-destructive-command-catalog";
 import { downscaleDataUrl, downscaleImageFile } from "./studio-image-utils";
 import {
   getStudioSharedDocument,
@@ -816,15 +818,17 @@ export function StudioUploadPublish() {
             disabled={!loggedIn || saving}
             type="button"
             onClick={() => {
-              if (
-                dirty &&
-                !window.confirm(
-                  "화면의 미저장 변경을 버리고 서버 원고를 다시 불러올까요?"
-                )
-              ) {
-                return;
-              }
-              setHydrationAttempt((attempt) => attempt + 1);
+              void (async () => {
+                if (
+                  dirty &&
+                  !(await confirmStudioDestructiveAction(
+                    studioDiscardLocalChangesRequest()
+                  ))
+                ) {
+                  return;
+                }
+                setHydrationAttempt((attempt) => attempt + 1);
+              })();
             }}
           >
             <RefreshCw size={15} aria-hidden="true" />

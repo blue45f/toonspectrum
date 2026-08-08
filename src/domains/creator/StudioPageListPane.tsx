@@ -16,6 +16,11 @@ import {
 import { Suspense, lazy, memo, useState } from "react";
 
 import { StudioEdgeRailButton } from "./studio-chrome-ui";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  studioDeletePageRequest,
+  studioDeletePagesBulkRequest,
+} from "./studio-destructive-command-catalog";
 import {
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
@@ -370,14 +375,15 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   type="button"
                   data-testid="studio-page-bulk-delete"
                   onClick={() => {
-                    if (
-                      globalThis.confirm(
-                        `선택한 ${liveSelectedPageIds.length}개 페이지를 삭제할까요?`
-                      )
-                    ) {
+                    void (async () => {
+                      if (
+                        !(await confirmStudioDestructiveAction(
+                          studioDeletePagesBulkRequest(liveSelectedPageIds.length)
+                        ))
+                      ) return;
                       deletePagesBulk(liveSelectedPageIds);
                       setSelectedPageIds([]);
-                    }
+                    })();
                   }}
                   disabled={pages.length <= 1}
                   className="ml-auto grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-auto lg:min-h-6 lg:rounded-lg lg:px-1.5"
@@ -658,9 +664,17 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (pages.length <= 1) return;
-                        if (globalThis.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
+                        void (async () => {
+                          if (
+                            !(await confirmStudioDestructiveAction(
+                              studioDeletePageRequest({
+                                pageNumber: idx + 1,
+                                elementCount: p.elements.length,
+                              })
+                            ))
+                          ) return;
                           deletePage(p.id);
-                        }
+                        })();
                       }}
                       disabled={pages.length <= 1}
                       className="grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-6 lg:rounded"

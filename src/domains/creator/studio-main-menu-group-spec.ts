@@ -15,61 +15,17 @@
  * Audit that ordered the regroup: `docs/rewrite/ux-audit-v5.md` §2.7, §4 Wave C.
  */
 
-export type StudioMenuSpecCoverage = "present" | "partial" | "absent";
+import { STUDIO_MENU_HELP_GROUP_SPEC } from "./studio-main-menu-group-spec-help";
+import { gap, has, ours, part } from "./studio-main-menu-group-spec-model";
 
-export interface StudioMenuSpecRow {
-  /** §15.3 wording, verbatim. */
-  readonly spec: string;
-  readonly coverage: StudioMenuSpecCoverage;
-  /** Qualified `<group>/<item>` ids of this group that answer the row. */
-  readonly items: readonly string[];
-  readonly note?: string;
-}
+import type { StudioMenuGroupSpec } from "./studio-main-menu-group-spec-model";
 
-export interface StudioMenuSpecExtra {
-  /** Qualified `<group>/<item>` id we ship that §15.3 does not list. */
-  readonly item: string;
-  readonly note: string;
-}
-
-export interface StudioMenuGroupSpec {
-  readonly id: string;
-  /** Menubar copy (Korean product voice). */
-  readonly labelKo: string;
-  /** §15.3 heading. */
-  readonly specName: string;
-  /**
-   * Menubar copy for non-Korean locales, for groups the regroup introduced whose
-   * `studio.mainMenu.group.<id>.label` key has not shipped yet. Same escape hatch
-   * the Help group already used; drop it once the packs carry the key.
-   */
-  readonly labelEn?: string;
-  /**
-   * Locale key to reuse for the group label. Set when the regroup renamed a
-   * group that already shipped translations (draw → brush) so 75 locale packs
-   * keep working.
-   */
-  readonly labelKey?: string;
-  /** `false` for product groups §15.3 does not define. */
-  readonly inV5Spec: boolean;
-  /** Menubar tooltip copy for groups whose locale packs have not shipped yet. */
-  readonly hintKo?: { readonly description: string; readonly tip?: string };
-  readonly rows: readonly StudioMenuSpecRow[];
-  readonly extras: readonly StudioMenuSpecExtra[];
-}
-
-const has = (spec: string, ...items: string[]): StudioMenuSpecRow =>
-  ({ spec, coverage: "present", items });
-
-const part = (spec: string, note: string, ...items: string[]): StudioMenuSpecRow =>
-  ({ spec, coverage: "partial", items, note });
-
-const gap = (spec: string, note?: string): StudioMenuSpecRow =>
-  note === undefined
-    ? { spec, coverage: "absent", items: [] }
-    : { spec, coverage: "absent", items: [], note };
-
-const ours = (item: string, note: string): StudioMenuSpecExtra => ({ item, note });
+export type {
+  StudioMenuGroupSpec,
+  StudioMenuSpecCoverage,
+  StudioMenuSpecExtra,
+  StudioMenuSpecRow,
+} from "./studio-main-menu-group-spec-model";
 
 export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.freeze([
   {
@@ -78,7 +34,11 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     specName: "File",
     inV5Spec: true,
     rows: [
-      gap("새 프로젝트", "게스트 진입 시 무제 문서가 자동 생성되고, 명시적 ‘새로 만들기’ 명령은 없다."),
+      part(
+        "새 프로젝트",
+        "빠른 시작 패널(템플릿·웹툰 마법사)만. 현재 문서를 비우는 ‘새로 만들기’ 명령은 여전히 없다.",
+        "file/quick-start",
+      ),
       part("열기·최근 파일", "프로젝트 도구 패널이 최근 작업 목록을 대신한다.", "file/project"),
       part(
         "CSP/PSD/ORA/PDF/Office/3D 가져오기",
@@ -90,19 +50,25 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       gap("원본 파일 연결"),
       part(
         "저장·다른 이름·버전 체크포인트",
-        "임시저장·게시만. 명명 체크포인트는 별도 패널에 있고 메뉴 진입점이 없다.",
+        "임시저장·게시·명명 체크포인트. ‘다른 이름으로 저장’은 여전히 없다.",
         "file/save-draft",
         "file/publish",
+        "file/checkpoints",
       ),
-      part("Publish Package", "아카이브 백업이 근사치. 배포 패키지 규격은 없다.", "file/export-archive"),
-      gap("포맷 호환성 보고서", "손실 미리보기는 가져오기 흐름 안에만 있다."),
-      gap("복구 센터", "세션 복구 배너만 있고 센터는 없다(감사 §2.10)."),
-      gap("프로젝트 권리 BOM"),
+      has("Publish Package", "file/publish-package", "file/export-archive"),
+      gap("포맷 호환성 보고서", "손실 미리보기는 가져오기 흐름 안에만 있고, 호환성 표는 데이터로만 있다."),
+      gap("복구 센터", "세션 복구 배너·신뢰성 레일만 있고 센터는 없다(감사 §2.10)."),
+      part(
+        "프로젝트 권리 BOM",
+        "에셋 권리 매니페스트(출처·라이선스·진단·CSV/JSON 내보내기)까지. 3D 패키지 BOM 은 아직 이 표에 합류하지 않았다.",
+        "file/rights-manifest",
+      ),
     ],
     extras: [
       ours("file/export", "내보내기 / 다운로드 — 현행 배포 동선의 진입점."),
       ours("file/copy-image", "이미지를 클립보드로."),
       ours("file/export-json", "백업(.json)."),
+      ours("file/publish-preflight", "게시 사전검사 — §15.3 행이 없지만 게시 패키지의 전제다."),
     ],
   },
   {
@@ -115,8 +81,12 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       part("History Branch", "선형 작업 내역만. 분기는 없다.", "edit/history"),
       has("잘라내기·복사·붙여넣기", "edit/cut", "edit/copy", "edit/paste"),
       has("Paste in Place", "edit/paste-in-place"),
-      gap("명령 반복"),
-      gap("Automation Recipe"),
+      gap("명령 반복", "필터 전용 ‘마지막 필터 다시 열기’만 있고 범용 명령 반복은 없다."),
+      part(
+        "Automation Recipe",
+        "액션 세트 편집·가져오기·내보내기·드라이런과 매크로 녹음까지. 조건 분기·스케줄은 없다.",
+        "edit/auto-actions",
+      ),
       has("Preferences", "edit/app-settings"),
       has("Input Device Calibration", "edit/pen-pressure"),
     ],
@@ -143,7 +113,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "view/fit",
         "view/actual-pixels",
       ),
-      gap("Navigator", "내비게이터 패널은 있으나 메뉴 항목이 없다."),
+      has("Navigator", "view/navigator"),
       gap("Proof/Pixel/Vector Preview"),
       part(
         "Color/ICC Soft Proof",
@@ -154,10 +124,17 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "view/color-vision-deuteranopia",
         "view/color-vision-tritanopia",
       ),
-      gap("Onion Skin"),
-      gap("Reference Overlay", "참고 이미지는 창(Window)▸Reference Desk 로 옮겼다."),
+      gap("Onion Skin", "어니언 스킨은 애니메이션 그룹이 정본 위치다(‘애니메이션 ▸ 어니언 스킨’)."),
+      part(
+        "Reference Overlay",
+        "밑그림(이메레스) 오버레이만. 참고 ‘이미지’ 는 창(Window)▸Reference Desk 로 옮겼다.",
+        "view/underlay",
+      ),
       part("Performance HUD", "제작 인사이트는 생산성 지표다. 렌더 성능 HUD 는 없다.", "view/production-insights"),
-      gap("Safe Mode", "제품 코드에 Safe Mode 가 없다(감사 §2.10)."),
+      gap(
+        "Safe Mode",
+        "런타임은 있다(GPU 손실·저장소 압박이 자동 진입). 수동 진입은 신뢰성 계층의 제품 경계라 메뉴가 임의로 열지 않는다.",
+      ),
     ],
     extras: [
       ours("view/fullscreen", "전체화면."),
@@ -176,17 +153,22 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       tip: "페이지 추가·시퀀스는 ‘만화’ 메뉴의 페이지 관리에 있습니다.",
     },
     rows: [
-      gap("크기·해상도·작업 색공간", "문서 설정 패널에만 있다."),
+      part(
+        "크기·해상도·작업 색공간",
+        "캔버스 크기·매직 리사이즈·가이드까지. 문서 DPI 와 작업 색공간 선택은 없다(내보내기에만 DPI 가 있다).",
+        "canvas/canvas-settings",
+      ),
       gap("Crop/Trim", "레이어 자르기는 레이어 메뉴에 있고 캔버스 자르기는 없다."),
-      gap("웹툰 세로 캔버스"),
+      gap("웹툰 세로 캔버스", "세로 프리셋과 플랫폼 폭 가이드는 캔버스 설정 안에 있고 전용 명령은 없다."),
       gap("페이지/아트보드/슬라이드", "페이지 명령은 ‘만화’ 그룹의 Page Manager 로 묶었다."),
       part(
         "그리드·자·퍼스",
-        "px 눈금자와 원근 도우미만. 그리드·대칭자는 없다.",
+        "px 눈금자·그리드·원근 도우미. 아이소메트릭 그리드와 고급 자는 그리기 인스펙터 전용이다.",
         "canvas/canvas-rulers",
         "canvas/perspective-guide",
+        "canvas/grid",
       ),
-      gap("대칭·만다라"),
+      gap("대칭·만다라", "6종 대칭(방사·만화경 포함)이 있으나 그리기 옵션 바와 인스펙터 전용이다."),
       gap("Seamless/Wrap-around"),
     ],
     extras: [],
@@ -208,7 +190,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
         "layer/image",
       ),
       gap("Group/Folder"),
-      gap("Mask/Clipping", "클리핑 마스크는 인스펙터 체크박스로만 도달한다(감사 §2.2 실패 항목)."),
+      part("Mask/Clipping", "클리핑 토글과 마스크 편집면 진입만. 마스크 생성·적용·반전은 인스펙터 전용이다.", "layer/clipping-mask", "layer/mask"),
       part("Reference/Draft/Lock", "나만 숨긴 레이어 복구만 있다.", "layer/reset-local-visibility"),
       gap("Smart Linked Object"),
       gap("Layer Comp"),
@@ -229,17 +211,29 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     specName: "Select",
     inV5Spec: true,
     hintKo: {
-      description: "문서 전체 선택, 선택 해제, 선택 반전을 실행합니다.",
-      tip: "사각·올가미 같은 선택 도구 자체는 왼쪽 도구 막대에 있습니다.",
+      description: "선택 도구를 고르고, 문서 전체 선택·해제·반전을 실행합니다.",
+      tip: "같은 도구를 한 번 더 고르면 꺼집니다. 툴레일에도 사각·원형·올가미가 있습니다.",
     },
     rows: [
-      gap("Rectangle/Ellipse/Lasso/Polygon", "선택 도구는 왼쪽 툴레일에만 있다."),
-      gap("Magic Wand/Color Range"),
-      gap("Semantic/Object Select"),
-      gap("Expand/Shrink/Feather/Smooth"),
-      gap("Quick Mask", "`Q` 로만 도달한다. 메뉴 항목이 없다."),
-      gap("Save Selection"),
-      gap("Selection HUD"),
+      has(
+        "Rectangle/Ellipse/Lasso/Polygon",
+        "select/marquee-rect",
+        "select/marquee-ellipse",
+        "select/lasso",
+        "select/poly-lasso",
+      ),
+      has("Magic Wand/Color Range", "select/magic-wand", "select/color-range"),
+      gap(
+        "Semantic/Object Select",
+        "AI 피사체 분리는 ‘레이어 분리’로 있으나 결과가 선택 영역이 아니라 레이어라 이 행을 채우지 못한다.",
+      ),
+      gap(
+        "Expand/Shrink/Feather/Smooth",
+        "확장·축소·페더는 선택 도구 패널의 슬라이더로만 있고 명령이 아니다. Smooth 는 아예 없다.",
+      ),
+      has("Quick Mask", "select/quick-mask"),
+      gap("Save Selection", "선택 실행취소·다시실행만 있고 이름 붙인 선택 저장은 없다."),
+      gap("Selection HUD", "요소 선택용 컨텍스트 바만 있고 픽셀 선택용 HUD 는 없다."),
     ],
     extras: [
       ours("select/select-all", "모두 선택 — §15.3 행에 명시가 없으나 Select 가 정본 위치다."),
@@ -255,7 +249,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     inV5Spec: true,
     hintKo: { description: "선택 영역과 레이어의 크기·회전·왜곡을 다룹니다." },
     rows: [
-      gap("Scale/Rotate/Skew/Perspective", "변형 도구는 툴레일에만 있다(감사 §2.2 실패 항목)."),
+      part("Scale/Rotate/Skew/Perspective", "선택 대상에 맞는 자유 변형 진입만. 왜곡·원근은 리터치 패널 안이다.", "transform/pixel-transform"),
       gap("Mesh Warp"),
       gap("Puppet Warp"),
       gap("Liquify", "리퀴파이는 툴레일 도구로만 있다."),
@@ -271,23 +265,43 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     specName: "Brush",
     labelKey: "studio.mainMenu.group.draw.label",
     inV5Spec: true,
+    // Wave D. The audit read 0 of 10 here, yet every feature shipped — behind a
+    // right-inspector hunt. Rows below open those surfaces; the ones left absent
+    // are product gaps, not routing gaps, and each says which.
     rows: [
-      gap("Preset Browser", "브러시 프리셋은 우패널에서만 고른다."),
-      gap("Brush Studio/Brush DNA", "Brush Studio 는 인스펙터 런처로만 열린다."),
-      gap("Pressure/Tilt/Velocity", "펜 압력 설정은 편집▸Input Device Calibration 이 담당한다."),
-      gap("Stabilizer"),
-      gap("Tip/Texture/Dual Tip"),
-      gap("Natural Media/Pigment"),
-      gap("Particle/Physics"),
-      gap("Import SUT/ABR/MYB/KPP", "ABR 임포트는 구현돼 있으나 메뉴 진입점이 없다."),
-      gap("Fidelity Lab"),
-      gap("Team Preset Versioning"),
+      has("Preset Browser", "brush/preset-browser"),
+      has("Brush Studio/Brush DNA", "brush/brush-studio"),
+      // 한 항목은 한 행만 주장한다. 아래 셋은 조정 수단이 Brush Studio 행 안에 있을
+      // 뿐 전용 행이 없으므로, 커버된 척하지 않고 위치만 기록한다.
+      gap(
+        "Pressure/Tilt/Velocity",
+        "전용 행이 없다. 필압·틸트·속도 곡선은 브러시 스튜디오의 ‘반응’·‘입력’ 탭에 있고, 기기 캘리브레이션은 편집▸Input Device Calibration 이 담당한다.",
+      ),
+      gap("Stabilizer", "전용 행이 없다. 보정 강도·모드는 브러시 스튜디오와 그리기 옵션 바에 있다."),
+      gap("Tip/Texture/Dual Tip", "전용 행이 없다. 촉 모양·경도·간격은 브러시 스튜디오 ‘촉’ 탭에 있고, 듀얼 팁은 편집 UI 가 없다."),
+      part(
+        "Natural Media/Pigment",
+        "hokusai 자연매체 변환만. 안료 혼합(Kubelka-Munk) 모델은 없다.",
+        "brush/natural-media",
+      ),
+      gap("Particle/Physics", "입자·물리 브러시 엔진 자체가 없다."),
+      part(
+        "Import SUT/ABR/MYB/KPP",
+        "ABR·MYB·KPP·자체 JSON 만. `.sut`(CSP) 파서는 없다. MYB/KPP 는 굵기·농도·필압·촉만 옮기고 나머지는 경고로 표시한다(studio-brush-pack-import.ts).",
+        "brush/import-pack",
+      ),
+      gap("Fidelity Lab", "hokusai 충실도 골든 테스트만 있고 작가가 여는 비교 랩은 없다."),
+      gap("Team Preset Versioning", "브러시는 기기 로컬 저장이고 팀 버전 관리가 없다."),
     ],
     extras: [
       ours("brush/pen", "펜 — §15.3은 도구 활성화를 팔레트로 다루지만 메뉴에서도 1클릭이어야 한다."),
       ours("brush/eraser", "지우개."),
       ours("brush/fill", "채우기."),
       ours("brush/smart-shape", "스마트 도형 — 펜 + 도형 보정 모드."),
+      ours(
+        "brush/my-brushes",
+        "내 브러시 — §15.3에 대응 행이 없다. 저장·가져오기·재적용을 한 곳에서 하는 사용자 라이브러리다.",
+      ),
       ours("brush/bg", "배경 · 톤."),
       ours("brush/style", "팔레트 · 브랜드."),
     ],
@@ -298,7 +312,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     specName: "Filter",
     inV5Spec: true,
     rows: [
-      gap("Adjustment Layer", "보정은 파괴적으로만 적용된다."),
+      part("Adjustment Layer", "레벨·톤 커브만 레이어 파라미터라 비파괴다. 보정 레이어 개체는 없고 나머지 33개 필터는 파괴적이다.", "filter/levels", "filter/tone-curve"),
       has(
         "Color/Blur/Sharpen",
         "filter/gaussian-blur",
@@ -362,12 +376,15 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     hintKo: { description: "도형·프레임·화살표 같은 벡터 요소를 캔버스에 놓습니다." },
     rows: [
       part("Pen/Bezier/Shape", "SVG 도형·프레임 배치만. 베지어 편집은 없다.", "vector/elements"),
-      gap("Anchor/Width/Edit Stroke"),
-      gap("Boolean/Offset/Trim"),
-      gap("Vector Eraser"),
+      gap(
+        "Anchor/Width/Edit Stroke",
+        "노드 편집·획 스타일 패널은 있으나 ‘draw’ 요소를 고른 상태의 인스펙터 전용이라 메뉴에서 켤 대상이 없다.",
+      ),
+      gap("Boolean/Offset/Trim", "패스 불리언은 도형 2개를 마퀴로 고른 인스펙터 전용이고, 오프셋 엔진은 UI 가 없다."),
+      has("Vector Eraser", "vector/erase-to-intersection"),
       gap("Live Appearance"),
       gap("Pattern Along Path"),
-      gap("Vectorize Raster"),
+      gap("Vectorize Raster", "래스터→패스 커널은 있으나 제품 호출자가 없다."),
     ],
     extras: [],
   },
@@ -383,12 +400,19 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     },
     rows: [
       has("CJK Text", "text/text"),
-      gap("Vertical Writing/Ruby/Kinsoku"),
-      gap("Paragraph/Style"),
+      gap(
+        "Vertical Writing/Ruby/Kinsoku",
+        "세로쓰기·금칙·루비 모두 구현돼 있으나 선택한 텍스트의 인스펙터 체크박스와 대사 일괄 편집 안에만 있다.",
+      ),
+      gap("Paragraph/Style", "요소별 서식만 있고 이름 붙인 문단·문자 스타일 객체가 없다."),
       has("Balloon/Leader/Tail", "text/bubble"),
-      gap("Dialogue Link"),
-      gap("Localization Layout"),
-      gap("Font Report"),
+      has("Dialogue Link", "text/dialogue-batch"),
+      part(
+        "Localization Layout",
+        "언어 전환·번역 메모리·말풍선 자동 맞춤까지. 로케일별 폰트/박스 오버라이드와 넘침 보고서는 없다.",
+        "text/dialogue-translate",
+      ),
+      gap("Font Report", "폰트 사용·라이선스 보고서가 없다(사용자 폰트 관리 패널도 아직 미배선)."),
     ],
     extras: [],
   },
@@ -399,18 +423,35 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     specName: "Comic & Story",
     inV5Spec: true,
     hintKo: {
-      description: "페이지를 추가하고 시퀀스를 열어 회차 전체를 관리합니다.",
+      description: "페이지·톤·대본·연속성까지 회차 전체를 관리합니다.",
       tip: "콜라주는 여러 칸을 한 번에 배치할 때 씁니다.",
     },
     rows: [
-      part("Panel/Frame Border", "콜라주 레이아웃만. 칸 테두리 편집은 없다.", "comic/collage"),
-      gap("Tone/Focus/Speed Lines", "톤·집중선은 필터와 배경 메뉴에 흩어져 있다."),
+      part(
+        "Panel/Frame Border",
+        "콜라주 레이아웃만 메뉴에 있다. 칸 테두리·컷 분할 편집은 프레임을 고른 인스펙터 전용이다.",
+        "comic/collage",
+      ),
+      part(
+        "Tone/Focus/Speed Lines",
+        "톤 라이브러리만. 집중선·속도선은 해당 요소를 고른 인스펙터 전용이고 하프톤은 보정 스택 안이다.",
+        "comic/tone",
+      ),
       has("Page Manager", "comic/page", "comic/page-sequence"),
-      gap("Script/Shot/Panel"),
-      gap("Continuity Check"),
-      gap("Scroll Rhythm"),
-      gap("Story Bible"),
-      gap("Animatic"),
+      part(
+        "Script/Shot/Panel",
+        "Writer Room(대본)과 스토리보드 그리드(샷·카메라 태그)까지. 시나리오 자동 배치는 AI 팝오버 안에 남아 있다.",
+        "comic/writer-room",
+        "comic/storyboard",
+      ),
+      has("Continuity Check", "comic/continuity"),
+      has("Scroll Rhythm", "comic/scroll-preview"),
+      part(
+        "Story Bible",
+        "제작 바이블(설정·약속/회수 원장)까지. 캐릭터 바이블은 아직 프로젝트 시트 전용이다.",
+        "comic/story-bible",
+      ),
+      has("Animatic", "comic/animatic"),
     ],
     extras: [],
   },
@@ -420,16 +461,22 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     labelEn: "Animation",
     specName: "Animation",
     inV5Spec: true,
-    hintKo: { description: "타임라인과 프레임 편집." },
+    hintKo: {
+      description: "타임라인·프레임 편집과 어니언 스킨을 켭니다.",
+      tip: "프레임 애니메이션은 이미지 레이어를 고른 뒤 여세요.",
+    },
     rows: [
-      gap("Timeline"),
-      gap("Frame/Cel"),
-      gap("Rig/Puppet"),
+      has("Timeline", "animation/timeline"),
+      has("Frame/Cel", "animation/frame-anim"),
+      gap("Rig/Puppet", "퍼펫 워프는 있으나 변형 도구지 애니메이션 릭이 아니다."),
       gap("State Machine"),
-      gap("Onion Skin"),
-      gap("Audio/Markers"),
-      gap("Motion Capture"),
-      gap("Export GIF/Video/Sequence/OTIO"),
+      has("Onion Skin", "animation/onion-skin"),
+      gap("Audio/Markers", "애니매틱의 대사·효과음 큐는 마커지 오디오 트랙이 아니다. 오디오 가져오기가 없다."),
+      gap("Motion Capture", "웹캠 포즈 스캐너는 VRM 포저 안의 단계라 애니메이션 명령으로 꺼낼 대상이 아니다."),
+      gap(
+        "Export GIF/Video/Sequence/OTIO",
+        "GIF·APNG·WebM 내보내기는 프레임 애니메이션 패널 안에만 있다. 이미지 시퀀스·OTIO 는 없다.",
+      ),
     ],
     extras: [],
   },
@@ -444,14 +491,14 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       tip: "포즈를 잡은 뒤 캔버스로 굽고 그 위에 선을 따세요.",
     },
     rows: [
-      gap("Scene/Outliner"),
+      gap("Scene/Outliner", "레이어 목록 탭으로 있으나 3D 배경 대화상자 안의 탭이라 메뉴가 직접 열 대상이 아니다."),
       has("VRM/Pose/Expression", "3d/mannequin3d", "3d/char"),
-      gap("Camera/Light"),
+      gap("Camera/Light", "카메라·조명 스튜디오는 3D 배경 대화상자 ▸ 뷰 탭 ▸ 카메라 섹션 안에 있다."),
       part("Room Builder", "3D 배경 패널 안에서만 구성한다.", "3d/bg3d"),
-      gap("Modeling/Boolean"),
-      gap("Physics/Cloth/Hair"),
-      gap("3D→2D Pass", "굽기는 3D 패널 안에 있고 메뉴 항목이 없다."),
-      gap("Surface Paint"),
+      gap("Modeling/Boolean", "Hybrid DCC 패널이 있으나 3D 그룹이 아니라 툴레일·프로젝트 시트가 연다."),
+      gap("Physics/Cloth/Hair", "강체 물리만 있고 천·머리카락 저작 UI 는 없다."),
+      gap("3D→2D Pass", "굽기(삽입·LT 출력)는 3D 배경 대화상자 하단에 있고 메뉴 항목이 없다."),
+      gap("Surface Paint", "VRM 텍스처 페인트는 3D 캐릭터 대화상자 안의 단계다."),
       gap("Camera Tracking"),
     ],
     extras: [],
@@ -462,16 +509,22 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     labelEn: "Collaboration",
     specName: "Collaboration",
     inV5Spec: true,
-    hintKo: { description: "공유·권한·리뷰 세션." },
+    hintKo: {
+      description: "공유 권한·댓글·검토 승인을 엽니다.",
+      tip: "라이브 세션과 참여자 현황도 팀 패널 안에 있습니다.",
+    },
     rows: [
-      gap("Share/Permission", "팀 작업공간 버튼으로만 도달한다."),
-      gap("Presence/Soft Lock", "동작하지만 메뉴 항목이 없다."),
-      gap("Comment/Paint-over", "댓글 도구는 툴레일에만 있다."),
+      has("Share/Permission", "collaboration/team"),
+      gap(
+        "Presence/Soft Lock",
+        "참여자 표시와 소프트 잠금은 동작하지만 켜고 끄는 명령이 아니라 상태다. 세션 화면은 팀 패널이 연다.",
+      ),
+      part("Comment/Paint-over", "댓글 스레드까지. 덧그리기(paint-over)는 없다.", "collaboration/comments"),
       gap("Proposal Branch"),
-      gap("Version Compare"),
-      gap("Approval"),
-      gap("Review Session"),
-      gap("Audit Log"),
+      gap("Version Compare", "리비전 비교는 체크포인트 패널 안에 있고, 그 문은 파일 ▸ 버전 체크포인트가 연다."),
+      has("Approval", "collaboration/page-review"),
+      gap("Review Session", "Writer Room 의 검토 화면이 근사치이며 만화 ▸ Writer Room 이 연다."),
+      gap("Audit Log", "팀 활동 피드가 근사치이고 감사 로그 규격은 없다."),
     ],
     extras: [],
   },
@@ -527,76 +580,5 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ours("ai/integrations", "연동 설정."),
     ],
   },
-  {
-    id: "help",
-    labelKo: "도움말",
-    specName: "Help",
-    inV5Spec: true,
-    rows: [
-      gap("Command Search", "통합 명령 검색이 없다(감사 §2.8)."),
-      gap("Current Tool Help"),
-      part("Tutorial Project", "기능 튜토리얼 허브. 튜토리얼 ‘프로젝트’는 아니다.", "help/feature-tutorials"),
-      gap("CSP/Photoshop terminology search"),
-      gap("Device/Browser Diagnosis"),
-      gap("Recovery Guide"),
-      gap("License/Attribution"),
-      gap("Bug Report Package"),
-    ],
-    extras: [ours("help/shortcuts", "단축키 · 기본 조작.")],
-  },
+  STUDIO_MENU_HELP_GROUP_SPEC,
 ]);
-
-/** Menubar order. §15.3 order, with the product-only AI group before Window. */
-export const STUDIO_MENU_GROUP_ORDER: readonly string[] = Object.freeze(
-  STUDIO_MENU_GROUP_SPEC.map((group) => group.id),
-);
-
-export function studioMenuGroupSpec(id: string): StudioMenuGroupSpec | undefined {
-  return STUDIO_MENU_GROUP_SPEC.find((group) => group.id === id);
-}
-
-/** Every qualified item id this table claims for a group, rows first then extras. */
-export function studioMenuSpecClaimedItems(groupId: string): readonly string[] {
-  const group = studioMenuGroupSpec(groupId);
-  if (!group) return [];
-  return [
-    ...group.rows.flatMap((row) => row.items),
-    ...group.extras.map((extra) => extra.item),
-  ];
-}
-
-export interface StudioMenuSpecCoverageSummary {
-  readonly specGroups: number;
-  readonly groupsWithItems: number;
-  readonly emptyGroupIds: readonly string[];
-  readonly specRows: number;
-  readonly rowsPresent: number;
-  readonly rowsPartial: number;
-  readonly rowsAbsent: number;
-  readonly extras: number;
-}
-
-export function studioMenuSpecCoverageSummary(): StudioMenuSpecCoverageSummary {
-  const spec = STUDIO_MENU_GROUP_SPEC.filter((group) => group.inV5Spec);
-  const rows = spec.flatMap((group) => group.rows);
-  const empty = spec.filter((group) => studioMenuSpecClaimedItems(group.id).length === 0);
-  return {
-    specGroups: spec.length,
-    groupsWithItems: spec.length - empty.length,
-    emptyGroupIds: empty.map((group) => group.id),
-    specRows: rows.length,
-    rowsPresent: rows.filter((row) => row.coverage === "present").length,
-    rowsPartial: rows.filter((row) => row.coverage === "partial").length,
-    rowsAbsent: rows.filter((row) => row.coverage === "absent").length,
-    extras: STUDIO_MENU_GROUP_SPEC.reduce((sum, group) => sum + group.extras.length, 0),
-  };
-}
-
-/** §15.3 rows we ship nothing for, as `Group ▸ row`. The Wave C shortfall list. */
-export function studioMenuSpecMissingRows(): readonly string[] {
-  return STUDIO_MENU_GROUP_SPEC.filter((group) => group.inV5Spec).flatMap((group) =>
-    group.rows
-      .filter((row) => row.coverage === "absent")
-      .map((row) => `${group.specName} ▸ ${row.spec}`),
-  );
-}

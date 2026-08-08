@@ -192,6 +192,11 @@ import {
   planStudioPerfectFreehandRender,
   type StudioPerfectFreehandRenderPlan,
 } from "./studio-outline-stroke-contract";
+import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
+import {
+  resolveStudioDocumentPaperSurface,
+  studioPaperGranulationIsActive,
+} from "./studio-paper-granulation-runtime";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
 import {
   buildStudioPerfectFreehandPathData,
@@ -1726,6 +1731,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           usesCausalDepositPlan
           || materialIdentity.dryMediaPresetId !== null
         ) {
+          const paperResponse = resolveStudioPaperBrushResponse(el.brush);
           const sharedCoverageInput = {
             dynamics,
             materialIdentity,
@@ -1733,6 +1739,15 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             stroke,
             stampGrid: renderBudget.stampGrid,
             markBudget,
+            // SVG는 Canvas와 같은 마크를 직렬화해야 하므로 종이 결도 같은 입력으로 받는다.
+            ...(studioPaperGranulationIsActive(paperResponse)
+              ? {
+                  paper: {
+                    response: paperResponse,
+                    surface: resolveStudioDocumentPaperSurface(),
+                  },
+                }
+              : {}),
           };
           const completeCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
             ...sharedCoverageInput,
