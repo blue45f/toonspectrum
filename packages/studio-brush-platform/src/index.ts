@@ -5,3 +5,4 @@ export * from "./geometry";
 export * from "./compile";
 export * from "./raster-compile";
 export * from "./providers";
+export * from "./natural-media-fullsize-benchmark";

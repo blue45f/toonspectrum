@@ -1,4 +1,6 @@
-import createLibMypaintModule from "./mypaint-wasm";
+// Keep the real ESM extension: Vite can infer it, but the standalone lane-11
+// benchmark runs under Node/tsx where extensionless .mjs resolution is invalid.
+import createLibMypaintModule from "./mypaint-wasm.mjs";
 
 import type { LibMypaintEmscriptenModule } from "./mypaint-wasm";
 
