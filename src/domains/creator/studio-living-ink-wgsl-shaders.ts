@@ -27,11 +27,50 @@ import {
   studioLivingInkVelocityDamping,
   studioLivingInkVorticityStrength,
 } from "./studio-living-ink-execution-protocol";
+import { STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION } from "./studio-living-ink-field";
 
-export const STUDIO_LIVING_INK_WGSL_SHADER_REVISION = "wgsl-field-v2" as const;
+import type { StudioLivingInkDisplayMode } from "./studio-living-ink-gpu-protocol";
+
+export const STUDIO_LIVING_INK_WGSL_SHADER_REVISION = "wgsl-field-v3-paper-resolve" as const;
 
 /** Field uniform slot count (f32/u32 words). The GPU buffer is `4 × this` bytes. */
-export const STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS = 24 as const;
+export const STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS = 40 as const;
+
+/**
+ * Display-resolve mode code, shared with the GLSL runtime's `displayMode` uniform. The numbers are
+ * the contract between the two backends — the WGSL resolve reproduces the same branch ladder
+ * (`> 3.5` flow, `> 2.5` water, `0.5 … 1.5` mobile-only, `> 1.5` fixed-only) that
+ * `DISPLAY_FRAGMENT` in `studio-living-ink-webgl2-runtime.ts` reads.
+ */
+export function studioLivingInkWgslDisplayModeCode(mode: StudioLivingInkDisplayMode): number {
+  if (mode === "mobile-pigment") return 1;
+  if (mode === "fixed-pigment") return 2;
+  if (mode === "water") return 3;
+  if (mode === "flow") return 4;
+  return 0;
+}
+
+/**
+ * Display-resolve tunables. These are the same uniforms the GLSL `display` program receives; they
+ * are packed here so the paper, granulation and edge-deposition model cannot drift between the two
+ * backends by being re-derived inside one shader's text.
+ */
+export interface StudioLivingInkDisplayUniformInput {
+  readonly displayWidth: number;
+  readonly displayHeight: number;
+  /** `beerLambertDensity * 2.2` for composite, `1.5` for every isolated channel view. */
+  readonly densityStrength: number;
+  readonly paperFiber: number;
+  readonly paperTooth: number;
+  readonly granulation: number;
+  /** `edgeDarkening * 2.2`, matching the GLSL uniform upload. */
+  readonly edgeAmount: number;
+  readonly wetSheen: number;
+  readonly vignette: number;
+  /** `config.seed % 4093`, exactly as the GLSL runtime derives it. */
+  readonly seed: number;
+  readonly displayMode: number;
+}
 
 export interface StudioLivingInkFieldUniformInput {
   readonly width: number;
@@ -49,6 +88,16 @@ export interface StudioLivingInkFieldUniformInput {
   readonly vorticity: number;
   readonly capillaryCreep: number;
   readonly fixing: boolean;
+  readonly dryingEdgeDeposition: number;
+  /**
+   * Per-channel pigment diffusion blend for this step, from `studioLivingInkPigmentDiffusionRates`
+   * — the same TS helper the GLSL pigment program uploads, so the two backends cannot drift into
+   * two different bleed rates.
+   */
+  readonly pigmentDiffusion: readonly [number, number, number, number];
+  /** True while a `fix` with `scope: "selection"` is settling, matching the GLSL exchange uniform. */
+  readonly fixSelectionEnabled: boolean;
+  readonly display: StudioLivingInkDisplayUniformInput;
 }
 
 /**
@@ -82,6 +131,23 @@ export function writeStudioLivingInkFieldUniforms(
   data[19] = Math.min(1, Math.max(0, input.capillaryCreep));
   data[20] = STUDIO_LIVING_INK_FLUID_DEFAULTS.velocityClamp;
   data[21] = Math.min(1, Math.max(0, input.chromaticSeparation));
+  words[22] = input.display.displayWidth;
+  words[23] = input.display.displayHeight;
+  data[24] = input.display.densityStrength;
+  data[25] = input.display.paperFiber;
+  data[26] = input.display.paperTooth;
+  data[27] = input.display.granulation;
+  data[28] = input.display.edgeAmount;
+  data[29] = input.display.wetSheen;
+  data[30] = input.display.vignette;
+  data[31] = input.display.seed;
+  data[32] = input.display.displayMode;
+  data[33] = Math.min(1, Math.max(0, input.dryingEdgeDeposition));
+  data[34] = input.pigmentDiffusion[0];
+  data[35] = input.pigmentDiffusion[1];
+  data[36] = input.pigmentDiffusion[2];
+  data[37] = input.pigmentDiffusion[3];
+  data[38] = input.fixSelectionEnabled ? 1 : 0;
   return data;
 }
 
@@ -110,8 +176,24 @@ struct FieldUniforms {
   capillaryCreep: f32,
   velocityClamp: f32,
   chromaticSeparation: f32,
+  displayWidth: u32,
+  displayHeight: u32,
+  densityStrength: f32,
+  fiberAmount: f32,
+  toothAmount: f32,
+  granulationAmount: f32,
+  edgeAmount: f32,
+  wetSheenAmount: f32,
+  vignetteAmount: f32,
+  seed: f32,
+  displayMode: f32,
+  edgeDeposition: f32,
+  diffusionR: f32,
+  diffusionG: f32,
+  diffusionB: f32,
+  diffusionW: f32,
+  fixSelectionEnabled: f32,
   pad0: f32,
-  pad1: f32,
 }
 
 @group(0) @binding(0) var<uniform> u: FieldUniforms;
@@ -128,6 +210,56 @@ fn ink_right(x: u32, w: u32) -> u32 { return select(x + 1u, x, x + 1u >= w); }
  */
 function wgslFloat(value: number): string {
   return Number.isInteger(value) ? `${value}.0` : `${value}`;
+}
+
+/**
+ * WGSL reserved words that read like ordinary variable names, and are therefore the ones a shader
+ * author actually reaches for. (`struct Splat { from: vec2f, … }` is the one that got written.)
+ *
+ * This list exists because of how such a mistake fails. `createShaderModule` does not throw;
+ * `createComputePipeline` does not throw either — it returns a pipeline object that is merely
+ * *invalid*, so every dispatch using it is silently dropped. The runtime then computes nothing,
+ * the display resolve still paints paper, and the frame looks plausible. Downstream, the WebGPU
+ * factory's fallback stamps `backend: "webgpu-offscreen-half-float"` onto a WebGL2 runtime, so even
+ * the backend-identity gate reads as if WGSL ran. Two shipped shaders were dead this way and the
+ * whole visual gate agreed with itself.
+ *
+ * The full WGSL reserved list is much longer; this is the subset that collides with plausible
+ * identifiers in this file's vocabulary. Add to it rather than removing from it.
+ */
+export const STUDIO_LIVING_INK_WGSL_RESERVED_IDENTIFIERS: readonly string[] = Object.freeze([
+  "as", "auto", "await", "become", "cast", "catch", "class", "crate", "delete", "do", "enum",
+  "explicit", "export", "extern", "external", "filter", "final", "from", "get", "goto", "handle",
+  "impl", "implements", "import", "inline", "interface", "layout", "match", "meta", "mod", "module",
+  "move", "mut", "namespace", "new", "nil", "null", "of", "operator", "package", "partition", "pass",
+  "precise", "precision", "priv", "protected", "pub", "public", "readonly", "ref", "regardless",
+  "register", "require", "resource", "restrict", "self", "set", "shared", "sizeof", "smooth",
+  "static", "std", "super", "target", "template", "this", "throw", "trait", "try", "type", "typedef",
+  "typeof", "union", "unless", "unsafe", "use", "using", "varying", "virtual", "void", "where",
+  "while", "writeonly", "yield",
+]);
+
+/**
+ * Identifiers a WGSL source declares: `let`/`var`/`const` bindings, function names, function
+ * parameters and struct members. Deliberately a lexical scan rather than a parser — it only has to
+ * be good enough to catch a reserved word in a declaration position.
+ */
+export function listStudioLivingInkWgslDeclaredIdentifiers(source: string): readonly string[] {
+  const names = new Set<string>();
+  for (const match of source.matchAll(/\b(?:let|var|const)\s*(?:<[^>]*>)?\s*([A-Za-z_]\w*)/g)) {
+    names.add(match[1]!);
+  }
+  for (const match of source.matchAll(/\bfn\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/g)) {
+    names.add(match[1]!);
+    for (const parameter of match[2]!.split(",")) {
+      const name = /(?:^|\)\s*)\s*(?:@builtin\([^)]*\)\s*)?([A-Za-z_]\w*)\s*:/.exec(parameter.trim());
+      if (name) names.add(name[1]!);
+    }
+  }
+  for (const match of source.matchAll(/^\s{2,}([A-Za-z_]\w*)\s*:\s*[A-Za-z_]/gm)) {
+    names.add(match[1]!);
+  }
+  return Object.freeze([...names]);
 }
 
 /**
@@ -188,34 +320,91 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
+/**
+ * Capsule deposit, transcribed from `SPLAT_FRAGMENT` in `studio-living-ink-webgl2-runtime.ts`.
+ *
+ * The GLSL kernel measures distances in aspect-corrected uv, i.e. in units of `1 / fieldHeight`,
+ * which is exactly the cell space this compute pass works in — so the segment projection, the
+ * `mix(startRadius, radius, along)` taper, the `exp(-falloff * d²/r²)` profile and the
+ * max-versus-add blend port across one for one. A single dab is the degenerate case where `from`
+ * equals `to`; nothing here special-cases it, exactly as in GLSL.
+ */
 export const STUDIO_LIVING_INK_WGSL_SPLAT = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 struct Splat {
-  x: f32,
-  y: f32,
+  startPoint: vec2f,
+  endPoint: vec2f,
+  startRadius: f32,
   radius: f32,
-  amount: f32,
-  r: f32,
-  g: f32,
-  b: f32,
-  w: f32,
+  falloff: f32,
+  radialVector: f32,
+  startAmount: vec4f,
+  endAmount: vec4f,
+  maximumBlend: f32,
+  selectionEnabled: f32,
+  pad0: f32,
+  pad1: f32,
 }
 @group(0) @binding(1) var<storage, read_write> field: array<vec4f>;
 @group(0) @binding(2) var<uniform> splat: Splat;
+@group(0) @binding(3) var<storage, read> selection: array<vec4f>;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= u.width || gid.y >= u.height) { return; }
   let i = gid.y * u.width + gid.x;
-  let dx = f32(gid.x) + 0.5 - splat.x;
-  let dy = f32(gid.y) + 0.5 - splat.y;
-  let r2 = splat.radius * splat.radius;
-  let d2 = dx * dx + dy * dy;
-  if (d2 > r2 * 4.0) { return; }
-  let w = exp(-d2 / max(r2, 1e-4)) * splat.amount;
-  var p = field[i];
-  p = p + vec4f(splat.r, splat.g, splat.b, splat.w) * w;
-  field[i] = p;
+  let point = vec2f(f32(gid.x) + 0.5, f32(gid.y) + 0.5);
+  let segment = splat.endPoint - splat.startPoint;
+  let along = clamp(
+    dot(point - splat.startPoint, segment) / max(dot(segment, segment), 1e-9),
+    0.0,
+    1.0,
+  );
+  let delta = point - (splat.startPoint + segment * along);
+  let localRadius = mix(splat.startRadius, splat.radius, along);
+  let localAmount = mix(splat.startAmount, splat.endAmount, along);
+  let normalizedDistance = dot(delta, delta) / max(localRadius * localRadius, 1e-9);
+  // Falloff-aware cutoff: exp(-14) is below one part in a million of the peak, so the profile is
+  // indistinguishable from the un-truncated GLSL one at every falloff the runtime uses (0.9 … 3.25).
+  if (splat.falloff * normalizedDistance > 14.0) { return; }
+  let gaussian = exp(-splat.falloff * normalizedDistance);
+  let mask = mix(1.0, clamp(selection[i].x, 0.0, 1.0), splat.selectionEnabled);
+  let radialDirection = normalize(delta + vec2f(1e-7));
+  var deposited = localAmount * gaussian * mask;
+  if (splat.radialVector > 0.5) {
+    deposited = vec4f(radialDirection * localAmount.x, 0.0, 0.0) * gaussian * mask;
+  }
+  let source = field[i];
+  field[i] = select(source + deposited, max(source, deposited), splat.maximumBlend > 0.5);
+}
+`;
+
+/** Selection-masked clear: `source * (1 - coverage)`, the WGSL twin of `CLEAR_MASKED_FRAGMENT`. */
+export const STUDIO_LIVING_INK_WGSL_CLEAR_MASKED = /* wgsl */ `
+${STUDIO_LIVING_INK_WGSL_COMMON}
+@group(0) @binding(1) var<storage, read_write> field: array<vec4f>;
+@group(0) @binding(2) var<storage, read> selection: array<vec4f>;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= u.width || gid.y >= u.height) { return; }
+  let i = gid.y * u.width + gid.x;
+  let keep = 1.0 - clamp(selection[i].x, 0.0, 1.0);
+  field[i] = field[i] * keep;
+}
+`;
+
+/** Additive merge of the per-stroke capsule-union deposit into the mobile pigment well. */
+export const STUDIO_LIVING_INK_WGSL_MERGE_DEPOSIT = /* wgsl */ `
+${STUDIO_LIVING_INK_WGSL_COMMON}
+@group(0) @binding(1) var<storage, read_write> base: array<vec4f>;
+@group(0) @binding(2) var<storage, read> deposit: array<vec4f>;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= u.width || gid.y >= u.height) { return; }
+  let i = gid.y * u.width + gid.x;
+  base[i] = max(base[i], vec4f(0.0)) + max(deposit[i], vec4f(0.0));
 }
 `;
 
@@ -226,14 +415,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 export const STUDIO_LIVING_INK_WGSL_SPLAT_VELOCITY = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 struct Splat {
-  x: f32,
-  y: f32,
+  startPoint: vec2f,
+  endPoint: vec2f,
+  startRadius: f32,
   radius: f32,
-  amount: f32,
-  r: f32,
-  g: f32,
-  b: f32,
-  w: f32,
+  falloff: f32,
+  radialVector: f32,
+  startAmount: vec4f,
+  endAmount: vec4f,
+  maximumBlend: f32,
+  selectionEnabled: f32,
+  pad0: f32,
+  pad1: f32,
 }
 @group(0) @binding(1) var<storage, read_write> velocity: array<vec4f>;
 @group(0) @binding(2) var<uniform> splat: Splat;
@@ -242,18 +435,29 @@ struct Splat {
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= u.coarseWidth || gid.y >= u.coarseHeight) { return; }
   let i = gid.y * u.coarseWidth + gid.x;
-  let uv = vec2f(
-    (f32(gid.x) + 0.5) / f32(u.coarseWidth),
-    (f32(gid.y) + 0.5) / f32(u.coarseHeight),
+  // Impulse geometry is authored in fine cells so the caller never has to know the coarse scale.
+  let point = vec2f(
+    (f32(gid.x) + 0.5) / f32(u.coarseWidth) * f32(u.width),
+    (f32(gid.y) + 0.5) / f32(u.coarseHeight) * f32(u.height),
   );
-  let center = vec2f(splat.x / f32(u.width), splat.y / f32(u.height));
-  let radiusUv = max(splat.radius, 1.0) / f32(u.width);
-  let delta = uv - center;
-  let d2 = dot(delta, delta);
-  let r2 = radiusUv * radiusUv;
-  if (d2 > r2 * 4.0) { return; }
-  let w = exp(-d2 / max(r2, 1e-8)) * splat.amount;
-  let moved = velocity[i].xy + vec2f(splat.r, splat.g) * w;
+  let segment = splat.endPoint - splat.startPoint;
+  let along = clamp(
+    dot(point - splat.startPoint, segment) / max(dot(segment, segment), 1e-9),
+    0.0,
+    1.0,
+  );
+  let delta = point - (splat.startPoint + segment * along);
+  let localRadius = mix(splat.startRadius, splat.radius, along);
+  let localAmount = mix(splat.startAmount, splat.endAmount, along);
+  let normalizedDistance = dot(delta, delta) / max(localRadius * localRadius, 1e-9);
+  if (splat.falloff * normalizedDistance > 14.0) { return; }
+  let gaussian = exp(-splat.falloff * normalizedDistance);
+  let radialDirection = normalize(delta + vec2f(1e-7));
+  var impulse = localAmount.xy * gaussian;
+  if (splat.radialVector > 0.5) {
+    impulse = radialDirection * localAmount.x * gaussian;
+  }
+  let moved = velocity[i].xy + impulse;
   velocity[i] = vec4f(
     clamp(moved, vec2f(-u.velocityClamp), vec2f(u.velocityClamp)),
     0.0,
@@ -431,7 +635,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Surface water: advection by the wash, capillary creep front, and evaporation. */
+/**
+ * Surface water: advection by the wash, an anisotropic capillary creep front, and evaporation.
+ * Transcribed from `WET_FRAGMENT`.
+ *
+ * The creep stencil is deliberately *not* a four-neighbour Laplacian. Paper fibres run in a
+ * slowly-varying direction, so the front reaches further along the fibre than across it; an
+ * axis-aligned stencil instead produces the square/diamond spreading that reads as grid artefact
+ * rather than as paper, and it also under-expands the wash along the fibre axis.
+ */
 export const STUDIO_LIVING_INK_WGSL_WET = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 @group(0) @binding(1) var<storage, read> src: array<vec4f>;
@@ -453,20 +665,38 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     vec2f(1.0),
   );
   let center = sampleWet(origin).x;
-  let reach = texel * (1.0 + u.capillaryCreep * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.creepReachGain)});
-  let far = reach * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.creepFarReach)};
-  let neighborhood = 0.25 * (
-    sampleWet(origin + vec2f(reach.x, 0.0)).x
-    + sampleWet(origin - vec2f(reach.x, 0.0)).x
-    + sampleWet(origin + vec2f(0.0, reach.y)).x
-    + sampleWet(origin - vec2f(0.0, reach.y)).x
+  // Slowly varying paper fibres make capillary spread elongated but continuous. Sampling a fibre
+  // axis plus its perpendicular avoids grid diamonds and exposes real paper-direction response.
+  let fieldSize = vec2f(f32(u.width), f32(u.height));
+  let fibreCell = floor(uv * fieldSize / 28.0);
+  let fibreNoise = fract(sin(dot(fibreCell + vec2f(u.seed), vec2f(41.73, 97.11))) * 43758.5453);
+  let fibreAngle = (fibreNoise - 0.5) * 1.4 + 0.34;
+  let fibre = vec2f(cos(fibreAngle), sin(fibreAngle));
+  let perpendicular = vec2f(-fibre.y, fibre.x);
+  let parallelReach = fibre * texel * (1.0 + u.capillaryCreep * (3.0 + 3.0 * u.fiberAmount));
+  let perpendicularReach = perpendicular * texel * (1.0 + u.capillaryCreep * 1.6);
+  let farParallelReach = parallelReach * 1.4;
+  let farPerpendicularReach = perpendicularReach * 1.25;
+  let parallelWeight = 0.5 + u.fiberAmount * 0.22;
+  let perpendicularWeight = 1.0 - parallelWeight;
+  let neighborhood = parallelWeight * 0.5 * (
+    sampleWet(origin + parallelReach).x + sampleWet(origin - parallelReach).x
+  ) + perpendicularWeight * 0.5 * (
+    sampleWet(origin + perpendicularReach).x + sampleWet(origin - perpendicularReach).x
   );
-  let frontier = max(
-    max(sampleWet(origin + vec2f(far.x, 0.0)).x, sampleWet(origin - vec2f(far.x, 0.0)).x),
-    max(sampleWet(origin + vec2f(0.0, far.y)).x, sampleWet(origin - vec2f(0.0, far.y)).x),
+  // Porous paper advances a continuous capillary front. A bounded maximum-principle source grows
+  // the wet boundary without stamping circles or creating the square/diamond diffusion of a
+  // four-neighbour Laplacian.
+  let frontierSource = max(
+    max(sampleWet(origin + farParallelReach).x, sampleWet(origin - farParallelReach).x),
+    max(
+      sampleWet(origin + farPerpendicularReach).x,
+      sampleWet(origin - farPerpendicularReach).x,
+    ),
   );
-  let frontAdvance = max(0.0, frontier - center)
-    * u.capillaryCreep * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.frontAdvanceGain)};
+  let frontAdvance = max(0.0, frontierSource - center)
+    * u.capillaryCreep
+    * (${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.frontAdvanceGain)} + u.fiberAmount * 0.045);
   let blend = clamp(
     u.capillaryCreep * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.creepBlendGain)},
     0.0,
@@ -483,10 +713,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 `;
 
 /**
- * Semi-Lagrangian pigment transport with channel-asymmetric chromatography sampling. Mobility is a
- * smoothstep on wetness, so pigment on dry paper is frozen in place rather than slowly smeared.
+ * Pigment transport, transcribed from `PIGMENT_FRAGMENT`.
+ *
+ * One kernel, as in GLSL: semi-Lagrangian advection with channel-asymmetric chromatography
+ * sampling, axial+diagonal diffusion at TS-computed rates, drying-front edge pooling, saturated
+ * centre dilution, the Deegan compressibility correction, and a dt-scaled transport blend. Mobility
+ * is a smoothstep on wetness, so pigment on dry paper is frozen in place rather than slowly
+ * smeared.
+ *
+ * Splitting this into an "advect" pass plus a "diffuse" pass — which is what this file used to do —
+ * is not a refactor of the same physics: the transport blend at the end is a *rate*, and applying
+ * it twice per tick, once per half-kernel, moves a different amount of pigment than the certified
+ * runtime does.
  */
-export const STUDIO_LIVING_INK_WGSL_ADVECT_PIGMENT = /* wgsl */ `
+export const STUDIO_LIVING_INK_WGSL_PIGMENT = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 @group(0) @binding(1) var<storage, read> src: array<vec4f>;
 @group(0) @binding(2) var<storage, read_write> dst: array<vec4f>;
@@ -501,128 +741,419 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= u.width || gid.y >= u.height) { return; }
   let i = gid.y * u.width + gid.x;
   let current = src[i];
-  let mobility = smoothstep(u.pigmentWetGateMin, u.pigmentWetGateMax, wet[i].x);
-  if (mobility < 0.001) { dst[i] = current; return; }
   let texel = vec2f(1.0 / f32(u.width), 1.0 / f32(u.height));
   let uv = vec2f((f32(gid.x) + 0.5) * texel.x, (f32(gid.y) + 0.5) * texel.y);
+  let wetness = sampleWet(uv).x;
+  // Dry paper has zero mobility: the smoothstep gate is what stops a stroke from creeping after
+  // the water is gone. A raw clamp(wet) would keep bleeding at any residual moisture.
+  let mobility = smoothstep(u.pigmentWetGateMin, u.pigmentWetGateMax, wetness);
+  if (mobility < 0.001) { dst[i] = current; return; }
   let v = sampleVelocity(uv).xy;
-  let wetGradient = 0.5 * vec2f(
-    sampleWet(uv + vec2f(texel.x, 0.0)).x - sampleWet(uv - vec2f(texel.x, 0.0)).x,
-    sampleWet(uv + vec2f(0.0, texel.y)).x - sampleWet(uv - vec2f(0.0, texel.y)).x,
-  );
+  let wetLeft = sampleWet(uv - vec2f(texel.x, 0.0)).x;
+  let wetRight = sampleWet(uv + vec2f(texel.x, 0.0)).x;
+  let wetLower = sampleWet(uv - vec2f(0.0, texel.y)).x;
+  let wetUpper = sampleWet(uv + vec2f(0.0, texel.y)).x;
+  let wetGradient = 0.5 * vec2f(wetRight - wetLeft, wetUpper - wetLower);
   let towardWetCenter = normalize(wetGradient + vec2f(1e-6));
-  let capillaryBacktrace = towardWetCenter * texel
-    * (${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentCapillaryBase)}
-      + u.capillaryCreep * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentCapillaryGain)})
-    * mobility;
+  let capillaryReach = ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentCapillaryBase)}
+    + u.capillaryCreep * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentCapillaryGain)};
+  let capillaryBacktrace = towardWetCenter * texel * capillaryReach * mobility;
   let baseOrigin = clamp(
     uv - v * u.dt * mobility + capillaryBacktrace,
     vec2f(0.0),
     vec2f(1.0),
   );
-  let separation = normalize(v + wetGradient * 4.0 + vec2f(1e-5));
-  let chromaShift = separation * texel * u.chromaticSeparation * mobility * u.dt
+  // InkWash §06 chemistry: channel-asymmetric advection samples + TS-uploaded diffusion rates so
+  // wet edges chromatograph into a dark core with a cool halo rather than a monochrome blur.
+  let separation = clamp(u.chromaticSeparation, 0.0, 1.0);
+  let chroma = vec3f(u.chromaR, u.chromaG, u.chromaB);
+  let separationDirection = normalize(v + wetGradient * 4.0 + vec2f(1e-5));
+  let chromaShift = separationDirection * texel * separation * mobility * u.dt
     * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.chromaShiftScale)};
-  let red = samplePigment(clamp(baseOrigin - chromaShift * u.chromaR, vec2f(0.0), vec2f(1.0))).x;
+  let red = samplePigment(clamp(baseOrigin - chromaShift * chroma.x, vec2f(0.0), vec2f(1.0))).x;
   let green = samplePigment(clamp(
-    baseOrigin - chromaShift * u.chromaG * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.chromaGreenShiftScale)},
+    baseOrigin - chromaShift * chroma.y * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.chromaGreenShiftScale)},
     vec2f(0.0),
     vec2f(1.0),
   )).y;
   let blue = samplePigment(clamp(
-    baseOrigin + chromaShift * u.chromaB * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.chromaBlueShiftScale)},
+    baseOrigin + chromaShift * chroma.z * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.chromaBlueShiftScale)},
     vec2f(0.0),
     vec2f(1.0),
   )).z;
   let white = samplePigment(baseOrigin).w;
   let transported = vec4f(red, green, blue, white);
-  // A rate, not a replacement: replacing the whole cell each tick bleaches the water path.
+  let axialTexel = texel * (1.0 + u.bleed * 3.8);
+  let diagonalTexel = axialTexel * 0.70710678;
+  let axialNeighbors = 0.25 * (
+    samplePigment(baseOrigin + vec2f(axialTexel.x, 0.0))
+    + samplePigment(baseOrigin - vec2f(axialTexel.x, 0.0))
+    + samplePigment(baseOrigin + vec2f(0.0, axialTexel.y))
+    + samplePigment(baseOrigin - vec2f(0.0, axialTexel.y))
+  );
+  let diagonalNeighbors = 0.25 * (
+    samplePigment(baseOrigin + diagonalTexel)
+    + samplePigment(baseOrigin + vec2f(diagonalTexel.x, -diagonalTexel.y))
+    + samplePigment(baseOrigin + vec2f(-diagonalTexel.x, diagonalTexel.y))
+    + samplePigment(baseOrigin - diagonalTexel)
+  );
+  let neighbors = mix(axialNeighbors, diagonalNeighbors, 0.5);
+  // Rates are precomputed at mobility=1 by studioLivingInkPigmentDiffusionRates and scaled by local
+  // wet mobility here, so dry paper stays frozen. Both runtimes clear the brush footprint before
+  // the tick loop, so the scrub-tip rate never applies during simulation and only the quiet rate
+  // is uploaded.
+  let separatedDiffusion = clamp(
+    vec4f(u.diffusionR, u.diffusionG, u.diffusionB, u.diffusionW) * mobility,
+    vec4f(0.0),
+    vec4f(${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentChannelCeiling)}),
+  );
+  var evolved = mix(transported, neighbors, separatedDiffusion);
+  let wetGradientStrength = length(wetGradient);
+  let evaporationFront = smoothstep(0.004, 0.095, wetness)
+    * (1.0 - smoothstep(0.18, 0.62, wetness));
+  let edgePool = u.edgeDeposition * evaporationFront
+    * (1.0 + clamp(wetGradientStrength * 18.0, 0.0, 1.8));
+  evolved = vec4f(evolved.xyz * (1.0 + edgePool * u.dt * 2.4), evolved.w);
+  let saturatedWashCenter = smoothstep(0.26, 0.7, wetness);
+  evolved = vec4f(evolved.xyz * (1.0 - u.bleed * saturatedWashCenter * u.dt * 0.42), evolved.w);
+  // Deegan transport (the "coffee ring") — why a dwell mark must empty its own centre.
+  // capillaryBacktrace above already carries pigment down the wetness gradient: water leaving the
+  // puddle to replace what evaporates at the pinned front drags its suspended pigment outward.
+  // But pigment here is an *areal density*, and semi-Lagrangian advection transports a sampled
+  // value, which silently drops the compressibility term of the conservation law
+  //   dc/dt = -c * div(u).
+  // For a radial dwell flow div(u) > 0 everywhere inside the front (the same annulus of water
+  // spreads over a larger circumference), so omitting it is exactly what leaves the darkest
+  // pigment sitting dead centre and reads as an ink dot instead of a wash. The velocity solver
+  // cannot supply this term either: an evaporation-driven flux is divergent by construction —
+  // mass leaves the film as vapour, not sideways — and pressure projection deletes precisely that
+  // component. So it belongs here, on the pigment field.
+  //
+  // div(d) = A * div(n)      geometric spreading — the interior thins as the ring of water covers
+  //                          a longer circumference. This is the term that stops a dwell mark from
+  //                          reading as a dot.
+  //        + grad(A) . n     deceleration — transport weakens as the film thins toward the front,
+  //                          so pigment piles into the drying edge (the hard rim).
+  // The curvature bound is not cosmetic: the wet pass advances its front with a stencil several
+  // texels wide, so a front curvature tighter than roughly twice that reach is not represented in
+  // the wetness field at all — measuring it there returns paper grain, not surface shape.
+  let wetLaplacian = wetLeft + wetRight + wetLower + wetUpper - 4.0 * wetness;
+  let frontNormalStep = towardWetCenter * texel;
+  let wetSecondDerivativeAlongNormal =
+    sampleWet(clamp(uv + frontNormalStep, vec2f(0.0), vec2f(1.0))).x
+    + sampleWet(clamp(uv - frontNormalStep, vec2f(0.0), vec2f(1.0))).x
+    - 2.0 * wetness;
+  let resolvedFrontCurvature = 0.08;
+  let frontCurvature = clamp(
+    (wetLaplacian - wetSecondDerivativeAlongNormal) / max(wetGradientStrength, 1e-5),
+    -resolvedFrontCurvature,
+    resolvedFrontCurvature,
+  );
+  let mobilityRamp = clamp((wetness - 0.015) / 0.445, 0.0, 1.0);
+  let mobilitySlope = 6.0 * mobilityRamp * (1.0 - mobilityRamp) / 0.445;
+  let displacementDivergence = capillaryReach
+    * (mobility * frontCurvature + mobilitySlope * wetGradientStrength);
+  evolved = vec4f(evolved.xyz * clamp(1.0 + displacementDivergence, 0.8, 1.3), evolved.w);
+  // Advection is a rate over the fixed step. Replacing most of the pigment field every tick
+  // bleaches the water path and piles all colour at the two ends of a stroke.
   let transportBlend = clamp(
     mobility * u.dt * (${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentTransportBase)}
       + u.bleed * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentTransportBleedGain)}),
     0.0,
     ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentTransportCeiling)},
   );
-  dst[i] = mix(current, transported, transportBlend);
+  dst[i] = mix(current, evolved, transportBlend);
 }
 `;
 
-/** Pigment diffusion with chromatography channel rates, gated by wet mobility. */
-export const STUDIO_LIVING_INK_WGSL_PIGMENT = /* wgsl */ `
-${STUDIO_LIVING_INK_WGSL_COMMON}
-@group(0) @binding(1) var<storage, read> src: array<vec4f>;
-@group(0) @binding(2) var<storage, read_write> dst: array<vec4f>;
-@group(0) @binding(3) var<storage, read> wet: array<vec4f>;
-
-@compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  if (gid.x >= u.width || gid.y >= u.height) { return; }
-  let w = u.width;
-  let x = gid.x;
-  let y = gid.y;
-  let i = ink_index(x, y, w);
-  // Dry paper has zero mobility: the smoothstep gate is what stops a stroke from creeping after
-  // the water is gone. A raw clamp(wet) would keep bleeding at any residual moisture.
-  let mobility = smoothstep(u.pigmentWetGateMin, u.pigmentWetGateMax, wet[i].x);
-  let diff = min(
-    ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentDiffusionCeiling)},
-    u.bleed * mobility * u.dt * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentDiffusionDtScale)},
-  );
-  let ceiling = ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentChannelCeiling)};
-  let dr = min(ceiling, diff * u.chromaR);
-  let dg = min(ceiling, diff * u.chromaG);
-  let db = min(ceiling, diff * u.chromaB);
-  let xm = ink_left(x);
-  let xp = ink_right(x, w);
-  let ym = ink_left(y);
-  let yp = ink_right(y, u.height);
-  let c = src[i];
-  let n = (src[ink_index(xm, y, w)] + src[ink_index(xp, y, w)]
-    + src[ink_index(x, ym, w)] + src[ink_index(x, yp, w)]) * 0.25;
-  dst[i] = vec4f(
-    mix(c.x, n.x, dr),
-    mix(c.y, n.y, dg),
-    mix(c.z, n.z, db),
-    mix(c.w, n.w, min(ceiling, diff * ${wgslFloat(STUDIO_LIVING_INK_FLUID_DEFAULTS.pigmentWhiteChannelGain)})),
-  );
-}
-`;
-
-/** Fix: transfer mobile pigment into fixed well. */
+/**
+ * Fix: settle mobile pigment into the immutable fixed well. Transcribed from `EXCHANGE_FRAGMENT`.
+ *
+ * White gouache is not a fourth pigment channel in the fixed well — it is *bleaching*. The deposit
+ * converts the existing fixed density to transmittance, mixes it toward paper white by its
+ * Beer-Lambert coverage, and converts back; the fixed alpha then decays instead of accumulating.
+ * A naive `fixed += mobile * t` (which is what this kernel used to be) leaves the white as a
+ * permanent alpha in the fixed well, so the display's white-coverage term saturates and every
+ * subsequent dark stroke over that white is invisible — measured as a dark-over-white density gain
+ * of 0.02 where the certified runtime gains 113.6.
+ */
 export const STUDIO_LIVING_INK_WGSL_FIX = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 @group(0) @binding(1) var<storage, read_write> mobile: array<vec4f>;
-@group(0) @binding(2) var<storage, read_write> fixed: array<vec4f>;
-@group(0) @binding(3) var<storage, read_write> wet: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> fixedWell: array<vec4f>;
+@group(0) @binding(3) var<storage, read> selection: array<vec4f>;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= u.width || gid.y >= u.height) { return; }
   let i = gid.y * u.width + gid.x;
-  let m = mobile[i];
-  let t = clamp(u.fixTransfer, 0.0, 1.0);
-  fixed[i] = fixed[i] + m * t;
-  mobile[i] = m * (1.0 - t);
-  wet[i] = wet[i] * (1.0 - t * 0.85);
+  let m = max(mobile[i], vec4f(0.0));
+  let fixedPigment = max(fixedWell[i], vec4f(0.0));
+  let coverage = mix(1.0, clamp(selection[i].x, 0.0, 1.0), u.fixSelectionEnabled);
+  let accepted = clamp(u.fixTransfer * coverage, 0.0, 1.0);
+  let darkDeposit = m.xyz * accepted;
+  let whiteDeposit = m.w * accepted;
+  let previousTransmittance = exp(-fixedPigment.xyz);
+  let bleachCoverage = 1.0
+    - exp(-${wgslFloat(STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION)} * whiteDeposit);
+  let bleached = mix(previousTransmittance, vec3f(1.0), clamp(bleachCoverage, 0.0, 1.0));
+  let fixedDensity = -log(clamp(bleached, vec3f(1e-5), vec3f(1.0))) + darkDeposit;
+  fixedWell[i] = vec4f(fixedDensity, fixedPigment.w * (1.0 - accepted));
+  mobile[i] = m * (1.0 - accepted);
 }
 `;
 
-/** Beer–Lambert composite to rgba8unorm storage (as f32 then scaled). */
+/**
+ * Watercolour display resolve — the WGSL transcription of `DISPLAY_FRAGMENT` in
+ * `studio-living-ink-webgl2-runtime.ts`, statement for statement.
+ *
+ * This pass is the picture. Everything above it computes a field; this is where the field becomes
+ * paper with ink on it, and it is where the two backends most obviously must not diverge: a bare
+ * `exp(-density)` resolve produces a technically correct, visually dead image — pure white paper,
+ * ink an order of magnitude too faint, no granulation, no drying-front deposition, no capillary
+ * plume. So none of the numbers below are re-invented. Every constant, gate and kernel weight is
+ * lifted from the certified GLSL program, including the eight-tap rotated plume, the three
+ * deterministic capillary lobes, the drying-front edge concentration and the near-black floor's
+ * companion white-gouache extinction.
+ *
+ * It runs on the *display* grid, not the field grid, because the paper model is authored in display
+ * pixels (`pixel = uv * displayResolution`) while pigment and water are sampled through
+ * clamp-to-edge bilinear taps in field uv — the same split the fragment shader gets for free from
+ * `gl_FragCoord` plus `sampler2D`.
+ */
 export const STUDIO_LIVING_INK_WGSL_DISPLAY = /* wgsl */ `
 ${STUDIO_LIVING_INK_WGSL_COMMON}
 @group(0) @binding(1) var<storage, read> mobile: array<vec4f>;
-@group(0) @binding(2) var<storage, read> fixed: array<vec4f>;
+@group(0) @binding(2) var<storage, read> fixedWell: array<vec4f>;
 @group(0) @binding(3) var<storage, read_write> outRgba: array<vec4f>;
+@group(0) @binding(4) var<storage, read> wet: array<vec4f>;
+@group(0) @binding(5) var<storage, read> velocity: array<vec4f>;
+${bilinearSampler("sampleMobile", "mobile", "u.width", "u.height")}
+${bilinearSampler("sampleFixed", "fixedWell", "u.width", "u.height")}
+${bilinearSampler("sampleWet", "wet", "u.width", "u.height")}
+${bilinearSampler("sampleVelocity", "velocity", "u.coarseWidth", "u.coarseHeight")}
+
+fn randomCell(cell: vec2f) -> f32 {
+  return fract(sin(dot(cell + vec2f(u.seed), vec2f(91.17, 17.31))) * 43758.5453);
+}
+
+fn smoothNoise(p: vec2f) -> f32 {
+  let cell = floor(p);
+  var local = fract(p);
+  local = local * local * (3.0 - 2.0 * local);
+  let a = randomCell(cell);
+  let b = randomCell(cell + vec2f(1.0, 0.0));
+  let c = randomCell(cell + vec2f(0.0, 1.0));
+  let d = randomCell(cell + vec2f(1.0, 1.0));
+  return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+}
+
+fn layeredFiber(start: vec2f) -> f32 {
+  var result = 0.0;
+  var amplitude = 0.55;
+  var p = start;
+  for (var octave = 0; octave < 4; octave = octave + 1) {
+    result = result + amplitude * smoothNoise(p);
+    p = p * 2.03 + vec2f(11.7, 3.9);
+    amplitude = amplitude * 0.48;
+  }
+  return result;
+}
+
+fn mobilePigment(p: vec2f) -> vec4f {
+  if (u.displayMode > 1.5) { return vec4f(0.0); }
+  return max(sampleMobile(p), vec4f(0.0));
+}
+
+fn fixedPigmentAt(p: vec2f) -> vec4f {
+  if (u.displayMode > 0.5 && u.displayMode < 1.5) { return vec4f(0.0); }
+  return max(sampleFixed(p), vec4f(0.0));
+}
+
+fn clampUv(p: vec2f) -> vec2f {
+  return clamp(p, vec2f(0.0), vec2f(1.0));
+}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
-  if (gid.x >= u.width || gid.y >= u.height) { return; }
-  let i = gid.y * u.width + gid.x;
-  let od = (mobile[i] + fixed[i]) * u.beerDensity;
-  let reflectance = exp(-od.xyz);
-  let white = clamp(mobile[i].w + fixed[i].w, 0.0, 1.0);
-  let rgb = mix(reflectance, vec3f(1.0), white * 0.85);
-  outRgba[i] = vec4f(clamp(rgb, vec3f(0.0), vec3f(1.0)), 1.0);
+  if (gid.x >= u.displayWidth || gid.y >= u.displayHeight) { return; }
+  let i = gid.y * u.displayWidth + gid.x;
+  let uv = vec2f(
+    (f32(gid.x) + 0.5) / f32(u.displayWidth),
+    (f32(gid.y) + 0.5) / f32(u.displayHeight),
+  );
+  let fineTexel = vec2f(1.0 / f32(u.width), 1.0 / f32(u.height));
+  var wetness = max(0.0, sampleWet(uv).x);
+  if (u.displayMode > 3.5) {
+    let v = sampleVelocity(uv).xy;
+    outRgba[i] = vec4f(
+      clamp(vec3f(0.5 + v.x * 0.35, 0.5 + v.y * 0.35, length(v)), vec3f(0.0), vec3f(1.0)),
+      1.0,
+    );
+    return;
+  }
+  if (u.displayMode > 2.5) {
+    outRgba[i] = vec4f(vec3f(clamp(wetness, 0.0, 1.0)), 1.0);
+    return;
+  }
+  var mobileContribution = mobilePigment(uv);
+  let fixedContribution = fixedPigmentAt(uv);
+  var combined = fixedContribution + mobileContribution;
+  if (u.displayMode < 0.5 && wetness > 0.01) {
+    // Reconstruct the capillary plume from the authoritative mobile field at display time. The
+    // rotated eight-tap kernel follows the local paper direction, avoiding both square Gaussian
+    // blur and the circular dab joints of a stamp renderer.
+    let fieldPixel = uv / fineTexel;
+    let plumeAngle = (smoothNoise(fieldPixel * 0.021 + vec2f(23.0, 71.0)) - 0.5) * 1.7;
+    let axis = vec2f(cos(plumeAngle), sin(plumeAngle));
+    let crossAxis = vec2f(-axis.y, axis.x);
+    let plumeRadius = (4.0 + smoothstep(0.025, 0.7, wetness) * 27.0)
+      * mix(0.8, 1.2, smoothNoise(fieldPixel * 0.057 + vec2f(3.0, 47.0)));
+    var plumeWarp = vec2f(
+      smoothNoise(fieldPixel * 0.039 + vec2f(79.0, 13.0)) - 0.5,
+      smoothNoise(fieldPixel * 0.043 + vec2f(17.0, 101.0)) - 0.5,
+    ) * fineTexel * plumeRadius * 0.42;
+    // A real wet edge does not expand as a mirror-symmetric lens. Two low-frequency curls plus a
+    // bounded vertical paper drift place three deterministic, overlapping capillary lobes. The
+    // frequencies stay well below dab spacing, so this changes the wash silhouette without adding
+    // isolated dots, noisy scallops or frame-to-frame randomness.
+    let lobeWaveA = sin(fieldPixel.x * 0.071 + fieldPixel.y * 0.019 + u.seed * 0.017);
+    let lobeWaveB = sin(fieldPixel.x * 0.033 - fieldPixel.y * 0.027 + u.seed * 0.031 + 1.7);
+    // Negated against GLSL: the drift is the one *deliberate* direction in this kernel (a wash
+    // creeping down the page), and GLSL authors it in WebGL uv where +y points up. The surrounding
+    // noise terms are symmetric so their sign is immaterial, but this one is the picture.
+    let verticalDrift = -(0.14 + lobeWaveA * 0.17 + lobeWaveB * 0.09);
+    plumeWarp = plumeWarp + vec2f(
+      fineTexel.x * plumeRadius * lobeWaveB * 0.08,
+      fineTexel.y * plumeRadius * verticalDrift,
+    );
+    let plumeUv = clampUv(uv + plumeWarp);
+    let a = axis * fineTexel * plumeRadius;
+    let b = crossAxis * fineTexel * plumeRadius * 0.96;
+    let diagonalA = (a + b) * 0.70710678;
+    let diagonalB = (a - b) * 0.70710678;
+    let mobileCenter = mobileContribution;
+    let nearPlume = 0.125 * (
+      sampleMobile(clampUv(plumeUv + a * 0.48))
+      + sampleMobile(clampUv(plumeUv - a * 0.48))
+      + sampleMobile(clampUv(plumeUv + b * 0.48))
+      + sampleMobile(clampUv(plumeUv - b * 0.48))
+      + sampleMobile(clampUv(plumeUv + diagonalA * 0.58))
+      + sampleMobile(clampUv(plumeUv - diagonalA * 0.58))
+      + sampleMobile(clampUv(plumeUv + diagonalB * 0.58))
+      + sampleMobile(clampUv(plumeUv - diagonalB * 0.58))
+    );
+    let farPlume = 0.25 * (
+      sampleMobile(clampUv(plumeUv + a))
+      + sampleMobile(clampUv(plumeUv - a))
+      + sampleMobile(clampUv(plumeUv + b))
+      + sampleMobile(clampUv(plumeUv - b))
+    );
+    let lobeOffsetA = fineTexel * plumeRadius
+      * vec2f(0.34 + lobeWaveB * 0.08, -0.18 + lobeWaveA * 0.1);
+    let lobeOffsetB = fineTexel * plumeRadius
+      * vec2f(-0.23 + lobeWaveA * 0.07, 0.31 + lobeWaveB * 0.08);
+    let lobeOffsetC = fineTexel * plumeRadius
+      * vec2f(0.08 + lobeWaveB * 0.05, 0.48 + lobeWaveA * 0.06);
+    let lobePlume =
+      sampleMobile(clampUv(plumeUv + lobeOffsetA)) * 0.42
+      + sampleMobile(clampUv(plumeUv + lobeOffsetB)) * 0.34
+      + sampleMobile(clampUv(plumeUv + lobeOffsetC)) * 0.24;
+    // Smooth energy reconstruction removes the star/ridge faceting of a peak/max kernel. Paper
+    // granulation is applied afterwards, so texture remains organic without encoding tap geometry.
+    let lobeGain = 0.73 + lobeWaveA * 0.1 + lobeWaveB * 0.06;
+    var plume = max(
+      mobileCenter * 0.9,
+      nearPlume * 2.76 + farPlume * 1.02 + lobePlume * lobeGain,
+    );
+    // Preserve the physical channel separation after broad plume reconstruction. Two bounded
+    // channel-biased lobe probes keep the fringe spatial (rather than merely tinting the wash)
+    // without producing a synthetic rainbow edge.
+    let chromaCurl = normalize(axis * 0.82 + crossAxis * 0.57)
+      * fineTexel * plumeRadius * (0.15 + u.chromaticSeparation * 0.5);
+    let redLobe = sampleMobile(clampUv(plumeUv + lobeOffsetA + chromaCurl)).x;
+    let blueLobe = sampleMobile(clampUv(plumeUv + lobeOffsetB - chromaCurl)).z;
+    plume.x = plume.x + redLobe * u.chromaticSeparation * 1.05;
+    plume.z = plume.z + blueLobe * u.chromaticSeparation * 1.05;
+    let plumeGate = smoothstep(0.018, 0.58, wetness) * 0.9;
+    mobileContribution = mix(mobileCenter, plume, plumeGate);
+    let saturatedCenterDilution = smoothstep(0.3, 1.1, wetness) * 0.64;
+    mobileContribution = vec4f(
+      mobileContribution.xyz * (1.0 - saturatedCenterDilution),
+      mobileContribution.w,
+    );
+    // Water may continue changing the paper and mobile pigment after Fix, but it must never
+    // bleach the immutable fixed well. Compose fixed pigment only after every wet-dependent
+    // plume and dilution operation has finished.
+    combined = fixedContribution + mobileContribution;
+  }
+  if (u.displayMode > 0.5) { wetness = 0.0; }
+  let centerDensity = dot(combined.xyz, vec3f(0.333333));
+  let mobileCenterDensity = dot(mobileContribution.xyz, vec3f(0.333333));
+  let mobileLeft = dot(mobilePigment(uv - vec2f(fineTexel.x, 0.0)).xyz, vec3f(0.333333));
+  let mobileRight = dot(mobilePigment(uv + vec2f(fineTexel.x, 0.0)).xyz, vec3f(0.333333));
+  let mobileLower = dot(mobilePigment(uv - vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
+  let mobileUpper = dot(mobilePigment(uv + vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
+  let mobilePigmentEdge = length(vec2f(
+    mobileRight - mobileLeft,
+    mobileUpper - mobileLower,
+  ));
+  let fixedLeft = dot(fixedPigmentAt(uv - vec2f(fineTexel.x, 0.0)).xyz, vec3f(0.333333));
+  let fixedRight = dot(fixedPigmentAt(uv + vec2f(fineTexel.x, 0.0)).xyz, vec3f(0.333333));
+  let fixedLower = dot(fixedPigmentAt(uv - vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
+  let fixedUpper = dot(fixedPigmentAt(uv + vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
+  let fixedPigmentEdge = length(vec2f(fixedRight - fixedLeft, fixedUpper - fixedLower));
+  let pixel = uv * vec2f(f32(u.displayWidth), f32(u.displayHeight));
+  let fiber = layeredFiber(pixel * vec2f(0.035, 0.085));
+  let tooth = smoothNoise(pixel * 0.31 + vec2f(7.3, 19.1));
+  let grain = layeredFiber(pixel * 0.105 + vec2f(41.0, 13.0));
+  let coarseTooth = layeredFiber(pixel * vec2f(0.017, 0.026) + vec2f(5.7, 31.0));
+  let microTooth = randomCell(floor(pixel * 0.92));
+  var paper = vec3f(0.965, 0.956, 0.932);
+  // Two-scale directional paper is visible on an empty page and therefore measurable instead of
+  // being a pigment-only cosmetic effect. The amplitudes stay below one display code value when
+  // users turn both material controls down to zero.
+  paper = paper - vec3f((fiber - 0.5) * 0.12 * u.fiberAmount);
+  paper = paper - vec3f((tooth - 0.5) * 0.085 * u.toothAmount);
+  paper = paper - vec3f((coarseTooth - 0.5) * 0.05 * (0.35 + u.fiberAmount * 0.65));
+  paper = paper - vec3f((microTooth - 0.5) * 0.05 * u.toothAmount);
+  var fixedOpticalDensity = fixedContribution.xyz * u.densityStrength;
+  var mobileOpticalDensity = mobileContribution.xyz * u.densityStrength;
+  let granulationGate = smoothstep(0.005, 0.24, centerDensity)
+    * (1.0 - smoothstep(0.38, 1.15, centerDensity) * 0.74);
+  let sediment = (grain - 0.5) * 2.0 + (tooth - 0.5) * 0.7;
+  let granulationMultiplier = 1.0
+    + sediment * u.granulationAmount * 2.15 * granulationGate;
+  fixedOpticalDensity = fixedOpticalDensity * granulationMultiplier;
+  mobileOpticalDensity = mobileOpticalDensity * granulationMultiplier;
+  let wetGradient = length(vec2f(
+    sampleWet(clampUv(uv + vec2f(fineTexel.x, 0.0))).x
+      - sampleWet(clampUv(uv - vec2f(fineTexel.x, 0.0))).x,
+    sampleWet(clampUv(uv + vec2f(0.0, fineTexel.y))).x
+      - sampleWet(clampUv(uv - vec2f(0.0, fineTexel.y))).x,
+  ));
+  let dryingFront = smoothstep(0.006, 0.12, wetness)
+    * (1.0 - smoothstep(0.2, 0.62, wetness));
+  // The dry baseline remains part of both media wells. Drying-front concentration is mobile-only:
+  // clear water can move or settle unfixed pigment but cannot change already fixed optical density.
+  fixedOpticalDensity = fixedOpticalDensity * (1.0 + fixedPigmentEdge * u.edgeAmount * 0.65);
+  mobileOpticalDensity = mobileOpticalDensity * (1.0
+    + mobilePigmentEdge * u.edgeAmount * (0.65 + dryingFront * 4.2)
+    + dryingFront * mobileCenterDensity * u.edgeAmount * (0.9 + wetGradient * 7.0));
+  let opticalDensity = fixedOpticalDensity + mobileOpticalDensity;
+  var color = paper * exp(-opticalDensity);
+  let mobileWhiteCoverage = 1.0 - exp(-combined.w * ${wgslFloat(STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION)});
+  let gouache = vec3f(0.986, 0.982, 0.968);
+  color = mix(color, gouache, clamp(mobileWhiteCoverage, 0.0, 1.0));
+  let wetGate = smoothstep(0.015, 0.62, wetness);
+  // Clear water itself is subtle. Strong colour comes from transported pigment, preventing the
+  // opaque blue/grey bar that appears when a wetness mask is mistaken for paint.
+  color = color * (1.0 - wetGate * vec3f(0.018, 0.016, 0.012));
+  color = color + vec3f(0.035, 0.042, 0.052) * u.wetSheenAmount
+    * wetGate * clamp(wetGradient * 6.0, 0.0, 1.0);
+  let centered = uv - vec2f(0.5);
+  color = color * (1.0 - dot(centered, centered) * u.vignetteAmount);
+  outRgba[i] = vec4f(clamp(color, vec3f(0.0), vec3f(1.0)), 1.0);
 }
 `;
 
@@ -633,7 +1164,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 export const STUDIO_LIVING_INK_WGSL_PASS_ORDER = Object.freeze([
   "clear",
   "clear-coarse",
+  "clear-masked",
   "splat",
+  "merge-deposit",
   "splat-velocity",
   "advect-velocity",
   "curl",
@@ -642,7 +1175,6 @@ export const STUDIO_LIVING_INK_WGSL_PASS_ORDER = Object.freeze([
   "jacobi",
   "gradient",
   "wet",
-  "advect-pigment",
   "pigment",
   "fix",
   "display",
@@ -676,7 +1208,9 @@ export type StudioLivingInkWgslPassId =
 const WGSL_PASS_SOURCES: Readonly<Record<StudioLivingInkWgslPassId, string>> = Object.freeze({
   clear: STUDIO_LIVING_INK_WGSL_CLEAR,
   "clear-coarse": STUDIO_LIVING_INK_WGSL_CLEAR_COARSE,
+  "clear-masked": STUDIO_LIVING_INK_WGSL_CLEAR_MASKED,
   splat: STUDIO_LIVING_INK_WGSL_SPLAT,
+  "merge-deposit": STUDIO_LIVING_INK_WGSL_MERGE_DEPOSIT,
   "splat-velocity": STUDIO_LIVING_INK_WGSL_SPLAT_VELOCITY,
   "advect-velocity": STUDIO_LIVING_INK_WGSL_ADVECT_VELOCITY,
   curl: STUDIO_LIVING_INK_WGSL_CURL,
@@ -685,7 +1219,6 @@ const WGSL_PASS_SOURCES: Readonly<Record<StudioLivingInkWgslPassId, string>> = O
   jacobi: STUDIO_LIVING_INK_WGSL_JACOBI,
   gradient: STUDIO_LIVING_INK_WGSL_GRADIENT,
   wet: STUDIO_LIVING_INK_WGSL_WET,
-  "advect-pigment": STUDIO_LIVING_INK_WGSL_ADVECT_PIGMENT,
   pigment: STUDIO_LIVING_INK_WGSL_PIGMENT,
   fix: STUDIO_LIVING_INK_WGSL_FIX,
   display: STUDIO_LIVING_INK_WGSL_DISPLAY,
@@ -701,11 +1234,24 @@ export function studioLivingInkWgslPassIsCoarse(pass: StudioLivingInkWgslPassId)
   return (STUDIO_LIVING_INK_WGSL_COARSE_PASSES as readonly string[]).includes(pass);
 }
 
+export type StudioLivingInkWgslPassGrid = "fine" | "coarse" | "display";
+
+/**
+ * Dispatch grid for a pass. The display resolve is the one kernel that is neither: it is authored
+ * in display pixels because the paper model is, while it samples pigment and water in field uv.
+ */
+export function studioLivingInkWgslPassGrid(
+  pass: StudioLivingInkWgslPassId,
+): StudioLivingInkWgslPassGrid {
+  if (pass === "display") return "display";
+  return studioLivingInkWgslPassIsCoarse(pass) ? "coarse" : "fine";
+}
+
 export function listStudioLivingInkWgslPassSources(): ReadonlyArray<{
   readonly id: StudioLivingInkWgslPassId;
   readonly source: string;
   readonly entryPoint: "main";
-  readonly grid: "fine" | "coarse";
+  readonly grid: StudioLivingInkWgslPassGrid;
 }> {
   return Object.freeze(
     STUDIO_LIVING_INK_WGSL_PASS_ORDER.map((id) =>
@@ -713,7 +1259,7 @@ export function listStudioLivingInkWgslPassSources(): ReadonlyArray<{
         id,
         source: studioLivingInkWgslSourceForPass(id),
         entryPoint: "main" as const,
-        grid: studioLivingInkWgslPassIsCoarse(id) ? ("coarse" as const) : ("fine" as const),
+        grid: studioLivingInkWgslPassGrid(id),
       }),
     ),
   );

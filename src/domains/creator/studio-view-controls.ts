@@ -114,6 +114,18 @@ export interface StudioViewStageLayoutInput {
   canvasRotation?: number;
 }
 
+export interface StudioCanvasStageLayoutInput extends StudioViewStageLayoutInput {
+  /**
+   * Lay the Stage out as the document itself rather than as the artist's screen.
+   *
+   * Set while saving, exporting or capturing a timelapse frame. Every view-only decision has to be
+   * off in that mode, because those paths read Stage pixels as the document: a quarter turn or a
+   * horizontal flip would be baked into the output, and any Stage box smaller than
+   * `document × scale` would silently crop it.
+   */
+  captureDocumentView: boolean;
+}
+
 /** Props needed to lay a transformed document out inside an axis-aligned Konva Stage. */
 export interface StudioViewStageLayout {
   width: number;
@@ -646,6 +658,31 @@ export function planStudioViewStageLayout(
     scaleX: input.canvasFlipH ? -scale : scale,
     scaleY: scale,
   };
+}
+
+/**
+ * The single decision point for "what box is the Konva Stage right now".
+ *
+ * Both consumers go through here so they cannot drift apart:
+ * - the live editor canvas (`StudioCanvasViewport`), which passes the artist's view state, and
+ * - the capture choke points (`studio-stage-document-view.ts`, and the `suppressViewTransform`
+ *   render that `captureReadyStageForPage()` waits for), which pass `captureDocumentView: true`.
+ *
+ * Keeping the branch here — rather than at each call site — means a future change to Stage geometry
+ * (for example clipping the Stage to the visible viewport so zoom stops reallocating a document-sized
+ * backing store) is written once and is automatically excluded from every capture path.
+ * `studio-stage-document-raster-contract.test.ts` drives this function directly for that reason.
+ */
+export function planStudioCanvasStageLayout(
+  input: StudioCanvasStageLayoutInput
+): StudioViewStageLayout {
+  return planStudioViewStageLayout({
+    documentWidth: input.documentWidth,
+    documentHeight: input.documentHeight,
+    scale: input.scale,
+    canvasFlipH: input.captureDocumentView ? false : input.canvasFlipH,
+    canvasRotation: input.captureDocumentView ? 0 : input.canvasRotation,
+  });
 }
 
 function eventCode(event: StudioViewShortcutEvent): string {

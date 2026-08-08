@@ -67,56 +67,41 @@ const BACKEND_LANES = Object.freeze([
  * Recorded parity gap for the non-blocking WGSL lane, as a ratchet rather than an exemption.
  * Nothing here relaxes a threshold: the WGSL runtime is measured against exactly the same gates as
  * GLSL, and the run fails if the observed gap differs from this list in either direction — a new
- * regression, or a gate that started passing and was not removed from the record. Shrink this list
- * as the WGSL runtime reaches parity; it must reach empty before WebGPU can be made blocking.
+ * regression, or a gate that started passing and was not removed from the record.
  *
- * The first measured run recorded nineteen entries with a single cause, and it was not the one the
- * first reading of the code suggested. The WGSL runtime allocated its display buffer with
- * `MAP_READ | STORAGE | COPY_SRC | COPY_DST`; WebGPU only permits `MAP_READ` beside `COPY_DST`, so
- * the buffer was invalid from allocation, the `display` pass's bind group was rejected, and the
- * Beer-Lambert resolve never ran. Every readback was zeros — which is why the receipt agreed with
- * the screen and no hash-based check ever objected: both sides were hashing the same blank.
+ * **It is empty. The WGSL field runtime passes every gate the GLSL runtime passes.**
  *
- * That is fixed. The resolve runs, the runtime presents the pixels it hashes, and a blank readback
- * now fails closed instead of reaching a canvas. Nine gates were repaired outright and the line
- * lands at the same bounds as GLSL (x 20, y 71, w 214), which is what confirms geometry and
- * orientation are shared.
+ * Keeping the mechanism (and this note) after reaching parity is the point: an empty list means any
+ * WGSL regression now fails the run outright, and the history below is what a reader needs to
+ * recognise the two failure shapes this lane has already produced once.
  *
- * What remains below is no longer one bug. Two entries are gates that a blank frame used to
- * satisfy vacuously (identical blank pixels trivially "did not change"), and the rest are genuine
- * content differences between the two shaders: the WGSL display resolve is a bare `exp(-density)`
- * with no paper fibre, granulation, edge deposition, near-black floor or wash calibration, so the
- * page reads as pure white (paper stddev 0, clear darkness 0) and the ink is far too faint
- * (darkness 0.67 against 22.8). Closing those belongs to the WGSL field/display kernels in
- * `studio-living-ink-wgsl-shaders.ts`, not to presentation.
+ * The first measured run recorded nineteen entries with a single cause: the WGSL display buffer was
+ * allocated with `MAP_READ | STORAGE | …`, which WebGPU forbids, so the buffer was invalid from
+ * allocation, the `display` pass's bind group was rejected, and the Beer-Lambert resolve never ran.
+ * Every readback was zeros — which is why the receipt agreed with the screen and no hash-based
+ * check objected: both sides were hashing the same blank.
  *
- * One entry is not a runtime defect at all: the crash-recovery gate asserts
- * `recoveredCapabilities.backend === "webgl2-offscreen-half-float"`, which the WebGPU lane cannot
- * satisfy by construction. The recovery itself is demonstrably working on this lane — the epoch is
- * rejected immediately, a second Worker instance is created, and it renders a real post-crash
- * frame. It stays recorded because relaxing a gate is not this file's job; repairing that
- * assertion belongs to the harness.
+ * Fixing that left fifteen, and they were not one bug either. Two were gates a blank frame had
+ * satisfied vacuously; twelve were real content differences, because the WGSL display resolve was a
+ * bare `exp(-density)` with no paper fibre, granulation, edge deposition, near-black floor or wash
+ * calibration, and the field kernels had lost the anisotropic capillary stencil, the Deegan
+ * compressibility term and the white-gouache bleaching exchange; one was a harness assertion that
+ * hard-coded the WebGL2 backend and so could never be satisfied on this lane.
+ *
+ * Those are all closed. Two lessons are worth carrying, because both defects were *invisible* to a
+ * green-looking run:
+ *
+ * 1. A WGSL reserved word in a declaration (`from: vec2f`) does not throw. `createComputePipeline`
+ *    returns an invalid pipeline and every dispatch against it is silently dropped, so the runtime
+ *    computes nothing while still presenting a plausible frame.
+ * 2. When the WGSL runtime is refused, the WebGPU factory falls back to a WebGL2 runtime and stamps
+ *    the WebGPU backend name onto its capabilities. For one measured run this lane therefore ran
+ *    GLSL end to end while reporting itself as the WGSL lane, and its "near-parity" numbers were
+ *    GLSL's own. The harness now takes backend identity from the receipt of an operation that
+ *    actually ran; `src/domains/creator/studio-living-ink-wgsl-shaders.test.ts` guards the first.
  */
-const WEBGPU_RECORDED_PARITY_GAP = Object.freeze([
-  // Vacuously satisfied while every frame was blank; now measuring real pigment.
-  "fixed pigment changed under water scrub/advance",
-  "fixed pigment changed by at least one RGB code value under water",
-  "near-black reflectance floor is not deterministic",
-  "white gouache does not converge to paper reflectance in the isolated coverage gate",
-  // WGSL display/pigment kernels lack the paper, granulation and density model GLSL carries.
-  "ink line is blank or truncated",
-  "non-symmetric partial-alpha selection clear is not ordered correctly",
-  "white-fix-dark transmittance layering did not darken in order",
-  "watercolour bloom expansion 0 is below oracle-relative 32.5",
-  "watercolour wash difference 1.8933946488294315 is below oracle 54.59905716318946",
-  "paper texture stddev 0 is below oracle 3.5975805982535674",
-  "watercolour granulation is below the reviewed visible-texture floor",
-  "watercolour edge deposition is flat or clipped into an artificial hard rim",
-  "isolated wash did not settle into two to four smooth capillary lobes",
-  "isolated wash is mirror-symmetric or has collapsed into unbounded random drift",
-  // Harness assertion hard-codes the WebGL2 backend; see the note above.
-  "actual Chromium Worker crash did not reject the epoch and recover on a fresh Worker",
-]);
+const WEBGPU_RECORDED_PARITY_GAP = Object.freeze([]);
+
 
 function freePort() {
   return new Promise((resolve, reject) => {

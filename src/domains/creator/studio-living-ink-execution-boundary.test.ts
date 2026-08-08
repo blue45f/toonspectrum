@@ -150,8 +150,18 @@ describe("Living Ink actual execution boundary", () => {
     expect(verifier).toContain("WEBGPU_RECORDED_PARITY_GAP");
     expect(verifier).toContain("regressedGates");
     expect(verifier).toContain("repairedGates");
-    // Backend identity has to come from the Worker's own capability record, not a literal.
-    expect(browserGate).toContain('capabilities.backend === "webgpu-offscreen-half-float"');
+    /*
+     * Backend identity has to come from the receipt of an operation that actually ran, not from a
+     * literal and not from the capability record.
+     *
+     * The capability record is not a witness here: when the WGSL runtime is refused, the WebGPU
+     * factory falls back to a WebGL2 runtime and stamps `webgpu-offscreen-half-float` onto its
+     * capabilities. Reading identity from that stamp let the WGSL lane run GLSL end to end while
+     * reporting itself as the WGSL lane — two kernels had failed to compile, and an invalid
+     * pipeline drops its dispatches silently, so the lane's "near-parity" numbers were GLSL's own.
+     */
+    expect(browserGate).toContain("lineReceiptBackend = lineFrame.receipt.backend");
+    expect(browserGate).toContain('lineReceiptBackend === "webgpu-offscreen-half-float"');
     expect(browserGate).toContain("await bloomProvider.initialize()");
     expect(verifier).not.toContain('backend !== "real-chromium-dedicated-worker-offscreen-webgl2');
   });

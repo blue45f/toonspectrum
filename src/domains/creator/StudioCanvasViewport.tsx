@@ -63,7 +63,7 @@ import { normalizeShapeParams } from "./studio-stroke-shapes";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import { planStudioViewStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
+import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
 import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
 import { type StudioWorkAssetRenderPlaceholder } from "./studio-work-asset-render-projection";
 import { StudioBrushCursor } from "./StudioBrushCursor";
@@ -1452,12 +1452,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   // 보기 변환은 문서 데이터가 아니다. 저장·내보내기·타임랩스 캡처 프레임에서는
   // Stage를 정규 좌표계로 되돌려 회전/반전이 결과 픽셀에 굽히지 않게 한다.
   const suppressViewTransform = isExporting || saving || timelapseCapturing;
-  const stageViewLayout = planStudioViewStageLayout({
+  const stageViewLayout = planStudioCanvasStageLayout({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
     scale: effScale,
-    canvasFlipH: suppressViewTransform ? false : canvasFlipH,
-    canvasRotation: suppressViewTransform ? 0 : canvasRotation,
+    canvasFlipH,
+    canvasRotation,
+    captureDocumentView: suppressViewTransform,
   });
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
   const canvasCursorInput = {

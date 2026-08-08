@@ -1283,6 +1283,7 @@ import {
 } from "./studio-smart-guides";
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
+import { readStudioStageInDocumentView } from "./studio-stage-document-view";
 import {
   acquireStudioStagePointerFrameMapperCache,
   shouldSynchronizeStudioStagePointerPosition,
@@ -15032,6 +15033,20 @@ function StudioCuttoonEditor() {
       masterEditMode,
     };
   }, [activePage.id, activePage.elements, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
+  // 스테이지를 문서 전체로 되돌릴 때 필요한 기하. 동반 창(navigator) 캡처처럼 의존성 없는
+  // useCallback 안에서 캡처하는 경로가 현재 문서 크기·표시 배율을 읽어야 하므로 ref 로 보관한다.
+  const stageDocumentGeometryRef = useRef({
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    effectiveScale: effScale,
+  });
+  useEffect(() => {
+    stageDocumentGeometryRef.current = {
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      effectiveScale: effScale,
+    };
+  }, [canvasH, effScale]);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
   // 배율은 플랫폼 규격(폭 690·800·1440…)에 맞추면 소수가 될 수 있어 number로 둔다.
   const [exportScale, setExportScale] = useState<number>(2);
@@ -15407,11 +15422,16 @@ function StudioCuttoonEditor() {
       isNavigatorCaptureBlocked: () => Boolean(
         drawingRef.current || drawingPointerTransportRef.current?.getSession()
       ),
+      // 동반 창 내비게이터는 "문서 전체 축소판"이다 — 화면 거울이 아니다. 다른 캡처 경로와 같은
+      // 초크 포인트를 지나 문서 전체 스테이지에서 읽는다(보기 전용 회전·반전도 함께 정규화된다).
       captureNavigatorCanvas: (maximumLongestEdge) => {
         const stage = stageRef.current;
         if (!stage) return null;
-        const longestEdge = Math.max(1, stage.width(), stage.height());
-        return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+        const geometry = stageDocumentGeometryRef.current;
+        return readStudioStageInDocumentView(stage, geometry, () => {
+          const longestEdge = Math.max(1, stage.width(), stage.height());
+          return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+        });
       },
       getReferenceProjection: (surfaceGeneration) => {
         const ready = companionReferenceCaptureRuntimeRef.current?.getProjection(surfaceGeneration);
@@ -20498,34 +20518,16 @@ const puppetWarpArmed =
   }
 
   /**
-   * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않는다. Konva Stage의 루트 변환을 동기적으로
-   * 문서 좌표계로 되돌려 읽은 뒤, 사용자가 보고 있던 정확한 레이아웃을 즉시 복원한다.
+   * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않고, 스테이지 래스터는 언제나 **문서 전체**다.
+   * 두 불변식과 복원 기하는 `studio-stage-document-view.ts` 가 단독으로 소유한다 — 여기서는
+   * 현재 문서 크기·표시 배율만 넘긴다.
    */
   function readStageInDocumentView<T>(stage: Konva.Stage, read: () => T): T {
-    const previous = {
-      width: stage.width(),
-      height: stage.height(),
-      x: stage.x(),
-      y: stage.y(),
-      rotation: stage.rotation(),
-      scaleX: stage.scaleX(),
-      scaleY: stage.scaleY(),
-    };
-
-    try {
-      stage.size({ width: CANVAS_W * effScale, height: canvasH * effScale });
-      stage.position({ x: 0, y: 0 });
-      stage.rotation(0);
-      stage.scale({ x: effScale, y: effScale });
-      stage.draw();
-      return read();
-    } finally {
-      stage.size({ width: previous.width, height: previous.height });
-      stage.position({ x: previous.x, y: previous.y });
-      stage.rotation(previous.rotation);
-      stage.scale({ x: previous.scaleX, y: previous.scaleY });
-      stage.draw();
-    }
+    return readStudioStageInDocumentView(
+      stage,
+      { documentWidth: CANVAS_W, documentHeight: canvasH, effectiveScale: effScale },
+      read
+    );
   }
   // 브랜드 킷 — 제목/본문 글꼴을 현재 선택된 텍스트/말풍선 요소에 적용.
   // selected가 없거나 text/bubble이 아니면 아무 것도 하지 않는다(패널의 canApplyFont로 사전 방지되지만 방어적으로 재확인).
