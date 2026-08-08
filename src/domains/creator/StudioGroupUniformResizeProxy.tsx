@@ -260,16 +260,48 @@ export function StudioGroupUniformResizeProxy({
     if (!proxy || !mirrorDragElementId || !validBounds) return;
     const stage = proxy.getStage();
     if (!stage) return;
-    return mirrorStudioDrawElementTranslation(stage, mirrorDragElementId, (offset) => {
+    // Only ever restore what this effect hid, so a genuine `visible={false}` from props survives.
+    let parkedHere = false;
+    const detach = mirrorStudioDrawElementTranslation(stage, mirrorDragElementId, (offset) => {
       if (activeSessionRef.current) return;
       const x = bounds.x + offset.x;
       const y = bounds.y + offset.y;
       if (proxy.x() === x && proxy.y() === y) return;
       // No forceUpdate: moving the proxy fires `absoluteTransformChange`, which the Transformer
-      // already listens to and answers by rebuilding its anchors. Calling it again here doubled
-      // that rebuild on every axis event, and the anchors are the expensive part of the frame.
+      // already listens to and answers by rebuilding its anchors.
       proxy.position({ x, y });
+
+      // Park the handle frame for the duration of the move. Re-rastering nine anchors, the rotate
+      // handle and the dashed border on every drag frame doubled the layer's draw time (measured
+      // ~80ms -> ~157ms per drawScene), and a resize handle is not actionable mid-drag anyway.
+      // The stroke's own dashed selection indicator keeps the "selected" affordance, and it is a
+      // single unfilled Rect. Toggled imperatively so parking costs no React commit.
+      const dragging = offset.x !== 0 || offset.y !== 0;
+      const transformer = transformerRef.current;
+      if (!transformer) return;
+      if (dragging && transformer.visible()) {
+        transformer.visible(false);
+        parkedHere = true;
+        transformer.getLayer()?.batchDraw();
+      } else if (!dragging && parkedHere) {
+        transformer.visible(true);
+        parkedHere = false;
+        transformer.getLayer()?.batchDraw();
+      }
     });
+    // Captured for cleanup: by teardown the ref may already point at a different Transformer, and
+    // only the instance this effect actually hid should be restored.
+    const parkedTransformer = transformerRef.current;
+    return () => {
+      detach();
+      // Unparking must not depend on a later React render: `visible` is driven by a prop whose
+      // value did not change while we hid the node, so the reconciler would never re-set it and
+      // the handles would stay invisible for the rest of the selection.
+      if (parkedHere && parkedTransformer) {
+        parkedTransformer.visible(true);
+        parkedTransformer.getLayer()?.batchDraw();
+      }
+    };
   }, [mirrorDragElementId, bounds.x, bounds.y, validBounds]);
 
   const minimumSize = MINIMUM_VISUAL_SIZE_PX / scale;
@@ -327,12 +359,10 @@ export function StudioGroupUniformResizeProxy({
         borderDash={[2 / scale, 3 / scale]}
         anchorStyleFunc={(anchor) => {
           anchor.hitStrokeWidth(anchorHitSize);
-          // No drop shadow. A blurred shadow is one of the most expensive things canvas 2D can
-          // draw, and these anchors are re-rastered on every frame of a drag: measured at roughly
-          // 15ms per shadowed anchor per layer draw, which is what pushed a stroke drag from
-          // ~160ms to ~250ms per pointer move once the free-transform handle set grew to nine.
-          // The persimmon stroke on a near-white fill already separates them from any artwork.
-          anchor.shadowEnabled(false);
+          anchor.shadowColor("#111827");
+          anchor.shadowBlur(4 / scale);
+          anchor.shadowOpacity(0.32);
+          anchor.shadowOffsetY(1 / scale);
         }}
         boundBoxFunc={(oldBox, newBox) =>
           !Number.isFinite(newBox.x) ||

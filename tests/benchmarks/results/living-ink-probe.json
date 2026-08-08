@@ -7,46 +7,38 @@
     "reason": "the WGSL field runtime does not yet match the GLSL runtime on these gates",
     "unresolvedGates": [
       "actual Chromium Worker crash did not reject the epoch and recover on a fresh Worker",
-      "chromatic separation is absent or exaggerated into a rainbow fringe",
-      "clear did not return to paper",
-      "continuous capsule exposes periodic dab seams, gaps, or start/end bulbs",
+      "fixed pigment changed by at least one RGB code value under water",
+      "fixed pigment changed under water scrub/advance",
       "ink line is blank or truncated",
-      "isolated wash collapsed into a square or strongly biased ellipse",
       "isolated wash did not settle into two to four smooth capillary lobes",
-      "isolated wash has a spoke, facet, folded wedge or discontinuous radial edge",
       "isolated wash is mirror-symmetric or has collapsed into unbounded random drift",
+      "near-black reflectance floor is not deterministic",
       "non-symmetric partial-alpha selection clear is not ordered correctly",
       "paper texture stddev 0 is below oracle 3.5975805982535674",
-      "self-intersection erases pigment or accumulates an unbounded dark knot",
-      "water did not evolve a visible retained bloom",
       "watercolour bloom expansion 0 is below oracle-relative 32.5",
       "watercolour edge deposition is flat or clipped into an artificial hard rim",
       "watercolour granulation is below the reviewed visible-texture floor",
-      "watercolour line wash has a detached center lump or loses continuity at its shoulders",
-      "watercolour wash difference 0 is below oracle 54.59905716318946",
+      "watercolour wash difference 1.8933946488294315 is below oracle 54.59905716318946",
+      "white gouache does not converge to paper reflectance in the isolated coverage gate",
       "white-fix-dark transmittance layering did not darken in order"
     ],
     "regressedGates": [],
     "repairedGates": [],
     "recordedGap": [
       "actual Chromium Worker crash did not reject the epoch and recover on a fresh Worker",
-      "chromatic separation is absent or exaggerated into a rainbow fringe",
-      "clear did not return to paper",
-      "continuous capsule exposes periodic dab seams, gaps, or start/end bulbs",
+      "fixed pigment changed by at least one RGB code value under water",
+      "fixed pigment changed under water scrub/advance",
       "ink line is blank or truncated",
-      "isolated wash collapsed into a square or strongly biased ellipse",
       "isolated wash did not settle into two to four smooth capillary lobes",
-      "isolated wash has a spoke, facet, folded wedge or discontinuous radial edge",
       "isolated wash is mirror-symmetric or has collapsed into unbounded random drift",
+      "near-black reflectance floor is not deterministic",
       "non-symmetric partial-alpha selection clear is not ordered correctly",
       "paper texture stddev 0 is below oracle 3.5975805982535674",
-      "self-intersection erases pigment or accumulates an unbounded dark knot",
-      "water did not evolve a visible retained bloom",
       "watercolour bloom expansion 0 is below oracle-relative 32.5",
       "watercolour edge deposition is flat or clipped into an artificial hard rim",
       "watercolour granulation is below the reviewed visible-texture floor",
-      "watercolour line wash has a detached center lump or loses continuity at its shoulders",
-      "watercolour wash difference 0 is below oracle 54.59905716318946",
+      "watercolour wash difference 1.8933946488294315 is below oracle 54.59905716318946",
+      "white gouache does not converge to paper reflectance in the isolated coverage gate",
       "white-fix-dark transmittance layering did not darken in order"
     ]
   },
@@ -180,22 +172,6 @@
         "reinitialized": true,
         "postCrashFrameHash": "sha256:662332e83f50d708ef92d7872ed5ade470338c2266add33afb55c89ae73b8153"
       },
-      "performance": {
-        "interactiveElapsed": [
-          10.600000023841858,
-          11.600000023841858,
-          11.600000023841858,
-          25.30000001192093,
-          12.199999988079071,
-          14.199999988079071,
-          13.5,
-          15.199999988079071
-        ],
-        "maximumInteractiveWorkerMilliseconds": 25.30000001192093,
-        "averageInteractiveWorkerMilliseconds": 14.275000005960464,
-        "maximumMainThreadDelayMilliseconds": 1.300000011920929,
-        "coarseBase": 128
-      },
       "failures": []
     },
     "webgpu": {
@@ -228,18 +204,18 @@
         "--use-angle=metal"
       ],
       "lineBounds": {
-        "x": 0,
-        "y": 0,
-        "width": 0,
-        "height": 0
+        "x": 20,
+        "y": 71,
+        "width": 214,
+        "height": 18
       },
       "bloomBounds": {
-        "x": 0,
-        "y": 0,
-        "width": 0,
-        "height": 0
+        "x": 20,
+        "y": 71,
+        "width": 214,
+        "height": 18
       },
-      "fixedInvariant": true,
+      "fixedInvariant": false,
       "cancelRollback": true,
       "deterministicReplay": true,
       "deferredPresentation": {
@@ -249,121 +225,101 @@
         "ackImageBitmapCount": 0,
         "explicitPresentationFrames": 1,
         "presentEveryOperationFrames": 81,
-        "baselineHash": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
-        "deferredHash": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
+        "baselineHash": "sha256:87ea2d6f715aa88974fd1843ad6b3314643d5cb3199cdaf2f409b74407cc4216",
+        "deferredHash": "sha256:87ea2d6f715aa88974fd1843ad6b3314643d5cb3199cdaf2f409b74407cc4216",
         "endpointExact": true,
         "finalRevision": 81
       },
       "visualQuality": {
-        "sumiLocalContrast": 0,
-        "sumiPeakDensityOverPaper": 0,
-        "pigmentRegionStandardDeviation": 0,
-        "fiberGranulationResidual": 0,
-        "bloomEdgeConcentration": 0,
+        "sumiLocalContrast": 2.6955204216073865,
+        "sumiPeakDensityOverPaper": 16.666666666666657,
+        "pigmentRegionStandardDeviation": 5.384320846959479,
+        "fiberGranulationResidual": 0.03679629629629668,
+        "bloomEdgeConcentration": 5.096084169453725,
         "lineWashHeightExpansion": 0,
         "isolatedBloomRadialShape": {
-          "meanRadius": 0,
-          "coefficientOfVariation": 0,
-          "maximumAdjacentJumpRatio": 0,
-          "normalizedHighFrequencyEdgeCurvature": 0,
-          "angularCoverage": 0,
-          "dominantLobeCount": 0
+          "meanRadius": 9.347222222222221,
+          "coefficientOfVariation": 0.062176748745639436,
+          "maximumAdjacentJumpRatio": 0.10698365527488857,
+          "normalizedHighFrequencyEdgeCurvature": 0.053491827637444284,
+          "angularCoverage": 1,
+          "dominantLobeCount": 1
         },
         "isolatedBloomAsymmetry": {
-          "leftRightMirrorResidual": 0,
-          "topBottomMirrorResidual": 0,
-          "centroidOffsetX": -128,
-          "centroidOffsetY": -80
+          "leftRightMirrorResidual": 0.16820083682008438,
+          "topBottomMirrorResidual": 0.1682008368200844,
+          "centroidOffsetX": -0.5000000000000142,
+          "centroidOffsetY": -0.5000000000000284
         },
         "isolatedBloomBounds": {
-          "x": 0,
-          "y": 0,
-          "width": 0,
-          "height": 0
+          "x": 118,
+          "y": 70,
+          "width": 20,
+          "height": 20
         },
-        "isolatedBloomGranulationResidual": 0,
-        "isolatedBloomRimMinusCenterDarkness": 0,
-        "isolatedBloomAspectRatio": 0,
-        "centralWashBandToMaximumRatio": 0,
-        "minimumWashBandToMaximumRatio": 0,
+        "isolatedBloomGranulationResidual": 0.028571428571428543,
+        "isolatedBloomRimMinusCenterDarkness": -8.00714053878611,
+        "isolatedBloomAspectRatio": 1,
+        "centralWashBandToMaximumRatio": 0.4938271604938268,
+        "minimumWashBandToMaximumRatio": 0.4932098765432092,
         "washBandDarkness": [
-          0,
-          0,
-          0,
-          0,
-          0
+          0.4941358024691357,
+          0.4956790123456784,
+          0.4938271604938268,
+          0.4932098765432092,
+          0.4962962962962959
         ],
         "continuousCapsule": {
-          "normalizedHighFrequencyResidual": 0,
-          "maximumAdjacentJumpRatio": 0,
-          "startEndToInteriorRatio": 0,
-          "minimumToMedianRatio": 0
+          "normalizedHighFrequencyResidual": 0.0008607198748044142,
+          "maximumAdjacentJumpRatio": 0.11111111111111427,
+          "startEndToInteriorRatio": 0.9673202614379082,
+          "minimumToMedianRatio": 1
         },
-        "selfIntersectionLuminanceRatio": 0,
-        "redBlueCentroidSeparationPixels": 0,
+        "selfIntersectionLuminanceRatio": 1.259259259259257,
+        "redBlueCentroidSeparationPixels": 0.5313476914597612,
         "paperLuminanceStandardDeviation": 0,
-        "wetSheenAndBloomDifference": 0,
-        "whiteCoverageLightening": 0,
-        "whiteCenterLuminance": 0,
-        "whiteCenterLuminanceDeltaFromPaper": 0,
-        "darkOverWhiteDensityGain": 0
+        "wetSheenAndBloomDifference": 1.8933946488294315,
+        "whiteCoverageLightening": -26.88151041666667,
+        "whiteCenterLuminance": 225.31770833333331,
+        "whiteCenterLuminanceDeltaFromPaper": 29.682291666666686,
+        "darkOverWhiteDensityGain": -7.248697916666675
       },
       "persistedJournalReload": {
         "serialization": "json-operation-journal-fresh-worker-runtime",
         "operationCount": 6,
-        "whiteHashBeforeReload": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
-        "whiteHashAfterReload": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
+        "whiteHashBeforeReload": "sha256:6d8fdf15a4697d247d99ec576f600547dda0207d588743acb729f42a32910528",
+        "whiteHashAfterReload": "sha256:6d8fdf15a4697d247d99ec576f600547dda0207d588743acb729f42a32910528",
         "whiteExact": true,
-        "darkOverWhiteHashBeforeReload": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
-        "darkOverWhiteHashAfterReload": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
+        "darkOverWhiteHashBeforeReload": "sha256:7c6f03e8d909d39cde669ca922b316b04a61c5a1e73a9a6502b29a51c9806bae",
+        "darkOverWhiteHashAfterReload": "sha256:7c6f03e8d909d39cde669ca922b316b04a61c5a1e73a9a6502b29a51c9806bae",
         "darkOverWhiteExact": true
       },
       "nearBlackReflectanceParity": {
-        "belowFloorHash": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
-        "atFloorHash": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502",
-        "exact": true
+        "belowFloorHash": "sha256:5dad02d63e021354983d52a9f5536367f32834a5e9b066fc0c0b4a216da85e21",
+        "atFloorHash": "sha256:e2b418782a37a551348e7a75b5e3c6e3739f3eb88aea4959203bd9f4716f8893",
+        "exact": false
       },
       "workerCrashRecovery": {
         "rejectedImmediately": true,
         "workerInstances": 2,
         "reinitialized": false,
-        "postCrashFrameHash": "sha256:c1ac72654dbbcb1ddec29cb9264376c7c4442fd0ed8882c5440a28445ad62502"
-      },
-      "performance": {
-        "interactiveElapsed": [
-          7.099999964237213,
-          7.099999964237213,
-          6.899999976158142,
-          6.899999976158142,
-          6.899999976158142,
-          6.899999976158142,
-          6.800000011920929,
-          6.700000047683716
-        ],
-        "maximumInteractiveWorkerMilliseconds": 7.099999964237213,
-        "averageInteractiveWorkerMilliseconds": 6.912499986588955,
-        "maximumMainThreadDelayMilliseconds": 1.600000023841858,
-        "coarseBase": 128
+        "postCrashFrameHash": "sha256:109c626b24557160035ba73404e6104b2adb6e47708bb5cc65b0a75588e5b093"
       },
       "failures": [
         "ink line is blank or truncated",
-        "water did not evolve a visible retained bloom",
+        "fixed pigment changed under water scrub/advance",
         "non-symmetric partial-alpha selection clear is not ordered correctly",
-        "clear did not return to paper",
         "white-fix-dark transmittance layering did not darken in order",
         "watercolour bloom expansion 0 is below oracle-relative 32.5",
-        "watercolour wash difference 0 is below oracle 54.59905716318946",
+        "watercolour wash difference 1.8933946488294315 is below oracle 54.59905716318946",
         "paper texture stddev 0 is below oracle 3.5975805982535674",
         "watercolour granulation is below the reviewed visible-texture floor",
         "watercolour edge deposition is flat or clipped into an artificial hard rim",
-        "isolated wash has a spoke, facet, folded wedge or discontinuous radial edge",
         "isolated wash did not settle into two to four smooth capillary lobes",
         "isolated wash is mirror-symmetric or has collapsed into unbounded random drift",
-        "isolated wash collapsed into a square or strongly biased ellipse",
-        "watercolour line wash has a detached center lump or loses continuity at its shoulders",
-        "chromatic separation is absent or exaggerated into a rainbow fringe",
-        "continuous capsule exposes periodic dab seams, gaps, or start/end bulbs",
-        "self-intersection erases pigment or accumulates an unbounded dark knot",
+        "white gouache does not converge to paper reflectance in the isolated coverage gate",
+        "near-black reflectance floor is not deterministic",
+        "fixed pigment changed by at least one RGB code value under water",
         "actual Chromium Worker crash did not reject the epoch and recover on a fresh Worker"
       ]
     }

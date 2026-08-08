@@ -280,6 +280,7 @@ import {
 } from "./studio-canvas-cursor";
 import { resolveStudioCanvasGestureDisposition } from "./studio-canvas-gesture-arbitration";
 import {
+  recordStudioHotPathRender,
   recordStudioRenderProfile,
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
@@ -439,6 +440,7 @@ import {
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import { isCompleteStudioDrawOp } from "./studio-draw-completion";
+import { planStudioDrawObjectTransform } from "./studio-draw-object-transform";
 import { planStudioDrawPointerRelease } from "./studio-draw-pointer-release-plan";
 import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
@@ -1167,6 +1169,15 @@ import {
 } from "./studio-retouch-raster-gesture";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
+  STUDIO_SCROLL_VIEWPORT_ORIGIN,
+  STUDIO_SCROLL_VIEWPORT_SETTLE_MS,
+  createStudioScrollViewportStore,
+  planStudioScrollViewportCommit,
+  studioScrollViewportsEqual,
+  type StudioScrollViewport,
+  type StudioScrollViewportStore,
+} from "./studio-scroll-viewport-store";
+import {
   clampCanvasPlacementCenter,
   computeAlignDeltas,
   computeDistributeDeltas,
@@ -1485,6 +1496,7 @@ import {
   type StudioPageListPaneHandlers,
 } from "./StudioPageListPane";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
+import { StudioScrollViewportSubscriber } from "./StudioScrollViewportSubscriber";
 import {
   StudioToolBeltContent,
   type FxPickerSection,
@@ -6630,11 +6642,29 @@ function StudioCuttoonEditor() {
     elId: string | null;
   }>({ visible: false, x: 0, y: 0, elId: null });
 
-  // 미니맵 스크롤 정보 상태
-  const [scrollPos, setScrollPos] = useState({ left: 0, top: 0, width: 0, height: 0, scrollWidth: 0, scrollHeight: 0 });
+  // 미니맵 스크롤 정보 상태. 여기 있는 값은 **정착된** 뷰포트다 — 팬/스크롤 프레임마다
+  // 갱신되는 살아 있는 좌표는 아래 scrollViewportStore 가 들고 있고, 프레임 정확도가 필요한
+  // 구독자(룰러 바·미니맵 뷰포트 박스)만 그 스토어를 본다. 줌 제스처가 틱마다 setZoom 을
+  // 부르지 않는 것과 같은 계약이다(핫패스 탈React).
+  const [scrollPos, setScrollPos] = useState<StudioScrollViewport>(STUDIO_SCROLL_VIEWPORT_ORIGIN);
+  const scrollPosRef = useRef(scrollPos);
+  scrollPosRef.current = scrollPos;
+  const scrollViewportStoreRef = useRef<StudioScrollViewportStore | null>(null);
+  scrollViewportStoreRef.current ??= createStudioScrollViewportStore();
+  const scrollViewportStore = scrollViewportStoreRef.current;
+  /** React 에 아직 반영되지 않은 살아 있는 스크롤 좌표(정착 커밋 대기). */
+  const pendingScrollCommitRef = useRef<StudioScrollViewport | null>(null);
+  const scrollCommitSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushScrollViewportCommitRef = useRef<() => void>(() => {});
   const scrollRafRef = useRef<number | null>(null);
   const updateScrollPosRef = useRef<() => void>(() => {});
   const revokeStudioRasterHandoffRef = useRef<() => void>(() => {});
+  // 핫패스 탈React 계약의 런타임 계측점. 의존성 배열이 없으므로 이 컴포넌트가 실제로
+  // 다시 렌더된 커밋에서만 실행된다(bail-out 은 세지 않는다). 하네스가 싱크를 미리
+  // 심어두지 않았다면 프로퍼티 조회 1회로 끝난다.
+  useEffect(() => {
+    recordStudioHotPathRender("studio:editor");
+  });
 
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
@@ -6913,7 +6943,8 @@ function StudioCuttoonEditor() {
     endLiveResourceEdit();
   }
   function commitCanvasSelectionResize(
-    targetBounds: StudioGroupUniformResizeBounds
+    targetBounds: StudioGroupUniformResizeBounds,
+    rotationDeg = 0
   ) {
     const session = groupResizeRef.current;
     groupResizeRef.current = null;
@@ -6934,6 +6965,7 @@ function StudioCuttoonEditor() {
       );
       if (
         !finitePositiveGroupResizeBounds(targetBounds) ||
+        !Number.isFinite(rotationDeg) ||
         !selectionStillMatches ||
         !sourceStillMatches ||
         currentPageIdRef.current !== session.pageId ||
@@ -6947,14 +6979,41 @@ function StudioCuttoonEditor() {
         return;
       }
 
-      const next = planStudioGroupUniformResize({
-        items: currentElements,
-        selectedIds: session.selectedIds,
-        sourceBounds: session.sourceBounds,
-        targetBounds,
-        isLocked: (element) =>
-          isEffectivelyLocked(element, activeGroupsRef.current),
-      });
+      // A single stroke is one point array, so it can absorb rotation and independent width/height
+      // exactly; the group planner stays authoritative for every mixed/multi selection, where a
+      // general affine is not a safe default. Both bake into `points` and hand the result to the
+      // one document commit below, so undo/redo and CRDT publication are identical either way.
+      const soleSelection =
+        session.selectedIds.length === 1
+          ? currentById.get(session.selectedIds[0]!)
+          : undefined;
+      const soleSelectedDraw =
+        soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
+          ? soleSelection
+          : undefined;
+      const next =
+        soleSelectedDraw?.type === "draw"
+          ? (() => {
+              const transformed = planStudioDrawObjectTransform({
+                el: soleSelectedDraw,
+                sourceBounds: session.sourceBounds,
+                targetBounds,
+                rotationDeg,
+              });
+              return transformed
+                ? currentElements.map((element) =>
+                    element.id === transformed.id ? transformed : element
+                  )
+                : [...currentElements];
+            })()
+          : planStudioGroupUniformResize({
+              items: currentElements,
+              selectedIds: session.selectedIds,
+              sourceBounds: session.sourceBounds,
+              targetBounds,
+              isLocked: (element) =>
+                isEffectivelyLocked(element, activeGroupsRef.current),
+            });
       const nextById = new Map(next.map((element) => [element.id, element]));
       const changed = session.selectedIds.some(
         (id) => nextById.get(id) !== currentById.get(id)
@@ -9433,15 +9492,33 @@ function StudioCuttoonEditor() {
     };
   }, [isSpacePressed, editing]);
 
-  // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶고 동일값이면 렌더를 생략한다.
+  // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶는다.
+  //
+  // 좌표는 항상 살아 있는 스토어로 먼저 나가고(React 작업 0), React 상태 커밋은
+  // planStudioScrollViewportCommit 이 정한다: 스크롤 오프셋만 바뀐 프레임(=팬 핫패스)은
+  // 정착 타이머로 미루고, 뷰포트 박스(리사이즈·패널 토글·줌 재배치)가 바뀌면 즉시 커밋한다.
+  // 프레임 정확도가 필요한 UI는 전부 스토어를 구독하므로 미루는 동안에도 화면은 동일하다.
   useEffect(() => {
+    const commitScrollViewport = (next: StudioScrollViewport) => {
+      pendingScrollCommitRef.current = null;
+      if (scrollCommitSettleTimerRef.current !== null) {
+        globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+        scrollCommitSettleTimerRef.current = null;
+      }
+      setScrollPos((prev) => (studioScrollViewportsEqual(prev, next) ? prev : next));
+    };
+    flushScrollViewportCommitRef.current = () => {
+      const pending = pendingScrollCommitRef.current;
+      if (!pending) return;
+      commitScrollViewport(pending);
+    };
     updateScrollPosRef.current = () => {
       if (scrollRafRef.current !== null) return;
       scrollRafRef.current = globalThis.requestAnimationFrame(() => {
         scrollRafRef.current = null;
         const wrap = wrapRef.current;
         if (!wrap) return;
-        const next = {
+        const next: StudioScrollViewport = {
           left: wrap.scrollLeft,
           top: wrap.scrollTop,
           width: wrap.clientWidth,
@@ -9449,19 +9526,33 @@ function StudioCuttoonEditor() {
           scrollWidth: wrap.scrollWidth,
           scrollHeight: wrap.scrollHeight,
         };
-        setScrollPos((prev) =>
-          prev.left === next.left &&
-          prev.top === next.top &&
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.scrollWidth === next.scrollWidth &&
-          prev.scrollHeight === next.scrollHeight
-            ? prev
-            : next
+        scrollViewportStore.publish(next);
+        const mode = planStudioScrollViewportCommit(scrollPosRef.current, next);
+        if (mode === "none") {
+          pendingScrollCommitRef.current = null;
+          return;
+        }
+        if (mode === "immediate") {
+          commitScrollViewport(next);
+          return;
+        }
+        pendingScrollCommitRef.current = next;
+        if (scrollCommitSettleTimerRef.current !== null) {
+          globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+        }
+        scrollCommitSettleTimerRef.current = globalThis.setTimeout(
+          () => flushScrollViewportCommitRef.current(),
+          STUDIO_SCROLL_VIEWPORT_SETTLE_MS
         );
       });
     };
   });
+  useEffect(() => () => {
+    if (scrollCommitSettleTimerRef.current !== null) {
+      globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+      scrollCommitSettleTimerRef.current = null;
+    }
+  }, []);
   const updateScrollPos = () => updateScrollPosRef.current();
 
   useLayoutEffect(() => {
@@ -9488,6 +9579,12 @@ function StudioCuttoonEditor() {
       revokeStudioRasterHandoffRef.current();
       updateScrollPosRef.current();
     };
+    // Anything that starts touching the canvas (draw, select, pan) must see a
+    // settled viewport: the GPU/live-ink overlay surfaces are positioned from
+    // the React snapshot, so a scroll that is still inside its settle window is
+    // landed here before the gesture reads it.
+    const onPointerDownCapture = () => flushScrollViewportCommitRef.current();
+    wrap.addEventListener("pointerdown", onPointerDownCapture, { capture: true });
     wrap.addEventListener("scroll", onScroll, { passive: true });
     globalThis.addEventListener("resize", onResize);
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -9496,6 +9593,7 @@ function StudioCuttoonEditor() {
     resizeObserver?.observe(wrap);
     const timer = globalThis.setTimeout(onResize, 150);
     return () => {
+      wrap.removeEventListener("pointerdown", onPointerDownCapture, { capture: true });
       wrap.removeEventListener("scroll", onScroll);
       globalThis.removeEventListener("resize", onResize);
       resizeObserver?.disconnect();
@@ -10090,6 +10188,9 @@ function StudioCuttoonEditor() {
 
   const onWrapMouseUp = () => {
     setIsPanning(false);
+    // The drag is over: land the deferred viewport snapshot in the same commit
+    // instead of waiting out the settle timer.
+    flushScrollViewportCommitRef.current();
   };
 
   const onMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -15169,13 +15270,18 @@ function StudioCuttoonEditor() {
   };
 
   const disarmAllPixelToolsRef = useRef<() => void>(() => undefined);
+  // 컴패니언 명령 핸들러는 빈 deps 이펙트에 갇혀 있어 렌더마다 새로 만들어지는 전이 함수를
+  // 직접 캡처하면 stale closure가 된다. 로컬 레일·툴벨트와 같은 정본 전이를 ref로 흘린다.
+  const activatePrimaryCanvasToolRef = useRef<
+    (tool: "select" | "draw", drawMode?: DrawMode) => void
+  >(() => undefined);
   const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
     companionCommandHandlerRef.current = (command) => {
       const toolExecution = executeStudioCompanionToolCommand(command, {
-        disarmAllPixelTools: disarmAllPixelToolsRef.current,
-        setTool,
-        setDrawMode,
+        activatePrimaryCanvasTool: (tool, drawMode) => {
+          activatePrimaryCanvasToolRef.current(tool, drawMode);
+        },
       });
       if (toolExecution.handled) return;
       switch (command) {
@@ -23115,7 +23221,9 @@ const puppetWarpArmed =
       activateDrawToolWithProperties("eraser");
       setMobileSheet(null);
     } else if (action === "eyedropper") {
-      setEyedropperActive(true);
+      // 키보드(I)·툴레일과 같은 토글 계약. Quick Deck/라디얼만 "항상 켜기"였던 탓에
+      // 같은 명령이 진입점마다 다르게 동작했다. 위 disarm이 이미 이전 소유자를 해제한다.
+      setEyedropperActive(!eyedropperActive);
       setMobileSheet(null);
     } else if (action === "properties") {
       openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
@@ -23524,6 +23632,26 @@ const puppetWarpArmed =
         ) {
           e.preventDefault();
           dismissActiveMobileSheet();
+        }
+        return;
+      }
+      // 파일 메뉴(`임시저장`)와 Quick Access deck이 ⌘S를 광고하므로 실제 핸들러를 여기에 둔다.
+      // 광고만 되고 바인딩이 없으면 브라우저 "페이지 저장" 대화상자가 대신 뜬다.
+      // 제목·대사 입력 중에도 저장은 동작해야 하므로 편집 게이트보다 앞에 배치한다.
+      if (
+        (e.metaKey || e.ctrlKey)
+        && !e.altKey
+        && !e.shiftKey
+        && e.code === "KeyS"
+        && !e.repeat
+      ) {
+        e.preventDefault();
+        if (collaborationDocumentLocked) {
+          announceDrawingShortcut(collaborationLockMessage());
+        } else if (saving) {
+          announceDrawingShortcut("이미 저장 중이에요");
+        } else {
+          void handleSave("draft");
         }
         return;
       }
@@ -28685,6 +28813,7 @@ const puppetWarpArmed =
       }
     );
   }
+  activatePrimaryCanvasToolRef.current = activatePrimaryCanvasTool;
   /** CSP/PPT: surface properties after a draw tool pick (rail, shortcuts, companion). */
   function activateDrawToolWithProperties(nextDrawMode?: DrawMode) {
     if (showQuickStart) dismissQuickStart();
@@ -38614,6 +38743,7 @@ function clearSelectionForEdit() {
   });
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
+    activatePrimaryCanvasTool,
     fitCanvasToWidth,
     openFrameAnimationForSelected,
     openPixelSelectionTransform,
@@ -38653,6 +38783,7 @@ function clearSelectionForEdit() {
   });
 
   const studioToolBeltContentHandlers = useStudioStableHandlers<StudioToolBeltContentHandlers>({
+    activatePrimaryCanvasTool,
     openFrameAnimationForSelected,
     addBgScene,
     addBubble,
@@ -38757,6 +38888,17 @@ function clearSelectionForEdit() {
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
+    // 검수·미리보기 7종: 툴벨트가 전 뷰포트에서 display:none이라 프로젝트 시트가 정본 진입점이다.
+    toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
+    openTimelapse: () => setTimelapseOpen(true),
+    openStoryboardGrid: () => setStoryboardGridOpen(true),
+    openScrollPreview: () => setScrollPreviewOpen(true),
+    openContinuityCheck: () => setContinuityOpen(true),
+    toggleDocumentComments: () => {
+      setTeamPanelOpen(false);
+      setCommentsOpen((open) => !open);
+    },
+    openPageReview: () => setPageReviewOpen(true),
   });
 
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
@@ -40140,10 +40282,13 @@ function clearSelectionForEdit() {
           isMobile={isMobile}
           liveWorkspaceLayout={liveWorkspaceLayout}
           loadedWork={loadedWork}
+          masterEditMode={masterEditMode}
           menu={menu}
           mobileImmersive={mobileImmersive}
           historyPanelOpen={historyPanelOpen}
+          openStudioCommentCount={openStudioCommentCount}
           pageCount={studioMenubarPageLabels.length}
+          pageEditLocked={pageEditLocked}
           pageLabels={studioMenubarPageLabels}
           dialoguePages={pages}
           projectActionsOpen={projectActionsOpen}
@@ -40699,7 +40844,6 @@ function clearSelectionForEdit() {
           selectedImageMutationLocked={selectedImageMutationLocked}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
-          setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
           setEyedropperActive={setEyedropperActive}
           setMenu={setMenu}
@@ -40739,23 +40883,30 @@ function clearSelectionForEdit() {
           >
           {showRulers && !canvasOnlyMode ? (
             <Suspense fallback={null}>
-              <StudioCanvasRulerBars
-                visible
-                scale={effScale}
-                scrollLeft={scrollPos.left}
-                scrollTop={scrollPos.top}
-                canvasWidth={CANVAS_W}
-                canvasHeight={canvasH}
-                guides={canvasGuides}
-                onAddGuide={(axis, pos) => {
-                  setCanvasGuides((g) => ({
-                    ...g,
-                    [axis === "h" ? "horizontal" : "vertical"]: [
-                      ...g[axis === "h" ? "horizontal" : "vertical"],
-                      pos,
-                    ],
-                  }));
-                }}
+              {/* 룰러 눈금은 스크롤 오프셋을 프레임 단위로 따라가야 한다. 스토어를 구독해
+                  이 서브트리만 다시 그리고, 페이지 커밋은 만들지 않는다. */}
+              <StudioScrollViewportSubscriber
+                store={scrollViewportStore}
+                render={(viewport) => (
+                  <StudioCanvasRulerBars
+                    visible
+                    scale={effScale}
+                    scrollLeft={viewport.left}
+                    scrollTop={viewport.top}
+                    canvasWidth={CANVAS_W}
+                    canvasHeight={canvasH}
+                    guides={canvasGuides}
+                    onAddGuide={(axis, pos) => {
+                      setCanvasGuides((g) => ({
+                        ...g,
+                        [axis === "h" ? "horizontal" : "vertical"]: [
+                          ...g[axis === "h" ? "horizontal" : "vertical"],
+                          pos,
+                        ],
+                      }));
+                    }}
+                  />
+                )}
               />
             </Suspense>
           ) : null}
@@ -41342,7 +41493,7 @@ function clearSelectionForEdit() {
           saving={saving}
           studioFilterPreparationBusy={studioFilterPreparationBusy}
           studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
-          scrollPos={scrollPos}
+          scrollViewportStore={scrollViewportStore}
           selected={selected}
           selectedBg3dEditSource={selectedBg3dEditSource}
           selectedBubbleTailGeometry={selectedBubbleTailGeometry}

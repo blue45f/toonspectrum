@@ -218,10 +218,19 @@ function visibleStagePoint(
   };
 }
 
+/** Same boot sequence as the canvas-interaction harness so both read one UI. */
 async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
-  await page.goto(studioUrl, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".konvajs-content", { timeout: 60_000 });
-  await page.waitForTimeout(2_500);
+  page.setDefaultTimeout(15_000);
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
+  // esbuild's __name helper is absent on some preview chunks.
+  await page.evaluate("globalThis.__name ??= (target) => target");
+  await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  await page.keyboard.press("b");
+  const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
+  await toolbar.waitFor({ state: "visible", timeout: 20_000 });
+  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
+  if ((await pen.getAttribute("aria-pressed")) !== "true") await pen.click();
+  await page.waitForTimeout(400);
 }
 
 async function findFreePort(): Promise<number> {
@@ -377,12 +386,26 @@ async function main(): Promise<void> {
       const scrollBefore = await page.evaluate(() => globalThis.__hotPathGate!.scrollOffset());
       const pan = await measure(page, "pan:hand-drag", async () => {
         const moves = 40;
+        // The drag traces a full circle, so its start and end scroll offsets are
+        // the same. Validity has to be judged on the largest excursion during
+        // the drag or a pan that scrolled hundreds of pixels would look inert.
+        let maxExcursion = 0;
         for (let index = 1; index <= moves; index += 1) {
           const t = index / moves;
           await page.mouse.move(
             start.x + Math.sin(t * Math.PI * 2) * 160,
             start.y + Math.cos(t * Math.PI * 2) * 90,
           );
+          if (index % 5 === 0 && scrollBefore) {
+            const sample = await page.evaluate(() => globalThis.__hotPathGate!.scrollOffset());
+            if (sample) {
+              maxExcursion = Math.max(
+                maxExcursion,
+                Math.abs(sample.left - scrollBefore.left),
+                Math.abs(sample.top - scrollBefore.top),
+              );
+            }
+          }
         }
         const scrollAfter = await page.evaluate(() => globalThis.__hotPathGate!.scrollOffset());
         return {
@@ -390,11 +413,10 @@ async function main(): Promise<void> {
           handToolActive: handActive,
           scrollBefore,
           scrollAfter,
+          maxScrollExcursionPx: maxExcursion,
           // A pan that never scrolled would report a flattering zero; the gate
           // must know the gesture actually moved the view.
-          scrolled:
-            !!scrollBefore && !!scrollAfter
-            && (scrollBefore.left !== scrollAfter.left || scrollBefore.top !== scrollAfter.top),
+          scrolled: maxExcursion > 8,
         };
       });
       await page.mouse.up();

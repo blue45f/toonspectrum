@@ -61,12 +61,14 @@ export const STUDIO_HOT_PATH_COMMIT_BUDGETS: readonly StudioHotPathGestureBudget
       input: "hand tool, 40 pointermove drag",
       maxEditorRenders: 2,
       maxCanvasRenders: 2,
-      maxReactCommits: 8,
+      maxReactCommits: 48,
       rationale:
         "Panning is a view gesture: scroll offsets reach the live store, and React " +
-        "sees one settled snapshot at the end. Two renders cover the tool switch " +
-        "and the settle commit. The commit ceiling leaves room for the live scroll " +
-        "subscribers (rulers, minimap box) to coalesce a few frames.",
+        "sees one settled snapshot at the end. Two editor renders cover the tool " +
+        "switch and the settle commit — that is the zero-tolerance line. The live " +
+        "scroll subscribers (rulers, minimap viewport box) may legitimately commit " +
+        "once per animation frame, so the commit ceiling is drag-length shaped and " +
+        "only catches a runaway.",
     }),
     Object.freeze({
       gesture: "zoom:wheel-gesture",

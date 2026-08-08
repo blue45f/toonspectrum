@@ -65,6 +65,52 @@ function sha256(value: Uint8Array | string): `sha256:${string}` {
   return `sha256:${sha256HexPortable(bytes)}`;
 }
 
+/**
+ * Re-orders display rows bottom-first, which is the orientation every Living Ink receipt declares
+ * (`displayReadbackOrientation: "webgl-bottom-left-row-major"`). The WGSL field is top-down — a
+ * splat lands at the same row index the pointer reports — so the presented surface is the natural
+ * order and the *hash* is the flipped one, exactly inverting the WebGL2 runtime where `readPixels`
+ * hands back bottom-up rows and presentation flips them. Both runtimes therefore hash the same
+ * canonical byte order for the same picture.
+ */
+function bottomUpRowMajor(pixels: Uint8Array, width: number, height: number): Uint8Array {
+  const stride = width * 4;
+  const normalized = new Uint8Array(pixels.length);
+  for (let row = 0; row < height; row += 1) {
+    normalized.set(
+      pixels.subarray(row * stride, row * stride + stride),
+      (height - 1 - row) * stride,
+    );
+  }
+  return normalized;
+}
+
+/**
+ * True when a readback carries no presentable surface at all: every pixel fully transparent, or
+ * every colour byte zero.
+ *
+ * This is the contract that was missing. A Living Ink display resolve is `exp(-opticalDensity)`,
+ * so an *empty* field resolves to white paper and a saturated one only approaches black
+ * asymptotically — a whole canvas of exact `rgb(0,0,0)` is not a picture this engine can compute,
+ * it is the signature of a display buffer that was never written. Treating it as a real frame is
+ * what let a blank WebGPU canvas ship: the receipt hashed the same zeros the screen showed, so
+ * every hash-based check agreed with itself and nothing looked wrong.
+ */
+export function studioLivingInkPresentedPixelsAreBlank(
+  pixels: Uint8Array | Uint8ClampedArray,
+): boolean {
+  let maximumAlpha = 0;
+  let maximumColour = 0;
+  for (let index = 0; index < pixels.length; index += 4) {
+    const alpha = pixels[index + 3] ?? 0;
+    if (alpha > maximumAlpha) maximumAlpha = alpha;
+    const colour = Math.max(pixels[index] ?? 0, pixels[index + 1] ?? 0, pixels[index + 2] ?? 0);
+    if (colour > maximumColour) maximumColour = colour;
+    if (maximumAlpha > 0 && maximumColour > 0) return false;
+  }
+  return true;
+}
+
 function unionBounds(
   a: StudioLivingInkBounds | null,
   b: StudioLivingInkBounds,
@@ -101,6 +147,7 @@ export class StudioLivingInkWebGpuPureRuntime {
   private readonly device: GPUDevice;
   private readonly config: StudioLivingInkExecutionConfig;
   private readonly canvas: OffscreenCanvas;
+  private readonly presentation: OffscreenCanvasRenderingContext2D;
   private readonly pipelines = new Map<StudioLivingInkWgslPassId, GPUComputePipeline>();
   private readonly coarseWidth: number;
   private readonly coarseHeight: number;
@@ -128,11 +175,13 @@ export class StudioLivingInkWebGpuPureRuntime {
     device: GPUDevice,
     config: StudioLivingInkExecutionConfig,
     canvas: OffscreenCanvas,
+    presentation: OffscreenCanvasRenderingContext2D,
   ) {
     this.device = device;
     this.webGpuDevice = device;
     this.config = Object.freeze({ ...config });
     this.canvas = canvas;
+    this.presentation = presentation;
     const coarse = studioLivingInkCoarseVelocityGrid(
       config.fieldWidth,
       config.fieldHeight,
@@ -179,16 +228,16 @@ export class StudioLivingInkWebGpuPureRuntime {
     }
 
     const canvas = new OffscreenCanvas(config.displayWidth, config.displayHeight);
-    // Prefer pure WebGPU canvas surface when available; buffers remain source of truth.
-    try {
-      (canvas as OffscreenCanvas & {
-        getContext?: (id: string) => unknown;
-      }).getContext?.("webgpu");
-    } catch {
-      /* ignore — storage-buffer path still works */
-    }
+    /*
+     * The WGSL passes resolve into a storage buffer, so the presentation surface has to be one
+     * that can *receive* those pixels — a 2D context. This runtime used to acquire a `webgpu`
+     * context here and never configure or render into it, which only looked like a GPU present
+     * path: `transferToImageBitmap()` then handed back a surface nothing had drawn to.
+     */
+    const presentation = canvas.getContext("2d", { alpha: false });
+    if (!presentation) return null;
 
-    const runtime = new StudioLivingInkWebGpuPureRuntime(device, config, canvas);
+    const runtime = new StudioLivingInkWebGpuPureRuntime(device, config, canvas, presentation);
     try {
       runtime.allocateBuffers();
       runtime.compilePipelines();
@@ -225,7 +274,13 @@ export class StudioLivingInkWebGpuPureRuntime {
     this.curl = this.device.createBuffer({ size: coarseBytes, usage });
     this.pressureA = this.device.createBuffer({ size: coarseBytes, usage });
     this.pressureB = this.device.createBuffer({ size: coarseBytes, usage });
-    this.display = this.device.createBuffer({ size: bytes, usage: usage | GPUBufferUsage.MAP_READ });
+    /*
+     * `MAP_READ` may only be paired with `COPY_DST` — combining it with `STORAGE` made every
+     * display buffer invalid at allocation, so the `display` pass's bind group was rejected and
+     * the resolve silently never ran. The readback below already copies into its own mappable
+     * staging buffer, so this buffer only ever needed to be a storage/copy target.
+     */
+    this.display = this.device.createBuffer({ size: bytes, usage });
     this.uniforms = this.device.createBuffer({
       size: STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -632,23 +687,9 @@ export class StudioLivingInkWebGpuPureRuntime {
       pressureIterations,
       simulationTicks: ticks,
       started,
-      displaySha256: sha256(pixels),
+      displaySha256: this.displayHash(pixels),
     });
-    // transferToImageBitmap may fail without webgpu canvas context — synthesize from pixels
-    let image: ImageBitmap;
-    try {
-      image = this.canvas.transferToImageBitmap();
-    } catch {
-      const c = new OffscreenCanvas(this.config.displayWidth, this.config.displayHeight);
-      const ctx = c.getContext("2d");
-      if (!ctx) throw new Error("Living Ink WGSL display context unavailable.");
-      const rgba = new Uint8ClampedArray(pixels.byteLength);
-      rgba.set(pixels);
-      const imageData = new ImageData(rgba, this.config.displayWidth, this.config.displayHeight);
-      ctx.putImageData(imageData, 0, 0);
-      image = c.transferToImageBitmap();
-    }
-    return Object.freeze({ image, receipt });
+    return Object.freeze({ image: this.present(pixels), receipt });
   }
 
   async renderFrame(
@@ -669,25 +710,40 @@ export class StudioLivingInkWebGpuPureRuntime {
       pressureIterations: 0,
       simulationTicks: 0,
       started,
-      displaySha256: sha256(pixels),
+      displaySha256: this.displayHash(pixels),
     });
-    let image: ImageBitmap;
-    try {
-      image = this.canvas.transferToImageBitmap();
-    } catch {
-      const c = new OffscreenCanvas(this.config.displayWidth, this.config.displayHeight);
-      const ctx = c.getContext("2d");
-      if (!ctx) throw new Error("Living Ink WGSL display context unavailable.");
-      const rgba = new Uint8ClampedArray(pixels.byteLength);
-      rgba.set(pixels);
-      ctx.putImageData(
-        new ImageData(rgba, this.config.displayWidth, this.config.displayHeight),
-        0,
-        0,
+    return Object.freeze({ image: this.present(pixels), receipt });
+  }
+
+  /** Canonical receipt hash: the presented pixels, in the orientation the receipt declares. */
+  private displayHash(pixels: Uint8Array): `sha256:${string}` {
+    return sha256(bottomUpRowMajor(pixels, this.config.displayWidth, this.config.displayHeight));
+  }
+
+  /**
+   * Turns the resolved pixels into the frame the caller shows. The bitmap is built from the very
+   * array the receipt hashes, so "what was verified" and "what reaches the screen" cannot drift
+   * apart — the drift is precisely what shipped a blank WebGPU canvas past a matching receipt.
+   *
+   * Fails closed on a blank readback rather than presenting it. The runtime has no second pixel
+   * source to fall back to; the recoverable fallback lives one level up, in
+   * `tryCreateStudioLivingInkWebGpuRuntime`, which admits this runtime only after it proves it can
+   * present a real frame and otherwise hands the user the WebGL2 backend.
+   */
+  private present(pixels: Uint8Array): ImageBitmap {
+    if (studioLivingInkPresentedPixelsAreBlank(pixels)) {
+      throw new Error(
+        "Living Ink WGSL runtime resolved an empty display frame; refusing to present a blank canvas.",
       );
-      image = c.transferToImageBitmap();
     }
-    return Object.freeze({ image, receipt });
+    const rgba = new Uint8ClampedArray(pixels.byteLength);
+    rgba.set(pixels);
+    this.presentation.putImageData(
+      new ImageData(rgba, this.config.displayWidth, this.config.displayHeight),
+      0,
+      0,
+    );
+    return this.canvas.transferToImageBitmap();
   }
 
   private async renderDisplay(_mode: StudioLivingInkDisplayMode): Promise<void> {
@@ -700,6 +756,7 @@ export class StudioLivingInkWebGpuPureRuntime {
     ]);
   }
 
+  /** Resolved display pixels in natural top-down ImageData order (see `bottomUpRowMajor`). */
   private async readDisplayRgba8(): Promise<Uint8Array> {
     // Map requires MAP_READ-only buffer; copy display → staging
     const bytes = this.cellCount() * 16;

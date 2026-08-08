@@ -118,6 +118,44 @@ describe("Living Ink actual execution boundary", () => {
     expect(verifier).toContain("simulation ACK batching dropped input");
   });
 
+  it("empties the centre of a dwell wash through the divergence of its own capillary flow", () => {
+    // A dwell mark's outflow is divergent by construction, so the pressure-projected velocity
+    // field cannot carry it and semi-Lagrangian value advection cannot express its dilution. The
+    // pigment pass therefore has to scale density by the divergence of the displacement it uses,
+    // or the mark dries as an ink dot with its darkest point dead centre.
+    expect(runtime).toContain("capillaryBacktrace");
+    expect(runtime).toContain("frontCurvature");
+    expect(runtime).toContain("wetSecondDerivativeAlongNormal");
+    expect(runtime).toContain("displacementDivergence");
+    // Both halves of div(A*n) must be present: geometric spreading empties the interior and the
+    // along-flow slowdown deposits that pigment into the drying rim. Keeping only the first is a
+    // pigment sink that bleaches every wash.
+    expect(runtime).toContain("mobility * frontCurvature");
+    expect(runtime).toContain("mobilitySlope * wetGradientStrength");
+    expect(verifier).toContain("central ink dot or an artificial hollow ring");
+  });
+
+  it("gates both shipped GPU backends instead of whichever one the launch flags selected", () => {
+    // The Worker prefers the WGSL field runtime whenever a WebGPU adapter exists, so a probe that
+    // launches one browser leaves the other shipped backend completely unverified.
+    expect(verifier).toContain("BACKEND_LANES");
+    expect(verifier).toContain("--enable-unsafe-webgpu");
+    expect(verifier).toContain("--use-angle=metal");
+    expect(verifier).toContain("--disable-features=WebGPU");
+    expect(verifier).toContain("real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1");
+    expect(verifier).toContain("webgpuVisualParity");
+    // The WGSL gap is a ratchet, not an exemption: the run fails when the observed gap grows *or*
+    // shrinks without the record being updated, so neither a regression nor a repair can pass
+    // unnoticed. No threshold is per-backend.
+    expect(verifier).toContain("WEBGPU_RECORDED_PARITY_GAP");
+    expect(verifier).toContain("regressedGates");
+    expect(verifier).toContain("repairedGates");
+    // Backend identity has to come from the Worker's own capability record, not a literal.
+    expect(browserGate).toContain('capabilities.backend === "webgpu-offscreen-half-float"');
+    expect(browserGate).toContain("await bloomProvider.initialize()");
+    expect(verifier).not.toContain('backend !== "real-chromium-dedicated-worker-offscreen-webgl2');
+  });
+
   it("serializes all input and rolls failed or cancelled mutations back before acknowledgement", () => {
     expect(worker).toContain("queue = queue.then(() => handle(request), () => handle(request))");
     expect(worker).toContain("await rebuildAcceptedJournal();");

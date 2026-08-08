@@ -70,35 +70,51 @@ const BACKEND_LANES = Object.freeze([
  * regression, or a gate that started passing and was not removed from the record. Shrink this list
  * as the WGSL runtime reaches parity; it must reach empty before WebGPU can be made blocking.
  *
- * What the first measured run found. Every entry below has one root cause, not nineteen: the WGSL
- * runtime computes its display pixels correctly (the receipt hash is taken from them) but then
- * presents a different surface. `StudioLivingInkWebGpuPureRuntime.tryCreate` acquires a `webgpu`
- * canvas context it never configures or draws into, and both presentation paths call
- * `canvas.transferToImageBitmap()` first, falling back to the computed pixels only if that
- * *throws*. It does not throw — it returns an empty bitmap — so every presented frame is blank and
- * every pixel gate reads zero. Repairing presentation is a change to the WGSL runtime and is
- * deliberately outside this probe's scope; the point of the lane is that the failure is now
- * measured on a real adapter instead of shipping unobserved.
+ * The first measured run recorded nineteen entries with a single cause, and it was not the one the
+ * first reading of the code suggested. The WGSL runtime allocated its display buffer with
+ * `MAP_READ | STORAGE | COPY_SRC | COPY_DST`; WebGPU only permits `MAP_READ` beside `COPY_DST`, so
+ * the buffer was invalid from allocation, the `display` pass's bind group was rejected, and the
+ * Beer-Lambert resolve never ran. Every readback was zeros — which is why the receipt agreed with
+ * the screen and no hash-based check ever objected: both sides were hashing the same blank.
+ *
+ * That is fixed. The resolve runs, the runtime presents the pixels it hashes, and a blank readback
+ * now fails closed instead of reaching a canvas. Nine gates were repaired outright and the line
+ * lands at the same bounds as GLSL (x 20, y 71, w 214), which is what confirms geometry and
+ * orientation are shared.
+ *
+ * What remains below is no longer one bug. Two entries are gates that a blank frame used to
+ * satisfy vacuously (identical blank pixels trivially "did not change"), and the rest are genuine
+ * content differences between the two shaders: the WGSL display resolve is a bare `exp(-density)`
+ * with no paper fibre, granulation, edge deposition, near-black floor or wash calibration, so the
+ * page reads as pure white (paper stddev 0, clear darkness 0) and the ink is far too faint
+ * (darkness 0.67 against 22.8). Closing those belongs to the WGSL field/display kernels in
+ * `studio-living-ink-wgsl-shaders.ts`, not to presentation.
+ *
+ * One entry is not a runtime defect at all: the crash-recovery gate asserts
+ * `recoveredCapabilities.backend === "webgl2-offscreen-half-float"`, which the WebGPU lane cannot
+ * satisfy by construction. The recovery itself is demonstrably working on this lane — the epoch is
+ * rejected immediately, a second Worker instance is created, and it renders a real post-crash
+ * frame. It stays recorded because relaxing a gate is not this file's job; repairing that
+ * assertion belongs to the harness.
  */
 const WEBGPU_RECORDED_PARITY_GAP = Object.freeze([
+  // Vacuously satisfied while every frame was blank; now measuring real pigment.
+  "fixed pigment changed under water scrub/advance",
+  "fixed pigment changed by at least one RGB code value under water",
+  "near-black reflectance floor is not deterministic",
+  "white gouache does not converge to paper reflectance in the isolated coverage gate",
+  // WGSL display/pigment kernels lack the paper, granulation and density model GLSL carries.
   "ink line is blank or truncated",
-  "water did not evolve a visible retained bloom",
   "non-symmetric partial-alpha selection clear is not ordered correctly",
-  "clear did not return to paper",
   "white-fix-dark transmittance layering did not darken in order",
   "watercolour bloom expansion 0 is below oracle-relative 32.5",
-  "watercolour wash difference 0 is below oracle 54.59905716318946",
+  "watercolour wash difference 1.8933946488294315 is below oracle 54.59905716318946",
   "paper texture stddev 0 is below oracle 3.5975805982535674",
   "watercolour granulation is below the reviewed visible-texture floor",
   "watercolour edge deposition is flat or clipped into an artificial hard rim",
-  "isolated wash has a spoke, facet, folded wedge or discontinuous radial edge",
   "isolated wash did not settle into two to four smooth capillary lobes",
   "isolated wash is mirror-symmetric or has collapsed into unbounded random drift",
-  "isolated wash collapsed into a square or strongly biased ellipse",
-  "watercolour line wash has a detached center lump or loses continuity at its shoulders",
-  "chromatic separation is absent or exaggerated into a rainbow fringe",
-  "continuous capsule exposes periodic dab seams, gaps, or start/end bulbs",
-  "self-intersection erases pigment or accumulates an unbounded dark knot",
+  // Harness assertion hard-codes the WebGL2 backend; see the note above.
   "actual Chromium Worker crash did not reject the epoch and recover on a fresh Worker",
 ]);
 
@@ -141,7 +157,7 @@ function html() {
 h1{margin:0 0 16px;font-size:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .card{padding:10px;border:1px solid #374151;border-radius:12px;background:#1f2937}h2{margin:0 0 8px;font-size:13px}
 canvas{display:block;width:100%;height:auto;border-radius:8px;background:#f7f3ea;image-rendering:auto}
-</style></head><body><h1>ToonSpectrum Living Ink · actual Worker/WebGL2 gate</h1><main class="grid">${cards}</main>
+</style></head><body><h1>ToonSpectrum Living Ink · actual Worker GPU gate (WebGL2 and WebGPU lanes)</h1><main class="grid">${cards}</main>
 <script type="module" src="${ENTRY}"></script></body></html>`;
 }
 
@@ -309,7 +325,7 @@ function validate(result, diagnostics, lane) {
 async function runLane(lane, port) {
   const laneDirectory = join(EVIDENCE_ROOT, lane.id);
   mkdirSync(laneDirectory, { recursive: true });
-  let browser = null;
+  let browser;
   try {
     browser = await chromium.launch({ headless: true, args: [...lane.launchArguments] });
   } catch (error) {
@@ -508,10 +524,10 @@ async function main() {
       // Wall-clock timings live in the evidence directory only; they would churn this file on
       // every run and hide the numbers a reviewer actually diffs.
       backends: Object.fromEntries(
-        Object.entries(summary.backends).map(([id, lane]) => {
-          const { performance: _timings, ...stable } = lane;
-          return [id, stable];
-        }),
+        Object.entries(summary.backends).map(([id, lane]) => [
+          id,
+          Object.fromEntries(Object.entries(lane).filter(([key]) => key !== "performance")),
+        ]),
       ),
     }, null, 2)}\n`);
     console.log(JSON.stringify(summary, null, 2));

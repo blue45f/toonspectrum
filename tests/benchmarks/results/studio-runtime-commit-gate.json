@@ -1,0 +1,134 @@
+{
+  "gate": "tests/benchmarks/harness/studio-runtime-commit-gate.ts",
+  "contract": "src/domains/creator/studio-hot-path-commit-budget.ts",
+  "generatedAt": "2026-08-08T07:46:11.734Z",
+  "route": "http://127.0.0.1:52892/studio",
+  "build": "production dist/ served by vite preview (pnpm exec vite build)",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max"
+  },
+  "method": {
+    "pageRenders": "product-emitted counters (recordStudioHotPathRender) armed by installing globalThis.__studioHotPathRenderCounters before any app script runs",
+    "reactCommits": "stub __REACT_DEVTOOLS_GLOBAL_HOOK__ installed before app scripts; react-dom calls onCommitFiberRoot on it in production builds too",
+    "validity": "a control gesture must move both counters and a 2s idle window must leave them at zero"
+  },
+  "instrumentationValidity": {
+    "reactRenderersInjected": 1,
+    "controlGesture": {
+      "action": "brush size slider 6 -> 18 -> 6",
+      "reactCommits": 11,
+      "editorRenders": 4,
+      "canvasRenders": 4
+    },
+    "countersProvenLive": true,
+    "note": "react-dom commit counter and product render counters both moved on a control gesture"
+  },
+  "budgets": [
+    {
+      "gesture": "idle",
+      "input": "2s with no input at all",
+      "maxEditorRenders": 0,
+      "maxCanvasRenders": 0,
+      "maxReactCommits": 0,
+      "rationale": "Nothing may render without input. This is also the validity baseline: a non-zero gesture count can only be attributed to the gesture if idle is 0."
+    },
+    {
+      "gesture": "pan:hand-drag",
+      "input": "hand tool, 40 pointermove drag",
+      "maxEditorRenders": 2,
+      "maxCanvasRenders": 2,
+      "maxReactCommits": 48,
+      "rationale": "Panning is a view gesture: scroll offsets reach the live store, and React sees one settled snapshot at the end. Two editor renders cover the tool switch and the settle commit — that is the zero-tolerance line. The live scroll subscribers (rulers, minimap viewport box) may legitimately commit once per animation frame, so the commit ceiling is drag-length shaped and only catches a runaway."
+    },
+    {
+      "gesture": "zoom:wheel-gesture",
+      "input": "20 wheel notches over the canvas",
+      "maxEditorRenders": 0,
+      "maxCanvasRenders": 0,
+      "maxReactCommits": 2,
+      "rationale": "The wheel gesture is CSS-transform only until settle. This already held at zero commits when it was measured; the gate keeps it that way."
+    },
+    {
+      "gesture": "zoom:wheel-settle",
+      "input": "the commit after the wheel gesture stops",
+      "maxEditorRenders": 2,
+      "maxCanvasRenders": 2,
+      "maxReactCommits": 6,
+      "rationale": "Settling zoom is a real layout change and is allowed to commit: once for the zoom level, once for the anchor scroll correction it performs."
+    },
+    {
+      "gesture": "stroke:pen-paced",
+      "input": "pen brush, 60 pointermove drag at ~60Hz",
+      "maxEditorRenders": 2,
+      "maxCanvasRenders": 2,
+      "maxReactCommits": 90,
+      "rationale": "Stroke frames commit into the isolated draft-preview store, which is the designed behaviour, so the commit ceiling is per-frame-shaped. What must not happen is the editor shell re-rendering per sample — that is the line the render budget draws."
+    }
+  ],
+  "readings": [
+    {
+      "gesture": "idle",
+      "reactCommits": 0,
+      "editorRenders": 0,
+      "canvasRenders": 0,
+      "evidence": {
+        "observedMs": 2000
+      }
+    },
+    {
+      "gesture": "zoom:wheel-gesture",
+      "reactCommits": 0,
+      "editorRenders": 0,
+      "canvasRenders": 0,
+      "evidence": {
+        "notches": 20,
+        "zoomBefore": "100%"
+      }
+    },
+    {
+      "gesture": "zoom:wheel-settle",
+      "reactCommits": 6,
+      "editorRenders": 2,
+      "canvasRenders": 2,
+      "evidence": {
+        "zoomAfter": "100%",
+        "zoomChanged": false
+      }
+    },
+    {
+      "gesture": "pan:hand-drag",
+      "reactCommits": 22,
+      "editorRenders": 1,
+      "canvasRenders": 1,
+      "evidence": {
+        "pointerMoves": 40,
+        "handToolActive": "true",
+        "scrollBefore": {
+          "left": 0,
+          "top": 0
+        },
+        "scrollAfter": {
+          "left": 0,
+          "top": 0
+        },
+        "maxScrollExcursionPx": 90,
+        "scrolled": true
+      }
+    },
+    {
+      "gesture": "stroke:pen-paced",
+      "reactCommits": 21,
+      "editorRenders": 0,
+      "canvasRenders": 0,
+      "evidence": {
+        "pointerMoves": 60
+      }
+    }
+  ],
+  "violations": [],
+  "failure": null,
+  "passed": true,
+  "runtimeMs": 24232.6
+}

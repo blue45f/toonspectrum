@@ -202,7 +202,7 @@ import {
 import { normalizeSkewPatch } from "./studio-skew";
 import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shapes";
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
-import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
+import { type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import {
@@ -230,6 +230,7 @@ import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioMinimapViewportBox } from "./StudioMinimapViewportBox";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
 import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
@@ -250,6 +251,7 @@ import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./studio-brush-default-restore";
+import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
@@ -523,7 +525,12 @@ interface StudioInspectorAsideProps {
   saving: boolean;
   studioFilterPreparationBusy: boolean;
   studioLayerLiftDisabledReason: string | null;
-  scrollPos: { left: number; top: number; width: number; height: number; scrollWidth: number; scrollHeight: number; };
+  /**
+   * Live canvas scroll offset. The minimap viewport box tracks the scroll at
+   * frame rate, so it subscribes to this store instead of re-rendering the whole
+   * aside from a `StudioPage` state value once per pan frame.
+   */
+  scrollViewportStore: StudioScrollViewportStore;
   selected: El | null;
   selectedBg3dEditSource: { readonly scene?: StudioBg3dSceneDocument; readonly legacyDataUrl?: string; } | null;
   selectedBubbleTailGeometry: import("./studio-bubble-custom-shape").BubbleShapeGeometry | null;
@@ -883,7 +890,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   saving,
   studioFilterPreparationBusy,
   studioLayerLiftDisabledReason,
-  scrollPos,
+  scrollViewportStore,
   selected,
   selectedBg3dEditSource,
   selectedBubbleTailGeometry,
@@ -1491,16 +1498,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     currentBrushSnapshot.sourcePresetName
     ?? BRUSH_PRESETS.find((preset) => preset.id === brush)?.name
     ?? brush;
-  const minimapViewportRect = projectStudioViewRectToDocumentRect({
-    documentWidth: CANVAS_W,
-    documentHeight: canvasH,
-    canvasFlipH,
-    canvasRotation,
-    x: scrollPos.left / effScale,
-    y: scrollPos.top / effScale,
-    width: scrollPos.width / effScale,
-    height: scrollPos.height / effScale,
-  });
   const canvasControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistDisabledReason = inspectorInteractionPolicy.page.reason;
@@ -4025,18 +4022,16 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   );
                 })
                   : null}
-                {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용) */}
-                {scrollPos.scrollWidth > 0 && (
-                  <div
-                    className="pointer-events-none absolute rounded-[2px] border border-accent shadow-[0_0_0_240px_oklch(0.1_0.01_70/0.35)]"
-                    style={{
-                      left: `${(minimapViewportRect.x / CANVAS_W) * 100}%`,
-                      top: `${(minimapViewportRect.y / canvasH) * 100}%`,
-                      width: `${(minimapViewportRect.width / CANVAS_W) * 100}%`,
-                      height: `${(minimapViewportRect.height / canvasH) * 100}%`,
-                    }}
-                  />
-                )}
+                {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용).
+                    팬 중에도 프레임 정확도를 지켜야 하므로 살아 있는 스크롤 스토어를 구독하는
+                    전용 리프로 분리했다(이 박스만 다시 그려지고 인스펙터 렌더는 없다). */}
+                <StudioMinimapViewportBox
+                  store={scrollViewportStore}
+                  canvasHeight={canvasH}
+                  effScale={effScale}
+                  canvasFlipH={canvasFlipH}
+                  canvasRotation={canvasRotation}
+                />
               </div>
             </div>
           </div>

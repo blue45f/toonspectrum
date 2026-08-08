@@ -232,6 +232,8 @@ interface PerfBridge {
     timedOut: boolean;
   } | null;
   zoomLabel: () => string | null;
+  /** Scroll offset of the canvas scroll host, used to prove a pan really panned. */
+  scrollOffset: () => { left: number; top: number } | null;
   snapshotPatch: (centerX: number, centerY: number, patch: number) => number[] | null;
 }
 
@@ -464,6 +466,20 @@ const PAGE_INSTRUMENTATION_SOURCE = String.raw`
         for (let i = 0; i < spans.length; i += 1) {
           const text = (spans[i].textContent || "").trim();
           if (/^\d+%$/.test(text)) return text;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    },
+    /**
+     * Scroll offset of the canvas scroll host (nearest scrollable ancestor of
+     * the stage). Used to prove a pan gesture really moved the view.
+     */
+    scrollOffset: function () {
+      let node = document.querySelector(".konvajs-content");
+      while (node) {
+        if (node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) {
+          return { left: node.scrollLeft, top: node.scrollTop };
         }
         node = node.parentElement;
       }
@@ -892,17 +908,32 @@ async function measurePan(page: Page, cpuThrottleRate: number): Promise<Scenario
     await hand.waitFor({ state: "visible" });
     await hand.click();
     await page.waitForTimeout(150);
+    // A pan that never activated the hand tool, or whose start point sits
+    // outside the viewport because a previous scenario left the view zoomed in,
+    // reports a flattering zero. Both are checked, not assumed.
+    const handActive = await hand.getAttribute("aria-pressed");
+    invariant(handActive === "true", "hand tool did not activate; pan reading would be invalid");
 
     const stage = await stageBoxOf(page);
-    const startX = stage.x + stage.width * 0.35;
-    const startY = stage.y + stage.height * 0.45;
+    const startX = Math.min(
+      Math.max(stage.x + stage.width * 0.35, 8),
+      VIEWPORT.width - 8,
+    );
+    const startY = Math.min(
+      Math.max(stage.y + stage.height * 0.45, 8),
+      VIEWPORT.height - 8,
+    );
     await page.mouse.move(startX, startY);
     await page.mouse.down();
+    const scrollBefore = await page.evaluate(() => globalThis.__canvasPerf!.scrollOffset());
 
     await page.evaluate(() => globalThis.__canvasPerf!.startFrames());
     const mark = await page.evaluate(() => globalThis.__canvasPerf!.markStart());
     const steps = 40;
     const dispatchMs: number[] = [];
+    // The drag traces a full circle, so its endpoints share a scroll offset.
+    // Validity is judged on the largest excursion reached during the drag.
+    let maxScrollExcursionPx = 0;
     for (let index = 1; index <= steps; index += 1) {
       const t = index / steps;
       const started = performance.now();
@@ -911,6 +942,16 @@ async function measurePan(page: Page, cpuThrottleRate: number): Promise<Scenario
         startY + Math.cos(t * Math.PI * 2) * 90,
       );
       dispatchMs.push(performance.now() - started);
+      if (index % 5 === 0 && scrollBefore) {
+        const sample = await page.evaluate(() => globalThis.__canvasPerf!.scrollOffset());
+        if (sample) {
+          maxScrollExcursionPx = Math.max(
+            maxScrollExcursionPx,
+            Math.abs(sample.left - scrollBefore.left),
+            Math.abs(sample.top - scrollBefore.top),
+          );
+        }
+      }
     }
     const instrumentation = await page.evaluate(
       (m) => globalThis.__canvasPerf!.measure(m),
@@ -920,12 +961,18 @@ async function measurePan(page: Page, cpuThrottleRate: number): Promise<Scenario
     await page.mouse.up();
     await page.keyboard.press("b");
     await page.waitForTimeout(150);
+    invariant(
+      maxScrollExcursionPx > 8,
+      `pan never scrolled the view (max excursion ${maxScrollExcursionPx}px); reading would be invalid`,
+    );
 
     return {
       scenario: "pan:hand-drag",
       cpuThrottleRate,
       status: "ok",
       pointerMoves: steps,
+      handToolActive: handActive === "true",
+      maxScrollExcursionPx: round(maxScrollExcursionPx),
       dispatchMs: {
         p50: round(percentile([...dispatchMs].sort((a, b) => a - b), 0.5)),
         p95: round(percentile([...dispatchMs].sort((a, b) => a - b), 0.95)),
@@ -1444,8 +1491,19 @@ async function runPass(
       } else {
         log(`zoom×${steps}: FAILED ${zoom.error}`);
       }
+      // Shift+0 is swallowed when focus is still inside a text input (the
+      // studio's key handler ignores typing targets), which silently leaves the
+      // next scenario zoomed in. Move focus out first, then verify the reset.
+      await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) active.blur();
+      });
       await page.keyboard.press("Shift+0").catch(() => undefined);
       await page.waitForTimeout(1_200);
+      const resetLabel = await page
+        .evaluate(() => globalThis.__canvasPerf!.zoomLabel())
+        .catch(() => null);
+      if (resetLabel !== "100%") log(`zoom reset after x${steps} left the view at ${String(resetLabel)}`);
     }
 
     if (SELECTED_GROUPS.has("pan")) {
