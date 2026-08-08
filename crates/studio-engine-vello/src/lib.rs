@@ -14,11 +14,15 @@ pub mod lottie;
 pub mod render;
 pub mod scene;
 pub mod text;
+pub mod text_vertical;
 
 pub use geometry::{bez_path_to_path_ir_json, fit_polyline, segment_count};
 pub use render::{parse_scene, render_scene, RenderError};
 pub use scene::SceneIR;
 pub use text::{shape_text, shaped_text_to_json, ShapedText};
+pub use text_vertical::{
+    shape_text_vertical, shaped_text_vertical_to_json, VerticalMetricsSource, VerticalShapedText,
+};
 
 use wasm_bindgen::prelude::*;
 

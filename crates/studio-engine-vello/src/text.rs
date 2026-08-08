@@ -29,6 +29,12 @@ pub struct ShapedGlyph {
 pub struct ShapedText {
     pub width: f32,
     pub height: f32,
+    /// Layout advance width including trailing whitespace (parley
+    /// `full_width`). The vertical lane needs it so a rotated `word␣` run
+    /// keeps its inter-word gap when the run advance becomes a vertical
+    /// advance. `shaped_text_to_json` intentionally omits it to keep the
+    /// horizontal JSON contract byte-stable.
+    pub full_width: f32,
     pub line_count: usize,
     pub glyphs: Vec<ShapedGlyph>,
 }
@@ -160,6 +166,7 @@ pub fn shape_text(
     Ok(ShapedText {
         width: layout.width(),
         height: layout.height(),
+        full_width: layout.full_width(),
         line_count,
         glyphs,
     })

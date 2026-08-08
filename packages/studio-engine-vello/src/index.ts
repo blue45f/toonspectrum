@@ -29,6 +29,20 @@ export {
 export { shapeTextToGlyphPaths, shapedTextSchema, shapedGlyphSchema } from "./text";
 export type { ShapedText, ShapedGlyph, ShapeTextOptions } from "./text";
 export {
+  shapeTextVerticalToGlyphPaths,
+  verticalColumnSchema,
+  verticalMetricsSourceSchema,
+  verticalShapedGlyphSchema,
+  verticalShapedTextSchema,
+} from "./text-vertical";
+export type {
+  ShapeTextVerticalOptions,
+  VerticalColumn,
+  VerticalMetricsSource,
+  VerticalShapedGlyph,
+  VerticalShapedText,
+} from "./text-vertical";
+export {
   computeTextShapeKey,
   createTextShapeCache,
   estimateShapedTextBytes,

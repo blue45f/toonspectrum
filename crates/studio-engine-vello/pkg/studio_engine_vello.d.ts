@@ -22,6 +22,12 @@ export function render_scene_json(scene_json: string): Uint8Array;
  */
 export function shape_text_json(text: string, font_bytes: Uint8Array, font_size: number, max_width: number): string;
 
+/**
+ * Shapes text into vertical-writing positioned glyph PathIR JSON (manual
+ * vertical composition over the Parley lane — V12 Text row, 세로쓰기 확장).
+ */
+export function shape_text_vertical_json(text: string, font_bytes: Uint8Array, font_size: number, max_height_px: number): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -30,6 +36,7 @@ export interface InitOutput {
     readonly fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;

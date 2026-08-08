@@ -90,6 +90,7 @@ export const velloCpuProviderDescriptor: ProviderDescriptor =
       "render.blend.screen",
       "render.blend.darken",
       "render.blend.lighten",
+      "render.text.vertical",
       "export.deterministic",
     ],
     limitations: [

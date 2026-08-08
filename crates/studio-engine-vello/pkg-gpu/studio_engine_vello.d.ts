@@ -51,6 +51,12 @@ export function render_scene_json(scene_json: string): Uint8Array;
  */
 export function shape_text_json(text: string, font_bytes: Uint8Array, font_size: number, max_width: number): string;
 
+/**
+ * Shapes text into vertical-writing positioned glyph PathIR JSON (manual
+ * vertical composition over the Parley lane — V12 Text row, 세로쓰기 확장).
+ */
+export function shape_text_vertical_json(text: string, font_bytes: Uint8Array, font_size: number, max_height_px: number): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -62,6 +68,7 @@ export interface InitOutput {
     readonly render_scene_gpu_json: (a: number, b: number) => any;
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
+    readonly shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___js_sys_76f24397c5a322f2___Function_fn_wasm_bindgen_b055bf54e8b77daf___JsValue_____wasm_bindgen_b055bf54e8b77daf___sys__Undefined___js_sys_76f24397c5a322f2___Function_fn_wasm_bindgen_b055bf54e8b77daf___JsValue_____wasm_bindgen_b055bf54e8b77daf___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue______true_: (a: number, b: number, c: any) => void;

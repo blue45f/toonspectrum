@@ -93,6 +93,38 @@ export function shape_text_json(text, font_bytes, font_size, max_width) {
         wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
     }
 }
+
+/**
+ * Shapes text into vertical-writing positioned glyph PathIR JSON (manual
+ * vertical composition over the Parley lane — V12 Text row, 세로쓰기 확장).
+ * @param {string} text
+ * @param {Uint8Array} font_bytes
+ * @param {number} font_size
+ * @param {number} max_height_px
+ * @returns {string}
+ */
+export function shape_text_vertical_json(text, font_bytes, font_size, max_height_px) {
+    let deferred4_0;
+    let deferred4_1;
+    try {
+        const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray8ToWasm0(font_bytes, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.shape_text_vertical_json(ptr0, len0, ptr1, len1, font_size, max_height_px);
+        var ptr3 = ret[0];
+        var len3 = ret[1];
+        if (ret[3]) {
+            ptr3 = 0; len3 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred4_0 = ptr3;
+        deferred4_1 = len3;
+        return getStringFromWasm0(ptr3, len3);
+    } finally {
+        wasm.__wbindgen_free(deferred4_0, deferred4_1, 1);
+    }
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
