@@ -6,6 +6,12 @@ import {
 } from "@toonspectrum/studio-engine-registry";
 
 import {
+  selectStudioStrokeRoute,
+  type SelectStudioStrokeRouteResult,
+  type StudioStrokeRouteTournamentState,
+  type StudioStrokeRouteWorkloadTraits,
+} from "./studio-stroke-route-tournament";
+import {
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY,
   resolveStudioStrokeSurfaceRoute,
   type StudioStrokeSurfaceRouteKind,
@@ -21,6 +27,15 @@ import {
  *
  * Parity here is the delegation precondition: only after the planner provably
  * reproduces the pinned-route contract may step (c) route real strokes.
+ *
+ * V12 §5 (observation-only): an optional tournament probe projects the
+ * renderer tournament's winner cache + kill switch onto the admitted ladder
+ * via selectStudioStrokeRoute — the same pattern the filter island runs for
+ * real. The probe can only be observed: legacyKind/plannedKind/agrees and the
+ * planner product are computed exactly as before, with or without a probe,
+ * and a pristine probe (empty cache, nothing killed) reports the admitted
+ * ladder unchanged. The next cutover slice consumes this observation; no
+ * component is wired here.
  */
 
 /** Route lanes as V11 providers, ladder order = registration order. */
@@ -94,11 +109,26 @@ export function admittedLanes(
   return lanes;
 }
 
+/**
+ * Optional V12 §5 tournament probe. `traits` describe the stroke workload the
+ * bucket derives from; `state` is already-hydrated in-memory tournament state
+ * (the shared StudioRendererTournamentRuntime satisfies it structurally).
+ */
+export interface StudioStrokeSurfaceShadowTournamentProbe {
+  readonly traits: StudioStrokeRouteWorkloadTraits;
+  readonly state: StudioStrokeRouteTournamentState;
+}
+
 export interface StudioV11SurfacePlanShadowResult {
   legacyKind: StudioStrokeSurfaceRouteKind;
   plannedKind: StudioStrokeSurfaceRouteKind;
   agrees: boolean;
   plan: SurfacePlan;
+  /**
+   * Observation-only tournament projection of the admitted ladder. Null when
+   * no probe was supplied. Never feeds back into legacyKind/plannedKind/plan.
+   */
+  tournament: SelectStudioStrokeRouteResult | null;
 }
 
 const shadowRegistry = buildShadowRegistry();
@@ -106,6 +136,7 @@ const shadowPlanner = new HybridExecutionPlanner(shadowRegistry);
 
 export function planStudioStrokeSurfaceShadow(
   input: StudioStrokeSurfaceRouteSnapshotInput,
+  tournamentProbe?: StudioStrokeSurfaceShadowTournamentProbe,
 ): StudioV11SurfacePlanShadowResult {
   const lanes = admittedLanes(input);
   // Highest-priority admitted lane, expressed as a capability disjunction:
@@ -133,10 +164,20 @@ export function planStudioStrokeSurfaceShadow(
     "",
   ) as StudioStrokeSurfaceRouteKind;
   const legacyKind = resolveStudioStrokeSurfaceRoute(input).kind;
+  // Observation only: the tournament projection runs after (and independent
+  // of) the parity computation, so a probe can never alter the shadow verdict.
+  const tournament = tournamentProbe
+    ? selectStudioStrokeRoute({
+        lanes,
+        traits: tournamentProbe.traits,
+        state: tournamentProbe.state,
+      })
+    : null;
   return {
     legacyKind,
     plannedKind,
     agrees: legacyKind === plannedKind,
     plan,
+    tournament,
   };
 }

@@ -394,6 +394,9 @@ importers:
       wasm-vips:
         specifier: ^0.0.18
         version: 0.0.18
+      wesl:
+        specifier: ^0.7.28
+        version: 0.7.28
       wrangler:
         specifier: 4.116.0
         version: 4.116.0
@@ -6771,6 +6774,9 @@ packages:
   websocket-extensions@0.1.4:
     resolution: {integrity: sha512-OqedPIGOfsDlo31UNwYbCFMSaO9m9G/0faIHj5/dZFDMFqPTcx6UwqyOy3COEaEOg/9VsGIpdqn62W5KhoKSpg==}
     engines: {node: '>=0.8.0'}
+
+  wesl@0.7.28:
+    resolution: {integrity: sha512-rJG4Q7QixTpu80BBlkdpPbNNWCFLespEMBzxEc5WLGL3J7EIOpn0vSSIz0YIk9aycqqwd+LWNut1cWz9KIFgEA==}
 
   whatwg-mimetype@5.0.0:
     resolution: {integrity: sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw==}
@@ -13187,6 +13193,8 @@ snapshots:
       websocket-extensions: 0.1.4
 
   websocket-extensions@0.1.4: {}
+
+  wesl@0.7.28: {}
 
   whatwg-mimetype@5.0.0: {}
 

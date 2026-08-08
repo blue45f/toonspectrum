@@ -7,3 +7,4 @@ export * from "./effect-compiler";
 export * from "./benchmark-registry";
 export * from "./tournament";
 export * from "./wgsl-variants";
+export * from "./wesl-compile";

@@ -1,4 +1,8 @@
-import { evaluateLicenseGate } from "@toonspectrum/studio-engine-registry";
+import {
+  RemoteKillSwitch,
+  WinnerCache,
+  evaluateLicenseGate,
+} from "@toonspectrum/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 
@@ -10,13 +14,22 @@ import {
   deriveStudioV11BackendDescriptors,
 } from "./studio-engine-provider-bridge";
 import {
+  studioStrokeRouteBucket,
+  studioStrokeRouteProviderId,
+  type StudioStrokeRouteWorkloadTraits,
+} from "./studio-stroke-route-tournament";
+import {
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY,
   type StudioHokusaiStrokeSurfaceSupport,
   type StudioStrokeSurfaceProviderState,
   type StudioStrokeSurfaceRouteKind,
   type StudioStrokeSurfaceRouteSnapshotInput,
 } from "./studio-stroke-surface-route";
-import { planStudioStrokeSurfaceShadow } from "./studio-surface-plan-shadow";
+import {
+  admittedLanes,
+  planStudioStrokeSurfaceShadow,
+  type StudioStrokeSurfaceShadowTournamentProbe,
+} from "./studio-surface-plan-shadow";
 
 /**
  * V11 strangler gate (ADR 0001 개정): the shadow HybridExecutionPlanner must
@@ -191,5 +204,170 @@ describe("V11 descriptor bridge (backend audit → ProviderDescriptor)", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * V12 §5 observation-only seam: an optional tournament probe projects the
+ * winner cache + kill switch onto the admitted ladder without ever feeding
+ * back into the parity verdict. The exhaustive case pins the backwards
+ * contract — with pristine tournament state the shadow output is invariant
+ * over the full 8,192-state admission space, and the observation reports the
+ * admitted ladder unchanged.
+ */
+
+function* allAdmissionSnapshots(): Generator<StudioStrokeSurfaceRouteSnapshotInput> {
+  for (const eligible of BOOLEANS) {
+    for (const providerState of PROVIDER_STATES) {
+      for (const capabilitiesAccepted of BOOLEANS) {
+        for (const livingAdmitted of BOOLEANS) {
+          for (const hokusaiAdmitted of BOOLEANS) {
+            for (const surface of HOKUSAI_SURFACES) {
+              for (const stampAdmitted of BOOLEANS) {
+                for (const gpuAdmitted of BOOLEANS) {
+                  for (const liveInkAdmitted of BOOLEANS) {
+                    for (const wetFallbackAdmitted of BOOLEANS) {
+                      for (const dynamicAdmitted of BOOLEANS) {
+                        yield snapshot({
+                          livingInk: {
+                            eligible,
+                            providerState,
+                            capabilitiesAccepted,
+                            admitted: livingAdmitted,
+                          },
+                          hokusai: { admitted: hokusaiAdmitted, surface },
+                          stampAdmitted,
+                          gpuAdmitted,
+                          liveInkAdmitted,
+                          wetFallbackAdmitted,
+                          dynamicAdmitted,
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+describe("V12 §5 tournament probe on the shadow planner (observation only)", () => {
+  const TRAITS: StudioStrokeRouteWorkloadTraits = {
+    pointCount: 40,
+    brushFamily: "wet-ink",
+    canvasScale: 1,
+  };
+
+  function pristineProbe(): StudioStrokeSurfaceShadowTournamentProbe {
+    return {
+      traits: TRAITS,
+      state: {
+        deviceHash: "device-a",
+        winnerCache: new WinnerCache(),
+        killSwitch: new RemoteKillSwitch(),
+      },
+    };
+  }
+
+  it("empty tournament state leaves the shadow output invariant across all 8192 states", () => {
+    const probe = pristineProbe();
+    let total = 0;
+    for (const input of allAdmissionSnapshots()) {
+      const base = planStudioStrokeSurfaceShadow(input);
+      const observed = planStudioStrokeSurfaceShadow(input, probe);
+      if (base.tournament !== null) {
+        throw new Error("probe-less shadow result must carry no tournament observation");
+      }
+      if (
+        base.legacyKind !== observed.legacyKind ||
+        base.plannedKind !== observed.plannedKind ||
+        base.agrees !== observed.agrees
+      ) {
+        throw new Error(
+          `pristine probe changed the shadow verdict for ${JSON.stringify(input)}`,
+        );
+      }
+      const observation = observed.tournament;
+      if (observation === null) {
+        throw new Error("probed shadow result must carry the tournament observation");
+      }
+      const admitted = admittedLanes(input);
+      if (
+        observation.lanes.join(",") !== admitted.join(",") ||
+        observation.killedLanes.length !== 0 ||
+        observation.promotedLane !== null ||
+        observation.killIgnoredReason !== null
+      ) {
+        throw new Error(
+          `pristine probe altered the admitted ladder for ${JSON.stringify(input)}`,
+        );
+      }
+      if (observation.lanes[0] !== observed.plannedKind) {
+        throw new Error(
+          `observation head diverged from the planned lane for ${JSON.stringify(input)}`,
+        );
+      }
+      total += 1;
+    }
+    expect(total).toBe(8192);
+  });
+
+  it("a winner probe reorders only the observation; verdict and plan stay legacy", () => {
+    const probe = pristineProbe();
+    probe.state.winnerCache.set(studioStrokeRouteBucket(TRAITS), "device-a", {
+      providerId: studioStrokeRouteProviderId("dynamic"),
+      expectedWarmMs: 2,
+      decidedAtSample: 4,
+    });
+    const result = planStudioStrokeSurfaceShadow(
+      snapshot({ gpuAdmitted: true, dynamicAdmitted: true }),
+      probe,
+    );
+    expect(result.legacyKind).toBe("gpu");
+    expect(result.plannedKind).toBe("gpu");
+    expect(result.agrees).toBe(true);
+    expect(result.plan.islands[0]?.fallbackChain).toEqual([
+      "stroke-route-gpu",
+      "stroke-route-live-ink",
+      "stroke-route-wet-fallback",
+      "stroke-route-dynamic",
+      "stroke-route-konva",
+    ]);
+    expect(result.tournament?.lanes).toEqual(["dynamic", "gpu", "konva"]);
+    expect(result.tournament?.promotedLane).toBe("dynamic");
+    expect(result.tournament?.bucket).toBe(studioStrokeRouteBucket(TRAITS));
+  });
+
+  it("a kill probe prunes the observed ladder while the legacy route is untouched", () => {
+    const probe = pristineProbe();
+    probe.state.killSwitch.kill(studioStrokeRouteProviderId("gpu"), "remote flag");
+    const result = planStudioStrokeSurfaceShadow(
+      snapshot({ gpuAdmitted: true, dynamicAdmitted: true }),
+      probe,
+    );
+    expect(result.legacyKind).toBe("gpu");
+    expect(result.plannedKind).toBe("gpu");
+    expect(result.tournament?.lanes).toEqual(["dynamic", "konva"]);
+    expect(result.tournament?.killedLanes).toEqual(["gpu"]);
+    expect(result.tournament?.killIgnoredReason).toBeNull();
+  });
+
+  it("killing every admitted lane is ignored in the observation with the reason logged", () => {
+    const probe = pristineProbe();
+    for (const kind of ["gpu", "dynamic", "konva"] as const) {
+      probe.state.killSwitch.kill(studioStrokeRouteProviderId(kind), "panic");
+    }
+    const result = planStudioStrokeSurfaceShadow(
+      snapshot({ gpuAdmitted: true, dynamicAdmitted: true }),
+      probe,
+    );
+    expect(result.legacyKind).toBe("gpu");
+    expect(result.tournament?.lanes).toEqual(["gpu", "dynamic", "konva"]);
+    expect(result.tournament?.killIgnoredReason).toContain("keeping the original order");
+    expect(result.tournament?.killIgnoredReason).toContain("panic");
   });
 });
