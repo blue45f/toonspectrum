@@ -1,0 +1,446 @@
+{
+  "harness": "tests/benchmarks/harness/large-scene.ts",
+  "generatedAt": "2026-08-07T17:46:38.400Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "cores": 12,
+    "node": "v24.16.0"
+  },
+  "environment": {
+    "concurrentLoad": "8h soak harness (pnpm run soak:studio-engine, SOAK_MINUTES=480) was running on this host during measurement; p50/p95 medians are the headline metrics to stay robust to that background CPU noise"
+  },
+  "config": {
+    "warmup": 1,
+    "defaultIterations": 5,
+    "reducedIterations": 3,
+    "slowRenderThresholdMs": 4000,
+    "pointsPerStroke": 24,
+    "pathSteps": [
+      1000,
+      5000,
+      15000,
+      30000
+    ],
+    "canvasSizes": [
+      512,
+      1024
+    ],
+    "note": "per-combo iterations recorded in each engine row; 30k paths measured at 1024² only (plan-allowed runtime bound); scenes are seeded-LCG deterministic, seed recorded per combo"
+  },
+  "engines": {
+    "skia-canvaskit": "canvaskit-wasm 0.41.1 CPU raster surface (surface.dispose() adapter); consumes SceneIR objects directly — no JSON boundary",
+    "vello-cpu": "vello_cpu 0.2.0 (baseline SIMD, single thread, wasm) — each call includes zod normalize + JSON serialize + wasm-side serde parse (§9.2 boundary); boundaryPrep rows quantify the JS-side share standalone"
+  },
+  "combos": [
+    {
+      "paths": 1000,
+      "canvas": "512x512",
+      "seed": 104057529,
+      "sceneJsonBytes": 1600595,
+      "boundaryPrep": {
+        "p50Ms": 16.645,
+        "samplesMs": [
+          23.549,
+          16.645,
+          14.593
+        ],
+        "shareOfVelloP50": 0.0275
+      },
+      "vello-cpu": {
+        "iterations": 5,
+        "samplesMs": [
+          603.418,
+          605.093,
+          604.504,
+          606.179,
+          605.743
+        ],
+        "p50Ms": 605.093,
+        "p95Ms": 606.179,
+        "meanMs": 604.987,
+        "throughputMiBps": 1.65,
+        "deterministic": true,
+        "pixelSha256": "f44840e5a5fee7152674b77cb7e5a4fec438a7cd15e2c1dfaa216699ecf40c4f"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          81.821,
+          79.321,
+          79.255,
+          78.252,
+          77.956
+        ],
+        "p50Ms": 79.255,
+        "p95Ms": 81.821,
+        "meanMs": 79.321,
+        "throughputMiBps": 12.62,
+        "deterministic": true,
+        "pixelSha256": "2785407223bd337b21e215d04d3f39d9a3182b94a53e30ea4a916db5d64b676f"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 1000,
+      "canvas": "1024x1024",
+      "seed": 108112057,
+      "sceneJsonBytes": 1590329,
+      "boundaryPrep": {
+        "p50Ms": 14.733,
+        "samplesMs": [
+          14.927,
+          14.454,
+          14.733
+        ],
+        "shareOfVelloP50": 0.0137
+      },
+      "vello-cpu": {
+        "iterations": 5,
+        "samplesMs": [
+          1069.397,
+          1079.604,
+          1077.045,
+          1075.854,
+          1074.67
+        ],
+        "p50Ms": 1075.854,
+        "p95Ms": 1079.604,
+        "meanMs": 1075.314,
+        "throughputMiBps": 3.72,
+        "deterministic": true,
+        "pixelSha256": "6cccb09c4939e96e41dca08fa1ceee0fe0cdb05941c4bccf9d49ac13fd0dbe65"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          121.203,
+          123.13,
+          123.411,
+          123.243,
+          124.621
+        ],
+        "p50Ms": 123.243,
+        "p95Ms": 124.621,
+        "meanMs": 123.121,
+        "throughputMiBps": 32.46,
+        "deterministic": true,
+        "pixelSha256": "43c12f15860af858ff6500266552fb95d1cf3f6f2372f2fae4171efd5ece8c52"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 5000,
+      "canvas": "512x512",
+      "seed": 504069529,
+      "sceneJsonBytes": 8007317,
+      "boundaryPrep": {
+        "p50Ms": 76.487,
+        "samplesMs": [
+          75.294,
+          76.487,
+          81.008
+        ],
+        "shareOfVelloP50": 0.0259
+      },
+      "vello-cpu": {
+        "iterations": 5,
+        "samplesMs": [
+          2959.136,
+          2954.64,
+          2963.313,
+          2951.991,
+          2955.291
+        ],
+        "p50Ms": 2955.291,
+        "p95Ms": 2963.313,
+        "meanMs": 2956.874,
+        "throughputMiBps": 0.34,
+        "deterministic": true,
+        "pixelSha256": "ef0bb798ba3310eb3c036b1940651085c4f1630d70e000c66b4bce64045ad835"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          382.51,
+          382.617,
+          381.187,
+          381.256,
+          380.589
+        ],
+        "p50Ms": 381.256,
+        "p95Ms": 382.617,
+        "meanMs": 381.632,
+        "throughputMiBps": 2.62,
+        "deterministic": true,
+        "pixelSha256": "a503615bc6cd9001917210d2233f294bfe81bd5965b8c44bb1e68cbff1d55237"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 5000,
+      "canvas": "1024x1024",
+      "seed": 508124057,
+      "sceneJsonBytes": 7954934,
+      "boundaryPrep": {
+        "p50Ms": 69.422,
+        "samplesMs": [
+          72.382,
+          69.141,
+          69.422
+        ],
+        "shareOfVelloP50": 0.0132
+      },
+      "vello-cpu": {
+        "iterations": 3,
+        "samplesMs": [
+          5250.732,
+          5246.547,
+          5276.314
+        ],
+        "p50Ms": 5250.732,
+        "p95Ms": 5276.314,
+        "meanMs": 5257.864,
+        "throughputMiBps": 0.76,
+        "deterministic": true,
+        "pixelSha256": "2a88faf988ecdaaad6ac54ae3fa00cc338afdbde55a25bac22c6ecdb594c220a"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          605.419,
+          600.606,
+          598.535,
+          600.246,
+          605.32
+        ],
+        "p50Ms": 600.606,
+        "p95Ms": 605.419,
+        "meanMs": 602.025,
+        "throughputMiBps": 6.66,
+        "deterministic": true,
+        "pixelSha256": "d6181ae87641619000c334d2badce1af135eab79fc03cc48471e71f2b994b403"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 15000,
+      "canvas": "512x512",
+      "seed": 1504099529,
+      "sceneJsonBytes": 24044610,
+      "boundaryPrep": {
+        "p50Ms": 215.515,
+        "samplesMs": [
+          247.876,
+          215.515,
+          212.781
+        ],
+        "shareOfVelloP50": 0.0243
+      },
+      "vello-cpu": {
+        "iterations": 3,
+        "samplesMs": [
+          8889.044,
+          8819.952,
+          8850.772
+        ],
+        "p50Ms": 8850.772,
+        "p95Ms": 8889.044,
+        "meanMs": 8853.256,
+        "throughputMiBps": 0.11,
+        "deterministic": true,
+        "pixelSha256": "dedfc918adfc8af257d21175582abf2ef873cb582605eabbccf807f09cce7e4a"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          1146.225,
+          1148.728,
+          1180.399,
+          1136.847,
+          1143.215
+        ],
+        "p50Ms": 1146.225,
+        "p95Ms": 1180.399,
+        "meanMs": 1151.083,
+        "throughputMiBps": 0.87,
+        "deterministic": true,
+        "pixelSha256": "eb61af27e6414abaf3724ae5753ef2cbe7779e37b3898687f72f376d7e7aaafb"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 15000,
+      "canvas": "1024x1024",
+      "seed": 1508154057,
+      "sceneJsonBytes": 23884560,
+      "boundaryPrep": {
+        "p50Ms": 214.152,
+        "samplesMs": [
+          231.781,
+          214.152,
+          211.492
+        ],
+        "shareOfVelloP50": 0.0135
+      },
+      "vello-cpu": {
+        "iterations": 3,
+        "samplesMs": [
+          15896.031,
+          15858.739,
+          15879.449
+        ],
+        "p50Ms": 15879.449,
+        "p95Ms": 15896.031,
+        "meanMs": 15878.073,
+        "throughputMiBps": 0.25,
+        "deterministic": true,
+        "pixelSha256": "bb8fa1f5822e737f857d136bf8b2bf93a9e4e068fbc72425572b7045c016c459"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          1811.471,
+          1822.985,
+          1814.733,
+          1820.455,
+          1855.937
+        ],
+        "p50Ms": 1820.455,
+        "p95Ms": 1855.937,
+        "meanMs": 1825.116,
+        "throughputMiBps": 2.2,
+        "deterministic": true,
+        "pixelSha256": "48640f97f91fc88fa48f9a1229acd8c551972e1063fe9a3351029f10ace3b58a"
+      },
+      "crossEngineByteLengthMatch": true
+    },
+    {
+      "paths": 30000,
+      "canvas": "1024x1024",
+      "seed": 3008199057,
+      "sceneJsonBytes": 47781115,
+      "boundaryPrep": {
+        "p50Ms": 433.459,
+        "samplesMs": [
+          433.459,
+          477.747,
+          422.738
+        ],
+        "shareOfVelloP50": 0.0136
+      },
+      "vello-cpu": {
+        "iterations": 3,
+        "samplesMs": [
+          31877.656,
+          31943.145,
+          31744.213
+        ],
+        "p50Ms": 31877.656,
+        "p95Ms": 31943.145,
+        "meanMs": 31855.005,
+        "throughputMiBps": 0.13,
+        "deterministic": true,
+        "pixelSha256": "3106dc96a2ad35ae9ea7b871f17a0d7117bea1cd948fa76202dc4bdef03feb81"
+      },
+      "skia-canvaskit": {
+        "iterations": 5,
+        "samplesMs": [
+          3597.664,
+          3603.761,
+          3606.715,
+          3591.178,
+          3582.235
+        ],
+        "p50Ms": 3597.664,
+        "p95Ms": 3606.715,
+        "meanMs": 3596.31,
+        "throughputMiBps": 1.11,
+        "deterministic": true,
+        "pixelSha256": "e641fbffb6bbfd05d7c690b6e1701f78e211b9edc12119ecbc482218d2c3c042"
+      },
+      "crossEngineByteLengthMatch": true
+    }
+  ],
+  "gpuBrowser": {
+    "harness": "packages/studio-engine-vello/src/__tests__/gpu-browser-large.test.ts (VELLO_GPU_LARGE_PROBE=1)",
+    "engine": "vello 0.9.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0 in the same wasm build",
+    "note": "gpu/cpu timings include the wasm-side serde parse of the scene JSON (not separable without crate changes) plus, for GPU, pipeline submit and full readback; jsonBoundary isolates the JS-side JSON.parse/JSON.stringify cost of the same payload",
+    "measuredAt": "2026-08-08T00:01:09.969Z",
+    "browser": {
+      "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+      "version": "140.0.7339.186"
+    },
+    "adapter": {
+      "backend": "BrowserWebGpu",
+      "deviceType": "Other",
+      "driver": "",
+      "driverInfo": "",
+      "name": ""
+    },
+    "parityGatePct": 0.6,
+    "timedSamples": 5,
+    "concurrentLoad": "8h soak harness (pnpm run soak:studio-engine) may share this host; medians reported",
+    "scenes": [
+      {
+        "scene": "5000-paths-512sq",
+        "paths": 5000,
+        "canvas": "512x512",
+        "seed": 504069529,
+        "fuzzyMismatchPct": 0,
+        "gpuP50Ms": 73.7,
+        "gpuP95Ms": 76.4,
+        "cpuInBrowserP50Ms": 2471.7,
+        "jsonBoundary": {
+          "sceneJsonBytes": 8007317,
+          "parseP50Ms": 18,
+          "stringifyP50Ms": 10.2
+        },
+        "gpuSamplesMs": [
+          76.4,
+          72.7,
+          73.7,
+          71.9,
+          73.9
+        ],
+        "cpuSamplesMs": [
+          2491.8,
+          2477.2,
+          2471.7,
+          2466.6,
+          2470.3
+        ]
+      },
+      {
+        "scene": "15000-paths-512sq",
+        "paths": 15000,
+        "canvas": "512x512",
+        "seed": 1504099529,
+        "fuzzyMismatchPct": 0.0004,
+        "gpuP50Ms": 205,
+        "gpuP95Ms": 210.4,
+        "cpuInBrowserP50Ms": 7410.3,
+        "jsonBoundary": {
+          "sceneJsonBytes": 24044610,
+          "parseP50Ms": 54.8,
+          "stringifyP50Ms": 32
+        },
+        "gpuSamplesMs": [
+          210.4,
+          205.8,
+          204.8,
+          203.8,
+          205
+        ],
+        "cpuSamplesMs": [
+          7399.7,
+          7414.4,
+          7420.5,
+          7410.3,
+          7408.7
+        ]
+      }
+    ]
+  }
+}
