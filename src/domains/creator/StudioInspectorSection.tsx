@@ -20,10 +20,16 @@
  */
 
 import { ChevronDown } from "lucide-react";
-import { Suspense, useEffect, useId, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 
 import { inspectorSectionLabel } from "./studio-inspector-density";
+import { isStudioInspectorFocusTarget } from "./studio-inspector-focus";
+import {
+  scrollStudioInspectorTargetIntoView,
+  useStudioInspectorFocusRequest,
+} from "./studio-inspector-focus-effect";
 
+import type { StudioInspectorFocusTarget } from "./studio-inspector-focus";
 import type { ReactNode } from "react";
 
 export interface StudioInspectorSectionProps {
@@ -55,15 +61,26 @@ export function StudioInspectorSection({
 }: StudioInspectorSectionProps) {
   const [open, setOpen] = useState(defaultOpen || forceOpen);
   const panelId = useId();
+  const rootRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (forceOpen) setOpen(true);
   }, [forceOpen]);
 
+  // A menu row pointing at this section must land the artist *on the control*,
+  // not on a collapsed header they still have to find and click.
+  const focusTarget: StudioInspectorFocusTarget | null =
+    isStudioInspectorFocusTarget(sectionId) ? sectionId : null;
+  useStudioInspectorFocusRequest(focusTarget, () => {
+    setOpen(true);
+    scrollStudioInspectorTargetIntoView(rootRef.current);
+  });
+
   const heading = title ?? inspectorSectionLabel(sectionId) ?? sectionId;
 
   return (
     <section
+      ref={rootRef}
       className="mt-3 border-t border-line/50 pt-3"
       data-inspector-section={sectionId}
     >

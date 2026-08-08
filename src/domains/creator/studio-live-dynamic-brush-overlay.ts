@@ -74,6 +74,13 @@ import {
   resolveStudioLiveSurfaceDevicePixelRatio,
   STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS,
 } from "./studio-low-latency-canvas";
+import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
+import {
+  resolveStudioDocumentPaperSurface,
+  studioPaperGranulationIsActive,
+  type StudioPaperGranulationSettings,
+  type StudioPaperSurfaceSettings,
+} from "./studio-paper-granulation-runtime";
 import {
   studioProfessionalShelfRibbonCarrierOwnsMaterial,
 } from "./studio-professional-shelf-ribbon-carrier";
@@ -171,6 +178,14 @@ interface DetachedDynamicStrokeStyle {
   readonly symmetrySignature: string;
   readonly transforms: readonly StudioBrushSymmetryTransform[];
   readonly strokeOrigins: readonly Readonly<{ x: number; y: number }>[];
+  /**
+   * 이 도구의 종이 반응 + 스트로크 시작 시점의 문서 종이. 획을 그리는 도중 문서 종이가 바뀌어도
+   * 라이브 프리픽스와 커밋 결과가 갈라지지 않도록 시작 시 한 번 확정한다.
+   */
+  readonly paper?: Readonly<{
+    readonly response: StudioPaperGranulationSettings;
+    readonly surface: StudioPaperSurfaceSettings;
+  }>;
 }
 
 interface DynamicStrokeSource {
@@ -697,6 +712,10 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
     const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
     return Object.freeze({ x, y });
   });
+  const paperResponse = resolveStudioPaperBrushResponse(element.brush);
+  const paper = studioPaperGranulationIsActive(paperResponse)
+    ? Object.freeze({ response: paperResponse, surface: resolveStudioDocumentPaperSurface() })
+    : undefined;
   return {
     strokeId: element.id,
     brushId: element.brush!,
@@ -712,6 +731,7 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
     symmetrySignature,
     transforms,
     strokeOrigins,
+    ...(paper ? { paper } : {}),
   };
 }
 
@@ -1167,6 +1187,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       strokeOrigins: active.style.strokeOrigins,
       dynamics: active.style.dynamics,
       materialIdentity: active.style.materialIdentity,
+      ...(active.style.paper ? { paper: active.style.paper } : {}),
       dynamicSeed: active.style.seed,
       stroke: active.style.color,
       stampGrid: active.stampGrid,
@@ -1562,6 +1583,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         stroke: style.color,
         stampGrid,
         markBudget: causalMarkBudget(style.dynamics),
+        ...(style.paper ? { paper: style.paper } : {}),
       });
       if (!marks.ok) return null;
       const firstDab = acceptedSegments
@@ -1634,6 +1656,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       strokeOrigins: style.strokeOrigins,
       dynamics: style.dynamics,
       materialIdentity: style.materialIdentity,
+      ...(style.paper ? { paper: style.paper } : {}),
       dynamicSeed: style.seed,
       stroke: style.color,
       stampGrid: renderBudget.stampGrid,

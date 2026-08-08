@@ -34,6 +34,8 @@ import {
   Settings2,
   SlidersHorizontal,
   Smartphone,
+  SunMedium,
+  Tablet,
   Trash2,
   Undo2,
   X,
@@ -118,6 +120,11 @@ const DEFAULT_WORKSPACE_ICONS: Record<StudioDefaultWorkspaceId, LucideIcon> = {
   review: ScanSearch,
   publish: Send,
   "pro-comic": PanelsTopLeft,
+  "quick-sketch": PencilLine,
+  "csp-migration": PanelLeft,
+  "pen-display": Tablet,
+  "mobile-draw": Smartphone,
+  "photo-edit": SunMedium,
 };
 
 const INSPECTOR_PRIMARY_LABELS: Record<

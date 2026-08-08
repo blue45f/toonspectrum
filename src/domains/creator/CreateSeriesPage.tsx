@@ -18,6 +18,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
 import { SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { buildStudioHref } from "./creator-studio-links";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeleteSeriesRequest } from "./studio-destructive-command-catalog";
+import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 
 import { CoverImage } from "@/components/cover-image";
 import { Container } from "@/components/section";
@@ -121,7 +124,11 @@ export function CreateSeriesPage() {
 
   async function onDelete() {
     if (!series || deleting) return;
-    if (!globalThis.confirm("이 시리즈를 삭제할까요? 회차 작품들은 시리즈에서만 분리되고 삭제되지 않습니다.")) return;
+    if (
+      !(await confirmStudioDestructiveAction(
+        studioDeleteSeriesRequest(series.title || "이 시리즈")
+      ))
+    ) return;
     setDeleting(true);
     setActionError(null);
     try {
@@ -170,6 +177,8 @@ export function CreateSeriesPage() {
 
   return (
     <Container size="wide" className="py-8 lg:py-10">
+      {/* 스튜디오 밖 라우트에도 승인 표면을 둔다 — 없으면 네이티브 confirm 으로 떨어진다. */}
+      <StudioDestructiveConfirmHost />
       <Link
         href="/create?tab=series"
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"

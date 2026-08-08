@@ -21,7 +21,19 @@
  * `globalThis.confirm` 을 쓴다.
  */
 
-export type StudioDestructiveReversibility = "undoable" | "irreversible";
+/**
+ * 되돌림 등급.
+ *  - `undoable` — 문서 히스토리(⌘Z)로 정확히 되돌아온다.
+ *  - `irreversible` — 되돌릴 수 없다(서버 삭제·브라우저 저장소 레코드 삭제·히스토리 밖 문서
+ *    사이드카). 승인 게이트를 유지하되 무엇이 영구히 사라지는지 명시한다.
+ *  - `document-untouched` — 그림 문서를 전혀 건드리지 않는다(내보내기 선택, 공유 동의,
+ *    기기 라이브러리 가져오기). "실행 취소로 되돌아온다"도 "영구히 사라진다"도 거짓이므로
+ *    별도 등급을 둔다 — 거짓 안심과 거짓 공포 둘 다 조용한 실패의 한 형태다.
+ */
+export type StudioDestructiveReversibility =
+  | "undoable"
+  | "irreversible"
+  | "document-untouched";
 
 export interface StudioDestructiveLoss {
   /** 사라지는 대상의 이름. 예: "현재 페이지의 요소". */
@@ -37,6 +49,13 @@ export interface StudioDestructiveActionRequest {
   readonly id: string;
   /** 명령 이름. preview 첫 줄. */
   readonly title: string;
+  /**
+   * 제목 바로 아래 한 문단. 손실 목록으로 표현되지 않는 명령(내보내기 분할 선택, 공유 동의,
+   * 기기 라이브러리 가져오기)이 **무슨 일이 일어나는지**를 말하는 자리다. 이 값이 있고
+   * `losses` 가 비어 있으면 "사라지는 것" 블록 자체를 띄우지 않는다 — 사라지는 것이 없는데
+   * "확인된 손실 없음"을 읽히는 것은 정보가 아니라 잡음이다.
+   */
+  readonly intro?: string;
   /** 사라지는 것들. 비어 있으면 preview 는 "확인된 손실 없음"을 명시한다. */
   readonly losses: readonly StudioDestructiveLoss[];
   /** 대신 들어오는 것들(교체형 명령). */
@@ -47,12 +66,34 @@ export interface StudioDestructiveActionRequest {
    * "되돌릴 수 있다"고만 말하고 일부가 안 돌아오면 그것이 숨은 실패다.
    */
   readonly undoNote?: string;
+  /**
+   * 승인 버튼 문구. 취소가 "아무 일도 안 함"이 아니라 **두 번째 동작**인 명령(예: 내보내기
+   * 분할 대신 배율 낮추기)은 두 라벨을 반드시 채운다 — 무엇을 고르는지 모르게 하는 것이
+   * 조용한 실패다.
+   */
+  readonly confirmLabel?: string;
+  readonly cancelLabel?: string;
 }
 
 export const STUDIO_DESTRUCTIVE_UNDO_HINT =
   "실행 취소(Ctrl/⌘+Z)로 되돌릴 수 있어요.";
 export const STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT =
   "되돌릴 수 없어요. 실행 취소로도 복구되지 않습니다.";
+export const STUDIO_DESTRUCTIVE_DOCUMENT_UNTOUCHED_HINT =
+  "그림 문서는 바뀌지 않아요.";
+
+export function studioDestructiveReversibilityHint(
+  reversibility: StudioDestructiveReversibility,
+): string {
+  switch (reversibility) {
+    case "undoable":
+      return STUDIO_DESTRUCTIVE_UNDO_HINT;
+    case "irreversible":
+      return STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT;
+    case "document-untouched":
+      return STUDIO_DESTRUCTIVE_DOCUMENT_UNTOUCHED_HINT;
+  }
+}
 
 function formatLoss(loss: StudioDestructiveLoss): string {
   const counted =
@@ -69,25 +110,25 @@ function formatLoss(loss: StudioDestructiveLoss): string {
 export function formatStudioDestructivePreview(
   request: StudioDestructiveActionRequest,
 ): string {
-  const lines: string[] = [request.title, ""];
-  lines.push("사라지는 것");
-  if (request.losses.length === 0) {
-    lines.push("· 확인된 손실 없음");
-  } else {
-    for (const loss of request.losses) lines.push(formatLoss(loss));
+  const blocks: string[] = [request.title];
+  if (request.intro) blocks.push(request.intro);
+  // 손실이 없고 무슨 일이 일어나는지 intro 가 이미 말했다면 빈 손실 블록을 띄우지 않는다.
+  if (request.losses.length > 0 || !request.intro) {
+    const lossLines =
+      request.losses.length === 0
+        ? ["· 확인된 손실 없음"]
+        : request.losses.map(formatLoss);
+    blocks.push(["사라지는 것", ...lossLines].join("\n"));
   }
   if (request.gains && request.gains.length > 0) {
-    lines.push("", "대신 들어오는 것");
-    for (const gain of request.gains) lines.push(`· ${gain}`);
+    blocks.push(
+      ["대신 들어오는 것", ...request.gains.map((gain) => `· ${gain}`)].join("\n"),
+    );
   }
-  lines.push(
-    "",
-    request.reversibility === "undoable"
-      ? STUDIO_DESTRUCTIVE_UNDO_HINT
-      : STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT,
-  );
-  if (request.undoNote) lines.push(request.undoNote);
-  return lines.join("\n");
+  const closing = [studioDestructiveReversibilityHint(request.reversibility)];
+  if (request.undoNote) closing.push(request.undoNote);
+  blocks.push(closing.join("\n"));
+  return blocks.join("\n\n");
 }
 
 /** 원장·상태 레일에 쓰는 한 줄 요약. */
@@ -108,16 +149,22 @@ export function summarizeStudioDestructiveLosses(
 /* Presenter seam                                                      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 승인 표면. 온캔버스 다이얼로그는 사용자의 응답을 동기적으로 돌려줄 수 없으므로
+ * `Promise<boolean>` 을 허용한다. 동기 presenter(테스트·네이티브 fallback)도 그대로 쓴다.
+ */
 export type StudioDestructiveConfirmPresenter = (
   request: StudioDestructiveActionRequest,
   preview: string,
-) => boolean;
+) => boolean | Promise<boolean>;
 
 let presenter: StudioDestructiveConfirmPresenter | null = null;
 
 /**
- * preview 표면 교체 지점. 온캔버스 다이얼로그가 준비되면 여기에 꽂으면 되고, 그때까지는
- * 기본 presenter 가 **preview 텍스트를 담은** 네이티브 confirm 을 띄운다.
+ * preview 표면 교체 지점. 온캔버스 다이얼로그(`StudioDestructiveConfirmHost`)가 마운트되면
+ * 여기에 꽂히고, 그 표면이 없는 곳(테스트·SSR·호스트 미마운트 라우트)에서는 기본 presenter 가
+ * **preview 텍스트를 담은** 네이티브 confirm 을 띄운다. 이 모듈이 그 fallback 의 유일한
+ * 소유자다 — 다른 곳에 네이티브 confirm 이 다시 생기면 계약 테스트가 막는다.
  */
 export function setStudioDestructiveConfirmPresenter(
   next: StudioDestructiveConfirmPresenter | null,
@@ -133,6 +180,25 @@ function defaultPresenter(preview: string): boolean {
     return false;
   }
   return confirmFn(preview) === true;
+}
+
+/**
+ * 승인 여부를 묻는 단일 통로. presenter 가 던지면 **거절**로 처리한다 — 승인 표면이
+ * 깨졌을 때 파괴가 통과하는 쪽이 더 나쁜 실패다.
+ */
+async function askForApproval(
+  request: StudioDestructiveActionRequest,
+): Promise<boolean> {
+  const preview = formatStudioDestructivePreview(request);
+  try {
+    const answer = await (presenter ?? ((_request, text) => defaultPresenter(text)))(
+      request,
+      preview,
+    );
+    return answer === true;
+  } catch {
+    return false;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -215,20 +281,31 @@ export interface StudioDestructiveActionInput {
 
 export type StudioDestructiveRunStatus = "declined" | StudioDestructiveOutcome;
 
+/** 성공 고지 문구 — 되돌림 등급별로 사실만 말한다. */
+function committedSummary(request: StudioDestructiveActionRequest): string {
+  switch (request.reversibility) {
+    case "undoable":
+      return `${summarizeStudioDestructiveLosses(request)}을(를) 정리했어요.`;
+    case "irreversible":
+      return `${summarizeStudioDestructiveLosses(request)}을(를) 영구히 지웠어요.`;
+    case "document-untouched":
+      return `${request.title}을(를) 실행했어요.`;
+  }
+}
+
+function refusedSummary(request: StudioDestructiveActionRequest): string {
+  return `${request.title}을(를) 적용하지 못했습니다. 문서가 잠겼거나 저장 중일 수 있어요.`;
+}
+
 /**
  * preview → 승인 → 실행 → 결과 고지의 단일 흐름.
  * 반환값은 호출부가 후속 상태 갱신을 이어갈지 판단하는 데 쓴다(`"committed"` 만 진행).
  */
-export function runStudioDestructiveAction(
+export async function runStudioDestructiveAction(
   input: StudioDestructiveActionInput,
-): StudioDestructiveRunStatus {
+): Promise<StudioDestructiveRunStatus> {
   const request = input.request;
-  const preview = formatStudioDestructivePreview(request);
-  const accepted = (presenter ?? ((_request, text) => defaultPresenter(text)))(
-    request,
-    preview,
-  );
-  if (!accepted) return "declined";
+  if (!(await askForApproval(request))) return "declined";
   const at = (input.now ?? Date.now)();
   let outcome: StudioDestructiveOutcome;
   let summary: string;
@@ -236,13 +313,10 @@ export function runStudioDestructiveAction(
     const result = input.execute();
     if (result === false) {
       outcome = "refused";
-      summary = `${request.title}을(를) 적용하지 못했습니다. 문서가 잠겼거나 저장 중일 수 있어요.`;
+      summary = refusedSummary(request);
     } else {
       outcome = "committed";
-      summary =
-        request.reversibility === "undoable"
-          ? `${summarizeStudioDestructiveLosses(request)}을(를) 정리했어요.`
-          : `${summarizeStudioDestructiveLosses(request)}을(를) 영구히 지웠어요.`;
+      summary = committedSummary(request);
     }
   } catch (cause: unknown) {
     outcome = "failed";
@@ -274,9 +348,8 @@ export function runStudioDestructiveAction(
  */
 export function confirmStudioDestructiveAction(
   request: StudioDestructiveActionRequest,
-): boolean {
-  const preview = formatStudioDestructivePreview(request);
-  return (presenter ?? ((_request, text) => defaultPresenter(text)))(request, preview);
+): Promise<boolean> {
+  return askForApproval(request);
 }
 
 export function recordStudioDestructiveOutcome(input: {
@@ -290,11 +363,9 @@ export function recordStudioDestructiveOutcome(input: {
   const summary =
     input.detail
     ?? (outcome === "committed"
-      ? request.reversibility === "undoable"
-        ? `${summarizeStudioDestructiveLosses(request)}을(를) 정리했어요.`
-        : `${summarizeStudioDestructiveLosses(request)}을(를) 영구히 지웠어요.`
+      ? committedSummary(request)
       : outcome === "refused"
-        ? `${request.title}을(를) 적용하지 못했습니다. 문서가 잠겼거나 저장 중일 수 있어요.`
+        ? refusedSummary(request)
         : `${request.title} 중 오류가 났습니다.`);
   pushRecord({
     id: request.id,

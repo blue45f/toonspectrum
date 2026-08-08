@@ -1,6 +1,8 @@
 import { Download, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
 import { useId, useRef, useState, type ChangeEvent } from "react";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeletePoseMaterialRequest } from "./studio-destructive-command-catalog";
 import {
   STUDIO_POSE_SCOPES,
   isStudioHumanoidBoneInScope,
@@ -276,8 +278,12 @@ export function StudioVrmPoseMaterialPanel({
     }));
   }
 
-  function handleDelete(material: StudioPoseMaterial): void {
-    if (!globalThis.confirm(`“${material.name}” 포즈 소재를 이 기기에서 삭제할까요?`)) return;
+  async function handleDelete(material: StudioPoseMaterial): Promise<void> {
+    if (
+      !(await confirmStudioDestructiveAction(
+        studioDeletePoseMaterialRequest(material.name),
+      ))
+    ) return;
     if (
       updateFromMutation(
         deleteStudioPoseMaterial(storageAdapter, material.id),
@@ -518,7 +524,7 @@ export function StudioVrmPoseMaterialPanel({
                   <button
                     type="button"
                     disabled={mutationDisabled}
-                    onClick={() => handleDelete(material)}
+                    onClick={() => void handleDelete(material)}
                     className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 hover:border-bad/40 hover:text-bad disabled:opacity-45"
                     aria-label={`${material.name} 포즈 소재 삭제`}
                   >

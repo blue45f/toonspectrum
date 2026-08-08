@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  resetStudioDestructiveActionLedger,
+  setStudioDestructiveConfirmPresenter,
+  type StudioDestructiveActionRequest,
+} from "./studio-destructive-action-preview";
 import {
   StudioPageListPane,
   type StudioPageListPaneHandlers,
@@ -10,6 +15,26 @@ import {
 } from "./StudioPageListPane";
 
 import type { PageState } from "./studio-page-state";
+
+/**
+ * 파괴 승인은 이제 구조화된 요청을 거친다(네이티브 confirm 문자열이 아니다).
+ * 테스트는 그 요청을 받아 적고 승인한다 — 문구가 아니라 계약을 검사한다.
+ */
+function captureApprovals(): readonly StudioDestructiveActionRequest[] {
+  const seen: StudioDestructiveActionRequest[] = [];
+  setStudioDestructiveConfirmPresenter((request) => {
+    seen.push(request);
+    return true;
+  });
+  return seen;
+}
+
+/** 승인이 비동기라 클릭 뒤 마이크로태스크를 흘려보낸다. */
+async function settleApproval(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
 
 vi.mock("./studio-page-lazy-ui", () => ({
   StudioPageThumbnail: ({ page, className }: { page: PageState; className?: string }) => (
@@ -127,12 +152,13 @@ afterEach(() => {
   cleanup();
   window.localStorage.clear();
   vi.restoreAllMocks();
+  resetStudioDestructiveActionLedger();
 });
 
 describe("StudioPageListPane", () => {
-  it("keeps selection and page CRUD routed through the caller-owned contracts", () => {
+  it("keeps selection and page CRUD routed through the caller-owned contracts", async () => {
     const props = createProps();
-    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+    const approvals = captureApprovals();
     render(<StudioPageListPane {...props} />);
 
     fireEvent.click(screen.getByRole("button", { name: "두 번째 선택" }));
@@ -146,13 +172,19 @@ describe("StudioPageListPane", () => {
     fireEvent.click(secondPage.getByRole("button", { name: "이 뒤에 빈 페이지 삽입" }));
     fireEvent.click(secondPage.getByRole("button", { name: "이 페이지 내용 비우기" }));
     fireEvent.click(secondPage.getByRole("button", { name: "페이지 삭제" }));
+    await settleApproval();
 
     expect(props.stableHandlers.duplicatePage).toHaveBeenCalledWith("page-2");
     expect(props.stableHandlers.duplicatePageMirrored).toHaveBeenCalledWith("page-2");
     expect(props.stableHandlers.insertPageBefore).toHaveBeenCalledWith("page-2");
     expect(props.stableHandlers.insertPageAfter).toHaveBeenCalledWith("page-2");
     expect(props.stableHandlers.clearPageFor).toHaveBeenCalledWith("page-2");
-    expect(confirm).toHaveBeenCalledWith("2페이지를 삭제할까요?");
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({
+      id: "studio.page.delete",
+      title: "2페이지 삭제",
+      reversibility: "undoable",
+    });
     expect(props.stableHandlers.deletePage).toHaveBeenCalledWith("page-2");
     expect(props.setCurrentPageId).not.toHaveBeenCalled();
   });
@@ -331,9 +363,9 @@ describe("StudioPageListPane", () => {
     expect(props.setMobileSheet).toHaveBeenCalledWith(null);
   });
 
-  it("multi-selects with meta/shift and routes bulk move/delete through stable handlers", () => {
+  it("multi-selects with meta/shift and routes bulk move/delete through stable handlers", async () => {
     const props = createProps();
-    const confirm = vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+    const approvals = captureApprovals();
     render(<StudioPageListPane {...props} />);
 
     fireEvent.click(screen.getByRole("button", { name: "첫 장면 선택" }));
@@ -366,7 +398,19 @@ describe("StudioPageListPane", () => {
     );
 
     fireEvent.click(screen.getByTestId("studio-page-bulk-delete"));
-    expect(confirm).toHaveBeenCalledWith("선택한 3개 페이지를 삭제할까요?");
+    await settleApproval();
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]).toMatchObject({
+      id: "studio.page.delete-bulk",
+      reversibility: "undoable",
+      losses: [
+        {
+          label: "선택한 페이지",
+          count: 3,
+          note: "각 페이지의 요소가 함께 사라져요",
+        },
+      ],
+    });
     expect(props.stableHandlers.deletePagesBulk).toHaveBeenCalledWith([
       "page-1",
       "page-2",

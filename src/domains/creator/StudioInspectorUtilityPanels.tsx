@@ -112,6 +112,8 @@ export function StudioInspectorBrushCatalogButton({
     <button
       type="button"
       aria-haspopup="dialog"
+      // 그리기 ▸ 브러시 프리셋 목록 메뉴 항목이 앵커·복귀 포커스로 되찾는 런처다.
+      data-studio-brush-catalog-launcher="true"
       onClick={(event) => onOpen(event.currentTarget)}
       className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     >

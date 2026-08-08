@@ -29,6 +29,8 @@ import {
   type AnimationTimelineDoc,
   type StudioAnimEase,
 } from "./studio-anim-tracks";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioRemoveTimelineTrackRequest } from "./studio-destructive-command-catalog";
 import { MAX_FRAME_FPS, MIN_FRAME_FPS, type OnionSkinSettings } from "./studio-frame-animation";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -582,9 +584,14 @@ export function StudioAnimTimelinePanel({
               type="button"
               onClick={() => {
                 if (!hasTrack(doc, focusedRow.id)) return;
-                if (globalThis.confirm(`"${focusedRow.label}" 레이어의 모든 키프레임을 지울까요?`)) {
+                void (async () => {
+                  if (
+                    !(await confirmStudioDestructiveAction(
+                      studioRemoveTimelineTrackRequest(focusedRow.label)
+                    ))
+                  ) return;
                   onRemoveTrack(focusedRow.id);
-                }
+                })();
               }}
               disabled={!hasTrack(doc, focusedRow.id)}
               title={hasTrack(doc, focusedRow.id) ? undefined : "삭제할 키프레임이 없어요"}

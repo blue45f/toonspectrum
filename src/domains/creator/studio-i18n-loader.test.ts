@@ -32,7 +32,7 @@ describe("Studio lazy i18n assets", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_243);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_257);
     }
     expect(resolveI18nValue("ko", "studio.canvas.wheelMode.zoom")).toBe(
       "휠: 캔버스 확대·축소",

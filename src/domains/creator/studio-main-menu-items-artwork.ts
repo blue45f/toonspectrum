@@ -1,11 +1,20 @@
 /**
- * §15.3 artwork groups — Select, Layer, Brush.
+ * §15.3 artwork groups — Select, Layer, Transform.
  *
- * These three are the groups the UX audit called out as structurally missing
+ * Brush moved to `studio-main-menu-items-brush.ts` when its §15.3 rows landed:
+ * four groups sharing one line budget would have made the drawing group's growth
+ * everyone else's problem.
+ *
+ * Three of these are the groups the UX audit called out as structurally missing
  * (`docs/rewrite/ux-audit-v5.md` §2.7): selection and layer commands used to be
  * buried inside Edit, and drawing lived in a product-only `그리기` group. Every
  * relocated item keeps its original handler and carries `legacyPath` so locale
  * keys and disabled-reason copy do not move with it.
+ *
+ * Wave D adds the two rows the audit measured as 1–2–3 failures because the menu
+ * had no path to them at all: Layer ▸ Mask/Clipping and Transform ▸ Scale/Rotate.
+ * Both dispatch the handlers the inspector and the tool rail already use — the
+ * menu opens a second door, it does not fork the behaviour.
  */
 
 import {
@@ -14,16 +23,13 @@ import {
   ChevronDown,
   ChevronUp,
   Crop,
-  Eraser,
   ImagePlus,
   Lasso,
   Layers,
   LayoutGrid,
-  Mountain,
-  PaintBucket,
-  Palette,
-  Pencil,
-  Shapes,
+  Scaling,
+  SquareDashed,
+  SquareStack,
   X,
 } from "lucide-react";
 
@@ -139,9 +145,39 @@ export function buildStudioLayerMenuItems({
       legacyPath: "edit/crop-layer",
       icon: Crop,
       disabled: state.edit.cropLayerDisabled,
-      separatorAfter: true,
       onSelect: () => {
         editor.openSelectedLayerCrop();
+      },
+    },
+    // §15.3 Layer ▸ Mask/Clipping. Until Wave D the only door was the inspector
+    // 속성 탭 checkbox, which the audit measured at 3 actions (§2.2).
+    {
+      id: "clipping-mask",
+      commandId: "layer.clipping-mask",
+      label: "아래 레이어에 클리핑",
+      icon: SquareStack,
+      checked: state.clippingMaskActive,
+      selectionRole: "checkbox",
+      disabled: state.clippingMaskDisabled,
+      unavailableReason: state.clippingMaskDisabled
+        ? "클리핑할 레이어 하나를 먼저 선택하세요."
+        : undefined,
+      onSelect: () => {
+        editor.toggleClippingMask();
+      },
+    },
+    {
+      id: "mask",
+      commandId: "layer.mask",
+      label: "레이어 마스크 편집…",
+      icon: SquareDashed,
+      disabled: !state.imageLayerSelected,
+      unavailableReason: state.imageLayerSelected
+        ? undefined
+        : "마스크를 편집할 이미지 레이어를 먼저 선택하세요.",
+      separatorAfter: true,
+      onSelect: () => {
+        ui.openLayerMask();
       },
     },
     {
@@ -159,77 +195,22 @@ export function buildStudioLayerMenuItems({
 }
 
 /**
- * Brush — the former `그리기` group. The group id becomes `brush` to match
- * §15.3; the Korean label and its locale key stay put (see the spec table's
- * `labelKey`), so shipped translations keep resolving.
+ * Transform — §15.3 declared the group from the start, but every transform door
+ * was a tool-rail button, and the audit measured 19 of the rail's 34 buttons
+ * below the fold at 1440×900 (`docs/rewrite/ux-audit-v5.md` §2.2). One menu row
+ * into the host's existing free-transform entry point is what makes it 2 actions.
  */
-export function buildStudioBrushMenuItems({
-  editor,
+export function buildStudioTransformMenuItems({
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
   return [
     {
-      id: "pen",
-      commandId: "tool.pen",
-      legacyPath: "draw/pen",
-      label: "펜",
-      icon: Pencil,
-      shortcut: "B",
+      id: "pixel-transform",
+      commandId: "transform.pixel-selection",
+      label: "선택 변형",
+      icon: Scaling,
       onSelect: () => {
-        ui.selectDrawMode("pen");
-      },
-    },
-    {
-      id: "eraser",
-      commandId: "tool.eraser",
-      legacyPath: "draw/eraser",
-      label: "지우개",
-      icon: Eraser,
-      shortcut: "E",
-      onSelect: () => {
-        ui.selectDrawMode("eraser");
-      },
-    },
-    {
-      id: "fill",
-      commandId: "tool.fill",
-      legacyPath: "draw/fill",
-      label: "채우기",
-      icon: PaintBucket,
-      shortcut: "G",
-      onSelect: () => {
-        editor.toggleAdvancedFill();
-      },
-    },
-    {
-      id: "smart-shape",
-      commandId: "tool.smart-shape",
-      legacyPath: "draw/smart-shape",
-      label: "스마트 도형",
-      icon: Shapes,
-      separatorAfter: true,
-      onSelect: () => {
-        ui.enableSmartShape();
-      },
-    },
-    {
-      id: "bg",
-      commandId: "brush.background-tone",
-      legacyPath: "draw/bg",
-      label: "배경 · 톤",
-      icon: Mountain,
-      onSelect: () => {
-        ui.openStudioMenu("bgFill");
-      },
-    },
-    {
-      id: "style",
-      commandId: "brush.palette-brand",
-      legacyPath: "draw/style",
-      label: "팔레트 · 브랜드",
-      icon: Palette,
-      onSelect: () => {
-        ui.openStudioMenu("palette");
+        ui.activateTransformTool();
       },
     },
   ];

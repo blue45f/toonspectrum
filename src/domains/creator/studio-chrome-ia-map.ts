@@ -77,10 +77,11 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
 ] as const;
 
 /**
- * Top menubar group order — V5 §15.3. Transform, Animation and Collaboration are
- * §15.3 groups we ship no command for yet, so they are declared in
- * `studio-main-menu-group-spec.ts` but never rendered; `ai` is a product group
- * §15.3 does not define.
+ * Top menubar group order — V5 §15.3, complete. `ai` is a product group §15.3
+ * does not define. Transform joined the rendered set in Wave D; Animation and
+ * Collaboration joined it in Wave E, once the menu got a door onto the keyframe
+ * timeline, the team panel and the review flow — features that had shipped long
+ * before anything in the menubar could reach them.
  */
 export const STUDIO_CHROME_MENUBAR_GROUP_ORDER = [
   "file",
@@ -89,12 +90,15 @@ export const STUDIO_CHROME_MENUBAR_GROUP_ORDER = [
   "canvas",
   "layer",
   "select",
+  "transform",
   "brush",
   "filter",
   "vector",
   "text",
   "comic",
+  "animation",
   "3d",
+  "collaboration",
   "window",
   "ai",
   "help",
@@ -113,12 +117,15 @@ export const STUDIO_CHROME_MENUBAR_GROUP_LABELS: Readonly<
   canvas: "캔버스",
   layer: "레이어",
   select: "선택",
+  transform: "변형",
   brush: "그리기",
   filter: "필터",
   vector: "벡터",
   text: "텍스트",
   comic: "만화",
+  animation: "애니메이션",
   "3d": "3D",
+  collaboration: "협업",
   window: "창",
   ai: "AI",
   help: "도움말",
@@ -167,7 +174,11 @@ export const STUDIO_CHROME_SELECT_CORE_ACTION_IDS = [
 
 /**
  * File menu item order for CSP/PPT-like document flow:
- * save & publish → import → project tools → export/share.
+ * save & publish → import → project tools → export/share → project surfaces.
+ *
+ * Wave E appended the five surfaces whose only door was the desktop-only
+ * 프로젝트 작업 sheet. They sit after the export loop on purpose: the export loop
+ * is the high-frequency path and must not move down the menu to make room.
  */
 export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [
   "save-draft",
@@ -180,6 +191,11 @@ export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [
   "copy-image",
   "export-json",
   "export-archive",
+  "quick-start",
+  "checkpoints",
+  "publish-preflight",
+  "publish-package",
+  "rights-manifest",
 ] as const;
 
 /** CSP-style left rail tool groups (divider boundaries). */

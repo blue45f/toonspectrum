@@ -204,7 +204,8 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
     expect(html).toContain('aria-controls="_R_0_-custom-list"');
     expect(html).toContain('role="search"');
     expect(html).toContain("작업공간 이름 또는 용도 검색");
-    expect(html).toContain("검색 결과 9개");
+    // Twelve built-in profiles plus the two saved above.
+    expect(html).toContain("검색 결과 14개");
   });
 
   it("separates quick switching from the workspace management and preferences views", () => {

@@ -326,6 +326,9 @@ function canvasCoverageMarksForSvgFixture(
     stroke: el.stroke,
     stampGrid: retainedPlan.plan.renderBudget.stampGrid,
     markBudget: retainedPlan.plan.markBudget,
+    // 종이 결은 렌더 플랜이 도구 물성 + 문서 종이에서 확정한다. SVG도 같은 입력을 받으므로
+    // 이 Canvas 기준선 역시 StudioDrawNode와 똑같이 그대로 전달해야 두 경로가 비교 가능하다.
+    ...(retainedPlan.plan.paper ? { paper: retainedPlan.plan.paper } : {}),
   }).coveragePlan;
   if (!coverage.ok) {
     throw new Error(`coverage fixture rejected: ${coverage.reason}`);

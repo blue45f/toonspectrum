@@ -1,3 +1,8 @@
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  studioExportSplitChoiceRequest,
+  studioExportSplitRequiredRequest,
+} from "./studio-destructive-command-catalog";
 import {
   drawVignette,
   isDefaultPageGrade,
@@ -256,16 +261,22 @@ export function createStudioRasterExportOrchestration({
       const fittingScale = maxFittingScale(pageHeights, spacing, scale);
       const plannedParts = splitPagesForExport(pageHeights, spacing, scale).length;
       if (fittingScale !== null) {
-        split = globalThis.confirm(
-          `${scale}×로 한 장에 합치면 브라우저 캔버스 한계(약 ${MAX_CANVAS_DIM.toLocaleString()}px)를 넘어요.\n` +
-            `확인: ${plannedParts}개 파일로 나눠 저장 / 취소: ${fittingScale}×로 낮춰 한 파일로 저장`
+        // 취소가 "저장 안 함"이 아니라 "배율을 낮춰 한 파일로 저장"이다. 두 결과를 버튼
+        // 라벨로 드러내야 사용자가 무엇을 고르는지 안다(네이티브 confirm 은 못 하던 일).
+        split = await confirmStudioDestructiveAction(
+          studioExportSplitChoiceRequest({
+            scale,
+            maxCanvasDimLabel: MAX_CANVAS_DIM.toLocaleString(),
+            partCount: plannedParts,
+            fittingScale,
+          })
         );
         if (!split) scale = fittingScale;
       } else {
         if (
-          !globalThis.confirm(
-            `페이지가 길어 ${scale}× 한 파일로는 저장할 수 없어요.\n${plannedParts}개 파일로 나눠 저장할까요?`
-          )
+          !(await confirmStudioDestructiveAction(
+            studioExportSplitRequiredRequest({ scale, partCount: plannedParts })
+          ))
         ) {
           return;
         }
