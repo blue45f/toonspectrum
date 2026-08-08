@@ -20,6 +20,24 @@ const PKG_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg");
 // V12 lane 2 (ADR-0011): separate GPU artifact built with
 // `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu`.
 const PKG_GPU_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg-gpu");
+// V12 lane 11 (ADR-0011): pinned libmypaint v1.6.1 emcc build (MyPaint
+// reference parity lane) — artifacts + bridge sources are hash-pinned.
+const LIBMYPAINT_DIR = join(
+  ROOT,
+  "packages",
+  "studio-brush-platform",
+  "src",
+  "libmypaint",
+);
+// V12 lane 3 (ADR-0011): google/ink-stroke-modeler emscripten PoC artifact
+// (commit-pinned wasm + C bridge, quarantined lane — see its README.md).
+const INK_MODELER_DIR = join(
+  ROOT,
+  "packages",
+  "studio-brush-platform",
+  "src",
+  "ink-modeler",
+);
 
 function fail(message) {
   console.error(`verify:studio-engine FAILED — ${message}`);
@@ -30,7 +48,9 @@ function fail(message) {
 function verifyPkgIntegrity(pkgDir, label, rebuildHint) {
   const manifest = readFileSync(join(pkgDir, "INTEGRITY.sha256"), "utf8");
   for (const line of manifest.split("\n")) {
-    if (line.trim() === "") continue;
+    // Blank lines and `#` metadata pins (toolchain/source versions) are
+    // allowed — the hokusai-style manifests carry build provenance comments.
+    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
     const match = line.match(/^([0-9a-f]{64}) [ *](.+)$/);
     if (!match) fail(`unparseable ${label} INTEGRITY line: ${line}`);
     const [, expected, file] = match;
@@ -54,6 +74,12 @@ verifyPkgIntegrity(
   "pkg-gpu",
   "rebuild via `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu` " +
     "(then re-apply the eslint-disable banner per docs/engines/vello-baseline.md §2) and refresh INTEGRITY.sha256",
+);
+verifyPkgIntegrity(
+  INK_MODELER_DIR,
+  "ink-modeler",
+  "rebuild via emcc per packages/studio-brush-platform/src/ink-modeler/README.md " +
+    "(re-apply the two-line @generated banner) and refresh INTEGRITY.sha256",
 );
 
 const STUDIO_ENGINE_PACKAGES = [

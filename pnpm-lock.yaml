@@ -261,6 +261,9 @@ importers:
       three-mesh-bvh:
         specifier: 0.9.13
         version: 0.9.13(three@0.184.0)
+      wasm-vips:
+        specifier: ^0.0.18
+        version: 0.0.18
       web-ifc:
         specifier: 0.0.77
         version: 0.0.77
@@ -391,9 +394,6 @@ importers:
       vitest:
         specifier: '>=4.1.9'
         version: 4.1.9(@types/node@24.13.2)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
-      wasm-vips:
-        specifier: ^0.0.18
-        version: 0.0.18
       wesl:
         specifier: ^0.7.28
         version: 0.7.28
