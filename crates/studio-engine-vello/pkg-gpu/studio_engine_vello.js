@@ -18,6 +18,42 @@ export function adapter_version() {
 }
 
 /**
+ * Adopts a `GPUDevice` the page owns (StudioGpuFabric's single-owner
+ * device) as *the* device this module renders on, replacing any previously
+ * installed context.
+ *
+ * wgpu never destroys an adopted handle, so the fabric's lease/refcount
+ * policy stays authoritative. Rejects if `device` is not a `GPUDevice`.
+ * @param {any} device
+ */
+export function adopt_gpu_device(device) {
+    const ret = wasm.adopt_gpu_device(device);
+    if (ret[1]) {
+        throw takeFromExternrefTable0(ret[0]);
+    }
+}
+
+/**
+ * True once [`adopt_gpu_device`] installed an external device.
+ * @returns {boolean}
+ */
+export function fabric_device_adopted() {
+    const ret = wasm.fabric_device_adopted();
+    return ret !== 0;
+}
+
+/**
+ * Returns the `GPUDevice` this module currently renders on, or `null`
+ * before initialization. The probe compares it by identity against the
+ * fabric device to prove adoption really happened.
+ * @returns {any}
+ */
+export function fabric_device_handle() {
+    const ret = wasm.fabric_device_handle();
+    return ret;
+}
+
+/**
  * Fits a flat x,y polyline into editable cubic PathIR JSON (Kurbo E05 lane).
  * @param {Float64Array} points
  * @param {boolean} closed
@@ -92,6 +128,21 @@ export function render_scene_gpu_json(scene_json) {
     const ptr0 = passStringToWasm0(scene_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.render_scene_gpu_json(ptr0, len0);
+    return ret;
+}
+
+/**
+ * Renders SceneIR JSON on the adopted device and resolves with the raw
+ * `GPUTexture` — no `copy_texture_to_buffer`, no `mapAsync`, no JS-side
+ * pixel array. The caller owns the returned handle and can bind it
+ * directly in its own WGSL pass (V12 §6.3 L4).
+ * @param {string} scene_json
+ * @returns {Promise<any>}
+ */
+export function render_scene_gpu_texture_json(scene_json) {
+    const ptr0 = passStringToWasm0(scene_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.render_scene_gpu_texture_json(ptr0, len0);
     return ret;
 }
 
@@ -203,6 +254,11 @@ function __wbg_get_imports() {
         },
         __wbg___wbindgen_is_null_ea9085d691f535d3: function(arg0) {
             const ret = arg0 === null;
+            return ret;
+        },
+        __wbg___wbindgen_is_object_a27215656b807791: function(arg0) {
+            const val = arg0;
+            const ret = typeof(val) === 'object' && val !== null;
             return ret;
         },
         __wbg___wbindgen_is_undefined_c05833b95a3cf397: function(arg0) {
@@ -726,12 +782,12 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 605, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 610, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue______true_);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 639, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 644, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_);
             return ret;
         },

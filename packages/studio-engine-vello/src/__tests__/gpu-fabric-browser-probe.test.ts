@@ -338,7 +338,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             const byteLength = size * size * 4;
 
             // (b-1) vello 내부 디바이스 렌더 + readback + JS 경계 — 현행 교환의 앞반부.
-            let velloPixels = new Uint8Array(0);
+            let velloPixels: Uint8Array = new Uint8Array(0);
             const velloSamples = await timed(async () => {
               velloPixels = (await (
                 module.render_scene_gpu_json as (json: string) => Promise<Uint8Array>
@@ -495,8 +495,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         interop: Array<Record<string, unknown>>;
       };
 
-      // (a) pkg-gpu 는 외부 디바이스 주입 진입점을 노출하지 않는다 — export 전수 스캔.
-      expect(payload.deviceInjectionExports).toEqual([]);
+      // (a) pkg-gpu 의 디바이스 주입 진입점 — export 전수 스캔.
+      // 2026-08-08 toon-vello fork 트랙 개설 후 이 목록은 더 이상 비어 있지 않다
+      // (`adopt_gpu_device`·`fabric_device_handle`·`fabric_device_adopted`).
+      // 주입 성립 여부의 실측은 toon-vello-fork-browser-probe.test.ts 가 담당하고,
+      // 본 프로브는 "주입 없이 별개 디바이스로 갈 때의 교환 비용" 기준선을 유지한다.
+      expect(payload.deviceInjectionExports).toContain("adopt_gpu_device");
       expect(payload.wasmExports).toContain("render_scene_gpu_json");
       // (c) 별개 GPUDevice 간 텍스처 직접 공유는 거부된다 — 브로커 same-device 확인 근거.
       expect(

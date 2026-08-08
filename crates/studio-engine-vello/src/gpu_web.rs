@@ -37,6 +37,11 @@ struct GpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
     renderer: RefCell<Renderer>,
+    /// True when the device came from [`adopt_gpu_device`] instead of our own
+    /// adapter request — the probe asserts on this so "zero-copy" can never be
+    /// claimed for a self-owned device.
+    #[cfg(feature = "fabric")]
+    adopted: bool,
 }
 
 thread_local! {
@@ -69,6 +74,22 @@ async fn acquire_context() -> Result<Rc<GpuContext>, String> {
         .request_device(&wgpu::DeviceDescriptor::default())
         .await
         .map_err(|error| format!("WebGPU device request failed: {error}"))?;
+    install_context(
+        device,
+        queue,
+        #[cfg(feature = "fabric")]
+        false,
+    )
+}
+
+/// Builds the vello renderer for `device` and installs it as the singleton.
+/// Shared by the self-owned adapter path and the fabric adoption path so both
+/// use identical `RendererOptions` (the AA configuration the parity gates ran).
+fn install_context(
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    #[cfg(feature = "fabric")] adopted: bool,
+) -> Result<Rc<GpuContext>, String> {
     let renderer = Renderer::new(
         &device,
         RendererOptions {
@@ -84,6 +105,8 @@ async fn acquire_context() -> Result<Rc<GpuContext>, String> {
         device,
         queue,
         renderer: RefCell::new(renderer),
+        #[cfg(feature = "fabric")]
+        adopted,
     });
     GPU_CONTEXT.with(|slot| *slot.borrow_mut() = Some(Rc::clone(&context)));
     Ok(context)
@@ -317,5 +340,162 @@ pub async fn probe_webgpu() -> String {
             "reason": reason,
         })
         .to_string(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// V12 §5/§6 StudioGpuFabric adoption lane (`fabric` feature, build track B).
+//
+// Everything below needs `crates/vendor/wgpu-toon`'s `toon-fabric` patch —
+// stock wgpu 29 has no way to build a `wgpu::Device` around a `GPUDevice` the
+// page already owns, which is what forced the L0 readback exchange measured in
+// `tests/benchmarks/results/gpu-fabric-probe.json`.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "fabric")]
+mod fabric {
+    use super::{
+        encode_scene, install_context, parse_scene, wgpu, Color, GpuContext, RenderParams,
+        AaConfig, JsError, JsValue, Rc, GPU_CONTEXT,
+    };
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsCast;
+
+    /// Usage set for a fabric render target: vello writes it through a storage
+    /// binding, JS filter kernels sample it (`TEXTURE_BINDING`) or blit it
+    /// (`COPY_SRC`) — all on the adopted device, so no readback is involved.
+    const FABRIC_TARGET_USAGE: wgpu::TextureUsages = wgpu::TextureUsages::STORAGE_BINDING
+        .union(wgpu::TextureUsages::COPY_SRC)
+        .union(wgpu::TextureUsages::TEXTURE_BINDING);
+
+    fn adopted_context() -> Result<Rc<GpuContext>, String> {
+        let context = GPU_CONTEXT
+            .with(|slot| slot.borrow().clone())
+            .ok_or_else(|| {
+                "fabric lane not initialized — call adopt_gpu_device(device) first".to_string()
+            })?;
+        if !context.adopted {
+            return Err(
+                "fabric lane refuses a self-owned device — the wasm module already created its \
+                 own GPUDevice, so textures it produces cannot be shared; adopt the fabric \
+                 device before the first render"
+                    .to_string(),
+            );
+        }
+        Ok(context)
+    }
+
+    /// Adopts a `GPUDevice` the page owns (StudioGpuFabric's single-owner
+    /// device) as *the* device this module renders on, replacing any previously
+    /// installed context.
+    ///
+    /// wgpu never destroys an adopted handle, so the fabric's lease/refcount
+    /// policy stays authoritative. Rejects if `device` is not a `GPUDevice`.
+    #[wasm_bindgen]
+    pub fn adopt_gpu_device(device: JsValue) -> Result<(), JsError> {
+        if !device.is_object() {
+            return Err(JsError::new(
+                "adopt_gpu_device expects a GPUDevice object",
+            ));
+        }
+        let handle: wgpu::webgpu::GpuDevice = device.unchecked_into();
+        let (device, queue) = wgpu::Device::from_webgpu_handle(handle);
+        install_context(device, queue, true).map_err(|error| JsError::new(&error))?;
+        Ok(())
+    }
+
+    /// Returns the `GPUDevice` this module currently renders on, or `null`
+    /// before initialization. The probe compares it by identity against the
+    /// fabric device to prove adoption really happened.
+    #[wasm_bindgen]
+    pub fn fabric_device_handle() -> JsValue {
+        GPU_CONTEXT
+            .with(|slot| slot.borrow().clone())
+            .and_then(|context| context.device.as_webgpu().cloned())
+            .map_or(JsValue::NULL, JsValue::from)
+    }
+
+    /// True once [`adopt_gpu_device`] installed an external device.
+    #[wasm_bindgen]
+    pub fn fabric_device_adopted() -> bool {
+        GPU_CONTEXT.with(|slot| slot.borrow().as_ref().is_some_and(|c| c.adopted))
+    }
+
+    /// Renders SceneIR JSON on the adopted device and resolves with the raw
+    /// `GPUTexture` — no `copy_texture_to_buffer`, no `mapAsync`, no JS-side
+    /// pixel array. The caller owns the returned handle and can bind it
+    /// directly in its own WGSL pass (V12 §6.3 L4).
+    #[wasm_bindgen]
+    pub async fn render_scene_gpu_texture_json(scene_json: String) -> Result<JsValue, JsError> {
+        let scene_ir = parse_scene(&scene_json).map_err(|error| JsError::new(&error.to_string()))?;
+        if scene_ir.version != 11 {
+            return Err(JsError::new(&format!(
+                "invalid scene: unsupported scene version: {}",
+                scene_ir.version
+            )));
+        }
+        if scene_ir.width == 0
+            || scene_ir.height == 0
+            || scene_ir.width > u32::from(u16::MAX)
+            || scene_ir.height > u32::from(u16::MAX)
+        {
+            return Err(JsError::new(&format!(
+                "invalid scene: scene size out of range: {}x{}",
+                scene_ir.width, scene_ir.height
+            )));
+        }
+        let scene = encode_scene(&scene_ir).map_err(|features| {
+            JsError::new(&format!(
+                "vello-gpu-browser provider cannot render required scene features: {}",
+                features.join(", ")
+            ))
+        })?;
+        let context = adopted_context().map_err(|error| JsError::new(&error))?;
+
+        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("vello-fabric-target"),
+            size: wgpu::Extent3d {
+                width: scene_ir.width,
+                height: scene_ir.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: FABRIC_TARGET_USAGE,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        context
+            .renderer
+            .borrow_mut()
+            .render_to_texture(
+                &context.device,
+                &context.queue,
+                &scene,
+                &view,
+                &RenderParams {
+                    base_color: Color::new([
+                        scene_ir.background.r,
+                        scene_ir.background.g,
+                        scene_ir.background.b,
+                        scene_ir.background.a,
+                    ]),
+                    width: scene_ir.width,
+                    height: scene_ir.height,
+                    antialiasing_method: AaConfig::Area,
+                },
+            )
+            .map_err(|error| JsError::new(&format!("vello GPU render failed: {error}")))?;
+
+        // Hand the JS object out and let the Rust wrapper drop: every `Drop`
+        // in wgpu's WebGPU backend is a no-op, so the GPUTexture outlives it
+        // and its lifetime is now the caller's (the fabric's) business.
+        let handle = texture
+            .as_webgpu()
+            .cloned()
+            .ok_or_else(|| JsError::new("adopted device is not on the WebGPU backend"))?;
+        Ok(JsValue::from(handle))
     }
 }

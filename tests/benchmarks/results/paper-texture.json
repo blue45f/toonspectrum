@@ -1,0 +1,312 @@
+{
+  "source": "tests/visual/paper-granulation.test.ts",
+  "reference": "Curtis et al. 1997, Computer-Generated Watercolor (SIGGRAPH) — edge darkening / granulation",
+  "deterministic": true,
+  "tile": {
+    "width": 128,
+    "height": 128,
+    "seed": 41
+  },
+  "paperPresets": {
+    "hot-press": {
+      "octaves": 2,
+      "baseCells": 32,
+      "lacunarity": 2,
+      "persistence": 0.42,
+      "fibreAnisotropy": 1,
+      "amplitude": 0.2,
+      "toothBias": 0.92
+    },
+    "cold-press": {
+      "octaves": 4,
+      "baseCells": 16,
+      "lacunarity": 2,
+      "persistence": 0.55,
+      "fibreAnisotropy": 1.55,
+      "amplitude": 0.48,
+      "toothBias": 1.15
+    },
+    "rough": {
+      "octaves": 5,
+      "baseCells": 8,
+      "lacunarity": 2,
+      "persistence": 0.62,
+      "fibreAnisotropy": 1.2,
+      "amplitude": 0.78,
+      "toothBias": 1.3
+    }
+  },
+  "paperStats": {
+    "hot-press": {
+      "rmsRoughness": 0.03416,
+      "autocorrelationX": 2.818,
+      "autocorrelationY": 2.829,
+      "fibreAnisotropyMeasured": 0.996,
+      "seamRatioX": 0.752,
+      "seamRatioY": 0.674,
+      "seamStepX": 0.01017,
+      "interiorStepX": 0.01353,
+      "seamStepY": 0.00918,
+      "interiorStepY": 0.01363,
+      "min": 0.3984,
+      "max": 0.5928,
+      "mean": 0.5,
+      "sha256": "8089b09edda9edc7"
+    },
+    "cold-press": {
+      "rmsRoughness": 0.06601,
+      "autocorrelationX": 4.918,
+      "autocorrelationY": 3.238,
+      "fibreAnisotropyMeasured": 1.519,
+      "seamRatioX": 0.715,
+      "seamRatioY": 0.853,
+      "seamStepX": 0.01612,
+      "interiorStepX": 0.02253,
+      "seamStepY": 0.02568,
+      "interiorStepY": 0.03012,
+      "min": 0.314,
+      "max": 0.7199,
+      "mean": 0.5,
+      "sha256": "9e26db3290a19b59"
+    },
+    "rough": {
+      "rmsRoughness": 0.09903,
+      "autocorrelationX": 8.579,
+      "autocorrelationY": 7.333,
+      "fibreAnisotropyMeasured": 1.17,
+      "seamRatioX": 0.953,
+      "seamRatioY": 0.807,
+      "seamStepX": 0.02405,
+      "interiorStepX": 0.02524,
+      "seamStepY": 0.023,
+      "interiorStepY": 0.0285,
+      "min": 0.2496,
+      "max": 0.8388,
+      "mean": 0.5,
+      "sha256": "4a21633ffbc667a3"
+    }
+  },
+  "granulation": {
+    "uniformWashLevel": 0.5,
+    "paper": "cold-press",
+    "byPigment": {
+      "ultramarine-blue": {
+        "mean": 0.5,
+        "standardDeviation": 0.107177,
+        "coefficientOfVariation": 0.214354,
+        "heightCorrelation": -0.99548,
+        "min": 0.2211,
+        "max": 0.8634
+      },
+      "cerulean-blue": {
+        "mean": 0.5,
+        "standardDeviation": 0.131067,
+        "coefficientOfVariation": 0.262133,
+        "heightCorrelation": -0.99416,
+        "min": 0.17,
+        "max": 0.9558
+      },
+      "burnt-umber": {
+        "mean": 0.5,
+        "standardDeviation": 0.053994,
+        "coefficientOfVariation": 0.107989,
+        "heightCorrelation": -0.9982,
+        "min": 0.3462,
+        "max": 0.6709
+      },
+      "sumi-ink": {
+        "mean": 0.5,
+        "standardDeviation": 0.014257,
+        "coefficientOfVariation": 0.028513,
+        "heightCorrelation": -0.99977,
+        "min": 0.4551,
+        "max": 0.5419
+      },
+      "phthalo-blue": {
+        "mean": 0.5,
+        "standardDeviation": 0.000239,
+        "coefficientOfVariation": 0.000478,
+        "heightCorrelation": -1,
+        "min": 0.4992,
+        "max": 0.5007
+      },
+      "quinacridone-rose": {
+        "mean": 0.5,
+        "standardDeviation": 0.000534,
+        "coefficientOfVariation": 0.001068,
+        "heightCorrelation": -1,
+        "min": 0.4982,
+        "max": 0.5015
+      },
+      "granulation-off": {
+        "mean": 0.5,
+        "standardDeviation": 0,
+        "coefficientOfVariation": 0,
+        "heightCorrelation": 0,
+        "min": 0.5,
+        "max": 0.5
+      }
+    }
+  },
+  "edgeDarkening": {
+    "wash": {
+      "radius": 40,
+      "ringBand": [
+        0.78,
+        1
+      ],
+      "coreBand": [
+        0,
+        0.45
+      ]
+    },
+    "baseline": {
+      "ringMean": 1,
+      "coreMean": 1,
+      "ringToCore": 1,
+      "totalPigment": 5025
+    },
+    "byCase": {
+      "off": {
+        "strength": 0,
+        "steps": 12,
+        "ringMean": 1,
+        "coreMean": 1,
+        "ringToCore": 1,
+        "totalPigment": 5025
+      },
+      "gentle": {
+        "strength": 0.3,
+        "steps": 6,
+        "ringMean": 1.0554,
+        "coreMean": 0.9651,
+        "ringToCore": 1.0936,
+        "totalPigment": 5025
+      },
+      "studio-default": {
+        "strength": 0.6,
+        "steps": 6,
+        "ringMean": 1.1091,
+        "coreMean": 0.9312,
+        "ringToCore": 1.191,
+        "totalPigment": 5025
+      },
+      "full": {
+        "strength": 1,
+        "steps": 12,
+        "ringMean": 1.3357,
+        "coreMean": 0.7882,
+        "ringToCore": 1.6945,
+        "totalPigment": 5025
+      }
+    }
+  },
+  "grainSpectrum": {
+    "ruler": "tests/benchmarks/harness/brush-texture-lab.ts grainMetrics (64px window, DC removed, Hann taper, separable 2D DFT)",
+    "bands": {
+      "lowMax": 0.03125,
+      "midMax": 0.125
+    },
+    "note": "브러시 랩의 wash-soft 실측 midBandRatio 0.036476(저주파 96.2%)이 '재질 질감 없음' 기준선이다. 이 표는 종이 커널만 잰 것이며 libmypaint/hokusai 렌더 경로와 무관하므로 랩 게이트 밴드에는 영향이 없다 — 브러시 경로가 종이 커널을 채택할 때 그 밴드를 함께 갱신해야 한다.",
+    "labWashSoftMidBandRatio": 0.036476,
+    "smoothWashBaseline": {
+      "windowMeanAlpha": 0.330341,
+      "midBandRatio": 0.025778,
+      "lowBandRatio": 0.973862,
+      "highBandRatio": 0.000359,
+      "midBandPeakPeriodPx": 28.622
+    },
+    "byPaperAndPigment": {
+      "hot-press/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3924,
+        "midBandRatio": 0.256389,
+        "lowBandRatio": 0.630755,
+        "highBandRatio": 0.112856,
+        "midBandRatioGainVsSmoothWash": 9.946,
+        "midBandPowerNormalised": 0.001820754,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9877
+      },
+      "hot-press/sumi-ink": {
+        "alphaDeltaMovedPixels": 2958,
+        "midBandRatio": 0.033899,
+        "lowBandRatio": 0.962547,
+        "highBandRatio": 0.003554,
+        "midBandRatioGainVsSmoothWash": 1.315,
+        "midBandPowerNormalised": 0.000154915,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9648
+      },
+      "hot-press/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "cold-press/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 4016,
+        "midBandRatio": 0.437296,
+        "lowBandRatio": 0.444885,
+        "highBandRatio": 0.117819,
+        "midBandRatioGainVsSmoothWash": 16.964,
+        "midBandPowerNormalised": 0.006361853,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9834
+      },
+      "cold-press/sumi-ink": {
+        "alphaDeltaMovedPixels": 3478,
+        "midBandRatio": 0.047475,
+        "lowBandRatio": 0.946161,
+        "highBandRatio": 0.006364,
+        "midBandRatioGainVsSmoothWash": 1.842,
+        "midBandPowerNormalised": 0.000232531,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9809
+      },
+      "cold-press/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "rough/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 4053,
+        "midBandRatio": 0.338797,
+        "lowBandRatio": 0.615508,
+        "highBandRatio": 0.045694,
+        "midBandRatioGainVsSmoothWash": 13.143,
+        "midBandPowerNormalised": 0.010588087,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9772
+      },
+      "rough/sumi-ink": {
+        "alphaDeltaMovedPixels": 3768,
+        "midBandRatio": 0.05944,
+        "lowBandRatio": 0.935809,
+        "highBandRatio": 0.004751,
+        "midBandRatioGainVsSmoothWash": 2.306,
+        "midBandPowerNormalised": 0.000334704,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9842
+      },
+      "rough/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      }
+    }
+  }
+}

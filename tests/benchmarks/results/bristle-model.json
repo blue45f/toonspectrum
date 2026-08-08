@@ -1,0 +1,326 @@
+{
+  "harness": "tests/visual/bristle-quality.test.ts",
+  "model": "packages/studio-brush-platform/src/bristle-model.ts",
+  "generatedAt": "2026-08-08T06:15:24.172Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "lineage": "2D reduction of WetBrush (Chen et al., SIGGRAPH Asia 2015) — concepts only, no upstream code: bristles collapse to a 1D cross-section with a spring-loaded spread, seeded clump splitting and a per-hair ink reservoir",
+  "presets": {
+    "round": {
+      "bristleCount": 16,
+      "stiffness": 0.55,
+      "spreadResponse": 0.9,
+      "inkCapacity": 1,
+      "seed": 1592594433,
+      "baseRadiusPx": 14,
+      "tipProfile": "round",
+      "coverage": 1.7,
+      "hysteresis": 0.35,
+      "capacityVariation": 0.3,
+      "splitThreshold": 0.35
+    },
+    "flat": {
+      "bristleCount": 24,
+      "stiffness": 0.75,
+      "spreadResponse": 0.45,
+      "inkCapacity": 1.25,
+      "seed": 1592598530,
+      "baseRadiusPx": 20,
+      "tipProfile": "flat",
+      "coverage": 1.9,
+      "hysteresis": 0.22,
+      "spreadExponent": 1.1,
+      "tiltShift": 0.55,
+      "tiltContact": 0.85,
+      "layoutJitter": 0.12,
+      "stiffnessVariation": 0.15,
+      "radiusVariation": 0.1,
+      "capacityVariation": 0.2,
+      "bristlesPerClump": 6,
+      "splitThreshold": 0.45
+    },
+    "rough": {
+      "bristleCount": 12,
+      "stiffness": 0.85,
+      "spreadResponse": 1.35,
+      "inkCapacity": 0.55,
+      "seed": 1592602627,
+      "baseRadiusPx": 16,
+      "tipProfile": "irregular",
+      "coverage": 1.45,
+      "hysteresis": 0.5,
+      "flowRate": 0.008,
+      "capillary": 0.12,
+      "inkFadeFraction": 0.5,
+      "layoutJitter": 0.6,
+      "stiffnessVariation": 0.55,
+      "radiusVariation": 0.45,
+      "capacityVariation": 0.55,
+      "bristlesPerClump": 2,
+      "splitThreshold": 0.15,
+      "splitAmplitude": 0.7,
+      "liftFraction": 0.7
+    }
+  },
+  "gates": {
+    "pressureSpread": {
+      "harness": "round preset (inkCapacity 24), 120-step 0→1 pressure ramp then 120-step 1→0; contact width read from the rendered footprint alpha (>0), 256x96 window",
+      "monotoneViolationsOnLoad": 0,
+      "widthAtZeroPressurePx": 0,
+      "widthAtFullPressurePx": 59,
+      "hysteresis": {
+        "probes": [
+          {
+            "pressure": 0.2,
+            "upPx": 32,
+            "downPx": 39,
+            "gapPx": 7
+          },
+          {
+            "pressure": 0.3,
+            "upPx": 35,
+            "downPx": 41,
+            "gapPx": 6
+          },
+          {
+            "pressure": 0.4,
+            "upPx": 38,
+            "downPx": 45,
+            "gapPx": 7
+          },
+          {
+            "pressure": 0.5,
+            "upPx": 41,
+            "downPx": 48,
+            "gapPx": 7
+          },
+          {
+            "pressure": 0.6,
+            "upPx": 44,
+            "downPx": 52,
+            "gapPx": 8
+          },
+          {
+            "pressure": 0.7,
+            "upPx": 47,
+            "downPx": 54,
+            "gapPx": 7
+          },
+          {
+            "pressure": 0.8,
+            "upPx": 50,
+            "downPx": 57,
+            "gapPx": 7
+          },
+          {
+            "pressure": 0.9,
+            "upPx": 55,
+            "downPx": 59,
+            "gapPx": 4
+          }
+        ],
+        "meanGapPx": 6.625,
+        "minGapPx": 4
+      },
+      "controlHysteresisOff": {
+        "config": {
+          "hysteresis": 0,
+          "springRateHz": 400
+        },
+        "meanGapPx": 0.25
+      }
+    },
+    "dryBrush": {
+      "harness": "constant-pressure 0.55 horizontal stroke, 240 samples x 2px, rendered at 560x140; a gap is an interior run of alpha == 0 at least 2px wide; wet = inkRatio > 0.8, dry = inkRatio < 0.35",
+      "presets": {
+        "round": {
+          "wetColumns": 44,
+          "wetGapColumns": 0,
+          "wetMaxGaps": 0,
+          "dryColumns": 95,
+          "dryGapColumns": 95,
+          "dryGapColumnRatio": 1,
+          "dryMaxGaps": 2,
+          "dryWidestGapPx": 10,
+          "dryMaxContactCount": 15,
+          "firstGapArcPx": 260,
+          "gapCentersOutsideSpan": 0,
+          "gapsExceedingBristleSlots": 0,
+          "finalInkRatio": 0.16476143865598053,
+          "finalSplitDrive": 0.4093183536945114
+        },
+        "flat": {
+          "wetColumns": 44,
+          "wetGapColumns": 0,
+          "wetMaxGaps": 0,
+          "dryColumns": 96,
+          "dryGapColumns": 96,
+          "dryGapColumnRatio": 1,
+          "dryMaxGaps": 3,
+          "dryWidestGapPx": 10,
+          "dryMaxContactCount": 22,
+          "firstGapArcPx": 256,
+          "gapCentersOutsideSpan": 0,
+          "gapsExceedingBristleSlots": 0,
+          "finalInkRatio": 0.06172745860040093,
+          "finalSplitDrive": 0.4410879515152519
+        },
+        "rough": {
+          "wetColumns": 16,
+          "wetGapColumns": 15,
+          "wetMaxGaps": 4,
+          "dryColumns": 185,
+          "dryGapColumns": 185,
+          "dryGapColumnRatio": 1,
+          "dryMaxGaps": 5,
+          "dryWidestGapPx": 13,
+          "dryMaxContactCount": 11,
+          "firstGapArcPx": 2,
+          "gapCentersOutsideSpan": 0,
+          "gapsExceedingBristleSlots": 0,
+          "finalInkRatio": 0.10722798400767987,
+          "finalSplitDrive": 0.5489341549453666
+        }
+      },
+      "uniformControl": {
+        "wetColumns": 36,
+        "wetGapColumns": 0,
+        "wetMaxGaps": 0,
+        "dryColumns": 82,
+        "dryGapColumns": 26,
+        "dryGapColumnRatio": 0.3170731707317073,
+        "dryMaxGaps": 1,
+        "dryWidestGapPx": 30,
+        "dryMaxContactCount": 16,
+        "firstGapArcPx": 342,
+        "gapCentersOutsideSpan": 0,
+        "gapsExceedingBristleSlots": 0,
+        "finalInkRatio": 0,
+        "finalSplitDrive": 0.55
+      },
+      "byBristleCount": [
+        {
+          "bristleCount": 16,
+          "dryMaxGaps": 2,
+          "dryGapColumnRatio": 1,
+          "dryWidestGapPx": 10
+        },
+        {
+          "bristleCount": 24,
+          "dryMaxGaps": 3,
+          "dryGapColumnRatio": 1,
+          "dryWidestGapPx": 6
+        },
+        {
+          "bristleCount": 32,
+          "dryMaxGaps": 3,
+          "dryGapColumnRatio": 0.8911,
+          "dryWidestGapPx": 7
+        }
+      ]
+    },
+    "tiltAsymmetry": {
+      "harness": "round preset, 40-sample horizontal stroke at pressure 0.55; tiltY leans across the cross-section; centroid measured on the rendered footprint alpha",
+      "rows": [
+        {
+          "tiltY": 0,
+          "renderedCentroidShiftPx": 0.0651,
+          "stateCentroidShiftPx": 0.0733,
+          "contactWidthPx": 43.9653
+        },
+        {
+          "tiltY": 0.25,
+          "renderedCentroidShiftPx": 3.2819,
+          "stateCentroidShiftPx": 3.1512,
+          "contactWidthPx": 45.325
+        },
+        {
+          "tiltY": 0.5,
+          "renderedCentroidShiftPx": 6.7013,
+          "stateCentroidShiftPx": 6.3787,
+          "contactWidthPx": 46.6909
+        },
+        {
+          "tiltY": 0.75,
+          "renderedCentroidShiftPx": 10.1668,
+          "stateCentroidShiftPx": 9.7558,
+          "contactWidthPx": 48.063
+        },
+        {
+          "tiltY": 1,
+          "renderedCentroidShiftPx": 13.7675,
+          "stateCentroidShiftPx": 13.2826,
+          "contactWidthPx": 49.4413
+        }
+      ]
+    },
+    "determinism": {
+      "harness": "pressure-ramp 0.25→0.85 horizontal stroke with tiltY 0.35, 240 samples, rendered at 560x140, alpha quantized to u8",
+      "note": "bit-identity is scoped to one JS engine build (Math.exp/Math.pow are not cross-engine bit-exact by spec)",
+      "presetSha256": {
+        "round": "24abfa6ad51620f2ceaf1d4a1d87a4fa5375605a2263133d90c715f792b6c840",
+        "flat": "df436e2bc290601f5fe46acfc94513fd616699b60031b61454b510b0c4500818",
+        "rough": "009d17e6410cd2facff0220ebf81ba9b9bf8c09e388b1b1d3062f76702ce807b"
+      },
+      "reseededRoundSha256": "addecd3a02e92fe020eb5992e1a2eb6118ca75dbcec3066d0d2ba388757437fd"
+    },
+    "performance": {
+      "harness": "240-sample pressure-ramp stroke, median of 41 runs after two warmup passes, round preset with bristleCount swept",
+      "frameBudgetMs": 16.6667,
+      "rows": [
+        {
+          "bristleCount": 8,
+          "simOnlyP50Ms": 0.04283,
+          "withFootprintsP50Ms": 0.06538,
+          "simOnlyPerSampleUs": 0.1785,
+          "frameBudgetPct": 0.257,
+          "samplesPerFrameBudget": 93385
+        },
+        {
+          "bristleCount": 16,
+          "simOnlyP50Ms": 0.22071,
+          "withFootprintsP50Ms": 0.13312,
+          "simOnlyPerSampleUs": 0.9196,
+          "frameBudgetPct": 1.324,
+          "samplesPerFrameBudget": 18123
+        },
+        {
+          "bristleCount": 32,
+          "simOnlyP50Ms": 0.14175,
+          "withFootprintsP50Ms": 0.22817,
+          "simOnlyPerSampleUs": 0.5906,
+          "frameBudgetPct": 0.851,
+          "samplesPerFrameBudget": 28218
+        },
+        {
+          "bristleCount": 64,
+          "simOnlyP50Ms": 0.23058,
+          "withFootprintsP50Ms": 0.38042,
+          "simOnlyPerSampleUs": 0.9608,
+          "frameBudgetPct": 1.384,
+          "samplesPerFrameBudget": 17347
+        },
+        {
+          "bristleCount": 128,
+          "simOnlyP50Ms": 0.42625,
+          "withFootprintsP50Ms": 0.77212,
+          "simOnlyPerSampleUs": 1.776,
+          "frameBudgetPct": 2.558,
+          "samplesPerFrameBudget": 9384
+        }
+      ]
+    },
+    "stampJoin": {
+      "note": "each track feeds renderCompiledBrushStroke(hokusai, compiled, { samples }) verbatim; stamp alpha lowers to RasterStrokeSample.pressure",
+      "tracks": 16,
+      "stamps": 3241,
+      "trackSamples": 3241,
+      "maxRadiusModulation": 1.0177,
+      "lossyDimension": "a Hokusai stroke carries ONE setRadiusLog radius, so per-step radius modulation (max/mean above) must be lowered into the brush's pressure→radius curve; it is reported, never dropped silently"
+    }
+  }
+}

@@ -22,7 +22,7 @@
 | harfrust | 0.10.0 | MIT | https://crates.io/crates/harfrust | 텍스트 shaping (Parley 하위 기반) |
 | skrifa | 0.42.1 / 0.43.2 / 0.44.0 (3중 핀) | MIT OR Apache-2.0 | https://crates.io/crates/skrifa | 폰트 outline·metrics. 0.42.1=vello 0.9.0·vello_encoding 소비, 0.43.2=직접 의존(`skrifa = "0.43"`)·parley 소비, 0.44.0=glifo 소비 |
 | ICU4X (icu_* 11종) | 2.2.0 (전부 동일) | Unicode-3.0 | https://crates.io/crates/icu_segmenter 외 | 언어 분절·정규화·속성 (Parley 하위 기반). icu_collections·icu_locale·icu_locale_core·icu_locale_data·icu_normalizer(+data)·icu_properties(+data)·icu_provider·icu_segmenter(+data) |
-| wgpu (+ wgpu-core/hal/types) | 29.0.4 (전부 동일) | MIT OR Apache-2.0 | https://crates.io/crates/wgpu · https://github.com/gfx-rs/wgpu | 단일 GPUDevice·Queue·자원·프로파일링 허브. 현재 핀은 **upstream-compatible 트랙(wgpu 29)** — 매트릭스의 wgpu 30 experimental track은 next 트랙(§3 참조) |
+| wgpu (+ wgpu-core/hal/types) | 29.0.4 (전부 동일) | MIT OR Apache-2.0 | https://crates.io/crates/wgpu · https://github.com/gfx-rs/wgpu | 단일 GPUDevice·Queue·자원·프로파일링 허브. **2026-08-08부터 소스는 `crates/vendor/wgpu-toon`(crates.io 29.0.4 + TOON-PATCH 0001, `[patch.crates-io]` 배선)** — 같은 버전·같은 상류 바이트이며 패치는 `toon-fabric` 피처 뒤에만 있다(§3). 매트릭스의 wgpu 30 트랙은 vello 0.9의 `wgpu ^29.0.3` 핀 때문에 도달 불가로 판정(§3.1) |
 | naga | 29.0.4 | MIT OR Apache-2.0 | https://crates.io/crates/naga | WGSL validation·reflection·backend translation (vello_shaders 경유) |
 
 보조 핀(같은 Cargo.lock 실측, 위 크레이트가 끌어오는 Vello 생태계 내부 크레이트):
@@ -81,7 +81,100 @@ fontique `Apache-2.0 OR MIT` / harfrust `MIT` / skrifa `MIT OR Apache-2.0` / icu
   `renderSceneToPixelsGpu`·`compareGpuVsCpu`, 동적 import로 CPU 번들 무영향), Rust 경계:
   `src/gpu_web.rs`(wasm32+`gpu` 전용), 장면 인코딩은 네이티브 패리티 하니스와 공용 `src/gpu_scene.rs`.
 
-## 3. vendor/fork 전략 (V12 §6) — 승격 게이트 통과 전 미개설
+## 3. vendor/fork 전략 (V12 §5) — **개설됨 (2026-08-08)**
+
+### 3.1 상류 조사 결론 (실측)
+
+- **wgpu 29.0.4(현행 핀)**: 외부 `GPUDevice` 채택 경로 없음. `src/lib.rs`의 `mod backend`는
+  private, `backend::webgpu::WebDevice.inner`는 `pub(crate)`, JS 핸들로부터의 공개 생성자 부재.
+  `Device::from_custom`은 채택이 아니라 백엔드 전체 재구현을 요구한다.
+- **wgpu 30.0.0**: crates.io 인덱스 실측 존재(2026-07-02 발행). **export 방향은 이미 상류에 있다** —
+  `pub mod webgpu`(GpuDevice/GpuQueue/GpuTexture/GpuTextureView/GpuBuffer 재노출),
+  `Device::as_webgpu()`·`Queue::as_webgpu()`·`Texture::as_webgpu()`,
+  `Device::create_texture_from_webgpu_handle()`. 그러나 **adoption 방향(`Device::from_webgpu_handle`)은
+  wgpu 30에도 없다.**
+- **버전 승격은 오늘 불가**: crates.io 인덱스 실측상 vello 0.9.0 의존은 `wgpu ^29.0.3`이고,
+  wgpu 30은 semver major라 도달 불가. wgpu 30으로 가려면 vello까지 포크해야 하므로,
+  **벤더 대상은 wgpu 29.0.4 쪽이 최소 표면**이라고 판정했다.
+
+### 3.2 벤더 트랙 구조
+
+```text
+crates/vendor/wgpu-toon/                 crates.io wgpu 29.0.4 + TOON-PATCH 0001
+crates/vendor/wgpu-toon/PATCHES/         0001-webgpu-handle-adoption.patch (재현 절차 포함)
+crates/vendor/wgpu-toon/UPSTREAM.sha256  벤더 트리 전 파일 핀
+crates/studio-engine-vello/              [patch.crates-io] wgpu = { path = "../vendor/wgpu-toon" }
+```
+
+- 상류 원본: `https://static.crates.io/crates/wgpu/wgpu-29.0.4.crate`,
+  sha256 `76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07`
+  (crates.io 인덱스 `cksum`과 일치 확인).
+- 패치는 **6개 파일 · 총 308줄 패치 파일(대부분 주석)** — `Cargo.toml`, `src/lib.rs`,
+  `src/backend/webgpu.rs`, `src/api/{device,queue,texture}.rs`. 각 hunk에 WHY / UPSTREAM /
+  REMOVE WHEN 주석이 붙는다(§5.1 "숨은 임시 패치 금지").
+- **드리프트 게이트**: `crates/studio-engine-vello/tests/vendor_patch_parity.rs`가 벤더 트리 전
+  파일 해시를 `UPSTREAM.sha256`과 대조하고, 패치 파일이 선언한 파일 집합과 상류 체크섬 기록을
+  검증한다. 미선언 편집은 테스트 실패로 드러난다.
+
+### 3.3 패치 표면 (TOON-PATCH 0001)
+
+| # | 항목 | 상류 상태 | 제거 조건 |
+| --- | --- | --- | --- |
+| 1 | `pub mod webgpu` JS 핸들 타입 재노출 | wgpu 30에 동일 존재 | vello의 wgpu 핀 ≥ 30 |
+| 2 | `Device/Queue/Texture::as_webgpu()` | wgpu 30에 동일 존재 | vello의 wgpu 핀 ≥ 30 |
+| 3 | `Device::create_texture_from_webgpu_handle()` | wgpu 30에 존재(우리 것은 DropCallback 생략) | vello의 wgpu 핀 ≥ 30 |
+| 4 | `Device::from_webgpu_handle()` — 외부 GPUDevice/Queue 채택 | **상류 부재(30 포함)** | 상류가 채택 API를 받아들일 때 |
+
+§5.4 upstream 원칙: 1~3은 순수 백포트라 핀 상향과 함께 자연 소멸하고, **4번이 ToonStudio의
+상류 PR 후보**다(웹 백엔드의 모든 `Drop`이 이미 no-op이라 소유권 이전 위험이 없다는 점이 근거).
+
+### 3.4 두 빌드 트랙 (§5.2)
+
+```text
+Track A  upstream-compatible — 벤더 크레이트의 `toon-fabric` 피처 OFF
+         cargo test                                              (네이티브)
+         cargo check --target wasm32-unknown-unknown --features lottie
+         → 모든 패치 hunk가 cfg-out 되어 상류 29.0.4와 API 동일. 상류 회귀 감지용.
+
+Track B  toon-vello — `toon-fabric` ON
+         cargo check --target wasm32-unknown-unknown --features fabric
+         wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie,fabric
+         → adopt_gpu_device / render_scene_gpu_texture_json 진입점 포함.
+```
+
+트랙 전환은 **Cargo 피처 하나**다(`[patch]` 토글이나 `--config` 곡예 없음). 커밋된 `pkg-gpu/`
+산출물은 Track B다 — Track A는 `cargo check`로 상시 검증한다.
+
+### 3.5 zero-copy 실증 (2026-08-08)
+
+`tests/benchmarks/results/toon-vello-fork.json`, 하니스
+`packages/studio-engine-vello/src/__tests__/toon-vello-fork-browser-probe.test.ts`
+(`TOON_VELLO_FORK_PROBE=1`), Chromium 140.0.7339.186 headless metal:
+
+- **채택 성립**: `adopt_gpu_device(fabricDevice)` 후 `fabric_device_handle() === fabricDevice`
+  (플래그가 아니라 **JS 객체 참조 동일성**으로 판별).
+- **L4 성립**: `render_scene_gpu_texture_json`이 돌려준 `GPUTexture`를 fabric 디바이스가
+  바인드그룹에 직접 넣어 컴퓨트 패스에서 소비 — 검증 오류 0. 같은 디바이스 GPU copy(L3)도 통과.
+- **픽셀 동등**: 공유 텍스처에서 읽은 바이트가 기존 L0 경로(`render_scene_gpu_json`) 결과와
+  **바이트 일치** — 패치가 렌더 결과를 바꾸지 않는다.
+- **교환 비용** (p50, 같은 실행에서 L0 기준선 동시 측정):
+
+  | 크기 | L0 교환(렌더+readback+업로드) | adopted 렌더→공유 텍스처 | 배속 |
+  | --- | --- | --- | --- |
+  | 256² | 5.10ms | 2.70ms | 1.89× |
+  | 512² | 5.50ms | 2.60ms | 2.12× |
+  | 1024² | 7.30ms | 3.00ms | 2.43× |
+
+  adopted 경로는 submit→완료 왕복 플로어(≈2.4ms, 같은 표에서 `sameDeviceCopyP50Ms`로 관측)에
+  거의 붙는다 — 즉 **readback 성분이 사라진 것**이 배속의 실체다. 1024²에서 L0가 지불하던
+  4.4ms readback + 2.9ms 업로드가 0이 됐다.
+
+- JS 경계: `packages/studio-engine-vello/src/gpu-browser.ts`
+  (`adoptGpuDevice`·`isGpuDeviceAdopted`·`gpuDeviceHandle`·`renderSceneToTextureGpu`).
+  Rust 경계: `crates/studio-engine-vello/src/gpu_web.rs`의 `fabric` 모듈(wasm32 + `fabric` 전용).
+  `adopted` 가드가 있어 self-owned 디바이스에서는 공유 텍스처를 내주지 않는다(조용한 거짓 zero-copy 금지).
+
+### 3.6 (이력) 개설 전 기록
 
 V12 Codex §6은 `toon-vello` fork를 현 저장소 안에서 다음 구조로 관리하도록 규정한다.
 
@@ -98,9 +191,12 @@ upstream-compatible: Vello upstream + wgpu 29
 next:                toon-vello patches + wgpu 30
 ```
 
-**현재 상태: 미개설.** 위 디렉터리와 next 트랙은 아직 만들지 않으며, 현재는 §1의 crates.io 핀
-(= upstream-compatible 트랙, wgpu 29.0.4)만 사용한다. fork는 "숨은 임시 패치"가 아니라 정식 제품
-자산이어야 하므로, 유지 비용을 정당화할 실측 근거가 생기기 전에는 개설하지 않는다.
+~~**현재 상태: 미개설.**~~ → **2026-08-08 개설, §3.2가 실제 구조다.** 디렉터리 이름은 V12 §5.1의
+예시(`vendor/vello-upstream`·`patches/vello`)와 다르게 `crates/vendor/wgpu-toon`을 택했다 —
+실측 결과 패치가 필요한 곳이 vello가 아니라 **wgpu**였기 때문이고(§3.1), 리포의 Rust 크레이트는
+모두 `crates/` 아래 있으므로 경계를 그쪽에 맞췄다. next 트랙의 "wgpu 30 rebase"도 §3.1 근거로
+**wgpu 29.0.4 + 최소 패치**로 대체했다(vello 0.9가 `wgpu ^29.0.3`을 핀하므로 30은 도달 불가).
+아래는 개설 판단 당시의 원문 기록이다.
 
 **개설 조건**: 레인 2(Vello GPU WebGPU wasm)가 **실브라우저 WebGPU 실구동 패리티 게이트를 통과**했을 때
 (네이티브 패리티와 동일한 퍼지 게이트 + 성능 실측을 브라우저에서 재현). 그 시점부터 §6의 patch backlog

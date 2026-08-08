@@ -172,6 +172,59 @@ function mapRenderError(error: unknown): Error {
   return error instanceof Error ? error : new Error(message);
 }
 
+/**
+ * Adopts a `GPUDevice` the caller owns (StudioGpuFabric's single-owner device)
+ * as the device the vello wasm module renders on — V12 §6.1 single device
+ * ownership, build track B (`--features fabric`, backed by the
+ * `crates/vendor/wgpu-toon` patch).
+ *
+ * Call this before the first render: the module installs a device singleton on
+ * first use, and `renderSceneToTextureGpu` refuses to hand out a texture from a
+ * self-owned device (it could not be shared).
+ *
+ * wgpu never destroys an adopted handle, so the fabric's lease/refcount policy
+ * stays authoritative.
+ */
+export async function adoptGpuDevice(device: GPUDevice): Promise<void> {
+  const module = await requireInitialized();
+  module.adopt_gpu_device(device);
+}
+
+/** True once {@link adoptGpuDevice} installed an external device. */
+export async function isGpuDeviceAdopted(): Promise<boolean> {
+  const module = await requireInitialized();
+  return module.fabric_device_adopted();
+}
+
+/**
+ * The `GPUDevice` the wasm module currently renders on, or `null` before
+ * initialization. Compare it by identity against the fabric device to prove
+ * adoption really happened rather than assuming it.
+ */
+export async function gpuDeviceHandle(): Promise<GPUDevice | null> {
+  const module = await requireInitialized();
+  return (module.fabric_device_handle() as GPUDevice | null) ?? null;
+}
+
+/**
+ * Renders a SceneIR on the adopted device and resolves with the raw
+ * `GPUTexture` — no readback, no pixel array crossing the wasm boundary
+ * (V12 §6.3 L4). The caller owns the returned texture.
+ *
+ * `rgba8unorm`, usage `STORAGE_BINDING | COPY_SRC | TEXTURE_BINDING`.
+ */
+export async function renderSceneToTextureGpu(scene: SceneIR): Promise<GPUTexture> {
+  const module = await requireInitialized();
+  const normalized = sceneIRSchema.parse(scene);
+  try {
+    return (await module.render_scene_gpu_texture_json(
+      JSON.stringify(normalized),
+    )) as GPUTexture;
+  } catch (error) {
+    throw mapRenderError(error);
+  }
+}
+
 function directionalMismatches(
   from: Uint8Array,
   to: Uint8Array,

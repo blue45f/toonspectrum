@@ -7,6 +7,28 @@
 export function adapter_version(): string;
 
 /**
+ * Adopts a `GPUDevice` the page owns (StudioGpuFabric's single-owner
+ * device) as *the* device this module renders on, replacing any previously
+ * installed context.
+ *
+ * wgpu never destroys an adopted handle, so the fabric's lease/refcount
+ * policy stays authoritative. Rejects if `device` is not a `GPUDevice`.
+ */
+export function adopt_gpu_device(device: any): void;
+
+/**
+ * True once [`adopt_gpu_device`] installed an external device.
+ */
+export function fabric_device_adopted(): boolean;
+
+/**
+ * Returns the `GPUDevice` this module currently renders on, or `null`
+ * before initialization. The probe compares it by identity against the
+ * fabric device to prove adoption really happened.
+ */
+export function fabric_device_handle(): any;
+
+/**
  * Fits a flat x,y polyline into editable cubic PathIR JSON (Kurbo E05 lane).
  */
 export function fit_polyline_json(points: Float64Array, closed: boolean, accuracy: number): string;
@@ -41,6 +63,14 @@ export function render_lottie_gpu_json(lottie_json: string, frame: number, width
 export function render_scene_gpu_json(scene_json: string): Promise<Uint8Array>;
 
 /**
+ * Renders SceneIR JSON on the adopted device and resolves with the raw
+ * `GPUTexture` — no `copy_texture_to_buffer`, no `mapAsync`, no JS-side
+ * pixel array. The caller owns the returned handle and can bind it
+ * directly in its own WGSL pass (V12 §6.3 L4).
+ */
+export function render_scene_gpu_texture_json(scene_json: string): Promise<any>;
+
+/**
  * Renders SceneIR JSON to straight RGBA8 bytes (width * height * 4).
  */
 export function render_scene_json(scene_json: string): Uint8Array;
@@ -62,10 +92,14 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly adapter_version: () => [number, number];
+    readonly adopt_gpu_device: (a: any) => [number, number];
+    readonly fabric_device_adopted: () => number;
+    readonly fabric_device_handle: () => any;
     readonly fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
     readonly probe_webgpu: () => any;
     readonly render_lottie_gpu_json: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly render_scene_gpu_json: (a: number, b: number) => any;
+    readonly render_scene_gpu_texture_json: (a: number, b: number) => any;
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];

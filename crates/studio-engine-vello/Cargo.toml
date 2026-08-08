@@ -25,6 +25,13 @@ skrifa = "0.43"
 [features]
 default = []
 gpu = ["dep:vello", "dep:wasm-bindgen-futures", "dep:js-sys"]
+# V12 §5 toon-vello fork track — StudioGpuFabric device adoption.
+# Track A (`upstream`, default): `toon-fabric` off, so crates/vendor/wgpu-toon
+# compiles byte-equivalent to crates.io wgpu 29.0.4 and this module is absent.
+# Track B (`toon`): this feature on, enabling the vendored patch and the
+# `adopt_gpu_device` / `render_scene_gpu_texture_json` entry points.
+# See docs/engines/vello-baseline.md §3.
+fabric = ["gpu", "dep:wgpu"]
 # Velato Lottie lane (ADR-0011): rides on the gpu render path, so it is a
 # strict superset feature — `pkg-gpu` is built with `--features lottie`.
 lottie = ["gpu", "dep:velato"]
@@ -34,6 +41,23 @@ lottie = ["gpu", "dep:velato"]
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { version = "0.4", optional = true }
 js-sys = { version = "0.3", optional = true }
+# V12 §5 fork track: only the `fabric` feature needs wgpu by name (to turn on
+# `wgpu/toon-fabric`); vello pulls the same crate transitively otherwise.
+wgpu = { version = "29.0.4", optional = true, default-features = false, features = ["toon-fabric"] }
+
+# ---------------------------------------------------------------------------
+# V12 §5.1 toon-vello fork track — the fork is a first-class product asset, not
+# a hidden temporary patch. `crates/vendor/wgpu-toon` is crates.io wgpu 29.0.4
+# (sha256 76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07,
+# verified against the crates.io index) plus six commented hunks, all gated
+# behind its `toon-fabric` feature. With the feature off — the default, i.e.
+# build track A — every hunk compiles out and the crate is API-identical to
+# upstream, which is what makes track A a real upstream-regression detector.
+# `crates/vendor/wgpu-toon/UPSTREAM.sha256` pins every vendored file and
+# `tests/vendor_patch_parity.rs` fails on any undeclared drift.
+# ---------------------------------------------------------------------------
+[patch.crates-io]
+wgpu = { path = "../vendor/wgpu-toon" }
 
 [profile.release]
 opt-level = "s"

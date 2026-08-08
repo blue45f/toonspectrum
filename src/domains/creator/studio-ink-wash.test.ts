@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_INK_WASH,
+  DEFAULT_INK_WASH_EDGE_DARKENING,
+  DEFAULT_INK_WASH_PAPER_KIND,
   INK_WASH_EDGE_BLEED_RANGE,
+  INK_WASH_EDGE_DARKENING_RANGE,
   INK_WASH_GRANULATION_RANGE,
   INK_WASH_PAPER_RANGE,
   INK_WASH_PRESETS,
@@ -14,6 +17,7 @@ import {
   normalizeInkWash,
   type InkWash,
 } from "./studio-ink-wash";
+import { PAPER_REFERENCE_TILE, createPaperHeightField } from "./studio-paper-texture";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
@@ -349,5 +353,259 @@ describe("inkWashKonvaFilter", () => {
       invalid,
     );
     expect(dataEqual(invalid, invalidBefore)).toBe(true);
+  });
+
+  it("새 attr(paperKind/edgeDarkening)을 읽어 종이 결과 가장자리 링을 바꾼다", () => {
+    const base = { inkWashStrength: 100, inkWashSpread: 3, inkWashEdgeBleed: 60, inkWashGranulation: 90, inkWashPaper: 0, inkWashColor: "#000000", inkWashSeed: 5 };
+    // 균일한 회색은 습윤 그래디언트가 0이라 edgeDarkening이 항등이다 — 얼룩진 워시로 만든다.
+    const makeBlob = (): StudioImageDataLike => {
+      const image = makeSolid(24, 24, [235, 235, 235, 255]);
+      for (let y = 7; y < 17; y++) {
+        for (let x = 7; x < 17; x++) {
+          const offset = (y * 24 + x) * 4;
+          image.data[offset] = 40;
+          image.data[offset + 1] = 40;
+          image.data[offset + 2] = 40;
+        }
+      }
+      return image;
+    };
+    const smooth = makeBlob();
+    const coarse = makeBlob();
+    const dried = makeBlob();
+
+    inkWashKonvaFilter.call({ attrs: { ...base, inkWashPaperKind: "hot-press" } }, smooth);
+    inkWashKonvaFilter.call({ attrs: { ...base, inkWashPaperKind: "rough" } }, coarse);
+    inkWashKonvaFilter.call({ attrs: { ...base, inkWashPaperKind: "rough", inkWashEdgeDarkening: 80 } }, dried);
+
+    expect(dataEqual(smooth, coarse)).toBe(false);
+    expect(dataEqual(coarse, dried)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 종이 결 물리 — studio-paper-texture 접합
+// ---------------------------------------------------------------------------
+
+/** 픽셀 배열의 R 채널만 뽑는다. */
+function redChannel(image: StudioImageDataLike): number[] {
+  const red: number[] = [];
+  for (let index = 0; index < image.data.length; index += 4) red.push(image.data[index]!);
+  return red;
+}
+
+function pearson(left: ArrayLike<number>, right: ArrayLike<number>): number {
+  const average = (values: ArrayLike<number>): number => {
+    let sum = 0;
+    for (let index = 0; index < values.length; index++) sum += values[index]!;
+    return sum / values.length;
+  };
+  const meanLeft = average(left);
+  const meanRight = average(right);
+  let covariance = 0;
+  let varianceLeft = 0;
+  let varianceRight = 0;
+  for (let index = 0; index < left.length; index++) {
+    const a = left[index]! - meanLeft;
+    const b = right[index]! - meanRight;
+    covariance += a * b;
+    varianceLeft += a * a;
+    varianceRight += b * b;
+  }
+  return covariance / Math.sqrt(varianceLeft * varianceRight);
+}
+
+describe("normalizeInkWash — 선택 필드(paperKind/edgeDarkening)", () => {
+  it("입력에 없으면 출력에도 넣지 않는다(기존 7키 저장본 round-trip 보존)", () => {
+    const normalized = normalizeInkWash({ strength: 50 });
+    expect("paperKind" in normalized).toBe(false);
+    expect("edgeDarkening" in normalized).toBe(false);
+    expect(DEFAULT_INK_WASH_EDGE_DARKENING).toBe(0);
+    expect(DEFAULT_INK_WASH_PAPER_KIND).toBe("cold-press");
+  });
+
+  it("입력에 있으면 정규화해서 유지한다", () => {
+    expect(normalizeInkWash({ paperKind: "rough", edgeDarkening: 62 })).toMatchObject({
+      paperKind: "rough",
+      edgeDarkening: 62,
+    });
+    expect(INK_WASH_EDGE_DARKENING_RANGE).toEqual({ min: 0, max: 100, step: 1 });
+  });
+
+  it("무효한 선택 값은 안전한 기본으로 접는다", () => {
+    expect(
+      normalizeInkWash({ paperKind: "washi" as never, edgeDarkening: 999 }),
+    ).toMatchObject({ paperKind: "cold-press", edgeDarkening: 100 });
+    expect(normalizeInkWash({ edgeDarkening: Number.NaN })).toMatchObject({ edgeDarkening: 0 });
+  });
+
+  it("선택 값을 담은 설정도 round-trip 한다", () => {
+    const value = normalizeInkWash({ ...DEFAULT_INK_WASH, strength: 70, paperKind: "hot-press", edgeDarkening: 30 });
+    expect(normalizeInkWash(value)).toEqual(value);
+  });
+});
+
+describe("applyInkWash — 입자 침착(granulation)", () => {
+  const TILE = PAPER_REFERENCE_TILE;
+
+  it("안료가 종이 높이맵의 골에 몰린다(밝기와 높이의 강한 양의 상관)", () => {
+    const image = makeSolid(TILE, TILE, [128, 128, 128, 255]);
+    applyInkWash(image, {
+      ...DEFAULT_INK_WASH,
+      strength: 100,
+      edgeBleed: 0,
+      granulation: 70,
+      paper: 0,
+      inkColor: "#000000",
+      seed: 41,
+      paperKind: "cold-press",
+    });
+    const paper = createPaperHeightField({ kind: "cold-press", width: TILE, height: TILE, seed: 41 });
+    // 골(낮은 height)에 안료가 더 남아 어두워지므로 R은 height와 같이 움직인다.
+    expect(pearson(redChannel(image), paper.values)).toBeGreaterThan(0.9);
+  });
+
+  it("종이 종류를 바꾸면 침착 패턴이 실제로 달라진다", () => {
+    const settings: InkWash = {
+      ...DEFAULT_INK_WASH,
+      strength: 100,
+      edgeBleed: 0,
+      granulation: 80,
+      paper: 0,
+      inkColor: "#000000",
+      seed: 41,
+    };
+    const smooth = makeSolid(TILE, 16, [128, 128, 128, 255]);
+    const coarse = makeSolid(TILE, 16, [128, 128, 128, 255]);
+    applyInkWash(smooth, { ...settings, paperKind: "hot-press" });
+    applyInkWash(coarse, { ...settings, paperKind: "rough" });
+    expect(dataEqual(smooth, coarse)).toBe(false);
+
+    // 황목이 더 거친 종이이므로 같은 안료라도 밝기 편차가 커야 한다.
+    const range = (image: StudioImageDataLike): number => {
+      const red = redChannel(image);
+      return Math.max(...red) - Math.min(...red);
+    };
+    expect(range(coarse)).toBeGreaterThan(range(smooth));
+  });
+
+  it("granulation 0이면 종이 골 침착이 사라진다(조작 감지)", () => {
+    const flat = makeSolid(64, 8, [128, 128, 128, 255]);
+    applyInkWash(flat, {
+      ...DEFAULT_INK_WASH,
+      strength: 100,
+      edgeBleed: 0,
+      granulation: 0,
+      paper: 0,
+      inkColor: "#000000",
+    });
+    const red = redChannel(flat);
+    expect(Math.max(...red) - Math.min(...red)).toBe(0);
+  });
+
+  it("종이 타일은 seamless라 넓은 캔버스에서 반복 이음선이 없다", () => {
+    const wide = makeSolid(TILE * 2 + 44, 1, [200, 200, 200, 255]);
+    applyInkWash(wide, {
+      ...DEFAULT_INK_WASH,
+      strength: 100,
+      edgeBleed: 0,
+      granulation: 0,
+      paper: 100,
+      seed: 41,
+      paperKind: "cold-press",
+    });
+    const red = redChannel(wide);
+    // 타일이 정확히 wrap 된다.
+    expect(red[TILE]).toBe(red[0]);
+    expect(red[TILE * 2]).toBe(red[0]);
+    // 이음선 계단이 타일 내부 최대 계단을 넘지 않는다 = 눈에 띄는 줄이 없다.
+    let maxInterior = 0;
+    for (let x = 0; x < TILE - 1; x++) maxInterior = Math.max(maxInterior, Math.abs(red[x + 1]! - red[x]!));
+    expect(Math.abs(red[TILE]! - red[TILE - 1]!)).toBeLessThanOrEqual(maxInterior);
+  });
+});
+
+describe("applyInkWash — 가장자리 어두워짐(edge darkening)", () => {
+  const SIZE = 48;
+  const CENTER = SIZE / 2;
+  const DISC_RADIUS = 14;
+
+  function makeDisc(): StudioImageDataLike {
+    const image = makeSolid(SIZE, SIZE, [255, 255, 255, 255]);
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (Math.hypot(x - CENTER, y - CENTER) > DISC_RADIUS) continue;
+        const offset = (y * SIZE + x) * 4;
+        image.data[offset] = 0;
+        image.data[offset + 1] = 0;
+        image.data[offset + 2] = 0;
+      }
+    }
+    return image;
+  }
+
+  const settings: InkWash = {
+    ...DEFAULT_INK_WASH,
+    strength: 100,
+    spread: 4,
+    edgeBleed: 70,
+    granulation: 0,
+    paper: 0,
+    inkColor: "#000000",
+    seed: 3,
+  };
+
+  function bandMean(image: StudioImageDataLike, inner: number, outer: number): number {
+    let sum = 0;
+    let count = 0;
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        const radius = Math.hypot(x - CENTER, y - CENTER);
+        if (radius < inner || radius > outer) continue;
+        sum += image.data[(y * SIZE + x) * 4]!;
+        count++;
+      }
+    }
+    return sum / count;
+  }
+
+  it("키가 없으면 명시적 0과 픽셀 단위로 같다(기존 저장본 무변화)", () => {
+    const implicit = makeDisc();
+    const explicitZero = makeDisc();
+    applyInkWash(implicit, settings);
+    applyInkWash(explicitZero, { ...settings, edgeDarkening: 0 });
+    expect(dataEqual(implicit, explicitZero)).toBe(true);
+  });
+
+  it("켜면 안료가 중심에서 젖은 가장자리로 실려 나간다(wet edge)", () => {
+    const dry = makeDisc();
+    const wet = makeDisc();
+    applyInkWash(dry, settings);
+    applyInkWash(wet, { ...settings, edgeDarkening: 90 });
+
+    // 가장자리 링은 더 진해지고(R 감소), 중심부는 안료가 빠져나가 밝아진다.
+    expect(bandMean(wet, DISC_RADIUS + 1, DISC_RADIUS + 5)).toBeLessThan(bandMean(dry, DISC_RADIUS + 1, DISC_RADIUS + 5));
+    expect(bandMean(wet, 0, 5)).toBeGreaterThan(bandMean(dry, 0, 5));
+  });
+
+  it("강도를 올릴수록 링 대비가 커지고 알파는 그대로다", () => {
+    const gentle = makeDisc();
+    const strong = makeDisc();
+    const alphaBefore = alphaValues(makeDisc());
+    applyInkWash(gentle, { ...settings, edgeDarkening: 30 });
+    applyInkWash(strong, { ...settings, edgeDarkening: 100 });
+
+    const contrast = (image: StudioImageDataLike): number =>
+      bandMean(image, 0, 5) - bandMean(image, DISC_RADIUS + 1, DISC_RADIUS + 5);
+    expect(contrast(strong)).toBeGreaterThan(contrast(gentle));
+    expect(alphaValues(strong)).toEqual(alphaBefore);
+  });
+
+  it("edgeBleed 0이어도 독립적으로 동작한다", () => {
+    const off = makeDisc();
+    const on = makeDisc();
+    applyInkWash(off, { ...settings, edgeBleed: 0 });
+    applyInkWash(on, { ...settings, edgeBleed: 0, edgeDarkening: 80 });
+    expect(dataEqual(off, on)).toBe(false);
   });
 });

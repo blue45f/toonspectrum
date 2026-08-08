@@ -1,0 +1,308 @@
+toon-vello fork track — TOON-PATCH 0001
+
+Base: crates.io wgpu 29.0.4
+  https://static.crates.io/crates/wgpu/wgpu-29.0.4.crate
+  sha256 76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07
+  (matches the crates.io index cksum for 29.0.4, verified 2026-08-08)
+
+Regenerate the vendored tree from scratch:
+  curl -sLO https://static.crates.io/crates/wgpu/wgpu-29.0.4.crate
+  shasum -a 256 wgpu-29.0.4.crate   # must match the sha256 above
+  tar xzf wgpu-29.0.4.crate && mv wgpu-29.0.4 crates/vendor/wgpu-toon
+  patch -p1 -d crates/vendor/wgpu-toon < crates/vendor/wgpu-toon/PATCHES/0001-webgpu-handle-adoption.patch
+
+Every hunk is gated behind the crate's `toon-fabric` feature, so with the
+feature off the vendored crate is API-identical to upstream (build track A).
+See crates/vendor/wgpu-toon/Cargo.toml for the WHY / UPSTREAM / REMOVE WHEN
+rationale, and docs/engines/vello-baseline.md §3 for the track definitions.
+
+diff -ruN a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml	2026-08-08 14:42:44
++++ b/Cargo.toml	2026-08-08 14:42:44
+@@ -99,6 +99,32 @@
+     "wgpu-core?/strict_asserts",
+     "wgpu-types/strict_asserts",
+ ]
++
++# TOON-PATCH 0001 (ToonStudio V12 §5 toon-vello fork track).
++#
++# WHY: vello 0.9 pins `wgpu ^29.0.3`, and wgpu 29 has no way to build a
++# `wgpu::Device` around a `GPUDevice` the page already owns
++# (`mod backend` is private, `backend::webgpu::WebDevice.inner` is
++# `pub(crate)`, and `Device::from_custom` demands a whole custom backend
++# rather than adoption). That forces ToonStudio's WGSL filter kernels and
++# vello onto two separate `GPUDevice`s, so every exchange is a CPU readback
++# (V12 §6.3 L0) — measured at 2.9x the same-device GPU copy at 1024²
++# (`tests/benchmarks/results/gpu-fabric-probe.json`).
++#
++# OFF BY DEFAULT ON PURPOSE: with this feature disabled, every patch hunk in
++# this vendored tree compiles out and the crate is API-identical to upstream
++# 29.0.4. That is build track A (`upstream`) — it is what detects upstream
++# regressions. Track B (`toon`) enables `toon-fabric`.
++#
++# REMOVE WHEN: wgpu upstream ships `Device`/`Queue` adoption of an external
++# WebGPU handle AND vello's wgpu pin reaches that release. wgpu 30.0.0
++# already ships the *export* half of this patch (`Device::as_webgpu`,
++# `Texture::as_webgpu`, `Device::create_texture_from_webgpu_handle`, public
++# `wgpu::webgpu` handle module), so those hunks are a straight backport and
++# die with the pin bump; the *adoption* half
++# (`Device::from_webgpu_handle` / `Queue::from_webgpu_handle`) does not
++# exist upstream at all and is our upstream PR candidate (V12 §5.4).
++toon-fabric = []
+ trace = [
+     "serde",
+     "wgpu-core?/trace",
+diff -ruN a/src/api/device.rs b/src/api/device.rs
+--- a/src/api/device.rs	2026-08-08 14:42:44
++++ b/src/api/device.rs	2026-08-08 14:42:44
+@@ -49,6 +49,86 @@
+         }
+     }
+ 
++    // TOON-PATCH 0001 hunk 4/6 — WebGPU handle adoption + export on `Device`.
++    // WHY / REMOVE WHEN: see `toon-fabric` in this crate's Cargo.toml.
++    // UPSTREAM: `as_webgpu` and `create_texture_from_webgpu_handle` are
++    // backports of wgpu 30.0.0 (`wgpu-30.0.0/src/api/device.rs`);
++    // `from_webgpu_handle` has no upstream counterpart and is our PR
++    // candidate.
++
++    /// Builds a `Device` around a [`webgpu::GpuDevice`] the caller already
++    /// owns — typically one the page created with `navigator.gpu` and shares
++    /// with other WebGPU consumers.
++    ///
++    /// Returns the adopted `Device` together with its [`Queue`], taken from
++    /// `device.queue()` so the two are guaranteed to belong to the same JS
++    /// object.
++    ///
++    /// wgpu never destroys an adopted handle: the caller stays responsible for
++    /// the `GPUDevice` lifetime, and dropping every `Device`/`Queue` clone
++    /// leaves the underlying JS object untouched.
++    ///
++    /// The caller must guarantee that the device's reported limits and
++    /// features cover what will be asked of it — wgpu reads them back from the
++    /// handle, so no separate validation is performed here.
++    #[cfg(all(webgpu, feature = "toon-fabric"))]
++    #[must_use]
++    pub fn from_webgpu_handle(device: webgpu::GpuDevice) -> (Self, Queue) {
++        let queue = crate::backend::webgpu::WebQueue::from_external_handle(device.queue());
++        let device = crate::backend::webgpu::WebDevice::from_external_handle(device);
++        (
++            Self {
++                inner: device.into(),
++            },
++            Queue {
++                inner: queue.into(),
++            },
++        )
++    }
++
++    /// Returns the underlying [`webgpu::GpuDevice`] handle if this `Device`
++    /// is on the WebGPU backend, otherwise `None`.
++    #[cfg(all(webgpu, feature = "toon-fabric"))]
++    pub fn as_webgpu(&self) -> Option<&webgpu::GpuDevice> {
++        self.inner.as_webgpu_opt().map(|device| &device.inner)
++    }
++
++    /// Wraps a [`webgpu::GpuTexture`] this crate did not create, so it can be
++    /// rendered into or sampled like any other [`Texture`].
++    ///
++    /// This is the WebGPU counterpart of [`Self::create_texture_from_hal`].
++    /// wgpu never destroys the wrapped handle.
++    ///
++    /// The caller must guarantee:
++    ///
++    /// 1. `texture` was produced by the same underlying `GPUDevice` that this
++    ///    `Device` wraps.
++    /// 2. `desc.format`, `desc.size`, `desc.usage`, `desc.dimension`,
++    ///    `desc.mip_level_count` and `desc.sample_count` match the real
++    ///    `GPUTexture` — wgpu stores them verbatim and reports them from
++    ///    [`Texture::size`], [`Texture::format`] etc. without re-reading the
++    ///    handle. A mismatch yields wrong metadata and downstream
++    ///    `GPUValidationError`s, never memory unsafety (the browser bounds
++    ///    every access).
++    /// 3. The `GPUTexture` outlives every wgpu submission that references it.
++    #[cfg(all(webgpu, feature = "toon-fabric"))]
++    #[must_use]
++    pub fn create_texture_from_webgpu_handle(
++        &self,
++        texture: webgpu::GpuTexture,
++        desc: &TextureDescriptor<'_>,
++    ) -> Texture {
++        let inner = self.inner.as_webgpu().wrap_external_texture(texture);
++        Texture {
++            inner,
++            descriptor: TextureDescriptor {
++                label: None,
++                view_formats: &[],
++                ..desc.clone()
++            },
++        }
++    }
++
+     /// Constructs a stub device for testing using [`Backend::Noop`].
+     ///
+     /// This is a convenience function which avoids the configuration, `async`, and fallibility
+diff -ruN a/src/api/queue.rs b/src/api/queue.rs
+--- a/src/api/queue.rs	2026-08-08 14:42:44
++++ b/src/api/queue.rs	2026-08-08 14:42:44
+@@ -33,6 +33,19 @@
+             inner: dispatch::DispatchQueue::custom(queue),
+         }
+     }
++
++    // TOON-PATCH 0001 hunk 5/6 — WebGPU handle export on `Queue`.
++    // WHY / REMOVE WHEN: see `toon-fabric` in this crate's Cargo.toml.
++    // UPSTREAM: backport of wgpu 30.0.0 (`wgpu-30.0.0/src/api/queue.rs`).
++    // Adoption lives on [`crate::Device::from_webgpu_handle`], which returns
++    // the paired `Queue`, so there is deliberately no `Queue`-only adopter.
++
++    /// Returns the underlying [`webgpu::GpuQueue`] handle if this `Queue` is
++    /// on the WebGPU backend, otherwise `None`.
++    #[cfg(all(webgpu, feature = "toon-fabric"))]
++    pub fn as_webgpu(&self) -> Option<&webgpu::GpuQueue> {
++        self.inner.as_webgpu_opt().map(|queue| &queue.inner)
++    }
+ }
+ 
+ /// Identifier for a particular call to [`Queue::submit`]. Can be used
+diff -ruN a/src/api/texture.rs b/src/api/texture.rs
+--- a/src/api/texture.rs	2026-08-08 14:42:44
++++ b/src/api/texture.rs	2026-08-08 14:42:44
+@@ -63,6 +63,23 @@
+         unsafe { texture.context.texture_as_hal::<A>(texture) }
+     }
+ 
++    // TOON-PATCH 0001 hunk 6/6 — WebGPU handle export on `Texture`.
++    // WHY / REMOVE WHEN: see `toon-fabric` in this crate's Cargo.toml.
++    // UPSTREAM: backport of wgpu 30.0.0 (`wgpu-30.0.0/src/api/texture.rs`).
++
++    /// Returns the underlying [`webgpu::GpuTexture`] handle if this `Texture`
++    /// is on the WebGPU backend.
++    ///
++    /// Use this on the WebGPU backend instead of [`Self::as_hal`].
++    ///
++    /// The returned handle is the same JS object wgpu uses internally; it can
++    /// be passed to other WebGPU-aware JS APIs, used for identity comparison,
++    /// or fed back into [`Device::create_texture_from_webgpu_handle`].
++    #[cfg(all(webgpu, feature = "toon-fabric"))]
++    pub fn as_webgpu(&self) -> Option<&webgpu::GpuTexture> {
++        self.inner.as_webgpu_opt().map(|texture| &texture.inner)
++    }
++
+     #[cfg(custom)]
+     /// Returns custom implementation of Texture (if custom backend and is internally T)
+     pub fn as_custom<T: custom::TextureInterface>(&self) -> Option<&T> {
+diff -ruN a/src/backend/webgpu.rs b/src/backend/webgpu.rs
+--- a/src/backend/webgpu.rs	2026-08-08 14:42:44
++++ b/src/backend/webgpu.rs	2026-08-08 14:42:44
+@@ -3,7 +3,12 @@
+ mod defined_non_null_js_value;
+ mod ext_bindings;
+ #[allow(clippy::allow_attributes)]
+-mod webgpu_sys;
++// TOON-PATCH 0001 hunk 2/6 — `mod` -> `pub(crate) mod` so `crate::webgpu`
++// (lib.rs hunk 1/6) can re-export the JS handle types. No item visibility
++// changes; the generated bindings inside are already `pub`.
++// UPSTREAM: wgpu 30.0.0 declares this exact `pub(crate) mod webgpu_sys;`.
++// REMOVE WHEN: vello's wgpu pin reaches >= 30.
++pub(crate) mod webgpu_sys;
+ 
+ use alloc::{
+     boxed::Box,
+@@ -1211,6 +1216,61 @@
+     pub(crate) inner: webgpu_sys::GpuQueue,
+     /// Unique identifier for this Queue.
+     ident: crate::cmp::Identifier,
++}
++
++// TOON-PATCH 0001 hunk 3/6 — adopt an externally created `GPUDevice`.
++//
++// WHY: `WebDevice`/`WebQueue` are only ever built inside
++// `future_request_device`, i.e. exclusively from a device wgpu itself
++// requested. Nothing here needs to change for adoption to be sound — every
++// `Drop` impl in this backend is already a no-op, so wgpu never destroys the
++// handle it wraps, and `Identifier::create()` keeps the usual per-object
++// identity contract.
++// UPSTREAM: absent from wgpu 30.0.0 as well (30 ships only the *export*
++// direction). This is the ToonStudio upstream PR candidate (V12 §5.4).
++// REMOVE WHEN: upstream accepts external-handle device adoption.
++#[cfg(feature = "toon-fabric")]
++impl WebDevice {
++    /// Wraps a `GPUDevice` this crate did not create.
++    ///
++    /// The caller keeps ownership of the JS object: wgpu never calls
++    /// `destroy()` on it and never drops it (`Drop for WebDevice` is a no-op).
++    pub(crate) fn from_external_handle(device: webgpu_sys::GpuDevice) -> Self {
++        Self {
++            inner: device,
++            ident: crate::cmp::Identifier::create(),
++            error_scope_count: Rc::new(Cell::new(0)),
++        }
++    }
++
++    /// Wraps a `GPUTexture` this crate did not create, so it can be used as a
++    /// render target / bind-group entry like any other [`crate::Texture`].
++    ///
++    /// Safety contract is the caller's, exactly as documented on
++    /// [`crate::Device::create_texture_from_webgpu_handle`].
++    pub(crate) fn wrap_external_texture(
++        &self,
++        texture: webgpu_sys::GpuTexture,
++    ) -> dispatch::DispatchTexture {
++        WebTexture {
++            inner: texture,
++            ident: crate::cmp::Identifier::create(),
++        }
++        .into()
++    }
++}
++
++#[cfg(feature = "toon-fabric")]
++impl WebQueue {
++    /// Wraps a `GPUQueue` this crate did not create — pair with
++    /// [`WebDevice::from_external_handle`] using `device.queue()` so the queue
++    /// and device belong to the same JS object.
++    pub(crate) fn from_external_handle(queue: webgpu_sys::GpuQueue) -> Self {
++        Self {
++            inner: queue,
++            ident: crate::cmp::Identifier::create(),
++        }
++    }
+ }
+ 
+ #[derive(Debug, Clone)]
+diff -ruN a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs	2026-08-08 14:42:44
++++ b/src/lib.rs	2026-08-08 14:42:44
+@@ -186,5 +186,31 @@
+ #[cfg(web)]
+ pub use web_sys;
+ 
++// TOON-PATCH 0001 hunk 1/6 — public WebGPU JS-handle types.
++//
++// WHY: interop crates cannot name `backend::webgpu::webgpu_sys::*` because
++// `mod backend` is private, so there is no way to hand wgpu a `GPUDevice`
++// the page created, nor to read the `GPUTexture` behind a `wgpu::Texture`.
++// UPSTREAM: this module is verbatim what wgpu 30.0.0 ships as `wgpu::webgpu`
++// (wgpu-30.0.0/src/lib.rs), minus `DropCallback` (see hunk 3/6).
++// REMOVE WHEN: vello's wgpu pin reaches >= 30.
++/// Vendored WebGPU JS-handle types used by the WebGPU backend.
++///
++/// They are exposed publicly so that interop crates can read the JS handle
++/// behind a [`Texture`] / [`Device`] / etc. (via [`Texture::as_webgpu`] and
++/// siblings), and pass a foreign handle in (via
++/// [`Device::from_webgpu_handle`] and
++/// [`Device::create_texture_from_webgpu_handle`]).
++///
++/// A `web_sys::GpuTexture` from a consumer's own `web-sys` dependency wraps
++/// the same JS object as a `wgpu::webgpu::GpuTexture`; convert between them
++/// with [`wasm_bindgen::JsCast::unchecked_into`].
++#[cfg(all(webgpu, feature = "toon-fabric"))]
++pub mod webgpu {
++    pub use crate::backend::webgpu::webgpu_sys::{
++        GpuBuffer, GpuDevice, GpuQueue, GpuTexture, GpuTextureView,
++    };
++}
++
+ #[doc(hidden)]
+ pub use macros::helpers as __macro_helpers;

@@ -2,10 +2,14 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const adapter_version: () => [number, number];
+export const adopt_gpu_device: (a: any) => [number, number];
+export const fabric_device_adopted: () => number;
+export const fabric_device_handle: () => any;
 export const fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const probe_webgpu: () => any;
 export const render_lottie_gpu_json: (a: number, b: number, c: number, d: number, e: number) => any;
 export const render_scene_gpu_json: (a: number, b: number) => any;
+export const render_scene_gpu_texture_json: (a: number, b: number) => any;
 export const render_scene_json: (a: number, b: number) => [number, number, number, number];
 export const shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
