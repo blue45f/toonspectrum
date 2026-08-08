@@ -1,0 +1,118 @@
+{
+  "harness": "tests/benchmarks/harness/color-lab.ts",
+  "generatedAt": "2026-08-08T00:16:02.780Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "environment": {
+    "concurrentLoad": "24h 소크 벤치가 같은 호스트에서 병행 중 — 이 랩은 수치 정확도만 계측하며 타이밍 비의존이라 결과에 영향 없음"
+  },
+  "reference": {
+    "transfer": "IEC 61966-2-1 piecewise sRGB EOTF/OETF (f64, 부호 보존 확장)",
+    "matrices": "CSS Color 4 'Sample code for Color Conversions' 유리수 행렬 — sRGB(IEC 61966-2-1)/Display-P3(SMPTE RP 431-2) 원색 + D65, Bradford 순응 없음",
+    "deltaE": "CIEDE2000 (Sharma/Wu/Dalal 2005), kL=kC=kH=1, CIELAB D65"
+  },
+  "ciede2000Validation": {
+    "pairs": 34,
+    "maxAbsError": 0.000049499,
+    "tolerance": 0.0001
+  },
+  "grid": {
+    "steps": 9,
+    "colors": 729,
+    "codes": [
+      0,
+      32,
+      64,
+      96,
+      128,
+      159,
+      191,
+      223,
+      255
+    ]
+  },
+  "studioTargets": [
+    "src/domains/creator/studio-highbit-transfer.ts (studioHighBitSrgbToLinear / studioHighBitLinearToSrgb)",
+    "src/domains/creator/studio-highbit-colorspace.ts (convertStudioHighBitLinearGamut — STUDIO_HIGHBIT_SRGB_TO_DISPLAY_P3 / _DISPLAY_P3_TO_SRGB)"
+  ],
+  "measurements": {
+    "quantization8bitFloorDeltaE00": {
+      "max": 0.509218,
+      "mean": 0.122902,
+      "p95": 0.290692
+    },
+    "studioComposedVsReferenceDeltaE00": {
+      "max": 9.4369e-14,
+      "mean": 1.51909e-14,
+      "p95": 4.74878e-14
+    },
+    "canvaskit": [
+      {
+        "lane": "srgb-surface-readPixels-dst-display-p3-rgba8888",
+        "supported": true,
+        "notes": "readPixels(dstColorSpace=DISPLAY_P3) 색변환 실측 확정",
+        "vsReferenceDeltaE00": {
+          "max": 0.509218,
+          "mean": 0.123189,
+          "p95": 0.290692
+        },
+        "vsIdentityDeltaE00": {
+          "max": 7.04117,
+          "mean": 3.14409,
+          "p95": 5.08573
+        }
+      },
+      {
+        "lane": "srgb-surface-readPixels-dst-display-p3-rgbaF32",
+        "supported": true,
+        "notes": "readPixels(dstColorSpace=DISPLAY_P3) 색변환 실측 확정",
+        "vsReferenceDeltaE00": {
+          "max": 0.0266918,
+          "mean": 0.00625757,
+          "p95": 0.0128816
+        },
+        "vsIdentityDeltaE00": {
+          "max": 6.85939,
+          "mean": 3.13437,
+          "p95": 5.0513
+        }
+      },
+      {
+        "lane": "MakeRasterDirectSurface-display-p3-rgba8888",
+        "supported": true,
+        "notes": "MakeRasterDirectSurface(ImageInfo{colorSpace: DISPLAY_P3, alphaType: Unpremul}) P3 서피스 실측 확정 — 쓰기 시 SRGB→P3 변환 수행",
+        "vsReferenceDeltaE00": {
+          "max": 0.509218,
+          "mean": 0.123189,
+          "p95": 0.290692
+        },
+        "vsIdentityDeltaE00": {
+          "max": 7.04117,
+          "mean": 3.14409,
+          "p95": 5.08573
+        }
+      }
+    ]
+  },
+  "roundtripDeltaE00": {
+    "referenceF64": {
+      "max": 6.91068e-14,
+      "mean": 1.33918e-14,
+      "p95": 4.76004e-14
+    },
+    "studioComposedF64": {
+      "max": 8.61765e-14,
+      "mean": 1.38503e-14,
+      "p95": 4.84093e-14
+    },
+    "canvaskitRgba8888": {
+      "max": 0.65192,
+      "mean": 0.0543272,
+      "p95": 0.24306
+    }
+  }
+}
