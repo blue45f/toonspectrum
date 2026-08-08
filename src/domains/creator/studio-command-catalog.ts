@@ -13,16 +13,19 @@
  * shortcut or a behaviour, the disagreement is recorded in `COMMAND_CONFLICTS`
  * rather than resolved by picking a winner here.
  *
- * Wave C (2026-08-08) regrouped the main menu to V5 §15.3. The item **count** is
- * unchanged at 116 — nothing was added or dropped — but the qualified menu
+ * Wave C (2026-08-08) regrouped the main menu to V5 §15.3. The regroup itself
+ * added and dropped nothing (116 items) — but the qualified menu
  * `nativeId`s moved with their groups (`edit/select-all` → `select/select-all`,
  * `draw/pen` → `brush/pen`, and so on) and `view/app-settings` was renamed to
  * `window/app-settings-window` to make menu item ids globally unique
  * (conflict `menu-item-id-collision`). Which §15.3 rows we cover lives in
  * `studio-main-menu-group-spec.ts`.
  *
+ * 그 뒤 툴벨트 전용이던 검수·미리보기 3종(`view/anim-timeline`, `view/vertical-scroll-preview`,
+ * `view/storyboard-grid`)이 보기 메뉴로 승격되며 116 → 119가 됐다.
+ *
  * Measured 2026-08-08 against:
- * - `studio-main-menu-items-*.ts`     15 rendered groups / 116 items
+ * - `studio-main-menu-items-*.ts`     15 rendered groups / 119 items
  * - `studio-edit-controls.ts`         STUDIO_EDIT_MENU_COMMANDS, 20 entries
  * - `studio-quick-access-integration.ts` STUDIO_QUICK_ACCESS_COMMAND_IDS, 18
  * - `studio-quick-actions.ts`         QUICK_ACTION_IDS, 16
@@ -235,7 +238,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     ],
     declarationRef:
       "studio-main-menu-item-routing.ts (STUDIO_MENU_ITEM_BUILDERS) + studio-main-menu-items-*.ts",
-    measuredCount: 166,
+    measuredCount: 169,
   },
   "edit-menu": {
     label: "편집 메뉴 명령 테이블",
@@ -327,6 +330,10 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "view/save-current-view",
   "view/restore-view",
   "view/production-insights",
+  // 검수·미리보기 3종 — 툴벨트에서 승격(studio-project-review-actions.ts 주석).
+  "view/anim-timeline",
+  "view/vertical-scroll-preview",
+  "view/storyboard-grid",
   // view, Wave E (2) — studio-main-menu-items-authoring.ts
   "view/navigator",
   "view/underlay",
@@ -1075,6 +1082,33 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       labels: [ko("제작 인사이트…"), en("Production insights…")],
       aliases: [ours("제작 인사이트")],
       origins: [menu("view/production-insights")],
+    }),
+    defineCommand({
+      id: "view.anim-timeline",
+      labels: [
+        ko("다중 레이어 타임라인", "레이어별 키프레임과 재생 구간을 시간축에서 편집합니다."),
+        en("Layer timeline"),
+      ],
+      aliases: [ours("타임라인")],
+      origins: [menu("view/anim-timeline")],
+    }),
+    defineCommand({
+      id: "view.scroll-preview",
+      labels: [
+        ko("세로 스크롤 미리보기", "페이지를 모바일 독자 폭으로 이어 붙여 읽기 흐름을 확인합니다."),
+        en("Vertical scroll preview"),
+      ],
+      aliases: [ours("웹툰 미리보기")],
+      origins: [menu("view/vertical-scroll-preview")],
+    }),
+    defineCommand({
+      id: "view.storyboard-grid",
+      labels: [
+        ko("스토리보드 그리드 보기", "모든 페이지를 격자로 펼쳐 컷 흐름과 장면 전환을 비교합니다."),
+        en("Storyboard grid"),
+      ],
+      aliases: [ours("콘티 보기")],
+      origins: [menu("view/storyboard-grid")],
     }),
 
     /* -------------------------------------------------------------- window */

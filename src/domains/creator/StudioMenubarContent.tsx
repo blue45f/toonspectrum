@@ -738,7 +738,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 )
               : null}
           </div>
-          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
+          {/* 폰 폭에서도 보여야 한다. 이 시트는 검수·미리보기 7종의 유일한 포인터 경로인데
+              (`StudioProjectReviewActions` 주석), 430px 기본 상태에서는 앱 메뉴바가
+              `md:flex` + 몰입 `!hidden`이고 툴벨트도 몰입에서 숨어 대체 경로가 없다.
+              시트 본문은 이미 `grid-cols-2` / `inset-x-2` / safe-area 패딩으로 폰 레이아웃을
+              갖고 있었다 — 막고 있던 건 트리거뿐이었다. 라벨은 `max-xl:sr-only`라 좁은 폭에서
+              아이콘만 차지한다. */}
+          <div ref={projectActionsRef} className="relative shrink-0">
             <StudioToolHintTarget hint={MENUBAR_HINTS.project} preferredSide="bottom">
               <button
                 type="button"
@@ -753,14 +759,20 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 className={buttonClass({
                   size: "sm",
                   variant: "quiet",
-                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                  // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
+                  // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
+                  className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
                 <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
+                {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][임시저장][게시하기]로
+                    320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
+                    (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
+                    열림 상태는 `aria-expanded`가 이미 전달하므로, 가장 좁은 폭에서만 접는다. */}
                 <ChevronDown
                   size={13}
                   className={cn(
-                    "transition-transform motion-reduce:transition-none",
+                    "transition-transform motion-reduce:transition-none max-sm:hidden",
                     projectActionsOpen && "rotate-180"
                   )}
                   aria-hidden

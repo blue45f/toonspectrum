@@ -78,6 +78,13 @@ export interface StudioMainMenuBuilderState extends StudioMainMenuSurfaceState {
    * when the host cannot tell; the help surface then says so instead of guessing.
    */
   activeToolCommandId: string | null;
+  /** 다중 레이어 타임라인이 열려 있는지 — View 메뉴의 토글 체크 상태. */
+  animationTimelineOpen: boolean;
+  /**
+   * 마스터 편집 중인지. 히스토리 스크러빙을 쓰는 표면(타임라인)은 이때 열 수 없다 —
+   * 툴벨트가 쓰던 것과 같은 게이트다(`StudioToolBeltContent.tsx`).
+   */
+  masterEditMode: boolean;
 }
 
 export interface StudioMainMenuEditorActions {
@@ -143,6 +150,14 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   toggleReferencePanel: () => unknown;
   togglePageSequence: () => unknown;
   openProductionInsights: () => unknown;
+  /**
+   * 검수·미리보기 3종. 원래 툴벨트에만 있었고 벨트 호스트가 전 뷰포트에서
+   * `display:none`이라 도달 불가였다 — `studio-project-review-actions.ts` 주석 참조.
+   * 벨트와 같은 패널 상태를 열어야 두 진입점이 갈라지지 않는다.
+   */
+  toggleAnimationTimeline: () => unknown;
+  openScrollPreview: () => unknown;
+  openStoryboardGrid: () => unknown;
   collapseSidePanels: () => unknown;
   openToolsCompanion: () => unknown;
   toggleQuickAccessPalette: () => unknown;

@@ -79,27 +79,25 @@ describe("툴벨트 전용 기능 도달성", () => {
     expect(dialog).not.toContain("inert");
   });
 
-  it("진단이 측정한 세 뷰포트 중 최소 하나에서 대체 진입점이 실제로 보인다", () => {
-    // 진단 하네스가 실제로 조작한 폭들(docs/perf/heavy-feature-findings.md).
-    const measuredViewports = [1_600, 900, 430] as const;
-    const tailwindSm = 640;
-
+  it("대체 진입점의 트리거에는 폭 게이트가 하나도 없다", () => {
+    // 이 파일의 이전 판은 "세 뷰포트 중 최소 하나에서 보이면 통과"였고, 트리거의
+    // `max-sm:hidden` 때문에 430px 가 빠진 상태로 초록이었다. 시트 본문은 이미
+    // `grid-cols-2` / `inset-x-2` 로 폰 레이아웃이었으니 막고 있던 건 트리거뿐이었다.
+    //
+    // 폭별 도달성 자체는 실제 렌더로 검증하는 `studio-review-entry-point-viewports.test.tsx`
+    // 가 소유한다. 여기서는 그 트리거가 다시 폭으로 게이팅되지 않는 것만 못박는다.
     const triggerStart = menubar.indexOf("<div ref={projectActionsRef}");
     expect(triggerStart).toBeGreaterThan(-1);
     const triggerHost = menubar.slice(triggerStart, menubar.indexOf(">", triggerStart));
-    const hiddenBelowSm = triggerHost.includes("max-sm:hidden");
-    expect(triggerHost).not.toMatch(/\blg:hidden\b/u);
 
-    const reachableWidths = measuredViewports.filter(
-      (width) => !hiddenBelowSm || width >= tailwindSm,
-    );
-    expect(reachableWidths.length).toBeGreaterThan(0);
-    expect(reachableWidths).toContain(1_600);
+    expect(triggerHost).not.toMatch(/\b(?:max-)?(?:sm|md|lg|xl|2xl):hidden\b/u);
+    expect(triggerHost).not.toMatch(/\bhidden\b/u);
   });
 
-  it("폰 폭에서 벨트를 숨기는 조건은 몰입 모드 하나뿐이다 — 430px의 탈출구", () => {
-    // 430px에서는 프로젝트 시트가 `max-sm:hidden`이라, 몰입 해제로 벨트를 되살리는 경로가
-    // 남아 있어야 한다. 무조건 `max-lg:hidden`이 하나라도 붙으면 그 탈출구가 사라진다.
+  it("폰 폭에서 벨트를 숨기는 조건은 몰입 모드 하나뿐이다", () => {
+    // 벨트는 이제 유일한 경로가 아니지만(프로젝트 시트가 전 폭에서 보인다), 몰입을 끈
+    // 폰 사용자에게는 여전히 익숙한 경로다. 무조건적인 `max-lg:hidden`이 하나라도 붙으면
+    // 그 경로가 조용히 사라진다.
     const narrowGates = (beltHost.match(/"max-lg:hidden"/gu) ?? []).length;
     const immersiveGates =
       (beltHost.match(/mobileImmersive\s*&&\s*"max-lg:hidden"/gu) ?? []).length;

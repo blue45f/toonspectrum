@@ -136,6 +136,9 @@ function createUiActions(): StudioMainMenuUiActions {
     toggleReferencePanel: vi.fn(),
     togglePageSequence: vi.fn(),
     openProductionInsights: vi.fn(),
+    toggleAnimationTimeline: vi.fn(),
+    openScrollPreview: vi.fn(),
+    openStoryboardGrid: vi.fn(),
     collapseSidePanels: vi.fn(),
     openToolsCompanion: vi.fn(),
     toggleQuickAccessPalette: vi.fn(),
@@ -155,7 +158,6 @@ function createUiActions(): StudioMainMenuUiActions {
     activatePixelSelectionTool: vi.fn(),
     enterQuickMask: vi.fn(),
     commitQuickMask: vi.fn(),
-    toggleAnimationTimeline: vi.fn(),
     openFrameAnimation: vi.fn(),
     toggleOnionSkin: vi.fn(),
     openAnimaticTimeline: vi.fn(),
@@ -164,8 +166,6 @@ function createUiActions(): StudioMainMenuUiActions {
     openPageReview: vi.fn(),
     openCheckpoints: vi.fn(),
     openWriterRoom: vi.fn(),
-    openStoryboardGrid: vi.fn(),
-    openScrollPreview: vi.fn(),
     openContinuityCheck: vi.fn(),
     openProductionBible: vi.fn(),
     openQuickStart: vi.fn(),
@@ -536,6 +536,39 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "view", "restore-view").unavailableReason).toContain(
       "보기 변환"
     );
+  });
+
+  it("보기 메뉴의 검수·미리보기 3종을 주입된 ui 액션으로 보낸다", () => {
+    // 벨트에서 승격된 항목들이다. 여기서 어긋나면 메뉴에는 보이지만 아무것도 열지 않는,
+    // 도달성 테스트가 잡지 못하는 종류의 회귀가 된다(버튼은 가시하니까).
+    const { groups, ui } = buildMenu();
+
+    menuItem(groups, "view", "anim-timeline").onSelect();
+    menuItem(groups, "view", "vertical-scroll-preview").onSelect();
+    menuItem(groups, "view", "storyboard-grid").onSelect();
+
+    expect(ui.toggleAnimationTimeline).toHaveBeenCalledOnce();
+    expect(ui.openScrollPreview).toHaveBeenCalledOnce();
+    expect(ui.openStoryboardGrid).toHaveBeenCalledOnce();
+  });
+
+  it("마스터 편집 중에는 타임라인 항목이 벨트와 같은 이유로 잠긴다", () => {
+    const { groups } = buildMenu({ masterEditMode: true });
+    const timeline = menuItem(groups, "view", "anim-timeline");
+
+    expect(timeline.disabled).toBe(true);
+    expect(timeline.unavailableReason).toContain("마스터 편집");
+    // 나머지 둘은 히스토리 스크러빙을 쓰지 않으므로 잠기지 않는다.
+    expect(menuItem(groups, "view", "vertical-scroll-preview").disabled).toBeFalsy();
+    expect(menuItem(groups, "view", "storyboard-grid").disabled).toBeFalsy();
+  });
+
+  it("타임라인 항목은 열림 상태를 체크 표시로 반영한다", () => {
+    expect(menuItem(buildMenu().groups, "view", "anim-timeline").checked).toBe(false);
+    expect(
+      menuItem(buildMenu({ animationTimelineOpen: true }).groups, "view", "anim-timeline")
+        .checked,
+    ).toBe(true);
   });
 
   it("routes file, edit, layer, and drawing commands to their injected owners", () => {

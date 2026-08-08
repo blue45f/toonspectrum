@@ -140,6 +140,11 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
       ours("view/fullscreen", "전체화면."),
       ours("view/save-current-view", "현재 보기 저장."),
       ours("view/restore-view", "보기 복원."),
+      // 웹툰 고유 검수 표면이라 §15.3 View 행에 대응하는 항목이 없다. Onion Skin /
+      // Proof Preview 행과는 다른 기능이므로 그 행을 채운 것으로 세지 않는다.
+      ours("view/anim-timeline", "다중 레이어 타임라인 — 레이어별 키프레임 편집."),
+      ours("view/vertical-scroll-preview", "세로 스크롤 미리보기 — 모바일 독자 시점."),
+      ours("view/storyboard-grid", "스토리보드 그리드 — 전체 페이지 격자 비교."),
     ],
   },
   {

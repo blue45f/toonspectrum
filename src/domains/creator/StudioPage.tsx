@@ -37339,11 +37339,13 @@ function clearSelectionForEdit() {
           clippingMaskDisabled: menuClippingMaskDisabled,
           imageLayerSelected: menuImageLayerSelected,
           activeToolCommandId: menuActiveToolCommandId,
+          animationTimelineOpen: timelineOpen,
+          masterEditMode,
         },
         // Name-for-name delegation; it carries no browser state, so it lives in
         // the pure layer (`studio-main-menu-editor-bindings.ts`).
         editor: bindStudioMainMenuEditorActions(studioMainMenuActions),
-          ui: {
+        ui: {
           ...bindStudioMainMenuSurfaceActions(studioMainMenuSurfaceActions),
           openExportDownload: () => {
             setProjectActionsOpen(false);
@@ -37402,6 +37404,11 @@ function clearSelectionForEdit() {
           },
           togglePageSequence: () => setPageSequenceOpen((current) => !current),
           openProductionInsights: () => setProductionInsightsOpen(true),
+          // 벨트/프로젝트 시트와 **같은** 상태를 토글한다. 별도 상태를 만들면 한쪽에서 연
+          // 패널을 다른 쪽에서 닫지 못하는 유령 상태가 생긴다.
+          toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
+          openScrollPreview: () => setScrollPreviewOpen(true),
+          openStoryboardGrid: () => setStoryboardGridOpen(true),
           collapseSidePanels: () => {
             setLeftPanelOpen(false);
             setRightPanelOpenWithOverride(false);
@@ -37466,6 +37473,8 @@ function clearSelectionForEdit() {
       menuHasLocallyHiddenLayers,
       menuHasSavedView,
       menuSharedNonOwnerSave,
+      masterEditMode,
+      timelineOpen,
       pageSequenceOpen,
       perspectiveRulerActive,
       projectArchiveBusy,

@@ -175,7 +175,8 @@ describe("§15.3 menu group spec", () => {
       rowsPresent: 37,
       rowsPartial: 34,
       rowsAbsent: 64,
-      extras: 34,
+      // 툴벨트에서 승격한 검수·미리보기 3종은 §15.3 행이 없어 extras로 센다.
+      extras: 37,
     });
   });
 
