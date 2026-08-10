@@ -241,7 +241,7 @@ async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   // Close any open group first
   await page.keyboard.press("Escape").catch(() => undefined);
   await page.waitForTimeout(80);
-  const btn = nav.getByRole("button", { name: label, exact: true });
+  const btn = nav.getByRole("menuitem", { name: label, exact: true });
   await btn.click({ timeout: 5000 });
   await page.locator(`[role="menu"][aria-label="${label}"]`).waitFor({ state: "visible", timeout: 5000 });
 }
@@ -301,7 +301,7 @@ async function assertMainMenus(page: Page): Promise<string[]> {
 
   // Top-level group labels always visible
   for (const group of Object.keys(MAIN_MENU)) {
-    if (!(await nav.getByRole("button", { name: group, exact: true }).isVisible().catch(() => false))) {
+    if (!(await nav.getByRole("menuitem", { name: group, exact: true }).isVisible().catch(() => false))) {
       failures.push(`메인 메뉴 그룹 버튼 미노출: ${group}`);
     }
   }

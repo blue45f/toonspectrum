@@ -24,10 +24,12 @@ import { preview, type PreviewServer } from "vite";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const LANGUAGE_KEY = "toonspectrum-lang";
 const SCRATCH =
   process.env.TOONSPECTRUM_COMPANION_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-companion");
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
@@ -230,12 +232,12 @@ async function waitForNavigatorPreview(page: Page): Promise<boolean> {
   }).catch(() => false);
 }
 
-async function openViewMenu(page: Page): Promise<ReturnType<Page["locator"]>> {
+async function openWindowMenu(page: Page): Promise<ReturnType<Page["locator"]>> {
   const menuBar = page.locator('[data-studio-main-menu="true"]');
   await menuBar.waitFor({ state: "visible", timeout: 20_000 });
   await page.keyboard.press("Escape").catch(() => undefined);
-  await menuBar.getByRole("button", { name: "보기", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="보기"]');
+  await menuBar.getByRole("menuitem", { name: "창", exact: true }).click();
+  const menu = page.locator('[role="menu"][aria-label="창"]');
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }
@@ -244,7 +246,7 @@ async function openWorkspaceCompanion(
   primary: Page,
   observePopup: PopupObserver,
 ): Promise<Page> {
-  const menu = await openViewMenu(primary);
+  const menu = await openWindowMenu(primary);
   const launcher = menu.getByRole("menuitem", {
     name: "멀티 디스플레이 작업공간…",
     exact: true,
@@ -304,16 +306,21 @@ async function verifyToolRoundTrip(primary: Page, workspace: Page): Promise<bool
 }
 
 async function installStudioPreferences(context: BrowserContext): Promise<void> {
-  await context.addInitScript(({ quickStartKey, densityKey }) => {
+  await context.addInitScript(({ quickStartKey, densityKey, languageKey }) => {
     try {
       globalThis.localStorage.setItem(quickStartKey, "1");
       globalThis.localStorage.setItem(densityKey, JSON.stringify({ mode: "full" }));
+      globalThis.localStorage.setItem(
+        languageKey,
+        JSON.stringify({ state: { lang: "ko" }, version: 0 }),
+      );
     } catch {
       // Hardened storage must not stop the browser contract itself.
     }
   }, {
     quickStartKey: QUICKSTART_KEY,
     densityKey: UI_DENSITY_KEY,
+    languageKey: LANGUAGE_KEY,
   });
 }
 
