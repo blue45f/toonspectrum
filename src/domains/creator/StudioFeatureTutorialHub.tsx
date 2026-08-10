@@ -17,11 +17,10 @@ import {
   groupStudioFeatureTutorials,
   isTutorialCompleted,
   markTutorialCompleted,
-  readTutorialProgress,
   STUDIO_FEATURE_TUTORIAL_BY_ID,
   STUDIO_FEATURE_TUTORIALS,
   tutorialCompletionRatio,
-  writeTutorialProgress,
+  emptyTutorialProgress,
   type StudioFeatureTutorial,
   type StudioTutorialCategory,
   type StudioTutorialProgress,
@@ -31,6 +30,10 @@ import {
   studioSearchTextMatches,
   tokenizeStudioSearchQuery,
 } from "./studio-search-text";
+import {
+  acquireProductStudioTutorialProgressRepository,
+  type StudioTutorialProgressRepository,
+} from "./studio-tutorial-progress-sqlite";
 
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -157,6 +160,8 @@ export type StudioFeatureTutorialHubProps = {
     action: StudioTutorialTryAction,
     trigger: HTMLButtonElement,
   ) => void;
+  /** Test seam; product defaults to the shared SQLite/OPFS authority. */
+  acquireProgressRepository?: () => Promise<StudioTutorialProgressRepository>;
 };
 
 function resolveInitialId(preferred?: string | null, progress?: StudioTutorialProgress): string {
@@ -170,6 +175,7 @@ export function StudioFeatureTutorialHub({
   onClose,
   initialTutorialId = null,
   onTryAction,
+  acquireProgressRepository = acquireProductStudioTutorialProgressRepository,
 }: StudioFeatureTutorialHubProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -177,14 +183,26 @@ export function StudioFeatureTutorialHub({
   const openerRef = useRef<HTMLElement | null>(null);
   const closeFromEffect = useEffectEvent(onClose);
 
-  const [progress, setProgress] = useState<StudioTutorialProgress>(() => readTutorialProgress());
-  const [activeId, setActiveId] = useState(() => resolveInitialId(initialTutorialId, readTutorialProgress()));
+  const [progress, setProgress] = useState<StudioTutorialProgress>(() => emptyTutorialProgress());
+  const [activeId, setActiveId] = useState(() => resolveInitialId(initialTutorialId));
+  const [preferenceAuthority, setPreferenceAuthority] = useState<
+    "loading" | "sqlite-opfs" | "memory-only"
+  >("loading");
+  const progressRepositoryRef = useRef<StudioTutorialProgressRepository | null>(null);
+  const progressDirtyRef = useRef(false);
+  const progressLoadGenerationRef = useRef(0);
+  const progressMountedRef = useRef(true);
   const [stepIndex, setStepIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const t = useT();
   const language = useI18n((state) => state.lang);
   const preferSourceCopy = language.toLocaleLowerCase().startsWith("ko");
   const searchCopy = preferSourceCopy ? TUTORIAL_SEARCH_COPY.ko : TUTORIAL_SEARCH_COPY.en;
+
+  useEffect(() => {
+    progressMountedRef.current = true;
+    return () => { progressMountedRef.current = false; };
+  }, []);
 
   const visibleTutorials = filterStudioFeatureTutorials(
     STUDIO_FEATURE_TUTORIALS,
@@ -208,13 +226,46 @@ export function StudioFeatureTutorialHub({
   // open 시 초기 튜토리얼·진행 동기화
   useEffect(() => {
     if (!open) return;
-    const nextProgress = readTutorialProgress();
-    setProgress(nextProgress);
-    const id = resolveInitialId(initialTutorialId, nextProgress);
-    setActiveId(id);
+    const generation = progressLoadGenerationRef.current + 1;
+    progressLoadGenerationRef.current = generation;
+    setPreferenceAuthority("loading");
+    void acquireProgressRepository()
+      .then(async (repository) => {
+        progressRepositoryRef.current = repository;
+        const nextProgress = await repository.load();
+        if (!progressMountedRef.current || progressLoadGenerationRef.current !== generation) return;
+        setPreferenceAuthority("sqlite-opfs");
+        if (!progressDirtyRef.current) {
+          setProgress(nextProgress);
+          setActiveId(resolveInitialId(initialTutorialId, nextProgress));
+        }
+      })
+      .catch(() => {
+        if (progressMountedRef.current && progressLoadGenerationRef.current === generation) {
+          setPreferenceAuthority("memory-only");
+        }
+      });
+    if (!progressDirtyRef.current) setActiveId(resolveInitialId(initialTutorialId));
     setStepIndex(0);
     setSearchQuery("");
-  }, [open, initialTutorialId]);
+  }, [acquireProgressRepository, open, initialTutorialId]);
+
+  function persistProgress(next: StudioTutorialProgress): void {
+    progressDirtyRef.current = true;
+    const save = progressRepositoryRef.current
+      ? progressRepositoryRef.current.save(next)
+      : acquireProgressRepository().then((repository) => {
+          progressRepositoryRef.current = repository;
+          return repository.save(next);
+        });
+    void save
+      .then(() => {
+        if (progressMountedRef.current) setPreferenceAuthority("sqlite-opfs");
+      })
+      .catch(() => {
+        if (progressMountedRef.current) setPreferenceAuthority("memory-only");
+      });
+  }
 
   // 진짜 modal 계약: 포커스 진입·순환·복원, 배경 inert, html/body 스크롤 잠금을 함께 관리한다.
   useEffect(() => {
@@ -281,7 +332,7 @@ export function StudioFeatureTutorialHub({
     setStepIndex(0);
     const next = { ...progress, lastId: tutorial.id };
     setProgress(next);
-    writeTutorialProgress(next);
+    persistProgress(next);
   }
 
   function updateSearchQuery(nextQuery: string) {
@@ -304,7 +355,7 @@ export function StudioFeatureTutorialHub({
     }
     const next = markTutorialCompleted(progress, active.id);
     setProgress(next);
-    writeTutorialProgress(next);
+    persistProgress(next);
   }
 
   function goPrev() {
@@ -333,6 +384,7 @@ export function StudioFeatureTutorialHub({
         role="dialog"
         aria-modal="true"
         aria-labelledby="studio-tutorial-title"
+        data-studio-tutorial-progress-authority={preferenceAuthority}
         tabIndex={-1}
         className="flex max-h-[min(92dvh,44rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-line/70 bg-panel pb-[env(safe-area-inset-bottom)] shadow-2xl sm:rounded-2xl sm:pb-0"
       >
@@ -384,6 +436,18 @@ export function StudioFeatureTutorialHub({
             </button>
           </div>
         </div>
+
+        {preferenceAuthority === "memory-only" ? (
+          <p
+            aria-live="polite"
+            data-studio-tutorial-persistence-status="memory-only"
+            className="shrink-0 border-b border-warning/35 bg-warning/10 px-4 py-1.5 text-[0.65rem] text-fg-2"
+          >
+            {preferSourceCopy
+              ? "튜토리얼 진행도는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다."
+              : "Tutorial progress stays in this tab until local storage is available again."}
+          </p>
+        ) : null}
 
         {/* body: list + detail */}
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">

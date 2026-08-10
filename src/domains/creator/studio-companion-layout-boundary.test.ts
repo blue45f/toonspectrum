@@ -42,6 +42,7 @@ function readModuleImports(fileName: string): ModuleImports {
 
 const LAYOUT_MODULES = [
   "./studio-companion-window-layout",
+  "./studio-companion-window-preferences-sqlite",
   "./use-studio-companion-window-layout",
   "./StudioCompanionWindowLayoutControls",
   "./StudioCompanionWorkspacePresets",
@@ -92,6 +93,12 @@ describe("Studio companion layout bundle boundary", () => {
     expect(
       hook.static.filter((specifier) => specifier === "./studio-companion-window-layout")
     ).toEqual(["./studio-companion-window-layout"]);
+    expect(
+      hook.static.filter(
+        (specifier) => specifier === "./studio-companion-window-preferences-sqlite",
+      ),
+    ).toEqual(["./studio-companion-window-preferences-sqlite"]);
     expect(hook.dynamic).not.toContain("./studio-companion-window-layout");
+    expect(hook.dynamic).not.toContain("./studio-companion-window-preferences-sqlite");
   });
 });

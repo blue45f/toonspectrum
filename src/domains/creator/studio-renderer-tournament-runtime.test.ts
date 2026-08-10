@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
-  STUDIO_TOURNAMENT_WINNER_STORAGE_KEY,
   computeStudioDeviceHash,
-  createLocalStorageTournamentPersistence,
   createStudioTournamentRuntime,
   installDefaultTournamentPersistence,
   parsePersistedTournamentState,
@@ -13,14 +11,13 @@ import {
   selectFilterLane,
   type PersistedTournamentStateV1,
   type TournamentPersistencePort,
-  type TournamentWinnerStorage,
 } from "./studio-renderer-tournament-runtime";
 
 import type { ShadowComparisonReport } from "@toonspectrum/studio-engine-registry";
 
 /**
  * V12 §5 runtime wiring contracts: winner persistence goes through the async
- * TournamentPersistencePort (localStorage is only the fallback adapter) and
+ * TournamentPersistencePort (SQLite in product, explicit memory-only without it) and
  * survives sessions without ever throwing on bad data or missing storage;
  * hydration is a one-shot boot step; cost samples are real measurements only;
  * kills evict cached wins; shadow sampling can observe but never touch the
@@ -28,16 +25,21 @@ import type { ShadowComparisonReport } from "@toonspectrum/studio-engine-registr
  * exactly the identity when the tournament has nothing to say.
  */
 
-function createFakeStorage(initial?: Record<string, string>): TournamentWinnerStorage & {
-  readonly data: Map<string, string>;
+function createMemoryPort(initial: PersistedTournamentStateV1 | null = null): {
+  port: TournamentPersistencePort;
+  read(): PersistedTournamentStateV1 | null;
 } {
-  const data = new Map<string, string>(Object.entries(initial ?? {}));
+  let state = initial;
   return {
-    data,
-    getItem: (key) => data.get(key) ?? null,
-    setItem: (key, value) => {
-      data.set(key, value);
+    port: {
+      load: () => Promise.resolve(state),
+      save: (next) => {
+        state = structuredClone(next);
+        return Promise.resolve();
+      },
+      status: () => ({ mode: "sqlite-opfs", durable: true, reason: null }),
     },
+    read: () => state,
   };
 }
 
@@ -47,10 +49,10 @@ const WINNER = {
   decidedAtSample: 3,
 };
 
-describe("winner cache persistence (async port + localStorage fallback adapter)", () => {
+describe("winner cache persistence (async SQLite-shaped port)", () => {
   it("round-trips winners through explicit persist into a freshly hydrated runtime", async () => {
-    const storage = createFakeStorage();
-    const port = createLocalStorageTournamentPersistence(storage);
+    const memory = createMemoryPort();
+    const { port } = memory;
     const first = createStudioTournamentRuntime({ persistence: port, deviceHash: "dev-a" });
     first.recordWinner("bucket-1", "dev-a", WINNER);
     first.recordWinner("bucket-2", "dev-b", {
@@ -69,43 +71,14 @@ describe("winner cache persistence (async port + localStorage fallback adapter)"
     expect(second.winnerCache.get("bucket-2", "dev-b")?.providerId).toBe(
       "filter-lane-gpu-chain",
     );
-    const raw = storage.data.get(STUDIO_TOURNAMENT_WINNER_STORAGE_KEY);
-    expect(raw).toBeDefined();
-    expect(JSON.parse(raw ?? "{}").version).toBe(
+    expect(memory.read()?.version).toBe(
       STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
     );
   });
 
-  it("ignores unparsable payloads instead of throwing", async () => {
-    const storage = createFakeStorage({
-      [STUDIO_TOURNAMENT_WINNER_STORAGE_KEY]: "{not json!!",
-    });
-    const runtime = createStudioTournamentRuntime({
-      persistence: createLocalStorageTournamentPersistence(storage),
-      deviceHash: "dev-a",
-    });
-    await expect(runtime.hydrate()).resolves.toBe(false);
-    expect(runtime.winnerCache.size).toBe(0);
-  });
-
-  it("ignores payloads with a foreign schema version", async () => {
-    const storage = createFakeStorage({
-      [STUDIO_TOURNAMENT_WINNER_STORAGE_KEY]: JSON.stringify({
-        version: 999,
-        entries: [{ bucket: "b", deviceHash: "d", ...WINNER }],
-      }),
-    });
-    const runtime = createStudioTournamentRuntime({
-      persistence: createLocalStorageTournamentPersistence(storage),
-      deviceHash: "dev-a",
-    });
-    await expect(runtime.hydrate()).resolves.toBe(false);
-    expect(runtime.winnerCache.size).toBe(0);
-  });
-
-  it("keeps well-formed entries and drops malformed ones from a mixed payload", async () => {
-    const storage = createFakeStorage({
-      [STUDIO_TOURNAMENT_WINNER_STORAGE_KEY]: JSON.stringify({
+  it("keeps well-formed entries and drops malformed ones from an untrusted port", async () => {
+    const port: TournamentPersistencePort = {
+      load: () => Promise.resolve({
         version: STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
         entries: [
           { bucket: "good", deviceHash: "dev-a", ...WINNER },
@@ -114,10 +87,11 @@ describe("winner cache persistence (async port + localStorage fallback adapter)"
           null,
           "junk",
         ],
-      }),
-    });
+      } as unknown as PersistedTournamentStateV1),
+      save: () => Promise.resolve(),
+    };
     const runtime = createStudioTournamentRuntime({
-      persistence: createLocalStorageTournamentPersistence(storage),
+      persistence: port,
       deviceHash: "dev-a",
     });
     await expect(runtime.hydrate()).resolves.toBe(true);
@@ -134,24 +108,11 @@ describe("winner cache persistence (async port + localStorage fallback adapter)"
     runtime.recordWinner("bucket-1", "dev-a", WINNER);
     await expect(runtime.persist()).resolves.toBe(false);
     expect(runtime.winnerCache.get("bucket-1", "dev-a")).toEqual(WINNER);
-  });
-
-  it("treats a throwing synchronous storage (privacy mode / quota) as absent", async () => {
-    const throwing: TournamentWinnerStorage = {
-      getItem: () => {
-        throw new Error("denied");
-      },
-      setItem: () => {
-        throw new Error("quota");
-      },
-    };
-    const runtime = createStudioTournamentRuntime({
-      persistence: createLocalStorageTournamentPersistence(throwing),
-      deviceHash: "dev-a",
+    expect(runtime.persistenceStatus()).toEqual({
+      mode: "memory-only",
+      durable: false,
+      reason: "SQLite/OPFS tournament persistence is not installed",
     });
-    await expect(runtime.hydrate()).resolves.toBe(false);
-    runtime.recordWinner("bucket-1", "dev-a", WINNER);
-    await expect(runtime.persist()).resolves.toBe(false);
   });
 
   it("absorbs async port rejections into calm booleans (load and save)", async () => {
@@ -318,9 +279,114 @@ describe("cost model sampling", () => {
   });
 });
 
+describe("bounded measured product tournament", () => {
+  const PIXELS = new Uint8Array([20, 40, 60, 255]);
+  const GPU = "filter-lane-gpu-chain";
+  const WORKER = "filter-lane-worker";
+
+  function evaluate(
+    runtime: ReturnType<typeof createStudioTournamentRuntime>,
+    options: { gpuPixels?: Uint8Array; penDown?: boolean } = {},
+  ) {
+    return runtime.evaluateMeasuredTournament({
+      bucket: "filter-bucket",
+      width: 1,
+      height: 1,
+      referenceProviderId: WORKER,
+      candidates: [
+        { providerId: GPU, pixels: options.gpuPixels ?? PIXELS },
+        { providerId: WORKER, pixels: PIXELS },
+      ],
+      penDown: options.penDown,
+    });
+  }
+
+  it("never creates a winner from a one-sided or synthetic estimate", () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    runtime.recordRenderSample(GPU, "filter-bucket", 1);
+    const outcome = evaluate(runtime);
+    expect(outcome.decision).toBe("insufficient-evidence");
+    expect(runtime.winnerCache.get("filter-bucket", "dev-a")).toBeNull();
+  });
+
+  it("creates an initial winner only after two real samples pass the visual gate", () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    runtime.recordRenderSample(GPU, "filter-bucket", 2);
+    runtime.recordRenderSample(WORKER, "filter-bucket", 5);
+    const outcome = evaluate(runtime);
+    expect(outcome).toMatchObject({
+      decision: "initial-winner",
+      winnerId: GPU,
+      changed: true,
+    });
+    expect(outcome.visual[GPU]).toEqual({ pass: true, mismatchPct: 0 });
+  });
+
+  it("rejects a faster candidate that diverges from the reference pixels", () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    runtime.recordRenderSample(GPU, "filter-bucket", 1);
+    runtime.recordRenderSample(WORKER, "filter-bucket", 8);
+    const outcome = evaluate(runtime, {
+      gpuPixels: new Uint8Array([255, 255, 255, 255]),
+    });
+    expect(outcome.winnerId).toBe(WORKER);
+    expect(outcome.visual[GPU]?.pass).toBe(false);
+  });
+
+  it("holds an 11% challenger and switches a 15% challenger", () => {
+    const eleven = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    eleven.recordWinner("filter-bucket", "dev-a", {
+      providerId: WORKER,
+      expectedWarmMs: 10,
+      decidedAtSample: 1,
+    });
+    eleven.recordRenderSample(WORKER, "filter-bucket", 10);
+    eleven.recordRenderSample(GPU, "filter-bucket", 8.9);
+    expect(evaluate(eleven)).toMatchObject({
+      decision: "hysteresis-hold",
+      winnerId: WORKER,
+      changed: false,
+    });
+
+    const fifteen = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    fifteen.recordWinner("filter-bucket", "dev-a", {
+      providerId: WORKER,
+      expectedWarmMs: 10,
+      decidedAtSample: 1,
+    });
+    fifteen.recordRenderSample(WORKER, "filter-bucket", 10);
+    fifteen.recordRenderSample(GPU, "filter-bucket", 8.5);
+    expect(evaluate(fifteen)).toMatchObject({
+      decision: "switched",
+      winnerId: GPU,
+      changed: true,
+    });
+  });
+
+  it("never creates or changes a winner while pen-down", () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    runtime.recordRenderSample(GPU, "filter-bucket", 1);
+    runtime.recordRenderSample(WORKER, "filter-bucket", 8);
+    expect(evaluate(runtime, { penDown: true })).toMatchObject({
+      decision: "pen-down-hold",
+      winnerId: null,
+      changed: false,
+    });
+  });
+
+  it("keeps a killed challenger out of the winner cache", () => {
+    const runtime = createStudioTournamentRuntime({ persistence: null, deviceHash: "dev-a" });
+    runtime.applyKillList([GPU], "driver fault");
+    runtime.recordRenderSample(GPU, "filter-bucket", 1);
+    runtime.recordRenderSample(WORKER, "filter-bucket", 8);
+    expect(evaluate(runtime).decision).toBe("insufficient-evidence");
+    expect(runtime.winnerCache.get("filter-bucket", "dev-a")).toBeNull();
+  });
+});
+
 describe("remote kill switch", () => {
   it("applyKillList kills providers and evicts their cached wins everywhere", async () => {
-    const port = createLocalStorageTournamentPersistence(createFakeStorage());
+    const { port } = createMemoryPort();
     const runtime = createStudioTournamentRuntime({
       persistence: port,
       deviceHash: "dev-a",

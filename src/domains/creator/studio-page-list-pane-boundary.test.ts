@@ -98,14 +98,14 @@ describe("Studio page-list pane module boundary", () => {
     const page = moduleShape("./StudioPage.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
 
-    expect(page.valueImports.filter((specifier) => specifier === "./StudioPageListPane")).toEqual([
+    expect(page.valueImports).not.toContain("./StudioPageListPane");
+    expect(page.dynamicImports.filter((specifier) => specifier === "./StudioPageListPane")).toEqual([
       "./StudioPageListPane",
     ]);
-    expect(page.dynamicImports).not.toContain("./StudioPageListPane");
     expect(pane.allImports).not.toContain("./StudioPage");
     expect(pane.dynamicImports).not.toContain("./StudioPage");
     expect(page.source).toContain("useStudioStableHandlers<StudioPageListPaneHandlers>({");
-    expect(page.source).toContain("<StudioPageListPane");
+    expect(page.source).toContain("<LazyStudioPageListPane");
   });
 
   it("wires multi-page bulk move/delete through pure studio-pages helpers", () => {
@@ -141,23 +141,27 @@ describe("Studio page-list pane module boundary", () => {
     expect(pane.valueImports).toContain("./studio-page-lazy-ui");
     expect(pane.namedValueImports.get("StudioPageThumbnail")).toBe("./studio-page-lazy-ui");
     expect(pane.allImports).not.toContain("./StudioPageThumbnails");
-    expect(pane.valueImports).toContain("./StudioPanelResizeHandle");
+    expect(pane.valueImports).not.toContain("./StudioPanelResizeHandle");
+    expect(pane.topLevelDeclarations).toContain("StudioPageListResizeHandle");
+    expect(pane.source).toContain('data-studio-panel-resizer="true"');
     expect(pane.allImports).not.toContain("konva");
     expect(pane.allImports).not.toContain("react-konva/lib/ReactKonvaCore");
     expect(pane.source).not.toContain("useStudioStableHandlers(");
     expect(pane.source).not.toContain("lazyRetry(");
   });
 
-  it("shares one resize-handle owner without either extracted module importing StudioPage", () => {
+  it("keeps resize handles accessible without creating a shared startup chunk", () => {
     const page = moduleShape("./StudioPage.tsx");
     const pane = moduleShape("./StudioPageListPane.tsx");
     const resizeHandle = moduleShape("./StudioPanelResizeHandle.tsx");
 
     expect(page.valueImports).toContain("./StudioPanelResizeHandle");
-    expect(pane.valueImports).toContain("./StudioPanelResizeHandle");
+    expect(pane.valueImports).not.toContain("./StudioPanelResizeHandle");
+    expect(pane.topLevelDeclarations).toContain("StudioPageListResizeHandle");
     expect(resizeHandle.exportedDeclarations).toContain("StudioPanelResizeHandle");
     expect(resizeHandle.exportedDeclarations).toContain("StudioPanelResizeHandleProps");
     expect(resizeHandle.allImports).not.toContain("./StudioPage");
+    expect(pane.allImports).not.toContain("./StudioPage");
     expect(page.topLevelDeclarations).not.toContain("PanelResizeHandle");
   });
 });

@@ -17,7 +17,7 @@ import type { SceneIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
 
 export interface SceneFingerprint {
   /** Fingerprint trait schema. Bump only when bucket semantics change. */
-  fingerprintVersion: 2;
+  fingerprintVersion: 2 | 3;
   canvasWidth: number;
   canvasHeight: number;
   nodeCount: number;
@@ -46,6 +46,22 @@ export interface SceneFingerprint {
   textCount: number;
   /** Unicode scalar/code-point count; never presented as a shaped glyph count. */
   textCodePointCount: number;
+  /** Changed paths / total paths, measured by the scene compiler. Null in legacy v2 mode. */
+  changedPathRatio: number | null;
+  /** Shaped glyph count supplied by the text layout provider. Never inferred from code points. */
+  glyphCount: number | null;
+  /** Unique shaped font faces used by the scene. Null when layout evidence is unavailable. */
+  uniqueFontCount: number | null;
+  imageCount: number | null;
+  externalTextureCount: number | null;
+  /** Semantic document layers, not renderer node/group count. */
+  layerCount: number | null;
+  maskDepth: number | null;
+  filterNodeCount: number | null;
+  maxFilterRadius: number | null;
+  visibleBoundsRatio: number | null;
+  animationRate: number | null;
+  expectedOverdraw: number | null;
   canvasArea: number;
   /**
    * Quantized complexity key used by WinnerCache/ProviderCostModel. Same
@@ -53,6 +69,27 @@ export interface SceneFingerprint {
    * complexity class intentionally share a bucket so measurements pool.
    */
   bucket: string;
+}
+
+/**
+ * Dynamic V12 fingerprint observations that cannot be recovered faithfully
+ * from the stable SceneIR alone. Supplying this complete object opts into the
+ * v3 bucket. Omitting it deliberately preserves the persisted v2 bucket and
+ * leaves these metrics null instead of inventing evidence.
+ */
+export interface SceneFingerprintV12Metrics {
+  changedPathRatio: number;
+  glyphCount: number;
+  uniqueFontCount: number;
+  imageCount: number;
+  externalTextureCount: number;
+  layerCount: number;
+  maskDepth: number;
+  filterNodeCount: number;
+  maxFilterRadius: number;
+  visibleBoundsRatio: number;
+  animationRate: number;
+  expectedOverdraw: number;
 }
 
 /**
@@ -71,7 +108,70 @@ export function quantizePow2Bucket(value: number): number {
 
 const pow2Bucket = quantizePow2Bucket;
 
-export function computeSceneFingerprint(scene: SceneIR): SceneFingerprint {
+function assertFingerprintCount(label: string, value: number): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${label} must be a non-negative safe integer, got ${value}`);
+  }
+}
+
+function assertFingerprintRange(
+  label: string,
+  value: number,
+  minimum: number,
+  maximum: number,
+): void {
+  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new RangeError(
+      `${label} must be finite and within [${minimum}, ${maximum}], got ${value}`,
+    );
+  }
+}
+
+function assertFingerprintNonNegative(label: string, value: number): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${label} must be a finite non-negative number, got ${value}`);
+  }
+}
+
+/** Sixteenth-step ratio bucket, inclusive 0..16. */
+export function quantizeUnitRatioBucket(value: number): number {
+  assertFingerprintRange("ratio", value, 0, 1);
+  return Math.round(value * 16);
+}
+
+/** Fixed-resolution non-negative bucket used for rates and overdraw. */
+export function quantizeFixedBucket(value: number, unitsPerOne: number): number {
+  assertFingerprintNonNegative("value", value);
+  if (!Number.isSafeInteger(unitsPerOne) || unitsPerOne <= 0) {
+    throw new RangeError(`unitsPerOne must be a positive safe integer, got ${unitsPerOne}`);
+  }
+  const bucket = Math.round(value * unitsPerOne);
+  if (!Number.isSafeInteger(bucket)) {
+    throw new RangeError(`quantized value exceeds the safe integer range`);
+  }
+  return bucket;
+}
+
+function validateSceneFingerprintV12Metrics(metrics: SceneFingerprintV12Metrics): void {
+  assertFingerprintRange("changedPathRatio", metrics.changedPathRatio, 0, 1);
+  assertFingerprintCount("glyphCount", metrics.glyphCount);
+  assertFingerprintCount("uniqueFontCount", metrics.uniqueFontCount);
+  assertFingerprintCount("imageCount", metrics.imageCount);
+  assertFingerprintCount("externalTextureCount", metrics.externalTextureCount);
+  assertFingerprintCount("layerCount", metrics.layerCount);
+  assertFingerprintCount("maskDepth", metrics.maskDepth);
+  assertFingerprintCount("filterNodeCount", metrics.filterNodeCount);
+  assertFingerprintNonNegative("maxFilterRadius", metrics.maxFilterRadius);
+  assertFingerprintRange("visibleBoundsRatio", metrics.visibleBoundsRatio, 0, 1);
+  assertFingerprintNonNegative("animationRate", metrics.animationRate);
+  assertFingerprintNonNegative("expectedOverdraw", metrics.expectedOverdraw);
+}
+
+export function computeSceneFingerprint(
+  scene: SceneIR,
+  v12Metrics?: SceneFingerprintV12Metrics,
+): SceneFingerprint {
+  if (v12Metrics) validateSceneFingerprintV12Metrics(v12Metrics);
   let nodeCount = 0;
   let pathCount = 0;
   let pathSegmentCount = 0;
@@ -179,8 +279,8 @@ export function computeSceneFingerprint(scene: SceneIR): SceneFingerprint {
   visit(scene.nodes, 0);
 
   const canvasArea = scene.width * scene.height;
-  const bucket = [
-    "v2",
+  const bucketParts = [
+    v12Metrics ? "v3" : "v2",
     `a${pow2Bucket(canvasArea)}`,
     `w${pow2Bucket(scene.width)}`,
     `h${pow2Bucket(scene.height)}`,
@@ -196,10 +296,27 @@ export function computeSceneFingerprint(scene: SceneIR): SceneFingerprint {
     `t${pow2Bucket(textCount)}`,
     `u${pow2Bucket(textCodePointCount)}`,
     `d${groupDepth}`,
-  ].join("|");
+  ];
+  if (v12Metrics) {
+    bucketParts.push(
+      `cp${quantizeUnitRatioBucket(v12Metrics.changedPathRatio)}`,
+      `gl${pow2Bucket(v12Metrics.glyphCount)}`,
+      `uf${pow2Bucket(v12Metrics.uniqueFontCount)}`,
+      `im${pow2Bucket(v12Metrics.imageCount)}`,
+      `xt${pow2Bucket(v12Metrics.externalTextureCount)}`,
+      `ly${pow2Bucket(v12Metrics.layerCount)}`,
+      `md${pow2Bucket(v12Metrics.maskDepth)}`,
+      `fn${pow2Bucket(v12Metrics.filterNodeCount)}`,
+      `fr${pow2Bucket(v12Metrics.maxFilterRadius)}`,
+      `vb${quantizeUnitRatioBucket(v12Metrics.visibleBoundsRatio)}`,
+      `ar${quantizeFixedBucket(v12Metrics.animationRate, 10)}`,
+      `od${quantizeFixedBucket(v12Metrics.expectedOverdraw, 4)}`,
+    );
+  }
+  const bucket = bucketParts.join("|");
 
   return {
-    fingerprintVersion: 2,
+    fingerprintVersion: v12Metrics ? 3 : 2,
     canvasWidth: scene.width,
     canvasHeight: scene.height,
     nodeCount,
@@ -227,6 +344,18 @@ export function computeSceneFingerprint(scene: SceneIR): SceneFingerprint {
     clipPathSegmentCount,
     textCount,
     textCodePointCount,
+    changedPathRatio: v12Metrics?.changedPathRatio ?? null,
+    glyphCount: v12Metrics?.glyphCount ?? null,
+    uniqueFontCount: v12Metrics?.uniqueFontCount ?? null,
+    imageCount: v12Metrics?.imageCount ?? null,
+    externalTextureCount: v12Metrics?.externalTextureCount ?? null,
+    layerCount: v12Metrics?.layerCount ?? null,
+    maskDepth: v12Metrics?.maskDepth ?? null,
+    filterNodeCount: v12Metrics?.filterNodeCount ?? null,
+    maxFilterRadius: v12Metrics?.maxFilterRadius ?? null,
+    visibleBoundsRatio: v12Metrics?.visibleBoundsRatio ?? null,
+    animationRate: v12Metrics?.animationRate ?? null,
+    expectedOverdraw: v12Metrics?.expectedOverdraw ?? null,
     canvasArea,
     bucket,
   };
@@ -246,7 +375,7 @@ export interface DeviceWorkloadProfile {
    * Opt in to the explicit partition schema. Omitted profiles retain the V12
    * legacy `deviceHash` partition so existing persisted winner keys still load.
    */
-  profileVersion?: 1;
+  profileVersion?: 1 | 2;
   runtime?: "browser-main" | "browser-worker" | "node" | "native" | null;
   workload?: "interactive" | "preview" | "final" | "shadow" | null;
   browserEngine?: string | null;
@@ -262,6 +391,11 @@ export interface DeviceWorkloadProfile {
   devicePixelRatio?: number | null;
   colorSpace?: string | null;
   powerPreference?: "low-power" | "high-performance" | "default" | null;
+  /** Hash of the complete shader package; required by the V12 v2 partition. */
+  shaderPackageHash?: string | null;
+  viewportWidth?: number | null;
+  viewportHeight?: number | null;
+  qualityProfile?: string | null;
 }
 
 function assertProfileText(label: string, value: string): void {
@@ -277,6 +411,36 @@ function assertOptionalPositive(label: string, value: number | null | undefined)
   }
 }
 
+function assertRequiredPositive(label: string, value: number | null | undefined): number {
+  assertOptionalPositive(label, value);
+  if (value === null || value === undefined) {
+    throw new RangeError(`${label} is required by DeviceWorkloadProfile v2`);
+  }
+  return value;
+}
+
+function assertRequiredPositiveInteger(
+  label: string,
+  value: number | null | undefined,
+): number {
+  const resolved = assertRequiredPositive(label, value);
+  if (!Number.isSafeInteger(resolved)) {
+    throw new RangeError(`${label} must be a positive safe integer, got ${resolved}`);
+  }
+  return resolved;
+}
+
+function assertRequiredProfileText(
+  label: string,
+  value: string | null | undefined,
+): string {
+  if (value === null || value === undefined) {
+    throw new RangeError(`${label} is required by DeviceWorkloadProfile v2`);
+  }
+  assertProfileText(label, value);
+  return value;
+}
+
 function encodePartitionValue(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return "?";
   return encodeURIComponent(String(value));
@@ -290,7 +454,20 @@ function encodePartitionValue(value: string | number | boolean | null | undefine
 export function deviceWorkloadPartitionKey(profile: DeviceWorkloadProfile): string {
   assertProfileText("deviceHash", profile.deviceHash);
   assertProfileText("engineHash", profile.engineHash);
-  if (profile.profileVersion === undefined) return profile.deviceHash;
+  const hasV2Traits =
+    profile.shaderPackageHash !== undefined ||
+    profile.viewportWidth !== undefined ||
+    profile.viewportHeight !== undefined ||
+    profile.qualityProfile !== undefined;
+  if (profile.profileVersion === undefined) {
+    if (hasV2Traits) {
+      throw new RangeError(`V12 shader/viewport/quality traits require profileVersion 2`);
+    }
+    return profile.deviceHash;
+  }
+  if (profile.profileVersion !== 1 && profile.profileVersion !== 2) {
+    throw new RangeError(`unsupported DeviceWorkloadProfile version ${String(profile.profileVersion)}`);
+  }
   assertOptionalPositive("logicalCpuCount", profile.logicalCpuCount);
   assertOptionalPositive("deviceMemoryGiB", profile.deviceMemoryGiB);
   assertOptionalPositive("maxTextureDimension2D", profile.maxTextureDimension2D);
@@ -316,6 +493,16 @@ export function deviceWorkloadPartitionKey(profile: DeviceWorkloadProfile): stri
     ["colorSpace", profile.colorSpace],
     ["power", profile.powerPreference],
   ];
+  if (profile.profileVersion === 2) {
+    traits.push(
+      ["shader", assertRequiredProfileText("shaderPackageHash", profile.shaderPackageHash)],
+      ["viewportWidth", assertRequiredPositiveInteger("viewportWidth", profile.viewportWidth)],
+      ["viewportHeight", assertRequiredPositiveInteger("viewportHeight", profile.viewportHeight)],
+      ["quality", assertRequiredProfileText("qualityProfile", profile.qualityProfile)],
+    );
+  } else if (hasV2Traits) {
+    throw new RangeError(`V12 shader/viewport/quality traits require profileVersion 2`);
+  }
   return traits.map(([label, value]) => `${label}=${encodePartitionValue(value)}`).join("|");
 }
 
@@ -630,15 +817,19 @@ export class WinnerCache {
 }
 
 /* ------------------------------------------------------------------ */
-/* §5.5 HysteresisPolicy — <12% expected gain holds; pen-down holds    */
+/* §5.5 HysteresisPolicy — gain + frame/scene/texture boundary gates   */
 /* ------------------------------------------------------------------ */
 
 export const DEFAULT_HYSTERESIS_MIN_GAIN_PCT = 12;
+export const DEFAULT_HYSTERESIS_MIN_OBSERVED_FRAMES = 120;
 
 export type SwitchHoldReason =
   | "pen-down"
   | "no-gain"
   | "below-hysteresis-threshold"
+  | "eligibility-evidence-missing"
+  | "different-texture-boundary"
+  | "insufficient-observed-frames-or-scene-boundary"
   | "gain-above-threshold";
 
 export interface SwitchDecision {
@@ -647,33 +838,129 @@ export interface SwitchDecision {
   reason: SwitchHoldReason;
 }
 
+export interface HysteresisPerformanceInput {
+  incumbentWarmMs: number;
+  challengerWarmMs: number;
+  penDown: boolean;
+}
+
+export interface HysteresisSwitchEligibility {
+  /** Frames observed since the incumbent became primary for this scene bucket. */
+  observedFrames: number;
+  /** True only at an explicit scene/island ownership boundary. */
+  sceneBoundary: boolean;
+  /** Both providers consume and produce the same texture boundary contract. */
+  sameTextureBoundary: boolean;
+}
+
+export interface HysteresisPolicyOptions {
+  minObservedFrames?: number;
+}
+
 export class HysteresisPolicy {
-  constructor(readonly minGainPct: number = DEFAULT_HYSTERESIS_MIN_GAIN_PCT) {
+  readonly minObservedFrames: number;
+
+  constructor(
+    readonly minGainPct: number = DEFAULT_HYSTERESIS_MIN_GAIN_PCT,
+    options: HysteresisPolicyOptions = {},
+  ) {
     if (!Number.isFinite(minGainPct) || minGainPct <= 0) {
       throw new RangeError(`minGainPct must be positive, got ${minGainPct}`);
     }
+    this.minObservedFrames =
+      options.minObservedFrames ?? DEFAULT_HYSTERESIS_MIN_OBSERVED_FRAMES;
+    if (!Number.isSafeInteger(this.minObservedFrames) || this.minObservedFrames <= 0) {
+      throw new RangeError(
+        `minObservedFrames must be a positive safe integer, got ${this.minObservedFrames}`,
+      );
+    }
   }
 
-  evaluate(input: {
-    incumbentWarmMs: number;
-    challengerWarmMs: number;
-    penDown: boolean;
-  }): SwitchDecision {
-    const expectedGainPct =
-      input.incumbentWarmMs > 0
-        ? ((input.incumbentWarmMs - input.challengerWarmMs) / input.incumbentWarmMs) * 100
-        : 0;
-    if (expectedGainPct <= 0) {
-      return { allow: false, expectedGainPct, reason: "no-gain" };
+  private performanceDecision(input: HysteresisPerformanceInput): SwitchDecision | null {
+    if (!Number.isFinite(input.incumbentWarmMs) || input.incumbentWarmMs <= 0) {
+      throw new RangeError(
+        `incumbentWarmMs must be a finite positive number, got ${input.incumbentWarmMs}`,
+      );
     }
-    // The winner never switches mid-stroke, no matter how large the gain.
+    if (!Number.isFinite(input.challengerWarmMs) || input.challengerWarmMs < 0) {
+      throw new RangeError(
+        `challengerWarmMs must be a finite non-negative number, got ${input.challengerWarmMs}`,
+      );
+    }
+    const expectedGainPct =
+      ((input.incumbentWarmMs - input.challengerWarmMs) / input.incumbentWarmMs) * 100;
+    // Pen-down is the absolute first blocker, independent of timing evidence.
     if (input.penDown) {
       return { allow: false, expectedGainPct, reason: "pen-down" };
+    }
+    if (expectedGainPct <= 0) {
+      return { allow: false, expectedGainPct, reason: "no-gain" };
     }
     if (expectedGainPct < this.minGainPct) {
       return { allow: false, expectedGainPct, reason: "below-hysteresis-threshold" };
     }
+    return null;
+  }
+
+  /**
+   * Full V12 switch contract. A challenger may switch after 120 observed
+   * frames OR at an explicit scene boundary, and only across an equivalent
+   * texture boundary. Missing evidence fails closed.
+   */
+  evaluateV12(
+    input: HysteresisPerformanceInput & Partial<HysteresisSwitchEligibility>,
+  ): SwitchDecision {
+    const performance = this.performanceDecision(input);
+    if (performance) return performance;
+    const expectedGainPct =
+      ((input.incumbentWarmMs - input.challengerWarmMs) / input.incumbentWarmMs) * 100;
+    if (
+      input.observedFrames === undefined ||
+      input.sceneBoundary === undefined ||
+      input.sameTextureBoundary === undefined
+    ) {
+      return { allow: false, expectedGainPct, reason: "eligibility-evidence-missing" };
+    }
+    if (!Number.isSafeInteger(input.observedFrames) || input.observedFrames < 0) {
+      throw new RangeError(
+        `observedFrames must be a non-negative safe integer, got ${input.observedFrames}`,
+      );
+    }
+    if (typeof input.sceneBoundary !== "boolean") {
+      throw new TypeError(`sceneBoundary must be boolean`);
+    }
+    if (typeof input.sameTextureBoundary !== "boolean") {
+      throw new TypeError(`sameTextureBoundary must be boolean`);
+    }
+    if (!input.sameTextureBoundary) {
+      return { allow: false, expectedGainPct, reason: "different-texture-boundary" };
+    }
+    if (input.observedFrames < this.minObservedFrames && !input.sceneBoundary) {
+      return {
+        allow: false,
+        expectedGainPct,
+        reason: "insufficient-observed-frames-or-scene-boundary",
+      };
+    }
     return { allow: true, expectedGainPct, reason: "gain-above-threshold" };
+  }
+
+  /**
+   * Explicit compatibility override for bounded corpora and deterministic
+   * microbenchmarks that do not own a 120-frame lifecycle or texture surface.
+   * Production callers should use evaluateV12.
+   */
+  evaluateBounded(input: HysteresisPerformanceInput): SwitchDecision {
+    const performance = this.performanceDecision(input);
+    if (performance) return performance;
+    const expectedGainPct =
+      ((input.incumbentWarmMs - input.challengerWarmMs) / input.incumbentWarmMs) * 100;
+    return { allow: true, expectedGainPct, reason: "gain-above-threshold" };
+  }
+
+  /** @deprecated Use evaluateV12 in product code or evaluateBounded in bounded tests. */
+  evaluate(input: HysteresisPerformanceInput): SwitchDecision {
+    return this.evaluateBounded(input);
   }
 }
 
@@ -821,6 +1108,89 @@ export async function runShadowComparison(
 }
 
 /* ------------------------------------------------------------------ */
+/* §5.7.1 Deterministic shadow sampling policy                         */
+/* ------------------------------------------------------------------ */
+
+export type ShadowSamplingChannel = "development" | "canary" | "general";
+
+export interface ShadowSamplingPolicy {
+  minProbability: number;
+  defaultProbability: number;
+  maxProbability: number;
+  requiresIdle: boolean;
+  requiresUserOptIn: boolean;
+}
+
+export const SHADOW_SAMPLING_POLICIES: Readonly<
+  Record<ShadowSamplingChannel, Readonly<ShadowSamplingPolicy>>
+> = Object.freeze({
+  development: Object.freeze({
+    minProbability: 0.1,
+    defaultProbability: 0.1,
+    maxProbability: 1,
+    requiresIdle: false,
+    requiresUserOptIn: false,
+  }),
+  canary: Object.freeze({
+    minProbability: 0.05,
+    defaultProbability: 0.05,
+    maxProbability: 0.05,
+    requiresIdle: false,
+    requiresUserOptIn: false,
+  }),
+  general: Object.freeze({
+    minProbability: 0.001,
+    defaultProbability: 0.001,
+    maxProbability: 0.01,
+    requiresIdle: true,
+    requiresUserOptIn: true,
+  }),
+});
+
+export interface ShadowSamplingRequest {
+  channel: ShadowSamplingChannel;
+  /** Stable scene/provider/frame identity. The same key always returns the same decision. */
+  sampleKey: string;
+  probability?: number;
+  idle?: boolean;
+  userOptIn?: boolean;
+}
+
+/** Deterministic FNV-1a projection into the half-open unit interval [0, 1). */
+export function shadowSamplingUnitInterval(sampleKey: string): number {
+  assertProfileText("sampleKey", sampleKey);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < sampleKey.length; index += 1) {
+    const codeUnit = sampleKey.charCodeAt(index);
+    hash ^= codeUnit & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+    hash ^= codeUnit >>> 8;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash / 0x1_0000_0000;
+}
+
+export function shouldSampleShadowRender(request: ShadowSamplingRequest): boolean {
+  const policy = SHADOW_SAMPLING_POLICIES[request.channel];
+  if (!policy) {
+    throw new RangeError(`unknown shadow sampling channel ${String(request.channel)}`);
+  }
+  const probability = request.probability ?? policy.defaultProbability;
+  if (
+    !Number.isFinite(probability) ||
+    probability < policy.minProbability ||
+    probability > policy.maxProbability
+  ) {
+    throw new RangeError(
+      `${request.channel} shadow probability must be within [${policy.minProbability}, ${policy.maxProbability}], got ${probability}`,
+    );
+  }
+  if (policy.requiresIdle && request.idle !== true) return false;
+  if (policy.requiresUserOptIn && request.userOptIn !== true) return false;
+  return shadowSamplingUnitInterval(`${request.channel}:${request.sampleKey}`) < probability;
+}
+
+/* ------------------------------------------------------------------ */
 /* §5.8 PromotionRegistry + RemoteKillSwitch                           */
 /* ------------------------------------------------------------------ */
 
@@ -884,7 +1254,8 @@ export interface ProviderQuarantinePolicy {
 
 export const DEFAULT_PROVIDER_QUARANTINE_POLICY: Readonly<ProviderQuarantinePolicy> =
   Object.freeze({
-    visualFailureThreshold: 3,
+    // A visual mismatch is a correctness blocker, not a performance warning.
+    visualFailureThreshold: 1,
     shadowFailureThreshold: 3,
     revivalVisualPasses: 3,
     revivalShadowPasses: 3,
@@ -943,6 +1314,17 @@ function createProviderHealth(providerId: string): MutableProviderHealth {
   };
 }
 
+function assertVisualGateResult(result: VisualGateResult): void {
+  if (
+    typeof result.pass !== "boolean" ||
+    !Number.isFinite(result.mismatchPct) ||
+    result.mismatchPct < 0 ||
+    result.mismatchPct > 100
+  ) {
+    throw new RangeError(`visual gate result must carry pass:boolean and mismatchPct within [0, 100]`);
+  }
+}
+
 /**
  * Evidence-only automatic quarantine. Failures accumulate deterministically;
  * passes reset consecutive counters but never auto-revive a quarantined
@@ -977,7 +1359,20 @@ export class ProviderQuarantineRegistry {
     state.recoveryShadowPasses = 0;
   }
 
+  /** Immediately quarantines a provider after one verified correctness failure. */
+  recordCorrectnessFailure(providerId: string, detail: string): ProviderHealthSnapshot {
+    assertProfileText("providerId", providerId);
+    assertProfileText("correctness failure detail", detail);
+    const state = this.state(providerId);
+    state.visualFailures += 1;
+    state.consecutiveVisualFailures += 1;
+    this.quarantine(state, `correctness blocker: ${detail}`);
+    return { ...state };
+  }
+
   recordVisualGate(providerId: string, result: VisualGateResult): ProviderHealthSnapshot {
+    assertProfileText("providerId", providerId);
+    assertVisualGateResult(result);
     const state = this.state(providerId);
     if (result.pass) {
       state.visualPasses += 1;
@@ -989,7 +1384,7 @@ export class ProviderQuarantineRegistry {
       if (state.consecutiveVisualFailures >= this.policy.visualFailureThreshold) {
         this.quarantine(
           state,
-          `visual gate failed ${state.consecutiveVisualFailures} consecutive times`,
+          `correctness blocker: visual gate failed ${state.consecutiveVisualFailures} consecutive times`,
         );
       }
     }
@@ -1000,6 +1395,8 @@ export class ProviderQuarantineRegistry {
     providerId: string,
     report: ShadowComparisonReport,
   ): ProviderHealthSnapshot {
+    assertProfileText("providerId", providerId);
+    if (report.gate) assertVisualGateResult(report.gate);
     const state = this.state(providerId);
     const passed = report.error === null && report.gate?.pass === true;
     if (passed) {
@@ -1009,7 +1406,15 @@ export class ProviderQuarantineRegistry {
     } else {
       state.shadowFailures += 1;
       state.consecutiveShadowFailures += 1;
-      if (state.consecutiveShadowFailures >= this.policy.shadowFailureThreshold) {
+      // A completed visual comparison that diverges is one correctness
+      // blocker and quarantines immediately. Runtime/performance failures may
+      // retain the configured consecutive threshold.
+      if (report.gate?.pass === false) {
+        this.quarantine(
+          state,
+          `correctness blocker: shadow visual divergence (${report.gate.mismatchPct}%)`,
+        );
+      } else if (state.consecutiveShadowFailures >= this.policy.shadowFailureThreshold) {
         const detail = report.error ?? "visual divergence";
         this.quarantine(
           state,
@@ -1163,6 +1568,13 @@ export interface TournamentRequest {
   referenceRender?: () => Uint8Array;
   penDown?: boolean;
   hysteresis?: HysteresisPolicy;
+  /**
+   * Enables the full V12 120-frame/scene-boundary/texture-boundary gate.
+   * Omission preserves the bounded-corpus behavior of pre-contract callers.
+   */
+  switchEligibility?: HysteresisSwitchEligibility;
+  /** Explicit legacy/test escape hatch for corpora without a frame lifecycle. */
+  boundedImmediateSwitchEvaluation?: boolean;
   /** Clock injection for deterministic measurement in tests. */
   now?: () => number;
 }
@@ -1340,11 +1752,19 @@ export function runTournament(request: TournamentRequest): TournamentResult {
     return { winnerId: incumbent.providerId, decision: "cached", stats: baseStats };
   }
 
-  const decision = hysteresis.evaluate({
+  const performanceInput: HysteresisPerformanceInput = {
     incumbentWarmMs,
     challengerWarmMs: challenger.warmMs,
     penDown,
-  });
+  };
+  if (request.switchEligibility && request.boundedImmediateSwitchEvaluation) {
+    throw new TournamentError(
+      `switchEligibility and boundedImmediateSwitchEvaluation are mutually exclusive`,
+    );
+  }
+  const decision = request.boundedImmediateSwitchEvaluation
+    ? hysteresis.evaluateBounded(performanceInput)
+    : hysteresis.evaluateV12({ ...performanceInput, ...request.switchEligibility });
   const stats: TournamentStats = {
     ...baseStats,
     challengerId: challenger.providerId,

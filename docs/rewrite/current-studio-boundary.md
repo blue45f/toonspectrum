@@ -1,207 +1,265 @@
-# 기존 Studio 경계 감사 (V11.1 §12.2)
+# 현재 Studio 경계 감사 (V12)
 
-- 감사 일자: 2026-08-07
-- 감사 대상: `claude/toonstudio-v11-codex-master-23fdef` 워크트리, HEAD `5ad23665c3423e2957c63f6080ae9fa83ca7b0b1`
-  (근거: `/Users/hjunkim/WebstormProjects/toonspectrum/.git/worktrees/toonstudio-v11-codex-master-23fdef/HEAD`)
-- 방법: 전부 실파일 열람·grep/find 실측. 추측값 없음. 모든 수치는 감사 시점 스냅샷이며,
-  같은 워크트리에서 병렬 세션이 활동 중이라 일부 값(패키지명·apps 목록)은 감사 도중
-  변한 것을 직접 관측했다 — 해당 항목은 본문에 명시.
+- 감사 일자: 2026-08-11
+- 감사 대상: `/Users/hjunkim/WebstormProjects/toonspectrum` 현재 루트 트리
+- 감사 범위: 현재 소스, 설정, 테스트, 커밋된 benchmark JSON, retained Git metadata 유실 대조,
+  production build와 전체 `verify:push`의 경계 사실
+- 제외 범위: 24시간 실행, 외부 Clip Studio Paint 블라인드 랩, 실제 전원 차단·브라우저
+  프로세스 crash·quota 고갈·실기기 매트릭스
 
-## 1. 경계 값 확정표 (10개)
+이 문서는 과거 V11.1 linked worktree 스냅샷을 대체한다. 현재 상태는 “신엔진이 앱과
+미배선”도 “V12가 전체 Studio를 이미 대체”도 아니다. V12 계층은 기존 `/studio`에 실제로
+배선됐지만, 제품 권위는 기능별 island와 provider gate로 제한된다.
 
-| 경계 | 확정 값 | 근거 (경로:라인) |
-| --- | --- | --- |
-| REPO_ROOT | `/Users/hjunkim/WebstormProjects/toonspectrum/.claude/worktrees/toonstudio-v11-codex-master-23fdef` (linked worktree), origin `https://github.com/blue45f/toonspectrum.git` | `.git` 파일 → `gitdir: /Users/hjunkim/WebstormProjects/toonspectrum/.git/worktrees/toonstudio-v11-codex-master-23fdef`; origin은 `/Users/hjunkim/WebstormProjects/toonspectrum/.git/config:13` |
-| STUDIO_APP_ROOT | `src/domains/creator` — .ts/.tsx **3,593개**(그중 테스트 1,747개), **총 1,470,842 LOC**; 최대 파일 `StudioPage.tsx` 42,111줄 | find/wc 실측; `src/domains/creator/StudioPage.tsx` wc -l |
-| STUDIO_ROUTE_ENTRY | `src/app/routes/AppRouter.tsx:307` `<Route path="/studio" element={<StudioPage />} />` (동반 라우트 `/studio/tools-companion`:308) | 부트스트랩 체인: `index.html:115` `<script type="module" src="/src/app/main.tsx">` → `src/app/main.tsx:33` createRoot → `src/app/AppShell.tsx:5,139` `<AppRouter />` → `AppRouter.tsx:178-186` lazy `import("@/src/domains/creator/StudioPage")` |
-| STUDIO_BUILD_TARGET | Vite → `dist/` 단일 SPA. manifest 강제(`vite.config.ts:236`), manualChunks(`:245`)로 `studio-konva-runtime`(:305-307)·`studio-bg3d-babylon-runtime`(:253)·`studio-workspaces`(:262)·`studio-selection-tools`(:272)·`studio-tool-hints`(:281)·`studio-core-micro-contracts`(:294)·`react-runtime`(:303)·lucide 2종(:309-312) 분리. 엔트리 프리로드 제외(`:15-22`) | 예산 게이트 `scripts/check-studio-bundle.mjs` — entry 정의 `:7` (`src/domains/creator/StudioPage.tsx`), budgets 블록 `:22`(값 :99-110): studio raw 3,060,000/gzip 1,000,000, studioEntry 1,284,000/389,000, studioIncremental 2,556,000/840,000/chunks 158, app 510,000/170,000, bg3d 계열 별도 6종 |
-| STUDIO_DEPLOY_TARGET | **Vercel Git Integration이 실제 서빙 주체**. `render.yaml`은 Socket.IO 협업 전용 preview 호스트, `deploy/cloudflare-realtime`은 realtime Worker | `.github/workflows/deploy-vercel.yml:1-6` "Production pushes are deployed by Vercel Git Integration … manual emergency fallback"(workflow_dispatch 전용); `vercel.json:7` outputDirectory=dist, `:36` SPA rewrite → /index.html, `:57-70` `/studio`·`/studio/(.*)`에 COOP same-origin + COEP credentialless; `render.yaml:1-13` `toonspectrum-studio-live`(free, CRDT/잠금 Socket.IO 전용, `API_RUNTIME_ROLE=studio-live`) |
-| AUTH_SESSION_BOUNDARY | Google OAuth + 이메일 로그인 + 세션쿠키 `toonspectrum-auth-session`. **토스 appLogin/mTLS 코드는 이 레포에 부재**(전 소스 grep 0건 — 토스 미니앱은 별도 저장소) | `apps/api/src/modules/auth/auth.controller.ts:109` @Controller("auth"), `:149` session, `:170/:197` oauth start/callback, `:238` google/id-token, `:360/:407/:446` signup/login/logout; 쿠키명 `apps/api/src/session-cookie.ts:5`; `apps/api/src/session-middleware.ts`; 서버 공용 `lib/server/session.ts`·`lib/server/oauth.ts`; 프론트 `src/domains/account/AuthCallbackPage.tsx`; Render와 `AUTH_SESSION_SECRET`만 공유(`render.yaml` envVars 말미) |
-| SHARED_UI_BOUNDARY | `packages/core`(@toonspectrum/core, src 38파일 — creator 직접 import는 1파일, src 전체 5파일), 루트 `components/`(78항목), 디자인 토큰 `src/styles/globals.css` | creator의 components 소비 실측 상위: `@/components/ui/button-utils`(65회)·`section`(5)·`use-media-query`(4)·`cover-image`(4)·`use-resizable`(3)·`ui/button`(3); 토큰: `src/styles/globals.css` Tailwind v4 `@theme` OKLCH 커스텀 프로퍼티 150개 + studio 전용 셀렉터(`html[data-studio-mobile-immersive]` 등 :5-20) |
-| API_BOUNDARY | `apps/api` NestJS 모듈 13개: admin·auth·catalog·community·creator·creator-marketplace·feedback·fortune·health·legal·me·studio-ai·studio-realtime-ticket | Studio가 호출하는 그룹 — ① `/api/creator/*`: `apps/api/src/modules/creator/creator.controller.ts:62-439+`(works :68-112, **revisions :122-154**(목록/단건/comparison/restore), team/document :169-280, assets :322-408, series :418-439, draft-collaboration :86-98) ② CRDT/협업: `studio-crdt-*.repository.ts`·`studio-crdt-root-schema.ts`·`studio-live.gateway.ts`(유일한 @WebSocketGateway)·`apps/api/src/realtime/studio-postgres-io.adapter.ts` ③ `/api/studio-realtime`(티켓, `modules/studio-realtime-ticket` ↔ 프론트 `src/domains/creator/studio-live-auth-ticket-client.ts`) ④ `/api/studio-ai`. 프론트 실측 호출 빈도: /api/creator 7, /api/studio-realtime 5, /api/studio-ai 2 |
-| CURRENT_STORAGE_BOUNDARY | OPFS 루트 3개 + IndexedDB 7개 + localStorage 다수(접근 파일 116개) | §1.1 참조 |
-| CURRENT_WORKER_BOUNDARY | 전용 Worker **52개**(`src/domains/creator/*.worker.ts`, 합계 7,062 LOC) + worker-client 래퍼 페어 | §1.2 참조. Worker 자산 COOP/COEP 게이팅: `src/app/studio-cross-origin-isolation.ts:128` (`assets/studio-*.worker-*.js` 패턴) + `vercel.json` `/assets/(.*)` COEP credentialless 헤더 |
+## 1. 현재 경계 요약
 
-### 1.1 CURRENT_STORAGE_BOUNDARY 상세
+| 경계 | 현재 판정 | 직접 근거 | 확대 해석 금지 |
+| --- | --- | --- | --- |
+| 앱/URL | **기존 `/studio`에서 in-place** | [`index.html`](../../index.html) → [`src/app/main.tsx`](../../src/app/main.tsx) → [`src/app/routes/AppRouter.tsx`](../../src/app/routes/AppRouter.tsx) → [`src/domains/creator/StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) | 별도 `/studio-v11`, `/studio-v12`, `/studio/v12` 제품 route가 있다는 뜻이 아니다. |
+| 문서·입력 권위 | **Konva Stage 유지** | [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)의 `<Stage>`와 pointer handlers | Vello가 전체 문서, pointer, brush pixel 또는 whole-canvas 권위를 얻었다고 말할 수 없다. |
+| Vello 제품 배선 | **selection-overlay island에 제한해 기본 활성** | [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts), [`studio-vello-hub-surface.tsx`](../../src/domains/creator/studio-vello-hub-surface.tsx), [`studio-vello-hub.ts`](../../src/domains/creator/studio-vello-hub.ts) | scene-local candidate이며 `productWidePromoted=false`, `persistentWinnerStorage=false`다. |
+| 렌더/브러시 tournament | **실제 제품 호출부에 배선** | [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx)의 pointer-down admission, [`StudioKonvaImageNode.tsx`](../../src/domains/creator/StudioKonvaImageNode.tsx)의 filter-island plan | winner cache가 모든 장면·장치의 기본 renderer 승격을 의미하지 않는다. |
+| VRM 표면 브러시 | **round-tip/no-mixing 제품 경로에 배선** | [`StudioVrmPoser.tsx`](../../src/domains/creator/StudioVrmPoser.tsx), [`studio-vrm-surface-paint-tool.ts`](../../src/domains/creator/studio-vrm-surface-paint-tool.ts), [`studio-vrm-surface-brush-provider.ts`](../../src/domains/creator/studio-vrm-surface-brush-provider.ts) | stamp/image/smudge/wet와 사람 손맛·다중 실기기 품질까지 통과했다는 뜻이 아니다. |
+| Velato | **엔진 패키지·wasm·하니스 구현, 제품 호출부 없음** | [`crates/studio-engine-vello/Cargo.toml`](../../crates/studio-engine-vello/Cargo.toml), [`packages/studio-engine-vello/src/lottie.ts`](../../packages/studio-engine-vello/src/lottie.ts) | 현재 Studio Lottie UI가 Velato를 사용한다고 말할 수 없다. |
+| WESL | **컴파일러·corpus 구현, 제품 호출부 없음** | [`packages/studio-engine-registry/src/wesl-compile.ts`](../../packages/studio-engine-registry/src/wesl-compile.ts) | 결합 승격 raw gate가 `passed=false`이므로 제품 기본 shader platform이라고 말할 수 없다. |
+| 로컬 데이터 | **SQLite WASM + OPFS SAH-pool이 제품 기본 권위** | [`studio-local-database.ts`](../../src/domains/creator/studio-local-database.ts), [`studio-local-database.worker.ts`](../../src/domains/creator/studio-local-database.worker.ts) | OPFS는 cloud backup이 아니며 실제 power-loss/fsync 보장을 이 소스만으로 주장할 수 없다. |
+| browser KV | **localStorage/IndexedDB 호환 시임이 남음** | [`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts)의 exact allowance 원장 | “localStorage가 소스에서 완전히 제거됨”은 거짓이다. 제품 창작 데이터의 기본 권위가 아니라는 것이 현재 계약이다. |
+| 외부 gate | **미통과·격리 유지** | 8시간 soak raw artifact, CSP 블라인드 랩 CLI, CRDT fault artifact (§6) | 기술 CSP 검사, 8시간 soak, Worker terminate를 외부 CSP/24h/물리 fault 통과로 대체할 수 없다. |
 
-OPFS 루트 (3개, 이름공간 상호 분리):
+## 2. `/studio` in-place 진입과 표면 소유권
 
-- `toonspectrum-studio-autosave-v3` — `src/domains/creator/studio-autosave-opfs-session.ts:29`
-- `toonspectrum-studio-engine-storage-v2` — `src/domains/creator/studio-engine-tile-storage-opfs-v2-backend.ts:22`
-- `toonspectrum-hybrid-dcc-v1` — `src/domains/creator/StudioPage.tsx:4933` (rootName 인자)
-- 공용 접근 계층: `studio-opfs-filesystem.ts`, `studio-opfs-sync-access-store.ts`, `studio-opfs-recovery-journal.ts`
+현재 부트스트랩과 route는 다음 하나의 제품 경로다.
 
-IndexedDB (DB명 실측):
-
-- `toonspectrum-studio-crdt-outbox` — `studio-crdt-outbox.ts:6`
-- `toonspectrum-studio-crdt-recovery-vault` — `studio-crdt-recovery-vault.ts:7` (동일 DB를 `studio-pages-history-durable-runtime.ts:34`도 사용)
-- `toonspectrum-studio-checkpoints` — `studio-checkpoints.ts:7`
-- `toonspectrum-studio-asset-library` — `studio-asset-library.ts:8`
-- `toonspectrum-studio-vrm-library` — `vrm-library.ts:1`
-- `toonspectrum-studio-bg3d-model-library` — `bg3d-model-library.ts:29`
-- `toonspectrum-studio-production-bible` — `studio-production-bible.ts:219`
-
-localStorage 주요 키 (전부 `src/domains/creator` 실측):
-
-- `toonspectrum:studio:workspaces` — `studio-workspaces.ts:57` (레거시 `studio:leftW`/`studio:rightW` :70-71)
-- `toonspectrum-studio-app-settings:v1` — `studio-app-settings.ts:22`
-- `toonspectrum-studio-brush-slots:v2`(현행)/`:v1`(레거시) — `studio-brush-slots.ts:21-22`
-- `toonspectrum-studio-ui-density:v1` — `studio-ui-density.ts:16`
-- `toonspectrum-studio-quick-actions:v1` — `studio-quick-actions.ts:69`
-- `toonspectrum-studio-effect-favorites:v1` — `studio-effect-favorites.ts:30`
-- `toonspectrum-studio-mannequin-state:v1` — `studio-mannequin-poses.ts:510`
-- `toonspectrum:studio:page-preview-size:v1` — `StudioPageListPane.tsx:51`
-- `studio_tracking_calibration` — `studio-vrm-tracking-calibration.ts:33`
-- `studio_reference_panel_v1` — `studio-reference-panel.ts:21`
-- `studio_unsplash_access_key` — `studio-stock-image-client.ts:69`
-- 직접 리터럴: `studio_custom_poses`, `studio_pose_clipboard`, `studio_vrm_full_clip`, `studio_vrm_full_states`, `studio_webcam_consent`
-
-### 1.2 CURRENT_WORKER_BOUNDARY 상세 (52개 전수, 기능군별)
-
-- 엔진/저장 코어: `studio-engine.worker.ts`(+`studio-engine-worker-client.ts`), `studio-storage.worker.ts`, `studio-offscreen-raster.worker.ts`, `studio-crdt-raster.worker.ts`, `studio-crc32.worker.ts`
-- 브러시/자연매체: `studio-hokusai-live-brush.worker.ts`, `studio-hokusai-natural-media.worker.ts`(hokusai wasm 소비), `studio-procedural-artistic-brush.worker.ts`, `studio-physics-particle-brush-provider.worker.ts`, `studio-fiber-bristle-brush-provider.worker.ts`, `studio-procedural-media-surface-provider.worker.ts`, `studio-multi-light-surface-provider.worker.ts`, `studio-living-ink.worker.ts`
-- 필터/리터치: `studio-image-filter.worker.ts`, `studio-liquify.worker.ts`, `studio-smudge.worker.ts`, `studio-heal-clone.worker.ts`, `studio-retouch.worker.ts`, `studio-outline.worker.ts`, `studio-auto-color-hints.worker.ts`
-- 선택: `studio-magic-wand.worker.ts`, `studio-color-range.worker.ts`, `studio-advanced-fill.worker.ts`
-- 레이어 리프트: `studio-layer-lift-compose/-mask/-artifact.worker.ts` (3종)
-- BG3D: `studio-bg3d-geometry/-physics/-obj/-obj-preflight/-glb-validation/-lt-render/-shot-png/-shot-psd/-shot-batch/-shot-contact-sheet.worker.ts` (10종) + `studio-occt.worker.ts`, `studio-opencv-image-provider.worker.ts`, `studio-xatlas-uv-provider.worker.ts`, `studio-weighted-deformation-provider.worker.ts`
-- VRM: `studio-vrm-texture-fill/-texture-geometry/-photo-pose.worker.ts` (3종)
-- 포맷/입출력: `studio-svg-export.worker.ts`, `studio-hybrid-dcc-glb-export.worker.ts`, `studio-raster-interchange.worker.ts`, `studio-first-party-raster-codec.worker.ts`, `studio-first-party-will-v1-document-codec.worker.ts`, `studio-will-v1-opc.worker.ts`, `studio-abr-import.worker.ts`, `studio-paper-vector-refinement.worker.ts`, `studio-revision-compare.worker.ts`
-
-생성 방식은 `new Worker(new URL(...))` 페어 패턴(예: `studio-engine-worker-client.ts`, `studio-magic-wand-worker-client.ts` 등 클라이언트 파일 30여 개 실측).
-
-## 2. 의존 방향 그래프
-
-```
-index.html:115
-  └─ src/app/main.tsx:33 (createRoot)
-      └─ src/app/App.tsx → src/app/AppShell.tsx:139 <AppRouter/>
-          └─ src/app/routes/AppRouter.tsx:178-186 (lazy) · :307 <Route path="/studio">
-              └─ src/domains/creator/StudioPage.tsx (42,111줄, 편집 코어 진입점)
-                  ├─ [현행 렌더] Konva 스테이지 계열 (react-konva import 76파일)
-                  │     └─ vite chunk "studio-konva-runtime" (vite.config.ts:305-307)
-                  ├─ [핫패스] 탈React 파이프라인 → studio-engine-* 58파일
-                  │     └─ Worker 52개 → OPFS(§1.1 루트 3) / IndexedDB(§1.1)
-                  ├─ [협업] studio-live-*/StudioLive* 61파일
-                  │     └─ /studio-live WebSocket (vite.config.ts:330 프록시)
-                  │         └─ apps/api studio-live.gateway.ts → Postgres pubsub
-                  │             (realtime/studio-postgres-io.adapter.ts) / Render / CF Worker
-                  └─ [HTTP] /api/creator·/api/studio-realtime·/api/studio-ai (§1 API_BOUNDARY)
-
-[V11 신엔진 계층 — 아직 앱과 미배선]
-packages/studio-{brush-platform,command-registry,engine-registry,engine-skia,
-                 engine-vello,project-model} + studio-hokusai-wasm + crates/studio-engine-vello
-  ← 소비자는 tests/benchmarks/harness/main.ts·tests/visual/cross-renderer-diff.test.ts 뿐
+```text
+index.html
+  -> src/app/main.tsx
+  -> src/app/AppShell.tsx
+  -> src/app/routes/AppRouter.tsx
+  -> /studio
+  -> src/domains/creator/StudioPage.tsx
+  -> src/domains/creator/StudioCanvasViewport.tsx
+       |- Konva Stage: 문서 표시와 pointer 입력 권위
+       |- Vello Hub: 선택 오버레이 island의 조건부 단독 권위
+       `- Pixi: Vello disabled/fallback 때 같은 island의 명시적 fallback
 ```
 
-방향성 검증 (실측):
+- [`AppRouter.tsx`](../../src/app/routes/AppRouter.tsx)는 `StudioPage`를 lazy import하고 정확히
+  `path="/studio"`에 마운트한다. 동반 도구는 `path="/studio/tools-companion"`이며 별도 V12 앱이
+  아니다.
+- 같은 router는 [`StudioCrossOriginIsolationGate.tsx`](../../src/app/StudioCrossOriginIsolationGate.tsx)로
+  Studio 문서 전환을 감싼다. [`vercel.json`](../../vercel.json)은 `/studio`와 `/studio/(.*)`에
+  COOP `same-origin`, COEP `credentialless`를 설정하고, 전체 응답에 HTTP
+  `Content-Security-Policy`를 설정한다.
+- [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)는 현재도 Konva
+  `<Stage>`와 `onPointerDown`/`onPointerMove`/`onPointerUp` 경로를 마운트한다. Vello canvas는
+  [`studio-vello-hub-canvas-target.ts`](../../src/domains/creator/studio-vello-hub-canvas-target.ts)에서
+  `pointerEvents = "none"`이다.
+- 따라서 “in-place 교체”는 URL·앱을 새로 만들지 않고 기존 호출부 내부에서 기능별 provider를
+  교체한다는 뜻이다. whole-canvas 단일 엔진 컷오버 완료를 뜻하지 않는다.
 
-- 엔진 계층 → UI 금지: `packages/studio-*/src` 전체에서 `from "react"`·`src/domains` import **0건** (grep 실측).
-- 역방향(구 Studio → 신 엔진): `src/`·`apps/`에서 `@toonspectrum/studio-brush-platform` 등 6패키지 import **0건** — V11 핸드오프 전 상태.
-- 신 엔진 소비자: `tests/visual/cross-renderer-diff.test.ts:5-15` (project-model·engine-skia·engine-vello), `tests/benchmarks/harness/main.ts:17-25` (brush-platform·project-model·engine-skia).
+## 3. 현재 엔진 배선
 
-## 3. 유지/폐기 결정표 (V11.1 §0.4 기준)
+과거의 “`packages/studio-*` 소비자는 tests/benchmarks뿐이고 `src/` import는 0건”이라는 문장은
+더 이상 맞지 않는다.
 
-| 판정 | 대상 | 근거 경로 |
+### 3.1 renderer/brush tournament
+
+- [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx)는 mount 뒤
+  `bootStudioTournamentPersistence()`를 호출한다. 구현은
+  [`studio-tournament-persistence-bootstrap.ts`](../../src/domains/creator/studio-tournament-persistence-bootstrap.ts)에서
+  SQLite adapter를 dynamic import하고, hydration이 끝나기 전에는 원래 lane 순서를 유지한다.
+- 같은 `StudioPage.tsx`의 실제 pointer-down 경로는
+  [`studio-stroke-route-tournament.ts`](../../src/domains/creator/studio-stroke-route-tournament.ts)의
+  `resolveStudioStrokeRoutePointerDownGate()`로 living-ink, Hokusai, stamp, GPU, live-ink,
+  wet-fallback, dynamic, Konva admission을 결정한다. Konva는 fail-visible 종단 fallback으로 남는다.
+- [`StudioKonvaImageNode.tsx`](../../src/domains/creator/StudioKonvaImageNode.tsx)는
+  [`studio-filter-island-plan.ts`](../../src/domains/creator/studio-filter-island-plan.ts)의
+  `planStudioFilterIslandLanes()`를 실제 이미지 필터 경로에서 호출한다.
+- tournament 메커니즘은
+  [`@toonspectrum/studio-engine-registry`](../../packages/studio-engine-registry/src/index.ts)에서 오고,
+  제품 브리지는 [`studio-renderer-tournament-runtime.ts`](../../src/domains/creator/studio-renderer-tournament-runtime.ts)에
+  있다. 이 배선은 존재하지만 장면/장치 전체의 영구 승격과는 별개다.
+
+### 3.2 Vello GPU/CPU 제품 island
+
+- [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts)는
+  `studio-vello-hub-selection-overlay-v1`을 기본 활성화한다. 범위는
+  `accelerated-selection-overlay` 하나이며 document/input/brush-pixel/canonical-document 권위는
+  모두 `false`다.
+- [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)는
+  `StudioVelloHubSurface`를 기존 `/studio` canvas host에 직접 마운트한다. Vello가 명시적으로
+  disabled되거나 `fallback` 상태일 때만 같은 selection island의 Pixi host를 활성화한다.
+- [`studio-vello-hub.ts`](../../src/domains/creator/studio-vello-hub.ts)의 Classic backend는
+  [`studio-gpu-fabric.ts`](../../src/domains/creator/studio-gpu-fabric.ts)의 공유 `GPUDevice` lease를
+  채택하고 Vello GPU texture를 만든다. CPU backend는 `vello_cpu` pixels를 품질 기준/fallback으로
+  사용한다.
+- [`studio-vello-hub-canvas-target.ts`](../../src/domains/creator/studio-vello-hub-canvas-target.ts)는
+  GPU frame을 `GPUCanvasContext.getCurrentTexture()`로 texture-to-texture copy해 표시한다. CPU frame만
+  `putImageData()`를 사용하며, GPU hot path를 CPU readback으로 가장하지 않는다.
+- hub의 승격은 scene-local memory evidence, visual shadow, 12% hysteresis, pen-up 전환 금지에 묶인다.
+  Hybrid/Sparse GPU는 [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts)에서
+  `unavailable-upstream-api`로 남아 있다. 현재 제품 GPU backend는 Vello 0.9 Classic이다.
+
+### 3.3 Velato와 WESL: 구현됨, 제품 기본 아님
+
+| lane | 현재 구현 | 제품 caller 확인 | 현재 판정 |
+| --- | --- | --- | --- |
+| Velato 0.11 Lottie | Rust `lottie` feature가 Lottie JSON을 Vello scene으로 낮추고, TS가 `renderLottieToPixelsGpu()`를 export한다. 커밋된 [`velato-lottie-browser.json`](../../tests/benchmarks/results/velato-lottie-browser.json)은 package probe 스냅샷이다. | 비테스트 `src/`·`apps/`에서 `renderLottieToPixelsGpu` 호출 없음. export와 package 내부 구현만 확인됨. | 엔진 후보/하니스. Studio Lottie 제품 표면 배선으로 승격되지 않음. |
+| WESL 0.7.28 | [`wesl-compile.ts`](../../packages/studio-engine-registry/src/wesl-compile.ts)가 `*.wesl?raw`, `link()`, `@if`, virtual schedule module로 WGSL variant를 만든다. [`wesl-variants-browser.json`](../../tests/benchmarks/results/wesl-variants-browser.json)은 35개 variant 스냅샷을 가진다. | 비테스트 `src/`에서 `compileWeslVariant()` 호출 없음. | compiler candidate. [`wgsl-variants-pipeline.json`](../../tests/benchmarks/results/wgsl-variants-pipeline.json)의 결합 gate는 `passed=false`; 정적 WGSL/기존 생성기 기본을 유지. |
+
+커밋된 JSON은 과거 실행 영수증이다. 이번 문서 감사에서는 Velato/WESL 실제 브라우저 probe를
+재실행하지 않았으므로 그 artifact보다 넓은 통과를 주장하지 않는다.
+
+### 3.4 VRM 표면 브러시 제품 경로
+
+- [`StudioVrmPoser.tsx`](../../src/domains/creator/StudioVrmPoser.tsx)의 실제 R3F pointer workflow가
+  down/move/up, `Intersection.faceIndex`, pressure/tilt와 analytic camera scale을
+  [`studio-vrm-surface-paint-tool.ts`](../../src/domains/creator/studio-vrm-surface-paint-tool.ts)의
+  bounded transaction으로 전달한다.
+- transaction은 최대 2,048 input samples와 50,000 projected operations로 제한되고, 기존
+  `BrushProgramIR`/`StrokeIR`→surface adapter→`StudioVrmTexturePaintRuntime` 경계에서 atlas를
+  정확히 한 번 원자 커밋한다. 별도 브러시 엔진이나 문서 권위를 만들지 않는다.
+- pointercancel/leave/lost capture/window blur/device loss/unmount는 discard 또는 rollback한다.
+  face index·texel density 근거가 없으면 seam-safe로 가장하지 않고 compatibility round path로 보낸다.
+- 자동 제품 계약 127건은 이 배선·결정적 undo/replay·hot-path readback 0을 고정한다. 다중 실제
+  VRM corpus의 사람 시각 품질·손맛, 실 GPU resident memory와 실기기 pressure/tilt는 외부 gate다.
+
+## 4. SQLite/OPFS 제품 권위
+
+제품 로컬 SQL 경계는 다음과 같다.
+
+- package: `@sqlite.org/sqlite-wasm` `3.53.0-build1` — [`package.json`](../../package.json)
+- OPFS SAH-pool directory: `toonspectrum-studio-sqlite`
+- logical database: `studio-local-v12.db`
+- app-lifetime owner: [`studio-local-database-runtime.ts`](../../src/domains/creator/studio-local-database-runtime.ts)
+- Dedicated Worker RPC: [`studio-local-database-worker-client.ts`](../../src/domains/creator/studio-local-database-worker-client.ts)
+  → [`studio-local-database.worker.ts`](../../src/domains/creator/studio-local-database.worker.ts)
+- schema/API: [`studio-local-database.ts`](../../src/domains/creator/studio-local-database.ts)
+
+Worker는 `@sqlite.org/sqlite-wasm`을 동적 import하고 SAH-pool 하나를 소유한다. OPFS/SQLite를 열 수
+없으면 core open은 `SqliteUnavailableError`로 명시 실패한다. 각 UI 기능이 허용하는 memory-only
+session은 “저장됨”과 다른 상태이며 localStorage를 durable 성공으로 승격하는 우회가 아니다.
+
+현재 shared SQLite runtime을 제품 factory로 사용하는 범위에는 journal/history, renderer tournament,
+autosave mirror, brush/filter/palette/marketplace catalog, UI preferences, tutorial progress,
+translation memory, production bible, custom font manifest, generic/VRM/BG3D asset manifest,
+CRDT outbox/recovery, owner-scoped workspace·Quick Access·draft collaboration identity, Pro Draw,
+companion-window layout, Reference Panel, watermark, VRM recent pose/character 등이 포함된다.
+workspace의 BroadcastChannel은 snapshot을 전송하지 않고 revision invalidation만 전달하며, 실제
+병합은 SQLite 재읽기와 dirty-revision fence를 통과한다. 정확한 호출부는 다음 명령으로 재감사한다.
+
+```sh
+rg -n -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' \
+  'acquireStudioLocalDatabase|acquireProductStudio|createStudio.*Sqlite|sqlite-opfs' \
+  src/domains/creator
+```
+
+## 5. 남은 localStorage/IndexedDB 호환 시임
+
+“제품 기본 권위가 SQLite/OPFS다”와 “browser KV 코드가 없다”는 다른 주장이다. 후자는 현재
+거짓이다. exact allowlist의 단일 원장은
+[`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts)다.
+
+| 잔여 시임 | 현재 동작 | 대표 경로 |
 | --- | --- | --- |
-| 유지 | 인증/세션 | `apps/api/src/modules/auth/*`, `apps/api/src/session-cookie.ts:5`, `session-middleware.ts` |
-| 유지 | 결제/마켓 | `apps/api/src/modules/creator-marketplace/` |
-| 유지 | 배포 파이프라인 | Vercel Git Integration(`deploy-vercel.yml:1-6` fallback 선언), `vercel.json`, `render.yaml`, `deploy/cloudflare-realtime/wrangler.jsonc`, 게이트 `scripts/vercel-production-release-gate.mjs`(`vercel.json:5` ignoreCommand) |
-| 유지 | 업로드·CDN | `apps/api/src/modules/creator/studio-asset-upload.guard.ts`, `apps/api/src/infrastructure/supabase-object-storage/`, `vercel.json` `/assets`·`/vrm`·`/audio` 캐시/CORS 헤더 |
-| 유지 | `/studio` URL | `src/app/routes/AppRouter.tsx:307`, `vercel.json:57-70` 라우트별 COOP/COEP |
-| 유지 | 디자인 토큰 | `src/styles/globals.css` `@theme` OKLCH 150 토큰 |
-| 감사 후 재사용 | OPFS 스토리지 브리지 | `studio-engine-tile-storage-bridge.ts`, `studio-engine-tile-storage-opfs-v2-backend.ts`, `studio-opfs-filesystem.ts`, `studio-opfs-sync-access-store.ts` (+ 검증 `scripts/studio-engine-tile-storage-opfs-v2-browser.ts`) |
-| 감사 후 재사용 | Worker 인프라 | §1.2 52개 + COOP/COEP 게이팅(`src/app/studio-cross-origin-isolation.ts:128`, `vercel.json` /assets 헤더) — 신엔진 wasm 워커에 그대로 필요 |
-| 감사 후 재사용 | CRDT 백엔드 | `apps/api/src/modules/creator/studio-crdt-*.{ts}`(root-schema·repository·checkpoint coordinator), `studio-live.gateway.ts`, `apps/api/src/realtime/*`, `deploy/cloudflare-realtime/`, 클라 `studio-crdt-outbox.ts`·`studio-crdt-recovery-vault.ts` |
-| 게이트 미통과 시 교체 | 기존 렌더 루프(Konva 스테이지) | react-konva/konva import 76파일·72,853 LOC (대표: `StudioPage.tsx`, `StudioDraftPreviewLayers.tsx`, `StudioKonvaImageNode.tsx`, `StudioCanvasGuideLayers.tsx`); 전용 chunk `studio-konva-runtime`(`vite.config.ts:305-307`) |
-| 게이트 미통과 시 교체 | 구 Undo/저널 | `studio-command-journal.ts`, `studio-pages-history-command-journal(-client).ts`, `studio-opfs-recovery-journal.ts`, `studio-webgpu-live-source-journal.ts`, `studio-checkpoints.ts`, `studio-autosave(-opfs-session).ts` — journal/autosave/checkpoints/history 계열 38파일·18,009 LOC |
-| 게이트 미통과 시 교체 | 구 브러시 파이프라인 | brush 명명 계열 239파일·127,592 LOC + hokusai 워커 2종(§1.2) |
-| 게이트 미통과 시 교체 | 구 필터 파이프라인 (3경로) | filter 명명 계열 98파일·42,878 LOC — ① CPU/캔버스 canonical 경로 `studio-engine-canonical-filter-plan.ts` ② Worker 경로 `studio-image-filter.worker.ts` ③ WebGPU 경로(패리티 게이트 `scripts/studio-engine-webgpu-filter-parity-browser.ts`, `scripts/studio-gpu-filters-parity-browser.ts`) |
-| 게이트 미통과 시 교체 | 구 문서 모델 | `studio-first-party-will-v1-document-codec.worker.ts`·`studio-will-v1-opc.worker.ts`(will-v1 문서 코덱), `toonspectrum.studio-project`/`studio-project-archive` 코덱 식별자군, 서버측 `apps/api/src/modules/creator/studio-crdt-root-schema.ts` — 신 SoT는 `@toonspectrum/studio-project-model`의 Stable IR(`docs/adr/0002-stable-ir-as-source-of-truth.md`) |
+| autosave 호환 읽기 | OPFS/SQLite 후보를 먼저 조정한다. durable 후보가 없거나 open이 실패할 때 기존 browser-storage JSON을 `compatibility-only` 복구 후보로 표시할 수 있지만 새 autosave를 localStorage에 쓰지 않는다. durable write/clear 뒤에는 구 key를 삭제한다. | [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx), [`studio-autosave-opfs-session.ts`](../../src/domains/creator/studio-autosave-opfs-session.ts) |
+| 삭제 전용 cleanup | autosave/sidecar, AI recent prompts, VRM pose clipboard, account data-destruction, server revision restore가 구 key를 제거한다. `removeItem`은 새 권위를 만들지 않는다. | [`studio-data-destruction.ts`](../../src/domains/creator/studio-data-destruction.ts), [`studio-server-revision-restore-controller.ts`](../../src/domains/creator/studio-server-revision-restore-controller.ts) |
+| 명시적 legacy import/test adapter | brush/filter/production-bible/animatic/BG3D preset/brand/clip/font/marketplace/palette 등의 codec가 주입된 `Storage`를 처리한다. 제품 default는 `discard`; import는 명시 opt-in이어야 한다. | [`studio-brush-library-sqlite-repository.ts`](../../src/domains/creator/studio-brush-library-sqlite-repository.ts), [`studio-filter-library-sqlite-repository.ts`](../../src/domains/creator/studio-filter-library-sqlite-repository.ts), [`studio-production-bible.ts`](../../src/domains/creator/studio-production-bible.ts) |
+| UI-only compatibility helper | tutorial progress와 workspace의 주입형 rollback/test codec 등 구 동기 helper는 남아 있지만 제품 UI factory는 SQLite runtime/repository를 사용한다. exact key/write 수는 allowlist가 고정한다. | [`studio-feature-tutorials.ts`](../../src/domains/creator/studio-feature-tutorials.ts), [`studio-tutorial-progress-sqlite.ts`](../../src/domains/creator/studio-tutorial-progress-sqlite.ts), [`studio-workspaces.ts`](../../src/domains/creator/studio-workspaces.ts) |
+| legacy IndexedDB | BG3D/asset/checkpoint/CRDT/history/production-bible/VRM 등의 기존 DB adapter가 명시적 import·rollback seam으로 남는다. product factory의 ambient 자동 선택을 허용하지 않는다. | [`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts) |
+| 탭 범위 민감 상태 | 일부 clipboard/BYOK 설정은 `sessionStorage`를 사용한다. 이는 재시작 durable authority가 아니며 scanner도 별도로 취급한다. | [`studio-ai-client.ts`](../../src/domains/creator/studio-ai-client.ts), [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) |
 
-주의: `studio-live-*` 61파일(40,918 LOC)은 "교체 대상 오버레이 UI"와 "재사용 대상 CRDT
-클라이언트 배선"이 섞여 있다. §0.4 적용 시 CRDT 프로토콜/티켓 클라이언트
-(`studio-live-collaboration-protocol.ts`, `studio-live-auth-ticket-client.ts`)는 재사용 축,
-캔버스 오버레이(`studio-live-canvas-overlay-model.ts` 등)는 렌더 루프와 함께 교체 축이다.
+따라서 삭제 기준은 “`localStorage` 문자열 grep 0건”이 아니다. 새 창작 데이터 write 또는 새
+IndexedDB open이 exact allowance 없이 들어오지 못하고, 제품 factory가 legacy adapter를 ambient하게
+선택하지 못하는지가 현재 경계다.
 
-## 4. 삭제 목록 — 교체 대상 인벤토리 (`src/domains/creator` 실측)
+## 6. 외부·장시간·물리 fault gate
 
-| 그룹 | 파일 수 | LOC | 산정 방식 |
-| --- | ---: | ---: | --- |
-| Konva 스테이지 계열 | 76 | 72,853 | `konva`/`react-konva` import 파일 grep |
-| live 협업 계열 (`studio-live-*`/`StudioLive*`) | 61 | 40,918 | 접두 glob (§3 주의 항목 — 부분 재사용) |
-| 라이브 잉크 오버레이 계열 (living-ink/live-ink/wet-ink/DraftPreview) | 58 | (live 계열과 일부 중복) | 명명 grep |
-| 구 저널/오토세이브/체크포인트/히스토리 | 38 | 18,009 | journal/autosave/checkpoints/history 명명 grep |
-| 구 필터 3경로 | 98 | 42,878 | filter 명명 grep |
-| 구 브러시 파이프라인 | 239 | 127,592 | brush 명명 grep |
-| 전용 Worker 본체 | 52 | 7,062 | `*.worker.ts` glob |
-| WebGPU 실험/런타임 | 88 | — | webgpu 명명 grep |
-| CRDT 클라이언트 | 45 | — | crdt 명명 grep (재사용 후보 포함) |
-| (모수) creator 도메인 전체 | 3,593 | 1,470,842 | find/wc |
+여기서 외부 **CSP**는 Clip Studio Paint 비교를 뜻한다. HTTP
+**Content-Security-Policy** 기술 검증과 혼동하면 안 된다.
 
-그룹 간 중복이 있으므로 합산은 모수를 넘지 않는 상한 지표로만 사용할 것.
+| gate | 현재 트리의 증거 | 현재 상태 | 닫기 위한 조건/명령 |
+| --- | --- | --- | --- |
+| HTTP Content-Security-Policy | [`vercel.json`](../../vercel.json), [`verify-vercel-csp.mjs`](../../scripts/verify-vercel-csp.mjs) | 이번 감사에서 `pnpm run verify:csp` 통과. 이는 정적 배포 정책/inline hash 검사다. | 실제 배포 응답과 각 browser runtime 오류 검사는 별도 release/browser QA 범위다. |
+| 외부 Clip Studio Paint 비열위 | [`csp-blind-lab.ts`](../../tests/benchmarks/harness/csp-blind-lab.ts)와 [`csp-blind-lab-cli.ts`](../../tests/benchmarks/harness/csp-blind-lab-cli.ts)는 packet/analyze 도구만 제공한다. 현재 tree에 study/response/analysis JSON은 없다. | **미통과 (`insufficient-data`로 취급)** | 최신 Clip Studio Paint와 ToonStudio를 동일 물리 태블릿·동일 과제로 사전등록하고, 사람 응답을 모아 CLI `analyze`가 `pass`를 내야 한다. |
+| 24시간 soak | [`soak.json`](../../tests/benchmarks/results/soak.json), [`soak-leak-regression-2026-08-08.json`](../../tests/benchmarks/results/soak-leak-regression-2026-08-08.json)은 둘 다 `soakMinutes: 480`이다. `1440` artifact는 없다. | **미통과·8시간으로 대체 불가** | `SOAK_MINUTES=1440 pnpm run soak:studio-engine`을 중단 없이 실행하고 raw result, 오류 0, 메모리 수렴을 보존한다. |
+| SQLite/OPFS 물리 fault | [`crdt-recovery-sqlite-opfs-browser.json`](../../tests/benchmarks/results/crdt-recovery-sqlite-opfs-browser.json)은 close/reopen·Worker terminate·손상 격리를 기록하지만 `osCrashPowerLoss`와 `quotaExhaustion`은 `null`이고 remaining gate를 열어 둔다. | **부분 기술 증거만 있음; 물리 fault 미통과** | full browser process crash, OS crash/power loss, browser-enforced quota, SAH-pool capacity, 장기 multi-tab contention, cross-platform filesystem matrix를 별도 격리 환경에서 실행한다. |
+| 제품 전체 renderer 승격 | [`renderer-tournament-browser.json`](../../tests/benchmarks/results/renderer-tournament-browser.json)은 `boundedCorpusOnly=true`, `productWidePromotion=false`, `cspNonInferiority="not-measured"`를 기록한다. | **bounded candidate만 허용** | 24h shadow/soak, 외부 CSP blind lab, 장치/장면 matrix와 PromotionRegistry 승인이 필요하다. |
+| 실기기 GPU/표시 matrix | 현재 자동 artifact는 주로 Chromium/macOS/Apple Metal 범위다. | **미통과 범위 유지** | Windows D3D12, Linux Vulkan, 통합 GPU, mobile WebGPU, P3/HDR와 실제 target-app round-trip을 실행한다. |
 
-## 5. V11 엔진 계층 현황
+외부 CSP packet/analyze 명령은 operator가 사전등록 study와 응답 파일을 준비한 뒤 다음과 같다.
 
-패키지 6종 — **감사 도중 리네임 완료를 직접 관측**: 감사 시작 시 package.json name이
-`@toonspectrum/{brush-platform,command-registry,provider-catalog,skia-adapter,vello-adapter,project-model}-v11`
-이었고, 종료 시점 재확인에서 아래 현재명으로 확정됐다(디렉터리명은 처음부터 동일).
+```sh
+pnpm exec tsx tests/benchmarks/harness/csp-blind-lab-cli.ts packet \
+  --study study.json --evaluator artist-001 \
+  --packet-out packet.json --key-out sealed-key.json
 
-- `packages/studio-brush-platform` → `@toonspectrum/studio-brush-platform` (src 7파일)
-- `packages/studio-command-registry` → `@toonspectrum/studio-command-registry` (src 2파일)
-- `packages/studio-engine-registry` → `@toonspectrum/studio-engine-registry` (src 7파일)
-- `packages/studio-engine-skia` → `@toonspectrum/studio-engine-skia` (src 5파일, `/node` 서브패스로 CanvasKit 로더)
-- `packages/studio-engine-vello` → `@toonspectrum/studio-engine-vello` (src 5파일)
-- `packages/studio-project-model` → `@toonspectrum/studio-project-model` (src 23파일, sceneIRSchema)
-- 부속: `packages/studio-hokusai-wasm` (Rust crate + wasm-pack `pkg/` + `pkg/INTEGRITY.sha256`)
+pnpm exec tsx tests/benchmarks/harness/csp-blind-lab-cli.ts analyze \
+  --study study.json --keys sealed-keys.json \
+  --responses responses.json --out analysis.json
+```
 
-Rust crate: `crates/studio-engine-vello` — `src/{lib,render,scene}.rs`, `tests/render.rs`,
-커밋된 wasm 산출물 `pkg/vello_adapter_v11_bg.wasm` + `pkg/INTEGRITY.sha256`
-(wasm 산출물 내부 명칭은 아직 `vello_adapter_v11` 구명 유지).
+위 파일명은 operator 입력 예시이며 현재 repository artifact 경로가 아니다. 이번 감사에서는 두 명령을
+실행하지 않았다.
 
-테스트 트리 `tests/` (실측 — `studio-v11` 하위 디렉터리가 아니라 4분할 구조):
+## 7. 이번 감사에서 실행한 검증
 
-- `tests/corpus/vector/` — 시나리오 8항목(`01-solid-shapes` ~ `07-group-opacity` + `golden/`)
-- `tests/benchmarks/harness/main.ts` — 엔진 패키지 직접 소비 벤치 하니스(`bench:studio-engine`, package.json:65)
-- `tests/fault-injection/journal-faults.test.ts`
-- `tests/visual/cross-renderer-diff.test.ts` — Skia(CanvasKit) vs Vello 크로스 렌더러 diff
+### 소스/아티팩트 감사 명령
 
-검증 게이트: `scripts/verify-studio-engine.mjs`(:1-11 — ① wasm INTEGRITY 무결성 ② 전 패키지
-typecheck ③ V11 테스트 스코프 실행), `package.json:66` `verify:studio-engine`,
-`scripts/studio-hokusai-wasm-release-contract.mjs`. 설계 근거 ADR 8건:
-`docs/adr/0001-v11-greenfield-monorepo-placement.md` ~ `0008-license-isolation-policy.md`
-(0002 Stable IR SoT, 0003 단일 표면 소유자, 0004 CanvasKit+Vello CPU 베이스라인,
-0005 잉킹 단계화, 0006 hokusai 자연매체 우선, 0007 append 저널+two-slot 저장).
-후보 조사 문서: `docs/candidates/{engine-portfolio,filters,natural-media,renderer-2d,storage-recovery,stroke-brush,text-layout}`.
+```sh
+cd /Users/hjunkim/WebstormProjects/toonspectrum
 
-## 6. 병렬 앱 부재 증명
+rg -n '<script[^>]+type="module"|createRoot|<AppRouter|Route path="/studio"' \
+  index.html src/app/main.tsx src/app/AppShell.tsx src/app/routes/AppRouter.tsx
 
-- `apps/` 실측: 최종 상태 **`api` 단독**. 감사 초반에는 `apps/benchmark-lab-v11`이 존재했으나
-  감사 도중 제거를 관측 — 벤치 하니스는 `tests/benchmarks/harness/`로 정리됐다.
-  워크스페이스 글롭은 `pnpm-workspace.yaml:2-4` (`.`, `apps/*`, `packages/*`).
-- `/studio-v11` 라우트 부재: `src/` 전체 + `vercel.json`에서 `studio-v11`·`/studio/v11`·
-  `studio_v11` grep **0건**. 라우터의 studio 계열 라우트는 `/studio`(:307)와
-  `/studio/tools-companion`(:308) 둘뿐이며, 유사명 경로는 몰입형 판정에서 명시 제외된다
-  (`src/app/routes/immersive-mobile-route.ts:5-9` — `/studio-guide` 오인 방지).
-- 결론: 병렬 스튜디오 앱·병렬 라우트 없음. V11은 "새 앱"이 아니라 기존 `/studio` 뒤의
-  엔진 계층 교체로 진행 중이다(ADR 0001·0003과 일치).
+rg -n -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' \
+  '@toonspectrum/studio-(brush-platform|command-registry|engine-registry|engine-vello|project-model)' \
+  src apps
 
-## 7. V11.1 §12.4 교체 순서에 대응하는 현재 상태
+rg -n -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' \
+  'renderLottieToPixelsGpu|compileWeslVariant' src apps packages
 
-1. **엔진 독립 검증(선행)** — 이미 성립. packages/crates/tests/게이트가 앱과 완전히 분리돼
-   존재하고(§5), UI→엔진·엔진→UI 어느 방향 import도 0건(§2)이라 교체 순서의 전제인
-   "앱 무영향 병행 개발"이 현재 상태로 보장된다.
-2. **스위치 지점 단일화** — `/studio` 진입은 `AppRouter.tsx:178-186`의 lazy import 경계
-   하나뿐이다. §12.4의 단계별 컷오버는 이 한 지점(또는 StudioPage 내부의 렌더 서피스
-   소유자 교체)만 건드리면 되고, 배포 표면(vercel.json COOP/COEP·/assets 헤더)은 이미
-   wasm/Worker 신엔진이 요구하는 격리 조건을 충족한다.
-3. **저장 마이그레이션** — OPFS 루트 3개가 버전 접미(v3/v2/v1)로 이름공간 분리돼 있어
-   신 저장 계층(ADR 0007 append 저널+two-slot)을 새 루트로 병행 기동한 뒤 구 루트를
-   읽기-이관-폐기하는 순서가 가능하다. IndexedDB의 CRDT outbox/recovery-vault는 CRDT
-   백엔드 재사용 축이므로 교체 순서상 마지막까지 유지된다.
-4. **Worker/CRDT 재사용 축** — Worker 격리 인프라와 서버 CRDT 스키마는 클라이언트 엔진
-   교체와 독립이라 §12.4 어느 단계에서도 끊기지 않는다. 단 `studio-live-*`의 오버레이
-   UI는 렌더 루프 교체 단계에 묶인다(§3 주의).
-5. **게이트 갱신 부채** — `check-studio-bundle.mjs` 예산은 구 청크 명(`studio-konva-runtime`
-   등) 기준이므로, 신 엔진 청크가 라우트 그래프에 들어오는 단계에서 budgets(:22)와
-   manualChunks(vite.config.ts:245)를 같은 커밋에서 갱신해야 CI(`package.json:45`)가
-   교체를 오검출하지 않는다.
+rg -n '"soakMinutes"[[:space:]]*:[[:space:]]*(480|1440)' \
+  tests/benchmarks/results -g '*.json'
+```
+
+### 집중 계약 테스트
+
+```sh
+pnpm exec vitest run \
+  src/domains/creator/studio-vello-hub-product-wiring.test.ts \
+  src/domains/creator/studio-vello-hub-surface.test.tsx \
+  src/domains/creator/studio-browser-kv-authority-boundary.test.ts \
+  src/domains/creator/studio-tournament-sqlite-only-boundary.test.ts \
+  src/domains/creator/studio-v12-data-discard-policy.test.ts \
+  packages/studio-engine-vello/src/__tests__/lottie.test.ts \
+  packages/studio-engine-registry/src/__tests__/wesl-compile.test.ts
+
+pnpm run verify:csp
+```
+
+결과: Vitest 7 files, 42 tests 통과, browser probe 1건 명시 skip; `verify:csp` 통과. skip된
+browser probe나 커밋된 benchmark JSON을 이번 감사에서 새로 실행한 gate로 계산하지 않는다.
+
+### 최종 자동 검증
+
+```sh
+pnpm run build
+pnpm run verify:push
+```
+
+최종 통합 트리에서 architecture/lint/root+API typecheck, 전체 Vitest, Cloudflare realtime test·typecheck·
+Wrangler dry-run, production build/CSP/notice, workspace build와 Studio bundle ratchet을 실행했다. 번들은
+Studio route **4,661.6/1,492.7KiB(raw/gzip)**, `StudioPage` **1,938.8/572.2KiB**,
+app shell 이후 **4,078.9/1,309.3KiB**, route/app-shell 정적 청크 **200/191개**로 기준 갱신 없이
+27개 ratchet 전부 통과했다.
+
+### 이번 감사에서 실행하지 않은 외부·장시간 gate
+
+```sh
+SOAK_MINUTES=1440 pnpm run soak:studio-engine
+```
+
+외부 Clip Studio Paint 블라인드 랩, 실제 전원 차단/브라우저 프로세스 crash, browser-enforced quota,
+장기 multi-tab contention, Windows/Linux/mobile GPU matrix는 실행하지 않았다. 따라서 이 문서는 해당
+gate를 통과했다고 주장하지 않는다.

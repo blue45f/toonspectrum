@@ -2,14 +2,19 @@ import { describe, expect, it } from "vitest";
 
 
 import { EffectCompileError, compileEffectGraph } from "../effect-compiler";
-import { registerFilterProviders, wasmVipsPipelineDescriptor } from "../filter-providers";
+import {
+  registerFilterProviderTestFixtures,
+  registerFilterProviders,
+  wasmVipsPipelineDescriptor,
+} from "../filter-providers";
 import { EngineCapabilityRegistry } from "../registry";
 
 import type { EffectGraphIR } from "@toonspectrum/studio-project-model";
 
 function filterRegistry(): EngineCapabilityRegistry {
-  const registry = new EngineCapabilityRegistry();
+  const registry = EngineCapabilityRegistry.forTestFixtures();
   registerFilterProviders(registry);
+  registerFilterProviderTestFixtures(registry);
   return registry;
 }
 

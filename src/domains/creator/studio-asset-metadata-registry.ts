@@ -9,6 +9,7 @@ import {
   canonicalJson,
   collectSceneFeatures,
   computeAssetContentDigest,
+  computeAssetStructuredDigest,
   sceneFeatureCapabilityVocabulary,
 } from "@toonspectrum/studio-project-model";
 
@@ -40,6 +41,9 @@ import type {
   AssetKindIR,
   AssetLicenseIR,
   AssetMetadataIR,
+  AssetNormalizedIrReference,
+  AssetProviderRequirementIR,
+  AssetRendererVariantIR,
   BrushProgramIR,
 } from "@toonspectrum/studio-project-model";
 
@@ -297,6 +301,141 @@ function deriveBrushEngineRequirements(
   return [...requirements].sort();
 }
 
+function descriptorById(providerId: string): ProviderDescriptor {
+  const descriptor = STUDIO_KNOWN_ENGINE_DESCRIPTORS.find(
+    (candidate) => candidate.id === providerId,
+  );
+  if (descriptor === undefined) {
+    throw new StudioAssetMetadataRegistryError(
+      `cannot derive asset metadata for unknown provider: ${providerId}`,
+    );
+  }
+  return descriptor;
+}
+
+function deriveProviderRequirements(
+  capabilities: readonly string[],
+): AssetProviderRequirementIR[] {
+  return [...new Set(capabilities)]
+    .sort()
+    .map((capability) => ({
+      capability,
+      providerIds: STUDIO_KNOWN_ENGINE_DESCRIPTORS
+        .filter((descriptor) => descriptor.capabilities.includes(capability))
+        .map((descriptor) => descriptor.id)
+        .sort(),
+      // Provider descriptor versions are exact deployment identities and are
+      // not uniformly semver (some pin multiple native crates). A fabricated
+      // semver range would be less truthful than an explicit null.
+      versionRange: null,
+      optional: false,
+      reason: `Normalized IR requires ${capability}.`,
+    }));
+}
+
+function originalBlobRef(
+  content: Uint8Array | string,
+  mediaType: string,
+) {
+  return {
+    digest: computeAssetContentDigest(content),
+    byteLength:
+      typeof content === "string"
+        ? new TextEncoder().encode(content).byteLength
+        : content.byteLength,
+    mediaType,
+    // Import does not itself persist to CAS/OPFS. A locator is populated only
+    // after the storage layer has durably committed the exact digest.
+    locator: null,
+  };
+}
+
+function normalizedIrRef(
+  value: unknown,
+  schema: "toonspectrum.brush-program-ir" | "toonspectrum.scene-ir",
+  mediaType: string,
+): AssetNormalizedIrReference {
+  return {
+    digest: computeAssetStructuredDigest(value),
+    schema,
+    schemaVersion: 11,
+    mediaType,
+    // Same truthfulness rule as originalBlobRef: no storage receipt, no URL.
+    locator: null,
+  };
+}
+
+function rendererVariant(
+  id: string,
+  tier: "stable" | "studio-max",
+  providerId: string,
+  normalizedReference: AssetNormalizedIrReference,
+  requiredCapabilities: readonly string[],
+  limitations: readonly string[],
+): AssetRendererVariantIR {
+  const descriptor = descriptorById(providerId);
+  const unsupported = requiredCapabilities.filter(
+    (capability) => !descriptor.capabilities.includes(capability),
+  );
+  if (unsupported.length > 0) {
+    throw new StudioAssetMetadataRegistryError(
+      `provider ${providerId} cannot back renderer variant ${id}; missing ` +
+        unsupported.join(", "),
+    );
+  }
+  return {
+    id,
+    tier,
+    providerId,
+    providerVersion: descriptor.version,
+    normalizedIrRef: normalizedReference,
+    requiredCapabilities: [...requiredCapabilities],
+    // Descriptor maturity is not asset-specific visual evidence. Imported
+    // cards remain unmeasured until the exact material is rendered and gated.
+    qualityStatus: "unmeasured",
+    determinism: "unmeasured",
+    limitations: [...limitations],
+  };
+}
+
+function importedPreviewVariants(
+  stableRendererVariantId: string | null,
+  studioMaxRendererVariantId: string | null,
+) {
+  return {
+    stable: {
+      status: "not-generated" as const,
+      artifactRef: null,
+      rendererVariantId: stableRendererVariantId,
+      realStrokePreviewIds: [],
+      reason:
+        "Format import produced normalized IR but did not render a stable preview artifact.",
+    },
+    studioMax: {
+      status: "not-generated" as const,
+      artifactRef: null,
+      rendererVariantId: studioMaxRendererVariantId,
+      realStrokePreviewIds: [],
+      reason:
+        "Format import produced normalized IR but did not run the Studio Max renderer or quality gate.",
+    },
+  };
+}
+
+function unlistedMarketplace(sourceFormat: "myb" | "kpp" | "svg") {
+  return {
+    status: "not-listed" as const,
+    listingId: null,
+    publisherId: null,
+    access: null,
+    category: null,
+    tags: [sourceFormat],
+    commercialUseAllowed: null,
+    attributionRequired: null,
+    updatedAt: null,
+  };
+}
+
 /**
  * Derives an AssetMetadataIR card from a format-gateway import result. The
  * digest always covers the ORIGINAL payload (bytes / source text), and the
@@ -323,13 +462,87 @@ export function deriveAssetMetadata(
   switch (input.format) {
     case "myb": {
       const { preset, unmappedSettings } = input.result;
+      const engineRequirements = deriveBrushEngineRequirements(preset, "myb");
+      const normalizedReference = normalizedIrRef(
+        preset,
+        "toonspectrum.brush-program-ir",
+        "application/vnd.toonspectrum.brush-program+json",
+      );
+      const hokusaiCapabilities = engineRequirements.filter((capability) =>
+        descriptorById("hokusai-natural-media").capabilities.includes(capability),
+      );
+      const outlineCapabilities = engineRequirements.filter((capability) =>
+        descriptorById("perfect-freehand").capabilities.includes(capability),
+      );
       candidate = {
         ...base,
         kind: "brush-program",
         name: identity.name ?? preset.name,
-        engineRequirements: deriveBrushEngineRequirements(preset, "myb"),
+        engineRequirements,
+        providerRequirements: deriveProviderRequirements(engineRequirements),
         sourceFormat: "myb",
         contentDigest: computeAssetContentDigest(input.bytes),
+        originalBlobRef: originalBlobRef(input.bytes, "application/json"),
+        normalizedIrRef: normalizedReference,
+        rendererVariants: [
+          rendererVariant(
+            "stable-hokusai",
+            "stable",
+            "hokusai-natural-media",
+            normalizedReference,
+            hokusaiCapabilities,
+            ["Natural-media tiles require the raster surface owner for compositing."],
+          ),
+          ...(outlineCapabilities.length === 0
+            ? []
+            : [
+                rendererVariant(
+                  "stable-perfect-freehand-fallback",
+                  "stable",
+                  "perfect-freehand",
+                  normalizedReference,
+                  outlineCapabilities,
+                  ["Natural-media mixing and MYB dab dynamics are not reproduced."],
+                ),
+              ]),
+        ],
+        realStrokePreviews: [],
+        deviceProfiles: [],
+        visualEquivalenceReport: null,
+        dependencies: [],
+        previewVariants: importedPreviewVariants("stable-hokusai", null),
+        fallback: {
+          strategy: "renderer-variant",
+          rendererVariantId:
+            outlineCapabilities.length === 0
+              ? "stable-hokusai"
+              : "stable-perfect-freehand-fallback",
+          providerId:
+            outlineCapabilities.length === 0
+              ? "hokusai-natural-media"
+              : "perfect-freehand",
+          preservesNormalizedIr: true,
+          reason:
+            "When the natural-media lane is unavailable, retain BrushProgramIR and use the pressure-outline lane without claiming MYB visual parity.",
+          limitations:
+            outlineCapabilities.length === 0
+              ? ["No independent provider fallback is currently available."]
+              : ["Natural-media mixing, texture and dab dynamics are unavailable in fallback."],
+        },
+        replacementCondition: {
+          summary:
+            "Replace the stable brush lane only after exact real-device strokes meet or exceed visual, pressure and fallback gates for this material.",
+          requiredEvidence: [
+            "visual-equivalence",
+            "real-device-stroke",
+            "pressure-fidelity",
+            "performance",
+            "memory",
+            "fallback",
+            "soak",
+          ],
+        },
+        marketplace: unlistedMarketplace("myb"),
         provenance: {
           ...provenanceBase,
           importer: "studio-format-gateway/importMybBrush",
@@ -341,13 +554,90 @@ export function deriveAssetMetadata(
     }
     case "kpp": {
       const { program, unmapped, warnings } = input.result;
+      const engineRequirements = deriveBrushEngineRequirements(program, "kpp");
+      const normalizedReference = normalizedIrRef(
+        program,
+        "toonspectrum.brush-program-ir",
+        "application/vnd.toonspectrum.brush-program+json",
+      );
+      const hokusaiCapabilities = engineRequirements.filter((capability) =>
+        descriptorById("hokusai-natural-media").capabilities.includes(capability),
+      );
+      const outlineCapabilities = engineRequirements.filter((capability) =>
+        descriptorById("perfect-freehand").capabilities.includes(capability),
+      );
       candidate = {
         ...base,
         kind: "brush-program",
         name: identity.name ?? program.name,
-        engineRequirements: deriveBrushEngineRequirements(program, "kpp"),
+        engineRequirements,
+        providerRequirements: deriveProviderRequirements(engineRequirements),
         sourceFormat: "kpp",
         contentDigest: computeAssetContentDigest(input.bytes),
+        originalBlobRef: originalBlobRef(input.bytes, "image/png"),
+        normalizedIrRef: normalizedReference,
+        rendererVariants: [
+          ...(hokusaiCapabilities.length === 0
+            ? []
+            : [
+                rendererVariant(
+                  "stable-hokusai",
+                  "stable",
+                  "hokusai-natural-media",
+                  normalizedReference,
+                  hokusaiCapabilities,
+                  ["KPP parameters outside BrushProgramIR remain in provenance/sourcePayload."],
+                ),
+              ]),
+          ...(outlineCapabilities.length === 0
+            ? []
+            : [
+                rendererVariant(
+                  "stable-perfect-freehand-fallback",
+                  "stable",
+                  "perfect-freehand",
+                  normalizedReference,
+                  outlineCapabilities,
+                  ["Krita paint dynamics and natural-media mixing are not reproduced."],
+                ),
+              ]),
+        ],
+        realStrokePreviews: [],
+        deviceProfiles: [],
+        visualEquivalenceReport: null,
+        dependencies: [],
+        previewVariants: importedPreviewVariants(
+          hokusaiCapabilities.length > 0 ? "stable-hokusai" : null,
+          null,
+        ),
+        fallback: {
+          strategy: "renderer-variant",
+          rendererVariantId:
+            outlineCapabilities.length > 0
+              ? "stable-perfect-freehand-fallback"
+              : "stable-hokusai",
+          providerId:
+            outlineCapabilities.length > 0
+              ? "perfect-freehand"
+              : "hokusai-natural-media",
+          preservesNormalizedIr: true,
+          reason:
+            "Retain normalized BrushProgramIR and surface all KPP approximation limits when the preferred dynamics provider is unavailable.",
+          limitations: ["Fallback does not claim Krita or CSP stroke equivalence."],
+        },
+        replacementCondition: {
+          summary:
+            "Replace this brush path only with real-device, pressure-fidelity and visual evidence over the same KPP corpus.",
+          requiredEvidence: [
+            "visual-equivalence",
+            "real-device-stroke",
+            "pressure-fidelity",
+            "performance",
+            "fallback",
+            "soak",
+          ],
+        },
+        marketplace: unlistedMarketplace("kpp"),
         provenance: {
           ...provenanceBase,
           importer: "studio-format-gateway/parseKppPreset",
@@ -359,15 +649,77 @@ export function deriveAssetMetadata(
     }
     case "svg": {
       const { scene, warnings, unsupported } = input.result;
+      const engineRequirements = collectSceneFeatures(scene);
+      const normalizedReference = normalizedIrRef(
+        scene,
+        "toonspectrum.scene-ir",
+        "application/vnd.toonspectrum.scene+json",
+      );
       candidate = {
         ...base,
         kind: "svg-decoration",
         name: identity.name ?? identity.id,
         // Scene-feature inventory IS the requirement list: exactly what the
         // planner will ask an adapter to honor for this decoration.
-        engineRequirements: collectSceneFeatures(scene),
+        engineRequirements,
+        providerRequirements: deriveProviderRequirements(engineRequirements),
         sourceFormat: "svg",
         contentDigest: computeAssetContentDigest(input.svgText),
+        originalBlobRef: originalBlobRef(input.svgText, "image/svg+xml"),
+        normalizedIrRef: normalizedReference,
+        rendererVariants: [
+          rendererVariant(
+            "stable-canvaskit",
+            "stable",
+            "skia-canvaskit",
+            normalizedReference,
+            engineRequirements,
+            ["CanvasKit text requires an explicitly registered font asset."],
+          ),
+          rendererVariant(
+            "studio-max-vello-gpu",
+            "studio-max",
+            "vello-gpu-browser",
+            normalizedReference,
+            engineRequirements,
+            [
+              "WebGPU availability is runtime-gated.",
+              "This imported asset has no asset-specific visual-equivalence measurement yet.",
+            ],
+          ),
+        ],
+        realStrokePreviews: [],
+        deviceProfiles: [],
+        visualEquivalenceReport: null,
+        dependencies: [],
+        previewVariants: importedPreviewVariants(
+          "stable-canvaskit",
+          "studio-max-vello-gpu",
+        ),
+        fallback: {
+          strategy: "renderer-variant",
+          rendererVariantId: "stable-canvaskit",
+          providerId: "skia-canvaskit",
+          preservesNormalizedIr: true,
+          reason:
+            "If the Studio Max WebGPU path is unavailable or fails its asset-specific gate, render the same SceneIR with CanvasKit.",
+          limitations: [
+            "Unsupported SVG source features remain listed in provenance and are not reconstructed by fallback.",
+          ],
+        },
+        replacementCondition: {
+          summary:
+            "Promote or replace the SVG renderer only after the same SceneIR passes visual equivalence, performance, memory, fallback and soak gates.",
+          requiredEvidence: [
+            "visual-equivalence",
+            "performance",
+            "memory",
+            "determinism",
+            "fallback",
+            "soak",
+          ],
+        },
+        marketplace: unlistedMarketplace("svg"),
         provenance: {
           ...provenanceBase,
           importer: "studio-format-gateway/parseSvgToScene",

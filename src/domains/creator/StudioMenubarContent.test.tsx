@@ -152,10 +152,19 @@ describe("resolveStudioMenubarLaneOverflow", () => {
   });
 });
 describe("StudioMenubarContent", () => {
-  it("keeps export controls in a body portal and delegates preload and copy actions", () => {
+  it("waits for watermark readiness before toggling export controls", async () => {
     const stableHandlers = createHandlers();
     const setExportMenuOpen = vi.fn();
     const setProjectActionsOpen = vi.fn();
+    let resolveWatermark!: (value: Awaited<ReturnType<
+      typeof stableHandlers.ensureWatermarkLoaded
+    >>) => void;
+    const watermarkReady = new Promise<Awaited<ReturnType<
+      typeof stableHandlers.ensureWatermarkLoaded
+    >>>((resolve) => {
+      resolveWatermark = resolve;
+    });
+    vi.mocked(stableHandlers.ensureWatermarkLoaded).mockReturnValue(watermarkReady);
     render(
       <StudioMenubarContent
         {...createProps({
@@ -174,7 +183,11 @@ describe("StudioMenubarContent", () => {
 
     expect(preloadStudioExportMenuPanel).toHaveBeenCalledTimes(3);
     expect(stableHandlers.ensureWatermarkLoaded).toHaveBeenCalledOnce();
-    expect(setProjectActionsOpen).toHaveBeenCalledWith(false);
+    expect(setProjectActionsOpen).not.toHaveBeenCalled();
+    expect(setExportMenuOpen).not.toHaveBeenCalled();
+
+    resolveWatermark(createProps().watermark);
+    await waitFor(() => expect(setProjectActionsOpen).toHaveBeenCalledWith(false));
     expect(setExportMenuOpen).toHaveBeenCalledWith(expect.any(Function));
     expect(vi.mocked(setExportMenuOpen).mock.calls.at(-1)?.[0]).toBeTypeOf("function");
     expect((vi.mocked(setExportMenuOpen).mock.calls.at(-1)?.[0] as (open: boolean) => boolean)(true)).toBe(false);

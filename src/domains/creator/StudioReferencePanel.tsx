@@ -61,16 +61,17 @@ import {
 import {
   clampReferencePanelRect,
   defaultReferencePanelSettings,
-  deserializeReferencePanelSettings,
   dragReferencePanelRect,
   filterReferenceAssetsByName,
-  REFERENCE_PANEL_STORAGE_KEY,
   resetReferencePanelSize,
   resizeReferencePanelRect,
   resolvePinnedAsset,
-  serializeReferencePanelSettings,
   type ReferencePanelSettings,
 } from "./studio-reference-panel";
+import {
+  acquireProductStudioReferencePanelPreferencesRepository,
+  type StudioReferencePanelPreferencesRepository,
+} from "./studio-reference-panel-preferences-sqlite";
 import { importStudioRemoteReferenceImage } from "./studio-remote-reference-image-client";
 
 import type {
@@ -89,6 +90,8 @@ export interface StudioReferencePanelProps {
   onChange: (next: StudioReferenceBoardDocument) => boolean | void;
   /** Optional Studio primary-color sink. Color inspection never mutates the reference document. */
   onPickColor?: (hex: string) => void;
+  /** Test/runtime injection seam; product defaults to the shared SQLite/OPFS authority. */
+  acquirePreferences?: () => Promise<StudioReferencePanelPreferencesRepository>;
 }
 
 type DragKind = "move" | "resize";
@@ -106,6 +109,7 @@ type ItemDragSession = {
 };
 type LibraryStatus = "idle" | "loading" | "ready" | "error";
 type ColorAnalysisStatus = "idle" | "loading" | "ready" | "error";
+type ReferencePanelPreferencesAuthority = "loading" | "sqlite-opfs" | "memory-only";
 type ReferenceColorRasterCache = {
   itemId: string;
   source: string;
@@ -295,18 +299,14 @@ export function StudioReferencePanel({
   document,
   onChange,
   onPickColor,
+  acquirePreferences = acquireProductStudioReferencePanelPreferencesRepository,
 }: StudioReferencePanelProps): ReactElement | null {
-  const [settings, setSettings] = useState<ReferencePanelSettings>(() => {
-    if (typeof window === "undefined") return defaultReferencePanelSettings(1280, 800);
-    const { w, h } = readViewport();
-    let raw: string | null;
-    try {
-      raw = window.localStorage.getItem(REFERENCE_PANEL_STORAGE_KEY);
-    } catch {
-      raw = null;
-    }
-    return deserializeReferencePanelSettings(raw, w, h);
-  });
+  const [settings, setSettings] = useState<ReferencePanelSettings>(() =>
+    typeof window === "undefined"
+      ? defaultReferencePanelSettings(1280, 800)
+      : defaultReferencePanelSettings(window.innerWidth, window.innerHeight));
+  const [preferencesAuthority, setPreferencesAuthority] =
+    useState<ReferencePanelPreferencesAuthority>("loading");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [pickerQuery, setPickerQuery] = useState("");
@@ -337,6 +337,12 @@ export function StudioReferencePanel({
   const itemDragSessionRef = useRef<ItemDragSession | null>(null);
   const dragPreviewRef = useRef<{ itemId: string; view: StudioReferenceBoardItemView } | null>(null);
   const settingsRef = useRef(settings);
+  const settingsRevisionRef = useRef(0);
+  const lastEnqueuedSettingsRevisionRef = useRef(0);
+  const settingsHydratedRef = useRef(false);
+  const settingsLoadedFromSqliteRef = useRef(false);
+  const preferencesRepositoryRef = useRef<StudioReferencePanelPreferencesRepository | null>(null);
+  const preferencesHydrationGenerationRef = useRef(0);
   const latestDocumentRef = useRef(document);
   const onChangeRef = useRef(onChange);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -372,6 +378,35 @@ export function StudioReferencePanel({
   const selectedColorSource = effectiveSelectedAsset?.dataUrl ?? null;
   const colorPickingEnabled = typeof onPickColor === "function";
 
+  function updateSettings(
+    updater: (previous: ReferencePanelSettings) => ReferencePanelSettings,
+  ): void {
+    settingsRevisionRef.current += 1;
+    setSettings((previous) => {
+      const next = updater(previous);
+      settingsRef.current = next;
+      return next;
+    });
+  }
+
+  function enqueueCurrentSettingsSave(reportFailure: boolean): void {
+    const repository = preferencesRepositoryRef.current;
+    const revision = settingsRevisionRef.current;
+    if (
+      repository === null
+      || !settingsHydratedRef.current
+      || revision <= lastEnqueuedSettingsRevisionRef.current
+    ) {
+      return;
+    }
+    lastEnqueuedSettingsRevisionRef.current = revision;
+    void repository.save(settingsRef.current).catch(() => {
+      if (reportFailure && mountedRef.current) {
+        setPreferencesAuthority("memory-only");
+      }
+    });
+  }
+
   function emitDocumentChange(next: StudioReferenceBoardDocument): boolean {
     if (next === latestDocumentRef.current) return true;
     const accepted = onChangeRef.current(next);
@@ -404,6 +439,39 @@ export function StudioReferencePanel({
       remoteImportAbortRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!open || settingsHydratedRef.current) return;
+    const generation = preferencesHydrationGenerationRef.current + 1;
+    preferencesHydrationGenerationRef.current = generation;
+    let cancelled = false;
+    setPreferencesAuthority("loading");
+
+    void acquirePreferences()
+      .then(async (repository) => {
+        const { w, h } = readViewport();
+        const snapshot = await repository.load(w, h);
+        if (cancelled || preferencesHydrationGenerationRef.current !== generation) return;
+        preferencesRepositoryRef.current = repository;
+        settingsHydratedRef.current = true;
+        settingsLoadedFromSqliteRef.current = snapshot.persisted;
+        if (settingsRevisionRef.current === 0) {
+          settingsRef.current = snapshot.settings;
+          setSettings(snapshot.settings);
+        }
+        setPreferencesAuthority("sqlite-opfs");
+      })
+      .catch(() => {
+        if (cancelled || preferencesHydrationGenerationRef.current !== generation) return;
+        settingsHydratedRef.current = true;
+        preferencesRepositoryRef.current = null;
+        setPreferencesAuthority("memory-only");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [acquirePreferences, open]);
 
   useEffect(() => {
     const previous = previousImportScopeRef.current;
@@ -500,12 +568,15 @@ export function StudioReferencePanel({
     selectedColorSource,
   ]);
 
-  // v1 workspace settings carried one pinned image. Migrate it once into an empty project board,
-  // then clear the workspace hint so an intentional later delete cannot resurrect the old image.
+  // A SQLite-loaded v1 setting may carry one pinned image. Promote it once into an empty project
+  // board, then clear the hint so a later intentional delete cannot resurrect the image. The
+  // discarded localStorage authority is never probed.
   useEffect(() => {
     if (
       !open
       || libraryStatus !== "ready"
+      || preferencesAuthority !== "sqlite-opfs"
+      || !settingsLoadedFromSqliteRef.current
       || legacyMigrationAttemptedRef.current
       || settings.assetId === null
     ) {
@@ -514,7 +585,7 @@ export function StudioReferencePanel({
     legacyMigrationAttemptedRef.current = true;
     const legacyAsset = resolvePinnedAsset(assets, settings.assetId);
     const legacyFlip = settings.flipped;
-    setSettings((previous) => ({ ...previous, assetId: null, flipped: false }));
+    updateSettings((previous) => ({ ...previous, assetId: null, flipped: false }));
     if (!legacyAsset || latestDocumentRef.current.items.length > 0) return;
 
     const ticket = beginReferenceImport();
@@ -538,30 +609,33 @@ export function StudioReferencePanel({
         if (!isReferenceImportActive(ticket)) return;
         setLibraryError("이전 참고 이미지의 콘텐츠 해시를 계산하지 못했습니다.");
       });
-  }, [assets, libraryStatus, open, settings.assetId, settings.flipped]);
+  }, [assets, libraryStatus, open, preferencesAuthority, settings.assetId, settings.flipped]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || preferencesAuthority !== "sqlite-opfs" || settingsRevisionRef.current === 0) {
+      return;
+    }
     const timer = setTimeout(() => {
-      try {
-        window.localStorage.setItem(REFERENCE_PANEL_STORAGE_KEY, serializeReferencePanelSettings(settingsRef.current));
-      } catch {
-        // Storage-blocked environments keep a working, non-persistent panel.
-      }
+      if (saveTimerRef.current === timer) saveTimerRef.current = null;
+      enqueueCurrentSettingsSave(true);
     }, 200);
     saveTimerRef.current = timer;
-    return () => clearTimeout(timer);
-  }, [open, settings]);
+    return () => {
+      clearTimeout(timer);
+      if (saveTimerRef.current === timer) saveTimerRef.current = null;
+    };
+  }, [open, preferencesAuthority, settings]);
+
+  useEffect(() => {
+    if (open) return;
+    enqueueCurrentSettingsSave(true);
+  }, [open]);
 
   useEffect(() => {
     return () => {
-      if (!saveTimerRef.current) return;
-      clearTimeout(saveTimerRef.current);
-      try {
-        window.localStorage.setItem(REFERENCE_PANEL_STORAGE_KEY, serializeReferencePanelSettings(settingsRef.current));
-      } catch {
-        // Same fallback as the debounced save above.
-      }
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      enqueueCurrentSettingsSave(false);
+      void preferencesRepositoryRef.current?.flush().catch(() => undefined);
     };
   }, []);
 
@@ -569,7 +643,7 @@ export function StudioReferencePanel({
     if (!open) return;
     const onResize = () => {
       const { w, h } = readViewport();
-      setSettings((previous) => ({ ...previous, ...clampReferencePanelRect(previous, w, h) }));
+      updateSettings((previous) => ({ ...previous, ...clampReferencePanelRect(previous, w, h) }));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -641,7 +715,7 @@ export function StudioReferencePanel({
       const nextRect = session.kind === "move"
         ? dragReferencePanelRect(session.startRect, session.startPointer, pointer, w, h)
         : resizeReferencePanelRect(session.startRect, session.startPointer, pointer, w, h);
-      setSettings((previous) => ({ ...previous, ...nextRect }));
+      updateSettings((previous) => ({ ...previous, ...nextRect }));
     };
     const onEnd = () => {
       panelDragSessionRef.current = null;
@@ -668,7 +742,7 @@ export function StudioReferencePanel({
     else if (event.key === "ArrowUp") dh = -step;
     else return;
     event.preventDefault();
-    setSettings((previous) => ({
+    updateSettings((previous) => ({
       ...previous,
       ...resizeReferencePanelRect(previous, { x: 0, y: 0 }, { x: dw, y: dh }, w, h),
     }));
@@ -1130,6 +1204,7 @@ export function StudioReferencePanel({
     <div
       role="region"
       aria-label="포즈 참고 보드"
+      data-studio-reference-preferences-authority={preferencesAuthority}
       className="fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
       style={{ left: settings.x, top: settings.y, width: settings.width, height: settings.height }}
     >
@@ -1203,6 +1278,16 @@ export function StudioReferencePanel({
           </button>
         </div>
       </header>
+
+      {preferencesAuthority === "memory-only" ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="shrink-0 border-b border-warning/30 bg-warning/10 px-2 py-1 text-[0.61rem] leading-relaxed text-warning"
+        >
+          참고 보드 배치 설정은 현재 세션 메모리에서만 유지됩니다.
+        </p>
+      ) : null}
 
       <div
         data-testid="reference-board-dropzone"
@@ -1766,7 +1851,7 @@ export function StudioReferencePanel({
         onKeyDown={resizeByKeyboard}
         onDoubleClick={() => {
           const { w, h } = readViewport();
-          setSettings((previous) => ({ ...previous, ...resetReferencePanelSize(previous, w, h) }));
+          updateSettings((previous) => ({ ...previous, ...resetReferencePanelSize(previous, w, h) }));
         }}
       />
     </div>

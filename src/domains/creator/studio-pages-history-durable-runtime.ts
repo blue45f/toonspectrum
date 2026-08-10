@@ -2,7 +2,6 @@ import {
   calculateStudioCrc32,
 } from "./studio-crc32";
 import {
-  SqliteUnavailableError,
   type StudioLocalDatabase,
 } from "./studio-local-database";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
@@ -135,17 +134,67 @@ interface StudioPagesHistoryDurableRuntimeOptions {
   } | null;
   readonly onError?: (cause: unknown) => void;
   readonly persistenceKind?: StudioPagesHistoryPersistenceKind;
+  readonly initialDurabilityCause?: unknown;
+  readonly onDurabilityStatus?: (status: StudioPagesHistoryDurabilityStatus) => void;
 }
 
-export type StudioPagesHistoryPersistenceKind = "sqlite-opfs" | "legacy-opfs-or-indexeddb";
+export type StudioPagesHistoryPersistenceKind =
+  | "sqlite-opfs"
+  | "native-opfs"
+  | "legacy-indexeddb"
+  | "memory-only";
+
+export type StudioPagesHistoryDurabilityState = "durable" | "memory-only";
+
+export interface StudioPagesHistoryDurabilityStatus {
+  readonly state: StudioPagesHistoryDurabilityState;
+  readonly durable: boolean;
+  readonly persistenceKind: StudioPagesHistoryPersistenceKind;
+  readonly retryable: boolean;
+  readonly cause: unknown;
+}
+
+function historyDurabilityStatus(
+  persistenceKind: StudioPagesHistoryPersistenceKind,
+  cause: unknown = null,
+): StudioPagesHistoryDurabilityStatus {
+  const durable = persistenceKind !== "memory-only";
+  return Object.freeze({
+    state: durable ? "durable" : "memory-only",
+    durable,
+    persistenceKind,
+    retryable: !durable,
+    cause,
+  });
+}
+
+export class StudioPagesHistoryDurabilityUnavailableError extends Error {
+  readonly code = "STUDIO_HISTORY_DURABILITY_UNAVAILABLE";
+  readonly causes: readonly unknown[];
+
+  constructor(causes: readonly unknown[]) {
+    super(
+      "페이지 실행 취소 기록을 영구 저장할 수 없어 이 탭의 메모리에서만 유지합니다.",
+      { cause: causes.at(-1) },
+    );
+    this.name = "StudioPagesHistoryDurabilityUnavailableError";
+    this.causes = Object.freeze([...causes]);
+  }
+}
 
 export interface CreateDefaultStudioPagesHistoryDurableRuntimeOptions {
   readonly initialTarget: StudioHistoryJournalNavigationTarget | null;
   readonly onError?: (cause: unknown) => void;
+  readonly onDurabilityStatus?: (status: StudioPagesHistoryDurabilityStatus) => void;
   /** Test/embedding seam; production opens the OPFS SAH-pool SQLite database. */
   readonly openDatabase?: () => Promise<StudioLocalDatabase>;
-  /** Explicit emergency rollback only. SQLite is the product default. */
+  /** Set false only to exercise or embed the native-OPFS authority directly. */
   readonly preferSqlite?: boolean;
+  /**
+   * Explicit legacy/emergency seam. Product boot never constructs or passes an IndexedDB vault.
+   * The caller must opt in and owns explaining this compatibility authority to the user.
+   */
+  readonly legacyRecoveryVault?: StudioCompatibleRecoveryVaultCallbacks | null;
 }
 
 interface BrowserRecoveryScope {
@@ -160,7 +209,6 @@ interface BrowserRecoveryScope {
       ): Promise<T>;
     };
   };
-  readonly localStorage?: Storage;
   readonly crypto?: {
     readonly randomUUID?: () => string;
   };
@@ -189,6 +237,112 @@ function recoveryIdentity(
 
 function recoveryPageId(identity: StudioOpfsRecoveryJournalIdentity): string {
   return `page-${historyHash(identity.documentId)}`;
+}
+
+/**
+ * Session-only sidecar used when both durable browser authorities are unavailable.
+ *
+ * This port deliberately has no browser-storage dependency. It keeps the asynchronous journal
+ * contract alive so accepted edits, undo and redo remain fail-safe, while `persistenceKind` and
+ * the observable status make clear that closing this tab can discard this recovery horizon.
+ */
+function createStudioPagesHistoryMemoryRecovery(
+  identity: StudioOpfsRecoveryJournalIdentity,
+): StudioPagesHistoryRecoveryPort {
+  let sequence = 0;
+  let writerEpoch = 0;
+  let latestPayload: Uint8Array | null = null;
+  const entries: StudioOpfsRecoveryEntry[] = [];
+  const payloadBytes = async (
+    source: StudioOpfsRecoveryAppendInput["payload"],
+  ): Promise<Uint8Array> => {
+    if (source instanceof Uint8Array) return new Uint8Array(source);
+    if (source instanceof Blob) return new Uint8Array(await source.arrayBuffer());
+    const chunks: Uint8Array[] = [];
+    let byteLength = 0;
+    for await (const chunk of source) {
+      chunks.push(chunk);
+      byteLength += chunk.byteLength;
+    }
+    const bytes = new Uint8Array(byteLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes;
+  };
+  const append = async (
+    kind: "operation" | "checkpoint",
+    input: StudioOpfsRecoveryAppendInput | StudioOpfsRecoveryCheckpointInput,
+  ): Promise<StudioOpfsRecoveryEntry> => {
+    const payload = await payloadBytes(input.payload);
+    sequence += 1;
+    latestPayload = payload;
+    const entry = Object.freeze({
+      kind,
+      id: input.id,
+      sequence,
+      pageId: input.pageId,
+      revision: input.revision,
+      documentId: identity.documentId,
+      documentVersion: identity.documentVersion,
+      engineVersion: identity.engineVersion,
+      writerEpoch,
+      createdAt: Date.now(),
+      byteLength: payload.byteLength,
+      chunks: Object.freeze([]),
+      compactThroughSequence: kind === "checkpoint"
+        ? (input as StudioOpfsRecoveryCheckpointInput).compactThroughSequence
+        : null,
+      descriptorPath: `memory-only://${identity.documentId}/${sequence}`,
+      descriptorCrc32: calculateStudioCrc32(payload),
+    } satisfies StudioOpfsRecoveryEntry);
+    // The command journal already owns the full in-tab history. Keep only the latest serialized
+    // recovery frontier here so a non-durable fallback cannot double memory on long sessions.
+    entries.splice(0, entries.length, entry);
+    return entry;
+  };
+  return {
+    async scanLatest(): Promise<StudioOpfsRecoveryScan> {
+      return Object.freeze({
+        generation: 0,
+        writerEpoch,
+        lastSequence: sequence,
+        totalPayloadBytes: entries.reduce((total, entry) => total + entry.byteLength, 0),
+        entries: Object.freeze([...entries]),
+        selectedSlot: null,
+        ignoredSlots: Object.freeze([]),
+      });
+    },
+    async acquireWriter({ ownerId }): Promise<StudioOpfsRecoveryWriterLease> {
+      writerEpoch += 1;
+      const acquiredAt = Date.now();
+      return Object.freeze({
+        documentId: identity.documentId,
+        ownerId,
+        token: `memory-only-${writerEpoch}`,
+        epoch: writerEpoch,
+        acquiredAt,
+        expiresAt: acquiredAt + 30_000,
+      });
+    },
+    async appendCommand(input): Promise<StudioOpfsRecoveryEntry> {
+      return await append("operation", input);
+    },
+    async compact(input): Promise<StudioOpfsRecoveryEntry> {
+      return await append("checkpoint", input);
+    },
+    async flush(): Promise<void> {
+      // Session memory is already synchronous; this is not a durability receipt.
+    },
+    async abort(): Promise<void> {
+      // The in-memory command journal owns accepted edits and is disposed with the client.
+    },
+    async readLatestPayload(): Promise<Uint8Array | null> {
+      return latestPayload ? new Uint8Array(latestPayload) : null;
+    },
+  };
 }
 
 function recoveryStateKey(documentId: string): string {
@@ -701,7 +855,11 @@ export class StudioPagesHistoryDurableRuntime
   readonly #recovery: StudioPagesHistoryRecoveryPort;
   readonly #pageId: string;
   readonly #onError: ((cause: unknown) => void) | undefined;
+  readonly #onDurabilityStatus:
+    | ((status: StudioPagesHistoryDurabilityStatus) => void)
+    | undefined;
   readonly persistenceKind: StudioPagesHistoryPersistenceKind;
+  #durabilityStatus: StudioPagesHistoryDurabilityStatus;
   #lastSequence: number;
   #revision: number;
   #writesSinceCheckpoint = 0;
@@ -718,7 +876,12 @@ export class StudioPagesHistoryDurableRuntime
     this.#recovery = options.recovery;
     this.#pageId = options.pageId;
     this.#onError = options.onError;
-    this.persistenceKind = options.persistenceKind ?? "legacy-opfs-or-indexeddb";
+    this.#onDurabilityStatus = options.onDurabilityStatus;
+    this.persistenceKind = options.persistenceKind ?? "memory-only";
+    this.#durabilityStatus = historyDurabilityStatus(
+      this.persistenceKind,
+      options.initialDurabilityCause,
+    );
     this.#lastSequence = options.initialScan.lastSequence;
     this.#revision = options.initialScan.entries.at(-1)?.revision ?? 0;
     const target = options.eventTarget;
@@ -729,11 +892,22 @@ export class StudioPagesHistoryDurableRuntime
       target.addEventListener("pagehide", listener);
       this.#removePageHide = () => target.removeEventListener("pagehide", listener);
     }
+    this.#publishDurabilityStatus();
+  }
+
+  #publishDurabilityStatus(): void {
+    try {
+      this.#onDurabilityStatus?.(this.#durabilityStatus);
+    } catch {
+      // Status observers cannot escape into the accepted edit path.
+    }
   }
 
   #reportFailure(cause: unknown): void {
     if (this.#durabilityFailed) return;
     this.#durabilityFailed = true;
+    this.#durabilityStatus = historyDurabilityStatus("memory-only", cause);
+    this.#publishDurabilityStatus();
     try {
       this.#onError?.(cause);
     } catch {
@@ -843,6 +1017,10 @@ export class StudioPagesHistoryDurableRuntime
     return this.#commandJournal.serialize();
   }
 
+  durabilityStatus(): StudioPagesHistoryDurabilityStatus {
+    return this.#durabilityStatus;
+  }
+
   async flush(): Promise<void> {
     this.#flushCoalescedWrite();
     await this.#tail;
@@ -872,40 +1050,59 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
   scope: BrowserRecoveryScope = globalThis as unknown as BrowserRecoveryScope,
 ): Promise<StudioPagesHistoryDurableRuntime> {
   const identity = recoveryIdentity(options.initialTarget);
+  const ownerId = typeof scope.crypto?.randomUUID === "function"
+    ? `history-${scope.crypto.randomUUID()}`
+    : `history-${historyHash(`${Date.now()}:${identity.documentId}`)}`;
   const reportInitializationError = (cause: unknown): void => {
     try {
       options.onError?.(cause);
     } catch {
-      // Diagnostics cannot turn an available persistence fallback into a startup failure.
+      // Diagnostics cannot escape into the accepted edit path.
     }
   };
+  const activationFailures: unknown[] = [];
   let recovery: StudioPagesHistoryRecoveryPort | null = null;
-  let persistenceKind: StudioPagesHistoryPersistenceKind = "legacy-opfs-or-indexeddb";
+  let initialScan: StudioOpfsRecoveryScan | null = null;
+  let persistenceKind: StudioPagesHistoryPersistenceKind = "memory-only";
+  let initialDurabilityCause: unknown = null;
+
+  const activate = async (
+    candidate: StudioPagesHistoryRecoveryPort,
+    kind: Exclude<StudioPagesHistoryPersistenceKind, "memory-only">,
+  ): Promise<boolean> => {
+    try {
+      const scan = await candidate.scanLatest();
+      await candidate.acquireWriter({ ownerId });
+      recovery = candidate;
+      initialScan = scan;
+      persistenceKind = kind;
+      return true;
+    } catch (cause) {
+      activationFailures.push(cause);
+      await candidate.abort("history-authority-activation-failed").catch(() => undefined);
+      return false;
+    }
+  };
+
   if (options.preferSqlite !== false) {
     try {
       const database = await (options.openDatabase?.()
         ?? acquireStudioLocalDatabase());
-      recovery = createStudioPagesHistorySqliteRecovery({
+      await activate(createStudioPagesHistorySqliteRecovery({
         database,
         identity,
         closeDatabaseOnAbort: false,
         lockManager: scope.navigator?.locks ?? null,
-      });
-      persistenceKind = "sqlite-opfs";
+      }), "sqlite-opfs");
     } catch (cause) {
-      // OPFS/SQLite capability absence is an explicit, observable legacy fallback. Unexpected
-      // initialization failures are also reported to the existing diagnostics channel.
-      if (!(cause instanceof SqliteUnavailableError)) reportInitializationError(cause);
+      activationFailures.push(cause);
     }
   }
+
   if (recovery === null) {
-    let selection: StudioOpfsFileSystemSelection | null = null;
-    const vault = createStudioPagesHistoryIndexedDbRecoveryVault({
-      identity,
-      indexedDB: scope.indexedDB ?? null,
-    });
-    const legacyRecovery: StudioOpfsRecoveryRuntime =
-      await createStudioOpfsRecoveryRuntime({
+    try {
+      let selection: StudioOpfsFileSystemSelection | null = null;
+      const opfsRecovery: StudioOpfsRecoveryRuntime = await createStudioOpfsRecoveryRuntime({
         probeCapabilities: async () => {
           selection = await selectStudioOpfsFileSystem(scope, {
             rootName: "toonspectrum-studio-history-recovery",
@@ -932,15 +1129,34 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
             }),
           });
         },
-        existingRecoveryVault: vault,
+        // IndexedDB is never constructed here. A compatibility vault can participate only when
+        // an embedding caller explicitly creates and passes it through the named legacy seam.
+        existingRecoveryVault: options.legacyRecoveryVault ?? null,
       });
-    recovery = legacyRecovery;
+      const backend = opfsRecovery.status().backend;
+      if (backend === "fail-closed") {
+        throw new Error("native OPFS history authority is unavailable");
+      }
+      await activate(
+        opfsRecovery,
+        backend === "opfs-journal" ? "native-opfs" : "legacy-indexeddb",
+      );
+    } catch (cause) {
+      activationFailures.push(cause);
+    }
   }
-  const initialScan = await recovery.scanLatest();
-  const ownerId = typeof scope.crypto?.randomUUID === "function"
-    ? `history-${scope.crypto.randomUUID()}`
-    : `history-${historyHash(`${Date.now()}:${identity.documentId}`)}`;
-  await recovery.acquireWriter({ ownerId });
+
+  if (recovery === null || initialScan === null) {
+    initialDurabilityCause = new StudioPagesHistoryDurabilityUnavailableError(
+      activationFailures,
+    );
+    reportInitializationError(initialDurabilityCause);
+    recovery = createStudioPagesHistoryMemoryRecovery(identity);
+    initialScan = await recovery.scanLatest();
+    await recovery.acquireWriter({ ownerId });
+    persistenceKind = "memory-only";
+  }
+
   let commandJournal = createStudioPagesHistoryCommandJournal();
   const latestPayload = await recovery.readLatestPayload?.();
   if (latestPayload && options.initialTarget) {
@@ -967,5 +1183,7 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
         : null,
     onError: options.onError,
     persistenceKind,
+    initialDurabilityCause,
+    onDurabilityStatus: options.onDurabilityStatus,
   });
 }

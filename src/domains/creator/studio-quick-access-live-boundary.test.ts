@@ -49,7 +49,10 @@ describe("Studio Quick Access live boundary", () => {
   it("persists only the bounded owner-scoped local model without a network path", () => {
     expect(integrationSource).toContain("encodeStudioQuickAccessState(state)");
     expect(integrationSource).toContain("VALID_OWNER_SCOPE");
-    expect(integrationSource).toContain("storage.setItem(key, encoded)");
+    expect(integrationSource).toContain('authority: "sqlite-opfs" as const');
+    expect(integrationSource).toContain("await store.set(ownerScope, encoded)");
+    expect(integrationSource).toContain("await store.get(ownerScope) !== encoded");
+    expect(integrationSource).not.toMatch(/\b(?:localStorage|sessionStorage)\s*\./u);
     expect(integrationSource).not.toMatch(/\bfetch\s*\(/u);
     expect(integrationSource).not.toMatch(/\bWebSocket\b/u);
   });

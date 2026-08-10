@@ -43,6 +43,8 @@ import {
   type StudioAppSettingsTab,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import { runStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioResetApplicationSettingsRequest } from "./studio-destructive-command-catalog";
 import { StudioToggleChip } from "./studio-panel-ui";
 import {
   MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
@@ -67,7 +69,7 @@ export type StudioAppSettingsPanelProps = {
   open: boolean;
   settings: StudioAppSettings;
   initialTab?: StudioAppSettingsTab;
-  persistenceState?: "saved" | "session-only";
+  persistenceState?: "loading" | "saved" | "session-only";
   onClose: () => void;
   onChange: (next: StudioAppSettings) => void;
   onResetAll: () => void;
@@ -892,13 +894,10 @@ export function StudioAppSettingsPanel({
                       "mt-2 min-h-11 text-bad sm:min-h-8 pointer-coarse:min-h-11"
                     )}
                     onClick={() => {
-                      if (
-                        globalThis.confirm?.(
-                          t("studio.settings.other.resetConfirm")
-                        )
-                      ) {
-                        onResetAll();
-                      }
+                      void runStudioDestructiveAction({
+                        request: studioResetApplicationSettingsRequest(),
+                        execute: onResetAll,
+                      });
                     }}
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
@@ -929,6 +928,13 @@ export function StudioAppSettingsPanel({
                   </button>
                 ) : null}
               </div>
+            ) : persistenceState === "loading" ? (
+              <p
+                className="text-[0.68rem] text-fg-3"
+                data-studio-app-settings-persistence="loading"
+              >
+                SQLite/OPFS에서 설정을 확인하는 중입니다.
+              </p>
             ) : (
               <p className="text-[0.68rem] text-fg-3">
                 {t("studio.settings.other.persistenceSaved")}

@@ -20,6 +20,7 @@ export interface StudioWorkspaceThreeWayMergeResult {
   readonly conflictPaths: readonly string[];
 }
 
+/** @deprecated Synchronous injected-storage rollback/test seam; product uses the SQLite runtime. */
 export type StudioWorkspacePendingReconcileResult =
   | Readonly<{
       readonly kind: "retry-latest-raw";
@@ -31,6 +32,7 @@ export type StudioWorkspacePendingReconcileResult =
       readonly conflictPaths: readonly string[];
     }>;
 
+/** @deprecated Product reconciliation re-reads SQLite via StudioWorkspacePersistenceRuntime. */
 export interface ReconcileStudioWorkspacePendingSyncInput {
   readonly storage: StudioWorkspaceStorage;
   readonly storageKey: string;
@@ -369,6 +371,9 @@ export function mergeStudioWorkspaceStates(
 }
 
 /**
+ * @deprecated Explicit injected localStorage rollback/test seam. The product runtime performs
+ * equivalent guarded reconciliation against SQLite/OPFS and never calls this function.
+ *
  * Performs the final synchronous commit boundary for a queued cross-tab workspace update.
  *
  * The caller may await the rare merge chunk before entering this function. We then re-read the raw

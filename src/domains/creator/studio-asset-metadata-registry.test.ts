@@ -6,6 +6,7 @@ import {
   UnknownAssetCapabilityError,
   collectSceneFeatures,
   computeAssetContentDigest,
+  computeAssetStructuredDigest,
 } from "@toonspectrum/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -100,11 +101,11 @@ function deriveSvgCard(): AssetMetadataIR {
 }
 
 function engineSet(descriptorIds: readonly string[]): EngineCapabilityRegistry {
-  const engines = new EngineCapabilityRegistry();
+  const engines = EngineCapabilityRegistry.forTestFixtures();
   for (const id of descriptorIds) {
     const descriptor = STUDIO_KNOWN_ENGINE_DESCRIPTORS.find((d) => d.id === id);
     if (!descriptor) throw new Error(`unknown test descriptor id: ${id}`);
-    engines.register(descriptor);
+    engines.registerTestFixture(descriptor);
   }
   return engines;
 }
@@ -134,6 +135,72 @@ describe("deriveAssetMetadata", () => {
       "stroke.geometry.pressure-outline",
     ]);
     expect(card.contentDigest).toBe(computeAssetContentDigest(bytes));
+    expect(card.originalBlobRef).toEqual({
+      digest: card.contentDigest,
+      byteLength: bytes.byteLength,
+      mediaType: "application/json",
+      locator: null,
+    });
+    expect(card.normalizedIrRef).toEqual({
+      digest: computeAssetStructuredDigest(result.preset),
+      schema: "toonspectrum.brush-program-ir",
+      schemaVersion: 11,
+      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      locator: null,
+    });
+    expect(card.providerRequirements).toEqual([
+      {
+        capability: "brush.natural-media.dynamics",
+        providerIds: ["hokusai-natural-media"],
+        versionRange: null,
+        optional: false,
+        reason: "Normalized IR requires brush.natural-media.dynamics.",
+      },
+      {
+        capability: "brush.natural-media.myb",
+        providerIds: ["hokusai-natural-media"],
+        versionRange: null,
+        optional: false,
+        reason: "Normalized IR requires brush.natural-media.myb.",
+      },
+      {
+        capability: "stroke.geometry.pressure-outline",
+        providerIds: ["perfect-freehand"],
+        versionRange: null,
+        optional: false,
+        reason: "Normalized IR requires stroke.geometry.pressure-outline.",
+      },
+    ]);
+    expect(card.rendererVariants.map(({ id, qualityStatus }) => ({ id, qualityStatus }))).toEqual([
+      { id: "stable-hokusai", qualityStatus: "unmeasured" },
+      { id: "stable-perfect-freehand-fallback", qualityStatus: "unmeasured" },
+    ]);
+    expect(card.realStrokePreviews).toEqual([]);
+    expect(card.deviceProfiles).toEqual([]);
+    expect(card.visualEquivalenceReport).toBeNull();
+    expect(card.previewVariants.stable).toMatchObject({
+      status: "not-generated",
+      artifactRef: null,
+      rendererVariantId: "stable-hokusai",
+    });
+    expect(card.previewVariants.studioMax).toMatchObject({
+      status: "not-generated",
+      artifactRef: null,
+      rendererVariantId: null,
+    });
+    expect(card.fallback).toMatchObject({
+      strategy: "renderer-variant",
+      rendererVariantId: "stable-perfect-freehand-fallback",
+      providerId: "perfect-freehand",
+      preservesNormalizedIr: true,
+    });
+    expect(card.replacementCondition?.requiredEvidence).toContain("real-device-stroke");
+    expect(card.marketplace).toMatchObject({
+      status: "not-listed",
+      listingId: null,
+      publisherId: null,
+      commercialUseAllowed: null,
+    });
     expect(card.provenance.importer).toBe("studio-format-gateway/importMybBrush");
     // Every unmapped .myb setting survives into provenance — zero silent loss.
     expect(card.provenance.unmapped).toEqual(result.unmappedSettings);
@@ -154,6 +221,25 @@ describe("deriveAssetMetadata", () => {
       "stroke.geometry.pressure-outline",
     ]);
     expect(card.contentDigest).toBe(computeAssetContentDigest(bytes));
+    expect(card.originalBlobRef).toMatchObject({
+      digest: card.contentDigest,
+      byteLength: bytes.byteLength,
+      mediaType: "image/png",
+      locator: null,
+    });
+    expect(card.normalizedIrRef?.digest).toBe(
+      computeAssetStructuredDigest(result.program),
+    );
+    expect(card.rendererVariants.every((variant) => variant.qualityStatus === "unmeasured")).toBe(
+      true,
+    );
+    expect(card.previewVariants.stable?.status).toBe("not-generated");
+    expect(card.previewVariants.studioMax?.status).toBe("not-generated");
+    expect(card.visualEquivalenceReport).toBeNull();
+    expect(card.fallback?.limitations).toContain(
+      "Fallback does not claim Krita or CSP stroke equivalence.",
+    );
+    expect(card.marketplace?.status).toBe("not-listed");
     expect(card.provenance.warnings).toEqual(result.warnings);
     expect(card.provenance.unmapped).toEqual(result.unmapped);
   });
@@ -170,7 +256,75 @@ describe("deriveAssetMetadata", () => {
       "render.vector.stroke",
     ]);
     expect(card.contentDigest).toBe(computeAssetContentDigest(SVG_FIXTURE));
+    expect(card.originalBlobRef).toEqual({
+      digest: card.contentDigest,
+      byteLength: new TextEncoder().encode(SVG_FIXTURE).byteLength,
+      mediaType: "image/svg+xml",
+      locator: null,
+    });
+    expect(card.normalizedIrRef).toEqual({
+      digest: computeAssetStructuredDigest(result.scene),
+      schema: "toonspectrum.scene-ir",
+      schemaVersion: 11,
+      mediaType: "application/vnd.toonspectrum.scene+json",
+      locator: null,
+    });
+    expect(card.rendererVariants.map(({ id, tier, qualityStatus }) => ({
+      id,
+      tier,
+      qualityStatus,
+    }))).toEqual([
+      { id: "stable-canvaskit", tier: "stable", qualityStatus: "unmeasured" },
+      {
+        id: "studio-max-vello-gpu",
+        tier: "studio-max",
+        qualityStatus: "unmeasured",
+      },
+    ]);
+    expect(card.previewVariants.stable).toMatchObject({
+      status: "not-generated",
+      artifactRef: null,
+      rendererVariantId: "stable-canvaskit",
+    });
+    expect(card.previewVariants.studioMax).toMatchObject({
+      status: "not-generated",
+      artifactRef: null,
+      rendererVariantId: "studio-max-vello-gpu",
+    });
+    expect(card.visualEquivalenceReport).toBeNull();
+    expect(card.fallback).toMatchObject({
+      rendererVariantId: "stable-canvaskit",
+      providerId: "skia-canvaskit",
+      preservesNormalizedIr: true,
+    });
+    expect(card.marketplace).toMatchObject({
+      status: "not-listed",
+      tags: ["svg"],
+    });
     expect(card.provenance.importer).toBe("studio-format-gateway/parseSvgToScene");
+  });
+
+  it("only names providers that actually declare each derived capability", () => {
+    for (const card of [deriveMybCard(), deriveKppCard(), deriveSvgCard()]) {
+      expect(card.providerRequirements.map((requirement) => requirement.capability)).toEqual(
+        card.engineRequirements,
+      );
+      for (const requirement of card.providerRequirements) {
+        expect(requirement.providerIds.length).toBeGreaterThan(0);
+        for (const providerId of requirement.providerIds) {
+          const descriptor = STUDIO_KNOWN_ENGINE_DESCRIPTORS.find(
+            (candidate) => candidate.id === providerId,
+          );
+          expect(descriptor?.capabilities).toContain(requirement.capability);
+        }
+      }
+      expect(card.rendererVariants.every((variant) => variant.qualityStatus === "unmeasured")).toBe(
+        true,
+      );
+      expect(card.realStrokePreviews).toEqual([]);
+      expect(card.deviceProfiles).toEqual([]);
+      expect(card.visualEquivalenceReport).toBeNull();
+    }
   });
 
   it("is deterministic: same payload + clock produces an identical card, changed bytes change the digest", () => {
@@ -234,6 +388,9 @@ describe("StudioAssetMetadataRegistry", () => {
       ...deriveSvgCard(),
       id: "asset-rogue",
       engineRequirements: ["render.hologram.field"],
+      // Exercise the legacy capability view: the schema lifts this single
+      // token into providerRequirements before the registry vocabulary gate.
+      providerRequirements: undefined,
     };
     expect(() => registry.register(rogue)).toThrow(UnknownAssetCapabilityError);
     // A rejected card must not be queryable (no partial registration).

@@ -20,6 +20,7 @@ import { STUDIO_RASTER_IMAGE_PRESENTATION_PROBE_VERSION } from "./studio-raster-
 import { sha256HexPortable } from "./studio-sha256";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
+import type { StudioAnimatedImageFilterStatus } from "./studio-animated-image-filter-runtime";
 import type { FrameEl, ImageEl } from "./studio-element-model";
 
 type DragEndEventStub = {
@@ -34,6 +35,9 @@ type CapturedImageProps = {
   image?: CanvasImageSource;
   onDragEnd?: (event: DragEndEventStub) => void;
   outlineWorkerRevision?: string;
+  studioAnimatedImageFilterOwner?: string;
+  studioAnimatedImageFilterReason?: string;
+  studioAnimatedImageFilterStatus?: string;
   x?: number;
 };
 
@@ -98,6 +102,10 @@ const filterCapture = vi.hoisted(() => ({
   runWorker: vi.fn((): Promise<unknown> => new Promise(() => undefined)),
 }));
 
+const tournamentCapture = vi.hoisted(() => ({
+  schedule: vi.fn(),
+}));
+
 vi.mock("react-konva/lib/ReactKonvaCore", async () => {
   const { forwardRef, useEffect, useImperativeHandle } = await import("react");
   const Image = forwardRef<unknown, Record<string, unknown>>((props, ref) => {
@@ -131,6 +139,10 @@ vi.mock("./studio-image-filter-worker-client", () => ({
   createStudioImageFilterResidentWorkerSession: undefined,
   runStudioImageFilterWorker: filterCapture.runWorker,
   studioImageFilterRequiresWorker: () => false,
+}));
+
+vi.mock("./studio-filter-render-tournament", () => ({
+  scheduleStudioFilterRenderTournament: tournamentCapture.schedule,
 }));
 
 vi.mock("./studio-gpu-filter-apply", () => ({
@@ -881,6 +893,185 @@ describe("StudioKonvaImageNode image lifecycle", () => {
 });
 
 describe("StudioKonvaImageNode animated GIF scheduling", () => {
+  it("recaches and redraws filtered browser frames without entering the renderer tournament", async () => {
+    const onStatus = vi.fn<(status: StudioAnimatedImageFilterStatus) => void>();
+    const view = render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={imageEl({ brightness: 0.25, isAnimatedGif: true })}
+        innerRef={vi.fn()}
+        onAnimatedImageFilterStatus={onStatus}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    await resolveLatestImage();
+
+    await waitFor(() => {
+      expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("active");
+    });
+    expect(latestImageProps()).toMatchObject({
+      filters: [filterCapture.filter],
+      studioAnimatedImageFilterOwner: "konva-live-gif-frame-cache-v1",
+      studioAnimatedImageFilterReason: "live-frame-cache",
+    });
+    expect(onStatus.mock.calls.at(-1)?.[0]).toMatchObject({
+      reason: "live-frame-cache",
+      state: "active",
+    });
+    expect(konvaCapture.node.cache).toHaveBeenCalledWith({ pixelRatio: 1 });
+    expect(filterCapture.runWorker).not.toHaveBeenCalled();
+    expect(tournamentCapture.schedule).not.toHaveBeenCalled();
+
+    const cacheCount = konvaCapture.node.cache.mock.calls.length;
+    fireNextAnimationFrame(79);
+    expect(konvaCapture.node.cache).toHaveBeenCalledTimes(cacheCount);
+    fireNextAnimationFrame(80);
+    expect(konvaCapture.node.cache).toHaveBeenCalledTimes(cacheCount + 1);
+    expect(konvaCapture.layer.batchDraw).toHaveBeenCalled();
+
+    const pendingId = animationFrames.pending.keys().next().value as number;
+    const clearCount = konvaCapture.node.clearCache.mock.calls.length;
+    view.unmount();
+    expect(animationFrames.cancel).toHaveBeenLastCalledWith(pendingId);
+    expect(konvaCapture.node.clearCache.mock.calls.length).toBeGreaterThan(clearCount);
+  });
+
+  it("pauses filtered GIF cache work during pen-down and clears it when filters are removed", async () => {
+    const liveStrokeRef = { current: { active: true } as unknown };
+    const onStatus = vi.fn<(status: StudioAnimatedImageFilterStatus) => void>();
+    const view = render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={imageEl({ brightness: 0.25, isAnimatedGif: true })}
+        innerRef={vi.fn()}
+        liveStrokeRef={liveStrokeRef}
+        onAnimatedImageFilterStatus={onStatus}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    await resolveLatestImage();
+    await waitFor(() => {
+      expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("preparing");
+    });
+    expect(konvaCapture.node.cache).not.toHaveBeenCalled();
+
+    fireNextAnimationFrame(80);
+    expect(konvaCapture.node.cache).not.toHaveBeenCalled();
+    liveStrokeRef.current = null;
+    fireNextAnimationFrame(81);
+    await waitFor(() => {
+      expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("active");
+    });
+    expect(konvaCapture.node.cache).toHaveBeenCalledTimes(1);
+
+    const cacheCount = konvaCapture.node.cache.mock.calls.length;
+    const clearCount = konvaCapture.node.clearCache.mock.calls.length;
+    view.rerender(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={imageEl({ isAnimatedGif: true })}
+        innerRef={vi.fn()}
+        liveStrokeRef={liveStrokeRef}
+        onAnimatedImageFilterStatus={onStatus}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    await waitFor(() => {
+      expect(onStatus.mock.calls.at(-1)?.[0]).toMatchObject({
+        reason: "not-requested",
+        state: "inactive",
+      });
+    });
+    expect(konvaCapture.node.clearCache.mock.calls.length).toBeGreaterThan(clearCount);
+    expect(latestImageProps().filters).toEqual([]);
+    fireNextAnimationFrame(160);
+    expect(konvaCapture.node.cache).toHaveBeenCalledTimes(cacheCount);
+  });
+
+  it("rejects a stale filtered GIF callback and starts a fresh owner after source change", async () => {
+    const onStatus = vi.fn<(status: StudioAnimatedImageFilterStatus) => void>();
+    const renderNode = (src: string) => (
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={imageEl({ brightness: 0.25, isAnimatedGif: true, src })}
+        innerRef={vi.fn()}
+        onAnimatedImageFilterStatus={onStatus}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    const view = render(renderNode("first.gif"));
+    await resolveLatestImage();
+    await waitFor(() => {
+      expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("active");
+    });
+
+    const staleEntry = animationFrames.pending.entries().next().value as
+      | [number, FrameRequestCallback]
+      | undefined;
+    expect(staleEntry).toBeDefined();
+    view.rerender(renderNode("second.gif"));
+    const cacheCountAfterSourceChange = konvaCapture.node.cache.mock.calls.length;
+    const drawCountAfterSourceChange = konvaCapture.layer.batchDraw.mock.calls.length;
+    act(() => staleEntry![1](160));
+    expect(konvaCapture.node.cache).toHaveBeenCalledTimes(cacheCountAfterSourceChange);
+    expect(konvaCapture.layer.batchDraw).toHaveBeenCalledTimes(drawCountAfterSourceChange);
+
+    await resolveLatestImage();
+    await waitFor(() => {
+      expect(latestImageProps().studioAnimatedImageFilterStatus).toBe("active");
+      expect(latestImageProps().image).toBe(imageCapture.instances.at(-1));
+    });
+    expect(konvaCapture.node.cache.mock.calls.length).toBeGreaterThan(cacheCountAfterSourceChange);
+    expect(animationFrames.pending).toHaveLength(1);
+  });
+
+  it("surfaces budget degradation while keeping the raw GIF animation moving", async () => {
+    const onStatus = vi.fn<(status: StudioAnimatedImageFilterStatus) => void>();
+    render(
+      <StudioKonvaImageNode
+        autoFitFrames={null}
+        draggable
+        el={imageEl({
+          brightness: 0.25,
+          height: 5_000,
+          isAnimatedGif: true,
+          width: 5_000,
+        })}
+        innerRef={vi.fn()}
+        onAnimatedImageFilterStatus={onStatus}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />,
+    );
+    await resolveLatestImage();
+
+    await waitFor(() => {
+      expect(latestImageProps()).toMatchObject({
+        studioAnimatedImageFilterReason: "pixel-budget-exceeded",
+        studioAnimatedImageFilterStatus: "degraded",
+      });
+    });
+    expect(onStatus.mock.calls.at(-1)?.[0]).toMatchObject({
+      reason: "pixel-budget-exceeded",
+      state: "degraded",
+    });
+    expect(latestImageProps().filters).toBeUndefined();
+    expect(konvaCapture.node.cache).not.toHaveBeenCalled();
+    konvaCapture.layer.batchDraw.mockClear();
+    fireNextAnimationFrame(80);
+    expect(konvaCapture.layer.batchDraw).toHaveBeenCalledTimes(1);
+    expect(filterCapture.runWorker).not.toHaveBeenCalled();
+    expect(tournamentCapture.schedule).not.toHaveBeenCalled();
+  });
+
   it("throttles redraws, yields to live ink, resumes, and cancels on unmount", async () => {
     const liveStrokeRef = { current: null as unknown };
     const view = render(

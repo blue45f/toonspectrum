@@ -1,5 +1,6 @@
 /**
- * Studio 기능별 튜토리얼 카탈로그 — 순수 데이터 + 진행 상태(localStorage).
+ * Studio 기능별 튜토리얼 카탈로그와 순수 진행 상태 모델.
+ * 제품 진행도 권위는 SQLite/OPFS이며 아래 Storage 함수는 명시적 레거시 테스트 seam이다.
  * UI(StudioFeatureTutorialHub)와 StudioPage 액션 배선이 같은 id 를 공유한다.
  */
 
@@ -809,7 +810,7 @@ export function groupStudioFeatureTutorials(
   })).filter((g) => g.items.length > 0);
 }
 
-// ── 진행 상태 (localStorage) ──────────────────────────────────────────────
+// ── 진행 상태 ─────────────────────────────────────────────────────────────
 
 export const STUDIO_TUTORIAL_PROGRESS_KEY = "toonspectrum.studio.tutorialProgress.v1";
 
@@ -824,28 +825,43 @@ export function emptyTutorialProgress(): StudioTutorialProgress {
   return { completed: [] };
 }
 
+export function normalizeTutorialProgress(value: unknown): StudioTutorialProgress {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return emptyTutorialProgress();
+  }
+  const candidate = value as Partial<StudioTutorialProgress>;
+  const completed = Array.isArray(candidate.completed)
+    ? [...new Set(candidate.completed.filter(
+        (id): id is string => typeof id === "string" && STUDIO_FEATURE_TUTORIAL_BY_ID.has(id),
+      ))]
+    : [];
+  const lastId = typeof candidate.lastId === "string"
+    && STUDIO_FEATURE_TUTORIAL_BY_ID.has(candidate.lastId)
+    ? candidate.lastId
+    : undefined;
+  return { completed, ...(lastId ? { lastId } : {}) };
+}
+
+/** Explicit pre-V12 import/test seam. Product Studio uses SQLite/OPFS. */
 export function readTutorialProgress(): StudioTutorialProgress {
   if (typeof window === "undefined") return emptyTutorialProgress();
   try {
     const raw = globalThis.localStorage.getItem(STUDIO_TUTORIAL_PROGRESS_KEY);
     if (!raw) return emptyTutorialProgress();
-    const parsed = JSON.parse(raw) as Partial<StudioTutorialProgress>;
-    const completed = Array.isArray(parsed.completed)
-      ? parsed.completed.filter((id): id is string => typeof id === "string")
-      : [];
-    return {
-      completed,
-      lastId: typeof parsed.lastId === "string" ? parsed.lastId : undefined,
-    };
+    return normalizeTutorialProgress(JSON.parse(raw) as unknown);
   } catch {
     return emptyTutorialProgress();
   }
 }
 
+/** Explicit pre-V12 import/test seam. Product Studio uses SQLite/OPFS. */
 export function writeTutorialProgress(progress: StudioTutorialProgress): void {
   if (typeof window === "undefined") return;
   try {
-    globalThis.localStorage.setItem(STUDIO_TUTORIAL_PROGRESS_KEY, JSON.stringify(progress));
+    globalThis.localStorage.setItem(
+      STUDIO_TUTORIAL_PROGRESS_KEY,
+      JSON.stringify(normalizeTutorialProgress(progress)),
+    );
   } catch {
     // private mode / quota
   }

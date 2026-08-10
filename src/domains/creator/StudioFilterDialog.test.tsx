@@ -14,6 +14,7 @@ import {
   type ProductFilterLibraryRepository,
   type StudioFilterLibraryPreset,
 } from "./studio-filter-library-sqlite-repository";
+import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogCatalogCount = STUDIO_FILTER_DIALOG_CATALOG.length;
@@ -65,6 +66,19 @@ function backdrop(): HTMLElement {
   return document.querySelector<HTMLElement>("[data-studio-modal-backdrop='true']")!;
 }
 
+function createUiPreferencesHarness() {
+  const values = new Map<string, string>();
+  const repository = createStudioUiPreferencesRepository({
+    get: async (key) => values.get(key) ?? null,
+    set: async (key, value) => { values.set(key, value); },
+    delete: async (key) => { values.delete(key); },
+  });
+  return {
+    values,
+    acquire: async () => repository,
+  };
+}
+
 /**
  * jsdom에는 레이아웃이 없어 모든 요소가 getClientRects().length === 0이고, 그러면 모달이 초기
  * 포커스를 다이얼로그 안으로 못 옮긴다. 그 상태로 언마운트하면 React가 커밋 뮤테이션 단계에서
@@ -107,7 +121,9 @@ function renderMotionFilterDialog(
   );
 }
 
-function renderInteractiveMotionFilterDialog() {
+function renderInteractiveMotionFilterDialog(
+  acquireUiPreferences = createUiPreferencesHarness().acquire,
+) {
   const onApply = vi.fn();
   render(
     <StudioFilterDialog
@@ -116,6 +132,7 @@ function renderInteractiveMotionFilterDialog() {
       image={{}}
       initialDraft={{ kind: "motion-blur", distance: 12, angle: -45 }}
       rootRef={createRef<HTMLElement>()}
+      acquireUiPreferences={acquireUiPreferences}
       onPreview={vi.fn()}
       onApply={onApply}
       onClose={vi.fn()}
@@ -617,8 +634,9 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toContain("max-h-[min(44dvh,24rem)]");
   });
 
-  it("persists filter favorites locally and restores the favorites view", () => {
-    const first = renderInteractiveMotionFilterDialog();
+  it("persists filter favorites in SQLite preferences and restores the favorites view", async () => {
+    const preferences = createUiPreferencesHarness();
+    const first = renderInteractiveMotionFilterDialog(preferences.acquire);
     const firstGallery = screen.getByRole("region", { name: "필터 갤러리" });
     fireEvent.click(
       within(firstGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
@@ -630,9 +648,17 @@ describe("StudioFilterDialog", () => {
       within(firstGallery).getByRole("button", { name: "글리치 즐겨찾기 해제" }),
     ).toBeTruthy();
     expect(first.onApply).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(preferences.values.get("effect-favorites")).toContain("filter:glitch");
+    });
 
     cleanup();
-    renderInteractiveMotionFilterDialog();
+    renderInteractiveMotionFilterDialog(preferences.acquire);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog").getAttribute("data-studio-ui-preferences-authority"),
+      ).toBe("sqlite-opfs");
+    });
     const secondGallery = screen.getByRole("region", { name: "필터 갤러리" });
     fireEvent.click(
       within(secondGallery).getByRole("button", { name: /다른 필터 둘러보기/ }),
@@ -641,6 +667,16 @@ describe("StudioFilterDialog", () => {
     expect(
       within(secondGallery).getByRole("button", { name: "글리치 필터 선택" }),
     ).toBeTruthy();
+  });
+
+  it("discloses memory-only favorites when SQLite/OPFS preferences are unavailable", async () => {
+    renderInteractiveMotionFilterDialog(async () => {
+      throw new Error("SQLite unavailable");
+    });
+    expect((await screen.findByRole("status")).textContent).toContain("이번 탭에서만 유지");
+    expect(
+      screen.getByRole("dialog").getAttribute("data-studio-ui-preferences-authority"),
+    ).toBe("memory-only");
   });
 
   it("switches filter kinds in place, remembers recents, and preserves apply semantics", () => {

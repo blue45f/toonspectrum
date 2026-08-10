@@ -332,6 +332,9 @@ describe("runTournament", () => {
       scene: RACE_SCENE,
       profile: PROFILE,
       killSwitch: new RemoteKillSwitch(),
+      // This unit fixture has no 120-frame lifecycle; production callers use
+      // switchEligibility and the full V12 boundary gate.
+      boundedImmediateSwitchEvaluation: true,
     };
 
     const eleven = runTournament({ ...base, ...hysteresisSetup(89), penDown: false });

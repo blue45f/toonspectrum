@@ -1,4 +1,5 @@
 import {
+  HysteresisPolicy,
   ProviderCostModel,
   RemoteKillSwitch,
   WinnerCache,
@@ -16,11 +17,9 @@ import {
  * runShadowComparison) live in @toonspectrum/studio-engine-registry as pure
  * mechanisms. This module gives them a browser runtime without touching React:
  *
- * - winner decisions persist across sessions through an async
- *   TournamentPersistencePort (versioned schema, parse failures ignored —
- *   never throw). localStorage is only the fallback adapter of that port;
- *   richer stores (e.g. a SQLite/OPFS adapter) plug in via
- *   installDefaultTournamentPersistence without changes here;
+ * - winner decisions persist through an async TournamentPersistencePort.
+ *   The product installs the SQLite/OPFS adapter; without it the runtime is
+ *   explicitly memory-only and never opens localStorage/IndexedDB;
  * - hydration is a one-shot boot step (`hydrate()`); every synchronous
  *   decision path — selectFilterLane included — reads only the already-loaded
  *   in-memory state;
@@ -43,6 +42,7 @@ import {
 /* Persistence port — async, adapter-agnostic                          */
 /* ------------------------------------------------------------------ */
 
+/** Legacy key used only inside SQLite's kv table during structured-row migration. */
 export const STUDIO_TOURNAMENT_WINNER_STORAGE_KEY =
   "toonspectrum-studio-v12-tournament-winners-v1";
 export const STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION = 1;
@@ -58,15 +58,18 @@ export interface PersistedTournamentStateV1 {
 }
 
 /**
- * Async persistence seam for tournament winner state. Adapters own the medium
- * (localStorage fallback below; SQLite/OPFS lives in its own module and is
- * injected at boot). `load` resolves null when nothing usable is stored;
- * `save` rejects on write failure — the runtime converts both into calm
- * booleans and never lets persistence throw into a render path.
+ * Async persistence seam for tournament winner state. The product adapter is
+ * SQLite/OPFS and is injected at boot. `load` resolves null when no valid row
+ * exists; `save` rejects on write failure — the runtime converts that into a
+ * calm false while exposing the adapter's non-durable status separately.
  */
 export interface TournamentPersistencePort {
   load(): Promise<PersistedTournamentStateV1 | null>;
   save(state: PersistedTournamentStateV1): Promise<void>;
+  /** Non-blocking durable sink for accepted real render samples. */
+  recordSample?(sample: StudioTournamentRenderSampleEvent): void | Promise<void>;
+  /** Current persistence truth. SQLite adapters update it after lazy open. */
+  status?(): StudioTournamentPersistenceStatus;
 }
 
 export type TournamentPersistenceFactory = () => TournamentPersistencePort | null;
@@ -116,82 +119,23 @@ export function parsePersistedTournamentState(
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* localStorage fallback adapter                                       */
-/* ------------------------------------------------------------------ */
+export type StudioTournamentPersistenceMode =
+  | "initializing-sqlite"
+  | "sqlite-opfs"
+  | "memory-only";
 
-/** Minimal synchronous storage surface the fallback adapter wraps. */
-export interface TournamentWinnerStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
+export interface StudioTournamentPersistenceStatus {
+  mode: StudioTournamentPersistenceMode;
+  durable: boolean;
+  reason: string | null;
 }
 
-/**
- * Default storage: `globalThis.localStorage` when it exists and is usable.
- * SSR (no localStorage) and privacy modes that throw on access both resolve
- * to null — the adapter then loads nothing and rejects saves.
- */
-export function resolveDefaultTournamentStorage(): TournamentWinnerStorage | null {
-  try {
-    const storage = (globalThis as { localStorage?: TournamentWinnerStorage })
-      .localStorage;
-    if (
-      !storage ||
-      typeof storage.getItem !== "function" ||
-      typeof storage.setItem !== "function"
-    ) {
-      return null;
-    }
-    return storage;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * V12-only fallback adapter: the synchronous localStorage API wrapped behind
- * the async port. The key does not overlap pre-V12 tournament state.
- * Unreadable/unparsable payloads load as null (ignored, never thrown);
- * saving without usable storage or over quota rejects, which the runtime
- * reports as `persist() === false`.
- */
-export function createLocalStorageTournamentPersistence(
-  storage?: TournamentWinnerStorage | null,
-): TournamentPersistencePort {
-  const resolved = storage === undefined ? resolveDefaultTournamentStorage() : storage;
-  return {
-    load: () => {
-      if (!resolved) return Promise.resolve(null);
-      let raw: string | null;
-      try {
-        raw = resolved.getItem(STUDIO_TOURNAMENT_WINNER_STORAGE_KEY);
-      } catch {
-        return Promise.resolve(null);
-      }
-      if (raw === null) return Promise.resolve(null);
-      let payload: unknown;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        return Promise.resolve(null);
-      }
-      return Promise.resolve(parsePersistedTournamentState(payload));
-    },
-    save: (state) => {
-      if (!resolved) {
-        return Promise.reject(new Error("tournament persistence storage unavailable"));
-      }
-      try {
-        resolved.setItem(STUDIO_TOURNAMENT_WINNER_STORAGE_KEY, JSON.stringify(state));
-      } catch (error) {
-        return Promise.reject(
-          error instanceof Error ? error : new Error(String(error)),
-        );
-      }
-      return Promise.resolve();
-    },
-  };
-}
+const MEMORY_ONLY_TOURNAMENT_STATUS: Readonly<StudioTournamentPersistenceStatus> =
+  Object.freeze({
+    mode: "memory-only",
+    durable: false,
+    reason: "SQLite/OPFS tournament persistence is not installed",
+  });
 
 /* ------------------------------------------------------------------ */
 /* Default adapter injection point                                     */
@@ -201,9 +145,9 @@ let defaultPersistenceFactory: TournamentPersistenceFactory | null = null;
 
 /**
  * Boot-time injection point for the default persistence adapter: a richer
- * store (e.g. the SQLite/OPFS adapter in its own module) installs its factory
- * here and every runtime constructed afterwards without an explicit
- * `persistence` option uses it. `null` restores the localStorage fallback.
+ * store (the SQLite/OPFS adapter in its own module) installs its factory here
+ * and every runtime constructed afterwards without an explicit `persistence`
+ * option uses it. `null` restores explicit memory-only operation.
  */
 export function installDefaultTournamentPersistence(
   factory: TournamentPersistenceFactory | null,
@@ -211,10 +155,10 @@ export function installDefaultTournamentPersistence(
   defaultPersistenceFactory = factory;
 }
 
-/** Resolves the currently installed default adapter (localStorage fallback). */
+/** Resolves the installed SQLite adapter, or null for explicit memory-only mode. */
 export function resolveDefaultTournamentPersistence(): TournamentPersistencePort | null {
   if (defaultPersistenceFactory) return defaultPersistenceFactory();
-  return createLocalStorageTournamentPersistence();
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -268,10 +212,44 @@ export interface StudioTournamentRenderSampleEvent {
   ms: number;
 }
 
+export interface StudioMeasuredTournamentCandidate {
+  providerId: string;
+  /** Pixels produced by this provider for the exact same accepted request. */
+  pixels: Uint8Array;
+}
+
+export interface StudioMeasuredTournamentRequest {
+  bucket: string;
+  width: number;
+  height: number;
+  referenceProviderId: string;
+  /** Hard-bounded by evaluateMeasuredTournament to 2-3 candidates. */
+  candidates: readonly StudioMeasuredTournamentCandidate[];
+  /** A winner is never created or changed while a pen stroke owns the surface. */
+  penDown?: boolean;
+  gate?: VisualEquivalenceGate;
+}
+
+export type StudioMeasuredTournamentDecision =
+  | "initial-winner"
+  | "retained"
+  | "hysteresis-hold"
+  | "pen-down-hold"
+  | "switched"
+  | "insufficient-evidence";
+
+export interface StudioMeasuredTournamentResult {
+  decision: StudioMeasuredTournamentDecision;
+  winnerId: string | null;
+  changed: boolean;
+  visual: Record<string, { pass: boolean; mismatchPct: number }>;
+  expectedGainPct: number | null;
+}
+
 export interface StudioTournamentRuntimeOptions {
   /**
    * Persistence port. `undefined` = currently installed default adapter
-   * (localStorage fallback unless a richer adapter was installed);
+   * (SQLite/OPFS when boot installed it, otherwise explicit memory-only);
    * `null` = in-memory only.
    */
   persistence?: TournamentPersistencePort | null;
@@ -310,6 +288,16 @@ export class StudioRendererTournamentRuntime {
     for (const kill of killList) {
       this.applyKillList([kill.providerId], kill.reason);
     }
+  }
+
+  /** Observable persistence truth; callers never infer durability from hydrate(). */
+  persistenceStatus(): StudioTournamentPersistenceStatus {
+    if (!this.persistence) return { ...MEMORY_ONLY_TOURNAMENT_STATUS };
+    return this.persistence.status?.() ?? {
+      mode: "memory-only",
+      durable: false,
+      reason: "Tournament persistence adapter does not expose durable status",
+    };
   }
 
   private static persistKey(bucket: string, deviceHash: string): string {
@@ -393,14 +381,166 @@ export class StudioRendererTournamentRuntime {
   recordRenderSample(providerId: string, bucket: string, ms: number): boolean {
     if (!Number.isFinite(ms) || ms < 0) return false;
     this.costModel.record(providerId, bucket, { warmMs: ms });
+    const sample = { providerId, bucket, ms };
+    try {
+      const pending = this.persistence?.recordSample?.(sample);
+      if (pending) void Promise.resolve(pending).catch(() => undefined);
+    } catch {
+      // Durable telemetry never owns the render path.
+    }
     if (this.onRenderSample) {
       try {
-        this.onRenderSample({ providerId, bucket, ms });
+        this.onRenderSample(sample);
       } catch {
         // Observer hygiene never affects the hot path or the recorded sample.
       }
     }
     return true;
+  }
+
+  /**
+   * Resolves a bounded product tournament from already-completed real renders.
+   * Timing samples must have entered `recordRenderSample` first; this method
+   * never invents a missing estimate and never invokes a renderer itself.
+   */
+  evaluateMeasuredTournament(
+    request: StudioMeasuredTournamentRequest,
+  ): StudioMeasuredTournamentResult {
+    if (request.candidates.length < 2 || request.candidates.length > 3) {
+      throw new RangeError("measured tournament requires 2-3 bounded candidates");
+    }
+    const unique = new Map(
+      request.candidates.map((candidate) => [candidate.providerId, candidate]),
+    );
+    if (unique.size !== request.candidates.length) {
+      throw new RangeError("measured tournament candidates must have unique providers");
+    }
+    const reference = unique.get(request.referenceProviderId);
+    if (!reference) {
+      throw new RangeError("measured tournament reference provider is missing");
+    }
+    const expectedBytes = request.width * request.height * 4;
+    if (
+      !Number.isSafeInteger(expectedBytes) ||
+      expectedBytes <= 0 ||
+      request.candidates.some((candidate) => candidate.pixels.byteLength !== expectedBytes)
+    ) {
+      throw new RangeError("measured tournament pixel dimensions are inconsistent");
+    }
+
+    const gate = request.gate ?? createFuzzyNeighborhoodGate();
+    const visual = new Map<string, { pass: boolean; mismatchPct: number }>();
+    visual.set(reference.providerId, { pass: true, mismatchPct: 0 });
+    for (const candidate of request.candidates) {
+      if (candidate.providerId === reference.providerId) continue;
+      visual.set(
+        candidate.providerId,
+        gate(
+          candidate.pixels,
+          reference.pixels,
+          request.width,
+          request.height,
+        ),
+      );
+    }
+
+    const sampled = request.candidates.flatMap((candidate) => {
+      if (this.killSwitch.isKilled(candidate.providerId)) return [];
+      const estimate = this.costModel.estimate(candidate.providerId, request.bucket);
+      if (estimate?.warmP50Ms === null || estimate?.warmP50Ms === undefined) return [];
+      return [{ providerId: candidate.providerId, warmMs: estimate.warmP50Ms }];
+    });
+    // A one-sided sample is telemetry, not a tournament. At least two visual-
+    // comparable providers must have real measurements before any winner changes.
+    if (sampled.length < 2) {
+      return {
+        decision: "insufficient-evidence",
+        winnerId: this.winnerCache.get(request.bucket, this.deviceHash)?.providerId ?? null,
+        changed: false,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: null,
+      };
+    }
+    const measured = sampled.filter(
+      (candidate) => visual.get(candidate.providerId)?.pass === true,
+    );
+    if (measured.length === 0) {
+      return {
+        decision: "insufficient-evidence",
+        winnerId: this.winnerCache.get(request.bucket, this.deviceHash)?.providerId ?? null,
+        changed: false,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: null,
+      };
+    }
+
+    const incumbent = this.winnerCache.get(request.bucket, this.deviceHash);
+    if (request.penDown === true) {
+      return {
+        decision: "pen-down-hold",
+        winnerId: incumbent?.providerId ?? null,
+        changed: false,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: null,
+      };
+    }
+    const best = measured.reduce((winner, candidate) =>
+      candidate.warmMs < winner.warmMs ? candidate : winner,
+    );
+
+    if (!incumbent) {
+      this.recordWinner(request.bucket, this.deviceHash, {
+        providerId: best.providerId,
+        expectedWarmMs: best.warmMs,
+        decidedAtSample: this.costModel.sampleCount(best.providerId, request.bucket),
+      });
+      return {
+        decision: "initial-winner",
+        winnerId: best.providerId,
+        changed: true,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: null,
+      };
+    }
+
+    const measuredIncumbent = measured.find(
+      (candidate) => candidate.providerId === incumbent.providerId,
+    );
+    if (!measuredIncumbent || best.providerId === incumbent.providerId) {
+      return {
+        decision: measuredIncumbent ? "retained" : "insufficient-evidence",
+        winnerId: incumbent.providerId,
+        changed: false,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: null,
+      };
+    }
+    const switchDecision = new HysteresisPolicy(12).evaluate({
+      incumbentWarmMs: measuredIncumbent.warmMs,
+      challengerWarmMs: best.warmMs,
+      penDown: false,
+    });
+    if (!switchDecision.allow) {
+      return {
+        decision: "hysteresis-hold",
+        winnerId: incumbent.providerId,
+        changed: false,
+        visual: Object.fromEntries(visual),
+        expectedGainPct: switchDecision.expectedGainPct,
+      };
+    }
+    this.recordWinner(request.bucket, this.deviceHash, {
+      providerId: best.providerId,
+      expectedWarmMs: best.warmMs,
+      decidedAtSample: this.costModel.sampleCount(best.providerId, request.bucket),
+    });
+    return {
+      decision: "switched",
+      winnerId: best.providerId,
+      changed: true,
+      visual: Object.fromEntries(visual),
+      expectedGainPct: switchDecision.expectedGainPct,
+    };
   }
 
   /**

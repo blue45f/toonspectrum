@@ -3,7 +3,7 @@
  * Search + category chips + recent MRU. Placement via onAdd(svg, w, h, id).
  */
 import { Grip, MessageCircle, MousePointer2, Search, Sparkles, X } from "lucide-react";
-import { useId, useState, type DragEvent, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type ReactElement } from "react";
 
 import { svgToDataUrl } from "./studio-characters";
 import {
@@ -14,12 +14,15 @@ import {
   type StudioElementItem,
 } from "./studio-elements-catalog";
 import {
-  loadStudioElementsRecent,
-  pushStudioElementRecent,
+  rememberStudioElementRecent,
 } from "./studio-elements-recent";
 import { writeStudioAssetDragPayload } from "./studio-insert-drag-writer";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { serializeStudioLocalAssetDragPayload } from "./studio-shared-asset-drag";
+import {
+  acquireProductStudioUiPreferencesRepository,
+  type StudioUiPreferencesRepository,
+} from "./studio-ui-preferences-sqlite";
 import { StudioSvgAssetPreview } from "./StudioSvgAssetPreview";
 
 import type { StudioSvgProductTournament } from "./studio-svg-vello-product-router";
@@ -30,6 +33,8 @@ export interface StudioElementsPanelProps {
   onAdd: (item: StudioElementItem) => void;
   onOpenBubbles?: () => void;
   previewTournament?: Pick<StudioSvgProductTournament, "resolve">;
+  /** Test seam; product defaults to SQLite over OPFS. */
+  acquireUiPreferences?: () => Promise<StudioUiPreferencesRepository>;
   className?: string;
 }
 
@@ -103,15 +108,41 @@ export function StudioElementsPanel({
   onAdd,
   onOpenBubbles,
   previewTournament,
+  acquireUiPreferences = acquireProductStudioUiPreferencesRepository,
   className,
 }: StudioElementsPanelProps): ReactElement {
   const resultsId = useId();
   const placementHelpId = useId();
   const [category, setCategory] = useState<StudioElementCategory | "all">("shape");
   const [query, setQuery] = useState("");
-  const [recentIds, setRecentIds] = useState(
-    () => loadStudioElementsRecent(globalThis.localStorage).ids
-  );
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [preferenceAuthority, setPreferenceAuthority] = useState<
+    "loading" | "sqlite-opfs" | "memory-only"
+  >("loading");
+  const preferenceRepositoryRef = useRef<StudioUiPreferencesRepository | null>(null);
+  const recentDirtyRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void acquireUiPreferences()
+      .then(async (repository) => {
+        preferenceRepositoryRef.current = repository;
+        const recent = await repository.loadElementsRecent();
+        if (!active) return;
+        setPreferenceAuthority("sqlite-opfs");
+        if (!recentDirtyRef.current) setRecentIds(recent.ids);
+      })
+      .catch(() => {
+        if (active) setPreferenceAuthority("memory-only");
+      });
+    return () => { active = false; };
+  }, [acquireUiPreferences]);
 
   const items = listStudioElementLibrary(category, query);
   const recentItems = recentIds
@@ -119,13 +150,33 @@ export function StudioElementsPanel({
     .filter((el): el is StudioElementItem => el !== null && el.category !== "bubble");
 
   function handlePick(item: StudioElementItem) {
-    const next = pushStudioElementRecent(globalThis.localStorage, item.id);
-    setRecentIds(next.ids);
+    recentDirtyRef.current = true;
+    setRecentIds((current) => {
+      const next = rememberStudioElementRecent({ version: 1, ids: current }, item.id);
+      const save = preferenceRepositoryRef.current
+        ? preferenceRepositoryRef.current.saveElementsRecent(next)
+        : acquireUiPreferences().then((repository) => {
+            preferenceRepositoryRef.current = repository;
+            return repository.saveElementsRecent(next);
+          });
+      void save
+        .then(() => {
+          if (mountedRef.current) setPreferenceAuthority("sqlite-opfs");
+        })
+        .catch(() => {
+          if (mountedRef.current) setPreferenceAuthority("memory-only");
+        });
+      return next.ids;
+    });
     onAdd(item);
   }
 
   return (
-    <div className={cn("grid gap-2", className)} data-studio-elements-panel="true">
+    <div
+      className={cn("grid gap-2", className)}
+      data-studio-elements-panel="true"
+      data-studio-ui-preferences-authority={preferenceAuthority}
+    >
       <div className="flex items-start gap-2 rounded-lg border border-line bg-card px-2 py-1.5">
         <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
         <div className="min-w-0">
@@ -135,6 +186,12 @@ export function StudioElementsPanel({
           </p>
         </div>
       </div>
+
+      {preferenceAuthority === "memory-only" ? (
+        <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[0.62rem] text-fg-2">
+          최근 요소는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
+        </p>
+      ) : null}
 
       <div
         id={placementHelpId}

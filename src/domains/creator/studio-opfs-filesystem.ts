@@ -11,12 +11,12 @@
  *   - 좁은 구조적 인터페이스 StudioOpfsFileSystem 을 정의하고,
  *   - 진짜 OPFS 바인딩은 얇은 어댑터(createStudioOpfsNativeFileSystem)로,
  *   - 테스트는 인메모리 가짜(createStudioOpfsMemoryFileSystem)로,
- *   - OPFS가 없는 브라우저는 localStorage 어댑터(createStudioOpfsLocalStorageFileSystem)로
- * 각각 갈아끼운다. 상위 저장소(studio-opfs-asset-store.ts)는 셋을 구분하지 않는다.
+ *   - V11 이전 자료의 명시적 import/test만 legacy localStorage 어댑터로
+ * 각각 갈아끼운다. 제품 선택기는 OPFS를 자동 선택하고, 불가능하면 손실 가능성이 드러나는
+ * memory-only 결과를 반환한다. localStorage는 제품 폴백 후보가 아니다.
  *
- * "호환성을 버린다"는 결정은 *능력*에 대한 것이지 *정확성*에 대한 것이 아니다 — OPFS가 없는
- * 브라우저에서도 스튜디오는 계속 동작해야 하고, 다만 옛 천장(그리고 그에 맞춘 정직한 한국어
- * 안내)으로 되돌아갈 뿐이다.
+ * OPFS가 없는 브라우저에서도 편집은 계속할 수 있지만, 선택 결과의 `durability`와 `reason`이
+ * 창을 닫으면 사라지는 상태를 명시한다. 영속 저장처럼 보이는 조용한 폴백은 허용하지 않는다.
  */
 
 // ── 오류 ────────────────────────────────────────────────────────────────
@@ -390,25 +390,27 @@ function isQuotaError(error: unknown): boolean {
   return name === "QuotaExceededError" || name === "NS_ERROR_FILE_NO_DEVICE_SPACE";
 }
 
-// ── localStorage 폴백 어댑터 ─────────────────────────────────────────────
+// ── 명시적 legacy/import-test localStorage 어댑터 ────────────────────────
 
-export interface StudioOpfsLocalStorageLike {
+export interface StudioOpfsLegacyLocalStorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-export interface StudioOpfsLocalStorageFileSystemOptions {
+/** @deprecated V11 자료 import codec의 타입 호환성만을 위한 별칭. 제품 선택에 사용하지 않는다. */
+export type StudioOpfsLocalStorageLike = StudioOpfsLegacyLocalStorageLike;
+
+export interface StudioOpfsLegacyLocalStorageFileSystemOptions {
   keyPrefix?: string;
   /**
-   * 폴백이 쓸 수 있는 원본 바이트 총량. 기본 1.5 MB(base64로 약 2 MB 문자) —
-   * 브러시·팔레트·클립·환경설정이 쓰는 나머지 localStorage 예산을 침범하지 않는 선이다.
-   * OPFS가 있는 브라우저에서는 이 상한이 아예 적용되지 않는다.
+   * 명시적 legacy import/test 어댑터가 쓸 수 있는 원본 바이트 총량. 기본 1.5 MB
+   * (base64로 약 2 MB 문자). 이 값은 제품 저장 용량이 아니다.
    */
   maxTotalBytes?: number;
 }
 
-export const STUDIO_OPFS_FALLBACK_MAX_TOTAL_BYTES = 1_500_000;
+export const STUDIO_OPFS_LEGACY_LOCAL_STORAGE_MAX_TOTAL_BYTES = 1_500_000;
 
 const B64_CHUNK = 0x8000;
 
@@ -428,16 +430,17 @@ function fromBase64(value: string): Uint8Array {
 }
 
 /**
- * OPFS가 없는 브라우저용 폴백. 옛 천장(localStorage)을 그대로 쓰되, 자산만 별도 이름공간에
- * 두고 총량을 스스로 제한한다. 상한을 넘으면 조용히 자르지 않고 숫자를 밝힌 한국어로 거절한다.
+ * V11 이전 자료를 명시적으로 읽는 import 또는 테스트 전용 어댑터. 제품 부팅/능력 탐지에서
+ * 자동 선택하지 않는다. 상한을 넘으면 조용히 자르지 않고 숫자를 밝힌 한국어로 거절한다.
  */
-export function createStudioOpfsLocalStorageFileSystem(
-  storage: StudioOpfsLocalStorageLike,
-  options: StudioOpfsLocalStorageFileSystemOptions = {}
+export function createStudioOpfsLegacyLocalStorageFileSystem(
+  storage: StudioOpfsLegacyLocalStorageLike,
+  options: StudioOpfsLegacyLocalStorageFileSystemOptions = {}
 ): StudioOpfsFileSystem {
-  const keyPrefix = options.keyPrefix ?? "toonspectrum-studio-opfs-fallback:";
+  const keyPrefix = options.keyPrefix ?? "toonspectrum-studio-opfs-legacy:";
   const indexKey = `${keyPrefix}__paths`;
-  const maxTotalBytes = options.maxTotalBytes ?? STUDIO_OPFS_FALLBACK_MAX_TOTAL_BYTES;
+  const maxTotalBytes =
+    options.maxTotalBytes ?? STUDIO_OPFS_LEGACY_LOCAL_STORAGE_MAX_TOTAL_BYTES;
 
   function readIndex(): string[] {
     try {
@@ -532,15 +535,25 @@ export interface StudioOpfsStorageManagerProbeLike {
 
 export interface StudioOpfsFileSystemProbeScope {
   navigator?: { storage?: StudioOpfsStorageManagerProbeLike };
-  localStorage?: StudioOpfsLocalStorageLike;
 }
 
-export interface StudioOpfsFileSystemSelection {
-  fs: StudioOpfsFileSystem;
-  kind: StudioOpfsFileSystemKind;
-  /** 왜 이 어댑터가 선택됐는지. 진단 패널에 그대로 띄울 수 있는 한국어. */
-  reason: string;
-}
+export type StudioOpfsFileSystemSelection =
+  | {
+      readonly fs: StudioOpfsFileSystem;
+      readonly kind: "opfs";
+      readonly durability: "durable";
+      /** 왜 이 어댑터가 선택됐는지. 진단 패널에 그대로 띄울 수 있는 한국어. */
+      readonly reason: string;
+      readonly cause: null;
+    }
+  | {
+      readonly fs: StudioOpfsMemoryFileSystem;
+      readonly kind: "memory";
+      readonly durability: "memory-only";
+      /** 영속 저장이 불가능하므로 탭 종료 시 손실됨을 반드시 밝힌다. */
+      readonly reason: string;
+      readonly cause: unknown;
+    };
 
 /**
  * 실제로 디렉터리를 열어 보고 고른다. `getDirectory`가 함수로 존재해도 시크릿 모드·
@@ -548,9 +561,13 @@ export interface StudioOpfsFileSystemSelection {
  */
 export async function selectStudioOpfsFileSystem(
   scope: StudioOpfsFileSystemProbeScope = globalThis as StudioOpfsFileSystemProbeScope,
-  options: { rootName?: string; fallbackMaxTotalBytes?: number } = {}
+  options: { rootName?: string } = {}
 ): Promise<StudioOpfsFileSystemSelection> {
   const manager = scope.navigator?.storage;
+  let unavailableCause: unknown = new StudioOpfsError(
+    "NOT_SUPPORTED",
+    "이 브라우저는 OPFS를 지원하지 않아요.",
+  );
   if (manager && typeof manager.getDirectory === "function") {
     const native = createStudioOpfsNativeFileSystem(
       manager as StudioOpfsStorageManagerLike,
@@ -558,34 +575,26 @@ export async function selectStudioOpfsFileSystem(
     );
     try {
       await native.list();
-      return { fs: native, kind: "opfs", reason: "OPFS를 사용해요. 자산 보관함 용량 제한이 없어요." };
-    } catch {
-      // 아래 폴백으로 내려간다.
+      return {
+        fs: native,
+        kind: "opfs",
+        durability: "durable",
+        reason: "OPFS를 사용해요. 자산 보관함을 이 기기에 영구 저장합니다.",
+        cause: null,
+      };
+    } catch (cause) {
+      unavailableCause = cause;
     }
-  }
-
-  let storage: StudioOpfsLocalStorageLike | undefined;
-  try {
-    storage = scope.localStorage;
-  } catch {
-    storage = undefined;
-  }
-  if (storage) {
-    return {
-      fs: createStudioOpfsLocalStorageFileSystem(storage, {
-        maxTotalBytes: options.fallbackMaxTotalBytes,
-      }),
-      kind: "local-storage",
-      reason:
-        "이 브라우저는 대용량 저장소(OPFS)를 지원하지 않아 예전 방식으로 저장해요. "
-        + "자산 보관함 용량이 제한돼요.",
-    };
   }
 
   return {
     fs: createStudioOpfsMemoryFileSystem(),
     kind: "memory",
-    reason: "저장소를 쓸 수 없어 이번 세션에서만 자산을 기억해요. 창을 닫으면 사라져요.",
+    durability: "memory-only",
+    reason:
+      "OPFS 영구 저장소를 열 수 없어 이번 탭 메모리에서만 자산을 유지해요. "
+      + "창을 닫거나 새로고침하면 사라집니다.",
+    cause: unavailableCause,
   };
 }
 

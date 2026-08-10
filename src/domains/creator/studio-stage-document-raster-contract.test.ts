@@ -34,6 +34,7 @@ import {
 import { planStudioCanvasStageLayout, type StudioViewStageLayout } from "./studio-view-controls";
 
 import type { PageState } from "./studio-page-state";
+import type { WatermarkSettings } from "./studio-watermark";
 import type Konva from "konva";
 
 // Encoders and file sinks are not the subject here; the capture geometry is. Keeping the real
@@ -279,11 +280,28 @@ function createPage(id: string): PageState {
   return { id, elements: [], bg: "#ffffff", bgGrad: null, canvasH: DOCUMENT_HEIGHT };
 }
 
+function deferred<Value>() {
+  let resolvePromise!: (value: Value | PromiseLike<Value>) => void;
+  let rejectPromise!: (cause?: unknown) => void;
+  const promise = new Promise<Value>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  return { promise, resolve: resolvePromise, reject: rejectPromise };
+}
+
 const EXPORT_SCALE = 2;
 
 function createOrchestration(
   host: ReturnType<typeof createStageHost>,
-  pages: readonly PageState[]
+  pages: readonly PageState[],
+  watermarkOptions: {
+    ensureWatermarkLoaded?: () => Promise<WatermarkSettings>;
+    drawWatermarkOnCanvas?: (
+      canvas: HTMLCanvasElement,
+      settings: WatermarkSettings,
+    ) => void;
+  } = {},
 ) {
   const errors: (string | null)[] = [];
   const orchestration = createStudioRasterExportOrchestration({
@@ -298,8 +316,14 @@ function createOrchestration(
     pageGrade: DEFAULT_PAGE_GRADE,
     title: "contract",
     ensureSharedDocumentAvailableForExport: () => true,
-    ensureWatermarkLoaded: () => ({ enabled: false, text: "", opacity: 0, position: "br", size: 1 }) as never,
-    drawWatermarkOnCanvas: () => undefined,
+    ensureWatermarkLoaded: watermarkOptions.ensureWatermarkLoaded ?? (async () => ({
+      enabled: false,
+      text: "",
+      opacity: 0,
+      position: "br",
+      size: 1,
+    })),
+    drawWatermarkOnCanvas: watermarkOptions.drawWatermarkOnCanvas ?? (() => undefined),
     // The production `captureReadyStageForPage` awaits the committed capture render; the flag flip
     // above is that commit. Awaiting a microtask keeps the async ordering of the real call.
     captureReadyStageForPage: async () => {
@@ -450,6 +474,67 @@ describe("stage raster is always the full document raster", () => {
     expect(documentCornersCovered(capture)).toBe(false);
     expect(() => expectFullDocumentRaster(capture, EXPORT_SCALE)).toThrow();
   });
+});
+
+describe("raster export watermark readiness", () => {
+  const exportPaths = [
+    {
+      label: "download",
+      run: (orchestration: ReturnType<typeof createOrchestration>["orchestration"]) =>
+        orchestration.handleDownload(),
+    },
+    {
+      label: "raster interchange",
+      run: (orchestration: ReturnType<typeof createOrchestration>["orchestration"]) =>
+        orchestration.exportCurrentPageToRasterInterchange("qoi"),
+    },
+    {
+      label: "clipboard",
+      run: (orchestration: ReturnType<typeof createOrchestration>["orchestration"]) =>
+        orchestration.handleCopyToClipboard(),
+    },
+    {
+      label: "all-page strip",
+      run: (orchestration: ReturnType<typeof createOrchestration>["orchestration"]) =>
+        orchestration.handleDownloadAll(),
+    },
+  ] as const;
+
+  for (const path of exportPaths) {
+    it(`does not capture ${path.label} before durable or memory-only settings resolve`, async () => {
+      const host = createStageHost({ canvasFlipH: false, canvasRotation: 0 });
+      const pages = [createPage("page-1"), createPage("page-2")];
+      const ready = deferred<WatermarkSettings>();
+      const durableSettings: WatermarkSettings = {
+        enabled: true,
+        text: `hydrated ${path.label}`,
+        opacity: 0.37,
+        position: "tl",
+        size: 0.04,
+      };
+      const ensureWatermarkLoaded = vi.fn(() => ready.promise);
+      const drawWatermarkOnCanvas = vi.fn();
+      const { orchestration } = createOrchestration(host, pages, {
+        ensureWatermarkLoaded,
+        drawWatermarkOnCanvas,
+      });
+
+      const exporting = path.run(orchestration);
+      await vi.waitFor(() => expect(ensureWatermarkLoaded).toHaveBeenCalledOnce());
+
+      expect(host.stage.captures).toHaveLength(0);
+      expect(drawWatermarkOnCanvas).not.toHaveBeenCalled();
+
+      ready.resolve(durableSettings);
+      await exporting;
+
+      expect(drawWatermarkOnCanvas).toHaveBeenCalledWith(
+        expect.anything(),
+        durableSettings,
+      );
+      expect(ensureWatermarkLoaded).toHaveBeenCalledOnce();
+    });
+  }
 });
 
 describe("readStudioStageInDocumentView", () => {

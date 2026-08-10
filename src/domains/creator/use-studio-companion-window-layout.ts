@@ -2,24 +2,32 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   captureStudioCompanionWindowLayout,
-  clearStudioCompanionWindowLayout,
-  loadStudioCompanionWindowLayout,
   resolveStudioCompanionWindowPlacement,
-  saveStudioCompanionWindowLayout,
-  type StudioCompanionWindowLayoutStorage,
   type StudioCompanionWindowLayoutSurface,
   type StudioCompanionWindowLayoutV1,
   type StudioCompanionWindowMetricsLike,
   type StudioCompanionWindowPlacement,
 } from "./studio-companion-window-layout";
+import {
+  createStudioCompanionWindowPreferencesRuntime,
+  type CreateStudioCompanionWindowPreferencesRuntimeOptions,
+  type StudioCompanionWindowPreferencesAuthority,
+  type StudioCompanionWindowPreferencesRuntime,
+} from "./studio-companion-window-preferences-sqlite";
 
 export const STUDIO_COMPANION_WINDOW_LAYOUT_POLL_MS = 1_000;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_RESIZE_DEBOUNCE_MS = 250;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_MAXIMIZED_TOLERANCE_PX = 16;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_RESTORE_TOLERANCE_PX = 24;
+/** Pre-V12 key identifier retained only for explicit tests/destruction inventories. */
 export const STUDIO_COMPANION_WINDOW_LAYOUT_REMEMBER_STORAGE_PREFIX =
   "toonspectrum.studio.companion-window-layout.remember.v1";
 
+export function studioCompanionWindowLayoutRememberStorageKey(
+  surface: StudioCompanionWindowLayoutSurface,
+): string {
+  return `${STUDIO_COMPANION_WINDOW_LAYOUT_REMEMBER_STORAGE_PREFIX}.${surface}`;
+}
 export type StudioCompanionWindowLayoutRuntimeStatus =
   | "disabled"
   | "waiting-for-binding"
@@ -46,6 +54,10 @@ export interface UseStudioCompanionWindowLayoutInput {
   onSaved?: (layout: StudioCompanionWindowLayoutV1, sessionOnly: boolean) => void;
   onRestored?: (placement: StudioCompanionWindowPlacement) => void;
   onTopologyStale?: () => void;
+  /** Deterministic test seam; product callers use SQLite/OPFS + BroadcastChannel. */
+  preferencesRuntimeFactory?: (
+    options: CreateStudioCompanionWindowPreferencesRuntimeOptions,
+  ) => StudioCompanionWindowPreferencesRuntime;
 }
 
 export interface UseStudioCompanionWindowLayoutResult {
@@ -53,6 +65,8 @@ export interface UseStudioCompanionWindowLayoutResult {
   hasSaved: boolean;
   rememberEnabled: boolean;
   sessionOnly: boolean;
+  persistenceAuthority: StudioCompanionWindowPreferencesAuthority;
+  synchronizationDegraded: boolean;
   /**
    * Call after an explicit user placement action has issued moveTo()/resizeTo(). The hook then
    * re-checks an already-granted permission and waits for two stable samples before persisting.
@@ -96,74 +110,6 @@ type SurfaceLifetimeState = {
   topologyFingerprint: string | null;
   topologyStale: boolean;
 };
-
-type RememberPreferenceReadResult = {
-  status: "valid" | "missing" | "invalid" | "unavailable";
-  value: boolean | null;
-};
-
-function readBrowserStorage(): StudioCompanionWindowLayoutStorage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-export function studioCompanionWindowLayoutRememberStorageKey(
-  surface: StudioCompanionWindowLayoutSurface
-): string {
-  return `${STUDIO_COMPANION_WINDOW_LAYOUT_REMEMBER_STORAGE_PREFIX}.${surface}`;
-}
-
-function readRememberPreference(
-  storage: StudioCompanionWindowLayoutStorage | null,
-  surface: StudioCompanionWindowLayoutSurface
-): RememberPreferenceReadResult {
-  if (!storage) return { status: "unavailable", value: null };
-  try {
-    const value = storage.getItem(studioCompanionWindowLayoutRememberStorageKey(surface));
-    return value === "1"
-      ? { status: "valid", value: true }
-      : value === "0"
-        ? { status: "valid", value: false }
-        : value === null
-          ? { status: "missing", value: null }
-          : { status: "invalid", value: false };
-  } catch {
-    return { status: "unavailable", value: null };
-  }
-}
-
-function clearRememberPreference(
-  storage: StudioCompanionWindowLayoutStorage | null,
-  surface: StudioCompanionWindowLayoutSurface
-): boolean {
-  if (!storage?.removeItem) return false;
-  const key = studioCompanionWindowLayoutRememberStorageKey(surface);
-  try {
-    storage.removeItem(key);
-    return storage.getItem(key) === null;
-  } catch {
-    return false;
-  }
-}
-
-function writeRememberPreference(
-  storage: StudioCompanionWindowLayoutStorage | null,
-  surface: StudioCompanionWindowLayoutSurface,
-  enabled: boolean
-): boolean {
-  if (!storage) return false;
-  const key = studioCompanionWindowLayoutRememberStorageKey(surface);
-  const value = enabled ? "1" : "0";
-  try {
-    storage.setItem(key, value);
-    return storage.getItem(key) === value;
-  } catch {
-    return false;
-  }
-}
 
 function readWindowMetrics(source: Window): StudioCompanionWindowMetricsLike | null {
   try {
@@ -281,17 +227,23 @@ export function useStudioCompanionWindowLayout({
   onSaved,
   onRestored,
   onTopologyStale,
+  preferencesRuntimeFactory = createStudioCompanionWindowPreferencesRuntime,
 }: UseStudioCompanionWindowLayoutInput): UseStudioCompanionWindowLayoutResult {
   const [status, setStatus] = useState<StudioCompanionWindowLayoutRuntimeStatus>("disabled");
   const [hasSaved, setHasSaved] = useState(false);
   const [rememberEnabled, setRememberEnabledState] = useState(initialRememberEnabled);
   const [sessionOnly, setSessionOnly] = useState(false);
+  const [persistenceAuthority, setPersistenceAuthority] =
+    useState<StudioCompanionWindowPreferencesAuthority>("loading");
+  const [synchronizationDegraded, setSynchronizationDegraded] = useState(false);
   const statusRef = useRef(status);
+  const rememberEnabledRef = useRef(rememberEnabled);
+  rememberEnabledRef.current = rememberEnabled;
   const activeSurfaceRef = useRef(surface);
-  const sessionLayoutsRef = useRef(new Map<StudioCompanionWindowLayoutSurface, StudioCompanionWindowLayoutV1>());
-  const sessionRememberPreferencesRef = useRef(
-    new Map<StudioCompanionWindowLayoutSurface, boolean>()
-  );
+  const sessionPreferencesRef = useRef(new Map<
+    StudioCompanionWindowLayoutSurface,
+    { rememberEnabled: boolean; layout: StudioCompanionWindowLayoutV1 | null }
+  >());
   const surfaceLifetimeStateRef = useRef(
     new Map<StudioCompanionWindowLayoutSurface, SurfaceLifetimeState>()
   );
@@ -332,14 +284,21 @@ export function useStudioCompanionWindowLayout({
     let pollTimer: ReturnType<typeof globalThis.setInterval> | null = null;
     let resizeTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
     let persistenceSessionOnly = false;
-    let storage: StudioCompanionWindowLayoutStorage | null = null;
-    let savedLayout: StudioCompanionWindowLayoutV1 | null = null;
-
+    let persistenceHydrated = false;
     const surfaceChanged = activeSurfaceRef.current !== surface;
+    const sessionPreference = sessionPreferencesRef.current.get(surface);
+    let rememberEnabledCurrent = sessionPreference?.rememberEnabled
+      ?? (surfaceChanged ? initialRememberEnabled : rememberEnabledRef.current);
+    let savedLayout: StudioCompanionWindowLayoutV1 | null = sessionPreference?.layout ?? null;
+    let preferencesRuntime: StudioCompanionWindowPreferencesRuntime | null = null;
+    let unsubscribePreferences: (() => void) | null = null;
+
     if (surfaceChanged) {
       activeSurfaceRef.current = surface;
       setHasSaved(false);
       setSessionOnly(false);
+      setPersistenceAuthority("loading");
+      setSynchronizationDegraded(false);
     }
 
     const publishStatus = (next: StudioCompanionWindowLayoutRuntimeStatus) => {
@@ -389,8 +348,8 @@ export function useStudioCompanionWindowLayout({
 
     const markSessionOnly = () => {
       persistenceSessionOnly = true;
-      storage = null;
       setSessionOnly(true);
+      setPersistenceAuthority("memory-only");
     };
 
     const persistStableMetrics = (
@@ -399,7 +358,7 @@ export function useStudioCompanionWindowLayout({
     ) => {
       if (
         disposed
-        || !rememberEnabled
+        || !rememberEnabledCurrent
         || topologyStale
         || !details
         || (stable.key === lastSavedMetricsKey && completedSettle === null)
@@ -436,14 +395,11 @@ export function useStudioCompanionWindowLayout({
         now: Date.now(),
       });
       if (!layout) return;
-      const result = saveStudioCompanionWindowLayout(storage, surface, layout, { now: layout.savedAt });
-      const storedLayout = result.layout ?? layout;
-      sessionLayoutsRef.current.set(surface, storedLayout);
+      const storedLayout = preferencesRuntime?.setLayout(layout).layout ?? layout;
       savedLayout = storedLayout;
       lastSavedMetricsKey = stable.key;
       setHasSaved(true);
-      if (result.status === "session-only") markSessionOnly();
-      callbacksRef.current.onSaved?.(storedLayout, result.status === "session-only");
+      callbacksRef.current.onSaved?.(storedLayout, persistenceSessionOnly);
       if (restoredPlacement) {
         callbacksRef.current.onRestored?.(restoredPlacement);
         pendingRestoredPlacement = null;
@@ -471,7 +427,7 @@ export function useStudioCompanionWindowLayout({
     const sampleGeometry = (allowHidden = false) => {
       if (
         disposed
-        || !rememberEnabled
+        || !rememberEnabledCurrent
         || topologyStale
         || !details
         || (!allowHidden && document.visibilityState !== "visible")
@@ -484,7 +440,7 @@ export function useStudioCompanionWindowLayout({
       stopPolling();
       if (
         disposed
-        || !rememberEnabled
+        || !rememberEnabledCurrent
         || topologyStale
         || !details
         || document.visibilityState !== "visible"
@@ -497,7 +453,7 @@ export function useStudioCompanionWindowLayout({
     };
 
     const flushStableGeometry = () => {
-      if (disposed || !rememberEnabled || topologyStale || settleKind !== null || !details) return;
+      if (disposed || !rememberEnabledCurrent || topologyStale || settleKind !== null || !details) return;
       const current = readWindowMetrics(window);
       if (current) acceptSample(current);
       if (stableSampleCount < 2 && lastStable) persistStableMetrics(lastStable);
@@ -653,9 +609,9 @@ export function useStudioCompanionWindowLayout({
       installDetails(nextDetails, manualPlacementRequested);
     };
 
-    const clearSavedLayout = () => {
+    const clearSavedLayout = (persist = true) => {
       if (disposed || !enabled || !interactionReady) return;
-      sessionLayoutsRef.current.delete(surface);
+      if (persist) preferencesRuntime?.clearLayout();
       savedLayout = null;
       restoreAttempted = true;
       surfaceLifetimeState.restoreAttempted = true;
@@ -667,13 +623,11 @@ export function useStudioCompanionWindowLayout({
       const currentMetrics = readWindowMetrics(window);
       lastSavedMetricsKey = currentMetrics ? metricsKey(currentMetrics) : null;
       setHasSaved(false);
-      const result = clearStudioCompanionWindowLayout(storage, surface);
-      if (result.status === "session-only") markSessionOnly();
       publishReadyStatus("ready");
     };
 
     notifyManualPlacementRef.current = () => {
-      if (disposed || !enabled || !interactionReady || !rememberEnabled) return;
+      if (disposed || !enabled || !interactionReady || !rememberEnabledCurrent) return;
       manualPlacementRequested = true;
       topologyStale = false;
       surfaceLifetimeState.topologyStale = false;
@@ -691,66 +645,32 @@ export function useStudioCompanionWindowLayout({
     resetSavedLayoutRef.current = clearSavedLayout;
     setRememberEnabledRef.current = (next) => {
       if (disposed || !enabled || !interactionReady) return;
-      if (next === rememberEnabled) return;
-      sessionRememberPreferencesRef.current.set(surface, next);
-      if (!next) clearSavedLayout();
-      if (!writeRememberPreference(storage, surface, next)) markSessionOnly();
+      if (next === rememberEnabledCurrent) return;
+      rememberEnabledCurrent = next;
+      const nextSnapshot = preferencesRuntime?.setRememberEnabled(next);
+      savedLayout = nextSnapshot?.layout ?? (next ? savedLayout : null);
+      if (!next) clearSavedLayout(false);
       setRememberEnabledState(next);
+      if (next && persistenceHydrated) void refreshPermission();
     };
 
     if (!enabled) {
       setHasSaved(false);
       setSessionOnly(false);
+      setPersistenceAuthority("loading");
+      setSynchronizationDegraded(false);
       publishStatus("disabled");
       return () => {
         disposed = true;
       };
     }
     if (!interactionReady) {
+      setPersistenceAuthority("loading");
       publishStatus("waiting-for-binding");
       return () => {
         disposed = true;
       };
     }
-    storage = readBrowserStorage();
-    const rememberedPreference = readRememberPreference(storage, surface);
-    if (rememberedPreference.status === "unavailable") markSessionOnly();
-    if (rememberedPreference.status === "invalid") {
-      if (!clearRememberPreference(storage, surface)) markSessionOnly();
-    }
-    if (rememberedPreference.value !== null) {
-      sessionRememberPreferencesRef.current.set(surface, rememberedPreference.value);
-    }
-    const desiredRememberEnabled = rememberedPreference.value
-      ?? sessionRememberPreferencesRef.current.get(surface)
-      ?? (surfaceChanged ? initialRememberEnabled : rememberEnabled);
-    if (desiredRememberEnabled !== rememberEnabled) {
-      setRememberEnabledState(desiredRememberEnabled);
-      publishReadyStatus("ready");
-      return () => {
-        disposed = true;
-      };
-    }
-    if (!rememberEnabled) {
-      publishReadyStatus("ready");
-      return () => {
-        disposed = true;
-      };
-    }
-
-    const loaded = loadStudioCompanionWindowLayout(storage, surface);
-    if (loaded.status === "session-only") {
-      if (loaded.failure === "invalid-payload") {
-        const cleared = clearStudioCompanionWindowLayout(storage, surface);
-        if (cleared.status === "session-only") markSessionOnly();
-      } else {
-        markSessionOnly();
-      }
-    }
-    savedLayout = sessionLayoutsRef.current.get(surface) ?? loaded.layout;
-    if (savedLayout) sessionLayoutsRef.current.set(surface, savedLayout);
-    setHasSaved(savedLayout !== null);
-
     const onResize = () => {
       if (resizeTimer !== null) globalThis.clearTimeout(resizeTimer);
       resizeTimer = globalThis.setTimeout(() => {
@@ -771,7 +691,45 @@ export function useStudioCompanionWindowLayout({
     window.addEventListener("blur", onLifecycleFlush);
     window.addEventListener("pagehide", onLifecycleFlush);
     document.addEventListener("visibilitychange", onVisibilityChange);
-    void refreshPermission();
+
+    preferencesRuntime = preferencesRuntimeFactory({
+      surface,
+      initialRememberEnabled: rememberEnabledCurrent,
+    });
+    const applyPreferenceState = (
+      state: ReturnType<StudioCompanionWindowPreferencesRuntime["current"]>,
+    ) => {
+      if (disposed) return;
+      const wasRememberEnabled = rememberEnabledCurrent;
+      rememberEnabledCurrent = state.snapshot.rememberEnabled;
+      savedLayout = state.snapshot.layout;
+      sessionPreferencesRef.current.set(surface, {
+        rememberEnabled: rememberEnabledCurrent,
+        layout: savedLayout,
+      });
+      persistenceSessionOnly = state.authority === "memory-only";
+      setPersistenceAuthority(state.authority);
+      setSessionOnly(persistenceSessionOnly);
+      setSynchronizationDegraded(state.liveSync === "memory-only");
+      setRememberEnabledState(rememberEnabledCurrent);
+      setHasSaved(savedLayout !== null);
+      if (!rememberEnabledCurrent) {
+        cancelPlacementAttempt();
+        publishReadyStatus("ready");
+      } else if (!wasRememberEnabled && persistenceHydrated) {
+        void refreshPermission();
+      }
+    };
+    unsubscribePreferences = preferencesRuntime.subscribe(applyPreferenceState);
+    applyPreferenceState(preferencesRuntime.current());
+    void preferencesRuntime.hydrate().then((state) => {
+      if (disposed) return;
+      persistenceHydrated = true;
+      applyPreferenceState(state);
+      if (state.authority === "memory-only") markSessionOnly();
+      if (rememberEnabledCurrent) void refreshPermission();
+      else publishReadyStatus("ready");
+    });
 
     return () => {
       disposed = true;
@@ -784,11 +742,15 @@ export function useStudioCompanionWindowLayout({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       clearPermissionListener();
       clearDetailsListener();
+      unsubscribePreferences?.();
+      unsubscribePreferences = null;
+      preferencesRuntime?.close();
+      preferencesRuntime = null;
       notifyManualPlacementRef.current = () => undefined;
       resetSavedLayoutRef.current = () => undefined;
       setRememberEnabledRef.current = (next) => setRememberEnabledState(next);
     };
-  }, [enabled, initialRememberEnabled, interactionReady, rememberEnabled, surface]);
+  }, [enabled, initialRememberEnabled, interactionReady, preferencesRuntimeFactory, surface]);
 
   function notifyManualPlacement(): void {
     notifyManualPlacementRef.current();
@@ -811,6 +773,8 @@ export function useStudioCompanionWindowLayout({
     hasSaved,
     rememberEnabled,
     sessionOnly,
+    persistenceAuthority,
+    synchronizationDegraded,
     notifyManualPlacement,
     resetSavedLayout,
     setRememberEnabled,

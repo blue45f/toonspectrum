@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioPagesHistoryCommandJournalClient,
+  STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS,
   type StudioPagesHistoryCommandJournalClientOptions,
 } from "./studio-pages-history-command-journal-client";
 
@@ -9,6 +12,7 @@ import type {
   StudioHistoryJournalNavigationTarget,
   StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal";
+import type { StudioPagesHistoryDurabilityStatus } from "./studio-pages-history-durable-runtime";
 
 function pages(elementCount: number) {
   return [{
@@ -79,6 +83,25 @@ class BrokenRecoveryRuntime extends FakeRuntime {
 
   override reset() {
     throw this.recoveryFailure;
+  }
+}
+
+class DurabilityRuntime extends FakeRuntime {
+  closeCount = 0;
+
+  constructor(
+    private readonly status: StudioPagesHistoryDurabilityStatus,
+  ) {
+    super();
+  }
+
+  durabilityStatus() {
+    return this.status;
+  }
+
+  async close() {
+    this.closeCount += 1;
+    this.dispose();
   }
 }
 
@@ -303,5 +326,101 @@ describe("Studio pages history command journal lazy client", () => {
       "Studio history journal client has been disposed."
     );
     expect(loadRuntime).toHaveBeenCalledOnce();
+  });
+
+  it("retries a memory-only authority and checkpoints the latest accepted snapshot", async () => {
+    const unavailable = new Error("durable authority unavailable");
+    const memoryRuntime = new DurabilityRuntime({
+      state: "memory-only",
+      durable: false,
+      persistenceKind: "memory-only",
+      retryable: true,
+      cause: unavailable,
+    });
+    const durableRuntime = new DurabilityRuntime({
+      state: "durable",
+      durable: true,
+      persistenceKind: "sqlite-opfs",
+      retryable: false,
+      cause: null,
+    });
+    const onDurabilityStatus = vi.fn();
+    let attempt = 0;
+    const client = createStudioPagesHistoryCommandJournalClient({
+      loadRuntime: async () => (++attempt === 1 ? memoryRuntime : durableRuntime),
+      onDurabilityStatus,
+    });
+
+    client.recordTransition({
+      mutationKind: "elements.commit",
+      previousPages: pages(0),
+      nextPages: pages(3),
+      previousHistoryIndex: 0,
+      nextHistoryIndex: 1,
+    });
+    await client.ready();
+    expect(client.durabilityStatus()).toMatchObject({ state: "memory-only" });
+
+    await expect(client.retryDurability()).resolves.toBe(true);
+    expect(memoryRuntime.closeCount).toBe(1);
+    expect(durableRuntime.actions).toEqual([
+      {
+        kind: "rebase",
+        target: {
+          pages: pages(3),
+          historyIndex: 1,
+        },
+      },
+    ]);
+    expect(client.durabilityStatus()).toMatchObject({
+      state: "durable",
+      persistenceKind: "sqlite-opfs",
+    });
+    expect(onDurabilityStatus.mock.calls.map(([status]) => status.state)).toEqual([
+      STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS.state,
+      "memory-only",
+      "retrying",
+      "durable",
+    ]);
+  });
+
+  it("keeps a failed retry explicitly memory-only and retryable", async () => {
+    const onDurabilityStatus = vi.fn();
+    const loadRuntime = vi.fn(async () => new DurabilityRuntime({
+      state: "memory-only",
+      durable: false,
+      persistenceKind: "memory-only",
+      retryable: true,
+      cause: new Error("still unavailable"),
+    }));
+    const client = createStudioPagesHistoryCommandJournalClient({
+      loadRuntime,
+      onDurabilityStatus,
+    });
+
+    client.rebase({ pages: pages(2), historyIndex: 0 });
+    await client.ready();
+    await expect(client.retryDurability()).resolves.toBe(false);
+
+    expect(loadRuntime).toHaveBeenCalledTimes(2);
+    expect(client.durabilityStatus()).toMatchObject({
+      state: "memory-only",
+      durable: false,
+      retryable: true,
+    });
+    expect(onDurabilityStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: "memory-only", retryable: true }),
+    );
+  });
+
+  it("keeps the production journal status observable with a retry control", () => {
+    const studioPage = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+
+    expect(studioPage).toContain("observeDurabilityStatus(");
+    expect(studioPage).toContain("onError: (cause) =>");
+    expect(studioPage).toContain("setPagesHistoryDurabilityStatus");
+    expect(studioPage).toContain("retryDurability()");
+    expect(studioPage).toContain('data-studio-pages-history-durability="memory-only"');
+    expect(studioPage).toContain("복구 기록 저장소 다시 연결");
   });
 });

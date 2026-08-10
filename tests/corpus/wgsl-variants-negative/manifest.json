@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "mutationSeed": 1592639710,
+  "note": "Deterministic authored malformed-WGSL corpus. Every case must be rejected by naga::front::wgsl or Validator(all, WebGPU-baseline capabilities).",
+  "cases": [
+    { "file": "parse-unclosed-function.wgsl", "category": "parse", "description": "Function body ends before its closing brace." },
+    { "file": "parse-unknown-address-space.wgsl", "category": "parse", "description": "Global variable declares an unknown WGSL address space." },
+    { "file": "type-return-width-mismatch.wgsl", "category": "type", "description": "A vec3 value is returned from a vec4 function." },
+    { "file": "type-binary-vector-width-mismatch.wgsl", "category": "type", "description": "A binary expression combines vectors of incompatible widths." },
+    { "file": "address-uniform-runtime-array.wgsl", "category": "address-space", "description": "A runtime-sized array is placed in uniform address space." },
+    { "file": "address-write-readonly-storage.wgsl", "category": "address-space", "description": "A compute entry point writes through a read-only storage binding." },
+    { "file": "binding-duplicate-resource.wgsl", "category": "binding", "description": "Two resources used by one entry point collide at group 0 binding 0." },
+    { "file": "binding-missing-group.wgsl", "category": "binding", "description": "A bound resource specifies binding without group." },
+    { "file": "entry-compute-missing-workgroup-size.wgsl", "category": "entrypoint", "description": "A compute entry point omits its mandatory workgroup_size attribute." },
+    { "file": "entry-vertex-missing-position.wgsl", "category": "entrypoint", "description": "A vertex entry point returns only a user location and no position builtin." },
+    { "file": "workgroup-zero-dimension.wgsl", "category": "workgroup", "description": "A compute workgroup dimension is zero." },
+    { "file": "resource-sampler-in-uniform-buffer.wgsl", "category": "resource", "description": "A sampler handle is illegally declared in uniform address space." },
+    { "file": "resource-read-writeonly-storage-texture.wgsl", "category": "resource", "description": "A write-only storage texture is read with textureLoad." },
+    { "file": "numeric-u32-literal-overflow.wgsl", "category": "numeric-edge", "description": "An explicitly suffixed u32 literal exceeds the u32 range." },
+    { "file": "numeric-f32-literal-infinity.wgsl", "category": "numeric-edge", "description": "A decimal f32 literal overflows to infinity." },
+    { "file": "numeric-shift-width.wgsl", "category": "numeric-edge", "description": "A u32 value is shifted by its full bit width." },
+    { "file": "numeric-constant-divide-by-zero.wgsl", "category": "numeric-edge", "description": "A constant integer expression divides by zero." }
+  ]
+}

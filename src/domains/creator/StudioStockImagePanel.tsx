@@ -49,7 +49,9 @@ export interface StudioStockImagePanelProps {
 }
 
 export function StudioStockImagePanel({ onInsert, onOpenSettings }: StudioStockImagePanelProps) {
-  const [accessKey] = useState(() => loadStudioStockImageAccessKey(globalThis.localStorage));
+  // BYOK credentials are deliberately tab-scoped. The settings panel deletes the retired
+  // localStorage value without reading it, so this consumer must use the same session authority.
+  const [accessKey] = useState(() => loadStudioStockImageAccessKey(globalThis.sessionStorage));
   const configured = isStudioStockImageConfigured(accessKey);
 
   const [query, setQuery] = useState("");

@@ -7,23 +7,34 @@ import {
 import {
   STUDIO_QUICK_ACCESS_COMMAND_IDS,
   buildStudioQuickAccessCommandCatalog,
+  createStudioQuickAccessRepository,
   loadStudioQuickAccessState,
   resolveStudioQuickAccessExecutionIntent,
   saveStudioQuickAccessState,
-  type StudioQuickAccessStorage,
+  type StudioQuickAccessRepository,
 } from "./studio-quick-access-integration";
 
-function memoryStorage(): StudioQuickAccessStorage & {
-  values: Map<string, string>;
-} {
-  const values = new Map<string, string>();
+function memoryStore(initial: Record<string, string> = {}) {
+  const values = new Map(Object.entries(initial));
   return {
     values,
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => {
+    async get(key: string) {
+      return values.get(key) ?? null;
+    },
+    async set(key: string, value: string) {
       values.set(key, value);
     },
+    async delete(key: string) {
+      values.delete(key);
+    },
   };
+}
+
+function repositoryFactory(
+  store: ReturnType<typeof memoryStore>,
+): () => Promise<StudioQuickAccessRepository> {
+  const repository = createStudioQuickAccessRepository(store);
+  return async () => repository;
 }
 
 describe("studio quick access live command registry", () => {
@@ -53,72 +64,80 @@ describe("studio quick access live command registry", () => {
   });
 });
 
-describe("studio quick access owner-scoped persistence", () => {
-  it("round-trips the exact local model without crossing owner scopes", () => {
-    const storage = memoryStorage();
+describe("studio quick access owner-scoped SQLite persistence", () => {
+  it("round-trips the exact local model without crossing owner scopes", async () => {
+    const store = memoryStore();
+    const acquireRepository = repositoryFactory(store);
     const customized = addStudioQuickAccessCommand(
       DEFAULT_STUDIO_QUICK_ACCESS_STATE,
       DEFAULT_STUDIO_QUICK_ACCESS_STATE.activeSetId,
       "add-bubble",
     );
 
-    expect(saveStudioQuickAccessState(
-      storage,
+    await expect(saveStudioQuickAccessState(
       "owner-0123456789abcdef",
       customized,
-    )).toBe("persisted");
-    expect(loadStudioQuickAccessState(
-      storage,
+      acquireRepository,
+    )).resolves.toBe("persisted");
+    await expect(loadStudioQuickAccessState(
       "owner-0123456789abcdef",
-    )).toEqual(customized);
-    expect(loadStudioQuickAccessState(
-      storage,
+      acquireRepository,
+    )).resolves.toMatchObject({
+      state: customized,
+      authority: "sqlite-opfs",
+      failure: null,
+    });
+    await expect(loadStudioQuickAccessState(
       "owner-fedcba9876543210",
-    )).toEqual(DEFAULT_STUDIO_QUICK_ACCESS_STATE);
+      acquireRepository,
+    )).resolves.toMatchObject({
+      state: DEFAULT_STUDIO_QUICK_ACCESS_STATE,
+      authority: "sqlite-opfs",
+      failure: null,
+    });
   });
 
-  it("fails closed for invalid owners, malformed payloads, and storage failures", () => {
-    const storage = memoryStorage();
-    storage.values.set(
-      "toonspectrum-studio-quick-access:v1:guest",
-      "{bad json",
-    );
-    expect(loadStudioQuickAccessState(storage, "guest")).toEqual(
-      DEFAULT_STUDIO_QUICK_ACCESS_STATE,
-    );
-    expect(saveStudioQuickAccessState(
-      storage,
+  it("fails closed for invalid owners, malformed payloads, and unavailable SQLite", async () => {
+    const store = memoryStore({ guest: "{bad json" });
+    const acquireRepository = repositoryFactory(store);
+
+    await expect(loadStudioQuickAccessState("guest", acquireRepository)).resolves.toMatchObject({
+      state: DEFAULT_STUDIO_QUICK_ACCESS_STATE,
+      authority: "memory-only",
+      failure: "read-failed",
+    });
+    await expect(saveStudioQuickAccessState(
       "../../other-user",
       DEFAULT_STUDIO_QUICK_ACCESS_STATE,
-    )).toBe("invalid-owner");
-    expect(storage.values.size).toBe(1);
-
-    const throwingStorage: StudioQuickAccessStorage = {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-    };
-    expect(loadStudioQuickAccessState(throwingStorage, "guest")).toEqual(
-      DEFAULT_STUDIO_QUICK_ACCESS_STATE,
-    );
-    expect(saveStudioQuickAccessState(
-      throwingStorage,
+      acquireRepository,
+    )).resolves.toBe("invalid-owner");
+    await expect(saveStudioQuickAccessState(
       "guest",
       DEFAULT_STUDIO_QUICK_ACCESS_STATE,
-    )).toBe("write-failed");
+      async () => {
+        throw new Error("OPFS blocked");
+      },
+    )).resolves.toBe("storage-unavailable");
   });
 
-  it("reports verification failures without throwing", () => {
-    expect(saveStudioQuickAccessState(
-      {
-        getItem: () => "different",
-        setItem: () => undefined,
+  it("reports verified SQLite write failures without throwing", async () => {
+    const values = new Map<string, string>();
+    const repository = createStudioQuickAccessRepository({
+      async get(key) {
+        return values.get(key) ?? null;
       },
+      async set() {
+        // Simulates an interrupted or silently ignored OPFS write.
+      },
+      async delete(key) {
+        values.delete(key);
+      },
+    });
+
+    await expect(saveStudioQuickAccessState(
       "guest",
       DEFAULT_STUDIO_QUICK_ACCESS_STATE,
-    )).toBe("verification-failed");
+      async () => repository,
+    )).resolves.toBe("verification-failed");
   });
 });

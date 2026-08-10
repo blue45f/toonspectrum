@@ -27,8 +27,7 @@ import {
 import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
-  loadStudioAdvancedFillSettings,
-  saveStudioAdvancedFillSettings,
+  DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
   type StudioAdvancedFillSettings,
 } from "./studio-advanced-fill-settings";
 import {
@@ -121,20 +120,16 @@ import {
   assertStudioApiJsonPayloadSize,
 } from "./studio-api-payload-safety";
 import {
-  loadStudioAppSettings,
+  defaultStudioAppSettings,
   matchStudioShortcut,
-  saveStudioAppSettings,
-  studioAppSettingsStorage,
   type StudioAppSettings,
   type StudioAppSettingsTab,
   type StudioRailToolId,
 } from "./studio-app-settings";
 import {
   createStudioAssetFavoriteId,
-  loadStudioAssetFavoriteState,
   normalizeStudioAssetFavoriteState,
   removeStudioAssetFavorite,
-  saveStudioAssetFavoriteState,
   toggleStudioAssetFavorite,
   type StudioAssetFavoriteId,
   type StudioAssetFavoriteState,
@@ -518,9 +513,8 @@ import {
   type StudioEditorMutationTicket,
 } from "./studio-editor-scope";
 import {
-  loadStudioEffectFavoriteState,
+  normalizeStudioEffectFavoriteState,
   rememberStudioEffectRecent,
-  saveStudioEffectFavoriteState,
   toggleStudioEffectFavorite,
   type StudioEffectFavoriteState,
   type StudioEffectId,
@@ -1003,6 +997,8 @@ import {
 } from "./studio-pages";
 import {
   createStudioPagesHistoryCommandJournalClient,
+  STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS,
+  type StudioPagesHistoryCommandJournalDurabilityStatus,
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal-client";
 import { createPalette } from "./studio-palette-library";
@@ -1409,8 +1405,6 @@ import {
   peekBootedStudioTournamentRuntime,
 } from "./studio-tournament-persistence-bootstrap";
 import {
-  loadStudioUiDensityState,
-  saveStudioUiDensityState,
   studioUiDensityAllows,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
@@ -1457,7 +1451,6 @@ import {
 } from "./studio-view-controls";
 import {
   DEFAULT_WATERMARK,
-  normalizeWatermark,
   type WatermarkSettings,
 } from "./studio-watermark";
 import {
@@ -1516,17 +1509,18 @@ import {
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
   captureStudioWorkspaceDeviceLayout,
-  loadStudioWorkspacePersistence,
+  createStudioWorkspaceDefaultState,
+  normalizeStudioWorkspaceStateForOwner,
   normalizeStudioWorkspaceLayout,
   resolveStudioWorkspaceControlSide,
   resolveStudioWorkspaceDeviceKind,
   resolveStudioWorkspaceDeviceLayout,
-  saveStudioWorkspaceState,
+  studioWorkspaceLaunchSurface,
   studioWorkspaceOwnerScope,
-  studioWorkspaceStorageKey,
   updateStudioWorkspaceLiveLayout,
   type StudioMobileControlSide,
   type StudioWorkspaceDeviceKind,
+  type StudioWorkspaceId,
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
   type StudioWorkspaceSaveResult,
@@ -1563,10 +1557,6 @@ import {
 } from "./StudioLazyPanelStack";
 import { StudioRouteLoading } from "./StudioLazySurfaceFallback";
 import {
-  StudioLeftToolRail,
-  type StudioLeftToolRailHandlers,
-} from "./StudioLeftToolRail";
-import {
   StudioLiveCollaborationProvider,
   type StudioCrdtAuthoritativeSaveBarrier,
   type StudioCrdtSceneGraphRuntime,
@@ -1577,10 +1567,6 @@ import {
   type StudioOptionsBarsHandlers,
   type StudioOptionsBarsSelectionModel,
 } from "./StudioOptionsBars";
-import {
-  StudioPageListPane,
-  type StudioPageListPaneHandlers,
-} from "./StudioPageListPane";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
 import { StudioScrollViewportSubscriber } from "./StudioScrollViewportSubscriber";
 import {
@@ -1739,7 +1725,12 @@ import type {
   StudioCompanionCommandName,
   StudioCompanionPrimaryRuntime,
 } from "./studio-tools-companion";
+import type { StudioUiBooleanPreferenceKey } from "./studio-ui-preferences-sqlite";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
+import type {
+  StudioWatermarkPreferenceRuntime,
+  StudioWatermarkPreferenceSnapshot,
+} from "./studio-watermark-preferences-sqlite";
 import type {
   StudioGpuBackend,
   StudioGpuFrameReceipt,
@@ -1752,6 +1743,10 @@ import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type {
+  StudioWorkspacePersistenceRuntime,
+  StudioWorkspaceRuntimeSaveResult,
+} from "./studio-workspace-sqlite-runtime";
+import type {
   StudioAssetShareOptions,
   StudioAssetSortOrder,
   StudioAssetTab,
@@ -1763,6 +1758,7 @@ import type {
   StudioLayerLiftReviewPreview,
 } from "./StudioLayerLiftDialog";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
+import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type {
   StudioCommentPinClickPayload,
   StudioCommentPinReanchorPayload,
@@ -1775,6 +1771,7 @@ import type {
   StudioMobileSheet,
   StudioMobileEditingDockUi,
 } from "./StudioMobileEditingDock";
+import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type {
   StudioWebGpuCanvasHandle,
@@ -1827,6 +1824,37 @@ const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
 
 type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
+
+type StudioUiPreferencesSqliteModule =
+  typeof import("./studio-ui-preferences-sqlite");
+let studioUiPreferencesSqliteModulePromise: Promise<StudioUiPreferencesSqliteModule> | null = null;
+
+function loadStudioUiPreferencesSqliteModule(): Promise<StudioUiPreferencesSqliteModule> {
+  studioUiPreferencesSqliteModulePromise ??= import("./studio-ui-preferences-sqlite");
+  studioUiPreferencesSqliteModulePromise.catch(() => {
+    studioUiPreferencesSqliteModulePromise = null;
+  });
+  return studioUiPreferencesSqliteModulePromise;
+}
+
+async function acquireProductStudioUiPreferencesRepository() {
+  const module = await loadStudioUiPreferencesSqliteModule();
+  return module.acquireProductStudioUiPreferencesRepository();
+}
+
+type StudioWatermarkPreferencesSqliteModule =
+  typeof import("./studio-watermark-preferences-sqlite");
+let studioWatermarkPreferencesSqliteModulePromise: Promise<StudioWatermarkPreferencesSqliteModule> | null = null;
+
+function loadStudioWatermarkPreferencesSqliteModule(): Promise<StudioWatermarkPreferencesSqliteModule> {
+  studioWatermarkPreferencesSqliteModulePromise ??= import(
+    "./studio-watermark-preferences-sqlite"
+  );
+  studioWatermarkPreferencesSqliteModulePromise.catch(() => {
+    studioWatermarkPreferencesSqliteModulePromise = null;
+  });
+  return studioWatermarkPreferencesSqliteModulePromise;
+}
 
 function studioInkGestureTimeOrigin(
   contract: unknown,
@@ -2084,6 +2112,18 @@ const LazyStudioHybridDccDialog = lazy(() =>
 const LazyStudioQuickAccessSurface = lazy(() =>
   import("./StudioQuickAccessSurface").then(({ StudioQuickAccessSurface }) => ({
     default: StudioQuickAccessSurface,
+  }))
+);
+
+const LazyStudioPageListPane = lazy(() =>
+  import("./StudioPageListPane").then(({ StudioPageListPane }) => ({
+    default: StudioPageListPane,
+  }))
+);
+
+const LazyStudioLeftToolRail = lazy(() =>
+  import("./StudioLeftToolRail").then(({ StudioLeftToolRail }) => ({
+    default: StudioLeftToolRail,
   }))
 );
 
@@ -2373,8 +2413,8 @@ interface PendingBrushDelete {
 
 interface PendingStudioWorkspaceSync {
   readonly ownerScope: string;
-  readonly storageKey: string;
-  readonly latestEventRaw: string | null;
+  /** Broadcast metadata only; the state itself is always re-read from SQLite authority. */
+  readonly authorityRevision: number;
   readonly sequence: number;
   /**
    * Last owner-verified state known before the first queued external write.
@@ -2516,7 +2556,6 @@ function applyBubbleAnchors(nextElements: El[]): El[] {
   return changed ? out : nextElements;
 }
 
-const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 // Pointer contact defaults to the exact suffix-only Canvas2D overlay. `auto` admits only a stable,
 // anonymous local percentile cohort; the stroke-level device/contract/receipt gates below still
 // fail back to Canvas2D. WebGPU continues to serve 3D, FX and settled composition independently.
@@ -2545,76 +2584,20 @@ const STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED =
 
 function createStudioPageHistoryCommandJournalClient() {
   return createStudioPagesHistoryCommandJournalClient({
-    onError: import.meta.env.DEV
-      ? (cause) => console.warn("Studio command journal client recovered.", cause)
-      : undefined,
+    onError: (cause) => {
+      // This callback exists in production too. The client publishes the same failure through its
+      // structured status observer, while the console receipt preserves the original cause.
+      console.error("Studio command journal durability degraded.", cause);
+    },
   });
 }
 
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
-const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const WATERMARK_KEY = "toonspectrum-studio-watermark";
-const COMMENT_PINS_HIDDEN_KEY = "toonspectrum-studio-comment-pins-hidden";
 // 생성형 AI(이미지 생성) 최초 사용 고지 — 사용자가 처음 쓸 때 "생성형 AI를 활용한다"는
-// 사실을 인지하도록 한다. 1회 확인하면 localStorage 에 저장한다.
-const AI_ASSET_NOTICE_ACK_KEY = "toonspectrum-studio-ai-notice-ack";
-
-function readAiNoticeAck() {
-  if (typeof window === "undefined") return false;
-  try {
-    return globalThis.localStorage.getItem(AI_ASSET_NOTICE_ACK_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function storeAiNoticeAck() {
-  if (typeof window === "undefined") return;
-  try {
-    globalThis.localStorage.setItem(AI_ASSET_NOTICE_ACK_KEY, "1");
-  } catch {
-    // localStorage 사용 불가(시크릿/임베드) 시에도 동작은 유지(고지는 패널 안내문이 담당).
-  }
-}
+// 사실을 인지하도록 한다. V12 제품 권위는 아래 SQLite/OPFS UI preference repository다.
 
 const QUICK_SAMPLE_CANVAS_H = 1120;
 const QUICK_SAMPLE_MARGIN = 24;
-
-function readQuickStartDismissed() {
-  if (typeof window === "undefined") return false;
-  try {
-    return globalThis.localStorage.getItem(QUICK_START_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function storeQuickStartDismissed() {
-  if (typeof window === "undefined") return;
-  try {
-    globalThis.localStorage.setItem(QUICK_START_DISMISSED_KEY, "1");
-  } catch {
-    // localStorage may be unavailable in private or embedded browser contexts.
-  }
-}
-
-function readMobileHintDismissed() {
-  if (typeof window === "undefined") return false;
-  try {
-    return globalThis.localStorage.getItem(MOBILE_HINT_DISMISSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function storeMobileHintDismissed() {
-  if (typeof window === "undefined") return;
-  try {
-    globalThis.localStorage.setItem(MOBILE_HINT_DISMISSED_KEY, "1");
-  } catch {
-    // localStorage may be unavailable in private or embedded browser contexts.
-  }
-}
 
 function createQuickSampleFrames(): FrameEl[] {
   const height = Math.round((QUICK_SAMPLE_CANVAS_H - QUICK_SAMPLE_MARGIN * 3) / 2);
@@ -2677,23 +2660,6 @@ async function sha256Blob(blob: Blob): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function studioFavoriteStorage(): Storage | null {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    // Sandboxed/private browser contexts can throw while the storage property itself is accessed.
-    return null;
-  }
-}
-
-function studioWorkspaceStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function studioBrushQuickSlotsDeviceProfile(): string {
   const browserNavigator = globalThis.navigator;
   const userAgent = browserNavigator?.userAgent ?? "";
@@ -2724,14 +2690,6 @@ function studioBrushQuickSlotsDeviceProfile(): string {
   return `browser-v1:${browserFamily}:${platform}:touch-${maxTouchPoints}:cores-${
     hardwareConcurrency
   }`;
-}
-
-function studioAdvancedFillStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 function isStudioAiReferenceCompatibleAsset(asset: Pick<StudioAsset, "dataUrl">): boolean {
@@ -3165,28 +3123,34 @@ function StudioCuttoonEditor() {
     key: string;
     promise: Promise<boolean>;
   } | null>(null);
-  const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
-    loadStudioUiDensityState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
-    ).mode
+  const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(
+    () => defaultStudioAppSettings().general.densityMode,
   );
   // 앱 설정 — toolbar / shortcuts / mouse / touch / grids / other.
-  const [appSettings, setAppSettings] = useState<StudioAppSettings>(() =>
-    loadStudioAppSettings(studioAppSettingsStorage())
-  );
+  const [appSettings, setAppSettings] = useState<StudioAppSettings>(defaultStudioAppSettings);
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
   const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<StudioAppSettingsTab>("general");
   const [appSettingsPersistenceState, setAppSettingsPersistenceState] = useState<
-    "saved" | "session-only"
-  >("saved");
+    "loading" | "saved" | "session-only"
+  >("loading");
   const [railMoreOpen, setRailMoreOpen] = useState(false);
   const appSettingsRef = useRef(appSettings);
+  const appSettingsUserRevisionRef = useRef(0);
+  const uiBooleanPreferenceRevisionsRef = useRef<
+    Record<StudioUiBooleanPreferenceKey, number>
+  >({
+    "ai-notice-acknowledged": 0,
+    "quick-start-dismissed": 0,
+    "mobile-hint-dismissed": 0,
+    "comment-pins-hidden": 0,
+  });
   appSettingsRef.current = appSettings;
   const [effectFavoriteState, setEffectFavoriteState] = useState<StudioEffectFavoriteState>(() =>
-    loadStudioEffectFavoriteState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
-    )
+    normalizeStudioEffectFavoriteState(undefined)
   );
+  const effectFavoriteStateRef = useRef(effectFavoriteState);
+  const effectFavoriteUserRevisionRef = useRef(0);
+  effectFavoriteStateRef.current = effectFavoriteState;
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
   // 확장 블렌드(포토샵 전용 10모드) — 라이브 합성 불가(Konva 백드롭 미지원)라 "아래와 병합" bake 전용.
@@ -3211,15 +3175,30 @@ function StudioCuttoonEditor() {
     advanceEngineEpoch(): number;
     dispose(): void;
   } | null>(null);
-  function persistAppSettings(next: StudioAppSettings): boolean {
-    const settingsSaved = saveStudioAppSettings(studioAppSettingsStorage(), next);
-    const densitySaved = saveStudioUiDensityState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-      { mode: next.general.densityMode }
-    );
-    const saved = settingsSaved && densitySaved;
-    setAppSettingsPersistenceState(saved ? "saved" : "session-only");
-    return saved;
+  function persistAppSettings(next: StudioAppSettings): void {
+    const revision = ++appSettingsUserRevisionRef.current;
+    setAppSettingsPersistenceState("loading");
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveAppSettings(next))
+      .then(() => {
+        if (appSettingsUserRevisionRef.current === revision) {
+          setAppSettingsPersistenceState("saved");
+        }
+      })
+      .catch(() => {
+        if (appSettingsUserRevisionRef.current === revision) {
+          setAppSettingsPersistenceState("session-only");
+        }
+      });
+  }
+  function persistStudioUiBooleanPreference(
+    key: StudioUiBooleanPreferenceKey,
+    value: boolean,
+  ): void {
+    uiBooleanPreferenceRevisionsRef.current[key] += 1;
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveBooleanPreference(key, value))
+      .catch(() => setAppSettingsPersistenceState("session-only"));
   }
   function setStudioUiDensity(mode: StudioUiDensityMode) {
     if (mode === "focus") setForceRightPanelOpen(false);
@@ -3250,11 +3229,16 @@ function StudioCuttoonEditor() {
     [appSettings.toolbar.visibleIds]
   );
   function persistEffectFavoriteState(next: StudioEffectFavoriteState) {
+    const revision = ++effectFavoriteUserRevisionRef.current;
+    effectFavoriteStateRef.current = next;
     setEffectFavoriteState(next);
-    saveStudioEffectFavoriteState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-      next
-    );
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveEffectFavorites(next))
+      .catch(() => {
+        if (effectFavoriteUserRevisionRef.current === revision) {
+          setAppSettingsPersistenceState("session-only");
+        }
+      });
   }
   function toggleEffectFavorite(effectId: StudioEffectId) {
     persistEffectFavoriteState(toggleStudioEffectFavorite(effectFavoriteState, effectId));
@@ -3631,15 +3615,12 @@ function StudioCuttoonEditor() {
     }
     let current = true;
     void import("./studio-draft-collaboration")
-      .then(({ loadOrCreateStudioDraftCollaborationIdentity }) => {
+      .then(async ({ loadOrCreateStudioDraftCollaborationIdentity }) => {
         if (!current) return;
-        const identity = loadOrCreateStudioDraftCollaborationIdentity(
-          studioWorkspaceStorage(),
-          {
-            documentScopeKey: autosaveKey,
-            ownerScopeKey: studioAuthUserId,
-          }
-        );
+        const identity = await loadOrCreateStudioDraftCollaborationIdentity({
+          documentScopeKey: autosaveKey,
+          ownerScopeKey: studioAuthUserId,
+        });
         if (current) setDraftCollaboration({ status: "local", identity });
       })
       .catch((error: unknown) => {
@@ -4031,6 +4012,10 @@ function StudioCuttoonEditor() {
   pagesHiRef.current = pagesHi;
   const pagesHistoryRef = useRef(pagesHistory);
   pagesHistoryRef.current = pagesHistory;
+  const [pagesHistoryDurabilityStatus, setPagesHistoryDurabilityStatus] =
+    useState<StudioPagesHistoryCommandJournalDurabilityStatus>(
+      STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS
+    );
   const pagesHistoryCommandJournalRef = useRef<ReturnType<
     typeof createStudioPagesHistoryCommandJournalClient
   > | null>(null);
@@ -4040,13 +4025,28 @@ function StudioCuttoonEditor() {
     pagesHistoryCommandJournalRef.current ??=
       createStudioPageHistoryCommandJournalClient();
     const client = pagesHistoryCommandJournalRef.current;
+    const stopObservingDurability = client?.observeDurabilityStatus(
+      setPagesHistoryDurabilityStatus
+    );
     return () => {
+      stopObservingDurability?.();
       client?.dispose();
       if (pagesHistoryCommandJournalRef.current === client) {
         pagesHistoryCommandJournalRef.current = null;
       }
     };
   }, []);
+  function retryStudioHistoryDurability(): void {
+    void pagesHistoryCommandJournalRef.current?.retryDurability().catch((cause: unknown) => {
+      setPagesHistoryDurabilityStatus({
+        state: "memory-only",
+        durable: false,
+        persistenceKind: "memory-only",
+        retryable: true,
+        cause,
+      });
+    });
+  }
   function rebaseStudioHistoryJournal(
     resultingPages: StudioHistoryJournalTransitionInput["nextPages"],
     resultingHistoryIndex: number,
@@ -5456,23 +5456,17 @@ function StudioCuttoonEditor() {
       requestId: ++studioCommentFocusRequestSequenceRef.current,
     });
   }
-  const [studioCommentPinsHidden, setStudioCommentPinsHidden] = useState(() => {
-    try {
-      return globalThis.localStorage.getItem(COMMENT_PINS_HIDDEN_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      globalThis.localStorage.setItem(
-        COMMENT_PINS_HIDDEN_KEY,
-        studioCommentPinsHidden ? "1" : "0"
-      );
-    } catch {
-      // Storage-restricted embeds still keep the preference for this tab session.
-    }
-  }, [studioCommentPinsHidden]);
+  const [studioCommentPinsHidden, setStudioCommentPinsHiddenState] = useState(false);
+  const studioCommentPinsHiddenRef = useRef(studioCommentPinsHidden);
+  studioCommentPinsHiddenRef.current = studioCommentPinsHidden;
+  function setStudioCommentPinsHidden(next: SetStateAction<boolean>): void {
+    const resolved = typeof next === "function"
+      ? next(studioCommentPinsHiddenRef.current)
+      : next;
+    studioCommentPinsHiddenRef.current = resolved;
+    setStudioCommentPinsHiddenState(resolved);
+    persistStudioUiBooleanPreference("comment-pins-hidden", resolved);
+  }
   const [sharedDocumentNotice, setSharedDocumentNotice] = useState<string | null>(null);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [followingStudioSessionId, setFollowingStudioSessionId] = useState<string | null>(null);
@@ -5883,12 +5877,20 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     return () => autoActionAbortRef.current?.abort();
   }, []);
-  // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 초기 레이아웃부터 하나의
-  // owner-scoped envelope에서 읽어 패널·인스펙터·퀵 메뉴가 서로 다른 저장본으로 갈라지지 않게 한다.
+  // 작업공간은 원고 내용과 분리된 계정/브라우저별 UI 상태다. 첫 페인트는 안전한 기본값으로
+  // 시작하고, owner-scoped SQLite/OPFS snapshot을 비동기로 hydration한다. 그 사이의 UI 편집은
+  // 아래 dirty revision fence가 보존하므로 늦은 load가 사용자의 새 배치를 덮지 않는다.
   const currentWorkspaceOwnerScope = studioWorkspaceOwnerScope(studioAuthUserId);
-  const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() =>
-    loadStudioWorkspacePersistence(studioWorkspaceStorage(), studioAuthUserId)
-  );
+  const [workspacePersistence, setWorkspacePersistence] = useState<StudioWorkspaceLoadResult>(() => ({
+    state: createStudioWorkspaceDefaultState(studioAuthUserId),
+    ownerScope: currentWorkspaceOwnerScope,
+    source: "default",
+    status: "session-only",
+    failure: null,
+  }));
+  const workspaceRuntimeRef = useRef<StudioWorkspacePersistenceRuntime | null>(null);
+  const workspaceHydrationGenerationRef = useRef(0);
+  const workspaceDirtyRevisionRef = useRef(0);
   const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const workspaceState = workspacePersistence.state;
@@ -6085,14 +6087,23 @@ function StudioCuttoonEditor() {
       ) {
         return;
       }
-      const nextState = runtime.loadStudioQuickAccessState(
-        studioWorkspaceStorage(),
-        ownerScope,
-      );
+      const loadResult = await runtime.loadStudioQuickAccessState(ownerScope);
+      if (
+        requestEpoch !== quickAccessLoadEpochRef.current
+        || quickAccessOwnerScopeRef.current !== ownerScope
+      ) {
+        return;
+      }
       quickAccessLoadedOwnerScopeRef.current = ownerScope;
       quickAccessIntegrationRef.current = runtime;
       setQuickAccessIntegration(runtime);
-      setQuickAccessState(nextState);
+      setQuickAccessState(loadResult.state);
+      if (loadResult.authority === "memory-only") {
+        quickAccessPersistenceWarningRef.current = true;
+        announceDrawingShortcut(
+          "SQLite/OPFS를 열지 못해 빠른 액세스 변경은 현재 세션에만 유지돼요",
+        );
+      }
       showLoadedStudioQuickAccessPalette();
     } catch (error) {
       console.error("Failed to load Studio Quick Access:", error);
@@ -6115,20 +6126,21 @@ function StudioCuttoonEditor() {
   function changeStudioQuickAccessState(next: StudioQuickAccessState): void {
     const runtime = quickAccessIntegrationRef.current;
     if (!runtime) return;
+    const ownerScope = currentWorkspaceOwnerScope;
     setQuickAccessState(next);
-    const status = runtime.saveStudioQuickAccessState(
-      studioWorkspaceStorage(),
-      currentWorkspaceOwnerScope,
-      next,
-    );
-    if (status === "persisted") {
-      quickAccessPersistenceWarningRef.current = false;
-      return;
-    }
-    if (!quickAccessPersistenceWarningRef.current) {
-      quickAccessPersistenceWarningRef.current = true;
-      announceDrawingShortcut("빠른 액세스 변경은 현재 세션에만 유지돼요");
-    }
+    void runtime.saveStudioQuickAccessState(ownerScope, next).then((status) => {
+      if (quickAccessOwnerScopeRef.current !== ownerScope) return;
+      if (status === "persisted") {
+        quickAccessPersistenceWarningRef.current = false;
+        return;
+      }
+      if (!quickAccessPersistenceWarningRef.current) {
+        quickAccessPersistenceWarningRef.current = true;
+        announceDrawingShortcut(
+          "SQLite/OPFS 저장에 실패해 빠른 액세스 변경은 현재 세션에만 유지돼요",
+        );
+      }
+    });
   }
 
   useEffect(() => {
@@ -6477,8 +6489,9 @@ function StudioCuttoonEditor() {
 
   function applyStudioWorkspaceLayout(
     layout: StudioWorkspaceLayout,
+    workspaceId?: StudioWorkspaceId,
     source: StudioWorkspaceLayoutSource = "switch",
-    clearSyncNotice = true
+    clearSyncNotice = true,
   ) {
     cancelDrawingPaletteDrag();
     // Applying a profile is the one moment its device overrides are consulted. The authored profile
@@ -6499,6 +6512,7 @@ function StudioCuttoonEditor() {
     setMobileSheet(null);
     setQuickActionsOpen(false);
     closeStudioMenusForWorkspace(source);
+    if (workspaceId) applyStudioWorkspaceLaunchSurface(workspaceId);
     if (clearSyncNotice) setWorkspaceSyncNotice(null);
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
@@ -6506,123 +6520,255 @@ function StudioCuttoonEditor() {
     applyStudioWorkspaceLayout
   );
 
+  function updateWorkspacePersistenceSnapshot(next: StudioWorkspaceLoadResult): void {
+    workspacePersistenceRef.current = next;
+    setWorkspacePersistence(next);
+  }
+
+  function runtimeFailureNotice(
+    result: Pick<StudioWorkspaceRuntimeSaveResult, "failure" | "authority">,
+  ): string | null {
+    if (result.failure === "owner-mismatch") {
+      return "계정이 바뀌어 이전 작업공간 변경을 저장하지 않았어요.";
+    }
+    if (result.authority === "memory-only" || result.failure) {
+      return "SQLite/OPFS 저장을 사용할 수 없어 작업공간 변경을 현재 세션에 유지하고 있어요.";
+    }
+    return null;
+  }
+
   function persistStudioWorkspaceState(nextState: StudioWorkspaceState): StudioWorkspaceSaveResult {
-    if (pendingExternalWorkspaceSyncRef.current) {
-      const ownerScope = currentWorkspaceOwnerScope;
-      const ownerChanged = workspacePersistence.ownerScope !== ownerScope;
+    const ownerScope = currentWorkspaceOwnerScope;
+    const current = workspacePersistenceRef.current;
+    const scopedState = normalizeStudioWorkspaceStateForOwner(nextState, ownerScope);
+    const guardRevision = workspaceDirtyRevisionRef.current + 1;
+    workspaceDirtyRevisionRef.current = guardRevision;
+
+    const blockedByOwner = current.ownerScope !== ownerScope;
+    const blockedByExternalMerge = pendingExternalWorkspaceSyncRef.current !== null;
+    const optimistic: StudioWorkspaceLoadResult = {
+      ...current,
+      state: blockedByOwner ? current.state : scopedState,
+      ownerScope,
+      status: "session-only",
+      failure: blockedByOwner ? "owner-mismatch" : null,
+    };
+    if (!blockedByOwner) updateWorkspacePersistenceSnapshot(optimistic);
+
+    if (blockedByOwner || blockedByExternalMerge) {
       setWorkspaceSyncNotice(
-        ownerChanged
+        blockedByOwner
           ? "계정 전환 중이라 이전 작업공간 변경을 저장하지 않았어요."
-          : "다른 탭의 변경과 안전하게 합치는 동안 이 작업공간 변경은 현재 세션에 유지돼요."
+          : "다른 탭의 변경과 안전하게 합치는 동안 이 작업공간 변경은 현재 세션에 유지돼요.",
       );
-      const sessionState = ownerChanged ? workspacePersistence.state : nextState;
-      if (!ownerChanged) {
-        workspacePersistenceRef.current = {
-          ...workspacePersistenceRef.current,
-          state: sessionState,
-          status: "session-only",
-          failure: "verification-failed",
-        };
-        setWorkspacePersistence((current) =>
-          current.ownerScope === ownerScope
-            ? {
-                ...current,
-                state: sessionState,
-                status: "session-only",
-                failure: "verification-failed",
-              }
-            : current
-        );
-      }
       return Object.freeze({
-        state: sessionState,
+        state: optimistic.state,
         ownerScope,
-        status: "session-only",
-        failure: ownerChanged ? "owner-mismatch" : "verification-failed",
+        status: "session-only" as const,
+        failure: blockedByOwner ? "owner-mismatch" as const : null,
       });
     }
-    const result = saveStudioWorkspaceState(
-      studioWorkspaceStorage(),
-      studioAuthUserId,
-      nextState,
-      { sourceOwnerScope: workspacePersistence.ownerScope }
-    );
-    if (result.status === "persisted" && result.failure === null) {
-      workspaceSyncBaseStateRef.current = result.state;
+
+    const runtime = workspaceRuntimeRef.current;
+    if (!runtime || runtime.ownerScope !== ownerScope) {
+      setWorkspaceSyncNotice(
+        "SQLite/OPFS 작업공간 저장소를 준비하는 동안 변경을 현재 세션에 유지하고 있어요.",
+      );
+      return Object.freeze({
+        state: scopedState,
+        ownerScope,
+        status: "session-only" as const,
+        failure: "storage-unavailable" as const,
+      });
     }
-    if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
-    setWorkspacePersistence((current) => {
-      // 로그인 경계가 바뀐 렌더의 오래된 이벤트는 새 계정 작업공간에 섞지 않는다.
-      if (current.ownerScope !== result.ownerScope || result.failure === "owner-mismatch") {
-        return current;
+
+    void runtime.save(scopedState, current.ownerScope, guardRevision).then((result) => {
+      if (
+        workspaceRuntimeRef.current !== runtime
+        || result.ownerScope !== currentWorkspaceOwnerScope
+        || result.guardRevision !== workspaceDirtyRevisionRef.current
+      ) {
+        return;
       }
-      return {
-        ...current,
+      const nextPersistence: StudioWorkspaceLoadResult = {
+        ...workspacePersistenceRef.current,
         state: result.state,
+        ownerScope: result.ownerScope,
+        source: result.status === "persisted" ? "current" : "default",
         status: result.status,
         failure: result.failure,
       };
+      if (result.status === "persisted" && result.failure === null) {
+        workspaceSyncBaseStateRef.current = result.state;
+      }
+      updateWorkspacePersistenceSnapshot(nextPersistence);
+      setWorkspaceSyncNotice(runtimeFailureNotice(result));
+    }).catch(() => {
+      if (workspaceRuntimeRef.current !== runtime) return;
+      setWorkspaceSyncNotice(
+        "SQLite/OPFS 작업공간 저장을 확인하지 못해 변경을 현재 세션에 유지하고 있어요.",
+      );
     });
-    return result;
+
+    return Object.freeze({
+      state: scopedState,
+      ownerScope,
+      status: "session-only" as const,
+      failure: null,
+    });
   }
+  const persistStudioWorkspaceStateFromEffect = useEffectEvent(
+    persistStudioWorkspaceState,
+  );
 
-  // 로그인/로그아웃으로 owner가 바뀌면 새 범위의 상태를 원자적으로 읽고 실제 패널에도 적용한다.
-  // guest 상태를 인증 계정 키로 저장하거나 반대 방향으로 덮어쓰는 것을 막는 핵심 경계다.
+  // owner가 바뀔 때마다 별도의 SQLite/OPFS runtime을 열고, 늦은 hydration은 dirty revision
+  // fence로 막는다. BroadcastChannel은 상태를 운반하지 않고 revision invalidation만 전달한다.
   useEffect(() => {
-    if (workspacePersistence.ownerScope === currentWorkspaceOwnerScope) return;
-    const discardedPendingExternalSync = pendingExternalWorkspaceSync !== null;
-    replacePendingExternalWorkspaceSync(null);
-    const nextPersistence = loadStudioWorkspacePersistence(
-      studioWorkspaceStorage(),
-      studioAuthUserId
-    );
-    workspaceSyncBaseStateRef.current = nextPersistence.state;
-    setWorkspacePersistence(nextPersistence);
-    applyStudioWorkspaceLayoutFromEffect(
-      nextPersistence.state.liveLayout,
-      "owner-scope-change",
-      false
-    );
-    setWorkspaceSyncNotice(
-      discardedPendingExternalSync
-        ? "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요."
-        : null
-    );
-  }, [
-    currentWorkspaceOwnerScope,
-    pendingExternalWorkspaceSync,
-    studioAuthUserId,
-    workspacePersistence.ownerScope,
-  ]);
+    const generation = workspaceHydrationGenerationRef.current + 1;
+    workspaceHydrationGenerationRef.current = generation;
+    workspaceDirtyRevisionRef.current = 0;
+    const ownerScope = currentWorkspaceOwnerScope;
+    workspaceRuntimeRef.current?.close();
+    workspaceRuntimeRef.current = null;
 
-  // 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은 상호작용이 끝난 다음
-  // base/local/external 3-way 병합으로 재생한다. 서로 다른 변경은 모두 보존하고 동일 경로
-  // 충돌만 현재 탭을 우선해, 외부 카탈로그와 현재 배치 어느 쪽도 통째로 덮지 않는다.
+    const defaultState = createStudioWorkspaceDefaultState(studioAuthUserId);
+    const initialPersistence: StudioWorkspaceLoadResult = {
+      state: defaultState,
+      ownerScope,
+      source: "default",
+      status: "session-only",
+      failure: null,
+    };
+    workspaceSyncBaseStateRef.current = defaultState;
+    replacePendingExternalWorkspaceSync(null);
+    updateWorkspacePersistenceSnapshot(initialPersistence);
+    applyStudioWorkspaceLayoutFromEffect(
+      defaultState.liveLayout,
+      defaultState.activeWorkspaceId,
+      "owner-scope-change",
+      false,
+    );
+
+    let active = true;
+    let runtime: StudioWorkspacePersistenceRuntime | null = null;
+    let unsubscribe: () => void = () => undefined;
+    void import("./studio-workspace-sqlite-runtime").then(async (module) => {
+      if (!active || workspaceHydrationGenerationRef.current !== generation) return;
+      runtime = module.createStudioWorkspacePersistenceRuntime({
+        userId: studioAuthUserId,
+      });
+      workspaceRuntimeRef.current = runtime;
+      unsubscribe = runtime.subscribeInvalidation((invalidation) => {
+        if (
+          workspaceRuntimeRef.current !== runtime
+          || invalidation.ownerScope !== ownerScope
+        ) {
+          return;
+        }
+        const previous = pendingExternalWorkspaceSyncRef.current;
+        const sequence = workspaceSyncSequenceRef.current + 1;
+        workspaceSyncSequenceRef.current = sequence;
+        replacePendingExternalWorkspaceSync({
+          ownerScope,
+          authorityRevision: Math.max(
+            invalidation.revision,
+            previous?.ownerScope === ownerScope ? previous.authorityRevision : 0,
+          ),
+          sequence,
+          baseState:
+            previous?.ownerScope === ownerScope
+              ? previous.baseState
+              : workspaceSyncBaseStateRef.current,
+        });
+        if (drawingPaletteDraggingRef.current) {
+          setWorkspaceSyncNotice(
+            "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요.",
+          );
+        }
+      });
+
+      const result = await runtime.hydrate({
+        getCurrentState: () => {
+          const current = workspacePersistenceRef.current;
+          return current.ownerScope === ownerScope ? current.state : defaultState;
+        },
+        getDirtyRevision: () => workspaceDirtyRevisionRef.current,
+      });
+      if (
+        !active
+        || workspaceRuntimeRef.current !== runtime
+        || workspaceHydrationGenerationRef.current !== generation
+        || result.ownerScope !== ownerScope
+        || result.guardRevision !== workspaceDirtyRevisionRef.current
+      ) {
+        return;
+      }
+      workspaceSyncBaseStateRef.current = result.state;
+      updateWorkspacePersistenceSnapshot({
+        state: result.state,
+        ownerScope: result.ownerScope,
+        source: result.source,
+        status: result.status,
+        failure: result.failure,
+      });
+      applyStudioWorkspaceLayoutFromEffect(
+        result.state.liveLayout,
+        result.state.activeWorkspaceId,
+        "owner-scope-change",
+        false,
+      );
+      setWorkspaceSyncNotice(
+        result.authority === "memory-only"
+          ? "SQLite/OPFS 작업공간 저장소를 열지 못해 현재 세션에서 계속 작업할 수 있어요."
+          : result.conflictPaths.length > 0
+            ? "초기 작업공간을 현재 세션 변경과 안전하게 합쳤어요."
+            : null,
+      );
+    }).catch(() => {
+      if (!active || workspaceHydrationGenerationRef.current !== generation) return;
+      setWorkspaceSyncNotice(
+        "SQLite/OPFS 작업공간 모듈을 열지 못해 변경을 현재 세션에 유지하고 있어요.",
+      );
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+      if (runtime && workspaceRuntimeRef.current === runtime) {
+        workspaceRuntimeRef.current = null;
+      }
+      runtime?.close();
+    };
+  }, [currentWorkspaceOwnerScope, studioAuthUserId]);
+
+  // 드래그나 작업공간 메뉴 편집과 겹친 외부 revision은 상호작용 종료 뒤 SQLite에서 다시
+  // 읽고 base/local/external 3-way merge한다. 같은 경로 충돌만 현재 탭 우선으로 남긴다.
   useEffect(() => {
     if (
-      leftResize.dragging ||
-      rightResize.dragging ||
-      drawingPaletteDragging ||
-      !pendingExternalWorkspaceSync
+      leftResize.dragging
+      || rightResize.dragging
+      || drawingPaletteDragging
+      || !pendingExternalWorkspaceSync
     ) {
       return;
     }
-    const pendingSync = pendingExternalWorkspaceSync;
 
+    const pendingSync = pendingExternalWorkspaceSync;
     const ownerScope = currentWorkspaceOwnerScope;
-    const storageKey = studioWorkspaceStorageKey(studioAuthUserId);
-    const currentPersistence = workspacePersistenceRef.current;
+    const runtime = workspaceRuntimeRef.current;
     if (
-      pendingSync.ownerScope !== ownerScope ||
-      pendingSync.storageKey !== storageKey ||
-      currentPersistence.ownerScope !== ownerScope
+      pendingSync.ownerScope !== ownerScope
+      || !runtime
+      || runtime.ownerScope !== ownerScope
+      || workspacePersistenceRef.current.ownerScope !== ownerScope
     ) {
       replacePendingExternalWorkspaceSync(null);
       setWorkspaceSyncNotice(
-        "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요."
+        "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요.",
       );
       return;
     }
+
     let cancelled = false;
     let deferredWorkspaceMenu: HTMLElement | null = null;
     let retryFrame: number | null = null;
@@ -6635,17 +6781,14 @@ function StudioCuttoonEditor() {
     };
     const deferWhileWorkspaceMenuOpen = () => {
       const workspaceMenu = document.querySelector<HTMLElement>(
-        '[data-testid="studio-workspace-dialog"]:not([hidden])'
+        '[data-testid="studio-workspace-dialog"]:not([hidden])',
       );
       if (!workspaceMenu) return false;
       setWorkspaceSyncNotice(
-        "작업공간 편집을 마치면 다른 탭의 변경과 자동으로 합칠게요."
+        "작업공간 편집을 마치면 다른 탭의 변경과 자동으로 합칠게요.",
       );
       if (deferredWorkspaceMenu !== workspaceMenu) {
-        deferredWorkspaceMenu?.removeEventListener(
-          "focusout",
-          retryAfterWorkspaceMenu
-        );
+        deferredWorkspaceMenu?.removeEventListener("focusout", retryAfterWorkspaceMenu);
         deferredWorkspaceMenu = workspaceMenu;
         workspaceMenu.addEventListener("focusout", retryAfterWorkspaceMenu, {
           once: true,
@@ -6655,161 +6798,87 @@ function StudioCuttoonEditor() {
     };
     const cancelPendingMerge = () => {
       cancelled = true;
-      deferredWorkspaceMenu?.removeEventListener(
-        "focusout",
-        retryAfterWorkspaceMenu
-      );
+      deferredWorkspaceMenu?.removeEventListener("focusout", retryAfterWorkspaceMenu);
       if (retryFrame !== null) globalThis.cancelAnimationFrame(retryFrame);
     };
-    if (deferWhileWorkspaceMenuOpen()) {
-      return cancelPendingMerge;
-    }
+    if (deferWhileWorkspaceMenuOpen()) return cancelPendingMerge;
 
-    const storage = studioWorkspaceStorage();
-    if (!storage) {
-      const localState = updateStudioWorkspaceLiveLayout(
-        currentPersistence.state,
-        liveWorkspaceLayoutRef.current
-      );
+    void runtime.reconcile({
+      sourceOwnerScope: ownerScope,
+      baseState: pendingSync.baseState,
+      getLocalState: () => {
+        const current = workspacePersistenceRef.current;
+        return updateStudioWorkspaceLiveLayout(
+          current.ownerScope === ownerScope ? current.state : pendingSync.baseState,
+          liveWorkspaceLayoutRef.current,
+        );
+      },
+      getDirtyRevision: () => workspaceDirtyRevisionRef.current,
+    }).then((result) => {
+      if (cancelled || workspaceRuntimeRef.current !== runtime) return;
+      const latestPending = pendingExternalWorkspaceSyncRef.current;
+      if (
+        !latestPending
+        || latestPending.sequence !== pendingSync.sequence
+        || latestPending.authorityRevision !== pendingSync.authorityRevision
+        || result.ownerScope !== ownerScope
+      ) {
+        return;
+      }
+      if (deferWhileWorkspaceMenuOpen()) return;
+      if (result.guardRevision !== workspaceDirtyRevisionRef.current) {
+        const sequence = workspaceSyncSequenceRef.current + 1;
+        workspaceSyncSequenceRef.current = sequence;
+        replacePendingExternalWorkspaceSync({ ...latestPending, sequence });
+        return;
+      }
+
+      workspaceSyncBaseStateRef.current = result.state;
       replacePendingExternalWorkspaceSync(null);
-      setWorkspacePersistence((current) =>
-        current.ownerScope === ownerScope
-          ? {
-              ...current,
-              state: localState,
-              status: "session-only",
-              failure: "storage-unavailable",
-            }
-          : current
-      );
-      setWorkspaceSyncNotice(
-        "저장소를 사용할 수 없어 현재 배치를 이 세션에 유지하고 있어요."
-      );
-      return;
-    }
-    const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId);
-    if (loaded.failure) {
-      const localState = updateStudioWorkspaceLiveLayout(
-        currentPersistence.state,
-        liveWorkspaceLayoutRef.current
-      );
-      replacePendingExternalWorkspaceSync(null);
-      setWorkspacePersistence((current) =>
-        current.ownerScope === ownerScope
-          ? {
-              ...current,
-              state: localState,
-              status: "session-only",
-              failure: loaded.failure,
-            }
-          : current
-      );
-      setWorkspaceSyncNotice(
-        "다른 탭의 작업공간을 확인하지 못해 현재 배치를 이 세션에 유지했어요."
-      );
-      return;
-    }
-    void import("./studio-workspace-three-way-merge")
-      .then(({ reconcileStudioWorkspacePendingSync }) => {
-        if (cancelled) return;
-        const latestPending = pendingExternalWorkspaceSyncRef.current;
-        if (
-          !latestPending ||
-          latestPending.sequence !== pendingSync.sequence ||
-          latestPending.ownerScope !== ownerScope ||
-          latestPending.storageKey !== storageKey
-        ) {
-          return;
-        }
-        if (deferWhileWorkspaceMenuOpen()) return;
-        const latestPersistence = workspacePersistenceRef.current;
-        if (latestPersistence.ownerScope !== ownerScope) {
-          replacePendingExternalWorkspaceSync(null);
-          return;
-        }
-        const reconciliation = reconcileStudioWorkspacePendingSync({
-          storage,
-          storageKey,
-          expectedRaw: latestPending.latestEventRaw,
-          userId: studioAuthUserId,
-          ownerScope,
-          base: pendingSync.baseState,
-          local: updateStudioWorkspaceLiveLayout(
-            latestPersistence.state,
-            liveWorkspaceLayoutRef.current
-          ),
-          external: loaded.state,
-        });
-        if (reconciliation.kind === "retry-latest-raw") {
-          const sequence = workspaceSyncSequenceRef.current + 1;
-          workspaceSyncSequenceRef.current = sequence;
-          replacePendingExternalWorkspaceSync({
-            ...latestPending,
-            latestEventRaw: reconciliation.latestRaw,
-            sequence,
-          });
-          return;
-        }
-        const { conflictPaths, result } = reconciliation;
-        if (cancelled) return;
-        if (result.status === "persisted" && result.failure === null) {
-          workspaceSyncBaseStateRef.current = result.state;
-        }
-        replacePendingExternalWorkspaceSync(null);
-        const mergedPersistence = {
-          ...loaded,
-          state: result.state,
-          status: result.status,
-          failure: result.failure,
-        };
-        workspacePersistenceRef.current = mergedPersistence;
-        setWorkspacePersistence(mergedPersistence);
-        applyStudioWorkspaceLayoutFromEffect(
-          result.state.liveLayout,
-          "external-sync",
-          false
-        );
-        setWorkspaceMenuEpoch((current) => current + 1);
-        setWorkspaceSyncNotice(
-          conflictPaths.length > 0
-            ? `다른 탭의 변경을 합쳤어요. 겹친 ${conflictPaths.length}개 설정은 현재 탭을 유지했습니다.`
-            : result.status === "persisted"
-              ? "다른 탭의 변경과 현재 배치를 안전하게 합쳤어요."
-              : "다른 탭의 변경을 합쳐 현재 세션에 유지했어요."
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        const latestPending = pendingExternalWorkspaceSyncRef.current;
-        if (!latestPending || latestPending.sequence !== pendingSync.sequence) {
-          return;
-        }
-        const latestPersistence = workspacePersistenceRef.current;
-        const latestLocalState = updateStudioWorkspaceLiveLayout(
-          latestPersistence.state,
-          liveWorkspaceLayoutRef.current
-        );
-        replacePendingExternalWorkspaceSync(null);
-        workspacePersistenceRef.current = {
-          ...latestPersistence,
-          state: latestLocalState,
-          status: "session-only",
-          failure: "verification-failed",
-        };
-        setWorkspacePersistence((current) =>
-          current.ownerScope === ownerScope
-            ? {
-                ...current,
-                state: latestLocalState,
-                status: "session-only",
-                failure: "verification-failed",
-              }
-            : current
-        );
-        setWorkspaceSyncNotice(
-          "다른 탭의 변경을 합치지 못해 현재 배치를 이 세션에 유지했어요."
-        );
+      updateWorkspacePersistenceSnapshot({
+        ...workspacePersistenceRef.current,
+        state: result.state,
+        ownerScope: result.ownerScope,
+        source: result.status === "persisted" ? "current" : "default",
+        status: result.status,
+        failure: result.failure,
       });
+      applyStudioWorkspaceLayoutFromEffect(
+        result.state.liveLayout,
+        result.state.activeWorkspaceId,
+        "external-sync",
+        false,
+      );
+      setWorkspaceMenuEpoch((current) => current + 1);
+      setWorkspaceSyncNotice(
+        result.conflictPaths.length > 0
+          ? "다른 탭의 변경을 합쳤어요. 겹친 "
+            + result.conflictPaths.length
+            + "개 설정은 현재 탭을 유지했습니다."
+          : result.status === "persisted"
+            ? "다른 탭의 변경과 현재 배치를 안전하게 합쳤어요."
+            : runtimeFailureNotice(result),
+      );
+    }).catch(() => {
+      if (cancelled || workspaceRuntimeRef.current !== runtime) return;
+      const latestPending = pendingExternalWorkspaceSyncRef.current;
+      if (!latestPending || latestPending.sequence !== pendingSync.sequence) return;
+      const current = workspacePersistenceRef.current;
+      const localState = updateStudioWorkspaceLiveLayout(
+        current.state,
+        liveWorkspaceLayoutRef.current,
+      );
+      replacePendingExternalWorkspaceSync(null);
+      updateWorkspacePersistenceSnapshot({
+        ...current,
+        state: localState,
+        status: "session-only",
+        failure: "verification-failed",
+      });
+      setWorkspaceSyncNotice(
+        "다른 탭의 변경을 합치지 못해 현재 배치를 이 세션에 유지했어요.",
+      );
+    });
     return cancelPendingMerge;
   }, [
     currentWorkspaceOwnerScope,
@@ -6822,15 +6891,13 @@ function StudioCuttoonEditor() {
     workspaceSyncRetryEpoch,
   ]);
 
-  // 활성 프리셋 스냅샷은 그대로 두고 liveLayout만 즉시 저장한다. 패널 폭은 pointerup까지
-  // 기다렸다가 최종값 한 번만 저장해 드래그 쓰기 폭주와 탭 종료 직전 상태 유실을 함께 막는다.
+  // 활성 프리셋 스냅샷은 그대로 두고 liveLayout만 저장한다. 패널 폭은 pointerup까지 기다려
+  // 최종값 한 번만 SQLite에 기록한다.
   useEffect(() => {
     const ownerScope = currentWorkspaceOwnerScope;
     if (workspacePersistence.ownerScope !== ownerScope) return;
     if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return;
     if (pendingExternalWorkspaceSync) return;
-    // 화면 기하를 저자형으로 되돌려 저장한다. 되돌리지 않으면 폰에서 한 번 연 것이 데스크톱 도크로
-    // 굳어, 작가가 저술한 배치가 "마지막에 연 기기"로 영구히 덮인다.
     const nextLayout = captureStudioWorkspaceDeviceLayout(
       workspacePersistence.state.liveLayout,
       normalizeStudioWorkspaceLayout(
@@ -6845,46 +6912,16 @@ function StudioCuttoonEditor() {
           drawingPalettes: drawingPaletteLayout,
           quickActions: quickActionsPreferences,
         },
-        workspacePersistence.state.liveLayout
-      ),
-      workspaceDeviceKind
-    );
-    if (
-      areStudioWorkspaceLayoutsEqual(
         workspacePersistence.state.liveLayout,
-        nextLayout
-      )
-    ) {
+      ),
+      workspaceDeviceKind,
+    );
+    if (areStudioWorkspaceLayoutsEqual(workspacePersistence.state.liveLayout, nextLayout)) {
       return;
     }
-
-    const sourceState = workspacePersistence.state;
-    const nextState = updateStudioWorkspaceLiveLayout(sourceState, nextLayout);
-    const result = saveStudioWorkspaceState(
-      studioWorkspaceStorage(),
-      studioAuthUserId,
-      nextState,
-      { sourceOwnerScope: ownerScope }
+    persistStudioWorkspaceStateFromEffect(
+      updateStudioWorkspaceLiveLayout(workspacePersistence.state, nextLayout),
     );
-    if (result.status === "persisted" && result.failure === null) {
-      workspaceSyncBaseStateRef.current = result.state;
-    }
-    setWorkspacePersistence((current) => {
-      if (
-        current.ownerScope !== ownerScope ||
-        current.state !== sourceState ||
-        result.failure === "owner-mismatch"
-      ) {
-        return current;
-      }
-      return {
-        ...current,
-        state: result.state,
-        status: result.status,
-        failure: result.failure,
-      };
-    });
-    if (result.failure !== "owner-mismatch") setWorkspaceSyncNotice(null);
   }, [
     currentWorkspaceOwnerScope,
     drawingPaletteDragging,
@@ -6903,43 +6940,6 @@ function StudioCuttoonEditor() {
     workspacePersistence.ownerScope,
     workspacePersistence.state,
   ]);
-
-  // 다른 탭에서 같은 계정의 작업공간을 저장하면 원고를 새로고침하지 않고 UI 배치만 동기화한다.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const storage = studioWorkspaceStorage();
-    if (!storage) return;
-    const ownerScope = currentWorkspaceOwnerScope;
-    const storageKey = studioWorkspaceStorageKey(studioAuthUserId);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      if (event.storageArea && event.storageArea !== storage) return;
-      const currentPersistence = workspacePersistenceRef.current;
-      if (currentPersistence.ownerScope !== ownerScope) return;
-      const sequence = workspaceSyncSequenceRef.current + 1;
-      workspaceSyncSequenceRef.current = sequence;
-      const previousPending = pendingExternalWorkspaceSyncRef.current;
-      replacePendingExternalWorkspaceSync({
-        ownerScope,
-        storageKey,
-        latestEventRaw: event.newValue,
-        sequence,
-        baseState:
-          previousPending?.ownerScope === ownerScope &&
-          previousPending.storageKey === storageKey
-            ? previousPending.baseState
-            : workspaceSyncBaseStateRef.current,
-      });
-      if (drawingPaletteDraggingRef.current) {
-        setWorkspaceSyncNotice(
-          "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요."
-        );
-        return;
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [currentWorkspaceOwnerScope, studioAuthUserId]);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
   const [, setClipStorageState] = useState<
@@ -7785,16 +7785,28 @@ function StudioCuttoonEditor() {
   }
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  const recentColorsRef = useRef(recentColors);
+  const recentColorsUserRevisionRef = useRef(0);
+  recentColorsRef.current = recentColors;
   const recentColorsLoadRef = useRef<Promise<void> | null>(null);
   const ensureRecentColorsLoaded = () => {
     if (recentColorsLoadRef.current) return;
-    recentColorsLoadRef.current = import("./studio-color-utils")
-      .then(({ readRecentColors }) => {
-        setRecentColors(readRecentColors(globalThis.localStorage));
+    const revisionAtStart = recentColorsUserRevisionRef.current;
+    recentColorsLoadRef.current = acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.loadRecentColors())
+      .then(async (loaded) => {
+        if (recentColorsUserRevisionRef.current === revisionAtStart) {
+          recentColorsRef.current = loaded;
+          setRecentColors(loaded);
+          return;
+        }
+        const repository = await acquireProductStudioUiPreferencesRepository();
+        await repository.saveRecentColors(recentColorsRef.current);
       })
       .catch((err) => {
         recentColorsLoadRef.current = null;
-        console.error("Failed to load studio recent colors:", err);
+        setAppSettingsPersistenceState("session-only");
+        console.error("Failed to load SQLite/OPFS studio recent colors:", err);
       });
   };
   // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
@@ -7909,13 +7921,15 @@ function StudioCuttoonEditor() {
   }, [canvasOnlyMode]);
   const rememberColor = (c: string) => {
     void import("./studio-color-utils")
-      .then(({ pushRecentColor, storeRecentColors }) => {
-        setRecentColors((prev) => {
-          const next = pushRecentColor(prev, c);
-          if (next === prev) return prev;
-          storeRecentColors(globalThis.localStorage, next);
-          return next;
-        });
+      .then(({ pushRecentColor }) => {
+        const next = pushRecentColor(recentColorsRef.current, c);
+        if (next === recentColorsRef.current) return;
+        recentColorsUserRevisionRef.current += 1;
+        recentColorsRef.current = next;
+        setRecentColors(next);
+        void acquireProductStudioUiPreferencesRepository()
+          .then((repository) => repository.saveRecentColors(next))
+          .catch(() => setAppSettingsPersistenceState("session-only"));
       })
       .catch((err) => {
         console.error("Failed to store studio recent color:", err);
@@ -9160,8 +9174,12 @@ function StudioCuttoonEditor() {
     state: StudioAssetFavoriteState;
   }>(() => ({
     userId: studioAuthUserId,
-    state: loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
+    state: normalizeStudioAssetFavoriteState(undefined),
   }));
+  const assetFavoriteWorkspaceRef = useRef(assetFavoriteWorkspace);
+  const assetFavoriteHydrationGenerationRef = useRef(0);
+  const assetFavoriteUserRevisionRef = useRef(0);
+  assetFavoriteWorkspaceRef.current = assetFavoriteWorkspace;
   const [assetFavoriteOnly, setAssetFavoriteOnly] = useState(false);
   const [rasterFavoriteOnly, setRasterFavoriteOnly] = useState(false);
   const assetFavoriteState =
@@ -9377,49 +9395,70 @@ function StudioCuttoonEditor() {
     bg3dMutationPageIdRef.current = bg3dOpen ? currentPageIdRef.current : null;
   }, [bg3dOpen]);
 
-  // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 localStorage에 분리하고,
+  // 즐겨찾기는 프로젝트 내용이 아니라 작가 작업공간 선호다. 계정별 SQLite/OPFS 행으로 분리하고,
   // 로그인 사용자가 바뀌는 한 렌더 동안 이전 계정의 별표가 보이거나 새 키에 기록되지 않게 owner와
-  // 상태를 한 객체로 묶는다. 저장소가 막힌 브라우저에서도 모듈의 best-effort 계약으로 편집은 유지된다.
+  // 상태를 한 객체로 묶는다. 저장소가 막히면 현재 세션 상태만 유지하고 설정 경고를 노출한다.
   useEffect(() => {
-    setAssetFavoriteWorkspace({
+    const generation = ++assetFavoriteHydrationGenerationRef.current;
+    assetFavoriteUserRevisionRef.current = 0;
+    const empty = {
       userId: studioAuthUserId,
-      state: loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
-    });
+      state: normalizeStudioAssetFavoriteState(undefined),
+    };
+    assetFavoriteWorkspaceRef.current = empty;
+    setAssetFavoriteWorkspace(empty);
     setAssetFavoriteOnly(false);
     setRasterFavoriteOnly(false);
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.loadAssetFavorites(studioAuthUserId))
+      .then(async (loaded) => {
+        if (
+          generation !== assetFavoriteHydrationGenerationRef.current
+          || assetFavoriteWorkspaceRef.current.userId !== studioAuthUserId
+        ) return;
+        if (assetFavoriteUserRevisionRef.current === 0) {
+          const hydrated = { userId: studioAuthUserId, state: loaded };
+          assetFavoriteWorkspaceRef.current = hydrated;
+          setAssetFavoriteWorkspace(hydrated);
+          return;
+        }
+        const repository = await acquireProductStudioUiPreferencesRepository();
+        await repository.saveAssetFavorites(
+          studioAuthUserId,
+          assetFavoriteWorkspaceRef.current.state,
+        );
+      })
+      .catch(() => setAppSettingsPersistenceState("session-only"));
   }, [studioAuthUserId]);
 
-  useEffect(() => {
-    if (assetFavoriteWorkspace.userId !== studioAuthUserId) return;
-    saveStudioAssetFavoriteState(
-      studioFavoriteStorage(),
-      studioAuthUserId,
-      assetFavoriteWorkspace.state
-    );
-  }, [assetFavoriteWorkspace, studioAuthUserId]);
+  function commitAssetFavoriteState(state: StudioAssetFavoriteState): void {
+    const next = { userId: studioAuthUserId, state };
+    assetFavoriteUserRevisionRef.current += 1;
+    assetFavoriteWorkspaceRef.current = next;
+    setAssetFavoriteWorkspace(next);
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveAssetFavorites(studioAuthUserId, state))
+      .catch(() => setAppSettingsPersistenceState("session-only"));
+  }
 
   function toggleAssetFavorite(id: StudioAssetFavoriteId) {
-    setAssetFavoriteWorkspace((current) => ({
-      userId: studioAuthUserId,
-      state: toggleStudioAssetFavorite(
-        current.userId === studioAuthUserId
-          ? current.state
-          : loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
-        id
-      ),
-    }));
+    const current = assetFavoriteWorkspaceRef.current;
+    commitAssetFavoriteState(toggleStudioAssetFavorite(
+      current.userId === studioAuthUserId
+        ? current.state
+        : normalizeStudioAssetFavoriteState(undefined),
+      id,
+    ));
   }
 
   function removeAssetFavorite(id: StudioAssetFavoriteId) {
-    setAssetFavoriteWorkspace((current) => ({
-      userId: studioAuthUserId,
-      state: removeStudioAssetFavorite(
-        current.userId === studioAuthUserId
-          ? current.state
-          : loadStudioAssetFavoriteState(studioFavoriteStorage(), studioAuthUserId),
-        id
-      ),
-    }));
+    const current = assetFavoriteWorkspaceRef.current;
+    commitAssetFavoriteState(removeStudioAssetFavorite(
+      current.userId === studioAuthUserId
+        ? current.state
+        : normalizeStudioAssetFavoriteState(undefined),
+      id,
+    ));
   }
   // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때만 채워진다 — WorkDetail.pages(렌더링된
   // 컷 이미지)가 있어야 컷별 연출(WorkFxPanel)의 "컷 이미지 클릭해 마크 찍기" UI가 성립하므로,
@@ -9501,6 +9540,37 @@ function StudioCuttoonEditor() {
     }
   }, [frameAnimOpen, frameAnimTargetId, frameAnimTarget]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+
+  /**
+   * A task workspace must open the production surface it promises, not merely rearrange generic
+   * docks. This one-shot launch runs only on an explicit workspace apply/load; normal panel edits
+   * never fight the artist by reopening a surface they closed.
+   */
+  function applyStudioWorkspaceLaunchSurface(workspaceId: StudioWorkspaceId) {
+    switch (studioWorkspaceLaunchSurface(workspaceId)) {
+      case "vector-design":
+        activatePrimaryCanvasTool("draw", "shape");
+        openInspectorRoute({ primary: "layers", image: "transform" });
+        return;
+      case "animation":
+        setTimelinePlaying(false);
+        setTimelineOpen(true);
+        setOnionSkin((current) => ({ ...current, enabled: true }));
+        return;
+      case "pose-3d":
+        setMannequinPoserOpen(true);
+        return;
+      case null:
+        return;
+    }
+  }
+  const initialWorkspaceLaunchId = useRef(workspaceState.activeWorkspaceId).current;
+  const applyInitialStudioWorkspaceLaunch = useEffectEvent(
+    applyStudioWorkspaceLaunchSurface,
+  );
+  useEffect(() => {
+    applyInitialStudioWorkspaceLaunch(initialWorkspaceLaunchId);
+  }, [initialWorkspaceLaunchId]);
   const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
@@ -9547,10 +9617,104 @@ function StudioCuttoonEditor() {
     raf = globalThis.requestAnimationFrame(tick);
     return () => globalThis.cancelAnimationFrame(raf);
   }, [timelinePlaying, animTimeline]);
-  const [quickStartDismissed, setQuickStartDismissed] = useState(readQuickStartDismissed);
+  const [quickStartDismissed, setQuickStartDismissed] = useState(false);
+  const quickStartDismissedRef = useRef(quickStartDismissed);
+  quickStartDismissedRef.current = quickStartDismissed;
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [quickComicOpen, setQuickComicOpen] = useState(false);
-  const [mobileHintDismissed, setMobileHintDismissed] = useState(readMobileHintDismissed);
+  const [mobileHintDismissed, setMobileHintDismissed] = useState(false);
+  const mobileHintDismissedRef = useRef(mobileHintDismissed);
+  mobileHintDismissedRef.current = mobileHintDismissed;
+  const [aiNoticeAcknowledged, setAiNoticeAcknowledged] = useState(false);
+  const aiNoticeAcknowledgedRef = useRef(aiNoticeAcknowledged);
+  aiNoticeAcknowledgedRef.current = aiNoticeAcknowledged;
+  const [uiBooleanPreferencesReady, setUiBooleanPreferencesReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const revisionsAtStart = { ...uiBooleanPreferenceRevisionsRef.current };
+    void acquireProductStudioUiPreferencesRepository()
+      .then(async (repository) => {
+        const results = await Promise.allSettled([
+          repository.loadBooleanPreference("ai-notice-acknowledged"),
+          repository.loadBooleanPreference("quick-start-dismissed"),
+          repository.loadBooleanPreference("mobile-hint-dismissed"),
+          repository.loadBooleanPreference("comment-pins-hidden"),
+        ]);
+        if (cancelled) return;
+
+        let degraded = false;
+        const reconcile = async (
+          key: StudioUiBooleanPreferenceKey,
+          result: PromiseSettledResult<boolean>,
+          current: () => boolean,
+          apply: (value: boolean) => void,
+        ): Promise<void> => {
+          if (result.status === "fulfilled") {
+            if (uiBooleanPreferenceRevisionsRef.current[key] === revisionsAtStart[key]) {
+              apply(result.value);
+              return;
+            }
+          } else if (uiBooleanPreferenceRevisionsRef.current[key] === revisionsAtStart[key]) {
+            degraded = true;
+            return;
+          }
+          try {
+            await repository.saveBooleanPreference(key, current());
+          } catch {
+            degraded = true;
+          }
+        };
+
+        await reconcile(
+          "ai-notice-acknowledged",
+          results[0],
+          () => aiNoticeAcknowledgedRef.current,
+          (value) => {
+            aiNoticeAcknowledgedRef.current = value;
+            setAiNoticeAcknowledged(value);
+          },
+        );
+        await reconcile(
+          "quick-start-dismissed",
+          results[1],
+          () => quickStartDismissedRef.current,
+          (value) => {
+            quickStartDismissedRef.current = value;
+            setQuickStartDismissed(value);
+          },
+        );
+        await reconcile(
+          "mobile-hint-dismissed",
+          results[2],
+          () => mobileHintDismissedRef.current,
+          (value) => {
+            mobileHintDismissedRef.current = value;
+            setMobileHintDismissed(value);
+          },
+        );
+        await reconcile(
+          "comment-pins-hidden",
+          results[3],
+          () => studioCommentPinsHiddenRef.current,
+          (value) => {
+            studioCommentPinsHiddenRef.current = value;
+            setStudioCommentPinsHiddenState(value);
+          },
+        );
+        if (!cancelled) {
+          setUiBooleanPreferencesReady(true);
+          if (degraded) setAppSettingsPersistenceState("session-only");
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUiBooleanPreferencesReady(true);
+        setAppSettingsPersistenceState("session-only");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [title, setTitleState] = useState("");
   const setTitle = (next: Parameters<typeof setTitleState>[0]) => {
@@ -9621,6 +9785,83 @@ function StudioCuttoonEditor() {
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const settingsRevisionAtStart = appSettingsUserRevisionRef.current;
+    const favoritesRevisionAtStart = effectFavoriteUserRevisionRef.current;
+
+    void acquireProductStudioUiPreferencesRepository()
+      .then(async (repository) => {
+        const [settingsResult, favoritesResult] = await Promise.allSettled([
+          repository.loadAppSettings(),
+          repository.loadEffectFavorites(),
+        ]);
+        if (cancelled) return;
+
+        let degraded = false;
+        if (settingsResult.status === "fulfilled") {
+          if (appSettingsUserRevisionRef.current === settingsRevisionAtStart) {
+            const hydrated = settingsResult.value;
+            appSettingsRef.current = hydrated;
+            setAppSettings(hydrated);
+            setUiDensityMode(hydrated.general.densityMode);
+            if (hydrated.general.densityMode === "focus") setForceRightPanelOpen(false);
+            setShowGrid(hydrated.grids.showPixelGrid);
+            setShowRulers(hydrated.grids.showCanvasRulers);
+            setGridSize(hydrated.grids.pixelGridSize);
+            setShowAlignmentGuides(hydrated.grids.showAlignmentGuides);
+            setSnapEnabled(hydrated.grids.snapToPixelGrid);
+            setPressureCurve(hydrated.other.pressureCurve);
+          } else {
+            try {
+              await repository.saveAppSettings(appSettingsRef.current);
+            } catch {
+              degraded = true;
+            }
+          }
+        } else if (appSettingsUserRevisionRef.current !== settingsRevisionAtStart) {
+          try {
+            await repository.saveAppSettings(appSettingsRef.current);
+          } catch {
+            degraded = true;
+          }
+        } else {
+          degraded = true;
+        }
+
+        if (favoritesResult.status === "fulfilled") {
+          if (effectFavoriteUserRevisionRef.current === favoritesRevisionAtStart) {
+            effectFavoriteStateRef.current = favoritesResult.value;
+            setEffectFavoriteState(favoritesResult.value);
+          } else {
+            try {
+              await repository.saveEffectFavorites(effectFavoriteStateRef.current);
+            } catch {
+              degraded = true;
+            }
+          }
+        } else if (effectFavoriteUserRevisionRef.current !== favoritesRevisionAtStart) {
+          try {
+            await repository.saveEffectFavorites(effectFavoriteStateRef.current);
+          } catch {
+            degraded = true;
+          }
+        } else {
+          degraded = true;
+        }
+
+        if (!cancelled) {
+          setAppSettingsPersistenceState(degraded ? "session-only" : "saved");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAppSettingsPersistenceState("session-only");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     if (
       masterEditMode
@@ -15384,9 +15625,13 @@ function StudioCuttoonEditor() {
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [advancedFillActive, setAdvancedFillActive] = useState(false);
   const [advancedFillBusy, setAdvancedFillBusy] = useState(false);
-  const [advancedFillSettings, setAdvancedFillSettings] = useState<StudioAdvancedFillSettings>(() =>
-    loadStudioAdvancedFillSettings(studioAdvancedFillStorage())
-  );
+  const [advancedFillSettings, setAdvancedFillSettingsState] =
+    useState<StudioAdvancedFillSettings>(() => ({
+      ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS,
+    }));
+  const advancedFillSettingsRef = useRef(advancedFillSettings);
+  const advancedFillUserRevisionRef = useRef(0);
+  advancedFillSettingsRef.current = advancedFillSettings;
   const [advancedFillPreview, setAdvancedFillPreview] = useState<StudioAdvancedFillPreview | null>(null);
   const [advancedFillVirtualTarget, setAdvancedFillVirtualTarget] =
     useState<StudioAdvancedFillVirtualTarget | null>(null);
@@ -15837,8 +16082,26 @@ function StudioCuttoonEditor() {
     selectedImageElementId,
   ]);
   useEffect(() => {
-    saveStudioAdvancedFillSettings(studioAdvancedFillStorage(), advancedFillSettings);
-  }, [advancedFillSettings]);
+    let cancelled = false;
+    const revisionAtStart = advancedFillUserRevisionRef.current;
+    void acquireProductStudioUiPreferencesRepository()
+      .then(async (repository) => {
+        const loaded = await repository.loadAdvancedFillSettings();
+        if (cancelled) return;
+        if (advancedFillUserRevisionRef.current === revisionAtStart) {
+          advancedFillSettingsRef.current = loaded;
+          setAdvancedFillSettingsState(loaded);
+          return;
+        }
+        await repository.saveAdvancedFillSettings(advancedFillSettingsRef.current);
+      })
+      .catch(() => {
+        if (!cancelled) setAppSettingsPersistenceState("session-only");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     void activePage.id;
     void selectedId;
@@ -16498,30 +16761,107 @@ function StudioCuttoonEditor() {
   const [exportTransparent, setExportTransparent] = useState(false);
   // 선택한 플랫폼 내보내기 규격(없으면 null = 자유 배율).
   const [exportPresetId, setExportPresetId] = useState<string | null>(null);
-  // 내보내기 워터마크/서명 — 세션 넘어 유지되게 localStorage에 저장.
-  const [watermark, setWatermarkState] = useState<WatermarkSettings>(DEFAULT_WATERMARK);
-  const watermarkLoadedRef = useRef(false);
-  const ensureWatermarkLoaded = () => {
-    if (watermarkLoadedRef.current) return watermark;
-    watermarkLoadedRef.current = true;
+  // 내보내기 워터마크/서명 — SQLite/OPFS를 유일한 영속 authority로 사용한다. DB가 막혀도
+  // 현재 탭 편집은 유지하되 아래 경고를 통해 새로고침 시 손실됨을 명시한다.
+  const [watermarkPreferenceSnapshot, setWatermarkPreferenceSnapshot] =
+    useState<StudioWatermarkPreferenceSnapshot>(() => ({
+      authority: "sqlite-opfs",
+      settings: { ...DEFAULT_WATERMARK },
+      state: "hydrating",
+      durable: false,
+      message: null,
+      cause: null,
+    }));
+  const watermarkPreferenceRuntimeRef = useRef<StudioWatermarkPreferenceRuntime | null>(null);
+  const watermarkPreferenceRuntimePromiseRef = useRef<
+    Promise<StudioWatermarkPreferenceRuntime> | null
+  >(null);
+  const watermarkPendingSettingsRef = useRef<WatermarkSettings>({ ...DEFAULT_WATERMARK });
+  const watermarkPreferenceDirtyRef = useRef(false);
+  const acquireWatermarkPreferenceRuntime = useCallback((): Promise<StudioWatermarkPreferenceRuntime> => {
+    if (watermarkPreferenceRuntimeRef.current) {
+      return Promise.resolve(watermarkPreferenceRuntimeRef.current);
+    }
+    if (watermarkPreferenceRuntimePromiseRef.current) {
+      return watermarkPreferenceRuntimePromiseRef.current;
+    }
+    const pending = loadStudioWatermarkPreferencesSqliteModule()
+      .then((module) => {
+        const runtime = module.createStudioWatermarkPreferenceRuntime({
+          initialSettings: watermarkPendingSettingsRef.current,
+        });
+        watermarkPreferenceRuntimeRef.current = runtime;
+        if (watermarkPreferenceDirtyRef.current) {
+          runtime.update(watermarkPendingSettingsRef.current);
+        }
+        return runtime;
+      })
+      .catch((cause: unknown) => {
+        watermarkPreferenceRuntimePromiseRef.current = null;
+        throw cause;
+      });
+    watermarkPreferenceRuntimePromiseRef.current = pending;
+    return pending;
+  }, []);
+  const watermark = watermarkPreferenceSnapshot.settings;
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: () => void = () => undefined;
+    void acquireWatermarkPreferenceRuntime()
+      .then((runtime) => {
+        if (!active) return;
+        const publish = () => {
+          const snapshot = runtime.getSnapshot();
+          watermarkPendingSettingsRef.current = snapshot.settings;
+          if (snapshot.durable) watermarkPreferenceDirtyRef.current = false;
+          setWatermarkPreferenceSnapshot(snapshot);
+        };
+        unsubscribe = runtime.subscribe(publish);
+        publish();
+        void runtime.hydrate();
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        setWatermarkPreferenceSnapshot((current) => ({
+          ...current,
+          state: "memory-only",
+          durable: false,
+          message: `워터마크 설정 저장소를 불러오지 못했습니다. 현재 탭에서만 유지됩니다: ${detail}`,
+          cause,
+        }));
+      });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [acquireWatermarkPreferenceRuntime]);
+  const ensureWatermarkLoaded = async () => {
     try {
-      const raw = globalThis.localStorage.getItem(WATERMARK_KEY);
-      const next = raw ? normalizeWatermark(JSON.parse(raw)) : DEFAULT_WATERMARK;
-      setWatermarkState(next);
-      return next;
+      const runtime = await acquireWatermarkPreferenceRuntime();
+      return (await runtime.awaitReady()).settings;
     } catch {
-      // 접근/파싱 불가면 기본값 유지.
-      return watermark;
+      return watermarkPendingSettingsRef.current;
     }
   };
   const setWatermark = (next: WatermarkSettings) => {
-    watermarkLoadedRef.current = true;
-    setWatermarkState(next);
-    try {
-      globalThis.localStorage.setItem(WATERMARK_KEY, JSON.stringify(next));
-    } catch {
-      // 저장 불가(시크릿/임베드)는 무시 — 이번 세션엔 적용됨.
-    }
+    watermarkPreferenceDirtyRef.current = true;
+    watermarkPendingSettingsRef.current = next;
+    setWatermarkPreferenceSnapshot((current) => ({
+      ...current,
+      settings: next,
+      state: current.state === "memory-only" ? "memory-only" : "saving",
+      durable: false,
+    }));
+    const runtime = watermarkPreferenceRuntimeRef.current;
+    if (runtime) runtime.update(next);
+    else void acquireWatermarkPreferenceRuntime().catch(() => undefined);
+  };
+  const retryWatermarkPreferenceRuntime = () => {
+    const runtime = watermarkPreferenceRuntimeRef.current;
+    return runtime
+      ? runtime.retry()
+      : acquireWatermarkPreferenceRuntime().then((loaded) => loaded.retry());
   };
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const projectActionsRef = useRef<HTMLDivElement>(null);
@@ -18979,7 +19319,8 @@ const puppetWarpArmed =
   // intercepting the primary brush tray in live tests).
   const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
-    (workHydrated
+    (uiBooleanPreferencesReady
+      && workHydrated
       && autosaveChecked
       && !hasAutosave
       && !quickStartDismissed
@@ -19735,10 +20076,32 @@ const puppetWarpArmed =
     loadStudioAiSessionSettings(globalThis.sessionStorage, globalThis.localStorage)
   );
   const [serverAiStatus, setServerAiStatus] = useState<StudioServerAiStatus | null>(null);
-  const [serverAiProvider, setServerAiProvider] = useState<StudioServerAiProviderPreference>(() => {
-    const value = globalThis.localStorage?.getItem("toonspectrum-studio-server-ai-provider");
-    return value === "zai" || value === "deepseek" ? value : "auto";
-  });
+  const [serverAiProvider, setServerAiProviderState] =
+    useState<StudioServerAiProviderPreference>("auto");
+  const serverAiProviderRef = useRef(serverAiProvider);
+  const serverAiProviderUserRevisionRef = useRef(0);
+  serverAiProviderRef.current = serverAiProvider;
+  useEffect(() => {
+    let cancelled = false;
+    const revisionAtStart = serverAiProviderUserRevisionRef.current;
+    void acquireProductStudioUiPreferencesRepository()
+      .then(async (repository) => {
+        const loaded = await repository.loadServerAiProvider();
+        if (cancelled) return;
+        if (serverAiProviderUserRevisionRef.current === revisionAtStart) {
+          serverAiProviderRef.current = loaded;
+          setServerAiProviderState(loaded);
+          return;
+        }
+        await repository.saveServerAiProvider(serverAiProviderRef.current);
+      })
+      .catch(() => {
+        if (!cancelled) setAppSettingsPersistenceState("session-only");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     void getStudioServerAiStatus(controller.signal)
@@ -19773,12 +20136,12 @@ const puppetWarpArmed =
         ? `${configuredServerAiProviders.map((provider) => provider.label).join(" → ") || "서버 AI"} 자동`
         : configuredServerAiProviders.find((provider) => provider.id === serverAiProvider)?.label ?? "서버 AI";
   function updateServerAiProvider(next: StudioServerAiProviderPreference) {
-    setServerAiProvider(next);
-    try {
-      globalThis.localStorage?.setItem("toonspectrum-studio-server-ai-provider", next);
-    } catch {
-      // 저장소가 차단된 환경에서도 현재 세션 선택은 유지한다.
-    }
+    serverAiProviderUserRevisionRef.current += 1;
+    serverAiProviderRef.current = next;
+    setServerAiProviderState(next);
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveServerAiProvider(next))
+      .catch(() => setAppSettingsPersistenceState("session-only"));
   }
   function updateAiSettings(next: StudioAiSettings) {
     setAiSettings(next);
@@ -20149,7 +20512,7 @@ const puppetWarpArmed =
   // 타야 해서 일반화한다.
   const aiNoticePendingActionRef = useRef<(() => void) | null>(null);
   // 생성형 AI 콘텐츠를 만드는 동작(이미지 생성/편집) 전부가 이 게이트를 통과한다 — 최초 1회만
-  // 고지하고(readAiNoticeAck), 이후엔 바로 실행한다. 사용자가 고지 모달을 취소하면 아무 일도
+  // 고지하고, 이후엔 SQLite/OPFS에 저장된 확인 상태로 바로 실행한다. 사용자가 고지 모달을 취소하면 아무 일도
   // 일어나지 않는다(pending ref가 조용히 버려짐 — busy 상태를 미리 세팅하지 않았으므로 "취소했는데
   // 계속 로딩 스피너가 도는" 문제가 없다).
   function runWithAiNotice(action: () => void) {
@@ -20157,7 +20520,7 @@ const puppetWarpArmed =
       setError(collaborationLockMessage());
       return;
     }
-    if (!readAiNoticeAck()) {
+    if (!aiNoticeAcknowledgedRef.current) {
       aiNoticePendingActionRef.current = action;
       setAiNoticeOpen(true);
       return;
@@ -20262,7 +20625,9 @@ const puppetWarpArmed =
 
   // 사용자가 최초 사용 고지를 확인하면 저장하고, 보류 중이던 동작(pending ref)을 이어서 실행한다.
   function acknowledgeAiNotice() {
-    storeAiNoticeAck();
+    aiNoticeAcknowledgedRef.current = true;
+    setAiNoticeAcknowledged(true);
+    persistStudioUiBooleanPreference("ai-notice-acknowledged", true);
     setAiNoticeOpen(false);
     const action = aiNoticePendingActionRef.current;
     aiNoticePendingActionRef.current = null;
@@ -23998,8 +24363,9 @@ const puppetWarpArmed =
   }
   function dismissQuickStart() {
     setQuickStartOpen(false);
+    quickStartDismissedRef.current = true;
     setQuickStartDismissed(true);
-    storeQuickStartDismissed();
+    persistStudioUiBooleanPreference("quick-start-dismissed", true);
   }
   function openQuickComicWizard() {
     dismissQuickStart();
@@ -24007,13 +24373,15 @@ const puppetWarpArmed =
     setQuickComicOpen(true);
   }
   function dismissMobileHint() {
+    mobileHintDismissedRef.current = true;
     setMobileHintDismissed(true);
-    storeMobileHintDismissed();
+    persistStudioUiBooleanPreference("mobile-hint-dismissed", true);
   }
   // 캔버스 transient surface priority: autosave > drawing feedback > first-use coach.
   // Several independent floating notices used to cover the same mobile pixels at once.
   const showMobileHint =
     isMobile &&
+    uiBooleanPreferencesReady &&
     !mobileHintDismissed &&
     workHydrated &&
     !showQuickStart &&
@@ -30046,7 +30414,12 @@ const puppetWarpArmed =
   }
 
   function updateAdvancedFillSettings(next: StudioAdvancedFillSettings) {
-    setAdvancedFillSettings(next);
+    advancedFillUserRevisionRef.current += 1;
+    advancedFillSettingsRef.current = next;
+    setAdvancedFillSettingsState(next);
+    void acquireProductStudioUiPreferencesRepository()
+      .then((repository) => repository.saveAdvancedFillSettings(next))
+      .catch(() => setAppSettingsPersistenceState("session-only"));
     invalidateAdvancedFillWork(
       advancedFillBusy
         ? "설정이 바뀌어 진행 중인 계산과 이전 미리보기를 취소했습니다. 캔버스를 다시 탭하세요."
@@ -39160,6 +39533,7 @@ function clearSelectionForEdit() {
       setPublishPreflightOpen(true);
       return;
     }
+    const watermarkForExport = await ensureWatermarkLoaded();
     setPublishPackageExportBusy(true);
     setPublishPackageExportProgress(null);
     setPublishPackageExportStatus({ tone: "info", text: "페이지 픽셀을 캡처하는 중…" });
@@ -39185,7 +39559,7 @@ function clearSelectionForEdit() {
         seriesTitle: title,
         sources,
         thumbnailSourceId: currentPageId,
-        watermark: ensureWatermarkLoaded(),
+        watermark: watermarkForExport,
         onProgress: (done, total) => {
           setPublishPackageExportProgress({ done, total });
           setPublishPackageExportStatus({
@@ -39229,7 +39603,7 @@ function clearSelectionForEdit() {
           pageMetadata: pages,
           profile: effectivePublishPackageSettings.reviewPdfProfile,
           title: "review",
-          watermark: ensureWatermarkLoaded(),
+          watermark: watermarkForExport,
           onProgress: (done, total) => {
             setPublishPackageExportProgress({ done, total });
           },
@@ -41974,6 +42348,7 @@ function clearSelectionForEdit() {
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       data-studio-editor="true"
       data-studio-app-shell="true"
+      data-studio-watermark-persistence={watermarkPreferenceSnapshot.state}
       className={cn(
         // Default draw-app shell: fill the viewport without site chrome padding.
         "flex min-h-0 flex-col bg-canvas text-fg",
@@ -42003,6 +42378,54 @@ function clearSelectionForEdit() {
     {/* 파괴적 명령 승인 표면. body 로 포털되므로 위치는 자유롭지만, 스튜디오 셸 안에 두어
         스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
     <StudioDestructiveConfirmHost />
+    {pagesHistoryDurabilityStatus.state === "memory-only" ? (
+      <div
+        data-studio-pages-history-durability="memory-only"
+        role="alert"
+        aria-live="assertive"
+        className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
+      >
+        <span className="min-w-0 flex-1 font-medium leading-relaxed">
+          페이지 실행 취소 기록을 영구 저장하지 못하고 있습니다. 편집은 이 탭의 메모리에서
+          계속되지만, 탭을 닫기 전에 프로젝트를 저장하거나 JSON 백업을 만들어 주세요.
+        </span>
+        <button
+          type="button"
+          onClick={retryStudioHistoryDurability}
+          className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+        >
+          복구 기록 저장소 다시 연결
+        </button>
+      </div>
+    ) : pagesHistoryDurabilityStatus.state === "retrying" ? (
+      <div
+        data-studio-pages-history-durability="retrying"
+        role="status"
+        aria-live="polite"
+        className="mx-3 mt-2 shrink-0 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-medium text-warning"
+      >
+        복구 기록 저장소에 다시 연결하는 중입니다. 편집은 계속할 수 있습니다.
+      </div>
+    ) : null}
+    {watermarkPreferenceSnapshot.state === "memory-only" ? (
+      <div
+        data-studio-watermark-persistence-warning="memory-only"
+        role="alert"
+        aria-live="assertive"
+        className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
+      >
+        <span className="min-w-0 flex-1 font-medium leading-relaxed">
+          {watermarkPreferenceSnapshot.message}
+        </span>
+        <button
+          type="button"
+          onClick={() => void retryWatermarkPreferenceRuntime()}
+          className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+        >
+          워터마크 저장소 다시 연결
+        </button>
+      </div>
+    ) : null}
     <input
       ref={editMenuImageInputRef}
       type="file"
@@ -42994,34 +43417,53 @@ function clearSelectionForEdit() {
           />
         )}
         {/* 왼쪽: 페이지 목록 — 접히면 아이콘 엣지 레일 */}
-        <StudioPageListPane
-          collaborationDocumentLocked={collaborationDocumentLocked}
-          collaborationLockMessage={collaborationLockMessage}
-          composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
-          currentPageId={currentPageId}
-          isMobile={isMobile}
-          leftResize={leftResize}
-          master={master}
-          masterEditMode={masterEditMode}
-          masterPanelOpen={masterPanelOpen}
-          metaEditPageId={metaEditPageId}
-          mobileKeyboardInset={mobileKeyboardInset}
-          mobileSheet={mobileSheet}
-          pageDnd={pageDnd}
-          pages={pages}
-          pagesSheetRef={pagesSheetRef}
-          presentationPanelsHidden={presentationPanelsHidden}
-          setCurrentPageId={setCurrentPageId}
-          setLeftPanelOpen={setLeftPanelOpen}
-          setMasterPanelOpen={setMasterPanelOpen}
-          setMetaEditPageId={setMetaEditPageId}
-          setMobileSheet={setMobileSheet}
-          visibleLeftPanelOpen={visibleLeftPanelOpen}
-          stableHandlers={studioPageListPaneHandlers}
-        />
+        <Suspense
+          fallback={(
+            <div
+              aria-hidden="true"
+              data-studio-page-list-loading="true"
+              className="hidden w-12 shrink-0 border-r border-line bg-panel lg:block"
+            />
+          )}
+        >
+          <LazyStudioPageListPane
+            collaborationDocumentLocked={collaborationDocumentLocked}
+            collaborationLockMessage={collaborationLockMessage}
+            composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+            currentPageId={currentPageId}
+            isMobile={isMobile}
+            leftResize={leftResize}
+            master={master}
+            masterEditMode={masterEditMode}
+            masterPanelOpen={masterPanelOpen}
+            metaEditPageId={metaEditPageId}
+            mobileKeyboardInset={mobileKeyboardInset}
+            mobileSheet={mobileSheet}
+            pageDnd={pageDnd}
+            pages={pages}
+            pagesSheetRef={pagesSheetRef}
+            presentationPanelsHidden={presentationPanelsHidden}
+            setCurrentPageId={setCurrentPageId}
+            setLeftPanelOpen={setLeftPanelOpen}
+            setMasterPanelOpen={setMasterPanelOpen}
+            setMetaEditPageId={setMetaEditPageId}
+            setMobileSheet={setMobileSheet}
+            visibleLeftPanelOpen={visibleLeftPanelOpen}
+            stableHandlers={studioPageListPaneHandlers}
+          />
+        </Suspense>
 
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
-        <StudioLeftToolRail
+        <Suspense
+          fallback={(
+            <div
+              aria-hidden="true"
+              data-studio-left-tool-rail-loading="true"
+              className="hidden w-14 shrink-0 border-r border-line bg-panel lg:block"
+            />
+          )}
+        >
+        <LazyStudioLeftToolRail
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           pixelToolTargetAvailable={pixelToolTargetAvailable}
           rasterRetouchTargetAvailable={rasterRetouchTargetAvailable}
@@ -43080,6 +43522,7 @@ function clearSelectionForEdit() {
           viewTool={viewTool}
           stableHandlers={studioLeftToolRailHandlers}
         />
+        </Suspense>
 
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">

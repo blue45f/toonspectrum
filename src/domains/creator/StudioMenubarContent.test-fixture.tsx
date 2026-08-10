@@ -27,7 +27,7 @@ export function createHandlers(): StudioMenubarContentHandlers {
     applyStudioWorkspaceLayout: vi.fn(),
     cancelInterchangeImport: vi.fn(),
     changeMobileImmersiveMode: vi.fn(),
-    ensureWatermarkLoaded: vi.fn(() => WATERMARK),
+    ensureWatermarkLoaded: vi.fn(async () => WATERMARK),
     exportCurrentPageToInkMl: vi.fn(async () => ({}) as never),
     exportCurrentPageToWillV1: vi.fn(async () => ({}) as never),
     exportCurrentPageToPsd: vi.fn(async () => ({}) as never),

@@ -18,7 +18,7 @@ import { STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY } from "./studio-stock-image-
 import { StudioStockImagePanel } from "./StudioStockImagePanel";
 
 // studio-stock-image-client.test.ts의 createMemoryStorage와 동일한 최소 stub. 이 저장소는 Node
-// 환경(vitest.config.ts environment:"node")이라 globalThis.localStorage가 원래 존재하지 않으므로
+// 환경(vitest.config.ts environment:"node")이라 globalThis.sessionStorage가 원래 존재하지 않으므로
 // (studio-stock-image-client.ts의 loadStudioStockImageAccessKey가 그 경우 ""로 취급하는 것과
 // 동일하게), 테스트마다 이 stub을 globalThis에 직접 얹었다가 afterEach에서 지운다.
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -40,11 +40,11 @@ const noopOpenSettings = () => {
 
 describe("StudioStockImagePanel mount-time render contract", () => {
   afterEach(() => {
-    Reflect.deleteProperty(globalThis, "localStorage");
+    Reflect.deleteProperty(globalThis, "sessionStorage");
   });
 
   it("shows the settings guidance and disables search when no Access Key is saved", () => {
-    globalThis.localStorage = fakeStorage() as unknown as Storage;
+    globalThis.sessionStorage = fakeStorage() as unknown as Storage;
 
     const html = renderToStaticMarkup(
       <StudioStockImagePanel onInsert={noopInsert} onOpenSettings={noopOpenSettings} />
@@ -61,7 +61,7 @@ describe("StudioStockImagePanel mount-time render contract", () => {
   });
 
   it("hides the settings guidance and enables search when an Access Key is already saved", () => {
-    globalThis.localStorage = fakeStorage({
+    globalThis.sessionStorage = fakeStorage({
       [STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY]: "unsplash-existing-key",
     }) as unknown as Storage;
 

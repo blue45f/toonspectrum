@@ -1,5 +1,10 @@
 /**
- * Recent page backgrounds — localStorage MRU (PicsArt-style).
+ * Recent page-background state and normalization.
+ *
+ * The synchronous Storage helpers below are retained only as an explicit
+ * legacy/import-test seam. Product Studio persists this state through
+ * `studio-ui-preferences-sqlite.ts` (SQLite over OPFS) and does not select a
+ * browser Storage implementation automatically.
  */
 
 export const STUDIO_BACKGROUND_RECENT_KEY = "toonspectrum-studio-bg-recent:v1";

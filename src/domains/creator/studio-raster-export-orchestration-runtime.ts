@@ -50,7 +50,7 @@ export interface StudioRasterExportOrchestrationInput {
   readonly pageGrade: PageGrade;
   readonly title: string;
   readonly ensureSharedDocumentAvailableForExport: () => boolean;
-  readonly ensureWatermarkLoaded: () => WatermarkSettings;
+  readonly ensureWatermarkLoaded: () => Promise<WatermarkSettings>;
   readonly drawWatermarkOnCanvas: (
     canvas: HTMLCanvasElement,
     settings: WatermarkSettings,
@@ -110,7 +110,7 @@ export function createStudioRasterExportOrchestration({
 }: StudioRasterExportOrchestrationInput): StudioRasterExportOrchestration {
   async function handleDownload() {
     if (!ensureSharedDocumentAvailableForExport()) return;
-    const watermarkForExport = ensureWatermarkLoaded();
+    const watermarkForExport = await ensureWatermarkLoaded();
     setExportMenuOpen(false);
     setSelectedId(null);
     const originalMasterEditMode = masterEditMode;
@@ -163,7 +163,7 @@ export function createStudioRasterExportOrchestration({
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공유 문서를 불러온 뒤 내보낼 수 있습니다.");
     }
-    const watermarkForExport = ensureWatermarkLoaded();
+    const watermarkForExport = await ensureWatermarkLoaded();
     const originalMasterEditMode = masterEditMode;
     setSelectedId(null);
     setMasterEditMode(false);
@@ -216,7 +216,7 @@ export function createStudioRasterExportOrchestration({
 
   async function handleCopyToClipboard() {
     if (!ensureSharedDocumentAvailableForExport()) return;
-    const watermarkForExport = ensureWatermarkLoaded();
+    const watermarkForExport = await ensureWatermarkLoaded();
     setExportMenuOpen(false);
     setSelectedId(null);
     const originalMasterEditMode = masterEditMode;
@@ -241,7 +241,7 @@ export function createStudioRasterExportOrchestration({
 
   async function handleDownloadAll(spacing = 24) {
     if (!ensureSharedDocumentAvailableForExport()) return;
-    const watermarkForExport = ensureWatermarkLoaded();
+    const watermarkForExport = await ensureWatermarkLoaded();
     setExportMenuOpen(false);
     const {
       MAX_CANVAS_DIM,

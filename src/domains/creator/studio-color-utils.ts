@@ -39,6 +39,20 @@ export function pushRecentColor(list: string[], color: string, max = 12): string
 // 최근 사용 색 localStorage 키.
 export const RECENT_COLORS_KEY = "toonspectrum-studio-recent-colors";
 
+/** Normalizes untrusted persisted data to the bounded recent-color list. */
+export function normalizeRecentColors(value: unknown, max = 12): string[] {
+  if (!Array.isArray(value)) return [];
+  const normalized: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const color = normalizeHexColor(item);
+    if (color === null || normalized.includes(color)) continue;
+    normalized.push(color);
+    if (normalized.length >= Math.max(0, Math.floor(max))) break;
+  }
+  return normalized;
+}
+
 /**
  * 저장소에서 최근 사용 색 목록을 읽는다.
  * JSON 배열을 파싱해 유효한 헥스 색만 남기고, 파싱 실패·예외(getItem throw 포함) 시 [].
@@ -48,8 +62,7 @@ export function readRecentColors(storage: Pick<Storage, "getItem">): string[] {
     const raw = storage.getItem(RECENT_COLORS_KEY);
     if (raw === null) return [];
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === "string" && isValidHexColor(item));
+    return normalizeRecentColors(parsed);
   } catch {
     return [];
   }

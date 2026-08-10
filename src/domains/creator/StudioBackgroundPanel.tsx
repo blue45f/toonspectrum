@@ -13,7 +13,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useState, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 
 import {
   findStudioBackgroundPreset,
@@ -26,11 +26,14 @@ import {
   type StudioBackgroundPreset,
 } from "./studio-background-presets";
 import {
-  loadStudioBackgroundRecent,
-  pushStudioBackgroundRecent,
+  rememberStudioBackgroundRecent,
 } from "./studio-background-recent";
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import {
+  acquireProductStudioUiPreferencesRepository,
+  type StudioUiPreferencesRepository,
+} from "./studio-ui-preferences-sqlite";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -48,6 +51,8 @@ export interface StudioBackgroundPanelProps {
   sizeSlot?: ReactNode;
   /** Initial tab. */
   initialTab?: StudioBackgroundEditorTab;
+  /** Test seam; product defaults to the shared SQLite/OPFS preferences repository. */
+  acquireUiPreferences?: () => Promise<StudioUiPreferencesRepository>;
   className?: string;
 }
 
@@ -112,6 +117,7 @@ export function StudioBackgroundPanel({
   onApply,
   sizeSlot,
   initialTab = "fill",
+  acquireUiPreferences = acquireProductStudioUiPreferencesRepository,
   className,
 }: StudioBackgroundPanelProps): ReactElement {
   const t = useT();
@@ -119,9 +125,38 @@ export function StudioBackgroundPanel({
   const [category, setCategory] = useState<StudioBackgroundCategory>("solid");
   const [query, setQuery] = useState("");
   const [customColor, setCustomColor] = useState(currentBg || "#f7f1e6");
-  const [recentIds, setRecentIds] = useState(
-    () => loadStudioBackgroundRecent(globalThis.localStorage).ids
-  );
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [preferenceAuthority, setPreferenceAuthority] = useState<
+    "loading" | "sqlite-opfs" | "memory-only"
+  >("loading");
+  const preferenceRepositoryRef = useRef<StudioUiPreferencesRepository | null>(null);
+  const recentDirtyRef = useRef(false);
+  const preferenceMountedRef = useRef(true);
+
+  useEffect(() => {
+    preferenceMountedRef.current = true;
+    return () => {
+      preferenceMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void acquireUiPreferences()
+      .then(async (repository) => {
+        preferenceRepositoryRef.current = repository;
+        const recent = await repository.loadBackgroundRecent();
+        if (!active) return;
+        setPreferenceAuthority("sqlite-opfs");
+        if (!recentDirtyRef.current) setRecentIds(recent.ids);
+      })
+      .catch(() => {
+        if (active) setPreferenceAuthority("memory-only");
+      });
+    return () => {
+      active = false;
+    };
+  }, [acquireUiPreferences]);
 
   const items = listStudioBackgroundPresets(category, query);
   const recentItems = recentIds
@@ -149,8 +184,24 @@ export function StudioBackgroundPanel({
   }
 
   function pick(preset: StudioBackgroundPreset) {
-    const next = pushStudioBackgroundRecent(globalThis.localStorage, preset.id);
-    setRecentIds(next.ids);
+    recentDirtyRef.current = true;
+    setRecentIds((current) => {
+      const next = rememberStudioBackgroundRecent({ version: 1, ids: current }, preset.id);
+      const save = preferenceRepositoryRef.current
+        ? preferenceRepositoryRef.current.saveBackgroundRecent(next)
+        : acquireUiPreferences().then((repository) => {
+            preferenceRepositoryRef.current = repository;
+            return repository.saveBackgroundRecent(next);
+          });
+      void save
+        .then(() => {
+          if (preferenceMountedRef.current) setPreferenceAuthority("sqlite-opfs");
+        })
+        .catch(() => {
+          if (preferenceMountedRef.current) setPreferenceAuthority("memory-only");
+        });
+      return next.ids;
+    });
     onApply(planStudioBackgroundApply(preset, canvasW, canvasH));
   }
 
@@ -159,7 +210,11 @@ export function StudioBackgroundPanel({
   }
 
   return (
-    <div className={cn("grid gap-2", className)} data-studio-background-panel="true">
+    <div
+      className={cn("grid gap-2", className)}
+      data-studio-background-panel="true"
+      data-studio-ui-preferences-authority={preferenceAuthority}
+    >
       {/* Friendly header */}
       <div className="flex items-start gap-2 rounded-xl border border-line bg-card px-2.5 py-2">
         <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -180,6 +235,12 @@ export function StudioBackgroundPanel({
           aria-label={t("studio.background.currentBackgroundPreview")}
         />
       </div>
+
+      {preferenceAuthority === "memory-only" ? (
+        <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2 py-1 text-[0.62rem] text-fg-2">
+          최근 배경은 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
+        </p>
+      ) : null}
 
       {/* Editor tabs */}
       <div

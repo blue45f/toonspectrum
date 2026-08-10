@@ -67,7 +67,7 @@ import {
 import type { Browser, BrowserContext, Page, Response } from "playwright";
 import type { PreviewServer } from "vite";
 
-export const RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION = 3 as const;
+export const RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION = 4 as const;
 export const RENDERER_TOURNAMENT_BROWSER_COLD_SAMPLES = 7;
 
 const RESULT_TIMEOUT_MS = 8 * 60 * 1_000;
@@ -264,8 +264,8 @@ export interface RendererTournamentBrowserArtifact {
    * The bounded renderer-tournament evidence and its strict-CSP execution gate passed.
    * This is not product-wide promotion and does not claim external CSP non-inferiority.
    */
-  readonly releasePass: boolean;
-  /** Backward-compatible bounded tournament verdict. Always equals releasePass. */
+  readonly boundedHarnessPass: boolean;
+  /** Backward-compatible bounded-harness verdict. Never denotes product release readiness. */
   readonly pass: boolean;
   readonly benchmark: Readonly<{
     execution: "vite-production-build-chromium-metal-webgpu";
@@ -1509,17 +1509,17 @@ export function validateRendererTournamentBrowserArtifact(
     issues.push("artifact records unresolved validation issues");
   }
   const expectedTechnicalPass = issues.length === 0;
-  const expectedReleasePass = expectedTechnicalPass && csp?.status === "clean";
+  const expectedBoundedHarnessPass = expectedTechnicalPass && csp?.status === "clean";
   const expectedStatus = expectedTechnicalPass
-    ? expectedReleasePass ? "pass" : "quarantined"
+    ? expectedBoundedHarnessPass ? "pass" : "quarantined"
     : "fail";
   if (
     root.technicalPass !== expectedTechnicalPass ||
-    root.releasePass !== expectedReleasePass ||
-    root.pass !== expectedReleasePass ||
+    root.boundedHarnessPass !== expectedBoundedHarnessPass ||
+    root.pass !== expectedBoundedHarnessPass ||
     root.status !== expectedStatus
   ) {
-    issues.push("top-level technical/release verdict is inconsistent with evidence and CSP");
+    issues.push("top-level technical/bounded-harness verdict is inconsistent with evidence and CSP");
   }
   return issues;
 }
@@ -2043,7 +2043,7 @@ export async function runRendererTournamentBrowserBenchmark(
       generatedAt: new Date().toISOString(),
       status: cspClean ? "pass" : "quarantined",
       technicalPass: true,
-      releasePass: cspClean,
+      boundedHarnessPass: cspClean,
       pass: cspClean,
       benchmark,
       diagnostics: readonlyDiagnostics(mutableDiagnostics),
@@ -2060,8 +2060,8 @@ export async function runRendererTournamentBrowserBenchmark(
       ...provisional,
       status: validationIssues.length === 0 ? provisional.status : "fail",
       technicalPass: validationIssues.length === 0,
-      releasePass: validationIssues.length === 0 && provisional.releasePass,
-      pass: validationIssues.length === 0 && provisional.releasePass,
+      boundedHarnessPass: validationIssues.length === 0 && provisional.boundedHarnessPass,
+      pass: validationIssues.length === 0 && provisional.boundedHarnessPass,
       validationIssues,
     };
   } finally {
@@ -2081,7 +2081,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({
       status: artifact.status,
       technicalPass: artifact.technicalPass,
-      releasePass: artifact.releasePass,
+      boundedHarnessPass: artifact.boundedHarnessPass,
       pass: artifact.pass,
       result: resultPath,
       profile: artifact.benchmark?.profile.profile,
@@ -2147,7 +2147,7 @@ async function main(): Promise<void> {
       generatedAt: new Date().toISOString(),
       status: "fail",
       technicalPass: false,
-      releasePass: false,
+      boundedHarnessPass: false,
       pass: false,
       benchmark: null,
       diagnostics: emptyDiagnostics(),

@@ -41,8 +41,8 @@ describe("V11 filter island plan", () => {
   it("the same island is rejected in interactive mode (hot-path readback ban)", async () => {
     const { EngineCapabilityRegistry, HybridExecutionPlanner, providerDescriptorSchema } =
       await import("@toonspectrum/studio-engine-registry");
-    const registry = new EngineCapabilityRegistry();
-    registry.register(
+    const registry = EngineCapabilityRegistry.forTestFixtures();
+    registry.registerTestFixture(
       providerDescriptorSchema.parse({
         id: "filter-lane-probe",
         kind: "filter",
@@ -86,10 +86,10 @@ describe("V11 filter island plan", () => {
       "utf8",
     );
     expect(source).toMatch(
-      /import \{ planStudioFilterIslandLanes \} from "\.\/studio-filter-island-plan";/u,
+      /import \{[\s\S]*?planStudioFilterIslandLanes[\s\S]*?\} from "\.\/studio-filter-island-plan";/u,
     );
     expect(source).toMatch(
-      /const filterIslandPlan = planStudioFilterIslandLanes\(\{\s*gpuChainEligible:/u,
+      /const filterIslandPlan = planStudioFilterIslandLanes\(filterIslandInput\);/u,
     );
     expect(source).toMatch(
       /filterIslandPlan\.lanes\[0\] === "gpu-chain" && gpuFilterModule/u,
@@ -356,6 +356,21 @@ describe("size-aware filter lane order", () => {
     const { lanes, laneCosts } = planStudioFilterIslandLanes(input);
     expect(laneCosts?.lanes[0]).toBe("gpu-chain");
     expect(lanes).toEqual(["konva-native", "gpu-chain", "worker"]);
+  });
+
+  it("a seed cost order never fabricates or records a tournament winner", () => {
+    const runtime = createStudioTournamentRuntime(PRISTINE);
+    installStudioTournamentRuntime(runtime);
+    const bucketInput = {
+      gpuChainEligible: true,
+      workload: { width: 256, height: 256, chainSteps: 1 },
+    };
+    const planned = planStudioFilterIslandLanes(bucketInput);
+    expect(planned.laneCosts?.basis).toBe("seed");
+    expect(runtime.winnerCache.get(
+      studioFilterIslandBucket(bucketInput),
+      runtime.deviceHash,
+    )).toBeNull();
   });
 
   it("a remote kill still outranks everything, including a cheap cost verdict", () => {

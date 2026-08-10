@@ -9,11 +9,11 @@ import {
   STUDIO_TOURNAMENT_WINNER_STORAGE_KEY,
   createStudioTournamentRuntime,
   type PersistedTournamentStateV1,
-  type TournamentPersistencePort,
 } from "./studio-renderer-tournament-runtime";
 import {
   createCostSampleSink,
   createSqliteTournamentPersistence,
+  StudioTournamentPersistenceUnavailableError,
 } from "./studio-tournament-sqlite-persistence";
 
 const STATE: PersistedTournamentStateV1 = {
@@ -33,7 +33,6 @@ describe("studio-tournament-sqlite-persistence", () => {
   it("round-trips tournament state through a real sqlite kv store", async () => {
     const port = createSqliteTournamentPersistence({
       openDatabase: () => openStudioLocalDatabase({ vfs: "memory" }),
-      fallback: null,
     });
     expect(await port.load()).toBeNull();
     await port.save(STATE);
@@ -42,7 +41,7 @@ describe("studio-tournament-sqlite-persistence", () => {
 
   it("opens the database once across repeated load/save calls", async () => {
     const openDatabase = vi.fn(() => openStudioLocalDatabase({ vfs: "memory" }));
-    const port = createSqliteTournamentPersistence({ openDatabase, fallback: null });
+    const port = createSqliteTournamentPersistence({ openDatabase });
     await port.save(STATE);
     await port.load();
     await port.load();
@@ -54,7 +53,6 @@ describe("studio-tournament-sqlite-persistence", () => {
     const kv = database.asAsyncKeyValueStore("tournament");
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     await kv.set(STUDIO_TOURNAMENT_WINNER_STORAGE_KEY, "not-json{");
     expect(await port.load()).toBeNull();
@@ -65,33 +63,35 @@ describe("studio-tournament-sqlite-persistence", () => {
     expect(await port.load()).toBeNull();
   });
 
-  it("degrades to the fallback port when sqlite is unavailable", async () => {
-    const saved: PersistedTournamentStateV1[] = [];
-    const fallback: TournamentPersistencePort = {
-      load: () => Promise.resolve(STATE),
-      save: (state) => {
-        saved.push(state);
-        return Promise.resolve();
-      },
-    };
+  it("reports explicit memory-only status without opening another browser store", async () => {
     const openDatabase = vi.fn(() =>
       Promise.reject(new SqliteUnavailableError("opfs unavailable in test")),
     );
-    const port = createSqliteTournamentPersistence({ openDatabase, fallback });
-    expect(await port.load()).toEqual(STATE);
-    await port.save(STATE);
-    expect(saved).toEqual([STATE]);
+    const port = createSqliteTournamentPersistence({ openDatabase });
+    await expect(port.load()).rejects.toBeInstanceOf(
+      StudioTournamentPersistenceUnavailableError,
+    );
+    await expect(port.save(STATE)).rejects.toBeInstanceOf(
+      StudioTournamentPersistenceUnavailableError,
+    );
+    expect(port.status?.()).toMatchObject({
+      mode: "memory-only",
+      durable: false,
+      reason: expect.stringContaining("opfs unavailable in test"),
+    });
     expect(openDatabase).toHaveBeenCalledTimes(1);
   });
 
-  it("persists silently without a fallback when sqlite is unavailable", async () => {
+  it("becomes durable only after SQLite opens successfully", async () => {
     const port = createSqliteTournamentPersistence({
-      openDatabase: () =>
-        Promise.reject(new SqliteUnavailableError("opfs unavailable in test")),
-      fallback: null,
+      openDatabase: () => openStudioLocalDatabase({ vfs: "memory" }),
+    });
+    expect(port.status?.()).toMatchObject({
+      mode: "initializing-sqlite",
+      durable: false,
     });
     expect(await port.load()).toBeNull();
-    await expect(port.save(STATE)).resolves.toBeUndefined();
+    expect(port.status?.()).toEqual({ mode: "sqlite-opfs", durable: true, reason: null });
   });
 });
 
@@ -108,7 +108,6 @@ describe("structured tournament_winners promotion", () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     await port.save(STATE);
     const rows = await database.listTournamentWinners();
@@ -124,7 +123,6 @@ describe("structured tournament_winners promotion", () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     await database.putTournamentWinner(STATE.entries[0]);
     // 부분 필드 오염 — REAL 컬럼에 TEXT 가 앉은 행은 그 행만 드롭된다.
@@ -139,7 +137,6 @@ describe("structured tournament_winners promotion", () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     const previous: PersistedTournamentStateV1 = {
       version: STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
@@ -162,7 +159,6 @@ describe("structured tournament_winners promotion", () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     await port.save({
       version: STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
@@ -179,7 +175,6 @@ describe("structured tournament_winners promotion", () => {
     await kv.set(STUDIO_TOURNAMENT_WINNER_STORAGE_KEY, JSON.stringify(STATE));
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     // 구조화 행이 없으니 구버전 blob 이 그대로 보인다.
     const loaded = await port.load();
@@ -204,13 +199,40 @@ describe("structured tournament_winners promotion", () => {
     await database.putTournamentWinner(STATE.entries[0]);
     const port = createSqliteTournamentPersistence({
       openDatabase: () => Promise.resolve(database),
-      fallback: null,
     });
     expect(await port.load()).toEqual(STATE);
   });
 });
 
 describe("createCostSampleSink", () => {
+  it("the SQLite persistence port receives accepted runtime samples without caller glue", async () => {
+    const database = await openStudioLocalDatabase({ vfs: "memory" });
+    const port = createSqliteTournamentPersistence({
+      openDatabase: () => Promise.resolve(database),
+    });
+    const runtime = createStudioTournamentRuntime({
+      persistence: port,
+      deviceHash: "dev-a",
+    });
+    expect(runtime.recordRenderSample("filter-lane-worker", "filter-512", 3.25)).toBe(
+      true,
+    );
+    expect(
+      runtime.recordRenderSample("filter-lane-worker", "filter-512", Number.NaN),
+    ).toBe(false);
+
+    await vi.waitFor(async () => {
+      expect(
+        await database.listCostSamples("filter-lane-worker", "filter-512"),
+      ).toHaveLength(1);
+    });
+    expect(runtime.persistenceStatus()).toEqual({
+      mode: "sqlite-opfs",
+      durable: true,
+      reason: null,
+    });
+  });
+
   it("flows accepted runtime render samples into persistent cost_samples", async () => {
     const database = await openStudioLocalDatabase({ vfs: "memory" });
     const sink = createCostSampleSink(database);

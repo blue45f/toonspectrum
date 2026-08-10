@@ -176,6 +176,53 @@ export interface WgslVariantStageLayout {
   readonly lutBase: number | null;
 }
 
+export interface WgslVariantShaderManifest {
+  readonly inputFormats: readonly ["rgba8-packed-u32-storage"];
+  readonly outputFormats: readonly ["rgba8-packed-u32-storage"];
+  readonly bindGroups: {
+    readonly group: 0;
+    readonly bindings: typeof WGSL_VARIANT_BINDINGS;
+    readonly lutBindingPresent: boolean;
+  };
+  readonly workgroupSize: {
+    readonly x: typeof WGSL_VARIANT_WORKGROUP_SIZE;
+    readonly y: 1;
+    readonly z: 1;
+    readonly dispatchRowThreads: typeof WGSL_VARIANT_DISPATCH_ROW_THREADS;
+  };
+  readonly storageWrites: {
+    readonly targets: readonly ["dst"];
+    readonly policy: "single-bounded-write-per-invocation";
+    readonly guard: "global-index < pixel-count";
+  };
+  readonly bounds: {
+    readonly input: "full-frame";
+    readonly output: "full-frame";
+    readonly haloPx: 0;
+  };
+  readonly determinism: {
+    readonly class: "deterministic";
+    readonly timeIndependent: true;
+    readonly stageBoundaryQuantization: "round-half-even-rgba8";
+  };
+  readonly memoryEstimate: {
+    readonly fixedBytes: number;
+    readonly bytesPerPixel: 8;
+    readonly formula: "uniform + lut + src-rgba8 + dst-rgba8";
+  };
+  readonly timeDependency: "none";
+  readonly variants: {
+    readonly preview: string;
+    readonly final: string;
+    readonly pixelEquivalent: true;
+  };
+  readonly licenseProvenance: {
+    readonly spdx: "LicenseRef-ToonSpectrum-Proprietary";
+    readonly source: "ToonStudio deterministic WGSL variant composer";
+    readonly generatedFrom: "EffectGraphIR color-operation subsequence";
+  };
+}
+
 export interface ComposedWgslVariant {
   readonly wgsl: string;
   /** 연산 시퀀스+파라미터 구조 해시 — 값이 아닌 구조만 반영한다. */
@@ -191,6 +238,8 @@ export interface ComposedWgslVariant {
   readonly stages: readonly WgslVariantStageLayout[];
   /** variantKey 가 해시하는 정규화 구조 문자열(디버그·중복판정 근거). */
   readonly structure: string;
+  /** V12 shader 실행·sandbox·예산 판단에 필요한 자기완결 manifest. */
+  readonly manifest: WgslVariantShaderManifest;
 }
 
 function isLutOp(spec: WgslFilterOpSpec): spec is WgslLevelsOp | WgslCurvesOp {
@@ -268,6 +317,56 @@ function fnv1a32(text: string): string {
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");
+}
+
+function buildShaderManifest(input: {
+  readonly variantKey: string;
+  readonly usesLut: boolean;
+  readonly uniformByteLength: number;
+  readonly lutEntryCount: number;
+}): WgslVariantShaderManifest {
+  return Object.freeze({
+    inputFormats: Object.freeze(["rgba8-packed-u32-storage"] as const),
+    outputFormats: Object.freeze(["rgba8-packed-u32-storage"] as const),
+    bindGroups: Object.freeze({
+      group: 0,
+      bindings: WGSL_VARIANT_BINDINGS,
+      lutBindingPresent: input.usesLut,
+    }),
+    workgroupSize: Object.freeze({
+      x: WGSL_VARIANT_WORKGROUP_SIZE,
+      y: 1,
+      z: 1,
+      dispatchRowThreads: WGSL_VARIANT_DISPATCH_ROW_THREADS,
+    }),
+    storageWrites: Object.freeze({
+      targets: Object.freeze(["dst"] as const),
+      policy: "single-bounded-write-per-invocation",
+      guard: "global-index < pixel-count",
+    }),
+    bounds: Object.freeze({ input: "full-frame", output: "full-frame", haloPx: 0 }),
+    determinism: Object.freeze({
+      class: "deterministic",
+      timeIndependent: true,
+      stageBoundaryQuantization: "round-half-even-rgba8",
+    }),
+    memoryEstimate: Object.freeze({
+      fixedBytes: input.uniformByteLength + input.lutEntryCount * Uint32Array.BYTES_PER_ELEMENT,
+      bytesPerPixel: 8,
+      formula: "uniform + lut + src-rgba8 + dst-rgba8",
+    }),
+    timeDependency: "none",
+    variants: Object.freeze({
+      preview: input.variantKey,
+      final: input.variantKey,
+      pixelEquivalent: true,
+    }),
+    licenseProvenance: Object.freeze({
+      spdx: "LicenseRef-ToonSpectrum-Proprietary",
+      source: "ToonStudio deterministic WGSL variant composer",
+      generatedFrom: "EffectGraphIR color-operation subsequence",
+    }),
+  });
 }
 
 interface StagePlan {
@@ -481,6 +580,12 @@ export function composeWgslVariant(ops: readonly WgslFilterOpSpec[]): ComposedWg
     uniformByteLength,
     stages: stages.map((stage) => stage.layout),
     structure,
+    manifest: buildShaderManifest({
+      variantKey,
+      usesLut,
+      uniformByteLength,
+      lutEntryCount,
+    }),
   };
 }
 

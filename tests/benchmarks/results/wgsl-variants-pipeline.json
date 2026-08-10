@@ -279,6 +279,7 @@
       "frameP50Reduced": false,
       "jankStddevReduced": false,
       "jankP99OverP50Reduced": false,
+      "jankReduced": false,
       "verdict": "parity-at-sync-floor",
       "note": "512² 체인의 GPU 실행(수백µs)이 submit→onSubmittedWorkDone 왕복(~2.5ms)에 가려져 두 방식 모두 같은 측정 플로어에 앉는다 — 벽시계 프레임/jank 차이는 타이머 해상도(100µs) 이내"
     },
@@ -286,6 +287,6 @@
       "available": true,
       "reduced": true
     },
-    "passed": true
+    "passed": false
   }
 }

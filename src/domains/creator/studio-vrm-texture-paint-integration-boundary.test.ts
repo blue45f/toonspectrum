@@ -15,6 +15,10 @@ const fillWorkerClientSource = readFileSync(
   new URL("./studio-vrm-texture-fill-worker-client.ts", import.meta.url),
   "utf8",
 );
+const surfaceBrushProviderSource = readFileSync(
+  new URL("./studio-vrm-surface-brush-provider.ts", import.meta.url),
+  "utf8",
+);
 
 function requiredIndex(source: string, token: string, from = 0): number {
   const index = source.indexOf(token, from);
@@ -100,12 +104,15 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     const finish = poserSource.indexOf("const finishTexturePaint =", move);
     const cancel = poserSource.indexOf("const cancelTexturePaint =", finish);
     const primitive = poserSource.indexOf("<primitive", cancel);
+    const primitiveEnd = poserSource.indexOf("/>", primitive);
+    const primitiveSource = poserSource.slice(primitive, primitiveEnd + 2);
 
     expect(down).toBeGreaterThan(-1);
     expect(move).toBeGreaterThan(down);
     expect(finish).toBeGreaterThan(move);
     expect(cancel).toBeGreaterThan(finish);
     expect(primitive).toBeGreaterThan(cancel);
+    expect(primitiveEnd).toBeGreaterThan(primitive);
     expect(poserSource.slice(down, move)).toContain("runtime.beginStroke({");
     expect(poserSource.slice(move, finish)).toContain(".moveStroke({");
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.commitStroke(pointerId)");
@@ -117,14 +124,15 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(poserSource).toContain(
-      'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
+      'gl.domElement.addEventListener("lostpointercapture", cancelLostPointerCapture)',
     );
+    expect(poserSource).toContain('cancelTexturePaintSurface("lost-capture", event.pointerId)');
     expect(poserSource).toContain('window.addEventListener("blur", cancelOnWindowBlur)');
     expect(poserSource).toContain("cancelTexturePaint();");
-    expect(poserSource.slice(primitive, primitive + 420)).toContain(
+    expect(primitiveSource).toContain(
       "onPointerCancel={cancelTexturePaint}",
     );
-    expect(poserSource.slice(primitive, primitive + 420)).toContain(
+    expect(primitiveSource).toContain(
       "onLostPointerCapture={cancelTexturePaint}",
     );
   });
@@ -148,7 +156,10 @@ describe("Studio VRM texture-paint production integration boundary", () => {
 
     expect(hitStart).toBeGreaterThan(-1);
     expect(hitEnd).toBeGreaterThan(hitStart);
-    expect(hitSource).toContain("faceIndex: event.faceIndex");
+    expect(hitSource).toContain("return adaptThreeRaycastIntersection(event)");
+    expect(surfaceBrushProviderSource).toContain(
+      ': { faceIndex: intersection.faceIndex })',
+    );
     expect(poserSource.slice(begin, move)).toContain(
       "const hit = studioVrmTexturePaintHit(event)",
     );
@@ -170,8 +181,13 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     );
 
     expect(hitSource).toContain("(!event.uv && !event.uv1)");
-    expect(hitSource).toContain("...(event.uv ? { uv: event.uv } : {})");
-    expect(hitSource).toContain("...(event.uv1 ? { uv1: event.uv1 } : {})");
+    expect(hitSource).toContain("return adaptThreeRaycastIntersection(event)");
+    expect(surfaceBrushProviderSource).toContain(
+      "...(intersection.uv ? { uv: intersection.uv } : {})",
+    );
+    expect(surfaceBrushProviderSource).toContain(
+      "...(intersection.uv1 ? { uv1: intersection.uv1 } : {})",
+    );
     expect(runtimeSource).toContain(
       "readonly uv1?: THREE.Vector2 | Readonly<{ x: number; y: number }>;",
     );
@@ -587,7 +603,10 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(pointerLifecycle).toContain(
-      'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
+      'gl.domElement.addEventListener("lostpointercapture", cancelLostPointerCapture)',
+    );
+    expect(pointerLifecycle).toContain(
+      'cancelTexturePaintSurface("lost-capture", event.pointerId)',
     );
     expect(pointerLifecycle).toContain("cancelTexturePaintPendingOneShotTap()");
     expect(cancel).toContain(
@@ -637,7 +656,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       "setTexturePaintEyedropperActive(false)",
     );
     expect(keyboard.slice(fillShortcut)).toContain(
-      'tool: current.tool === "brush" ? "fill" : "brush"',
+      'tool: current.tool === "fill" ? "surface-brush" : "fill"',
     );
   });
 

@@ -31,6 +31,7 @@ import {
   STUDIO_WORKSPACE_STATE_VERSION,
   STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS,
   STUDIO_WORKSPACE_CATALOGUE_COVERAGE,
+  studioWorkspaceLaunchSurface,
   STUDIO_WORKSPACE_DEVICE_KINDS,
   STUDIO_WORKSPACE_STORAGE_KEY,
   areStudioWorkspaceLayoutsEqual,
@@ -133,6 +134,9 @@ const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
   "pen-display",
   "mobile-draw",
   "photo-edit",
+  "vector-design",
+  "animation",
+  "pose-3d",
 ]);
 
 describe("built-in Studio workspaces", () => {
@@ -158,10 +162,10 @@ describe("built-in Studio workspaces", () => {
       "pro-comic",
       ...STUDIO_EXPANDED_WORKSPACE_IDS,
     ]);
-    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(12);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(15);
     expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size)
-      .toBe(12);
-    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(12);
+      .toBe(15);
+    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(15);
 
     for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
       expect(Object.isFrozen(workspace)).toBe(true);
@@ -267,16 +271,20 @@ describe("built-in Studio workspaces", () => {
 
     expect(new Set(STUDIO_WORKSPACE_CATALOGUE_COVERAGE.map((entry) => entry.requirement)).size)
       .toBe(12);
-    expect(STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS).toEqual([
-      "Vector Design",
-      "Animation",
-      "Pose & 3D",
-    ]);
+    expect(STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS).toEqual([]);
     // Every profile the catalogue does claim must be a distinct workspace, never a duplicate.
     const claimed = STUDIO_WORKSPACE_CATALOGUE_COVERAGE
       .filter((entry) => entry.workspaceId !== null)
       .map((entry) => entry.workspaceId);
     expect(new Set(claimed).size).toBe(claimed.length);
+  });
+
+  it("maps the three specialist profiles to real one-shot production surfaces", () => {
+    expect(studioWorkspaceLaunchSurface("vector-design")).toBe("vector-design");
+    expect(studioWorkspaceLaunchSurface("animation")).toBe("animation");
+    expect(studioWorkspaceLaunchSurface("pose-3d")).toBe("pose-3d");
+    expect(studioWorkspaceLaunchSurface("lineart")).toBeNull();
+    expect(studioWorkspaceLaunchSurface("custom-artist-layout")).toBeNull();
   });
 
   it("keeps built-ins outside owner storage and lists custom workspaces after them", () => {

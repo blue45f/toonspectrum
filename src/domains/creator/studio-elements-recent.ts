@@ -1,6 +1,8 @@
 /**
- * Recent Studio elements — localStorage-backed MRU for shapes/stickers (PicsArt-style).
- * Storage injected for tests; pure normalize/update helpers.
+ * Recent Studio element state and pure normalize/update helpers.
+ *
+ * The synchronous Storage helpers are retained only as an explicit legacy/import-test seam.
+ * Product Studio persists this state through `studio-ui-preferences-sqlite.ts`.
  */
 
 export const STUDIO_ELEMENTS_RECENT_KEY = "toonspectrum-studio-elements-recent:v1";

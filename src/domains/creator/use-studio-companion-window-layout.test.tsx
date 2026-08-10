@@ -6,10 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   captureStudioCompanionWindowLayout,
+  clearStudioCompanionWindowLayout,
+  loadStudioCompanionWindowLayout,
   saveStudioCompanionWindowLayout,
   studioCompanionWindowLayoutStorageKey,
   type StudioCompanionWindowLayoutSurface,
 } from "./studio-companion-window-layout";
+import {
+  createStudioCompanionWindowPreferenceSnapshot,
+  createStudioCompanionWindowPreferencesRuntime,
+  type CreateStudioCompanionWindowPreferencesRuntimeOptions,
+  type StudioCompanionWindowPreferencesRepository,
+} from "./studio-companion-window-preferences-sqlite";
 import {
   STUDIO_COMPANION_WINDOW_LAYOUT_POLL_MS,
   STUDIO_COMPANION_WINDOW_LAYOUT_RESIZE_DEBOUNCE_MS,
@@ -103,6 +111,74 @@ for (const [owner, key] of [
 
 let visibilityState: DocumentVisibilityState;
 let latestResultReader: (() => UseStudioCompanionWindowLayoutResult) | null;
+let preferenceMutationSequence = 0;
+
+function testPreferencesRepository(): StudioCompanionWindowPreferencesRepository {
+  return {
+    authority: "sqlite-opfs",
+    async load(surface) {
+      const storage = window.localStorage;
+      const rememberKey = studioCompanionWindowLayoutRememberStorageKey(surface);
+      const rawRemember = storage.getItem(rememberKey);
+      let rememberEnabled: boolean | null = null;
+      if (rawRemember === "1" || rawRemember === "0") {
+        rememberEnabled = rawRemember === "1";
+      } else if (rawRemember !== null) {
+        storage.removeItem(rememberKey);
+        rememberEnabled = false;
+      }
+      const loaded = loadStudioCompanionWindowLayout(storage, surface, { now: NOW });
+      if (loaded.status === "session-only" && loaded.failure === "invalid-payload") {
+        clearStudioCompanionWindowLayout(storage, surface);
+      }
+      const loadedLayout = loaded.status === "persisted" ? loaded.layout : null;
+      if (rememberEnabled === null && loadedLayout === null) return null;
+      preferenceMutationSequence += 1;
+      return createStudioCompanionWindowPreferenceSnapshot({
+        surface,
+        revision: 1,
+        writerInstanceId: "test-layout-writer-0001",
+        mutationId: `test-layout-load-${String(preferenceMutationSequence).padStart(4, "0")}`,
+        rememberEnabled: rememberEnabled ?? true,
+        layout: loadedLayout,
+      });
+    },
+    async save(snapshot) {
+      const storage = window.localStorage;
+      const rememberKey = studioCompanionWindowLayoutRememberStorageKey(snapshot.surface);
+      const currentRemember = storage.getItem(rememberKey);
+      const nextRemember = snapshot.rememberEnabled ? "1" : "0";
+      if (!snapshot.rememberEnabled || currentRemember !== null) {
+        if (currentRemember !== nextRemember) storage.setItem(rememberKey, nextRemember);
+      }
+      const result = snapshot.layout
+        ? saveStudioCompanionWindowLayout(storage, snapshot.surface, snapshot.layout, {
+          now: snapshot.layout.savedAt,
+        })
+        : clearStudioCompanionWindowLayout(storage, snapshot.surface);
+      if (result.status === "session-only") throw new Error(result.failure);
+      return { accepted: true, snapshot };
+    },
+    async flush() {
+      await Promise.resolve();
+    },
+  };
+}
+
+function testPreferencesRuntimeFactory(
+  options: CreateStudioCompanionWindowPreferencesRuntimeOptions,
+) {
+  return createStudioCompanionWindowPreferencesRuntime({
+    ...options,
+    writerInstanceId: "test-layout-runtime-0001",
+    createMutationId: () => {
+      preferenceMutationSequence += 1;
+      return `test-layout-mutation-${String(preferenceMutationSequence).padStart(4, "0")}`;
+    },
+    repositoryFactory: async () => testPreferencesRepository(),
+    channelFactory: () => null,
+  });
+}
 
 function restoreProperty(owner: object, namespace: string, key: string): void {
   const descriptor = originalDescriptors.get(`${namespace}.${key}`);
@@ -167,6 +243,7 @@ function renderLayoutHook(
     (input: UseStudioCompanionWindowLayoutInput) => useStudioCompanionWindowLayout({
       ...input,
       initialRememberEnabled: input.initialRememberEnabled ?? defaultRememberEnabled,
+      preferencesRuntimeFactory: input.preferencesRuntimeFactory ?? testPreferencesRuntimeFactory,
     }),
     { initialProps: props }
   );
@@ -217,6 +294,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   visibilityState = "visible";
   latestResultReader = null;
+  preferenceMutationSequence = 0;
   Object.defineProperty(document, "visibilityState", {
     configurable: true,
     get: () => visibilityState,
@@ -371,6 +449,7 @@ describe("useStudioCompanionWindowLayout", () => {
           enabled: true,
           interactionReady: true,
           initialRememberEnabled: true,
+          preferencesRuntimeFactory: testPreferencesRuntimeFactory,
         },
         wrapper: ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>,
       }

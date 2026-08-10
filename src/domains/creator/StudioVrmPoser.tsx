@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal, type ThreeEvent } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
-import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
@@ -124,6 +124,11 @@ import {
   normalizeStudioVrmPoseTranslations,
 } from "./studio-vrm-pose-translations";
 import {
+  createStudioVrmPoserPreferencesRuntime,
+  hasStudioVrmWebcamSessionConsent,
+  rememberStudioVrmWebcamSessionConsent,
+} from "./studio-vrm-poser-preferences-sqlite"; // session-only key: "studio_webcam_consent"
+import {
   applyExpressionWeightsToVrm,
   applyPoseToVrm,
   applyVrmCustomColors,
@@ -161,17 +166,11 @@ import {
   filterStudioVrmPosesByBucket,
   filterStudioVrmPosesByQuery,
   findStudioVrmLightingQuickPreset,
-  loadStudioVrmRecentCharacters,
-  loadStudioVrmRecentPoses,
-  rememberStudioVrmRecent,
-  saveStudioVrmRecentCharacters,
-  saveStudioVrmRecentPoses,
   STUDIO_VRM_LIGHTING_QUICK_PRESETS,
   STUDIO_VRM_POSE_BUCKETS,
   studioVrmPoseBucketCountLabel,
   type StudioVrmPoseBucketId,
   type StudioVrmPoseListItem,
-  type StudioVrmRecentState,
 } from "./studio-vrm-poser-ux";
 import {
   DEFAULT_BONE_OFFSETS,
@@ -249,6 +248,12 @@ import {
   resetStudioVrmFullStateHistory,
   stepStudioVrmFullStateHistory,
 } from "./studio-vrm-state-history";
+import { adaptThreeRaycastIntersection } from "./studio-vrm-surface-brush-provider";
+import {
+  createStudioVrmSurfacePaintTool,
+  type StudioVrmSurfacePaintPointerSample,
+  type StudioVrmSurfacePaintToolSnapshot,
+} from "./studio-vrm-surface-paint-tool";
 import { createStudioVrmTexturePaintCursor } from "./studio-vrm-texture-paint-cursor";
 import {
   planStudioVrmTexturePaintDeviceTier,
@@ -820,7 +825,7 @@ const CHARACTER_PANEL_SECTIONS: Array<{
 ];
 
 const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS: StudioVrmTexturePaintPanelSettings = {
-  tool: "brush",
+  tool: "surface-brush",
   brushKind: "ink",
   color: "#d85f48",
   sizeTexels: 48,
@@ -2366,15 +2371,7 @@ function studioVrmTexturePaintHit(
   event: ThreeEvent<PointerEvent>,
 ): StudioVrmTexturePaintRayHit | null {
   if (!(event.object instanceof THREE.Mesh) || (!event.uv && !event.uv1)) return null;
-  const hit = {
-    object: event.object,
-    ...(event.uv ? { uv: event.uv } : {}),
-    ...(event.uv1 ? { uv1: event.uv1 } : {}),
-    face: event.face,
-    faceIndex: event.faceIndex,
-    point: event.point,
-  };
-  return hit;
+  return adaptThreeRaycastIntersection(event);
 }
 
 function studioVrmTexturePaintPressure(event: ThreeEvent<PointerEvent>): number {
@@ -2383,6 +2380,66 @@ function studioVrmTexturePaintPressure(event: ThreeEvent<PointerEvent>): number 
     return Math.min(1, Math.max(0.01, pressure));
   }
   return event.pointerType === "pen" ? 0.01 : 0.5;
+}
+
+function studioVrmSurfacePaintWorldUnitsPerCssPixel(
+  camera: THREE.Camera,
+  point: Readonly<{ x: number; y: number; z: number }>,
+  viewportHeightCssPixels: number,
+  cameraPoint: THREE.Vector3,
+): number | null {
+  if (!Number.isFinite(viewportHeightCssPixels) || viewportHeightCssPixels <= 0) return null;
+  if (camera instanceof THREE.PerspectiveCamera) {
+    cameraPoint.set(point.x, point.y, point.z).applyMatrix4(camera.matrixWorldInverse);
+    const depth = -cameraPoint.z;
+    if (!Number.isFinite(depth) || depth <= 0) return null;
+    const verticalFovRadians = THREE.MathUtils.degToRad(camera.getEffectiveFOV());
+    const value = (2 * depth * Math.tan(verticalFovRadians / 2)) / viewportHeightCssPixels;
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  if (camera instanceof THREE.OrthographicCamera) {
+    const value = Math.abs(camera.top - camera.bottom)
+      / Math.max(Number.EPSILON, camera.zoom)
+      / viewportHeightCssPixels;
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }
+  return null;
+}
+
+function studioVrmSurfacePaintPointerSample(
+  event: ThreeEvent<PointerEvent>,
+  phase: StudioVrmSurfacePaintPointerSample["phase"],
+  hit: StudioVrmTexturePaintRayHit,
+  camera: THREE.Camera,
+  viewportHeightCssPixels: number,
+  cameraPoint: THREE.Vector3,
+): StudioVrmSurfacePaintPointerSample {
+  const tiltX = Number.isFinite(event.tiltX)
+    ? THREE.MathUtils.clamp(event.tiltX, -90, 90)
+    : 0;
+  const tiltY = Number.isFinite(event.tiltY)
+    ? THREE.MathUtils.clamp(event.tiltY, -90, 90)
+    : 0;
+  return Object.freeze({
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    timeStamp: Number.isFinite(event.timeStamp) ? Math.max(0, event.timeStamp) : 0,
+    pressure: studioVrmTexturePaintPressure(event),
+    tiltX,
+    tiltY,
+    phase,
+    hit,
+    worldUnitsPerCssPixel: hit.point
+      ? studioVrmSurfacePaintWorldUnitsPerCssPixel(
+          camera,
+          hit.point,
+          viewportHeightCssPixels,
+          cameraPoint,
+        )
+      : null,
+  });
 }
 
 const STUDIO_VRM_TEXTURE_PAINT_ONE_SHOT_TAP_MAX_DISTANCE_CSS_PX = 10;
@@ -2447,6 +2504,7 @@ function VrmActor({
   texturePaintEyedropperActive,
   onTexturePaintColorSampled,
   onTexturePaintEyedropperComplete,
+  onTexturePaintSurfaceStateChange,
 }: {
   bodyRotation: number;
   customBones: PoseBoneMap;
@@ -2468,8 +2526,12 @@ function VrmActor({
   texturePaintEyedropperActive: boolean;
   onTexturePaintColorSampled: (color: string) => void;
   onTexturePaintEyedropperComplete: () => void;
+  onTexturePaintSurfaceStateChange: (
+    snapshot: StudioVrmSurfacePaintToolSnapshot | null,
+  ) => void;
 }) {
   const gl = useThree((state) => state.gl);
+  const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const texturePaintRuntimeRef = useRef(texturePaintRuntime);
   const texturePaintSettingsRef = useRef(texturePaintSettings);
@@ -2477,6 +2539,7 @@ function VrmActor({
   const texturePaintEyedropperActiveRef = useRef(texturePaintEyedropperActive);
   const texturePaintColorSampledRef = useRef(onTexturePaintColorSampled);
   const texturePaintEyedropperCompleteRef = useRef(onTexturePaintEyedropperComplete);
+  const texturePaintSurfaceStateChangeRef = useRef(onTexturePaintSurfaceStateChange);
   const texturePaintOneShotGenerationRef = useRef(0);
   const texturePaintOneShotAbortRef = useRef<AbortController | null>(null);
   const texturePaintOneShotBusyRef = useRef(false);
@@ -2488,6 +2551,19 @@ function VrmActor({
   } | null>(null);
   const finishTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
   const cancelTexturePaintRef = useRef<(pointerId?: number) => void>(() => undefined);
+  const texturePaintSurfacePointerIdRef = useRef<number | null>(null);
+  const texturePaintSurfaceCaptureTargetRef = useRef<{
+    releasePointerCapture(pointerId: number): void;
+  } | null>(null);
+  const finishTexturePaintSurfaceRef = useRef<(pointerId?: number) => void>(() => undefined);
+  const cancelTexturePaintSurfaceRef = useRef<(
+    reason: "disabled" | "device-failure" | "lost-capture" | "pointer-cancel" | "pointer-leave" | "tool-change" | "unmount" | "window-blur",
+    pointerId?: number,
+  ) => void>(() => undefined);
+  const texturePaintSurfaceCameraPointRef = useRef(new THREE.Vector3());
+  const [texturePaintSurfaceTool] = useState(() => createStudioVrmSurfacePaintTool({
+    onSnapshot: (snapshot) => texturePaintSurfaceStateChangeRef.current(snapshot),
+  }));
 
   const releaseTexturePaintPendingOneShotCapture = useCallback(
     (pending: StudioVrmTexturePaintPendingOneShotTap) => {
@@ -2594,9 +2670,11 @@ function VrmActor({
     texturePaintEyedropperActiveRef.current = texturePaintEyedropperActive;
     texturePaintColorSampledRef.current = onTexturePaintColorSampled;
     texturePaintEyedropperCompleteRef.current = onTexturePaintEyedropperComplete;
+    texturePaintSurfaceStateChangeRef.current = onTexturePaintSurfaceStateChange;
   }, [
     onTexturePaintColorSampled,
     onTexturePaintEyedropperComplete,
+    onTexturePaintSurfaceStateChange,
     texturePaintEnabled,
     texturePaintEyedropperActive,
     texturePaintRuntime,
@@ -2609,7 +2687,10 @@ function VrmActor({
     texturePaintOneShotAbortRef.current?.abort();
     texturePaintOneShotAbortRef.current = null;
     texturePaintOneShotBusyRef.current = false;
-  }, [cancelTexturePaintPendingOneShotTap]);
+    texturePaintSurfaceTool.cancel("unmount");
+    texturePaintSurfaceTool.dispose();
+    texturePaintSurfaceStateChangeRef.current(null);
+  }, [cancelTexturePaintPendingOneShotTap, texturePaintSurfaceTool]);
 
   useEffect(() => {
     const releaseCapture = (pointerId: number) => {
@@ -2648,8 +2729,48 @@ function VrmActor({
       const result = texturePaintRuntimeRef.current?.cancelStroke(pointerId);
       if (result?.ok && result.value) invalidate();
     };
+    const releaseSurfaceCapture = (pointerId: number) => {
+      const captureTarget = texturePaintSurfaceCaptureTargetRef.current;
+      texturePaintSurfaceCaptureTargetRef.current = null;
+      if (!captureTarget) return;
+      try {
+        captureTarget.releasePointerCapture(pointerId);
+      } catch {
+        // Native pointerup/lostpointercapture may already have released it.
+      }
+    };
+    const finishTexturePaintSurface = (matchingPointerId?: number) => {
+      const pointerId = texturePaintSurfacePointerIdRef.current;
+      if (
+        pointerId === null
+        || (matchingPointerId !== undefined && matchingPointerId !== pointerId)
+      ) {
+        return;
+      }
+      texturePaintSurfacePointerIdRef.current = null;
+      releaseSurfaceCapture(pointerId);
+      void texturePaintSurfaceTool.finish(pointerId).then(() => invalidate());
+    };
+    const cancelTexturePaintSurface = (
+      reason: "disabled" | "device-failure" | "lost-capture" | "pointer-cancel" | "pointer-leave" | "tool-change" | "unmount" | "window-blur",
+      matchingPointerId?: number,
+    ) => {
+      const pointerId = texturePaintSurfacePointerIdRef.current;
+      if (
+        pointerId === null
+        || (matchingPointerId !== undefined && matchingPointerId !== pointerId)
+      ) {
+        if (matchingPointerId === undefined) texturePaintSurfaceTool.cancel(reason);
+        return;
+      }
+      texturePaintSurfacePointerIdRef.current = null;
+      releaseSurfaceCapture(pointerId);
+      if (texturePaintSurfaceTool.cancel(reason, pointerId)) invalidate();
+    };
     finishTexturePaintRef.current = finishTexturePaint;
     cancelTexturePaintRef.current = cancelTexturePaint;
+    finishTexturePaintSurfaceRef.current = finishTexturePaintSurface;
+    cancelTexturePaintSurfaceRef.current = cancelTexturePaintSurface;
 
     const finishMatchingPointer = (event: PointerEvent) => {
       finishTexturePaintPendingOneShotTap(
@@ -2658,10 +2779,20 @@ function VrmActor({
         event.clientY,
       );
       finishTexturePaint(event.pointerId);
+      finishTexturePaintSurface(event.pointerId);
     };
     const cancelMatchingPointer = (event: PointerEvent) => {
       cancelTexturePaintPendingOneShotTap(event.pointerId);
       cancelTexturePaint(event.pointerId);
+      cancelTexturePaintSurface("pointer-cancel", event.pointerId);
+    };
+    const cancelLostPointerCapture = (event: PointerEvent) => {
+      cancelTexturePaintPendingOneShotTap(event.pointerId);
+      cancelTexturePaint(event.pointerId);
+      cancelTexturePaintSurface("lost-capture", event.pointerId);
+    };
+    const cancelPointerLeave = (event: PointerEvent) => {
+      cancelTexturePaintSurface("pointer-leave", event.pointerId);
     };
     const cancelPendingTapOnMove = (event: PointerEvent) => {
       const pending = texturePaintPendingOneShotTapRef.current;
@@ -2678,10 +2809,20 @@ function VrmActor({
       if (pending && pending.pointerId !== event.pointerId) {
         cancelTexturePaintPendingOneShotTap();
       }
+      const surfacePointerId = texturePaintSurfacePointerIdRef.current;
+      if (surfacePointerId !== null && surfacePointerId !== event.pointerId) {
+        cancelTexturePaintSurface("pointer-cancel", surfacePointerId);
+      }
     };
     const cancelOnWindowBlur = () => {
       cancelTexturePaintPendingOneShotTap();
       cancelTexturePaint();
+      cancelTexturePaintSurface("window-blur");
+    };
+    const cancelOnGraphicsDeviceFailure = () => {
+      cancelTexturePaintPendingOneShotTap();
+      cancelTexturePaint();
+      cancelTexturePaintSurface("device-failure");
     };
     window.addEventListener("pointermove", cancelPendingTapOnMove, { passive: true });
     window.addEventListener("pointerup", finishMatchingPointer, { passive: true });
@@ -2692,7 +2833,9 @@ function VrmActor({
       cancelPendingTapOnAdditionalPointer,
       true,
     );
-    gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer);
+    gl.domElement.addEventListener("lostpointercapture", cancelLostPointerCapture);
+    gl.domElement.addEventListener("pointerleave", cancelPointerLeave);
+    gl.domElement.addEventListener("webglcontextlost", cancelOnGraphicsDeviceFailure);
     return () => {
       window.removeEventListener("pointermove", cancelPendingTapOnMove);
       window.removeEventListener("pointerup", finishMatchingPointer);
@@ -2703,14 +2846,23 @@ function VrmActor({
         cancelPendingTapOnAdditionalPointer,
         true,
       );
-      gl.domElement.removeEventListener("lostpointercapture", cancelMatchingPointer);
+      gl.domElement.removeEventListener("lostpointercapture", cancelLostPointerCapture);
+      gl.domElement.removeEventListener("pointerleave", cancelPointerLeave);
+      gl.domElement.removeEventListener("webglcontextlost", cancelOnGraphicsDeviceFailure);
       cancelTexturePaintPendingOneShotTap();
       cancelTexturePaint();
+      cancelTexturePaintSurface("unmount");
       if (finishTexturePaintRef.current === finishTexturePaint) {
         finishTexturePaintRef.current = () => undefined;
       }
       if (cancelTexturePaintRef.current === cancelTexturePaint) {
         cancelTexturePaintRef.current = () => undefined;
+      }
+      if (finishTexturePaintSurfaceRef.current === finishTexturePaintSurface) {
+        finishTexturePaintSurfaceRef.current = () => undefined;
+      }
+      if (cancelTexturePaintSurfaceRef.current === cancelTexturePaintSurface) {
+        cancelTexturePaintSurfaceRef.current = () => undefined;
       }
     };
   }, [
@@ -2718,10 +2870,14 @@ function VrmActor({
     finishTexturePaintPendingOneShotTap,
     gl,
     invalidate,
+    texturePaintSurfaceTool,
   ]);
 
   useEffect(() => {
     cancelTexturePaintPendingOneShotTap();
+    if (texturePaintSettings.tool !== "surface-brush") {
+      cancelTexturePaintSurfaceRef.current("tool-change");
+    }
   }, [
     cancelTexturePaintPendingOneShotTap,
     texturePaintEyedropperActive,
@@ -2733,6 +2889,7 @@ function VrmActor({
     if (texturePaintEnabled) return;
     cancelTexturePaintPendingOneShotTap();
     cancelTexturePaintRef.current();
+    cancelTexturePaintSurfaceRef.current("disabled");
     texturePaintOneShotGenerationRef.current += 1;
     texturePaintOneShotAbortRef.current?.abort();
     texturePaintOneShotAbortRef.current = null;
@@ -2900,6 +3057,19 @@ function VrmActor({
     }
   };
 
+  const releaseFailedTexturePaintSurfacePointer = (pointerId: number) => {
+    if (texturePaintSurfacePointerIdRef.current !== pointerId) return;
+    texturePaintSurfacePointerIdRef.current = null;
+    const captureTarget = texturePaintSurfaceCaptureTargetRef.current;
+    texturePaintSurfaceCaptureTargetRef.current = null;
+    if (!captureTarget) return;
+    try {
+      captureTarget.releasePointerCapture(pointerId);
+    } catch {
+      // A native pointerup/lostpointercapture may have won the race.
+    }
+  };
+
   const beginTexturePaint = (event: ThreeEvent<PointerEvent>) => {
     const existingPendingTap = texturePaintPendingOneShotTapRef.current;
     if (existingPendingTap) {
@@ -2919,6 +3089,10 @@ function VrmActor({
       || !event.isPrimary
       || event.button !== 0
       || texturePaintPointerIdRef.current !== null
+      || texturePaintSurfacePointerIdRef.current !== null
+      || ["collecting", "committing", "cancelling"].includes(
+        texturePaintSurfaceTool.getSnapshot().status,
+      )
       || texturePaintOneShotBusyRef.current
     ) {
       return;
@@ -2957,11 +3131,44 @@ function VrmActor({
       return;
     }
     const pointerId = event.pointerId;
-    texturePaintPointerIdRef.current = pointerId;
     const captureTarget = event.currentTarget as unknown as {
       setPointerCapture(pointerId: number): void;
       releasePointerCapture(pointerId: number): void;
     };
+    if (settings.tool === "surface-brush") {
+      const viewportHeight = gl.domElement.getBoundingClientRect().height;
+      const begin = texturePaintSurfaceTool.begin({
+        runtime,
+        settings: {
+          color: settings.color,
+          sizeCssPixels: settings.sizeTexels,
+          opacity: settings.opacity,
+          flow: settings.tuning.flow,
+          hardness: settings.tuning.hardness,
+          minSize: settings.tuning.minSize,
+        },
+        sample: studioVrmSurfacePaintPointerSample(
+          event,
+          "down",
+          hit,
+          camera,
+          viewportHeight,
+          texturePaintSurfaceCameraPointRef.current,
+        ),
+      });
+      if (begin.route === "surface-brush") {
+        texturePaintSurfacePointerIdRef.current = pointerId;
+        try {
+          captureTarget.setPointerCapture(pointerId);
+          texturePaintSurfaceCaptureTargetRef.current = captureTarget;
+        } catch {
+          texturePaintSurfaceCaptureTargetRef.current = null;
+        }
+        return;
+      }
+    }
+
+    texturePaintPointerIdRef.current = pointerId;
     try {
       captureTarget.setPointerCapture(pointerId);
       texturePaintCaptureTargetRef.current = captureTarget;
@@ -2975,11 +3182,11 @@ function VrmActor({
       hit,
       pressure: studioVrmTexturePaintPressure(event),
       style: {
-        kind: settings.brushKind,
+        kind: settings.tool === "surface-brush" ? "ink" : settings.brushKind,
         color: settings.color,
         sizeTexels: settings.sizeTexels,
         opacity: settings.opacity,
-        blend: settings.blend,
+        blend: settings.tool === "surface-brush" ? "normal" : settings.blend,
         tuning: settings.tuning,
       },
     }).then((result) => {
@@ -2997,6 +3204,30 @@ function VrmActor({
       event.stopPropagation();
       if (studioVrmTexturePaintOneShotTapMoved(pendingTap, event.clientX, event.clientY)) {
         cancelTexturePaintPendingOneShotTap(event.pointerId);
+      }
+      return;
+    }
+    const surfacePointerId = texturePaintSurfacePointerIdRef.current;
+    if (surfacePointerId !== null && event.pointerId === surfacePointerId) {
+      event.stopPropagation();
+      if (texturePaintMutationBlockedRef.current || !texturePaintEnabledRef.current) {
+        cancelTexturePaintSurfaceRef.current("disabled", surfacePointerId);
+        return;
+      }
+      const hit = studioVrmTexturePaintHit(event);
+      if (!hit) return;
+      const appended = texturePaintSurfaceTool.append(
+        studioVrmSurfacePaintPointerSample(
+          event,
+          "move",
+          hit,
+          camera,
+          gl.domElement.getBoundingClientRect().height,
+          texturePaintSurfaceCameraPointRef.current,
+        ),
+      );
+      if (!appended && texturePaintSurfaceTool.getSnapshot().status === "error") {
+        releaseFailedTexturePaintSurfacePointer(surfacePointerId);
       }
       return;
     }
@@ -3031,6 +3262,24 @@ function VrmActor({
       event.stopPropagation();
       return;
     }
+    if (texturePaintSurfacePointerIdRef.current === event.pointerId) {
+      event.stopPropagation();
+      const hit = studioVrmTexturePaintHit(event);
+      if (hit) {
+        texturePaintSurfaceTool.append(
+          studioVrmSurfacePaintPointerSample(
+            event,
+            "up",
+            hit,
+            camera,
+            gl.domElement.getBoundingClientRect().height,
+            texturePaintSurfaceCameraPointRef.current,
+          ),
+        );
+      }
+      finishTexturePaintSurfaceRef.current(event.pointerId);
+      return;
+    }
     if (texturePaintPointerIdRef.current !== event.pointerId) return;
     event.stopPropagation();
     finishTexturePaintRef.current(event.pointerId);
@@ -3039,6 +3288,11 @@ function VrmActor({
   const cancelTexturePaint = (event: ThreeEvent<PointerEvent>) => {
     if (cancelTexturePaintPendingOneShotTap(event.pointerId)) {
       event.stopPropagation();
+      return;
+    }
+    if (texturePaintSurfacePointerIdRef.current === event.pointerId) {
+      event.stopPropagation();
+      cancelTexturePaintSurfaceRef.current("pointer-cancel", event.pointerId);
       return;
     }
     if (texturePaintPointerIdRef.current !== event.pointerId) return;
@@ -3053,6 +3307,11 @@ function VrmActor({
       onPointerMove={moveTexturePaint}
       onPointerUp={finishTexturePaint}
       onPointerCancel={cancelTexturePaint}
+      onPointerLeave={(event: ThreeEvent<PointerEvent>) => {
+        if (texturePaintSurfacePointerIdRef.current !== event.pointerId) return;
+        event.stopPropagation();
+        cancelTexturePaintSurfaceRef.current("pointer-leave", event.pointerId);
+      }}
       onLostPointerCapture={cancelTexturePaint}
     />
   );
@@ -3492,6 +3751,8 @@ export function StudioVrmPoser({
     useState<string | null>(null);
   const [texturePaintSnapshot, setTexturePaintSnapshot] =
     useState<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
+  const [texturePaintSurfaceToolSnapshot, setTexturePaintSurfaceToolSnapshot] =
+    useState<StudioVrmSurfacePaintToolSnapshot | null>(null);
   const [texturePaintPersistenceStatus, setTexturePaintPersistenceStatus] =
     useState<TexturePaintPersistenceStatus>("idle");
   const [texturePaintPersistenceError, setTexturePaintPersistenceError] = useState("");
@@ -3500,12 +3761,18 @@ export function StudioVrmPoser({
     planStudioVrmTexturePaintDeviceTier(readStudioVrmTexturePaintEnvironmentSignals()));
   const [poseQuery, setPoseQuery] = useState("");
   const [poseBucket, setPoseBucket] = useState<StudioVrmPoseBucketId>("all");
-  const [recentPoseState, setRecentPoseState] = useState<StudioVrmRecentState>(() =>
-    loadStudioVrmRecentPoses(typeof localStorage === "undefined" ? null : localStorage)
+  const [recentPreferencesRuntime] = useState(() =>
+    createStudioVrmPoserPreferencesRuntime());
+  const recentPreferencesSnapshot = useSyncExternalStore(
+    recentPreferencesRuntime.subscribe,
+    recentPreferencesRuntime.getSnapshot,
+    recentPreferencesRuntime.getSnapshot,
   );
-  const [recentCharacterState, setRecentCharacterState] = useState<StudioVrmRecentState>(() =>
-    loadStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage)
-  );
+  const recentPoseState = recentPreferencesSnapshot.recentPoses;
+  const recentCharacterState = recentPreferencesSnapshot.recentCharacters;
+  useEffect(() => {
+    if (open) void recentPreferencesRuntime.hydrate();
+  }, [open, recentPreferencesRuntime]);
   const [bodyRotation, setBodyRotation] = useState(0);
   const [mannequinMode, setMannequinMode] = useState(false);
   const [jointHandlesVisible, setJointHandlesVisible] = useState(true);
@@ -3640,6 +3907,7 @@ export function StudioVrmPoser({
   const [webcamLoading, setWebcamLoading] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
   const [showConsent, setShowConsent] = useState(false);
+  const [webcamConsentGranted, setWebcamConsentGranted] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
   const [browserPermissionState, setBrowserPermissionState] = useState<"granted" | "denied" | "prompt" | "unsupported">("prompt");
@@ -5061,8 +5329,16 @@ export function StudioVrmPoser({
     texturePaintModeSelected && texturePaintDisabledReason.length === 0;
   const texturePaintSampling = texturePaintSnapshot?.activeOperation === "sample";
   const texturePaintFilling = texturePaintSnapshot?.activeOperation === "fill";
+  const texturePaintSurfaceStrokeActive = Boolean(
+    texturePaintSurfaceToolSnapshot
+    && ["collecting", "committing", "cancelling"].includes(
+      texturePaintSurfaceToolSnapshot.status,
+    ),
+  );
   const texturePaintStrokeActive =
-    texturePaintSnapshot?.status === "loading" || texturePaintSnapshot?.status === "painting";
+    texturePaintSurfaceStrokeActive
+    || texturePaintSnapshot?.status === "loading"
+    || texturePaintSnapshot?.status === "painting";
   const texturePaintTargetLabel = texturePaintSnapshot?.activeTarget
     ? `${texturePaintSnapshot.activeTarget.sourceName || "Base color"} · ${texturePaintSnapshot.activeTarget.width}×${texturePaintSnapshot.activeTarget.height}`
     : null;
@@ -5076,6 +5352,9 @@ export function StudioVrmPoser({
         : "";
   const texturePaintStatus = texturePaintDisabledReason
     || texturePaintBudgetErrorStatus
+    || (texturePaintSettings.tool === "surface-brush"
+      ? texturePaintSurfaceToolSnapshot?.message ?? ""
+      : "")
     || texturePaintSnapshot?.error?.message
     || texturePaintSnapshot?.guidance?.message
     || (texturePaintSnapshot?.status === "loading"
@@ -5141,6 +5420,7 @@ export function StudioVrmPoser({
   const doUndo = () => {
     if (
       texturePaintMutationBlockedRef.current
+      || texturePaintSurfaceStrokeActive
       || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
     ) return;
     if (
@@ -5155,6 +5435,7 @@ export function StudioVrmPoser({
   const doRedo = () => {
     if (
       texturePaintMutationBlockedRef.current
+      || texturePaintSurfaceStrokeActive
       || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
     ) return;
     if (
@@ -7373,9 +7654,9 @@ export function StudioVrmPoser({
       setExpressionWeights({});
       setActiveExpressionId("neutral");
     }
-    const nextRecent = rememberStudioVrmRecent(recentPoseState, poseId);
-    setRecentPoseState(nextRecent);
-    saveStudioVrmRecentPoses(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
+    // `saveStudioVrmRecentPoses` remains only as an explicit legacy import/test seam in the pure
+    // UX module. The product path records this selection through SQLite/OPFS.
+    recentPreferencesRuntime.rememberPose(poseId);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
         bones: plan.bones,
@@ -7412,9 +7693,7 @@ export function StudioVrmPoser({
   }
 
   function rememberCharacterSelection(modelId: string) {
-    const nextRecent = rememberStudioVrmRecent(recentCharacterState, modelId);
-    setRecentCharacterState(nextRecent);
-    saveStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
+    recentPreferencesRuntime.rememberCharacter(modelId);
   }
 
   function handlePhotoPoseApply(payload: StudioVrmPhotoPoseApplyPayload) {
@@ -8301,6 +8580,11 @@ export function StudioVrmPoser({
       setStatus("ready");
       return;
     }
+    if (texturePaintSurfaceStrokeActive) {
+      setError("V12 UV 표면 획의 저장 또는 취소가 끝난 뒤 이 포즈를 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
     const activeTexturePaintPointerId =
       texturePaintSnapshotRef.current?.activePointerId;
     if (typeof activeTexturePaintPointerId === "number") {
@@ -8595,6 +8879,10 @@ export function StudioVrmPoser({
       aria-describedby={dialogDescriptionId}
       className="fixed inset-0 z-[80] isolate overflow-hidden overscroll-none bg-[oklch(0.08_0.01_70/0.86)] p-2 text-fg backdrop-blur-sm pointer-coarse:[&_button]:min-h-11 pointer-coarse:[&_button]:min-w-11 pointer-coarse:[&_input:not([type=range]):not([type=checkbox]):not([type=color])]:min-h-11 pointer-coarse:[&_input[type=range]]:h-11 pointer-coarse:[&_select]:min-h-11 pointer-coarse:[&_summary]:min-h-11 sm:p-4"
       data-studio-vrm-dialog="true"
+      data-studio-vrm-recent-persistence={recentPreferencesSnapshot.state}
+      data-studio-vrm-recent-authority={
+        recentPreferencesSnapshot.state === "memory-only" ? "memory-only" : "sqlite-opfs"
+      }
       role="dialog"
       tabIndex={-1}
       style={{
@@ -8639,6 +8927,24 @@ export function StudioVrmPoser({
             <X size={17} aria-hidden />
           </button>
         </header>
+
+        {recentPreferencesSnapshot.state === "memory-only" ? (
+          <div
+            className="flex shrink-0 items-center justify-between gap-3 border-b border-warn/30 bg-warn/10 px-4 py-2 text-[0.68rem] leading-relaxed text-warn sm:px-5"
+            role="status"
+            aria-live="polite"
+            data-studio-vrm-recent-persistence-warning="memory-only"
+          >
+            <span>{recentPreferencesSnapshot.message}</span>
+            <button
+              type="button"
+              className="shrink-0 rounded border border-warn/40 bg-card px-2.5 py-1 font-semibold hover:bg-raised"
+              onClick={() => void recentPreferencesRuntime.retry()}
+            >
+              SQLite/OPFS 다시 연결
+            </button>
+          </div>
+        ) : null}
 
         {/* 모바일: 뷰포트(상단)+컨트롤(하단) 두 행을 명시적으로 나눠 컨트롤 패널이 자체 스크롤되게 한다
             (행을 안 잡으면 패널이 모달 밖으로 흘러 하단의 웹캠/푸터가 잘림). 데스크톱(lg): 2단 컬럼. */}
@@ -8704,7 +9010,7 @@ export function StudioVrmPoser({
                       setTexturePaintEyedropperActive(false);
                       setTexturePaintSettings((current) => ({
                         ...current,
-                        tool: current.tool === "brush" ? "fill" : "brush",
+                        tool: current.tool === "fill" ? "surface-brush" : "fill",
                       }));
                     }
                   }}
@@ -8759,6 +9065,7 @@ export function StudioVrmPoser({
                       onTexturePaintColorSampled={handleTexturePaintColorSampled}
                       onTexturePaintEyedropperComplete={() =>
                         setTexturePaintEyedropperActive(false)}
+                      onTexturePaintSurfaceStateChange={setTexturePaintSurfaceToolSnapshot}
                     />
                   ) : null}
                   {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive ? (
@@ -11346,7 +11653,8 @@ export function StudioVrmPoser({
                             type="button"
                             className="rounded bg-accent px-3 py-1.5 text-white font-semibold hover:bg-accent/90 cursor-pointer text-xs"
                             onClick={() => {
-                              localStorage.setItem("studio_webcam_consent", "true");
+                              rememberStudioVrmWebcamSessionConsent();
+                              setWebcamConsentGranted(true);
                               setShowConsent(false);
                               setWebcamActive(true);
                             }}
@@ -11381,8 +11689,10 @@ export function StudioVrmPoser({
                                 setWebcamActive(false);
                               } else {
                                 setWebcamError(null);
-                                const consented = localStorage.getItem("studio_webcam_consent") === "true";
-                                if (consented) {
+                                if (
+                                  webcamConsentGranted
+                                  || hasStudioVrmWebcamSessionConsent()
+                                ) {
                                   setWebcamActive(true);
                                 } else {
                                   setShowConsent(true);

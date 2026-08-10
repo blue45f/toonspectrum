@@ -54,7 +54,6 @@ import {
   createStudioCompanionCommandId,
   createStudioCompanionInstanceId,
   isStudioCompanionMessageFresh,
-  isStudioCompanionPresentationSafeState,
   isStudioToolsCompanionWindowReusable,
   openStudioCompanionSurfaceWindow,
   parseStudioCompanionMessage,
@@ -70,7 +69,6 @@ import {
   type StudioCompanionControl,
   type StudioCompanionDensity,
   type StudioCompanionMessage,
-  type StudioCompanionPresentationSafeState,
   type StudioCompanionReferenceColorResult,
   type StudioCompanionSurface,
   type StudioCompanionToolId,
@@ -97,8 +95,6 @@ const PRIMARY_STALE_AFTER_MS = 12_000;
 const BRUSH_CONTROL_COALESCE_MS = 64;
 const NAVIGATOR_CONTROL_COALESCE_MS = 32;
 const SCREEN_DETAILS_TIMEOUT_MS = 2_500;
-const PRESENTATION_SAFE_STORAGE_PREFIX = "toonspectrum.studio.companion.presentation-safe";
-const PRESENTATION_SAFE_STORAGE_MAX_CHARS = 1_024;
 const REFERENCE_IMAGE_DECODE_TIMEOUT_MS = 5_000;
 
 type CompanionMode = "tools" | "navigator" | "review" | "reference";
@@ -149,83 +145,6 @@ function tText(
 type WindowWithScreenDetails = Window & {
   getScreenDetails?: () => Promise<{ screens: readonly unknown[]; currentScreen?: unknown }>;
 };
-
-function presentationSafeStorageKey(sessionId: string): string {
-  return `${PRESENTATION_SAFE_STORAGE_PREFIX}.${sessionId}`;
-}
-
-type StoredPresentationSafe = Readonly<{
-  kind: "state" | "legacy" | "missing" | "invalid" | "unavailable";
-  enabled: boolean;
-  state: StudioCompanionPresentationSafeState | null;
-}>;
-
-function parseStoredPresentationSafe(raw: string | null): StoredPresentationSafe {
-  if (raw === null) return { kind: "missing", enabled: false, state: null };
-  if (raw === "1" || raw === "0") {
-    return { kind: "legacy", enabled: raw === "1", state: null };
-  }
-  if (raw.length === 0 || raw.length > PRESENTATION_SAFE_STORAGE_MAX_CHARS) {
-    return { kind: "invalid", enabled: false, state: null };
-  }
-  try {
-    const state = JSON.parse(raw) as unknown;
-    return isStudioCompanionPresentationSafeState(state)
-      ? { kind: "state", enabled: state.enabled, state: Object.freeze({ ...state }) }
-      : { kind: "invalid", enabled: false, state: null };
-  } catch {
-    return { kind: "invalid", enabled: false, state: null };
-  }
-}
-
-function readPresentationSafe(sessionId: string | null): StoredPresentationSafe {
-  if (!sessionId || typeof window === "undefined") {
-    return { kind: "unavailable", enabled: false, state: null };
-  }
-  try {
-    return parseStoredPresentationSafe(
-      window.localStorage.getItem(presentationSafeStorageKey(sessionId))
-    );
-  } catch {
-    return { kind: "unavailable", enabled: false, state: null };
-  }
-}
-
-function writePresentationSafe(
-  sessionId: string | null,
-  state: StudioCompanionPresentationSafeState
-): boolean {
-  if (
-    !sessionId
-    || typeof window === "undefined"
-    || !isStudioCompanionPresentationSafeState(state)
-  ) return false;
-  try {
-    const serialized = JSON.stringify(state);
-    if (serialized.length === 0 || serialized.length > PRESENTATION_SAFE_STORAGE_MAX_CHARS) {
-      return false;
-    }
-    window.localStorage.setItem(presentationSafeStorageKey(sessionId), serialized);
-    return true;
-  } catch {
-    // Private browsing and hardened WebViews may deny localStorage; peer LWW remains usable.
-    return false;
-  }
-}
-
-function samePresentationSafeState(
-  left: StudioCompanionPresentationSafeState | null,
-  right: StudioCompanionPresentationSafeState | null
-): boolean {
-  return Boolean(
-    left
-    && right
-    && left.enabled === right.enabled
-    && left.clock === right.clock
-    && left.writerInstanceId === right.writerInstanceId
-    && left.mutationId === right.mutationId
-  );
-}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -353,8 +272,10 @@ export function StudioToolsCompanionPage() {
   const [referenceConnectionEpoch, setReferenceConnectionEpoch] = useState(0);
   const [presentationSafeState, setPresentationSafeState] = useState(() => ({
     sessionId,
-    enabled: readPresentationSafe(sessionId).enabled,
+    enabled: false,
   }));
+  const [presentationSafeTransport, setPresentationSafeTransport] =
+    useState<"pending" | "broadcast" | "memory-only">("pending");
   const [screenPlacementStatus, setScreenPlacementStatus] = useState<ScreenPlacementStatus | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const interactionReady = connected && targetPrimaryInstanceId !== null;
@@ -386,7 +307,7 @@ export function StudioToolsCompanionPage() {
 
   const presentationSafe = presentationSafeState.sessionId === sessionId
     ? presentationSafeState.enabled
-    : readPresentationSafe(sessionId).enabled;
+    : false;
   useLayoutEffect(() => {
     // BroadcastChannel callbacks are external observers. Expose only the value that React
     // committed; a speculative/abandoned render must never momentarily reopen preview capture.
@@ -400,6 +321,7 @@ export function StudioToolsCompanionPage() {
       channel.postMessage(msg);
       return true;
     } catch {
+      setPresentationSafeTransport("memory-only");
       setLastError(localizeText(
         t,
         "채널 전송에 실패했습니다. 기본 스튜디오 탭이 같은 출처인지 확인하세요.",
@@ -539,7 +461,6 @@ export function StudioToolsCompanionPage() {
     if (!companionInstanceId || !guard) return;
     const state = guard.write(enabled, createStudioCompanionCommandId());
     if (!state) return;
-    writePresentationSafe(sessionId, state);
     post(buildStudioCompanionPresentationSafe({
       companionInstanceId,
       targetCompanionInstanceId: null,
@@ -610,60 +531,6 @@ export function StudioToolsCompanionPage() {
   }, [presentationSafe]);
 
   useEffect(() => {
-    const stored = readPresentationSafe(sessionId);
-    applyPresentationSafe(stored.enabled);
-    if (!sessionId) return;
-    const key = presentationSafeStorageKey(sessionId);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== key) return;
-      const incoming = parseStoredPresentationSafe(event.newValue);
-      if (incoming.kind === "missing" || incoming.kind === "invalid") return;
-      const companionInstanceId = companionInstanceIdRef.current;
-      const guard = presentationSafeGuardRef.current;
-      const channel = channelRef.current;
-      if (!companionInstanceId || !guard || !channel) {
-        applyPresentationSafe(incoming.enabled);
-        return;
-      }
-
-      let state: StudioCompanionPresentationSafeState | null = null;
-      let shouldBroadcast = false;
-      if (incoming.kind === "state" && incoming.state) {
-        const merged = guard.merge(incoming.state);
-        const current = guard.current();
-        if (merged || samePresentationSafeState(current, incoming.state)) {
-          state = current;
-        } else if (current) {
-          // The storage event lost the LWW race. Repair durable storage and peers with the newer
-          // register instead of letting an older browser task resurrect a stale preference.
-          state = current;
-          shouldBroadcast = true;
-        }
-      } else if (incoming.kind === "legacy") {
-        state = guard.write(incoming.enabled, createStudioCompanionCommandId());
-        shouldBroadcast = state !== null;
-      }
-      if (!state) return;
-      applyPresentationSafe(state.enabled);
-      if (incoming.kind !== "state" || !samePresentationSafeState(state, incoming.state)) {
-        writePresentationSafe(sessionId, state);
-      }
-      if (!shouldBroadcast) return;
-      try {
-        channel.postMessage(buildStudioCompanionPresentationSafe({
-          companionInstanceId,
-          targetCompanionInstanceId: null,
-          state,
-        }));
-      } catch {
-        // Storage already applied the safety state; the next peer hello repairs convergence.
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [applyPresentationSafe, sessionId]);
-
-  useEffect(() => {
     if (surface !== "workspace") return;
     const previousSessionId = dedicatedWindowOwnerSessionRef.current;
     if (previousSessionId === sessionId) return;
@@ -699,6 +566,8 @@ export function StudioToolsCompanionPage() {
     setDensity("full");
     setLastError(null);
     setScreenPlacementStatus(null);
+    setPresentationSafeTransport("pending");
+    applyPresentationSafe(false);
     screenPlacementEpochRef.current += 1;
     targetPrimaryInstanceIdRef.current = null;
     pendingPingNonceRef.current = null;
@@ -739,6 +608,7 @@ export function StudioToolsCompanionPage() {
     const channel = createStudioCompanionChannel(sessionId);
     channelRef.current = channel;
     if (!channel) {
+      setPresentationSafeTransport("memory-only");
       setLastError(localizeText(
         t,
         "이 브라우저는 BroadcastChannel을 지원하지 않습니다.",
@@ -746,29 +616,11 @@ export function StudioToolsCompanionPage() {
       ));
       return;
     }
+    setPresentationSafeTransport("broadcast");
 
     const presentationSafeGuard = new StudioCompanionPresentationSafeGuard();
     presentationSafeGuard.bind(companionInstanceId);
-    const storedPresentationSafe = readPresentationSafe(sessionId);
-    if (storedPresentationSafe.kind === "state" && storedPresentationSafe.state) {
-      presentationSafeGuard.merge(storedPresentationSafe.state);
-    } else if (
-      storedPresentationSafe.kind === "legacy"
-      || (storedPresentationSafe.kind === "unavailable" && presentationSafeRef.current)
-    ) {
-      const seededState = presentationSafeGuard.write(
-        storedPresentationSafe.kind === "unavailable"
-          ? presentationSafeRef.current
-          : storedPresentationSafe.enabled,
-        createStudioCompanionCommandId()
-      );
-      if (seededState) writePresentationSafe(sessionId, seededState);
-    }
     presentationSafeGuardRef.current = presentationSafeGuard;
-    const initialPresentationSafeState = presentationSafeGuard.current();
-    if (initialPresentationSafeState) {
-      applyPresentationSafe(initialPresentationSafeState.enabled);
-    }
 
     let lastPrimaryActivityAt = 0;
     let primaryConfirmed = false;
@@ -961,44 +813,8 @@ export function StudioToolsCompanionPage() {
       }
       if (msg.type === "companion-presentation-safe") {
         if (!presentationSafeGuard.accept(msg, { companionInstanceId })) return;
-        let state = presentationSafeGuard.current();
-        const durable = msg.targetCompanionInstanceId === null
-          ? null
-          : readPresentationSafe(sessionId);
-        if (
-          state
-          && durable?.kind === "state"
-          && durable.state
-          && durable.state.enabled !== state.enabled
-        ) {
-          // A targeted message is a peer-hello snapshot, not a fresh user mutation. If a
-          // suspended peer replays an older preference with an artificially higher clock, first
-          // observe that clock and then publish a newer corrective value from durable storage.
-          state = presentationSafeGuard.write(
-            durable.state.enabled,
-            createStudioCompanionCommandId()
-          );
-          if (state) {
-            applyPresentationSafe(state.enabled);
-            writePresentationSafe(sessionId, state);
-            try {
-              channel.postMessage(buildStudioCompanionPresentationSafe({
-                companionInstanceId,
-                targetCompanionInstanceId: null,
-                state,
-              }));
-            } catch {
-              // Durable state remains authoritative and the next peer hello retries convergence.
-            }
-          }
-          return;
-        }
-        if (state) {
-          applyPresentationSafe(state.enabled);
-          // Persist the exact total-order register. A reopened companion can now reject a stale
-          // snapshot instead of reconstructing the value with a reset Lamport clock.
-          writePresentationSafe(sessionId, state);
-        }
+        const state = presentationSafeGuard.current();
+        if (state) applyPresentationSafe(state.enabled);
         return;
       }
       if (msg.type === "primary-goodbye") {
@@ -1458,7 +1274,13 @@ export function StudioToolsCompanionPage() {
           ? t("studio.toolsCompanion.layoutSettings.staleTopology")
           : companionWindowLayout.status === "restore-failed"
             ? t("studio.toolsCompanion.layoutSettings.restoreFailed")
-          : null;
+            : companionWindowLayout.synchronizationDegraded
+              ? localizeText(
+                t,
+                "창 간 배치 동기화를 사용할 수 없어 이 창은 SQLite 저장본만 사용합니다.",
+                "studio.toolsCompanion.layoutSettings.liveSyncDegraded",
+              )
+              : null;
   const windowLayoutSettings = (
     <>
       <StudioCompanionWindowLayoutControls
@@ -1499,6 +1321,7 @@ export function StudioToolsCompanionPage() {
     <div
       data-testid="studio-tools-companion-root"
       data-companion-surface={effectiveSurface}
+      data-presentation-safe-authority={presentationSafeTransport}
       className="flex h-dvh min-h-0 flex-col overflow-x-hidden overflow-y-auto bg-canvas text-fg [--studio-safe-bottom:env(safe-area-inset-bottom)] [--studio-safe-left:env(safe-area-inset-left)] [--studio-safe-right:env(safe-area-inset-right)] [--studio-safe-top:env(safe-area-inset-top)]"
     >
       <header className="sticky top-0 z-20 border-b border-line bg-panel/95 pb-2 backdrop-blur-xl [padding-left:max(0.75rem,var(--studio-safe-left))] [padding-right:max(0.75rem,var(--studio-safe-right))] [padding-top:max(0.65rem,var(--studio-safe-top))]">
