@@ -17,7 +17,10 @@ import type {
   StudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
 
-export { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
+export {
+  registerStudioBg3dCaptureExcludedObject,
+  registerStudioBg3dDepthExcludedObject,
+} from "./studio-bg3d-capture-exclusion";
 export {
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,

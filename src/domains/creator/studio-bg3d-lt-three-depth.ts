@@ -2,6 +2,7 @@
 
 import * as THREE from "three";
 
+import { hideStudioBg3dDepthExcludedObjects } from "./studio-bg3d-capture-exclusion";
 import {
   decodeStudioBg3dThreeRgbaDepth,
   STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
@@ -63,6 +64,7 @@ export async function captureStudioBg3dThreeDepth(
   });
   depthMaterial.toneMapped = false;
   const packed = new Uint8Array(width * height * 4);
+  const restoreDepthExcludedObjects = hideStudioBg3dDepthExcludedObjects(scene);
 
   try {
     let readback: Promise<THREE.TypedArray>;
@@ -82,13 +84,19 @@ export async function captureStudioBg3dThreeDepth(
       // or through MeshDepthMaterial while the GPU fence is pending.
       readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, packed);
     } finally {
-      scene.overrideMaterial = previousOverrideMaterial;
-      scene.background = previousSceneBackground;
-      scene.backgroundRotation.copy(previousSceneBackgroundRotation);
-      renderer.setRenderTarget(previousTarget);
-      renderer.setClearColor(previousClearColor, previousClearAlpha);
-      renderer.autoClear = previousAutoClear;
-      renderer.xr.enabled = previousXrEnabled;
+      try {
+        scene.overrideMaterial = previousOverrideMaterial;
+        scene.background = previousSceneBackground;
+        scene.backgroundRotation.copy(previousSceneBackgroundRotation);
+        renderer.setRenderTarget(previousTarget);
+        renderer.setClearColor(previousClearColor, previousClearAlpha);
+        renderer.autoClear = previousAutoClear;
+        renderer.xr.enabled = previousXrEnabled;
+      } finally {
+        // The GPU submission already owns the draw. Restore beauty-only objects immediately so a
+        // live R3F frame cannot visibly lose its contact shadows while the readback fence settles.
+        restoreDepthExcludedObjects();
+      }
     }
     await readback;
     return decodeStudioBg3dThreeRgbaDepth({ width, height, rgba: packed, flipY: true });

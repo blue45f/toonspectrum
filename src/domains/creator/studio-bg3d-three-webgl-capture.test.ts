@@ -6,6 +6,7 @@ import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import {
   createStudioBg3dThreeWebglCaptureAdapter,
   registerStudioBg3dCaptureExcludedObject,
+  registerStudioBg3dDepthExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
 
 vi.mock("./studio-bg3d-lt-three-depth", () => ({
@@ -232,7 +233,14 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     alreadyHiddenHelper.visible = false;
     const importedLookingNode = new THREE.Group();
     importedLookingNode.userData.studioCaptureExcluded = true;
-    f.scene.add(visibleHelper, alreadyHiddenHelper, importedLookingNode);
+    const beautyOnlyContactShadow = new THREE.Group();
+    registerStudioBg3dDepthExcludedObject(beautyOnlyContactShadow);
+    f.scene.add(
+      visibleHelper,
+      alreadyHiddenHelper,
+      importedLookingNode,
+      beautyOnlyContactShadow,
+    );
     const panorama = new THREE.DataTexture();
     f.scene.background = panorama;
     vi.mocked(f.renderer.render).mockImplementation((renderedScene) => {
@@ -241,6 +249,7 @@ describe("Three WebGL Studio 3D capture adapter", () => {
       expect(visibleHelper.visible).toBe(false);
       expect(alreadyHiddenHelper.visible).toBe(false);
       expect(importedLookingNode.visible).toBe(true);
+      expect(beautyOnlyContactShadow.visible).toBe(true);
     });
     captureDepthMock.mockImplementationOnce(() => {
       expect(visibleHelper.visible).toBe(false);
@@ -268,6 +277,7 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     expect(visibleHelper.visible).toBe(true);
     expect(alreadyHiddenHelper.visible).toBe(false);
     expect(importedLookingNode.visible).toBe(true);
+    expect(beautyOnlyContactShadow.visible).toBe(true);
 
     colorReadback.resolve(f.bottomUpRgba);
     const depth = Float32Array.from([0, 0.25, 0.75, 1]);

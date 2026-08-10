@@ -12,10 +12,14 @@ import type {
 const LazyStudioBg3dSharedVrmCharacter = lazy(
   () => import("./StudioBg3dSharedVrmCharacter"),
 );
+const LazyStudioBg3dSharedCharacterContactShadow = lazy(
+  () => import("./StudioBg3dSharedCharacterContactShadow"),
+);
 
 export function StudioBg3dSharedCharacterSceneContent({
   characters,
   includeInCapture,
+  groundingResults,
   onGrounding,
   onSelect,
   onStatus,
@@ -24,6 +28,7 @@ export function StudioBg3dSharedCharacterSceneContent({
 }: {
   characters: readonly StudioShared3dCharacterSource[];
   includeInCapture: boolean;
+  groundingResults: Readonly<Record<string, StudioBg3dSharedCharacterGroundingResult>>;
   onGrounding: (
     runtimeKey: string,
     result: StudioBg3dSharedCharacterGroundingResult | null,
@@ -40,6 +45,10 @@ export function StudioBg3dSharedCharacterSceneContent({
           ? registerStudioBg3dCaptureExcludedObject
           : undefined}
       >
+        <LazyStudioBg3dSharedCharacterContactShadow
+          source={source}
+          grounding={groundingResults[source.runtimeKey]}
+        />
         <LazyStudioBg3dSharedVrmCharacter
           source={source}
           surfaceRevision={surfaceRevision}

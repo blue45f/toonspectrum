@@ -461,6 +461,24 @@ describe("Studio BG3D shared character surface raycast", () => {
     });
   });
 
+  it("never lets renderer-only contact overlays become a grounding surface", () => {
+    const scene = new THREE.Scene();
+    const overlay = groundPlane("contact-overlay", 0.1, new THREE.MeshBasicMaterial());
+    overlay.userData.studioBg3dRendererOverlay = true;
+    scene.add(
+      overlay,
+      groundPlane("authored-floor", -0.04, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "authored-floor",
+      point: [0, -0.04, 0],
+    });
+  });
+
   it("preserves instanced surface identity resolution", () => {
     const scene = new THREE.Scene();
     const geometry = new THREE.PlaneGeometry(2, 2);

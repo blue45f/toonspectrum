@@ -174,7 +174,10 @@ function surfaceIdentity(object: THREE.Object3D, instanceId?: number):
     // THREE.Raycaster also reports objects hidden by an ancestor. Hidden background layers must
     // never become an invisible floor for a shared character.
     if (!current.visible) return null;
-    if (current.userData.studioBg3dSharedCharacterSelection === true) return null;
+    if (
+      current.userData.studioBg3dSharedCharacterSelection === true
+      || current.userData.studioBg3dRendererOverlay === true
+    ) return null;
     if (!identity) {
       const resolveInstanceId = current.userData.studioBg3dResolveInstanceId;
       if (typeof resolveInstanceId === "function" && Number.isSafeInteger(instanceId)) {

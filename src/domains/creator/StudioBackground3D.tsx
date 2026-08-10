@@ -9387,6 +9387,7 @@ export function StudioBackground3D({
     <StudioBg3dSharedCharacterSceneContent
       characters={sharedCharacters}
       includeInCapture={includeSharedCharactersInCapture}
+      groundingResults={sharedCharacterGroundings}
       surfaceRevision={sharedCharacterGroundSurfaceRevision}
       selectedElementId={effectiveSelectedSharedCharacterElementId}
       onSelect={(elementId) => {
