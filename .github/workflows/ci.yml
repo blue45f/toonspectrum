@@ -27,6 +27,9 @@ jobs:
         run: pnpm run verify:studio-p5-brush-real-runtime
 
   verify:
+    # Keep this job ID because repository CI-policy tests inspect jobs.verify. The display name
+    # moves so the fresh 3D job can retain the stable "CI / verify" check context.
+    name: core
     runs-on: ubuntu-latest
     # The complete root suite contains broad Studio/browser and disposable-DB gates. On the
     # GitHub runner, checkout/install/lint/typecheck consume about 9 minutes before Vitest starts,
@@ -220,7 +223,45 @@ jobs:
             --config deploy/cloudflare-realtime/wrangler.jsonc \
             --outdir /tmp/toonspectrum-cloudflare-realtime-dry-run
       - run: pnpm run build
-      - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
-        run: pnpm run verify:studio-3d-console
       - run: pnpm run check:studio-bundle
       - run: pnpm run build:all
+
+  studio-3d-runtime:
+    # Preserve the existing "CI / verify" check context while moving the GPU proof onto
+    # a clean GitHub-hosted VM. Browser-process retries cannot recover the observed runner-level
+    # Dawn/SwiftShader context loss after the long core job.
+    name: verify
+    needs: verify
+    # Always materialize the release-facing check. A failed/cancelled core job must produce a failing
+    # 3D gate instead of a potentially merge-neutral skipped downstream check.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - name: Require successful core CI
+        env:
+          CORE_RESULT: ${{ needs.verify.result }}
+        run: |
+          if [[ "$CORE_RESULT" != "success" ]]; then
+            echo "::error::Core CI gate ended with result '$CORE_RESULT'."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+        with:
+          # Dependency, build, and browser code from the PR must not inherit a checkout token.
+          persist-credentials: false
+      # package.json "packageManager" remains the pnpm version authority.
+      - uses: pnpm/action-setup@v6 # NOSONAR S7637 신뢰된 1st-party 액션
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build production Studio assets on the isolated runner
+        run: pnpm run build
+      - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
+        run: pnpm run verify:studio-3d-console

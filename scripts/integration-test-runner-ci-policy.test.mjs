@@ -81,4 +81,73 @@ describe("database integration runner CI policy", () => {
       /0 applied, [0-9]+ checksum-verified skips/u,
     );
   });
+
+  it("keeps the Studio 3D parity proof on a fresh hard-gated runner", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    const coreJob = workflow.jobs?.verify;
+    const parityJob = workflow.jobs?.["studio-3d-runtime"];
+    const paritySteps = parityJob?.steps ?? [];
+    const coreCommands = (coreJob?.steps ?? [])
+      .map((step) => step.run)
+      .filter((command) => typeof command === "string");
+    const parityCommands = (parityJob?.steps ?? [])
+      .map((step) => step.run)
+      .filter((command) => typeof command === "string");
+
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(coreJob?.name).toBe("core");
+    expect(coreCommands).not.toContain("pnpm run verify:studio-3d-console");
+    expect(coreCommands).toContain("pnpm run check:studio-bundle");
+    expect(coreCommands).toContain("pnpm run build:all");
+
+    expect(parityJob).toMatchObject({
+      name: "verify",
+      needs: "verify",
+      if: "${{ always() }}",
+      "runs-on": "ubuntu-latest",
+      "timeout-minutes": 20,
+      env: {
+        NODE_OPTIONS: "--max-old-space-size=8192",
+      },
+    });
+    expect(parityJob?.services).toBeUndefined();
+    expect(paritySteps.map((step) => step.uses).filter(Boolean)).toEqual([
+      "actions/checkout@v6",
+      "pnpm/action-setup@v6",
+      "actions/setup-node@v6",
+    ]);
+
+    const coreResultGate = paritySteps.find(
+      (step) => step.name === "Require successful core CI",
+    );
+    expect(coreResultGate?.env?.CORE_RESULT).toBe("${{ needs.verify.result }}");
+    expect(coreResultGate?.run).toContain('if [[ "$CORE_RESULT" != "success" ]]');
+    expect(coreResultGate?.if).toBeUndefined();
+    expect(coreResultGate?.["continue-on-error"]).not.toBe(true);
+
+    const checkout = paritySteps.find(
+      (step) => step.uses === "actions/checkout@v6",
+    );
+    expect(checkout?.with?.["persist-credentials"]).toBe(false);
+
+    const installIndex = parityCommands.indexOf("pnpm install --frozen-lockfile");
+    const browserInstallIndex = parityCommands.indexOf(
+      "pnpm exec playwright install --with-deps chromium",
+    );
+    const buildIndex = parityCommands.indexOf("pnpm run build");
+    const parityIndex = parityCommands.indexOf("pnpm run verify:studio-3d-console");
+    expect(installIndex).toBeGreaterThanOrEqual(0);
+    expect(browserInstallIndex).toBeGreaterThan(installIndex);
+    expect(buildIndex).toBeGreaterThan(browserInstallIndex);
+    expect(parityIndex).toBeGreaterThan(buildIndex);
+    expect(
+      parityCommands.filter((command) => command === "pnpm run verify:studio-3d-console"),
+    ).toHaveLength(1);
+
+    const parityStep = paritySteps.find(
+      (step) => step.run === "pnpm run verify:studio-3d-console",
+    );
+    expect(parityStep?.if).toBeUndefined();
+    expect(parityStep?.["continue-on-error"]).not.toBe(true);
+  });
 });
