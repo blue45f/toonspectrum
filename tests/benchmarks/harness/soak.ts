@@ -683,12 +683,18 @@ async function runSoak(soakMinutes: number, resultPath: string): Promise<SoakRep
     sourceAtStart = captureSourceSnapshot();
     errors.push(...sourceSnapshotErrors(sourceAtStart, "start"));
     if (errors.length === 0) {
+      // The renderer package barrels intentionally expose browser-only WESL
+      // `?raw` modules through their provider descriptors. Plain Node/tsx has
+      // no loader for that Vite import convention, and the soak does not use
+      // descriptors or shader compilation. Load only the executable runtime
+      // modules so a 24-hour reliability gate cannot be blocked by unrelated
+      // browser build-time assets.
       const [skia, skiaNode, vello, velloNode, projectModel] = await Promise.all([
-        import("@toonspectrum/studio-engine-skia"),
-        import("@toonspectrum/studio-engine-skia/node"),
-        import("@toonspectrum/studio-engine-vello"),
-        import("@toonspectrum/studio-engine-vello/node"),
-        import("@toonspectrum/studio-project-model"),
+        import("../../../packages/studio-engine-skia/src/render.ts"),
+        import("../../../packages/studio-engine-skia/src/node/index.ts"),
+        import("../../../packages/studio-engine-vello/src/render.ts"),
+        import("../../../packages/studio-engine-vello/src/node/index.ts"),
+        import("../../../packages/studio-project-model/src/index.ts"),
       ]);
       const [ck] = await Promise.all([skiaNode.loadCanvasKitNode(), velloNode.loadVelloNode()]);
       workloadStartedAt = new Date();

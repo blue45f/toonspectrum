@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -106,6 +109,22 @@ describe("soak memory convergence", () => {
 });
 
 describe("soak evidence inputs", () => {
+  it("loads only Node-compatible runtime modules instead of browser WESL barrels", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("./soak.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(source).not.toContain('import("@toonspectrum/studio-engine-skia")');
+    expect(source).not.toContain('import("@toonspectrum/studio-engine-vello")');
+    expect(source).toContain(
+      'import("../../../packages/studio-engine-skia/src/render.ts")',
+    );
+    expect(source).toContain(
+      'import("../../../packages/studio-engine-vello/src/render.ts")',
+    );
+  });
+
   it.each(["1440", "480", "0.25"])("accepts finite positive SOAK_MINUTES=%s", (raw) => {
     expect(parseSoakMinutes(raw)).toBe(Number(raw));
   });
