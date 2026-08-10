@@ -1348,6 +1348,291 @@ function isMToonOutlineMaterial(mat: THREE.Material & { isOutline?: boolean }): 
   return mat.isOutline === true;
 }
 
+type VrmCustomColorReadableTexture = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+  lowLuma: number;
+  highLuma: number;
+};
+
+type VrmCustomColorTextureState = {
+  originalMap: THREE.Texture;
+  originalShadeMultiplyTexture: THREE.Texture | null | undefined;
+  generatedMap: THREE.DataTexture;
+  targetHex: string;
+};
+
+type VrmCustomColorTexturedMaterial = THREE.Material & {
+  color?: THREE.Color;
+  map?: THREE.Texture | null;
+  shadeMultiplyTexture?: THREE.Texture | null;
+  userData: Record<string, unknown>;
+};
+
+const VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY = "__vrmCustomColorTextureState";
+const VRM_CUSTOM_COLOR_TEXTURE_MAX_PIXELS = 4096 * 4096;
+const vrmCustomColorTextureAnalysisCache = new WeakMap<
+  THREE.Texture,
+  VrmCustomColorReadableTexture | null
+>();
+
+function vrmCustomColorTextureLuma(r: number, g: number, b: number): number {
+  return Math.round((54 * r + 183 * g + 19 * b) / 256);
+}
+
+function vrmCustomColorTexturePercentile(
+  histogram: Uint32Array,
+  visiblePixels: number,
+  percentile: number,
+): number {
+  const target = Math.max(1, Math.ceil(visiblePixels * percentile));
+  let accumulated = 0;
+  for (let value = 0; value < histogram.length; value += 1) {
+    accumulated += histogram[value] ?? 0;
+    if (accumulated >= target) return value;
+  }
+  return 255;
+}
+
+function analyzeVrmCustomColorTexture(
+  texture: THREE.Texture,
+): VrmCustomColorReadableTexture | null {
+  if (vrmCustomColorTextureAnalysisCache.has(texture)) {
+    return vrmCustomColorTextureAnalysisCache.get(texture) ?? null;
+  }
+
+  const image = texture.image as {
+    width?: unknown;
+    height?: unknown;
+    data?: unknown;
+  } | null | undefined;
+  const width = typeof image?.width === "number" ? Math.floor(image.width) : 0;
+  const height = typeof image?.height === "number" ? Math.floor(image.height) : 0;
+  const pixelCount = width * height;
+  if (
+    width <= 0
+    || height <= 0
+    || !Number.isSafeInteger(pixelCount)
+    || pixelCount > VRM_CUSTOM_COLOR_TEXTURE_MAX_PIXELS
+  ) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  let pixels: Uint8ClampedArray | null = null;
+  if (
+    (image?.data instanceof Uint8Array || image?.data instanceof Uint8ClampedArray)
+    && image.data.byteLength === pixelCount * 4
+    && texture.format === THREE.RGBAFormat
+    && texture.type === THREE.UnsignedByteType
+  ) {
+    pixels = new Uint8ClampedArray(image.data.byteLength);
+    pixels.set(image.data);
+  } else if (typeof document !== "undefined") {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        context.drawImage(image as CanvasImageSource, 0, 0, width, height);
+        const source = context.getImageData(0, 0, width, height).data;
+        pixels = new Uint8ClampedArray(source.length);
+        pixels.set(source);
+      }
+      canvas.width = 0;
+      canvas.height = 0;
+    } catch {
+      pixels = null;
+    }
+  }
+
+  if (!pixels) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const histogram = new Uint32Array(256);
+  let visiblePixels = 0;
+  let lumaTotal = 0;
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    if ((pixels[offset + 3] ?? 0) < 16) continue;
+    const luma = vrmCustomColorTextureLuma(
+      pixels[offset] ?? 0,
+      pixels[offset + 1] ?? 0,
+      pixels[offset + 2] ?? 0,
+    );
+    histogram[luma] = (histogram[luma] ?? 0) + 1;
+    lumaTotal += luma;
+    visiblePixels += 1;
+  }
+
+  if (visiblePixels === 0) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const averageLuma = lumaTotal / visiblePixels;
+  const highLuma = vrmCustomColorTexturePercentile(histogram, visiblePixels, 0.9);
+  // Light albedo already accepts the normal material-color multiply path. Only synthesize
+  // a replacement for dark maps where multiplication cannot reveal the requested hue.
+  if (averageLuma > 82 || highLuma > 140) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const readable = {
+    width,
+    height,
+    data: pixels,
+    lowLuma: vrmCustomColorTexturePercentile(histogram, visiblePixels, 0.05),
+    highLuma,
+  };
+  vrmCustomColorTextureAnalysisCache.set(texture, readable);
+  return readable;
+}
+
+function parseVrmCustomColorRgb(hex: string): [number, number, number] | null {
+  const match = /^#?([0-9a-f]{6})$/iu.exec(hex.trim());
+  if (!match?.[1]) return null;
+  const value = Number.parseInt(match[1], 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+function writeVrmCustomColorTexturePixels(
+  target: Uint8Array,
+  readable: VrmCustomColorReadableTexture,
+  hex: string,
+): boolean {
+  const rgb = parseVrmCustomColorRgb(hex);
+  if (!rgb || target.byteLength !== readable.data.byteLength) return false;
+  const [targetR, targetG, targetB] = rgb;
+  const span = Math.max(24, readable.highLuma - readable.lowLuma);
+  for (let offset = 0; offset < readable.data.length; offset += 4) {
+    const sourceR = readable.data[offset] ?? 0;
+    const sourceG = readable.data[offset + 1] ?? 0;
+    const sourceB = readable.data[offset + 2] ?? 0;
+    const luma = vrmCustomColorTextureLuma(sourceR, sourceG, sourceB);
+    const detail = THREE.MathUtils.clamp((luma - readable.lowLuma) / span, 0, 1);
+    // Even a pure-black albedo receives 45% of the requested color, while native
+    // highlights reach the full target. This preserves folds without black × tint collapse.
+    const brightness = 0.45 + 0.55 * detail;
+    target[offset] = Math.round(targetR * brightness);
+    target[offset + 1] = Math.round(targetG * brightness);
+    target[offset + 2] = Math.round(targetB * brightness);
+    target[offset + 3] = readable.data[offset + 3] ?? 0;
+  }
+  return true;
+}
+
+function copyVrmCustomColorTextureSampling(
+  source: THREE.Texture,
+  target: THREE.DataTexture,
+): void {
+  if (source.matrixAutoUpdate) source.updateMatrix();
+  target.mapping = source.mapping;
+  target.channel = source.channel;
+  target.wrapS = source.wrapS;
+  target.wrapT = source.wrapT;
+  target.magFilter = source.magFilter;
+  target.minFilter = source.minFilter;
+  target.anisotropy = source.anisotropy;
+  target.colorSpace = source.colorSpace;
+  target.offset.copy(source.offset);
+  target.repeat.copy(source.repeat);
+  target.center.copy(source.center);
+  target.rotation = source.rotation;
+  target.matrixAutoUpdate = source.matrixAutoUpdate;
+  target.matrix.copy(source.matrix);
+  target.generateMipmaps = source.generateMipmaps;
+  target.premultiplyAlpha = source.premultiplyAlpha;
+  target.unpackAlignment = source.unpackAlignment;
+  target.flipY = source.flipY;
+  target.name = source.name
+    ? `${source.name} · Studio custom color`
+    : "Studio VRM custom color";
+}
+
+function restoreVrmCustomColorTexture(material: VrmCustomColorTexturedMaterial): boolean {
+  const state = material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] as
+    | VrmCustomColorTextureState
+    | undefined;
+  if (!state) return false;
+  if (material.map === state.generatedMap) material.map = state.originalMap;
+  if (material.shadeMultiplyTexture === state.generatedMap) {
+    material.shadeMultiplyTexture = state.originalShadeMultiplyTexture;
+  }
+  state.generatedMap.dispose();
+  delete material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY];
+  material.needsUpdate = true;
+  return true;
+}
+
+function applyVrmCustomColorTexture(
+  material: VrmCustomColorTexturedMaterial,
+  targetHex: string,
+): boolean {
+  let state = material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] as
+    | VrmCustomColorTextureState
+    | undefined;
+  if (
+    state
+    && material.map !== state.generatedMap
+    && material.map !== state.originalMap
+  ) {
+    state.generatedMap.dispose();
+    delete material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY];
+    state = undefined;
+  }
+
+  const originalMap = state?.originalMap ?? material.map;
+  if (!originalMap) {
+    if (state) restoreVrmCustomColorTexture(material);
+    return false;
+  }
+  const readable = analyzeVrmCustomColorTexture(originalMap);
+  if (!readable) {
+    if (state) restoreVrmCustomColorTexture(material);
+    return false;
+  }
+
+  if (!state) {
+    const data = new Uint8Array(readable.data.byteLength);
+    const generatedMap = new THREE.DataTexture(
+      data,
+      readable.width,
+      readable.height,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    copyVrmCustomColorTextureSampling(originalMap, generatedMap);
+    state = {
+      originalMap,
+      originalShadeMultiplyTexture: material.shadeMultiplyTexture,
+      generatedMap,
+      targetHex: "",
+    };
+    material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] = state;
+  }
+
+  if (state.targetHex !== targetHex) {
+    const target = (state.generatedMap.image as { data: Uint8Array }).data;
+    if (!writeVrmCustomColorTexturePixels(target, readable, targetHex)) {
+      restoreVrmCustomColorTexture(material);
+      return false;
+    }
+    state.targetHex = targetHex;
+    state.generatedMap.needsUpdate = true;
+  }
+  material.map = state.generatedMap;
+  if (state.originalShadeMultiplyTexture === state.originalMap) {
+    material.shadeMultiplyTexture = state.generatedMap;
+  }
+  material.needsUpdate = true;
+  return true;
+}
+
 export function scrubVrmMannequinColorCaches(vrm: VRM) {
   vrm.scene.traverse((obj) => {
     if (!(obj as Partial<THREE.Mesh>).isMesh) return;
@@ -1448,12 +1733,14 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
           }
           colored.userData.__vrmCustomColorOriginal = original;
         }
-        colored.color.set(customHex);
+        const textureColorApplied = applyVrmCustomColorTexture(colored, customHex);
+        colored.color.set(textureColorApplied ? "#ffffff" : customHex);
         colored.needsUpdate = true;
         colored.userData.__vrmCustomColorApplied = true;
         return;
       }
 
+      restoreVrmCustomColorTexture(colored);
       if (colored.userData.__vrmCustomColorApplied === true && original) {
         colored.color.copy(original);
         colored.needsUpdate = true;

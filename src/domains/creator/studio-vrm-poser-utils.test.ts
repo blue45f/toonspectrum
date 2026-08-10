@@ -878,4 +878,47 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     expect(tops.userData.__vrmCustomColorApplied).toBe(true);
     expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
   });
+
+  it("recolors a dark albedo texture and restores the native map on reset", () => {
+    const { vrm } = createMinimalVrm();
+    const nativePixels = new Uint8Array([
+      0, 0, 0, 255,
+      32, 32, 32, 255,
+    ]);
+    const nativeMap = new THREE.DataTexture(
+      nativePixels,
+      2,
+      1,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: nativeMap,
+    });
+    addMesh(vrm.scene, "Body", bottoms);
+
+    applyVrmCustomColors(vrm, { bottoms: "#22cc88" });
+
+    expect(bottoms.map).not.toBe(nativeMap);
+    expect(bottoms.map).toBeInstanceOf(THREE.DataTexture);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    const generatedMap = bottoms.map as THREE.DataTexture;
+    const generatedPixels = (generatedMap.image as { data: Uint8Array }).data;
+    expect(generatedPixels[0]).toBeGreaterThan(0);
+    expect(generatedPixels[1]).toBeGreaterThan(generatedPixels[0]!);
+    expect(generatedPixels[2]).toBeGreaterThan(generatedPixels[0]!);
+    expect(generatedPixels[3]).toBe(255);
+    let disposed = false;
+    generatedMap.addEventListener("dispose", () => {
+      disposed = true;
+    });
+
+    applyVrmCustomColors(vrm, {});
+
+    expect(bottoms.map).toBe(nativeMap);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    expect(disposed).toBe(true);
+  });
 });
