@@ -339,7 +339,7 @@ function scanStrictScene(
   if (!serialized) {
     fail(
       "SCENE_INVALID",
-      "프로젝트의 VRM 표면 페인팅 장면이 canonical v5 형식이 아닙니다.",
+      "프로젝트의 VRM 표면 페인팅 장면이 canonical v6 형식이 아닙니다.",
       scenePointer,
     );
   }
@@ -347,7 +347,7 @@ function scanStrictScene(
   if (!scene || serializeStudioVrmSceneDocument(scene) !== serialized) {
     fail(
       "SCENE_INVALID",
-      "프로젝트의 VRM 표면 페인팅 장면이 canonical v5 형식이 아닙니다.",
+      "프로젝트의 VRM 표면 페인팅 장면이 canonical v6 형식이 아닙니다.",
       scenePointer,
     );
   }

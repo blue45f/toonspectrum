@@ -541,7 +541,7 @@ import {
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
   createStudioShared3dCharacterShadowEntity,
-} from "./studio-shared-3d-scene-bridge";
+} from "./studio-shared-3d-scene-runtime";
 import { StudioBg3dActionFooter } from "./StudioBg3dActionFooter";
 import { StudioBg3dDirectionalShadowLight } from "./StudioBg3dDirectionalShadowLight";
 import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";

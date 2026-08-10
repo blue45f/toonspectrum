@@ -16,7 +16,7 @@ import {
   inspectStudioShared3dCaptureReadiness,
   parseStudioShared3dCharacterStageTransform,
   studioShared3dCharacterStageTransformHash,
-} from "./studio-shared-3d-scene-bridge";
+} from "./studio-shared-3d-scene-runtime";
 import { shouldCaptureStudioShared3dStageCharacters } from
   "./studio-shared-3d-stage-capture-intent";
 

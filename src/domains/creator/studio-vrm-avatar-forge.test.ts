@@ -15,12 +15,17 @@ import {
   buildAvatarForgeHairParts,
   buildAvatarForgeBodyAdjustmentPlan,
   createAvatarForgeState,
+  migrateAvatarForgeBodyToStudioVrmProportions,
   parseAvatarForgeState,
   sanitizeAvatarForgeState,
   serializeAvatarForgeState,
   type AvatarForgeHairPart,
   type AvatarForgeHairStyle,
 } from "./studio-vrm-avatar-forge";
+import {
+  NEUTRAL_STUDIO_VRM_PROPORTIONS,
+  STUDIO_VRM_PROPORTION_PRESETS,
+} from "./studio-vrm-proportion-core";
 
 /* ────────────────────────────────────────────────────────────────────────
  * v1 하위호환 잠금
@@ -89,6 +94,10 @@ const ALL_STYLES = [...V1_STYLES, ...V2_STYLES] as const;
 
 function digest(parts: AvatarForgeHairPart[]) {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+}
+
+function stateDigest(state: unknown) {
+  return createHash("sha256").update(JSON.stringify(state)).digest("hex");
 }
 
 function styleState(style: AvatarForgeHairStyle, patch: Partial<Record<string, unknown>> = {}) {
@@ -197,11 +206,11 @@ describe("studio-vrm-avatar-forge state", () => {
   });
 });
 
-/* ── v1 → v3 하위호환 ──────────────────────────────────────────────────── */
+/* ── v1 → v4 하위호환 ──────────────────────────────────────────────────── */
 
 describe("v1 하위호환(바이트 단위 지오메트리 고정)", () => {
-  it("스키마 버전이 3으로 올라갔다", () => {
-    expect(AVATAR_FORGE_VERSION).toBe(3);
+  it("스키마 버전이 4로 올라갔다", () => {
+    expect(AVATAR_FORGE_VERSION).toBe(4);
   });
 
   it.each(V1_STYLES)("v1 스타일 %s의 파츠 계획이 v1과 문자 단위로 같다", (style) => {
@@ -314,7 +323,7 @@ describe("v1 하위호환(바이트 단위 지오메트리 고정)", () => {
   });
 });
 
-/* ── v3 체형 실루엣 ─────────────────────────────────────────────────────── */
+/* ── v3 체형 실루엣 → v4 관절 비율 ─────────────────────────────────────── */
 
 describe("v3 체형 실루엣", () => {
   it("v1·v2 문서는 새 체형 키를 신뢰하지 않고 원본 비율로 안전하게 승격한다", () => {
@@ -410,6 +419,209 @@ describe("v3 체형 실루엣", () => {
       ...entry.positionMultiplier,
       ...entry.scaleMultiplier,
     ]).every(Number.isFinite)).toBe(true);
+  });
+});
+
+/* ── v4 canonical proportion state ──────────────────────────────────────── */
+
+describe("v4 canonical proportion state", () => {
+  it("v1·v2의 중립 비율을 보존하고 v3의 네 호환 컨트롤만 관절 비율로 승격한다", () => {
+    for (const version of [1, 2]) {
+      const migrated = sanitizeAvatarForgeState({
+        version,
+        body: {
+          shoulderWidth: 1.14,
+          torsoLength: 1.12,
+          hipWidth: 1.12,
+          armLength: 1.1,
+          legLength: 1.12,
+        },
+      });
+      expect(migrated.proportions).toEqual(NEUTRAL_STUDIO_VRM_PROPORTIONS);
+      expect(migrated.legacyHipWidth).toBeUndefined();
+    }
+
+    const migrated = sanitizeAvatarForgeState({
+      version: 3,
+      bodyPresetId: "hero",
+      body: {
+        shoulderWidth: 1.1,
+        torsoLength: 1.06,
+        hipWidth: 1.08,
+        armLength: 1.04,
+        legLength: 1.07,
+      },
+    });
+
+    expect(migrated.proportions).toEqual({
+      ...NEUTRAL_STUDIO_VRM_PROPORTIONS,
+      shoulderWidth: 1.1,
+      torsoLength: 1.06,
+      armLength: 1.04,
+      legLength: 1.07,
+    });
+    expect(migrated.bodyPresetId).toBe("hero");
+    expect(migrated.legacyHipWidth).toBe(1.08);
+  });
+
+  it("v3 얼굴·헤어·색상·악센트를 보존하며 결정적인 v4 문서로 마이그레이션한다", () => {
+    const source = createAvatarForgeState("wave-diva");
+    const legacyDocument = {
+      version: 3,
+      presetId: source.presetId,
+      bodyPresetId: "soft",
+      face: { ...source.face, headDepth: 1.08, cheekVolume: 0.58 },
+      body: {
+        shoulderWidth: 0.94,
+        torsoLength: 0.99,
+        hipWidth: 1.08,
+        armLength: 0.98,
+        legLength: 0.99,
+      },
+      hair: {
+        ...source.hair,
+        replaceOriginal: true,
+        shine: 0.73,
+        baseColor: "#123456",
+        tipColor: "#abcdef",
+      },
+      faceAccents: source.faceAccents?.map((accent) =>
+        accent.id === "beauty-mark"
+          ? { ...accent, enabled: true, color: "#112233", intensity: 0.82 }
+          : { ...accent },
+      ),
+    };
+
+    const first = sanitizeAvatarForgeState(legacyDocument);
+    const second = sanitizeAvatarForgeState(legacyDocument);
+
+    expect(first).toEqual(second);
+    expect(first.face).toEqual(legacyDocument.face);
+    expect(first.hair).toEqual(legacyDocument.hair);
+    expect(first.faceAccents).toEqual(legacyDocument.faceAccents);
+    expect(first.proportions.shoulderWidth).toBe(0.94);
+    expect(first.proportions.torsoLength).toBe(0.99);
+    expect(first.proportions.armLength).toBe(0.98);
+    expect(first.proportions.legLength).toBe(0.99);
+    expect(first.legacyHipWidth).toBe(1.08);
+    expect(stateDigest(first)).toBe(
+      "626bd75bd6c47cd9676a1cdb09a0506d0740d9b343d6ced9b888b2992eec8b49",
+    );
+  });
+
+  it("hipWidth는 코어 비율로 가장하지 않고 v3 메타데이터로만 보존한다", () => {
+    const narrow = migrateAvatarForgeBodyToStudioVrmProportions({
+      shoulderWidth: 1.03,
+      torsoLength: 1.04,
+      hipWidth: 0.9,
+      armLength: 1.05,
+      legLength: 1.06,
+    });
+    const wide = migrateAvatarForgeBodyToStudioVrmProportions({
+      shoulderWidth: 1.03,
+      torsoLength: 1.04,
+      hipWidth: 1.12,
+      armLength: 1.05,
+      legLength: 1.06,
+    });
+    const migrated = sanitizeAvatarForgeState({
+      version: 3,
+      body: {
+        shoulderWidth: 1.03,
+        torsoLength: 1.04,
+        hipWidth: 1.12,
+        armLength: 1.05,
+        legLength: 1.06,
+      },
+    });
+
+    expect(narrow).toEqual(wide);
+    expect("hipWidth" in migrated.proportions).toBe(false);
+    expect(migrated.legacyHipWidth).toBe(1.12);
+    expect(migrated.body.hipWidth).toBe(1.12);
+  });
+
+  it("v4 정규화·JSON 왕복은 멱등이고 손상되거나 누락된 입력은 안전한 중립으로 복구한다", () => {
+    const resolved = sanitizeAvatarForgeState({
+      version: AVATAR_FORGE_VERSION,
+      proportions: {
+        version: 999,
+        presetId: " custom ",
+        overallHeight: "1.23",
+        headBodyRatio: 1.4,
+        armLength: 0.71,
+        legLength: 1.42,
+        torsoLength: 0.81,
+        shoulderWidth: 1.22,
+        handScale: 1.3,
+        footScale: 0.8,
+        neckLength: 1.5,
+        unknown: "discard",
+      },
+      legacyHipWidth: 1.09,
+      hair: { style: "hime", baseColor: "#112233", tipColor: "#445566" },
+    });
+
+    expect(sanitizeAvatarForgeState(resolved)).toEqual(resolved);
+    expect(parseAvatarForgeState(JSON.stringify(resolved))).toEqual(resolved);
+    expect(resolved.proportions.presetId).toBe("custom");
+    expect("unknown" in resolved.proportions).toBe(false);
+
+    const corrupt = sanitizeAvatarForgeState({
+      version: AVATAR_FORGE_VERSION,
+      proportions: {
+        overallHeight: Number.POSITIVE_INFINITY,
+        headBodyRatio: false,
+        armLength: [],
+        legLength: null,
+        torsoLength: {},
+      },
+    });
+    expect(corrupt.proportions).toEqual(NEUTRAL_STUDIO_VRM_PROPORTIONS);
+    expect(sanitizeAvatarForgeState({ version: AVATAR_FORGE_VERSION }).proportions).toEqual(
+      NEUTRAL_STUDIO_VRM_PROPORTIONS,
+    );
+    expect(parseAvatarForgeState("{broken").proportions).toEqual(
+      NEUTRAL_STUDIO_VRM_PROPORTIONS,
+    );
+  });
+
+  it("3–9두신 비율 프리셋을 canonical state에서 손실 없이 받는다", () => {
+    expect(STUDIO_VRM_PROPORTION_PRESETS.map((preset) => preset.targetHeadUnits)).toEqual([
+      8, 7, 6, 5, 4, 3, 9,
+    ]);
+    for (const preset of STUDIO_VRM_PROPORTION_PRESETS) {
+      const resolved = sanitizeAvatarForgeState({
+        version: AVATAR_FORGE_VERSION,
+        proportions: preset.proportions,
+      });
+      expect(resolved.proportions).toEqual(preset.proportions);
+      expect(resolved.proportions.presetId).toBe(preset.id);
+    }
+  });
+
+  it("체형 프리셋은 나머지 canonical 비율을 보존하고 대응하는 네 관절 컨트롤만 바꾼다", () => {
+    const source = sanitizeAvatarForgeState({
+      version: AVATAR_FORGE_VERSION,
+      proportions: STUDIO_VRM_PROPORTION_PRESETS.find(
+        (preset) => preset.id === "sd-chibi-3",
+      )?.proportions,
+    });
+    const applied = applyAvatarForgeBodyPreset(source, "hero");
+    const hero = AVATAR_FORGE_BODY_PRESETS.find((preset) => preset.id === "hero")?.body;
+
+    expect(applied.proportions.presetId).toBeUndefined();
+    expect(applied.proportions.overallHeight).toBe(source.proportions.overallHeight);
+    expect(applied.proportions.headBodyRatio).toBe(source.proportions.headBodyRatio);
+    expect(applied.proportions.handScale).toBe(source.proportions.handScale);
+    expect(applied.proportions.footScale).toBe(source.proportions.footScale);
+    expect(applied.proportions.neckLength).toBe(source.proportions.neckLength);
+    expect(applied.proportions.shoulderWidth).toBe(hero?.shoulderWidth);
+    expect(applied.proportions.torsoLength).toBe(hero?.torsoLength);
+    expect(applied.proportions.armLength).toBe(hero?.armLength);
+    expect(applied.proportions.legLength).toBe(hero?.legLength);
+    expect(applied.legacyHipWidth).toBe(hero?.hipWidth);
+    expect(applied.body.hipWidth).toBe(hero?.hipWidth);
   });
 });
 

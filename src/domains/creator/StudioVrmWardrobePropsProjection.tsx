@@ -39,6 +39,11 @@ import {
   type WardrobeMetrics,
   type WardrobeSlot,
 } from "./studio-vrm-wardrobe";
+import {
+  StudioVrmXpbdSkirtAttachment,
+  type StudioVrmXpbdSkirtCaptureSync,
+  type StudioVrmXpbdSkirtSurfaceReceipt,
+} from "./StudioVrmXpbdSkirtAttachment";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -81,6 +86,10 @@ const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
 });
 
 export type StudioVrmProjectionAttachmentStatus = "ready" | "unavailable" | "detached";
+export type StudioVrmWardrobeSurfaceReceipt =
+  | StudioVrmSkinnedGarmentReceipt
+  | StudioVrmXpbdSkirtSurfaceReceipt;
+export type StudioVrmWardrobeCaptureSync = StudioVrmXpbdSkirtCaptureSync;
 
 /**
  * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
@@ -90,11 +99,14 @@ export function StudioVrmPropAttachment({
   vrm,
   instance,
   metrics,
+  rigRevision,
   onAttachmentStatus,
 }: {
   vrm: VRM;
   instance: PropInstance;
   metrics: VrmPropRigMetrics;
+  /** Re-resolves normalized bone identities after a humanoid rebuild. */
+  rigRevision?: number;
   onAttachmentStatus?: (
     uid: string,
     propId: string,
@@ -102,8 +114,11 @@ export function StudioVrmPropAttachment({
   ) => void;
 }) {
   const boneNode = useMemo(
-    () => vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null,
-    [instance.bone, vrm],
+    () => {
+      void rigRevision;
+      return vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
+    },
+    [instance.bone, rigRevision, vrm],
   );
   const smartGroupRef = useRef<THREE.Group | null>(null);
   const localPositionRef = useRef(new THREE.Vector3());
@@ -596,8 +611,53 @@ function scheduleGarmentDisposal(group: THREE.Object3D) {
   });
 }
 
-/** 워드로브 한 슬롯 장착분을 humanoid 본들에 포털로 부착한다(파츠가 본을 따라 포즈 추종). */
-export function StudioVrmWardrobeAttachment({
+export interface StudioVrmWardrobeAttachmentProps {
+  readonly vrm: VRM;
+  readonly slot: WardrobeSlot;
+  readonly equip: WardrobeEquip;
+  readonly metrics: WardrobeMetrics;
+  readonly effectiveFit: number;
+  readonly rigRevision?: number;
+  readonly onSurfaceReceipt: (
+    slot: WardrobeSlot,
+    receipt: StudioVrmWardrobeSurfaceReceipt | null,
+  ) => void;
+  readonly onAttachmentStatus?: (
+    slot: WardrobeSlot,
+    itemId: string,
+    status: StudioVrmProjectionAttachmentStatus,
+  ) => void;
+  readonly onXpbdCaptureSyncChange?: (
+    slot: WardrobeSlot,
+    sync: StudioVrmWardrobeCaptureSync,
+    active: boolean,
+  ) => void;
+}
+
+/** Selects bounded XPBD for audited skirts and keeps the existing garment as a fail-safe. */
+export function StudioVrmWardrobeAttachment(props: StudioVrmWardrobeAttachmentProps) {
+  const def = wardrobeItemById(props.equip.itemId);
+  if (def?.geometrySource === "xpbd-skirt-v1") {
+    return (
+      <StudioVrmXpbdSkirtAttachment
+        vrm={props.vrm}
+        slot={props.slot}
+        equip={props.equip}
+        metrics={props.metrics}
+        effectiveFit={props.effectiveFit}
+        topologyGeneration={props.rigRevision}
+        onSurfaceReceipt={props.onSurfaceReceipt}
+        onAttachmentStatus={props.onAttachmentStatus}
+        onCaptureSyncChange={props.onXpbdCaptureSyncChange}
+        fallback={<StudioVrmProceduralWardrobeAttachment {...props} />}
+      />
+    );
+  }
+  return <StudioVrmProceduralWardrobeAttachment {...props} />;
+}
+
+/** Existing skinned/rigid procedural path, retained as the XPBD unavailable fallback. */
+function StudioVrmProceduralWardrobeAttachment({
   vrm,
   slot,
   equip,
@@ -605,19 +665,7 @@ export function StudioVrmWardrobeAttachment({
   effectiveFit,
   onSurfaceReceipt,
   onAttachmentStatus,
-}: {
-  vrm: VRM;
-  slot: WardrobeSlot;
-  equip: WardrobeEquip;
-  metrics: WardrobeMetrics;
-  effectiveFit: number;
-  onSurfaceReceipt: (slot: WardrobeSlot, receipt: StudioVrmSkinnedGarmentReceipt | null) => void;
-  onAttachmentStatus?: (
-    slot: WardrobeSlot,
-    itemId: string,
-    status: StudioVrmProjectionAttachmentStatus,
-  ) => void;
-}) {
+}: StudioVrmWardrobeAttachmentProps) {
   const renderable = useMemo(() => {
     const def = wardrobeItemById(equip.itemId);
     if (!def) return { entries: [], receipt: null, complete: false };
@@ -676,7 +724,11 @@ export function StudioVrmWardrobeAttachment({
     return {
       entries,
       receipt: null,
-      complete: groups.size > 0 && entries.length === groups.size,
+      // XPBD-authored skirts may show this rigid geometry as a local preview fallback, but it is
+      // not the authored cloth surface and must never certify Shared Stage/capture fidelity.
+      complete: def.geometrySource !== "xpbd-skirt-v1"
+        && groups.size > 0
+        && entries.length === groups.size,
     };
   }, [vrm, equip.itemId, effectiveFit, metrics]);
 

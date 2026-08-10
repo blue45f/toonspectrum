@@ -1,7 +1,6 @@
 import { useThree } from "@react-three/fiber";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 
-import { applyStudioBg3dLinkedCharacterState } from "./studio-bg3d-shared-vrm-runtime";
 import { parseCostumeState } from "./studio-vrm-costume";
 import {
   applyStudioVrmCostumeState,
@@ -17,12 +16,10 @@ import { createStudioVrmLinkedAppearanceReadinessPlan } from
   "./studio-vrm-linked-appearance-readiness-plan";
 import {
   scaleVrmPropRigMetrics,
-  type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
 import {
   WARDROBE_SLOTS,
   mergeWardrobeCostumeVisibility,
-  type WardrobeMetrics,
   type WardrobeSlot,
   type WardrobeState,
 } from "./studio-vrm-wardrobe";
@@ -31,10 +28,14 @@ import {
   StudioVrmRuntimeCommit,
   StudioVrmWardrobeAttachment,
   type StudioVrmProjectionAttachmentStatus,
+  type StudioVrmWardrobeSurfaceReceipt,
 } from "./StudioVrmWardrobePropsProjection";
 
+import type {
+  StudioBg3dLinkedVrmPreparedState,
+  StudioBg3dLinkedVrmRuntimeOwner,
+} from "./studio-bg3d-shared-vrm-runtime";
 import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
-import type { StudioVrmSkinnedGarmentReceipt } from "./studio-vrm-skinned-garment";
 import type { VRM } from "@pixiv/three-vrm";
 
 type ProjectionStatus = "loading" | "ready" | "unavailable";
@@ -51,6 +52,8 @@ interface AttachmentRegistry {
 
 interface BaseProjectionState {
   readonly identityKey: string;
+  readonly preparedIdentityKey: string | null;
+  readonly rigRevision: number | null;
   readonly status: "pending" | "ready" | "unavailable";
 }
 
@@ -129,13 +132,15 @@ function applyProjectionCostume({
 
 function ignoreWardrobeSurfaceReceipt(
   _slot: WardrobeSlot,
-  _receipt: StudioVrmSkinnedGarmentReceipt | null,
+  _receipt: StudioVrmWardrobeSurfaceReceipt | null,
 ) {}
 
 function StudioBg3dSharedVrmReadinessGate({
   vrm,
   source,
   identityKey,
+  preparedIdentityKey,
+  rigRevision,
   registry,
   baseProjectionRef,
   attachmentFailureRef,
@@ -145,6 +150,8 @@ function StudioBg3dSharedVrmReadinessGate({
   vrm: VRM;
   source: StudioShared3dCharacterSource;
   identityKey: string;
+  preparedIdentityKey: string;
+  rigRevision: number;
   registry: AttachmentRegistry;
   baseProjectionRef: RefObject<BaseProjectionState>;
   attachmentFailureRef: RefObject<AttachmentFailureSignal | null>;
@@ -227,7 +234,12 @@ function StudioBg3dSharedVrmReadinessGate({
       return;
     }
     const baseProjection = baseProjectionRef.current;
-    if (!baseProjection || baseProjection.identityKey !== identityKey) return;
+    if (
+      !baseProjection
+      || baseProjection.identityKey !== identityKey
+      || baseProjection.preparedIdentityKey !== preparedIdentityKey
+      || baseProjection.rigRevision !== rigRevision
+    ) return;
     if (baseProjection.status === "unavailable") {
       failRuntime("base-projection-unavailable", "The canonical VRM state could not be applied.");
       return;
@@ -367,15 +379,13 @@ function StudioBg3dSharedVrmReadinessGate({
 export function StudioBg3dSharedVrmAppearanceRuntime({
   vrm,
   source,
-  wardrobeMetrics,
-  propRigMetrics,
+  runtimeOwner,
   costumeMeshes,
   onStatus,
 }: {
   vrm: VRM;
   source: StudioShared3dCharacterSource;
-  wardrobeMetrics: WardrobeMetrics;
-  propRigMetrics: VrmPropRigMetrics;
+  runtimeOwner: StudioBg3dLinkedVrmRuntimeOwner;
   costumeMeshes: StudioVrmCostumeMeshEntry[];
   onStatus: (identityKey: string, status: ProjectionStatus) => void;
 }) {
@@ -385,55 +395,117 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
   const fullySupported = projection.wardrobe.status !== "unsupported"
     && projection.handProps.status !== "unsupported";
   const wardrobeState = fullySupported ? wardrobeStateFromSource(source) : {};
-  const fitReport = inspectStudioVrmGarmentFit(wardrobeState, wardrobeMetrics);
-  const effectivePropRigMetrics = scaleVrmPropRigMetrics(
-    propRigMetrics,
-    source.scene.appearance.bodyScale,
-  );
   const registryRef = useRef<AttachmentRegistry>({
     wardrobe: new Map(),
     props: new Map(),
   });
   const baseProjectionRef = useRef<BaseProjectionState>({
     identityKey,
+    preparedIdentityKey: null,
+    rigRevision: null,
     status: "pending",
   });
   const attachmentFailureRef = useRef<AttachmentFailureSignal | null>(null);
+  const activePreparedIdentityRef = useRef<string | null>(null);
   const activatedAppearanceIdentityRef = useRef<string | null>(null);
+  const onStatusRef = useRef(onStatus);
+  const sourceRef = useRef(source);
+  const [prepared, setPrepared] = useState<StudioBg3dLinkedVrmPreparedState | null>(null);
   const [attachmentsQuarantined, setAttachmentsQuarantined] = useState(false);
 
   useLayoutEffect(() => {
+    onStatusRef.current = onStatus;
+  }, [onStatus]);
+
+  useLayoutEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
+
+  useLayoutEffect(() => {
+    const preparedSource = sourceRef.current;
+    // The primitive is already mounted by the model owner, but an unprepared/rest or stale prior
+    // generation must never flash into the shared stage before its receipt gate is complete.
+    vrm.scene.visible = false;
+    activePreparedIdentityRef.current = null;
+    activatedAppearanceIdentityRef.current = null;
     attachmentFailureRef.current = null;
-    baseProjectionRef.current = { identityKey, status: "pending" };
+    registryRef.current = { wardrobe: new Map(), props: new Map() };
+    baseProjectionRef.current = {
+      identityKey,
+      preparedIdentityKey: null,
+      rigRevision: null,
+      status: "pending",
+    };
+    setPrepared(null);
+    setAttachmentsQuarantined(false);
+    onStatusRef.current(identityKey, "loading");
     try {
-      const currentPropRigMetrics = scaleVrmPropRigMetrics(
-        propRigMetrics,
-        source.scene.appearance.bodyScale,
-      );
-      const applied = applyStudioBg3dLinkedCharacterState(vrm, source, {
-        propRigMetrics: currentPropRigMetrics,
+      if (runtimeOwner.vrm !== vrm) throw new Error("stale-vrm-runtime-owner");
+      const result = runtimeOwner.prepare(preparedSource, identityKey, {
         projectHandProps: fullySupported,
       });
-      if (!applied) {
-        baseProjectionRef.current = { identityKey, status: "unavailable" };
+      if (!result.ok) {
+        baseProjectionRef.current = {
+          identityKey,
+          preparedIdentityKey: null,
+          rigRevision: null,
+          status: "unavailable",
+        };
+        onStatusRef.current(identityKey, "unavailable");
+        invalidate();
+        return;
+      }
+      if (
+        result.prepared.identityKey !== identityKey
+        || result.prepared.preparedIdentityKey.length === 0
+        || !Number.isSafeInteger(result.prepared.rigRevision)
+        || result.prepared.rigRevision < 1
+        || result.prepared.receipt.applyGeneration !== result.prepared.rigRevision
+        || result.prepared.receipt.modelGeneration !== runtimeOwner.modelGeneration
+      ) {
+        baseProjectionRef.current = {
+          identityKey,
+          preparedIdentityKey: null,
+          rigRevision: null,
+          status: "unavailable",
+        };
+        onStatusRef.current(identityKey, "unavailable");
         invalidate();
         return;
       }
 
-      const includeProjectedWardrobe = activatedAppearanceIdentityRef.current === identityKey;
       if (!applyProjectionCostume({
-        source,
+        source: preparedSource,
         costumeMeshes,
-        wardrobeState: fullySupported ? wardrobeStateFromSource(source) : {},
-        includeProjectedWardrobe,
+        wardrobeState: fullySupported ? wardrobeStateFromSource(preparedSource) : {},
+        includeProjectedWardrobe: false,
       })) {
-        baseProjectionRef.current = { identityKey, status: "unavailable" };
+        baseProjectionRef.current = {
+          identityKey,
+          preparedIdentityKey: null,
+          rigRevision: null,
+          status: "unavailable",
+        };
+        onStatusRef.current(identityKey, "unavailable");
         invalidate();
         return;
       }
-      baseProjectionRef.current = { identityKey, status: "ready" };
+      activePreparedIdentityRef.current = result.prepared.preparedIdentityKey;
+      baseProjectionRef.current = {
+        identityKey,
+        preparedIdentityKey: result.prepared.preparedIdentityKey,
+        rigRevision: result.prepared.rigRevision,
+        status: "ready",
+      };
+      setPrepared(result.prepared);
     } catch {
-      baseProjectionRef.current = { identityKey, status: "unavailable" };
+      baseProjectionRef.current = {
+        identityKey,
+        preparedIdentityKey: null,
+        rigRevision: null,
+        status: "unavailable",
+      };
+      onStatusRef.current(identityKey, "unavailable");
     }
     invalidate();
   }, [
@@ -441,26 +513,52 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
     fullySupported,
     identityKey,
     invalidate,
-    propRigMetrics,
-    source,
+    runtimeOwner,
     vrm,
   ]);
 
+  const preparedForIdentity = prepared?.identityKey === identityKey
+    && activePreparedIdentityRef.current === prepared.preparedIdentityKey
+    ? prepared
+    : null;
+  const preparedIdentityKey = preparedForIdentity?.preparedIdentityKey ?? null;
+  const fitReport = preparedForIdentity
+    ? inspectStudioVrmGarmentFit(wardrobeState, preparedForIdentity.wardrobeMetrics)
+    : null;
+  const effectivePropRigMetrics = preparedForIdentity
+    ? scaleVrmPropRigMetrics(
+        preparedForIdentity.propRigMetrics,
+        source.scene.appearance.bodyScale,
+      )
+    : null;
+
   function handleAttachmentsReady(): boolean {
+    if (
+      !preparedIdentityKey
+      || activePreparedIdentityRef.current !== preparedIdentityKey
+    ) return false;
     if (!applyProjectionCostume({
       source,
       costumeMeshes,
       wardrobeState: fullySupported ? wardrobeStateFromSource(source) : {},
       includeProjectedWardrobe: true,
     })) return false;
-    activatedAppearanceIdentityRef.current = identityKey;
+    activatedAppearanceIdentityRef.current = preparedIdentityKey;
     invalidate();
     return true;
   }
 
   function handleProjectionStatus(status: ProjectionStatus) {
+    if (
+      !preparedIdentityKey
+      || activePreparedIdentityRef.current !== preparedIdentityKey
+    ) return;
+    vrm.scene.visible = status === "ready";
     if (status === "loading" || status === "unavailable") {
-      if (activatedAppearanceIdentityRef.current !== identityKey || status === "unavailable") {
+      if (
+        activatedAppearanceIdentityRef.current !== preparedIdentityKey
+        || status === "unavailable"
+      ) {
         activatedAppearanceIdentityRef.current = null;
         applyProjectionCostume({
           source,
@@ -476,7 +574,7 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
         setAttachmentsQuarantined(true);
       }
     }
-    onStatus(identityKey, status);
+    onStatusRef.current(identityKey, status);
   }
 
   function handlePropAttachmentStatus(
@@ -484,6 +582,10 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
     propId: string,
     status: StudioVrmProjectionAttachmentStatus,
   ) {
+    if (
+      !preparedIdentityKey
+      || activePreparedIdentityRef.current !== preparedIdentityKey
+    ) return;
     const registry = registryRef.current.props;
     if (status === "detached") {
       if (registry.get(uid)?.id === propId) registry.delete(uid);
@@ -505,6 +607,10 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
     itemId: string,
     status: StudioVrmProjectionAttachmentStatus,
   ) {
+    if (
+      !preparedIdentityKey
+      || activePreparedIdentityRef.current !== preparedIdentityKey
+    ) return;
     const registry = registryRef.current.wardrobe;
     if (status === "detached") {
       if (registry.get(slot)?.id === itemId) registry.delete(slot);
@@ -523,46 +629,60 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
 
   return (
     <>
-      {fullySupported && !attachmentsQuarantined && projection.handProps.status === "supported"
+      {preparedForIdentity
+        && effectivePropRigMetrics
+        && fullySupported
+        && !attachmentsQuarantined
+        && projection.handProps.status === "supported"
         ? projection.handProps.props.map((prop) => (
             <StudioVrmPropAttachment
-              key={prop.uid}
+              key={`${preparedForIdentity.preparedIdentityKey}:${prop.uid}`}
               vrm={vrm}
               instance={prop.instance}
               metrics={effectivePropRigMetrics}
+              rigRevision={preparedForIdentity.rigRevision}
               onAttachmentStatus={handlePropAttachmentStatus}
             />
           ))
         : null}
-      {fullySupported && !attachmentsQuarantined && projection.wardrobe.status === "supported"
+      {preparedForIdentity
+        && fitReport
+        && fullySupported
+        && !attachmentsQuarantined
+        && projection.wardrobe.status === "supported"
         ? WARDROBE_SLOTS.map((slot) => {
             const equip = wardrobeState[slot];
             const slotFit = fitReport.slots[slot];
             return equip ? (
               <StudioVrmWardrobeAttachment
-                key={slot}
+                key={`${preparedForIdentity.preparedIdentityKey}:${slot}`}
                 vrm={vrm}
                 slot={slot}
                 equip={equip}
-                metrics={wardrobeMetrics}
+                metrics={preparedForIdentity.wardrobeMetrics}
                 effectiveFit={slotFit?.effectiveFit ?? equip.fit}
+                rigRevision={preparedForIdentity.rigRevision}
                 onSurfaceReceipt={ignoreWardrobeSurfaceReceipt}
                 onAttachmentStatus={handleWardrobeAttachmentStatus}
               />
             ) : null;
           })
         : null}
-      <StudioBg3dSharedVrmReadinessGate
-        key={identityKey}
-        vrm={vrm}
-        source={source}
-        identityKey={identityKey}
-        registry={registryRef.current}
-        baseProjectionRef={baseProjectionRef}
-        attachmentFailureRef={attachmentFailureRef}
-        onAttachmentsReady={handleAttachmentsReady}
-        onStatus={handleProjectionStatus}
-      />
+      {preparedForIdentity ? (
+        <StudioBg3dSharedVrmReadinessGate
+          key={preparedForIdentity.preparedIdentityKey}
+          vrm={vrm}
+          source={source}
+          identityKey={identityKey}
+          preparedIdentityKey={preparedForIdentity.preparedIdentityKey}
+          rigRevision={preparedForIdentity.rigRevision}
+          registry={registryRef.current}
+          baseProjectionRef={baseProjectionRef}
+          attachmentFailureRef={attachmentFailureRef}
+          onAttachmentsReady={handleAttachmentsReady}
+          onStatus={handleProjectionStatus}
+        />
+      ) : null}
     </>
   );
 }

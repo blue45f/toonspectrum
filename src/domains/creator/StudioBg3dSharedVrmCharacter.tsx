@@ -9,23 +9,24 @@ import {
   type StudioBg3dSharedCharacterGroundingResult,
   type StudioBg3dSharedCharacterSurfaceHit,
 } from "./studio-bg3d-shared-character-grounding";
-import { loadStudioBg3dLinkedVrm } from "./studio-bg3d-shared-vrm-runtime";
+import {
+  createStudioBg3dLinkedVrmRuntimeOwner,
+  loadStudioBg3dLinkedVrm,
+  type StudioBg3dLinkedVrmRuntimeOwner,
+} from "./studio-bg3d-shared-vrm-runtime";
 import { studioShared3dCharacterWorldTransform } from "./studio-shared-3d-scene-bridge";
 import { disposeStudioVrmAsset } from "./studio-vrm-asset-runtime";
 import {
   collectStudioVrmCostumeMeshes,
   type StudioVrmCostumeMeshEntry,
 } from "./studio-vrm-costume-runtime";
-import { measureVrmPropRigMetrics, type VrmPropRigMetrics } from "./studio-vrm-prop-rig";
 import { StudioBg3dSharedVrmAppearanceRuntime } from
   "./StudioBg3dSharedVrmAppearanceRuntime";
-import { measureStudioVrmWardrobeMetrics } from "./StudioVrmWardrobePropsProjection";
 
 import type {
   StudioShared3dCharacterRuntimeStatus,
   StudioShared3dCharacterSource,
 } from "./studio-shared-3d-scene-bridge";
-import type { WardrobeMetrics } from "./studio-vrm-wardrobe";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface StudioBg3dSharedVrmCharacterProps {
@@ -55,8 +56,7 @@ const GROUND_RAY_DISTANCE_METERS = 1.4;
 
 interface StudioBg3dSharedVrmAsset {
   readonly vrm: VRM;
-  readonly wardrobeMetrics: WardrobeMetrics;
-  readonly propRigMetrics: VrmPropRigMetrics;
+  readonly runtimeOwner: StudioBg3dLinkedVrmRuntimeOwner;
   readonly costumeMeshes: StudioVrmCostumeMeshEntry[];
 }
 
@@ -321,6 +321,7 @@ export default function StudioBg3dSharedVrmCharacter({
   useEffect(() => {
     let cancelled = false;
     let ownedVrm: VRM | null = null;
+    let ownedRuntime: StudioBg3dLinkedVrmRuntimeOwner | null = null;
     setAsset(null);
     appearanceReadyIdentityRef.current = null;
     reportCurrentStatus("loading");
@@ -333,14 +334,27 @@ export default function StudioBg3dSharedVrmCharacter({
         ownedVrm = null;
         return;
       }
-      // These measurements must observe the untouched rest rig. Runtime pose/body/material state
-      // and procedural attachments are applied only after this complete envelope is admitted.
-      const wardrobeMetrics = measureStudioVrmWardrobeMetrics(loaded);
-      const propRigMetrics = measureVrmPropRigMetrics(loaded);
+      // Capture the model-owned rest hierarchy before any pose, root transform, legacy bodyScale,
+      // material state, or procedural attachment becomes externally addressable.
+      const runtimeResult = createStudioBg3dLinkedVrmRuntimeOwner(
+        loaded,
+        source.modelRuntimeKey,
+      );
+      if (!runtimeResult.ok) {
+        disposeStudioVrmAsset(loaded);
+        ownedVrm = null;
+        reportCurrentStatus("unavailable");
+        return;
+      }
+      ownedRuntime = runtimeResult.owner;
       const costumeMeshes = collectStudioVrmCostumeMeshes(loaded);
-      setAsset({ vrm: loaded, wardrobeMetrics, propRigMetrics, costumeMeshes });
+      setAsset({ vrm: loaded, runtimeOwner: runtimeResult.owner, costumeMeshes });
     }).catch(() => {
       if (!cancelled) {
+        if (ownedRuntime) {
+          ownedRuntime.dispose();
+          ownedRuntime = null;
+        }
         if (ownedVrm) disposeStudioVrmAsset(ownedVrm);
         ownedVrm = null;
         reportCurrentStatus("unavailable");
@@ -351,6 +365,12 @@ export default function StudioBg3dSharedVrmCharacter({
       cancelled = true;
       setAsset(null);
       appearanceReadyIdentityRef.current = null;
+      if (ownedRuntime) {
+        // Dispose restores the cached neutral rig while this exact generation is still current.
+        // The owner invalidates its generation immediately afterwards, before the VRM is released.
+        ownedRuntime.dispose();
+        ownedRuntime = null;
+      }
       if (ownedVrm) {
         disposeStudioVrmAsset(ownedVrm);
         ownedVrm = null;
@@ -420,8 +440,7 @@ export default function StudioBg3dSharedVrmCharacter({
         ])}
         vrm={vrm}
         source={source}
-        wardrobeMetrics={asset.wardrobeMetrics}
-        propRigMetrics={asset.propRigMetrics}
+        runtimeOwner={asset.runtimeOwner}
         costumeMeshes={asset.costumeMeshes}
         onStatus={handleAppearanceStatus}
       />

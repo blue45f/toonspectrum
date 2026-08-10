@@ -1418,6 +1418,7 @@ describe("studio-project-archive", () => {
     const legacyScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete legacyScene.rig;
     delete legacyScene.surfacePaint;
+    delete legacyScene.lightingTone;
     delete (legacyScene.pose as Record<string, unknown>).translations;
     delete (legacyScene.pose as Record<string, unknown>).ikConstraints;
     legacyScene.version = 1;
@@ -1437,6 +1438,7 @@ describe("studio-project-archive", () => {
     expect(promoted.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(promoted.pose).toEqual(currentScene.pose);
     expect(promoted.expressions).toEqual(currentScene.expressions);
+    expect(promoted.lightingTone).toBe("morning");
     expect(promoted.rig).toMatchObject({
       jointProfile: { id: "neutral" },
       fullBodyIk: false,
@@ -1446,6 +1448,7 @@ describe("studio-project-archive", () => {
 
     const versionTwoScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete versionTwoScene.surfacePaint;
+    delete versionTwoScene.lightingTone;
     delete (versionTwoScene.pose as Record<string, unknown>).translations;
     delete (versionTwoScene.pose as Record<string, unknown>).ikConstraints;
     versionTwoScene.version = 2;
@@ -1461,6 +1464,7 @@ describe("studio-project-archive", () => {
     }).vrmScene;
     expect(promotedV2.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(promotedV2.rig).toEqual(currentScene.rig);
+    expect(promotedV2.lightingTone).toBe("morning");
     expect(promotedV2.pose.translations).toEqual(currentScene.pose.translations);
 
     await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({

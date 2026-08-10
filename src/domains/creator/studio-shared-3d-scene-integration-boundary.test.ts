@@ -18,6 +18,18 @@ const characterStatusSource = readFileSync(
   new URL("./StudioBg3dSharedCharacterStatusOverlay.tsx", import.meta.url),
   "utf8",
 );
+const characterStatusHookSource = readFileSync(
+  new URL("./useStudioBg3dSharedCharacterStatus.ts", import.meta.url),
+  "utf8",
+);
+const characterPlacementPanelSource = readFileSync(
+  new URL("./StudioBg3dSharedCharacterPlacementPanel.tsx", import.meta.url),
+  "utf8",
+);
+const sharedSceneRuntimeSource = readFileSync(
+  new URL("./studio-shared-3d-scene-runtime.ts", import.meta.url),
+  "utf8",
+);
 const characterSource = readFileSync(
   new URL("./StudioBg3dSharedVrmCharacter.tsx", import.meta.url),
   "utf8",
@@ -84,6 +96,26 @@ describe("shared character/background 3D scene integration boundary", () => {
     );
   });
 
+  it("keeps the initial background renderer on the lightweight shared-stage runtime", () => {
+    expect(backgroundSource).toContain(
+      'from "./studio-shared-3d-scene-runtime";',
+    );
+    expect(characterStatusHookSource).toContain(
+      'from "./studio-shared-3d-scene-runtime";',
+    );
+    expect(characterPlacementPanelSource).toContain(
+      'from "./studio-shared-3d-scene-runtime";',
+    );
+    expect(sharedSceneRuntimeSource).not.toContain("studio-vrm-avatar-forge");
+    expect(sharedSceneRuntimeSource).not.toContain(
+      "studio-vrm-linked-appearance-projection-plan",
+    );
+    expect(sharedSceneRuntimeSource).not.toContain("studio-vrm-wardrobe");
+    expect(sharedSceneRuntimeSource).toContain(
+      'import type {\n  StudioVrmSceneDocument,',
+    );
+  });
+
   it("keeps capture and viewport authority exclusively inside the stable main View", () => {
     const sceneContentStart = backgroundSource.indexOf("const sceneContent = (");
     const mainViewStart = backgroundSource.indexOf(
@@ -109,17 +141,20 @@ describe("shared character/background 3D scene integration boundary", () => {
     );
   });
 
-  it("measures the pristine rig before projecting pose, wardrobe, props, or costume state", () => {
-    const wardrobeMeasurement = characterSource.indexOf(
-      "measureStudioVrmWardrobeMetrics(loaded)",
+  it("owns one pristine proportion runtime before projecting pose, fit, or attachments", () => {
+    const runtimeCreation = characterSource.indexOf(
+      "createStudioBg3dLinkedVrmRuntimeOwner(",
     );
-    const propMeasurement = characterSource.indexOf("measureVrmPropRigMetrics(loaded)");
     const costumeCollection = characterSource.indexOf("collectStudioVrmCostumeMeshes(loaded)");
     const assetAdmission = characterSource.indexOf("setAsset({ vrm: loaded");
-    expect(wardrobeMeasurement).toBeGreaterThan(0);
-    expect(propMeasurement).toBeGreaterThan(wardrobeMeasurement);
-    expect(costumeCollection).toBeGreaterThan(propMeasurement);
+    expect(runtimeCreation).toBeGreaterThan(0);
+    expect(costumeCollection).toBeGreaterThan(runtimeCreation);
     expect(assetAdmission).toBeGreaterThan(costumeCollection);
+    expect(characterRuntimeSource).toContain("measureStudioVrmProportionHeadLength(vrm)");
+    expect(characterRuntimeSource).toContain("createStudioVrmProportionRigRuntime(adapter");
+    expect(characterRuntimeSource).toContain("createStudioVrmProportionFitTransaction(");
+    expect(characterRuntimeSource).toContain("runtime.apply(forge.proportions)");
+    expect(characterRuntimeSource).toContain("preparedIdentityKey");
     expect(characterSource).toContain("<StudioBg3dSharedVrmAppearanceRuntime");
   });
 
@@ -134,6 +169,24 @@ describe("shared character/background 3D scene integration boundary", () => {
     expect(characterSceneContentSource).not.toContain(
       "StudioBg3dSharedVrmAppearanceRuntime",
     );
+  });
+
+  it("gates attachments on the prepared rig identity and disposes runtime before its VRM", () => {
+    expect(appearanceRuntimeSource).toContain(
+      "runtimeOwner.prepare(preparedSource, identityKey",
+    );
+    expect(appearanceRuntimeSource).toContain("preparedForIdentity");
+    expect(appearanceRuntimeSource).toContain(
+      "rigRevision={preparedForIdentity.rigRevision}",
+    );
+    expect(appearanceRuntimeSource).toContain(
+      "result.prepared.receipt.modelGeneration !== runtimeOwner.modelGeneration",
+    );
+
+    const cleanup = characterSource.slice(characterSource.indexOf("return () => {"));
+    expect(cleanup.indexOf("ownedRuntime.dispose()")).toBeGreaterThan(0);
+    expect(cleanup.indexOf("disposeStudioVrmAsset(ownedVrm)"))
+      .toBeGreaterThan(cleanup.indexOf("ownedRuntime.dispose()"));
   });
 
   it("keeps appearance planning pure and outside the heavy renderer boundary", () => {

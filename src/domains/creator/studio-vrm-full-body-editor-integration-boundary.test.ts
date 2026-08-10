@@ -15,7 +15,7 @@ describe("Studio VRM full-body editor integration boundary", () => {
     expect(restore).toBeGreaterThan(cancel);
     expect(source.slice(restore, restore + 160)).toContain("trustPersistentIkPose: true");
     expect(source).toContain("transaction.revision !== jointIkRevisionRef.current");
-    expect(source).toContain("key={jointHandleSessionGeneration}");
+    expect(source).toContain('key={`${jointHandleSessionGeneration}:${proportionRigRevision}`}');
     expect(source).toContain("jointIkTransactionRef.current = null;");
   });
 
@@ -58,7 +58,9 @@ describe("Studio VRM full-body editor integration boundary", () => {
   });
 
   it("aborts deferred insert/share capture when the persistent pose changes before readback", () => {
-    expect(source).toContain("const sharePoseSignature = currentPersistentIkSignature();");
+    expect(source).toContain(
+      "const sharePoseSignature = persistentIkCurrentSignatureRef.current;",
+    );
     expect(source).toContain("const capturePoseSignature = currentPersistentIkSignature();");
     expect(source).toContain(
       "persistentIkCurrentSignatureRef.current !== sharePoseSignature",
@@ -68,7 +70,10 @@ describe("Studio VRM full-body editor integration boundary", () => {
     );
     expect(source).toContain("capturePreconditionsAreCurrent()");
     expect(source).toContain("pendingPersistentIkCommandRef.current !== null");
-    expect(source).toContain("hasLockedConstraint && (webcamActive || idleAnimation)");
+    expect(source).toContain("if (webcamActive || idleAnimation) {");
+    expect(source).toContain("webcamActiveRef.current || idleAnimationRef.current");
+    expect(source).toContain("&& !webcamActiveRef.current");
+    expect(source).toContain("&& !idleAnimationRef.current");
     expect(source).toContain("dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration");
     expect(source).toContain("dynamicPoseGenerationRef.current === captureDynamicPoseGeneration");
   });

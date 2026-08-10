@@ -22,7 +22,7 @@ import { StudioBg3dSharedVrmAppearanceRuntime } from
 import type { StudioShared3dCharacterSource } from "./studio-shared-3d-scene-bridge";
 
 const runtimeMocks = vi.hoisted(() => ({
-  applyBase: vi.fn(() => true),
+  prepare: vi.fn(),
   applyCostume: vi.fn(),
   commitCallbacks: [] as Array<((frame: number) => void) | null>,
   invalidate: vi.fn(),
@@ -31,11 +31,13 @@ const runtimeMocks = vi.hoisted(() => ({
     propId: string,
     status: "ready" | "unavailable" | "detached",
   ) => void>(),
+  propRigRevisions: [] as number[],
   wardrobeCallbacks: new Map<string, (
     slot: string,
     itemId: string,
     status: "ready" | "unavailable" | "detached",
   ) => void>(),
+  wardrobeRigRevisions: [] as number[],
   propStatus: "ready" as "ready" | "unavailable",
   wardrobeStatus: "ready" as "ready" | "unavailable",
 }));
@@ -43,10 +45,6 @@ const runtimeMocks = vi.hoisted(() => ({
 vi.mock("@react-three/fiber", () => ({
   useThree: (selector: (state: { invalidate: typeof runtimeMocks.invalidate }) => unknown) =>
     selector({ invalidate: runtimeMocks.invalidate }),
-}));
-
-vi.mock("./studio-bg3d-shared-vrm-runtime", () => ({
-  applyStudioBg3dLinkedCharacterState: runtimeMocks.applyBase,
 }));
 
 vi.mock("./studio-vrm-costume-runtime", () => ({
@@ -58,14 +56,16 @@ vi.mock("./StudioVrmWardrobePropsProjection", async () => {
   return {
     StudioVrmPropAttachment: (props: {
       instance: { uid: string; propId: string };
+      rigRevision?: number;
       onAttachmentStatus?: (
         uid: string,
         propId: string,
         status: "ready" | "unavailable" | "detached",
       ) => void;
     }) => {
-      const { instance, onAttachmentStatus } = props;
+      const { instance, onAttachmentStatus, rigRevision } = props;
       useLayoutEffect(() => {
+        if (rigRevision !== undefined) runtimeMocks.propRigRevisions.push(rigRevision);
         if (onAttachmentStatus) {
           runtimeMocks.propCallbacks.set(instance.uid, onAttachmentStatus);
         }
@@ -84,20 +84,22 @@ vi.mock("./StudioVrmWardrobePropsProjection", async () => {
             "detached",
           );
         };
-      }, [instance.propId, instance.uid, onAttachmentStatus]);
+      }, [instance.propId, instance.uid, onAttachmentStatus, rigRevision]);
       return null;
     },
     StudioVrmWardrobeAttachment: (props: {
       slot: string;
       equip: { itemId: string };
+      rigRevision?: number;
       onAttachmentStatus?: (
         slot: string,
         itemId: string,
         status: "ready" | "unavailable" | "detached",
       ) => void;
     }) => {
-      const { equip, onAttachmentStatus, slot } = props;
+      const { equip, onAttachmentStatus, rigRevision, slot } = props;
       useLayoutEffect(() => {
+        if (rigRevision !== undefined) runtimeMocks.wardrobeRigRevisions.push(rigRevision);
         if (onAttachmentStatus) {
           runtimeMocks.wardrobeCallbacks.set(slot, onAttachmentStatus);
         }
@@ -116,7 +118,7 @@ vi.mock("./StudioVrmWardrobePropsProjection", async () => {
             "detached",
           );
         };
-      }, [equip.itemId, onAttachmentStatus, slot]);
+      }, [equip.itemId, onAttachmentStatus, rigRevision, slot]);
       return null;
     },
     StudioVrmRuntimeCommit: (props: { onCommitFrame?: (frame: number) => void }) => {
@@ -165,17 +167,25 @@ function renderRuntime(
     slot: "tops",
     mesh: new THREE.Mesh(),
   }] as never;
+  const runtimeOwner = {
+    vrm,
+    modelRuntimeKey: source.modelRuntimeKey,
+    modelGeneration: "test-model-generation",
+    runtime: {},
+    disposed: false,
+    prepare: runtimeMocks.prepare,
+    dispose: vi.fn(),
+  } as never;
   const result = render(
     <StudioBg3dSharedVrmAppearanceRuntime
       vrm={vrm}
       source={source}
-      wardrobeMetrics={FALLBACK_WARDROBE_METRICS}
-      propRigMetrics={DEFAULT_VRM_PROP_RIG_METRICS}
+      runtimeOwner={runtimeOwner}
       costumeMeshes={costumeMeshes}
       onStatus={onStatus}
     />,
   );
-  return { ...result, onStatus };
+  return { ...result, costumeMeshes, onStatus, runtimeOwner, vrm };
 }
 
 function latestCommitCallback(): (frame: number) => void {
@@ -189,19 +199,42 @@ describe("Shared Stage linked VRM appearance runtime", () => {
     vi.clearAllMocks();
     runtimeMocks.commitCallbacks.length = 0;
     runtimeMocks.propCallbacks.clear();
+    runtimeMocks.propRigRevisions.length = 0;
     runtimeMocks.wardrobeCallbacks.clear();
+    runtimeMocks.wardrobeRigRevisions.length = 0;
     runtimeMocks.propStatus = "ready";
     runtimeMocks.wardrobeStatus = "ready";
+    runtimeMocks.prepare.mockImplementation((
+      _source: StudioShared3dCharacterSource,
+      identityKey: string,
+    ) => ({
+      ok: true,
+      prepared: {
+        identityKey,
+        preparedIdentityKey: `${identityKey}:test-model-generation:7`,
+        rigRevision: 7,
+        receipt: {
+          ok: true,
+          applyGeneration: 7,
+          modelGeneration: "test-model-generation",
+        },
+        wardrobeMetrics: FALLBACK_WARDROBE_METRICS,
+        propRigMetrics: DEFAULT_VRM_PROP_RIG_METRICS,
+      },
+    }));
   });
 
   afterEach(() => cleanup());
 
   it("requires attachments, a runtime commit, and a strictly later demand frame before ready", () => {
-    const { onStatus } = renderRuntime(supportedSource());
+    const { onStatus, vrm } = renderRuntime(supportedSource());
     const commit = latestCommitCallback();
 
     expect(onStatus.mock.calls.map((call) => call[1])).toContain("loading");
     expect(onStatus.mock.calls.map((call) => call[1])).not.toContain("ready");
+    expect(runtimeMocks.propRigRevisions).toContain(7);
+    expect(runtimeMocks.wardrobeRigRevisions).toContain(7);
+    expect((vrm as { scene: THREE.Group }).scene.visible).toBe(false);
 
     act(() => commit(0));
     expect(onStatus.mock.calls.map((call) => call[1])).not.toContain("ready");
@@ -213,6 +246,73 @@ describe("Shared Stage linked VRM appearance runtime", () => {
 
     act(() => commit(1));
     expect(onStatus.mock.calls.at(-1)?.[1]).toBe("ready");
+    expect((vrm as { scene: THREE.Group }).scene.visible).toBe(true);
+  });
+
+  it("does not mount attachments or a commit gate before proportion preparation succeeds", () => {
+    runtimeMocks.prepare.mockReturnValueOnce({
+      ok: false,
+      code: "proportion-runtime-failed",
+      detail: "rebuild failed",
+    });
+
+    const { onStatus, vrm } = renderRuntime(supportedSource());
+
+    expect(onStatus.mock.calls.at(-1)?.[1]).toBe("unavailable");
+    expect(onStatus.mock.calls.filter((call) => call[1] === "ready")).toHaveLength(0);
+    expect(runtimeMocks.propCallbacks).toHaveLength(0);
+    expect(runtimeMocks.wardrobeCallbacks).toHaveLength(0);
+    expect(runtimeMocks.commitCallbacks.filter(Boolean)).toHaveLength(0);
+    expect((vrm as { scene: THREE.Group }).scene.visible).toBe(false);
+  });
+
+  it("rejects a stale prepared identity before attachments can claim readiness", () => {
+    runtimeMocks.prepare.mockImplementationOnce((
+      _source: StudioShared3dCharacterSource,
+      identityKey: string,
+    ) => ({
+      ok: true,
+      prepared: {
+        identityKey: `${identityKey}:stale`,
+        preparedIdentityKey: "stale-preparation",
+        rigRevision: 7,
+        receipt: {
+          ok: true,
+          applyGeneration: 7,
+          modelGeneration: "test-model-generation",
+        },
+        wardrobeMetrics: FALLBACK_WARDROBE_METRICS,
+        propRigMetrics: DEFAULT_VRM_PROP_RIG_METRICS,
+      },
+    }));
+
+    const { onStatus } = renderRuntime(supportedSource());
+
+    expect(onStatus.mock.calls.at(-1)?.[1]).toBe("unavailable");
+    expect(runtimeMocks.propCallbacks).toHaveLength(0);
+    expect(runtimeMocks.wardrobeCallbacks).toHaveLength(0);
+    expect(runtimeMocks.commitCallbacks.filter(Boolean)).toHaveLength(0);
+  });
+
+  it("does not restart preparation when an equivalent source object is reconstructed", () => {
+    const source = supportedSource();
+    const rendered = renderRuntime(source);
+    const loadingCalls = rendered.onStatus.mock.calls
+      .filter((call) => call[1] === "loading").length;
+
+    rendered.rerender(
+      <StudioBg3dSharedVrmAppearanceRuntime
+        vrm={rendered.vrm}
+        source={supportedSource()}
+        runtimeOwner={rendered.runtimeOwner}
+        costumeMeshes={rendered.costumeMeshes}
+        onStatus={rendered.onStatus}
+      />,
+    );
+
+    expect(runtimeMocks.prepare).toHaveBeenCalledTimes(1);
+    expect(rendered.onStatus.mock.calls.filter((call) => call[1] === "loading"))
+      .toHaveLength(loadingCalls);
   });
 
   it("keeps the authored costume visible and fails closed when an attachment is unavailable", () => {
@@ -343,16 +443,25 @@ describe("Shared Stage linked VRM appearance runtime", () => {
 
   it("deactivates an old generation callback after placement changes", () => {
     const firstSource = supportedSource(0);
+    const nextSource = supportedSource(1);
+    const nextVrm = { scene: new THREE.Group(), update: vi.fn() } as never;
     const onStatus = vi.fn();
     const rendered = renderRuntime(firstSource, onStatus);
     const oldCommit = latestCommitCallback();
 
     rendered.rerender(
       <StudioBg3dSharedVrmAppearanceRuntime
-        vrm={{ scene: new THREE.Group(), update: vi.fn() } as never}
-        source={supportedSource(1)}
-        wardrobeMetrics={FALLBACK_WARDROBE_METRICS}
-        propRigMetrics={DEFAULT_VRM_PROP_RIG_METRICS}
+        vrm={nextVrm}
+        source={nextSource}
+        runtimeOwner={{
+          vrm: nextVrm,
+          modelRuntimeKey: nextSource.modelRuntimeKey,
+          modelGeneration: "next-model-generation",
+          runtime: {},
+          disposed: false,
+          prepare: runtimeMocks.prepare,
+          dispose: vi.fn(),
+        } as never}
         costumeMeshes={[]}
         onStatus={onStatus}
       />,

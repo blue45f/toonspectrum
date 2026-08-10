@@ -684,8 +684,14 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(poserSource).toContain(
       "typeof activeTexturePaintPointerId === \"number\"",
     );
-    expect(poserSource).toContain(
-      "persistentIkReconciling || texturePaintStrokeActive",
+    const insertAction = poserSource.indexOf("onClick={handleInsert}");
+    const insertDisabled = poserSource.lastIndexOf("disabled={", insertAction);
+    expect(insertDisabled).toBeGreaterThan(-1);
+    expect(poserSource.slice(insertDisabled, insertAction)).toContain(
+      "persistentIkReconciling",
+    );
+    expect(poserSource.slice(insertDisabled, insertAction)).toContain(
+      "texturePaintStrokeActive",
     );
     const viewportUndo = poserSource.indexOf("const viewportCanUndo =");
     const viewportRedo = poserSource.indexOf("const viewportCanRedo =", viewportUndo);

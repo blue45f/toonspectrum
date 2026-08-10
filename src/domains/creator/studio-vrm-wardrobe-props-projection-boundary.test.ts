@@ -12,7 +12,15 @@ const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",
 );
+const xpbdSkirtAttachmentSource = readFileSync(
+  new URL("./StudioVrmXpbdSkirtAttachment.tsx", import.meta.url),
+  "utf8",
+);
 const lazyUiSource = readFileSync(new URL("./studio-page-lazy-ui.ts", import.meta.url), "utf8");
+const proportionFitSource = readFileSync(
+  new URL("./studio-vrm-proportion-fit-transaction.ts", import.meta.url),
+  "utf8",
+);
 
 function requiredIndex(source: string, token: string, from = 0): number {
   const index = source.indexOf(token, from);
@@ -66,13 +74,16 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(poserSource).toContain('from "./StudioVrmWardrobePropsProjection";');
     for (const exportedName of [
       "StudioVrmPropAttachment",
-      "measureStudioVrmWardrobeMetrics",
       "StudioVrmWardrobeAttachment",
       "StudioVrmRuntimeCommit",
     ]) {
       expect(projectionSource).toContain(`export function ${exportedName}(`);
       expect(poserSource).toContain(exportedName);
     }
+    expect(projectionSource).toContain(
+      "export function measureStudioVrmWardrobeMetrics(",
+    );
+    expect(proportionFitSource).toContain("measureStudioVrmWardrobeMetrics");
 
     expect(poserSource).not.toMatch(
       /function (?:VrmPropAttachment|measureVrmWardrobeMetrics|VrmWardrobeAttachment|VrmRuntimeCommit)\b/u,
@@ -89,6 +100,12 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     }
 
     expect(projectionSource).not.toMatch(
+      /from ["']\.\/(?:StudioVrmPoser|StudioPage)["']/u,
+    );
+    expect(projectionSource).toContain(
+      'from "./StudioVrmXpbdSkirtAttachment";',
+    );
+    expect(xpbdSkirtAttachmentSource).not.toMatch(
       /from ["']\.\/(?:StudioVrmPoser|StudioPage)["']/u,
     );
     expect(lazyUiSource).toContain('() => import("./StudioVrmPoser")');
@@ -120,7 +137,7 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
   it("preserves skinned/rigid garment assembly and material-only color or fabric updates", () => {
     const wardrobeRuntime = sourceBetween(
       projectionSource,
-      "export function StudioVrmWardrobeAttachment(",
+      "function StudioVrmProceduralWardrobeAttachment(",
       "/** base pose/tracking과 모든 소품 IK가 끝난 뒤",
     );
     const renderable = sourceBetween(
@@ -150,29 +167,51 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(wardrobeRuntime).toContain("createPortal(<primitive object={entry.object} />, entry.node)");
   });
 
-  it("keeps rest-pose measurement before either restore or spawn pose application", () => {
+  it("measures wardrobe and prop fit inside the committed proportion-rig rest lifecycle", () => {
+    const proportionTransaction = proportionFitSource;
     const installVrm = sourceBetween(
       poserSource,
       "function installVrm(",
       "function loadModelFromLibraryEntry(",
     );
     const wardrobeMeasurement = requiredIndex(
-      installVrm,
-      "setWardrobeMetrics(measureStudioVrmWardrobeMetrics(nextVrm));",
+      proportionTransaction,
+      "wardrobe = measureStudioVrmWardrobeMetrics(vrm);",
     );
     const propMeasurement = requiredIndex(
-      installVrm,
-      "setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));",
+      proportionTransaction,
+      "props = measureVrmPropRigMetrics(vrm);",
       wardrobeMeasurement,
     );
+    const poseApplication = requiredIndex(
+      proportionTransaction,
+      "return reapplyAuthoredState();",
+      propMeasurement,
+    );
+    const runtimeInitialization = requiredIndex(
+      installVrm,
+      "initializeProportionRigRuntime(nextVrm);",
+    );
     const pendingRestore = requiredIndex(installVrm, "const pending = pendingPoseDataRef.current;");
-    const restore = requiredIndex(installVrm, "commitFullStateRestore(pendingFull, nextVrm);");
-    const spawnPose = requiredIndex(installVrm, "applyPoserVisualState(nextVrm, {");
+    const restore = requiredIndex(installVrm, "commitFullStateRestore(pendingFull, nextVrm, {");
+    const spawnTransaction = requiredIndex(
+      installVrm,
+      "createStudioVrmProportionPoseTransaction(nextVrm, {",
+      restore,
+    );
+    const spawnCommit = requiredIndex(
+      installVrm,
+      "applyProportionRigState(",
+      spawnTransaction,
+    );
 
     expect(wardrobeMeasurement).toBeLessThan(propMeasurement);
-    expect(propMeasurement).toBeLessThan(pendingRestore);
+    expect(propMeasurement).toBeLessThan(poseApplication);
+    expect(runtimeInitialization).toBeLessThan(pendingRestore);
     expect(pendingRestore).toBeLessThan(restore);
-    expect(propMeasurement).toBeLessThan(spawnPose);
+    expect(spawnTransaction).toBeLessThan(spawnCommit);
+    expect(poserSource).not.toContain("requestAnimationFrame(() => {\n      if (vrmRef.current !== vrm) return;\n      setWardrobeMetrics");
+    expect(projectionSource).toContain("[instance.bone, rigRevision, vrm]");
   });
 
   it("preserves raw-rig wardrobe measurements as an exported engine adapter", () => {

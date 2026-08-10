@@ -11,24 +11,36 @@ import { useId, useState } from "react";
 
 import {
   AVATAR_FORGE_BANG_STYLE_OPTIONS,
-  AVATAR_FORGE_BODY_LIMITS,
-  AVATAR_FORGE_BODY_PRESETS,
   AVATAR_FORGE_FACE_ACCENT_OPTIONS,
   AVATAR_FORGE_FACE_LIMITS,
   AVATAR_FORGE_HAIR_LIMITS,
   AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
-  applyAvatarForgeBodyPreset,
   createAvatarForgeState,
-  type AvatarForgeBodyParams,
+  sanitizeAvatarForgeState,
   type AvatarForgeFaceAccentId,
   type AvatarForgeFaceParams,
   type AvatarForgeHairParams,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
+import { resolveStudioVrmAvatarForgeVisualProportionMetrics } from "./studio-vrm-avatar-forge-face-controller";
+import {
+  formatStudioVrmHeadUnits,
+  resolveStudioVrmProportionMetrics,
+  STUDIO_VRM_PROPORTION_KEYS,
+  STUDIO_VRM_PROPORTION_LIMITS,
+  STUDIO_VRM_PROPORTION_PRESETS,
+  type StudioVrmProportionKey,
+  type StudioVrmProportionMetrics,
+} from "./studio-vrm-proportion-core";
 
 /** 정밀 파라미터 슬라이더 순서 — 라벨/범위는 AVATAR_FORGE_HAIR_LIMITS가 단일 소스. */
 const HAIR_DETAIL_KEYS = ["strandWidth", "fringe", "curl", "shine", "wave", "ahoge", "tailHeight"] as const;
+const ORDERED_PROPORTION_PRESETS = Object.freeze(
+  [...STUDIO_VRM_PROPORTION_PRESETS].sort(
+    (left, right) => left.targetHeadUnits - right.targetHeadUnits,
+  ),
+);
 
 type ForgeView = "presets" | "body" | "hair" | "face";
 
@@ -36,6 +48,10 @@ type StudioVrmAvatarForgePanelProps = {
   state: AvatarForgeState;
   disabled?: boolean;
   detectedOriginalHairCount?: number;
+  proportionMetrics?: StudioVrmProportionMetrics | null;
+  proportionMetricsLabel?: string;
+  proportionPresetNote?: string | null;
+  proportionUnavailableReason?: string | null;
   onChange: (state: AvatarForgeState) => void;
 };
 
@@ -59,6 +75,10 @@ export function StudioVrmAvatarForgePanel({
   state,
   disabled = false,
   detectedOriginalHairCount = 0,
+  proportionMetrics: runtimeProportionMetrics = null,
+  proportionMetricsLabel = "모델 실측",
+  proportionPresetNote = null,
+  proportionUnavailableReason = null,
   onChange,
 }: StudioVrmAvatarForgePanelProps) {
   const controlId = useId();
@@ -68,13 +88,17 @@ export function StudioVrmAvatarForgePanel({
     onChange({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
   };
 
-  const updateBody = <K extends keyof AvatarForgeBodyParams>(key: K, value: AvatarForgeBodyParams[K]) => {
-    onChange({
+  const updateProportion = (key: StudioVrmProportionKey, value: number) => {
+    onChange(sanitizeAvatarForgeState({
       ...state,
       presetId: undefined,
       bodyPresetId: undefined,
-      body: { ...state.body, [key]: value },
-    });
+      proportions: {
+        ...state.proportions,
+        presetId: undefined,
+        [key]: value,
+      },
+    }));
   };
 
   const updateHair = <K extends keyof AvatarForgeHairParams>(key: K, value: AvatarForgeHairParams[K]) => {
@@ -93,6 +117,19 @@ export function StudioVrmAvatarForgePanel({
       ),
     });
   };
+  const proportionMetrics = runtimeProportionMetrics
+    ?? resolveStudioVrmProportionMetrics(state.proportions);
+  const visualProportionMetrics = resolveStudioVrmAvatarForgeVisualProportionMetrics(
+    proportionMetrics,
+    state.face,
+  );
+  const visualHeadUnitsDiffer = Math.abs(
+    visualProportionMetrics.headUnits - proportionMetrics.headUnits,
+  ) >= 0.05;
+  const proportionControlsDisabled = disabled || Boolean(proportionUnavailableReason);
+  const selectedProportionPreset = STUDIO_VRM_PROPORTION_PRESETS.find(
+    (preset) => preset.id === state.proportions.presetId,
+  );
 
   return (
     <section className="overflow-hidden rounded-2xl border border-accent/30 bg-[linear-gradient(145deg,var(--color-card),color-mix(in_oklch,var(--color-accent)_7%,var(--color-panel)))] shadow-[0_12px_36px_oklch(0_0_0/0.12)]">
@@ -196,20 +233,25 @@ export function StudioVrmAvatarForgePanel({
           <div role="tabpanel" aria-label="체형 실루엣 편집" className="space-y-3.5">
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[0.68rem] font-bold text-fg-2">체형 시작 프리셋</p>
-                <span className="text-[0.6rem] text-fg-3">얼굴·헤어는 유지</span>
+                <p className="text-[0.68rem] font-bold text-fg-2">두신 비율 프리셋</p>
+                <span className="text-[0.6rem] text-fg-3">3~9두신 · 얼굴·헤어 유지</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {AVATAR_FORGE_BODY_PRESETS.map((preset) => {
-                  const selected = state.bodyPresetId === preset.id;
+                {ORDERED_PROPORTION_PRESETS.map((preset) => {
+                  const selected = state.proportions.presetId === preset.id;
                   return (
                     <button
                       key={preset.id}
                       type="button"
-                      disabled={disabled}
+                      disabled={proportionControlsDisabled}
                       aria-pressed={selected}
                       aria-label={`${preset.label} 체형: ${preset.hint}`}
-                      onClick={() => onChange(applyAvatarForgeBodyPreset(state, preset.id))}
+                      onClick={() => onChange(sanitizeAvatarForgeState({
+                        ...state,
+                        presetId: undefined,
+                        bodyPresetId: undefined,
+                        proportions: preset.proportions,
+                      }))}
                       className={`flex min-h-16 min-w-0 items-start gap-2 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                         selected
                           ? "border-accent bg-accent-soft text-accent"
@@ -234,19 +276,27 @@ export function StudioVrmAvatarForgePanel({
             </div>
 
             <div className="rounded-lg border border-line bg-card/70 p-3">
-              <p className="mb-1 text-[0.68rem] font-bold text-fg-2">리그 보존 체형 비율</p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-[0.68rem] font-bold text-fg-2">리그 안전 체형 비율</p>
+                <span className="rounded-full border border-accent/25 bg-accent-soft px-1.5 py-0.5 text-[0.58rem] font-bold text-accent">
+                  관절 이동 방식
+                </span>
+              </div>
               <p className="mb-3 text-[0.62rem] leading-relaxed text-fg-3">
-                원본 메시를 다시 쓰지 않고 본 사이 거리와 안전한 폭만 조절합니다. 포즈·의상·소품은 같은 리그를 계속 따라가요.
+                본을 찌그러뜨리지 않고 관절 사이 거리를 rest 자세 기준으로 다시 계산합니다. 포즈·IK·의상·소품은 같은 리그를 계속 따라가요.
               </p>
               <div className="space-y-3">
-                {(Object.keys(AVATAR_FORGE_BODY_LIMITS) as Array<keyof AvatarForgeBodyParams>).map((key) => {
-                  const limit = AVATAR_FORGE_BODY_LIMITS[key];
+                {STUDIO_VRM_PROPORTION_KEYS.map((key) => {
+                  const limit = STUDIO_VRM_PROPORTION_LIMITS[key];
                   return (
                     <label key={key} className="block">
                       <span className="mb-1 flex items-center justify-between gap-2 text-[0.65rem] font-semibold text-fg-2">
-                        {limit.label}
+                        <span>
+                          {limit.label}
+                          <span className="ml-1 font-normal text-fg-3">· {limit.hint}</span>
+                        </span>
                         <output className="tabular-nums text-fg-3">
-                          {formatValue(state.body[key], limit.unit)}
+                          {formatValue(state.proportions[key], limit.unit)}
                         </output>
                       </span>
                       <input
@@ -255,9 +305,9 @@ export function StudioVrmAvatarForgePanel({
                         min={limit.min}
                         max={limit.max}
                         step={limit.step}
-                        value={state.body[key]}
-                        disabled={disabled}
-                        onChange={(event) => updateBody(key, Number(event.target.value))}
+                        value={state.proportions[key]}
+                        disabled={proportionControlsDisabled}
+                        onChange={(event) => updateProportion(key, Number(event.target.value))}
                         className="h-11 w-full cursor-pointer accent-accent disabled:cursor-not-allowed sm:h-8"
                       />
                     </label>
@@ -271,10 +321,25 @@ export function StudioVrmAvatarForgePanel({
               aria-live="polite"
               className="rounded-lg border border-line/70 bg-panel/55 px-3 py-2 text-[0.62rem] leading-relaxed text-fg-3"
             >
-              {state.bodyPresetId
-                ? `${AVATAR_FORGE_BODY_PRESETS.find((preset) => preset.id === state.bodyPresetId)?.label ?? "선택한"} 체형 적용 중 · 슬라이더를 움직이면 직접 조절로 전환됩니다.`
-                : "직접 조절 중 · 얼굴, 헤어, 색상 설정은 그대로 보존됩니다."}
+              <span className="font-bold text-fg-2">
+                골격 {formatStudioVrmHeadUnits(proportionMetrics.headUnits)} · {runtimeProportionMetrics ? proportionMetricsLabel : "비율 기준 예상"} 신장 {proportionMetrics.totalHeight.toFixed(2)}m
+              </span>
+              {visualHeadUnitsDiffer
+                ? ` · 현재 얼굴 조형 ${formatStudioVrmHeadUnits(visualProportionMetrics.headUnits)}`
+                : ""}
+              {selectedProportionPreset
+                ? proportionPresetNote
+                  ? ` · ${proportionPresetNote}`
+                  : ` · ${selectedProportionPreset.label} 적용 중입니다. 슬라이더를 움직이면 직접 조절로 전환돼요.`
+                : " · 직접 조절 중입니다. 실제 모델의 원래 키를 기준으로 같은 비율이 적용돼요."}
             </p>
+            {proportionUnavailableReason ? (
+              <p role="alert" className="rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-[0.62rem] leading-relaxed text-danger">
+                {disabled
+                  ? `리그를 안전한 상태로 확인할 때까지 아바타 조형을 잠시 중단했습니다. ${proportionUnavailableReason}`
+                  : `이 모델은 리그 안전 체형 편집을 사용할 수 없습니다. ${proportionUnavailableReason} 헤어·얼굴 편집은 계속 사용할 수 있어요.`}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
