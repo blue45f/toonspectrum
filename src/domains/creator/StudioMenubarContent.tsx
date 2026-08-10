@@ -19,6 +19,8 @@ import {
   Music4,
   Package,
   PlaySquare,
+  Save,
+  Send,
   ShieldCheck,
   Redo2,
   Undo2,
@@ -987,7 +989,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   // Windowed: sticky exit keeps the control reachable while the long title lane
                   // scrolls. Immersive: no sticky/ring — the compact pill has no scroll sibling.
                   !mobileImmersive &&
-                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]",
+                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                   mobileImmersive &&
                     "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
                 )}
@@ -997,7 +999,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 ) : (
                   <Maximize2 size={15} aria-hidden />
                 )}
-                {mobileImmersive ? "종료" : "전체화면"}
+                <span className={!mobileImmersive ? "max-[359px]:sr-only" : undefined}>
+                  {mobileImmersive ? "종료" : "전체화면"}
+                </span>
               </button>
             </StudioToolHintTarget>
           ) : null}
@@ -1585,12 +1589,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   variant: "quiet",
                   className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                 }),
-                isMobile && "min-h-11",
+                isMobile &&
+                  "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                 mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
               )}
             >
-              {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+              {saving ? (
+                <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <Save size={14} className="hidden max-[359px]:block" aria-hidden />
+              )}
+              <span className="max-[359px]:sr-only">
+                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+              </span>
             </button>
           </StudioToolHintTarget>
           {!sharedDocument || sharedDocument.role === "owner" ? (
@@ -1620,12 +1631,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     variant: "solid",
                     className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                   }),
-                  isMobile && "min-h-11",
+                  isMobile &&
+                    "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                   mobileImmersive && "rounded-full px-3 shadow-none"
                 )}
               >
-                {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-                {workId ? "수정 게시" : "게시하기"}
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                ) : (
+                  <Send size={14} className="hidden max-[359px]:block" aria-hidden />
+                )}
+                <span className="max-[359px]:sr-only">
+                  {workId ? "수정 게시" : "게시하기"}
+                </span>
               </button>
             </StudioToolHintTarget>
           ) : null}

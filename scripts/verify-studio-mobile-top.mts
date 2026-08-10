@@ -635,8 +635,10 @@ async function probeMenuWithinViewport(
       .waitFor({ state: "hidden", timeout: 4000 })
       .then(() => true)
       .catch(() => false);
-  } catch {
-    // fall through with defaults; caller decides hard/soft
+  } catch (error) {
+    log(
+      `${id} probe error: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   return { id, opened, withinViewport, docOverflowX, closed };
 }
@@ -730,6 +732,11 @@ async function runMode(
     expandedDock.dockHeight = expandedMetrics.dockHeight;
     expandedDock.smallTargets = expandedMetrics.dockSmallTargets;
     await workspaceToggle.click();
+    await page
+      .locator(
+        '[data-studio-mobile-editing-dock="true"][data-studio-mobile-dock-expanded="false"]',
+      )
+      .waitFor({ state: "attached", timeout: 4000 });
   }
 
   const menus: MenuProbeResult[] = [];

@@ -78,12 +78,27 @@ describe("StudioWorkspaceMenuGate", () => {
       expect(classLine).not.toContain("overflow-hidden");
     }
     // 유일한 shrink 대상은 이름이고, 두 상태 배지는 shrink-0 로 남는다.
-    expect(gateSource).toContain('<span className="min-w-0 truncate">');
+    expect(gateSource).toContain(
+      '<span className="min-w-0 truncate max-[359px]:sr-only">'
+    );
     expect(gateSource).toContain('className="shrink-0 rounded-full bg-warn/15');
     expect(gateSource).toContain('className="shrink-0 rounded-full bg-cool/15');
     expect(menuSource).toContain('<span className="min-w-0 truncate">');
     expect(menuSource).toContain('className="shrink-0 rounded-full bg-warn/15');
     expect(menuSource).toContain('className="shrink-0 rounded-full bg-cool/15');
+  });
+
+  it("compacts the trigger without losing its accessible name at 320px", () => {
+    const html = renderGate(undefined, {
+      status: "session-only",
+      failure: "write-failed",
+    });
+
+    expect(html).toContain("max-[359px]:size-11");
+    expect(html).toContain("max-[359px]:justify-center");
+    expect(html).toContain("max-[359px]:sr-only");
+    expect(html.match(/max-\[359px\]:hidden/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toContain("작업공간: 스토리보드, 변경은 이 세션에서만 유지");
   });
 
   it("uses one analyzable lazy import and all three intent preload signals", () => {

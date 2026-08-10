@@ -437,6 +437,22 @@ describe("StudioMenubarContent", () => {
     expect(stableHandlers.handleSave).toHaveBeenNthCalledWith(2, "published");
   });
 
+  it("keeps every windowed action touchable while exposing the primary lane at 320px", () => {
+    render(<StudioMenubarContent {...createProps({ isMobile: true })} />);
+
+    for (const name of ["전체 화면 드로잉", "임시저장", "게시하기"] as const) {
+      const action = screen.getByRole("button", { name });
+      expect(action.className).toContain("max-[359px]:size-11");
+      const label = [...action.querySelectorAll("span")].find((span) =>
+        span.textContent?.includes(name === "전체 화면 드로잉" ? "전체화면" : name),
+      );
+      expect(label?.className).toContain("max-[359px]:sr-only");
+    }
+
+    expect(screen.getByRole("button", { name: "프로젝트 작업" }).className)
+      .toContain("min-w-11");
+  });
+
   it("switches the mobile immersive coach from entering to exiting", () => {
     const view = render(
       <StudioToolHintPreferencesProvider mode="compact" touchHoldDelayMs={640} reduceMotion>
