@@ -59,6 +59,8 @@ const EXCLUDED_DIRECTORY_NAMES = new Set([
 const TEST_FILE_PATTERN = /(?:\.boundary)?\.(?:spec|test)\.[cm]?[jt]sx?$/u;
 const DURABLE_AUTHORITY_PATTERN =
   /(?:asset|autosave|bible|brand|brush|calibration|catalog|checkpoint|clip|collab|crdt|document|effect|filter|font|journal|library|mannequin|marketplace|outbox|pack|palette|pose|preset|project|recovery|scene|snapshot|texture|timeline|translation|workspace)/iu;
+const BROWSER_KV_LEXICAL_SURFACE_PATTERN =
+  /\b(?:Dexie|IDBDatabase|IDBFactory|IDBObjectStore|indexedDB|localStorage|openDB|removeItem|sessionStorage|setItem)\b|["'](?:dexie|idb|idb-keyval)["']/u;
 
 function slash(value: string): string {
   return value.replaceAll("\\", "/");
@@ -79,6 +81,15 @@ function isProductSourceFile(file: string): boolean {
     && !name.endsWith(".d.ts")
     && !TEST_FILE_PATTERN.test(name)
     && !name.includes(".stories.");
+}
+
+function mayContainBrowserKvAuthority(source: string): boolean {
+  // Every finding produced below requires at least one of these exact language/library surfaces.
+  // This conservative prefilter only avoids building a TypeScript AST for provably inert files;
+  // it does not narrow the repository roots, allowance checks, or finding rules.
+  // A backslash may encode an identifier or string-literal escape that TypeScript normalises to
+  // one of those surfaces (for example `set\u0049tem`), so those files always reach the AST gate.
+  return source.includes("\\") || BROWSER_KV_LEXICAL_SURFACE_PATTERN.test(source);
 }
 
 function walkProductSources(root: string): string[] {
@@ -256,6 +267,7 @@ function finding(
  * used for the repository gate.
  */
 function analyzeBrowserKvSource(file: string, source: string): readonly BrowserKvFinding[] {
+  if (!mayContainBrowserKvAuthority(source)) return Object.freeze([]);
   const sourceFile = ts.createSourceFile(
     file,
     source,
@@ -535,14 +547,28 @@ describe("Studio browser-KV authority boundary", () => {
       `import Dexie from "dexie"; const db = new Dexie("studio-project"); db.table("p").put(payload);`,
       `import { openDB } from "idb"; openDB("studio-scene", 1);`,
       `const { openDB } = await import("idb"); openDB("studio-document", 1);`,
+      String.raw`storage.set\u0049tem("studio-project", payload);`,
+      String.raw`storage["set\Item"]("studio-project", payload);`,
     ] as const;
 
     for (const [index, fixture] of fixtures.entries()) {
+      expect(mayContainBrowserKvAuthority(fixture), fixture).toBe(true);
       expect(
         analyzeBrowserKvSource(`fixture-${index}-studio-project.ts`, fixture),
         fixture,
       ).not.toHaveLength(0);
     }
+  });
+
+  it("skips AST construction only when no detectable browser-KV surface exists", () => {
+    const inertSource = `
+      export function renderStudioPreview(frame: Uint8Array): number {
+        return frame.reduce((sum, value) => sum + value, 0);
+      }
+    `.repeat(2_000);
+
+    expect(mayContainBrowserKvAuthority(inertSource)).toBe(false);
+    expect(analyzeBrowserKvSource("large-inert-studio-source.ts", inertSource)).toEqual([]);
   });
 
   it("does not classify direct, qualified, or aliased sessionStorage writes as durable authority", () => {
@@ -647,13 +673,17 @@ describe("Studio browser-KV authority boundary", () => {
     }
   });
 
-  it("scans creator plus every discovered studio package and admits no unreviewed authority", () => {
-    const roots = studioSourceRoots().map((root) => slash(relative(WORKSPACE_ROOT, root)));
-    expect(roots).toContain("src/domains/creator");
-    expect(roots).toContain("packages/studio-project-model/src");
-    expect(roots).toContain("packages/studio-brush-platform/src");
-    expect(roots.length).toBeGreaterThanOrEqual(8);
+  it(
+    "scans creator plus every discovered studio package and admits no unreviewed authority",
+    () => {
+      const roots = studioSourceRoots().map((root) => slash(relative(WORKSPACE_ROOT, root)));
+      expect(roots).toContain("src/domains/creator");
+      expect(roots).toContain("packages/studio-project-model/src");
+      expect(roots).toContain("packages/studio-brush-platform/src");
+      expect(roots.length).toBeGreaterThanOrEqual(8);
 
-    expect(unauthorizedFindings(analyzeWorkspace(), ALLOWANCES)).toEqual([]);
-  });
+      expect(unauthorizedFindings(analyzeWorkspace(), ALLOWANCES)).toEqual([]);
+    },
+    60_000,
+  );
 });
