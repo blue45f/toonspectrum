@@ -83,6 +83,7 @@ describe("database integration runner CI policy", () => {
   });
 
   it("keeps the Studio 3D parity proof on a fresh hard-gated runner", () => {
+    const packageManifest = readJson("package.json");
     const workflow = readYaml(".github/workflows/ci.yml");
     const coreJob = workflow.jobs?.verify;
     const parityJob = workflow.jobs?.["studio-3d-runtime"];
@@ -95,6 +96,9 @@ describe("database integration runner CI policy", () => {
       .filter((command) => typeof command === "string");
 
     expect(workflow.permissions).toEqual({ contents: "read" });
+    const playwrightVersion = packageManifest.devDependencies?.playwright;
+    expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/u);
+    expect(packageManifest.devDependencies?.["@playwright/test"]).toBe(playwrightVersion);
     expect(coreJob?.name).toBe("core");
     expect(coreCommands).not.toContain("pnpm run verify:studio-3d-console");
     expect(coreCommands).toContain("pnpm run check:studio-bundle");
