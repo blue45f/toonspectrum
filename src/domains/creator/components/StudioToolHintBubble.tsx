@@ -55,8 +55,20 @@ let studioToolHintPreviewModulePromise:
   | null = null;
 
 function loadStudioToolHintPreviewModule() {
-  studioToolHintPreviewModulePromise ??= import("./StudioToolHintPreview");
+  studioToolHintPreviewModulePromise ??= import("./StudioToolHintPreview").catch(
+    (error: unknown) => {
+      // Do not retain a rejected speculative preload in this module-level request cache.
+      studioToolHintPreviewModulePromise = null;
+      throw error;
+    }
+  );
   return studioToolHintPreviewModulePromise;
+}
+
+function preloadStudioToolHintPreviewModule(): void {
+  void loadStudioToolHintPreviewModule().catch(() => {
+    // Compact tooltip content remains usable; the rendered lazy boundary owns real errors.
+  });
 }
 
 const LazyStudioToolHintPreview = lazy(async () => ({
@@ -183,7 +195,7 @@ export function StudioToolHintBubble({
 
   useEffect(() => {
     if (!richCoachAvailable) return;
-    void loadStudioToolHintPreviewModule();
+    preloadStudioToolHintPreviewModule();
   }, [richCoachAvailable]);
 
   useLayoutEffect(() => {

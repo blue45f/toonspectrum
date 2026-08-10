@@ -320,8 +320,20 @@ let studioToolHintBubbleModulePromise:
   | null = null;
 
 function loadStudioToolHintBubbleModule() {
-  studioToolHintBubbleModulePromise ??= import("./components/StudioToolHintBubble");
+  studioToolHintBubbleModulePromise ??= import("./components/StudioToolHintBubble").catch(
+    (error: unknown) => {
+      // Do not retain a rejected speculative preload in this module-level request cache.
+      studioToolHintBubbleModulePromise = null;
+      throw error;
+    }
+  );
   return studioToolHintBubbleModulePromise;
+}
+
+function preloadStudioToolHintBubbleModule(): void {
+  void loadStudioToolHintBubbleModule().catch(() => {
+    // Hover/focus/touch preloading is best effort. The rendered lazy boundary owns real errors.
+  });
 }
 
 const LazyStudioToolHintBubble = lazy(async () => ({
@@ -541,7 +553,7 @@ export function StudioToolHintTarget({
       return;
     }
     coordinator.clearPending(tipId);
-    void loadStudioToolHintBubbleModule();
+    preloadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
       hideTimer.current = 0;
@@ -587,7 +599,7 @@ export function StudioToolHintTarget({
     if (suppressedPointerHintAt) return;
     if (interaction.isHoverSuppressed()) return;
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
-    void loadStudioToolHintBubbleModule();
+    preloadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
       hideTimer.current = 0;
@@ -670,7 +682,7 @@ export function StudioToolHintTarget({
     armPointerSuppression(event.clientX, event.clientY);
     touchHoldOpened.current = false;
     setExpanded(false);
-    void loadStudioToolHintBubbleModule();
+    preloadStudioToolHintBubbleModule();
     const intentEpoch = coordinator.getDismissEpoch();
     coordinator.markPending(tipId);
     touchHoldTimer.current = globalThis.setTimeout(() => {

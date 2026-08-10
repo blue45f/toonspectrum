@@ -121,6 +121,9 @@ describe("StudioToolHint", () => {
 
   it("keeps the preview implementation behind rich-mode intent", () => {
     expect(bubbleSource).toContain("studioToolHintPreviewModulePromise ??= import");
+    expect(bubbleSource).toContain("studioToolHintPreviewModulePromise = null;");
+    expect(bubbleSource).toContain("function preloadStudioToolHintPreviewModule(): void");
+    expect(bubbleSource).toContain("void loadStudioToolHintPreviewModule().catch");
     expect(bubbleSource).not.toMatch(
       /const studioToolHintPreviewModulePromise\s*=\s*import/u
     );
@@ -129,6 +132,13 @@ describe("StudioToolHint", () => {
     expect(bubbleSource).toContain(
       "reducedMotion={reducedMotion ? true : undefined}"
     );
+  });
+
+  it("keeps canceled tooltip intent preloads handled and retryable", () => {
+    expect(source).toContain("studioToolHintBubbleModulePromise = null;");
+    expect(source).toContain("function preloadStudioToolHintBubbleModule(): void");
+    expect(source).toContain("void loadStudioToolHintBubbleModule().catch");
+    expect(source).not.toContain("void loadStudioToolHintBubbleModule();");
   });
 
   it("condenses the coach instead of promising a preview hidden by the short-height layout", () => {

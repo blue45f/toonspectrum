@@ -119,6 +119,9 @@ describe("StudioColorPopover", () => {
 
     expect(screen.queryByRole("dialog", { name: "말풍선 색상 선택" })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(trigger));
+    // Focusing the hinted trigger starts a best-effort chunk preload. Drain that request and any
+    // nested preview imports before Vitest tears down its module environment.
+    await vi.dynamicImportSettled();
   });
 
   it("keeps the portaled popup inside a short mobile viewport and dismisses outside", async () => {
