@@ -1,5 +1,5 @@
 import { resolveStudioBrushRenderFamily } from "./studio-brush";
-import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import { resolveStudioCapturedBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 
 /**
@@ -118,7 +118,7 @@ export function isStudioBoundedFlowPaintModelCompatible(
   if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
   if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
   if (typeof input.brushDynamics !== "object" || input.brushDynamics === null) return false;
-  if (resolveStudioBrushDynamicsPresetId(input.brush) === null) return false;
+  if (resolveStudioCapturedBrushDynamicsPresetId(input) === null) return false;
   if (!hasCausalGeometry(input)) return false;
   return isStudioBoundedFlowSymmetryCompatible(input.symmetry);
 }

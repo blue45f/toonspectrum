@@ -6,8 +6,11 @@ import {
   STUDIO_BRUSH_CATALOG_COUNTS,
 } from "./studio-brush-catalog";
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   planNormalizedStudioDynamicBrushDabs,
+  resolveStudioBrushDynamicsSelectionPresetId,
   resolveStudioBrushDynamicsPresetId,
+  serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
 import {
@@ -17,6 +20,40 @@ import {
 } from "./studio-brush-selection";
 
 describe("studio brush catalogue selection", () => {
+  it("authors core wet media as distinct bounded dynamics without reclassifying legacy ids", () => {
+    const expectedEngine = new Map<string, "airbrush" | "ink-particle">([
+      ["watercolor", "airbrush"],
+      ["ink-wash", "airbrush"],
+      ["inkwash-pen", "ink-particle"],
+      ["inkwash-water-brush", "airbrush"],
+      ["inkwash-bleed-wash", "airbrush"],
+      ["inkwash-white-ink", "ink-particle"],
+    ]);
+    const signatures = new Set<string>();
+
+    for (const [brushId, engine] of expectedEngine) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+
+      // A bare historical id must remain on the causal-watercolor compatibility renderer.
+      expect(resolveStudioBrushDynamicsPresetId(brushId), `${brushId}: legacy id drift`)
+        .toBeNull();
+      expect(selection.brushDynamics, `${brushId}: authored snapshot missing`).not.toBeNull();
+      expect(selection.brushDynamics?.depositPipeline, `${brushId}: causal pipeline`)
+        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+      expect(selection.brushDynamics?.opacity.base, `${brushId}: outer opacity duplicated`).toBe(1);
+      expect(
+        resolveStudioBrushDynamicsSelectionPresetId(brushId, selection.brushDynamics),
+        `${brushId}: renderer engine`,
+      ).toBe(engine);
+      signatures.add(serializeStudioBrushDynamicsSettingsCanonical(selection.brushDynamics));
+    }
+
+    expect(signatures.size).toBe(expectedEngine.size);
+  });
+
   it("keeps catalogue and runtime identity explicit for core brushes", () => {
     const selection = studioCoreBrushCatalogSelection({
       id: "chalk",

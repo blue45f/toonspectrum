@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { BRUSH_PRESETS } from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
@@ -21,6 +22,7 @@ import {
   STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
   STUDIO_DYNAMIC_BRUSH_RENDER_STAMP_GRIDS,
 } from "./studio-brush-render-budget";
+import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import { clearStudioBrushTextureStampCache } from "./studio-brush-textured-stamp";
 import { STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS } from "./studio-causal-dynamic-brush-deposit-v2";
 import {
@@ -1134,6 +1136,80 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     },
   );
 
+  it("streams and seals every core wet preset with identical live and retained marks", () => {
+    const wetBrushIds = [
+      "watercolor",
+      "ink-wash",
+      "inkwash-pen",
+      "inkwash-water-brush",
+      "inkwash-bleed-wash",
+      "inkwash-white-ink",
+    ] as const;
+    const pointPairs = Array.from({ length: 72 }, (_, index) => [
+      12 + index * 4,
+      70 + Math.sin(index / 7) * 9,
+    ]);
+
+    for (const brushId of wetBrushIds) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      if (!preset) throw new Error(`missing ${brushId} preset`);
+      const selection = studioCoreBrushCatalogSelection(preset);
+      if (!selection.brushDynamics) throw new Error(`missing ${brushId} dynamics`);
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const element = drawElement(`core-wet-${brushId}`, pointPairs.flat(), {
+        brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
+        brushDynamics: selection.brushDynamics,
+        strokeWidth: selection.defaultWidth,
+        opacity: selection.defaultOpacity,
+      });
+
+      expect(studioLiveDynamicBrushOverlaySupportsElement(element), `${brushId}: route`)
+        .toBe(true);
+      expect(renderer.begin(element).status, `${brushId}: begin`).toBe("started");
+      expect(renderer.appendFrom(element).status, `${brushId}: append`).toBe("appended");
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      const clearsBeforeEnd = activeCanvas.clearCount();
+      const sealed = renderer.end(element);
+
+      expect(sealed.status, `${brushId}: end`).toBe("settled");
+      expect(activeCanvas.clearCount(), `${brushId}: no pointer-up repaint`)
+        .toBe(clearsBeforeEnd + 1);
+      expect(settledCanvas.recordedComposites[0]?.marks, `${brushId}: live/final parity`)
+        .toEqual(liveMarks);
+    }
+  });
+
+  it("rebuilds release-corrected first points with corrected stroke-fixed paper origins", () => {
+    const preset = BRUSH_PRESETS.find((candidate) => candidate.id === "ink-wash");
+    if (!preset) throw new Error("missing ink-wash preset");
+    const selection = studioCoreBrushCatalogSelection(preset);
+    if (!selection.brushDynamics) throw new Error("missing ink-wash dynamics");
+    const original = drawElement(
+      "corrected-origin",
+      [18, 28, 42, 33, 68, 41, 94, 52],
+      {
+        brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
+        brushDynamics: selection.brushDynamics,
+      },
+    );
+    const corrected = {
+      ...original,
+      points: [24, 34, ...original.points.slice(2)],
+    };
+    const correctedLive = attachedRenderer();
+    expect(correctedLive.renderer.begin(original).status).toBe("started");
+    expect(correctedLive.renderer.appendFrom(original).status).toBe("appended");
+    expect(correctedLive.renderer.end(corrected).status).toBe("settled");
+
+    const reference = attachedRenderer();
+    expect(reference.renderer.begin(corrected).status).toBe("started");
+    expect(reference.renderer.end(corrected).status).toBe("settled");
+    expect(correctedLive.settledCanvas.recordedComposites)
+      .toEqual(reference.settledCanvas.recordedComposites);
+  });
+
   it.each([
     "crayon",
     "chalk",
@@ -1370,6 +1446,47 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       ).toBe(roundMarks);
     }
   });
+
+  it.each([
+    "watercolor-wet-wash",
+    "sumi-wash-fray",
+  ] as const)(
+    "seals the already-canonical %s live surface without a pointer-up repaint",
+    (catalogId) => {
+      const selection = materializeStudioBrushPackSelection(catalogId);
+      if (!selection) throw new Error(`missing ${catalogId} selection`);
+      const { activeCanvas, renderer, settledCanvas } = attachedRenderer();
+      const pointPairs = Array.from({ length: 96 }, (_, index) => [
+        8 + index * 4,
+        64 + Math.sin(index / 6) * 11,
+      ]);
+      const element = drawElement(`fast-seal-${catalogId}`, pointPairs.flat(), {
+        brush: selection.runtimeBrushId,
+        brushCatalogId: selection.catalogId,
+        brushDynamics: selection.brushDynamics,
+        strokeWidth: selection.defaultWidth,
+        opacity: selection.defaultOpacity,
+        pressures: Array.from({ length: pointPairs.length }, (_, index) =>
+          0.38 + (index % 7) * 0.075
+        ),
+        speeds: Array.from({ length: pointPairs.length }, (_, index) => 3 + (index % 5)),
+        tiltXs: Array.from({ length: pointPairs.length }, () => 12),
+        tiltYs: Array.from({ length: pointPairs.length }, () => -9),
+        twists: Array.from({ length: pointPairs.length }, () => 23),
+      });
+
+      expect(renderer.begin(element).status).toBe("started");
+      expect(renderer.appendFrom(element).status).toBe("appended");
+      const liveMarks = structuredClone(activeCanvas.recordedMarks);
+      const clearsBeforeEnd = activeCanvas.clearCount();
+      const sealed = renderer.end(element);
+
+      expect(sealed.status).toBe("settled");
+      // One clear retires the active surface. A second clear would mean end rebuilt it first.
+      expect(activeCanvas.clearCount()).toBe(clearsBeforeEnd + 1);
+      expect(settledCanvas.recordedComposites[0]?.marks).toEqual(liveMarks);
+    },
+  );
 
   it.each([
     "chalk-rough",
@@ -1742,5 +1859,34 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       settledCanvas.width,
       settledCanvas.height,
     ]).toEqual([1, 1, 1, 1, 1, 1]);
+  });
+
+  it("does not seal an active stroke after its backing surface is released", () => {
+    vi.stubGlobal("devicePixelRatio", 1);
+    const dimension = Math.floor(
+      Math.sqrt(STUDIO_LIVE_SURFACE_MAX_BACKING_PIXELS / 3),
+    );
+    const { renderer, settledCanvas } = attachedRenderer();
+    const element = drawElement(
+      "surface-released-before-end",
+      [10, 20, 34, 24, 58, 31],
+      { brushDynamics: segmentedCausalOverlayDynamics() },
+    );
+    expect(renderer.begin(element).status).toBe("started");
+    expect(renderer.appendFrom(element).status).toBe("appended");
+
+    renderer.setSurface({
+      ...SURFACE,
+      width: dimension + 1,
+      height: dimension + 1,
+      documentWidth: dimension + 1,
+    });
+
+    expect(renderer.backingPixelCount).toBe(3);
+    expect(renderer.end(element)).toEqual({
+      status: "fallback",
+      reason: "surface-budget",
+    });
+    expect(settledCanvas.recordedComposites).toEqual([]);
   });
 });

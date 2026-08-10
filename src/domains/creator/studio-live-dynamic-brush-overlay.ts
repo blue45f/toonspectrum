@@ -583,6 +583,68 @@ function detachedSource(source: DynamicStrokeSource): DynamicStrokeSource {
   };
 }
 
+function dynamicSourceFromElement(
+  element: DrawEl,
+  fallbackPressure: number,
+): DynamicStrokeSource | null {
+  const source: DynamicStrokeSource = {
+    points: [],
+    pressures: [],
+    tangentialPressures: [],
+    speeds: [],
+    tiltXs: [],
+    tiltYs: [],
+    twists: [],
+  };
+  const total = Math.floor(element.points.length / 2);
+  for (let index = 0; index < total; index += 1) {
+    const sample = sourceSampleAt(element, index, fallbackPressure);
+    if (!sample) return null;
+    appendSourceSample(source, sample);
+  }
+  return source;
+}
+
+function dynamicSourceMatchesElement(
+  source: DynamicStrokeSource,
+  element: DrawEl,
+  fallbackPressure: number,
+): boolean {
+  const total = Math.floor(element.points.length / 2);
+  if (source.points.length !== total * 2) return false;
+  for (let index = 0; index < total; index += 1) {
+    const sample = sourceSampleAt(element, index, fallbackPressure);
+    if (!sample) return false;
+    if (
+      source.points[index * 2] !== sample.x
+      || source.points[index * 2 + 1] !== sample.y
+      || source.pressures[index] !== sample.pressure
+      || source.tangentialPressures[index] !== sample.tangentialPressure
+      || source.speeds[index] !== sample.speed
+      || source.tiltXs[index] !== sample.tiltX
+      || source.tiltYs[index] !== sample.tiltY
+      || source.twists[index] !== sample.twist
+    ) return false;
+  }
+  return true;
+}
+
+function dynamicStyleForSourceOrigin(
+  style: DetachedDynamicStrokeStyle,
+  source: DynamicStrokeSource,
+): DetachedDynamicStrokeStyle | null {
+  const firstX = finiteCoordinate(source.points[0]);
+  const firstY = finiteCoordinate(source.points[1]);
+  if (firstX === null || firstY === null) return null;
+  return {
+    ...style,
+    strokeOrigins: style.transforms.map((transform) => {
+      const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
+      return Object.freeze({ x, y });
+    }),
+  };
+}
+
 function segmentedDabCount(
   segments: readonly (readonly StudioDynamicBrushDab[])[],
 ): number {
@@ -712,7 +774,9 @@ function styleFromElement(element: DrawEl): DetachedDynamicStrokeStyle | null {
     const [x, y] = transformStudioBrushSymmetryPoint(firstX, firstY, transform);
     return Object.freeze({ x, y });
   });
-  const paperResponse = resolveStudioPaperBrushResponse(element.brush);
+  const paperResponse = resolveStudioPaperBrushResponse(
+    element.brush,
+  );
   const paper = studioPaperGranulationIsActive(paperResponse)
     ? Object.freeze({ response: paperResponse, surface: resolveStudioDocumentPaperSurface() })
     : undefined;
@@ -1007,13 +1071,58 @@ export class StudioLiveDynamicBrushOverlayRenderer {
     return this.appendCanonicalFrom(element, active, total);
   }
 
-  /** Exact full replay seals endpoint/taper once, then flattens the stroke into the settled FIFO. */
+  /**
+   * Causal live marks are already the canonical accepted prefix. Seal that surface directly;
+   * re-planning and repainting thousands of identical marks on pointer-up only adds a long task
+   * and a visible compositor handoff. Legacy/non-causal strokes retain their exact full replay.
+   */
   end(element: DrawEl): StudioLiveDynamicBrushEndResult {
     const appended = this.appendFrom(element);
     if (appended.status === "fallback") return appended;
     const active = this.active;
     if (!active) return { status: "fallback", reason: "surface-unavailable" };
-    const exact = this.exactPlan(active.style, active.source);
+    if (!this.surfaceReady()) {
+      return this.failActive(
+        this.surfaceUsable ? "surface-unavailable" : "surface-budget",
+      );
+    }
+    const sourceMatches = dynamicSourceMatchesElement(
+      active.source,
+      element,
+      active.style.dynamics.fallbackPressure,
+    );
+    if (active.causalState && sourceMatches) {
+      if (!this.flattenActiveToSettled(active.style.opacity)) {
+        return this.failActive("surface-render");
+      }
+      this.settled.push({
+        style: active.style,
+        source: detachedSource(active.source),
+      });
+      const result = {
+        status: "settled" as const,
+        dabCount: active.acceptedCausalDabCount,
+        markCount: active.markCount,
+        ...(active.acceptedPrefixReceipt
+          ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+          : {}),
+      };
+      this.resetActiveState();
+      this.clearActiveRect();
+      return result;
+    }
+
+    // Same-length post-correction can replace points or sensor channels without appendFrom seeing
+    // a longer suffix. Rebuild that uncommon release input instead of sealing a stale live prefix.
+    const exactSource = sourceMatches
+      ? active.source
+      : dynamicSourceFromElement(element, active.style.dynamics.fallbackPressure);
+    if (!exactSource) return this.failActive("invalid-sample");
+    const exactStyle = sourceMatches
+      ? active.style
+      : dynamicStyleForSourceOrigin(active.style, exactSource);
+    if (!exactStyle) return this.failActive("invalid-sample");
+    const exact = this.exactPlan(exactStyle, exactSource);
     if (!exact) return this.failActive("material-plan");
     this.clearActiveRect();
     active.markCount = 0;
@@ -1025,8 +1134,8 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       return this.failActive("surface-render");
     }
     this.settled.push({
-      style: active.style,
-      source: detachedSource(active.source),
+      style: exactStyle,
+      source: detachedSource(exactSource),
     });
     const result = {
       status: "settled" as const,

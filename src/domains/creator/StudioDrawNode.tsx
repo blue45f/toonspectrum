@@ -32,7 +32,7 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
 import {
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
   resolveStudioBrushRuntimeContract,
@@ -332,7 +332,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     ? resolveStudioStampBrushKind(el.brush)
     : null;
   const dynamicBrushId = kind === "freehand" && el.mode !== "eraser"
-    ? resolveStudioBrushDynamicsPresetId(el.brush)
+    ? resolveStudioCapturedBrushDynamicsPresetId(el)
     : null;
   // Stamp and dynamic-dab renderers own their symmetry fan inside one bounded Shape. Do not build
   // and discard up to 64 complete transformed source-point arrays on every active-draft frame.

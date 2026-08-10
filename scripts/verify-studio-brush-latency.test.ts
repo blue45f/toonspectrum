@@ -32,6 +32,14 @@ describe("studio brush latency verifier compositor boundary", () => {
     );
   });
 
+  it("allows an exact representative subset for focused performance regressions", () => {
+    expect(verifierSource).toContain("process.env.TOONSPECTRUM_BRUSH_LATENCY_IDS");
+    expect(verifierSource).toContain("STUDIO_BRUSH_LATENCY_IDS.filter");
+    expect(verifierSource).toContain(
+      "TOONSPECTRUM_BRUSH_LATENCY_IDS contains an unknown or duplicate representative id",
+    );
+  });
+
   it("suppresses optional API failures only for its own exact loopback preview", () => {
     expect(verifierSource).toContain('previewUrl.hostname !== "127.0.0.1"');
     expect(verifierSource).toContain("url.origin === previewUrl.origin");

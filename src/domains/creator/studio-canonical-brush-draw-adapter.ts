@@ -14,7 +14,7 @@ import {
 } from "./studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
 import {
@@ -810,7 +810,7 @@ function dynamicRecipe(
   request: StudioCanonicalBrushDrawAdapterRequest,
 ): BuildResult<RecipeBuild> {
   const { element } = request;
-  const presetId = resolveStudioBrushDynamicsPresetId(element.brush);
+  const presetId = resolveStudioCapturedBrushDynamicsPresetId(element);
   if (!presetId || !element.brushDynamics) {
     return reject(
       "unsupported-brush",

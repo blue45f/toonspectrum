@@ -126,6 +126,7 @@ describe("studio brush continuity audit", () => {
 
   it("keeps every low-alpha preset above the first-stroke and browser-pixel visibility floors", () => {
     const expectedLowAlphaMedia = new Set([
+      "inkwash-water-brush",
       "watercolor-wet-wash",
       "watercolor-flat-wash",
       "smoke-wisp-layered",

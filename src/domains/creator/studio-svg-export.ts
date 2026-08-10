@@ -51,7 +51,7 @@ import {
   isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
   studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
@@ -1623,7 +1623,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
     : null;
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
-  const dynamicBrushId = kind === "freehand" ? resolveStudioBrushDynamicsPresetId(el.brush) : null;
+  const dynamicBrushId = kind === "freehand"
+    ? resolveStudioCapturedBrushDynamicsPresetId(el)
+    : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
   let dynamicPlanFailed = false;
@@ -1799,7 +1801,9 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           usesCausalDepositPlan
           || materialIdentity.dryMediaPresetId !== null
         ) {
-          const paperResponse = resolveStudioPaperBrushResponse(el.brush);
+          const paperResponse = resolveStudioPaperBrushResponse(
+            el.brush,
+          );
           const sharedCoverageInput = {
             dynamics,
             materialIdentity,
@@ -2170,7 +2174,7 @@ function serializeFreehand(
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
-  const dynamicsPresetId = resolveStudioBrushDynamicsPresetId(brush);
+  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el);
   const dynamicBrush = dynamicsPresetId !== null;
   const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);

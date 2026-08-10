@@ -3,7 +3,9 @@ import {
   resolveStudioBrushRenderFamily,
   type StudioBrushRenderFamily,
 } from "./studio-brush";
-import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import {
+  resolveStudioCapturedBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
 import { resolveStudioStampBrushKind } from "./studio-brush-stamp-engine";
 import { isStudioPixelPencilRenderMode } from "./studio-pixel-pencil";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
@@ -210,7 +212,7 @@ export function applyStudioSmartShapeBrushEffect(
 
   const brush = sourceStroke.brush ?? "pen";
   const knownBrush = Object.prototype.hasOwnProperty.call(STUDIO_BRUSH_RENDER_FAMILY, brush)
-    || resolveStudioBrushDynamicsPresetId(brush) !== null
+    || resolveStudioCapturedBrushDynamicsPresetId(sourceStroke) !== null
     || resolveStudioStampBrushKind(brush) !== null;
   if (!knownBrush) return fallback(geometricStroke, "unknown-brush");
 
@@ -232,7 +234,7 @@ export function applyStudioSmartShapeBrushEffect(
 
   const sampleCount = outline.length / 2;
   const family = resolveStudioBrushRenderFamily(brush);
-  const dynamic = resolveStudioBrushDynamicsPresetId(brush) !== null;
+  const dynamic = resolveStudioCapturedBrushDynamicsPresetId(sourceStroke) !== null;
   const calligraphy = family === "calligraphy";
   const stamp = resolveStudioStampBrushKind(brush) !== null;
   let applied: DrawEl = {

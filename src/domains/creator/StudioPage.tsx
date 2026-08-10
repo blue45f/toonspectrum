@@ -205,7 +205,7 @@ import {
 } from "./studio-brush-backend-quality-policy";
 import {
   normalizeStudioBrushDynamicsSettings,
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
@@ -804,6 +804,7 @@ import {
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
 import {
+  STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED,
   studioLivingInkAdmitsBrush,
   studioLivingInkExplicitBrushKey,
   studioLivingInkSupportsExplicitBrush,
@@ -11892,8 +11893,13 @@ function StudioCuttoonEditor() {
     brush,
     activeCatalogBrush.id,
   );
-  const livingInkPhysicalModeEnabled = currentLivingInkExplicitBrushKey !== null
+  const livingInkPhysicalModeEnabled = STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED
+    && currentLivingInkExplicitBrushKey !== null
     && livingInkPhysicalBrushKey === currentLivingInkExplicitBrushKey;
+  useEffect(() => {
+    // Opt-in state belongs to one exact brush identity. Never resurrect it after a brush switch.
+    setLivingInkPhysicalBrushKey(null);
+  }, [currentLivingInkExplicitBrushKey]);
   const [livingInkScope, setLivingInkScope] = useState<"all" | "selection">("all");
   const [livingInkMaterial, setLivingInkMaterial] = useState<StudioLivingInkMaterialControls>(
     () => ({ ...DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS }),
@@ -12299,7 +12305,7 @@ function StudioCuttoonEditor() {
       && element.livingInkReceipt?.pageId === activePage.id
     );
     const receipt = canonicalImage?.livingInkReceipt;
-    if (!receipt && !livingInkPhysicalModeEnabled) {
+    if (!livingInkPhysicalModeEnabled) {
       livingInkAuthorityVerificationEpochRef.current += 1;
       livingInkAuthorityVerificationAbortRef.current?.abort();
       livingInkAuthorityVerificationAbortRef.current = null;
@@ -12311,7 +12317,7 @@ function StudioCuttoonEditor() {
       // publishing `ready` over this unavailable state.
       void livingInkCoordinatorRef.current.dispose();
       setLivingInkState("unavailable");
-      setLivingInkStateMessage("물리 번짐을 직접 켜면 전용 표면을 준비합니다.");
+      setLivingInkStateMessage("일반 수채처럼 각 획을 독립 레이어로 저장합니다.");
       return;
     }
     const freshPlan = planStudioLivingInkProductExecutionConfig({
@@ -32967,7 +32973,7 @@ const puppetWarpArmed =
     const current = drawingRef.current;
     if (!current || samples.length === 0) return;
     const capturePointerDynamics = current.mode === "pen"
-      && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
+      && resolveStudioCapturedBrushDynamicsPresetId(current) !== null;
     const captureInkSensorChannels =
       current.mode === "pen" && current.inkInput !== undefined;
     const captureExtendedInkSensorChannels =
@@ -33524,7 +33530,8 @@ const puppetWarpArmed =
           pressureModel: current.pressureModel,
         });
     if (!shouldAppend) return;
-    const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
+    const capturePointerDynamics = current.mode === "pen"
+      && resolveStudioCapturedBrushDynamicsPresetId(current) !== null;
     const captureInkSensorChannels =
       current.mode === "pen" && current.inkInput !== undefined;
     const captureExtendedInkSensorChannels =
@@ -41183,7 +41190,9 @@ function clearSelectionForEdit() {
     setLivingInkMode,
     setLivingInkPhysicalModeEnabled: (enabled) => {
       setLivingInkPhysicalBrushKey(
-        enabled ? currentLivingInkExplicitBrushKey : null,
+        enabled && STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED
+          ? currentLivingInkExplicitBrushKey
+          : null,
       );
     },
     setLivingInkScope,
@@ -41246,10 +41255,8 @@ function clearSelectionForEdit() {
     livingInkScope,
     livingInkSelectionReady,
   );
-  const livingInkBrushSupported = studioLivingInkSupportsExplicitBrush(
-    brush,
-    activeCatalogBrush.id,
-  );
+  const livingInkBrushSupported = STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED
+    && studioLivingInkSupportsExplicitBrush(brush, activeCatalogBrush.id);
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
     () => ({
       visible: tool === "draw" && !canvasOnlyMode,

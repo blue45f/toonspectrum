@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { BRUSH_PRESETS } from "./studio-brush";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
+import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
@@ -535,6 +537,50 @@ describe("planStudioDrawPointerStart", () => {
     expect(watercolor.causalInputPlan.mode).toBe("immediate");
     expect(watercolor.element.watercolorPipeline).toBe("causal-walker-v2");
     expect(watercolor.element.stampPipeline).toBeUndefined();
+  });
+
+  it("authors every core wet preset as one bounded dynamic stroke while preserving legacy walkers", () => {
+    const wetBrushIds = [
+      "watercolor",
+      "ink-wash",
+      "inkwash-pen",
+      "inkwash-water-brush",
+      "inkwash-bleed-wash",
+      "inkwash-white-ink",
+    ] as const;
+
+    for (const brushId of wetBrushIds) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+      const plan = planStudioDrawPointerStart(input({
+        brush: brushId,
+        brushCatalogId: selection.catalogId,
+        brushCatalogName: selection.catalogName,
+        brushDynamics: selection.brushDynamics,
+        brushOpacity: selection.defaultOpacity,
+        strokeWidth: selection.defaultWidth,
+      }));
+
+      expect(plan.element.paintModel, `${brushId}: bounded paint model`)
+        .toBe(STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2);
+      expect(plan.element.brushDynamics, `${brushId}: durable snapshot`)
+        .toMatchObject(selection.brushDynamics!);
+      expect(plan.element.watercolorPipeline, `${brushId}: legacy engine leaked`)
+        .toBeUndefined();
+      expect(plan.capturePointerDynamics, `${brushId}: sensor channels`).toBe(true);
+      expect(plan.causalInputPlan.mode, `${brushId}: dynamic input isolation`).toBe("legacy");
+    }
+
+    const legacy = planStudioDrawPointerStart(input({
+      brush: "ink-wash",
+      brushDynamics: undefined,
+    }));
+    expect(legacy.element.paintModel).toBeUndefined();
+    expect(legacy.element.brushDynamics).toBeUndefined();
+    expect(legacy.element.watercolorPipeline).toBe("causal-walker-v2");
+    expect(legacy.capturePointerDynamics).toBe(false);
   });
 
   it("applies CSP pressure min size to residual pen first samples", () => {
