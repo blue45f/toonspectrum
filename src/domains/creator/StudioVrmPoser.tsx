@@ -2838,6 +2838,7 @@ export function StudioVrmPoser({
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoading, setWebcamLoading] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [webcamErrorStage, setWebcamErrorStage] = useState<"camera" | "engine" | null>(null);
   const [showConsent, setShowConsent] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOptions>(DEFAULT_TRACKING_OPTIONS);
@@ -4984,7 +4985,28 @@ export function StudioVrmPoser({
     const startCamera = async () => {
       setWebcamLoading(true);
       setWebcamError(null);
+      setWebcamErrorStage(null);
+      let failureStage: "camera" | "engine" = "engine";
       try {
+        // MediaPipe must settle before asking for a privacy-sensitive camera grant. If engine
+        // initialization fails, the browser never lights the camera or leaves a stream to clean up.
+        let landmarker;
+        let poseLandmarker;
+        try {
+          [landmarker, poseLandmarker] = await Promise.all([
+            initFaceLandmarker(),
+            initPoseLandmarker(),
+          ]);
+        } catch (modelErr) {
+          console.error("Tracking AI models initialization failed:", modelErr);
+          throw new Error(
+            "얼굴 및 전신 동작 인식 엔진을 준비하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하고, 계속되면 페이지를 새로고침해 주세요.",
+            { cause: modelErr },
+          );
+        }
+        if (!active) return;
+
+        failureStage = "camera";
         let stream: MediaStream;
         try {
           if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -5039,18 +5061,6 @@ export function StudioVrmPoser({
           } catch (e) {
             console.error("Video play failed:", e);
           }
-        }
-
-        let landmarker;
-        let poseLandmarker;
-        try {
-          [landmarker, poseLandmarker] = await Promise.all([
-            initFaceLandmarker(),
-            initPoseLandmarker(),
-          ]);
-        } catch (modelErr) {
-          console.error("Tracking AI models initialization failed:", modelErr);
-          throw new Error("얼굴 및 전신 인식 AI 모델(MediaPipe)을 초기화하지 못했습니다. 인터넷 연결 상태를 확인하고 페이지를 새로고침해 주세요.", { cause: modelErr });
         }
 
         if (!active) return;
@@ -5223,6 +5233,7 @@ export function StudioVrmPoser({
       } catch (err) {
         console.error("Webcam start failed:", err);
         const errMsg = err instanceof Error ? err.message : "카메라 권한 접근에 실패했거나 트래킹 로드 오류가 발생했습니다.";
+        setWebcamErrorStage(failureStage);
         setWebcamError(errMsg);
         setWebcamActive(false);
         setWebcamLoading(false);
@@ -10493,7 +10504,11 @@ export function StudioVrmPoser({
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="shrink-0 mt-0.5" size={14} />
                           <div>
-                            <p className="font-semibold mb-1 text-[0.72rem]">카메라 권한 및 연결 오류</p>
+                            <p className="font-semibold mb-1 text-[0.72rem]">
+                              {webcamErrorStage === "engine"
+                                ? "동작 인식 엔진 오류"
+                                : "카메라 권한 및 연결 오류"}
+                            </p>
                             <p className="whitespace-pre-line text-[0.65rem] opacity-90">{webcamError}</p>
                           </div>
                         </div>
@@ -10503,22 +10518,26 @@ export function StudioVrmPoser({
                             className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
                             onClick={() => {
                               setWebcamError(null);
+                              setWebcamErrorStage(null);
                               setWebcamActive(true);
                             }}
                           >
                             다시 시도
                           </button>
-                          <button
-                            type="button"
-                            className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
-                            onClick={() => {
-                              // Re-check permission state
-                              setBrowserPermissionState("prompt");
-                              setWebcamError(null);
-                            }}
-                          >
-                            권한 상태 재확인
-                          </button>
+                          {webcamErrorStage !== "engine" ? (
+                            <button
+                              type="button"
+                              className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
+                              onClick={() => {
+                                // Re-check permission state
+                                setBrowserPermissionState("prompt");
+                                setWebcamError(null);
+                                setWebcamErrorStage(null);
+                              }}
+                            >
+                              권한 상태 재확인
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className="rounded border border-line bg-card px-2.5 py-1 text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg"

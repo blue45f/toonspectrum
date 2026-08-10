@@ -3444,7 +3444,10 @@ export function StudioBackground3D({
 
   // The cache owns only verified-loader snapshots and disposes each shared resource once.
   useEffect(() => {
-    if (!open || !modelsPanelActivated) return;
+    // `componentActiveRef` fences every async editor operation, not only the model library.
+    // Gating this lifecycle behind the Models tab leaves diagnostics, capture, physics, and
+    // restore work permanently unable to publish while the dialog is otherwise fully active.
+    if (!open) return;
     componentActiveRef.current = true;
     const cache = modelRootCacheRef.current;
     const pending = modelLoadPendingRef.current;
@@ -3459,7 +3462,7 @@ export function StudioBackground3D({
       attachmentByStorageId.clear();
       storageIdByAttachment.clear();
     };
-  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // LT presets use fail-closed SQLite/OPFS authority with an explicit tab-memory fallback.
   useEffect(() => {

@@ -32,6 +32,7 @@ import {
 } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import { openStudioLocalDatabase } from "./studio-local-database";
+import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
@@ -315,6 +316,38 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
       STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
       STUDIO_BG3D_LIBRARY_MANIFEST_KEYS.models,
     )).toBeNull();
+  });
+
+  it("keeps union owner refs when a Worker loses the SQLite commit response", async () => {
+    const database = await openNamedDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem, now: () => 100 });
+    const uncertainDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async () => {
+            throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+              "kvSet",
+              new Error("response-channel-lost"),
+            );
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const authority = authorityFor(uncertainDatabase, fileSystem, { assetStore: assets });
+    let uncertainHash = "";
+
+    await expect(authority.mutate("models", () => [], async (context) => {
+      const receipt = await context.putBlob(new Uint8Array([4, 5, 6]), "application/octet-stream");
+      uncertainHash = receipt.hash;
+      return { nextRaw: "{}", nextRefs: [receipt.hash], result: undefined };
+    })).rejects.toMatchObject({ code: "transaction-failed" });
+
+    expect(await assets.ownerRefs("studio-bg3d-libraries-v12:models"))
+      .toEqual([uncertainHash]);
+    expect((await assets.sweep({ graceMs: 0 })).removed).toHaveLength(0);
   });
 
   it("rejects a CAS quota failure without publishing a model manifest", async () => {

@@ -12,6 +12,7 @@ import {
   type StudioAssetManifestEntry,
 } from "./studio-asset-library-sqlite-opfs-repository";
 import { openStudioLocalDatabase } from "./studio-local-database";
+import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
@@ -276,6 +277,39 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
     )).toBe(before);
     expect(await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER)).toEqual([first.contentHash]);
     expect((await stable.repository.list()).map(({ id }) => id)).toEqual([first.id]);
+  });
+
+  it("keeps old and candidate asset blobs pinned when the commit response is lost", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const stable = await fixture({ database, fs, store, createId: () => "stable-asset" });
+    const first = await stable.repository.save(saveInput(22));
+    const uncertain = proxyDatabase(database, {
+      kvSet: async (namespace, key, value) => {
+        if (namespace === STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE) {
+          throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+            "kvSet",
+            new Error("response-channel-lost"),
+          );
+        }
+        return database.kvSet(namespace, key, value);
+      },
+    });
+    const candidate = await fixture({
+      database: uncertain,
+      fs,
+      store,
+      createId: () => "candidate-asset",
+    });
+
+    await expect(candidate.repository.save(saveInput(23)))
+      .rejects.toMatchObject({ code: "unavailable" });
+
+    const ownerRefs = await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER);
+    expect(ownerRefs).toContain(first.contentHash);
+    expect(ownerRefs).toHaveLength(2);
+    expect((await store.sweep({ graceMs: 0 })).removed).toHaveLength(0);
   });
 
   it("fails before manifest publication when OPFS quota cannot admit the blob", async () => {

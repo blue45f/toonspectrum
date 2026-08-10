@@ -7,6 +7,7 @@
  * explicit error that the UI can surface as unsaved/session-only state.
  */
 
+import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsNativeFileSystem } from "./studio-opfs-filesystem";
@@ -369,11 +370,17 @@ export function createStudioBg3dLibrariesAuthority(
           // The manifest is now authoritative; shrinking owner refs cannot make the commit torn.
           await assets.setOwnerRefs(owner, nextRefs);
         } catch (cause) {
-          if (!manifestCommitted) {
+          if (
+            !manifestCommitted
+            && !isStudioLocalDatabaseCommitOutcomeUnknownError(cause)
+          ) {
             // A failed SQLite publication must not pin the newly written CAS payload forever.
             // Restoring the old owner set is best-effort; the grace window still prevents unsafe
             // collection if this repair itself is interrupted.
             await assets.setOwnerRefs(owner, oldRefs).catch(() => []);
+          } else if (!manifestCommitted) {
+            // The Worker may have committed before its response was lost. Keep the old+new union
+            // pinned until a later reopen can reconcile it against the durable manifest.
           }
           if (cause instanceof StudioBg3dLibrariesAuthorityError) throw cause;
           throw authorityError(

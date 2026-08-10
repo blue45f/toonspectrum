@@ -155,7 +155,7 @@ const MODIFIER_COPY: Readonly<Record<
   bevel: {
     label: "모서리 다듬기",
     technical: "Bevel",
-    description: "날카로운 모서리를 여러 단계로 부드럽게 깎습니다.",
+    description: "날카로운 모서리를 정확한 한 단계 절삭으로 다듬습니다.",
   },
 };
 
@@ -514,14 +514,15 @@ function ModifierParameters({
       />
       <ModifierNumberField
         label={`${instanceName} 분할 수`}
-        visibleLabel="둥글기 단계"
+        visibleLabel="둥글기 단계 (현재 1단계)"
+        description="정확한 다단계 토폴로지가 준비될 때까지 안전한 1단계로 고정됩니다."
         value={modifier.segments}
         min={1}
-        max={16}
+        max={1}
         step={1}
         unit="단계"
-        disabled={busy}
-        onChange={(segments) => onPatch({ segments: Math.max(1, Math.trunc(segments)) })}
+        disabled
+        onChange={() => onPatch({ segments: 1 })}
       />
       <ModifierNumberField
         label={`${instanceName} 적용 각도`}

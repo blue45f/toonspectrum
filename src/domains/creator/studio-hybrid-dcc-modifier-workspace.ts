@@ -256,7 +256,9 @@ function defaultModifier(
         id,
         enabled: true,
         amount: 0.08,
-        segments: 3,
+        // The exact evaluator currently ships one topology-safe cut. Do not create a default
+        // stack the evaluator must reject or advertise approximate multi-segment geometry.
+        segments: 1,
         angleLimitRad: Math.PI / 3,
         weightInfluence: 0,
       };
@@ -374,7 +376,7 @@ function patchModifier(
         ...modifier,
         enabled,
         amount: finiteNumber(patch.amount, modifier.amount, 0, 0.45),
-        segments: Math.trunc(finiteNumber(patch.segments, modifier.segments, 1, 12)),
+        segments: Math.trunc(finiteNumber(patch.segments, modifier.segments, 1, 1)),
         angleLimitRad: finiteNumber(
           patch.angleLimitRad,
           modifier.angleLimitRad,

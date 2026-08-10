@@ -863,6 +863,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const pngEncoderWorkers: string[] = [];
   const glbValidationWorkers: string[] = [];
   const ktx2TranscoderWorkers: string[] = [];
+  const localDatabaseWorkers: string[] = [];
   const basisWasmResponses: string[] = [];
   let expectingLiveContextLoss = false;
   let liveContextExplicitlyLost = false;
@@ -897,6 +898,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     const url = worker.url();
     if (url.includes("studio-bg3d-shot-png.worker")) pngEncoderWorkers.push(url);
     if (url.includes("studio-bg3d-glb-validation.worker")) glbValidationWorkers.push(url);
+    if (url.includes("studio-local-database.worker")) localDatabaseWorkers.push(url);
     if (url.startsWith("blob:")) ktx2TranscoderWorkers.push(url);
   });
   page.on("request", (request) => {
@@ -1117,6 +1119,36 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
 
   await backgroundDialog.getByRole("tab", { name: "에셋", exact: true }).click();
+  const assetLibrarySection = backgroundDialog.locator(
+    'section[aria-labelledby="bg3d-asset-library-title"]',
+  );
+  const assetLibraryReadySection = backgroundDialog.locator(
+    'section[aria-labelledby="bg3d-asset-library-title"][aria-busy="false"]',
+  );
+  await assetLibraryReadySection.waitFor({
+    state: "visible",
+    timeout: 90_000,
+  });
+  const assetLibraryText = await assetLibrarySection.innerText();
+  assertCondition(
+    !assetLibraryText.includes("저장된 3D 모델 목록을 불러오지 못했습니다."),
+    `the SQLite/OPFS model library failed before KTX2 upload:\n${assetLibraryText}`,
+  );
+  assertCondition(
+    localDatabaseWorkers.length === 1,
+    `expected one page-authoritative Studio SQLite Worker, observed ${String(
+      localDatabaseWorkers.length,
+    )}: ${localDatabaseWorkers.join(", ") || "(none)"}`,
+  );
+  assertCondition(
+    await page.evaluate(() =>
+      typeof FileSystemFileHandle !== "undefined"
+      && typeof Reflect.get(
+        FileSystemFileHandle.prototype,
+        "createSyncAccessHandle",
+      ) !== "function"),
+    "the Window unexpectedly owns createSyncAccessHandle; this proof must exercise Window-to-Worker SQLite",
+  );
   const ktxCanvas = backgroundDialog.locator("canvas").first();
   await ktxCanvas.waitFor({ state: "visible", timeout: 5_000 });
   await ktxCanvas.evaluate(() => new Promise<void>((resolve) => {
@@ -1144,9 +1176,10 @@ async function run(page: Page, studioUrl: string): Promise<void> {
       { cause },
     );
   }
-  await backgroundDialog.locator(
-    'section[aria-labelledby="bg3d-asset-library-title"][aria-busy="false"]',
-  ).waitFor({ state: "visible", timeout: 90_000 });
+  await assetLibraryReadySection.waitFor({
+    state: "visible",
+    timeout: 90_000,
+  });
 
   await backgroundDialog.getByRole("tab", { name: "레이어", exact: true }).click();
   await backgroundDialog.getByText(`${KTX2_SMOKE_MODEL_LABEL} 1`, { exact: true }).waitFor({

@@ -11,6 +11,7 @@ import {
   type StudioCustomFontManifestEntry,
 } from "./studio-custom-font-sqlite-opfs-repository";
 import { openStudioLocalDatabase } from "./studio-local-database";
+import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
@@ -289,6 +290,41 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
     )).toBe(manifestBefore);
     expect(await store.ownerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER)).toEqual([first.contentHash]);
     expect((await stable.repository.list()).map(({ id }) => id)).toEqual([first.id]);
+  });
+
+  it("keeps old and candidate font blobs pinned when the commit response is lost", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const stable = await fixture({ database, fs, store, createId: () => "stable-font" });
+    const first = await stable.repository.save({ fileName: "Stable.ttf", bytes: fontBytes(35) });
+    const uncertain = proxyDatabase(database, {
+      kvSet: async (namespace, key, value) => {
+        if (namespace === STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE) {
+          throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+            "kvSet",
+            new Error("response-channel-lost"),
+          );
+        }
+        return database.kvSet(namespace, key, value);
+      },
+    });
+    const candidate = await fixture({
+      database: uncertain,
+      fs,
+      store,
+      createId: () => "candidate-font",
+    });
+
+    await expect(candidate.repository.save({
+      fileName: "Candidate.ttf",
+      bytes: fontBytes(37),
+    })).rejects.toMatchObject({ code: "unavailable" });
+
+    const ownerRefs = await store.ownerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER);
+    expect(ownerRefs).toContain(first.contentHash);
+    expect(ownerRefs).toHaveLength(2);
+    expect((await store.sweep({ graceMs: 0 })).removed).toHaveLength(0);
   });
 
   it("enforces professional but bounded count, per-file, and 2 GiB logical limits", async () => {
