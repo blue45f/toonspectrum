@@ -4,6 +4,7 @@ import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY,
   loadStudioVrmAsset,
 } from "./studio-vrm-asset-runtime";
+import { resolveStudioVrmFingerAuthority } from "./studio-vrm-auto-grip-authority";
 import {
   applyBodyScale,
   applyExpressionWeightsToVrm,
@@ -15,6 +16,13 @@ import {
   type PoseBoneMap,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
+import {
+  createAutoGripFingerOverrides,
+  inspectAutoGripReadiness,
+  type VrmPropRigMetrics,
+} from "./studio-vrm-prop-rig";
+import { propDefById } from "./studio-vrm-props";
+import { STUDIO_VRM_FINGER_BONES } from "./studio-vrm-scene-document";
 import {
   getStoredVrmModelByHash,
   selectableSampleVrmUrl,
@@ -45,6 +53,10 @@ export async function loadStudioBg3dLinkedVrm(
 export function applyStudioBg3dLinkedCharacterState(
   vrm: VRM,
   source: StudioShared3dCharacterSource,
+  options: Readonly<{
+    propRigMetrics?: VrmPropRigMetrics;
+    projectHandProps?: boolean;
+  }> = {},
 ): boolean {
   const { scene } = source;
   const [stageX, stageY, stageZ] = source.stageTransform.position;
@@ -59,7 +71,49 @@ export function applyStudioBg3dLinkedCharacterState(
   );
   if (!poseApplied) return false;
 
-  applyFingerRotations(vrm, scene.pose.fingerOverrides as FingerRotationMap);
+  const handProps = source.compatibility.appearanceProjection.handProps;
+  const projectedProps = options.projectHandProps !== false && handProps.status === "supported"
+    ? handProps.props.map((prop) => prop.instance)
+    : [];
+  const authoredFingers = scene.pose.fingerOverrides as FingerRotationMap;
+  let effectiveFingers = authoredFingers;
+  if (options.propRigMetrics) {
+    const autoGripItems = projectedProps.filter((item) => item.rig?.autoFingerPose === true);
+    if (autoGripItems.some((item) => (
+      inspectAutoGripReadiness(
+        item,
+        projectedProps,
+        propDefById,
+        options.propRigMetrics,
+      ).kind !== "ready"
+    ))) return false;
+
+    const autoGrip = createAutoGripFingerOverrides(
+      projectedProps,
+      propDefById,
+      options.propRigMetrics,
+    );
+    const requiredHands = new Set<"left" | "right">();
+    for (const item of autoGripItems) {
+      if (item.bone === "leftHand") requiredHands.add("left");
+      if (item.bone === "rightHand") requiredHands.add("right");
+      const secondary = item.rig?.secondary;
+      if (secondary?.enabled && secondary.influence > 0) {
+        requiredHands.add(secondary.bone === "leftHand" ? "left" : "right");
+      }
+    }
+    for (const hand of requiredHands) {
+      const prefix = hand === "left" ? "left" : "right";
+      const complete = STUDIO_VRM_FINGER_BONES
+        .filter((bone) => bone.startsWith(prefix))
+        .every((bone) => autoGrip[bone] !== undefined);
+      if (!complete) return false;
+    }
+    effectiveFingers = resolveStudioVrmFingerAuthority(authoredFingers, autoGrip);
+  } else if (projectedProps.some((item) => item.rig?.autoFingerPose === true)) {
+    return false;
+  }
+  applyFingerRotations(vrm, effectiveFingers);
   applyBodyScale(vrm, scene.appearance.bodyScale);
   applyExpressionWeightsToVrm(vrm, { ...scene.expressions });
   applyVrmCustomColors(vrm, { ...scene.appearance.customColors });

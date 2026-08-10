@@ -13,11 +13,13 @@ import {
   studioShared3dCharacterWorldTransform,
 } from "./studio-shared-3d-scene-bridge";
 import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
+import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
 } from "./studio-vrm-scene-document";
+import { createWardrobeEquip, serializeWardrobe } from "./studio-vrm-wardrobe";
 
 describe("studio shared 3D scene bridge", () => {
   it("links canonical VRM authorities without projecting them into the background schema", () => {
@@ -49,6 +51,12 @@ describe("studio shared 3D scene bridge", () => {
     expect(session.characters[0]?.compatibility.roundTrip).toBe(
       "source-authority-preserved",
     );
+    expect(session.characters[0]?.compatibility.appearanceProjection).toMatchObject({
+      kind: "studio-vrm-linked-appearance-projection-plan",
+      version: 1,
+      wardrobe: { status: "empty" },
+      handProps: { status: "empty" },
+    });
     expect(session.characters[0]?.sourceHash).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(session.characters[0]?.runtimeKey).toContain(
       session.characters[0]?.sourceHash ?? "missing",
@@ -97,6 +105,91 @@ describe("studio shared 3D scene bridge", () => {
       "wardrobe",
     ]);
     expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
+  });
+
+  it("plans known wardrobe and hand props exactly but keeps capture fail-closed until runtime receipts exist", () => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        wardrobe: serializeWardrobe({
+          top: createWardrobeEquip("shirt")!,
+          shoes: createWardrobeEquip("boots")!,
+        }),
+      },
+      props: serializeVrmProps([createPropInstance("mug", "shared-mug")!]),
+    });
+    const before = serializeStudioVrmSceneDocument(scene);
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({
+      status: "supported",
+      slots: [
+        { slot: "top", itemId: "shirt" },
+        { slot: "shoes", itemId: "boots" },
+      ],
+    });
+    expect(report.appearanceProjection.handProps).toMatchObject({
+      status: "supported",
+      props: [{
+        uid: "shared-mug",
+        propId: "mug",
+        autoGripHand: "rightHand",
+      }],
+    });
+    expect(report.previewOmissions.map(({ code }) => code)).toEqual([
+      "props",
+      "wardrobe",
+    ]);
+    expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
+  });
+
+  it("exposes fail-closed reasons for future or partial appearance documents", () => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        wardrobe: {
+          version: 999,
+          slots: { top: { itemId: "shirt" } },
+        },
+      },
+      props: {
+        version: 2,
+        items: [{ uid: "future", propId: "future-prop", bone: "rightHand" }],
+      },
+    });
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({
+      status: "unsupported",
+      reasons: [expect.objectContaining({ code: "unsupported-version" })],
+    });
+    expect(report.appearanceProjection.handProps).toMatchObject({
+      status: "unsupported",
+      reasons: expect.arrayContaining([expect.objectContaining({ code: "unknown-prop" })]),
+    });
+    expect(report.previewOmissions.map(({ code }) => code)).toEqual(["props", "wardrobe"]);
+  });
+
+  it.each([
+    ["missing V2 slots", { version: 2 }],
+    ["hybrid V2 direct slot", { version: 2, top: { itemId: "shirt" } }],
+    ["explicit null V2 slot", { version: 2, slots: { top: null } }],
+  ])("keeps the source visible for a %s wardrobe envelope", (_label, wardrobe) => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: { ...exact.appearance, wardrobe },
+    });
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({ status: "unsupported" });
+    expect(report.previewOmissions).toContainEqual(
+      expect.objectContaining({ code: "wardrobe" }),
+    );
   });
 
   it("keeps the neutral Avatar Forge state capturable while flagging real forge edits", () => {

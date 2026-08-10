@@ -15,12 +15,16 @@ describe("Studio BG3D Shared Stage projection", () => {
       previewOnlyElementIds: ["hero"],
     };
     for (const operation of ["insert", "update"] as const) {
-      expect(resolveStudioBg3dSharedStageMutationBlockedReason({
+      const reason = resolveStudioBg3dSharedStageMutationBlockedReason({
         operation,
         mutationKind: "connect",
         includeCharactersInCapture: true,
         captureReadiness: readiness,
-      })).toContain("연결 적용을 막았어요");
+      });
+      expect(reason).toBe(
+        "캐릭터 1명의 일부 설정을 아직 배경 이미지에 빠짐없이 담을 수 없어 연결 적용을 멈췄어요. 연결 설정에서 ‘배경만’을 선택하면 캐릭터 원본은 그대로 두고 배경만 적용할 수 있어요.",
+      );
+      expect(reason).not.toMatch(/의상·소품|아바타 꾸미기|페인트|물리/u);
     }
   });
 

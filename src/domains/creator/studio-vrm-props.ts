@@ -679,6 +679,518 @@ export function serializeVrmProps(items: PropInstance[]): SerializedVrmProps | u
   return { version: VRM_PROPS_VERSION, items };
 }
 
+/* ── Shared Stage 투영용 엄격 검사 ─────────────────────────────────────
+ * 편집기 로드 경로의 parseVrmProps는 오래된 문서를 최대한 복구해야 하므로 UID를 발급하고
+ * 손상된 값을 정규화한다. 반면 Shared Stage는 다른 런타임으로 상태를 복제하므로, 같은 입력이
+ * 언제나 같은 결과를 내고 지원하지 않는 의미를 조용히 버리지 않는 별도의 fail-closed 경계가
+ * 필요하다. 아래 검사는 호출자 입력과 전역 UID 발급 상태를 전혀 변경하지 않는다.
+ */
+
+export type VrmPropsProjectionSourceVersion = "absent" | "legacy" | "unknown" | 1 | 2;
+
+export type VrmPropsProjectionIssueReason =
+  | "invalid-document"
+  | "unsupported-document-field"
+  | "unsupported-version"
+  | "invalid-items"
+  | "invalid-item"
+  | "unsupported-item-field"
+  | "missing-prop-id"
+  | "invalid-prop-id"
+  | "unknown-prop-id"
+  | "missing-uid"
+  | "invalid-uid"
+  | "duplicate-uid"
+  | "missing-bone"
+  | "invalid-bone"
+  | "invalid-position"
+  | "invalid-rotation"
+  | "invalid-scale"
+  | "invalid-color"
+  | "rig-not-supported-for-source-version"
+  | "invalid-rig"
+  | "unsupported-rig-version"
+  | "unsupported-rig-field"
+  | "invalid-rig-mode"
+  | "invalid-rig-anchor"
+  | "invalid-rig-auto-scale"
+  | "invalid-rig-auto-finger-pose"
+  | "invalid-rig-grip-fit"
+  | "invalid-rig-delta-position"
+  | "invalid-rig-delta-rotation"
+  | "invalid-rig-delta-scale"
+  | "unsupported-rig-secondary"
+  | "invalid-rig-secondary"
+  | "unsupported-secondary-field"
+  | "invalid-secondary-enabled"
+  | "invalid-secondary-anchor"
+  | "invalid-secondary-bone"
+  | "invalid-secondary-influence"
+  | "invalid-secondary-elbow-hint";
+
+export interface VrmPropsProjectionIssue {
+  readonly reason: VrmPropsProjectionIssueReason;
+  /** 문서 루트 기준의 안정적인 필드 경로. */
+  readonly path: string;
+  /** 항목 밖 문서 오류에는 존재하지 않는다. */
+  readonly itemIndex?: number;
+  /** 입력에 문자열 식별자가 있었다면 진단용으로 원문을 그대로 보존한다. */
+  readonly uid?: string;
+  readonly propId?: string;
+}
+
+export interface VrmPropsProjectionDocument {
+  readonly version: typeof VRM_PROPS_VERSION;
+  readonly items: readonly PropInstance[];
+}
+
+export type VrmPropsProjectionInspection =
+  | Readonly<{
+      status: "ready";
+      sourceVersion: Exclude<VrmPropsProjectionSourceVersion, "unknown">;
+      document: VrmPropsProjectionDocument;
+    }>
+  | Readonly<{
+      status: "rejected";
+      sourceVersion: VrmPropsProjectionSourceVersion;
+      issues: readonly VrmPropsProjectionIssue[];
+    }>;
+
+const PROJECTION_RIG_FIELDS = [
+  "version",
+  "mode",
+  "anchorId",
+  "autoScale",
+  "autoFingerPose",
+  "gripFit",
+  "deltaPosition",
+  "deltaRotationDeg",
+  "deltaScale",
+  "secondary",
+] as const;
+
+const PROJECTION_SECONDARY_FIELDS = [
+  "enabled",
+  "anchorId",
+  "bone",
+  "influence",
+  "elbowHint",
+] as const;
+
+const PROJECTION_DOCUMENT_FIELDS = ["version", "items"] as const;
+
+const PROJECTION_ITEM_FIELDS = [
+  "uid",
+  "propId",
+  "bone",
+  "position",
+  "rotationDeg",
+  "scale",
+  "color",
+  "rig",
+] as const;
+
+function freezeVrmPropsProjectionValue<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    freezeVrmPropsProjectionValue(child);
+  }
+  return Object.freeze(value);
+}
+
+function projectionIssue(
+  reason: VrmPropsProjectionIssueReason,
+  path: string,
+  itemIndex?: number,
+  entry?: Record<string, unknown>
+): VrmPropsProjectionIssue {
+  return {
+    reason,
+    path,
+    ...(itemIndex === undefined ? {} : { itemIndex }),
+    ...(typeof entry?.uid === "string" ? { uid: entry.uid } : {}),
+    ...(typeof entry?.propId === "string" ? { propId: entry.propId } : {}),
+  };
+}
+
+function isProjectionRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function projectionVec3(value: unknown, limit: number): Vec3 | null {
+  if (
+    !Array.isArray(value)
+    || value.length !== 3
+    || value.some((component) => typeof component !== "number" || !Number.isFinite(component) || Math.abs(component) > limit)
+  ) return null;
+  return [value[0] as number, value[1] as number, value[2] as number];
+}
+
+function isProjectionNumberInRange(value: unknown, min: number, max: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function unsupportedProjectionFields(
+  value: Record<string, unknown>,
+  supported: readonly string[]
+): string[] {
+  return Object.keys(value)
+    .filter((field) => !supported.includes(field))
+    .sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+}
+
+function inspectProjectionSecondary(
+  value: unknown,
+  def: PropDef,
+  primaryBone: PropAttachBone,
+  itemIndex: number,
+  entry: Record<string, unknown>,
+  issues: VrmPropsProjectionIssue[]
+): PropRigSecondary | undefined {
+  const path = `items[${itemIndex}].rig.secondary`;
+  const secondaryAnchor = def.anchors.find((candidate) => candidate.role === "secondary");
+  if (!secondaryAnchor || !isHandBone(primaryBone)) {
+    issues.push(projectionIssue("unsupported-rig-secondary", path, itemIndex, entry));
+    return undefined;
+  }
+  if (!isProjectionRecord(value)) {
+    issues.push(projectionIssue("invalid-rig-secondary", path, itemIndex, entry));
+    return undefined;
+  }
+
+  const unsupportedFields = unsupportedProjectionFields(value, PROJECTION_SECONDARY_FIELDS);
+  for (const field of unsupportedFields) {
+    issues.push(projectionIssue("unsupported-secondary-field", `${path}.${field}`, itemIndex, entry));
+  }
+
+  const enabled = value.enabled;
+  if (typeof enabled !== "boolean") {
+    issues.push(projectionIssue("invalid-secondary-enabled", `${path}.enabled`, itemIndex, entry));
+  }
+
+  const anchorId = value.anchorId;
+  const anchorSupported = typeof anchorId === "string"
+    && def.anchors.some((candidate) => candidate.role === "secondary" && candidate.id === anchorId);
+  if (!anchorSupported) {
+    issues.push(projectionIssue("invalid-secondary-anchor", `${path}.anchorId`, itemIndex, entry));
+  }
+
+  const bone = value.bone;
+  const expectedBone: PropHandBone = primaryBone === "leftHand" ? "rightHand" : "leftHand";
+  if (!isHandBone(bone) || bone !== expectedBone) {
+    issues.push(projectionIssue("invalid-secondary-bone", `${path}.bone`, itemIndex, entry));
+  }
+
+  const influenceValue = value.influence;
+  const influence = influenceValue === undefined
+    ? def.secondaryGripInfluence ?? 0.75
+    : influenceValue;
+  if (!isProjectionNumberInRange(influence, 0, 1)) {
+    issues.push(projectionIssue("invalid-secondary-influence", `${path}.influence`, itemIndex, entry));
+  }
+
+  const hasElbowHint = value.elbowHint !== undefined;
+  const elbowHint = hasElbowHint ? projectionVec3(value.elbowHint, POS_LIMIT) : undefined;
+  if (hasElbowHint && !elbowHint) {
+    issues.push(projectionIssue("invalid-secondary-elbow-hint", `${path}.elbowHint`, itemIndex, entry));
+  }
+
+  if (
+    typeof enabled !== "boolean"
+    || !anchorSupported
+    || !isHandBone(bone)
+    || bone !== expectedBone
+    || !isProjectionNumberInRange(influence, 0, 1)
+    || (hasElbowHint && !elbowHint)
+    || unsupportedFields.length > 0
+  ) return undefined;
+
+  return {
+    enabled,
+    anchorId,
+    bone,
+    influence,
+    ...(elbowHint ? { elbowHint } : {}),
+  };
+}
+
+function inspectProjectionRig(
+  value: unknown,
+  def: PropDef,
+  primaryBone: PropAttachBone,
+  itemIndex: number,
+  entry: Record<string, unknown>,
+  issues: VrmPropsProjectionIssue[]
+): PropRigV2 | undefined {
+  const path = `items[${itemIndex}].rig`;
+  if (!isProjectionRecord(value)) {
+    issues.push(projectionIssue("invalid-rig", path, itemIndex, entry));
+    return undefined;
+  }
+  if (value.version !== VRM_PROPS_VERSION) {
+    issues.push(projectionIssue("unsupported-rig-version", `${path}.version`, itemIndex, entry));
+    return undefined;
+  }
+
+  const unsupportedFields = unsupportedProjectionFields(value, PROJECTION_RIG_FIELDS);
+  for (const field of unsupportedFields) {
+    issues.push(projectionIssue("unsupported-rig-field", `${path}.${field}`, itemIndex, entry));
+  }
+
+  const mode = value.mode;
+  if (mode !== "auto" && mode !== "custom") {
+    issues.push(projectionIssue("invalid-rig-mode", `${path}.mode`, itemIndex, entry));
+  }
+
+  const anchorId = value.anchorId;
+  const anchorSupported = typeof anchorId === "string"
+    && def.anchors.some((candidate) => candidate.role !== "secondary" && candidate.id === anchorId);
+  if (!anchorSupported) {
+    issues.push(projectionIssue("invalid-rig-anchor", `${path}.anchorId`, itemIndex, entry));
+  }
+
+  const autoScale = value.autoScale;
+  if (typeof autoScale !== "boolean") {
+    issues.push(projectionIssue("invalid-rig-auto-scale", `${path}.autoScale`, itemIndex, entry));
+  }
+
+  const autoFingerPose = value.autoFingerPose;
+  if (typeof autoFingerPose !== "boolean") {
+    issues.push(projectionIssue("invalid-rig-auto-finger-pose", `${path}.autoFingerPose`, itemIndex, entry));
+  }
+
+  const gripFitInput = value.gripFit;
+  const gripFitValue = gripFitInput === undefined ? 1 : gripFitInput;
+  if (!isProjectionNumberInRange(gripFitValue, VRM_PROP_GRIP_FIT_MIN, VRM_PROP_GRIP_FIT_MAX)) {
+    issues.push(projectionIssue("invalid-rig-grip-fit", `${path}.gripFit`, itemIndex, entry));
+  }
+
+  const deltaPosition = projectionVec3(value.deltaPosition, POS_LIMIT);
+  if (!deltaPosition) {
+    issues.push(projectionIssue("invalid-rig-delta-position", `${path}.deltaPosition`, itemIndex, entry));
+  }
+
+  const deltaRotationDeg = projectionVec3(value.deltaRotationDeg, ROT_LIMIT);
+  if (!deltaRotationDeg) {
+    issues.push(projectionIssue("invalid-rig-delta-rotation", `${path}.deltaRotationDeg`, itemIndex, entry));
+  }
+
+  const deltaScaleValue = value.deltaScale;
+  if (!isProjectionNumberInRange(deltaScaleValue, SCALE_MIN, SCALE_MAX)) {
+    issues.push(projectionIssue("invalid-rig-delta-scale", `${path}.deltaScale`, itemIndex, entry));
+  }
+
+  const hasSecondary = value.secondary !== undefined;
+  const secondary = hasSecondary
+    ? inspectProjectionSecondary(value.secondary, def, primaryBone, itemIndex, entry, issues)
+    : undefined;
+
+  if (
+    unsupportedFields.length > 0
+    || (mode !== "auto" && mode !== "custom")
+    || !anchorSupported
+    || typeof autoScale !== "boolean"
+    || typeof autoFingerPose !== "boolean"
+    || !isProjectionNumberInRange(gripFitValue, VRM_PROP_GRIP_FIT_MIN, VRM_PROP_GRIP_FIT_MAX)
+    || !deltaPosition
+    || !deltaRotationDeg
+    || !isProjectionNumberInRange(deltaScaleValue, SCALE_MIN, SCALE_MAX)
+    || (hasSecondary && !secondary)
+  ) return undefined;
+
+  return {
+    version: VRM_PROPS_VERSION,
+    mode,
+    anchorId,
+    autoScale,
+    autoFingerPose,
+    gripFit: gripFitValue,
+    deltaPosition,
+    deltaRotationDeg,
+    deltaScale: deltaScaleValue,
+    ...(secondary ? { secondary } : {}),
+  };
+}
+
+function inspectProjectionItem(
+  value: unknown,
+  sourceVersion: Exclude<VrmPropsProjectionSourceVersion, "absent" | "unknown">,
+  itemIndex: number,
+  seenUids: string[],
+  issues: VrmPropsProjectionIssue[]
+): PropInstance | undefined {
+  const path = `items[${itemIndex}]`;
+  if (!isProjectionRecord(value)) {
+    issues.push(projectionIssue("invalid-item", path, itemIndex));
+    return undefined;
+  }
+  const entry = value;
+  const issueStart = issues.length;
+
+  for (const field of unsupportedProjectionFields(entry, PROJECTION_ITEM_FIELDS)) {
+    issues.push(projectionIssue("unsupported-item-field", `${path}.${field}`, itemIndex, entry));
+  }
+
+  const uidValue = entry.uid;
+  let uid: string | undefined;
+  if (!("uid" in entry)) {
+    issues.push(projectionIssue("missing-uid", `${path}.uid`, itemIndex, entry));
+  } else if (!isValidPropUid(uidValue)) {
+    issues.push(projectionIssue("invalid-uid", `${path}.uid`, itemIndex, entry));
+  } else if (seenUids.includes(uidValue)) {
+    issues.push(projectionIssue("duplicate-uid", `${path}.uid`, itemIndex, entry));
+  } else {
+    seenUids.push(uidValue);
+    uid = uidValue;
+  }
+
+  const propIdValue = entry.propId;
+  if (!("propId" in entry)) {
+    issues.push(projectionIssue("missing-prop-id", `${path}.propId`, itemIndex, entry));
+    return undefined;
+  }
+  if (typeof propIdValue !== "string" || propIdValue.length === 0) {
+    issues.push(projectionIssue("invalid-prop-id", `${path}.propId`, itemIndex, entry));
+    return undefined;
+  }
+  const def = propDefById(propIdValue);
+  if (!def) {
+    issues.push(projectionIssue("unknown-prop-id", `${path}.propId`, itemIndex, entry));
+    return undefined;
+  }
+
+  const boneValue = entry.bone;
+  if (!("bone" in entry)) {
+    issues.push(projectionIssue("missing-bone", `${path}.bone`, itemIndex, entry));
+  } else if (!isAttachBone(boneValue)) {
+    issues.push(projectionIssue("invalid-bone", `${path}.bone`, itemIndex, entry));
+  }
+
+  const position = projectionVec3(entry.position, POS_LIMIT);
+  if (!position) issues.push(projectionIssue("invalid-position", `${path}.position`, itemIndex, entry));
+
+  const rotationDeg = projectionVec3(entry.rotationDeg, ROT_LIMIT);
+  if (!rotationDeg) issues.push(projectionIssue("invalid-rotation", `${path}.rotationDeg`, itemIndex, entry));
+
+  const scaleValue = entry.scale;
+  if (!isProjectionNumberInRange(scaleValue, SCALE_MIN, SCALE_MAX)) {
+    issues.push(projectionIssue("invalid-scale", `${path}.scale`, itemIndex, entry));
+  }
+
+  const colorValue = entry.color;
+  const colorValid = def.defaultColor === null
+    ? colorValue === null
+    : typeof colorValue === "string" && /^#[0-9a-fA-F]{6}$/.test(colorValue);
+  if (!colorValid) issues.push(projectionIssue("invalid-color", `${path}.color`, itemIndex, entry));
+
+  let rig: PropRigV2 | undefined;
+  if (entry.rig !== undefined) {
+    if (sourceVersion !== VRM_PROPS_VERSION) {
+      issues.push(projectionIssue("rig-not-supported-for-source-version", `${path}.rig`, itemIndex, entry));
+    } else if (isAttachBone(boneValue)) {
+      rig = inspectProjectionRig(entry.rig, def, boneValue, itemIndex, entry, issues);
+    }
+  }
+
+  if (
+    issues.length !== issueStart
+    || uid === undefined
+    || !isAttachBone(boneValue)
+    || !position
+    || !rotationDeg
+    || !isProjectionNumberInRange(scaleValue, SCALE_MIN, SCALE_MAX)
+    || !colorValid
+    || (entry.rig !== undefined && sourceVersion === VRM_PROPS_VERSION && !rig)
+    || (entry.rig !== undefined && sourceVersion !== VRM_PROPS_VERSION)
+  ) return undefined;
+
+  return {
+    uid,
+    propId: def.id,
+    bone: boneValue,
+    position,
+    rotationDeg,
+    scale: scaleValue,
+    color: typeof colorValue === "string" ? colorValue.toLowerCase() : null,
+    ...(rig ? { rig } : {}),
+  };
+}
+
+/**
+ * Shared Stage 투영 전에 소품 문서를 순수하게 검사한다.
+ *
+ * - undefined/null은 저장 키가 없다는 뜻의 정상적인 빈 문서다.
+ * - version 없음(legacy), V1, V2만 해석한다. 미래/알 수 없는 버전은 전체 거부한다.
+ * - 한 항목이라도 손상되면 부분 성공이나 자동 복구 없이 전체 문서를 거부한다.
+ * - 성공 결과와 모든 진단은 호출자 입력에서 분리된 깊은 불변 값이다.
+ */
+export function inspectVrmPropsDocumentForProjection(raw: unknown): VrmPropsProjectionInspection {
+  if (raw === undefined || raw === null) {
+    return freezeVrmPropsProjectionValue({
+      status: "ready",
+      sourceVersion: "absent",
+      document: { version: VRM_PROPS_VERSION, items: [] },
+    });
+  }
+  if (!isProjectionRecord(raw)) {
+    return freezeVrmPropsProjectionValue({
+      status: "rejected",
+      sourceVersion: "unknown",
+      issues: [projectionIssue("invalid-document", "$")],
+    });
+  }
+
+  const hasVersion = Object.prototype.hasOwnProperty.call(raw, "version");
+  const rawVersion = raw.version;
+  const sourceVersion: Exclude<VrmPropsProjectionSourceVersion, "absent"> = !hasVersion
+    ? "legacy"
+    : rawVersion === 1 || rawVersion === VRM_PROPS_VERSION
+      ? rawVersion
+      : "unknown";
+  if (sourceVersion === "unknown") {
+    return freezeVrmPropsProjectionValue({
+      status: "rejected",
+      sourceVersion,
+      issues: [projectionIssue("unsupported-version", "version")],
+    });
+  }
+
+  if (!Array.isArray(raw.items)) {
+    return freezeVrmPropsProjectionValue({
+      status: "rejected",
+      sourceVersion,
+      issues: [projectionIssue("invalid-items", "items")],
+    });
+  }
+
+  const unsupportedDocumentFields = unsupportedProjectionFields(raw, PROJECTION_DOCUMENT_FIELDS);
+  if (unsupportedDocumentFields.length > 0) {
+    return freezeVrmPropsProjectionValue({
+      status: "rejected",
+      sourceVersion,
+      issues: unsupportedDocumentFields.map((field) =>
+        projectionIssue("unsupported-document-field", field)),
+    });
+  }
+
+  const issues: VrmPropsProjectionIssue[] = [];
+  const items: PropInstance[] = [];
+  const seenUids: string[] = [];
+  for (let itemIndex = 0; itemIndex < raw.items.length; itemIndex += 1) {
+    const item = inspectProjectionItem(raw.items[itemIndex], sourceVersion, itemIndex, seenUids, issues);
+    if (item) items.push(item);
+  }
+
+  if (issues.length > 0) {
+    return freezeVrmPropsProjectionValue({ status: "rejected", sourceVersion, issues });
+  }
+  return freezeVrmPropsProjectionValue({
+    status: "ready",
+    sourceVersion,
+    document: { version: VRM_PROPS_VERSION, items },
+  });
+}
+
 /* ── three.js 소품 메시 빌더(주입형 — 순수 테스트 가능) ──────────────────
  * StudioVrmPoser가 three를 주입해 호출한다. three에 의존하지 않도록 최소 팩토리 인터페이스만 받는다.
  */

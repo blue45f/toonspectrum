@@ -1,10 +1,9 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
-import { Canvas, useFrame, useThree, createPortal, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
 import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
@@ -34,15 +33,18 @@ import {
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
-  classifyMeshName,
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
   parseCostumeState,
   serializeCostume,
-  tintColor,
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
+import {
+  applyStudioVrmCostumeState,
+  collectStudioVrmCostumeMeshes,
+  type StudioVrmCostumeMeshEntry,
+} from "./studio-vrm-costume-runtime";
 import { createStudioVrmExpressionApplyPlan } from "./studio-vrm-expression-apply";
 import {
   solveStudioVrmFullBodyIk,
@@ -78,7 +80,6 @@ import {
   applyVrmSpringBonePhysics,
   settleVrmPhysics,
   countSpringBoneJoints,
-  PHYSICS_PREVIEW_MAX_DELTA,
   type VrmPhysicsSettings,
 } from "./studio-vrm-physics";
 import { createStudioVrmPoseApplyPlan } from "./studio-vrm-pose-apply";
@@ -162,16 +163,11 @@ import {
 } from "./studio-vrm-procedural-scene-props";
 import {
   applyVrmTwoBoneGrip,
-  createVrmTwoBoneGripState,
-  releaseVrmTwoBoneGripState,
 } from "./studio-vrm-prop-ik";
 import {
   createAutoGripFingerOverrides,
   DEFAULT_VRM_PROP_RIG_METRICS,
   measureVrmPropRigMetrics,
-  resolvePropAttachment,
-  resolveSecondaryHandConstraint,
-  resolveSecondaryPropTarget,
   scaleVrmPropRigMetrics,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
@@ -179,7 +175,6 @@ import {
   createPropInstance,
   parseVrmProps,
   serializeVrmProps,
-  buildPropObject,
   propDefById,
   type PropInstance,
 } from "./studio-vrm-props";
@@ -217,12 +212,6 @@ import {
   selectSharedPoseAssets,
   shouldLoadSharedPoseLibrary,
 } from "./studio-vrm-shared-pose-library";
-import {
-  buildStudioVrmGarmentGeometry,
-  buildStudioVrmSkinnedGarment,
-  type StudioVrmGarmentSkinBone,
-  type StudioVrmSkinnedGarmentReceipt,
-} from "./studio-vrm-skinned-garment";
 import {
   appendStudioVrmFullStateHistory,
   commitStudioVrmFullStateHistoryTransaction,
@@ -264,18 +253,12 @@ import {
   WARDROBE_FIT_MAX,
   selectableWardrobeItemsBySlot,
   wardrobeItemById,
-  wardrobeFabricById,
   selectableWardrobeSetById,
   applyWardrobeSet,
   createWardrobeEquip,
-  buildGarmentParts,
   mergeWardrobeCostumeVisibility,
   parseWardrobeDocument,
   serializeWardrobe,
-  sanitizeWardrobeMetrics,
-  type GarmentPart,
-  type LimbMetric,
-  type WardrobeBone,
   type WardrobeEquip,
   type WardrobeMetrics,
   type WardrobeSlot,
@@ -325,6 +308,12 @@ import {
   type StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
 import {
+  measureStudioVrmWardrobeMetrics,
+  StudioVrmPropAttachment,
+  StudioVrmRuntimeCommit,
+  StudioVrmWardrobeAttachment,
+} from "./StudioVrmWardrobePropsProjection";
+import {
   canonicalizeVrmContentHash,
   deleteStoredVrmModel,
   getStoredVrmModel,
@@ -341,6 +330,7 @@ import {
 import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
 import type { StudioPoseMaterial } from "./studio-pose-material";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
+import type { StudioVrmSkinnedGarmentReceipt } from "./studio-vrm-skinned-garment";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -1144,90 +1134,6 @@ function findCameraPreset(id: string) {
   return CAMERA_PRESETS.find((preset) => preset.id === id) ?? CAMERA_PRESETS[0];
 }
 
-/* ── 의상(costume) 메시 수집·리컬러·토글 ─────────────────────────────── */
-
-type CostumeMeshEntry = {
-  /** 직렬화·식별 키(노드 이름 우선, 비면 머티리얼 이름). */
-  key: string;
-  /** 표시용 이름. */
-  label: string;
-  slot: CostumeSlot;
-  mesh: THREE.Mesh;
-};
-
-// 원본 머티리얼 색(hex)을 메시별로 1회 캡처해 둔다(틴트는 항상 원본 기준 — 중첩 누적 방지).
-const costumeBaseColorCache = new WeakMap<THREE.Material, string>();
-const isolatedCostumeMaterialMeshes = new WeakSet<THREE.Mesh>();
-
-function materialBaseHex(mat: THREE.Material): string {
-  const cached = costumeBaseColorCache.get(mat);
-  if (cached) return cached;
-  const color = (mat as unknown as { color?: THREE.Color }).color;
-  const hex = color ? `#${color.getHexString()}` : "#cccccc";
-  costumeBaseColorCache.set(mat, hex);
-  return hex;
-}
-
-/** 씬그래프를 순회해 의상 슬롯에 해당하는 메시를 수집한다(피부·얼굴·눈·머리 제외). */
-function collectCostumeMeshes(vrm: VRM): CostumeMeshEntry[] {
-  const entries: CostumeMeshEntry[] = [];
-  const seenKeys = new Set<string>();
-  vrm.scene.traverse((obj) => {
-    if (!(obj as THREE.Mesh).isMesh) return;
-    const mesh = obj as THREE.Mesh;
-    let materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const matNames = materials.map((m) => (m as THREE.Material | undefined)?.name).filter(Boolean) as string[];
-    const materialClasses = matNames.map((name) => classifyMeshName(name));
-    const explicitMaterialSlot = materialClasses.find((entry) => entry.slot !== null && entry.protected === null)?.slot ?? null;
-    const hasProtectedMaterial = materialClasses.some((entry) => entry.protected !== null);
-    // Exporters sometimes name every primitive simply "Body". An explicit clothing material is
-    // stronger evidence than that generic node name, but a truly mixed skin+cloth material array
-    // remains protected because mesh-level visibility would hide skin with the outfit.
-    const cls = explicitMaterialSlot && !hasProtectedMaterial
-      ? { slot: explicitMaterialSlot, protected: null }
-      : classifyMeshName(mesh.name, ...matNames);
-    if (cls.slot === null || cls.protected !== null) return;
-    const baseKey = mesh.name || matNames[0] || `mesh-${entries.length}`;
-    let key = baseKey;
-    let duplicateIndex = 2;
-    while (seenKeys.has(key)) {
-      key = `${baseKey}#${duplicateIndex}`;
-      duplicateIndex += 1;
-    }
-    seenKeys.add(key);
-    // Costume recolor must never mutate a material shared by skin, hair, or another primitive.
-    // Clone once per installed mesh and keep MToon/physical subclasses through Material.clone().
-    if (!isolatedCostumeMaterialMeshes.has(mesh)) {
-      materials = materials.map((material) => material.clone());
-      mesh.material = Array.isArray(mesh.material) ? materials : materials[0]!;
-      isolatedCostumeMaterialMeshes.add(mesh);
-    }
-    // 원본 색 캡처
-    materials.forEach((m) => {
-      if (m) materialBaseHex(m as THREE.Material);
-    });
-    entries.push({ key, label: mesh.name || matNames[0] || "메시", slot: cls.slot, mesh });
-  });
-  return entries;
-}
-
-/** 수집된 의상 메시에 표시/숨김·리컬러 상태를 적용한다. */
-function applyCostumeState(entries: CostumeMeshEntry[], state: CostumeState) {
-  for (const entry of entries) {
-    entry.mesh.visible = !state.hidden.includes(entry.key);
-    const target = state.recolor[entry.key];
-    const materials = Array.isArray(entry.mesh.material) ? entry.mesh.material : [entry.mesh.material];
-    materials.forEach((m) => {
-      const mat = m as (THREE.Material & { color?: THREE.Color }) | undefined;
-      if (!mat || !mat.color) return;
-      const base = materialBaseHex(mat);
-      const next = target ? tintColor(base, target) : base;
-      mat.color.set(next);
-      mat.needsUpdate = true;
-    });
-  }
-}
-
 function getExpressionTone(name: string, vrm: VRM) {
   const expressionManager = vrm.expressionManager;
   if (!expressionManager) return "표정";
@@ -1486,637 +1392,7 @@ function CameraDirector({ presetId, resetNonce }: { presetId: string; resetNonce
   return null;
 }
 
-const pendingPropDisposals = new WeakMap<THREE.Object3D, object>();
-
-function disposePropObject(object: THREE.Object3D) {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.geometry) geometries.add(mesh.geometry);
-    const meshMaterials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    meshMaterials.forEach((material) => materials.add(material));
-  });
-  geometries.forEach((geometry) => geometry.dispose());
-  materials.forEach((material) => material.dispose());
-}
-
-/** StrictMode의 setup→cleanup→setup 재생에서는 두 번째 setup이 같은 object의 폐기를 취소한다. */
-function cancelScheduledPropDisposal(object: THREE.Object3D) {
-  pendingPropDisposals.delete(object);
-}
-
-function schedulePropDisposal(object: THREE.Object3D) {
-  const token = {};
-  pendingPropDisposals.set(object, token);
-  queueMicrotask(() => {
-    if (pendingPropDisposals.get(object) !== token) return;
-    pendingPropDisposals.delete(object);
-    disposePropObject(object);
-  });
-}
-
 const VRM_FRAME_BASE_PRIORITY = -3;
-const VRM_FRAME_PROP_PRIORITY = -2;
-const VRM_FRAME_COMMIT_PRIORITY = -1;
-const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
-  roundedBox: (width: number, height: number, depth: number, radius: number) => (
-    new RoundedBoxGeometry(width, height, depth, 3, radius)
-  ),
-});
-
-/**
- * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
- * 렌더해 body/head 비균일 스케일의 shear를 피하고, 실제 geometry anchor를 측정된 소켓에 맞춘다.
- */
-function VrmPropAttachment({
-  vrm,
-  instance,
-  metrics,
-}: {
-  vrm: VRM;
-  instance: PropInstance;
-  metrics: VrmPropRigMetrics;
-}) {
-  const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
-  const smartGroupRef = useRef<THREE.Group | null>(null);
-  const localPositionRef = useRef(new THREE.Vector3());
-  const boneWorldQuaternionRef = useRef(new THREE.Quaternion());
-  const localQuaternionRef = useRef(new THREE.Quaternion());
-  const anchorWorldOffsetRef = useRef(new THREE.Vector3());
-  const secondaryWorldTargetRef = useRef(new THREE.Vector3());
-  const secondaryTargetQuaternionRef = useRef(new THREE.Quaternion());
-  const groupWorldPositionRef = useRef(new THREE.Vector3());
-  const groupWorldQuaternionRef = useRef(new THREE.Quaternion());
-  const groupWorldScaleRef = useRef(new THREE.Vector3());
-  const handWorldScaleRef = useRef(new THREE.Vector3());
-  const [secondaryGripState] = useState(createVrmTwoBoneGripState);
-
-  useEffect(() => {
-    const node = vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
-    setBoneNode(node);
-  }, [vrm, instance.bone]);
-
-  const object = useMemo(() => {
-    const def = propDefById(instance.propId);
-    if (!def) return null;
-    return buildPropObject(
-      THREE as unknown as Parameters<typeof buildPropObject>[0],
-      def,
-      instance.color,
-      STUDIO_VRM_PROP_GEOMETRY_QUALITY,
-    ) as unknown as THREE.Object3D;
-  }, [instance.color, instance.propId]);
-  const definition = propDefById(instance.propId);
-  const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
-  const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
-  const secondaryActive = Boolean(secondary && secondary.influence > 0);
-  const secondaryBone = secondary?.bone ?? null;
-
-  useEffect(() => {
-    if (!secondaryActive) {
-      releaseVrmTwoBoneGripState(secondaryGripState);
-      return;
-    }
-    return () => {
-      releaseVrmTwoBoneGripState(secondaryGripState);
-      vrm.scene.updateMatrixWorld(true);
-    };
-  }, [secondaryActive, secondaryBone, secondaryGripState, vrm]);
-
-  useEffect(() => {
-    if (!object) return;
-    if (instance.rig) {
-      object.position.set(0, 0, 0);
-      object.rotation.set(0, 0, 0);
-      object.scale.setScalar(1);
-    } else {
-      object.position.set(instance.position[0], instance.position[1], instance.position[2]);
-      object.rotation.set(
-        THREE.MathUtils.degToRad(instance.rotationDeg[0]),
-        THREE.MathUtils.degToRad(instance.rotationDeg[1]),
-        THREE.MathUtils.degToRad(instance.rotationDeg[2])
-      );
-      object.scale.setScalar(instance.scale);
-    }
-  }, [object, instance.position, instance.rig, instance.rotationDeg, instance.scale]);
-
-  useEffect(() => {
-    if (!object) return;
-    cancelScheduledPropDisposal(object);
-    return () => schedulePropDisposal(object);
-  }, [object]);
-
-  useFrame(() => {
-    const group = smartGroupRef.current;
-    if (!group || !boneNode || !resolved?.usesSmartRig) return;
-
-    boneNode.updateWorldMatrix(true, false);
-    // socket만 bone matrix로 world 변환하고, geometry anchor 보정은 scale이 제거된 rigid world
-    // quaternion으로 계산한다. 부모의 비균일 body/head scale이 소품을 찌그러뜨리거나 접점을
-    // 밀어내지 않으면서도 손바닥 위치 자체는 체형 변화를 정확히 따라간다.
-    const socketWorldPosition = localPositionRef.current.set(...resolved.socketPosition);
-    boneNode.localToWorld(socketWorldPosition);
-    const boneWorldQuaternion = boneNode.getWorldQuaternion(boneWorldQuaternionRef.current);
-    const localQuaternion = localQuaternionRef.current.setFromEuler(new THREE.Euler(
-      THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
-      THREE.MathUtils.degToRad(resolved.rotationDeg[1]),
-      THREE.MathUtils.degToRad(resolved.rotationDeg[2]),
-      "XYZ"
-    ));
-    group.quaternion.copy(boneWorldQuaternion).multiply(localQuaternion).normalize();
-    group.scale.setScalar(resolved.scale);
-    const anchorWorldOffset = anchorWorldOffsetRef.current
-      .set(...resolved.anchor.position)
-      .multiplyScalar(resolved.scale)
-      .applyQuaternion(group.quaternion);
-    group.position.copy(socketWorldPosition).sub(anchorWorldOffset);
-    group.updateMatrixWorld(true);
-
-    if (secondary && secondary.influence > 0) {
-      const secondaryHandNode = vrm.humanoid?.getNormalizedBoneNode(secondary.bone) ?? null;
-      if (!secondaryHandNode) {
-        releaseVrmTwoBoneGripState(secondaryGripState);
-        return;
-      }
-      secondaryHandNode.updateWorldMatrix(true, false);
-      const groupWorldPosition = group.getWorldPosition(groupWorldPositionRef.current);
-      const groupWorldQuaternion = group.getWorldQuaternion(groupWorldQuaternionRef.current);
-      const groupWorldScale = group.getWorldScale(groupWorldScaleRef.current);
-      const handWorldScale = secondaryHandNode.getWorldScale(handWorldScaleRef.current);
-      const constraint = resolveSecondaryHandConstraint(
-        secondary.anchor,
-        [groupWorldPosition.x, groupWorldPosition.y, groupWorldPosition.z],
-        [groupWorldQuaternion.x, groupWorldQuaternion.y, groupWorldQuaternion.z, groupWorldQuaternion.w],
-        groupWorldScale.x,
-        metrics.handSockets[secondary.bone],
-        [handWorldScale.x, handWorldScale.y, handWorldScale.z]
-      );
-      if (!constraint) {
-        releaseVrmTwoBoneGripState(secondaryGripState);
-        return;
-      }
-      const target = secondaryWorldTargetRef.current.set(...constraint.wristWorldPosition);
-      const targetQuaternion = secondaryTargetQuaternionRef.current.set(...constraint.targetHandWorldQuaternion);
-      applyVrmTwoBoneGrip(
-        vrm,
-        secondary.bone === "leftHand" ? "left" : "right",
-        target,
-        secondary.influence,
-        secondary.elbowHint,
-        { targetQuaternion, state: secondaryGripState }
-      );
-    }
-  }, VRM_FRAME_PROP_PRIORITY);
-
-  if (!boneNode || !object) return null;
-  if (resolved?.usesSmartRig) {
-    return (
-      <group ref={smartGroupRef}>
-        <primitive object={object} />
-      </group>
-    );
-  }
-  return createPortal(<primitive object={object} />, boneNode);
-}
-
-/* ── 실장착 워드로브(studio-vrm-wardrobe) — 측정·조립·본 부착 ────────── */
-
-/**
- * 실제 스킨을 움직이는 raw 휴머노이드에서 본 로컬 치수를 잰다.
- * Avatar Forge가 raw 체형을 바꾼 뒤에도 같은 좌표계를 사용하므로 의상과 몸이 갈라지지 않는다.
- */
-function measureVrmWardrobeMetrics(vrm: VRM): WardrobeMetrics {
-  const humanoid = vrm.humanoid;
-  const fallback = sanitizeWardrobeMetrics(null);
-  if (!humanoid) return fallback;
-  vrm.scene.updateMatrixWorld(true);
-
-  const node = (name: VRMHumanBoneName) => humanoid.getRawBoneNode(name);
-  const world = (name: VRMHumanBoneName): THREE.Vector3 | null => {
-    const n = node(name);
-    return n ? n.getWorldPosition(new THREE.Vector3()) : null;
-  };
-  // 부착 본의 로컬 공간에서 목표 관절까지의 벡터. raw 본 스케일을 다시 곱하지 않도록
-  // world 길이가 아니라 이 로컬 길이로 geometry를 만든다.
-  const localVector = (from: VRMHumanBoneName, toWorld: THREE.Vector3): THREE.Vector3 | null => {
-    const n = node(from);
-    if (!n) return null;
-    const vector = n.worldToLocal(toWorld.clone());
-    return Number.isFinite(vector.x) && vector.lengthSq() > 1e-8 ? vector : null;
-  };
-  const toVec3 = (v: THREE.Vector3 | null): [number, number, number] | null => (v ? [v.x, v.y, v.z] : null);
-  const localDistanceBetween = (
-    anchor: VRMHumanBoneName,
-    a: THREE.Vector3 | null,
-    b: THREE.Vector3 | null,
-  ): number | undefined => {
-    const anchorNode = node(anchor);
-    if (!anchorNode || !a || !b) return undefined;
-    return anchorNode.worldToLocal(a.clone()).distanceTo(anchorNode.worldToLocal(b.clone()));
-  };
-
-  const hips = world("hips");
-  const spine = world("spine");
-  const neckW = world("neck") ?? world("head");
-  const limb = (from: VRMHumanBoneName, to: VRMHumanBoneName, fb: LimbMetric): LimbMetric => {
-    const b = world(to);
-    const vector = b ? localVector(from, b) : null;
-    if (!vector) return fb;
-    const len = vector.length();
-    const axis = vector.normalize();
-    return { len, axis: toVec3(axis) ?? fb.axis };
-  };
-
-  const lUpArm = world("leftUpperArm");
-  const rUpArm = world("rightUpperArm");
-  const lUpLeg = world("leftUpperLeg");
-  const rUpLeg = world("rightUpperLeg");
-  const lFoot = world("leftFoot");
-  const rFoot = world("rightFoot");
-  const rigSource: WardrobeMetrics["source"] = ([
-    "hips", "spine", "leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm",
-    "leftHand", "rightHand", "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg",
-    "leftFoot", "rightFoot",
-  ] as const).every((boneName) => node(boneName)) && neckW
-    ? "raw-rig"
-    : "partial-rig";
-
-  // 몸통 위 방향(spine 로컬) + 발 앞 방향(해부학: 왼쪽×위 = 앞).
-  const upVector = spine && neckW ? localVector("spine", neckW) : null;
-  const upLocal = upVector?.normalize() ?? null;
-  let footForward = fallback.footForward;
-  if (lUpLeg && rUpLeg && hips && neckW && lFoot && rFoot) {
-    const leftWorld = lUpLeg.clone().sub(rUpLeg).normalize();
-    const upWorld = neckW.clone().sub(hips).normalize();
-    const fwdWorld = leftWorld.clone().cross(upWorld).normalize();
-    const footLocalDir = (name: VRMHumanBoneName, at: THREE.Vector3): [number, number, number] | null => {
-      const n = node(name);
-      if (!n) return null;
-      const origin = n.worldToLocal(at.clone());
-      const tip = n.worldToLocal(at.clone().add(fwdWorld));
-      const dir = tip.sub(origin).normalize();
-      return Number.isFinite(dir.x) && dir.lengthSq() > 1e-8 ? [dir.x, dir.y, dir.z] : null;
-    };
-    footForward = {
-      left: footLocalDir("leftFoot", lFoot) ?? fallback.footForward.left,
-      right: footLocalDir("rightFoot", rFoot) ?? fallback.footForward.right,
-    };
-  }
-
-  return sanitizeWardrobeMetrics({
-    source: rigSource,
-    shoulderW: localDistanceBetween("spine", lUpArm, rUpArm),
-    hipW: localDistanceBetween("hips", lUpLeg, rUpLeg),
-    hipsToSpine: spine ? localVector("hips", spine)?.length() : undefined,
-    spineToNeck: neckW ? localVector("spine", neckW)?.length() : undefined,
-    // Ground height is not represented by a humanoid bone. A lower-leg-relative value remains
-    // stable under overall character scale and avoids measuring posed world Y as local geometry.
-    ankleH: Math.max(
-      0.02,
-      (limb("leftLowerLeg", "leftFoot", fallback.lowerLeg.left).len
-        + limb("rightLowerLeg", "rightFoot", fallback.lowerLeg.right).len) * 0.1,
-    ),
-    up: upLocal ? (toVec3(upLocal) ?? undefined) : undefined,
-    footForward,
-    upperArm: {
-      left: limb("leftUpperArm", "leftLowerArm", fallback.upperArm.left),
-      right: limb("rightUpperArm", "rightLowerArm", fallback.upperArm.right),
-    },
-    lowerArm: {
-      left: limb("leftLowerArm", "leftHand", fallback.lowerArm.left),
-      right: limb("rightLowerArm", "rightHand", fallback.lowerArm.right),
-    },
-    upperLeg: {
-      left: limb("leftUpperLeg", "leftLowerLeg", fallback.upperLeg.left),
-      right: limb("rightUpperLeg", "rightLowerLeg", fallback.upperLeg.right),
-    },
-    lowerLeg: {
-      left: limb("leftLowerLeg", "leftFoot", fallback.lowerLeg.left),
-      right: limb("rightLowerLeg", "rightFoot", fallback.lowerLeg.right),
-    },
-  });
-}
-
-const GARMENT_Y = new THREE.Vector3(0, 1, 0);
-const GARMENT_Z = new THREE.Vector3(0, 0, 1);
-
-function createGarmentWeaveTexture(fabricId: WardrobeEquip["fabricId"]): THREE.DataTexture | null {
-  const fabric = wardrobeFabricById(fabricId);
-  if (!fabric || fabric.weaveStrength <= 0) return null;
-  const size = 48;
-  const data = new Uint8Array(size * size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const u = x / size;
-      const v = y / size;
-      const warp = Math.sin(u * Math.PI * 2 * fabric.weaveFrequency);
-      const weft = Math.sin(v * Math.PI * 2 * fabric.weaveFrequency * 0.92);
-      const diagonal = fabricId === "denim"
-        ? Math.sin((u + v) * Math.PI * fabric.weaveFrequency * 1.35) * 0.55
-        : 0;
-      const knit = fabricId === "knit"
-        ? Math.cos((u - v) * Math.PI * fabric.weaveFrequency) * 0.38
-        : 0;
-      data[y * size + x] = Math.round(THREE.MathUtils.clamp(
-        128 + warp * 34 + weft * 26 + diagonal * 28 + knit * 28,
-        0,
-        255,
-      ));
-    }
-  }
-  const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat, THREE.UnsignedByteType);
-  texture.name = `wardrobe-weave:${fabricId}`;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.generateMipmaps = true;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function createGarmentMaterial(
-  part: GarmentPart,
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  weaveTexture: THREE.DataTexture | null,
-): THREE.MeshPhysicalMaterial {
-  const material = new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide });
-  applyGarmentMaterialStyle(material, part, itemColor, fabricId, weaveTexture);
-  return material;
-}
-
-function applyGarmentMaterialStyle(
-  material: THREE.MeshPhysicalMaterial,
-  part: GarmentPart,
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  weaveTexture: THREE.DataTexture | null,
-) {
-  const fabric = wardrobeFabricById(fabricId) ?? WARDROBE_FABRICS[0];
-  const color = new THREE.Color(part.color ?? itemColor);
-  const roughness = part.metalness !== undefined && part.metalness > 0.35
-    ? part.roughness ?? fabric.roughness
-    : fabric.roughness;
-  const metalness = part.metalness ?? fabric.metalness;
-  const fabricSurface = metalness < 0.35;
-  material.color.copy(color);
-  material.roughness = roughness;
-  material.metalness = metalness;
-  material.sheen = fabricSurface ? fabric.sheen : 0;
-  material.sheenRoughness = fabricSurface ? fabric.sheenRoughness : 1;
-  material.sheenColor.copy(color).lerp(new THREE.Color("#ffffff"), 0.12);
-  material.clearcoat = fabric.clearcoat;
-  material.clearcoatRoughness = fabric.clearcoatRoughness;
-  material.bumpMap = fabricSurface ? weaveTexture : null;
-  material.bumpScale = fabricSurface ? fabric.weaveStrength : 0;
-  material.userData.studioVrmGarmentPart = part;
-  material.userData.studioVrmGarmentFabricId = fabricId;
-  material.needsUpdate = true;
-}
-
-function disposeGarmentMaterials(materials: readonly THREE.Material[]) {
-  const textures = new Set<THREE.Texture>();
-  for (const material of materials) {
-    const physical = material as THREE.MeshPhysicalMaterial;
-    if (physical.bumpMap) textures.add(physical.bumpMap);
-    material.dispose();
-  }
-  textures.forEach((texture) => texture.dispose());
-}
-
-/** 파츠 스펙 목록을 본별 three 그룹으로 조립한다. */
-function assembleGarmentGroups(
-  parts: GarmentPart[],
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  name: string,
-): Map<WardrobeBone, THREE.Group> {
-  const groups = new Map<WardrobeBone, THREE.Group>();
-  const weaveTexture = createGarmentWeaveTexture(fabricId);
-  for (const part of parts) {
-    let group = groups.get(part.bone);
-    if (!group) {
-      group = new THREE.Group();
-      group.name = `${name}:${part.bone}`;
-      groups.set(part.bone, group);
-    }
-    const material = createGarmentMaterial(part, itemColor, fabricId, weaveTexture);
-    const geometry = buildStudioVrmGarmentGeometry(part.shape);
-    geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.position.set(part.offset[0], part.offset[1], part.offset[2]);
-    if (part.align) {
-      // 실린더/박스/구는 +Y, 토러스는 링 축(+Z)을 목표 방향으로 정렬.
-      const source = part.shape.kind === "torus" ? GARMENT_Z : GARMENT_Y;
-      const target = new THREE.Vector3(part.align[0], part.align[1], part.align[2]).normalize();
-      if (target.lengthSq() > 1e-8) mesh.quaternion.setFromUnitVectors(source, target);
-    }
-    if (part.squash) mesh.scale.set(part.squash[0], part.squash[1], part.squash[2]);
-    group.add(mesh);
-  }
-  return groups;
-}
-
-function collectVrmSourceSkeletonBones(vrm: VRM): Set<THREE.Bone> {
-  const bones = new Set<THREE.Bone>();
-  vrm.scene.traverse((object) => {
-    const skinned = object as THREE.SkinnedMesh;
-    if (!skinned.isSkinnedMesh) return;
-    skinned.skeleton.bones.forEach((bone) => bones.add(bone));
-  });
-  return bones;
-}
-
-function assembleSkinnedGarment(
-  vrm: VRM,
-  parts: readonly GarmentPart[],
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  name: string,
-) {
-  const weaveTexture = createGarmentWeaveTexture(fabricId);
-  const materials = parts.map((part) => createGarmentMaterial(part, itemColor, fabricId, weaveTexture));
-  const sourceBones = collectVrmSourceSkeletonBones(vrm);
-  const built = buildStudioVrmSkinnedGarment({
-    name,
-    root: vrm.scene,
-    parts,
-    materials,
-    resolveBone: (boneName: StudioVrmGarmentSkinBone) => {
-      const node = vrm.humanoid?.getRawBoneNode(boneName as VRMHumanBoneName) ?? null;
-      return node && sourceBones.has(node as THREE.Bone) ? node : null;
-    },
-  });
-  if (!built.surface) disposeGarmentMaterials(materials);
-  return built;
-}
-
-function disposeGarmentObject(group: THREE.Object3D) {
-  const textures = new Set<THREE.Texture>();
-  group.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
-      (mesh as THREE.SkinnedMesh).skeleton.dispose();
-    }
-    mesh.geometry?.dispose();
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach((m) => {
-      const physical = m as THREE.MeshPhysicalMaterial | undefined;
-      if (physical?.bumpMap) textures.add(physical.bumpMap);
-      m?.dispose();
-    });
-  });
-  textures.forEach((texture) => texture.dispose());
-}
-
-const pendingGarmentDisposals = new WeakMap<THREE.Object3D, object>();
-
-function cancelScheduledGarmentDisposal(group: THREE.Object3D) {
-  pendingGarmentDisposals.delete(group);
-}
-
-function scheduleGarmentDisposal(group: THREE.Object3D) {
-  const token = {};
-  pendingGarmentDisposals.set(group, token);
-  queueMicrotask(() => {
-    if (pendingGarmentDisposals.get(group) !== token) return;
-    pendingGarmentDisposals.delete(group);
-    disposeGarmentObject(group);
-  });
-}
-
-/** 워드로브 한 슬롯 장착분을 humanoid 본들에 포털로 부착한다(파츠가 본을 따라 포즈 추종). */
-function VrmWardrobeAttachment({
-  vrm,
-  slot,
-  equip,
-  metrics,
-  effectiveFit,
-  onSurfaceReceipt,
-}: {
-  vrm: VRM;
-  slot: WardrobeSlot;
-  equip: WardrobeEquip;
-  metrics: WardrobeMetrics;
-  effectiveFit: number;
-  onSurfaceReceipt: (slot: WardrobeSlot, receipt: StudioVrmSkinnedGarmentReceipt | null) => void;
-}) {
-  const renderable = useMemo(() => {
-    const def = wardrobeItemById(equip.itemId);
-    if (!def) return { entries: [], receipt: null };
-    const parts = buildGarmentParts(equip.itemId, metrics, effectiveFit);
-    const name = `wardrobe:${def.slot}:${def.id}`;
-    if (def.geometrySource === "skinned-procedural-v1") {
-      const built = assembleSkinnedGarment(
-        vrm,
-        parts,
-        def.defaultColor,
-        def.defaultFabricId,
-        name,
-      );
-      if (built.surface) {
-        return {
-          entries: [{
-            key: `${equip.itemId}:skinned`,
-            node: vrm.scene as THREE.Object3D,
-            object: built.surface.mesh as THREE.Object3D,
-          }],
-          receipt: built.receipt,
-        };
-      }
-      const groups = assembleGarmentGroups(
-        parts,
-        def.defaultColor,
-        def.defaultFabricId,
-        name,
-      );
-      const entries: { key: string; node: THREE.Object3D; object: THREE.Object3D }[] = [];
-      for (const [bone, object] of groups) {
-        const boneNode = vrm.humanoid?.getRawBoneNode(bone as VRMHumanBoneName) ?? null;
-        if (boneNode) entries.push({ key: `${equip.itemId}:${bone}`, node: boneNode, object });
-      }
-      return { entries, receipt: built.receipt };
-    }
-
-    const groups = assembleGarmentGroups(
-      parts,
-      def.defaultColor,
-      def.defaultFabricId,
-      `wardrobe:${def.slot}:${def.id}`,
-    );
-    const entries: { key: string; node: THREE.Object3D; object: THREE.Object3D }[] = [];
-    for (const [bone, object] of groups) {
-      const boneNode = vrm.humanoid?.getRawBoneNode(bone as VRMHumanBoneName) ?? null;
-      if (boneNode) entries.push({ key: `${equip.itemId}:${bone}`, node: boneNode, object });
-    }
-    return { entries, receipt: null };
-  }, [vrm, equip.itemId, effectiveFit, metrics]);
-
-  const entries = renderable.entries;
-
-  // 색상·원단만 바뀔 때 geometry/Skeleton을 다시 만들면 현재 포즈가 새 bind pose가 된다.
-  // 재질만 제자리에서 갱신해 포즈·핏·스키닝 표면을 그대로 유지한다.
-  useLayoutEffect(() => {
-    const materials = new Set<THREE.MeshPhysicalMaterial>();
-    for (const entry of entries) {
-      entry.object.traverse((object) => {
-        const mesh = object as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const meshMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const material of meshMaterials) {
-          if ((material as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
-            materials.add(material as THREE.MeshPhysicalMaterial);
-          }
-        }
-      });
-    }
-    if (materials.size === 0) return;
-
-    const fabricChanged = [...materials].some(
-      (material) => material.userData.studioVrmGarmentFabricId !== equip.fabricId,
-    );
-    const replacementWeave = fabricChanged ? createGarmentWeaveTexture(equip.fabricId) : null;
-    const retiredTextures = new Set<THREE.Texture>();
-    let replacementUsed = false;
-
-    for (const material of materials) {
-      const part = material.userData.studioVrmGarmentPart as GarmentPart | undefined;
-      if (!part) continue;
-      const previousBump = material.bumpMap;
-      const nextWeave = fabricChanged ? replacementWeave : previousBump as THREE.DataTexture | null;
-      applyGarmentMaterialStyle(material, part, equip.color, equip.fabricId, nextWeave);
-      if (replacementWeave && material.bumpMap === replacementWeave) replacementUsed = true;
-      if (previousBump && previousBump !== material.bumpMap) retiredTextures.add(previousBump);
-    }
-
-    retiredTextures.forEach((texture) => texture.dispose());
-    if (replacementWeave && !replacementUsed) replacementWeave.dispose();
-  }, [entries, equip.color, equip.fabricId]);
-
-  // GPU 버퍼 정리 — StrictMode의 setup→cleanup→setup에서는 같은 object 폐기를 취소하고,
-  // 실제 아이템/색/핏 교체나 언마운트에서만 다음 microtask에 해제한다.
-  useEffect(() => {
-    entries.forEach((entry) => cancelScheduledGarmentDisposal(entry.object));
-    return () => entries.forEach((entry) => scheduleGarmentDisposal(entry.object));
-  }, [entries]);
-
-  useEffect(() => {
-    onSurfaceReceipt(slot, renderable.receipt);
-  }, [onSurfaceReceipt, renderable.receipt, slot]);
-
-  return (
-    <>
-      {entries.map((entry) => (
-        <group key={entry.key}>{createPortal(<primitive object={entry.object} />, entry.node)}</group>
-      ))}
-    </>
-  );
-}
 
 function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
@@ -3182,26 +2458,6 @@ function VrmPoseBoneOverlay({
   );
 }
 
-/** base pose/tracking과 모든 소품 IK가 끝난 뒤 normalized pose를 raw VRM에 한 번만 전달한다. */
-function VrmRuntimeCommit({
-  vrm,
-  physicsPreview,
-  webcamActive,
-}: {
-  vrm: VRM;
-  physicsPreview: boolean;
-  webcamActive: boolean;
-}) {
-  useFrame((_, delta) => {
-    // 흔들림 미리보기·웹캠 트래킹 중에만 스프링본을 전진시키고, 탭 복귀 폭주는 상한 처리한다.
-    const springDelta = webcamActive || physicsPreview
-      ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA)
-      : 0;
-    vrm.update(springDelta);
-  }, VRM_FRAME_COMMIT_PRIORITY);
-  return null;
-}
-
 type LightingTone = "morning" | "sunset" | "night" | "studio";
 
 function VrmLighting({
@@ -3462,7 +2718,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [selectedVrmPropUid, setSelectedVrmPropUid] = useState<string | null>(null);
   // 의상(studio-vrm-costume) — 토글/리컬러 상태 + 수집된 메시 목록.
   const [costumeState, setCostumeState] = useState<CostumeState>({ hidden: [], recolor: {} });
-  const [costumeMeshes, setCostumeMeshes] = useState<CostumeMeshEntry[]>([]);
+  const [costumeMeshes, setCostumeMeshes] = useState<StudioVrmCostumeMeshEntry[]>([]);
   const [selectedCostumeKey, setSelectedCostumeKey] = useState<string | null>(null);
   // 실장착 워드로브(studio-vrm-wardrobe) — 슬롯별 장착 + 모델 실측 치수.
   const [wardrobeState, setWardrobeState] = useState<WardrobeState>({});
@@ -3484,7 +2740,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     if (!vrm) return;
     const frame = requestAnimationFrame(() => {
       if (vrmRef.current !== vrm) return;
-      setWardrobeMetrics(measureVrmWardrobeMetrics(vrm));
+      setWardrobeMetrics(measureStudioVrmWardrobeMetrics(vrm));
     });
     return () => cancelAnimationFrame(frame);
   }, [avatarForgeState.body, vrm]);
@@ -6125,7 +5381,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       : "";
 
     if (vrm) {
-      const meshes = collectCostumeMeshes(vrm);
+      const meshes = collectStudioVrmCostumeMeshes(vrm);
       // costume은 사용자의 수동 편집만 소유하고, 워드로브 자동 숨김은 현재 전체 슬롯에서 매번
       // 파생한다. 이 둘을 state에 섞지 않아 equip/unequip가 수동 숨김을 되살리지 않는다.
       const effectiveCostume = mergeWardrobeCostumeVisibility(
@@ -6137,7 +5393,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setCostumeMeshes(meshes);
       setCostumeState(restoredCostume);
       setSelectedCostumeKey(null);
-      applyCostumeState(meshes, effectiveCostume);
+      applyStudioVrmCostumeState(meshes, effectiveCostume);
       applyFullState(vrm, s, {
         applyPose: (b, y, translations) => applyPoseToVrm(vrm, b, y, translations),
         applyExpr: (w) => applyExpressionWeightsToVrm(vrm, w),
@@ -6675,7 +5931,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setInstalledModelId(nextModelId);
     modelLoadTargetIdRef.current = nextModelId;
     // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
-    setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
+    setWardrobeMetrics(measureStudioVrmWardrobeMetrics(nextVrm));
     setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));
 
     const pending = pendingPoseDataRef.current;
@@ -6752,12 +6008,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setWardrobeState({});
       setWardrobeAutoHide(true);
       // 의상 메시 수집 + 상태 초기화.
-      const meshes = collectCostumeMeshes(nextVrm);
+      const meshes = collectStudioVrmCostumeMeshes(nextVrm);
       setCostumeMeshes(meshes);
       const freshCostume: CostumeState = { hidden: [], recolor: {} };
       setCostumeState(freshCostume);
       setSelectedCostumeKey(null);
-      applyCostumeState(meshes, freshCostume);
+      applyStudioVrmCostumeState(meshes, freshCostume);
       // 물리 초기화 + 정착(머리카락/치마 자연 정착).
       setVrmPhysics(DEFAULT_VRM_PHYSICS);
       setPhysicsPreview(false);
@@ -7617,7 +6873,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   /* ── 의상 토글/리컬러 핸들러 ─────────────────────────────────────── */
   useEffect(() => {
-    applyCostumeState(
+    applyStudioVrmCostumeState(
       costumeMeshes,
       mergeWardrobeCostumeVisibility(
         costumeState,
@@ -7630,7 +6886,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   function updateCostume(next: CostumeState) {
     setCostumeState(next);
-    applyCostumeState(
+    applyStudioVrmCostumeState(
       costumeMeshes,
       mergeWardrobeCostumeVisibility(next, wardrobeState, costumeMeshes, wardrobeAutoHide),
     );
@@ -8396,11 +7652,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   ) : null}
                   {vrm
                     ? vrmPropItems.map((item) => (
-                        <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={effectivePropRigMetrics} />
+                        <StudioVrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={effectivePropRigMetrics} />
                       ))
                     : null}
                   {vrm ? (
-                    <VrmRuntimeCommit
+                    <StudioVrmRuntimeCommit
                       vrm={vrm}
                       physicsPreview={physicsPreview}
                       webcamActive={webcamActive}
@@ -8411,7 +7667,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                         const equip = wardrobeState[slot];
                         const fit = wardrobeFitReport.slots[slot];
                         return equip ? (
-                          <VrmWardrobeAttachment
+                          <StudioVrmWardrobeAttachment
                             key={slot}
                             vrm={vrm}
                             slot={slot}

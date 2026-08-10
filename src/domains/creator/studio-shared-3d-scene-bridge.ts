@@ -2,6 +2,10 @@ import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { sha256HexPortable } from "./studio-sha256";
 import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import {
+  createStudioVrmLinkedAppearanceProjectionPlan,
+  type StudioVrmLinkedAppearanceProjectionPlan,
+} from "./studio-vrm-linked-appearance-projection-plan";
+import {
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
   type StudioVrmCanonicalData,
@@ -58,6 +62,8 @@ export interface StudioShared3dCharacterCompatibility {
   /** Character documents are linked, never converted into the background schema. */
   readonly roundTrip: "source-authority-preserved";
   readonly supportedPreview: readonly string[];
+  /** Pure exact-projection requirements; runtime support remains gated by previewOmissions. */
+  readonly appearanceProjection: StudioVrmLinkedAppearanceProjectionPlan;
   /** These fields remain byte-safe in the source VRM document but are not rendered by this slice. */
   readonly previewOmissions: readonly StudioShared3dPreviewOmission[];
 }
@@ -351,6 +357,7 @@ function hasNonDefaultPhysics(scene: StudioVrmSceneDocument): boolean {
 export function inspectStudioShared3dCharacterCompatibility(
   scene: StudioVrmSceneDocument,
 ): StudioShared3dCharacterCompatibility {
+  const appearanceProjection = createStudioVrmLinkedAppearanceProjectionPlan(scene);
   const omissions: StudioShared3dPreviewOmission[] = [];
   if (hasNonNeutralAvatarForge(scene.appearance.avatarForge)) {
     omissions.push({ code: "avatar-forge", label: "아바타 포지 체형 세부값" });
@@ -364,7 +371,9 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (hasNonDefaultPhysics(scene)) {
     omissions.push({ code: "physics", label: "머리카락·의상 물리 미리보기" });
   }
-  if (hasCanonicalContent(scene.props)) {
+  // A structurally exact plan is not capture authority. Keep the omission until the shared
+  // runtime produces matching attachment/commit/post-commit receipts for this signature.
+  if (appearanceProjection.handProps.status !== "empty") {
     omissions.push({ code: "props", label: "손에 든 소품" });
   }
   if (scene.pose.ikConstraints.length > 0) {
@@ -376,12 +385,13 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (scene.surfacePaint.textures.length > 0) {
     omissions.push({ code: "surface-paint", label: "표면 페인트 텍스처" });
   }
-  if (hasCanonicalContent(scene.appearance.wardrobe)) {
+  if (appearanceProjection.wardrobe.status !== "empty") {
     omissions.push({ code: "wardrobe", label: "옷장 레이어 상태" });
   }
   return Object.freeze({
     roundTrip: "source-authority-preserved" as const,
     supportedPreview: PREVIEW_SUPPORTED,
+    appearanceProjection,
     previewOmissions: Object.freeze(omissions),
   });
 }

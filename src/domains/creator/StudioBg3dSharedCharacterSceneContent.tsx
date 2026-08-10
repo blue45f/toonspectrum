@@ -34,7 +34,7 @@ export function StudioBg3dSharedCharacterSceneContent({
   surfaceRevision: string;
 }) {
   return characters.map((source) => (
-    <Suspense key={source.runtimeKey} fallback={null}>
+    <Suspense key={source.modelRuntimeKey} fallback={null}>
       <group
         ref={!includeInCapture || source.compatibility.previewOmissions.length > 0
           ? registerStudioBg3dCaptureExcludedObject
