@@ -228,8 +228,9 @@ jobs:
 
   studio-3d-runtime:
     # Preserve the existing "CI / verify" check context while moving the GPU proof onto
-    # a clean GitHub-hosted VM. Browser-process retries cannot recover the observed runner-level
-    # Dawn/SwiftShader context loss after the long core job.
+    # a clean GitHub-hosted VM so CPU/memory contention cannot affect the release oracle. The
+    # WebGPU shards use headed Chromium under Xvfb because both headless-shell and regular
+    # new-headless lost the SwiftShader device on the first Babylon readback.
     name: verify
     needs: verify
     # Always materialize the release-facing check. A failed/cancelled core job must produce a failing
@@ -264,4 +265,6 @@ jobs:
       - name: Build production Studio assets on the isolated runner
         run: pnpm run build
       - name: Verify Studio 3D runtime and canonical WebGPU/WebGL2 stable-ID parity
-        run: pnpm run verify:studio-3d-console
+        # Linux headed Chromium requires Xvfb. A fixed 24-bit screen keeps the regular compositor
+        # deterministic while the verifier still owns the exact viewport of every proof page.
+        run: xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console

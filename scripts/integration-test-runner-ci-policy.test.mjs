@@ -135,17 +135,20 @@ describe("database integration runner CI policy", () => {
       "pnpm exec playwright install --with-deps chromium",
     );
     const buildIndex = parityCommands.indexOf("pnpm run build");
-    const parityIndex = parityCommands.indexOf("pnpm run verify:studio-3d-console");
+    const headedParityCommand =
+      'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
+    const parityIndex = parityCommands.indexOf(headedParityCommand);
     expect(installIndex).toBeGreaterThanOrEqual(0);
     expect(browserInstallIndex).toBeGreaterThan(installIndex);
     expect(buildIndex).toBeGreaterThan(browserInstallIndex);
     expect(parityIndex).toBeGreaterThan(buildIndex);
     expect(
-      parityCommands.filter((command) => command === "pnpm run verify:studio-3d-console"),
+      parityCommands.filter((command) => command === headedParityCommand),
     ).toHaveLength(1);
+    expect(parityCommands).not.toContain("pnpm run verify:studio-3d-console");
 
     const parityStep = paritySteps.find(
-      (step) => step.run === "pnpm run verify:studio-3d-console",
+      (step) => step.run === headedParityCommand,
     );
     expect(parityStep?.if).toBeUndefined();
     expect(parityStep?.["continue-on-error"]).not.toBe(true);

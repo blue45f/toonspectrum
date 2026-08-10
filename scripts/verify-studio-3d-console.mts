@@ -2827,12 +2827,17 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
   // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
   const webGpuBrowser = await chromium.launch({
     channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
-    headless: true,
+    // GitHub's GPU-less Linux runners repeatedly lose Dawn's SwiftShader device on the first
+    // Babylon readback in Chromium's new-headless path. Keep the exact browser build, adapter
+    // flags, proof shards, and assertions while exercising the regular headed compositor under
+    // the workflow-owned Xvfb display.
+    headless: false,
     args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
   });
   console.log(
     `[verify-studio-3d-console] WebGPU browser ` +
-      `channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} version=${webGpuBrowser.version()}`,
+      `mode=headed channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} ` +
+      `version=${webGpuBrowser.version()}`,
   );
   let webGpuContext: BrowserContext | null = null;
   await runStudio3dWebGpuShardWithCleanup(

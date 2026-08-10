@@ -214,7 +214,7 @@ describe("3D character production-preview color boundary", () => {
 });
 
 describe("3D WebGPU conformance browser boundary", () => {
-  it("uses regular Chromium new headless for the high-fidelity WebGPU proof", () => {
+  it("uses regular headed Chromium for the high-fidelity WebGPU proof", () => {
     const webGpuAttempt = sourceBetween(
       "async function runStudio3dWebGpuConformanceBrowserAttempt(",
       "async function main(): Promise<void>",
@@ -224,8 +224,13 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(webGpuAttempt).toContain(
       "channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL",
     );
+    expect(webGpuAttempt).toContain("headless: false");
+    expect(webGpuAttempt).not.toContain("headless: true");
     expect(webGpuAttempt).toContain(
-      "channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} version=${webGpuBrowser.version()}",
+      "mode=headed channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL}",
+    );
+    expect(webGpuAttempt).toContain(
+      "version=${webGpuBrowser.version()}",
     );
   });
 
