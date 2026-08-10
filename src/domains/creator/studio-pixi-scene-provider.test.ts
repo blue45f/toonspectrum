@@ -14,8 +14,22 @@ interface FakeContainerOptions {
   readonly isRenderGroup?: boolean;
 }
 
+class FakePoint {
+  constructor(
+    public x: number,
+    public y: number,
+  ) {}
+
+  set(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+}
+
 class FakeContainer {
   readonly children: FakeContainer[] = [];
+  readonly position = new FakePoint(0, 0);
+  readonly scale = new FakePoint(1, 1);
   label = "";
   isRenderGroup = false;
   sortableChildren = false;
@@ -23,6 +37,7 @@ class FakeContainer {
   zIndex = 0;
   visible = true;
   alpha = 1;
+  rotation = 0;
   destroyed = false;
 
   constructor(options: FakeContainerOptions = {}) {
@@ -272,13 +287,34 @@ describe("Studio Pixi scene provider", () => {
       },
     });
 
-    provider.resize({ width: 900, height: 1_600, dpr: 2.5 });
+    provider.resize({
+      width: 900,
+      height: 1_600,
+      dpr: 2.5,
+      documentTransform: {
+        scaleX: -1.5,
+        scaleY: 1.5,
+        offsetX: 320,
+        offsetY: 48,
+        rotation: 90,
+      },
+    });
     expect(application.renderer.resize).toHaveBeenCalledWith(900, 1_600, 2.5);
     expect(provider.viewport).toEqual({
       width: 900,
       height: 1_600,
       dpr: 2.5,
+      documentTransform: {
+        scaleX: -1.5,
+        scaleY: 1.5,
+        offsetX: 320,
+        offsetY: 48,
+        rotation: 90,
+      },
     });
+    expect(root.position).toEqual(expect.objectContaining({ x: 320, y: 48 }));
+    expect(root.scale).toEqual(expect.objectContaining({ x: -1.5, y: 1.5 }));
+    expect(root.rotation).toBeCloseTo(Math.PI / 2);
     expect(provider.canvas.style.width).toBe("900px");
     expect(provider.canvas.style.height).toBe("1600px");
 

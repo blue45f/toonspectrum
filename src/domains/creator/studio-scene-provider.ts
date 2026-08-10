@@ -83,8 +83,8 @@ export interface StudioSceneHitResult extends StudioSceneOverlayIdentity {
  * Overlay shapes are authored in **document** units, while the surface is sized in **viewport CSS
  * px**. Without this transform the two spaces are silently assumed to be identical, which only
  * holds at 100% zoom with no flip and no rotation; at any other view state the overlay paints a
- * correctly shaped rectangle in the wrong place at the wrong size. The fields mirror the Konva
- * stage attributes one-for-one so the overlay and the stage cannot drift apart.
+ * correctly shaped rectangle in the wrong place at the wrong size. The fields mirror the host
+ * stage transform one-for-one so the overlay and the authoritative canvas cannot drift apart.
  */
 export interface StudioSceneDocumentTransform {
   readonly scaleX: number;

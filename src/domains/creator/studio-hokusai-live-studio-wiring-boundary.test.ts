@@ -30,7 +30,7 @@ describe("Studio Hokusai live UI authority wiring", () => {
     const imageReceipt = sourceSection(
       IMAGE_NODE_SOURCE,
       "const hokusaiPngHash = el.hokusaiLiveReceipt?.canonical.pngHash;",
-      "if (!displayImg) return null;",
+      "const livingInkPngHash = el.livingInkReceipt?.canonicalPngSha256;",
     );
     expect(imageReceipt.indexOf("layer.drawScene();")).toBeGreaterThan(0);
     expect(imageReceipt.indexOf("onHokusaiCanonicalImageReady(el.id, hokusaiPngHash);"))

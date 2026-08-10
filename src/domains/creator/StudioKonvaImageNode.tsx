@@ -449,7 +449,7 @@ export function StudioKonvaImageNode({
   const filterProxySessionRef = useRef<StudioImageFilterWorkerSession | null>(null);
   const proxySourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
   const proxyCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const filterRequestAtRef = useRef(0);
+  const filterRequestAtRef = useRef<number | null>(null);
   const workerSourcePixelsRef = useRef<WorkerSourcePixelsState | null>(null);
   const workerSourceRevisionRef = useRef(0);
   const workerResultCacheRef = useRef<WorkerResultCacheState | null>(null);
@@ -941,10 +941,15 @@ export function StudioKonvaImageNode({
     let dispatchSettled = false;
     // Drag detection: how long since the previous parameter change reached this effect.
     const requestAt = studioImageFilterClockMs();
-    const sincePreviousRequest = requestAt - filterRequestAtRef.current;
+    const previousRequestAt = filterRequestAtRef.current;
+    const sincePreviousRequest = previousRequestAt === null
+      ? Number.POSITIVE_INFINITY
+      : requestAt - previousRequestAt;
     filterRequestAtRef.current = requestAt;
     const draggingParameters =
-      proxyPreviewEligible && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
+      proxyPreviewEligible
+      && previousRequestAt !== null
+      && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
     setWorkerRequiredFailureKey((current) => current === requestKey ? current : undefined);
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
     // A regular image can retain several recent filter results. If the same source becomes a

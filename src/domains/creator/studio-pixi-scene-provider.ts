@@ -150,9 +150,8 @@ function compareOverlayEntries(
 }
 
 /**
- * Selection chrome must keep a constant on-screen thickness, exactly like Konva's
- * `strokeScaleEnabled: false`. The root carries the document scale, so the authored stroke width
- * is divided by it before drawing.
+ * Selection chrome must keep a constant on-screen thickness while the document root is scaled,
+ * so the authored stroke width is divided by that scale before drawing.
  */
 function chromeStrokeScale(transform: StudioSceneDocumentTransform): number {
   const magnitude = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
