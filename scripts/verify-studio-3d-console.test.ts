@@ -21,6 +21,7 @@ import {
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
   runStudio3dWebGpuShardWithCleanup,
+  STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
   STUDIO_3D_WEBGPU_PROOF_SHARDS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
@@ -186,6 +187,21 @@ describe("3D character production-preview color boundary", () => {
 });
 
 describe("3D WebGPU conformance browser boundary", () => {
+  it("uses regular Chromium new headless for the high-fidelity WebGPU proof", () => {
+    const webGpuAttempt = sourceBetween(
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+      "async function main(): Promise<void>",
+    );
+
+    expect(STUDIO_3D_WEBGPU_BROWSER_CHANNEL).toBe("chromium");
+    expect(webGpuAttempt).toContain(
+      "channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL",
+    );
+    expect(webGpuAttempt).toContain(
+      "channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} version=${webGpuBrowser.version()}",
+    );
+  });
+
   it("pins both Dawn WebGPU and ANGLE WebGL to SwiftShader", () => {
     expect(Object.isFrozen(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS)).toBe(true);
     expect(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS).toEqual([

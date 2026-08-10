@@ -81,6 +81,7 @@ export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
 export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 3;
+export const STUDIO_3D_WEBGPU_BROWSER_CHANNEL = "chromium" as const;
 export const STUDIO_3D_WEBGPU_PROOF_SHARDS = Object.freeze([
   "babylon-artifact-parity",
   "magic-layer-alignment",
@@ -2808,9 +2809,14 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
   // Keep the conformance browser process exclusive. Chromium/Dawn SwiftShader has a materially
   // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
   const webGpuBrowser = await chromium.launch({
+    channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
     headless: true,
     args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
   });
+  console.log(
+    `[verify-studio-3d-console] WebGPU browser ` +
+      `channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL} version=${webGpuBrowser.version()}`,
+  );
   let webGpuContext: BrowserContext | null = null;
   await runStudio3dWebGpuShardWithCleanup(
     async () => {
